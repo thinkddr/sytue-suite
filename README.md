@@ -7,6 +7,40 @@
 
 Reúne identidad (SSO/OIDC/MFA/Passkeys/SCIM), correo, almacenamiento en la nube, ofimática colaborativa (documentos, hojas de cálculo, presentaciones, bases de datos y edición/firma de PDF), galería de fotos, notas, calendario, contactos, mensajería y videollamadas en tiempo real, streaming de vídeo, creador de sitios web, ERP y plataforma PaaS bajo **una sola identidad, una sola estética y una sola experiencia**.
 
+![Sytue One — portal de la suite](docs/capturas/web-one.webp)
+
+---
+
+## Capturas de pantalla
+
+> Todas las capturas usan una organización de demostración con datos ficticios (dominios reservados `.test`/`.example`).
+
+### Aplicaciones web
+
+| Sytue Mail | Sytue Drive |
+| --- | --- |
+| ![Sytue Mail](docs/capturas/web-mail.webp) | ![Sytue Drive](docs/capturas/web-drive.webp) |
+| **SyDocus — documentos** | **SyCalcus — hojas de cálculo** |
+| ![SyDocus](docs/capturas/web-docs.webp) | ![SyCalcus](docs/capturas/web-sheets.webp) |
+| **SyDiapos — presentaciones** | **SyCertiPDF — edición y firma de PDF** |
+| ![SyDiapos](docs/capturas/web-slides.webp) | ![SyCertiPDF](docs/capturas/web-pdf.webp) |
+| **Sytue Calendar** | **Sytue Contacts** |
+| ![Sytue Calendar](docs/capturas/web-calendar.webp) | ![Sytue Contacts](docs/capturas/web-contacts.webp) |
+| **Sytue Photos** | **Sytue ID — cuenta y seguridad** |
+| ![Sytue Photos](docs/capturas/web-photos.webp) | ![Sytue ID](docs/capturas/web-id.webp) |
+| **Sytue Web — creador de sitios** | **Sytue Hub — app nativa** |
+| ![Sytue Web](docs/capturas/web-pages.webp) | ![Sytue Hub](docs/capturas/nativa-hub.png) |
+
+### Aplicaciones nativas (Fyne · macOS, Windows, Linux)
+
+| Sytue Rooms | SyERP |
+| --- | --- |
+| ![Sytue Rooms](docs/capturas/nativa-rooms.png) | ![SyERP](docs/capturas/nativa-erp.png) |
+| **Sytue Cast** | **Sytue Bases** |
+| ![Sytue Cast](docs/capturas/nativa-cast.png) | ![Sytue Bases](docs/capturas/nativa-bases.png) |
+| **Sytue Notepads** | **Móvil (iOS / Android): Mail y Rooms** |
+| ![Sytue Notepads](docs/capturas/nativa-notes.png) | <img src="docs/capturas/movil-mail.png" width="48%" alt="Sytue Mail móvil"> <img src="docs/capturas/movil-rooms.png" width="48%" alt="Sytue Rooms móvil"> |
+
 ---
 
 ## Despliegue guiado en 1 comando (`./sytue-deploy`)

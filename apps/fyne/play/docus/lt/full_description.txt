@@ -1,0 +1,16 @@
+Bendras redagavimas realiuoju laiku
+
+• Viskas išsaugoma jūsų europietiškame Drive.
+• Bendras redagavimas realiuoju laiku, matant buvimą ir netrukdant vieni kitiems.
+• Juostelė su skirtukais: Pagrindinis, Įterpimas, Nuorodos, Laiškai ir Peržiūra.
+• Lentelės, vaizdai, figūros, SmartArt, diagramos, simboliai ir vandens ženklai.
+• Nuorodos: turinys, išnašos, citatos ir bibliografija.
+• Laiškai: duomenų suliejimas laiškams ir etiketėms.
+• Komentarų gijos, keitimų peržiūra ir versijos.
+• Pasirenkamas DI asistentas perrašymui, vertimui ar santraukai, tik jei jūsų organizacija jį įjungia.
+• Eksportavimas į ODT, DOCX ir PDF; Word failų atidarymas iš Drive.
+• Antraštės, poraštės, puslapių numeravimas ir pakartotinai naudojami blokai.
+• Automatinis išsaugojimas jūsų europietiškame Drive su istorija.
+• Atsisiuntimas iš pradžios puslapio PDF, HTML, Markdown, OpenDocument arba Microsoft Office formatu.
+
+Šifruojama perduodant (TLS 1.3). „Sytue“ infrastruktūra yra ES. Išorinių paslaugų vieta priklauso nuo jų teikėjo.

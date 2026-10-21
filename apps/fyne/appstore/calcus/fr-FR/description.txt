@@ -1,0 +1,18 @@
+Des chiffres qui se comprennent, dans une feuille qui travaille avec vous.
+
+• Formules, mise en forme conditionnelle et validation des données.
+• Importez des données externes et interrogez-les sans quitter la feuille.
+• Graphiques, graphiques sparkline, segments et tableaux de données.
+• Export en ODS et XLSX ; ouverture des fichiers Excel.
+• Formules avec aide contextuelle et recalcul instantané.
+• Mise en forme conditionnelle, validation des données et formats numériques régionaux.
+• Graphiques de plusieurs types, sparklines et segments.
+• Tableaux de données avec totaux et tri ; tableau croisé dynamique.
+• Données externes : connectez une source et interrogez-la depuis la feuille.
+• Solveur pour trouver la valeur qui atteint un objectif.
+• Macros pour automatiser les tâches répétitives.
+• Collaboration en temps réel avec présence et commentaires.
+• Filtres, segments et recherche dans la feuille.
+• Export en ODS, XLSX et PDF ; ouverture des fichiers Excel depuis Drive.
+
+Chiffrement en transit (TLS 1.3). L’infrastructure de Sytue se trouve dans l’UE. La localisation des services externes dépend de leur fournisseur.

@@ -1,0 +1,19 @@
+Privāts Eiropas pasts ar JMAP — bez izsekotājiem un reklāmām.
+
+• Ātra iesūtne ar pavedieniem, iezīmēm, filtriem un meklēšanu.
+• Failu pievienošana tieši no Sytue Drive.
+• E-pasta ziņojuma pārvēršana par Calendar notikumu.
+• Šifrēts pārsūtīšanas laikā (TLS 1.3). Sytue infrastruktūra atrodas ES. Ārējo pakalpojumu atrašanās vieta ir atkarīga no to sniedzēja.
+• Sarunu pavedieni ar lasīšanu, atbildēšanu un pārsūtīšanu ar vienu klikšķi.
+• Mapes, krāsainas iezīmes un meklēšana ar operatoriem (from:, has:attachment, is:unread…).
+• Automātiski noteikumi, kas ienākošos ziņojumus arhivē, iezīmē vai pārvieto.
+• Ieplānota sūtīšana un “Atsaukt sūtīšanu”.
+• Paraksti, adrešu aizstājvārdi un automātiska prombūtnes atbilde.
+• Kopīgotas un deleģētas pastkastes ar lasīšanas un sūtīšanas atļaujām.
+• Formatēta teksta redaktors ar pielikumiem no Sytue Drive bez failu dublēšanas.
+• Attālais saturs pēc noklusējuma bloķēts: neviens neuzzina, kad atverat e-pasta ziņojumu.
+• Parakstīts pasts (PGP un S/MIME) tiek atpazīts un atzīmēts; TLS pārsūtīšanas laikā.
+• Piekļuve arī no Thunderbird, Outlook, Apple Mail vai tālruņa ar lietotņu parolēm.
+• Adresāti kā žetoni, Contacts adrešu grāmata viena klikšķa attālumā un brīdinājums, ja uzrakstāt “pielikumā”, bet neko nepievienojat.
+
+Šifrēts pārsūtīšanas laikā (TLS 1.3). Sytue infrastruktūra atrodas ES. Ārējo pakalpojumu atrašanās vieta ir atkarīga no to sniedzēja.

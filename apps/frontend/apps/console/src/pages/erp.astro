@@ -1,0 +1,64 @@
+---
+/*
+ * Permisos de Sytue ERP — quién ve y quién toca cada módulo.
+ *
+ * Las personas salen del directorio de la organización (Sytue ID) y sus niveles,
+ * del ERP: así se le puede dar acceso a quien todavía no ha abierto la app.
+ * Owner y admin administran todo el ERP y no se tocan desde aquí.
+ */
+import ConsoleLayout from '../layouts/ConsoleLayout.astro';
+import { useT } from '../i18n/index.js';
+import ErpPermisosPanel from '../components/ErpPermisosPanel';
+import { requireSession } from '@sytue/auth/server';
+import { canonicaConOrg } from '@sytue/config';
+import { getBff, toBffContext } from '../server/bff.js';
+import { loadErpPermisos } from '../lib/erp.js';
+import { loadUsers } from '../lib/admin.js';
+
+export const prerender = false;
+
+const guard = await requireSession(getBff(), toBffContext(Astro), {
+  roles: ['admin', 'owner'],
+});
+if (guard instanceof Response) return guard;
+// Ruta en `sinOrg` (su nombre colisiona con el namespace de organizaciones):
+// con sesión, un salto local a la canónica con la org activa (ADR 0056).
+const canonica = canonicaConOrg(Astro.url, getBff().basePath, guard.session.user.tenant);
+if (canonica) return Astro.redirect(canonica);
+
+const locale = Astro.locals.locale;
+const t = useT(locale);
+
+// ponytail: la primera página del directorio (200, el máximo de Sytue ID); paginar cuando una
+// organización pase de ahí.
+const [permisos, usuarios] = await Promise.all([
+  loadErpPermisos(guard.session, locale),
+  loadUsers(guard.session, undefined, { limit: 200 }),
+]);
+
+// Directorio + quien tiene nivel en el ERP aunque ya no esté en el directorio.
+// Sin Sytue ID vivo, `loadUsers` devuelve el directorio de demostración: aquí no vale.
+const directorio = usuarios.live ? usuarios.data.items : [];
+const personas = new Map(
+  directorio.map((u) => [
+    u.id,
+    { sub: u.id, email: u.email, nombre: u.fullName, roles: u.roles as string[], modulos: {} },
+  ]),
+);
+for (const p of permisos.data.personas) {
+  personas.set(p.sub, { ...p, roles: personas.get(p.sub)?.roles ?? p.roles });
+}
+---
+
+<ConsoleLayout title={t('nav.erp')} section="erp">
+  <ErpPermisosPanel
+    client:load
+    locale={locale}
+    niveles={permisos.data.niveles}
+    modulos={permisos.data.modulos}
+    personas={[...personas.values()].sort((a, b) =>
+      (a.nombre || a.email).localeCompare(b.nombre || b.email),
+    )}
+    problema={permisos.ok ? undefined : permisos.status}
+  />
+</ConsoleLayout>

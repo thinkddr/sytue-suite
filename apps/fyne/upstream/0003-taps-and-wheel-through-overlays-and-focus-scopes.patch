@@ -1,0 +1,408 @@
+From faf352b9c605e0190592293f1e4329b1ad8149a7 Mon Sep 17 00:00:00 2001
+From: Daniel Delgado Ramos <328510259+thinkddr@users.noreply.github.com>
+Date: Wed, 23 Sep 2026 22:11:06 +0200
+Subject: [PATCH] feat: taps and the wheel through non modal overlays, and
+ focus scopes
+
+- An overlay that implements TapThrough() lets the click (glfw, on mouse down) or the
+  tap (mobile) that dismisses it reach what it was covering: a menu, not a modal dialog.
+- An overlay that implements ScrollThrough() lets the mouse wheel scroll what it covers,
+  and is refreshed afterwards so it can follow what moved underneath.
+- An object that implements FocusScope() restricts keyboard focus traversal to the
+  subtree it returns: a navigation drawer that is not an overlay.
+---
+ internal/app/focus_manager.go                 |   2 +-
+ internal/app/focus_scope_test.go              |  49 +++++++++
+ internal/driver/glfw/window.go                |  24 ++++-
+ internal/driver/glfw/window_through_test.go   | 100 ++++++++++++++++++
+ internal/driver/mobile/canvas.go              |  13 +++
+ internal/driver/mobile/canvas_through_test.go |  66 ++++++++++++
+ internal/driver/overlay_through.go            |  51 +++++++++
+ 7 files changed, 302 insertions(+), 3 deletions(-)
+ create mode 100644 internal/app/focus_scope_test.go
+ create mode 100644 internal/driver/glfw/window_through_test.go
+ create mode 100644 internal/driver/mobile/canvas_through_test.go
+ create mode 100644 internal/driver/overlay_through.go
+
+diff --git a/internal/app/focus_manager.go b/internal/app/focus_manager.go
+index 63fbb3ee3..ad72c3bef 100644
+--- a/internal/app/focus_manager.go
++++ b/internal/app/focus_manager.go
+@@ -110,7 +110,7 @@ func (f *FocusManager) nextInChain(current fyne.Focusable) fyne.Focusable {
+ func (f *FocusManager) nextWithWalker(current fyne.Focusable, walker walkerFunc) fyne.Focusable {
+ 	var next fyne.Focusable
+ 	found := current == nil // if we have no starting point then pretend we matched already
+-	walker(f.content, func(obj fyne.CanvasObject, _ fyne.Position, _ fyne.Position, _ fyne.Size) bool {
++	walker(driver.FocusScopeOf(f.content), func(obj fyne.CanvasObject, _ fyne.Position, _ fyne.Position, _ fyne.Size) bool {
+ 		if w, ok := obj.(fyne.Disableable); ok && w.Disabled() {
+ 			// disabled widget cannot receive focus
+ 			return false
+diff --git a/internal/app/focus_scope_test.go b/internal/app/focus_scope_test.go
+new file mode 100644
+index 000000000..15e4d610b
+--- /dev/null
++++ b/internal/app/focus_scope_test.go
+@@ -0,0 +1,49 @@
++package app_test
++
++import (
++	"testing"
++
++	"fyne.io/fyne/v2"
++	"fyne.io/fyne/v2/container"
++	"fyne.io/fyne/v2/internal/app"
++	"fyne.io/fyne/v2/widget"
++
++	"github.com/stretchr/testify/assert"
++)
++
++// scopedStack keeps focus traversal inside `scope` while it is set.
++type scopedStack struct {
++	widget.BaseWidget
++	content, scope fyne.CanvasObject
++}
++
++func (s *scopedStack) CreateRenderer() fyne.WidgetRenderer {
++	return widget.NewSimpleRenderer(s.content)
++}
++
++func (s *scopedStack) FocusScope() fyne.CanvasObject { return s.scope }
++
++func TestFocusManager_FocusScope(t *testing.T) {
++	outside, inside1, inside2 := &focusable{}, &focusable{}, &focusable{}
++	drawer := container.NewVBox(inside1, inside2)
++	root := &scopedStack{content: container.NewVBox(outside, drawer)}
++	root.ExtendBaseWidget(root)
++	m := app.NewFocusManager(root)
++
++	m.FocusNext()
++	assert.Equal(t, outside, m.Focused(), "without a scope, traversal walks the whole content")
++
++	root.scope = drawer
++	m.FocusNext()
++	assert.Equal(t, inside1, m.Focused(), "with a scope, Tab jumps into it")
++	m.FocusNext()
++	assert.Equal(t, inside2, m.Focused())
++	m.FocusNext()
++	assert.Equal(t, inside1, m.Focused(), "and wraps around inside it")
++	m.FocusPrevious()
++	assert.Equal(t, inside2, m.Focused(), "backwards too")
++
++	root.scope = nil
++	m.FocusNext()
++	assert.Equal(t, outside, m.Focused(), "a scope that is released gives the content back")
++}
+diff --git a/internal/driver/glfw/window.go b/internal/driver/glfw/window.go
+index 3585b713e..8b4c89307 100644
+--- a/internal/driver/glfw/window.go
++++ b/internal/driver/glfw/window.go
+@@ -463,6 +463,7 @@ func (w *window) mouseOut() {
+ 
+ func (w *window) processMouseClicked(button desktop.MouseButton, action action, modifiers fyne.KeyModifier) {
+ 	w.ensurePositionProcessed()
++	prevOverlay := w.canvas.Overlays().Top()
+ 
+ 	w.mouseDragPos = w.mousePos
+ 	mousePos := w.mousePos
+@@ -501,6 +502,15 @@ func (w *window) processMouseClicked(button desktop.MouseButton, action action,
+ 		w.mouseClickedHandleMouseable(mev, action, wid)
+ 	}
+ 
++	// If this press dismissed an overlay that lets its dismissing click through (a menu
++	// closes on mouse down and the click carries on to what it covered), the press
++	// belongs to whatever is under the pointer now: dispatch it again from the start.
++	if action == press && driver.PassesTapThrough(prevOverlay) &&
++		!slices.Contains(w.canvas.Overlays().List(), prevOverlay) {
++		w.processMouseClicked(button, action, modifiers)
++		return
++	}
++
+ 	focused := w.canvas.Focused()
+ 	if wid, ok := co.(fyne.Focusable); !ok || wid != focused {
+ 		ignore := false
+@@ -654,10 +664,20 @@ func (w *window) waitForDoubleTapEnded(co fyne.CanvasObject, ev *fyne.PointEvent
+ 
+ func (w *window) processMouseScrolled(xoff float64, yoff float64) {
+ 	mousePos := w.mousePos
+-	co, pos, _ := w.findObjectAtPositionMatching(w.canvas, mousePos, func(object fyne.CanvasObject) bool {
++	scrollable := func(object fyne.CanvasObject) bool {
+ 		_, ok := object.(fyne.Scrollable)
+ 		return ok
+-	})
++	}
++	co, pos, _ := w.findObjectAtPositionMatching(w.canvas, mousePos, scrollable)
++	top := w.canvas.Overlays().Top()
++	if co == nil && driver.PassesScrollThrough(top) {
++		// A non modal overlay (a menu) does not stop the wheel from scrolling what it
++		// covers; it is told afterwards so it can follow what moved underneath.
++		co, pos, _ = driver.FindObjectAtPositionMatching(mousePos, scrollable, nil, w.canvas.menu, w.canvas.Content())
++		if co != nil {
++			defer top.Refresh()
++		}
++	}
+ 	switch wid := co.(type) {
+ 	case fyne.Scrollable:
+ 		if math.Abs(xoff) >= scrollAccelerateCutoff {
+diff --git a/internal/driver/glfw/window_through_test.go b/internal/driver/glfw/window_through_test.go
+new file mode 100644
+index 000000000..49cf3dcbd
+--- /dev/null
++++ b/internal/driver/glfw/window_through_test.go
+@@ -0,0 +1,100 @@
++//go:build !no_glfw && !mobile
++
++package glfw
++
++import (
++	"image/color"
++	"testing"
++
++	"fyne.io/fyne/v2"
++	"fyne.io/fyne/v2/canvas"
++	"fyne.io/fyne/v2/driver/desktop"
++	"fyne.io/fyne/v2/widget"
++
++	"github.com/go-gl/glfw/v3.4/glfw"
++	"github.com/stretchr/testify/assert"
++)
++
++// dismissOnPress is an overlay that closes on mouse down, the way a menu does.
++type dismissOnPress struct {
++	widget.BaseWidget
++	c            fyne.Canvas
++	through      bool
++	refreshCount int
++}
++
++func newDismissOnPress(c fyne.Canvas, through bool) *dismissOnPress {
++	d := &dismissOnPress{c: c, through: through}
++	d.ExtendBaseWidget(d)
++	return d
++}
++
++func (d *dismissOnPress) CreateRenderer() fyne.WidgetRenderer {
++	return widget.NewSimpleRenderer(canvas.NewRectangle(color.Transparent))
++}
++func (d *dismissOnPress) MouseDown(*desktop.MouseEvent) { d.c.Overlays().Remove(d) }
++func (d *dismissOnPress) MouseUp(*desktop.MouseEvent)   {}
++func (d *dismissOnPress) Tapped(*fyne.PointEvent)       {}
++func (d *dismissOnPress) TapThrough() bool              { return d.through }
++func (d *dismissOnPress) ScrollThrough() bool           { return d.through }
++func (d *dismissOnPress) Refresh()                      { d.refreshCount++; d.BaseWidget.Refresh() }
++
++func TestWindow_Tapped_RedispatchAfterTapThroughOverlayDismiss(t *testing.T) {
++	for _, through := range []bool{true, false} {
++		w := createWindow("Test")
++		o := &tappableObject{Rectangle: canvas.NewRectangle(color.White)}
++		o.SetMinSize(fyne.NewSize(100, 100))
++		w.SetContent(o)
++		ensureCanvasSize(t, w, fyne.NewSize(108, 108))
++		over := newDismissOnPress(w.canvas, through)
++
++		runOnMain(func() {
++			w.canvas.Overlays().Add(over)
++			over.Resize(w.canvas.Size())
++			w.mousePos = fyne.NewPos(50, 50)
++			w.mouseClicked(w.viewport, glfw.MouseButton1, glfw.Press, 0)
++			w.mouseClicked(w.viewport, glfw.MouseButton1, glfw.Release, 0)
++
++			assert.Nil(t, w.canvas.Overlays().Top(), "the press dismissed the overlay")
++			if through {
++				assert.NotNil(t, o.popTapEvent(), "the click that dismissed a menu reaches what it covered")
++			} else {
++				assert.Nil(t, o.popTapEvent(), "an overlay that does not let it through keeps its click")
++			}
++		})
++		w.Close()
++	}
++}
++
++type scrollRecorder struct {
++	*canvas.Rectangle
++	scrolled int
++}
++
++func (s *scrollRecorder) Scrolled(*fyne.ScrollEvent) { s.scrolled++ }
++
++func TestWindow_Scrolled_ThroughNonModalOverlay(t *testing.T) {
++	for _, through := range []bool{true, false} {
++		w := createWindow("Test")
++		s := &scrollRecorder{Rectangle: canvas.NewRectangle(color.White)}
++		s.SetMinSize(fyne.NewSize(100, 100))
++		w.SetContent(s)
++		ensureCanvasSize(t, w, fyne.NewSize(108, 108))
++		over := newDismissOnPress(w.canvas, through)
++
++		runOnMain(func() {
++			w.canvas.Overlays().Add(over)
++			over.Resize(w.canvas.Size())
++			before := over.refreshCount
++			w.mousePos = fyne.NewPos(50, 50)
++			w.processMouseScrolled(0, -1)
++			if through {
++				assert.Equal(t, 1, s.scrolled, "the wheel scrolls what a non modal overlay covers")
++				assert.Greater(t, over.refreshCount, before, "and the overlay is refreshed to follow it")
++			} else {
++				assert.Equal(t, 0, s.scrolled, "a modal overlay keeps the wheel")
++			}
++		})
++		w.Close()
++	}
++}
+diff --git a/internal/driver/mobile/canvas.go b/internal/driver/mobile/canvas.go
+index 1f7880fed..c74d2d9a2 100644
+--- a/internal/driver/mobile/canvas.go
++++ b/internal/driver/mobile/canvas.go
+@@ -412,7 +412,20 @@ func (c *canvas) tapUp(pos fyne.Position, tapID int,
+ 			go c.waitForDoubleTap(co, ev, tapCallback, doubleTapCallback)
+ 		} else {
+ 			if wid, ok := co.(fyne.Tappable); ok {
++				prevOverlay := c.Overlays().Top()
+ 				tapCallback(wid, ev)
++
++				// if the tap dismissed an overlay that lets it through (a menu, not a
++				// modal dialog), forward it to the widget underneath
++				if intdriver.PassesTapThrough(prevOverlay) && !slices.Contains(c.Overlays().List(), prevOverlay) {
++					co2, objPos2, _ := c.findObjectAtPositionMatching(pos, func(object fyne.CanvasObject) bool {
++						_, ok := object.(fyne.Tappable)
++						return ok
++					})
++					if tap2, ok := co2.(fyne.Tappable); ok {
++						tapCallback(tap2, &fyne.PointEvent{Position: objPos2, AbsolutePosition: pos})
++					}
++				}
+ 			}
+ 		}
+ 	} else {
+diff --git a/internal/driver/mobile/canvas_through_test.go b/internal/driver/mobile/canvas_through_test.go
+new file mode 100644
+index 000000000..ebf07cc8d
+--- /dev/null
++++ b/internal/driver/mobile/canvas_through_test.go
+@@ -0,0 +1,66 @@
++//go:build !windows || !ci
++
++package mobile
++
++import (
++	"image/color"
++	"testing"
++
++	"fyne.io/fyne/v2"
++	fynecanvas "fyne.io/fyne/v2/canvas"
++	"fyne.io/fyne/v2/widget"
++
++	"github.com/stretchr/testify/assert"
++)
++
++// dismissOnTap is an overlay that closes when tapped, and may let that tap through.
++type dismissOnTap struct {
++	widget.BaseWidget
++	c       fyne.Canvas
++	through bool
++}
++
++func (d *dismissOnTap) CreateRenderer() fyne.WidgetRenderer {
++	return widget.NewSimpleRenderer(fynecanvas.NewRectangle(color.Transparent))
++}
++func (d *dismissOnTap) Tapped(*fyne.PointEvent) { d.c.Overlays().Remove(d) }
++func (d *dismissOnTap) TapThrough() bool        { return d.through }
++
++type tapCounter struct {
++	widget.BaseWidget
++	taps int
++}
++
++func (t *tapCounter) CreateRenderer() fyne.WidgetRenderer {
++	return widget.NewSimpleRenderer(fynecanvas.NewRectangle(color.White))
++}
++func (t *tapCounter) Tapped(*fyne.PointEvent) { t.taps++ }
++
++func Test_canvas_TapThroughDismissedOverlay(t *testing.T) {
++	for _, through := range []bool{true, false} {
++		content := &tapCounter{}
++		content.ExtendBaseWidget(content)
++		c := newCanvas(fyne.CurrentDevice()).(*canvas)
++		c.SetContent(content)
++		c.Resize(fyne.NewSize(100, 100))
++		over := &dismissOnTap{c: c, through: through}
++		over.ExtendBaseWidget(over)
++		c.Overlays().Add(over)
++		over.Resize(c.Size())
++
++		pos := fyne.NewPos(50, 50)
++		c.tapDown(pos, 0)
++		c.tapUp(pos, 0, func(wid fyne.Tappable, ev *fyne.PointEvent) {
++			wid.Tapped(ev)
++		}, func(wid fyne.SecondaryTappable, ev *fyne.PointEvent) {
++		}, func(wid fyne.DoubleTappable, ev *fyne.PointEvent) {
++		}, func(wid fyne.Draggable, ev *fyne.DragEvent) {
++		})
++		assert.Nil(t, c.Overlays().Top(), "the tap dismissed the overlay")
++		if through {
++			assert.Equal(t, 1, content.taps, "a tap that dismisses a menu reaches what it covered")
++		} else {
++			assert.Equal(t, 0, content.taps, "a modal overlay keeps the tap that dismisses it")
++		}
++	}
++}
+diff --git a/internal/driver/overlay_through.go b/internal/driver/overlay_through.go
+new file mode 100644
+index 000000000..cf6a2c59d
+--- /dev/null
++++ b/internal/driver/overlay_through.go
+@@ -0,0 +1,51 @@
++package driver
++
++import "fyne.io/fyne/v2"
++
++// tapThrough is implemented by an overlay that, when a tap or a click dismisses it,
++// lets that same tap reach what it was covering: a menu that closes on mouse down,
++// not a modal dialog.
++type tapThrough interface {
++	TapThrough() bool
++}
++
++// scrollThrough is implemented by a non modal overlay that lets the mouse wheel
++// scroll what it covers. It is refreshed afterwards, so it can follow what moved.
++type scrollThrough interface {
++	ScrollThrough() bool
++}
++
++// focusScope is implemented by an object that, while it returns a subtree, keeps
++// keyboard focus traversal inside that subtree: a navigation drawer that traps Tab like
++// a modal would, while the rest of the window stays visible and usable with the pointer.
++type focusScope interface {
++	FocusScope() fyne.CanvasObject
++}
++
++// PassesTapThrough reports whether a dismissed overlay lets its dismissing tap through.
++func PassesTapThrough(o fyne.CanvasObject) bool {
++	t, ok := o.(tapThrough)
++	return ok && t.TapThrough()
++}
++
++// PassesScrollThrough reports whether an overlay lets the mouse wheel through.
++func PassesScrollThrough(o fyne.CanvasObject) bool {
++	s, ok := o.(scrollThrough)
++	return ok && s.ScrollThrough()
++}
++
++// FocusScopeOf returns the subtree keyboard focus traversal is restricted to: the first
++// visible object in `root` that declares a scope, or `root` itself.
++func FocusScopeOf(root fyne.CanvasObject) fyne.CanvasObject {
++	scope := root
++	WalkVisibleObjectTree(root, func(o fyne.CanvasObject, _, _ fyne.Position, _ fyne.Size) bool {
++		if s, ok := o.(focusScope); ok {
++			if sub := s.FocusScope(); sub != nil {
++				scope = sub
++				return true
++			}
++		}
++		return false
++	}, nil)
++	return scope
++}
+-- 
+2.54.0 (Apple Git-157)
+

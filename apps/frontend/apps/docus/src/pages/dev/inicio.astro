@@ -1,0 +1,10 @@
+---
+/** Banco compartido de los inicios de Office: en producción, 404. */
+import Banco from '@sytue/office/vistas/dev/Inicio.astro';
+
+export const prerender = false;
+
+if (!import.meta.env.DEV) return new Response(null, { status: 404 });
+---
+
+<Banco />

@@ -1,0 +1,77 @@
+[
+  {
+    "clave": "vehiculo", "modulo": "flota", "titulo": "matricula",
+    "etiqueta": {"en":"Vehicles","es":"Vehículos","fr":"Véhicules","de":"Fahrzeuge","it":"Veicoli","bg":"Превозни средства","cs":"Vozidla","da":"Køretøjer","el":"Οχήματα","et":"Sõidukid","fi":"Ajoneuvot","ga":"Feithiclí","hr":"Vozila","hu":"Járművek","is":"Ökutæki","lt":"Transporto priemonės","lv":"Transportlīdzekļi","mt":"Vetturi","nb":"Kjøretøy","nl":"Voertuigen","pl":"Pojazdy","pt":"Veículos","ro":"Vehicule","sk":"Vozidlá","sl":"Vozila","sv":"Fordon"},
+    "estados": ["disponible","reservado","averiado","pausada"],
+    "campos": [
+      {"clave":"matricula","tipo":"texto","requerido":true},
+      {"clave":"marca","tipo":"texto"},
+      {"clave":"empleado","tipo":"relacion","modelo":"empleado"},
+      {"clave":"kilometros","tipo":"entero"},
+      {"clave":"fecha_inicio","tipo":"fecha"},
+      {"clave":"coste","tipo":"dinero"},
+      {"clave":"notas","tipo":"texto_largo"}
+    ],
+    "lista": ["matricula","marca","empleado","kilometros","estado"]
+  },
+  {
+    "clave": "equipo", "modulo": "mantenimiento", "titulo": "nombre",
+    "etiqueta": {"en":"Equipment","es":"Equipos","fr":"Équipements","de":"Anlagen","it":"Attrezzature","bg":"Оборудване","cs":"Zařízení","da":"Udstyr","el":"Εξοπλισμός","et":"Seadmed","fi":"Laitteet","ga":"Trealamh","hr":"Oprema","hu":"Eszközök","is":"Búnaður","lt":"Įranga","lv":"Aprīkojums","mt":"Tagħmir","nb":"Utstyr","nl":"Apparatuur","pl":"Sprzęt","pt":"Equipamentos","ro":"Echipamente","sk":"Zariadenia","sl":"Oprema","sv":"Utrustning"},
+    "estados": ["disponible","averiado","pausada"],
+    "campos": [
+      {"clave":"nombre","tipo":"texto","requerido":true},
+      {"clave":"codigo","tipo":"texto"},
+      {"clave":"almacen","tipo":"relacion","modelo":"almacen"},
+      {"clave":"empleado","tipo":"relacion","modelo":"empleado"},
+      {"clave":"fecha_inicio","tipo":"fecha"},
+      {"clave":"coste","tipo":"dinero"}
+    ],
+    "lista": ["codigo","nombre","almacen","empleado","estado"]
+  },
+  {
+    "clave": "orden_mantenimiento", "modulo": "mantenimiento", "secuencia": "OM",
+    "etiqueta": {"en":"Maintenance requests","es":"Órdenes de mantenimiento","fr":"Demandes de maintenance","de":"Wartungsaufträge","it":"Richieste di manutenzione","bg":"Заявки за поддръжка","cs":"Požadavky na údržbu","da":"Vedligeholdelsesanmodninger","el":"Αιτήματα συντήρησης","et":"Hooldustaotlused","fi":"Kunnossapitopyynnöt","ga":"Iarratais chothabhála","hr":"Zahtjevi za održavanje","hu":"Karbantartási kérések","is":"Viðhaldsbeiðnir","lt":"Priežiūros užklausos","lv":"Uzturēšanas pieprasījumi","mt":"Talbiet għal manutenzjoni","nb":"Vedlikeholdsforespørsler","nl":"Onderhoudsverzoeken","pl":"Zgłoszenia serwisowe","pt":"Pedidos de manutenção","ro":"Cereri de mentenanță","sk":"Požiadavky na údržbu","sl":"Zahteve za vzdrževanje","sv":"Underhållsärenden"},
+    "estados": ["nuevo","en_curso","hecho","cancelado"],
+    "campos": [
+      {"clave":"equipo","tipo":"relacion","modelo":"equipo","requerido":true},
+      {"clave":"tipo","tipo":"seleccion","opciones":["correctivo","preventivo"],"requerido":true},
+      {"clave":"prioridad","tipo":"seleccion","opciones":["baja","media","alta","urgente"]},
+      {"clave":"tecnico","tipo":"texto"},
+      {"clave":"fecha","tipo":"fecha","requerido":true},
+      {"clave":"duracion","tipo":"decimal"},
+      {"clave":"descripcion","tipo":"texto_largo"}
+    ],
+    "lista": ["ref","equipo","tipo","prioridad","fecha","estado"]
+  },
+  {
+    "clave": "ticket", "modulo": "ayuda", "secuencia": "TCK",
+    "etiqueta": {"en":"Tickets","es":"Tickets","fr":"Tickets","de":"Tickets","it":"Ticket","bg":"Заявки","cs":"Tikety","da":"Sager","el":"Αιτήματα υποστήριξης","et":"Pöördumised","fi":"Tukipyynnöt","ga":"Ticéid","hr":"Prijave","hu":"Hibajegyek","is":"Beiðnir","lt":"Užklausos","lv":"Pieteikumi","mt":"Biljetti","nb":"Saker","nl":"Tickets","pl":"Zgłoszenia","pt":"Tickets","ro":"Tichete","sk":"Tikety","sl":"Zahtevki","sv":"Ärenden"},
+    "estados": ["nuevo","en_curso","pendiente","hecho","cancelado"],
+    "campos": [
+      {"clave":"asunto","tipo":"texto","requerido":true},
+      {"clave":"cliente","tipo":"relacion","modelo":"contacto","requerido":true},
+      {"clave":"canal","tipo":"seleccion","opciones":["correo_valor","telefono_valor","web_valor","presencial"]},
+      {"clave":"prioridad","tipo":"seleccion","opciones":["baja","media","alta","urgente"]},
+      {"clave":"responsable","tipo":"texto"},
+      {"clave":"fecha","tipo":"fechahora","requerido":true},
+      {"clave":"vencimiento","tipo":"fechahora"},
+      {"clave":"descripcion","tipo":"texto_largo"},
+      {"clave":"resolucion","tipo":"texto_largo"}
+    ],
+    "lista": ["ref","asunto","cliente","prioridad","vencimiento","estado"]
+  },
+  {
+    "clave": "contrato_alquiler", "modulo": "alquiler", "secuencia": "ALQ",
+    "etiqueta": {"en":"Rental agreements","es":"Contratos de alquiler","fr":"Contrats de location","de":"Mietverträge","it":"Contratti di noleggio","bg":"Договори за наем","cs":"Nájemní smlouvy","da":"Lejeaftaler","el":"Συμβάσεις ενοικίασης","et":"Rendilepingud","fi":"Vuokrasopimukset","ga":"Comhaontuithe cíosa","hr":"Ugovori o najmu","hu":"Bérleti szerződések","is":"Leigusamningar","lt":"Nuomos sutartys","lv":"Nomas līgumi","mt":"Ftehimiet ta' kiri","nb":"Leieavtaler","nl":"Huurovereenkomsten","pl":"Umowy najmu","pt":"Contratos de aluguer","ro":"Contracte de închiriere","sk":"Nájomné zmluvy","sl":"Najemne pogodbe","sv":"Hyresavtal"},
+    "estados": ["borrador","confirmado","entregado","hecho","cancelado"],
+    "campos": [
+      {"clave":"cliente","tipo":"relacion","modelo":"contacto","requerido":true},
+      {"clave":"producto","tipo":"relacion","modelo":"producto","requerido":true},
+      {"clave":"fecha_inicio","tipo":"fecha","requerido":true},
+      {"clave":"fecha_fin","tipo":"fecha","requerido":true},
+      {"clave":"importe","tipo":"dinero","requerido":true},
+      {"clave":"fianza","tipo":"dinero"}
+    ],
+    "lista": ["ref","cliente","producto","fecha_inicio","fecha_fin","estado"]
+  }
+]

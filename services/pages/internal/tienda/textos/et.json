@@ -1,0 +1,10 @@
+{
+  "order_paid_buyer_subject": "Tellimuse kinnitus {number}",
+  "order_paid_buyer_body": "Täname ostu eest. Tellimus {number} on kinnitatud.",
+  "order_paid_store_subject": "Saabus uus tellimus: {number}",
+  "order_paid_store_body": "Olete saanud uue tellimuse {number} summas {total}.",
+  "withdrawal_ack_subject": "Taganemise kinnitus käes: {number}",
+  "withdrawal_ack_body": "Teie tellimuse {number} taganemistaotlus on registreeritud.",
+  "form_received_subject": "Vormi esitus saabunud: {form_id}",
+  "form_received_body": "Vormile {form_id} on laekunud uus vastus."
+}

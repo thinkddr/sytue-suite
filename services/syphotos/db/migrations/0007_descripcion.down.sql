@@ -1,0 +1,3 @@
+ALTER TABLE assets
+    DROP COLUMN IF EXISTS tags,
+    DROP COLUMN IF EXISTS description;

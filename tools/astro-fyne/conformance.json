@@ -1,0 +1,12 @@
+{
+  "schema": 1,
+  "package": "generated",
+  "entries": [
+    {
+      "name": "Conformance",
+      "source": "example/src/components/Conformance.tsx",
+      "export": "Conformance",
+      "output": "native/generated/conformance.gen.go"
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+-- SPDX-License-Identifier: Apache-2.0
+-- Copyright (c) 2026 Daniel Delgado Ramos
+--
+-- Dos arreglos de la campana de la suite.
+--
+-- 1. El CHECK de `source` de 0001 admitía los cinco orígenes de la primera versión
+--    (drive, mail, calendar, contacts, chat) y nadie lo amplió cuando la lista creció
+--    en el código (`domain.ValidSource`). Rooms, Docus, SyERP, Cloud y Notepads
+--    publicaban avisos que el INSERT rechazaba con un 23514; el Hub contestaba 500 y el
+--    emisor, que manda en segundo plano, solo lo apuntaba en su log. El origen ya lo
+--    valida el dominio en la única puerta de entrada; un segundo guardián en la base
+--    que hay que acordarse de ampliar es exactamente lo que falló.
+--
+-- 2. `params`: las variables del texto del aviso (quién, qué). El título que manda el
+--    emisor va en un idioma; con `type` + `params`, cada cliente lo compone en el del
+--    usuario que lo mira (`notifications.kind.<type>` del catálogo común).
+--
+-- sytue:destructive-ok el dominio valida `source` desde esta migración; retirar el
+-- CHECK no rompe a la versión anterior y permite los orígenes nuevos ya desplegados.
+ALTER TABLE notifications DROP CONSTRAINT IF EXISTS notifications_source_check;
+ALTER TABLE notifications ADD COLUMN params jsonb NOT NULL DEFAULT '{}'::jsonb;

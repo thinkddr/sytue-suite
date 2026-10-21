@@ -1,0 +1,17 @@
+Tellitav video ja otseülekanded: laadige üles, edastage ja jagage, ELis.
+
+• Laadige video üles ja see kodeeritakse ümber mitmesse kvaliteeti igale ekraanile.
+• Minge otse-eetrisse edastusprogrammist, brauserist või rakendusest.
+• Neli nähtavustaset: avalik, loendist väljas, organisatsioon või kindlad inimesed.
+• Otsevestlus ja kommentaarid, avaldaja põhimodereerimisega.
+• Laadige üles kuni 8 GiB videoid; originaal säilitatakse.
+• Otseülekanne edastusprogrammist RTMP kaudu, iga inimese oma voovõtmega.
+• Otse brauserist või rakendusest: kaamera, ekraan ja mikrofon.
+• Otseülekannete salvestised muutuvad automaatselt tellitavateks videoteks.
+• Avalik esileht ja kanal iga organisatsiooni kohta, indekseeritavad.
+• Loendist väljas lingid, videod ainult organisatsioonile või juurdepääs kindlatele inimestele @kasutajanime järgi.
+• Otsevestlus ja lõimedes kommentaarid, mida modereerivad avaldaja ja organisatsiooni haldurid.
+• Salvestusruum arvestatakse teie Sytue Drive’i kvooti; kõik Euroopa Liidus.
+• „Laadi Casti üles“ Sytue Drive’ist: video koopia läheb Casti ja fail jääb Drive’i.
+
+Krüpteeritud edastamisel (TLS 1.3). Sytue taristu asub ELis. Väliste teenuste asukoht sõltub nende pakkujast.

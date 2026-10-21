@@ -1,0 +1,1117 @@
+From a353ee54948f65485ce8cee7c1c5080f4069db68 Mon Sep 17 00:00:00 2001
+From: Daniel Delgado <328510259+thinkddr@users.noreply.github.com>
+Date: Fri, 25 Sep 2026 03:57:20 +0200
+Subject: [PATCH] feat(widget): a multi-line Entry spaces its rows by the
+ theme's line spacing
+
+RichText only added SizeNameLineSpacing between paragraphs, never between the rows
+of one inline segment, which is all the text of an Entry: its rows stepped by the
+font height alone, whatever the theme said. A multi-line Entry now asks for the gap
+between every row (RichText.spaceRows), and the layout, the min size, the cursor,
+the selection boxes and hit testing all step rows by font height + line spacing, as
+a CSS line-height does. A single-line Entry and every other RichText are unchanged.
+
+The Entry goldens with several rows move down by the test theme's spacing (4 px a
+row); selection_enter grows past the viewport and shows its scroll bar.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+---
+ widget/entry.go                               |   7 +-
+ widget/entry_linespacing_internal_test.go     |  98 ++++++++++++++++++
+ widget/richtext.go                            |  16 +++
+ widget/selectable.go                          |   8 +-
+ .../testdata/entry/carriage_return_text.png   | Bin 1768 -> 1775 bytes
+ .../entry/on_key_down_newline_typed.xml       |   4 +-
+ widget/testdata/entry/select_all_initial.xml  |   4 +-
+ widget/testdata/entry/select_all_selected.xml |  10 +-
+ .../entry/select_multi_line_initial.xml       |   4 +-
+ .../entry/select_multi_line_pagedown.xml      |   6 +-
+ .../select_multi_line_shift_pagedown.xml      |  10 +-
+ .../entry/select_multi_line_shift_pageup.xml  |   4 +-
+ .../entry/selection_add_one_row_down.xml      |  10 +-
+ .../testdata/entry/selection_add_to_end.xml   |   8 +-
+ .../testdata/entry/selection_add_to_home.xml  |   8 +-
+ .../entry/selection_delete_and_add_down.xml   |  10 +-
+ .../entry/selection_delete_and_add_up.xml     |   6 +-
+ .../entry/selection_delete_multi_line.xml     |   4 +-
+ .../selection_delete_reverse_multi_line.xml   |   4 +-
+ .../entry/selection_delete_single_line.xml    |   6 +-
+ .../entry/selection_deselect_backspace.xml    |   6 +-
+ .../entry/selection_deselect_delete.xml       |   6 +-
+ .../selection_deselect_select_backspace.xml   |   6 +-
+ widget/testdata/entry/selection_end.xml       |   6 +-
+ widget/testdata/entry/selection_enter.xml     |  20 ++--
+ .../testdata/entry/selection_focus_gained.xml |   8 +-
+ .../testdata/entry/selection_focus_lost.xml   |   4 +-
+ widget/testdata/entry/selection_home.xml      |   6 +-
+ widget/testdata/entry/selection_initial.xml   |   8 +-
+ .../entry/selection_initial_reverse.xml       |   8 +-
+ .../entry/selection_remove_add_one_row_up.xml |   6 +-
+ .../entry/selection_remove_one_row_up.xml     |   8 +-
+ widget/testdata/entry/selection_replace.xml   |   6 +-
+ widget/testdata/entry/selection_snap_down.xml |   6 +-
+ widget/testdata/entry/selection_snap_left.xml |   6 +-
+ .../testdata/entry/selection_snap_right.xml   |   6 +-
+ widget/testdata/entry/selection_snap_up.xml   |   4 +-
+ widget/testdata/entry/tapped_focused.xml      |   4 +-
+ widget/testdata/entry/tapped_initial.xml      |   4 +-
+ widget/testdata/entry/tapped_tapped_2nd_m.xml |   4 +-
+ widget/testdata/entry/tapped_tapped_3rd_m.xml |   4 +-
+ .../entry/tapped_tapped_after_last_col.xml    |   4 +-
+ .../entry/tapped_tapped_after_last_row.xml    |   6 +-
+ .../entry/wrap_multi_line_wrap_break.xml      |   4 +-
+ .../entry/wrap_multi_line_wrap_word.xml       |   4 +-
+ 45 files changed, 256 insertions(+), 125 deletions(-)
+ create mode 100644 widget/entry_linespacing_internal_test.go
+
+diff --git a/widget/entry.go b/widget/entry.go
+index 7bb5b21e5..877a5ecd8 100644
+--- a/widget/entry.go
++++ b/widget/entry.go
+@@ -233,7 +233,7 @@ func (e *Entry) CursorPosition() fyne.Position {
+ 
+ 	size := provider.lineSizeToColumn(e.CursorColumn, e.CursorRow, textSize, innerPad)
+ 	xPos := size.Width
+-	yPos := size.Height * float32(e.CursorRow)
++	yPos := (size.Height + provider.rowGap(th)) * float32(e.CursorRow)
+ 
+ 	return fyne.NewPos(xPos-(inputBorder/2), yPos+innerPad-inputBorder)
+ }
+@@ -1031,6 +1031,7 @@ func (e *Entry) pasteFromClipboard(clipboard fyne.Clipboard) {
+ 
+ // placeholderProvider returns the placeholder text handler for this entry
+ func (e *Entry) placeholderProvider() *RichText {
++	e.placeholder.spaceRows = e.MultiLine
+ 	if len(e.placeholder.Segments) > 0 {
+ 		return &e.placeholder
+ 	}
+@@ -1305,6 +1306,7 @@ func (e *Entry) syncSelectable() {
+ 
+ // textProvider returns the text handler for this entry
+ func (e *Entry) textProvider() *RichText {
++	e.text.spaceRows = e.MultiLine
+ 	if len(e.text.Segments) > 0 {
+ 		return &e.text
+ 	}
+@@ -1637,7 +1639,8 @@ func (r *entryRenderer) MinSize() fyne.Size {
+ 				count = multiLineRows
+ 			}
+ 
+-			minSize.Height = charMin.Height*float32(count) + innerPadding
++			gap := r.entry.placeholderProvider().rowGap(th)
++			minSize.Height = charMin.Height*float32(count) + gap*float32(count-1) + innerPadding
+ 		}
+ 
+ 		minSize = minSize.AddWidthHeight(innerPadding*2, innerPadding)
+diff --git a/widget/entry_linespacing_internal_test.go b/widget/entry_linespacing_internal_test.go
+new file mode 100644
+index 000000000..8a3f04c2b
+--- /dev/null
++++ b/widget/entry_linespacing_internal_test.go
+@@ -0,0 +1,98 @@
++package widget
++
++import (
++	"testing"
++
++	"github.com/stretchr/testify/assert"
++
++	"fyne.io/fyne/v2"
++	"fyne.io/fyne/v2/driver/desktop"
++	"fyne.io/fyne/v2/internal/cache"
++	"fyne.io/fyne/v2/test"
++	"fyne.io/fyne/v2/theme"
++)
++
++type lineSpacingTheme struct {
++	fyne.Theme
++	spacing float32
++}
++
++func (l lineSpacingTheme) Size(n fyne.ThemeSizeName) float32 {
++	if n == theme.SizeNameLineSpacing {
++		return l.spacing
++	}
++	return l.Theme.Size(n)
++}
++
++func spacedEntry(t *testing.T, multi bool, spacing float32) *Entry {
++	e := NewEntry()
++	if multi {
++		e = NewMultiLineEntry()
++	}
++	w := test.NewTempWindow(t, e)
++	cache.OverrideTheme(e, lineSpacingTheme{test.Theme(), spacing})
++	if multi {
++		e.SetText("one\ntwo\nthree")
++	} else {
++		e.SetText("one")
++	}
++	w.Resize(fyne.NewSize(200, 200))
++	e.Refresh()
++	return e
++}
++
++// A multi-line Entry steps its rows by the font height plus the theme's line spacing,
++// as a CSS line-height does, and the cursor, the selection and a tap follow the rows.
++func TestEntry_MultiLineRowsFollowLineSpacing(t *testing.T) {
++	const gap = 10
++	e := spacedEntry(t, true, gap)
++	th := e.Theme()
++	charH := e.text.charMinSize(false, e.TextStyle, th.Size(theme.SizeNameText)).Height
++
++	texts := richTextRenderTexts(&e.text)
++	assert.Len(t, texts, 3)
++	for i := 1; i < 3; i++ {
++		assert.InDelta(t, charH+gap, texts[i].Position().Y-texts[i-1].Position().Y, 0.01, "row %d", i)
++	}
++
++	flat := spacedEntry(t, true, 0)
++	assert.InDelta(t, 2*gap, e.text.MinSize().Height-flat.text.MinSize().Height, 0.01, "text min size")
++	assert.InDelta(t, 2*gap, e.MinSize().Height-flat.MinSize().Height, 0.01, "entry min size")
++
++	var cursorY [3]float32
++	for row := 0; row < 3; row++ {
++		e.CursorRow, e.CursorColumn = row, 1
++		cursorY[row] = e.CursorPosition().Y
++		if row > 0 {
++			assert.InDelta(t, texts[row].Position().Y-texts[0].Position().Y, cursorY[row]-cursorY[0], 0.01, "cursor row %d", row)
++		}
++		// A tap on the middle of the row, and one in the gap just below it, land on it.
++		p := fyne.NewPos(e.CursorPosition().X+2, cursorY[row]+charH/2)
++		r, _ := e.sel.getRowCol(p)
++		assert.Equal(t, row, r, "tap in row %d", row)
++		r, _ = e.sel.getRowCol(p.AddXY(0, charH/2+gap/2-1))
++		assert.Equal(t, row, r, "tap in the gap under row %d", row)
++	}
++
++	// Select from the start of row 0 to the end of row 2: one box per row, at the row.
++	e.CursorRow, e.CursorColumn = 0, 0
++	e.sel.cursorRow, e.sel.cursorColumn = 0, 0
++	e.KeyDown(&fyne.KeyEvent{Name: desktop.KeyShiftLeft})
++	e.TypedKey(&fyne.KeyEvent{Name: fyne.KeyDown})
++	e.TypedKey(&fyne.KeyEvent{Name: fyne.KeyDown})
++	e.KeyUp(&fyne.KeyEvent{Name: desktop.KeyShiftLeft})
++	boxes := test.TempWidgetRenderer(t, e.sel).(*selectableRenderer).selections
++	assert.Len(t, boxes, 3)
++	for i, b := range boxes {
++		assert.InDelta(t, cursorY[i], b.Position().Y, 1.01, "selection row %d", i)
++	}
++}
++
++// One line has no gap to add: a single-line Entry measures and paints the same whatever
++// the line spacing.
++func TestEntry_SingleLineIgnoresLineSpacing(t *testing.T) {
++	a, b := spacedEntry(t, false, 0), spacedEntry(t, false, 10)
++	assert.Equal(t, a.MinSize(), b.MinSize())
++	assert.Equal(t, richTextRenderTexts(&a.text)[0].Position(), richTextRenderTexts(&b.text)[0].Position())
++	assert.Equal(t, a.CursorPosition(), b.CursorPosition())
++}
+diff --git a/widget/richtext.go b/widget/richtext.go
+index 92b1b73e6..9cb170469 100644
+--- a/widget/richtext.go
++++ b/widget/richtext.go
+@@ -39,6 +39,7 @@ type RichText struct {
+ 	Truncation fyne.TextTruncation
+ 
+ 	inset     fyne.Size     // this varies due to how the widget works (entry with scroller vs others with padding)
++	spaceRows bool          // line spacing between the rows of one text too (see rowGap)
+ 	rowBounds []rowBoundary // cache for boundaries
+ 	scr       *widget.Scroll
+ 	prop      *canvas.Rectangle // used to apply text minsize to the scroller `scr`, if present - TODO improve #2464
+@@ -149,6 +150,17 @@ func (t *RichText) String() string {
+ 	return ret.String()
+ }
+ 
++// rowGap is the space between two rows of the same text: the theme's line spacing when
++// the owner asked for it with spaceRows (a multi-line Entry, whose text is one inline
++// segment), none otherwise. Layout, MinSize, the cursor, the selection and hit testing
++// all step rows by charMinSize().Height + rowGap.
++func (t *RichText) rowGap(th fyne.Theme) float32 {
++	if !t.spaceRows {
++		return 0
++	}
++	return th.Size(theme.SizeNameLineSpacing)
++}
++
+ // charMinSize returns the average char size to use for internal computation
+ func (t *RichText) charMinSize(concealed bool, style fyne.TextStyle, textSize float32) fyne.Size {
+ 	defaultChar := "M"
+@@ -622,6 +634,8 @@ func (r *textRenderer) Layout(size fyne.Size) {
+ 		lastSeg := bound.segments[len(bound.segments)-1]
+ 		if !lastSeg.Inline() && row < len(bounds)-1 && bounds[row+1].segments[0] != lastSeg { // ignore wrapped lines etc
+ 			yPos += lineSpacing
++		} else if r.obj.spaceRows && row < len(bounds)-1 {
++			yPos += lineSpacing
+ 		}
+ 	}
+ }
+@@ -724,6 +738,8 @@ func (r *textRenderer) calculateMin(bounds []rowBoundary, wrap fyne.TextWrap, ob
+ 		lastSeg := bound.segments[len(bound.segments)-1]
+ 		if !lastSeg.Inline() && row < len(bounds)-1 && bounds[row+1].segments[0] != lastSeg { // ignore wrapped lines etc
+ 			height += lineSpacing
++		} else if r.obj.spaceRows && row < len(bounds)-1 {
++			height += lineSpacing
+ 		}
+ 	}
+ 
+diff --git a/widget/selectable.go b/widget/selectable.go
+index fd0013986..c21e15da3 100644
+--- a/widget/selectable.go
++++ b/widget/selectable.go
+@@ -201,6 +201,12 @@ func (s *selectable) getRowCol(p fyne.Position) (int, int) {
+ 
+ 	rowHeight := s.provider.charMinSize(false, s.style, textSize).Height // TODO handle Password
+ 	row := int(math.Floor(float64(p.Y-innerPad+th.Size(theme.SizeNameLineSpacing)) / float64(rowHeight)))
++	if gap := s.provider.rowGap(th); gap > 0 {
++		// Rows start at innerPad-inputBorder, one every rowHeight+gap; a tap in the gap
++		// goes to the nearer row.
++		top := innerPad - th.Size(theme.SizeNameInputBorder)
++		row = int(math.Floor(float64(p.Y-top+gap/2) / float64(rowHeight+gap)))
++	}
+ 	col := 0
+ 	if row < 0 {
+ 		row = 0
+@@ -348,7 +354,7 @@ func (r *selectableRenderer) buildSelection() {
+ 	// Convert column, row into x,y
+ 	getCoordinates := func(column int, row int) (float32, float32) {
+ 		sz := provider.lineSizeToColumn(column, row, textSize, innerPad)
+-		return sz.Width, sz.Height*float32(row) - th.Size(theme.SizeNameInputBorder) + innerPad
++		return sz.Width, (sz.Height+provider.rowGap(th))*float32(row) - th.Size(theme.SizeNameInputBorder) + innerPad
+ 	}
+ 
+ 	lineHeight := r.sel.provider.charMinSize(r.sel.password, r.sel.style, textSize).Height
+diff --git a/widget/testdata/entry/carriage_return_text.png b/widget/testdata/entry/carriage_return_text.png
+index 9f6a1a9bd2fb30b91e556feb4d525b5f80ebfde7..14849dd1fb97c11d4e8775ead35843c602cd8e29 100644
+GIT binary patch
+delta 1759
+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
+BN^1ZB
+
+delta 1752
+zcmV;}1}FLN4d@M!B!90-L_t(|oa~xSOcT!=$7h#qE2UUU+bBvY7HY*%ibSgiqiE4c
+z2*wx_OjP1a^<v_|3&yv2@ZiZrJ#jSAcrekE(ZqzLk%Jg~Yr(B41+i$GvedrYm+kI9
+zVUqbTrIe)>xBk-4X=ZkI=K0PuyZb!T5?x(g;9mw8+JHZ$EPp^~h{a86wOXUmR99D5
+zR8$CIQVtk~357x)kB6eDtV`Jf^m@HUqxp-r@dC$j#XQr~({8t$duf3Hxb_UgxZQ4=
+zrp01$DL5gM$t06Wu~@9r>9ksHC=}xQVZk#1*WT@R<2YVfSy>9!0{|*2Dx^{=j^mS)
+zlgLQK0s(8+u73pp&@^2lrgOn@Je5izBmdu?)d>I~7K{J7dAyKFB+wz;#vHHF5?p>r
+zPQ(8B??73A(3AxT&FTs;o6Q!B1(r{qJh>V{3SR-|&!6w_@8`C(w6qKk4(7kBp`pQG
+zFu?Nm?b{U!MWJ>s$v?k^a)i@`A(zYd?c1kPseC@)(0|ZSJRZ-}St^z8*|TTk#*ML9
+z?CsmP-@bh-c;4c8pr)qg`t|EFnQVM~yrH3CU|>Kb5-ruas;cVh)vKE~Z+5v{iA3V^
+z<;&Z)Z7X={6?nj8GF`cH1yw66D^dB-p+i$sQ;!}!0sy>w_wLS}I~^SzBO@a@$LZ|s
+zq-pxWgMSAs%K`wx;qdX}$3K1g1gonkU}k2<X0xGceSLjTPY*2X_4;Tu+S}U;t29k-
+z*sx)#ahjT%zI^$D%pDsW>+9=NDwT_~ts)DUo16Ra;RCAv{{0)3#bR+Pm0}nMR)>d&
+zv+|||QxZfvokrDUGWjPVaB&{uKp;R-)QcA{_<wY!C~E!s^{84`SI4q!AP^{Q>f$`a
+zZ{EDwy?b{{OA7!1!?61L`s(WHr8*A}54X0q!p>5uw70i+baXV4NE9}8aXc_OI;v18
+zE?l@!F;6ray?gg=BofKld2({{;lqb#&z{9`Tq2Qt{`~pz<HrS0jd70__wU~i04Vsa
+zjDKO6TrQ_+IvS1g>>Q8BVWP;B#>Pefz|hbTYAM=>3;@8gY%myHjm~-a=R=9I0HG-h
+z5Sp?8p%F~Lkt0W7G?9f$r8;-+9EM>$$KfU5(xpo$PMknhv)Md2IJjlY7Sz(;-+%Gq
+zMV?baj7B3jq(f9yRhi9ZDB#SQGdFME%zr-)F99S;a?Ldwjj2@1Xf&c0gTX+O<Vx)4
+zMRK0}eRzcuBuO4ScC4nRCKwE27`AomR-4V%-roN7=~DoJLZMKpR8Rnp<2!fmG#Csl
+z%Z`tazkmN8CN3tEDH4g$G~L<R>G%6zy?O<s2{^t?CbL*9YPH(y^}1ZH6$#+wfqx%A
+zencV>ctEmg(<Xu-UcP);TU)zs-8#7Zp-{-{^#TB_R%>^6x5wl8`Sa(|qeuJt`rrty
+zt*zbN-BznL7!0D!3+@w%L^3cipx5i2PA5SSr%s(h^CsrWZyPTUuq+FA(a6Y%(P$(|
+zG8T)uT&}jZw%4y;qy3}P={h<(u76#-Ha9m1bH!V?ZrN-$sLfz7+_-Tg6bfYxzGKG@
+znM`*3_HDS>nM?+yrm0k_I3551IGs-T7#NMlv9U1#fZc94nM}|!r_%|OU9Z;*tp@;j
+zz1~0|(A?Y%t0YM-wjKbW)oLduCXk^M6BFoCB9SPX0FoqYYipaDnlu`X!++rb05}|u
+z=H_OtR;yGhp$D>(UAT!+vb$8=PY?umpK!}Xdx&Ay>-YOD7R$`c3|vUR-#<G$d+^{v
+zpU(#)dy1meYBi4IFuNCtL`tP{c6K)Z$iZNc`$3S)<*018+n0U0t>8mOlBCIGg3FI4
+zXm4*vbJ*?nbUNMB(}Q6cj(_8a4<C-l<I7s`@#DwF#>Td`HUPkyHEYmeFaTiJu3gLi
+z7i9$*8A+0R_wMBia5x-YU0uk;WHNdG{{7RZPaimN007|g`R?7jm$j)D^ZonxCr_SO
+zt=4op%`nWfXV1`iu*qbqtE+qd{CS?+i<uK6WHK4cvawi<|1AVT$bV$Aa5#((m!LyL
+zA`$m+V0Ck11fQfn3!0`Er^tN11LbH`XvzYF=D#Q)lgS8S$?|aDun2r{k7dITp+Mm(
+zw{d|0803gVqMTZVg{EovyIVLM=C&^o;PH51RLn3;JRUERy~HpK{543Y)4|Y#dv(E=
+zn4+lZ>1nN2i-P!4V^L~q3gsJ+3MdQl>({SHBqA1zMIsUW16L_P({v~l`ug=NOzybk
+uh=r(m{+4ZjN~x@I!IT9E&Hn-b0RR6dDfDsUKZD!=0000<MNUMnLSTX>yln;m
+
+diff --git a/widget/testdata/entry/on_key_down_newline_typed.xml b/widget/testdata/entry/on_key_down_newline_typed.xml
+index 321fd86f8..54c365bb1 100644
+--- a/widget/testdata/entry/on_key_down_newline_typed.xml
++++ b/widget/testdata/entry/on_key_down_newline_typed.xml
+@@ -7,9 +7,9 @@
+ 				<widget size="120x96" type="*widget.entryContent">
+ 					<widget size="120x96" type="*widget.RichText">
+ 						<text pos="8,6" size="10x19">H</text>
+-						<text pos="8,25" size="12x19">oi</text>
++						<text pos="8,29" size="12x19">oi</text>
+ 					</widget>
+-					<rectangle fillColor="primary" pos="15,25" size="2x19"/>
++					<rectangle fillColor="primary" pos="15,29" size="2x19"/>
+ 				</widget>
+ 			</widget>
+ 		</widget>
+diff --git a/widget/testdata/entry/select_all_initial.xml b/widget/testdata/entry/select_all_initial.xml
+index f4e79889d..25743febd 100644
+--- a/widget/testdata/entry/select_all_initial.xml
++++ b/widget/testdata/entry/select_all_initial.xml
+@@ -7,8 +7,8 @@
+ 				<widget size="120x96" type="*widget.entryContent">
+ 					<widget size="120x96" type="*widget.RichText">
+ 						<text pos="8,6" size="59x19">First Row</text>
+-						<text pos="8,25" size="79x19">Second Row</text>
+-						<text pos="8,44" size="65x19">Third Row</text>
++						<text pos="8,29" size="79x19">Second Row</text>
++						<text pos="8,52" size="65x19">Third Row</text>
+ 					</widget>
+ 					<rectangle fillColor="primary" pos="7,6" size="2x19"/>
+ 				</widget>
+diff --git a/widget/testdata/entry/select_all_selected.xml b/widget/testdata/entry/select_all_selected.xml
+index c1ac1dbe0..57c6cb860 100644
+--- a/widget/testdata/entry/select_all_selected.xml
++++ b/widget/testdata/entry/select_all_selected.xml
+@@ -7,15 +7,15 @@
+ 				<widget size="120x96" type="*widget.entryContent">
+ 					<widget size="0x0" type="*widget.selectable">
+ 						<rectangle fillColor="selection" pos="7,6" size="60x19"/>
+-						<rectangle fillColor="selection" pos="7,25" size="80x19"/>
+-						<rectangle fillColor="selection" pos="7,44" size="66x19"/>
++						<rectangle fillColor="selection" pos="7,29" size="80x19"/>
++						<rectangle fillColor="selection" pos="7,52" size="66x19"/>
+ 					</widget>
+ 					<widget size="120x96" type="*widget.RichText">
+ 						<text pos="8,6" size="59x19">First Row</text>
+-						<text pos="8,25" size="79x19">Second Row</text>
+-						<text pos="8,44" size="65x19">Third Row</text>
++						<text pos="8,29" size="79x19">Second Row</text>
++						<text pos="8,52" size="65x19">Third Row</text>
+ 					</widget>
+-					<rectangle fillColor="primary" pos="72,44" size="2x19"/>
++					<rectangle fillColor="primary" pos="72,52" size="2x19"/>
+ 				</widget>
+ 			</widget>
+ 		</widget>
+diff --git a/widget/testdata/entry/select_multi_line_initial.xml b/widget/testdata/entry/select_multi_line_initial.xml
+index 86357a6cf..ccef8ba2c 100644
+--- a/widget/testdata/entry/select_multi_line_initial.xml
++++ b/widget/testdata/entry/select_multi_line_initial.xml
+@@ -7,8 +7,8 @@
+ 				<widget size="120x96" type="*widget.entryContent">
+ 					<widget size="120x96" type="*widget.RichText">
+ 						<text pos="8,6" size="47x19">Testing</text>
+-						<text pos="8,25" size="47x19">Testing</text>
+-						<text pos="8,44" size="47x19">Testing</text>
++						<text pos="8,29" size="47x19">Testing</text>
++						<text pos="8,52" size="47x19">Testing</text>
+ 					</widget>
+ 					<rectangle fillColor="primary" pos="7,6" size="2x19"/>
+ 				</widget>
+diff --git a/widget/testdata/entry/select_multi_line_pagedown.xml b/widget/testdata/entry/select_multi_line_pagedown.xml
+index 76f2d2951..01af1a493 100644
+--- a/widget/testdata/entry/select_multi_line_pagedown.xml
++++ b/widget/testdata/entry/select_multi_line_pagedown.xml
+@@ -7,10 +7,10 @@
+ 				<widget size="120x96" type="*widget.entryContent">
+ 					<widget size="120x96" type="*widget.RichText">
+ 						<text pos="8,6" size="47x19">Testing</text>
+-						<text pos="8,25" size="47x19">Testing</text>
+-						<text pos="8,44" size="47x19">Testing</text>
++						<text pos="8,29" size="47x19">Testing</text>
++						<text pos="8,52" size="47x19">Testing</text>
+ 					</widget>
+-					<rectangle fillColor="primary" pos="54,44" size="2x19"/>
++					<rectangle fillColor="primary" pos="54,52" size="2x19"/>
+ 				</widget>
+ 			</widget>
+ 		</widget>
+diff --git a/widget/testdata/entry/select_multi_line_shift_pagedown.xml b/widget/testdata/entry/select_multi_line_shift_pagedown.xml
+index c4656dc34..b20f104d7 100644
+--- a/widget/testdata/entry/select_multi_line_shift_pagedown.xml
++++ b/widget/testdata/entry/select_multi_line_shift_pagedown.xml
+@@ -7,15 +7,15 @@
+ 				<widget size="120x96" type="*widget.entryContent">
+ 					<widget size="0x0" type="*widget.selectable">
+ 						<rectangle fillColor="selection" pos="14,6" size="40x19"/>
+-						<rectangle fillColor="selection" pos="7,25" size="48x19"/>
+-						<rectangle fillColor="selection" pos="7,44" size="48x19"/>
++						<rectangle fillColor="selection" pos="7,29" size="48x19"/>
++						<rectangle fillColor="selection" pos="7,52" size="48x19"/>
+ 					</widget>
+ 					<widget size="120x96" type="*widget.RichText">
+ 						<text pos="8,6" size="47x19">Testing</text>
+-						<text pos="8,25" size="47x19">Testing</text>
+-						<text pos="8,44" size="47x19">Testing</text>
++						<text pos="8,29" size="47x19">Testing</text>
++						<text pos="8,52" size="47x19">Testing</text>
+ 					</widget>
+-					<rectangle fillColor="primary" pos="54,44" size="2x19"/>
++					<rectangle fillColor="primary" pos="54,52" size="2x19"/>
+ 				</widget>
+ 			</widget>
+ 		</widget>
+diff --git a/widget/testdata/entry/select_multi_line_shift_pageup.xml b/widget/testdata/entry/select_multi_line_shift_pageup.xml
+index e42eea73f..949da4a5f 100644
+--- a/widget/testdata/entry/select_multi_line_shift_pageup.xml
++++ b/widget/testdata/entry/select_multi_line_shift_pageup.xml
+@@ -10,8 +10,8 @@
+ 					</widget>
+ 					<widget size="120x96" type="*widget.RichText">
+ 						<text pos="8,6" size="47x19">Testing</text>
+-						<text pos="8,25" size="47x19">Testing</text>
+-						<text pos="8,44" size="47x19">Testing</text>
++						<text pos="8,29" size="47x19">Testing</text>
++						<text pos="8,52" size="47x19">Testing</text>
+ 					</widget>
+ 					<rectangle fillColor="primary" pos="7,6" size="2x19"/>
+ 				</widget>
+diff --git a/widget/testdata/entry/selection_add_one_row_down.xml b/widget/testdata/entry/selection_add_one_row_down.xml
+index 4d24ab1f1..fdda89379 100644
+--- a/widget/testdata/entry/selection_add_one_row_down.xml
++++ b/widget/testdata/entry/selection_add_one_row_down.xml
+@@ -6,15 +6,15 @@
+ 			<widget pos="0,2" size="120x96" type="*widget.Scroll">
+ 				<widget size="120x96" type="*widget.entryContent">
+ 					<widget size="0x0" type="*widget.selectable">
+-						<rectangle fillColor="selection" pos="21,25" size="33x19"/>
+-						<rectangle fillColor="selection" pos="7,44" size="31x19"/>
++						<rectangle fillColor="selection" pos="21,29" size="33x19"/>
++						<rectangle fillColor="selection" pos="7,52" size="31x19"/>
+ 					</widget>
+ 					<widget size="120x96" type="*widget.RichText">
+ 						<text pos="8,6" size="47x19">Testing</text>
+-						<text pos="8,25" size="47x19">Testing</text>
+-						<text pos="8,44" size="47x19">Testing</text>
++						<text pos="8,29" size="47x19">Testing</text>
++						<text pos="8,52" size="47x19">Testing</text>
+ 					</widget>
+-					<rectangle fillColor="primary" pos="37,44" size="2x19"/>
++					<rectangle fillColor="primary" pos="37,52" size="2x19"/>
+ 				</widget>
+ 			</widget>
+ 		</widget>
+diff --git a/widget/testdata/entry/selection_add_to_end.xml b/widget/testdata/entry/selection_add_to_end.xml
+index 7c7f19ad1..1fb66e8b5 100644
+--- a/widget/testdata/entry/selection_add_to_end.xml
++++ b/widget/testdata/entry/selection_add_to_end.xml
+@@ -6,14 +6,14 @@
+ 			<widget pos="0,2" size="120x96" type="*widget.Scroll">
+ 				<widget size="120x96" type="*widget.entryContent">
+ 					<widget size="0x0" type="*widget.selectable">
+-						<rectangle fillColor="selection" pos="21,25" size="33x19"/>
++						<rectangle fillColor="selection" pos="21,29" size="33x19"/>
+ 					</widget>
+ 					<widget size="120x96" type="*widget.RichText">
+ 						<text pos="8,6" size="47x19">Testing</text>
+-						<text pos="8,25" size="47x19">Testing</text>
+-						<text pos="8,44" size="47x19">Testing</text>
++						<text pos="8,29" size="47x19">Testing</text>
++						<text pos="8,52" size="47x19">Testing</text>
+ 					</widget>
+-					<rectangle fillColor="primary" pos="54,25" size="2x19"/>
++					<rectangle fillColor="primary" pos="54,29" size="2x19"/>
+ 				</widget>
+ 			</widget>
+ 		</widget>
+diff --git a/widget/testdata/entry/selection_add_to_home.xml b/widget/testdata/entry/selection_add_to_home.xml
+index 3402c34d8..e3099b118 100644
+--- a/widget/testdata/entry/selection_add_to_home.xml
++++ b/widget/testdata/entry/selection_add_to_home.xml
+@@ -6,14 +6,14 @@
+ 			<widget pos="0,2" size="120x96" type="*widget.Scroll">
+ 				<widget size="120x96" type="*widget.entryContent">
+ 					<widget size="0x0" type="*widget.selectable">
+-						<rectangle fillColor="selection" pos="7,25" size="15x19"/>
++						<rectangle fillColor="selection" pos="7,29" size="15x19"/>
+ 					</widget>
+ 					<widget size="120x96" type="*widget.RichText">
+ 						<text pos="8,6" size="47x19">Testing</text>
+-						<text pos="8,25" size="47x19">Testing</text>
+-						<text pos="8,44" size="47x19">Testing</text>
++						<text pos="8,29" size="47x19">Testing</text>
++						<text pos="8,52" size="47x19">Testing</text>
+ 					</widget>
+-					<rectangle fillColor="primary" pos="7,25" size="2x19"/>
++					<rectangle fillColor="primary" pos="7,29" size="2x19"/>
+ 				</widget>
+ 			</widget>
+ 		</widget>
+diff --git a/widget/testdata/entry/selection_delete_and_add_down.xml b/widget/testdata/entry/selection_delete_and_add_down.xml
+index 78eaa871d..8d3f6d3f9 100644
+--- a/widget/testdata/entry/selection_delete_and_add_down.xml
++++ b/widget/testdata/entry/selection_delete_and_add_down.xml
+@@ -6,15 +6,15 @@
+ 			<widget pos="0,2" size="120x96" type="*widget.Scroll">
+ 				<widget size="120x96" type="*widget.entryContent">
+ 					<widget size="0x0" type="*widget.selectable">
+-						<rectangle fillColor="selection" pos="21,25" size="18x19"/>
+-						<rectangle fillColor="selection" pos="7,44" size="15x19"/>
++						<rectangle fillColor="selection" pos="21,29" size="18x19"/>
++						<rectangle fillColor="selection" pos="7,52" size="15x19"/>
+ 					</widget>
+ 					<widget size="120x96" type="*widget.RichText">
+ 						<text pos="8,6" size="47x19">Testing</text>
+-						<text pos="8,25" size="31x19">Teng</text>
+-						<text pos="8,44" size="47x19">Testing</text>
++						<text pos="8,29" size="31x19">Teng</text>
++						<text pos="8,52" size="47x19">Testing</text>
+ 					</widget>
+-					<rectangle fillColor="primary" pos="21,44" size="2x19"/>
++					<rectangle fillColor="primary" pos="21,52" size="2x19"/>
+ 				</widget>
+ 			</widget>
+ 		</widget>
+diff --git a/widget/testdata/entry/selection_delete_and_add_up.xml b/widget/testdata/entry/selection_delete_and_add_up.xml
+index aaab9fa85..ac011588b 100644
+--- a/widget/testdata/entry/selection_delete_and_add_up.xml
++++ b/widget/testdata/entry/selection_delete_and_add_up.xml
+@@ -7,12 +7,12 @@
+ 				<widget size="120x96" type="*widget.entryContent">
+ 					<widget size="0x0" type="*widget.selectable">
+ 						<rectangle fillColor="selection" pos="21,6" size="33x19"/>
+-						<rectangle fillColor="selection" pos="7,25" size="15x19"/>
++						<rectangle fillColor="selection" pos="7,29" size="15x19"/>
+ 					</widget>
+ 					<widget size="120x96" type="*widget.RichText">
+ 						<text pos="8,6" size="47x19">Testing</text>
+-						<text pos="8,25" size="31x19">Teng</text>
+-						<text pos="8,44" size="47x19">Testing</text>
++						<text pos="8,29" size="31x19">Teng</text>
++						<text pos="8,52" size="47x19">Testing</text>
+ 					</widget>
+ 					<rectangle fillColor="primary" pos="21,6" size="2x19"/>
+ 				</widget>
+diff --git a/widget/testdata/entry/selection_delete_multi_line.xml b/widget/testdata/entry/selection_delete_multi_line.xml
+index c6a6d2f31..e8ca5ea4a 100644
+--- a/widget/testdata/entry/selection_delete_multi_line.xml
++++ b/widget/testdata/entry/selection_delete_multi_line.xml
+@@ -7,9 +7,9 @@
+ 				<widget size="120x96" type="*widget.entryContent">
+ 					<widget size="120x96" type="*widget.RichText">
+ 						<text pos="8,6" size="47x19">Testing</text>
+-						<text pos="8,25" size="31x19">Teng</text>
++						<text pos="8,29" size="31x19">Teng</text>
+ 					</widget>
+-					<rectangle fillColor="primary" pos="21,25" size="2x19"/>
++					<rectangle fillColor="primary" pos="21,29" size="2x19"/>
+ 				</widget>
+ 			</widget>
+ 		</widget>
+diff --git a/widget/testdata/entry/selection_delete_reverse_multi_line.xml b/widget/testdata/entry/selection_delete_reverse_multi_line.xml
+index c0be0b6af..afb6f17ed 100644
+--- a/widget/testdata/entry/selection_delete_reverse_multi_line.xml
++++ b/widget/testdata/entry/selection_delete_reverse_multi_line.xml
+@@ -7,9 +7,9 @@
+ 				<widget size="120x96" type="*widget.entryContent">
+ 					<widget size="120x96" type="*widget.RichText">
+ 						<text pos="8,6" size="47x19">Testing</text>
+-						<text pos="8,25" size="62x19">Testisting</text>
++						<text pos="8,29" size="62x19">Testisting</text>
+ 					</widget>
+-					<rectangle fillColor="primary" pos="37,25" size="2x19"/>
++					<rectangle fillColor="primary" pos="37,29" size="2x19"/>
+ 				</widget>
+ 			</widget>
+ 		</widget>
+diff --git a/widget/testdata/entry/selection_delete_single_line.xml b/widget/testdata/entry/selection_delete_single_line.xml
+index 9426c37ee..bd21117c6 100644
+--- a/widget/testdata/entry/selection_delete_single_line.xml
++++ b/widget/testdata/entry/selection_delete_single_line.xml
+@@ -7,10 +7,10 @@
+ 				<widget size="120x96" type="*widget.entryContent">
+ 					<widget size="120x96" type="*widget.RichText">
+ 						<text pos="8,6" size="47x19">Testing</text>
+-						<text pos="8,25" size="31x19">Teng</text>
+-						<text pos="8,44" size="47x19">Testing</text>
++						<text pos="8,29" size="31x19">Teng</text>
++						<text pos="8,52" size="47x19">Testing</text>
+ 					</widget>
+-					<rectangle fillColor="primary" pos="21,25" size="2x19"/>
++					<rectangle fillColor="primary" pos="21,29" size="2x19"/>
+ 				</widget>
+ 			</widget>
+ 		</widget>
+diff --git a/widget/testdata/entry/selection_deselect_backspace.xml b/widget/testdata/entry/selection_deselect_backspace.xml
+index 09fb24384..7c218efa6 100644
+--- a/widget/testdata/entry/selection_deselect_backspace.xml
++++ b/widget/testdata/entry/selection_deselect_backspace.xml
+@@ -7,10 +7,10 @@
+ 				<widget size="120x96" type="*widget.entryContent">
+ 					<widget size="120x96" type="*widget.RichText">
+ 						<text pos="8,6" size="47x19">Testing</text>
+-						<text pos="8,25" size="39x19">Tsting</text>
+-						<text pos="8,44" size="47x19">Testing</text>
++						<text pos="8,29" size="39x19">Tsting</text>
++						<text pos="8,52" size="47x19">Testing</text>
+ 					</widget>
+-					<rectangle fillColor="primary" pos="14,25" size="2x19"/>
++					<rectangle fillColor="primary" pos="14,29" size="2x19"/>
+ 				</widget>
+ 			</widget>
+ 		</widget>
+diff --git a/widget/testdata/entry/selection_deselect_delete.xml b/widget/testdata/entry/selection_deselect_delete.xml
+index 8e82ab31d..fbac8bf5c 100644
+--- a/widget/testdata/entry/selection_deselect_delete.xml
++++ b/widget/testdata/entry/selection_deselect_delete.xml
+@@ -7,10 +7,10 @@
+ 				<widget size="120x96" type="*widget.entryContent">
+ 					<widget size="120x96" type="*widget.RichText">
+ 						<text pos="8,6" size="47x19">Testing</text>
+-						<text pos="8,25" size="40x19">Teting</text>
+-						<text pos="8,44" size="47x19">Testing</text>
++						<text pos="8,29" size="40x19">Teting</text>
++						<text pos="8,52" size="47x19">Testing</text>
+ 					</widget>
+-					<rectangle fillColor="primary" pos="21,25" size="2x19"/>
++					<rectangle fillColor="primary" pos="21,29" size="2x19"/>
+ 				</widget>
+ 			</widget>
+ 		</widget>
+diff --git a/widget/testdata/entry/selection_deselect_select_backspace.xml b/widget/testdata/entry/selection_deselect_select_backspace.xml
+index 9793734e1..5b93f7bc6 100644
+--- a/widget/testdata/entry/selection_deselect_select_backspace.xml
++++ b/widget/testdata/entry/selection_deselect_select_backspace.xml
+@@ -7,10 +7,10 @@
+ 				<widget size="120x96" type="*widget.entryContent">
+ 					<widget size="120x96" type="*widget.RichText">
+ 						<text pos="8,6" size="47x19">Testing</text>
+-						<text pos="8,25" size="35x19">Teing</text>
+-						<text pos="8,44" size="47x19">Testing</text>
++						<text pos="8,29" size="35x19">Teing</text>
++						<text pos="8,52" size="47x19">Testing</text>
+ 					</widget>
+-					<rectangle fillColor="primary" pos="21,25" size="2x19"/>
++					<rectangle fillColor="primary" pos="21,29" size="2x19"/>
+ 				</widget>
+ 			</widget>
+ 		</widget>
+diff --git a/widget/testdata/entry/selection_end.xml b/widget/testdata/entry/selection_end.xml
+index 87ff27149..5b50ec0b0 100644
+--- a/widget/testdata/entry/selection_end.xml
++++ b/widget/testdata/entry/selection_end.xml
+@@ -7,10 +7,10 @@
+ 				<widget size="120x96" type="*widget.entryContent">
+ 					<widget size="120x96" type="*widget.RichText">
+ 						<text pos="8,6" size="47x19">Testing</text>
+-						<text pos="8,25" size="47x19">Testing</text>
+-						<text pos="8,44" size="47x19">Testing</text>
++						<text pos="8,29" size="47x19">Testing</text>
++						<text pos="8,52" size="47x19">Testing</text>
+ 					</widget>
+-					<rectangle fillColor="primary" pos="54,25" size="2x19"/>
++					<rectangle fillColor="primary" pos="54,29" size="2x19"/>
+ 				</widget>
+ 			</widget>
+ 		</widget>
+diff --git a/widget/testdata/entry/selection_enter.xml b/widget/testdata/entry/selection_enter.xml
+index 6830e5bdf..21b4b54c9 100644
+--- a/widget/testdata/entry/selection_enter.xml
++++ b/widget/testdata/entry/selection_enter.xml
+@@ -4,14 +4,22 @@
+ 			<rectangle fillColor="inputBackground" pos="2,2" radius="4" size="116x96"/>
+ 			<rectangle pos="1,1" radius="4" size="117x97" strokeColor="primary" strokeWidth="2"/>
+ 			<widget pos="0,2" size="120x96" type="*widget.Scroll">
+-				<widget size="120x96" type="*widget.entryContent">
+-					<widget size="120x96" type="*widget.RichText">
++				<widget size="120x100" type="*widget.entryContent">
++					<widget size="120x100" type="*widget.RichText">
+ 						<text pos="8,6" size="47x19">Testing</text>
+-						<text pos="8,25" size="14x19">Te</text>
+-						<text pos="8,44" size="17x19">ng</text>
+-						<text pos="8,63" size="47x19">Testing</text>
++						<text pos="8,29" size="14x19">Te</text>
++						<text pos="8,52" size="17x19">ng</text>
++						<text pos="8,75" size="47x19">Testing</text>
++					</widget>
++					<rectangle fillColor="primary" pos="7,52" size="2x19"/>
++				</widget>
++				<widget pos="0,96" size="120x0" type="*widget.Shadow">
++					<linearGradient endColor="shadow" pos="0,-8" size="120x8"/>
++				</widget>
++				<widget pos="114,0" size="6x96" type="*widget.scrollBarArea">
++					<widget pos="3,0" size="3x91" type="*widget.scrollBar">
++						<rectangle fillColor="scrollbar" radius="3" size="3x91"/>
+ 					</widget>
+-					<rectangle fillColor="primary" pos="7,44" size="2x19"/>
+ 				</widget>
+ 			</widget>
+ 		</widget>
+diff --git a/widget/testdata/entry/selection_focus_gained.xml b/widget/testdata/entry/selection_focus_gained.xml
+index d22b9f41a..ad49242eb 100644
+--- a/widget/testdata/entry/selection_focus_gained.xml
++++ b/widget/testdata/entry/selection_focus_gained.xml
+@@ -6,14 +6,14 @@
+ 			<widget pos="0,2" size="120x96" type="*widget.Scroll">
+ 				<widget size="120x96" type="*widget.entryContent">
+ 					<widget size="0x0" type="*widget.selectable">
+-						<rectangle fillColor="selection" pos="21,25" size="16x19"/>
++						<rectangle fillColor="selection" pos="21,29" size="16x19"/>
+ 					</widget>
+ 					<widget size="120x96" type="*widget.RichText">
+ 						<text pos="8,6" size="47x19">Testing</text>
+-						<text pos="8,25" size="47x19">Testing</text>
+-						<text pos="8,44" size="47x19">Testing</text>
++						<text pos="8,29" size="47x19">Testing</text>
++						<text pos="8,52" size="47x19">Testing</text>
+ 					</widget>
+-					<rectangle fillColor="primary" pos="37,25" size="2x19"/>
++					<rectangle fillColor="primary" pos="37,29" size="2x19"/>
+ 				</widget>
+ 			</widget>
+ 		</widget>
+diff --git a/widget/testdata/entry/selection_focus_lost.xml b/widget/testdata/entry/selection_focus_lost.xml
+index 3636a264d..0bc3bec5e 100644
+--- a/widget/testdata/entry/selection_focus_lost.xml
++++ b/widget/testdata/entry/selection_focus_lost.xml
+@@ -7,8 +7,8 @@
+ 				<widget size="120x96" type="*widget.entryContent">
+ 					<widget size="120x96" type="*widget.RichText">
+ 						<text pos="8,6" size="47x19">Testing</text>
+-						<text pos="8,25" size="47x19">Testing</text>
+-						<text pos="8,44" size="47x19">Testing</text>
++						<text pos="8,29" size="47x19">Testing</text>
++						<text pos="8,52" size="47x19">Testing</text>
+ 					</widget>
+ 				</widget>
+ 			</widget>
+diff --git a/widget/testdata/entry/selection_home.xml b/widget/testdata/entry/selection_home.xml
+index 0b648e73e..8b24cb51c 100644
+--- a/widget/testdata/entry/selection_home.xml
++++ b/widget/testdata/entry/selection_home.xml
+@@ -7,10 +7,10 @@
+ 				<widget size="120x96" type="*widget.entryContent">
+ 					<widget size="120x96" type="*widget.RichText">
+ 						<text pos="8,6" size="47x19">Testing</text>
+-						<text pos="8,25" size="47x19">Testing</text>
+-						<text pos="8,44" size="47x19">Testing</text>
++						<text pos="8,29" size="47x19">Testing</text>
++						<text pos="8,52" size="47x19">Testing</text>
+ 					</widget>
+-					<rectangle fillColor="primary" pos="7,25" size="2x19"/>
++					<rectangle fillColor="primary" pos="7,29" size="2x19"/>
+ 				</widget>
+ 			</widget>
+ 		</widget>
+diff --git a/widget/testdata/entry/selection_initial.xml b/widget/testdata/entry/selection_initial.xml
+index d22b9f41a..ad49242eb 100644
+--- a/widget/testdata/entry/selection_initial.xml
++++ b/widget/testdata/entry/selection_initial.xml
+@@ -6,14 +6,14 @@
+ 			<widget pos="0,2" size="120x96" type="*widget.Scroll">
+ 				<widget size="120x96" type="*widget.entryContent">
+ 					<widget size="0x0" type="*widget.selectable">
+-						<rectangle fillColor="selection" pos="21,25" size="16x19"/>
++						<rectangle fillColor="selection" pos="21,29" size="16x19"/>
+ 					</widget>
+ 					<widget size="120x96" type="*widget.RichText">
+ 						<text pos="8,6" size="47x19">Testing</text>
+-						<text pos="8,25" size="47x19">Testing</text>
+-						<text pos="8,44" size="47x19">Testing</text>
++						<text pos="8,29" size="47x19">Testing</text>
++						<text pos="8,52" size="47x19">Testing</text>
+ 					</widget>
+-					<rectangle fillColor="primary" pos="37,25" size="2x19"/>
++					<rectangle fillColor="primary" pos="37,29" size="2x19"/>
+ 				</widget>
+ 			</widget>
+ 		</widget>
+diff --git a/widget/testdata/entry/selection_initial_reverse.xml b/widget/testdata/entry/selection_initial_reverse.xml
+index 38eb36126..1307ef43d 100644
+--- a/widget/testdata/entry/selection_initial_reverse.xml
++++ b/widget/testdata/entry/selection_initial_reverse.xml
+@@ -6,14 +6,14 @@
+ 			<widget pos="0,2" size="120x96" type="*widget.Scroll">
+ 				<widget size="120x96" type="*widget.entryContent">
+ 					<widget size="0x0" type="*widget.selectable">
+-						<rectangle fillColor="selection" pos="21,25" size="16x19"/>
++						<rectangle fillColor="selection" pos="21,29" size="16x19"/>
+ 					</widget>
+ 					<widget size="120x96" type="*widget.RichText">
+ 						<text pos="8,6" size="47x19">Testing</text>
+-						<text pos="8,25" size="47x19">Testing</text>
+-						<text pos="8,44" size="47x19">Testing</text>
++						<text pos="8,29" size="47x19">Testing</text>
++						<text pos="8,52" size="47x19">Testing</text>
+ 					</widget>
+-					<rectangle fillColor="primary" pos="21,25" size="2x19"/>
++					<rectangle fillColor="primary" pos="21,29" size="2x19"/>
+ 				</widget>
+ 			</widget>
+ 		</widget>
+diff --git a/widget/testdata/entry/selection_remove_add_one_row_up.xml b/widget/testdata/entry/selection_remove_add_one_row_up.xml
+index 4bb549162..80c139369 100644
+--- a/widget/testdata/entry/selection_remove_add_one_row_up.xml
++++ b/widget/testdata/entry/selection_remove_add_one_row_up.xml
+@@ -7,12 +7,12 @@
+ 				<widget size="120x96" type="*widget.entryContent">
+ 					<widget size="0x0" type="*widget.selectable">
+ 						<rectangle fillColor="selection" pos="37,6" size="18x19"/>
+-						<rectangle fillColor="selection" pos="7,25" size="15x19"/>
++						<rectangle fillColor="selection" pos="7,29" size="15x19"/>
+ 					</widget>
+ 					<widget size="120x96" type="*widget.RichText">
+ 						<text pos="8,6" size="47x19">Testing</text>
+-						<text pos="8,25" size="47x19">Testing</text>
+-						<text pos="8,44" size="47x19">Testing</text>
++						<text pos="8,29" size="47x19">Testing</text>
++						<text pos="8,52" size="47x19">Testing</text>
+ 					</widget>
+ 					<rectangle fillColor="primary" pos="37,6" size="2x19"/>
+ 				</widget>
+diff --git a/widget/testdata/entry/selection_remove_one_row_up.xml b/widget/testdata/entry/selection_remove_one_row_up.xml
+index d22b9f41a..ad49242eb 100644
+--- a/widget/testdata/entry/selection_remove_one_row_up.xml
++++ b/widget/testdata/entry/selection_remove_one_row_up.xml
+@@ -6,14 +6,14 @@
+ 			<widget pos="0,2" size="120x96" type="*widget.Scroll">
+ 				<widget size="120x96" type="*widget.entryContent">
+ 					<widget size="0x0" type="*widget.selectable">
+-						<rectangle fillColor="selection" pos="21,25" size="16x19"/>
++						<rectangle fillColor="selection" pos="21,29" size="16x19"/>
+ 					</widget>
+ 					<widget size="120x96" type="*widget.RichText">
+ 						<text pos="8,6" size="47x19">Testing</text>
+-						<text pos="8,25" size="47x19">Testing</text>
+-						<text pos="8,44" size="47x19">Testing</text>
++						<text pos="8,29" size="47x19">Testing</text>
++						<text pos="8,52" size="47x19">Testing</text>
+ 					</widget>
+-					<rectangle fillColor="primary" pos="37,25" size="2x19"/>
++					<rectangle fillColor="primary" pos="37,29" size="2x19"/>
+ 				</widget>
+ 			</widget>
+ 		</widget>
+diff --git a/widget/testdata/entry/selection_replace.xml b/widget/testdata/entry/selection_replace.xml
+index 331dcb404..12de03923 100644
+--- a/widget/testdata/entry/selection_replace.xml
++++ b/widget/testdata/entry/selection_replace.xml
+@@ -7,10 +7,10 @@
+ 				<widget size="120x96" type="*widget.entryContent">
+ 					<widget size="120x96" type="*widget.RichText">
+ 						<text pos="8,6" size="47x19">Testing</text>
+-						<text pos="8,25" size="64x19">Tehellong</text>
+-						<text pos="8,44" size="47x19">Testing</text>
++						<text pos="8,29" size="64x19">Tehellong</text>
++						<text pos="8,52" size="47x19">Testing</text>
+ 					</widget>
+-					<rectangle fillColor="primary" pos="53,25" size="2x19"/>
++					<rectangle fillColor="primary" pos="53,29" size="2x19"/>
+ 				</widget>
+ 			</widget>
+ 		</widget>
+diff --git a/widget/testdata/entry/selection_snap_down.xml b/widget/testdata/entry/selection_snap_down.xml
+index a7ed5c51e..45c6a718e 100644
+--- a/widget/testdata/entry/selection_snap_down.xml
++++ b/widget/testdata/entry/selection_snap_down.xml
+@@ -7,10 +7,10 @@
+ 				<widget size="120x96" type="*widget.entryContent">
+ 					<widget size="120x96" type="*widget.RichText">
+ 						<text pos="8,6" size="47x19">Testing</text>
+-						<text pos="8,25" size="47x19">Testing</text>
+-						<text pos="8,44" size="47x19">Testing</text>
++						<text pos="8,29" size="47x19">Testing</text>
++						<text pos="8,52" size="47x19">Testing</text>
+ 					</widget>
+-					<rectangle fillColor="primary" pos="37,44" size="2x19"/>
++					<rectangle fillColor="primary" pos="37,52" size="2x19"/>
+ 				</widget>
+ 			</widget>
+ 		</widget>
+diff --git a/widget/testdata/entry/selection_snap_left.xml b/widget/testdata/entry/selection_snap_left.xml
+index dcb9c591a..46d9751a6 100644
+--- a/widget/testdata/entry/selection_snap_left.xml
++++ b/widget/testdata/entry/selection_snap_left.xml
+@@ -7,10 +7,10 @@
+ 				<widget size="120x96" type="*widget.entryContent">
+ 					<widget size="120x96" type="*widget.RichText">
+ 						<text pos="8,6" size="47x19">Testing</text>
+-						<text pos="8,25" size="47x19">Testing</text>
+-						<text pos="8,44" size="47x19">Testing</text>
++						<text pos="8,29" size="47x19">Testing</text>
++						<text pos="8,52" size="47x19">Testing</text>
+ 					</widget>
+-					<rectangle fillColor="primary" pos="21,25" size="2x19"/>
++					<rectangle fillColor="primary" pos="21,29" size="2x19"/>
+ 				</widget>
+ 			</widget>
+ 		</widget>
+diff --git a/widget/testdata/entry/selection_snap_right.xml b/widget/testdata/entry/selection_snap_right.xml
+index 5a4700a76..1e104e86b 100644
+--- a/widget/testdata/entry/selection_snap_right.xml
++++ b/widget/testdata/entry/selection_snap_right.xml
+@@ -7,10 +7,10 @@
+ 				<widget size="120x96" type="*widget.entryContent">
+ 					<widget size="120x96" type="*widget.RichText">
+ 						<text pos="8,6" size="47x19">Testing</text>
+-						<text pos="8,25" size="47x19">Testing</text>
+-						<text pos="8,44" size="47x19">Testing</text>
++						<text pos="8,29" size="47x19">Testing</text>
++						<text pos="8,52" size="47x19">Testing</text>
+ 					</widget>
+-					<rectangle fillColor="primary" pos="37,25" size="2x19"/>
++					<rectangle fillColor="primary" pos="37,29" size="2x19"/>
+ 				</widget>
+ 			</widget>
+ 		</widget>
+diff --git a/widget/testdata/entry/selection_snap_up.xml b/widget/testdata/entry/selection_snap_up.xml
+index 21ab57933..adef0cd2b 100644
+--- a/widget/testdata/entry/selection_snap_up.xml
++++ b/widget/testdata/entry/selection_snap_up.xml
+@@ -7,8 +7,8 @@
+ 				<widget size="120x96" type="*widget.entryContent">
+ 					<widget size="120x96" type="*widget.RichText">
+ 						<text pos="8,6" size="47x19">Testing</text>
+-						<text pos="8,25" size="47x19">Testing</text>
+-						<text pos="8,44" size="47x19">Testing</text>
++						<text pos="8,29" size="47x19">Testing</text>
++						<text pos="8,52" size="47x19">Testing</text>
+ 					</widget>
+ 					<rectangle fillColor="primary" pos="37,6" size="2x19"/>
+ 				</widget>
+diff --git a/widget/testdata/entry/tapped_focused.xml b/widget/testdata/entry/tapped_focused.xml
+index 85aafd5b9..f3d032acd 100644
+--- a/widget/testdata/entry/tapped_focused.xml
++++ b/widget/testdata/entry/tapped_focused.xml
+@@ -7,8 +7,8 @@
+ 				<widget size="120x96" type="*widget.entryContent">
+ 					<widget size="120x96" type="*widget.RichText">
+ 						<text pos="8,6" size="38x19">MMM</text>
+-						<text pos="8,25" size="39x19">WWW</text>
+-						<text pos="8,44" size="0x19"></text>
++						<text pos="8,29" size="39x19">WWW</text>
++						<text pos="8,52" size="0x19"></text>
+ 					</widget>
+ 					<rectangle fillColor="primary" pos="7,6" size="2x19"/>
+ 				</widget>
+diff --git a/widget/testdata/entry/tapped_initial.xml b/widget/testdata/entry/tapped_initial.xml
+index 2e90f6d44..5974c4d7e 100644
+--- a/widget/testdata/entry/tapped_initial.xml
++++ b/widget/testdata/entry/tapped_initial.xml
+@@ -7,8 +7,8 @@
+ 				<widget size="120x96" type="*widget.entryContent">
+ 					<widget size="120x96" type="*widget.RichText">
+ 						<text pos="8,6" size="38x19">MMM</text>
+-						<text pos="8,25" size="39x19">WWW</text>
+-						<text pos="8,44" size="0x19"></text>
++						<text pos="8,29" size="39x19">WWW</text>
++						<text pos="8,52" size="0x19"></text>
+ 					</widget>
+ 				</widget>
+ 			</widget>
+diff --git a/widget/testdata/entry/tapped_tapped_2nd_m.xml b/widget/testdata/entry/tapped_tapped_2nd_m.xml
+index e6609d028..b8ecf37ff 100644
+--- a/widget/testdata/entry/tapped_tapped_2nd_m.xml
++++ b/widget/testdata/entry/tapped_tapped_2nd_m.xml
+@@ -7,8 +7,8 @@
+ 				<widget size="120x96" type="*widget.entryContent">
+ 					<widget size="120x96" type="*widget.RichText">
+ 						<text pos="8,6" size="38x19">MMM</text>
+-						<text pos="8,25" size="39x19">WWW</text>
+-						<text pos="8,44" size="0x19"></text>
++						<text pos="8,29" size="39x19">WWW</text>
++						<text pos="8,52" size="0x19"></text>
+ 					</widget>
+ 					<rectangle fillColor="primary" pos="19,6" size="2x19"/>
+ 				</widget>
+diff --git a/widget/testdata/entry/tapped_tapped_3rd_m.xml b/widget/testdata/entry/tapped_tapped_3rd_m.xml
+index 98c6352d4..b341b7cb6 100644
+--- a/widget/testdata/entry/tapped_tapped_3rd_m.xml
++++ b/widget/testdata/entry/tapped_tapped_3rd_m.xml
+@@ -7,8 +7,8 @@
+ 				<widget size="120x96" type="*widget.entryContent">
+ 					<widget size="120x96" type="*widget.RichText">
+ 						<text pos="8,6" size="38x19">MMM</text>
+-						<text pos="8,25" size="39x19">WWW</text>
+-						<text pos="8,44" size="0x19"></text>
++						<text pos="8,29" size="39x19">WWW</text>
++						<text pos="8,52" size="0x19"></text>
+ 					</widget>
+ 					<rectangle fillColor="primary" pos="32,6" size="2x19"/>
+ 				</widget>
+diff --git a/widget/testdata/entry/tapped_tapped_after_last_col.xml b/widget/testdata/entry/tapped_tapped_after_last_col.xml
+index e653fb13c..5ceb9b7a6 100644
+--- a/widget/testdata/entry/tapped_tapped_after_last_col.xml
++++ b/widget/testdata/entry/tapped_tapped_after_last_col.xml
+@@ -7,8 +7,8 @@
+ 				<widget size="120x96" type="*widget.entryContent">
+ 					<widget size="120x96" type="*widget.RichText">
+ 						<text pos="8,6" size="38x19">MMM</text>
+-						<text pos="8,25" size="39x19">WWW</text>
+-						<text pos="8,44" size="0x19"></text>
++						<text pos="8,29" size="39x19">WWW</text>
++						<text pos="8,52" size="0x19"></text>
+ 					</widget>
+ 					<rectangle fillColor="primary" pos="45,6" size="2x19"/>
+ 				</widget>
+diff --git a/widget/testdata/entry/tapped_tapped_after_last_row.xml b/widget/testdata/entry/tapped_tapped_after_last_row.xml
+index 9c4701c4d..9a1dacff9 100644
+--- a/widget/testdata/entry/tapped_tapped_after_last_row.xml
++++ b/widget/testdata/entry/tapped_tapped_after_last_row.xml
+@@ -7,10 +7,10 @@
+ 				<widget size="120x96" type="*widget.entryContent">
+ 					<widget size="120x96" type="*widget.RichText">
+ 						<text pos="8,6" size="38x19">MMM</text>
+-						<text pos="8,25" size="39x19">WWW</text>
+-						<text pos="8,44" size="0x19"></text>
++						<text pos="8,29" size="39x19">WWW</text>
++						<text pos="8,52" size="0x19"></text>
+ 					</widget>
+-					<rectangle fillColor="primary" pos="7,44" size="2x19"/>
++					<rectangle fillColor="primary" pos="7,52" size="2x19"/>
+ 				</widget>
+ 			</widget>
+ 		</widget>
+diff --git a/widget/testdata/entry/wrap_multi_line_wrap_break.xml b/widget/testdata/entry/wrap_multi_line_wrap_break.xml
+index bbfe42882..4c28dba99 100644
+--- a/widget/testdata/entry/wrap_multi_line_wrap_break.xml
++++ b/widget/testdata/entry/wrap_multi_line_wrap_break.xml
+@@ -7,8 +7,8 @@
+ 				<widget size="120x96" type="*widget.entryContent">
+ 					<widget size="120x96" type="*widget.RichText">
+ 						<text pos="8,6" size="101x19">A long text on s</text>
+-						<text pos="8,25" size="103x19">hort words w/o </text>
+-						<text pos="8,44" size="71x19">NLs or LFs.</text>
++						<text pos="8,29" size="103x19">hort words w/o </text>
++						<text pos="8,52" size="71x19">NLs or LFs.</text>
+ 					</widget>
+ 					<rectangle fillColor="primary" pos="7,6" size="2x19"/>
+ 				</widget>
+diff --git a/widget/testdata/entry/wrap_multi_line_wrap_word.xml b/widget/testdata/entry/wrap_multi_line_wrap_word.xml
+index 2167cee07..3ba3ed1fc 100644
+--- a/widget/testdata/entry/wrap_multi_line_wrap_word.xml
++++ b/widget/testdata/entry/wrap_multi_line_wrap_word.xml
+@@ -7,8 +7,8 @@
+ 				<widget size="120x96" type="*widget.entryContent">
+ 					<widget size="120x96" type="*widget.RichText">
+ 						<text pos="8,6" size="91x19">A long text on</text>
+-						<text pos="8,25" size="78x19">short words</text>
+-						<text pos="8,44" size="99x19">w/o NLs or LFs.</text>
++						<text pos="8,29" size="78x19">short words</text>
++						<text pos="8,52" size="99x19">w/o NLs or LFs.</text>
+ 					</widget>
+ 					<rectangle fillColor="primary" pos="7,6" size="2x19"/>
+ 				</widget>
+-- 
+2.54.0 (Apple Git-157)
+

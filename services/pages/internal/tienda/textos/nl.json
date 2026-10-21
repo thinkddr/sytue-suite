@@ -1,0 +1,10 @@
+{
+  "order_paid_buyer_subject": "Bestelbevestiging {number}",
+  "order_paid_buyer_body": "Bedankt voor je aankoop. Bestelling {number} is bevestigd.",
+  "order_paid_store_subject": "Nieuwe bestelling ontvangen: {number}",
+  "order_paid_store_body": "Je hebt een nieuwe bestelling {number} ontvangen voor {total}.",
+  "withdrawal_ack_subject": "Herroepingsbevestiging ontvangen: {number}",
+  "withdrawal_ack_body": "Je herroepingsverzoek voor bestelling {number} is geregistreerd.",
+  "form_received_subject": "Formulierinzending ontvangen: {form_id}",
+  "form_received_body": "Er is een nieuwe inzending ontvangen voor formulier {form_id}."
+}

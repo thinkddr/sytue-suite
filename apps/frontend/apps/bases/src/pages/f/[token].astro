@@ -1,0 +1,23 @@
+---
+/**
+ * El formulario público de una base (enlace revocable, sin sesión). Cualquiera con el
+ * enlace puede añadir un registro a la tabla; nadie ve nada más. Un enlace que no existe,
+ * caducó, se agotó o se revocó se ve igual: «no disponible».
+ */
+import AppLayout from '../../layouts/AppLayout.astro';
+import { FormularioPublico } from '../../islands/FormularioPublico.js';
+import { leerFormulario } from '../../lib/formulario.js';
+import { useT } from '../../i18n/index.js';
+
+export const prerender = false;
+
+const locale = Astro.locals.locale;
+const t = useT(locale);
+const token = Astro.params.token ?? '';
+const def = await leerFormulario(token, Astro.request);
+if (!def) Astro.response.status = 404;
+---
+
+<AppLayout title={def ? `${def.name} · Bases` : `${t('form.unavailable.title')} · Bases`}>
+  <FormularioPublico slot="app" client:load locale={locale} definicion={def} />
+</AppLayout>

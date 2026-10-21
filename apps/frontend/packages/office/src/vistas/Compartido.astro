@@ -1,0 +1,140 @@
+---
+/**
+ * /s/{token} — un documento COMPARTIDO por enlace, en solo lectura y SIN sesión.
+ *
+ * Es la dirección que copia «Compartir» (la web y las apps nativas) y hasta ahora
+ * no existía en ningún sitio: el enlace se creaba, se copiaba… y daba un 404.
+ *
+ * La credencial es el token, así que no hay AppLayout —que redirige a login— ni
+ * Sytue Shell: quien abre esto puede no tener cuenta. El servicio Go da el
+ * documento ya exportado a HTML (`/api/v1/share/{token}/view`) y cualquier fallo
+ * —token caducado, revocado, inventado o el servicio caído— se contesta con el
+ * mismo 404: distinguirlos diría qué tokens son válidos. Mismo patrón que el
+ * `/p/{token}` de SyPhotos.
+ *
+ * El HTML es el del editor y NO está saneado: lo escribió quien comparte. Por eso
+ * va en un `<iframe sandbox>` sin `allow-scripts` ni `allow-same-origin`: ni un
+ * script corre ni hereda el origen de la suite, donde el visitante puede tener
+ * sesión. Sus enlaces abren en otra pestaña (`<base target="_blank">` más
+ * `allow-popups-to-escape-sandbox`, para que la página de destino no nazca
+ * encerrada en el sandbox).
+ *
+ * Un enlace CON CONTRASEÑA no enseña nada hasta que se da: el servicio contesta 401 y
+ * aquí se pinta solo el formulario (`s/[token]/desbloquear.ts` la manda a comprobar). El
+ * título del documento tampoco sale antes: forma parte de lo protegido.
+ *
+ * «Abrir en el editor» solo con un enlace de editor o comentarista: canjea el
+ * enlace por un permiso de quien inicia sesión, también desde otra organización
+ * (`s/[token]/abrir.ts`, ADR 0052), y lleva al editor.
+ */
+import { Button, Input, SUFIJO_ICONOS, appForKey, themeInitScript, withBase } from '@sytue/ui';
+import { serverEnv } from '@sytue/auth/server';
+import { htmlLangAttrs } from '@sytue/i18n';
+import { docsT } from '../i18n';
+import { rutaPublica } from '../lib/enlaceClave';
+import type { VistaCompartida } from './entrar';
+import '../styles/global.css';
+
+interface Props {
+  /** La de `vistaCompartida(Astro)`; `null` = el enlace pide contraseña. */
+  vista: VistaCompartida | null;
+}
+
+const { vista } = Astro.props;
+const token = Astro.params.token ?? '';
+
+const locale = Astro.locals.locale;
+const { lang, dir } = htmlLangAttrs(locale);
+const t = docsT(locale);
+const prefijo = serverEnv(import.meta.env).SYTUE_BASE_PATH ?? import.meta.env.BASE_URL;
+const producto =
+  vista?.kind === 'spreadsheet' ? 'sheets' : vista?.kind === 'presentation' ? 'slides' : 'docs';
+const editable = vista?.role === 'editor' || vista?.role === 'commenter';
+// ponytail: una sustitución de texto sobre la cabecera que escribe el export del
+// servicio (`<head><meta charset…>`); si algún día no la trae, los enlaces se
+// abren dentro del marco, que es feo pero no inseguro.
+const html = vista?.html.replace('<head>', '<head><base target="_blank">') ?? '';
+const titulo = vista?.title ?? t('public.password.title');
+// Por qué se vuelve al formulario: contraseña errónea o demasiados intentos.
+const motivo = Astro.url.searchParams.get('clave');
+---
+
+<!doctype html>
+<html lang={lang} dir={dir} class="h-full" data-app={producto}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="referrer" content="no-referrer" />
+    <link
+      rel="icon"
+      href={withBase(prefijo, '/favicon.svg') + SUFIJO_ICONOS}
+      type="image/svg+xml"
+    />
+    <title>{titulo}</title>
+    <script is:inline set:html={themeInitScript}></script>
+  </head>
+  <body class="bg-bg text-text flex h-full flex-col antialiased">
+    {vista ? (
+      <>
+        <header class="border-border flex flex-wrap items-center gap-3 border-b px-4 py-3">
+          <h1 class="min-w-0 flex-1 truncate text-lg font-semibold" title={vista.title}>
+            {vista.title}
+          </h1>
+          <span class="text-text-muted text-sm">{t('public.readOnly')}</span>
+          {editable ? (
+            <form method="post" action={rutaPublica(token, '/abrir')}>
+              <Button variant="primary" size="sm" type="submit">
+                {t('public.openInEditor')}
+              </Button>
+            </form>
+          ) : null}
+        </header>
+        {/* Sin fondo propio: el documento no declara `color-scheme`, así que en tema
+              oscuro el navegador le pinta un lienzo claro opaco y se lee como papel. */}
+        <iframe
+          title={vista.title}
+          srcdoc={html}
+          sandbox="allow-popups allow-popups-to-escape-sandbox"
+          referrerpolicy="no-referrer"
+          class="min-h-0 w-full flex-1 border-0"
+        ></iframe>
+      </>
+    ) : (
+      <main class="flex min-h-0 flex-1 items-center justify-center p-4">
+        <form
+          method="post"
+          action={rutaPublica(token, '/desbloquear')}
+          class="border-border bg-surface flex w-full max-w-sm flex-col gap-3 rounded-lg border p-5"
+        >
+          <h1 class="text-lg font-semibold">{t('public.password.title')}</h1>
+          <p class="text-text-muted text-sm">{t('public.password.help')}</p>
+          <label class="flex flex-col gap-1" for="share-password">
+            <span class="text-sm font-medium">{t('public.password.label')}</span>
+            <Input
+              id="share-password"
+              name="password"
+              type="password"
+              required
+              maxLength={128}
+              autoComplete="off"
+              autoFocus
+            />
+          </label>
+          {motivo ? (
+            <p class="text-danger-text text-sm" role="alert">
+              {t(motivo === 'espera' ? 'public.password.wait' : 'public.password.wrong')}
+            </p>
+          ) : null}
+          <Button variant="primary" type="submit">
+            {t('public.password.submit')}
+          </Button>
+        </form>
+      </main>
+    )}
+    <p class="text-text-subtle py-2 text-center text-xs">
+      {t('public.by', { app: appForKey(producto)?.name ?? 'Sytue' })}
+    </p>
+  </body>
+</html>

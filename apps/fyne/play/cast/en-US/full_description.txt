@@ -1,0 +1,17 @@
+Your videos and your live streams, on demand and in real time, without leaving Europe.
+
+• Upload a video and it is transcoded into several qualities for any screen.
+• Go live from broadcasting software, from the browser or from the app.
+• Four levels of visibility: public, unlisted, organisation or specific people.
+• Live chat and comments, with basic moderation by the owner.
+• Upload videos of up to 8 GiB; the original is kept.
+• Live streaming from broadcasting software over RTMP, with a stream key per person.
+• Live from the browser or the app: camera, screen and microphone.
+• Live recordings become videos on demand automatically.
+• A public front page and a channel per organisation, indexable.
+• Unlisted links, organisation-only videos, or access for specific people by @username.
+• Live chat and threaded comments, moderated by the owner and the organisation admins.
+• Storage counted against your Sytue Drive quota; everything in the European Union.
+• “Upload to Cast” from Sytue Drive: a copy of the video goes to Cast and the file stays in Drive.
+
+Encrypted in transit (TLS 1.3). Sytue’s infrastructure is in the EU. The location of external services depends on their provider.

@@ -1,0 +1,16 @@
+{
+  "id": "sveltekit",
+  "name": "SvelteKit",
+  "description": "Empieza con estos ajustes para una app SvelteKit con render en servidor.",
+  "version": "1.0.0",
+  "license": "Apache-2.0",
+  "maintainer": "Sytue",
+  "framework": "node",
+  "build": {
+    "strategy": "buildpacks",
+    "install": "bun install --frozen-lockfile",
+    "build": "bun run build"
+  },
+  "docs_url": "https://svelte.dev/docs/kit",
+  "tags": ["ssr", "svelte"]
+}

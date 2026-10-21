@@ -1,0 +1,12 @@
+{
+  "@odata.context": "$metadata#Products",
+  "value": [
+    {
+      "@odata.etag": "W/\"3\"",
+      "ID": 3,
+      "Name": "Gizmo",
+      "Price": 4.25,
+      "Active": true
+    }
+  ]
+}

@@ -1,0 +1,559 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Daniel Delgado Ramos
+openapi: 3.1.0
+info:
+  title: Sytue Calendar API
+  version: "1.0.0"
+  description: >-
+    API REST de Sytue Calendar (servicio Go propio, clean-room sobre estandares
+    abiertos). Calendarios y eventos con recurrencias RFC 5545 (RRULE/RDATE/
+    EXDATE), invitaciones/scheduling iTIP (RFC 5546 / RFC 6638) y free/busy
+    (RFC 4791). Estado en PostgreSQL. El servidor CalDAV (RFC 4791) se expone
+    aparte bajo el prefijo `/dav` (no documentado aqui; es protocolo WebDAV).
+    Autenticacion: JWT de Sytue ID validado por JWKS. Aislamiento multi-tenant
+    por RLS. Código Apache-2.0, (c) 2026 Daniel Delgado Ramos.
+  license:
+    name: MIT
+  contact:
+    name: Sytue Platform
+    email: platform@sytue.eu
+
+servers:
+  - url: https://calendar.sytue.eu
+    description: Produccion
+  - url: https://calendar.sytue.localhost
+    description: Desarrollo local (Traefik + mkcert)
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Calendarios
+  - name: Eventos
+  - name: Free/Busy
+  - name: Invitaciones
+  - name: Salud
+
+paths:
+  /healthz:
+    get:
+      tags: [Salud]
+      summary: Liveness
+      security: []
+      responses:
+        "200":
+          description: El proceso esta vivo.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+                  version: { type: string }
+  /readyz:
+    get:
+      tags: [Salud]
+      summary: Readiness (comprueba dependencias)
+      security: []
+      responses:
+        "200": { description: Listo. }
+        "503": { description: No listo (alguna dependencia caida). }
+
+  /api/v1/calendars:
+    get:
+      tags: [Calendarios]
+      summary: Lista los calendarios del usuario
+      responses:
+        "200":
+          description: Lista de calendarios.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  calendars:
+                    type: array
+                    items: { $ref: "#/components/schemas/Calendar" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [Calendarios]
+      summary: Crea un calendario (coleccion CalDAV)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateCalendar" }
+      responses:
+        "201":
+          description: Calendario creado.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Calendar" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /api/v1/calendars/{id}:
+    parameters:
+      - $ref: "#/components/parameters/PathID"
+    get:
+      tags: [Calendarios]
+      summary: Obtiene un calendario
+      responses:
+        "200":
+          description: Calendario.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Calendar" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [Calendarios]
+      summary: Actualiza un calendario (parcial)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateCalendar" }
+      responses:
+        "200":
+          description: Calendario actualizado.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Calendar" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Calendarios]
+      summary: Borra un calendario (no el por defecto)
+      responses:
+        "204": { description: Borrado. }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/calendars/{id}/events:
+    parameters:
+      - $ref: "#/components/parameters/PathID"
+    post:
+      tags: [Eventos]
+      summary: Crea un evento (puntual o recurrente)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EventInput" }
+      responses:
+        "201":
+          description: Evento creado.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Event" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/calendars/{id}/instances:
+    parameters:
+      - $ref: "#/components/parameters/PathID"
+      - $ref: "#/components/parameters/RangeStart"
+      - $ref: "#/components/parameters/RangeEnd"
+    get:
+      tags: [Eventos]
+      summary: Expande las recurrencias del calendario en un rango (calendar-query)
+      description: >-
+        Devuelve las instancias concretas (expandiendo RRULE/RDATE y aplicando
+        EXDATE y los overrides RECURRENCE-ID) que solapan [start, end).
+      responses:
+        "200":
+          description: Instancias en el rango.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  start: { type: string, format: date-time }
+                  end: { type: string, format: date-time }
+                  instances:
+                    type: array
+                    items: { $ref: "#/components/schemas/Instance" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+  /api/v1/events/{id}:
+    parameters:
+      - $ref: "#/components/parameters/PathID"
+    get:
+      tags: [Eventos]
+      summary: Obtiene un evento
+      responses:
+        "200":
+          description: Evento, con sus recordatorios editables.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Event"
+                  - type: object
+                    properties:
+                      reminders:
+                        type: array
+                        items: { type: integer }
+                        description: "Minutos antes del inicio. Solo en este endpoint: leerlos pide el recurso iCalendar."
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [Eventos]
+      summary: Actualiza un evento
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EventInput" }
+      responses:
+        "200":
+          description: Evento actualizado.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Event" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Eventos]
+      summary: Borra un evento (entrega CANCEL a los asistentes)
+      responses:
+        "204": { description: Borrado. }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/events/{id}/attendees/partstat:
+    parameters:
+      - $ref: "#/components/parameters/PathID"
+    put:
+      tags: [Eventos]
+      summary: Fija el PARTSTAT de un asistente (RSVP)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  description: Asistente; por defecto el propio usuario.
+                partstat:
+                  $ref: "#/components/schemas/PartStat"
+              required: [partstat]
+      responses:
+        "200":
+          description: Asistente actualizado.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Attendee" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/freebusy:
+    parameters:
+      - $ref: "#/components/parameters/RangeStart"
+      - $ref: "#/components/parameters/RangeEnd"
+      - name: user
+        in: query
+        required: false
+        schema: { type: string }
+        description: Sub del usuario a consultar; por defecto el autenticado.
+    get:
+      tags: [Free/Busy]
+      summary: Disponibilidad (free/busy) de un usuario
+      responses:
+        "200":
+          description: Periodos ocupados fusionados.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user: { type: string }
+                  start: { type: string, format: date-time }
+                  end: { type: string, format: date-time }
+                  periods:
+                    type: array
+                    items: { $ref: "#/components/schemas/FreeBusyPeriod" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+  /api/v1/invitations:
+    get:
+      tags: [Invitaciones]
+      summary: Bandeja de planificacion (scheduling inbox) del usuario
+      parameters:
+        - name: pending
+          in: query
+          required: false
+          schema: { type: boolean }
+          description: Si true, solo invitaciones pendientes de respuesta.
+      responses:
+        "200":
+          description: Invitaciones.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  invitations:
+                    type: array
+                    items: { $ref: "#/components/schemas/Invitation" }
+
+  /api/v1/invitations/{id}/respond:
+    parameters:
+      - $ref: "#/components/parameters/PathID"
+    post:
+      tags: [Invitaciones]
+      summary: Responde a una invitacion (accept/decline/tentative)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [accepted, declined, tentative]
+              required: [status]
+      responses:
+        "200":
+          description: Invitacion respondida (se entrega REPLY al organizador).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Invitation" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT emitido por Sytue ID (validado por JWKS).
+
+  parameters:
+    PathID:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    RangeStart:
+      name: start
+      in: query
+      required: true
+      schema: { type: string, format: date-time }
+      description: Inicio del rango (RFC3339).
+    RangeEnd:
+      name: end
+      in: query
+      required: true
+      schema: { type: string, format: date-time }
+      description: Fin del rango (RFC3339), exclusivo.
+
+  responses:
+    Unauthorized:
+      description: Autenticacion requerida.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Forbidden:
+      description: Permiso insuficiente.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NotFound:
+      description: Recurso no encontrado.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    BadRequest:
+      description: Solicitud invalida.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Conflict:
+      description: Conflicto de unicidad.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code: { type: string }
+            message: { type: string }
+            details: {}
+        request_id: { type: string }
+
+    Calendar:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        owner_sub: { type: string }
+        name: { type: string }
+        display_name: { type: string }
+        description: { type: string }
+        color: { type: string, example: "#3B82F6" }
+        timezone: { type: string, example: "Europe/Madrid" }
+        components:
+          type: array
+          items: { type: string, enum: [VEVENT, VTODO, VJOURNAL] }
+        is_default: { type: boolean }
+        ctag: { type: string, format: uuid }
+        sync_token: { type: integer, format: int64 }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    CreateCalendar:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        display_name: { type: string }
+        description: { type: string }
+        color: { type: string }
+        timezone: { type: string }
+        components:
+          type: array
+          items: { type: string }
+
+    UpdateCalendar:
+      type: object
+      properties:
+        display_name: { type: string }
+        description: { type: string }
+        color: { type: string }
+        timezone: { type: string }
+
+    EventInput:
+      type: object
+      required: [start, end]
+      properties:
+        uid: { type: string, description: "Opcional; se genera si falta." }
+        summary: { type: string }
+        description: { type: string }
+        location: { type: string }
+        organizer: { type: string, description: "Email; por defecto el del usuario." }
+        start: { type: string, format: date-time }
+        end: { type: string, format: date-time }
+        tzid: { type: string, example: "Europe/Madrid" }
+        all_day: { type: boolean }
+        status: { $ref: "#/components/schemas/EventStatus" }
+        classification: { type: string, enum: [PUBLIC, PRIVATE, CONFIDENTIAL] }
+        transp: { type: string, enum: [OPAQUE, TRANSPARENT] }
+        rrule:
+          type: string
+          description: "Regla de recurrencia RFC 5545, p. ej. FREQ=WEEKLY;BYDAY=MO,WE,FR."
+          example: "FREQ=WEEKLY;BYDAY=MO;COUNT=10"
+        rdate:
+          type: array
+          items: { type: string, format: date-time }
+        exdate:
+          type: array
+          items: { type: string, format: date-time }
+        attendees:
+          type: array
+          items: { $ref: "#/components/schemas/AttendeeInput" }
+        send:
+          type: boolean
+          description: "Si true, entrega invitaciones iTIP a los asistentes."
+        reminders:
+          type: array
+          nullable: true
+          items: { type: integer, minimum: 0 }
+          description: "Recordatorios en minutos ANTES del inicio (0, en el momento). Ausente o null, se conservan los que haya; una lista, aunque vacía, sustituye a los editables y conserva los que la API no expresa (correo, hora fija, relativos al final)."
+
+    Event:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        calendar_id: { type: string, format: uuid }
+        object_id: { type: string, format: uuid }
+        uid: { type: string }
+        summary: { type: string }
+        description: { type: string }
+        location: { type: string }
+        organizer: { type: string }
+        dtstart: { type: string, format: date-time }
+        dtend: { type: string, format: date-time }
+        tzid: { type: string }
+        all_day: { type: boolean }
+        status: { $ref: "#/components/schemas/EventStatus" }
+        classification: { type: string }
+        transp: { type: string }
+        rrule: { type: string }
+        rdate:
+          type: array
+          items: { type: string, format: date-time }
+        exdate:
+          type: array
+          items: { type: string, format: date-time }
+        recurrence_end: { type: string, format: date-time, nullable: true }
+        recurrence_id: { type: string, format: date-time, nullable: true }
+        sequence_no: { type: integer }
+        attendees:
+          type: array
+          items: { $ref: "#/components/schemas/Attendee" }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    Instance:
+      type: object
+      properties:
+        event: { $ref: "#/components/schemas/Event" }
+        start: { type: string, format: date-time }
+        end: { type: string, format: date-time }
+        is_override: { type: boolean }
+
+    EventStatus:
+      type: string
+      enum: [CONFIRMED, TENTATIVE, CANCELLED]
+
+    PartStat:
+      type: string
+      enum: [NEEDS-ACTION, ACCEPTED, DECLINED, TENTATIVE, DELEGATED]
+
+    AttendeeInput:
+      type: object
+      required: [email]
+      properties:
+        email: { type: string }
+        common_name: { type: string }
+        role: { type: string, enum: [CHAIR, REQ-PARTICIPANT, OPT-PARTICIPANT, NON-PARTICIPANT] }
+        partstat: { $ref: "#/components/schemas/PartStat" }
+        cutype: { type: string, enum: [INDIVIDUAL, GROUP, RESOURCE, ROOM, UNKNOWN] }
+        rsvp: { type: boolean }
+
+    Attendee:
+      allOf:
+        - $ref: "#/components/schemas/AttendeeInput"
+        - type: object
+          properties:
+            id: { type: string, format: uuid }
+
+    FreeBusyPeriod:
+      type: object
+      properties:
+        start: { type: string, format: date-time }
+        end: { type: string, format: date-time }
+        type:
+          type: string
+          enum: [BUSY, BUSY-TENTATIVE, BUSY-UNAVAILABLE, FREE]
+
+    Invitation:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        event_id: { type: string, format: uuid, nullable: true }
+        uid: { type: string }
+        method:
+          type: string
+          enum: [REQUEST, REPLY, CANCEL, ADD, REFRESH, COUNTER, DECLINECOUNTER]
+        organizer: { type: string }
+        recipient: { type: string }
+        sequence_no: { type: integer }
+        status:
+          type: string
+          enum: [pending, accepted, declined, tentative, delivered, cancelled]
+        created_at: { type: string, format: date-time }
+        responded_at: { type: string, format: date-time, nullable: true }

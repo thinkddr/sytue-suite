@@ -1,0 +1,1 @@
+Mõistlikud numbrid tabelis, mis töötab koos teiega.

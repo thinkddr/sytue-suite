@@ -1,0 +1,95 @@
+{
+  "key": "google-workspace",
+  "tier": "tier2",
+  "manifest": {
+    "name": "Google Workspace",
+    "description": "Traer a Sytue lo que tienes en Google con un solo inicio de sesión: Drive (con Documentos, Hojas y Presentaciones EDITABLES en Sytue Docs), contactos, el correo de Gmail con sus carpetas y estados, y los calendarios con sus repeticiones, asistentes y zonas horarias. También sirve de inicio de sesión único y de origen de datos del Directorio.",
+    "category": "Productividad",
+    "color": "#4285F4",
+    "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#4285F4\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"3\" y=\"5\" width=\"18\" height=\"14\" rx=\"2\"/><line x1=\"3\" y1=\"9\" x2=\"21\" y2=\"9\"/><circle cx=\"12\" cy=\"14\" r=\"2.5\"/></svg>",
+    "identity": {
+      "kind": "saml",
+      "entity_id": "google.com/a/{domain}",
+      "acs_url": "https://www.google.com/a/{domain}/acs",
+      "name_id_format": "email"
+    },
+    "provisioning": "none",
+    "data": "gws",
+    "launch": {
+      "kind": "initiate"
+    },
+    "fields": [
+      {
+        "key": "domain",
+        "label": "Dominio de Google Workspace",
+        "placeholder": "acme.com",
+        "help": "El dominio principal de tu organización en Google Workspace.",
+        "required": true
+      },
+      {
+        "key": "admin_email",
+        "label": "Administrador delegado",
+        "placeholder": "admin@acme.com",
+        "help": "El superadministrador que la cuenta de servicio impersona (delegación a nivel de dominio) para leer el Directorio.",
+        "required": true
+      }
+    ],
+    "oauth": {
+      "authorize_url": "https://accounts.google.com/o/oauth2/v2/auth?access_type=offline&prompt=consent",
+      "token_url": "https://oauth2.googleapis.com/token",
+      "scopes": [
+        "openid",
+        "email",
+        "https://www.googleapis.com/auth/drive.readonly",
+        "https://www.googleapis.com/auth/contacts.readonly",
+        "https://www.googleapis.com/auth/gmail.readonly",
+        "https://www.googleapis.com/auth/calendar.readonly"
+      ],
+      "write_scopes": [
+        "https://www.googleapis.com/auth/drive.file",
+        "https://www.googleapis.com/auth/contacts",
+        "https://www.googleapis.com/auth/gmail.insert",
+        "https://www.googleapis.com/auth/gmail.labels",
+        "https://www.googleapis.com/auth/calendar.app.created"
+      ],
+      "revoke_url": "https://oauth2.googleapis.com/revoke"
+    },
+    "secret": {
+      "label": "Clave de cuenta de servicio (JSON)",
+      "help": "Solo si vas a migrar a TODA la organización: el JSON de una cuenta de servicio con delegación a nivel de dominio. Para traer lo de tu propia cuenta basta con «Conectar con Google»."
+    },
+    "substitutes": [
+      {
+        "product": "mail",
+        "open_url": "https://mail.google.com/a/{domain}"
+      },
+      {
+        "product": "drive",
+        "open_url": "https://drive.google.com/a/{domain}"
+      },
+      {
+        "product": "calendar",
+        "open_url": "https://calendar.google.com/a/{domain}"
+      },
+      {
+        "product": "contacts",
+        "open_url": "https://contacts.google.com/"
+      },
+      {
+        "product": "docs",
+        "open_url": "https://docs.google.com/document/",
+        "document_url": "https://docs.google.com/document/d/{document_id}/edit"
+      },
+      {
+        "product": "sheets",
+        "open_url": "https://docs.google.com/spreadsheets/",
+        "document_url": "https://docs.google.com/spreadsheets/d/{document_id}/edit"
+      },
+      {
+        "product": "slides",
+        "open_url": "https://docs.google.com/presentation/",
+        "document_url": "https://docs.google.com/presentation/d/{document_id}/edit"
+      }
+    ]
+  }
+}

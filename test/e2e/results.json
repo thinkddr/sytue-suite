@@ -1,0 +1,208 @@
+{
+  "config": {
+    "argv": [
+      "/opt/homebrew/Cellar/node/26.5.0/bin/node",
+      "/Users/ddr/Documents/Sytue/sytueOne/test/e2e/node_modules/.bin/playwright",
+      "test",
+      "tests/auth.setup.ts",
+      "--project=setup",
+      "--workers=1"
+    ],
+    "configFile": "/Users/ddr/Documents/Sytue/sytueOne/test/e2e/playwright.config.ts",
+    "rootDir": "/Users/ddr/Documents/Sytue/sytueOne/test/e2e/tests",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/Users/ddr/Documents/Sytue/sytueOne/test/e2e/test-results",
+        "repeatEach": 1,
+        "retries": 1,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "setup",
+        "name": "setup",
+        "testDir": "/Users/ddr/Documents/Sytue/sytueOne/test/e2e/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "/auth\\.setup\\.ts$/"
+        ],
+        "timeout": 45000
+      },
+      {
+        "outputDir": "/Users/ddr/Documents/Sytue/sytueOne/test/e2e/test-results",
+        "repeatEach": 1,
+        "retries": 1,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/Users/ddr/Documents/Sytue/sytueOne/test/e2e/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 45000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "json",
+        {
+          "outputFile": "results.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.61.1",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "auth.setup.ts",
+      "file": "auth.setup.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "autenticación como admin dev",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 300000,
+              "annotations": [
+                {
+                  "type": "slow",
+                  "location": {
+                    "file": "/Users/ddr/Documents/Sytue/sytueOne/test/e2e/tests/auth.setup.ts",
+                    "line": 13,
+                    "column": 9
+                  }
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "setup",
+              "projectName": "setup",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 120218,
+                  "error": {
+                    "message": "Error: page.waitForURL: Timeout 90000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation until \"load\"\n============================================================\n\nCall Log:\n- Timeout 120000ms exceeded while waiting on the predicate",
+                    "stack": "Error: page.waitForURL: Timeout 90000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation until \"load\"\n============================================================\n\nCall Log:\n- Timeout 120000ms exceeded while waiting on the predicate\n    at /Users/ddr/Documents/Sytue/sytueOne/test/e2e/tests/auth.setup.ts:54:6",
+                    "location": {
+                      "file": "/Users/ddr/Documents/Sytue/sytueOne/test/e2e/tests/auth.setup.ts",
+                      "column": 6,
+                      "line": 54
+                    },
+                    "snippet": "  52 |     });\n  53 |     expect(page.url()).not.toMatch(/\\/login\\//);\n> 54 |   }).toPass({ intervals: [13_000], timeout: 120_000 });\n     |      ^\n  55 |   await page\n  56 |     .waitForLoadState(\"networkidle\", { timeout: 15_000 })\n  57 |     .catch(() => {});"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "/Users/ddr/Documents/Sytue/sytueOne/test/e2e/tests/auth.setup.ts",
+                        "column": 6,
+                        "line": 54
+                      },
+                      "message": "Error: page.waitForURL: Timeout 90000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation until \"load\"\n============================================================\n\nCall Log:\n- Timeout 120000ms exceeded while waiting on the predicate\n\n  52 |     });\n  53 |     expect(page.url()).not.toMatch(/\\/login\\//);\n> 54 |   }).toPass({ intervals: [13_000], timeout: 120_000 });\n     |      ^\n  55 |   await page\n  56 |     .waitForLoadState(\"networkidle\", { timeout: 15_000 })\n  57 |     .catch(() => {});\n    at /Users/ddr/Documents/Sytue/sytueOne/test/e2e/tests/auth.setup.ts:54:6"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-08-07T16:55:09.845Z",
+                  "annotations": [
+                    {
+                      "type": "slow",
+                      "location": {
+                        "file": "/Users/ddr/Documents/Sytue/sytueOne/test/e2e/tests/auth.setup.ts",
+                        "line": 13,
+                        "column": 9
+                      }
+                    }
+                  ],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "/Users/ddr/Documents/Sytue/sytueOne/test/e2e/test-results/auth.setup.ts-autenticación-como-admin-dev-setup/error-context.md"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "/Users/ddr/Documents/Sytue/sytueOne/test/e2e/tests/auth.setup.ts",
+                    "column": 6,
+                    "line": 54
+                  }
+                },
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 131994,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 1,
+                  "startTime": "2026-08-07T16:57:11.243Z",
+                  "annotations": [
+                    {
+                      "type": "slow",
+                      "location": {
+                        "file": "/Users/ddr/Documents/Sytue/sytueOne/test/e2e/tests/auth.setup.ts",
+                        "line": 13,
+                        "column": 9
+                      }
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "flaky"
+            }
+          ],
+          "id": "17e3fe6f4d9d8bd79c6b-46f31a79bb915d4239d9",
+          "file": "auth.setup.ts",
+          "line": 10,
+          "column": 1
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-08-07T16:55:09.572Z",
+    "duration": 254471.339,
+    "expected": 0,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 1
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "order_paid_buyer_subject": "Potvrdenie objednávky {number}",
+  "order_paid_buyer_body": "Ďakujeme za váš nákup. Objednávka {number} bola potvrdená.",
+  "order_paid_store_subject": "Prijatá nová objednávka: {number}",
+  "order_paid_store_body": "Boli vám prijatá nová objednávka {number} v sume {total}.",
+  "withdrawal_ack_subject": "Potvrdenie o odstúpení prijaté: {number}",
+  "withdrawal_ack_body": "Vaša žiadosť o odstúpenie od objednávky {number} bola zaevidovaná.",
+  "form_received_subject": "Prijaté odoslanie formulára: {form_id}",
+  "form_received_body": "Bolo prijaté nové odoslanie pre formulár {form_id}."
+}

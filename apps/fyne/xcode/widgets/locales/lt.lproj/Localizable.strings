@@ -1,0 +1,17 @@
+"widgets.open" = "Atverti";
+"widgets.compose" = "Rašyti";
+"widgets.create" = "Kurti įvykį";
+"widgets.notes" = "Užrašai";
+"widgets.rows" = "Eilutės";
+"widgets.pending" = "Laukiama";
+"widgets.channels" = "Kanalai";
+"widgets.photos" = "Nuotraukos";
+"widgets.episodes" = "Epizodai";
+"widgets.apps" = "Programėlės";
+"widgets.calendars" = "Kalendoriai";
+"widgets.address_books" = "Adresų knygos";
+"search.label" = "Bendroji paieška";
+"dataflow.item.files" = "Failai";
+"dataflow.item.events" = "Kalendorius";
+"dataflow.item.documents" = "Dokumentai";
+"dataflow.item.contacts" = "Kontaktai";

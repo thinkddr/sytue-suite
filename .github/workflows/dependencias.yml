@@ -1,0 +1,257 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Daniel Delgado Ramos
+#
+# Renovate: quien ejecuta la política de dependencias que ya estaba escrita.
+#
+# POR QUÉ EXISTE. `renovate.json` lleva escrita desde hace tiempo la política de
+# CONVENTIONS §3 —«siempre última estable, fijada exactamente, actualizada de
+# forma CONTINUA y AUTOMÁTICA», parches con automerge, alertas de vulnerabilidad
+# con prioridad 20— y NADIE la ejecutaba. En GitHub la corre la app de Renovate;
+# aquí no hay app, así que el fichero era decorativo: ni una rama, ni un PR, ni
+# una ejecución. Medido el 2026-08-18, con el resultado esperable —las versiones
+# llevaban sin revisar desde el 2026-08-01 y cuatro componentes se habían quedado
+# atrás sin que nada lo dijera—.
+#
+# EL `schedule` SOLO EXISTE EN LA RAMA POR DEFECTO. El motor de la forja lee las
+# programaciones de `main` y de ninguna otra: mientras esto viva en una rama, el
+# lunes no pasa nada. Es el mismo fallo que dejó el escaneo nocturno sin correr
+# nunca. Para probarlo antes de fusionar está `workflow_dispatch`.
+# El nombre NO es «renovate» y no es cosmética: Forgejo compone el nombre de la red
+# de podman con el del workflow (`…-WORKFLOW-<name>-JOB-…-network`), y los cinco
+# intentos con ese nombre murieron en resolución de DNS —`aardvark-dns failed to
+# start`, `Could not resolve host`, `EAI_AGAIN`— mientras el resto de workflows
+# pasaba en el mismo runner y a la misma hora. Si hay una red huérfana con ese
+# sufijo sirviendo una configuración rota, cambiar el nombre la esquiva.
+#
+# Y aunque la hipótesis no se sostenga, «dependencias» describe mejor lo que hace
+# que el nombre de la herramienta, que es como se nombran los demás workflows de
+# aquí (`imagenes-produccion`, `release-desktop`).
+name: dependencias
+
+on:
+  # Lunes a las 09:45 UTC, que en Europe/Paris son las 11:45 (CEST) o las 10:45
+  # (CET). La ventana de `renovate.json` —"after 10am and before 1pm on monday"—
+  # cubre las dos, porque el cambio de hora mueve una y no la otra. Si se cambia
+  # una, se cambia la otra: fuera de su ventana, Renovate corre y no hace nada.
+  schedule:
+    - cron: "45 9 * * 1"
+  workflow_dispatch:
+    inputs:
+      dry:
+        description: "En seco: calcula todo y NO crea ramas ni PRs"
+        type: choice
+        options:
+          - "false"
+          - "true"
+        required: false
+        default: "false"
+
+# Lo que puede hacer GITHUB_TOKEN en este flujo, y nada más (GitHub lo
+# aplica; en Forgejo este campo se ignoraba y mandaba el token de cada paso).
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  # Renovate consulta commits/{ref}/status y /check-runs antes de decidir qué
+  # hacer con una PR. Sin estos permisos, omitidos = none, abortaba con
+  # integration-unauthorized después de crearla (#585). Solo necesita leerlos.
+  statuses: read
+  checks: read
+
+# `bash` EXPLÍCITO. Dentro de un `container:` GitHub ejecuta los `run:` con
+# `sh -e` y no con bash: `set -o pipefail`, `[[`, los arrays y `<<<` mueren
+# con «Illegal option» (cancelar-al-cerrar, 2026-09-27). Con `shell: bash`
+# es `bash --noprofile --norc -eo pipefail`, que es lo que corría en la forja.
+defaults:
+  run:
+    shell: bash
+
+env:
+  # El checkout lo escribe el runner (uid 1001) y los pasos corren como root dentro
+  # del `container:`: git ve un propietario ajeno, se niega («dubious ownership»)
+  # y `go build` muere con «error obtaining VCS status». La forja montaba el
+  # workspace con el mismo usuario y no lo notaba.
+  GIT_CONFIG_COUNT: "1"
+  GIT_CONFIG_KEY_0: safe.directory
+  GIT_CONFIG_VALUE_0: "*"
+
+# Dos Renovate a la vez sobre el mismo repositorio se pisan las ramas.
+concurrency:
+  group: dependencias
+  cancel-in-progress: false
+
+jobs:
+  actualizar:
+    name: Actualizar dependencias
+    runs-on: sytue-arm64
+    # Los runners propios del frontal (.github/RUNNERS.md): el job en un contenedor
+    # del Docker del CI. SIN el socket de Docker y SIN la caché de Go del host, que
+    # no usa: este job baja y ejecuta medio millar de paquetes de npm con un token
+    # que escribe en el repositorio, y lo que no tiene montado no lo puede tocar
+    # (auditoría 2026-10-06, CI-02 y CI-04).
+    container:
+      image: node:24-bookworm@sha256:64af3819f9275802414d7cdc38c27e9d82bd564dec4d4da87d008255d36c63b4
+    timeout-minutes: 60
+    steps:
+      # EL WORKSPACE DE UN RUNNER PROPIO ES EL QUE DEJÓ EL JOB ANTERIOR. Este job no
+      # clonaba —Renovate clona él mismo lo que analiza— y aun así ejecutaba
+      # `.github/actions/informe/accion.sh` con el token del job: el fichero que
+      # hubiera allí, de la rama o del tag que fuera (CI-08). Se clona lo que se
+      # ejecuta. La credencial no se queda en el árbol.
+      - name: Clonar el repositorio
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Bun para instalar Renovate y jq para su informe
+        run: $GITHUB_WORKSPACE/.github/actions/toolchain/accion.sh bun jq
+
+      # RENOVATE, CON TODO SU ÁRBOL FIJADO. Hasta el 2026-10-06 era
+      # `npx --yes renovate@X`: la versión de Renovate estaba fijada, pero sus ~560
+      # dependencias se resolvían contra npm en cada ejecución, sin lockfile, sin
+      # espera mínima y corriendo sus scripts de instalación, en el mismo paso que
+      # tenía el token (CI-02). Ahora la versión está en tools/renovate/package.json,
+      # el árbol entero con su hash en tools/renovate/bun.lock —que el job
+      # «vulnerabilidades» de security escanea como cualquier otro—, y se instala
+      # sin ejecutar ningún script y en un paso que no ve ningún token.
+      - name: Instalar Renovate con su lockfile
+        working-directory: tools/renovate
+        run: bun install --frozen-lockfile --ignore-scripts
+
+      # Renovate NO usa el clon de arriba: clona el repositorio ÉL MISMO en su
+      # propio directorio de trabajo y lee `renovate.json` de ahí.
+      - name: Ejecutar Renovate
+        env:
+          # En git.gay hacía falta un token de USUARIO: la forja rechazaba el del
+          # propio Actions («user does not exist [uid: 0, name: forgejo-actions]»).
+          # En GitHub el token del job SÍ vale, con los `permissions` de arriba
+          # (contenido y pull requests: crea ramas y PRs). Lo que no hace es
+          # disparar CI sobre esas PRs —GitHub no encadena workflows desde el token
+          # automático—, y aquí no importa: los gates no corren en pull request.
+          # Si algún día hiciera falta, se guarda un token de usuario en
+          # RENOVATE_TOKEN y se usa en su lugar.
+          RENOVATE_TOKEN: ${{ secrets.RENOVATE_TOKEN || github.token }}
+          RENOVATE_PLATFORM: github
+          RENOVATE_REPOSITORIES: ${{ github.repository }}
+          RENOVATE_AUTODISCOVER: "false"
+          # La configuración es `renovate.json` del repositorio, no la de aquí:
+          # este workflow solo dice CUÁNDO y CONTRA QUÉ, nunca QUÉ actualizar.
+          RENOVATE_REQUIRE_CONFIG: "required"
+          RENOVATE_ONBOARDING: "false"
+          RENOVATE_DRY_RUN: ${{ inputs.dry == 'true' && 'full' || '' }}
+          LOG_LEVEL: info
+          # UN SEGUNDO REGISTRO, EN JSON Y A FICHERO. El de la consola se queda
+          # legible para quien mire el job; este es el que se puede consultar, y
+          # es lo que permite decir QUÉ hay más nuevo sin abrir catorce PRs para
+          # enterarse. Renovate lo escribe él solo con estas dos variables.
+          LOG_FILE: /tmp/renovate.json
+          LOG_FILE_LEVEL: info
+        run: |
+          set -euo pipefail
+          # Se comprueba ANTES de gastar el runner: sin credencial, Renovate se
+          # pasa tres intentos y quince minutos para acabar diciendo algo que no
+          # menciona el token. Mejor decir aquí qué falta.
+          if [ -z "${RENOVATE_TOKEN:-}" ]; then
+            echo "::error::Sin credencial para Renovate: ni RENOVATE_TOKEN ni el token del job." >&2
+            exit 1
+          fi
+          # CON REINTENTO, y no por manía: el DNS de los contenedores de este
+          # runner falla a rachas —`aardvark-dns failed to start` y
+          # `Could not resolve host` en cuatro intentos seguidos, mientras los
+          # demás workflows pasaban—. Un fallo de resolución no es un veredicto
+          # sobre las dependencias, así que no debe quedarse como tal.
+          #
+          # Y UN ABORTO NO ES «TODO AL DÍA» (CI-12). Renovate sale con 0 también
+          # cuando abandona el repositorio a medias: el 2026-10-05 terminó en
+          # `external-host-error`, el paso siguiente contó cero pendientes y el
+          # resumen dijo que todo estaba en su última estable. Llevaba así desde la
+          # migración, sin abrir una sola PR. El veredicto se lee del registro
+          # (scripts/renovate-resultado.sh), y lo que no sea haber terminado se
+          # reintenta y, si sigue, es rojo.
+          for intento in 1 2 3; do
+            : > "$LOG_FILE"
+            if node "$GITHUB_WORKSPACE/tools/renovate/node_modules/renovate/dist/renovate.js" &&
+              "$GITHUB_WORKSPACE/scripts/renovate-resultado.sh" "$LOG_FILE"; then
+              exit 0
+            fi
+            echo "Renovate no terminó (intento ${intento}/3); esperando ${intento}0 s" >&2
+            sleep "${intento}0"
+          done
+          echo "::error::Renovate no completó en tres intentos" >&2
+          exit 1
+
+      # ---------------------------------------------------------------------
+      - name: Qué hay más nuevo que lo que llevamos
+        # `always()`: aunque Renovate acabe en rojo, lo que alcanzó a calcular
+        # antes de caerse sigue siendo información buena, y perderla obliga a
+        # repetir quince minutos de runner para volver a saber lo mismo.
+        if: always()
+        run: |
+          set -uo pipefail
+          LOG=/tmp/renovate.json
+          if [ ! -s "$LOG" ]; then
+            # NO se sale en verde en silencio. Un informe vacío porque no hubo
+            # registro y un informe vacío porque no hay nada que actualizar se
+            # leen igual, y solo uno de los dos es una buena noticia.
+            echo "::warning::Renovate no dejó registro JSON: no se puede decir qué hay pendiente." >&2
+            exit 0
+          fi
+
+          # Las actualizaciones aparecen anidadas a distintas profundidades según
+          # el gestor, así que se recorre el objeto entero (`..`) y se recoge todo
+          # lo que tenga nombre y versión nueva, en vez de acertar una ruta que
+          # cambiará con la próxima versión de Renovate.
+          grep -h '^{' "$LOG" |
+            jq -Rr 'fromjson? | .. | objects
+                    | select(has("depName") and has("newValue"))
+                    | "\(.depName)\t\(.currentValue // .currentVersion // "?")\t\(.newValue)"' |
+            sort -u >/tmp/pendientes.tsv || true
+
+          n="$(wc -l </tmp/pendientes.tsv | tr -d ' ')"
+          {
+            echo "## Dependencias con versión más nueva ($n)"
+            echo
+            if [ "$n" -eq 0 ]; then
+              echo "Ninguna: todo lo que el catálogo declara está en su última estable."
+            else
+              echo "| dependencia | ahora | disponible |"
+              echo "|---|---|---|"
+              awk -F'\t' '{printf "| `%s` | %s | **%s** |\n", $1, $2, $3}' /tmp/pendientes.tsv
+            fi
+          } | tee /tmp/informe-dependencias.md >>"${GITHUB_STEP_SUMMARY:-/dev/null}"
+
+          # Y por la consola también: el resumen del job no se ve desde la API ni
+          # desde un aviso, y este dato es justo el que se quiere leer sin entrar.
+          echo "--- pendientes ($n) ---"
+          cat /tmp/pendientes.tsv
+
+      # UNA INCIDENCIA, NO SOLO UN JOB EN VERDE. Un resumen que solo vive en la
+      # pestaña de una ejecución no lo lee nadie: hay que entrar a buscarlo, y a
+      # las dependencias pendientes se entra justo cuando ya es tarde. La
+      # incidencia aparece en la bandeja, se puede consultar por API y se cierra
+      # cuando se resuelve, que es lo que la convierte en trabajo y no en aviso.
+      - name: Publicar las actualizaciones pendientes como incidencia
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -uo pipefail
+          # Sin nada pendiente no se abre nada: una incidencia semanal diciendo
+          # «todo al día» enseña a cerrarlas sin leerlas, y entonces la que sí
+          # importa se cierra igual.
+          [ -s /tmp/pendientes.tsv ] || { echo "· nada pendiente: no se abre incidencia"; exit 0; }
+          "$GITHUB_WORKSPACE/.github/actions/informe/accion.sh" \
+            /tmp/informe-dependencias.md \
+            "dependencias: $(wc -l </tmp/pendientes.tsv | tr -d ' ') con versión más nueva"
+
+      - name: Informe si Renovate falla
+        if: failure()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # El log de una ejecución NO se puede leer desde fuera de git.gay, así
+          # que un Renovate en rojo era un rojo mudo: se sabía que falló y no por
+          # qué. Pasó hoy —el token equivocado— y costó abrir el navegador.
+          "$GITHUB_WORKSPACE/.github/actions/informe/accion.sh" \
+            /tmp/renovate.json "fallo dependencias $GITHUB_SHA"

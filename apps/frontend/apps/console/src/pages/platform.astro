@@ -1,0 +1,111 @@
+---
+/*
+ * Administración de plataforma (alcance global). La página se sirve a cualquier
+ * admin/owner porque la Console entera lo exige, pero los DATOS los sirve Sytue
+ * ID solo a quien está en `platform_admins` y ha entrado con segundo factor: si
+ * no lo está, las cuatro llamadas responden 403 y la vista lo explica en vez de
+ * fingir una consola vacía.
+ */
+import ConsoleLayout from '../layouts/ConsoleLayout.astro';
+import { useT } from '../i18n/index.js';
+import PlatformPanel from '../components/PlatformPanel';
+import { requireSession } from '@sytue/auth/server';
+import { getBff, isPlatformSurface, toBffContext } from '../server/bff.js';
+import {
+  accesoDePlataforma,
+  loadPlatformActivation,
+  loadPlatformActivations,
+  loadPlatformAdmins,
+  loadPlatformApprovals,
+  loadPlatformAudit,
+  loadPlatformMerges,
+  loadPlatformOrgs,
+  loadPlatformUsage,
+} from '../lib/platform.js';
+
+export const prerender = false;
+
+// SOLO sesión autenticada. El alcance de plataforma NO es un rol de
+// organización: exigir aquí `owner`/`admin` era la comprobación equivocada en
+// las dos direcciones —dejaba fuera a un admin global que no administra ninguna
+// organización, y habría dejado pasar al owner de cualquier organización
+// CLIENTE si la API no estuviera detrás—.
+//
+// Quién entra lo decide Sytue ID en cada petición: allowlist `platform_admins`
+// (consultada en la base, no en un claim, para que retirar a alguien tenga
+// efecto inmediato) más segundo factor obligatorio. Esta página se lo pregunta
+// abajo y no renderiza nada de la consola si responde 403.
+// La administración global vive SOLO en su superficie (platform.<dominio>). En la
+// consola de una organización no es que esté vacía: no existe. Servirla allí dejaba
+// una pantalla que hacía ocho llamadas para acabar en 403, y sugería a un admin
+// cliente que hay una puerta a la plataforma desde su consola. No la hay.
+if (!isPlatformSurface()) return new Response(null, { status: 404 });
+
+const guard = await requireSession(getBff(), toBffContext(Astro));
+if (guard instanceof Response) return guard;
+
+// SE PREGUNTA PRIMERO POR LA ELEVACIÓN, y solo si la hay se piden los datos.
+//
+// Las siete llamadas de abajo van todas detrás del mismo gate, así que sin
+// elevación viva las siete responden 403 —y cada una deja un aviso en el
+// registro de plataforma—. Ese registro es justo lo que se lee en la pestaña de
+// problemas de esta misma consola: abrir la pantalla sin estar elevado (lo
+// normal: se abre y ENTONCES se pide la elevación) metía siete falsos problemas
+// por visita y enterraba los de verdad.
+//
+// `/platform/activation` es la única ruta de plataforma que NO está detrás del
+// gate —tiene que estarlo para poder elevarse— y responde exactamente lo que
+// hace falta saber: 403 con su código si no se puede (fuera de la allowlist o
+// sin segundo factor), y la elevación viva o `null` si sí.
+const activacion = await loadPlatformActivation(guard.session);
+
+// El `code` separa los tres motivos por los que no hay datos, que llevan a
+// pantallas distintas: sin alcance, sin segundo factor y —el habitual— sin
+// elevar. La elevación viva, si la hay, es la de la barra de arriba.
+const acceso = accesoDePlataforma(activacion);
+const activacionActual = acceso.activation;
+let problema = acceso.problema;
+let motivo = acceso.motivo;
+
+const [usage, orgs, merges, admins, activaciones, registro, aprobaciones] = problema
+  ? []
+  : await Promise.all([
+      loadPlatformUsage(guard.session),
+      loadPlatformOrgs(guard.session),
+      loadPlatformMerges(guard.session),
+      loadPlatformAdmins(guard.session),
+      loadPlatformActivations(guard.session),
+      loadPlatformAudit(guard.session),
+      loadPlatformApprovals(guard.session),
+    ]);
+
+// Con elevación viva y aun así un fallo (la ventana pudo vencer entre las dos
+// tandas, o Sytue ID puede estar caído), manda el de `usage`: mostrar una
+// consola a medias sería peor que decir por qué no hay nada.
+if (!problema && usage && !usage.ok) {
+  problema = usage.status;
+  motivo = usage.code;
+}
+
+const locale = Astro.locals.locale;
+const t = useT(locale);
+---
+
+<ConsoleLayout title={t('page.platform')} section="platform">
+  <PlatformPanel
+    client:load
+    locale={locale}
+    usage={usage?.ok ? usage.data : null}
+    orgs={orgs?.ok ? orgs.data.items : []}
+    merges={merges?.ok ? merges.data.items : []}
+    admins={admins?.ok ? admins.data.items : []}
+    reviewDays={admins?.ok ? admins.data.review_days : 90}
+    activations={activaciones?.ok ? activaciones.data.items : []}
+    audit={registro?.ok ? registro.data.items : []}
+    auditCursor={registro?.ok ? registro.data.nextCursor : ''}
+    approvals={aprobaciones?.ok ? aprobaciones.data.items : []}
+    activation={activacionActual}
+    problema={problema}
+    motivo={motivo}
+  />
+</ConsoleLayout>

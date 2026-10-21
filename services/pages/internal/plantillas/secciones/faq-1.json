@@ -1,0 +1,72 @@
+{
+  "children": [
+    {
+      "content": {
+        "en": [
+          {
+            "text": "Frequently Asked Questions"
+          }
+        ],
+        "es": [
+          {
+            "text": "Preguntas frecuentes"
+          }
+        ]
+      },
+      "id": "tex0000001",
+      "tag": "h2",
+      "type": "text"
+    },
+    {
+      "content": {
+        "en": [
+          {
+            "text": "What are the usual delivery times?"
+          }
+        ],
+        "es": [
+          {
+            "text": "¿Cuáles son los plazos de entrega habituales?"
+          }
+        ]
+      },
+      "id": "tex0000002",
+      "tag": "h3",
+      "type": "text"
+    },
+    {
+      "content": {
+        "en": [
+          {
+            "text": "Standard delivery takes 3 to 5 business days depending on destination."
+          }
+        ],
+        "es": [
+          {
+            "text": "El plazo estándar es de 3 a 5 días laborables según destino."
+          }
+        ]
+      },
+      "id": "tex0000003",
+      "tag": "p",
+      "type": "text"
+    }
+  ],
+  "full_bleed": false,
+  "id": "sec0000001",
+  "kind": "faq",
+  "layout": {
+    "direction": "column",
+    "gap": 24,
+    "padding": [
+      32,
+      32,
+      32,
+      32
+    ],
+    "align": "center",
+    "justify": "center",
+    "wrap": false
+  },
+  "type": "section"
+}

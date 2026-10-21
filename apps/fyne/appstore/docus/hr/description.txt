@@ -1,0 +1,16 @@
+Zajedničko uređivanje u stvarnom vremenu
+
+• Sve spremljeno u vašem europskom Driveu.
+• Zajedničko uređivanje u stvarnom vremenu, uz prisutnost i bez međusobnog ometanja.
+• Vrpca s karticama: Polazno, Umetanje, Reference, Skupno slanje i Pregled.
+• Tablice, slike, oblici, SmartArt, grafikoni, simboli i vodeni žigovi.
+• Reference: sadržaj, fusnote, citati i bibliografija.
+• Skupno slanje: spajanje podataka za pisma i naljepnice.
+• Komentari u nitima, pregled promjena i verzije.
+• Neobavezni pomoćnik s umjetnom inteligencijom za preoblikovanje, prijevod ili sažimanje, samo ako ga vaša organizacija omogući.
+• Izvoz u ODT, DOCX i PDF; otvaranje datoteka programa Word iz Drivea.
+• Zaglavlja, podnožja, numeriranje stranica i blokovi za višekratnu upotrebu.
+• Automatsko spremanje u vaš europski Drive, s poviješću.
+• Preuzimanje s naslovnice kao PDF, HTML, Markdown, OpenDocument ili Microsoft Office.
+
+Šifrirano u prijenosu (TLS 1.3). Infrastruktura Sytuea nalazi se u EU-u. Lokacija vanjskih usluga ovisi o njihovu pružatelju.

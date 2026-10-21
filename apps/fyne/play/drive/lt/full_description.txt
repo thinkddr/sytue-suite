@@ -1,0 +1,16 @@
+Failai ir bendradarbiavimas su jūsų prekių ženklu.
+
+• Įkėlimas, tvarkymas ir bendrinimas kontroliuojamomis nuorodomis (teisės ir galiojimo pabaiga).
+• Dokumentų ir vaizdų peržiūra tiesiai puslapyje.
+• Pridėjimas programoje Mail, nesukuriant failo kopijos.
+• S3 pagrindu veikianti saugykla Europos regionuose.
+• Mano diskas, komandos diskai, bendrinama su manimi, naujausi, mėgstamiausi ir šiukšlinė.
+• Bendrinimo nuorodos su dviem lygiais (peržiūra arba redagavimas), slaptažodžiu ir galiojimo pabaiga.
+• Versijų istorija su atkūrimu.
+• Dokumentų, vaizdų ir PDF peržiūra neatsisiunčiant.
+• Biuro dokumentų atidarymas ir redagavimas Docus, Calcus ir Diapos; PDF – CertiPDF.
+• Konfidencialumo žymos, blokuojančios viešas nuorodas ten, kur joms ne vieta.
+• Bendrinimas Rooms kanale arba pridėjimas programoje Mail, nesukuriant failo kopijos.
+• S3 saugykla Europos regionuose, kvota visada matoma.
+
+Šifruojama perduodant (TLS 1.3). „Sytue“ infrastruktūra yra ES. Išorinių paslaugų vieta priklauso nuo jų teikėjo.

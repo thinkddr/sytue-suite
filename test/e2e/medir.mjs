@@ -1,0 +1,12 @@
+import { chromium } from 'playwright';
+import { fileURLToPath } from 'node:url';
+const S = fileURLToPath(new URL('.auth/admin.json', import.meta.url));
+const b = await chromium.launch();
+const c = await b.newContext({ storageState: S, ignoreHTTPSErrors: true, viewport: { width: 1440, height: 900 } });
+const p = await c.newPage();
+await p.goto('https://mail.sytue.localhost/', { waitUntil: 'domcontentloaded' });
+await p.locator('li').filter({ hasText: 'Acta del comité' }).first().waitFor({ timeout: 20000 });
+await p.waitForTimeout(1500);
+const h = await p.locator('li').filter({ hasText: 'Acta del comité' }).first().evaluate((el) => el.getBoundingClientRect().height);
+console.log('altura real de la fila:', h);
+await b.close();

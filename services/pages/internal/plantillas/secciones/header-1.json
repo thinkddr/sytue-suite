@@ -1,0 +1,91 @@
+{
+  "children": [
+    {
+      "alt": {
+        "en": "Logo",
+        "es": "Logotipo"
+      },
+      "fit": "contain",
+      "id": "ima0000001",
+      "size": {
+        "width": 140,
+        "height": 40
+      },
+      "src": {
+        "placeholder": "logo"
+      },
+      "type": "image"
+    },
+    {
+      "collapse_below": "tablet",
+      "id": "men0000001",
+      "items": [
+        {
+          "id": "mit0000001",
+          "label": {
+            "en": "Home",
+            "es": "Inicio"
+          },
+          "link": {
+            "page": "pag0000001"
+          }
+        },
+        {
+          "id": "mit0000002",
+          "label": {
+            "en": "Services",
+            "es": "Servicios"
+          },
+          "link": {
+            "page": "pag0000002"
+          }
+        },
+        {
+          "id": "mit0000003",
+          "label": {
+            "en": "Contact",
+            "es": "Contacto"
+          },
+          "link": {
+            "page": "pag0000003"
+          }
+        }
+      ],
+      "label": {
+        "en": "Navigation",
+        "es": "Navegación"
+      },
+      "orientation": "horizontal",
+      "type": "menu"
+    },
+    {
+      "action": {
+        "page": "pag0000003"
+      },
+      "id": "but0000001",
+      "label": {
+        "en": "Sign In",
+        "es": "Acceso"
+      },
+      "type": "button",
+      "variant": "primary"
+    }
+  ],
+  "full_bleed": false,
+  "id": "sec0000001",
+  "kind": "header",
+  "layout": {
+    "direction": "row",
+    "gap": 16,
+    "padding": [
+      20,
+      20,
+      20,
+      20
+    ],
+    "align": "center",
+    "justify": "space-between",
+    "wrap": false
+  },
+  "type": "section"
+}

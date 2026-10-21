@@ -1,0 +1,64 @@
+---
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: (c) 2026 Daniel Delgado Ramos
+ *
+ * Código abierto — créditos de los proyectos de terceros sobre los que se apoyan
+ * algunas piezas de la suite. Sytue escribe casi todo desde cero (correo,
+ * editores, calendario...), pero no reinventa lo que ya funciona bien: esta
+ * página lo dice con nombre y propósito, no como comparación de producto —por
+ * eso no entra en `lint-terceros.sh`, que solo caza comparaciones de plataforma.
+ */
+import { LOCALES } from '@sytue/i18n';
+import MarketingLayout from '../../layouts/MarketingLayout.astro';
+import { localeFromParam, localeParams, useT } from '../../i18n';
+
+export const getStaticPaths = localeParams;
+
+const locale = localeFromParam(Astro.params.locale);
+const t = useT(locale);
+
+const proyectos = [
+  { nombre: 'LiveKit', body: t('oss.livekit.body') },
+  { nombre: 'PostgreSQL', body: t('oss.postgres.body') },
+] as const;
+---
+
+<MarketingLayout
+  locale={locale}
+  path="/open-source"
+  title={t('meta.openSource.title')}
+  description={t('meta.openSource.description')}
+  alternates={LOCALES}
+>
+  <article class="mx-auto max-w-2xl px-6 py-16 md:py-20">
+    <span class="sytue-overline text-primary-text">{t('legal.overline')}</span>
+    <h1 class="sytue-h1 text-text mt-3 text-balance">{t('oss.title')}</h1>
+    <p class="text-text-muted mt-6 text-base leading-relaxed">{t('oss.intro')}</p>
+
+    <div class="mt-8 border-border bg-surface-sunken rounded-lg border p-6">
+      <span class="text-text block text-lg font-bold">Sytue Suite (Código fuente)</span>
+      <p class="text-text-muted mt-2 text-base">
+        Toda la suite colaborativa y de productividad está disponible como código abierto bajo licencia Apache 2.0, obra de Daniel Delgado Ramos (thinkddr).
+      </p>
+      <a
+        href="https://github.com/thinkddr/sytue-suite"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="mt-4 inline-flex items-center gap-2 text-primary-text font-semibold hover:underline"
+      >
+        <span>Ver repositorio en GitHub (thinkddr/sytue-suite)</span>
+        <span>&rarr;</span>
+      </a>
+    </div>
+
+    <ul class="mt-8 flex flex-col gap-4">
+      {proyectos.map((p) => (
+        <li class="border-border bg-surface rounded-lg border p-5">
+          <span class="text-text block text-base font-semibold">{p.nombre}</span>
+          <span class="text-text-muted mt-1 block text-base text-pretty">{p.body}</span>
+        </li>
+      ))}
+    </ul>
+  </article>
+</MarketingLayout>

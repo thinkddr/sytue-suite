@@ -1,0 +1,458 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "sytue-id.fullname" . }}
+  labels:
+    {{- include "sytue-id.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "sytue-id.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "sytue-id.labels" . | nindent 8 }}
+      annotations:
+        kubectl.kubernetes.io/default-container: id
+    spec:
+      automountServiceAccountToken: false
+      {{- with (.Values.global).imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- if .Values.clientSecrets.enabled }}
+      # Los clients confidenciales nacen con secret_hash NULL a propósito
+      # (migración 0002) y el token endpoint los rechaza con `invalid_client`
+      # mientras siga así: deny-by-default. Cada superficie recibe su secreto por
+      # Kubernetes, pero NADIE fijaba el hash correspondiente en la base de
+      # datos, así que el acceso fallaba hasta que alguien lo hacía a mano — y se
+      # volvía a perder en el siguiente despliegue.
+      #
+      # Va como initContainer y no como paso del arranque para que el servicio no
+      # llegue a aceptar tráfico con los clients aún deshabilitados: si esto
+      # falla, el pod no arranca, que es preferible a un IdP en marcha que
+      # rechaza a todas sus superficies.
+      initContainers:
+        - name: reconcile-client-secrets
+          image: "{{ include "sytue-id.imageRegistry" . }}/{{ .Values.image.repository }}:{{ ((.Values.global).image | default dict).tag | default .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          command: ["/app/id", "reconcile-client-secrets", "{{ .Values.clientSecrets.mountPath }}"]
+          env:
+            - name: SYTUE_ID_DATABASE_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgresql.existingSecret }}
+                  key: {{ .Values.postgresql.dsnKey }}
+          volumeMounts:
+            - name: client-secrets
+              mountPath: {{ .Values.clientSecrets.mountPath }}
+              readOnly: true
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- end }}
+      containers:
+        - name: id
+          image: "{{ include "sytue-id.imageRegistry" . }}/{{ .Values.image.repository }}:{{ ((.Values.global).image | default dict).tag | default .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.targetPort }}
+          env:
+            - name: SYTUE_ID_ROOMS_CALL_ACCESS_URL
+              value: {{ printf "http://%s-rooms" .Release.Name | quote }}
+            {{- include "sytue.documentCallsEnv" (dict "root" . "prefix" "SYTUE_ID" "secretSuffix" "ROOMS_CALL_ACCESS_SECRET") | nindent 12 }}
+            {{- if (.Values.global).otlp }}
+            {{- if (.Values.global).otlp.endpoint }}
+            # Telemetria: metricas OTLP directas a Cockpit, sin agente intermedio.
+            # Sale del umbrella y no de este chart para que los catorce escriban al
+            # MISMO sitio; si cada uno apuntara al suyo, no habria con que comparar.
+            # Vacio => no se exporta y el servicio sigue sirviendo igual.
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ (.Values.global).otlp.endpoint | quote }}
+            {{- end }}
+            {{- if (.Values.global).otlp.tokenSecret }}
+            # Por Secret y nunca por values: aunque el token solo permita escribir,
+            # con el se puede envenenar la serie que decide un escalado.
+            - name: OTEL_EXPORTER_OTLP_HEADERS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ (.Values.global).otlp.tokenSecret }}
+                  key: {{ (.Values.global).otlp.tokenKey | default "otlp-headers" }}
+                  optional: true
+            {{- end }}
+            {{- end }}
+            # Runtime Go atado a los limites del pod (helper sytue.goRuntimeEnv del umbrella):
+            # GOMAXPROCS=techo(limits.cpu) via downward API; GOMEMLIMIT=~85% de limits.memory.
+            {{- include "sytue.goRuntimeEnv" (dict "container" "id" "memLimit" .Values.resources.limits.memory) | nindent 12 }}
+            - name: SYTUE_ID_ENV
+              value: {{ include "sytue-id.env" . | quote }}
+            - name: SYTUE_ID_HTTP_ADDR
+              value: ":{{ .Values.service.targetPort }}"
+            - name: SYTUE_ID_LOG_LEVEL
+              value: {{ .Values.config.logLevel | quote }}
+            {{- if .Values.config.loginBypassKey }}
+            # Bypass de pruebas del captcha de login: por env y desde values SOLO
+            # si el operador lo inyecta (value vacio => ni la variable existe).
+            # PREFIJADA, como todo lo que lee el loader del servicio: el binario
+            # pide SYTUE_ID_LOGIN_BYPASS_KEY (config.go, l.Get) y una variable
+            # desnuda sería cableado muerto — lo cazó el gate de variables del
+            # render (helm-render-test.sh).
+            - name: SYTUE_ID_LOGIN_BYPASS_KEY
+              value: {{ .Values.config.loginBypassKey | quote }}
+            {{- end }}
+            # ----- Issuer OIDC propio (Sytue ID se emite a si mismo) -----
+            - name: SYTUE_ID_ISSUER
+              value: {{ include "sytue-id.oidcIssuer" . | quote }}
+            # Correo transaccional (reseteo, invitaciones, verificación). Sale por
+            # el MSA de Sytue Mail dentro del clúster: es quien firma DKIM, encola
+            # y reintenta. Sytue ID se autentica con un token que él mismo firma
+            # (el MSA exige un access token con scope mail, no una contraseña).
+            # Sin esto, Sytue ID se niega a arrancar en prod: antes escribía los
+            # enlaces en el log y el usuario nunca recibía nada.
+            - name: SYTUE_ID_SMTP_ADDR
+              value: {{ printf "%s-mail-mx:%d" .Release.Name (int .Values.config.mailSubmissionPort) | quote }}
+            # Se conecta al Service del MSA, pero EXIGE el nombre del host de
+            # correo en su certificado: dentro del clúster no hay ninguno emitido
+            # para el nombre de un Service, y desactivar la comprobación sería
+            # cambiar un problema real por uno peor.
+            #
+            # EL NOMBRE ERA `mail.` A MANO Y EL CERTIFICADO DICE `mx.`. Con eso,
+            # cada invitación moría en el STARTTLS —«certificate is valid for
+            # mx.sytue.eu, not mail.sytue.eu»— y la consola solo podía decir que
+            # el correo no había salido. El host del MTA lo decide el chart de
+            # Mail (`config.mxHost`, ver su `sytue-mail.mtaHost`) y NO es un
+            # nombre libre: el EHLO, el PTR de la IP y la resolución directa
+            # tienen que cerrar el círculo (FCrDNS) o el correo acaba en spam.
+            # Aquí se lee el mismo valor, con el mismo defecto, y hay un gate que
+            # comprueba que los dos charts no se separen.
+            - name: SYTUE_ID_SMTP_TLS_SERVER_NAME
+              value: {{ printf "%s.%s" (.Values.config.mxHost | default "mx") (include "sytue-id.domain" .) | quote }}
+            - name: SYTUE_ID_MAIL_FROM
+              value: {{ printf "Sytue <no-reply@%s>" (include "sytue-id.domain" .) | quote }}
+            # API HTTP de Sytue Mail, para el reconciliador que crea el buzón de
+            # cada usuario aprovisionado. Sin esto el binario cae a su defecto
+            # —http://mail:8086—, un host que en Kubernetes NO EXISTE: el Service
+            # se llama <release>-mail. El reconciliador lleva desde el despliegue
+            # fallando cada 30 s con «lookup mail: no such host», así que nadie
+            # tenía buzón, y el error solo se ve en el log de `id`.
+            - name: SYTUE_ID_MAIL_API_URL
+              value: {{ printf "http://%s-mail" .Release.Name | quote }}
+            - name: SYTUE_ID_PLATFORM_ORG_SLUG
+              value: {{ .Values.config.platformOrgSlug | quote }}
+            {{- with (.Values.global).accountAppPath }}
+            # Con la app «Mi cuenta» desplegada, el `/account` del IdP redirige a
+            # ella, a `account.<dominio>` y nunca a un host de organización. En
+            # `id.<dominio>` ni siquiera llega aquí: el Ingress se lo da a la app.
+            # SOLO ENTONCES: una instalación sin la app que recibiera el 302
+            # dejaría a su gente sin pantalla de cuenta —y sin forma de cambiar la
+            # contraseña—, así que es un valor que se puede dejar vacío y no una
+            # constante en el código.
+            - name: SYTUE_ID_ACCOUNT_APP_PATH
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.config.tenantDNSAddress }}
+            # Direcciones con las que se publica el subdominio de una organización
+            # que ya tiene correo en ese mismo nombre (el CNAME sería ilegal ahí).
+            # Se omite si está vacío: el servicio lo trata como «no configurado» y
+            # esas altas fallan con motivo en vez de fingir que publicaron.
+            - name: SYTUE_ID_TENANT_DNS_ADDRESS
+              value: {{ . | quote }}
+            {{- end }}
+            # Catálogo de piezas a las que el panel de plataforma les pregunta su
+            # versión. Lo calcula el chart paraguas a partir de lo que despliega
+            # (sytue-one/templates/componentes.yaml): un subchart no ve a sus
+            # hermanos, así que desde aquí no se sabe qué está encendido.
+            #
+            # `optional` ⇒ sin paraguas (este chart solo) no hay variable y la
+            # tabla sale vacía diciéndolo. Una pantalla de diagnóstico no puede
+            # impedir que arranque el IdP.
+            - name: SYTUE_ID_COMPONENTS
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ .Release.Name }}-componentes
+                  key: componentes
+                  optional: true
+            - name: SYTUE_ID_WEBAUTHN_RP_ID
+              value: {{ include "sytue-id.domain" . | quote }}
+            - name: SYTUE_ID_WEBAUTHN_RP_ORIGINS
+              # El alta de passkeys ocurre en la app Cuenta, que para la
+              # organización de plataforma vive en corporate.<dominio>, no en
+              # el issuer. WebAuthn valida el origin incluido por el
+              # autenticador al terminar el registro: omitirlo deja que begin
+              # responda 200 pero finish falle siempre con 403.
+              value: {{ printf "%s,https://%s.%s" (include "sytue-id.oidcIssuer" .) .Values.config.platformOrgSlug (include "sytue-id.domain" .) | quote }}
+            - name: SYTUE_ID_KEY_ROTATION_INTERVAL
+              value: {{ .Values.config.keyRotationInterval | quote }}
+            - name: SYTUE_ID_KEY_RETIRE_AFTER
+              value: {{ .Values.config.keyRetireAfter | quote }}
+            - name: SYTUE_ID_REQUIRE_PAID_SUBSCRIPTION
+              value: {{ .Values.config.requirePaidSubscription | quote }}
+            - name: SYTUE_ID_SELF_HOSTED
+              value: {{ .Values.config.selfHosted | quote }}
+            - name: SYTUE_ID_SIGNUP_ENABLED
+              value: {{ .Values.config.signupEnabled | quote }}
+            - name: SYTUE_ID_MOLLIE_REDIRECT_URL
+              value: {{ printf "https://one.%s/bienvenida?payment=return" (include "sytue-id.domain" .) | quote }}
+            - name: SYTUE_ID_MOLLIE_WEBHOOK_URL
+              value: {{ printf "%s/billing/webhooks/mollie" (include "sytue-id.oidcIssuer" .) | quote }}
+            # ----- Postgres EXTERNO (Scaleway RDB; unica fuente de verdad) -----
+            # Sytue ID lee su config con prefijo SYTUE_ID_ y usa DATABASE_DSN
+            # (no DATABASE_URL); ver services/id/internal/http/config.go.
+            - name: SYTUE_ID_DATABASE_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgresql.existingSecret }}
+                  key: {{ .Values.postgresql.dsnKey }}
+            # Pool pgx POR replica (bajo en prod: PgBouncer multiplexa hacia la RDB).
+            - name: SYTUE_ID_DB_MAX_CONNS
+              value: {{ .Values.config.dbMaxConns | quote }}
+            # DSN DIRECTO a la RDB (bypass del pooler) para estado de sesion:
+            # advisory locks de migraciones (platform/pkg/pg; SIN prefijo, la
+            # lee la plataforma). Opcional: sin PgBouncer se usa el DSN normal.
+            - name: DATABASE_DIRECT_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgresql.existingSecret }}
+                  key: {{ .Values.postgresql.dsnDirectKey }}
+                  optional: true
+            {{- if (.Values.global).dragonflyUrl }}
+            # Cache efimera compartida. Sytue ID la usa para el DERECHO DE
+            # SUSCRIPCION de cada organizacion, que se pregunta en CADA emision y
+            # refresco de token con una consulta que cruza suscripcion, miembros
+            # activos y asientos concedidos.
+            #
+            # Sale del umbrella y no de este chart para que apunte al MISMO sitio
+            # que Hub, Rooms y Docs: una cache por servicio no es una cache.
+            #
+            # Ausente => platform/pkg/cache degrada a no-op y el derecho se consulta
+            # en PostgreSQL, que es el comportamiento previo. A diferencia de la
+            # presencia de Hub, aqui la degradacion es CORRECTA con cualquier numero
+            # de replicas: no se guarda estado, solo se evita repetir una consulta.
+            #
+            # CON PREFIJO: Sytue ID carga con `config.NewLoader("SYTUE_ID")`, así que
+            # lee `SYTUE_ID_DRAGONFLY_URL`. Desnuda no la veía NUNCA —el mismo fallo
+            # que tumbó la caché de Docs— y el derecho de suscripción se resolvía
+            # contra PostgreSQL en cada emisión de token, con el gate en verde porque
+            # solo comparaba el nombre de Docs.
+            - name: SYTUE_ID_DRAGONFLY_URL
+              value: {{ (.Values.global).dragonflyUrl | quote }}
+            {{- if ((.Values.global).cache).secretName }}
+            # La contraseña va por Secret y APARTE de la URL. La URL no es un secreto
+            # —es la misma en dev y en prod— y se deja como `value:` a la vista para
+            # que se pueda comprobar que los siete servicios apuntan a la MISMA cache;
+            # meterla dentro de la URL obligaría a mandar la URL entera por Secret y
+            # ese gate se quedaría ciego.
+            #
+            # `optional: true` a propósito: sin la clave en el Secret, Dragonfly
+            # tampoco la exige (misma referencia opcional en su chart) y el conjunto
+            # sigue funcionando sin autenticación, que es el comportamiento previo.
+            - name: SYTUE_ID_DRAGONFLY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ ((.Values.global).cache).secretName }}
+                  key: {{ ((.Values.global).cache).passwordKey | default "dragonfly-password" }}
+                  optional: true
+            {{- end }}
+            {{- if ((.Values.global).cache).secretName }}
+            # Sella lo que se guarda en la cache. SIN ELLA NO SE CACHEA: el valor
+            # cacheado decide autenticación, y aceptarlo sin sello es dejar que quien
+            # escriba en Dragonfly emita credenciales. Ausente => todo se resuelve
+            # contra PostgreSQL, más lento y correcto.
+            - name: SYTUE_ID_CACHE_SIGNING_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ ((.Values.global).cache).secretName }}
+                  key: {{ ((.Values.global).cache).signingKeyKey | default "cache-signing-key" }}
+                  optional: true
+            {{- end }}
+            {{- end }}
+            # ----- Material criptografico (firma JWKS, sesiones) -----
+            - name: SYTUE_ID_KEY_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret }}
+                  key: key-encryption-key
+            # ----- Subdominio por organizacion (<slug>.<dominio>) -----
+            # Quien sirve la zona de la suite es Scaleway, no Cloudflare: sin
+            # esta clave el publicador no existe y el subdominio que el asistente
+            # de alta ensena queda RESERVADO sin resolver. Es `optional: true`
+            # a proposito —`02b-secretos.sh` la materializa vacia si nadie la ha
+            # aportado— y esa es la degradacion honesta: el alta sigue, y el
+            # estado que devuelve es `unconfigured` en vez de fingir `live`.
+            - name: SYTUE_ID_SCALEWAY_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret }}
+                  key: scaleway-dns-key
+                  optional: true
+            - name: SYTUE_ID_SCALEWAY_DNS_ZONE
+              value: {{ include "sytue-id.domain" . | quote }}
+            # Recolector de logs de plataforma: el MISMO valor que reciben los
+            # otros catorce servicios como SYTUE_LOG_COLLECTOR_TOKEN (helper
+            # sytue.logCollectorEnv del umbrella). Sin el, `POST /service-logs`
+            # responde 503 y la pantalla «que esta fallando» vuelve a ensenar
+            # solo lo del propio IdP, que es como estaba.
+            - name: SYTUE_ID_LOG_INGEST_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: sytue-log-ingest
+                  key: token
+                  optional: true
+            # Verificacion de las CONTRASENAS DE APLICACION que consulta Sytue Mail
+            # en cada AUTH de IMAP/SMTP. El MISMO valor vive en el deployment de
+            # correo (SYTUE_MAIL_ID_INTERNAL_SECRET), en un Secret compartido igual
+            # que el del recolector. Sin el, la ruta interna NO se monta y ningun
+            # cliente de correo puede entrar (fail-closed).
+            - name: SYTUE_ID_INTERNAL_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: sytue-id-internal
+                  key: token
+                  optional: true
+            # De una direccion a la persona de una organizacion, sin sesion (POST
+            # /internal/directory/resolve): solo para reconstruir las menciones de
+            # los avisos historicos de Docs. Secreto PROPIO, compartido solo con
+            # Docs. Sin el, la ruta no se monta.
+            - name: SYTUE_ID_DIRECTORIO_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: sytue-id-directorio
+                  key: secret
+                  optional: true
+            # Las organizaciones activas de una persona, sin sesion (POST
+            # /internal/people/orgs): solo para la politica de firmas de fuera de
+            # Docs (ADR 0059). Secreto PROPIO, compartido solo con Docs.
+            {{- if ((.Values.config).matrix).enabled }}
+            - name: SYTUE_ID_ROOMS_ACCESS_URL
+              value: {{ .Values.config.matrix.roomsURL | default (printf "http://%s-rooms" .Release.Name) | quote }}
+            - name: SYTUE_ID_MATRIX_LIFECYCLE_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.config.matrix.existingSecret | quote }}
+                  key: lifecycle-secret
+            {{- end }}
+            - name: SYTUE_ID_ORGS_PERSONA_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: sytue-id-orgs-persona
+                  key: secret
+                  optional: true
+            # Nombre visible de las organizaciones de fuera para la campana (POST
+            # /internal/orgs/names). Secreto PROPIO, compartido solo con el Hub.
+            - name: SYTUE_ID_NOMBRES_ORGS_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: sytue-id-nombres-orgs
+                  key: secret
+                  optional: true
+            # Estado de ciclo de vida de orgs por slug (POST /internal/orgs/status):
+            # solo para que Pages sepa si una organizacion sigue activa (A11, Pages
+            # ENCARGO §6.5). Secreto PROPIO, compartido solo con Pages.
+            - name: SYTUE_ID_ESTADO_ORGS_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: sytue-id-estado-orgs
+                  key: secret
+                  optional: true
+            # Propagacion del avatar propio a Sytue Contacts (POST
+            # /internal/avatar-sync). El MISMO valor vive en el deployment de
+            # contacts (INTERNAL_SECRET), en un Secret compartido. Vacia => el
+            # avatar se guarda igual; solo falta el reflejo en Contactos.
+            - name: SYTUE_ID_CONTACTS_INTERNAL_URL
+              value: {{ .Values.config.contactsInternalUrl | default (printf "http://%s-contacts" .Release.Name) | quote }}
+            - name: SYTUE_ID_CONTACTS_INTERNAL_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: sytue-contacts-internal
+                  key: token
+                  optional: true
+            # La puerta interna de Sytue Hub: al cambiar la foto, las barras abiertas
+            # de la suite la vuelven a pedir sin recargar (hubnotify.EventoAvatar).
+            # Opcional a propósito: sin el Secret el IdP arranca igual y la foto
+            # nueva se ve al entrar en cada app, como antes.
+            - name: SYTUE_ID_HUB_BASE_URL
+              value: {{ .Values.config.hubUrl | default (printf "http://%s-hub" .Release.Name) | quote }}
+            - name: SYTUE_ID_HUB_INTERNAL_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: sytue-hub-internal
+                  key: secret
+                  optional: true
+            # Clave de la API de Sweego para los SMS con el código del alta (ADR
+            # 0041). Opcional a propósito: sin ella el IdP arranca igual y lo único
+            # que se apaga es el alta autoservicio, que sin verificar el móvil no
+            # debe dar cuentas.
+            - name: SYTUE_ID_SMS_SWEEGO_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret }}
+                  key: sms-sweego-api-key
+                  optional: true
+            {{- if .Values.config.requirePaidSubscription }}
+            - name: SYTUE_ID_MOLLIE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret }}
+                  key: mollie-api-key
+            {{- end }}
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 3
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            {{- if .Values.clientSecrets.enabled }}
+            - name: client-secrets
+              mountPath: {{ .Values.clientSecrets.mountPath }}
+              readOnly: true
+            {{- end }}
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        {{- if .Values.clientSecrets.enabled }}
+        - name: client-secrets
+          secret:
+            secretName: {{ .Values.clientSecrets.existingSecret }}
+            defaultMode: 0400
+        {{- end }}
+      {{- with .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- range . }}
+        - maxSkew: {{ .maxSkew }}
+          topologyKey: {{ .topologyKey }}
+          whenUnsatisfiable: {{ .whenUnsatisfiable }}
+          labelSelector:
+            matchLabels:
+              {{- include "sytue-id.selectorLabels" $ | nindent 14 }}
+        {{- end }}
+      {{- end }}

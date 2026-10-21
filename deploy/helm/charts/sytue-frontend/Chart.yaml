@@ -1,0 +1,20 @@
+apiVersion: v2
+name: sytue-frontend
+description: >-
+  Sytue Frontend — superficies web Astro 5 + Preact 10 con la Sytue Shell (@sytue/shell)
+  y el design system (@sytue/ui). Repuntadas a los servicios Go (@sytue/api-clients).
+  Despliega cada app (portal, console, cloud-dashboard, mail, drive, calendar, contacts,
+  docs, chat, meet, www) como un Deployment con su Service e Ingress propio. BFF
+  (OIDC+PKCE contra Sytue ID) y cookie host-only __Host- httpOnly. Código Apache-2.0, (c) 2026 Daniel Delgado Ramos.
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+kubeVersion: ">=1.31.0-0"
+home: https://sytue.eu
+keywords: [sytue, frontend, astro, preact, shell]
+maintainers:
+  - name: Sytue Platform
+    email: platform@sytue.eu
+annotations:
+  licenses: MIT
+  sytue.eu/stack: astro

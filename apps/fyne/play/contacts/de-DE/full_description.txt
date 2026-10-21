@@ -1,0 +1,18 @@
+CardDAV-Kontakte, geteilt in Ihrer Organisation.
+
+• Gemeinsames Adressbuch für die ganze Organisation.
+• Import und Export im vCard-Format.
+• Duplikate zusammenführen, ohne Daten zu verlieren.
+• Kompatibel mit jedem CardDAV-Client.
+• Adressbücher, einschließlich des gemeinsamen Ihrer Organisation.
+• Vollständige Karte: Telefone, E-Mails, Adressen, Organisation, Geburtstag, Notizen und Foto.
+• Labels und Favoriten zum Gruppieren und Finden.
+• Duplikate erkennen und zusammenführen, ohne Daten zu verlieren.
+• vCard und CSV importieren und exportieren; einzelnen Kontakt exportieren.
+• Stapelaktionen und Papierkorb mit Wiederherstellung.
+• Sofortsuche und Autovervollständigung beim Schreiben in Mail.
+• Kompatibel mit jedem CardDAV-Client.
+• Bevorstehende Geburtstage aus deinem Adressbuch, mit denen dieses Monats hervorgehoben.
+• Erstelle einen Termin mit einem Kontakt oder kopiere seine Adresse, ohne die Karte zu verlassen.
+
+Verschlüsselt bei der Übertragung (TLS 1.3). Die Infrastruktur von Sytue befindet sich in der EU. Der Standort externer Dienste hängt von ihrem Anbieter ab.

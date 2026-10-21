@@ -1,0 +1,371 @@
+{
+ "pais": "IT",
+ "verificado": true,
+ "moneda": "EUR",
+ "formas": [
+  {
+   "clave": "ditta",
+   "nombre": "Ditta individuale",
+   "tipo": "persona_fisica"
+  },
+  {
+   "clave": "professionista",
+   "nombre": "Libero professionista",
+   "tipo": "persona_fisica"
+  },
+  {
+   "clave": "srl",
+   "nombre": "Srl",
+   "tipo": "sociedad"
+  },
+  {
+   "clave": "srls",
+   "nombre": "Srls",
+   "tipo": "sociedad"
+  },
+  {
+   "clave": "spa",
+   "nombre": "SpA",
+   "tipo": "sociedad"
+  },
+  {
+   "clave": "snc",
+   "nombre": "Snc",
+   "tipo": "sociedad"
+  },
+  {
+   "clave": "sas",
+   "nombre": "Sas",
+   "tipo": "sociedad"
+  }
+ ],
+ "portales": {
+  "ade": {
+   "nombre": "Agenzia delle Entrate — Fisconline/Entratel",
+   "url": "https://www.agenziaentrate.gov.it/"
+  },
+  "inps": {
+   "nombre": "INPS — Servizi online",
+   "url": "https://www.inps.it/"
+  },
+  "registro_imprese": {
+   "nombre": "Registro Imprese (Camere di Commercio)",
+   "url": "https://www.registroimprese.it/"
+  }
+ },
+ "obligaciones": [
+  {
+   "clave": "it_iva_m",
+   "nombre": "Liquidazione IVA mensile (F24)",
+   "concepto": "iva_periodica",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "16"
+   },
+   "margen_dias": 7,
+   "portal": "ade",
+   "aplica": {
+    "condiciones": [
+     "iva",
+     "iva_mensual"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_pct_mes": 1.25,
+    "recargo_max_pct": 25,
+    "nota": "Ravvedimento operoso (D.Lgs. 87/2024, violazioni dal 1° settembre 2024): sanzione base del 25 %, ridotta al 12,5 % entro 90 giorni; con ravvedimento 0,083 % al giorno entro 14 giorni, 1,25 % entro 30, 1,39 % entro 90, 3,125 % entro l'anno; oltre, sanzione piena."
+   },
+   "calculo": {
+    "tipo": "saldo_neto",
+    "haber": [
+     "477"
+    ],
+    "debe": [
+     "472"
+    ]
+   }
+  },
+  {
+   "clave": "it_iva_t",
+   "nombre": "Liquidazione IVA trimestrale (F24)",
+   "concepto": "iva_periodica",
+   "ambito": "fiscal",
+   "periodicidad": "trimestral",
+   "plazos": {
+    "T1": "05-16",
+    "T2": "08-20",
+    "T3": "11-16",
+    "T4": "03-16+1"
+   },
+   "margen_dias": 7,
+   "portal": "ade",
+   "aplica": {
+    "condiciones": [
+     "iva",
+     "!iva_mensual"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_pct_mes": 1.25,
+    "recargo_max_pct": 25,
+    "nota": "Ravvedimento operoso; maggiorazione dell'1 % a titolo di interessi per i contribuenti trimestrali."
+   },
+   "calculo": {
+    "tipo": "saldo_neto",
+    "haber": [
+     "477"
+    ],
+    "debe": [
+     "472"
+    ]
+   }
+  },
+  {
+   "clave": "it_lipe",
+   "nombre": "Comunicazione liquidazioni periodiche IVA (LIPE)",
+   "concepto": "iva_comunicacion",
+   "ambito": "fiscal",
+   "periodicidad": "trimestral",
+   "plazos": {
+    "T1": "05-31",
+    "T2": "09-30",
+    "T3": "11-30",
+    "T4": "02-ultimo+1"
+   },
+   "margen_dias": 7,
+   "portal": "ade",
+   "aplica": {
+    "condiciones": [
+     "iva"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 50000,
+    "nota": "Sanzione da 500 € a 2.000 €, ridotta alla metà se la comunicazione è trasmessa entro 15 giorni. Il quarto trimestre può confluire nella dichiarazione IVA annuale presentata entro febbraio; il termine che cade di sabato o festivo slitta al primo giorno feriale."
+   }
+  },
+  {
+   "clave": "it_iva_annuale",
+   "nombre": "Dichiarazione IVA annuale",
+   "concepto": "iva_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "04-30+1"
+   },
+   "margen_dias": 30,
+   "portal": "ade",
+   "aplica": {
+    "condiciones": [
+     "iva"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 25000,
+    "nota": "Da 250 € a 2.000 € se non è dovuta imposta; altrimenti dal 120 % al 240 % dell'imposta."
+   }
+  },
+  {
+   "clave": "it_intrastat",
+   "nombre": "Elenchi Intrastat",
+   "concepto": "operaciones_intracomunitarias",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "25"
+   },
+   "margen_dias": 7,
+   "portal": "ade",
+   "aplica": {
+    "condiciones": [
+     "intracomunitario"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 50000,
+    "nota": "Sanzione da 500 € a 1.000 € per elenco, ridotta della metà se presentato entro 30 giorni."
+   }
+  },
+  {
+   "clave": "it_ritenute",
+   "nombre": "Versamento ritenute (F24)",
+   "concepto": "retenciones_trabajo",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "16"
+   },
+   "margen_dias": 7,
+   "portal": "ade",
+   "aplica": {
+    "condiciones": [
+     "empleados"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_pct_mes": 1.25,
+    "recargo_max_pct": 25,
+    "nota": "Ravvedimento operoso come per l'IVA."
+   }
+  },
+  {
+   "clave": "it_inps",
+   "nombre": "Contributi INPS dipendenti",
+   "concepto": "seguridad_social",
+   "ambito": "laboral",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "16"
+   },
+   "margen_dias": 7,
+   "portal": "inps",
+   "aplica": {
+    "condiciones": [
+     "empleados"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_pct_mes": 0.5,
+    "recargo_max_pct": 40,
+    "nota": "Sanzione civile pari al tasso di interesse legale maggiorato di 5,5 punti annui (omissione) fino al 40 % dei contributi."
+   }
+  },
+  {
+   "clave": "it_cu",
+   "nombre": "Certificazione Unica",
+   "concepto": "certificados_retenciones",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "03-16+1"
+   },
+   "margen_dias": 14,
+   "portal": "ade",
+   "aplica": {
+    "condiciones": [
+     "empleados"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 10000,
+    "nota": "100 € per certificazione omessa o tardiva, massimo 50.000 € per sostituto."
+   }
+  },
+  {
+   "clave": "it_770",
+   "nombre": "Modello 770",
+   "concepto": "retenciones_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "10-31+1"
+   },
+   "margen_dias": 30,
+   "portal": "ade",
+   "aplica": {
+    "condiciones": [
+     "empleados"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 25000,
+    "nota": "Da 250 € a 2.000 €; dal 120 % al 240 % delle ritenute non dichiarate."
+   }
+  },
+  {
+   "clave": "it_acconti",
+   "nombre": "Acconti IRES/IRPEF",
+   "concepto": "pago_fraccionado_sociedades",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "1P": "06-30",
+    "2P": "11-30"
+   },
+   "margen_dias": 7,
+   "portal": "ade",
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_pct_mes": 1.25,
+    "recargo_max_pct": 25,
+    "nota": "Ravvedimento operoso."
+   }
+  },
+  {
+   "clave": "it_redditi_sc",
+   "nombre": "Modello Redditi SC (IRES)",
+   "concepto": "sociedades_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "10-31+1"
+   },
+   "margen_dias": 30,
+   "portal": "ade",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 25000,
+    "nota": "Da 250 € a 1.000 € (dichiarazione tardiva entro 90 giorni); oltre, dal 120 % al 240 % dell'imposta."
+   }
+  },
+  {
+   "clave": "it_redditi_pf",
+   "nombre": "Modello Redditi PF (IRPEF)",
+   "concepto": "renta_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "10-31+1"
+   },
+   "margen_dias": 30,
+   "portal": "ade",
+   "aplica": {
+    "tipos": [
+     "persona_fisica"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 25000,
+    "nota": "Da 250 € a 1.000 € entro 90 giorni; oltre, dal 120 % al 240 % dell'imposta."
+   }
+  },
+  {
+   "clave": "it_bilancio",
+   "nombre": "Deposito del bilancio",
+   "concepto": "cuentas_anuales",
+   "ambito": "mercantil",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "05-30+1"
+   },
+   "margen_dias": 30,
+   "portal": "registro_imprese",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 27480,
+    "nota": "Sanzione amministrativa da 274,80 € a 1.376 € per amministratore (art. 2630 c.c.), ridotta a un terzo se depositato entro 30 giorni."
+   }
+  }
+ ]
+}

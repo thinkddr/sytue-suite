@@ -1,0 +1,623 @@
+/**
+ * SyERP — componentes compartidos y capas de superficie y acciones azules.
+ */
+@import '@sytue/ui/styles.css';
+
+@source '../**/*.{astro,ts,tsx}';
+
+/*
+ * Las secciones de inicio son autosuficientes; contenerlas evita que
+ * actualizar una tarjeta obligue al navegador a recalcular toda la pantalla.
+ */
+.erp-main {
+  background: var(--sytue-bg);
+}
+.erp-workspace #erp-cajon {
+  padding: 1.25rem 1rem;
+  /* Es un cajón SOBRE el contenido, también en escritorio: conserva su fondo aunque la
+     forma «Marco» deje ver el marco a través de los menús laterales de su carcasa. */
+  background-color: var(--sytue-sidebar-bg);
+}
+/* El menú de módulos es un cajón también en escritorio: lo que tiene debajo es contenido,
+   no el fondo ambiental, y con el carril traslúcido su texto se colaba entre los rótulos.
+   Misma base opaca que el cajón de <768px (tokens/appearance.css). */
+[data-theme='translucent'] .erp-workspace #erp-cajon {
+  background-color: var(--sytue-neutral-50);
+  background-image: linear-gradient(var(--sytue-sidebar-bg), var(--sytue-sidebar-bg));
+}
+.erp-workspace #erp-cajon > button,
+.erp-workspace #erp-cajon li > button {
+  min-height: 2.75rem;
+}
+
+.erp-dashboard-section {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 26rem;
+}
+
+/* `content-visibility` se degrada sin romper la vista; este respaldo conserva
+ * el aislamiento de layout/pintado en navegadores aún sin esa optimización. */
+@supports not (content-visibility: auto) {
+  .erp-dashboard-section {
+    contain: layout style paint;
+  }
+}
+
+/* Caja: catálogo legible, ticket con números alineados, un único cobro. */
+.erp-tpv {
+  padding: clamp(1rem, 2vw, 2rem);
+  max-width: 100rem;
+  margin-inline: auto;
+}
+.erp-tpv button,
+.erp-tpv select {
+  min-height: max(44px, 2.75rem);
+}
+.erp-tpv .text-xs {
+  font-size: max(12px, 0.8rem);
+}
+.erp-tpv-mobile-ticket {
+  display: none;
+}
+.erp-tpv-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-block-end: 1.5rem;
+}
+.erp-tpv-heading h1 {
+  font-size: clamp(1.7rem, 2.5vw, 2.4rem);
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+.erp-tpv-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(20rem, 22rem);
+  align-items: start;
+  gap: 1.25rem;
+  padding: 1.25rem;
+  border-radius: var(--radius-xl);
+  background: var(--sytue-bg-subtle);
+}
+.erp-tpv-catalogue {
+  min-width: 0;
+  display: grid;
+  gap: 1rem;
+}
+.erp-tpv-search {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0 0.875rem;
+  max-width: 25rem;
+  border: 1px solid var(--sytue-border-strong);
+  background: var(--sytue-surface);
+  border-radius: var(--radius-md);
+}
+.erp-tpv .erp-tpv-search input {
+  width: 100%;
+  min-width: 0;
+  min-height: max(44px, 2.75rem);
+  background: transparent;
+  font-size: 1rem;
+}
+.erp-tpv-categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.erp-tpv-categories button {
+  background: transparent;
+  color: var(--sytue-primary-text);
+  padding: 0.5rem 0.875rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+}
+.erp-tpv-categories button[aria-pressed='true'] {
+  background: var(--sytue-primary);
+  color: var(--sytue-on-primary);
+  border-color: var(--sytue-primary);
+}
+.erp-tpv-products {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 10.5rem), 1fr));
+  gap: 0.75rem;
+}
+.erp-tpv-product {
+  display: flex;
+  flex-direction: column;
+  text-align: start;
+  min-height: 10rem;
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid var(--sytue-border-subtle);
+  background: var(--sytue-card-blue);
+  border-radius: var(--radius-lg);
+  transition:
+    border-color 120ms,
+    background 120ms;
+}
+.erp-tpv-product-wrap {
+  position: relative;
+  min-width: 0;
+}
+.erp-tpv-product-content {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  width: 100%;
+  min-height: inherit;
+  padding: 1rem;
+}
+.erp-tpv-product-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+.erp-tpv-product-photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.erp-tpv-product-with-image .erp-tpv-product-info {
+  flex: 0;
+  margin-top: auto;
+  padding: 0.5rem 0.75rem;
+  margin-inline: -0.5rem;
+  margin-bottom: -0.5rem;
+  border-radius: var(--radius-sm);
+  background: rgba(244, 246, 250, 0.96);
+  color: #202833;
+}
+.erp-tpv-product-with-image .erp-tpv-product-name {
+  margin-block: 0 0.5rem;
+}
+.erp-tpv-product-with-image .erp-tpv-product-code {
+  background: #f4f6fa;
+  color: #485465;
+}
+.erp-tpv-product-image-action {
+  position: absolute;
+  top: 0.75rem;
+  inset-inline-end: 0.75rem;
+  min-width: max(44px, 2.75rem);
+}
+.erp-tpv-product:hover:enabled {
+  border-color: var(--sytue-primary);
+  box-shadow: var(--shadow-sm);
+}
+.erp-tpv-product:disabled {
+  opacity: 0.55;
+}
+.erp-tpv-product-code {
+  font-size: 0.75rem;
+  color: var(--sytue-text-muted);
+  background: transparent;
+  align-self: flex-start;
+  padding: 0;
+  border-radius: 0;
+  letter-spacing: 0.06em;
+  overflow-wrap: anywhere;
+}
+.erp-tpv-product-name {
+  font-weight: 500;
+  font-size: 1.0625rem;
+  line-height: 1.35;
+  margin-block: 0.875rem;
+  overflow-wrap: anywhere;
+}
+.erp-tpv-product-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-block-start: auto;
+  font-variant-numeric: tabular-nums;
+}
+.erp-tpv-product-count {
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: var(--radius-sm);
+  background: var(--sytue-primary);
+  color: var(--sytue-on-primary);
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+.erp-tpv-receipt {
+  min-width: 0;
+  background: var(--sytue-surface);
+  border: 1px solid var(--sytue-border-subtle);
+  border-radius: var(--radius-xl);
+  padding: 1.25rem;
+  box-shadow: none;
+  scroll-margin-block-start: 5rem;
+}
+.erp-tpv-ticket-heading {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding-block-end: 1rem;
+  border-block-end: 1px solid var(--sytue-border);
+}
+.erp-tpv-ticket-heading h2 {
+  font-size: 1.25rem;
+  font-weight: 650;
+}
+.erp-tpv-ticket-heading time {
+  font-size: 0.8rem;
+  color: var(--sytue-text-muted);
+}
+.erp-tpv-field,
+.erp-tpv-open {
+  display: grid;
+  gap: 0.5rem;
+  margin-block: 1rem;
+  font-weight: 550;
+}
+.erp-tpv input:not([type='radio']),
+.erp-tpv select {
+  font-size: max(16px, 1rem);
+  min-height: max(48px, 3rem);
+}
+.erp-tpv-field input,
+.erp-tpv-open input,
+.erp-tpv-field select {
+  border: 1px solid var(--sytue-border-strong);
+  background: var(--sytue-bg);
+  border-radius: 0.375rem;
+  padding: 0.5rem 0.75rem;
+  width: 100%;
+  min-width: 0;
+}
+.erp-tpv-lines {
+  margin-block: 1rem;
+  max-height: clamp(8rem, calc(100dvh - 55rem), 16rem);
+  overflow-y: auto;
+}
+.erp-tpv-empty {
+  padding-block: 2rem;
+  text-align: center;
+  color: var(--sytue-text-muted);
+}
+.erp-tpv-lines ul {
+  display: grid;
+  gap: 1.25rem;
+}
+.erp-tpv-lines li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.5rem;
+  font-variant-numeric: tabular-nums;
+}
+.erp-tpv-lines li > div:first-child {
+  grid-column: 1/-1;
+  display: grid;
+  gap: 0.25rem;
+  overflow-wrap: anywhere;
+}
+.erp-tpv-lines li > div:first-child span {
+  font-size: 0.8rem;
+  color: var(--sytue-text-muted);
+}
+.erp-tpv-quantity {
+  display: flex;
+  align-items: center;
+  background: var(--sytue-primary);
+  border: 1px solid var(--sytue-primary);
+  border-radius: var(--radius-md);
+  width: fit-content;
+}
+.erp-tpv-quantity button {
+  min-width: max(44px, 2.75rem);
+  min-height: max(44px, 2.75rem);
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+.erp-tpv-quantity span {
+  min-width: 2.75rem;
+  color: var(--sytue-on-primary);
+  font-weight: 700;
+  text-align: center;
+}
+.erp-tpv-lines li > strong {
+  align-self: center;
+}
+.erp-tpv-totals {
+  margin-block-start: 1.25rem;
+  border-block: 1px solid var(--sytue-border);
+  padding-block: 1.25rem;
+  display: grid;
+  gap: 0.5rem;
+  font-variant-numeric: tabular-nums;
+}
+.erp-tpv-totals > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.erp-tpv-total {
+  font-size: 1.75rem;
+  font-weight: 650;
+  letter-spacing: -0.025em;
+}
+.erp-tpv-payment {
+  margin-block-start: 1.5rem;
+  display: grid;
+  gap: 1rem;
+}
+.erp-tpv-payment legend {
+  font-weight: 550;
+  margin-block-end: 0.5rem;
+}
+.erp-tpv-payment fieldset {
+  min-width: 0;
+}
+.erp-tpv-methods {
+  display: flex;
+  gap: 0.75rem;
+}
+.erp-tpv-methods label {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex: 1;
+  border: 1px solid var(--sytue-border-strong);
+  padding: 0.75rem;
+  border-radius: 0.375rem;
+}
+.erp-tpv-methods label:has(:checked) {
+  border-color: var(--sytue-primary);
+  background: var(--sytue-selected);
+}
+.erp-tpv-checkout {
+  width: 100%;
+  min-height: 3.5rem;
+  font-size: 1.1rem;
+}
+.erp-tpv-success {
+  display: grid;
+  justify-items: center;
+  gap: 1rem;
+  padding-block: 2rem;
+  text-align: center;
+}
+.erp-tpv-success h2 {
+  font-size: 1.4rem;
+  font-weight: 600;
+}
+.erp-tpv-grand-total {
+  font-size: 2.5rem;
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 1100px) {
+  .erp-tpv {
+    padding-block-end: 6rem;
+  }
+  .erp-tpv-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .erp-tpv-receipt {
+    max-width: 40rem;
+    width: 100%;
+  }
+  .erp-tpv-mobile-ticket {
+    position: fixed;
+    bottom: 1rem;
+    inset-inline: 1rem;
+    max-width: 40rem;
+    margin-inline: auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    min-height: 3.5rem;
+    margin-block-start: 1rem;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    background: var(--sytue-primary);
+    color: var(--sytue-on-primary);
+    box-shadow: 0 0.25rem 1rem color-mix(in srgb, var(--sytue-text) 15%, transparent);
+    z-index: 2;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .erp-tpv-product {
+    transition: none;
+  }
+}
+
+/* Cabeceras y cifras de los listados operativos. */
+.erp-workspace table {
+  font-variant-numeric: tabular-nums;
+}
+.erp-workspace th {
+  background: var(--sytue-bg-subtle);
+  color: var(--sytue-text-muted);
+}
+
+/* Navegación compacta; el cajón conserva todos los modelos y sus permisos. */
+.erp-rail {
+  display: none;
+}
+@media (min-width: 768px) {
+  .erp-rail {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.625rem;
+    width: 4.5rem;
+    flex: 0 0 4.5rem;
+    padding-block: 1.5rem;
+    background: var(--sytue-rail);
+  }
+  .erp-rail-bottom {
+    margin-block-start: auto;
+    display: grid;
+    gap: 0.625rem;
+  }
+  .erp-rail-action {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 2.75rem;
+    min-height: 2.75rem;
+    /* Radio y estados son tokens de FORMA (`--sytue-rail-*`, en tokens/appearance.css).
+       En «Carril», lo de siempre: velo en reposo y el activo, un cuadro macizo con el
+       icono del color. En «Marco», el carril es parte del marco: reposo sin fondo, y el
+       activo, un velo con el icono blanco y el RELLENO ámbar —lo que dice «estás
+       aquí»: aquí no hay rótulo que poner en negrita—. */
+    border-radius: var(--radius-nav);
+    --sytue-glyph-fill: var(--sytue-rail-item-fill);
+    background: var(--sytue-rail-item-bg);
+    color: var(--sytue-primary-text);
+  }
+  .erp-rail-action:hover {
+    background: var(--sytue-rail-item-hover);
+  }
+  .erp-rail-action[aria-current='page'] {
+    --sytue-glyph-fill: var(--sytue-sidebar-indicator);
+    background: var(--sytue-rail-active-bg);
+    color: var(--sytue-rail-active-fg);
+  }
+  /* «ESTÁS AQUÍ», en un carril de solo iconos: una barra del indicador a PLENA opacidad
+     en el borde del carril (el botón mide 44 px, centrado en los 72). El relleno del
+     icono no basta —se pinta al 34 % y hay iconos sin formas cerradas— y aquí no hay
+     rótulo que poner en negrita. Su ancho es un token de forma: 3 px en «Marco» y 0 en
+     «Carril», donde el activo ya es un cuadro macizo. */
+  .erp-rail-action[aria-current='page']::before {
+    content: '';
+    position: absolute;
+    inset-block: 0.5rem;
+    inset-inline-start: -0.875rem;
+    width: var(--sytue-rail-indicator);
+    border-radius: var(--radius-pill);
+    background: var(--sytue-sidebar-indicator);
+  }
+  .erp-rail-count {
+    position: absolute;
+    inset-block-start: -0.3rem;
+    inset-inline-end: -0.3rem;
+    min-width: 1.125rem;
+    height: 1.125rem;
+    padding-inline: 0.2rem;
+    border-radius: var(--radius-pill);
+    background: var(--sytue-danger);
+    /* Blanco, no `on-primary`: sobre el rojo de peligro el rótulo del primario
+       (casi negro en oscuro) se queda en 3,7:1. */
+    color: var(--sytue-neutral-0);
+    font-size: 0.6875rem;
+    font-weight: 600;
+  }
+}
+/* Tono del recurso, con una pareja sólida y traslúcida compartida. */
+.erp-tpv-product[data-tone='blue'] {
+  --product-card: var(--sytue-card-blue);
+  --product-solid: var(--sytue-card-solid-blue);
+  --product-on-solid: var(--sytue-on-card-solid-blue);
+  background: var(--product-card);
+}
+.erp-tpv-product[data-tone='violet'] {
+  --product-card: var(--sytue-card-violet);
+  --product-solid: var(--sytue-card-solid-violet);
+  --product-on-solid: var(--sytue-on-card-solid-violet);
+  background: var(--product-card);
+}
+.erp-tpv-product[data-tone='mint'] {
+  --product-card: var(--sytue-card-mint);
+  --product-solid: var(--sytue-card-solid-mint);
+  --product-on-solid: var(--sytue-on-card-solid-mint);
+  background: var(--product-card);
+}
+.erp-tpv-product[data-tone='rose'] {
+  --product-card: var(--sytue-card-rose);
+  --product-solid: var(--sytue-card-solid-rose);
+  --product-on-solid: var(--sytue-on-card-solid-rose);
+  background: var(--product-card);
+}
+.erp-tpv-product[data-tone='amber'] {
+  --product-card: var(--sytue-card-amber);
+  --product-solid: var(--sytue-card-solid-amber);
+  --product-on-solid: var(--sytue-on-card-solid-amber);
+  background: var(--product-card);
+}
+.erp-tpv-product[data-tone='cyan'] {
+  --product-card: var(--sytue-card-cyan);
+  --product-solid: var(--sytue-card-solid-cyan);
+  --product-on-solid: var(--sytue-on-card-solid-cyan);
+  background: var(--product-card);
+}
+.erp-tpv-product[data-tone='coral'] {
+  --product-card: var(--sytue-card-coral);
+  --product-solid: var(--sytue-card-solid-coral);
+  --product-on-solid: var(--sytue-on-card-solid-coral);
+  background: var(--product-card);
+}
+.erp-tpv-product[data-tone='lime'] {
+  --product-card: var(--sytue-card-lime);
+  --product-solid: var(--sytue-card-solid-lime);
+  --product-on-solid: var(--sytue-on-card-solid-lime);
+  background: var(--product-card);
+}
+.erp-tpv-product[data-tone='slate'] {
+  --product-card: var(--sytue-card-slate);
+  --product-solid: var(--sytue-card-solid-slate);
+  --product-on-solid: var(--sytue-on-card-solid-slate);
+  background: var(--product-card);
+}
+.erp-tpv-product[data-selected='true']:not(.erp-tpv-product-with-image) {
+  background: var(--product-solid, var(--sytue-card-solid-blue));
+  color: var(--product-on-solid, var(--sytue-on-card-solid-blue));
+}
+.erp-tpv-product[data-selected='true']:not(.erp-tpv-product-with-image) .erp-tpv-product-code {
+  color: inherit;
+}
+
+[data-theme='translucent'] .erp-main {
+  background: transparent;
+}
+
+.erp-tpv-product-bottom strong {
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+@media (max-width: 600px) {
+  .erp-tpv {
+    padding: 1rem 1rem 6rem;
+  }
+  .erp-tpv-layout {
+    padding: 0.875rem;
+    gap: 1.5rem;
+  }
+  .erp-tpv-products {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.625rem;
+  }
+  .erp-tpv-product {
+    min-height: 9.75rem;
+  }
+  .erp-tpv-product-content {
+    padding: 0.875rem;
+  }
+  .erp-tpv-product-name {
+    font-size: 1rem;
+  }
+  .erp-tpv-product-bottom {
+    flex-wrap: wrap;
+  }
+  .erp-tpv-heading {
+    gap: 0.75rem;
+  }
+}

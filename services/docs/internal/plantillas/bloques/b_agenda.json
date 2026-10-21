@@ -1,0 +1,21 @@
+{
+ "id": "b",
+ "boxes": [
+  {
+   "id": "b-titulo",
+   "x": 8,
+   "y": 8,
+   "w": 84,
+   "h": 16,
+   "html": "<h1>{{b_agenda.titulo}}</h1>"
+  },
+  {
+   "id": "b-cuerpo",
+   "x": 8,
+   "y": 30,
+   "w": 84,
+   "h": 60,
+   "html": "<ol><li>{{b_agenda.punto}}</li><li>{{b_agenda.punto}}</li><li>{{b_agenda.punto}}</li><li>{{b_agenda.punto}}</li></ol>"
+  }
+ ]
+}

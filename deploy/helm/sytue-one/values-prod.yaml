@@ -1,0 +1,695 @@
+# =============================================================================
+# Sytue One — overlay PROD (Scaleway Kapsule, region UE fr-par; DR nl-ams).
+# Uso: helm upgrade --install sytue-one deploy/helm/sytue-one \
+#        -n sytue-prod --create-namespace \
+#        -f deploy/helm/sytue-one/values.yaml \
+#        -f deploy/helm/sytue-one/values-prod.yaml
+#
+# Dominio prod: sytue.eu (one., id., drive., docs., mail., mx., calendar.,
+# contacts., notes., rooms., cloud., admin., hub., www.; chat./meet./console. son legados 301).
+# ACME PRODUCCION. Alta disponibilidad. 100% UE. Sin secretos (existingSecret).
+# =============================================================================
+
+global:
+  env: prod
+  domain: sytue.eu
+  region: fr-par
+  imageRegistry: rg.fr-par.scw.cloud/sytue-prod-platform
+  # Telemetria a Cockpit. Aqui va SOLO el nombre del Secret; el `endpoint` no se
+  # escribe porque lleva dentro el identificador de la data source, distinto en
+  # cada proyecto: lo descubre `03-desplegar.sh` con `scw cockpit data-source
+  # list` y lo pasa con `--set`. Fijarlo aqui haria que un entorno nuevo
+  # escribiera en el Cockpit de otro, y eso no da error: solo mezcla las series.
+  #
+  # El Secret lo materializa `02b-secretos.sh` desde Secret Manager. Si falta, el
+  # bloque de los charts no se renderiza, el exportador cae a descarte y los
+  # servicios sirven igual, sin metricas y con el escalado decidiendose por CPU.
+  otlp:
+    tokenSecret: sytue-otlp
+  # Secret compartido de la cache. Sin esta linea el chart no monta NADA: se
+  # puede crear y rotar `sytue-one-cache` sin que ningun pod lo llegue a leer, y
+  # Dragonfly sigue sin contrasena y sin firma con el despliegue en verde.
+  # El Secret se crea fuera del chart (ver el comentario en values.yaml).
+  cache:
+    secretName: sytue-one-cache
+  tls:
+    issuer: sytue-letsencrypt-prod
+    # ENCENDIDO el 2026-08-13, y solo después de que el webhook respondiera.
+    # El orden importa: un emisor con un solver que no contesta NO rompe los
+    # certificados que ya existen —rompe su RENOVACIÓN, y eso no se ve hasta que
+    # caducan semanas después—. `v1alpha1.acme.scaleway.com` da «all checks
+    # passed» antes de tocar esto.
+    dns01:
+      enabled: true
+    issuers:
+      sytue-letsencrypt-staging:
+        enabled: false
+      sytue-letsencrypt-prod:
+        enabled: true
+        server: https://acme-v02.api.letsencrypt.org/directory
+  networkPolicy:
+    enabled: true
+    allowExternalEgress: true
+    loadBalancerSourceCIDRs: ["10.20.0.0/22"]
+  # Redirección 301 sytue.com → sytue.eu preservando subdominio, path y query.
+  # DNS: infra/terraform/environments/prod/sytue-com-redirect.tf
+  # Helm: deploy/helm/charts/sytue-frontend/templates/sytue-com-redirect.yaml
+  comRedirect:
+    enabled: true
+  # APAGADO mientras no esté el Prometheus Operator, y no es una preferencia: sin
+  # sus CRD, `monitoring.coreos.com/v1` no existe en el clúster y Helm NI SIQUIERA
+  # RENDERIZA —«You have to deploy monitoring.coreos.com/v1 first»—, así que el
+  # despliegue entero se cae antes de aplicar nada. Se enciende junto con el
+  # operador, en el mismo cambio, no antes.
+  metrics:
+    serviceMonitor:
+      enabled: false
+      labels:
+        release: kube-prometheus-stack
+
+# Ingress canónico Traefik, como DAEMONSET: un pod por nodo, siempre.
+#
+# NO es preferencia, es un requisito del Load Balancer de Scaleway. Su health
+# check va POR NODO contra el nodePort, así que un nodo sin pod de Traefik se
+# marca `stopped`… y el LB le sigue enviando su parte del tráfico, que se pierde
+# entera. Medido el 2026-08-09: con dos réplicas sobre tres nodos, `id.sytue.eu`
+# perdía el 60-66 % de las conexiones —el TCP ni se establecía— mientras
+# `git.sytue.eu`, en otra máquina del mismo Scaleway, iba 10 de 10. Desde fuera
+# se ve como «la suite va lentísima», y no había nada lento: lo que respondía lo
+# hacía en 0,1-0,3 s.
+#
+# Con `replicas` fijas el fallo VUELVE cada vez que el pool crece: el
+# autoescalador añade un nodo, ese nodo no recibe pod, y se pierde otro tercio
+# del tráfico. Un DaemonSet sigue al pool por definición, que es justo lo que
+# hace falta cuando los nodos escalan con la demanda.
+#
+# Coste: un pod más por nodo, y cada uno pide 50m de CPU y 128Mi.
+traefik:
+  # DaemonSet + externalTrafficPolicy: Local. Los dos JUNTOS o ninguno, y el
+  # motivo es una NetworkPolicy, no la colocación de los pods.
+  #
+  # La NetworkPolicy de Traefik solo admite ingreso desde el Private Network
+  # (10.20.0.0/22), que es de donde viene el Load Balancer. Pero con
+  # `externalTrafficPolicy: Cluster` Cilium reparte el nodePort entre los pods de
+  # TODOS los nodos, y cuando el elegido está en otro nodo hace SNAT al router IP
+  # del nodo —100.64.x.y, la CIDR de pods—, que NO está en esa política. Ese SYN
+  # se descarta en el nodo destino, en silencio y sin RST, así que el cliente ve
+  # un connect que nunca completa y el health check (que tira el mismo dado) casi
+  # nunca lo nota. Medido el 2026-08-09: 13,8 % de peticiones perdidas y un 20 %
+  # más resueltas en 3,1 s exactos —el timeout_connect del LB más el redispatch—,
+  # cifras que coinciden con la probabilidad de que el balanceo elija un pod
+  # remoto (p≈0,37: p² de fallo duro, p(1−p) de rebote).
+  #
+  # Con `Local` no hay salto: el origen sigue siendo la IP del LB, que la política
+  # ya permite. Y `Local` EXIGE un pod en cada nodo, de ahí el DaemonSet: si no,
+  # el nodo sin pod agujerea su parte hasta que el health check lo saca. Por eso
+  # el DaemonSet solo (58cbab24) no arregló nada y se revirtió (a4b0943c): sin
+  # `Local`, Cilium sigue eligiendo backends remotos haga lo que haga el
+  # scheduler. Era necesario, no suficiente.
+  #
+  # `mail` y `livekit` ya usan Local; Traefik era el único que quedaba en el
+  # Cluster por defecto.
+  deployment:
+    kind: DaemonSet
+  service:
+    spec:
+      externalTrafficPolicy: Local
+  # Traefik NO tenía recursos propios: heredaba el `LimitRange` del namespace
+  # (1 CPU / 512Mi), que existe para que ningún pod se quede SIN límite —una red
+  # de seguridad— y no para dimensionar nada. Así que el único componente por el
+  # que pasa toda la suite estaba tallado por un valor accidental.
+  #
+  # Y se murió: los DOS pods `OOMKilled` el 2026-08-11 a las 20:42 UTC con 46
+  # segundos de diferencia, 5 y 6 reinicios en 2 días y medio. Los dos a la vez
+  # significa causa compartida —una punta, no una fuga de uno—, y con las dos
+  # réplicas caídas no hay ingress: la suite entera deja de responder mientras
+  # vuelven.
+  #
+  # En reposo consume 73-85Mi, así que el problema no es el uso normal sino el
+  # techo: la punta pasó de 512Mi. El buffering de peticiones y respuestas está
+  # apagado (por defecto en Traefik), o sea que los cuerpos no se acumulan en
+  # memoria y lo que crece son conexiones concurrentes, sesiones TLS y el almacén
+  # de certificados. 1Gi da margen de sobra para eso sin reservar de más: el
+  # `limit` no se reserva, solo el `request`, y ese sube a 192Mi —por encima del
+  # consumo medido, no por debajo—.
+  #
+  # Si volviera a tocar techo con 1Gi, la respuesta NO es otro Gi: sería buscar
+  # qué genera la punta (`kubectl top` durante el incidente y los access logs de
+  # esa ventana), porque a partir de aquí ya sería una fuga.
+  resources:
+    requests:
+      cpu: 100m
+      memory: 192Mi
+    limits:
+      cpu: "2"
+      memory: 1Gi
+  ports:
+    # ICE/TCP de LiveKit. Sustituye al Load Balancer propio del SFU: un LB-S con
+    # su IP son ~20 EUR/mes por publicar un solo puerto TCP, y Traefik ya termina
+    # el 5349 (TURN/TLS) de ese mismo chart.
+    #
+    # SIN TLS, que además es el defecto: ICE/TCP no es TLS y no manda SNI, así
+    # que la ruta usa `HostSNI("*")`, válido solo en un entryPoint sin TLS. No se
+    # escribe `tls: {enabled: false}` porque el schema del chart de Traefik lo
+    # rechaza —«additional properties 'tls' not allowed»— y tumba el render
+    # entero, no solo este puerto.
+    rtctcp:
+      port: 7881
+      expose:
+        default: true
+      exposedPort: 7881
+      protocol: TCP
+    turnudp:
+      expose:
+        # El Load Balancer gestionado de Scaleway solo admite TCP. Los clientes
+        # conservan TURN/TLS 5349 e ICE/TCP 7881 en este perfil inicial.
+        default: false
+  # Mirrored byte-a-byte by release.yml into the private EU registry.
+  image:
+    registry: rg.fr-par.scw.cloud
+    repository: sytue-prod-platform/traefik
+    tag: v3.7.10
+  versionOverride: v3.7.10
+  # Cada chart upstream nombra esta clave a su manera y NO lee la global: hay que
+  # apagarlas una a una o el render se cae por el CRD que falta (ver global.metrics).
+  metrics:
+    prometheus:
+      serviceMonitor:
+        enabled: false
+
+cert-manager:
+  prometheus:
+    servicemonitor:
+      enabled: false
+
+# -----------------------------------------------------------------------------
+# PgBouncer (pool_mode=transaction) entre los servicios Go y la RDB.
+#
+# LA CUENTA (RDB max_connections=200, infra/terraform modules/database):
+#   Hacia la RDB (tope duro del pooler):
+#     2 replicas PgBouncer x 11 bases x max_db_connections 7  = 154
+#     (la base 11 es `analytics`; el wildcard `*` de pgbouncer.ini no necesita
+#      declararla, pero SI cuenta en el presupuesto)
+#   Directo a la RDB (bypass DATABASE_DIRECT_URL; estado de sesion):
+#     LISTEN (1 conexion/replica en chat, docs y hub)          = 9 en suelo,
+#                                                                36 a HPA-max
+#     + migraciones (transitorias en despliegues) y mantenimiento
+#   Total <= 154 + 36 + margen ~10  = 200  ✓ (peor caso simultaneo)
+#     AVISO: la base 11 se comio parte del margen (era ~24 con 10 bases). La
+#     palanca, si aprieta, es settings.maxDbConnections 7 -> 6 (= 132 y margen
+#     ~32); NO subir replicaCount de PgBouncer sin rehacer esta cuenta.
+#
+#   Clientes -> PgBouncer (replicas x DB_MAX_CONNS, ya NO golpean la RDB):
+#     suelo:   id 2x4 + mail 2x3 + integrations 2x3
+#              + los nueve de una replica x3 + analytics (1x2 + 1x3)   = 52
+#     HPA-max: id 12x4 + mail 8x3 + integrations 8x3 + drive/docs/rooms/hub
+#              12x3 + calendar/contacts 8x3 + cloud-api 15x3
+#              + builder/controller 1x3 + analytics (10x2 + 1x3)       = 386
+#     (sin pooler, el SUELO ya eran 28 replicas x 10 = 280 > 200: ese era el
+#     fallo de la auditoria; max_client_conn=2000 lo absorbe de sobra).
+#
+# DSN (secrets sytue-<svc>-db, fuera de banda):
+#   dsn        -> postgres://<user>:<pass>@pgbouncer:6432/<base>?sslmode=disable
+#   dsn-direct -> postgres://<user>:<pass>@<rdb-privada>:5432/<base>?sslmode=require
+# Y el secret sytue-pgbouncer (userlist.txt) + sytue-postgresql (host/port RDB).
+# DEV (deploy/compose) NO usa PgBouncer.
+# -----------------------------------------------------------------------------
+pgbouncer:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: pgbouncer
+    useGlobalRegistry: true
+  serviceMonitor:
+    enabled: false
+
+integrations:
+  podDisruptionBudget: { enabled: true, minAvailable: 1 }
+  serviceMonitor:
+    enabled: false
+
+# Cache efimera compartida (presencia de Hub, pub/sub de Rooms y Docs). Igual que
+# PgBouncer: en produccion se sirve del mirror privado, con el NOMBRE CORTO con el
+# que este publica la imagen.
+dragonfly:
+  enabled: true
+  image:
+    # DEL ESPEJO otra vez, desde el 2026-08-18. Estuvo cuatro semanas tirando del
+    # origen —excepción con fecha en upstream-directo.txt— porque 1.40.1 corrige
+    # CVE-2026-62357 y lo único que copiaba al registro privado era el job de una
+    # release. Ya no: `.sygit/workflows/espejo-upstream.yml` lo hace a mano.
+    #
+    # NOMBRE CORTO (`dragonfly`, no la ruta de origen): es como publica el mirror.
+    # Con la ruta larga el helper compondría
+    # `<mirror>/docker.dragonflydb.io/dragonflydb/dragonfly` y el pull daría un
+    # 404 que parece que la imagen no existe.
+    #
+    # El digest se conserva: es el mismo a los dos lados —`crane copy` no
+    # reempaqueta— y es lo que fija QUÉ se ejecuta.
+    repository: dragonfly
+    useGlobalRegistry: true
+    digest: "sha256:ebf3c6c213e82fb51b4521660cca13f06f3421dc5b1ed14f2f474c50b5e29986"
+
+# -----------------------------------------------------------------------------
+# Servicios Go. config.dbMaxConns = pool pgx POR replica (DB_MAX_CONNS): bajo,
+# porque PgBouncer multiplexa hacia la RDB. Si se cambia, recalcular LA CUENTA.
+#
+# EL SUELO ES MIXTO POR CRITICIDAD, y es una decisión, no una transición a medias:
+#
+#   · Dos réplicas SOLO donde una caída no es aceptable ni un minuto: Sytue ID
+#     (sin él no entra nadie a NINGUNA app), Traefik (es la puerta de todo) y
+#     Sytue Mail (el correo entrante que se pierde no vuelve).
+#   · Una réplica con HPA en el resto: crecen bajo carga y en reposo cuestan lo
+#     que cuestan hoy. Sí aceptan el hueco de reprogramación de un pod.
+#
+# Un suelo de 3 en todo son ~30 pods parados sobre un pool de 2 nodos, y el
+# presupuesto de producción son 100 €/mes. Se sube cuando haya clientes que lo
+# justifiquen, servicio por servicio y con la telemetría delante — no de golpe.
+#
+# Esto vivió un tiempo en `deploy/production/values-piloto.yaml`, un fichero que
+# NINGÚN script cargaba: producción quedó con 1 HPA de 26 deployments y ni un
+# servicio con dos réplicas, y nadie lo vio porque el fichero existía y se leía
+# como aplicado. Por eso está aquí, en el único fichero de valores que el
+# despliegue carga siempre.
+# -----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# QUE ESCALAR Y DESESCALAR NO SE NOTE NUNCA
+#
+# Un `PodDisruptionBudget` con `minAvailable: 1` sobre un servicio de UNA réplica
+# es un candado: protege al usuario —nunca se queda en cero— pero deja el pod
+# inamovible, `disruptionsAllowed: 0`. Y si el pod no se puede mover, el nodo no
+# se puede vaciar; y si el nodo no se puede vaciar, el autoescalador NO PUEDE
+# retirarlo jamás. Con 19 de 27 servicios así, el desescalado no existía: se
+# pagaban nodos que ya no hacían falta. Se vio el 2026-08-09, cuando retirar un
+# nodo averiado se quedó colgado en el drenaje.
+#
+# La salida no es elegir entre disponibilidad y coste, sino atar las dos a la
+# demanda:
+#
+#   · Con usuarios activos el HPA sube a dos o más réplicas, y entonces vaciar un
+#     nodo se lleva UNA: el servicio sigue en pie y nadie nota nada.
+#   · Sin usuarios el suelo baja a una réplica y el PDB permite moverla. Sí hay un
+#     hueco de segundos al reprogramarla, pero no hay a quién afectar: por eso se
+#     mide la demanda real y no un horario.
+#
+# Por eso `maxUnavailable: 1` donde el suelo es una réplica y `minAvailable: 1`
+# donde ya hay dos garantizadas (Sytue ID, Mail, Integrations y Traefik): ahí sí
+# se puede evacuar una sin dejar el servicio a cero en ningún momento.
+# -----------------------------------------------------------------------------
+# OBJETIVOS DE ESCALADO POR DEMANDA — techo de seguridad, NO una calibración.
+#
+# 100 req/s por réplica, y 50 en los tres que no pueden llegar tarde (id, hub,
+# mail). Esos números NO salen de medir dónde se satura cada servicio, porque
+# hoy no hay con qué: descontadas las sondas, toda la plataforma mueve 0,02
+# req/s. Salen de elegir un techo por encima de cualquier tráfico plausible a
+# corto plazo, de modo que el HPA no dispare escalados espurios y siga mandando
+# la CPU mientras tanto.
+#
+# Es seguro ponerlos ya porque la regla del adapter excluye /healthz y /readyz:
+# sin tráfico real la métrica vale 0 y el HPA se queda en minReplicas. Con el
+# filtro puesto, un objetivo alto no hace nada; sin él, cualquier objetivo
+# clavaría los HPA en maxReplicas para siempre (ver docs/roadmap.md#escalado-pendiente).
+#
+# CUÁNDO SE CALIBRAN DE VERDAD: cuando haya carga real, buscando por servicio la
+# tasa por réplica a la que la latencia se sale de su SLO y poniendo el objetivo
+# por debajo de ese codo. Hasta entonces esto es un guardarraíl, no una medida.
+id:
+  podDisruptionBudget: { enabled: true, minAvailable: 1 }
+  config:
+    requirePaidSubscription: true
+    keyRotationInterval: 168h
+    keyRetireAfter: 1h
+    dbMaxConns: 4
+  autoscaling:
+    targetRequestsPerSecond: 50
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 12
+# Los nombres de bucket viven AQUÍ, no en `values-arranque.yaml`. Estuvieron solo
+# allí, y como ese fichero es un perfil OPCIONAL —producción no lo carga—, los
+# tres servicios de blobs corrían apuntando al defecto de su subchart:
+# `drive-blobs`, `docs-blobs`, `mail-blobs`, buckets que NO EXISTEN. No fallaba
+# nada porque ninguno crea el bucket ni lo toca al arrancar: el error habría sido
+# un `NoSuchBucket` en la primera subida real de un usuario.
+#
+# El gate no lo veía: comprueba que cada fichero de valores lo cargue alguien, y
+# `values-arranque.yaml` lo carga `03-desplegar.sh --arranque`. No era un fichero
+# huérfano, era un AJUSTE huérfano dentro de un fichero condicional.
+drive:
+  podDisruptionBudget: { enabled: true, minAvailable: null, maxUnavailable: 1 }
+  autoscaling:
+    targetRequestsPerSecond: 100
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 12
+  config:
+    dbMaxConns: 3
+    s3Bucket: sytue-prod-drive-blobs
+docs:
+  podDisruptionBudget: { enabled: true, minAvailable: null, maxUnavailable: 1 }
+  autoscaling:
+    targetRequestsPerSecond: 100
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 12
+  config:
+    dbMaxConns: 3
+    s3Bucket: sytue-prod-docs-blobs
+mail:
+  podDisruptionBudget: { enabled: true, minAvailable: 1 }
+  autoscaling:
+    targetRequestsPerSecond: 50
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 8
+  config:
+    dbMaxConns: 3
+    s3Bucket: sytue-prod-mail-blobs
+    # Correo a canal de Sytue Rooms: escribir a `<canal>+<token>@rooms.sytue.eu`
+    # publica el mensaje en ese canal. Los dos extremos estaban entregados y esto
+    # estaba VACIO en los dos charts, asi que el puente nacia nil
+    # (delivery.NewChannelBridge devuelve nil sin dominio) y la cuarta variante
+    # «Email» del webhook entrante no se ofrecia nunca. Debe coincidir con el
+    # rooms.config.channelMailDomain (abajo), que es quien lo publica para que la
+    # web y las apps ensenen la direccion, y con el MX de `rooms` que publica
+    # infra/terraform/modules/dns.
+    channelMailDomain: rooms.sytue.eu
+calendar:
+  podDisruptionBudget: { enabled: true, minAvailable: null, maxUnavailable: 1 }
+  autoscaling:
+    targetRequestsPerSecond: 100
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 8
+  config:
+    dbMaxConns: 3
+contacts:
+  podDisruptionBudget: { enabled: true, minAvailable: null, maxUnavailable: 1 }
+  autoscaling:
+    targetRequestsPerSecond: 100
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 8
+  config:
+    dbMaxConns: 3
+# Mismo techo que Contacts: escrituras cortas y frecuentes (arrastrar una nota es
+# una petición) sobre PostgreSQL, sin blobs ni conversiones.
+notes:
+  podDisruptionBudget: { enabled: true, minAvailable: null, maxUnavailable: 1 }
+  autoscaling:
+    targetRequestsPerSecond: 100
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 8
+  config:
+    dbMaxConns: 3
+syphotos:
+  podDisruptionBudget: { enabled: true, minAvailable: null, maxUnavailable: 1 }
+  autoscaling:
+    targetRequestsPerSecond: 100
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 8
+  # UN solo bloque `config`. Había dos, y en YAML el segundo pisa al primero
+  # sin aviso: `dbMaxConns: 3` no llegaba al chart y Sytue Photos abría las
+  # conexiones por defecto contra un Postgres compartido con toda la suite.
+  config:
+    dbMaxConns: 3
+    s3Bucket: sytue-prod-syphotos-derivadas
+# Sytue Cast. El techo es MENOR que el de un CRUD (50 y no 100 peticiones por
+# segundo y réplica): cada petición de /media es un segmento de vídeo servido en
+# streaming desde S3, así que una réplica aguanta menos peticiones simultáneas
+# que las de una API de JSON. La transcodificación no cuenta aquí: la hace el
+# Deployment cast-transcoder, con UNA réplica y sin HPA, porque su límite lo fija
+# la CPU que se le reserva y no el tráfico.
+cast:
+  podDisruptionBudget: { enabled: true, minAvailable: null, maxUnavailable: 1 }
+  autoscaling:
+    targetRequestsPerSecond: 50
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 8
+  config:
+    dbMaxConns: 3
+    # El bucket lo crea Terraform (módulo object-storage): sin acceso público y
+    # con las credenciales del secret `sytue-object-storage`, el de Drive/Docs/Mail.
+    s3Bucket: sytue-prod-cast-medios
+# SyERP. El techo es el de un servicio de CRUD: el pico no lo marca la
+# navegación —que es la de una hoja de cálculo con veinte filas— sino una
+# importación de Salesforce, que es puntual y la aguanta el autoescalado.
+syerp:
+  podDisruptionBudget: { enabled: true, minAvailable: null, maxUnavailable: 1 }
+  autoscaling:
+    targetRequestsPerSecond: 100
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 6
+  config:
+    dbMaxConns: 3
+# Rooms absorbe lo que eran dos servicios (mensajería y videollamada). Conserva el
+# techo del que más pesaba: el trabajo de medios lo hace el SFU, no este proceso, que
+# de la llamada solo orquesta salas, tokens y avisos.
+rooms:
+  podDisruptionBudget: { enabled: true, minAvailable: null, maxUnavailable: 1 }
+  autoscaling:
+    targetRequestsPerSecond: 100
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 12
+  config:
+    dbMaxConns: 3
+    # Grabación de reuniones. El bucket lo crea Terraform (módulo object-storage,
+    # entrada `recordings`): sin versionado, sin acceso público y con caducidad de
+    # 30 días para las versiones no vigentes. Las credenciales salen del secret
+    # `sytue-object-storage`, el mismo de Drive/Docs/Mail.
+    recordingBucket: sytue-prod-recordings
+    # El MISMO dominio que mail.config.channelMailDomain: Mail recibe y publica, y
+    # Rooms solo lo ensena con el secreto de cada webhook entrante.
+    channelMailDomain: rooms.sytue.eu
+# Sytue Bases, APAGADA en este entorno (decisión pendiente del dueño, 2026-10-04). El
+# defecto del chart es encendida, pero aquí los guiones de deploy/production todavía no
+# crean sus secretos (`sytue-bases`, `bases-oidc-client-secret`) ni existen el DNS
+# `bases.<dominio>` y su certificado: encenderla dejaría el pod en
+# CreateContainerConfigError. Pasos en docs/operations.md#bases-encendido.
+bases:
+  enabled: false
+hub:
+  podDisruptionBudget: { enabled: true, minAvailable: null, maxUnavailable: 1 }
+  autoscaling:
+    targetRequestsPerSecond: 50
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 12
+  config:
+    dbMaxConns: 3
+    # Sin `bases`: aquí está apagada (ver arriba) y el Hub no anuncia lo que no hay.
+    apps: [one, mail, drive, calendar, contacts, docs, notes, photos, rooms, cast, pages, erp, cloud, console, id]
+cloud-api:
+  podDisruptionBudget: { enabled: true, minAvailable: null, maxUnavailable: 1 }
+  autoscaling:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 15
+  config:
+    dbMaxConns: 3
+    s3: { endpoint: https://s3.fr-par.scw.cloud, region: fr-par, bucket: sytue-prod-build-cache, useSSL: true }
+    # Alertas por correo (canal `mailto:` en una alert_policy). El servidor es el
+    # de la casa; el buzón y su contraseña los custodia 02b-secretos.sh, que NO
+    # los inventa. Sin credenciales el aviso se omite y se dice en el registro:
+    # las alertas por webhook siguen igual.
+    smtp: { host: mx.sytue.eu, port: "587", from: cloud@corporate.sytue.eu }
+# Sin HPA a propósito: el builder consume una COLA. Escalarlo por CPU no acelera
+# nada —el trabajo llega al ritmo que llega— y dos réplicas compitiendo por el
+# mismo trabajo necesitan una coordinación que hoy no tienen.
+cloud-builder:
+  podDisruptionBudget: { enabled: true, minAvailable: null, maxUnavailable: 1 }
+  # CUATRO, no una. Con una sola réplica TODA la plataforma construye una app de
+  # cliente cada vez: `processOne` bloquea hasta que termina el Job de Kubernetes
+  # (services/cloud/internal/builder/builder.go), así que la concurrencia global
+  # de build de todos los tenants juntos era 1. Con builds de ~3 min, el décimo
+  # cliente de una ráfaga espera ~27 minutos antes de que su build EMPIECE, sin
+  # posición visible en ninguna parte.
+  #
+  # No hace falta cambiar código: la concurrencia ya está diseñada y estaba
+  # apagada. `ClaimNextBuild` usa `FOR UPDATE SKIP LOCKED` con el comentario
+  # «para permitir varios builders concurrentes sin colisiones»
+  # (services/cloud/internal/store/builds.go:163). Y el propio chart afirmaba
+  # «en prod se sube a 2+ replicas (values-prod)» — no era cierto, este fichero
+  # ponía 1.
+  #
+  # El builder ORQUESTA, no compila: cada réplica lanza un Job en
+  # `sytue-paas-builds` y espera. Lo que acota el consumo real sigue siendo el
+  # ResourceQuota de ese namespace, no este número.
+  #
+  # LO QUE ESTO NO ARREGLA: la cola es FIFO global (`ORDER BY created_at`), sin
+  # equidad por tenant. Un cliente que empuje cinco commits sigue poniéndose
+  # delante de todos los demás. Eso pide un turno rotatorio por tenant y es
+  # trabajo de código, no de valores.
+  replicaCount: 4
+  config:
+    dbMaxConns: 3
+    s3: { endpoint: https://s3.fr-par.scw.cloud, region: fr-par, bucket: sytue-prod-build-cache, useSSL: true }
+# Reconciliador del PaaS: SINGLETON (1 réplica; dos reconciliadores competirían por
+# el mismo estado). Pool pgx pequeño (LISTEN/NOTIFY + reconcile de baja frecuencia);
+# +4 conexiones cabe en el margen de LA CUENTA de PgBouncer.
+cloud-controller:
+  podDisruptionBudget: { enabled: true, minAvailable: null, maxUnavailable: 1 }
+  replicaCount: 1
+  config:
+    dbMaxConns: 4
+    s3: { endpoint: https://s3.fr-par.scw.cloud, region: fr-par, bucket: sytue-prod-build-cache, useSSL: true }
+    # Lo que corre DENTRO del namespace de cada cliente: su base de datos, su API
+    # REST, sus copias y sus tareas programadas. Del espejo privado y firmado,
+    # desde el 2026-08-18.
+    #
+    # Antes iban a docker.io directamente aunque las cuatro se espejaban en
+    # `upstream-images.txt`: el espejo existía y no lo consumía nadie. O sea que
+    # la base de datos de un cliente dependía de que Docker Hub estuviera en pie y
+    # de que su cuenta de origen no estuviera comprometida — y eso no lo cubre el
+    # digest, que solo garantiza el contenido de lo que YA se pudo descargar.
+    #
+    # El pull funciona porque el Secret de registro que el controlador pone en
+    # cada namespace de tenant se emite para el HOST entero (`rg.fr-par.scw.cloud`,
+    # ver controller/kubeplatform.go), no para un namespace suelto del registro.
+    managedImages:
+      postgres: rg.fr-par.scw.cloud/sytue-prod-platform/managed-postgres:18.6@sha256:06cad38a5d9f5d24b4d83d86def30795d5e4b757fedbf5281172b576dedcd941
+      postgrest: rg.fr-par.scw.cloud/sytue-prod-platform/managed-postgrest:v14.16@sha256:bea1c76a856fa39d1e542d25911cf95d02fe2bf971992d033044ff209f1504b8
+      rclone: rg.fr-par.scw.cloud/sytue-prod-platform/managed-rclone:1.75.0@sha256:b06aed988cf5967de7c25be5925240983981c757f4ed1ac9d2fa659d51d60548
+      httpTask: rg.fr-par.scw.cloud/sytue-prod-platform/managed-http-task:8.21.0@sha256:7c12af72ceb38b7432ab85e1a265cff6ae58e06f95539d539b654f2cfa64bb13
+
+# Sytue Analytics (ADR 0026). El COLECTOR es el endpoint de mas volumen de la
+# plataforma y el unico publico sin autenticar: suelo de 3 replicas para absorber
+# picos sin esperar al HPA. Pool pgx MINIMO (2) a proposito: son muchas replicas y
+# cada una escribe por LOTES (INSERT multi-fila cada ~1 s o 500 eventos), no una
+# conexion por evento. La API es SINGLETON porque lleva dentro el cron del servicio.
+analytics-ingest:
+  podDisruptionBudget: { enabled: true, minAvailable: null, maxUnavailable: 1 }
+  autoscaling:
+    targetRequestsPerSecond: 100
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 10
+  config:
+    dbMaxConns: 2
+analytics-api:
+  podDisruptionBudget: { enabled: true, minAvailable: null, maxUnavailable: 1 }
+  replicaCount: 1
+  config:
+    dbMaxConns: 3
+    reservedHostSuffixes: sites.sytue.eu
+
+# SFU LiveKit — single-node. Escala VERTICAL: para mas sesiones usar instancias mas
+# grandes, no replicas horizontales. El routing store que hay debajo NO es para eso:
+# es el canal por el que el SFU le pasa trabajo al grabador, y sigue siendo una
+# reunion por instancia.
+livekit:
+  replicaCount: 1
+  image:
+    repository: livekit
+    tag: v1.13.5
+    useGlobalRegistry: true
+  # Store de routing del SFU. NO es caché ni rendimiento: es el único canal por el
+  # que el SFU le pasa trabajo al egress. Sin esto, el botón de grabar arranca un
+  # egress que nadie recoge y la grabación no empieza nunca —sin un error que
+  # mencione la grabación—. Apunta a Dragonfly, que ya corre para la suite; lo que
+  # viaja son peticiones que caducan en segundos, así que sigue siendo efímero.
+  rtc:
+    # LA IP QUE EL SFU ANUNCIA EN LOS CANDIDATOS ICE, y hay que fijarla a mano.
+    #
+    # Con LB propio, `use_external_ip: true` bastaba: el pod descubría su IP y
+    # coincidía con la del balanceador. Al entrar por Traefik ya no coinciden —el
+    # cliente tiene que ir a la IP del ingress— y anunciar la otra rompe las
+    # llamadas SIN dar error: la sala abre, aparece «conectando» y no se oye a
+    # nadie.
+    #
+    # Es la IP del Load Balancer de Traefik, la misma que sirve toda la suite y
+    # la que debe validarse contra DNS en cada despliegue.
+    nodeIP: ""
+  redis:
+    enabled: true
+    address: "dragonfly:6379"
+  mediaService:
+    # ClusterIP, no LoadBalancer: el ICE/TCP entra por el Traefik de la suite
+    # (entryPoint `rtctcp`, más arriba en este fichero). Ahorra el tercer LB-S de
+    # la cuenta —unos 20 EUR/mes con su IP— y Traefik ya terminaba el 5349
+    # (TURN/TLS) de este mismo chart, así que la pieza ya existía.
+    type: ClusterIP
+    tcpEntryPoint: rtctcp
+    # Scaleway Load Balancer no admite UDP; mantenerlo en el Service deja ambos
+    # LB en Pending y bloquea ACME/Helm. Para el arranque usamos el fallback
+    # estándar ICE/TCP, además de TURN/TLS detrás de Traefik.
+    exposeUdp: false
+  # MEDIDO el 2026-08-09: el SFU pedía 1000m de CPU y 1 Gi, y consumía 1m y 18 Mi.
+  # Reservaba MEDIO NODO de los dos que tiene el clúster para estar en reposo, y
+  # era la mayor causa de que el autoescalador tuviera que añadir un tercer nodo:
+  # de los ~1625m que reservaba la suite entera, 1000m eran esto.
+  #
+  # El request cubre el reposo con margen de 100x; el LÍMITE no se toca y sigue en
+  # 8 CPU, que es lo que de verdad hace falta cuando hay una videollamada en curso.
+  # Ahí está la diferencia entre reservar y poder usar: un SFU pasa la mayor parte
+  # del tiempo sin nadie dentro, y pagar por ese vacío no compra calidad de medios.
+  #
+  # Si algún día hay llamadas sostenidas, esto se sube CON la telemetría delante:
+  # el número que importa es el p95 de CPU con salas activas, no una estimación.
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "8"
+      memory: 4Gi
+
+# Grabador de reuniones (LiveKit Egress, Apache-2.0). Proceso aparte del SFU: se
+# une a la sala como un participante más, compone el mosaico y sube el fichero al
+# bucket de grabaciones. Una réplica basta: hoy no hay grabaciones simultáneas, y
+# subirlo sin telemetría delante sería pagar por un Chrome parado.
+sytue-livekit-egress:
+  # APAGADO el 2026-08-18, y esto NO es una función aplazada: es que hoy no puede
+  # funcionar y encendida engaña.
+  #
+  # El egress exige 4 CPU para aceptar una grabación de sala compuesta —lo único
+  # que usa Rooms— y las compara con las de su contenedor antes de aceptar cada
+  # trabajo. Tenía 2. Así que arrancaba, pasaba sus sondas, salía `Running` y
+  # rechazaba todas las peticiones; el único rastro era un ERROR en el log del
+  # arranque. Encendido de esa forma reservaba además 1 CPU de request en un
+  # clúster de dos nodos con 1800m asignables cada uno: ~28% de un nodo para no
+  # grabar nunca.
+  #
+  # QUÉ FALTA EXACTAMENTE PARA ENCENDERLO, que es una sola cosa y cuesta dinero:
+  # un nodo donde quepan 4 CPU. El pool es `pop2_2c_8g` (2 vCPU, 1800m
+  # asignables), así que no caben en ninguno de los que hay ni añadiendo más.
+  # Hace falta un pool con instancias de 4 vCPU o más:
+  #
+  #   scw k8s pool create cluster-id=<id> name=grabacion node-type=pop2_4c_16g \
+  #     size=0 min-size=0 max-size=1 autoscaling=true autohealing=true
+  #
+  # Con size/min 0 solo se enciende cuando hay una grabación y se apaga sola
+  # después, así que el coste es por uso y no fijo. Después: `enabled: true` aquí
+  # y un nodeSelector hacia ese pool. El chart YA impide encenderlo con menos de
+  # 4 CPU, así que esto no puede volver a quedarse a medias en silencio.
+  enabled: false
+  redis:
+    address: "dragonfly:6379"
+
+# Frontends. Son once, y son quienes reciben el tráfico del navegador: escalan por
+# carga, pero el suelo se queda en 1 porque un BFF sin estado se reprograma rápido
+# y multiplicarlos por tres en reposo son veintidós pods parados.
+sytue-frontend:
+  # Mismo criterio que los servicios Go de una réplica: con `minAvailable: 1` los
+  # once BFF quedaban inamovibles y ningún nodo se podía vaciar. Un BFF sin estado
+  # se reprograma en segundos, y cuando hay usuarios el HPA ya ha subido a dos o
+  # más, así que vaciar un nodo se lleva una réplica sin que nadie lo note.
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: null
+    maxUnavailable: 1
+  # Bases, apagada como su servicio (ver `bases:` más arriba).
+  apps:
+    bases:
+      enabled: false
+  defaults:
+    replicaCount: 1
+    autoscaling:
+      enabled: true
+      minReplicas: 1
+      maxReplicas: 10

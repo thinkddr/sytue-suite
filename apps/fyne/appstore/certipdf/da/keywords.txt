@@ -1,0 +1,1 @@
+PDF,signature,annotate,kommentér

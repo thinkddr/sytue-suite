@@ -1,0 +1,114 @@
+[
+  {
+    "clave": "proyecto", "modulo": "proyectos", "titulo": "nombre",
+    "etiqueta": {"en":"Projects","es":"Proyectos","fr":"Projets","de":"Projekte","it":"Progetti","bg":"Проекти","cs":"Projekty","da":"Projekter","el":"Έργα","et":"Projektid","fi":"Projektit","ga":"Tionscadail","hr":"Projekti","hu":"Projektek","is":"Verkefni","lt":"Projektai","lv":"Projekti","mt":"Proġetti","nb":"Prosjekter","nl":"Projecten","pl":"Projekty","pt":"Projetos","ro":"Proiecte","sk":"Projekty","sl":"Projekti","sv":"Projekt"},
+    "estados": ["nuevo","en_curso","pausada","hecho","cancelado"],
+    "campos": [
+      {"clave":"nombre","tipo":"texto","requerido":true},
+      {"clave":"cliente","tipo":"relacion","modelo":"contacto"},
+      {"clave":"responsable","tipo":"texto"},
+      {"clave":"fecha_inicio","tipo":"fecha"},
+      {"clave":"fecha_fin","tipo":"fecha"},
+      {"clave":"importe","tipo":"dinero"},
+      {"clave":"avance","tipo":"entero"},
+      {"clave":"descripcion","tipo":"texto_largo"}
+    ],
+    "lista": ["nombre","cliente","responsable","fecha_fin","avance","estado"]
+  },
+  {
+    "clave": "tarea", "modulo": "proyectos", "titulo": "nombre",
+    "etiqueta": {"en":"Tasks","es":"Tareas","fr":"Tâches","de":"Aufgaben","it":"Attività","bg":"Задачи","cs":"Úkoly","da":"Opgaver","el":"Εργασίες","et":"Ülesanded","fi":"Tehtävät","ga":"Tascanna","hr":"Zadaci","hu":"Feladatok","is":"Verk","lt":"Užduotys","lv":"Uzdevumi","mt":"Kompiti","nb":"Oppgaver","nl":"Taken","pl":"Zadania","pt":"Tarefas","ro":"Sarcini","sk":"Úlohy","sl":"Naloge","sv":"Uppgifter"},
+    "estados": ["nuevo","en_curso","hecho","cancelado"],
+    "campos": [
+      {"clave":"nombre","tipo":"texto","requerido":true},
+      {"clave":"proyecto","tipo":"relacion","modelo":"proyecto","requerido":true},
+      {"clave":"responsable","tipo":"texto"},
+      {"clave":"prioridad","tipo":"seleccion","opciones":["baja","media","alta","urgente"]},
+      {"clave":"vencimiento","tipo":"fecha"},
+      {"clave":"horas","tipo":"decimal"},
+      {"clave":"descripcion","tipo":"texto_largo"}
+    ],
+    "lista": ["nombre","proyecto","responsable","prioridad","vencimiento","estado"]
+  },
+  {
+    "clave": "parte_horas", "modulo": "proyectos", "titulo": "descripcion",
+    "etiqueta": {"en":"Timesheets","es":"Partes de horas","fr":"Feuilles de temps","de":"Zeiterfassung","it":"Fogli ore","bg":"Отчети за работно време","cs":"Výkazy práce","da":"Timesedler","el":"Φύλλα χρόνου","et":"Tööajatabelid","fi":"Tuntikirjaukset","ga":"Bileoga ama","hr":"Evidencije radnog vremena","hu":"Munkaidő-nyilvántartás","is":"Tímaskýrslur","lt":"Darbo laiko žiniaraščiai","lv":"Darba laika uzskaite","mt":"Timesheets","nb":"Timelister","nl":"Urenstaten","pl":"Karty czasu pracy","pt":"Folhas de horas","ro":"Pontaje","sk":"Výkazy práce","sl":"Evidence ur","sv":"Tidrapporter"},
+    "campos": [
+      {"clave":"empleado","tipo":"relacion","modelo":"empleado","requerido":true},
+      {"clave":"tarea","tipo":"relacion","modelo":"tarea"},
+      {"clave":"proyecto","tipo":"relacion","modelo":"proyecto","requerido":true},
+      {"clave":"fecha","tipo":"fecha","requerido":true},
+      {"clave":"horas","tipo":"decimal","requerido":true},
+      {"clave":"descripcion","tipo":"texto"}
+    ],
+    "lista": ["fecha","empleado","proyecto","tarea","horas"]
+  },
+  {
+    "clave": "empleado", "modulo": "rrhh", "titulo": "nombre",
+    "etiqueta": {"en":"Employees","es":"Empleados","fr":"Employés","de":"Mitarbeitende","it":"Dipendenti","bg":"Служители","cs":"Zaměstnanci","da":"Medarbejdere","el":"Εργαζόμενοι","et":"Töötajad","fi":"Työntekijät","ga":"Fostaithe","hr":"Zaposlenici","hu":"Munkatársak","is":"Starfsfólk","lt":"Darbuotojai","lv":"Darbinieki","mt":"Impjegati","nb":"Ansatte","nl":"Medewerkers","pl":"Pracownicy","pt":"Colaboradores","ro":"Angajați","sk":"Zamestnanci","sl":"Zaposleni","sv":"Medarbetare"},
+    "estados": ["activa","pausada"],
+    "campos": [
+      {"clave":"nombre","tipo":"texto","requerido":true},
+      {"clave":"puesto","tipo":"texto"},
+      {"clave":"departamento","tipo":"relacion","modelo":"departamento"},
+      {"clave":"correo","tipo":"correo"},
+      {"clave":"telefono","tipo":"telefono"},
+      {"clave":"fecha_inicio","tipo":"fecha"},
+      {"clave":"salario","tipo":"dinero"},
+      {"clave":"responsable","tipo":"texto"},
+      {"clave":"externo_id","tipo":"texto"}
+    ],
+    "lista": ["nombre","puesto","departamento","correo","estado"]
+  },
+  {
+    "clave": "departamento", "modulo": "rrhh", "titulo": "nombre",
+    "etiqueta": {"en":"Departments","es":"Departamentos","fr":"Départements","de":"Abteilungen","it":"Reparti","bg":"Отдели","cs":"Oddělení","da":"Afdelinger","el":"Τμήματα","et":"Osakonnad","fi":"Osastot","ga":"Ranna","hr":"Odjeli","hu":"Részlegek","is":"Deildir","lt":"Skyriai","lv":"Nodaļas","mt":"Dipartimenti","nb":"Avdelinger","nl":"Afdelingen","pl":"Działy","pt":"Departamentos","ro":"Departamente","sk":"Oddelenia","sl":"Oddelki","sv":"Avdelningar"},
+    "campos": [
+      {"clave":"nombre","tipo":"texto","requerido":true},
+      {"clave":"responsable","tipo":"texto"}
+    ],
+    "lista": ["nombre","responsable"]
+  },
+  {
+    "clave": "ausencia", "modulo": "ausencias", "secuencia": "AUS",
+    "etiqueta": {"en":"Time off","es":"Ausencias","fr":"Congés","de":"Abwesenheiten","it":"Assenze","bg":"Отсъствия","cs":"Nepřítomnosti","da":"Fravær","el":"Άδειες","et":"Puudumised","fi":"Poissaolot","ga":"Saoire","hr":"Odsutnosti","hu":"Szabadságok","is":"Fjarvistir","lt":"Nebuvimai","lv":"Prombūtnes","mt":"Leave","nb":"Fravær","nl":"Verlof","pl":"Nieobecności","pt":"Ausências","ro":"Concedii","sk":"Neprítomnosti","sl":"Odsotnosti","sv":"Ledighet"},
+    "estados": ["pendiente","aprobado","rechazado","cancelado"],
+    "campos": [
+      {"clave":"empleado","tipo":"relacion","modelo":"empleado","requerido":true},
+      {"clave":"tipo","tipo":"seleccion","opciones":["vacaciones","baja_medica","asuntos_propios"],"requerido":true},
+      {"clave":"fecha_inicio","tipo":"fecha","requerido":true},
+      {"clave":"fecha_fin","tipo":"fecha","requerido":true},
+      {"clave":"duracion","tipo":"decimal"},
+      {"clave":"motivo","tipo":"texto"}
+    ],
+    "lista": ["ref","empleado","tipo","fecha_inicio","fecha_fin","estado"]
+  },
+  {
+    "clave": "vacante", "modulo": "reclutamiento", "titulo": "nombre",
+    "etiqueta": {"en":"Job openings","es":"Vacantes","fr":"Offres d'emploi","de":"Stellenangebote","it":"Posizioni aperte","bg":"Свободни позиции","cs":"Volné pozice","da":"Ledige stillinger","el":"Κενές θέσεις","et":"Vabad ametikohad","fi":"Avoimet työpaikat","ga":"Folúntais poist","hr":"Slobodna radna mjesta","hu":"Betöltendő állások","is":"Laus störf","lt":"Laisvos darbo vietos","lv":"Vakances","mt":"Postijiet vakanti","nb":"Ledige stillinger","nl":"Vacatures","pl":"Wakaty","pt":"Vagas","ro":"Posturi vacante","sk":"Voľné pozície","sl":"Prosta delovna mesta","sv":"Lediga tjänster"},
+    "estados": ["borrador","publicado","cerrado"],
+    "campos": [
+      {"clave":"nombre","tipo":"texto","requerido":true},
+      {"clave":"departamento","tipo":"relacion","modelo":"departamento"},
+      {"clave":"plazas","tipo":"entero"},
+      {"clave":"responsable","tipo":"texto"},
+      {"clave":"fecha_fin","tipo":"fecha"},
+      {"clave":"descripcion","tipo":"texto_largo"}
+    ],
+    "lista": ["nombre","departamento","plazas","fecha_fin","estado"]
+  },
+  {
+    "clave": "candidato", "modulo": "reclutamiento", "titulo": "nombre",
+    "etiqueta": {"en":"Applicants","es":"Candidatos","fr":"Candidats","de":"Bewerber","it":"Candidati","bg":"Кандидати","cs":"Uchazeči","da":"Ansøgere","el":"Υποψήφιοι","et":"Kandidaadid","fi":"Hakijat","ga":"Iarratasóirí","hr":"Kandidati","hu":"Jelentkezők","is":"Umsækjendur","lt":"Kandidatai","lv":"Kandidāti","mt":"Applikanti","nb":"Søkere","nl":"Sollicitanten","pl":"Kandydaci","pt":"Candidatos","ro":"Candidați","sk":"Uchádzači","sl":"Kandidati","sv":"Sökande"},
+    "estados": ["nuevo","entrevista","aceptado","contratado","rechazado"],
+    "campos": [
+      {"clave":"nombre","tipo":"texto","requerido":true},
+      {"clave":"vacante","tipo":"relacion","modelo":"vacante","requerido":true},
+      {"clave":"correo","tipo":"correo"},
+      {"clave":"telefono","tipo":"telefono"},
+      {"clave":"fecha","tipo":"fecha"},
+      {"clave":"notas","tipo":"texto_largo"}
+    ],
+    "lista": ["nombre","vacante","correo","fecha","estado"]
+  }
+]

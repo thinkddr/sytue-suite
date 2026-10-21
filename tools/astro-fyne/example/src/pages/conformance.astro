@@ -1,0 +1,6 @@
+---
+// SPDX-License-Identifier: Apache-2.0
+import { BrowserConformance } from "../components/BrowserConformance";
+import analysis from "../../../artifacts-conformance-analysis.json";
+---
+<html lang="en"><body><BrowserConformance sourceHash={analysis.sourceHash} client:load /></body></html>

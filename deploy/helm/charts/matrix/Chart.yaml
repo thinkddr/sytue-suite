@@ -1,0 +1,6 @@
+apiVersion: v2
+name: sytue-matrix
+description: Transporte Matrix de Rooms; Synapse oficial sin modificar (ADR 0077).
+type: application
+version: 1.0.0
+appVersion: "1.163.0"

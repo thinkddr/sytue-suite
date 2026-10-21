@@ -1,0 +1,399 @@
+{
+ "active": 0,
+ "sheets": [
+  {
+   "name": "{{horas.hoja}}",
+   "cells": {
+    "A1": "<b>{{horas.titulo}}</b>",
+    "A3": "<b>{{horas.persona}}</b>",
+    "A4": "<b>{{horas.periodo}}</b>",
+    "A6": "<b>{{gastos.fecha}}</b>",
+    "B6": "<b>{{horas.proyecto}}</b>",
+    "C6": "<b>{{planificacion.tarea}}</b>",
+    "D6": "<b>{{horas.horas}}</b>",
+    "E6": "<b>{{horas.tarifa}}</b>",
+    "F6": "<b>{{gastos.importe}}</b>",
+    "B7": "{{proyecto.titulo}}",
+    "C7": "{{horas.linea}}",
+    "F7": "=D7*E7",
+    "F8": "=D8*E8",
+    "F9": "=D9*E9",
+    "F10": "=D10*E10",
+    "F11": "=D11*E11",
+    "F12": "=D12*E12",
+    "F13": "=D13*E13",
+    "F14": "=D14*E14",
+    "F15": "=D15*E15",
+    "F16": "=D16*E16",
+    "F17": "=D17*E17",
+    "F18": "=D18*E18",
+    "F19": "=D19*E19",
+    "F20": "=D20*E20",
+    "F21": "=D21*E21",
+    "F22": "=D22*E22",
+    "F23": "=D23*E23",
+    "F24": "=D24*E24",
+    "F25": "=D25*E25",
+    "F26": "=D26*E26",
+    "A28": "<b>{{presupuesto.total}}</b>",
+    "D28": "=SUM(D7:D26)",
+    "F28": "=SUM(F7:F26)"
+   },
+   "formats": {
+    "A7": {
+     "id": "date"
+    },
+    "A8": {
+     "id": "date"
+    },
+    "A9": {
+     "id": "date"
+    },
+    "A10": {
+     "id": "date"
+    },
+    "A11": {
+     "id": "date"
+    },
+    "A12": {
+     "id": "date"
+    },
+    "A13": {
+     "id": "date"
+    },
+    "A14": {
+     "id": "date"
+    },
+    "A15": {
+     "id": "date"
+    },
+    "A16": {
+     "id": "date"
+    },
+    "A17": {
+     "id": "date"
+    },
+    "A18": {
+     "id": "date"
+    },
+    "A19": {
+     "id": "date"
+    },
+    "A20": {
+     "id": "date"
+    },
+    "A21": {
+     "id": "date"
+    },
+    "A22": {
+     "id": "date"
+    },
+    "A23": {
+     "id": "date"
+    },
+    "A24": {
+     "id": "date"
+    },
+    "A25": {
+     "id": "date"
+    },
+    "A26": {
+     "id": "date"
+    },
+    "D7": {
+     "id": "number"
+    },
+    "D8": {
+     "id": "number"
+    },
+    "D9": {
+     "id": "number"
+    },
+    "D10": {
+     "id": "number"
+    },
+    "D11": {
+     "id": "number"
+    },
+    "D12": {
+     "id": "number"
+    },
+    "D13": {
+     "id": "number"
+    },
+    "D14": {
+     "id": "number"
+    },
+    "D15": {
+     "id": "number"
+    },
+    "D16": {
+     "id": "number"
+    },
+    "D17": {
+     "id": "number"
+    },
+    "D18": {
+     "id": "number"
+    },
+    "D19": {
+     "id": "number"
+    },
+    "D20": {
+     "id": "number"
+    },
+    "D21": {
+     "id": "number"
+    },
+    "D22": {
+     "id": "number"
+    },
+    "D23": {
+     "id": "number"
+    },
+    "D24": {
+     "id": "number"
+    },
+    "D25": {
+     "id": "number"
+    },
+    "D26": {
+     "id": "number"
+    },
+    "D28": {
+     "id": "number"
+    },
+    "E7": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "E8": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "E9": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "E10": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "E11": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "E12": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "E13": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "E14": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "E15": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "E16": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "E17": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "E18": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "E19": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "E20": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "E21": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "E22": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "E23": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "E24": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "E25": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "E26": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "F7": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "F8": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "F9": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "F10": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "F11": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "F12": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "F13": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "F14": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "F15": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "F16": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "F17": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "F18": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "F19": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "F20": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "F21": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "F22": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "F23": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "F24": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "F25": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "F26": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "F28": {
+     "id": "currency",
+     "decimals": 2
+    }
+   },
+   "styles": {
+    "A6": {
+     "border": {
+      "b": true
+     }
+    },
+    "B6": {
+     "border": {
+      "b": true
+     }
+    },
+    "C6": {
+     "border": {
+      "b": true
+     }
+    },
+    "D6": {
+     "border": {
+      "b": true
+     }
+    },
+    "E6": {
+     "border": {
+      "b": true
+     }
+    },
+    "F6": {
+     "border": {
+      "b": true
+     }
+    },
+    "A28": {
+     "border": {
+      "t": true
+     }
+    },
+    "B28": {
+     "border": {
+      "t": true
+     }
+    },
+    "C28": {
+     "border": {
+      "t": true
+     }
+    },
+    "D28": {
+     "border": {
+      "t": true
+     }
+    },
+    "E28": {
+     "border": {
+      "t": true
+     }
+    },
+    "F28": {
+     "border": {
+      "t": true
+     }
+    }
+   },
+   "freeze": {
+    "cols": 0,
+    "rows": 6
+   }
+  }
+ ]
+}

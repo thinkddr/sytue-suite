@@ -1,0 +1,19 @@
+Yksityinen, eurooppalainen sähköposti JMAP:n kautta — ilman seurantaa ja mainoksia.
+
+• Nopea saapuneet-kansio ketjuilla, tunnisteilla, suodattimilla ja haulla.
+• Liitä tiedostoja suoraan Sytue Drivesta.
+• Muuta sähköposti Calendarin tapahtumaksi.
+• Salattu siirron aikana (TLS 1.3). Sytuen infrastruktuuri sijaitsee EU:ssa. Ulkoisten palvelujen sijainti riippuu niiden tarjoajasta.
+• Keskusteluketjut, lukeminen, vastaaminen ja edelleenlähetys yhdellä napsautuksella.
+• Kansiot, väritunnisteet ja haku operaattoreilla (from:, has:attachment, is:unread…).
+• Automaattiset säännöt, jotka arkistoivat, merkitsevät tai siirtävät saapuvan postin.
+• Ajastettu lähetys ja ”Peru lähetys”.
+• Allekirjoitukset, lähettäjäaliakset ja automaattinen lomavastaus.
+• Jaetut ja delegoidut postilaatikot luku- ja lähetysoikeuksin.
+• Muotoillun tekstin editori ja liitteet Sytue Drivesta ilman tiedostojen kopiointia.
+• Etäsisältö on oletuksena estetty: kukaan ei saa tietää, milloin avaat sähköpostin.
+• Allekirjoitettu posti (PGP ja S/MIME) tunnistetaan ja merkitään; TLS siirron aikana.
+• Käyttö myös Thunderbirdista, Outlookista, Apple Mailista tai puhelimesta sovellussalasanoilla.
+• Vastaanottajat tunnistepaloina, Contactsin osoitekirja yhden napsautuksen päässä ja varoitus, jos kirjoitat ”liitteenä” liittämättä mitään.
+
+Salattu siirron aikana (TLS 1.3). Sytuen infrastruktuuri sijaitsee EU:ssa. Ulkoisten palvelujen sijainti riippuu niiden tarjoajasta.

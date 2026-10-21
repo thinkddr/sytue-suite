@@ -1,0 +1,19 @@
+{
+  "name": "Sytue Cloud",
+  "short_name": "Cloud",
+  "description": "Despliegues, bases de datos, dominios y logs de tu plataforma soberana Sytue Cloud.",
+  "id": "/",
+  "start_url": ".",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "lang": "es",
+  "dir": "ltr",
+  "categories": ["business", "productivity"],
+  "theme_color": "#ffffff",
+  "background_color": "#f8f5f3",
+  "icons": [
+    { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icon-maskable.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}

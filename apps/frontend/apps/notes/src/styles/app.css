@@ -1,0 +1,436 @@
+/**
+ * Sytue Notepads — entrada de estilos: importa el design system (Tailwind v4 +
+ * tokens de marca Sytue). Sin tema propio. Lenguaje visual Sytue.
+ */
+@import '@sytue/ui/styles.css';
+
+@source '../**/*.{astro,ts,tsx}';
+
+/* La prosa de una nota. Tailwind quita el estilo a títulos, listas y citas, y sin
+   esto un `<h1>` escrito con la barra se veía como texto normal: la jerarquía
+   que BasKet enseña a golpe de vista no existía en pantalla. */
+@layer components {
+  .sytue-prose :is(h1, h2, h3, h4, h5, h6) {
+    @apply text-text mt-4 mb-1.5 leading-tight font-semibold first:mt-0;
+  }
+  .sytue-prose h1 {
+    @apply text-2xl;
+  }
+  .sytue-prose h2 {
+    @apply text-xl;
+  }
+  .sytue-prose h3 {
+    @apply text-lg;
+  }
+  .sytue-prose h4 {
+    @apply text-base;
+  }
+  .sytue-prose h5 {
+    @apply text-sm tracking-wide uppercase;
+  }
+  .sytue-prose h6 {
+    @apply text-text-muted text-sm;
+  }
+  .sytue-prose p {
+    @apply mb-2 last:mb-0;
+  }
+  .sytue-prose ul {
+    @apply my-1.5 list-disc pl-6;
+  }
+  .sytue-prose ol {
+    @apply my-1.5 list-decimal pl-6;
+  }
+  .sytue-prose li {
+    @apply my-0.5;
+  }
+  .sytue-prose blockquote {
+    @apply border-border text-text-muted my-2 border-l-[3px] pl-3;
+  }
+  .sytue-prose code {
+    @apply bg-bg-subtle rounded px-1 py-0.5 font-mono text-[0.92em];
+  }
+  .sytue-prose pre {
+    @apply bg-bg-subtle my-2 overflow-x-auto rounded-md px-3 py-2 font-mono text-sm;
+  }
+  .sytue-prose pre code {
+    @apply bg-transparent p-0;
+  }
+  .sytue-prose mark {
+    @apply rounded-sm bg-[#fff3a3] px-0.5 text-inherit;
+  }
+  /* El oscuro por sus DOS puertas, como los tokens: `dark:` de Tailwind solo mira
+     `prefers-color-scheme`, así que con el tema elegido a mano el resaltado salía del
+     color contrario al de la página. */
+  [data-theme='dark'] .sytue-prose mark {
+    @apply bg-[#6b5d00];
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme]) .sytue-prose mark {
+      @apply bg-[#6b5d00];
+    }
+  }
+  /* Lo buscado dentro de un resultado (Resaltado.tsx): el mismo amarillo. */
+  .notes-resalte {
+    @apply text-text rounded-sm bg-[#fff3a3];
+  }
+  [data-theme='dark'] .notes-resalte {
+    @apply bg-[#6b5d00];
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme]) .notes-resalte {
+      @apply bg-[#6b5d00];
+    }
+  }
+  .sytue-prose a {
+    @apply text-primary-text underline underline-offset-2;
+  }
+  /* Un #hashtag pintado (client/hashtags.ts): se lee como etiqueta, no como enlace. */
+  .sytue-prose a.notes-hashtag {
+    @apply font-medium no-underline hover:underline;
+  }
+  /* Una mención (`@ana@empresa.es`): a quien el servicio avisa al guardar la nota. */
+  .notes-mention {
+    @apply text-primary-text font-medium;
+  }
+  .sytue-prose hr {
+    @apply border-border my-3 border-t;
+  }
+  .sytue-prose .task-row {
+    @apply my-1 flex items-baseline gap-2;
+  }
+  .sytue-prose .task-row input[type='checkbox'] {
+    @apply accent-primary shrink-0 cursor-pointer self-center;
+  }
+  .sytue-prose .task-row > span {
+    @apply min-w-0 flex-1;
+  }
+}
+
+/* El aro de la casilla de una tarea sigue su forma: la esquina de 2px que pinta
+   Chromium. La casilla es un `<input>` nativo y Chromium deja a 0 su `border-radius`,
+   así que el aro global sobre ella es un cuadrado (medido: las cuatro esquinas del aro
+   eran aro). En `Checkbox` de @sytue/ui lo pinta un `<span>` alrededor
+   (`.sytue-focus-ring-choice`), pero aquí el HTML es el de la nota —
+   `<div class="task-row"><input type="checkbox"> <span>…</span></div>`, guardado así
+   y compartido con Fyne—, y no se le puede meter un envoltorio. Lo pinta un
+   `::before` de la fila, del tamaño y en el sitio de la casilla (va a la izquierda y
+   centrada, `self-center`), con el mismo aro y el mismo token que el resto.
+
+   Fuera de toda `@layer`, como el aro global: dentro de una, este `box-shadow: none`
+   perdería contra él y se verían los dos. */
+.sytue-prose .task-row {
+  --lado-casilla-tarea: 13px; /* la casilla de Chromium sin estilo */
+  position: relative;
+}
+.sytue-prose .task-row > input[type='checkbox'] {
+  width: var(--lado-casilla-tarea);
+  height: var(--lado-casilla-tarea);
+}
+.sytue-prose .task-row > input[type='checkbox']:focus-visible {
+  box-shadow: none;
+}
+.sytue-prose .task-row:has(> input[type='checkbox']:focus-visible)::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: var(--lado-casilla-tarea);
+  height: var(--lado-casilla-tarea);
+  translate: 0 -50%;
+  border-radius: 2px;
+  box-shadow: 0 0 0 2px var(--sytue-focus-ring);
+  pointer-events: none;
+}
+
+/* Notepads con la referencia de Twos: UNA columna de lectura para todo (el día, un
+   cuaderno en lista y las páginas de Tareas, Fijadas, Archivo, Buscar y Papelera), el
+   título de la página escrito una vez y en grande, filas sin caja ni raya entre ellas
+   y los controles en voz baja. Todo sale de los tokens: el oscuro y el translúcido
+   llegan solos. */
+@layer components {
+  .notes-col {
+    @apply mx-auto w-full max-w-[51rem] px-4 sm:px-6;
+  }
+  .notes-page {
+    @apply pt-8 pb-10;
+  }
+  .notes-page-head {
+    @apply mb-5 flex flex-wrap items-end justify-between gap-x-4 gap-y-2;
+  }
+  .notes-page-title {
+    @apply text-text text-2xl leading-tight font-semibold tracking-tight first-letter:uppercase sm:text-3xl;
+  }
+  /* Un rótulo de grupo dentro de una página: el día o el cuaderno de unas tareas. */
+  .notes-group {
+    @apply text-text-subtle mb-1 text-xs font-medium tracking-wide uppercase;
+  }
+  .notes-group-block + .notes-group-block {
+    @apply mt-6;
+  }
+
+  /* El segmentado: opciones de texto, y la elegida con un fondo suave. No es el
+     `Button` relleno: aquí no se ejecuta nada, se elige qué se mira. */
+  .notes-seg {
+    @apply flex flex-wrap items-center gap-0.5;
+  }
+  .notes-seg-item {
+    @apply text-text-muted hover:bg-bg-subtle hover:text-text inline-flex min-h-7 items-center gap-1.5 rounded-md px-2 text-sm whitespace-nowrap transition-colors duration-150 pointer-coarse:min-h-11 pointer-coarse:px-3;
+  }
+  .notes-seg-item[aria-pressed='true'] {
+    @apply bg-bg-subtle text-text font-medium;
+  }
+  .notes-seg-count {
+    @apply text-text-subtle text-xs font-normal tabular-nums;
+  }
+
+  .notes-day {
+    @apply pt-8 pb-1;
+  }
+  /* «Trasladada: 2». En el teléfono se cae: al lado de un recordatorio dejaba el título
+     de la tarea en tres palabras, y el título es lo que se viene a leer. */
+  .notes-carry {
+    @apply text-text-subtle shrink-0 pt-0.5 text-xs tabular-nums max-sm:hidden;
+  }
+  .notes-carry-bar {
+    @apply text-text-muted mt-3 flex flex-wrap items-center justify-between gap-2 text-sm;
+  }
+  /* Lo capturado sin red: una línea discreta por captura bajo la captura. */
+  .notes-pending {
+    @apply mt-2 flex flex-col gap-1 px-2 text-xs;
+  }
+  .notes-pending-item {
+    @apply flex min-h-6 items-center gap-2;
+  }
+  .notes-day-head {
+    @apply mb-4 grid gap-1;
+  }
+  .notes-day-row {
+    @apply flex flex-wrap items-center justify-between gap-x-3 gap-y-1;
+  }
+  .notes-day-sub {
+    @apply text-text-subtle flex items-center gap-1.5 text-sm tabular-nums;
+  }
+  .notes-day-nav {
+    @apply text-text-muted -mr-2 flex shrink-0 items-center gap-0.5;
+  }
+  /* El progreso del día: un aro de 14 px junto al año, no una barra con su rótulo. */
+  .notes-ring {
+    @apply inline-flex items-center gap-1.5;
+  }
+  .notes-ring svg {
+    @apply size-3.5 -rotate-90;
+  }
+  .notes-ring-track {
+    stroke: var(--sytue-border);
+  }
+  .notes-ring-value {
+    stroke: var(--sytue-primary);
+    transition: stroke-dashoffset 200ms ease;
+  }
+  .notes-week {
+    @apply mb-3 grid grid-cols-7;
+  }
+  .notes-week-day {
+    @apply text-text-muted hover:bg-bg-subtle flex min-w-0 flex-col items-center gap-0.5 rounded-lg py-1.5 transition-colors duration-150 disabled:opacity-50;
+  }
+  .notes-week-name {
+    @apply text-text-subtle text-xs;
+  }
+  .notes-week-num {
+    @apply grid h-8 w-8 place-items-center rounded-full text-base font-medium tabular-nums;
+  }
+  .notes-week-day[aria-current='date'] .notes-week-num {
+    @apply text-primary-text font-semibold;
+  }
+  .notes-week-day[aria-pressed='true'] .notes-week-num {
+    @apply bg-primary text-[var(--sytue-on-primary)];
+  }
+  .notes-week-dot {
+    @apply h-1 w-1 rounded-full;
+  }
+  .notes-week-dot--on {
+    @apply bg-text-subtle;
+  }
+  /* Con algo pendiente, el punto va en `primary`. */
+  .notes-week-dot--pending {
+    @apply bg-primary;
+  }
+  /* Donde va a caer la nota que se arrastra: un día de la tira o un cuaderno del árbol. */
+  .notes-week-day[data-drop='true'],
+  [data-drop-notebook][data-drop='true'] {
+    @apply ring-primary/50 ring-2;
+  }
+
+  /* La captura: una línea donde se escribe, sin caja. La pista de la sintaxis solo
+     aparece al entrar en el campo y ocupa el hueco que ya hay debajo: no empuja nada. */
+  .notes-capture-wrap {
+    @apply relative;
+  }
+  .notes-capture {
+    @apply border-border-subtle flex items-center gap-1 border-b py-1 transition-colors duration-150;
+  }
+  .notes-capture:focus-within {
+    @apply border-primary;
+  }
+  .notes-capture-input {
+    @apply min-w-0 flex-1 border-0! bg-transparent! px-1! text-base shadow-none!;
+  }
+  .notes-capture-input:focus-visible {
+    box-shadow: none !important;
+  }
+  .notes-capture-hint {
+    @apply text-text-subtle pointer-events-none absolute top-full left-0 mt-1 px-1 text-xs opacity-0 transition-opacity duration-150;
+  }
+  .notes-capture:focus-within + .notes-capture-hint {
+    @apply opacity-100;
+  }
+  .notes-day-filters {
+    @apply -mx-2 mt-7 flex flex-wrap items-center justify-between gap-x-3 gap-y-1;
+  }
+
+  /* La agenda del día: las mismas filas que las notas, con el glifo del calendario
+     en la columna fija y la hora a la derecha. Sin caja. */
+  .notes-agenda {
+    @apply border-border-subtle -mx-2 mt-3 flex flex-col border-b pb-2;
+  }
+  .notes-agenda-item {
+    @apply text-text-muted flex min-h-8 items-center gap-2 rounded-md px-2 text-base;
+  }
+  .notes-agenda-time {
+    @apply text-text-subtle shrink-0 text-xs tabular-nums;
+  }
+
+  /* Las notas en lista son filas, no tarjetas: un glifo por tipo en una columna
+     fija, sin raya entre ellas y con el menú solo al pasar por encima. La elegida
+     es un fondo, no un anillo. */
+  /* `grid-cols-1` es `minmax(0, 1fr)`: sin él la columna implícita crece hasta la fila
+     más ancha (una con recordatorio y «Trasladada») y en el teléfono TODAS las filas
+     se salían de la pantalla. */
+  .notes-stream {
+    @apply grid grid-cols-1 gap-px pb-10;
+  }
+  .notes-stream-note {
+    @apply rounded-md border-0 bg-transparent px-2 py-1.5 shadow-none!;
+  }
+  .notes-stream-note:hover,
+  .notes-stream-note:focus-within {
+    @apply bg-bg-subtle;
+  }
+  .notes-stream-note--selected {
+    @apply bg-selected;
+  }
+  .notes-stream-glyph {
+    @apply text-text-subtle mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center;
+  }
+  .notes-stream-bullet {
+    @apply bg-text-subtle h-1.5 w-1.5 rounded-full;
+  }
+  /* Un separador (`---`) es solo su raya: ni viñeta ni menú a la vista. */
+  .notes-stream-rule {
+    @apply border-border my-1 h-px flex-1 self-center border-t;
+  }
+  /* La nota de un cuaderno en árbol llena el panel: es una página, no una tarjeta. */
+  .notes-sheet {
+    @apply rounded-none border-0 bg-transparent px-6 py-6 shadow-none! sm:px-10;
+  }
+  .notes-sheet-title {
+    @apply text-2xl! leading-tight font-semibold! tracking-tight;
+  }
+
+  /* Filas de las páginas (tareas, resultados, archivo, papelera). */
+  .notes-rows {
+    @apply -mx-2 grid grid-cols-1 gap-px;
+  }
+  .notes-row {
+    @apply hover:bg-bg-subtle focus-within:bg-bg-subtle flex min-h-9 items-start gap-2 rounded-md px-2 py-1.5 transition-colors duration-150;
+  }
+  .notes-row-actions {
+    @apply flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity duration-150 pointer-coarse:opacity-100;
+  }
+  .notes-row:hover .notes-row-actions,
+  .notes-row:focus-within .notes-row-actions {
+    @apply opacity-100;
+  }
+
+  /* Semana: siete columnas separadas por una raya fina, sin tarjetas; en el teléfono,
+     una debajo de otra. */
+  .notes-week-view {
+    @apply mx-4 mt-2 mb-8 grid grid-cols-1 sm:mx-6 md:grid-cols-7;
+  }
+  .notes-week-col {
+    @apply border-border-subtle flex min-w-0 flex-col gap-1.5 border-b px-2 py-3 last:border-b-0 md:min-h-64 md:border-r md:border-b-0 md:last:border-r-0;
+  }
+  /* La cabecera de un día en Semana, Días y «Este día»: texto que se pulsa, no un botón. */
+  .notes-days-head {
+    @apply text-text hover:text-primary-text block self-start rounded-sm px-1 text-left leading-tight font-semibold transition-colors duration-150 first-letter:uppercase;
+  }
+  .notes-days-head[aria-current='date'] {
+    @apply text-primary-text;
+  }
+  .notes-day-line {
+    @apply text-text flex items-start gap-2 rounded-md px-1 py-1 text-sm break-words;
+  }
+  .notes-day-line:hover {
+    @apply bg-bg-subtle;
+  }
+  .notes-day-box {
+    @apply border-border-strong mt-0.5 size-3.5 shrink-0 rounded-sm border;
+  }
+  .notes-day-box--done {
+    @apply bg-primary border-primary;
+  }
+  .notes-day-dot {
+    @apply bg-text-subtle mx-[0.3125rem] mt-2 size-1 shrink-0 rounded-full;
+  }
+  .notes-days-view {
+    @apply mt-6 flex flex-col gap-6 pb-10;
+  }
+  .notes-days-entry {
+    @apply -mx-1 flex flex-col gap-1;
+  }
+  .notes-this-day {
+    @apply border-border-subtle mt-2 flex flex-col gap-2 border-t pt-5 pb-10;
+  }
+}
+
+/* Buscar en la nota: las coincidencias se pintan con la API de resaltados de CSS
+   (RichText.tsx), sin tocar el DOM de la nota. Los mismos amarillos que `<mark>`, y la
+   actual en un tono más subido para verla entre las demás. */
+::highlight(sytue-buscar) {
+  background-color: #fff3a3;
+}
+::highlight(sytue-buscar-actual) {
+  background-color: #f5c46b;
+}
+[data-theme='dark'] ::highlight(sytue-buscar) {
+  background-color: #6b5d00;
+}
+[data-theme='dark'] ::highlight(sytue-buscar-actual) {
+  background-color: #a36a00;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) ::highlight(sytue-buscar) {
+    background-color: #6b5d00;
+  }
+  :root:not([data-theme]) ::highlight(sytue-buscar-actual) {
+    background-color: #a36a00;
+  }
+}
+
+/* Una lista plegada (`<li class="plegada">`, como en Twos) esconde su sublista al LEERLA
+   y deja tres puntos en su lugar; en el editor se sigue viendo entera para poder
+   escribirla, con la viñeta en el color de marca como aviso. La sublista va dentro del `<li>` o justo
+   detrás, que es como la anida `indent` en Chromium.
+   ponytail: plegar mientras se escribe pediría mover el cursor por encima de lo
+   escondido; si se echa en falta, es aquí y en el editor de Fyne. */
+.sytue-prose:not([contenteditable]) li.plegada > :is(ul, ol),
+.sytue-prose:not([contenteditable]) li.plegada + :is(ul, ol) {
+  display: none;
+}
+.sytue-prose:not([contenteditable]) li.plegada::after {
+  content: ' …';
+  color: var(--sytue-text-subtle);
+}
+.sytue-prose[contenteditable] li.plegada::marker {
+  color: var(--sytue-primary);
+}

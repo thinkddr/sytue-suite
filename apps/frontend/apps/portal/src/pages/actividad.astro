@@ -1,0 +1,183 @@
+---
+/**
+ * Actividad reciente del portal — lo último que ha pasado en TODOS los productos
+ * (SSR). Consulta `GET /recent` del Sytue Hub en el servidor con el access token
+ * de la sesión, que JAMÁS llega al navegador, y corta por día.
+ *
+ * Mismo fan-out federado que la búsqueda, sin término: por eso comparte modelo y
+ * agrupación con `buscar.astro`. Sin JS de cliente —los filtros son enlaces GET—,
+ * que es lo que permite que esta página funcione igual con la pestaña recién
+ * abierta que tras una hora inactiva. docs/CONVENTIONS.md §11.
+ */
+import AppLayout from '../layouts/AppLayout.astro';
+import { useT } from '../i18n/index.js';
+import { r } from '../lib/rutas.js';
+import { bff, toBffContext } from '../lib/auth';
+import { canonicaConOrg, returnToCanonico } from '@sytue/config';
+import { hubClient } from '../lib/hub';
+import { groupByDay, dayLabelKey } from '../lib/activity';
+import { appForKey, ProductIcon } from '@sytue/ui';
+import { formatDate, formatTimeAgo } from '@sytue/i18n';
+import type { SearchResult } from '@sytue/api-clients';
+import type { ProductKey } from '@sytue/config';
+
+export const prerender = false;
+
+const session = await bff.getSession(toBffContext(Astro));
+if (!session) {
+  // ADR 0056: la entrada org-ful llega reescrita con la marca ?__org=; el returnTo
+  // sale canónico, no en la forma interna, o tras el login la barra se queda con ella.
+  const returnTo = returnToCanonico(Astro.url, bff.basePath);
+  const redireccionLogin = Astro.redirect(
+    `${bff.basePath}/auth/login?returnTo=${encodeURIComponent(returnTo)}`,
+  );
+  redireccionLogin.headers.set('cache-control', 'no-store');
+  return redireccionLogin;
+}
+// Ruta en `sinOrg` (su nombre colisiona con el namespace de organizaciones):
+// con sesión, un salto local a la canónica con la org activa.
+const canonica = canonicaConOrg(Astro.url, bff.basePath, session.user.tenant);
+if (canonica) return Astro.redirect(canonica);
+
+const locale = Astro.locals.locale;
+const t = useT(locale);
+
+// Filtro por producto. Se valida contra el catálogo ANTES de pasarlo al Hub: un
+// origen inventado en la query devolvería 400 y la página entera se caería por
+// un parámetro que alguien escribió a mano.
+const pedido = Astro.url.searchParams.get('source');
+const source = pedido && appForKey(pedido as ProductKey) ? (pedido as ProductKey) : undefined;
+
+let items: SearchResult[] = [];
+let failed = false;
+try {
+  items = await hubClient(session.tokens.accessToken).recent({
+    ...(source ? { sources: [source] } : {}),
+    limit: 20,
+  });
+} catch {
+  // Degradación elegante: el Hub no responde -> estado de error con reintento.
+  failed = true;
+}
+
+const grupos = groupByDay(items);
+// Los productos que HAY en esta tanda, para no ofrecer un filtro que no filtra.
+const presentes = [...new Set(items.map((i) => i.source))];
+const shortName = (name: string) => name.replace('Sytue ', '');
+const hoy = new Date();
+
+const etiquetaDia = (day: string, at: Date): string => {
+  const clave = dayLabelKey(day, hoy);
+  if (clave === 'today') return t('activity.today');
+  if (clave === 'yesterday') return t('activity.yesterday');
+  return formatDate(locale, at, { day: 'numeric', month: 'long', year: 'numeric' });
+};
+---
+
+<AppLayout title={t('page.activity')}>
+  <div class="mx-auto w-full max-w-[var(--container-content,1280px)] px-6 py-8">
+    <header class="mb-6">
+      <p class="sytue-overline text-text-subtle">{t('activity.overline')}</p>
+      <h1 class="sytue-h1 text-text mt-1.5">{t('activity.heading')}</h1>
+      <p class="text-text-muted mt-2 max-w-2xl text-base">{t('activity.intro')}</p>
+    </header>
+
+    {presentes.length > 1 || source ? (
+      <nav aria-label={t('activity.filterBy')} class="mb-6 flex flex-wrap gap-2">
+        <a
+          href={r('/actividad', Astro.locals.org)}
+          aria-current={source ? undefined : 'page'}
+          class={
+            'sytue-focus-ring rounded-control border px-3 py-1.5 text-sm font-medium transition-colors ' +
+            (source
+              ? 'border-border text-text-muted hover:border-text-subtle hover:text-text'
+              : 'border-primary bg-primary text-[var(--sytue-on-primary)]')
+          }
+        >
+          {t('activity.all')}
+        </a>
+        {presentes.map((key) => {
+          const app = appForKey(key);
+          const activo = source === key;
+          return (
+            <a
+              href={r(`/actividad?source=${encodeURIComponent(key)}`, Astro.locals.org)}
+              aria-current={activo ? 'page' : undefined}
+              class={
+                'sytue-focus-ring inline-flex items-center gap-1.5 rounded-control border px-3 py-1.5 text-sm font-medium transition-colors ' +
+                (activo
+                  ? 'border-primary bg-primary text-[var(--sytue-on-primary)]'
+                  : 'border-border text-text-muted hover:border-text-subtle hover:text-text')
+              }
+            >
+              <ProductIcon appKey={key} size={14} />
+              {app ? shortName(app.name) : key}
+            </a>
+          );
+        })}
+      </nav>
+    ) : null}
+
+    {failed ? (
+      <div
+        role="alert"
+        class="border-border bg-surface flex max-w-md flex-col items-start gap-1.5 rounded-lg border p-6"
+      >
+        <p class="text-text text-base font-semibold">{t('activity.failedTitle')}</p>
+        <p class="text-text-muted text-sm">{t('activity.failedBody')}</p>
+        <a
+          href={Astro.url.pathname + Astro.url.search}
+          class="text-primary-text sytue-focus-ring mt-2 rounded text-sm font-semibold hover:underline"
+        >
+          {t('activity.retry')}
+        </a>
+      </div>
+    ) : items.length === 0 ? (
+      <p class="text-text-muted max-w-xl text-base">{t('activity.empty')}</p>
+    ) : (
+      <div class="flex flex-col gap-8">
+        <p class="sr-only" role="status">
+          {t('activity.count', { count: items.length })}
+        </p>
+        {grupos.map((grupo) => (
+          <section aria-label={etiquetaDia(grupo.day, grupo.at)}>
+            <h2 class="sytue-overline text-text-subtle border-border mb-3 border-b pb-2">
+              {etiquetaDia(grupo.day, grupo.at)}
+            </h2>
+            <ul class="flex flex-col gap-1">
+              {grupo.items.map((item) => {
+                const app = appForKey(item.source);
+                return (
+                  <li>
+                    <a
+                      href={item.url}
+                      class="hover:bg-chrome-hover sytue-focus-ring group flex items-start gap-3 rounded-md px-3 py-2.5 transition-colors"
+                    >
+                      <span class="mt-0.5 shrink-0">
+                        <ProductIcon appKey={item.source} size={18} />
+                      </span>
+                      <span class="min-w-0 flex-1">
+                        <span class="text-text block truncate text-sm font-medium group-hover:underline">
+                          {item.title}
+                        </span>
+                        {item.snippet ? (
+                          <span class="text-text-muted mt-0.5 block truncate text-sm">
+                            {item.snippet}
+                          </span>
+                        ) : null}
+                      </span>
+                      <span class="text-text-subtle shrink-0 text-xs whitespace-nowrap tabular-nums">
+                        {item.timestamp ? formatTimeAgo(locale, new Date(item.timestamp)) : null}
+                      </span>
+                      <span class="sr-only">{app ? shortName(app.name) : item.source}</span>
+                    </a>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        ))}
+      </div>
+    )}
+  </div>
+</AppLayout>

@@ -1,0 +1,137 @@
+---
+/**
+ * ConsoleLayout — layout base de Sytue Admin. Exige sesión con rol admin/owner o con
+ * algún permiso de administración delegado (guard) y monta la Sytue Shell + el armazón de @sytue/ui. La administración de
+ * identidad solo es accesible a roles privilegiados. docs/CONVENTIONS.md §8, §11.
+ */
+import { APP_VIEWPORT } from '@sytue/config';
+import '../styles/app.css';
+import { serverEnv } from '@sytue/auth/server';
+import { htmlLangAttrs } from '@sytue/i18n';
+import { useT } from '../i18n/index.js';
+import { SUFIJO_ICONOS, basePathScript, themeInitScript, withBase } from '@sytue/ui';
+import { requireSession } from '@sytue/auth/server';
+import { allowedSections } from '../lib/sections.js';
+import { getBff, isPlatformSurface, toBffContext } from '../server/bff.js';
+import ConsoleShell from '../components/ConsoleShell';
+import VerifyEmailBanner from '../components/VerifyEmailBanner';
+
+interface Props {
+  section?: string;
+  title: string;
+}
+
+const { section, title } = Astro.props;
+
+// El idioma lo negoció el middleware (cookie > Accept-Language > inglés): aquí solo
+// se pinta, para que el <html>, el cromo del shell y las islas no puedan discrepar.
+const locale = Astro.locals.locale;
+const { lang, dir } = htmlLangAttrs(locale);
+const t = useT(locale);
+
+// El layout NO autoriza: solo lee la sesión para pintar la shell y los permisos
+// para filtrar el menú. Quien decide es cada página (las 16 llaman a
+// requireSession con lo que exija su ruta).
+//
+// Antes exigía aquí «algún permiso de administración» y devolvía su Response. Un
+// layout no puede cortar la respuesta: cuando ya se está renderizando, retornar
+// un Response da «ResponseSentError: The response has already been sent» y deja
+// el stream COLGADO (la petición no termina nunca). Le pasaba a todo usuario sin
+// permisos que entrara en /account —justo la página de reserva a la que la raíz
+// redirige a quien no tiene ninguna sección—, así que /account era inalcanzable
+// y el navegador se quedaba esperando.
+const guard = await requireSession(getBff(), toBffContext(Astro));
+if (guard instanceof Response) {
+  // Inalcanzable en la práctica: la página ya redirige al login antes de montar
+  // el layout. Se lanza (500) en vez de devolver la Response porque, insisto, un
+  // layout no puede cortar la respuesta sin dejar la petición colgada.
+  throw new Error('ConsoleLayout: sesión ausente; la página debió guardar la ruta antes.');
+}
+const { session } = guard;
+const allowed = allowedSections(
+  session.user.roles,
+  guard.perms,
+  isPlatformSurface(),
+  session.user.orgKind,
+  session.user.plan,
+);
+
+const hubBaseUrl = serverEnv(import.meta.env).SYTUE_HUB_URL ?? 'https://hub.sytue.eu';
+
+// El prefijo REAL de este host, que no siempre es el `base` del build: la misma
+// imagen sirve `admin.<dominio>` bajo `/admin` y `platform.<dominio>` en la raíz.
+// Lo usan el shim de fetch y la navegación del shell, y tienen que coincidir: si
+// uno prefija y el otro no, o las llamadas se van a la raíz o los enlaces del
+// menú caen en un 404 del que nada avisa.
+const basePath = serverEnv(import.meta.env).SYTUE_BASE_PATH ?? import.meta.env.BASE_URL;
+
+// Prefijo REAL bajo el que se sirve esta superficie: el del host si el servidor
+// lo publica (SYTUE_BASE_PATH) y, si no, el del build. Los assets del <head> se
+// unen con `withBase` y NO con `${BASE_URL}fichero`: BASE_URL llega SIN barra
+// final (`/mail`) y esa concatenación daba `/mailfavicon.svg`, un 404 medido en
+// producción con el que ninguna app de la suite tenía icono. ID sí lo tenía
+// porque es Go y escribe `/favicon.svg` a mano; por eso el fallo parecía de ID.
+const prefijo = serverEnv(import.meta.env).SYTUE_BASE_PATH ?? import.meta.env.BASE_URL;
+---
+
+<!doctype html>
+<html lang={lang} dir={dir} class="h-full">
+  <head>
+    <meta charset="utf-8" />
+    <!-- `interactive-widget=resizes-content`: sin esto el teclado virtual NO encoge el
+         viewport de maquetación, así que el `100dvh` del armazón sigue midiendo la
+         pantalla entera y lo que se está escribiendo queda DEBAJO del teclado — el
+         navegador desplaza el viewport visual para enseñar el campo y se lleva por
+         delante los botones que van con él. Se vio en el redactor de Sytue Mail. Lo
+         declaraba solo Sytue Rooms, que fue donde se descubrió.
+         La carcasa común reserva las zonas seguras en las cuatro orientaciones. -->
+    <meta name="viewport" content={APP_VIEWPORT} />
+    <meta name="description" content={t('shell.metaDescription')} />
+    <!-- Superficie autenticada: nunca se indexa (contrato §0.8). -->
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="color-scheme" content="light dark" />
+    <title>{title} · {t('shell.brand')}</title>
+    <!-- El Hub es OTRO origen y la shell le hace 3 peticiones nada mas hidratar:
+         sin esto, la primera pagaba DNS + TCP + TLS enteros (3 RTT) DESPUES de
+         ejecutar el JS. Anonimo porque los clientes no mandan cookies (fetch
+         same-origin por defecto), que es lo que exige reutilizar la conexion. -->
+    <link rel="preconnect" href={hubBaseUrl} crossorigin />
+    <link rel="icon" href={withBase(prefijo, '/favicon.ico') + SUFIJO_ICONOS} sizes="32x32" />
+    <link
+      rel="icon"
+      href={withBase(prefijo, '/favicon-64.png') + SUFIJO_ICONOS}
+      type="image/png"
+      sizes="64x64"
+    />
+    <link
+      rel="icon"
+      href={withBase(prefijo, '/favicon.svg') + SUFIJO_ICONOS}
+      type="image/svg+xml"
+    />
+    <link
+      rel="apple-touch-icon"
+      href={withBase(prefijo, '/apple-touch-icon.png') + SUFIJO_ICONOS}
+    />
+    <!-- Evita el flash de tema: aplica data-theme antes de pintar. -->
+    <!-- Prefija /api y /auth con el `base` de esta app: en producción cada
+         app se sirve bajo su prefijo y la raíz del host es un 404. -->
+    <script is:inline set:html={basePathScript(basePath)}></script>
+    <script is:inline set:html={themeInitScript}></script>
+  </head>
+  <body class="bg-bg text-text h-full antialiased">
+    <ConsoleShell
+      allowed={allowed}
+      basePath={basePath}
+      client:load
+      user={session.user}
+      hubBaseUrl={hubBaseUrl}
+      locale={locale}
+      section={section}
+    >
+      {!session.user.emailVerified && (
+        <VerifyEmailBanner client:load email={session.user.email} locale={locale} />
+      )}
+      <slot />
+    </ConsoleShell>
+  </body>
+</html>

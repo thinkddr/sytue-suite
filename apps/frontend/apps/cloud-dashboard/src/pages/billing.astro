@@ -1,0 +1,234 @@
+---
+/**
+ * Facturación — plan, gasto del período vs límite, comparación de planes,
+ * precios por unidad y facturas (con desglose). Server-rendered con @sytue/ui;
+ * datos vía el proxy del control-plane (lib/cloud.js). El precio autoritativo lo
+ * fija GET /billing/pricing; la tabla local pricing.ts es solo fallback.
+ */
+import DashboardLayout from '../layouts/DashboardLayout.astro';
+import { r } from '../lib/rutas';
+import DemoBanner from '../components/DemoBanner';
+import SpendLimitForm from '../components/SpendLimitForm';
+import InvoicesTable from '../components/InvoicesTable';
+import InvoiceLinesTable from '../components/InvoiceLinesTable';
+import {
+  Card,
+  CardBody,
+  CardHeader,
+  CardTitle,
+  Badge,
+  Icon,
+  EmptyState,
+  SectionHeader,
+} from '@sytue/ui';
+import { requireSession } from '@sytue/auth/server';
+import { canonicaConOrg } from '@sytue/config';
+import { getBff, toBffContext } from '../server/bff.js';
+import {
+  loadBillingAccount,
+  loadBillingPricing,
+  loadInvoices,
+  loadInvoice,
+  loadQuota,
+  firstSourceError,
+} from '../lib/cloud.js';
+import { formatEur } from '../lib/format.js';
+import { metricLabel, useT } from '../i18n/index.js';
+import { describeIncluded } from '../lib/pricing.js';
+
+export const prerender = false;
+
+// El idioma lo negocia el middleware una vez por petición; aquí solo se usa y
+// baja a las islas por props (nunca se detecta en el cliente: rompería la
+// hidratación, porque el servidor ya pintó en el idioma negociado).
+const locale = Astro.locals.locale;
+const t = useT(locale);
+
+const guard = await requireSession(getBff(), toBffContext(Astro));
+if (guard instanceof Response) return guard;
+// Ruta en `sinOrg` (su nombre colisiona con el namespace de organizaciones):
+// con sesión, un salto local a la canónica con la org activa (ADR 0056).
+const canonica = canonicaConOrg(Astro.url, getBff().basePath, guard.session.user.tenant);
+if (canonica) return Astro.redirect(canonica);
+
+const invoiceId = Astro.url.searchParams.get('invoice');
+
+const sources = await Promise.all([
+  loadBillingAccount(guard.session),
+  loadBillingPricing(guard.session),
+  loadInvoices(guard.session),
+]);
+const [
+  { live: accountLive, data: account },
+  { live: pricingLive, data: pricing },
+  { live: invoicesLive, data: invoices },
+] = sources;
+// Un 403 no es «modo demostración»: el aviso debe decir la verdad.
+const loadError = firstSourceError(...sources);
+const invoice = invoiceId ? await loadInvoice(guard.session, invoiceId) : undefined;
+// Cuanto queda del plan. Sin backend vivo no se pinta: una cifra inventada sobre
+// los limites de alguien es peor que no ensenar nada.
+const quota = await loadQuota(guard.session);
+const live = accountLive && pricingLive && invoicesLive;
+
+const planLabel: Record<string, string> = { free: 'Free', pro: 'Pro', team: 'Team' };
+const currentPlanLabel = planLabel[account.plan] ?? account.plan;
+---
+
+<DashboardLayout title={t('nav.billing')} section="billing" error={loadError}>
+  <DemoBanner live={live} locale={locale} error={loadError} />
+  <SectionHeader
+    icon={<Icon name="receipt" size={20} />}
+    title={t('nav.billing')}
+    subtitle={t('billing.subtitle')}
+    actions={<Badge tone="primary">{t('billing.planBadge', { plan: currentPlanLabel })}</Badge>}
+    level={1}
+  />
+
+  <div class="cloud-content">
+    <div class="grid gap-4 lg:grid-cols-2">
+      <SpendLimitForm
+        client:load
+        currentSpendEur={account.currentSpendEur}
+        spendLimitEur={account.spendLimitEur}
+        locale={locale}
+      />
+
+      {quota && (
+        <Card>
+          <CardHeader>
+            <CardTitle as="h2">{t('billing.quota')}</CardTitle>
+            <Badge tone="neutral">{t('billing.planBadge', { plan: currentPlanLabel })}</Badge>
+          </CardHeader>
+          <CardBody>
+            <dl class="divide-border divide-y">
+              <div class="flex items-baseline justify-between py-2 first:pt-0">
+                <dt class="text-text text-sm">{t('billing.quota.projects')}</dt>
+                <dd class="text-text text-sm tabular-nums">
+                  {quota.projects.max > 0
+                    ? t('billing.quota.of', {
+                        used: quota.projects.used,
+                        max: quota.projects.max,
+                      })
+                    : t('billing.quota.unlimited', { used: quota.projects.used })}
+                </dd>
+              </div>
+              <div class="flex items-baseline justify-between py-2">
+                <dt class="text-text text-sm">{t('billing.quota.services')}</dt>
+                <dd class="text-text text-sm tabular-nums">
+                  {quota.services.max > 0
+                    ? t('billing.quota.of', {
+                        used: quota.services.used,
+                        max: quota.services.max,
+                      })
+                    : t('billing.quota.unlimited', { used: quota.services.used })}
+                </dd>
+              </div>
+              <div class="flex items-baseline justify-between py-2 last:pb-0">
+                <dt class="text-text text-sm">{t('billing.quota.backups')}</dt>
+                <dd class="text-text text-sm tabular-nums">
+                  {t('billing.quota.days', { count: quota.backupRetentionDays })}
+                </dd>
+              </div>
+            </dl>
+            <p class="text-text-subtle mt-3 text-xs">{t('billing.quota.note')}</p>
+          </CardBody>
+        </Card>
+      )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle as="h2">{t('billing.unitPrices')}</CardTitle>
+          <Badge tone="neutral">{t('billing.noVat')}</Badge>
+        </CardHeader>
+        <CardBody>
+          <dl class="divide-border divide-y">
+            {pricing.metrics.map((m) => (
+              <div class="flex items-baseline justify-between py-2 first:pt-0 last:pb-0">
+                <dt class="text-text text-sm">{metricLabel(t, m.metric)}</dt>
+                <dd class="text-text text-sm tabular-nums">
+                  {formatEur(locale, m.priceEur)}
+                  <span class="text-text-subtle"> /{m.unit}</span>
+                </dd>
+              </div>
+            ))}
+          </dl>
+          <p class="text-text-subtle mt-3 text-xs">{t('billing.pricesNote')}</p>
+        </CardBody>
+      </Card>
+    </div>
+
+    <div class="mt-4">
+      <h2 class="sytue-h4 text-text mb-3">{t('billing.plans')}</h2>
+      <div class="grid gap-4 md:grid-cols-3">
+        {pricing.plans.map((p) => {
+          const isCurrent = p.id === account.plan;
+          return (
+            <Card raised={false} class={isCurrent ? 'border-primary ring-primary/20 ring-1' : ''}>
+              <CardBody class="flex flex-col gap-2">
+                <div class="flex items-center justify-between">
+                  <p class="text-text font-semibold">{planLabel[p.id] ?? p.id}</p>
+                  {isCurrent ? <Badge tone="primary">{t('billing.yourPlan')}</Badge> : null}
+                </div>
+                <p class="sytue-h3 text-text tabular-nums">
+                  {p.baseEur === 0 ? t('billing.noBaseFee') : formatEur(locale, p.baseEur)}
+                  {p.baseEur === 0 ? null : (
+                    <span class="text-text-subtle text-sm"> {t('billing.perMonth')}</span>
+                  )}
+                </p>
+                {
+                  /* Un plan sin cuota NO es un plan gratis: Sytue DevX se contrata
+                       sobre la suite. Decir «Gratis» a secas sería anunciar un precio
+                       que no es el que se cobra. */
+                  p.minSuiteSeats > 0 ? (
+                    <p class="text-text-muted text-sm">
+                      {t('billing.requiresSuite', {
+                        products: pricing.suite.products.join(', '),
+                        price: formatEur(locale, pricing.suite.seatPriceEur),
+                      })}
+                    </p>
+                  ) : null
+                }
+                <p class="text-text-muted text-sm">{describeIncluded(t, p.included)}</p>
+              </CardBody>
+            </Card>
+          );
+        })}
+      </div>
+    </div>
+
+    <Card class="mt-4">
+      <CardHeader>
+        <CardTitle as="h2">{invoice ? t('billing.breakdown') : t('billing.invoices')}</CardTitle>
+        {invoice ? (
+          <a
+            href={r('/billing')}
+            class="text-primary-text sytue-focus-ring-inset inline-flex items-center gap-1 rounded-sm text-sm font-medium hover:underline focus-visible:outline-none"
+          >
+            <Icon name="chevronLeft" size={16} />
+            {t('billing.back')}
+          </a>
+        ) : null}
+      </CardHeader>
+      <CardBody>
+        {invoiceId && !invoice ? (
+          <EmptyState
+            illustration={<Icon name="receipt" size={24} />}
+            title={t('billing.notFound.title')}
+            description={t('billing.notFound.desc')}
+          />
+        ) : invoice ? (
+          <InvoiceLinesTable lines={invoice.lines} total={invoice.totalEur} locale={locale} />
+        ) : invoices.length === 0 ? (
+          <EmptyState
+            illustration={<Icon name="receipt" size={24} />}
+            title={t('billing.empty.title')}
+            description={t('billing.empty.desc')}
+          />
+        ) : (
+          <InvoicesTable rows={invoices} locale={locale} />
+        )}
+      </CardBody>
+    </Card>
+  </div>
+</DashboardLayout>

@@ -1,0 +1,18 @@
+Myndirnar þínar, í röð og reglu og eftir þínum smekk, án þess að fara frá Evrópu.
+
+• Tímalína eftir mánuðum með leit eftir nafni.
+• Albúm með forsíðumynd; skoðun á öllum skjánum.
+• Ritill fyrir birtu, lit, snúning, speglun og skurð, í rauntíma.
+• Hver breyting er uppskrift: frumritið er aldrei snert.
+• Tímalína flokkuð eftir mánuðum, með leit eftir nafni og skörpum smámyndum.
+• Albúm: búa til, endurnefna, velja forsíðumynd, bæta við úr skoðaranum og fjarlægja.
+• Ritill með fjórum sleðum (lýsing, birtuskil, litmettun, litahiti), snúningi og speglun.
+• Hver breyting er uppskrift sem geymd er sér: frumritinu í Drive er aldrei breytt.
+• Útflutningur í fullri upplausn, unninn á þjóninum með sömu formúlum og í forskoðuninni.
+• Rusl með endurheimt.
+• Frumritin eru í Sytue Drive-inu þínu; afleiddar útgáfur eru skyndiminni sem hægt er að endurgera.
+• EXIF-gögn lesin úr skránni sjálfri; allt innan Evrópusambandsins.
+• Val á mörgum eftir mánuðum: í nýtt albúm, í ruslið eða niðurhal í einu.
+• Skyggnusýning, full stærð, snúningur úr skoðaranum og skurður með föstu hlutfalli.
+
+Dulkóðað í flutningi (TLS 1.3). Innviðir Sytue eru innan ESB. Staðsetning ytri þjónustu fer eftir þjónustuveitanda hennar.

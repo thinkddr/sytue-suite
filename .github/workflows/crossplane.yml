@@ -1,0 +1,144 @@
+# SPDX-License-Identifier: Apache-2.0
+name: crossplane-provider
+
+# SALIÓ DE `ci-go.yml` (2026-09-05) PORQUE ERA LO CARO Y CASI NUNCA ERA LO QUE
+# HABÍA CAMBIADO. Medido sobre 348 jobs de la forja: este job tarda 9,3 min de
+# media y se disparaba con `**/*.go`, o sea en toda pull request que tocara
+# cualquier línea de Go de la suite y en toda release. El provider vive en su
+# PROPIO módulo —`infra/crossplane/provider-scaleway/go.mod`—, así que ningún
+# cambio en `services/` ni en `platform/` puede romperlo.
+#
+# Ahora corre cuando toca su código, cuando se pide a mano, y una vez por semana.
+# El semanal NO es ceremonia: la generación descarga el provider de Terraform de
+# Scaleway, así que esto puede romperse sin que nadie toque el repositorio, y sin
+# una ejecución periódica nos enteraríamos el día que hiciera falta desplegar.
+on:
+  # SIN `pull_request`, A PROPOSITO (2026-09-12). En fase piloto se abren
+  # demasiadas y el runner es UNO y va en serie: se midio una cola de 412 jobs
+  # —unas 20 horas—, y el efecto real no fue esperar, fue que los gates NO
+  # LLEGABAN A CORRER y las PRs se fusionaban sin ellos. Asi salio a produccion
+  # una migracion que no aplicaba, y Sytue ID quedo tres releases sin arrancar.
+  #
+  # El gate vive ahora donde pasa algo irreversible: `imagenes-produccion` mira
+  # el estado COMBINADO del commit y se niega a publicar si no esta en verde.
+  # Lo que se pierde es aviso temprano; lo que se gana es un gate que de verdad
+  # corre. Antes de fusionar, el hook de pre-push ya valida en local.
+  schedule:
+    # Lunes a las 10:15 UTC, DETRÁS de `dependencias.yml` (09:45): si el barrido
+    # de dependencias movió algo del provider, esto lo compila con lo nuevo. El
+    # orden es lo que importa, no la hora.
+    - cron: "15 10 * * 1"
+  workflow_dispatch:
+
+# Lo que puede hacer GITHUB_TOKEN en este flujo, y nada más (GitHub lo
+# aplica; en Forgejo este campo se ignoraba y mandaba el token de cada paso).
+permissions:
+  contents: read
+
+# `bash` EXPLÍCITO. Dentro de un `container:` GitHub ejecuta los `run:` con
+# `sh -e` y no con bash: `set -o pipefail`, `[[`, los arrays y `<<<` mueren
+# con «Illegal option» (cancelar-al-cerrar, 2026-09-27). Con `shell: bash`
+# es `bash --noprofile --norc -eo pipefail`, que es lo que corría en la forja.
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  # UN DESPACHO A MANO NO CANCELA A OTRO (2026-09-27). El grupo lleva el `run_id`
+  # solo cuando el evento es `workflow_dispatch`: en GitHub dos despachos de la
+  # misma rama caían en el mismo grupo y el segundo cancelaba al primero, así
+  # que lanzar el CI sobre dos commits seguidos dejaba el primero sin veredicto
+  # (ci-go del 44d9b1bd, cancelado al lanzar el del 209f58f6). En push y en PR
+  # el sufijo vale vacío y todo sigue como antes.
+  group: crossplane-${{ github.event_name }}-${{ github.head_ref || github.ref_name }}${{ github.event_name == 'workflow_dispatch' && format('-{0}', github.run_id) || '' }}
+  cancel-in-progress: true
+
+# QUÉ ÁRBOL SE CLONA, Y POR QUÉ NO SIEMPRE `github.sha`.
+#
+# La forja registra cada programación con el commit en el que vio ESTE fichero y
+# lo reutiliza en todos los disparos: mientras nadie lo toque, el cron sigue
+# clonando el mismo árbol y la rama avanza sin él. Medido el 2026-09-11:
+# `security` y `mobile` corrían sobre b0372642 con `main` ya en 0bc05e1e, y los
+# dos fallaban por un lockfile que llevaba un día arreglado. Un nocturno que
+# escanea un árbol viejo no está mirando lo que se despliega, que es justo lo
+# único que tenía que hacer.
+#
+# En push y en pull request manda `github.sha`, que ahí sí es lo correcto: se
+# comprueba el commit concreto que llegó, no la cabeza de la rama.
+env:
+  # El checkout lo escribe el runner (uid 1001) y los pasos corren como root dentro
+  # del `container:`: git ve un propietario ajeno, se niega («dubious ownership»)
+  # y `go build` muere con «error obtaining VCS status». La forja montaba el
+  # workspace con el mismo usuario y no lo notaba.
+  GIT_CONFIG_COUNT: "1"
+  GIT_CONFIG_KEY_0: safe.directory
+  GIT_CONFIG_VALUE_0: "*"
+  REF_A_CLONAR: ${{ github.event_name == 'schedule' && github.ref_name || github.sha }}
+
+jobs:
+  # Se compila desde cero, GENERANDO: es la única forma de saber que el pipeline
+  # de Upjet sigue funcionando. Los ficheros generados no están en el repo —son
+  # decenas de miles de líneas— y por eso NO basta con compilar lo comiteado.
+  #
+  # Timeout holgado a propósito: la generación produce miles de ficheros.
+  provider:
+    name: crossplane-provider
+    runs-on: sytue-arm64
+    # Los runners propios del frontal (.github/RUNNERS.md): cada job en un
+    # contenedor del Docker del CI, con el proxy filtrado como socket de Docker
+    # y la caché de Go del host (con varios jobs, ancla `&ci` y `*ci`).
+    container:
+      image: node:24-bookworm@sha256:64af3819f9275802414d7cdc38c27e9d82bd564dec4d4da87d008255d36c63b4
+      env:
+        DOCKER_HOST: unix:///run/sytue-ci/docker.sock
+      volumes:
+        - /srv/ci/run/proxy.sock:/run/sytue-ci/docker.sock
+        - /var/cache/sytue-ci/go-build:/github/home/.cache/go-build
+        - /var/cache/sytue-ci/go-mod:/github/home/go/pkg/mod
+    timeout-minutes: 30
+    steps:
+      - name: Clonar el repositorio
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.REF_A_CLONAR }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      # La imagen del runner compartido de git.gay no trae Go ni Bun.
+      # Se instalan con la MISMA versión y sha256 que la imagen propia.
+      - name: Preparar toolchain
+        run: $GITHUB_WORKSPACE/.github/actions/toolchain/accion.sh go
+
+      - name: goimports, que el generador invoca POR NOMBRE
+        # Sin él en el PATH el generador muere a media escritura con «command no
+        # encontrado», dejando el módulo peor que antes de empezar. El go.mod lo
+        # declara como `tool`, pero eso no lo pone en el PATH.
+        #
+        # SIN `@latest`, y no es estilo: el gate de suministro lo rechaza porque una
+        # referencia mutable hace que dos ejecuciones del mismo commit puedan
+        # construir con binarios distintos. Ejecutado DENTRO del módulo del provider,
+        # `go install` sin versión usa la que fija su go.mod, que es reproducible y ya
+        # está sujeta al mismo gate que el resto.
+        working-directory: infra/crossplane/provider-scaleway
+        run: go install golang.org/x/tools/cmd/goimports
+      - name: Generar el provider
+        working-directory: infra/crossplane/provider-scaleway
+        run: |
+          export PATH="$(go env GOPATH)/bin:$PATH"
+          go run ./cmd/generator "$(pwd)"
+          cd apis
+          go run -tags generate sigs.k8s.io/controller-tools/cmd/controller-gen \
+            object:headerFile=../hack/boilerplate.go.txt paths=./... \
+            crd:allowDangerousTypes=true,crdVersions=v1 output:artifacts:config=../package/crds
+          go run -tags generate github.com/crossplane/crossplane-tools/cmd/angryjet \
+            generate-methodsets --header-file=../hack/boilerplate.go.txt ./...
+      # `go test` VA AQUÍ y no en `ci-go`, que es donde correría el resto: los
+      # tipos `zz_*.go` de este módulo se generan y están en .gitignore, así que
+      # en un clon limpio no compila hasta el paso de arriba. Antes de esto sus
+      # tests no los ejecutaba nadie.
+      - name: Compilar y verificar
+        working-directory: infra/crossplane/provider-scaleway
+        run: |
+          go build ./...
+          go vet ./...
+          go test ./...

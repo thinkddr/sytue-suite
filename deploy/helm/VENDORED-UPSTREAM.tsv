@@ -1,0 +1,2 @@
+# component	version	license	controller_hq	original_distribution	archive_sha256	repository_path	imported_on
+traefik-chart	41.1.0	MIT	Traefik Labs SAS; France	https://traefik.github.io/charts	0b4144b78251a1039913852991d9252419f35e69536043aa2be97d6226e3e7c3	deploy/helm/upstream/traefik-41.1.0.tgz	2026-08-02

@@ -1,0 +1,18 @@
+Zvezki, v katere gre vse: besedilo, datoteke, dogodki, celotni dokumenti.
+
+• Gnezdeni zvezki na prostem platnu, v stolpcih ali kot seznam.
+• Zapiski vseh vrst: besedilo, opravila, povezave, datoteke, dogodki iz Calendar, dokumenti iz Docs.
+• Vi odločate, kaj pride v iskanje — in kaj nikoli.
+• Gnezdeni zvezki z ikono in barvo; tri postavitve: prosta, stolpci in seznam.
+• Dvanajst vrst zapiskov: besedilo, opravila, povezave, barva, slika in sklici na Drive, Docus, Calendar, Rooms in druge zapiske.
+• Urejevalnik z oblikovanjem (krepko, seznami, povezave), ki shrani ob izhodu.
+• Oznake, pripenjanje, podvajanje, premikanje med zvezki, združevanje in vlečenje po platnu.
+• Vidnost za vsak zvezek: zasebno, osebno, organizacija ali javna povezava.
+• Vi odločate, kateri zvezki pridejo v iskanje po naboru.
+• Povratne povezave: kateri zapiski kažejo na tega.
+• Izvoz celotnega zvezka v HTML, PDF, Markdown in drugo; uvoz kopij.
+• Deljenje zapiska v kanal Rooms; ustvarjanje zapiskov z vlečenjem ali lepljenjem.
+• Tabele v urejevalniku in bližnjice Markdown med pisanjem: »- «, »# «, »> « in »```«.
+• Premik zapiska v drug zvezek, izvoz posameznega zapiska in razvrščanje zvezka po želji.
+
+Šifrirano med prenosom (TLS 1.3). Infrastruktura Sytue je v EU. Lokacija zunanjih storitev je odvisna od njihovega ponudnika.

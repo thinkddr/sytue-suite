@@ -1,0 +1,35 @@
+{
+  "name": "@sytue/app-console",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sytue Admin — administracion de tenants, usuarios y grupos consumiendo la API de administracion de Sytue ID y Sytue Hub. Astro 7 + Preact 10. Producto Sytue-native, propietario. Monta @sytue/shell y usa @sytue/ui. admin.sytue.eu.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "dev": "bun --bun astro dev --port 4322",
+    "build": "bun --bun astro build",
+    "preview": "bun --bun astro preview --port 4322",
+    "typecheck": "bun --bun astro check && bun --bun tsc -p tsconfig.json --noEmit",
+    "test": "bun test src/lib src/components src/i18n"
+  },
+  "dependencies": {
+    "@sytue/api-clients": "workspace:*",
+    "@sytue/auth": "workspace:*",
+    "@sytue/config": "workspace:*",
+    "@sytue/i18n": "workspace:*",
+    "@sytue/shell": "workspace:*",
+    "@sytue/ui": "workspace:*",
+    "@astrojs/node": "catalog:",
+    "@astrojs/preact": "catalog:",
+    "astro": "catalog:",
+    "preact": "10.29.8"
+  },
+  "devDependencies": {
+    "@astrojs/check": "catalog:",
+    "@happy-dom/global-registrator": "20.14.5",
+    "@tailwindcss/vite": "4.3.3",
+    "@types/bun": "1.4.2",
+    "tailwindcss": "4.3.3",
+    "typescript": "6.0.3"
+  }
+}

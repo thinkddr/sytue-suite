@@ -1,0 +1,19 @@
+E-mail privat și european prin JMAP — fără trackere și fără reclame.
+
+• O căsuță rapidă cu conversații, etichete, filtre și căutare.
+• Atașați fișiere direct din Sytue Drive.
+• Transformați un e-mail într-un eveniment în Calendar.
+• Criptare în tranzit (TLS 1.3). Infrastructura Sytue se află în UE. Locația serviciilor externe depinde de furnizorul lor.
+• Conversații cu citire, răspuns și redirecționare dintr-un clic.
+• Dosare, etichete colorate și căutare cu operatori (from:, has:attachment, is:unread…).
+• Reguli automate care arhivează, etichetează sau mută e-mailurile la sosire.
+• Trimitere programată și „Anulați trimiterea”.
+• Semnături, aliasuri de expeditor și răspuns automat de absență.
+• Căsuțe partajate și delegate cu permisiuni de citire și trimitere.
+• Editor de text formatat cu atașamente din Sytue Drive fără duplicarea fișierelor.
+• Conținutul extern este blocat implicit: nimeni nu află când deschideți un e-mail.
+• E-mailurile semnate (PGP și S/MIME) sunt recunoscute și marcate; TLS în tranzit.
+• Acces și din Thunderbird, Outlook, Apple Mail sau telefon, cu parole de aplicație.
+• Adrese afișate ca etichete, cu agenda din Contacts la un clic și un avertisment dacă scrieți „atașat” fără să atașați nimic.
+
+Criptare în tranzit (TLS 1.3). Infrastructura Sytue se află în UE. Locația serviciilor externe depinde de furnizorul lor.

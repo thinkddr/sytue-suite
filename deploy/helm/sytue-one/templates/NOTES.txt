@@ -1,0 +1,57 @@
+============================================================
+  Sytue One desplegado — entorno: {{ .Values.global.env }}
+{{- if .Values.global.networkPolicy.dataNamespace }}
+  Dominio: {{ .Values.global.domain }} (autoalojado, region {{ .Values.global.region }})
+{{- else }}
+  Dominio: {{ .Values.global.domain }} (100% UE / Scaleway {{ .Values.global.region }})
+{{- end }}
+  Stack: Go + Astro/Preact + PostgreSQL. Sin motores AGPL. Sin Redis/Valkey.
+============================================================
+
+Superficies publicadas (HTTPS, TLS automatico cert-manager / Traefik):
+
+  Portal      https://one.{{ .Values.global.domain }}
+  Sytue ID    https://id.{{ .Values.global.domain }}        (NUCLEAR — OIDC realm {{ .Values.global.identity.realm }})
+  Drive       https://drive.{{ .Values.global.domain }}     (SPA + /api,/webdav)
+  Docs (API)  https://docs.{{ .Values.global.domain }}/api/v1 (servicio de documentos)
+  Docus       https://docus.{{ .Values.global.domain }}/docus
+  Calcus      https://calcus.{{ .Values.global.domain }}/calcus
+  Diapos      https://diapos.{{ .Values.global.domain }}/diapos
+  CertiPDF    https://certipdf.{{ .Values.global.domain }}/certipdf
+  Mail        https://mail.{{ .Values.global.domain }}      (SPA + /jmap,/api; MX: mx.{{ .Values.global.domain }})
+  Calendar    https://calendar.{{ .Values.global.domain }}  (SPA + /api,/dav CalDAV)
+  Contacts    https://contacts.{{ .Values.global.domain }}  (SPA + /api,/dav CardDAV)
+  Chat        https://chat.{{ .Values.global.domain }}      (SPA + /api,/ws)
+  Meet        https://meet.{{ .Values.global.domain }}      (SPA + /api; SFU LiveKit en /rtc)
+  Cloud       https://cloud.{{ .Values.global.domain }}     (dashboard + /api control-plane)
+  Console     https://console.{{ .Values.global.domain }}
+  Hub         https://hub.{{ .Values.global.domain }}
+  www         https://www.{{ .Values.global.domain }}
+
+Comprobaciones:
+  kubectl -n {{ .Release.Namespace }} get pods -l app.kubernetes.io/part-of=sytue-one
+  kubectl -n {{ .Release.Namespace }} get pods -l sytue.eu/stack=go
+  kubectl -n {{ .Release.Namespace }} get ingress
+  kubectl -n {{ .Release.Namespace }} get certificate
+
+Onboarding de un tenant nuevo:
+  helm install tenant-<slug> deploy/helm/charts/tenant \
+    --set tenant.slug=<slug> --set tenant.env={{ .Values.global.env }}
+
+{{- if .Values.global.networkPolicy.dataNamespace }}
+
+SECRETOS: ya estan puestos, y NO vienen de Scaleway. En un despliegue autoalojado
+los materializa deploy/helm/bin/deploy.sh desde el .secrets.env de la
+propia maquina, antes de este helm upgrade: sytue-postgresql, sytue-<svc>-db,
+sytue-<svc>, sytue-object-storage, sytue-livekit-keys, sytue-frontend-bff...
+Aqui NO intervienen Scaleway Secret Manager ni deploy/production/02b-secretos.sh.
+
+PostgreSQL NO es externo en este perfil: corre DENTRO del cluster, igual que el
+almacenamiento S3 y la cache, en el namespace {{ .Values.global.networkPolicy.dataNamespace }}.
+{{- else }}
+
+RECORDATORIO: los secretos NO estan en el chart. ANTES de instalar, materializa desde
+Scaleway Secret Manager con deploy/production/02b-secretos.sh los Secret
+(sytue-postgresql, sytue-<svc>-db, sytue-<svc>, sytue-object-storage,
+sytue-livekit-keys, sytue-frontend-bff, ...). Ver README.md. PostgreSQL es EXTERNO (RDB).
+{{- end }}

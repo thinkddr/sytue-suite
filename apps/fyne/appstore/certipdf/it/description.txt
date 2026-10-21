@@ -1,0 +1,17 @@
+Il PDF, dall’inizio alla fine, nel tuo browser.
+
+• Evidenziare, sottolineare, commentare e disegnare sul documento.
+• Moduli: compila i campi o crea i tuoi.
+• Unire, estrarre, ruotare, numerare e applicare filigrane.
+• Pannello delle firme, oscuramento definitivo e documenti protetti da password.
+• Visualizzatore veloce con indice, miniature, ricerca e zoom a pagina o a larghezza.
+• Annotazioni: evidenziare, sottolineare, barrare, commentare, disegnare, forme, frecce e timbri.
+• Caselle di testo, misure e ritagli di zona.
+• Moduli: compila i campi esistenti o aggiungi i tuoi.
+• Pannello delle firme del documento.
+• Oscuramento definitivo: ciò che segni sparisce dal file, non solo dalla vista.
+• Pagine: unire, estrarre, eliminare, ruotare, numerare (anche Bates), intestazioni e piè di pagina.
+• Filigrana, sfondo e metadati modificabili.
+• Documenti protetti da password e permessi.
+
+Cifratura in transito (TLS 1.3). L’infrastruttura di Sytue si trova nell’UE. La posizione dei servizi esterni dipende dal loro fornitore.

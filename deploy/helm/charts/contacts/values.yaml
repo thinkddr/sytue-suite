@@ -1,0 +1,123 @@
+# sytue-contacts — defaults del subchart (servicio Go). global.* lo inyecta el umbrella.
+# Estado en PostgreSQL (RDB Scaleway, UE). Sin Redis/Valkey ni motores AGPL.
+enabled: true
+subdomain: contacts
+component: contacts
+replicaCount: 2
+
+image:
+  registry: ""                 # cae a global.imageRegistry (Scaleway Registry, UE)
+  repository: sytue-contacts
+  tag: "1.0.0"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8088             # puerto del SPEC
+
+ingress:
+  enabled: true
+  className: traefik
+  annotations: {}
+  # contacts.sytue.eu: el SPA Astro (sytue-frontend) sirve "/"; el backend Go expone
+  # CardDAV y API bajo prefijos para clientes nativos (CardDAV) y el BFF.
+  paths:
+    # `/api/v1` y NO `/api`: el BFF de la app Astro sirve sus propias rutas
+    # bajo /api/<recurso>, y un Prefix en /api se las quedaba TODAS y se las
+    # mandaba al servicio Go, que solo expone /api/v1. El navegador recibía
+    # 404 en cada carga y la app decía «no se pudieron cargar los datos».
+    - path: /api/v1
+      pathType: Prefix
+    - path: /dav
+      pathType: Prefix
+    - path: /.well-known/carddav
+      pathType: Exact
+    # Capa de compatibilidad: Google People API y Microsoft Graph (contacts), para
+    # integraciones de terceros con «base URL» configurable (handlers_compat.go).
+    - path: /compat
+      pathType: Prefix
+  tls:
+    secretName: tls-contacts-sytue-eu
+
+# Right-sized al footprint MEDIDO (Go ~6-40MiB RSS idle): requests modestos para
+# densidad/coste; limits con cabecera para picos (CRUD/CardDAV ligero; burstable).
+# Requests MEDIDOS en producción (kubectl top, 2026-08-09), no estimados: en
+# Kubernetes la factura la fija lo RESERVADO, no lo usado, y estos pods pedían
+# 25-75 veces su consumo real. Esa reserva inflada obligó a un tercer nodo cuando
+# la CPU real del clúster estaba al 3 %.
+#
+# El límite NO se toca: un pico sigue pudiendo usar toda la CPU que necesite. Y
+# bajar el request hace al HPA MÁS sensible —calcula el porcentaje sobre el
+# request—, que es justo lo que hace falta para escalar por demanda real.
+resources:
+  requests:
+    cpu: 15m
+    memory: 64Mi
+  limits:
+    cpu: "1"
+    memory: 192Mi
+
+autoscaling:
+  # Etiqueta `job` de la serie de metricas, para el HPA por demanda real.
+  # Es el ServiceName del BINARIO, que no siempre coincide con el nombre del
+  # chart ni con el del directorio; por eso se escribe y no se deduce.
+  metricJob: sytue-contacts
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 8
+  targetCPUUtilizationPercentage: 70
+  # Sin memoria: en Go la RSS queda alta tras el GC (mala señal de escalado) y
+  # GOMEMLIMIT (~85% de limits.memory) ya la acota -> se escala solo por CPU.
+
+networkPolicy:
+  enabled: true
+
+serviceMonitor:
+  enabled: true
+  path: /metrics
+  interval: 30s
+
+config:
+  # Tamano del pool pgx por replica (DB_MAX_CONNS). Prod lo baja (3-5):
+  # PgBouncer multiplexa hacia la RDB (ver values-prod.yaml del umbrella).
+  dbMaxConns: 10
+  logLevel: info
+
+# Postgres EXTERNO (Scaleway RDB). DSN por secret (nunca en git).
+postgresql:
+  existingSecret: sytue-contacts-db
+  dsnKey: dsn
+  # DSN directo a la RDB (bypass PgBouncer) para LISTEN/migraciones; opcional.
+  dsnDirectKey: dsn-direct
+
+# Secretos de la app (OIDC client secret y especificos del servicio).
+existingSecret: sytue-contacts
+
+# PodDisruptionBudget: garantiza disponibilidad durante drains/upgrades del cluster.
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+  # maxUnavailable: 1   # alternativa a minAvailable (usar uno u otro)
+
+# Reparto anti-afinidad suave por zona y nodo (alta disponibilidad multi-AZ, UE).
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: ScheduleAnyway
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: ScheduleAnyway
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  fsGroup: 10001
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]

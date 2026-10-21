@@ -1,0 +1,2034 @@
+{
+  "libreoffice": "LibreOffice 7.4.7.2 40(Build:2)",
+  "fecha": "2026-10-04",
+  "datos": {
+    "T1": 1,
+    "U1": 11.9,
+    "T2": 2,
+    "U2": 14.204,
+    "T3": 3,
+    "U3": 16.583,
+    "T4": 4,
+    "U4": 17.849,
+    "T5": 5,
+    "U5": 20.638,
+    "T6": 6,
+    "U6": 21.985,
+    "T7": 7,
+    "U7": 23.806,
+    "T8": 8,
+    "U8": 25.941,
+    "T9": 9,
+    "U9": 28.577,
+    "T10": 10,
+    "U10": 30.383,
+    "T11": 11,
+    "U11": 32.756,
+    "T12": 12,
+    "U12": 34.557,
+    "T13": 13,
+    "U13": 35.296,
+    "T14": 14,
+    "U14": 38.072,
+    "T15": 15,
+    "U15": 40.436,
+    "T16": 16,
+    "U16": 42.348,
+    "T17": 17,
+    "U17": 44.505,
+    "T18": 18,
+    "U18": 46.616,
+    "T19": 19,
+    "U19": 47.702,
+    "T20": 20,
+    "U20": 50.031,
+    "T21": 21,
+    "U21": 52.291,
+    "T22": 22,
+    "U22": 54.581,
+    "T23": 23,
+    "U23": 56.247,
+    "T24": 24,
+    "U24": 57.252,
+    "T25": 25,
+    "U25": 60.337,
+    "T26": 26,
+    "U26": 61.941,
+    "T27": 27,
+    "U27": 64.217,
+    "T28": 28,
+    "U28": 66.563,
+    "T29": 29,
+    "U29": 68.743,
+    "T30": 30,
+    "U30": 69.298,
+    "V1": 1,
+    "W1": 54.587,
+    "V2": 2,
+    "W2": 58.358,
+    "V3": 3,
+    "W3": 58.975,
+    "V4": 4,
+    "W4": 58.588,
+    "V5": 5,
+    "W5": 56.938,
+    "V6": 6,
+    "W6": 53.395,
+    "V7": 7,
+    "W7": 49.761,
+    "V8": 8,
+    "W8": 46.346,
+    "V9": 9,
+    "W9": 45.738,
+    "V10": 10,
+    "W10": 48,
+    "V11": 11,
+    "W11": 52.271,
+    "V12": 12,
+    "W12": 56.472,
+    "V13": 13,
+    "W13": 60.368,
+    "V14": 14,
+    "W14": 64.009,
+    "V15": 15,
+    "W15": 65.991,
+    "V16": 16,
+    "W16": 64.747,
+    "V17": 17,
+    "W17": 62.405,
+    "V18": 18,
+    "W18": 58.478,
+    "V19": 19,
+    "W19": 54.829,
+    "V20": 20,
+    "W20": 52.393,
+    "V21": 21,
+    "W21": 52.405,
+    "V22": 22,
+    "W22": 53.83,
+    "V23": 23,
+    "W23": 57.471,
+    "V24": 24,
+    "W24": 61.995,
+    "V25": 25,
+    "W25": 66.287,
+    "V26": 26,
+    "W26": 69.539,
+    "V27": 27,
+    "W27": 71.711,
+    "V28": 28,
+    "W28": 71.262,
+    "V29": 29,
+    "W29": 68.969,
+    "V30": 30,
+    "W30": 65.107,
+    "V31": 31,
+    "W31": 61.787,
+    "V32": 32,
+    "W32": 59.273,
+    "V33": 33,
+    "W33": 58.457,
+    "V34": 34,
+    "W34": 59.746,
+    "V35": 35,
+    "W35": 62.938,
+    "V36": 36,
+    "W36": 67.859,
+    "V37": 37,
+    "W37": 73.231,
+    "V38": 38,
+    "W38": 76.55,
+    "V39": 39,
+    "W39": 77.021,
+    "V40": 40,
+    "W40": 77.2,
+    "V41": 41,
+    "W41": 73.741,
+    "V42": 42,
+    "W42": 70.95,
+    "V43": 43,
+    "W43": 67.793,
+    "V44": 44,
+    "W44": 65.08,
+    "V45": 45,
+    "W45": 65.241,
+    "V46": 46,
+    "W46": 66.043,
+    "V47": 47,
+    "W47": 69.707,
+    "V48": 48,
+    "W48": 74.458,
+    "X1": 1,
+    "Y1": 26.221,
+    "X2": 2,
+    "Y2": 25.801,
+    "X3": 3,
+    "Y3": 20.694,
+    "X4": 4,
+    "Y4": 15.612,
+    "X5": 5,
+    "Y5": 16.853,
+    "X6": 6,
+    "Y6": 22.452,
+    "X7": 7,
+    "Y7": 28.563,
+    "X8": 8,
+    "Y8": 29.623,
+    "X9": 9,
+    "Y9": 23.439,
+    "X10": 10,
+    "Y10": 18.292,
+    "X11": 11,
+    "Y11": 17.8,
+    "X12": 12,
+    "Y12": 24.945,
+    "X13": 13,
+    "Y13": 31.652,
+    "X14": 14,
+    "Y14": 31.828,
+    "X15": 15,
+    "Y15": 26.265,
+    "X16": 16,
+    "Y16": 19.652,
+    "X17": 17,
+    "Y17": 20.335,
+    "X18": 18,
+    "Y18": 27.53,
+    "X19": 19,
+    "Y19": 35.043,
+    "X20": 20,
+    "Y20": 35.679,
+    "X21": 21,
+    "Y21": 28.657,
+    "X22": 22,
+    "Y22": 21.218,
+    "X23": 23,
+    "Y23": 21.102,
+    "X24": 24,
+    "Y24": 30.035,
+    "X25": 25,
+    "Y25": 37.604,
+    "X26": 26,
+    "Y26": 38.475,
+    "X27": 27,
+    "Y27": 31.118,
+    "X28": 28,
+    "Y28": 23.027,
+    "X29": 29,
+    "Y29": 23.4,
+    "X30": 30,
+    "Y30": 32.598,
+    "X31": 31,
+    "Y31": 40.333,
+    "X32": 32,
+    "Y32": 41.076,
+    "X33": 33,
+    "Y33": 33.645,
+    "X34": 34,
+    "Y34": 24.768,
+    "X35": 35,
+    "Y35": 24.775,
+    "X36": 36,
+    "Y36": 33.986,
+    "Z1": 1,
+    "AA1": 100.334,
+    "Z2": 2,
+    "AA2": 103.536,
+    "Z3": 3,
+    "AA3": 95.296,
+    "Z4": 4,
+    "AA4": 95.904,
+    "Z5": 5,
+    "AA5": 95.548,
+    "Z6": 6,
+    "AA6": 95.127,
+    "Z7": 7,
+    "AA7": 102.177,
+    "Z8": 8,
+    "AA8": 96.245,
+    "Z9": 9,
+    "AA9": 104.86,
+    "Z10": 10,
+    "AA10": 98.644,
+    "Z11": 11,
+    "AA11": 95.382,
+    "Z12": 12,
+    "AA12": 99.891,
+    "Z13": 13,
+    "AA13": 96.925,
+    "Z14": 14,
+    "AA14": 104.67,
+    "Z15": 15,
+    "AA15": 102.784,
+    "Z16": 16,
+    "AA16": 96.013,
+    "Z17": 17,
+    "AA17": 99.852,
+    "Z18": 18,
+    "AA18": 102.476,
+    "Z19": 19,
+    "AA19": 101.114,
+    "Z20": 20,
+    "AA20": 95.803,
+    "Z21": 21,
+    "AA21": 98.207,
+    "Z22": 22,
+    "AA22": 97.12,
+    "Z23": 23,
+    "AA23": 95.409,
+    "Z24": 24,
+    "AA24": 98.883,
+    "Z25": 25,
+    "AA25": 100.903,
+    "Z26": 26,
+    "AA26": 102.839,
+    "Z27": 27,
+    "AA27": 95.367,
+    "Z28": 28,
+    "AA28": 104.195,
+    "Z29": 29,
+    "AA29": 102.602,
+    "Z30": 30,
+    "AA30": 97.28,
+    "AB1": 1,
+    "AC1": 11.9,
+    "AB2": 2,
+    "AC2": 14.204,
+    "AB3": 3,
+    "AC3": 16.583,
+    "AB4": 4,
+    "AC4": 17.849,
+    "AB5": 5,
+    "AC5": 20.638,
+    "AB6": 6,
+    "AC6": 21.985,
+    "AB7": 9,
+    "AC7": 28.577,
+    "AB8": 10,
+    "AC8": 30.383,
+    "AB9": 11,
+    "AC9": 32.756,
+    "AB10": 12,
+    "AC10": 34.557,
+    "AB11": 13,
+    "AC11": 35.296,
+    "AB12": 14,
+    "AC12": 38.072,
+    "AB13": 15,
+    "AC13": 40.436,
+    "AB14": 16,
+    "AC14": 42.348,
+    "AB15": 17,
+    "AC15": 44.505,
+    "AB16": 18,
+    "AC16": 46.616,
+    "AB17": 20,
+    "AC17": 50.031,
+    "AB18": 21,
+    "AC18": 52.291,
+    "AB19": 22,
+    "AC19": 54.581,
+    "AB20": 25,
+    "AC20": 60.337,
+    "AB21": 26,
+    "AC21": 61.941,
+    "AB22": 27,
+    "AC22": 64.217,
+    "AB23": 28,
+    "AC23": 66.563,
+    "AB24": 29,
+    "AC24": 68.743,
+    "AB25": 30,
+    "AC25": 69.298,
+    "AD1": 1,
+    "AE1": 11.9,
+    "AD2": 2,
+    "AE2": 14.204,
+    "AD3": 3,
+    "AE3": 16.583,
+    "AD4": 4,
+    "AE4": 17.849,
+    "AD5": 5,
+    "AE5": 20.638,
+    "AD6": 5,
+    "AE6": 22.138,
+    "AD7": 6,
+    "AE7": 21.985,
+    "AD8": 7,
+    "AE8": 23.806,
+    "AD9": 8,
+    "AE9": 25.941,
+    "AD10": 9,
+    "AE10": 28.577,
+    "AD11": 10,
+    "AE11": 30.383,
+    "AD12": 11,
+    "AE12": 32.756,
+    "AD13": 12,
+    "AE13": 34.557,
+    "AD14": 12,
+    "AE14": 33.057,
+    "AD15": 12,
+    "AE15": 31.557,
+    "AD16": 13,
+    "AE16": 35.296,
+    "AD17": 14,
+    "AE17": 38.072,
+    "AD18": 15,
+    "AE18": 40.436,
+    "AD19": 16,
+    "AE19": 42.348,
+    "AD20": 17,
+    "AE20": 44.505,
+    "AD21": 18,
+    "AE21": 46.616,
+    "AD22": 19,
+    "AE22": 47.702,
+    "AD23": 20,
+    "AE23": 50.031,
+    "AD24": 20,
+    "AE24": 48.531,
+    "AD25": 21,
+    "AE25": 52.291,
+    "AD26": 22,
+    "AE26": 54.581,
+    "AD27": 23,
+    "AE27": 56.247,
+    "AD28": 24,
+    "AE28": 57.252,
+    "AF1": 44927,
+    "AG1": 223.64,
+    "AF2": 44958,
+    "AG2": 218.979,
+    "AF3": 44986,
+    "AG3": 210.522,
+    "AF4": 45017,
+    "AG4": 200.934,
+    "AF5": 45047,
+    "AG5": 195.082,
+    "AF6": 45078,
+    "AG6": 192.841,
+    "AF7": 45108,
+    "AG7": 198.261,
+    "AF8": 45139,
+    "AG8": 211.451,
+    "AF9": 45170,
+    "AG9": 225.043,
+    "AF10": 45200,
+    "AG10": 241.894,
+    "AF11": 45231,
+    "AG11": 255.042,
+    "AF12": 45261,
+    "AG12": 260.262,
+    "AF13": 45292,
+    "AG13": 262.036,
+    "AF14": 45323,
+    "AG14": 253.695,
+    "AF15": 45352,
+    "AG15": 245.045,
+    "AF16": 45383,
+    "AG16": 234.364,
+    "AF17": 45413,
+    "AG17": 230.119,
+    "AF18": 45444,
+    "AG18": 228.786,
+    "AF19": 45474,
+    "AG19": 236.758,
+    "AF20": 45505,
+    "AG20": 245.99,
+    "AF21": 45536,
+    "AG21": 264.626,
+    "AF22": 45566,
+    "AG22": 279.42,
+    "AF23": 45597,
+    "AG23": 291.462,
+    "AF24": 45627,
+    "AG24": 296.851,
+    "AF25": 45658,
+    "AG25": 296.017,
+    "AF26": 45689,
+    "AG26": 289.774,
+    "AF27": 45717,
+    "AG27": 280.553,
+    "AF28": 45748,
+    "AG28": 272.903,
+    "AF29": 45778,
+    "AG29": 265.552,
+    "AF30": 45809,
+    "AG30": 263.469,
+    "AF31": 45839,
+    "AG31": 269.353,
+    "AF32": 45870,
+    "AG32": 283.446,
+    "AF33": 45901,
+    "AG33": 299.785,
+    "AF34": 45931,
+    "AG34": 316.201,
+    "AF35": 45962,
+    "AG35": 328.317,
+    "AF36": 45992,
+    "AG36": 334.86,
+    "AH1": 45007,
+    "AI1": 87.004,
+    "AH2": 45014,
+    "AI2": 81.974,
+    "AH3": 45021,
+    "AI3": 77.17,
+    "AH4": 45028,
+    "AI4": 84.752,
+    "AH5": 45035,
+    "AI5": 91.749,
+    "AH6": 45042,
+    "AI6": 87.324,
+    "AH7": 45049,
+    "AI7": 81.905,
+    "AH8": 45056,
+    "AI8": 89.527,
+    "AH9": 45063,
+    "AI9": 96.926,
+    "AH10": 45070,
+    "AI10": 91.956,
+    "AH11": 45077,
+    "AI11": 87.665,
+    "AH12": 45084,
+    "AI12": 94.343,
+    "AH13": 45091,
+    "AI13": 101.473,
+    "AH14": 45098,
+    "AI14": 97.118,
+    "AH15": 45105,
+    "AI15": 92.036,
+    "AH16": 45112,
+    "AI16": 99.313,
+    "AH17": 45119,
+    "AI17": 106.719,
+    "AH18": 45126,
+    "AI18": 101.273,
+    "AH19": 45133,
+    "AI19": 96.917,
+    "AH20": 45140,
+    "AI20": 104.277,
+    "AH21": 45147,
+    "AI21": 111.213,
+    "AH22": 45154,
+    "AI22": 106.317,
+    "AH23": 45161,
+    "AI23": 101.822,
+    "AH24": 45168,
+    "AI24": 108.84,
+    "AH25": 45175,
+    "AI25": 115.501,
+    "AH26": 45182,
+    "AI26": 111.5,
+    "AH27": 45189,
+    "AI27": 106.783,
+    "AH28": 45196,
+    "AI28": 113.749,
+    "AH29": 45203,
+    "AI29": 120.733,
+    "AH30": 45210,
+    "AI30": 115.618,
+    "AH31": 45217,
+    "AI31": 111.384,
+    "AH32": 45224,
+    "AI32": 118.308,
+    "AH33": 45231,
+    "AI33": 125.234,
+    "AH34": 45238,
+    "AI34": 120.318,
+    "AH35": 45245,
+    "AI35": 115.656,
+    "AH36": 45252,
+    "AI36": 122.774,
+    "AH37": 45259,
+    "AI37": 130.437,
+    "AH38": 45266,
+    "AI38": 125.587,
+    "AH39": 45273,
+    "AI39": 120.898,
+    "AH40": 45280,
+    "AI40": 127.954,
+    "AJ1": 1,
+    "AK1": 54.587,
+    "AJ2": 8,
+    "AK2": 46.346,
+    "AJ3": 15,
+    "AK3": 65.991,
+    "AJ4": 22,
+    "AK4": 53.83,
+    "AJ5": 29,
+    "AK5": 68.969,
+    "AJ6": 36,
+    "AK6": 67.859,
+    "AJ7": 43,
+    "AK7": 67.793,
+    "AJ8": 2,
+    "AK8": 58.358,
+    "AJ9": 9,
+    "AK9": 45.738,
+    "AJ10": 16,
+    "AK10": 64.747,
+    "AJ11": 23,
+    "AK11": 57.471,
+    "AJ12": 30,
+    "AK12": 65.107,
+    "AJ13": 37,
+    "AK13": 73.231,
+    "AJ14": 44,
+    "AK14": 65.08,
+    "AJ15": 3,
+    "AK15": 58.975,
+    "AJ16": 10,
+    "AK16": 48,
+    "AJ17": 17,
+    "AK17": 62.405,
+    "AJ18": 24,
+    "AK18": 61.995,
+    "AJ19": 31,
+    "AK19": 61.787,
+    "AJ20": 38,
+    "AK20": 76.55,
+    "AJ21": 45,
+    "AK21": 65.241,
+    "AJ22": 4,
+    "AK22": 58.588,
+    "AJ23": 11,
+    "AK23": 52.271,
+    "AJ24": 18,
+    "AK24": 58.478,
+    "AJ25": 25,
+    "AK25": 66.287,
+    "AJ26": 32,
+    "AK26": 59.273,
+    "AJ27": 39,
+    "AK27": 77.021,
+    "AJ28": 46,
+    "AK28": 66.043,
+    "AJ29": 5,
+    "AK29": 56.938,
+    "AJ30": 12,
+    "AK30": 56.472,
+    "AJ31": 19,
+    "AK31": 54.829,
+    "AJ32": 26,
+    "AK32": 69.539,
+    "AJ33": 33,
+    "AK33": 58.457,
+    "AJ34": 40,
+    "AK34": 77.2,
+    "AJ35": 47,
+    "AK35": 69.707,
+    "AJ36": 6,
+    "AK36": 53.395,
+    "AJ37": 13,
+    "AK37": 60.368,
+    "AJ38": 20,
+    "AK38": 52.393,
+    "AJ39": 27,
+    "AK39": 71.711,
+    "AJ40": 34,
+    "AK40": 59.746,
+    "AJ41": 41,
+    "AK41": 73.741,
+    "AJ42": 48,
+    "AK42": 74.458,
+    "AJ43": 7,
+    "AK43": 49.761,
+    "AJ44": 14,
+    "AK44": 64.009,
+    "AJ45": 21,
+    "AK45": 52.405,
+    "AJ46": 28,
+    "AK46": 71.262,
+    "AJ47": 35,
+    "AK47": 62.938,
+    "AJ48": 42,
+    "AK48": 70.95,
+    "AL1": 1,
+    "AM1": 4,
+    "AL2": 2,
+    "AM2": 6,
+    "AL3": 3,
+    "AM3": 9,
+    "AL4": 4,
+    "AM4": 11,
+    "AL5": 5,
+    "AM5": 14,
+    "AL6": 6,
+    "AM6": 16
+  },
+  "casos": [
+    {
+      "f": "=FORECAST.ETS.ADD(31,U1:U30,T1:T30)",
+      "lo": 72.0118717451578
+    },
+    {
+      "f": "=FORECAST.ETS.ADD(33,U1:U30,T1:T30)",
+      "lo": 76.5383648727764
+    },
+    {
+      "f": "=FORECAST.ETS.ADD(31,U1:U30,T1:T30,0)",
+      "lo": 71.8771978055904
+    },
+    {
+      "f": "=FORECAST.ETS.MULT(31,U1:U30,T1:T30)",
+      "lo": 72.0927880177926
+    },
+    {
+      "f": "=FORECAST.ETS.MULT(33,U1:U30,T1:T30,0)",
+      "lo": 75.8356805642111
+    },
+    {
+      "f": "=FORECAST.ETS.PI.ADD(31,U1:U30,T1:T30)",
+      "lo": 0.562212709069542
+    },
+    {
+      "f": "=FORECAST.ETS.PI.ADD(33,U1:U30,T1:T30,0.9)",
+      "lo": 0.451655208184164
+    },
+    {
+      "f": "=FORECAST.ETS.PI.MULT(31,U1:U30,T1:T30)",
+      "lo": 0.955637527138933
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(U1:U30,T1:T30,1)",
+      "lo": 0.0029296875
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(U1:U30,T1:T30,2)",
+      "lo": 1
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(U1:U30,T1:T30,3)",
+      "lo": 0.9482421875
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(U1:U30,T1:T30,4)",
+      "lo": 0.112746717369639
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(U1:U30,T1:T30,5)",
+      "lo": 0.00474711804708623
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(U1:U30,T1:T30,6)",
+      "lo": 0.221845273098675
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(U1:U30,T1:T30,7)",
+      "lo": 0.341323982259876
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(U1:U30,T1:T30,8)",
+      "lo": 1
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(U1:U30,T1:T30,1)",
+      "lo": 0.25
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(U1:U30,T1:T30,2)",
+      "lo": 0
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(U1:U30,T1:T30,3)",
+      "lo": 0.9423828125
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(U1:U30,T1:T30,4)",
+      "lo": 0.216064957120391
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(U1:U30,T1:T30,5)",
+      "lo": 0.00942166619595895
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(U1:U30,T1:T30,6)",
+      "lo": 0.425138669556816
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(U1:U30,T1:T30,7)",
+      "lo": 0.615635905259799
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(U1:U30,T1:T30,8)",
+      "lo": 1
+    },
+    {
+      "f": "=FORECAST.ETS.SEASONALITY(U1:U30,T1:T30)",
+      "lo": 11
+    },
+    {
+      "f": "=FORECAST.ETS.ADD(49,W1:W48,V1:V48)",
+      "lo": 79.2865981143524
+    },
+    {
+      "f": "=FORECAST.ETS.ADD(51,W1:W48,V1:V48)",
+      "lo": 83.5421125452058
+    },
+    {
+      "f": "=FORECAST.ETS.ADD(49,W1:W48,V1:V48,0)",
+      "lo": 79.209
+    },
+    {
+      "f": "=FORECAST.ETS.MULT(49,W1:W48,V1:V48)",
+      "lo": 79.7665901651335
+    },
+    {
+      "f": "=FORECAST.ETS.MULT(51,W1:W48,V1:V48,0)",
+      "lo": 88.711
+    },
+    {
+      "f": "=FORECAST.ETS.PI.ADD(49,W1:W48,V1:V48)",
+      "lo": 0.832904463989678
+    },
+    {
+      "f": "=FORECAST.ETS.PI.ADD(51,W1:W48,V1:V48,0.9)",
+      "lo": 0.71359609921619
+    },
+    {
+      "f": "=FORECAST.ETS.PI.MULT(49,W1:W48,V1:V48)",
+      "lo": 1.19962633273448
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(W1:W48,V1:V48,1)",
+      "lo": 0.25
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(W1:W48,V1:V48,2)",
+      "lo": 0
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(W1:W48,V1:V48,3)",
+      "lo": 0.7216796875
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(W1:W48,V1:V48,4)",
+      "lo": 0.148350604451133
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(W1:W48,V1:V48,5)",
+      "lo": 0.00600870174331822
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(W1:W48,V1:V48,6)",
+      "lo": 0.388672133635687
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(W1:W48,V1:V48,7)",
+      "lo": 0.538376320104601
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(W1:W48,V1:V48,8)",
+      "lo": 1
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(W1:W48,V1:V48,1)",
+      "lo": 0.015625
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(W1:W48,V1:V48,2)",
+      "lo": 0.330078125
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(W1:W48,V1:V48,3)",
+      "lo": 1
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(W1:W48,V1:V48,4)",
+      "lo": 0.216375001082196
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(W1:W48,V1:V48,5)",
+      "lo": 0.00890601005802841
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(W1:W48,V1:V48,6)",
+      "lo": 0.566893095226612
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(W1:W48,V1:V48,7)",
+      "lo": 0.790751273499357
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(W1:W48,V1:V48,8)",
+      "lo": 1
+    },
+    {
+      "f": "=FORECAST.ETS.SEASONALITY(W1:W48,V1:V48)",
+      "lo": 12
+    },
+    {
+      "f": "=FORECAST.ETS.ADD(37,Y1:Y36,X1:X36)",
+      "lo": 42.7407865172626
+    },
+    {
+      "f": "=FORECAST.ETS.ADD(39,Y1:Y36,X1:X36)",
+      "lo": 36.0145866577357
+    },
+    {
+      "f": "=FORECAST.ETS.ADD(37,Y1:Y36,X1:X36,0)",
+      "lo": 34.2078571428571
+    },
+    {
+      "f": "=FORECAST.ETS.MULT(37,Y1:Y36,X1:X36)",
+      "lo": 43.3323942052495
+    },
+    {
+      "f": "=FORECAST.ETS.MULT(39,Y1:Y36,X1:X36,0)",
+      "lo": 34.6515714285714
+    },
+    {
+      "f": "=FORECAST.ETS.PI.ADD(37,Y1:Y36,X1:X36)",
+      "lo": 1.09347580432311
+    },
+    {
+      "f": "=FORECAST.ETS.PI.ADD(39,Y1:Y36,X1:X36,0.9)",
+      "lo": 0.882829052459584
+    },
+    {
+      "f": "=FORECAST.ETS.PI.MULT(37,Y1:Y36,X1:X36)",
+      "lo": 0.67833655421483
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(Y1:Y36,X1:X36,1)",
+      "lo": 0.0068359375
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(Y1:Y36,X1:X36,2)",
+      "lo": 1
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(Y1:Y36,X1:X36,3)",
+      "lo": 1
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(Y1:Y36,X1:X36,4)",
+      "lo": 0.0892043782088132
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(Y1:Y36,X1:X36,5)",
+      "lo": 0.0173836340052763
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(Y1:Y36,X1:X36,6)",
+      "lo": 0.443993803268907
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(Y1:Y36,X1:X36,7)",
+      "lo": 0.683545068724495
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(Y1:Y36,X1:X36,8)",
+      "lo": 1
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(Y1:Y36,X1:X36,1)",
+      "lo": 0.03125
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(Y1:Y36,X1:X36,2)",
+      "lo": 0.71484375
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(Y1:Y36,X1:X36,3)",
+      "lo": 0.5390625
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(Y1:Y36,X1:X36,4)",
+      "lo": 0.0652617360452795
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(Y1:Y36,X1:X36,5)",
+      "lo": 0.012447659631706
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(Y1:Y36,X1:X36,6)",
+      "lo": 0.32482493546278
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(Y1:Y36,X1:X36,7)",
+      "lo": 0.451903015026932
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(Y1:Y36,X1:X36,8)",
+      "lo": 1
+    },
+    {
+      "f": "=FORECAST.ETS.SEASONALITY(Y1:Y36,X1:X36)",
+      "lo": 6
+    },
+    {
+      "f": "=FORECAST.ETS.ADD(31,AA1:AA30,Z1:Z30)",
+      "lo": 99.8948984375
+    },
+    {
+      "f": "=FORECAST.ETS.ADD(33,AA1:AA30,Z1:Z30)",
+      "lo": 101.0543203125
+    },
+    {
+      "f": "=FORECAST.ETS.ADD(31,AA1:AA30,Z1:Z30,0)",
+      "lo": 97.1746896551724
+    },
+    {
+      "f": "=FORECAST.ETS.MULT(31,AA1:AA30,Z1:Z30)",
+      "lo": 100.051990144354
+    },
+    {
+      "f": "=FORECAST.ETS.MULT(33,AA1:AA30,Z1:Z30,0)",
+      "lo": 96.9640689655172
+    },
+    {
+      "f": "=FORECAST.ETS.PI.ADD(31,AA1:AA30,Z1:Z30)",
+      "lo": 4.99116910046439
+    },
+    {
+      "f": "=FORECAST.ETS.PI.ADD(33,AA1:AA30,Z1:Z30,0.9)",
+      "lo": 4.07236554098698
+    },
+    {
+      "f": "=FORECAST.ETS.PI.MULT(31,AA1:AA30,Z1:Z30)",
+      "lo": 5.12743741359289
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(AA1:AA30,Z1:Z30,1)",
+      "lo": 0
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(AA1:AA30,Z1:Z30,2)",
+      "lo": 0
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(AA1:AA30,Z1:Z30,3)",
+      "lo": 0.8984375
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(AA1:AA30,Z1:Z30,4)",
+      "lo": 0.422024150228954
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(AA1:AA30,Z1:Z30,5)",
+      "lo": 0.0171966227362461
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(AA1:AA30,Z1:Z30,6)",
+      "lo": 1.711609375
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(AA1:AA30,Z1:Z30,7)",
+      "lo": 3.21210606138991
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(AA1:AA30,Z1:Z30,8)",
+      "lo": 1
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(AA1:AA30,Z1:Z30,1)",
+      "lo": 0.0625
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(AA1:AA30,Z1:Z30,2)",
+      "lo": 0
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(AA1:AA30,Z1:Z30,3)",
+      "lo": 0.9248046875
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(AA1:AA30,Z1:Z30,4)",
+      "lo": 0.450850943365866
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(AA1:AA30,Z1:Z30,5)",
+      "lo": 0.0183472322165219
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(AA1:AA30,Z1:Z30,6)",
+      "lo": 1.8285226117367
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(AA1:AA30,Z1:Z30,7)",
+      "lo": 3.34052735959054
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(AA1:AA30,Z1:Z30,8)",
+      "lo": 1
+    },
+    {
+      "f": "=FORECAST.ETS.SEASONALITY(AA1:AA30,Z1:Z30)",
+      "lo": 14
+    },
+    {
+      "f": "=FORECAST.ETS.ADD(31,AC1:AC25,AB1:AB25)",
+      "lo": 72.258606134588
+    },
+    {
+      "f": "=FORECAST.ETS.ADD(33,AC1:AC25,AB1:AB25)",
+      "lo": 76.6183961736505
+    },
+    {
+      "f": "=FORECAST.ETS.ADD(31,AC1:AC25,AB1:AB25,0)",
+      "lo": 71.8837011107276
+    },
+    {
+      "f": "=FORECAST.ETS.MULT(31,AC1:AC25,AB1:AB25)",
+      "lo": 71.7020541486917
+    },
+    {
+      "f": "=FORECAST.ETS.MULT(33,AC1:AC25,AB1:AB25,0)",
+      "lo": 75.8421838693483
+    },
+    {
+      "f": "=FORECAST.ETS.PI.ADD(31,AC1:AC25,AB1:AB25)",
+      "lo": 0.64216012059407
+    },
+    {
+      "f": "=FORECAST.ETS.PI.ADD(33,AC1:AC25,AB1:AB25,0.9)",
+      "lo": 0.510668120319423
+    },
+    {
+      "f": "=FORECAST.ETS.PI.MULT(31,AC1:AC25,AB1:AB25)",
+      "lo": 1.27545793647235
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(AC1:AC25,AB1:AB25,1)",
+      "lo": 0
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(AC1:AC25,AB1:AB25,2)",
+      "lo": 0.0302734375
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(AC1:AC25,AB1:AB25,3)",
+      "lo": 0.4873046875
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(AC1:AC25,AB1:AB25,4)",
+      "lo": 0.13645908140766
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(AC1:AC25,AB1:AB25,5)",
+      "lo": 0.00560639100063711
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(AC1:AC25,AB1:AB25,6)",
+      "lo": 0.268502736824057
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(AC1:AC25,AB1:AB25,7)",
+      "lo": 0.413828378876691
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(AC1:AC25,AB1:AB25,8)",
+      "lo": 1
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(AC1:AC25,AB1:AB25,1)",
+      "lo": 0.25
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(AC1:AC25,AB1:AB25,2)",
+      "lo": 0
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(AC1:AC25,AB1:AB25,3)",
+      "lo": 0.986328125
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(AC1:AC25,AB1:AB25,4)",
+      "lo": 0.291734244892264
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(AC1:AC25,AB1:AB25,5)",
+      "lo": 0.0122745802323813
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(AC1:AC25,AB1:AB25,6)",
+      "lo": 0.574028803146228
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(AC1:AC25,AB1:AB25,7)",
+      "lo": 0.821560004591647
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(AC1:AC25,AB1:AB25,8)",
+      "lo": 1
+    },
+    {
+      "f": "=FORECAST.ETS.SEASONALITY(AC1:AC25,AB1:AB25)",
+      "lo": 11
+    },
+    {
+      "f": "=FORECAST.ETS.ADD(25,AE1:AE28,AD1:AD28)",
+      "lo": 59.3958333333334
+    },
+    {
+      "f": "=FORECAST.ETS.ADD(27,AE1:AE28,AD1:AD28)",
+      "lo": 64.7826666666667
+    },
+    {
+      "f": "=FORECAST.ETS.ADD(25,AE1:AE28,AD1:AD28,0)",
+      "lo": 59.8877352835879
+    },
+    {
+      "f": "=FORECAST.ETS.MULT(25,AE1:AE28,AD1:AD28)",
+      "lo": 59.4439314663019
+    },
+    {
+      "f": "=FORECAST.ETS.MULT(27,AE1:AE28,AD1:AD28,0)",
+      "lo": 63.831387457501
+    },
+    {
+      "f": "=FORECAST.ETS.PI.ADD(25,AE1:AE28,AD1:AD28)",
+      "lo": 0.602719355749294
+    },
+    {
+      "f": "=FORECAST.ETS.PI.ADD(27,AE1:AE28,AD1:AD28,0.9)",
+      "lo": 0.507669747826412
+    },
+    {
+      "f": "=FORECAST.ETS.PI.MULT(25,AE1:AE28,AD1:AD28)",
+      "lo": 1.41717458727936
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(AE1:AE28,AD1:AD28,1)",
+      "lo": 0
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(AE1:AE28,AD1:AD28,2)",
+      "lo": 0.12109375
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(AE1:AE28,AD1:AD28,3)",
+      "lo": 0
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(AE1:AE28,AD1:AD28,4)",
+      "lo": 0.0956290217343505
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(AE1:AE28,AD1:AD28,5)",
+      "lo": 0.00395386103306982
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(AE1:AE28,AD1:AD28,6)",
+      "lo": 0.197543478260877
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(AE1:AE28,AD1:AD28,7)",
+      "lo": 0.402478209270014
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(AE1:AE28,AD1:AD28,8)",
+      "lo": 1
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(AE1:AE28,AD1:AD28,1)",
+      "lo": 0
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(AE1:AE28,AD1:AD28,2)",
+      "lo": 0
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(AE1:AE28,AD1:AD28,3)",
+      "lo": 0
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(AE1:AE28,AD1:AD28,4)",
+      "lo": 0.204497765691213
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(AE1:AE28,AD1:AD28,5)",
+      "lo": 0.00870371833210299
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(AE1:AE28,AD1:AD28,6)",
+      "lo": 0.42243661180013
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(AE1:AE28,AD1:AD28,7)",
+      "lo": 0.849753697471927
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(AE1:AE28,AD1:AD28,8)",
+      "lo": 1
+    },
+    {
+      "f": "=FORECAST.ETS.SEASONALITY(AE1:AE28,AD1:AD28)",
+      "lo": 12
+    },
+    {
+      "f": "=FORECAST.ETS.ADD(46023,AG1:AG36,AF1:AF36)",
+      "lo": 333.299390869141
+    },
+    {
+      "f": "=FORECAST.ETS.ADD(46082,AG1:AG36,AF1:AF36)",
+      "lo": 317.501166171789
+    },
+    {
+      "f": "=FORECAST.ETS.ADD(46023,AG1:AG36,AF1:AF36,0)",
+      "lo": 341.403
+    },
+    {
+      "f": "=FORECAST.ETS.MULT(46023,AG1:AG36,AF1:AF36)",
+      "lo": 334.712165056127
+    },
+    {
+      "f": "=FORECAST.ETS.MULT(46082,AG1:AG36,AF1:AF36,0)",
+      "lo": 354.489
+    },
+    {
+      "f": "=FORECAST.ETS.PI.ADD(46023,AG1:AG36,AF1:AF36)",
+      "lo": 2.19321771069468
+    },
+    {
+      "f": "=FORECAST.ETS.PI.ADD(46082,AG1:AG36,AF1:AF36,0.9)",
+      "lo": 1.62575892169059
+    },
+    {
+      "f": "=FORECAST.ETS.PI.MULT(46023,AG1:AG36,AF1:AF36)",
+      "lo": 3.66848828279734
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(AG1:AG36,AF1:AF36,1)",
+      "lo": 0
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(AG1:AG36,AF1:AF36,2)",
+      "lo": 0.2490234375
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(AG1:AG36,AF1:AF36,3)",
+      "lo": 0.5556640625
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(AG1:AG36,AF1:AF36,4)",
+      "lo": 0.105032638214299
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(AG1:AG36,AF1:AF36,5)",
+      "lo": 0.00349747004146136
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(AG1:AG36,AF1:AF36,6)",
+      "lo": 0.931148318917418
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(AG1:AG36,AF1:AF36,7)",
+      "lo": 1.33812442209981
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(AG1:AG36,AF1:AF36,8)",
+      "lo": 1
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(AG1:AG36,AF1:AF36,1)",
+      "lo": 0
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(AG1:AG36,AF1:AF36,2)",
+      "lo": 0.2490234375
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(AG1:AG36,AF1:AF36,3)",
+      "lo": 1
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(AG1:AG36,AF1:AF36,4)",
+      "lo": 0.182762579088676
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(AG1:AG36,AF1:AF36,5)",
+      "lo": 0.00608493890468217
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(AG1:AG36,AF1:AF36,6)",
+      "lo": 1.62024939269082
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(AG1:AG36,AF1:AF36,7)",
+      "lo": 2.3755890515282
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(AG1:AG36,AF1:AF36,8)",
+      "lo": 1
+    },
+    {
+      "f": "=FORECAST.ETS.SEASONALITY(AG1:AG36,AF1:AF36)",
+      "lo": 12
+    },
+    {
+      "f": "=FORECAST.ETS.ADD(45287,AI1:AI40,AH1:AH40)",
+      "lo": 135.035414693401
+    },
+    {
+      "f": "=FORECAST.ETS.ADD(45301,AI1:AI40,AH1:AH40)",
+      "lo": 125.144873742983
+    },
+    {
+      "f": "=FORECAST.ETS.ADD(45287,AI1:AI40,AH1:AH40,0)",
+      "lo": 127.800183691472
+    },
+    {
+      "f": "=FORECAST.ETS.MULT(45287,AI1:AI40,AH1:AH40)",
+      "lo": 138.021826506074
+    },
+    {
+      "f": "=FORECAST.ETS.MULT(45301,AI1:AI40,AH1:AH40,0)",
+      "lo": 129.900183691472
+    },
+    {
+      "f": "=FORECAST.ETS.PI.ADD(45287,AI1:AI40,AH1:AH40)",
+      "lo": 0.448159074078291
+    },
+    {
+      "f": "=FORECAST.ETS.PI.ADD(45301,AI1:AI40,AH1:AH40,0.9)",
+      "lo": 0.352454608053307
+    },
+    {
+      "f": "=FORECAST.ETS.PI.MULT(45287,AI1:AI40,AH1:AH40)",
+      "lo": 1.46457726232069
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(AI1:AI40,AH1:AH40,1)",
+      "lo": 0.3232421875
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(AI1:AI40,AH1:AH40,2)",
+      "lo": 0
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(AI1:AI40,AH1:AH40,3)",
+      "lo": 0.5
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(AI1:AI40,AH1:AH40,4)",
+      "lo": 0.0265617018624641
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(AI1:AI40,AH1:AH40,5)",
+      "lo": 0.0013710737086446
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(AI1:AI40,AH1:AH40,6)",
+      "lo": 0.15757100536968
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(AI1:AI40,AH1:AH40,7)",
+      "lo": 0.276185024651288
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(AI1:AI40,AH1:AH40,8)",
+      "lo": 7
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(AI1:AI40,AH1:AH40,1)",
+      "lo": 0
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(AI1:AI40,AH1:AH40,2)",
+      "lo": 0.2490234375
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(AI1:AI40,AH1:AH40,3)",
+      "lo": 0
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(AI1:AI40,AH1:AH40,4)",
+      "lo": 0.0914038840891833
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(AI1:AI40,AH1:AH40,5)",
+      "lo": 0.00475422954579316
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(AI1:AI40,AH1:AH40,6)",
+      "lo": 0.542231894070743
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(AI1:AI40,AH1:AH40,7)",
+      "lo": 0.939615770647747
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(AI1:AI40,AH1:AH40,8)",
+      "lo": 7
+    },
+    {
+      "f": "=FORECAST.ETS.SEASONALITY(AI1:AI40,AH1:AH40)",
+      "lo": 20
+    },
+    {
+      "f": "=FORECAST.ETS.ADD(49,AK1:AK48,AJ1:AJ48)",
+      "lo": 79.2865981143524
+    },
+    {
+      "f": "=FORECAST.ETS.ADD(51,AK1:AK48,AJ1:AJ48)",
+      "lo": 83.5421125452058
+    },
+    {
+      "f": "=FORECAST.ETS.ADD(49,AK1:AK48,AJ1:AJ48,0)",
+      "lo": 79.209
+    },
+    {
+      "f": "=FORECAST.ETS.MULT(49,AK1:AK48,AJ1:AJ48)",
+      "lo": 79.7665901651335
+    },
+    {
+      "f": "=FORECAST.ETS.MULT(51,AK1:AK48,AJ1:AJ48,0)",
+      "lo": 88.711
+    },
+    {
+      "f": "=FORECAST.ETS.PI.ADD(49,AK1:AK48,AJ1:AJ48)",
+      "lo": 0.822545365056712
+    },
+    {
+      "f": "=FORECAST.ETS.PI.ADD(51,AK1:AK48,AJ1:AJ48,0.9)",
+      "lo": 0.708900628603303
+    },
+    {
+      "f": "=FORECAST.ETS.PI.MULT(49,AK1:AK48,AJ1:AJ48)",
+      "lo": 1.33215053566376
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(AK1:AK48,AJ1:AJ48,1)",
+      "lo": 0.25
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(AK1:AK48,AJ1:AJ48,2)",
+      "lo": 0
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(AK1:AK48,AJ1:AJ48,3)",
+      "lo": 0.7216796875
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(AK1:AK48,AJ1:AJ48,4)",
+      "lo": 0.148350604451133
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(AK1:AK48,AJ1:AJ48,5)",
+      "lo": 0.00600870174331822
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(AK1:AK48,AJ1:AJ48,6)",
+      "lo": 0.388672133635687
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(AK1:AK48,AJ1:AJ48,7)",
+      "lo": 0.538376320104601
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(AK1:AK48,AJ1:AJ48,8)",
+      "lo": 1
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(AK1:AK48,AJ1:AJ48,1)",
+      "lo": 0.015625
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(AK1:AK48,AJ1:AJ48,2)",
+      "lo": 0.330078125
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(AK1:AK48,AJ1:AJ48,3)",
+      "lo": 1
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(AK1:AK48,AJ1:AJ48,4)",
+      "lo": 0.216375001082196
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(AK1:AK48,AJ1:AJ48,5)",
+      "lo": 0.00890601005802841
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(AK1:AK48,AJ1:AJ48,6)",
+      "lo": 0.566893095226612
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(AK1:AK48,AJ1:AJ48,7)",
+      "lo": 0.790751273499357
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(AK1:AK48,AJ1:AJ48,8)",
+      "lo": 1
+    },
+    {
+      "f": "=FORECAST.ETS.SEASONALITY(AK1:AK48,AJ1:AJ48)",
+      "lo": 12
+    },
+    {
+      "f": "=FORECAST.ETS.ADD(7,AM1:AM6,AL1:AL6)",
+      "lo": 19
+    },
+    {
+      "f": "=FORECAST.ETS.ADD(9,AM1:AM6,AL1:AL6)",
+      "lo": 24
+    },
+    {
+      "f": "=FORECAST.ETS.ADD(7,AM1:AM6,AL1:AL6,0)",
+      "lo": 18.4
+    },
+    {
+      "f": "=FORECAST.ETS.MULT(7,AM1:AM6,AL1:AL6)",
+      "lo": 19.0525893215576
+    },
+    {
+      "f": "=FORECAST.ETS.MULT(9,AM1:AM6,AL1:AL6,0)",
+      "lo": 23.2
+    },
+    {
+      "f": "=FORECAST.ETS.PI.ADD(7,AM1:AM6,AL1:AL6)",
+      "lo": 0
+    },
+    {
+      "f": "=FORECAST.ETS.PI.ADD(9,AM1:AM6,AL1:AL6,0.9)",
+      "lo": 0
+    },
+    {
+      "f": "=FORECAST.ETS.PI.MULT(7,AM1:AM6,AL1:AL6)",
+      "lo": 0.260835270043554
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(AM1:AM6,AL1:AL6,1)",
+      "lo": 0
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(AM1:AM6,AL1:AL6,2)",
+      "lo": 0
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(AM1:AM6,AL1:AL6,3)",
+      "lo": 0
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(AM1:AM6,AL1:AL6,4)",
+      "lo": 0
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(AM1:AM6,AL1:AL6,5)",
+      "lo": 0
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(AM1:AM6,AL1:AL6,6)",
+      "lo": 0
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(AM1:AM6,AL1:AL6,7)",
+      "lo": 0
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(AM1:AM6,AL1:AL6,8)",
+      "lo": 1
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(AM1:AM6,AL1:AL6,1)",
+      "lo": 0
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(AM1:AM6,AL1:AL6,2)",
+      "lo": 0
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(AM1:AM6,AL1:AL6,3)",
+      "lo": 1
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(AM1:AM6,AL1:AL6,4)",
+      "lo": 0.0564885579196285
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(AM1:AM6,AL1:AL6,5)",
+      "lo": 0.0124225512853394
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(AM1:AM6,AL1:AL6,6)",
+      "lo": 0.141221394799071
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(AM1:AM6,AL1:AL6,7)",
+      "lo": 0.170035210651317
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.MULT(AM1:AM6,AL1:AL6,8)",
+      "lo": 1
+    },
+    {
+      "f": "=FORECAST.ETS.SEASONALITY(AM1:AM6,AL1:AL6)",
+      "lo": 2
+    },
+    {
+      "f": "=FORECAST.ETS.ADD(25,AE1:AE28,AD1:AD28,1,1,1)",
+      "lo": 59.3958333333334
+    },
+    {
+      "f": "=FORECAST.ETS.ADD(25,AE1:AE28,AD1:AD28,1,1,2)",
+      "lo": 59.08
+    },
+    {
+      "f": "=FORECAST.ETS.ADD(25,AE1:AE28,AD1:AD28,1,1,3)",
+      "lo": 59.08
+    },
+    {
+      "f": "=FORECAST.ETS.ADD(25,AE1:AE28,AD1:AD28,1,1,4)",
+      "lo": 59.5822673411369
+    },
+    {
+      "f": "=FORECAST.ETS.ADD(25,AE1:AE28,AD1:AD28,1,1,5)",
+      "lo": 59.2638206250448
+    },
+    {
+      "f": "=FORECAST.ETS.ADD(25,AE1:AE28,AD1:AD28,1,1,6)",
+      "lo": 60.2543617042062
+    },
+    {
+      "f": "=FORECAST.ETS.ADD(25,AE1:AE28,AD1:AD28,1,1,7)",
+      "lo": 67.2775212402344
+    },
+    {
+      "f": "=FORECAST.ETS.ADD(31,AC1:AC25,AB1:AB25,1,0)",
+      "lo": 72.779447930613
+    },
+    {
+      "f": "=FORECAST.ETS.ADD(31,AC1:AC25,AB1:AB25,1,1)",
+      "lo": 72.258606134588
+    },
+    {
+      "f": "=FORECAST.ETS.ADD(31,AC1:AC25,AB1:AB25,0,0)",
+      "lo": 64.3184199818748
+    },
+    {
+      "f": "=FORECAST.ETS.ADD(60,W1:W48,V1:V48,0)",
+      "lo": 131.47
+    },
+    {
+      "f": "=FORECAST.ETS.ADD(60,W1:W48,V1:V48,1)",
+      "lo": 80.2228116663075
+    },
+    {
+      "f": "=FORECAST.ETS.ADD(60,W1:W48,V1:V48,2)",
+      "lo": 131.871151789916
+    },
+    {
+      "f": "=FORECAST.ETS.ADD(60,W1:W48,V1:V48,3)",
+      "lo": 131.737589546383
+    },
+    {
+      "f": "=FORECAST.ETS.ADD(60,W1:W48,V1:V48,4)",
+      "lo": 136.32584447106
+    },
+    {
+      "f": "=FORECAST.ETS.ADD(60,W1:W48,V1:V48,6)",
+      "lo": 158.973793394386
+    },
+    {
+      "f": "=FORECAST.ETS.ADD(60,W1:W48,V1:V48,12)",
+      "lo": 80.2228116663075
+    },
+    {
+      "f": "=FORECAST.ETS.ADD(60,W1:W48,V1:V48,24)",
+      "lo": 80.7720000000001
+    },
+    {
+      "f": "=FORECAST.ETS.MULT(60,W1:W48,V1:V48,0)",
+      "lo": 131.47
+    },
+    {
+      "f": "=FORECAST.ETS.MULT(60,W1:W48,V1:V48,4)",
+      "lo": 128.045228873226
+    },
+    {
+      "f": "=FORECAST.ETS.MULT(60,W1:W48,V1:V48,12)",
+      "lo": 80.205455820266
+    },
+    {
+      "f": "=FORECAST.ETS.PI.ADD(60,W1:W48,V1:V48,0.5)",
+      "lo": 0.309849085070368
+    },
+    {
+      "f": "=FORECAST.ETS.PI.ADD(60,W1:W48,V1:V48,0.8)",
+      "lo": 0.626908243787796
+    },
+    {
+      "f": "=FORECAST.ETS.PI.ADD(60,W1:W48,V1:V48,0.99)",
+      "lo": 1.31372087675611
+    },
+    {
+      "f": "=FORECAST.ETS(60,W1:W48,V1:V48)",
+      "lo": 80.2228116663075
+    },
+    {
+      "f": "=FORECAST.ETS.CONFINT(60,W1:W48,V1:V48,0.95)",
+      "lo": 0.938848664151365
+    },
+    {
+      "f": "=FORECAST.ETS.STAT(W1:W48,V1:V48,7)",
+      "lo": 0.538376320104601
+    },
+    {
+      "f": "=FORECAST.ETS.ADD(60,W1:W48,T1:T30)",
+      "lo": {
+        "error": "#NUM!"
+      }
+    },
+    {
+      "f": "=FORECAST.ETS.ADD(20,W1:W48,V1:V48)",
+      "lo": 52.393
+    },
+    {
+      "f": "=FORECAST.ETS.ADD(60,W1:W48,V1:V48,-1)",
+      "lo": {
+        "error": "#NUM!"
+      }
+    },
+    {
+      "f": "=FORECAST.ETS.ADD(60,W1:W48,V1:V48,1,2)",
+      "lo": {
+        "error": "#NUM!"
+      }
+    },
+    {
+      "f": "=FORECAST.ETS.ADD(60,W1:W48,V1:V48,1,1,8)",
+      "lo": {
+        "error": "#NUM!"
+      }
+    },
+    {
+      "f": "=FORECAST.ETS.PI.ADD(60,W1:W48,V1:V48,1)",
+      "lo": 1.32986133353198
+    },
+    {
+      "f": "=FORECAST.ETS.PI.ADD(60,W1:W48,V1:V48,0)",
+      "lo": 0
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(W1:W48,V1:V48,9)",
+      "lo": 12
+    },
+    {
+      "f": "=FORECAST.ETS.STAT.ADD(W1:W48,V1:V48,0)",
+      "lo": {
+        "error": "#NUM!"
+      }
+    }
+  ],
+  "intervalos": {
+    "=FORECAST.ETS.PI.ADD(31,U1:U30,T1:T30)": {
+      "media": 0.536121224248982,
+      "min": 0.491450144745116,
+      "max": 0.599161985686166,
+      "n": 25
+    },
+    "=FORECAST.ETS.PI.ADD(33,U1:U30,T1:T30,0.9)": {
+      "media": 0.4391710868842034,
+      "min": 0.399414225516892,
+      "max": 0.476599674329648,
+      "n": 25
+    },
+    "=FORECAST.ETS.PI.MULT(31,U1:U30,T1:T30)": {
+      "media": 0.9902928656395333,
+      "min": 0.911973590776057,
+      "max": 1.07401368633096,
+      "n": 25
+    },
+    "=FORECAST.ETS.PI.ADD(49,W1:W48,V1:V48)": {
+      "media": 0.8268070098464073,
+      "min": 0.738331528536307,
+      "max": 0.907103415510562,
+      "n": 25
+    },
+    "=FORECAST.ETS.PI.ADD(51,W1:W48,V1:V48,0.9)": {
+      "media": 0.706543496037457,
+      "min": 0.631156308915834,
+      "max": 0.814730438441899,
+      "n": 25
+    },
+    "=FORECAST.ETS.PI.MULT(49,W1:W48,V1:V48)": {
+      "media": 1.220392341014869,
+      "min": 1.10680765475117,
+      "max": 1.34439671949984,
+      "n": 25
+    },
+    "=FORECAST.ETS.PI.ADD(37,Y1:Y36,X1:X36)": {
+      "media": 1.065222015145502,
+      "min": 0.951495691935605,
+      "max": 1.16638945526429,
+      "n": 25
+    },
+    "=FORECAST.ETS.PI.ADD(39,Y1:Y36,X1:X36,0.9)": {
+      "media": 0.8826072520045242,
+      "min": 0.783291232621778,
+      "max": 0.951983265397828,
+      "n": 25
+    },
+    "=FORECAST.ETS.PI.MULT(37,Y1:Y36,X1:X36)": {
+      "media": 0.7115158270540909,
+      "min": 0.663728411367401,
+      "max": 0.769068140497126,
+      "n": 25
+    },
+    "=FORECAST.ETS.PI.ADD(31,AA1:AA30,Z1:Z30)": {
+      "media": 4.9670741718979095,
+      "min": 4.50031208801876,
+      "max": 5.38127092356818,
+      "n": 25
+    },
+    "=FORECAST.ETS.PI.ADD(33,AA1:AA30,Z1:Z30,0.9)": {
+      "media": 4.110658519389401,
+      "min": 3.75424451229917,
+      "max": 4.40008812707551,
+      "n": 25
+    },
+    "=FORECAST.ETS.PI.MULT(31,AA1:AA30,Z1:Z30)": {
+      "media": 5.168572929849111,
+      "min": 4.57210203513911,
+      "max": 5.87409956015701,
+      "n": 25
+    },
+    "=FORECAST.ETS.PI.ADD(31,AC1:AC25,AB1:AB25)": {
+      "media": 0.6404086839733929,
+      "min": 0.562688292501761,
+      "max": 0.702840499325063,
+      "n": 25
+    },
+    "=FORECAST.ETS.PI.ADD(33,AC1:AC25,AB1:AB25,0.9)": {
+      "media": 0.5361970031685661,
+      "min": 0.490490104614693,
+      "max": 0.598704668410448,
+      "n": 25
+    },
+    "=FORECAST.ETS.PI.MULT(31,AC1:AC25,AB1:AB25)": {
+      "media": 1.281275022020377,
+      "min": 1.17069243730683,
+      "max": 1.42148878811119,
+      "n": 25
+    },
+    "=FORECAST.ETS.PI.ADD(25,AE1:AE28,AD1:AD28)": {
+      "media": 0.6309011840223886,
+      "min": 0.578283424415055,
+      "max": 0.679478826732066,
+      "n": 25
+    },
+    "=FORECAST.ETS.PI.ADD(27,AE1:AE28,AD1:AD28,0.9)": {
+      "media": 0.5109889980806964,
+      "min": 0.470015813992418,
+      "max": 0.551989884452993,
+      "n": 25
+    },
+    "=FORECAST.ETS.PI.MULT(25,AE1:AE28,AD1:AD28)": {
+      "media": 1.320148727815701,
+      "min": 1.16540188449542,
+      "max": 1.44866073204897,
+      "n": 25
+    },
+    "=FORECAST.ETS.PI.ADD(46023,AG1:AG36,AF1:AF36)": {
+      "media": 2.0763565313076042,
+      "min": 1.85798076870793,
+      "max": 2.28546115944016,
+      "n": 25
+    },
+    "=FORECAST.ETS.PI.ADD(46082,AG1:AG36,AF1:AF36,0.9)": {
+      "media": 1.6964586363293683,
+      "min": 1.58935613015166,
+      "max": 1.82966028064357,
+      "n": 25
+    },
+    "=FORECAST.ETS.PI.MULT(46023,AG1:AG36,AF1:AF36)": {
+      "media": 3.6372653911121255,
+      "min": 3.37580934286018,
+      "max": 3.97350237313856,
+      "n": 25
+    },
+    "=FORECAST.ETS.PI.ADD(45287,AI1:AI40,AH1:AH40)": {
+      "media": 0.43221665463239456,
+      "min": 0.405755508412653,
+      "max": 0.472714843812696,
+      "n": 25
+    },
+    "=FORECAST.ETS.PI.ADD(45301,AI1:AI40,AH1:AH40,0.9)": {
+      "media": 0.37350872991068057,
+      "min": 0.349083639269594,
+      "max": 0.402794218145928,
+      "n": 25
+    },
+    "=FORECAST.ETS.PI.MULT(45287,AI1:AI40,AH1:AH40)": {
+      "media": 1.4511630440915473,
+      "min": 1.30680356394868,
+      "max": 1.64464512979811,
+      "n": 25
+    },
+    "=FORECAST.ETS.PI.ADD(49,AK1:AK48,AJ1:AJ48)": {
+      "media": 0.8234859045182982,
+      "min": 0.702518313485427,
+      "max": 0.89991363214132,
+      "n": 25
+    },
+    "=FORECAST.ETS.PI.ADD(51,AK1:AK48,AJ1:AJ48,0.9)": {
+      "media": 0.7068925719585093,
+      "min": 0.656467984650519,
+      "max": 0.754816363834635,
+      "n": 25
+    },
+    "=FORECAST.ETS.PI.MULT(49,AK1:AK48,AJ1:AJ48)": {
+      "media": 1.2307728992424476,
+      "min": 1.16754426079723,
+      "max": 1.31998957862911,
+      "n": 25
+    },
+    "=FORECAST.ETS.PI.ADD(7,AM1:AM6,AL1:AL6)": {
+      "media": 0,
+      "min": 0,
+      "max": 0,
+      "n": 25
+    },
+    "=FORECAST.ETS.PI.ADD(9,AM1:AM6,AL1:AL6,0.9)": {
+      "media": 0,
+      "min": 0,
+      "max": 0,
+      "n": 25
+    },
+    "=FORECAST.ETS.PI.MULT(7,AM1:AM6,AL1:AL6)": {
+      "media": 0.2670087982221151,
+      "min": 0.250616742417897,
+      "max": 0.286973866887021,
+      "n": 25
+    },
+    "=FORECAST.ETS.PI.ADD(60,W1:W48,V1:V48,0.5)": {
+      "media": 0.30370405653733207,
+      "min": 0.277293640004928,
+      "max": 0.334153268593667,
+      "n": 25
+    },
+    "=FORECAST.ETS.PI.ADD(60,W1:W48,V1:V48,0.8)": {
+      "media": 0.5974606843028244,
+      "min": 0.567803319501408,
+      "max": 0.638547899188026,
+      "n": 25
+    },
+    "=FORECAST.ETS.PI.ADD(60,W1:W48,V1:V48,0.99)": {
+      "media": 1.2851307397314193,
+      "min": 1.18614034842469,
+      "max": 1.4358304078325,
+      "n": 25
+    },
+    "=FORECAST.ETS.CONFINT(60,W1:W48,V1:V48,0.95)": {
+      "media": 0.9662133737867181,
+      "min": 0.89069396662768,
+      "max": 1.10415869608653,
+      "n": 25
+    },
+    "=FORECAST.ETS.PI.ADD(60,W1:W48,V1:V48,1)": {
+      "media": 1.6716648570378283,
+      "min": 1.2009185686324,
+      "max": 2.35835027808049,
+      "n": 25
+    },
+    "=FORECAST.ETS.PI.ADD(60,W1:W48,V1:V48,0)": {
+      "media": 0,
+      "min": 0,
+      "max": 0,
+      "n": 25
+    }
+  }
+}

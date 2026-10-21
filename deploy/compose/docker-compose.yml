@@ -1,0 +1,2029 @@
+# Sytue One — Entorno de desarrollo LOCAL (Docker Compose)
+# ---------------------------------------------------------------------------
+# Levanta TODA la suite Sytue-native en un comando, bajo *.sytue.localhost con
+# TLS local (mkcert) vía Traefik. Stack ÚNICO: Go (backend) + Astro/Preact
+# (frontend) + PostgreSQL (estado/colas/caché) + S3 (blobs, MinIO en dev).
+#
+# TODOS los puertos se publican en 127.0.0.1, nunca en 0.0.0.0. Hasta el
+# 2026-08-07 eran 27 puertos abiertos a cualquiera que compartiera red: Postgres
+# en 5432, Dragonfly en 6379, MinIO en 9000, el IdP en 8081 y el servidor de
+# correo en 25/465/587/993. En una WiFi de oficina eso pasa desapercibido; en la
+# de un aeropuerto o un coworking, cualquiera con la misma IP de red llegaba a
+# la base de datos de desarrollo sin más.
+#
+# Publicar en loopback NO afecta a los contenedores entre sí: se hablan por la
+# red interna de Docker, con sus nombres de servicio. Solo cambia quién llega
+# desde fuera de esta máquina, que es exactamente lo que interesa. Para exponer
+# algo a un móvil de pruebas, se cambia ESE puerto a conciencia y se vuelve a
+# dejar como estaba.
+#
+# SIN motores AGPL (Keycloak/Nextcloud/OnlyOffice/Mattermost/Stalwart FUERA).
+# SIN Redis (servidor). DragonflyDB = cache/pub-sub EFÍMERO de infra (uso
+# interno, ver docs/security.md). LiveKit (Apache-2.0) como SFU de Meet.
+# Cada producto es un servicio Go propio (clean-room) en services/<svc>.
+#
+#   Arranque:   make dev-up    (o: docker compose up -d --build)
+#   Apagado:    make dev-down   ·  Limpieza total: make dev-clean
+#
+# 100% UE. Sin secretos reales: todo via .env (ver .env.example).
+# Puertos según docs/CONVENTIONS.md §6 (NO modificar).
+# ---------------------------------------------------------------------------
+
+name: sytue-one-dev
+
+# --- Anclas reutilizables ----------------------------------------------------
+x-restart: &restart
+  restart: unless-stopped
+
+x-logging: &logging
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+# --- Límites de memoria — DEV-ONLY ------------------------------------------
+# SOLO desarrollo local: acotan el RSS de cada contenedor para que la suite
+# COMPLETA quepa en un local de 8 GB (VM ~6 GiB). En PROD **no aplican**: prod se
+# despliega por Helm (deploy/helm) con sus propios requests/limits por chart.
+# mem_limit fija el tope del cgroup; combinado con GOMEMLIMIT (~50-65% del límite)
+# el GC de Go recorta ANTES de que el kernel mate el proceso por OOM. Se aplican a
+# los servicios Go vía merge de anclas (<<: [*restart, *logging, *mem-go]).
+x-mem-go: &mem-go
+  mem_limit: 128m
+x-mem-go-big: &mem-go-big
+  mem_limit: 256m
+
+# Build context común a TODOS los servicios Go: la RAÍZ del repo (módulo único
+# git.sytue.eu/sytue/one con go.mod en la raíz). El Dockerfile de cada servicio
+# vive en services/<svc>/Dockerfile (multi-stage golang:1.23 -> distroless).
+x-go-build: &go-build
+  context: ../..
+
+# Entorno común a los servicios Go: validan los JWT de Sytue ID (JWKS/discovery),
+# hablan PostgreSQL (pgx) y S3. DRAGONFLY_URL solo la reciben los servicios que
+# usan la capa efímera (hub/chat/docs); sin ella, platform/pkg/cache degrada a no-op.
+x-go-env: &go-env
+  GO_ENV: development
+  LOG_LEVEL: debug
+  OIDC_ISSUER: https://id.sytue.localhost
+  OIDC_JWKS_URL: http://id:8081/.well-known/jwks.json
+  S3_ENDPOINT: http://minio:9000
+  S3_REGION: fr-par
+  S3_ACCESS_KEY: ${MINIO_ROOT_USER}
+  S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+  S3_FORCE_PATH_STYLE: "true"
+  # --- Tuning del runtime Go — DEV-ONLY, env-driven --------------------------
+  # Son variables de ENTORNO (no hardcode en el binario): la MISMA imagen sirve a
+  # prod con OTROS valores (prod = Helm). GOMEMLIMIT = soft-limit del heap (~50-65%
+  # del mem_limit) => el GC se agita antes y evita el OOM del cgroup. GOGC=50
+  # recolecta el doble de a menudo (menos pico de RSS, algo más de CPU: OK en dev).
+  # GOMAXPROCS=2 acota los P (evita que ~12 binarios peleen por todos los cores).
+  # DB_MAX_CONNS=3 acota el pool pgx por servicio (los de prefijo vacío; id y docs
+  # lo reciben con SU prefijo en su propio bloque). Suma de pools << max_connections.
+  GOMEMLIMIT: 64MiB
+  GOGC: "50"
+  GOMAXPROCS: "2"
+  DB_MAX_CONNS: "3"
+
+# Entorno COMPARTIDO de las apps frontend (Astro/Preact). Cada app hace merge
+# (<<: *frontend-env) y sobreescribe SYTUE_OIDC_CLIENT_ID/REDIRECT_URI/
+# POST_LOGOUT_URI con su client confidencial (docs/CONVENTIONS.md §8). Astro SSR
+# expone las SYTUE_* (no-PUBLIC_) vía import.meta.env en dev. El BFF de
+# @sytue/auth exige ISSUER/CLIENT_ID/CLIENT_SECRET/REDIRECT_URI/
+# SESSION_SECRET; sin ellas la app da 500 ("falta SYTUE_OIDC_ISSUER").
+x-frontend-env: &frontend-env
+  NODE_ENV: development          # Astro/Vite leen NODE_ENV; el runtime/bundler es Bun (no Node)
+  PUBLIC_OIDC_ISSUER: https://id.sytue.localhost
+  PUBLIC_HUB_URL: https://hub.sytue.localhost
+  SYTUE_HUB_BASE_URL: https://hub.sytue.localhost  # el que leen los pages (index.astro) para el shell
+  SYTUE_OIDC_ISSUER: https://id.sytue.localhost
+  SYTUE_OIDC_SCOPES: openid profile email offline_access
+  SYTUE_SESSION_SECRET: ${SYTUE_SESSION_SECRET}
+  SYTUE_SECURE_COOKIES: "false"  # dev: cookies no-Secure sobre *.sytue.localhost
+  SYTUE_OIDC_CLIENT_SECRET: ${SYTUE_DEV_CLIENT_SECRET}  # dev: secreto compartido (ver seed de id)
+  # DEV: el BFF (server-side) descubre/canjea contra https://id.sytue.localhost
+  # (alias de Traefik en la red interna); el cert mkcert no lo valida el
+  # contenedor. Solo-dev: NUNCA en staging/prod. Bun honra esta var como Node.
+  NODE_TLS_REJECT_UNAUTHORIZED: "0"
+  # DEV: URLs de backend de datos que consume el BFF (server-side). Van al host
+  # PÚBLICO -api/-dav (no al nombre de servicio interno): el backend redirige el
+  # well-known JMAP/DAV a su PublicURL, así que ese host debe resolver dentro del
+  # contenedor -> se añaden como alias de Traefik (ver red 'sytue', abajo). Sin
+  # esto, cada app cae a su default de PROD (*.sytue.eu) -> 502.
+  SYTUE_JMAP_SESSION_URL: https://mail-api.sytue.localhost/.well-known/jmap
+  SYTUE_CALENDAR_BASE_URL: https://calendar-dav.sytue.localhost
+  SYTUE_CONTACTS_BASE_URL: https://contacts-dav.sytue.localhost
+  SYTUE_ROOMS_API_URL: https://rooms-api.sytue.localhost
+  # Host PÚBLICO de Rooms: el que se pone en el enlace de una videollamada de Calendar,
+  # porque lo abre el invitado en SU navegador (la -api es server-to-server).
+  SYTUE_ROOMS_PUBLIC_URL: https://rooms.sytue.localhost
+  # Alias del nombre anterior al rename: el frontend migra en su propia ola.
+  SYTUE_CHAT_API_URL: https://rooms-api.sytue.localhost
+  SYTUE_MEET_API_URL: https://rooms-api.sytue.localhost
+  # Drive/Docs leen su base con prefijo PUBLIC_ (misma en server y cliente). Al host
+  # público -dav/-api (alias Traefik ⇒ resuelve dentro del contenedor Y en el navegador).
+  PUBLIC_SYTUE_DRIVE_BASE_URL: https://drive-dav.sytue.localhost
+  PUBLIC_SYTUE_DOCS_BASE_URL: https://docs-api.sytue.localhost
+  # Browser-facing (el BFF las devuelve al cliente): host público enrutado por Traefik.
+  SYTUE_ROOMS_WS_URL: wss://rooms-api.sytue.localhost/ws
+  SYTUE_CHAT_WS_URL: wss://rooms-api.sytue.localhost/ws
+  SYTUE_LIVEKIT_URL: wss://rooms-sfu.sytue.localhost
+
+networks:
+  # Red de borde: solo lo que Traefik enruta vive aquí.
+  edge:
+    name: sytue-edge
+  # Red interna: backends, BD, object storage. No expuesta directamente.
+  backend:
+    name: sytue-backend
+    internal: false
+
+volumes:
+  postgres-data:
+  minio-data:
+
+services:
+  # ===========================================================================
+  # TRAEFIK 3 — Reverse proxy + TLS local (mkcert) + routing *.sytue.localhost
+  # ===========================================================================
+  traefik:
+    # Traefik 3 (última estable). >=3.6 NEGOCIA automáticamente la versión de la
+    # API de Docker con el daemon; v3.1 fijaba 1.24 y los daemons modernos
+    # (OrbStack exige >=1.40) la rechazaban, dejando el provider docker sin
+    # descubrir routers (todo 404). Ver docs/operations.md (CONVENTIONS §3: Traefik 3).
+    image: traefik:v3.7.13@sha256:1c32e7c368204fd72812152ebdd2ac0425993df6fd982317deb02e48f2d5423c
+    <<: [*restart, *logging]
+    mem_limit: 192m              # DEV-ONLY (prod: Helm)
+    environment:
+      GOMEMLIMIT: 128MiB         # DEV-ONLY: Traefik es Go; el GC recorta antes del OOM
+    command:
+      - "--configFile=/etc/traefik/traefik.yml"
+    ports:
+      - "127.0.0.1:80:80"      # HTTP -> redirect a HTTPS
+      - "127.0.0.1:443:443"    # HTTPS (TLS mkcert)
+      - "127.0.0.1:8080:8080"  # Dashboard Traefik
+    networks:
+      edge:
+      backend:
+        # Alias DEV: los BFF de las apps (@sytue/auth, server-side) descubren el
+        # issuer y canjean el code contra https://id.sytue.localhost. Ese host solo
+        # resuelve en la máquina anfitriona (mkcert), NO dentro de los contenedores.
+        # Con estos aliases Traefik responde a esos nombres desde la red interna y
+        # enruta al servicio real. El cert mkcert no lo valida el contenedor: en dev
+        # se desactiva la verificación TLS (NODE_TLS_REJECT_UNAUTHORIZED). Además de
+        # id/hub, los BFF de datos llaman a los hosts públicos -api/-dav (a los que el
+        # backend redirige el well-known JMAP/DAV), así que también deben resolver aquí.
+        aliases:
+          - id.sytue.localhost
+          - hub.sytue.localhost
+          - mail-api.sytue.localhost
+          - calendar-dav.sytue.localhost
+          - contacts-dav.sytue.localhost
+          - rooms-api.sytue.localhost
+          - docs-api.sytue.localhost
+          - drive-dav.sytue.localhost
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "./traefik/traefik.yml:/etc/traefik/traefik.yml:ro"
+      - "./traefik/dynamic:/etc/traefik/dynamic:ro"
+      - "./traefik/certs:/etc/traefik/certs:ro"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik.rule=Host(`traefik.sytue.localhost`)"
+      - "traefik.http.routers.traefik.entrypoints=websecure"
+      - "traefik.http.routers.traefik.tls=true"
+      - "traefik.http.routers.traefik.service=api@internal"
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ===========================================================================
+  # POSTGRESQL 16 — ÚNICO datastore (estado + colas + caché). Una BD por
+  # servicio Go (ver postgres/init/01-databases.sh). SIN Redis/Valkey.
+  # ===========================================================================
+  postgres:
+    image: postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
+    <<: [*restart, *logging]
+    mem_limit: 512m             # DEV-ONLY (prod: Helm/StatefulSet con sus límites)
+    # DEV-ONLY: buffers/conexiones/work_mem recortados para caber en 8 GB. Estos
+    # flags existen en PG16 y PG18 (el override local puede fijar la imagen a 16).
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_buffers=64MB"
+      - "-c"
+      - "max_connections=80"
+      - "-c"
+      - "work_mem=2MB"
+    networks: [backend]
+    ports:
+      - "127.0.0.1:5432:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_SUPERUSER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD}
+      POSTGRES_DB: postgres
+      # Pasadas al script de init (una BD/rol por servicio Go).
+      ID_DB_NAME: ${ID_DB_NAME:-sytue_id}
+      ID_DB_USER: ${ID_DB_USER:-sytue_id}
+      ID_DB_PASSWORD: ${ID_DB_PASSWORD}
+      DRIVE_DB_NAME: ${DRIVE_DB_NAME:-sytue_drive}
+      DRIVE_DB_USER: ${DRIVE_DB_USER:-sytue_drive}
+      DRIVE_DB_PASSWORD: ${DRIVE_DB_PASSWORD}
+      DOCS_DB_NAME: ${DOCS_DB_NAME:-sytue_docs}
+      DOCS_DB_USER: ${DOCS_DB_USER:-sytue_docs}
+      DOCS_DB_PASSWORD: ${DOCS_DB_PASSWORD}
+      MAIL_DB_NAME: ${MAIL_DB_NAME:-sytue_mail}
+      MAIL_DB_USER: ${MAIL_DB_USER:-sytue_mail}
+      MAIL_DB_PASSWORD: ${MAIL_DB_PASSWORD}
+      CALENDAR_DB_NAME: ${CALENDAR_DB_NAME:-sytue_calendar}
+      CALENDAR_DB_USER: ${CALENDAR_DB_USER:-sytue_calendar}
+      CALENDAR_DB_PASSWORD: ${CALENDAR_DB_PASSWORD}
+      CONTACTS_DB_NAME: ${CONTACTS_DB_NAME:-sytue_contacts}
+      CONTACTS_DB_USER: ${CONTACTS_DB_USER:-sytue_contacts}
+      CONTACTS_DB_PASSWORD: ${CONTACTS_DB_PASSWORD}
+      NOTES_DB_NAME: ${NOTES_DB_NAME:-sytue_notes}
+      NOTES_DB_USER: ${NOTES_DB_USER:-sytue_notes}
+      NOTES_DB_PASSWORD: ${NOTES_DB_PASSWORD}
+      SYPHOTOS_DB_NAME: ${SYPHOTOS_DB_NAME:-sytue_syphotos}
+      SYPHOTOS_DB_USER: ${SYPHOTOS_DB_USER:-sytue_syphotos}
+      SYPHOTOS_DB_PASSWORD: ${SYPHOTOS_DB_PASSWORD}
+      SYERP_DB_NAME: ${SYERP_DB_NAME:-sytue_syerp}
+      SYERP_DB_USER: ${SYERP_DB_USER:-sytue_syerp}
+      SYERP_DB_PASSWORD: ${SYERP_DB_PASSWORD}
+      CAST_DB_NAME: ${CAST_DB_NAME:-sytue_cast}
+      CAST_DB_USER: ${CAST_DB_USER:-sytue_cast}
+      CAST_DB_PASSWORD: ${CAST_DB_PASSWORD}
+      PAGES_DB_NAME: ${PAGES_DB_NAME:-sytue_pages}
+      PAGES_DB_USER: ${PAGES_DB_USER:-sytue_pages}
+      PAGES_DB_PASSWORD: ${PAGES_DB_PASSWORD}
+      BASES_DB_NAME: ${BASES_DB_NAME:-sytue_bases}
+      BASES_DB_USER: ${BASES_DB_USER:-sytue_bases}
+      BASES_DB_PASSWORD: ${BASES_DB_PASSWORD}
+      ROOMS_DB_NAME: ${ROOMS_DB_NAME:-sytue_rooms}
+      ROOMS_DB_USER: ${ROOMS_DB_USER:-sytue_rooms}
+      ROOMS_DB_PASSWORD: ${ROOMS_DB_PASSWORD}
+      HUB_DB_NAME: ${HUB_DB_NAME:-sytue_hub}
+      HUB_DB_USER: ${HUB_DB_USER:-sytue_hub}
+      HUB_DB_PASSWORD: ${HUB_DB_PASSWORD}
+      # Sin estas tres, el init (set -u) aborta al llegar a integrations y deja
+      # SIN crear los roles de integrations, cloud y PostgREST: esos servicios
+      # no arrancan en un volumen nuevo. Van en el mismo orden que el script.
+      INTEGRATIONS_DB_NAME: ${INTEGRATIONS_DB_NAME:-sytue_integrations}
+      INTEGRATIONS_DB_USER: ${INTEGRATIONS_DB_USER:-sytue_integrations}
+      INTEGRATIONS_DB_PASSWORD: ${INTEGRATIONS_DB_PASSWORD}
+      CLOUD_DB_NAME: ${CLOUD_DB_NAME:-sytue_cloud}
+      CLOUD_DB_USER: ${CLOUD_DB_USER:-sytue_cloud}
+      CLOUD_DB_PASSWORD: ${CLOUD_DB_PASSWORD}
+      POSTGREST_ROLE: ${POSTGREST_ROLE:-authenticator}
+      POSTGREST_ROLE_PASSWORD: ${POSTGREST_ROLE_PASSWORD}
+    volumes:
+      # PG18+ guarda los datos en un subdirectorio por versión mayor y monta en
+      # /var/lib/postgresql (no en .../data, que la imagen rechaza como
+      # «unused mount»). Así `pg_upgrade --link` no cruza puntos de montaje.
+      - "postgres-data:/var/lib/postgresql"
+      - "./postgres/init:/docker-entrypoint-initdb.d:ro"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_SUPERUSER:-postgres} -d postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  # ===========================================================================
+  # MINIO — Object Storage S3 (dev). Equivale a Scaleway Object Storage en prod.
+  # ===========================================================================
+  minio:
+    # Digest fijado, como el resto del repo: sin él la etiqueta puede moverse por
+    # detrás. Y OJO con esta pieza —es la única del compose que nadie vigila—:
+    # MinIO no publica imagen nueva desde 2025-09-07 y es AGPL-3.0. Está en la
+    # lista de vigencia desde el 2026-08-18 para que su estado se revise; el
+    # relevo natural es SeaweedFS (Apache-2.0), que ya se usa en el despliegue
+    # privado, pero cambiarlo toca el entorno de todas las sesiones y es una
+    # decisión aparte.
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
+    <<: [*restart, *logging]
+    mem_limit: 384m             # DEV-ONLY (prod: Helm)
+    networks: [edge, backend]
+    ports:
+      - "127.0.0.1:9000:9000"  # API S3
+      - "127.0.0.1:9001:9001"  # Consola web
+    environment:
+      GOMEMLIMIT: 256MiB        # DEV-ONLY: MinIO es Go
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_BROWSER_REDIRECT_URL: https://minio-console.sytue.localhost
+      MINIO_SERVER_URL: https://minio.sytue.localhost
+      MINIO_REGION: fr-par
+    command: ["server", "/data", "--console-address", ":9001"]
+    volumes:
+      - "minio-data:/data"
+    labels:
+      - "traefik.enable=true"
+      # API S3
+      - "traefik.http.routers.minio-api.rule=Host(`minio.sytue.localhost`)"
+      - "traefik.http.routers.minio-api.entrypoints=websecure"
+      - "traefik.http.routers.minio-api.tls=true"
+      - "traefik.http.routers.minio-api.service=minio-api"
+      - "traefik.http.services.minio-api.loadbalancer.server.port=9000"
+      # Consola
+      - "traefik.http.routers.minio-console.rule=Host(`minio-console.sytue.localhost`)"
+      - "traefik.http.routers.minio-console.entrypoints=websecure"
+      - "traefik.http.routers.minio-console.tls=true"
+      - "traefik.http.routers.minio-console.service=minio-console"
+      - "traefik.http.services.minio-console.loadbalancer.server.port=9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # Job efímero: crea los buckets dev (drive/mail/docs blobs, cloud, build-cache).
+  #
+  # `curl` y no el cliente `mc`: es AGPL-3.0 —prohibida por el firewall
+  # clean-room— y su repositorio está ARCHIVADO desde noviembre de 2025.
+  # Esta imagen ya está en el catálogo (`managed-http-task`), espejada y firmada,
+  # así que el cambio quita una dependencia de terceros en vez de añadirla.
+  minio-init:
+    image: curlimages/curl:8.22.0@sha256:58adaa4e8dca9c988bae2aba4ab3434a0bb2da16bbe3f92dec39ec7785166777
+    networks: [backend]
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    entrypoint: ["/bin/sh", "/init/minio-init.sh"]
+    volumes:
+      - "./minio/minio-init.sh:/init/minio-init.sh:ro"
+    restart: "no"
+
+  # ===========================================================================
+  # DRAGONFLYDB — cache/pub-sub EFÍMERO (presencia con TTL + fan-out). Servicio
+  # de INFRA hablado por red vía protocolo Redis (imagen Docker, como Postgres/
+  # MinIO/LiveKit); el código Go solo depende del cliente go-redis (BSD-2).
+  # BSL 1.1 con Additional Use Grant: uso interno, NO as-a-service => cumple
+  # (docs/security.md §2). Lo durable y el outbox SIGUEN en Postgres; si
+  # Dragonfly falta o cae, platform/pkg/cache degrada a no-op y los servicios
+  # siguen funcionando.
+  # ===========================================================================
+  dragonfly:
+    # Tag FIJA estable (nunca 'latest'): v1.40.1.
+    #
+    # 1.40.0 es el MÍNIMO por seguridad, no por features: CVE-2026-62357
+    # (GHSA-cmmv-h748-v93x) desborda el entero de `CMS.INITBYDIM` y deja que
+    # `CMS.INCRBY` escriba fuera del búfer. Dos comandos SIN AUTENTICAR tumban el
+    # proceso, y Dragonfly no pide contraseña por defecto. Afecta a todo < 1.40.
+    image: docker.dragonflydb.io/dragonflydb/dragonfly:v1.40.2@sha256:18afa43e911f1dff18c7d1eb452361876d9702bb1cdff5c5d75c69617a4065c9
+    <<: [*restart, *logging]
+    mem_limit: 384m             # DEV-ONLY (prod: Helm)
+    networks: [backend]
+    ports:
+      - "127.0.0.1:6379:6379"
+    # Cache efímera acotada con evicción al llenarse (cache_mode); sin volumen,
+    # datos efímeros por diseño. DEV-ONLY: 1 io-thread (Dragonfly exige >=256 MiB/
+    # thread) + maxmemory=256mb bajo mem_limit=384m (headroom). Prod: Helm con sus
+    # límites (allí sí escala threads/memoria). Sobra para presencia/pub-sub en dev.
+    command: ["dragonfly", "--logtostderr", "--proactor_threads=1", "--maxmemory=256mb", "--cache_mode=true"]
+    # Dragonfly recomienda memlock ilimitado para su gestión de memoria.
+    ulimits:
+      memlock: -1
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "6379", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # ===========================================================================
+  # LIVEKIT server (SFU WebRTC, Apache-2.0) — Sytue Meet, SIN modificar (imagen
+  # oficial UPSTREAM). Única app de terceros permitida. El BFF sytue-meet
+  # (servicio Go) mintea los JWT de sala TRAS validar OIDC contra Sytue ID.
+  # Nodo único en dev: SIN Redis/Valkey. Ver CONVENTIONS §1, §6, §8.
+  # ===========================================================================
+  livekit:
+    image: livekit/livekit-server:v1.13.7@sha256:6fd3b7088874c4d119160dd688798dfec852bc014786d392caad15f6f63912a3
+    <<: [*restart, *logging]
+    mem_limit: 256m             # DEV-ONLY (prod: Helm)
+    profiles: ["full", "rooms"]
+    networks: [edge, backend]
+    ports:
+      - "127.0.0.1:7880:7880"                    # WS/HTTP de señalización
+      - "127.0.0.1:7881:7881"                    # ICE/TCP fallback de media
+      - "50000-50100:50000-50100/udp"  # Rango UDP de media WebRTC (ICE/SRTP)
+    environment:
+      GOMEMLIMIT: 192MiB       # DEV-ONLY: LiveKit es Go
+      # Claves de API: "<API_KEY>: <API_SECRET>". El BFF sytue-meet firma los JWT.
+      LIVEKIT_KEYS: "${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}"
+    command: ["--config", "/etc/livekit/livekit.yaml"]
+    volumes:
+      - "./livekit/livekit.yaml:/etc/livekit/livekit.yaml:ro"
+    labels:
+      - "traefik.enable=true"
+      # Señalización WebSocket de LiveKit en rooms-sfu.sytue.localhost (el cliente
+      # Astro de Meet vive en meet.sytue.localhost; el control plane Go en :8089).
+      - "traefik.http.routers.livekit.rule=Host(`rooms-sfu.sytue.localhost`)"
+      - "traefik.http.routers.livekit.entrypoints=websecure"
+      - "traefik.http.routers.livekit.tls=true"
+      - "traefik.http.services.livekit.loadbalancer.server.port=7880"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:7880/ >/dev/null 2>&1 || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # ===========================================================================
+  # POSTGREST — API REST automática sobre Postgres (Sytue Cloud DB Studio, dev).
+  # Servicio gestionado del PaaS; el control plane (cloud-api) lo orquesta.
+  # ===========================================================================
+  postgrest:
+    image: postgrest/postgrest:v14.18@sha256:c7cd7e265a85b05248abf53f4473fcec7e327c282d0bd0cf60f1551996d09fcf
+    <<: [*restart, *logging]
+    mem_limit: 192m             # DEV-ONLY (prod: Helm)
+    profiles: ["full", "cloud"]
+    networks: [edge, backend]
+    environment:
+      PGRST_DB_POOL: "4"        # DEV-ONLY: pool pequeño (PostgREST es Haskell, sin GOMEMLIMIT)
+      PGRST_DB_URI: "postgres://${POSTGREST_ROLE:-authenticator}:${POSTGREST_ROLE_PASSWORD}@postgres:5432/${CLOUD_DB_NAME:-sytue_cloud}"
+      PGRST_DB_SCHEMAS: "public"
+      PGRST_DB_ANON_ROLE: "web_anon"
+      PGRST_OPENAPI_SERVER_PROXY_URI: "https://db.sytue.localhost"
+      PGRST_JWT_SECRET: ${POSTGREST_JWT_SECRET}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.postgrest.rule=Host(`db.sytue.localhost`)"
+      - "traefik.http.routers.postgrest.entrypoints=websecure"
+      - "traefik.http.routers.postgrest.tls=true"
+      - "traefik.http.services.postgrest.loadbalancer.server.port=3000"
+
+  # ===========================================================================
+  # SERVICIOS GO (services/<svc>) — un binario por producto. Build desde la RAÍZ
+  # del repo (módulo único) con Dockerfile en services/<svc>/Dockerfile.
+  # Cada uno valida los JWT de Sytue ID (JWKS) y usa su BD Postgres dedicada.
+  # ===========================================================================
+
+  # --- Sytue ID :8081 — IdP NUCLEAR (OIDC/OAuth2/PKCE, JWKS, SCIM, WebAuthn) ---
+  id:
+    build:
+      <<: *go-build
+      dockerfile: services/id/Dockerfile
+    <<: [*restart, *logging, *mem-go]
+    networks: [edge, backend]
+    ports:
+      - "127.0.0.1:8081:8081"
+    environment:
+      <<: *go-env
+      PORT: "8081"
+      PUBLIC_URL: https://id.sytue.localhost
+      # Sytue ID lee su config con prefijo SYTUE_ID_ (platform/pkg/config) y usa
+      # DATABASE_DSN (no DATABASE_URL). Ver services/id/internal/http/config.go.
+      SYTUE_ID_ENV: dev
+      SYTUE_ID_LOG_LEVEL: debug
+      SYTUE_ID_HTTP_ADDR: ":8081"
+      SYTUE_ID_DB_MAX_CONNS: "3"   # DEV-ONLY: id lee su prefijo SYTUE_ID_ (no DB_MAX_CONNS plano); prod: Helm
+      SYTUE_ID_ISSUER: https://id.sytue.localhost
+      # El otro extremo del verificador de contraseñas de aplicación (ver mail).
+      SYTUE_ID_INTERNAL_SECRET: ${ID_INTERNAL_SECRET}
+      SYTUE_ID_COOKIE_SECURE: "true"
+      SYTUE_ID_DATABASE_DSN: "postgres://${ID_DB_USER:-sytue_id}:${ID_DB_PASSWORD}@postgres:5432/${ID_DB_NAME:-sytue_id}?sslmode=disable"
+      # DEV: el seed (`/app/id seed`) fija el secret_hash de los clients
+      # confidenciales con este valor, el MISMO que usan los BFF de las apps
+      # (SYTUE_OIDC_CLIENT_SECRET). Sin él quedan deshabilitados y el login falla.
+      SYTUE_ID_DEV_CLIENT_SECRET: ${SYTUE_DEV_CLIENT_SECRET}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.id.rule=Host(`id.sytue.localhost`)"
+      - "traefik.http.routers.id.entrypoints=websecure"
+      - "traefik.http.routers.id.tls=true"
+      - "traefik.http.services.id.loadbalancer.server.port=8081"
+    healthcheck:
+      test: ["CMD", "/app/id", "healthcheck"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  # --- Sytue Drive :8082 — WebDAV + API REST; PG + S3 ---
+  drive:
+    build:
+      <<: *go-build
+      dockerfile: services/drive/Dockerfile
+    <<: [*restart, *logging, *mem-go-big]
+    profiles: ["full", "drive"]
+    networks: [edge, backend]
+    ports:
+      - "127.0.0.1:8082:8082"
+    environment:
+      <<: *go-env
+      GOMEMLIMIT: 160MiB       # DEV-ONLY: override del 64MiB de x-go-env (mem_limit 256m)
+      PORT: "8082"
+      PUBLIC_URL: https://drive.sytue.localhost
+      DATABASE_URL: "postgres://${DRIVE_DB_USER:-sytue_drive}:${DRIVE_DB_PASSWORD}@postgres:5432/${DRIVE_DB_NAME:-sytue_drive}?sslmode=disable"
+      S3_BUCKET: sytue-dev-drive-blobs
+      # Verja de los ADJUNTOS DE CANAL: Drive pregunta a Rooms si el usuario sigue
+      # siendo miembro del canal antes de servir el fichero (el roster vive en Rooms,
+      # los bytes en Drive). MISMO secreto en rooms y drive; sin él, los adjuntos de
+      # canal no se sirven (fail-closed).
+      ROOMS_URL: http://rooms:8085
+      # Sytue Bases: «exportar una vista a una carpeta» lee por su conector de solo lectura.
+      BASES_URL: http://bases:8102
+      ROOMS_INTERNAL_SECRET: ${ROOMS_INTERNAL_SECRET}
+      # /dav con Basic y una contraseña de aplicación: Drive la canjea en Sytue ID.
+      ID_INTERNAL_SECRET: ${ID_INTERNAL_SECRET}
+      # HOST WOPI — abrir los ficheros de Drive en un editor externo (el que despliegue
+      # cada cliente: la suite no incorpora motores AGPL). Ambas variables son opcionales
+      # y se apagan juntas: sin clave no se acuñan tokens y sin descubrimiento no se sabe
+      # con qué URL abre el editor cada tipo de fichero.
+      #   WOPI_KEY: 32 bytes en base64 (`openssl rand -base64 32`).
+      #   WOPI_DISCOVERY_URL: p. ej. https://<editor>/hosting/discovery
+      WOPI_KEY: ${DRIVE_WOPI_KEY:-}
+      WOPI_DISCOVERY_URL: ${DRIVE_WOPI_DISCOVERY_URL:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      id:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.drive.rule=Host(`drive-dav.sytue.localhost`)"
+      - "traefik.http.routers.drive.entrypoints=websecure"
+      - "traefik.http.routers.drive.tls=true"
+      - "traefik.http.services.drive.loadbalancer.server.port=8082"
+      # WebDAV en el host de PRODUCTO (donde el SPA sirve "/"): es la URL que el
+      # asistente «Conectar tus dispositivos» da para montar Drive en Finder o en
+      # el Explorador. Paridad con charts/drive ingress.paths.
+      - "traefik.http.routers.drive-dav-wk.rule=Host(`drive.sytue.localhost`) && PathPrefix(`/dav`)"
+      - "traefik.http.routers.drive-dav-wk.priority=100"
+      - "traefik.http.routers.drive-dav-wk.entrypoints=websecure"
+      - "traefik.http.routers.drive-dav-wk.tls=true"
+      - "traefik.http.routers.drive-dav-wk.service=drive"
+    healthcheck:
+      test: ["CMD", "/app/drive", "healthcheck"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  # --- Sytue Docs :8083 — modelo documental + colab CRDT/OT (WS); PG + S3 ---
+  # Sytue OCR — reconocimiento de texto para Sytue PDF (ADR-0034). Motor Tesseract 5
+  # (Apache-2.0) dentro de la imagen: sin SaaS, sin salida a internet.
+  #
+  # Su imagen instala paquetes del sistema, asi que tarda MUCHO mas en construirse
+  # que las demas. Por eso vive en su propio perfil ademas de en `full`: quien
+  # trabaja en Sytue PDF la levanta y el resto no la paga.
+  ocr:
+    build:
+      <<: *go-build
+      dockerfile: services/ocr/Dockerfile
+    <<: [*restart, *logging]
+    profiles: ["full", "docs", "ocr"]
+    networks: [backend]
+    environment:
+      <<: *go-env
+      PORT: "8096"
+      SYTUE_OCR_ENV: dev
+      SYTUE_OCR_LOG_LEVEL: debug
+      SYTUE_OCR_HTTP_ADDR: ":8096"
+      SYTUE_OCR_OIDC_ISSUER: https://id.sytue.localhost
+      SYTUE_OCR_OIDC_JWKS_URL: http://id:8081/.well-known/jwks.json
+      SYTUE_OCR_MAX_CONCURRENTES: "1"
+    # Sin `ports:` a proposito: es interno y en dev tampoco tiene por que
+    # escucharse desde el host.
+    depends_on:
+      id:
+        condition: service_healthy
+
+  docs:
+    build:
+      <<: *go-build
+      dockerfile: services/docs/Dockerfile
+    <<: [*restart, *logging, *mem-go-big]
+    profiles: ["full", "docs"]
+    networks: [edge, backend]
+    ports:
+      - "127.0.0.1:8083:8083"
+    environment:
+      <<: *go-env
+      GOMEMLIMIT: 160MiB       # DEV-ONLY: override del 64MiB de x-go-env (mem_limit 256m)
+      PORT: "8083"
+      # Sytue Docs lee su config con prefijo SYTUE_DOCS_ (services/docs/internal/config).
+      SYTUE_DOCS_PUBLIC_URL: https://docs-api.sytue.localhost
+      SYTUE_DOCS_ENV: dev
+      SYTUE_DOCS_LOG_LEVEL: debug
+      SYTUE_DOCS_HTTP_ADDR: ":8083"
+      SYTUE_DOCS_DB_MAX_CONNS: "3"   # DEV-ONLY: docs lee su prefijo SYTUE_DOCS_ (no DB_MAX_CONNS plano); prod: Helm
+      SYTUE_DOCS_OIDC_ISSUER: https://id.sytue.localhost
+      SYTUE_DOCS_OIDC_JWKS_URL: http://id:8081/.well-known/jwks.json
+      SYTUE_DOCS_DATABASE_URL: "postgres://${DOCS_DB_USER:-sytue_docs}:${DOCS_DB_PASSWORD}@postgres:5432/${DOCS_DB_NAME:-sytue_docs}?sslmode=disable"
+      # Conector de datos externos (Power Query): clave AES-256 (base64 de 32 bytes) que
+      # cifra las credenciales at-rest. Sin ella el conector rechaza las conexiones con
+      # credenciales (el servicio arranca igual). Ver services/docs/internal/connectors.
+      SYTUE_DOCS_SECRET_ENC_KEY: ${DOCS_SECRET_ENC_KEY:-}
+      # URL interna del Sytue Integration Gateway (orígenes de datos «gateway» en Sheets).
+      # Config de SERVICIO (no de usuario): docs no reenvía el JWT a un host arbitrario.
+      SYTUE_DOCS_INTEGRATIONS_URL: http://integrations:8093
+      # Sytue OCR: reconocimiento de texto de Sytue PDF (ADR-0034). Config de
+      # SERVICIO, igual que la de arriba.
+      SYTUE_DOCS_OCR_URL: http://ocr:8096
+      # Sytue Drive: la unidad donde aterriza el fichero de cada documento nuevo
+      # (carpeta «Sytue Docs»). A diferencia de las dos de arriba, esta llamada NO
+      # va con credenciales de servicio: docs reenvía el JWT de quien crea el
+      # documento, para que Drive aplique su propia autorización. Ver
+      # services/docs/internal/drive y docs/docs-en-drive.md.
+      SYTUE_DOCS_DRIVE_URL: http://drive:8082
+      # Conector de solo lectura de Calcus a Sytue Bases.
+      SYTUE_DOCS_BASES_URL: http://bases:8102
+      # docs (a diferencia de drive/mail) NO normaliza el endpoint S3: el cliente
+      # minio-go exige host:port SIN esquema + flag de TLS (S3_USE_SSL).
+      SYTUE_DOCS_S3_ENDPOINT: minio:9000
+      SYTUE_DOCS_S3_USE_SSL: "false"
+      SYTUE_DOCS_S3_REGION: fr-par
+      SYTUE_DOCS_S3_ACCESS_KEY: ${MINIO_ROOT_USER}
+      SYTUE_DOCS_S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      SYTUE_DOCS_S3_BUCKET: sytue-dev-docs-blobs
+      DATABASE_URL: "postgres://${DOCS_DB_USER:-sytue_docs}:${DOCS_DB_PASSWORD}@postgres:5432/${DOCS_DB_NAME:-sytue_docs}?sslmode=disable"
+      S3_BUCKET: sytue-dev-docs-blobs
+      # Cache/pub-sub efímero (presencia colab, fan-out). Sin ella => no-op.
+      DRAGONFLY_URL: redis://dragonfly:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      id:
+        condition: service_healthy
+      dragonfly:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.docs-api.rule=Host(`docs-api.sytue.localhost`)"
+      - "traefik.http.routers.docs-api.entrypoints=websecure"
+      - "traefik.http.routers.docs-api.tls=true"
+      - "traefik.http.services.docs-api.loadbalancer.server.port=8083"
+    healthcheck:
+      test: ["CMD", "/app/docs", "healthcheck"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  # --- Sytue Mail :8086 (HTTP/JMAP) + SMTP/IMAP 25/465/587/993; PG + S3 ---
+  mail:
+    build:
+      <<: *go-build
+      dockerfile: services/mail/Dockerfile
+    <<: [*restart, *logging, *mem-go-big]
+    profiles: ["full", "mail"]
+    networks: [edge, backend]
+    ports:
+      - "127.0.0.1:8086:8086"   # HTTP / JMAP
+      - "127.0.0.1:25:25"       # SMTP
+      - "127.0.0.1:465:465"     # SMTPS
+      - "127.0.0.1:587:587"     # Submission
+      - "127.0.0.1:993:993"     # IMAPS
+    environment:
+      <<: *go-env
+      GOMEMLIMIT: 160MiB       # DEV-ONLY: override del 64MiB de x-go-env (mem_limit 256m)
+      PORT: "8086"
+      PUBLIC_URL: https://mail-api.sytue.localhost
+      MAIL_HOSTNAME: mx.sytue.localhost
+      DATABASE_URL: "postgres://${MAIL_DB_USER:-sytue_mail}:${MAIL_DB_PASSWORD}@postgres:5432/${MAIL_DB_NAME:-sytue_mail}?sslmode=disable"
+      S3_BUCKET: sytue-dev-mail-blobs
+      # CORREO A CANAL de Sytue Rooms: el correo a `<token-del-webhook>@<este dominio>`
+      # se publica en su canal en vez de entregarse a un buzón. Es como entran las
+      # alertas de las herramientas que solo saben mandar email. Las dos variables se
+      # apagan juntas: sin dominio esas direcciones no existen, y sin Rooms no hay a
+      # quién entregar. El MISMO dominio va en el servicio de Rooms, que lo publica.
+      CHANNEL_MAIL_DOMAIN: ${CHANNEL_MAIL_DOMAIN:-rooms.sytue.localhost}
+      ROOMS_URL: http://rooms:8085
+      # CONTRASEÑAS DE APLICACIÓN: lo que se escribe en Thunderbird. El AUTH de
+      # IMAP/SMTP las verifica contra Sytue ID; sin el secreto solo se acepta un
+      # JWT con scope `mail`, que dura minutos y no se puede teclear.
+      ID_INTERNAL_URL: http://id:8081
+      ID_INTERNAL_SECRET: ${ID_INTERNAL_SECRET}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      id:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      # API JMAP/HTTP. SMTP/IMAP salen por puertos directos (no por Traefik).
+      # autoconfig./autodiscover. son los hosts que consultan Thunderbird y Outlook
+      # para configurarse con solo la dirección de correo (paridad con el Ingress de
+      # Helm: charts/mail/values.yaml ingress.extraSubdomains).
+      - "traefik.http.routers.mail-api.rule=Host(`mail-api.sytue.localhost`) || Host(`mx.sytue.localhost`) || Host(`autoconfig.sytue.localhost`) || Host(`autodiscover.sytue.localhost`)"
+      - "traefik.http.routers.mail-api.entrypoints=websecure"
+      - "traefik.http.routers.mail-api.tls=true"
+      - "traefik.http.services.mail-api.loadbalancer.server.port=8086"
+    healthcheck:
+      test: ["CMD", "/app/mail", "healthcheck"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  # --- Sytue Calendar :8087 — CalDAV + API REST; PG ---
+  calendar:
+    build:
+      <<: *go-build
+      dockerfile: services/calendar/Dockerfile
+    <<: [*restart, *logging, *mem-go]
+    profiles: ["full", "calendar"]
+    networks: [edge, backend]
+    ports:
+      - "127.0.0.1:8087:8087"
+    environment:
+      <<: *go-env
+      PORT: "8087"
+      PUBLIC_URL: https://calendar.sytue.localhost
+      DATABASE_URL: "postgres://${CALENDAR_DB_USER:-sytue_calendar}:${CALENDAR_DB_PASSWORD}@postgres:5432/${CALENDAR_DB_NAME:-sytue_calendar}?sslmode=disable"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      id:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.calendar.rule=Host(`calendar-dav.sytue.localhost`)"
+      - "traefik.http.routers.calendar.entrypoints=websecure"
+      - "traefik.http.routers.calendar.tls=true"
+      - "traefik.http.services.calendar.loadbalancer.server.port=8087"
+      # Descubrimiento CalDAV (RFC 6764) en el host de PRODUCTO, donde el SPA sirve
+      # "/": paridad con el Ingress de Helm (charts/calendar ingress.paths). Sin esta
+      # regla el well-known lo atendería el SPA y el cliente nativo no encontraría el
+      # servidor. priority alta = gana al catch-all de calendar-web.
+      - "traefik.http.routers.calendar-dav-wk.rule=Host(`calendar.sytue.localhost`) && (Path(`/.well-known/caldav`) || PathPrefix(`/dav`))"
+      - "traefik.http.routers.calendar-dav-wk.priority=100"
+      - "traefik.http.routers.calendar-dav-wk.entrypoints=websecure"
+      - "traefik.http.routers.calendar-dav-wk.tls=true"
+      - "traefik.http.routers.calendar-dav-wk.service=calendar"
+    healthcheck:
+      test: ["CMD", "/app/calendar", "healthcheck"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  # --- Sytue Contacts :8088 — CardDAV + API REST; PG ---
+  contacts:
+    build:
+      <<: *go-build
+      dockerfile: services/contacts/Dockerfile
+    <<: [*restart, *logging, *mem-go]
+    profiles: ["full", "contacts"]
+    networks: [edge, backend]
+    ports:
+      - "127.0.0.1:8088:8088"
+    environment:
+      <<: *go-env
+      PORT: "8088"
+      PUBLIC_URL: https://contacts.sytue.localhost
+      DATABASE_URL: "postgres://${CONTACTS_DB_USER:-sytue_contacts}:${CONTACTS_DB_PASSWORD}@postgres:5432/${CONTACTS_DB_NAME:-sytue_contacts}?sslmode=disable"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      id:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.contacts.rule=Host(`contacts-dav.sytue.localhost`)"
+      - "traefik.http.routers.contacts.entrypoints=websecure"
+      - "traefik.http.routers.contacts.tls=true"
+      - "traefik.http.services.contacts.loadbalancer.server.port=8088"
+      # Descubrimiento CardDAV (RFC 6764) en el host de PRODUCTO (mismo criterio
+      # que calendar, arriba).
+      - "traefik.http.routers.contacts-dav-wk.rule=Host(`contacts.sytue.localhost`) && (Path(`/.well-known/carddav`) || PathPrefix(`/dav`))"
+      - "traefik.http.routers.contacts-dav-wk.priority=100"
+      - "traefik.http.routers.contacts-dav-wk.entrypoints=websecure"
+      - "traefik.http.routers.contacts-dav-wk.tls=true"
+      - "traefik.http.routers.contacts-dav-wk.service=contacts"
+    healthcheck:
+      test: ["CMD", "/app/contacts", "healthcheck"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  # --- Sytue Notepads :8089 — cuadernos, notas y referencias cruzadas; PG ---
+  # Reaprovecha el puerto que dejó libre la señalización de Meet al unificarse
+  # Chat+Meet en Rooms (docs/CONVENTIONS.md §6).
+  notes:
+    build:
+      <<: *go-build
+      dockerfile: services/notes/Dockerfile
+    <<: [*restart, *logging, *mem-go]
+    profiles: ["full", "notes"]
+    networks: [edge, backend]
+    ports:
+      - "127.0.0.1:8089:8089"
+    environment:
+      <<: *go-env
+      PORT: "8089"
+      PUBLIC_URL: https://notes.sytue.localhost
+      DATABASE_URL: "postgres://${NOTES_DB_USER:-sytue_notes}:${NOTES_DB_PASSWORD}@postgres:5432/${NOTES_DB_NAME:-sytue_notes}?sslmode=disable"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      id:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      # El host de PRODUCTO lo sirve la app Astro; la API del servicio va bajo el
+      # mismo host en /api y /public, con prioridad por encima del catch-all del
+      # front (mismo criterio que el descubrimiento DAV de calendar y contacts).
+      - "traefik.http.routers.notes-api.rule=Host(`notes.sytue.localhost`) && (PathPrefix(`/api/v1`) || PathPrefix(`/public`))"
+      - "traefik.http.routers.notes-api.priority=100"
+      - "traefik.http.routers.notes-api.entrypoints=websecure"
+      - "traefik.http.routers.notes-api.tls=true"
+      - "traefik.http.services.notes-api.loadbalancer.server.port=8089"
+    healthcheck:
+      test: ["CMD", "/app/notes", "healthcheck"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  # --- SyERP :8098 — el ERP de la suite ---
+  # Los treinta y seis modelos del catálogo salen de un único servicio y una
+  # única base: añadir un módulo es un fichero JSON dentro de la imagen, no un
+  # servicio más que desplegar y vigilar.
+  syerp:
+    build:
+      <<: *go-build
+      dockerfile: services/syerp/Dockerfile
+    <<: [*restart, *logging, *mem-go]
+    profiles: ["full", "erp"]
+    networks: [edge, backend]
+    ports:
+      - "127.0.0.1:8098:8098"
+    environment:
+      <<: *go-env
+      PORT: "8098"
+      PUBLIC_URL: https://erp.sytue.localhost
+      # El egress a Salesforce sale por la pasarela, nunca desde aquí.
+      INTEGRATIONS_BASE_URL: http://integrations:8093
+      # Sytue AI y las apps de las que un informe puede leer, con el token de
+      # quien lo pide. Es la BASE del servicio de IA, sin /api/v1/assist.
+      SYTUE_AI_URL: http://ai:8084
+      ID_BASE_URL: http://id:8081
+      CONTACTS_BASE_URL: http://contacts:8088
+      CALENDAR_BASE_URL: http://calendar:8087
+      ROOMS_BASE_URL: http://rooms:8085
+      # Sella el secreto de firma de los webhooks de Stripe. Vacía en dev es
+      # legítimo: entonces no se puede configurar ningún webhook y el servicio lo
+      # dice al arrancar, en vez de guardar el secreto en claro. En prod el
+      # binario se niega a levantar sin ella.
+      SECRET_ENC_KEY: ${SYERP_SECRET_ENC_KEY:-}
+      DATABASE_URL: "postgres://${SYERP_DB_USER:-sytue_syerp}:${SYERP_DB_PASSWORD}@postgres:5432/${SYERP_DB_NAME:-sytue_syerp}?sslmode=disable"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      id:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      # El host de PRODUCTO lo sirve la app Astro; la API del servicio va bajo el
+      # mismo host en /api/v1, y el webhook de Stripe en /webhooks — que NO pasa
+      # por el front porque Stripe no tiene sesión.
+      - "traefik.http.routers.erp-api.rule=Host(`erp.sytue.localhost`) && (PathPrefix(`/api/v1`) || PathPrefix(`/webhooks`))"
+      - "traefik.http.routers.erp-api.priority=100"
+      - "traefik.http.routers.erp-api.entrypoints=websecure"
+      - "traefik.http.routers.erp-api.tls=true"
+      - "traefik.http.services.erp-api.loadbalancer.server.port=8098"
+    healthcheck:
+      test: ["CMD", "/app/syerp", "healthcheck"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  # --- Sytue Hub :8092 — búsqueda federada, notificaciones e intents cross-app ---
+  # La Sytue Shell lo llama desde TODAS las apps en cada carga (notificaciones y
+  # presencia). Sin él en dev, las once superficies recibían un 500 por página: un
+  # error de consola constante que enmascara los de verdad y hace fallar cualquier
+  # e2e que vigile la consola.
+  syphotos:
+    build:
+      <<: *go-build
+      dockerfile: services/syphotos/Dockerfile
+    <<: [*restart, *logging, *mem-go]
+    profiles: ["full", "photos"]
+    networks: [edge, backend]
+    ports:
+      - "127.0.0.1:8097:8097"
+    environment:
+      <<: *go-env
+      PORT: "8097"
+      PUBLIC_URL: https://photos.sytue.localhost
+      # Los ORIGINALES están en Drive; las derivadas van a un bucket propio.
+      DRIVE_URL: http://drive:8082
+      S3_BUCKET: sytue-dev-syphotos-derivadas
+      DATABASE_URL: "postgres://${SYPHOTOS_DB_USER:-sytue_syphotos}:${SYPHOTOS_DB_PASSWORD}@postgres:5432/${SYPHOTOS_DB_NAME:-sytue_syphotos}?sslmode=disable"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      id:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      # El host de PRODUCTO lo sirve la app Astro; la API del servicio va bajo el
+      # mismo host en /api y /public, con prioridad por encima del catch-all del
+      # front (mismo criterio que el descubrimiento DAV de calendar y contacts).
+      - "traefik.http.routers.photos-api.rule=Host(`photos.sytue.localhost`) && (PathPrefix(`/api/v1`) || PathPrefix(`/public`))"
+      - "traefik.http.routers.photos-api.priority=100"
+      - "traefik.http.routers.photos-api.entrypoints=websecure"
+      - "traefik.http.routers.photos-api.tls=true"
+      - "traefik.http.services.photos-api.loadbalancer.server.port=8097"
+    healthcheck:
+      test: ["CMD", "/app/syphotos", "healthcheck"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  # --- Sytue Cast :8099 — vídeo bajo demanda y directo (ADR 0061); PG + S3 ---
+  # DOS contenedores del MISMO binario: el servicio HTTP y el transcodificador
+  # (subcomando `transcoder`, imagen con ffmpeg) que saca trabajos de la cola.
+  cast:
+    build:
+      <<: *go-build
+      dockerfile: services/cast/Dockerfile
+    <<: [*restart, *logging, *mem-go]
+    profiles: ["full", "cast"]
+    networks: [edge, backend]
+    ports:
+      - "127.0.0.1:8099:8099"
+    environment:
+      <<: *go-env
+      PORT: "8099"
+      PUBLIC_URL: https://cast.sytue.localhost
+      DATABASE_URL: "postgres://${CAST_DB_USER:-sytue_cast}:${CAST_DB_PASSWORD}@postgres:5432/${CAST_DB_NAME:-sytue_cast}?sslmode=disable"
+      # Bucket PROPIO (original, HLS, WebM, pósteres); la cuota se cuenta en Drive.
+      S3_BUCKET: sytue-dev-cast-medios
+      DRIVE_URL: http://drive:8082
+      ID_URL: http://id:8081
+      # Secreto compartido con Drive para declarar la cuota (§8). El MISMO en los dos;
+      # en dev cae al de desarrollo del código, así que aquí solo se pone si se cambia.
+      CAST_INTERNAL_SECRET: ${CAST_INTERNAL_SECRET}
+      MEDIA_SIGNING_KEY: ${CAST_MEDIA_SIGNING_KEY}
+      # Avisos («está en directo») al Hub, con el secreto de desarrollo del código.
+      HUB_BASE_URL: http://hub:8092
+      # --- Directo: el SFU de Rooms, con Ingress y Egress ---
+      LIVEKIT_URL: https://rooms-sfu.sytue.localhost
+      LIVEKIT_HOST: http://livekit:7880
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET}
+      LIVEKIT_POLL_INTERVAL: 5s
+      CAST_INGEST_RTMP_URL: rtmp://cast-ingest.sytue.localhost/live
+    depends_on:
+      postgres:
+        condition: service_healthy
+      id:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      # El host de PRODUCTO lo sirve la app Astro; el servicio va bajo el mismo host
+      # en /api/v1, /public (solo dev: en prod lo pide el BFF por dentro), /ws
+      # (chat), /webhooks (LiveKit) y /media (HLS/WebM/póster con token firmado).
+      - "traefik.http.routers.cast-api.rule=Host(`cast.sytue.localhost`) && (PathPrefix(`/api/v1`) || PathPrefix(`/public`) || PathPrefix(`/ws`) || PathPrefix(`/webhooks`) || PathPrefix(`/media`))"
+      - "traefik.http.routers.cast-api.priority=100"
+      - "traefik.http.routers.cast-api.entrypoints=websecure"
+      - "traefik.http.routers.cast-api.tls=true"
+      - "traefik.http.services.cast-api.loadbalancer.server.port=8099"
+    healthcheck:
+      test: ["CMD", "/app/cast", "healthcheck"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  # --- Sytue Web :8100 — webs y tiendas de la organización (ADR 0062); PG + S3 ---
+  # Solo la API. El servidor de las webs publicadas (`pages sitios`, :8101) sirve
+  # <slug>.sites.<dominio> y necesita un comodín que el certificado de desarrollo
+  # (*.sytue.localhost) no cubre: se levanta a mano si hace falta probarlo.
+  pages:
+    build:
+      <<: *go-build
+      dockerfile: services/pages/Dockerfile
+    <<: [*restart, *logging, *mem-go]
+    profiles: ["full", "pages"]
+    networks: [edge, backend]
+    ports:
+      - "127.0.0.1:8100:8100"
+    environment:
+      <<: *go-env
+      PORT: "8100"
+      PUBLIC_URL: https://web.sytue.localhost
+      DATABASE_URL: "postgres://${PAGES_DB_USER:-sytue_pages}:${PAGES_DB_PASSWORD}@postgres:5432/${PAGES_DB_NAME:-sytue_pages}?sslmode=disable"
+      # Bucket PROPIO de las webs publicadas; sus secretos caen al valor de
+      # desarrollo del código (services/pages/internal/config).
+      S3_BUCKET: sytue-dev-pages-sitios
+      PAGES_SITES_DOMAIN: sites.sytue.localhost
+      PAGES_CAST_ORIGIN: https://cast.sytue.localhost
+      ID_URL: http://id:8081
+      # Avisos (pedidos, formularios, dominios) al Hub.
+      HUB_BASE_URL: http://hub:8092
+      SYTUE_AI_URL: http://ai:8084
+      SYERP_URL: http://syerp:8098
+      BASES_URL: http://bases:8102
+    depends_on:
+      postgres:
+        condition: service_healthy
+      id:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      # El host de PRODUCTO lo sirve la app Astro; el BFF llama a la API por la red
+      # interna, así que fuera solo salen los webhooks de las pasarelas y /_pages.
+      - "traefik.http.routers.pages-api.rule=Host(`web.sytue.localhost`) && (PathPrefix(`/webhooks`) || PathPrefix(`/_pages`))"
+      - "traefik.http.routers.pages-api.priority=100"
+      - "traefik.http.routers.pages-api.entrypoints=websecure"
+      - "traefik.http.routers.pages-api.tls=true"
+      - "traefik.http.services.pages-api.loadbalancer.server.port=8100"
+    healthcheck:
+      test: ["CMD", "/app/pages", "healthcheck"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  # --- Sytue Bases :8102 — tablas relacionales (ADR 0068); solo PG ---
+  bases:
+    build:
+      <<: *go-build
+      dockerfile: services/bases/Dockerfile
+    <<: [*restart, *logging, *mem-go]
+    profiles: ["full", "bases"]
+    networks: [edge, backend]
+    ports:
+      - "127.0.0.1:8102:8102"
+    environment:
+      <<: *go-env
+      PORT: "8102"
+      DATABASE_URL: "postgres://${BASES_DB_USER:-sytue_bases}:${BASES_DB_PASSWORD}@postgres:5432/${BASES_DB_NAME:-sytue_bases}?sslmode=disable"
+      PUBLIC_URL: https://bases.sytue.localhost
+      HUB_BASE_URL: http://hub:8092
+      ID_BASE_URL: http://id:8081
+    depends_on:
+      postgres:
+        condition: service_healthy
+      id:
+        condition: service_healthy
+    # Sin etiquetas de Traefik: a la API solo se llega por el BFF de la app y,
+    # el conector de Calcus, por la red interna desde Sytue Docs.
+    healthcheck:
+      test: ["CMD", "/app/bases", "healthcheck"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  cast-transcoder:
+    build:
+      <<: *go-build
+      dockerfile: services/cast/Dockerfile.transcoder
+    <<: [*restart, *logging]
+    # ffmpeg: más memoria que un servicio Go (mem-go es 128m). DEV-ONLY (prod: Helm).
+    mem_limit: 1536m
+    profiles: ["full", "cast"]
+    networks: [backend]
+    # Explícito aunque la imagen ya lo traiga: compose CONCATENA el ENTRYPOINT de la
+    # imagen con `command`, y el proceso tiene que ser exactamente `cast transcoder`.
+    entrypoint: ["/app/cast", "transcoder"]
+    environment:
+      <<: *go-env
+      GOMEMLIMIT: 1024MiB      # DEV-ONLY: override del 64MiB de x-go-env (mem_limit 1536m)
+      PUBLIC_URL: https://cast.sytue.localhost
+      DATABASE_URL: "postgres://${CAST_DB_USER:-sytue_cast}:${CAST_DB_PASSWORD}@postgres:5432/${CAST_DB_NAME:-sytue_cast}?sslmode=disable"
+      S3_BUCKET: sytue-dev-cast-medios
+      DRIVE_URL: http://drive:8082
+      CAST_INTERNAL_SECRET: ${CAST_INTERNAL_SECRET}
+      MEDIA_SIGNING_KEY: ${CAST_MEDIA_SIGNING_KEY}
+      HUB_BASE_URL: http://hub:8092
+      LIVEKIT_URL: https://rooms-sfu.sytue.localhost
+      LIVEKIT_HOST: http://livekit:7880
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET}
+      TRANSCODER_THREADS: "2"
+      TRANSCODER_MAX_MINUTES: "120"
+      TRANSCODER_TMPDIR: /tmp
+    tmpfs:
+      - /tmp:size=4g
+    depends_on:
+      postgres:
+        condition: service_healthy
+      cast:
+        condition: service_healthy
+    healthcheck:
+      # El trabajador late en un fichero en cada vuelta; el binario comprueba que
+      # exista y sea reciente (mismo criterio que la sonda del chart).
+      test: ["CMD", "/app/cast", "transcoder-healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # --- Sytue Hub :8092 — búsqueda federada, notificaciones e intents cross-app ---
+  # La Sytue Shell lo llama desde TODAS las apps en cada carga (notificaciones y
+  # presencia). Sin él en dev, las once superficies recibían un 500 por página: un
+  # error de consola constante que enmascara los de verdad y hace fallar cualquier
+  # e2e que vigile la consola.
+  hub:
+    build:
+      <<: *go-build
+      dockerfile: services/hub/Dockerfile
+    <<: [*restart, *logging, *mem-go]
+    profiles: ["full", "hub", "rooms"]
+    networks: [edge, backend]
+    ports:
+      - "127.0.0.1:8092:8092"
+    environment:
+      <<: *go-env
+      PORT: "8092"
+      PUBLIC_URL: https://hub.sytue.localhost
+      DATABASE_URL: "postgres://${HUB_DB_USER:-sytue_hub}:${HUB_DB_PASSWORD}@postgres:5432/${HUB_DB_NAME:-sytue_hub}?sslmode=disable"
+      # Capa efímera (presencia, tickets WS). Sin ella, platform/pkg/cache degrada a no-op.
+      DRAGONFLY_URL: redis://dragonfly:6379
+      # Conectores de la búsqueda federada: hosts INTERNOS de la red de compose.
+      DRIVE_BASE_URL: http://drive:8082
+      MAIL_BASE_URL: http://mail:8086
+      CALENDAR_BASE_URL: http://calendar:8087
+      CONTACTS_BASE_URL: http://contacts:8088
+      NOTES_BASE_URL: http://notes:8089
+      ROOMS_BASE_URL: http://rooms:8085
+      SYERP_BASE_URL: http://syerp:8098
+      ERP_BASE_URL: http://syerp:8098
+      INTEGRATIONS_BASE_URL: http://integrations:8093
+      # Sytue Cast (exportación de datos, CAST-ENCARGO §12.10; el Hub lo lee
+      # cuando su config lo conozca, y hasta entonces no molesta).
+      CAST_BASE_URL: http://cast:8099
+      # Sytue Web (exportación de datos y búsqueda de sitios).
+      PAGES_BASE_URL: http://pages:8100
+      # Sytue Bases (búsqueda de bases).
+      BASES_BASE_URL: http://bases:8102
+      BASES_PUBLIC_URL: https://bases.sytue.localhost/bases
+      # …y los PÚBLICOS, que son los que se abren al pulsar un resultado.
+      DRIVE_PUBLIC_URL: https://drive.sytue.localhost/drive
+      MAIL_PUBLIC_URL: https://mail.sytue.localhost
+      CALENDAR_PUBLIC_URL: https://calendar.sytue.localhost
+      CONTACTS_PUBLIC_URL: https://contacts.sytue.localhost
+      NOTES_PUBLIC_URL: https://notes.sytue.localhost
+      CALENDAR_PUBLIC_URL: https://calendar.sytue.localhost/calendar
+      CONTACTS_PUBLIC_URL: https://contacts.sytue.localhost/contacts
+      NOTES_PUBLIC_URL: https://notes.sytue.localhost/notes
+      ROOMS_PUBLIC_URL: https://rooms.sytue.localhost/rooms
+      ERP_PUBLIC_URL: https://erp.sytue.localhost/erp
+      PAGES_PUBLIC_URL: https://web.sytue.localhost/web
+    depends_on:
+      postgres:
+        condition: service_healthy
+      id:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.hub.rule=Host(`hub.sytue.localhost`)"
+      - "traefik.http.routers.hub.entrypoints=websecure"
+      - "traefik.http.routers.hub.tls=true"
+      - "traefik.http.services.hub.loadbalancer.server.port=8092"
+    healthcheck:
+      test: ["CMD", "/app/hub", "healthcheck"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  # --- Sytue Analytics :8094 colector · :8095 API — analitica web anonima ---
+  # Dos binarios y no uno a proposito (ADR 0026): el colector es el endpoint
+  # PUBLICO, sin autenticar y de mayor volumen de la plataforma, y no comparte
+  # proceso con nada que tenga secretos de otros servicios en memoria.
+  analytics-ingest:
+    build:
+      <<: *go-build
+      dockerfile: services/analytics/Dockerfile
+    <<: [*restart, *logging, *mem-go]
+    profiles: ["full", "analytics"]
+    networks: [edge, backend]
+    ports:
+      - "127.0.0.1:8094:8094"
+    environment:
+      <<: *go-env
+      PORT: "8094"
+      DATABASE_URL: "postgres://${ANALYTICS_DB_USER:-sytue_analytics}:${ANALYTICS_DB_PASSWORD}@postgres:5432/${ANALYTICS_DB_NAME:-sytue_analytics}?sslmode=disable"
+      # Sin KEK la sal del dia se guarda EN CLARO: vale para dev y el arranque lo
+      # avisa, pero en produccion es la diferencia entre «anonimo» y «anonimo
+      # salvo que alguien tenga un volcado».
+      SYTUE_ANALYTICS_KEY_ENCRYPTION_KEY: "${SYTUE_ANALYTICS_KEY_ENCRYPTION_KEY:-}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/app/analytics-ingest", "healthcheck"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  analytics-api:
+    build:
+      <<: *go-build
+      dockerfile: services/analytics/Dockerfile
+    # Misma imagen que el colector: trae los dos binarios y su ENTRYPOINT por
+    # defecto es el colector, así que aquí solo se cambia el proceso.
+    entrypoint: ["/app/analytics-api"]
+    <<: [*restart, *logging, *mem-go]
+    profiles: ["full", "analytics"]
+    networks: [edge, backend]
+    ports:
+      - "127.0.0.1:8095:8095"
+    environment:
+      <<: *go-env
+      PORT: "8095"
+      DATABASE_URL: "postgres://${ANALYTICS_DB_USER:-sytue_analytics}:${ANALYTICS_DB_PASSWORD}@postgres:5432/${ANALYTICS_DB_NAME:-sytue_analytics}?sslmode=disable"
+      SYTUE_ANALYTICS_KEY_ENCRYPTION_KEY: "${SYTUE_ANALYTICS_KEY_ENCRYPTION_KEY:-}"
+      OIDC_ISSUER: https://id.sytue.localhost
+    depends_on:
+      postgres:
+        condition: service_healthy
+      id:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/app/analytics-api", "healthcheck"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  # --- Sytue Rooms :8085 — mensajería (WS + REST) y videollamada; PG ---
+  rooms:
+    build:
+      <<: *go-build
+      dockerfile: services/rooms/Dockerfile
+    <<: [*restart, *logging, *mem-go]
+    profiles: ["full", "rooms"]
+    networks: [edge, backend]
+    ports:
+      - "127.0.0.1:8085:8085"
+    environment:
+      <<: *go-env
+      PORT: "8085"
+      PUBLIC_URL: https://rooms-api.sytue.localhost
+      # Correo a canal: el MISMO dominio que el de `mail`, que es quien recibe y
+      # publica. Rooms solo lo devuelve con el secreto de cada webhook entrante para
+      # que la web y las apps enseñen la dirección; si divergieran, la dirección
+      # enseñada rebotaría.
+      CHANNEL_MAIL_DOMAIN: ${CHANNEL_MAIL_DOMAIN:-rooms.sytue.localhost}
+      # Rooms necesita más pool que el resto porque DOS conexiones quedan FIJAS en
+      # LISTEN (Subscriber del hub WS + Dispatcher del outbox). Con el
+      # DB_MAX_CONNS=3 común solo quedaría UNA para todo el tráfico HTTP.
+      DB_MAX_CONNS: "8"
+      DATABASE_URL: "postgres://${ROOMS_DB_USER:-sytue_rooms}:${ROOMS_DB_PASSWORD}@postgres:5432/${ROOMS_DB_NAME:-sytue_rooms}?sslmode=disable"
+      # Cache/pub-sub efímero (presencia, fan-out). Sin ella => no-op.
+      DRAGONFLY_URL: redis://dragonfly:6379
+      # Secreto del endpoint INTERNO /internal/channel-access: la verja que consulta
+      # Drive para servir un adjunto solo a los miembros del canal. Debe coincidir con
+      # el de drive. Sin él no se monta y Drive queda fail-closed.
+      ROOMS_INTERNAL_SECRET: ${ROOMS_INTERNAL_SECRET}
+      # Sytue ID: encuentra a la persona de otra organización por su correo o su
+      # @usuario (people:resolve, ADR 0040).
+      ID_URL: http://id:8081
+      # --- Videollamada (la otra mitad de Rooms) ---
+      LIVEKIT_URL: https://rooms-sfu.sytue.localhost
+      LIVEKIT_HOST: http://livekit:7880
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      id:
+        condition: service_healthy
+      dragonfly:
+        condition: service_healthy
+      livekit:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.rooms-api.rule=Host(`rooms-api.sytue.localhost`)"
+      - "traefik.http.routers.rooms-api.entrypoints=websecure"
+      - "traefik.http.routers.rooms-api.tls=true"
+      - "traefik.http.services.rooms-api.loadbalancer.server.port=8085"
+    healthcheck:
+      test: ["CMD", "/app/rooms", "healthcheck"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  # --- Sytue AI :8084 — asistente del editor (LLM); STATELESS, sin BD ---
+  # Autentica el JWT de Sytue ID (JWKS) y delega en un proveedor LLM configurable
+  # (Scaleway por defecto, o un endpoint OpenAI-compatible soberano). La API key
+  # vive SOLO aquí (server-only): sin AI_API_KEY arranca sano y /assist da 503.
+  ai:
+    build:
+      <<: *go-build
+      dockerfile: services/ai/Dockerfile
+    <<: [*restart, *logging, *mem-go]
+    profiles: ["full", "docs"]
+    networks: [edge, backend]
+    ports:
+      - "127.0.0.1:8084:8084"
+    environment:
+      <<: *go-env
+      PORT: "8084"
+      PUBLIC_URL: https://ai.sytue.localhost
+      AI_PROVIDER: ${AI_PROVIDER:-scaleway}
+      AI_API_KEY: ${AI_API_KEY:-}
+      AI_MODEL: ${AI_MODEL:-mistral-small-3.2-24b-instruct-2506}
+      # Modelo soberano/self-hosted: AI_PROVIDER=openai-compat + AI_BASE_URL=<url>.
+      AI_BASE_URL: ${AI_BASE_URL:-https://api.scaleway.ai}
+    depends_on:
+      id:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.ai.rule=Host(`ai.sytue.localhost`)"
+      - "traefik.http.routers.ai.entrypoints=websecure"
+      - "traefik.http.routers.ai.tls=true"
+      - "traefik.http.services.ai.loadbalancer.server.port=8084"
+    healthcheck:
+      test: ["CMD", "/app/ai", "healthcheck"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  # --- Sytue Cloud API :8090 — control plane del PaaS + PostgREST; PG + S3 ---
+  cloud-api:
+    build:
+      <<: *go-build
+      dockerfile: services/cloud/Dockerfile.api
+    <<: [*restart, *logging, *mem-go]
+    profiles: ["full", "cloud"]
+    networks: [edge, backend]
+    ports:
+      - "127.0.0.1:8090:8090"
+    environment:
+      <<: *go-env
+      PORT: "8090"
+      PUBLIC_URL: https://cloud-api.sytue.localhost
+      # Tráfico M2M interno; el token del admin se revalida en Sytue ID.
+      IDENTITY_API_URL: http://id:8081
+      DATABASE_URL: "postgres://${CLOUD_DB_USER:-sytue_cloud}:${CLOUD_DB_PASSWORD}@postgres:5432/${CLOUD_DB_NAME:-sytue_cloud}?sslmode=disable"
+      S3_BUCKET: sytue-dev-cloud
+      # Clave AES-256 (base64, 32 bytes) para sellar secretos del PaaS (obligatoria).
+      SECRET_ENC_KEY: ${CLOUD_SECRET_ENC_KEY}
+      BUILDER_URL: http://cloud-builder:8091
+      POSTGREST_URL: http://postgrest:3000
+      # Los webhooks git se firman SIEMPRE, también en local: sin secreto se
+      # rechazan (el endpoint es público y una firma opcional no es una firma).
+      # Valor de dev conocido a propósito, para poder firmar a mano al probar.
+      WEBHOOK_SECRET: ${CLOUD_WEBHOOK_SECRET}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      id:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.cloud-api.rule=Host(`cloud-api.sytue.localhost`)"
+      - "traefik.http.routers.cloud-api.entrypoints=websecure"
+      - "traefik.http.routers.cloud-api.tls=true"
+      - "traefik.http.services.cloud-api.loadbalancer.server.port=8090"
+    healthcheck:
+      test: ["CMD", "/app/cloud-api", "healthcheck"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  # --- Sytue Cloud builder :8091 — builds (Kaniko-style); S3 build-cache ---
+  cloud-builder:
+    build:
+      <<: *go-build
+      dockerfile: services/cloud/Dockerfile.builder
+    <<: [*restart, *logging, *mem-go]
+    profiles: ["full", "cloud"]
+    networks: [backend]
+    ports:
+      - "127.0.0.1:8091:8091"
+    environment:
+      <<: *go-env
+      PORT: "8091"
+      # cloud-builder comparte config con cloud-api (services/cloud/internal/config):
+      # requiere DATABASE_URL, S3_* y SECRET_ENC_KEY. Su /readyz comprueba Postgres.
+      DATABASE_URL: "postgres://${CLOUD_DB_USER:-sytue_cloud}:${CLOUD_DB_PASSWORD}@postgres:5432/${CLOUD_DB_NAME:-sytue_cloud}?sslmode=disable"
+      SECRET_ENC_KEY: ${CLOUD_SECRET_ENC_KEY}
+      S3_BUCKET: sytue-dev-build-cache
+      S3_BUILD_CACHE_BUCKET: sytue-dev-build-cache
+      REGISTRY_URL: registry.sytue.localhost
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/app/cloud-builder", "healthcheck"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  # --- Sytue Cloud controller :8094 — reconciliador del PaaS; PG + S3 ---
+  # DEV: RUNNER_MODE=stub (no hay clúster local) => Platform/Provisioner stub, SIN
+  # client-go. En Kapsule corre con su ServiceAccount (deploy/helm/charts/cloud-controller).
+  # Comparte config con cloud-api/builder (services/cloud/internal/config): exige
+  # DATABASE_URL, S3_* y SECRET_ENC_KEY. Su /readyz comprueba Postgres.
+  cloud-controller:
+    build:
+      <<: *go-build
+      dockerfile: services/cloud/Dockerfile.controller
+    <<: [*restart, *logging, *mem-go]
+    profiles: ["full", "cloud"]
+    networks: [backend]
+    # 8094: el 8093 es del Integration Gateway (CONVENTIONS §6) y los dos juntos
+    # en el perfil `full` chocaban al arrancar («port is already allocated»).
+    ports:
+      - "127.0.0.1:8094:8094"
+    environment:
+      <<: *go-env
+      PORT: "8094"
+      DATABASE_URL: "postgres://${CLOUD_DB_USER:-sytue_cloud}:${CLOUD_DB_PASSWORD}@postgres:5432/${CLOUD_DB_NAME:-sytue_cloud}?sslmode=disable"
+      SECRET_ENC_KEY: ${CLOUD_SECRET_ENC_KEY}
+      S3_BUCKET: sytue-dev-build-cache
+      RUNNER_MODE: stub
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/app/cloud-controller", "healthcheck"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  # ===========================================================================
+  # APPS FRONTEND (Astro 5 + Preact 10) — build/serve local en modo dev.
+  # Cada app monta @sytue/shell + @sytue/ui y habla con su servicio Go vía
+  # @sytue/api-clients. Auth OIDC+PKCE contra Sytue ID (@sytue/auth).
+  # Build desde el monorepo apps/frontend (Bun workspaces; Bun sustituye Node+pnpm). Puertos §6.
+  # ===========================================================================
+  portal:
+    build: &frontend-build
+      context: ../../apps/frontend
+      dockerfile: Dockerfile
+      target: dev
+    <<: [*restart, *logging]
+    profiles: ["full", "portal"]
+    networks: [edge, backend]
+    command: ["bun", "run", "--filter", "@sytue/portal", "dev", "--host", "0.0.0.0", "--port", "4321"]
+    ports: ["4321:4321"]
+    environment:
+      <<: *frontend-env
+      SYTUE_OIDC_CLIENT_ID: sytue-one
+      SYTUE_OIDC_REDIRECT_URI: https://one.sytue.localhost/auth/callback
+      SYTUE_OIDC_POST_LOGOUT_URI: https://one.sytue.localhost/
+    volumes: &frontend-volumes
+      - "../../apps/frontend:/app:cached"
+      # node_modules viven en la IMAGEN (instalados con Bun para Linux), no en el
+      # host (macOS): volúmenes anónimos que enmascaran el bind mount para la raíz
+      # del workspace y para cada app (Bun coloca .bin/astro por app, sin hoisting).
+      - "/app/node_modules"
+      - "/app/packages/ui/node_modules"
+      - "/app/packages/shell/node_modules"
+      - "/app/packages/auth/node_modules"
+      - "/app/packages/api-clients/node_modules"
+      - "/app/packages/config/node_modules"
+      # Estos cuatro se añadieron al workspace DESPUÉS de escribirse esta lista y
+      # nadie los enmascaró: el bind mount les colaba los node_modules de macOS
+      # dentro de un contenedor Linux. `i18n` lo importa toda la suite.
+      - "/app/packages/i18n/node_modules"
+      - "/app/packages/offline/node_modules"
+      - "/app/packages/formula/node_modules"
+      - "/app/packages/cloud/node_modules"
+      - "/app/packages/office/node_modules"
+      - "/app/apps/portal/node_modules"
+      - "/app/apps/console/node_modules"
+      - "/app/apps/cloud-dashboard/node_modules"
+      - "/app/apps/www/node_modules"
+      - "/app/apps/mail/node_modules"
+      - "/app/apps/drive/node_modules"
+      - "/app/apps/calendar/node_modules"
+      - "/app/apps/contacts/node_modules"
+      - "/app/apps/docus/node_modules"
+      - "/app/apps/calcus/node_modules"
+      - "/app/apps/diapos/node_modules"
+      - "/app/apps/certipdf/node_modules"
+      - "/app/apps/notes/node_modules"
+      - "/app/apps/rooms/node_modules"
+      # .astro guarda un lock del dev-server (PID) por app: si se bind-montea el
+      # del host (con locks obsoletos de un `astro dev` local previo) Astro aborta
+      # con "Another astro dev server is already running". Volúmenes anónimos por
+      # app => cada contenedor arranca con un .astro limpio.
+      - "/app/apps/portal/.astro"
+      - "/app/apps/console/.astro"
+      - "/app/apps/cloud-dashboard/.astro"
+      - "/app/apps/www/.astro"
+      - "/app/apps/mail/.astro"
+      - "/app/apps/drive/.astro"
+      - "/app/apps/calendar/.astro"
+      - "/app/apps/contacts/.astro"
+      - "/app/apps/docus/.astro"
+      - "/app/apps/calcus/.astro"
+      - "/app/apps/diapos/.astro"
+      - "/app/apps/certipdf/.astro"
+      - "/app/apps/notes/.astro"
+      - "/app/apps/rooms/.astro"
+    depends_on:
+      id:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.portal.rule=Host(`one.sytue.localhost`)"
+      - "traefik.http.routers.portal.entrypoints=websecure"
+      - "traefik.http.routers.portal.tls=true"
+      - "traefik.http.services.portal.loadbalancer.server.port=4321"
+
+  console:
+    build: *frontend-build
+    <<: [*restart, *logging]
+    profiles: ["full", "console"]
+    networks: [edge, backend]
+    command: ["bun", "run", "--filter", "@sytue/app-console", "dev", "--host", "0.0.0.0", "--port", "4322"]
+    ports: ["4322:4322"]
+    environment:
+      <<: *frontend-env
+      # El client_id sigue siendo `sytue-console`: es un identificador estable, no
+      # un rótulo (igual que Rooms conserva `sytue-chat`).
+      SYTUE_OIDC_CLIENT_ID: sytue-console
+      SYTUE_OIDC_REDIRECT_URI: https://admin.sytue.localhost/auth/callback
+      SYTUE_OIDC_POST_LOGOUT_URI: https://admin.sytue.localhost/
+      # BFF (Cumplimiento, Auditoría unificada, catálogo de Apps) → servicios Go internos.
+      # Best-effort: si un servicio no está arriba (perfil inactivo), degrada sin romper.
+      SYTUE_MAIL_API_URL: http://mail:8086
+      SYTUE_DRIVE_API_URL: http://drive:8082
+      SYTUE_INTEGRATIONS_BASE_URL: http://integrations:8093
+    volumes: *frontend-volumes
+    depends_on:
+      id:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.admin-web.rule=Host(`admin.sytue.localhost`)"
+      - "traefik.http.routers.admin-web.entrypoints=websecure"
+      - "traefik.http.routers.admin-web.tls=true"
+      - "traefik.http.services.admin-web.loadbalancer.server.port=4322"
+      # Host LEGADO: console.* responde 301 permanente a admin.*, preservando el
+      # path. El router legado apunta al mismo servicio pero nunca proxya: el
+      # middleware redirige antes. `$${1}` escapa la interpolación de Compose.
+      # Mismo patrón que chat.*/meet.* → rooms.* (ver el servicio rooms-web).
+      - "traefik.http.routers.console-redirect.rule=Host(`console.sytue.localhost`)"
+      - "traefik.http.routers.console-redirect.entrypoints=websecure"
+      - "traefik.http.routers.console-redirect.tls=true"
+      - "traefik.http.routers.console-redirect.service=admin-web"
+      - "traefik.http.routers.console-redirect.middlewares=console-to-admin"
+      - "traefik.http.middlewares.console-to-admin.redirectregex.regex=^https?://console.sytue.localhost/(.*)"
+      - "traefik.http.middlewares.console-to-admin.redirectregex.replacement=https://admin.sytue.localhost/$${1}"
+      - "traefik.http.middlewares.console-to-admin.redirectregex.permanent=true"
+
+  cloud-dashboard:
+    build: *frontend-build
+    <<: [*restart, *logging]
+    profiles: ["full", "cloud"]
+    networks: [edge, backend]
+    command: ["bun", "run", "--filter", "@sytue/app-cloud-dashboard", "dev", "--host", "0.0.0.0", "--port", "4323"]
+    ports: ["4323:4323"]
+    environment:
+      <<: *frontend-env
+      SYTUE_OIDC_CLIENT_ID: sytue-cloud
+      SYTUE_OIDC_REDIRECT_URI: https://cloud.sytue.localhost/auth/callback
+      SYTUE_OIDC_POST_LOGOUT_URI: https://cloud.sytue.localhost/
+      # API de LECTURA de Sytue Analytics: interna y sin Ingress, así que el BFF
+      # la llama por la red de compose. Vacía = la sección de analítica aparece
+      # apagada, que es lo correcto en un perfil sin el servicio levantado.
+      SYTUE_ANALYTICS_API_URL: http://analytics-api:8095
+    volumes: *frontend-volumes
+    depends_on:
+      id:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.cloud.rule=Host(`cloud.sytue.localhost`)"
+      - "traefik.http.routers.cloud.entrypoints=websecure"
+      - "traefik.http.routers.cloud.tls=true"
+      - "traefik.http.services.cloud.loadbalancer.server.port=4323"
+
+  www:
+    build: *frontend-build
+    <<: [*restart, *logging]
+    profiles: ["full", "www"]
+    networks: [edge, backend]
+    command: ["bun", "run", "--filter", "@sytue/app-www", "dev", "--host", "0.0.0.0", "--port", "4324"]
+    ports: ["4324:4324"]
+    environment: *frontend-env
+    volumes: *frontend-volumes
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.www.rule=Host(`sytue.localhost`) || Host(`www.sytue.localhost`)"
+      - "traefik.http.routers.www.entrypoints=websecure"
+      - "traefik.http.routers.www.tls=true"
+      - "traefik.http.services.www.loadbalancer.server.port=4324"
+
+  mail-web:
+    build: *frontend-build
+    <<: [*restart, *logging]
+    profiles: ["full", "mail"]
+    networks: [edge, backend]
+    command: ["bun", "run", "--filter", "@sytue/mail", "dev", "--host", "0.0.0.0", "--port", "4325"]
+    ports: ["4325:4325"]
+    environment:
+      <<: *frontend-env
+      SYTUE_OIDC_CLIENT_ID: sytue-mail
+      SYTUE_OIDC_REDIRECT_URI: https://mail.sytue.localhost/auth/callback
+      SYTUE_OIDC_POST_LOGOUT_URI: https://mail.sytue.localhost/
+    volumes: *frontend-volumes
+    depends_on:
+      id:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.mail-web.rule=Host(`mail.sytue.localhost`)"
+      - "traefik.http.routers.mail-web.entrypoints=websecure"
+      - "traefik.http.routers.mail-web.tls=true"
+      - "traefik.http.services.mail-web.loadbalancer.server.port=4325"
+
+  drive-web:
+    build: *frontend-build
+    <<: [*restart, *logging]
+    profiles: ["full", "drive"]
+    networks: [edge, backend]
+    command: ["bun", "run", "--filter", "@sytue/drive", "dev", "--host", "0.0.0.0", "--port", "4326"]
+    ports: ["4326:4326"]
+    environment:
+      <<: *frontend-env
+      SYTUE_OIDC_CLIENT_ID: sytue-drive
+      SYTUE_OIDC_REDIRECT_URI: https://drive.sytue.localhost/auth/callback
+      SYTUE_OIDC_POST_LOGOUT_URI: https://drive.sytue.localhost/
+    volumes: *frontend-volumes
+    depends_on:
+      id:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.drive-web.rule=Host(`drive.sytue.localhost`)"
+      - "traefik.http.routers.drive-web.entrypoints=websecure"
+      - "traefik.http.routers.drive-web.tls=true"
+      - "traefik.http.services.drive-web.loadbalancer.server.port=4326"
+
+  calendar-web:
+    build: *frontend-build
+    <<: [*restart, *logging]
+    profiles: ["full", "calendar"]
+    networks: [edge, backend]
+    command: ["bun", "run", "--filter", "@sytue/calendar", "dev", "--host", "0.0.0.0", "--port", "4327"]
+    ports: ["4327:4327"]
+    environment:
+      <<: *frontend-env
+      SYTUE_OIDC_CLIENT_ID: sytue-calendar
+      SYTUE_OIDC_REDIRECT_URI: https://calendar.sytue.localhost/auth/callback
+      SYTUE_OIDC_POST_LOGOUT_URI: https://calendar.sytue.localhost/
+      # Referencia bidireccional con Sytue Notepads: la ficha del evento pregunta qué
+      # notas cuelgan de él (API interna) y enlaza a la app (host público).
+      SYTUE_NOTES_API_URL: http://notes:8089
+      PUBLIC_SYTUE_NOTES_BASE_URL: https://notes.sytue.localhost
+    volumes: *frontend-volumes
+    depends_on:
+      id:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.calendar-web.rule=Host(`calendar.sytue.localhost`)"
+      - "traefik.http.routers.calendar-web.entrypoints=websecure"
+      - "traefik.http.routers.calendar-web.tls=true"
+      - "traefik.http.services.calendar-web.loadbalancer.server.port=4327"
+
+  contacts-web:
+    build: *frontend-build
+    <<: [*restart, *logging]
+    profiles: ["full", "contacts"]
+    networks: [edge, backend]
+    command: ["bun", "run", "--filter", "@sytue/contacts", "dev", "--host", "0.0.0.0", "--port", "4328"]
+    ports: ["4328:4328"]
+    environment:
+      <<: *frontend-env
+      SYTUE_OIDC_CLIENT_ID: sytue-contacts
+      SYTUE_OIDC_REDIRECT_URI: https://contacts.sytue.localhost/auth/callback
+      SYTUE_OIDC_POST_LOGOUT_URI: https://contacts.sytue.localhost/
+    volumes: *frontend-volumes
+    depends_on:
+      id:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.contacts-web.rule=Host(`contacts.sytue.localhost`)"
+      - "traefik.http.routers.contacts-web.entrypoints=websecure"
+      - "traefik.http.routers.contacts-web.tls=true"
+      - "traefik.http.services.contacts-web.loadbalancer.server.port=4328"
+
+  notes-web:
+    build: *frontend-build
+    <<: [*restart, *logging]
+    profiles: ["full", "notes"]
+    networks: [edge, backend]
+    command: ["bun", "run", "--filter", "@sytue/notes", "dev", "--host", "0.0.0.0", "--port", "4331"]
+    ports: ["4331:4331"]
+    environment:
+      <<: *frontend-env
+      SYTUE_OIDC_CLIENT_ID: sytue-notes
+      SYTUE_OIDC_REDIRECT_URI: https://notes.sytue.localhost/auth/callback
+      SYTUE_OIDC_POST_LOGOUT_URI: https://notes.sytue.localhost/
+      SYTUE_NOTES_BASE_URL: http://notes:8089
+      PUBLIC_SYTUE_NOTES_BASE_URL: https://notes.sytue.localhost
+      # Los selectores de incrustación hablan con el resto de la suite DESDE EL
+      # SERVIDOR: el token de la sesión no baja al navegador.
+      SYTUE_DRIVE_API_URL: http://drive:8082
+      PUBLIC_SYTUE_DRIVE_BASE_URL: https://drive.sytue.localhost
+      SYTUE_DOCS_API_URL: http://docs:8083
+      PUBLIC_SYTUE_DOCS_BASE_URL: https://docs.sytue.localhost
+      PUBLIC_SYTUE_BASES_BASE_URL: http://bases:8102
+      SYTUE_CALENDAR_API_URL: http://calendar:8087
+      PUBLIC_SYTUE_CALENDAR_BASE_URL: https://calendar.sytue.localhost
+      SYTUE_ROOMS_API_URL: http://rooms:8085
+      PUBLIC_SYTUE_ROOMS_BASE_URL: https://rooms.sytue.localhost
+    volumes: *frontend-volumes
+    depends_on:
+      id:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.notes-web.rule=Host(`notes.sytue.localhost`)"
+      - "traefik.http.routers.notes-web.entrypoints=websecure"
+      - "traefik.http.routers.notes-web.tls=true"
+      - "traefik.http.services.notes-web.loadbalancer.server.port=4331"
+
+  erp-web:
+    build: *frontend-build
+    <<: [*restart, *logging]
+    profiles: ["full", "erp"]
+    networks: [edge, backend]
+    command: ["bun", "run", "--filter", "@sytue/erp", "dev", "--host", "0.0.0.0", "--port", "4334"]
+    ports: ["4334:4334"]
+    environment:
+      <<: *frontend-env
+      SYTUE_OIDC_CLIENT_ID: sytue-syerp
+      SYTUE_OIDC_REDIRECT_URI: https://erp.sytue.localhost/auth/callback
+      SYTUE_OIDC_POST_LOGOUT_URI: https://erp.sytue.localhost/
+      SYTUE_SYERP_INTERNAL_URL: http://syerp:8098
+      PUBLIC_SYTUE_SYERP_BASE_URL: https://erp.sytue.localhost
+    volumes: *frontend-volumes
+    depends_on:
+      id:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.erp-web.rule=Host(`erp.sytue.localhost`)"
+      - "traefik.http.routers.erp-web.entrypoints=websecure"
+      - "traefik.http.routers.erp-web.tls=true"
+      - "traefik.http.services.erp-web.loadbalancer.server.port=4334"
+
+  cast-web:
+    build: *frontend-build
+    <<: [*restart, *logging]
+    profiles: ["full", "cast"]
+    networks: [edge, backend]
+    command: ["bun", "run", "--filter", "@sytue/cast", "dev", "--host", "0.0.0.0", "--port", "4335"]
+    ports: ["4335:4335"]
+    environment:
+      <<: *frontend-env
+      SYTUE_OIDC_CLIENT_ID: sytue-cast
+      SYTUE_OIDC_REDIRECT_URI: https://cast.sytue.localhost/auth/callback
+      SYTUE_OIDC_POST_LOGOUT_URI: https://cast.sytue.localhost/
+      # El proxy api/[...ruta].ts reenvía al servicio por dentro (también /public).
+      SYTUE_CAST_API_URL: http://cast:8099
+      # El WebSocket del chat se lo devuelve el BFF al NAVEGADOR: host público.
+      SYTUE_CAST_WS_URL: wss://cast.sytue.localhost
+      PUBLIC_SYTUE_CAST_BASE_URL: https://cast.sytue.localhost
+    volumes: *frontend-volumes
+    depends_on:
+      id:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.cast-web.rule=Host(`cast.sytue.localhost`)"
+      - "traefik.http.routers.cast-web.entrypoints=websecure"
+      - "traefik.http.routers.cast-web.tls=true"
+      - "traefik.http.services.cast-web.loadbalancer.server.port=4335"
+
+  pages-web:
+    build: *frontend-build
+    <<: [*restart, *logging]
+    profiles: ["full", "pages"]
+    networks: [edge, backend]
+    command: ["bun", "run", "--filter", "@sytue/pages", "dev", "--host", "0.0.0.0", "--port", "4336"]
+    ports: ["4336:4336"]
+    environment:
+      <<: *frontend-env
+      SYTUE_OIDC_CLIENT_ID: sytue-pages
+      SYTUE_OIDC_REDIRECT_URI: https://web.sytue.localhost/auth/callback
+      SYTUE_OIDC_POST_LOGOUT_URI: https://web.sytue.localhost/
+      # El proxy api/[...ruta].ts reenvía al servicio por dentro.
+      SYTUE_PAGES_API_URL: http://pages:8100
+    volumes: *frontend-volumes
+    depends_on:
+      id:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.pages-web.rule=Host(`web.sytue.localhost`)"
+      - "traefik.http.routers.pages-web.entrypoints=websecure"
+      - "traefik.http.routers.pages-web.tls=true"
+      - "traefik.http.services.pages-web.loadbalancer.server.port=4336"
+
+  bases-web:
+    build: *frontend-build
+    <<: [*restart, *logging]
+    profiles: ["full", "bases"]
+    networks: [edge, backend]
+    command: ["bun", "run", "--filter", "@sytue/bases", "dev", "--host", "0.0.0.0", "--port", "4337"]
+    ports: ["4337:4337"]
+    environment:
+      <<: *frontend-env
+      SYTUE_OIDC_CLIENT_ID: sytue-bases
+      SYTUE_OIDC_REDIRECT_URI: https://bases.sytue.localhost/auth/callback
+      SYTUE_OIDC_POST_LOGOUT_URI: https://bases.sytue.localhost/
+      SYTUE_BASES_API_URL: http://bases:8102
+    volumes: *frontend-volumes
+    depends_on:
+      id:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.bases-web.rule=Host(`bases.sytue.localhost`)"
+      - "traefik.http.routers.bases-web.entrypoints=websecure"
+      - "traefik.http.routers.bases-web.tls=true"
+      - "traefik.http.services.bases-web.loadbalancer.server.port=4337"
+
+  # La ofimática con una app por producto (2026-10-12, ADR 0076): el mismo paquete
+  # (@sytue/office) con su host, su prefijo y su client OIDC (migración 0111 de Sytue ID).
+  docus-web:
+    build: *frontend-build
+    <<: [*restart, *logging]
+    profiles: ["full", "docs", "docus"]
+    networks: [edge, backend]
+    command: ["bun", "run", "--filter", "@sytue/docus", "dev", "--host", "0.0.0.0", "--port", "4338"]
+    ports: ["4338:4338"]
+    environment:
+      <<: *frontend-env
+      SYTUE_OIDC_CLIENT_ID: sytue-docus
+      SYTUE_OIDC_REDIRECT_URI: https://docus.sytue.localhost/auth/callback
+      SYTUE_OIDC_POST_LOGOUT_URI: https://docus.sytue.localhost/
+      SYTUE_AI_URL: http://ai:8084/api/v1/assist
+    volumes: *frontend-volumes
+    depends_on:
+      id:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.docus-web.rule=Host(`docus.sytue.localhost`)"
+      - "traefik.http.routers.docus-web.entrypoints=websecure"
+      - "traefik.http.routers.docus-web.tls=true"
+      - "traefik.http.services.docus-web.loadbalancer.server.port=4338"
+
+  # La ofimática con una app por producto (2026-10-12, ADR 0076): el mismo paquete
+  # (@sytue/office) con su host, su prefijo y su client OIDC (migración 0111 de Sytue ID).
+  calcus-web:
+    build: *frontend-build
+    <<: [*restart, *logging]
+    profiles: ["full", "docs", "calcus"]
+    networks: [edge, backend]
+    command: ["bun", "run", "--filter", "@sytue/calcus", "dev", "--host", "0.0.0.0", "--port", "4339"]
+    ports: ["4339:4339"]
+    environment:
+      <<: *frontend-env
+      SYTUE_OIDC_CLIENT_ID: sytue-calcus
+      SYTUE_OIDC_REDIRECT_URI: https://calcus.sytue.localhost/auth/callback
+      SYTUE_OIDC_POST_LOGOUT_URI: https://calcus.sytue.localhost/
+      SYTUE_AI_URL: http://ai:8084/api/v1/assist
+    volumes: *frontend-volumes
+    depends_on:
+      id:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.calcus-web.rule=Host(`calcus.sytue.localhost`)"
+      - "traefik.http.routers.calcus-web.entrypoints=websecure"
+      - "traefik.http.routers.calcus-web.tls=true"
+      - "traefik.http.services.calcus-web.loadbalancer.server.port=4339"
+
+  # La ofimática con una app por producto (2026-10-12, ADR 0076): el mismo paquete
+  # (@sytue/office) con su host, su prefijo y su client OIDC (migración 0111 de Sytue ID).
+  diapos-web:
+    build: *frontend-build
+    <<: [*restart, *logging]
+    profiles: ["full", "docs", "diapos"]
+    networks: [edge, backend]
+    command: ["bun", "run", "--filter", "@sytue/diapos", "dev", "--host", "0.0.0.0", "--port", "4340"]
+    ports: ["4340:4340"]
+    environment:
+      <<: *frontend-env
+      SYTUE_OIDC_CLIENT_ID: sytue-diapos
+      SYTUE_OIDC_REDIRECT_URI: https://diapos.sytue.localhost/auth/callback
+      SYTUE_OIDC_POST_LOGOUT_URI: https://diapos.sytue.localhost/
+      SYTUE_AI_URL: http://ai:8084/api/v1/assist
+    volumes: *frontend-volumes
+    depends_on:
+      id:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.diapos-web.rule=Host(`diapos.sytue.localhost`)"
+      - "traefik.http.routers.diapos-web.entrypoints=websecure"
+      - "traefik.http.routers.diapos-web.tls=true"
+      - "traefik.http.services.diapos-web.loadbalancer.server.port=4340"
+
+  # La ofimática con una app por producto (2026-10-12, ADR 0076): el mismo paquete
+  # (@sytue/office) con su host, su prefijo y su client OIDC (migración 0111 de Sytue ID).
+  certipdf-web:
+    build: *frontend-build
+    <<: [*restart, *logging]
+    profiles: ["full", "docs", "certipdf"]
+    networks: [edge, backend]
+    command: ["bun", "run", "--filter", "@sytue/certipdf", "dev", "--host", "0.0.0.0", "--port", "4341"]
+    ports: ["4341:4341"]
+    environment:
+      <<: *frontend-env
+      SYTUE_OIDC_CLIENT_ID: sytue-certipdf
+      SYTUE_OIDC_REDIRECT_URI: https://certipdf.sytue.localhost/auth/callback
+      SYTUE_OIDC_POST_LOGOUT_URI: https://certipdf.sytue.localhost/
+      SYTUE_AI_URL: http://ai:8084/api/v1/assist
+    volumes: *frontend-volumes
+    depends_on:
+      id:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.certipdf-web.rule=Host(`certipdf.sytue.localhost`)"
+      - "traefik.http.routers.certipdf-web.entrypoints=websecure"
+      - "traefik.http.routers.certipdf-web.tls=true"
+      - "traefik.http.services.certipdf-web.loadbalancer.server.port=4341"
+
+  rooms-web:
+    build: *frontend-build
+    <<: [*restart, *logging]
+    profiles: ["full", "rooms"]
+    networks: [edge, backend]
+    command: ["bun", "run", "--filter", "@sytue/rooms", "dev", "--host", "0.0.0.0", "--port", "4330"]
+    ports: ["4330:4330"]
+    environment:
+      <<: *frontend-env
+      # `sytue-chat`, no `sytue-rooms`: la migración 0023 renombró el client a
+      # «Sytue Rooms» pero CONSERVÓ el id (es clave ajena de sesiones, tokens y
+      # consentimientos). Con `sytue-rooms` el IdP responde «client_id
+      # desconocido» y Rooms no deja entrar en local. Igual que el chart de Helm.
+      SYTUE_OIDC_CLIENT_ID: sytue-chat
+      SYTUE_OIDC_REDIRECT_URI: https://rooms.sytue.localhost/auth/callback
+      SYTUE_OIDC_POST_LOGOUT_URI: https://rooms.sytue.localhost/
+    volumes: *frontend-volumes
+    depends_on:
+      id:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      # Sytue Rooms (Chat+Meet unificados) se sirve en su HOST CANÓNICO PROPIO.
+      - "traefik.http.routers.rooms-web.rule=Host(`rooms.sytue.localhost`)"
+      - "traefik.http.routers.rooms-web.entrypoints=websecure"
+      - "traefik.http.routers.rooms-web.tls=true"
+      - "traefik.http.services.rooms-web.loadbalancer.server.port=4330"
+      # Hosts LEGADOS: meet.* (su app Astro ya se retiró) y chat.* (Rooms vivía ahí)
+      # responden 301 permanente a rooms.*, preservando el path. El middleware
+      # redirige ANTES de tocar el backend, así que ambos routers pueden colgar del
+      # servicio rooms-web (nunca proxyan a él). `$${1}` escapa la interpolación de
+      # Compose para que Traefik reciba el literal `${1}`.
+      - "traefik.http.routers.meet-redirect.rule=Host(`meet.sytue.localhost`)"
+      - "traefik.http.routers.meet-redirect.entrypoints=websecure"
+      - "traefik.http.routers.meet-redirect.tls=true"
+      - "traefik.http.routers.meet-redirect.service=rooms-web"
+      - "traefik.http.routers.meet-redirect.middlewares=meet-to-rooms"
+      - "traefik.http.middlewares.meet-to-rooms.redirectregex.regex=^https?://meet.sytue.localhost/(.*)"
+      - "traefik.http.middlewares.meet-to-rooms.redirectregex.replacement=https://rooms.sytue.localhost/$${1}"
+      - "traefik.http.middlewares.meet-to-rooms.redirectregex.permanent=true"
+      - "traefik.http.routers.chat-redirect.rule=Host(`chat.sytue.localhost`)"
+      - "traefik.http.routers.chat-redirect.entrypoints=websecure"
+      - "traefik.http.routers.chat-redirect.tls=true"
+      - "traefik.http.routers.chat-redirect.service=rooms-web"
+      - "traefik.http.routers.chat-redirect.middlewares=chat-to-rooms"
+      - "traefik.http.middlewares.chat-to-rooms.redirectregex.regex=^https?://chat.sytue.localhost/(.*)"
+      - "traefik.http.middlewares.chat-to-rooms.redirectregex.replacement=https://rooms.sytue.localhost/$${1}"
+      - "traefik.http.middlewares.chat-to-rooms.redirectregex.permanent=true"

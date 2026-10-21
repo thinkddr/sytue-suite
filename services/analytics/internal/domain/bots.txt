@@ -1,0 +1,1520 @@
+# Sytue Analytics — firmas de bots/crawlers en el user-agent.
+#
+# Origen: crawler-user-agents (MIT, https://github.com/monperrus/crawler-user-agents),
+# fichero crawler-user-agents.json, campo "pattern". Atribución obligatoria: ver
+# la cabecera de bots.go.
+#
+# Transformación aplicada (una vez, a mano; para refrescar la lista se repite):
+# cada patrón se pasa a MINÚSCULAS y se reduce a texto literal — las clases de
+# una sola letra ([bB] -> b) y las alternancias de literales ((a|b) -> dos
+# entradas) se expanden; los pocos patrones con comodines reales se recortan a
+# su parte literal más distintiva. Sin expresiones regulares: la comparación es
+# subcadena exacta sobre el user-agent en minúsculas, que es ~25x más rápida que
+# una alternancia RE2 de 1500 ramas (medido: 2,5 us vs 3,4 ms por petición).
+#
+# Sintaxis: una entrada por línea, sobre el user-agent EN MINÚSCULAS.
+#   texto     coincide como subcadena
+#   ^texto    coincide como prefijo
+#   texto$    coincide como sufijo
+# Las líneas vacías y las que empiezan por '#' se ignoran.
+ dvbot
+007ac9 crawler
+008/
+2ip bot
+2ip.ru
+360spider
+7siters
+;owler
+^apache-httpclient
+^arenaunfurlbot
+^bw/
+^crunchbot
+^curl
+^dcrawl
+^httpie/
+^lcc
+^php-curl-class
+^seekbot
+^silk/
+a patent crawler
+a360-search
+a6-indexer
+aasa-bot
+abevalbot
+aboundex
+abuse.xmco.fr
+academicbotrtu
+acapbot
+accessible web bot
+accessstatus
+acoonbot
+acquia optimize
+activecomply
+acunetix
+adagiobot
+adbeat.com
+adbeat_bot
+addsearchbot
+addthis
+adidxbot
+adkerneltopiccrawler
+admantx
+adminlabs
+adsbot-google
+adsbot-google-mobile
+adsbot-iab
+adscanner
+adstxtcrawler
+advanced_crawler
+advbot
+adventurer
+agakidsbot
+agencyanalyticsbot
+ahc/
+ahrefsbot
+ahrefssiteaudit
+ai2bot
+aihitbot
+aiohttp
+air.ai/scanning
+aisearchbot
+akismetbot
+alertsite
+alexa site audit
+alexandriaorgbot
+algolia crawler
+alienfarm
+alittle client
+aliyunsecbot
+allafrica
+allorigins
+alphabot
+amazing-searchbot
+amazon cloudfront
+amazon-bedrock-agentcore-browser
+amazonadbot
+amazonbot
+amazonbuyforme
+amazonproductdiscovery
+amazonsellerinitiatedlisting
+amzn-searchbot
+amzn-user
+anchor browser
+anderspinkbot
+anomura
+anthropic-ai
+antibot
+anyevent
+ap3a.240617.008
+apercite
+apifybot
+apifywebsitecontentcrawler
+apis-google
+appengine-google
+appinsights
+applebot
+appsiteassociation
+arabot
+aragog/
+aranea
+aranet-searchbot
+archive-it
+archive.org_bot
+archivebot
+archivebox
+arquivo-web-crawler
+arquivobot
+artemis web reader
+artemisbot
+asana/
+asnriskscorer
+aspiegelbot
+atlassian-bot
+atom feed robot
+attracta
+atvowbot
+audigentadbot
+audisto crawler
+audistobot
+authory
+autoconfig test from ustc
+automaton
+awariobot
+awariorendererbot
+awariorssbot
+awariosmartbot
+awesomecrawler
+axios
+azureai-searchbot
+b2b bot
+backlinkcrawler
+bad neighborhood header detector
+baidu-yunguance
+baiduadsbot
+baiduspider
+barkrowler
+bazqux
+bdbot/
+bdcbot
+bdfetch
+beeperbot
+behloolbot
+bestchange
+betabot
+better uptime bot
+betteruptimebot
+bibliotheque nacional de france crawler
+bidswitchbot
+biglotron
+bigsur.ai
+bigupdatabot
+binarycanary
+bingbot
+bingpreview/
+binlar
+bitbot
+bitbucket-webhooks
+bitdiscovery
+bitlybot
+bitsightbot/
+bl.uk_lddc_bot
+bl.uk_ldfc_bot
+blackboard
+blackbox exporter/
+blackduck-fd
+blekkobot
+blexbot/
+bling erp
+blingerp
+blockaid
+bloglines
+blogmurabot
+blogtraffic/
+blogtrottr
+blogvault
+blp_bbot
+bluesky-domain-status-classifier
+bluesky/
+blueskypreviewbot
+bne.es_bot
+bnf.fr_bot
+bnfbot
+boardgamepricesbot
+bomborabot
+bot-pge.chlooe.com
+bot.araturka.com
+botify
+botpoke
+boxcarbot
+br-crawler
+brainobot
+brandonbot
+brandverity
+brandwatch
+bravebot
+brightbot
+brightedge crawler
+brokenlinkcheck.com
+browserbot-observer
+btwebclient
+bubing
+bublupbot
+buck/
+buddybot
+bufferlinkpreviewbot
+bugsnag
+bushbaby
+butterfly
+buttondown
+buzzbot
+bw/
+bytespider
+caliberbot
+caliperbot
+capitalonebot
+capitaloneshopping
+capsulechecker
+capterrabot
+carbon-umbrella-bot
+careerbot
+catchpoint
+caveman-hunter
+cc metadata scaper
+ccbot
+cdscbot
+censysinspect/
+centcombot/
+centro ads.txt crawler
+centuryb.o.t9
+centurybot
+cert pl
+certchief
+certytags
+changedetection
+channable
+channel3bot
+chargebeebot
+charlotte
+chatglm-spider
+chatgpt-user
+chatwork linkpreview
+check_http
+checkhost
+checkly
+checkmarknetwork/
+chirp
+chrome privacy preserving prefetch proxy
+chrome-lighthouse
+cincraw
+cirrusexplorer
+cispa webcrawler
+citeseerxbot
+citoid
+claritybot/
+classla-web
+claude-searchbot
+claude-user
+claude-web
+claudebot
+clearscopebot
+clickagy
+clickuplinkunfurler
+cliqzbot/
+cloudflare-alwaysonline
+cloudflare-autorag
+cloudflare-csup
+cloudflare-custom-error-page-crawler
+cloudflare-custom-hostname-verification
+cloudflare-healthchecks
+cloudflare-prefetch
+cloudflare-radar-scanner
+cloudflare-speedtest
+cloudflare-ssldetector
+cloudflare-stream-hook
+cloudflare-stream-webhook
+cloudflare-traffic-manager
+cloudflare-validator
+cloudflareradarurlscanner
+cloudtrellis
+cludo
+cmschecker
+coccoc
+cocolyzebot
+codabot
+code/1.
+cognitiveseo bot
+cognitiveseo.com
+cohere-ai
+cohere-training-data-crawler
+collapsify
+collection@infegy.com
+colly
+commafeed
+companybook-crawler
+content crawler spider
+contentkingapp
+contextad bot
+contextualbot
+contxbot
+convera
+convermax
+cookie-maestro
+cookiebot
+cookiehub bot
+cookiehubscan
+cookiehubverify
+cookieyesbot
+corporama matcher
+cotoyogi
+coveobot
+cozi-icalendar-feedreader
+crawl4ai
+crawler4j
+crawler_eb_germany
+crawlson
+crawlyprojectcrawler
+crazy egg
+criteobot
+critical css bot
+criticalcss.com
+cron-job.org
+cronless
+crusty/
+crystalsemanticsbot
+csirt.cz
+curebot
+customasynchttpclient
+cutbot
+cxensebot
+cxk_bot
+cybaabot
+cyberfindcrawler
+cyberpatrol
+cyotekwebcopy
+cypex.ai/scanning
+dareboost
+dark visitor
+daspeedbot
+datadog agent
+datadog synthetic
+datadogsynthetics
+datafeedwatch
+dataforseobot
+datagnionbot
+datanyze
+dataprovider.com
+daum/
+daumoa
+dazzle bluesky bot
+dbot)
+dead link checker
+deadlinkchecker
+deepcrawl
+deepnoc
+deepseekbot
+deskyobot
+detectify
+determ
+deusu/
+developers.google.com/+/web/snippet
+devin
+df bot
+diffbot/
+digg deeper
+digicert dcv
+digincore bot
+dingtalkbot-linkservice
+dirbuster
+discobot
+discordbot
+discourse forum onebox
+disqus
+dlc/
+dlvr.it
+dmbot
+dmbrowser
+dnbcrawler
+dnsscanner
+dnyzbot
+do not track verifier
+domain re-animator bot
+domaincrawler
+domains project/
+domainstatsbot
+domcopbot
+dominicbot
+dotbot
+dotcom-monitor
+dow jones searchbot
+download ninja
+downnotifier.com
+downtimedetector/
+dragonbot
+drataautopilot
+dratabot
+dreamhost data team
+drupact
+drupalbot
+ds9
+dubbotbot
+duckassistbot
+duckduckbot
+duckduckgo-favicons-bot
+e.ventures investment crawler
+easybib autocite
+easybill-importmanager
+easycron/
+easydns monitoring
+ec2linkfinder
+echoboxbot/
+ecovadissustainabilitybot
+edansbot
+edgewatch
+edisterbot
+electricmonk
+elisabot
+elmah.io uptime monitoring
+elmahio-uptimebot
+emailwolf
+embedly
+emoney advisor
+emoneybot
+epicbot
+epivozcrawler
+erepublik.tools
+eright
+europarchive.org
+ev-crawler/
+evc-batch
+evernoterichlinkbot
+everyfeed-spider
+everyonesocialbot
+evouptimebot
+exabot
+exodusmovement
+expanse
+experibot
+extecontextcrawl
+extlinksbot
+eyeotabot
+ezgif
+ezid
+ezlynx
+ezoicbot
+ezooms
+facebookbot
+facebookcatalog/
+facebookexternalhit
+facebot
+factset_spyderbot
+fast enterprise crawler
+fast-webcrawler
+fastdast
+fastmailua
+fdl stats bot
+fedicabot
+fedidb
+fediindex
+fedilist agent
+fedineko
+fedistatscrawler
+fedoraplanet
+fedreporter bot for ffiec
+fedreporterdatabot
+feed image audit
+feedbin
+feedbot
+feedburner
+feeder /
+feeder.co
+feedfetcher-google
+feedflow
+feedly
+feedpresso content index bot
+feedsearch bot
+feedsearch-crawler
+feedspot
+feedvalidator
+feedwind
+femtosearchbot
+fetch/
+fever
+fidget-spinner-bot
+filterdb.iss.net/crawler
+findfiles.net
+finditanswersbot
+findlink
+findthatfile
+findxbot
+fiperbot
+firecrawlagent
+firmograph
+flamingo_searchengine
+fleebsbot
+flipboardproxy
+flipboardrss
+fluffy
+fluid
+flyriverbot
+foregenix
+fr-crawler
+freespoke/
+freewebmonitoring sitechecker
+freshbot
+freshpingbot
+freshrss
+friendica
+friendly testing bot
+friendly-spider
+friendlycrawler/
+fuelbot
+fullstorybot/
+funnelback
+fuseonbot/
+fyndsearchengine-crawler
+fyndsearchengine-recrawler
+fyrebot
+g00g1e.net
+g2 web services
+g2reader-bot
+gabanzabot/
+gaisbot
+garlikcrawler
+gdnplus.com
+geedobot
+geedoproductsearch
+geedoshopproductfinder
+gemini-deep-research
+genieo
+genomecrawlerd
+getthit.com
+gg peekbot
+ghost inspector
+giftedvisitor scan
+gigablast
+gigabot
+gingercrawler
+github-camo
+globalwebsearch
+gluten free crawler/
+gnam gnam spider
+gnowitnewsbot
+go-http-client
+golfe/
+goodreads
+goodzer
+google favicon
+google trust services
+google web preview
+google-ads-conversions
+google-adwords-express
+google-adwords-instant
+google-agent
+google-apps-script
+google-area120
+google-certificates-bridge
+google-cloudvertexbot
+google-extended
+google-gemini-cli
+google-inspectiontool
+google-notebooklm
+google-physicalweb
+google-read-aloud
+google-safety
+google-site-verification
+google-structured-data-testing-tool
+google-trust-services/
+google-xrawler
+googleagent-mariner
+googleassociationservice$
+googleassociationservice/
+googlebot-ia/
+googlebot-image
+googlebot-mobile
+googlebot-news
+googlebot-video
+googlebot/
+googledocs
+googleimageproxy
+googleother
+googleproducer
+googlestackdrivermonitoring
+goparserbot
+gopay
+gotosocial
+gotsitemonitor.com
+gowikibot
+gptbot
+grammarly/
+grapeshotcrawler
+gregcrawler
+greppr web crawler
+grobbot
+groovinaadsbot/
+grouphigh/
+groupmebot
+grover/
+grub.org
+gsa-crawler
+gslfbot
+gtmetrix
+guestpostsbot/
+gulper web bot
+gwene
+halobot
+hanaleibot
+happywing
+hardenize
+harsilbot/
+hatena
+hawaiibot
+hcardvalidator
+headlesschrome
+headonlyscraper
+hello world
+helloworkjobpostingbot/
+henkbot
+heritrix
+hetrixtools
+hgfalphaxcrawl/
+hifibot/
+hlidam.to robot
+honeybadger uptime check
+honeybadgerbot
+hosttracker/
+hotjar
+hstspreload-bot
+http banner detection
+http_get
+https://developers.cloudflare.com/security-center/
+httpunit
+httpurlconnection
+httpx
+httrack
+hubspot
+huckabot/
+hydrozen.io
+hype machine/
+hypestat
+hyscore.io
+ia_archiver
+ias crawler
+iaskbot/
+iaskspider
+ibm crawler
+iboubot
+icbot/
+icc-crawler
+ichiro
+idg/eu
+iframely
+ifttt/
+imagefetcher/
+imagemind
+imagesiftbot
+imagespider
+img2dataset
+imgproxy/
+impact.com agent
+impendoom-bot/
+imrbot
+indeedbot
+indeedjobbot
+indy library
+inetdex-bot
+infoobot
+innguma/
+innologica
+inoreader
+instapaper/
+integromat/
+integromedb
+intelium_bot
+intelx.io_bot
+interfaxscanbot
+internetmeasurement
+internetvista monitor
+ioncrawl
+ip-web-crawler.com
+ips-agent
+irlbot
+irokez.cz monitoring
+isdownbot/
+iskanie
+isscyberriskcrawler/
+istellabot
+it2media-domain-crawler
+iubenda-radar/
+james bot
+jamie's spider
+jetmon/
+jetslide
+jetty
+jobboersebot
+jobswithgptcom-bot
+jooblebot
+jpg-newsbot
+jugendschutzprogramm-crawler
+jumio
+jyxobot
+k7mlwcbot
+kagi-fetcher
+kagibot/
+kaikki.org-digital-archive
+kangaroo bot
+kangaroobot/
+kargobot-artemis
+kazbtbot/
+kb.dk_bot
+kemvibot
+kendrabot
+keybasebot
+keycdn-tools/
+keydrop.io
+keys-so-bot
+kinsta-bot
+klaviyo/
+known agent
+komodiabot
+konturbot/
+kosmiobot
+krawlerbot
+kstandbot
+kukei.eu-bot/
+kunatocrawler
+l9explore
+l9scan
+lac_iaharvester
+laion-huggingface-processor
+landau-media-spider
+larbin
+laserlikebot
+lastmodbot/
+lb-spider
+legalmonster
+leikibot
+lemmy
+let's encrypt
+level9searchbot/
+library of congress web archiving
+libwww-perl
+lightspeedsystemscrawler
+linerbot/
+linespider
+linguee bot
+linkace/
+linkapediabot
+linkarchiver
+linkcheckerbot
+linkdex
+linkedinbot
+linkisbot
+linko
+linkpadbot
+linkreader/
+linksindexerbot/
+linktiger
+linkupbot
+linkwalker/
+lipperhey
+livelapbot
+lmarenaunfurlbot
+loc.gov/programs/web-archiving
+logicmonitor
+loomlybot
+loopimprovements.com
+lssbot
+lssrocketcrawler
+ltx71
+luminator-robots
+lwp-trivial
+lyonl-asset-proxy
+lyonl-crawler
+macocu
+macrobondbot
+madbbot/
+magellan
+magibot
+magicsearchdev/
+magnet.me-web/
+magnetmebot
+magpie-crawler
+magpierss
+magus bot
+mail.ru
+mail.ru_bot
+mailchimp
+mainwp/
+make/
+managewp
+manus-user
+mappydata
+marketgoo/
+marketingminer
+masscan
+mastodon
+matchorysearch
+mattermost-bot/
+mauibot
+mavifinds
+mb-linkchecker
+mbcrawler
+mcontextualbot
+mechanize
+medialogiabot
+mediamonitoringbot/
+mediapartners (googlebot)
+mediapartners-google
+mediatoolkitbot
+mediavinemetadataparser/
+mediumbot-metatagfetcher
+megaindex
+meltwaternews
+memorybot
+mergadobot
+meta-externalads/
+meta-externalagent/
+meta-externalfetcher/
+meta-externalhit/
+meta-webindexer
+metaiab facebook
+metainspector
+metajobbot
+metauri
+metorik
+mgidbot
+microsoftpreview/
+mindupbot
+miniature.io/
+minicrawler
+miniflux/
+minoru's fediverse crawler
+mirrorweb.com
+mirrorwebcrawler
+missinglettrbot/
+mistralai-user
+mithril-crawler
+mixnodecache/
+mixrankbot
+mj12bot
+mlbot
+moatbot
+modatscanner
+modernizebot
+modularconnector/
+mojeekbot/
+mollie http client
+monibot
+monitis -
+monitoring360bot/
+monitorss/
+monsidobot
+monspark/
+montastic-monitor
+montasticmonitor
+montools.com
+moodlebot
+moreover
+motominerbot/
+mrgbot/
+msnbot
+msrbot
+mtrobot
+muckrack
+multiviewbot
+mxtoolbox
+my-tiny-bot
+mybot/
+nanointeractive
+napbot
+naver blog rssbot
+naverbot
+nbertaupete95
+neevabot
+nerdbynature.bot
+nerdybot
+nessus
+nestdaddybot
+netapi
+netcraft ssl server survey
+netcraft web server survey
+netcraftsurveyagent
+netestate ne crawler
+neticle crawler
+netpeakcheckerbot/
+netresearchserver
+netseer crawler
+netshelter contentscan
+netsystemsresearch
+netumo
+netvibes
+netvigie
+new york times newsgathering
+newrelicbot/
+newrelicsynthetics
+newsai/
+newsblur
+newsharecounts
+newsify feed fetcher
+newsnow/
+newspaper/
+newsroom.bi
+nextcloud
+nicecrawler
+nicheindex
+niki-bot
+nikto
+nimbostratus-bot
+ning/
+ninja bot
+nitro-
+nitrobot
+nixstatsbot
+nlnz_iaharvester
+nlux_iaharvester
+nmap scripting engine
+noahbot
+node-fetch
+nodeping
+noibu
+nomore404.com robot
+noorobot
+nooshub/
+nostocrawlerbot
+notabot
+notion/
+novaact/
+novellum
+nstoolsbot/
+ntentbot
+nutch
+nuzzel
+nvdorz
+nyt_scraping
+oai-searchbot
+observepoint
+ocarinabot
+odin;
+odklbot/
+officestorebot
+offline explorer
+ohdear/
+oicrawler
+okhttp
+omgili
+omnisend/
+oncrawl/
+onetrust
+online domain tools
+online-webceo-bot
+onlineornot.com_bot
+opencode-smartfetch
+opengraph.io/
+opengraphcheck
+openhosebot
+openindexspider
+openrss
+opentheboxbot
+openvas
+operator/
+optimizer)
+orangebot/
+orbbot/
+orlo-linkpreview/
+outbrain
+outclicksbot
+outsellurlvalidator
+overcast/
+owler (ows.eu
+owler-w
+page-preview-tool
+page2rss
+pagepeeker/
+pagespeed/
+pagething
+pandalytics
+pangubot
+panopta
+panscient
+paperlibot
+paqlebot/
+parse.ly scraper/
+parselysharesbot
+paypal/
+pcore-http
+pdf24 url to pdf
+peer39_crawler
+penthouse critical path css generator
+perplexity-user
+perplexitybot/
+perplexityuser
+petalbot
+phantomjs
+phindbot
+phpcrawl
+phxbot
+pingadmin.ru/
+pingdom
+pingping.io/
+pinterest.com/bot
+piplbot
+pixalate.com
+plagawarebot
+playstore-google
+playwright
+plesk screenshot bot
+pocketcasts/
+pocketparser
+podchaserparser
+podimo
+poduptime
+poggio-citations
+pomothy-bot
+postrank
+potions/
+pr-cy.ru
+pressenginebot
+pricedroneshoppingbot/
+priecobot/
+primalbot
+printfriendly.com
+privacyawarebot
+pro-sitemaps/
+probelyspdr/
+productsup.io/crawler
+projectshield-urlcheck
+protopage/
+proximic
+prtg network monitor
+prtgcloudbot/
+ps_daily/
+psbot
+ptst/
+pulsepoint
+pulsepoint-crawler
+pulsetic.com
+puppeteer
+purebot
+pwabuilderhttpagent
+python-opengraph
+python-requests
+python-urllib
+pywikibot/
+qcbot
+qualifiedbot/
+qualys
+quantcastbot/
+quora-bot
+qwantbot
+qwantify
+qwarrybot
+rackspace monitoring/
+rakuten image extraction bot
+rakutenusabot-image/
+rankactivelinkbot
+rankurbot/
+ravencrawler/
+rawweb-bot
+readable/
+recurly webhooks/
+red/
+redditbot
+reelevant/
+refindbot
+regionstuttgartbot
+remove.bg/
+repolookoutbot
+researchbot
+researchscan.comsys.rwth-aachen.de
+retool/
+retrevopageanalyzer
+retrolistecom/
+reverseengineeringbot
+revvimgort/
+reward-gateway
+ridderbot
+riddler (http://riddler.io
+rigor)
+rivva
+robotschecker/
+rogerbot
+rsiteauditor
+rss reader
+rss-is-dead.lol web bot
+rss-parser
+rss.social
+rss2tg
+rssapi/
+rssbot/
+rssingbot
+rssreaderbot
+ruxitsynthetic
+rytebot
+s4a-probe-bot/
+s4a/
+safednsbot
+safesearch microdata crawler
+salesforce.com
+sandobacrawler/
+sansec security monitor/
+sbintuitionsbot/
+sbl-bot
+schema-markup-validator
+scoop.it/
+scope3
+scourrssbot/
+scoutjet
+scrapeherobot/
+scraping@nytimes.com
+scrapy
+screaming frog seo spider
+screeenly-bot
+scribdbot
+scrubby
+scrunchbot
+search.marginalia.nu
+searchatlas
+searcherweb
+searcherxweb
+searchexpress
+sebot-wa
+securityheaders
+seekport
+seewithkids
+selenium
+semaltbot/
+semantic-visions
+semanticbot
+semanticscholarbot
+sempi.tech
+semrushbot
+sendgrid event api
+sentibot
+sentinel-linkcheck
+sentry/
+sentryuptimebot/
+senutobot
+seo-audit-check-bot/
+seo4ajax.com
+seobilitybot
+seokicks
+seolizer
+seolyt
+seoscanners
+seositecheckup
+seostar.co
+seoulbot
+sequelwp
+serankingbacklinksbot
+serendeputybot
+serpstatbot/
+serptimizerbot
+server density service monitoring
+serverdensity
+serverhunterspider/
+seznambot
+seznamhomepagecrawler/
+sfdc-callout/
+shapbot
+shopify-captain-hook
+shortpixel
+shortwave image fetcher
+sidetrade indexer bot
+silktide
+simplecrawler
+simplepie
+simplescraper
+sincerasyntheticuser/
+sindresorhus/got
+sindup
+sirdatabot
+sistrix crawler
+site24x7
+siteauditbot/
+sitebot
+sitebulb
+sitecheck-sitecrawl
+sitecheckerbotcrawler
+siteexplorer.info
+siteimprove.com
+sitelock
+sitescorebot
+sitesearch360/
+sitesoverpagesbot
+sitesucker
+siteuptime.com
+skroutz imagebot
+skroutzbot
+skypeuripreview
+skyworkspider
+slaccalebot
+slack-imgproxy
+slackbot
+sleepbot
+slickbot/
+slurp
+smarshbot
+smartologybot/
+smtbot
+smtnetpmbot
+snacktory
+snap url preview service
+snapchatads/
+snapurlpreview/
+snipcart/
+socialrankiobot
+software-security-research
+sogou
+solarwinds/
+sonic
+sora pos/
+sosospider
+sottopopnone
+sparkpost
+sparkshipping
+spawning-ai
+spbot
+specificfeeds
+spectate/
+speedy
+spider.com
+spiderling
+splash version/
+splunk
+springservebot
+sqlmap
+sqwatcher
+ssl labs (https://www.ssllabs.com
+ssl labs$
+ssssbot/
+stape/
+startmebot/
+startpageprivateimageproxy/
+statabot/
+statistikaustria/
+statsdronebot
+statuscake
+statusnestbacklinkspider
+stepstonecrawlbot
+storebot-google
+storygizebot
+stractbot
+streamline3bot/
+stripe/
+sucuri
+summalybot
+summify
+supabase paired crawler
+superfeedr
+surdotlybot
+surveybot
+sustainabilitycrawler
+sv-watchagent
+svix-webhooks/
+swiftbot
+swifteqlinkchecker
+swimgbot
+swisscows
+synapse
+synthesibot
+synthetic-monitoring-agent/
+sysomos
+t3versionsbot
+taboolabot
+tactiscout/
+tagoobot
+tangibleebot
+taragroup intelligent bot
+tavilybot
+tchelebi/
+telegrambot
+teoma
+termly
+terracotta
+test certificate info
+test-bot
+testcrawler
+testlocally/
+testuri
+textrazor
+the knowledge ai
+theinternetsearchx
+theoldreader.com
+thesis-research-bot
+thinkbot
+thinklab
+thousandeyes
+tigerbot
+tiktokspider
+timpibot
+tineye
+tiny tiny rss
+tls tester
+tombapublicwebcrawler
+top100.rambler.ru crawler
+toplistbot
+toutiaospider
+traackr.com
+tracemyfile
+tracking-quality-spider
+trae/
+trafilatura
+trellis-services
+trendictionbot
+trendsmapresolver
+trentwil.es
+trove
+trovitbot
+trustly/
+tsm-turingos
+tsmbot
+ttd-content
+tumblr/
+turnitin
+tweakers
+tweetedtimes
+tweetmemebot
+twengabot
+twilioproxy/
+twinagent
+twingly
+twinwavescanner
+twitterbot
+twurly
+uaslinkchecker/
+ugaresearchagent
+uipbot
+um-fc
+um-ic
+um-ln
+unshorten.it!
+upday/
+updown.io
+upflow
+uptime-kuma
+uptime/
+uptimebot.org
+uptimebot/
+uptimedoctor
+uptimerobot
+uptimestatistics
+uptimia
+uptrends
+urlappendbot
+urlbeebot
+urlcheckr/
+urlsuma.de crawler
+urlsumabot
+useebookchecker/
+usinenouvellecrawler
+ut-dorkbot
+vagabondo/
+validator.nu
+valve/steam
+vaultpress
+vebidoobot
+velenpublicwebcrawler
+veoozbot
+vercel-screenshot
+vercelbot
+verispider
+verity/
+viber
+videootv bot
+videootvbot
+vigil/
+virustotal
+visionheight.com/scan
+vkrobot
+vkshare
+vmcrawl
+voilabot
+voluumdsp-content-bot
+vsusearchspider/
+vu-server-health-scanner/
+vuhuvbot
+w3c-checklink
+w3c-mobileok
+w3c_css_validator
+w3c_i18n-checker
+w3c_unicorn
+w3c_validator
+wadoobot
+wanscannerbot
+wardbot/
+watchbot monitoring robot
+watchful
+watchmouse
+watchtowr
+wayback
+wbsearchbot
+web measure/
+web screen service by hyperhost
+web-archive-net.com.bot
+webcapture
+webceo online/
+webcompanycrawler
+webcopier
+webdatastats
+webflow
+webgains-bot
+webmon
+weborama-fetcher
+webprosbot/
+website-info.net-robot
+websiteops
+websitepulse
+websniffer/
+webspidermount
+webwikibot/
+webzio
+webzip
+wedos online
+wellknownbot
+wepchsearchengine
+wesee:search
+wget
+whatsapp
+whatsmyip.org
+whatweb/
+wheregoes.com
+wheresitup.com/
+wikido
+wirereaderbot/
+wisebot
+wjhro/
+wknd-bot
+wmtips.com/
+wocbot
+woobot
+woorankreview/
+wordcountbot/
+wordpress/
+wordup-1
+wordupinfosearch
+woriobot
+workona-favicon-service/
+worldbot
+wormlybot
+wotbox
+wovn crawler
+wovncrawler/
+wowlink crawler/
+wp time capsule
+wpbot/
+wpmu dev broken link checker
+wpmu dev hub
+wpmudev uptime monitor
+wpscan
+wpsec/
+wpumbrella
+wrtnbot
+wsm/
+wtotem
+www.uptime.com
+xenu link sleuth
+xing bot
+xml sitemaps generator
+xovibot
+xovionpagecrawler
+xy-archive-compliance
+y!j
+yacybot
+yahoo ad monitoring
+yahoo link preview
+yahoocachesystem
+yahoomailproxy
+yak/
+yandex.com/bots
+yandexrenderresourcesbot/
+yandorirssbot
+yanga
+yellowbrandprotectionbot
+yelpspider
+yeti
+yextbot/
+yisouspider
+ylt chrome
+yokoygroupag/
+yoozbot
+youbot
+youdaobot
+yuuperbot
+zabbix
+zanistabot
+zapier
+zealbot
+zebra-v2-bot
+zenback bot
+zendesk webhook
+zgrab
+zmeu
+zombiebot/
+zoombot
+zoominfo-
+zoominfobot
+zoterotranslationserver/wmf
+zumbot
+zuperlistbot/
+zyborg
+zzhbot

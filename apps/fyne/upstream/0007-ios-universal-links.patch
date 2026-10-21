@@ -1,0 +1,40 @@
+From 80f85dbc8d88ccb0bd5c3821067ba48da1e4d338 Mon Sep 17 00:00:00 2001
+From: Daniel Delgado <admin@sytue.eu>
+Date: Fri, 25 Sep 2026 17:22:53 +0200
+Subject: [PATCH] feat(mobile/ios): deliver Universal Links to the URL handler
+
+An https link associated with the app arrives as an NSUserActivity of
+type BrowsingWeb through application:continueUserActivity:, not openURL.
+Forward its webpageURL to urlOpened, on cold start and while running.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+---
+ internal/driver/mobile/app/darwin_ios.m | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/internal/driver/mobile/app/darwin_ios.m b/internal/driver/mobile/app/darwin_ios.m
+index c0d6820..d622c4a 100644
+--- a/internal/driver/mobile/app/darwin_ios.m
++++ b/internal/driver/mobile/app/darwin_ios.m
+@@ -66,6 +66,18 @@ - (BOOL)application:(UIApplication *)application openURL:(NSURL *)url options:(N
+ 	return YES;
+ }
+ 
++// Universal Links: an https link the app is associated with (apple-app-site-association
++// plus the associated-domains entitlement) arrives as a browsing-web user activity, not
++// through openURL. iOS calls this both on a cold start (after didFinishLaunching) and
++// while running, so the URL goes to the same handler as a custom scheme.
++- (BOOL)application:(UIApplication *)application continueUserActivity:(NSUserActivity *)userActivity restorationHandler:(void (^)(NSArray<id<UIUserActivityRestoring>> *))restorationHandler {
++	if ([userActivity.activityType isEqualToString:NSUserActivityTypeBrowsingWeb] && userActivity.webpageURL != nil) {
++		urlOpened((char *)[[userActivity.webpageURL absoluteString] UTF8String]);
++		return YES;
++	}
++	return NO;
++}
++
+ - (void)applicationDidBecomeActive:(UIApplication * )application {
+ 	lifecycleFocused();
+ }
+-- 
+2.54.0 (Apple Git-157)
+

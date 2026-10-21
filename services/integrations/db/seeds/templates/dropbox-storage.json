@@ -1,0 +1,31 @@
+{
+  "key": "dropbox-storage",
+  "tier": "tier2",
+  "manifest": {
+    "name": "Dropbox",
+    "description": "Guarda los archivos nuevos de Sytue Drive en tu Dropbox. Las copias de seguridad y la recuperación son responsabilidad del cliente.",
+    "category": "Almacenamiento",
+    "color": "#0061FF",
+    "icon": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#0061FF\" stroke-width=\"2\" stroke-linejoin=\"round\"><path d=\"m7 3 5 3-5 3-5-3 5-3Zm10 0 5 3-5 3-5-3 5-3ZM7 9l5 3-5 3-5-3 5-3Zm10 0 5 3-5 3-5-3 5-3Zm-5 7 5-3v5l-5 3-5-3v-5l5 3Z\"/></svg>",
+    "identity": {
+      "kind": "none"
+    },
+    "provisioning": "none",
+    "launch": {
+      "kind": "url",
+      "url": "https://www.dropbox.com/home"
+    },
+    "oauth": {
+      "authorize_url": "https://www.dropbox.com/oauth2/authorize",
+      "token_url": "https://api.dropboxapi.com/oauth2/token",
+      "scopes": [
+        "files.metadata.read",
+        "files.content.read",
+        "files.content.write"
+      ],
+      "authorize_params": {
+        "token_access_type": "offline"
+      }
+    }
+  }
+}

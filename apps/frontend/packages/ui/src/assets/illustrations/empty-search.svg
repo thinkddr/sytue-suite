@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="160" viewBox="0 0 200 160" fill="none" role="img" aria-label="Sin resultados">
+  <title>Sin resultados</title>
+  <line x1="46" y1="124" x2="154" y2="124" stroke="var(--sytue-border)" stroke-width="2" stroke-linecap="round"/>
+  <!-- Lupa neutra -->
+  <circle cx="90" cy="72" r="26" stroke="var(--sytue-neutral-400)" stroke-width="2.4"/>
+  <line x1="109" y1="91" x2="124" y2="106" stroke="var(--sytue-neutral-400)" stroke-width="2.4" stroke-linecap="round"/>
+  <!-- Líneas de "nada dentro" + único acento azul en el punto de foco -->
+  <line x1="80" y1="72" x2="100" y2="72" stroke="var(--sytue-neutral-300)" stroke-width="2.4" stroke-linecap="round"/>
+  <circle cx="90" cy="72" r="3" fill="var(--sytue-primary-500)"/>
+</svg>

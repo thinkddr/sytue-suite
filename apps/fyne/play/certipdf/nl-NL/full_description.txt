@@ -1,0 +1,17 @@
+PDF van begin tot eind, in je browser.
+
+• Markeren, onderstrepen, opmerkingen plaatsen en tekenen op het document.
+• Formulieren: velden invullen of zelf formulieren maken.
+• Samenvoegen, uitnemen, draaien, nummeren en watermerken.
+• Handtekeningenpaneel, permanent zwartlakken en documenten met wachtwoordbeveiliging.
+• Een snelle viewer met overzicht, miniaturen, zoeken en zoomen op pagina of breedte.
+• Annotaties: markeren, onderstrepen, doorhalen, opmerkingen, tekenen, vormen, pijlen en stempels.
+• Tekstvakken, metingen en momentopnamen van gebieden.
+• Formulieren: bestaande velden invullen of eigen velden toevoegen.
+• Paneel voor het ondertekenen van documenten.
+• Permanent zwartlakken: wat je markeert, verdwijnt uit het bestand, niet alleen uit beeld.
+• Pagina's: samenvoegen, uitnemen, verwijderen, draaien, nummeren (ook Bates), kop- en voetteksten.
+• Watermerk, achtergrond en bewerkbare metadata.
+• Documenten en rechten met wachtwoordbeveiliging.
+
+Versleuteld tijdens transport (TLS 1.3). De infrastructuur van Sytue staat in de EU. De locatie van externe diensten hangt af van hun aanbieder.

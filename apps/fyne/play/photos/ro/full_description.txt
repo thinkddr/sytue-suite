@@ -1,0 +1,18 @@
+Fotografiile dumneavoastră, ordonate și pe gustul dumneavoastră, fără să părăsească Europa.
+
+• Cronologie pe luni cu căutare după nume.
+• Albume cu copertă; vizualizator pe tot ecranul.
+• Editor pentru lumină, culoare, rotire, oglindire și decupare, în timp real.
+• Fiecare editare este o rețetă: originalul nu este atins niciodată.
+• Cronologie grupată pe luni, cu căutare după nume și miniaturi clare.
+• Albume: creare, redenumire, alegerea copertei, adăugare din vizualizator și eliminare.
+• Editor cu patru glisoare (expunere, contrast, saturație, temperatură), rotire și oglindire.
+• Fiecare editare este o rețetă stocată separat: originalul din Drive nu se modifică niciodată.
+• Export la rezoluție completă, randat pe server cu aceleași formule ca în previzualizare.
+• Coș cu restaurare.
+• Originalele se află în Sytue Drive; derivatele sunt un cache care se poate regenera.
+• Date EXIF citite din fișierul însuși; totul în Uniunea Europeană.
+• Selecție multiplă pe luni: într-un album nou, în coș sau descărcare dintr-odată.
+• Prezentare, dimensiune completă, rotire din vizualizator și decupare cu raport fix.
+
+Criptare în tranzit (TLS 1.3). Infrastructura Sytue se află în UE. Locația serviciilor externe depinde de furnizorul lor.

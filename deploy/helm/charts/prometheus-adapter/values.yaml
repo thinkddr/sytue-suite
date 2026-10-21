@@ -1,0 +1,42 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Daniel Delgado Ramos
+
+enabled: false
+
+image:
+  # Del Registry privado, como todo: el nodo no tira de registros externos. La
+  # copia la hace el mirror de la release, firmada y con SBOM.
+  repository: prometheus-adapter
+  tag: v0.12.0
+
+replicaCount: 2
+
+# De dónde lee las series. Es la data source `custom` de Cockpit —las de fábrica
+# son de origen `scaleway` y no admiten nuestras métricas—, y el sufijo
+# `/prometheus` es su API de consulta, distinta del `/otlp` por el que se
+# escribe.
+prometheus:
+  url: ""
+  # El token va en un Secret y se monta como fichero: `--prometheus-token-file`
+  # manda `Authorization: Bearer`, y está comprobado que Cockpit lo acepta
+  # igual que su `X-Token` propio (los dos devuelven 200). Eso ahorra el proxy
+  # que haría falta para inyectar una cabecera no estándar.
+  tokenSecret: sytue-cockpit-lectura
+  tokenKey: token
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 96Mi
+  limits:
+    cpu: "1"
+    memory: 256Mi
+
+# El apiserver, al que el `default-deny` del namespace no deja llegar porque su
+# regla de salida por 443 excluye los rangos privados. Se pasa explícito y no se
+# descubre: un CIDR adivinado que no case deja el adapter en CrashLoop con un
+# timeout que no menciona la NetworkPolicy por ninguna parte.
+apiserverCIDR: 10.32.0.1/32
+# El endpoint real detrás de esa ClusterIP: `kubectl get endpoints kubernetes`.
+# En la red privada del clúster, que es la que el default-deny excluye.
+apiserverEndpointCIDR: 10.20.0.0/22

@@ -1,0 +1,17 @@
+"widgets.open" = "Ouvrir";
+"widgets.compose" = "Rédiger";
+"widgets.create" = "Créer un événement";
+"widgets.notes" = "Notes";
+"widgets.rows" = "Lignes";
+"widgets.pending" = "En attente";
+"widgets.channels" = "Canaux";
+"widgets.photos" = "Photos";
+"widgets.episodes" = "Épisodes";
+"widgets.apps" = "Applications";
+"widgets.calendars" = "Calendriers";
+"widgets.address_books" = "Carnets d’adresses";
+"search.label" = "Recherche globale";
+"dataflow.item.files" = "Fichiers";
+"dataflow.item.events" = "Agenda";
+"dataflow.item.documents" = "Documents";
+"dataflow.item.contacts" = "Contacts";

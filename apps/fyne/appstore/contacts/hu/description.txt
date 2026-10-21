@@ -1,0 +1,18 @@
+CardDAV-névjegyek, az egész szervezetben megosztva.
+
+• Közös címjegyzék az egész szervezet számára.
+• Importálás és exportálás vCard formátumban.
+• Ismétlődések egyesítése adatvesztés nélkül.
+• Bármely CardDAV-klienssel működik.
+• Címjegyzékek, köztük a szervezet közös címjegyzéke.
+• Teljes adatlap: telefonszámok, e-mailek, címek, szervezet, születésnap, jegyzetek és fotó.
+• Címkék és kedvencek a csoportosításhoz és a kereséshez.
+• Ismétlődések felismerése és egyesítése adatvesztés nélkül.
+• vCard és CSV importálása és exportálása; egyetlen névjegy exportálása.
+• Tömeges műveletek és helyreállítható kuka.
+• Azonnali keresés és automatikus kiegészítés gépelés közben a Mailben.
+• Bármely CardDAV-klienssel működik.
+• Közelgő születésnapok a címjegyzékből, a hónap születésnapjai kiemelve.
+• Megbeszélés létrehozása egy névjeggyel vagy a névjegy e-mail-címének másolása az adatlap elhagyása nélkül.
+
+Titkosítás átvitel közben (TLS 1.3). A Sytue infrastruktúrája az EU-ban található. A külső szolgáltatások helye a szolgáltatójuktól függ.

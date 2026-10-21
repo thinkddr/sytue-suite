@@ -1,0 +1,26 @@
+{
+  "key": "microsoft-mail",
+  "tier": "tier2",
+  "manifest": {
+    "name": "Microsoft Outlook",
+    "description": "Conecta tu cuenta personal de correo para leer y enviar mensajes desde Sytue Mail.",
+    "category": "Correo",
+    "color": "#0078D4",
+    "icon": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><rect x=\"3\" y=\"5\" width=\"18\" height=\"14\" rx=\"2\"/><path d=\"m3 6 9 7 9-7\"/></svg>",
+    "identity": {
+      "kind": "none"
+    },
+    "provisioning": "none",
+    "launch": {
+      "kind": "none"
+    },
+    "oauth": {
+      "authorize_url": "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
+      "token_url": "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+      "scopes": ["User.Read", "Mail.ReadWrite", "Mail.Send", "offline_access"],
+      "authorize_params": {
+        "prompt": "select_account"
+      }
+    }
+  }
+}

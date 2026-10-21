@@ -1,0 +1,14 @@
+{
+  "secret_key_hex": "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20",
+  "challenge": {
+    "algorithm": "SHA-256",
+    "challenge": "727945db10be7deb79bc02219805905e0a684d37fbc704b9a9b63756eda68ad9",
+    "maxnumber": 50000,
+    "salt": "b8f3a9e2c1d04567?expires=2000000000\u0026ambito=sytue-tienda%3Acheckout\u0026max=50000\u0026",
+    "signature": "984112eef8677f625ed2d271e33a60673a620eb18656ff78f3557146f848398e"
+  },
+  "solution": {
+    "number": 18423,
+    "payload_base64": "eyJhbGdvcml0aG0iOiJTSEEtMjU2IiwiY2hhbGxlbmdlIjoiNzI3OTQ1ZGIxMGJlN2RlYjc5YmMwMjIxOTgwNTkwNWUwYTY4NGQzN2ZiYzcwNGI5YTliNjM3NTZlZGE2OGFkOSIsIm51bWJlciI6MTg0MjMsInNhbHQiOiJiOGYzYTllMmMxZDA0NTY3P2V4cGlyZXM9MjAwMDAwMDAwMFx1MDAyNmFtYml0bz1zeXR1ZS10aWVuZGElM0FjaGVja291dFx1MDAyNm1heD01MDAwMFx1MDAyNiIsInNpZ25hdHVyZSI6Ijk4NDExMmVlZjg2NzdmNjI1ZWQyZDI3MWUzM2E2MDY3M2E2MjBlYjE4NjU2ZmY3OGYzNTU3MTQ2Zjg0ODM5OGUifQ=="
+  }
+}

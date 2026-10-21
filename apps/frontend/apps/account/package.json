@@ -1,0 +1,35 @@
+{
+  "name": "@sytue/account",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Mi cuenta — perfil, seguridad, dispositivos y accesos del propio usuario (Astro 7 + Preact 10) sobre Sytue ID. Monta la Sytue Shell y usa @sytue/ui. Producto Sytue-native, propietario. docs/CONVENTIONS.md §1.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "dev": "bun --bun astro dev --port 4333 --host",
+    "build": "bun --bun astro build",
+    "preview": "bun --bun astro preview --port 4333 --host",
+    "start": "bun ./dist/server/entry.mjs",
+    "test": "bun test",
+    "typecheck": "bun --bun astro check"
+  },
+  "dependencies": {
+    "@astrojs/node": "catalog:",
+    "@astrojs/preact": "catalog:",
+    "@sytue/api-clients": "workspace:*",
+    "@sytue/auth": "workspace:*",
+    "@sytue/config": "workspace:*",
+    "@sytue/i18n": "workspace:*",
+    "@sytue/shell": "workspace:*",
+    "@sytue/ui": "workspace:*",
+    "astro": "catalog:",
+    "preact": "10.29.8"
+  },
+  "devDependencies": {
+    "@astrojs/check": "catalog:",
+    "@tailwindcss/vite": "4.3.3",
+    "@types/bun": "1.4.2",
+    "tailwindcss": "4.3.3",
+    "typescript": "6.0.3"
+  }
+}

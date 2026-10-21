@@ -1,0 +1,57 @@
+{
+  "id": "vikunja",
+  "name": "Vikunja",
+  "description": "Listas de tareas y proyectos para el equipo, con tableros, calendario y recordatorios. Guarda todo en su propio disco: no necesita base de datos aparte.",
+  "category": "productivity",
+  "license": "AGPL-3.0-or-later",
+  "homepage": "https://vikunja.io/",
+  "source": "https://code.vikunja.io/vikunja",
+  "upstream": "docker.io/vikunja/vikunja:0.24.6",
+  "upstream_digest": "sha256:ed1f3ed467fecec0b57e9de7bc6607f8bbcbb23ffced6a81f5dfefc794cdbe3b",
+  "version": "0.24.6",
+  "ports": [
+    {
+      "name": "http",
+      "port": 3456
+    }
+  ],
+  "web_port": 3456,
+  "exports": [
+    {
+      "key": "VIKUNJA_URL",
+      "value": "http://{host}:{port}"
+    }
+  ],
+  "env": [
+    {
+      "key": "VIKUNJA_DATABASE_TYPE",
+      "value": "sqlite"
+    },
+    {
+      "key": "VIKUNJA_DATABASE_PATH",
+      "value": "/db/vikunja.db"
+    },
+    {
+      "key": "VIKUNJA_FILES_BASEPATH",
+      "value": "/db/files"
+    },
+    {
+      "key": "VIKUNJA_SERVICE_PUBLICURL",
+      "value": "{web_url}"
+    },
+    {
+      "key": "VIKUNJA_SERVICE_JWTSECRET",
+      "generate": true
+    },
+    {
+      "key": "VIKUNJA_SERVICE_ENABLEREGISTRATION",
+      "value": "false"
+    }
+  ],
+  "disk_gib": 10,
+  "data_path": "/db",
+  "memory_mib": 512,
+  "cpu_milli": 500,
+  "run_as_user": 1000,
+  "health_path": "/api/v1/info"
+}

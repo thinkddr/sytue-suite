@@ -1,0 +1,57 @@
+{
+  "artificial": true,
+  "generator": "matrix-sdk-crypto-wasm 18.9.0 / matrix-js-sdk 43.0.0",
+  "sessions": [
+    {
+      "algorithm": "m.megolm.v1.aes-sha2",
+      "room_id": "!rooms-js-fixture:matrix.fixture.invalid",
+      "sender_key": "vlF+qi4A/I1qPPpdyb8S8okg2OHBA5Ui8DEcfk5FniI",
+      "session_id": "zGnSiyzGOvwMAXCYISwCdvwwopmI7hQlRZqoxiN4yqg",
+      "session_key": "AQAAAADw787FdmffGmUAy+bBv8kxJJWh/n0MyZWjoWK7TO6Uqpb9tB0TL1POQa3PmEqK7wqg5ENECFFy3trFCDKm52JnEGhujimjFcTFY/LYAM4SsGq4K83H3u3+o3Ufn88FvguEsLS+6Fo8pqCCNz0KnhzIXh5as6TWLa0OElu86wDfQMxp0ossxjr8DAFwmCEsAnb8MKKZiO4UJUWaqMYjeMqo",
+      "sender_claimed_keys": {
+        "ed25519": "b3X5V1Y2trg6uN5qpAqi3j6THziVVH4/+Rz7D5VqSRc"
+      },
+      "forwarding_curve25519_key_chain": [],
+      "m.shared_history": true
+    }
+  ],
+  "events": [
+    {
+      "type": "m.room.encrypted",
+      "event_id": "$js-fixture-event",
+      "room_id": "!rooms-js-fixture:matrix.fixture.invalid",
+      "sender": "@sytue_js_fixture:matrix.fixture.invalid",
+      "origin_server_ts": 1792152000000,
+      "content": {
+        "algorithm": "m.megolm.v1.aes-sha2",
+        "ciphertext": "AwgAErABpSPQNfvbczBskkjG+ovjR9+sjITx7yTAOF/CJ41fjB+PwjBHFFpC4knOuEEPtdcTMuXkTidT3oJWV95q1K+YRtJmgn7Kh7Z9f+8vnCmLAL0pLnsBZm/+vqzrgMtomfNIvlwocumcHSVvbFamCbBCXxd6B7ce0L9vURfnV067fqHOC2wN13Lw85ceF0CupzglVqTx4mCx1kjclEEwMSJLVv7OHXdIQzqNXyT2oQjG4VfXyzyC/kL9SFMpR80V7x8piU++34WPxrU4cERLgXhK6Tr9fmW36QrDmITyteDNYgfoaR08Obnhbf133faBWkRhY+yaKAX4BAE",
+        "device_id": "JSFIXTURE",
+        "sender_key": "vlF+qi4A/I1qPPpdyb8S8okg2OHBA5Ui8DEcfk5FniI",
+        "session_id": "zGnSiyzGOvwMAXCYISwCdvwwopmI7hQlRZqoxiN4yqg"
+      }
+    }
+  ],
+  "plaintext": "Artificial JS → Go encrypted message · Áé🙂",
+  "attachment": {
+    "descriptor": {
+      "v": "v2",
+      "key": {
+        "kty": "oct",
+        "key_ops": [
+          "decrypt",
+          "encrypt"
+        ],
+        "alg": "A256CTR",
+        "k": "xuOzHDTmvSOC64L6OV2XX9eDlDkSuzI91rhzNm68YD8",
+        "ext": true
+      },
+      "iv": "SGh2cp3cIAAAAAAAAAAAAA",
+      "hashes": {
+        "sha256": "2x8m4ZLpVwdP5c6cv8cESd/LLjvjfRC2UGp3cHVwEiM"
+      },
+      "url": "mxc://matrix.fixture.invalid/js-artificial-file"
+    },
+    "ciphertext": "vVCSsdq0P+Hw0zAOZPlA6qU8aJ11U+0hnItVhmAbKX61+P+WhKHs4TPz8rxSwg7G/wmFX14=",
+    "plaintext": "QXJ0aWZpY2lhbCBKUyDihpIgR28gZW5jcnlwdGVkIGF0dGFjaG1lbnQgwrcgw4HDqfCfmYI="
+  }
+}

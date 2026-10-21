@@ -1,0 +1,38 @@
+{
+  "name": "@sytue/api-clients",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sytue One — SDKs tipados a los servicios Go propios: Sytue ID (OIDC/JWKS), Drive (REST+WebDAV), Docs (colab WS), Mail (JMAP), Calendar (REST+CalDAV), Contacts (REST+CardDAV), Notes (REST), Chat (REST+WS), Meet (REST+LiveKit), Hub y Cloud. TypeScript estricto. Autorizacion via JWT de Sytue ID. Clean-room, sin motores AGPL.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./id": "./src/id/index.ts",
+    "./drive": "./src/drive/index.ts",
+    "./docs": "./src/docs/index.ts",
+    "./mail": "./src/mail/index.ts",
+    "./calendar": "./src/calendar/index.ts",
+    "./contacts": "./src/contacts/index.ts",
+    "./notes": "./src/notes/index.ts",
+    "./chat": "./src/chat/index.ts",
+    "./meet": "./src/meet/index.ts",
+    "./hub": "./src/hub/index.ts",
+    "./cloud": "./src/cloud/index.ts",
+    "./bases": "./src/bases/index.ts"
+  },
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.lib.json",
+    "typecheck": "tsc -p tsconfig.lib.json --noEmit",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@sytue/config": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "6.0.3"
+  }
+}

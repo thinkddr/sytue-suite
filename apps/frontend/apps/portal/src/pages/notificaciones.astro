@@ -1,0 +1,50 @@
+---
+/**
+ * Bandeja de notificaciones de Sytue One — la vista completa de lo que el
+ * popover de la shell solo asoma: filtros, marcar todo y las reglas de silencio.
+ *
+ * La página es SSR (sesión y cromo) y el contenido una ISLA: aquí sí hace falta
+ * cliente, porque las notificaciones llegan por SSE y marcar una como leída no
+ * puede recargar la página. `buscar` y `actividad` no lo necesitan y por eso no
+ * lo llevan. docs/CONVENTIONS.md §11.
+ */
+import AppLayout from '../layouts/AppLayout.astro';
+import { useT } from '../i18n/index.js';
+import { bff, toBffContext } from '../lib/auth';
+import { hubBaseUrl } from '../lib/auth';
+import { canonicaConOrg, returnToCanonico } from '@sytue/config';
+import { NotificationsInbox } from '../components/NotificationsInbox';
+
+export const prerender = false;
+
+const session = await bff.getSession(toBffContext(Astro));
+if (!session) {
+  // ADR 0056: la entrada org-ful llega reescrita con la marca ?__org=; el returnTo
+  // sale canónico, no en la forma interna, o tras el login la barra se queda con ella.
+  const returnTo = returnToCanonico(Astro.url, bff.basePath);
+  const redireccionLogin = Astro.redirect(
+    `${bff.basePath}/auth/login?returnTo=${encodeURIComponent(returnTo)}`,
+  );
+  redireccionLogin.headers.set('cache-control', 'no-store');
+  return redireccionLogin;
+}
+// Ruta en `sinOrg` (su nombre colisiona con el namespace de organizaciones):
+// con sesión, un salto local a la canónica con la org activa.
+const canonica = canonicaConOrg(Astro.url, bff.basePath, session.user.tenant);
+if (canonica) return Astro.redirect(canonica);
+
+const locale = Astro.locals.locale;
+const t = useT(locale);
+---
+
+<AppLayout title={t('page.inbox')}>
+  <div class="mx-auto w-full max-w-[var(--container-content,1280px)] px-6 py-8">
+    <header class="mb-6">
+      <p class="sytue-overline text-text-subtle">{t('inbox.overline')}</p>
+      <h1 class="sytue-h1 text-text mt-1.5">{t('inbox.heading')}</h1>
+      <p class="text-text-muted mt-2 max-w-2xl text-base">{t('inbox.intro')}</p>
+    </header>
+
+    <NotificationsInbox client:load locale={locale} hubBaseUrl={hubBaseUrl()} />
+  </div>
+</AppLayout>

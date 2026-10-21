@@ -1,0 +1,27 @@
+---
+/**
+ * Sytue Cast — /studio. Exige sesión.
+ */
+import AppLayout from '../layouts/AppLayout.astro';
+import { StudioApp } from '../islands/StudioApp.js';
+import { alLogin, hubBaseUrl, sesionDe } from '../lib/pagina.js';
+import { useT } from '../i18n/index.js';
+
+export const prerender = false;
+
+const session = await sesionDe(Astro);
+// El redirect en una constante: el comprobador de Astro no ve lo que va tras `return`.
+const redireccion = session ? null : alLogin(Astro);
+if (redireccion || !session) return redireccion;
+const t = useT(Astro.locals.locale);
+---
+
+<AppLayout title={`${t('studio.title')} · ${t('app.title')}`}>
+  <StudioApp
+    slot="app"
+    client:load
+    locale={Astro.locals.locale}
+    user={session.user}
+    hubBaseUrl={hubBaseUrl()}
+  />
+</AppLayout>

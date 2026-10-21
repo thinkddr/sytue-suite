@@ -1,0 +1,1490 @@
+From 0806cc00ff9711108dfb4d52c4b1a707a4a074a3 Mon Sep 17 00:00:00 2001
+From: Daniel Delgado Ramos <328510259+thinkddr@users.noreply.github.com>
+Date: Wed, 23 Sep 2026 13:23:25 +0200
+Subject: [PATCH 1/3] feat: texto y URL soltados sobre una ventana (X11 y
+ Wayland)
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+GLFW solo acepta rutas soltadas: su XDnD de X11 y su wl_data_device de
+Wayland piden text/uri-list y nada más. Este parche añade
+glfwSetDropTextCallback: una ventana con esa retrollamada acepta además
+texto (text/plain;charset=utf-8, UTF8_STRING o text/plain) y reparte una
+lista de URI entre ficheros, que siguen yendo a la retrollamada de rutas,
+y URL, que van a la nueva. Sin la retrollamada, nada cambia.
+
+En Go, SetDropTextCallback pone una retrollamada para todas las ventanas,
+presentes y futuras, porque Fyne no deja ver su *glfw.Window.
+
+De paso, dos arreglos en el mismo camino: X11 ya no llama a la
+retrollamada de rutas con cero rutas (la aserción de _glfwInputDrop), y
+el XdndEnter de Wayland ya no desreferencia una ventana nula.
+---
+ v3.4/glfw/FORK-NOTICE.md            | 22 +++++++
+ v3.4/glfw/droptext.c                |  6 ++
+ v3.4/glfw/droptext.go               | 70 +++++++++++++++++++++
+ v3.4/glfw/glfw/include/GLFW/glfw3.h | 41 +++++++++++++
+ v3.4/glfw/glfw/src/input.c          | 94 +++++++++++++++++++++++++++++
+ v3.4/glfw/glfw/src/internal.h       |  3 +
+ v3.4/glfw/glfw/src/wl_platform.h    |  4 ++
+ v3.4/glfw/glfw/src/wl_window.c      | 41 ++++++++-----
+ v3.4/glfw/glfw/src/x11_init.c       |  2 +
+ v3.4/glfw/glfw/src/x11_platform.h   |  4 ++
+ v3.4/glfw/glfw/src/x11_window.c     | 50 ++++++++++++---
+ v3.4/glfw/window.go                 |  5 ++
+ 12 files changed, 317 insertions(+), 25 deletions(-)
+ create mode 100644 v3.4/glfw/FORK-NOTICE.md
+ create mode 100644 v3.4/glfw/droptext.c
+ create mode 100644 v3.4/glfw/droptext.go
+
+diff --git a/v3.4/glfw/FORK-NOTICE.md b/v3.4/glfw/FORK-NOTICE.md
+new file mode 100644
+index 0000000..a8ed491
+--- /dev/null
++++ b/v3.4/glfw/FORK-NOTICE.md
+@@ -0,0 +1,22 @@
++# Fork de Sytue de go-gl/glfw (v3.4)
++
++Este repositorio es el módulo `github.com/go-gl/glfw/v3.4/glfw` en la versión que
++requiere Fyne v2.8.1 (`v0.1.0-pre.1.0.20260707082822-2a407d02d01a`, GLFW C
++`7b6aead9fb88b3623e3b3725ebb42670cbe4c579`), con un único parche: **una ventana puede
++aceptar TEXTO y URL que no son ficheros soltados sobre ella**, además de las rutas.
++
++- C: `glfwSetDropTextCallback` y `GLFWdroptextfun` (`glfw/include/GLFW/glfw3.h`), el
++  reparto de `text/uri-list` entre ficheros y URL (`glfw/src/input.c`) y los backends
++  que lo entregan.
++- Go: `SetDropTextCallback` (`droptext.go`), una retrollamada para todas las ventanas.
++
++Una ventana sin retrollamada de texto se comporta EXACTAMENTE como sin el parche. Los
++ficheros siguen llegando por la retrollamada de rutas de siempre.
++
++Las fuentes alteradas llevan el comentario «Sytue patch» (la licencia zlib de GLFW pide
++marcarlas). El código original sigue siendo de sus autores y bajo sus licencias:
++BSD-3-Clause para el enlace de Go (`LICENSE`) y zlib para GLFW
++(`glfw/LICENSE.md`); lo añadido por Sytue se distribuye bajo esas mismas licencias.
++
++Este fork no está afiliado ni respaldado por go-gl ni por GLFW. Quien lo usa y por qué:
++`apps/fyne/upstream/README.md` del monorepo de Sytue One.
+diff --git a/v3.4/glfw/droptext.c b/v3.4/glfw/droptext.c
+new file mode 100644
+index 0000000..ff75170
+--- /dev/null
++++ b/v3.4/glfw/droptext.c
+@@ -0,0 +1,6 @@
++// Sytue patch: the C side of the text drop callback (droptext.go).
++#include "_cgo_export.h"
++
++void glfwSetDropTextCallbackCB(GLFWwindow *window) {
++  glfwSetDropTextCallback(window, (GLFWdroptextfun)goDropTextCB);
++}
+diff --git a/v3.4/glfw/droptext.go b/v3.4/glfw/droptext.go
+new file mode 100644
+index 0000000..43dc941
+--- /dev/null
++++ b/v3.4/glfw/droptext.go
+@@ -0,0 +1,70 @@
++package glfw
++
++// Sytue patch: text, and URLs that are not files, dropped on a window.
++//
++// It is a single callback for every window, present and future, rather than a
++// method on Window, because the toolkit that owns the windows (Fyne) keeps its
++// *Window private: whoever sets this callback tells the windows apart by their
++// native handle.
++
++//#define GLFW_INCLUDE_NONE
++//#include "glfw/include/GLFW/glfw3.h"
++//void glfwSetDropTextCallbackCB(GLFWwindow *window);
++import "C"
++
++import "unsafe"
++
++// DropTextCallback receives text, or URLs that are not files, dropped on w.
++// Exactly one of text and urls is set. x and y are in the same units as the
++// cursor position callback. File URLs still go to the window's DropCallback.
++type DropTextCallback func(w *Window, x, y float64, text string, urls []string)
++
++// fDropText is guarded by windows.l.
++var fDropText DropTextCallback
++
++// SetDropTextCallback sets the text drop callback of every window, the ones
++// that exist and the ones created afterwards. While it is nil, windows accept
++// only paths, exactly as without the patch.
++//
++// This function may only be called from the main thread.
++func SetDropTextCallback(cbfun DropTextCallback) {
++	windows.l.Lock()
++	fDropText = cbfun
++	for data := range windows.m {
++		setDropText(data)
++	}
++	n := len(windows.m)
++	windows.l.Unlock()
++	if n > 0 {
++		panicError()
++	}
++}
++
++// setDropText applies fDropText to one window; windows.l must be held.
++func setDropText(data *C.GLFWwindow) {
++	if fDropText == nil {
++		C.glfwSetDropTextCallback(data, nil)
++	} else {
++		C.glfwSetDropTextCallbackCB(data)
++	}
++}
++
++//export goDropTextCB
++func goDropTextCB(window unsafe.Pointer, x, y C.double, text *C.char, count C.int, urls **C.char) {
++	w := windows.get((*C.GLFWwindow)(window))
++	windows.l.Lock()
++	cb := fDropText
++	windows.l.Unlock()
++	if w == nil || cb == nil {
++		return
++	}
++	var t string
++	if text != nil {
++		t = C.GoString(text)
++	}
++	list := make([]string, 0, int(count))
++	for _, p := range unsafe.Slice(urls, int(count)) {
++		list = append(list, C.GoString(p))
++	}
++	cb(w, float64(x), float64(y), t, list)
++}
+diff --git a/v3.4/glfw/glfw/include/GLFW/glfw3.h b/v3.4/glfw/glfw/include/GLFW/glfw3.h
+index 9c55ac9..30553b3 100644
+--- a/v3.4/glfw/glfw/include/GLFW/glfw3.h
++++ b/v3.4/glfw/glfw/include/GLFW/glfw3.h
+@@ -1968,6 +1968,30 @@ typedef void (* GLFWcharmodsfun)(GLFWwindow* window, unsigned int codepoint, int
+  */
+ typedef void (* GLFWdropfun)(GLFWwindow* window, int path_count, const char* paths[]);
+ 
++/*! @brief The function pointer type for text drop callbacks (Sytue patch).
++ *
++ *  Called when text, or URLs that are not files, are dropped on the window.
++ *  Exactly one of the two is given: either `text` is not `NULL` and
++ *  `url_count` is zero, or `text` is `NULL` and there are `url_count` URLs.
++ *  File URLs never come here: they still go to the path drop callback.
++ *
++ *  @param[in] window The window that received the event.
++ *  @param[in] xpos The x-coordinate of the drop, in the same units as the
++ *  cursor position callback, relative to the content area.
++ *  @param[in] ypos The y-coordinate of the drop, likewise.
++ *  @param[in] text The dropped text, UTF-8 encoded, or `NULL`.
++ *  @param[in] url_count The number of dropped URLs.
++ *  @param[in] urls The dropped URLs, UTF-8 encoded.
++ *
++ *  @pointer_lifetime The text and the URL strings, as well as the array, are
++ *  only valid until the callback function returns.
++ *
++ *  @sa glfwSetDropTextCallback
++ *
++ *  @ingroup input
++ */
++typedef void (* GLFWdroptextfun)(GLFWwindow* window, double xpos, double ypos, const char* text, int url_count, const char* urls[]);
++
+ /*! @brief The function pointer type for monitor configuration callbacks.
+  *
+  *  This is the function pointer type for monitor configuration callbacks.
+@@ -5451,6 +5475,23 @@ GLFWAPI GLFWscrollfun glfwSetScrollCallback(GLFWwindow* window, GLFWscrollfun ca
+  */
+ GLFWAPI GLFWdropfun glfwSetDropCallback(GLFWwindow* window, GLFWdropfun callback);
+ 
++/*! @brief Sets the text drop callback (Sytue patch).
++ *
++ *  A window accepts dragged text, and URLs that are not files, only while it
++ *  has this callback: without it the window behaves exactly as before and
++ *  only accepts paths.
++ *
++ *  @param[in] window The window whose callback to set.
++ *  @param[in] callback The new text drop callback, or `NULL` to remove it.
++ *  @return The previously set callback, or `NULL` if no callback was set or
++ *  the library had not been [initialized](@ref intro_init).
++ *
++ *  @thread_safety This function must only be called from the main thread.
++ *
++ *  @ingroup input
++ */
++GLFWAPI GLFWdroptextfun glfwSetDropTextCallback(GLFWwindow* window, GLFWdroptextfun callback);
++
+ /*! @brief Returns whether the specified joystick is present.
+  *
+  *  This function returns whether the specified joystick is present.
+diff --git a/v3.4/glfw/glfw/src/input.c b/v3.4/glfw/glfw/src/input.c
+index 7b3b340..a305744 100644
+--- a/v3.4/glfw/glfw/src/input.c
++++ b/v3.4/glfw/glfw/src/input.c
+@@ -411,6 +411,90 @@ void _glfwInputDrop(_GLFWwindow* window, int count, const char** paths)
+         window->callbacks.drop((GLFWwindow*) window, count, paths);
+ }
+ 
++// Notifies shared code of text, or of URLs that are not files, dropped on a
++// window (Sytue patch)
++//
++void _glfwInputDropText(_GLFWwindow* window, double xpos, double ypos,
++                        const char* text, int count, const char** urls)
++{
++    assert(window != NULL);
++    assert((text != NULL) != (count > 0));
++
++    if (window->callbacks.droptext)
++        window->callbacks.droptext((GLFWwindow*) window, xpos, ypos, text, count, urls);
++}
++
++// Delivers a dropped text/uri-list (Sytue patch): the file URIs go to the
++// path drop callback, as before, and the rest to the text drop callback.
++// A window without a text drop callback gets the whole list as paths, which
++// is exactly what it got before the patch
++//
++void _glfwInputDropUriList(_GLFWwindow* window, double xpos, double ypos, char* list)
++{
++    int count = 0;
++    char** paths;
++
++    if (window->callbacks.droptext)
++    {
++        const size_t length = strlen(list);
++        // Each file line keeps its length plus one newline, and only the last
++        // one can lack a separator in the original
++        char* files = _glfw_calloc(length + 2, 1);
++        size_t filesLength = 0;
++        char* copy = _glfw_strdup(list);
++        const char** urls = _glfw_calloc(length + 1, sizeof(char*));
++        int urlCount = 0;
++        char* next = copy;
++
++        while (next)
++        {
++            char* line = next;
++            char* stop = line + strcspn(line, "\r\n");
++            next = *stop ? stop + 1 : NULL;
++            *stop = '\0';
++
++            while (*line == ' ' || *line == '\t')
++                line++;
++            while (stop > line && (stop[-1] == ' ' || stop[-1] == '\t'))
++                *--stop = '\0';
++
++            if (line[0] == '\0' || line[0] == '#')
++                continue;
++
++            if (strncmp(line, "file:", 5) == 0)
++            {
++                const size_t lineLength = strlen(line);
++                memcpy(files + filesLength, line, lineLength);
++                filesLength += lineLength;
++                files[filesLength++] = '\n';
++            }
++            else
++                urls[urlCount++] = line;
++        }
++
++        if (urlCount > 0)
++            _glfwInputDropText(window, xpos, ypos, NULL, urlCount, urls);
++
++        paths = _glfwParseUriList(files, &count);
++        if (count > 0)
++            _glfwInputDrop(window, count, (const char**) paths);
++
++        _glfw_free(urls);
++        _glfw_free(copy);
++        _glfw_free(files);
++    }
++    else
++    {
++        paths = _glfwParseUriList(list, &count);
++        if (count > 0)
++            _glfwInputDrop(window, count, (const char**) paths);
++    }
++
++    for (int i = 0;  i < count;  i++)
++        _glfw_free(paths[i]);
++    _glfw_free(paths);
++}
++
+ // Notifies shared code of a joystick connection or disconnection
+ //
+ void _glfwInputJoystick(_GLFWjoystick* js, int event)
+@@ -1027,6 +1111,16 @@ GLFWAPI GLFWdropfun glfwSetDropCallback(GLFWwindow* handle, GLFWdropfun cbfun)
+     return cbfun;
+ }
+ 
++GLFWAPI GLFWdroptextfun glfwSetDropTextCallback(GLFWwindow* handle, GLFWdroptextfun cbfun)
++{
++    _GLFWwindow* window = (_GLFWwindow*) handle;
++    assert(window != NULL);
++
++    _GLFW_REQUIRE_INIT_OR_RETURN(NULL);
++    _GLFW_SWAP(GLFWdroptextfun, window->callbacks.droptext, cbfun);
++    return cbfun;
++}
++
+ GLFWAPI int glfwJoystickPresent(int jid)
+ {
+     _GLFWjoystick* js;
+diff --git a/v3.4/glfw/glfw/src/internal.h b/v3.4/glfw/glfw/src/internal.h
+index 8873359..863792a 100644
+--- a/v3.4/glfw/glfw/src/internal.h
++++ b/v3.4/glfw/glfw/src/internal.h
+@@ -571,6 +571,7 @@ struct _GLFWwindow
+         GLFWcharfun               character;
+         GLFWcharmodsfun           charmods;
+         GLFWdropfun               drop;
++        GLFWdroptextfun           droptext;
+     } callbacks;
+ 
+     // This is defined in platform.h
+@@ -926,6 +927,8 @@ void _glfwInputMouseClick(_GLFWwindow* window, int button, int action, int mods)
+ void _glfwInputCursorPos(_GLFWwindow* window, double xpos, double ypos);
+ void _glfwInputCursorEnter(_GLFWwindow* window, GLFWbool entered);
+ void _glfwInputDrop(_GLFWwindow* window, int count, const char** names);
++void _glfwInputDropText(_GLFWwindow* window, double xpos, double ypos, const char* text, int count, const char** urls);
++void _glfwInputDropUriList(_GLFWwindow* window, double xpos, double ypos, char* list);
+ void _glfwInputJoystick(_GLFWjoystick* js, int event);
+ void _glfwInputJoystickAxis(_GLFWjoystick* js, int axis, float value);
+ void _glfwInputJoystickButton(_GLFWjoystick* js, int button, char value);
+diff --git a/v3.4/glfw/glfw/src/wl_platform.h b/v3.4/glfw/glfw/src/wl_platform.h
+index 149cd24..3e5469e 100644
+--- a/v3.4/glfw/glfw/src/wl_platform.h
++++ b/v3.4/glfw/glfw/src/wl_platform.h
+@@ -336,6 +336,7 @@ typedef struct _GLFWofferWayland
+ {
+     struct wl_data_offer*       offer;
+     GLFWbool                    text_plain_utf8;
++    GLFWbool                    text_plain;
+     GLFWbool                    text_uri_list;
+ } _GLFWofferWayland;
+ 
+@@ -447,6 +448,9 @@ typedef struct _GLFWlibraryWayland
+     struct wl_data_offer*       dragOffer;
+     _GLFWwindow*                dragFocus;
+     uint32_t                    dragSerial;
++    const char*                 dragMimeType;
++    double                      dragX;
++    double                      dragY;
+ 
+     const char*                 tag;
+ 
+diff --git a/v3.4/glfw/glfw/src/wl_window.c b/v3.4/glfw/glfw/src/wl_window.c
+index c990f02..156b63d 100644
+--- a/v3.4/glfw/glfw/src/wl_window.c
++++ b/v3.4/glfw/glfw/src/wl_window.c
+@@ -1928,6 +1928,8 @@ static void dataOfferHandleOffer(void* userData,
+         {
+             if (strcmp(mimeType, "text/plain;charset=utf-8") == 0)
+                 _glfw.wl.offers[i].text_plain_utf8 = GLFW_TRUE;
++            else if (strcmp(mimeType, "text/plain") == 0)
++                _glfw.wl.offers[i].text_plain = GLFW_TRUE;
+             else if (strcmp(mimeType, "text/uri-list") == 0)
+                 _glfw.wl.offers[i].text_uri_list = GLFW_TRUE;
+ 
+@@ -1988,11 +1990,26 @@ static void dataDeviceHandleEnter(void* userData,
+                     window = wl_surface_get_user_data(surface);
+             }
+ 
+-            if (surface == window->wl.surface && _glfw.wl.offers[i].text_uri_list)
++            // Sytue patch: without a URI list, plain text, but only for a
++            // window that asked for it with a text drop callback
++            const char* mimeType = NULL;
++            if (!window || surface != window->wl.surface)
++                mimeType = NULL;
++            else if (_glfw.wl.offers[i].text_uri_list)
++                mimeType = "text/uri-list";
++            else if (window->callbacks.droptext && _glfw.wl.offers[i].text_plain_utf8)
++                mimeType = "text/plain;charset=utf-8";
++            else if (window->callbacks.droptext && _glfw.wl.offers[i].text_plain)
++                mimeType = "text/plain";
++
++            if (mimeType)
+             {
+                 _glfw.wl.dragOffer = offer;
+                 _glfw.wl.dragFocus = window;
+                 _glfw.wl.dragSerial = serial;
++                _glfw.wl.dragMimeType = mimeType;
++                _glfw.wl.dragX = wl_fixed_to_double(x);
++                _glfw.wl.dragY = wl_fixed_to_double(y);
+             }
+ 
+             _glfw.wl.offers[i] = _glfw.wl.offers[_glfw.wl.offerCount - 1];
+@@ -2005,7 +2022,7 @@ static void dataDeviceHandleEnter(void* userData,
+         return;
+ 
+     if (_glfw.wl.dragOffer)
+-        wl_data_offer_accept(offer, serial, "text/uri-list");
++        wl_data_offer_accept(offer, serial, _glfw.wl.dragMimeType);
+     else
+     {
+         wl_data_offer_accept(offer, serial, NULL);
+@@ -2030,6 +2047,8 @@ static void dataDeviceHandleMotion(void* userData,
+                                    wl_fixed_t x,
+                                    wl_fixed_t y)
+ {
++    _glfw.wl.dragX = wl_fixed_to_double(x);
++    _glfw.wl.dragY = wl_fixed_to_double(y);
+ }
+ 
+ static void dataDeviceHandleDrop(void* userData,
+@@ -2038,19 +2057,11 @@ static void dataDeviceHandleDrop(void* userData,
+     if (!_glfw.wl.dragOffer)
+         return;
+ 
+-    char* string = readDataOfferAsString(_glfw.wl.dragOffer, "text/uri-list");
+-    if (string)
+-    {
+-        int count;
+-        char** paths = _glfwParseUriList(string, &count);
+-        if (paths)
+-            _glfwInputDrop(_glfw.wl.dragFocus, count, (const char**) paths);
+-
+-        for (int i = 0; i < count; i++)
+-            _glfw_free(paths[i]);
+-
+-        _glfw_free(paths);
+-    }
++    char* string = readDataOfferAsString(_glfw.wl.dragOffer, _glfw.wl.dragMimeType);
++    if (string && strcmp(_glfw.wl.dragMimeType, "text/uri-list") == 0)
++        _glfwInputDropUriList(_glfw.wl.dragFocus, _glfw.wl.dragX, _glfw.wl.dragY, string);
++    else if (string && string[0] != '\0')
++        _glfwInputDropText(_glfw.wl.dragFocus, _glfw.wl.dragX, _glfw.wl.dragY, string, 0, NULL);
+ 
+     _glfw_free(string);
+ }
+diff --git a/v3.4/glfw/glfw/src/x11_init.c b/v3.4/glfw/glfw/src/x11_init.c
+index e992f44..abaeefb 100644
+--- a/v3.4/glfw/glfw/src/x11_init.c
++++ b/v3.4/glfw/glfw/src/x11_init.c
+@@ -943,6 +943,8 @@ static GLFWbool initExtensions(void)
+     _glfw.x11.XdndSelection = XInternAtom(_glfw.x11.display, "XdndSelection", False);
+     _glfw.x11.XdndTypeList = XInternAtom(_glfw.x11.display, "XdndTypeList", False);
+     _glfw.x11.text_uri_list = XInternAtom(_glfw.x11.display, "text/uri-list", False);
++    _glfw.x11.text_plain_utf8 = XInternAtom(_glfw.x11.display, "text/plain;charset=utf-8", False);
++    _glfw.x11.text_plain = XInternAtom(_glfw.x11.display, "text/plain", False);
+ 
+     // ICCCM, EWMH and Motif window property atoms
+     // These can be set safely even without WM support
+diff --git a/v3.4/glfw/glfw/src/x11_platform.h b/v3.4/glfw/glfw/src/x11_platform.h
+index 14e363d..c38f97a 100644
+--- a/v3.4/glfw/glfw/src/x11_platform.h
++++ b/v3.4/glfw/glfw/src/x11_platform.h
+@@ -627,6 +627,8 @@ typedef struct _GLFWlibraryX11
+     Atom            XdndSelection;
+     Atom            XdndTypeList;
+     Atom            text_uri_list;
++    Atom            text_plain_utf8;
++    Atom            text_plain;
+ 
+     // Selection (clipboard) atoms
+     Atom            TARGETS;
+@@ -800,6 +802,8 @@ typedef struct _GLFWlibraryX11
+         int         version;
+         Window      source;
+         Atom        format;
++        double      xpos;
++        double      ypos;
+     } xdnd;
+ 
+     struct {
+diff --git a/v3.4/glfw/glfw/src/x11_window.c b/v3.4/glfw/glfw/src/x11_window.c
+index e029546..9f6b8e4 100644
+--- a/v3.4/glfw/glfw/src/x11_window.c
++++ b/v3.4/glfw/glfw/src/x11_window.c
+@@ -1607,6 +1607,27 @@ static void processEvent(XEvent *event)
+                     }
+                 }
+ 
++                // Sytue patch: without a URI list, plain text, but only for a
++                // window that asked for it with a text drop callback
++                if (!_glfw.x11.xdnd.format && window->callbacks.droptext)
++                {
++                    const Atom texts[] = { _glfw.x11.text_plain_utf8,
++                                           _glfw.x11.UTF8_STRING,
++                                           _glfw.x11.text_plain };
++
++                    for (unsigned int j = 0;  j < 3 && !_glfw.x11.xdnd.format;  j++)
++                    {
++                        for (unsigned int i = 0;  i < count;  i++)
++                        {
++                            if (formats[i] == texts[j])
++                            {
++                                _glfw.x11.xdnd.format = texts[j];
++                                break;
++                            }
++                        }
++                    }
++                }
++
+                 if (list && formats)
+                     XFree(formats);
+             }
+@@ -1665,6 +1686,8 @@ static void processEvent(XEvent *event)
+                                       &dummy);
+ 
+                 _glfwInputCursorPos(window, xpos, ypos);
++                _glfw.x11.xdnd.xpos = xpos;
++                _glfw.x11.xdnd.ypos = ypos;
+ 
+                 XEvent reply = { ClientMessage };
+                 reply.xclient.window = _glfw.x11.xdnd.source;
+@@ -1696,22 +1719,29 @@ static void processEvent(XEvent *event)
+             {
+                 // The converted data from the drag operation has arrived
+                 char* data;
++                const GLFWbool uris =
++                    event->xselection.target == _glfw.x11.text_uri_list;
++                // Sytue patch: sources label text with its target or with
++                // UTF8_STRING, so text is read whatever its type
+                 const unsigned long result =
+                     _glfwGetWindowPropertyX11(event->xselection.requestor,
+                                               event->xselection.property,
+-                                              event->xselection.target,
++                                              uris ? event->xselection.target : AnyPropertyType,
+                                               (unsigned char**) &data);
+ 
+-                if (result)
++                if (result && uris)
+                 {
+-                    int count;
+-                    char** paths = _glfwParseUriList(data, &count);
+-
+-                    _glfwInputDrop(window, count, (const char**) paths);
+-
+-                    for (int i = 0;  i < count;  i++)
+-                        _glfw_free(paths[i]);
+-                    _glfw_free(paths);
++                    _glfwInputDropUriList(window,
++                                          _glfw.x11.xdnd.xpos,
++                                          _glfw.x11.xdnd.ypos,
++                                          data);
++                }
++                else if (result)
++                {
++                    _glfwInputDropText(window,
++                                       _glfw.x11.xdnd.xpos,
++                                       _glfw.x11.xdnd.ypos,
++                                       data, 0, NULL);
+                 }
+ 
+                 if (data)
+diff --git a/v3.4/glfw/window.go b/v3.4/glfw/window.go
+index fdacc74..d05e573 100644
+--- a/v3.4/glfw/window.go
++++ b/v3.4/glfw/window.go
+@@ -398,6 +398,11 @@ func CreateWindow(width, height int, title string, monitor *Monitor, share *Wind
+ 
+ 	wnd := &Window{data: w}
+ 	windows.put(wnd)
++	windows.l.Lock()
++	if fDropText != nil { // Sytue patch: see droptext.go
++		setDropText(w)
++	}
++	windows.l.Unlock()
+ 	return wnd, nil
+ }
+ 
+-- 
+2.54.0 (Apple Git-157)
+
+
+From 3ac371eb68153523a1bb91c314fab5553a9de9a9 Mon Sep 17 00:00:00 2001
+From: Daniel Delgado Ramos <328510259+thinkddr@users.noreply.github.com>
+Date: Wed, 23 Sep 2026 13:33:11 +0200
+Subject: [PATCH 2/3] =?UTF-8?q?feat:=20texto=20y=20URL=20soltados=20tambi?=
+ =?UTF-8?q?=C3=A9n=20en=20macOS=20y=20Windows?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Cocoa: la vista se registra también para cadenas, y performDragOperation
+entrega, si no hay ficheros, las URL o el texto. Sin retrollamada de
+texto, un arrastre sin URL se rechaza, como antes.
+
+Win32: un IDropTarget de OLE registrado en cada ventana. Una ventana
+registrada para OLE deja de recibir WM_DROPFILES del Explorador, así que
+el destino entrega también los ficheros (CF_HDROP), por el mismo camino
+que WM_DROPFILES; texto con CF_UNICODETEXT y enlaces con
+UniformResourceLocatorW. Si el hilo ya está en el apartamento
+multihilo, OleInitialize falla y la ventana se queda con WM_DROPFILES.
+---
+ v3.4/glfw/FORK-NOTICE.md            |   6 +-
+ v3.4/glfw/build.go                  |   2 +-
+ v3.4/glfw/glfw/src/cocoa_window.m   |  40 ++++-
+ v3.4/glfw/glfw/src/win32_platform.h |  15 ++
+ v3.4/glfw/glfw/src/win32_window.c   | 267 +++++++++++++++++++++++++---
+ 5 files changed, 303 insertions(+), 27 deletions(-)
+
+diff --git a/v3.4/glfw/FORK-NOTICE.md b/v3.4/glfw/FORK-NOTICE.md
+index a8ed491..e6828ed 100644
+--- a/v3.4/glfw/FORK-NOTICE.md
++++ b/v3.4/glfw/FORK-NOTICE.md
+@@ -6,8 +6,10 @@ requiere Fyne v2.8.1 (`v0.1.0-pre.1.0.20260707082822-2a407d02d01a`, GLFW C
+ aceptar TEXTO y URL que no son ficheros soltados sobre ella**, además de las rutas.
+ 
+ - C: `glfwSetDropTextCallback` y `GLFWdroptextfun` (`glfw/include/GLFW/glfw3.h`), el
+-  reparto de `text/uri-list` entre ficheros y URL (`glfw/src/input.c`) y los backends
+-  que lo entregan.
++  reparto de `text/uri-list` entre ficheros y URL (`glfw/src/input.c`) y los cuatro
++  backends que lo entregan: el XDnD de X11, el `wl_data_device` de Wayland, la vista de
++  Cocoa y un `IDropTarget` de OLE en Win32 (que entrega también los ficheros, porque una
++  ventana registrada para OLE deja de recibir `WM_DROPFILES` del Explorador).
+ - Go: `SetDropTextCallback` (`droptext.go`), una retrollamada para todas las ventanas.
+ 
+ Una ventana sin retrollamada de texto se comporta EXACTAMENTE como sin el parche. Los
+diff --git a/v3.4/glfw/build.go b/v3.4/glfw/build.go
+index 4a48deb..30a41f0 100644
+--- a/v3.4/glfw/build.go
++++ b/v3.4/glfw/build.go
+@@ -9,7 +9,7 @@ package glfw
+ #cgo windows CFLAGS: -D_GLFW_WIN32 -Iglfw/deps/mingw
+ 
+ // Linker Options:
+-#cgo windows LDFLAGS: -lgdi32
++#cgo windows LDFLAGS: -lgdi32 -lole32
+ 
+ #cgo !gles2,windows LDFLAGS: -lopengl32
+ #cgo gles2,windows LDFLAGS: -lGLESv2
+diff --git a/v3.4/glfw/glfw/src/cocoa_window.m b/v3.4/glfw/glfw/src/cocoa_window.m
+index 0dcf0a3..16e30da 100644
+--- a/v3.4/glfw/glfw/src/cocoa_window.m
++++ b/v3.4/glfw/glfw/src/cocoa_window.m
+@@ -350,7 +350,8 @@ - (instancetype)initWithGlfwWindow:(_GLFWwindow *)initWindow
+         markedText = [[NSMutableAttributedString alloc] init];
+ 
+         [self updateTrackingAreas];
+-        [self registerForDraggedTypes:@[NSPasteboardTypeURL]];
++        // Sytue patch: strings too, for windows with a text drop callback
++        [self registerForDraggedTypes:@[NSPasteboardTypeURL, NSPasteboardTypeString]];
+     }
+ 
+     return self;
+@@ -615,6 +616,15 @@ - (void)scrollWheel:(NSEvent *)event
+ 
+ - (NSDragOperation)draggingEntered:(id <NSDraggingInfo>)sender
+ {
++    // Sytue patch: the view is registered for strings only because of the text
++    // drop callback, so without one a drag with no URL is refused, as before
++    if (!window->callbacks.droptext &&
++        ![[sender draggingPasteboard] availableTypeFromArray:@[NSPasteboardTypeURL,
++                                                                NSPasteboardTypeFileURL]])
++    {
++        return NSDragOperationNone;
++    }
++
+     // HACK: We don't know what to say here because we don't know what the
+     //       application wants to do with the paths
+     return NSDragOperationGeneric;
+@@ -645,6 +655,34 @@ - (BOOL)performDragOperation:(id <NSDraggingInfo>)sender
+             _glfw_free(paths[i]);
+         _glfw_free(paths);
+     }
++    else if (window->callbacks.droptext)
++    {
++        // Sytue patch: without files, the URLs, or else the text
++        const double xpos = pos.x;
++        const double ypos = contentRect.size.height - pos.y;
++
++        NSArray* links = nil;
++        if ([pasteboard availableTypeFromArray:@[NSPasteboardTypeURL]])
++            links = [pasteboard readObjectsForClasses:@[[NSURL class]] options:nil];
++
++        const NSUInteger linkCount = [links count];
++        if (linkCount)
++        {
++            const char** list = _glfw_calloc(linkCount, sizeof(char*));
++
++            for (NSUInteger i = 0;  i < linkCount;  i++)
++                list[i] = [[links[i] absoluteString] UTF8String];
++
++            _glfwInputDropText(window, xpos, ypos, NULL, (int) linkCount, list);
++            _glfw_free(list);
++        }
++        else
++        {
++            NSString* text = [pasteboard stringForType:NSPasteboardTypeString];
++            if ([text length])
++                _glfwInputDropText(window, xpos, ypos, [text UTF8String], 0, NULL);
++        }
++    }
+ 
+     return YES;
+ }
+diff --git a/v3.4/glfw/glfw/src/win32_platform.h b/v3.4/glfw/glfw/src/win32_platform.h
+index 7e3d884..f538592 100644
+--- a/v3.4/glfw/glfw/src/win32_platform.h
++++ b/v3.4/glfw/glfw/src/win32_platform.h
+@@ -66,6 +66,7 @@
+ 
+ #include <wctype.h>
+ #include <windows.h>
++#include <ole2.h> // Sytue patch: the OLE drop target
+ #include <dinput.h>
+ #include <xinput.h>
+ #include <dbt.h>
+@@ -408,6 +409,17 @@ typedef struct _GLFWlibraryWGL
+     GLFWbool                            ARB_context_flush_control;
+ } _GLFWlibraryWGL;
+ 
++// Sytue patch: the OLE drop target of a window (win32_window.c)
++//
++typedef struct _GLFWdropTargetWin32
++{
++    // First, so that the IDropTarget* that OLE hands back is one of these
++    IDropTarget         target;
++    _GLFWwindow*        window;
++    int                 kind;
++    GLFWbool            ole;
++} _GLFWdropTargetWin32;
++
+ // Win32-specific per-window data
+ //
+ typedef struct _GLFWwindowWin32
+@@ -433,6 +445,9 @@ typedef struct _GLFWwindowWin32
+     int                 lastCursorPosX, lastCursorPosY;
+     // The last received high surrogate when decoding pairs of UTF-16 messages
+     WCHAR               highSurrogate;
++
++    // Sytue patch: the OLE drop target (win32_window.c)
++    _GLFWdropTargetWin32 drop;
+ } _GLFWwindowWin32;
+ 
+ // Win32-specific global data
+diff --git a/v3.4/glfw/glfw/src/win32_window.c b/v3.4/glfw/glfw/src/win32_window.c
+index e6a9496..c263779 100644
+--- a/v3.4/glfw/glfw/src/win32_window.c
++++ b/v3.4/glfw/glfw/src/win32_window.c
+@@ -528,6 +528,231 @@ static void maximizeWindowManually(_GLFWwindow* window)
+                  SWP_NOACTIVATE | SWP_NOZORDER | SWP_FRAMECHANGED);
+ }
+ 
++// Delivers the paths in a HDROP, moving the cursor to where they were dropped
++//
++static void inputDropHDROP(_GLFWwindow* window, HDROP drop, POINT pt)
++{
++    const int count = DragQueryFileW(drop, 0xffffffff, NULL, 0);
++    char** paths = _glfw_calloc(count, sizeof(char*));
++    int i;
++
++    // Move the mouse to the position of the drop
++    _glfwInputCursorPos(window, pt.x, pt.y);
++
++    for (i = 0;  i < count;  i++)
++    {
++        const UINT length = DragQueryFileW(drop, i, NULL, 0);
++        WCHAR* buffer = _glfw_calloc((size_t) length + 1, sizeof(WCHAR));
++
++        DragQueryFileW(drop, i, buffer, length + 1);
++        paths[i] = _glfwCreateUTF8FromWideStringWin32(buffer);
++
++        _glfw_free(buffer);
++    }
++
++    if (count > 0)
++        _glfwInputDrop(window, count, (const char**) paths);
++
++    for (i = 0;  i < count;  i++)
++        _glfw_free(paths[i]);
++    _glfw_free(paths);
++}
++
++// Sytue patch: an OLE drop target, so that a window with a text drop callback
++// takes text and URLs as well as files. Windows registered for OLE drops no
++// longer get WM_DROPFILES from OLE sources such as Explorer, so the target
++// delivers the files too, through the same path as WM_DROPFILES
++//
++// The target lives inside the window and is revoked before the window goes,
++// so its reference count is not tracked
++//
++enum { DROP_NOTHING, DROP_FILES, DROP_TEXT };
++
++static const IID _glfw_IID_IUnknown =
++    {0x00000000,0x0000,0x0000,{0xc0,0x00,0x00,0x00,0x00,0x00,0x00,0x46}};
++static const IID _glfw_IID_IDropTarget =
++    {0x00000122,0x0000,0x0000,{0xc0,0x00,0x00,0x00,0x00,0x00,0x00,0x46}};
++
++static _GLFWwindow* dropTargetWindow(IDropTarget* target)
++{
++    return ((_GLFWdropTargetWin32*) target)->window;
++}
++
++static CLIPFORMAT dropURLFormat(void)
++{
++    static CLIPFORMAT format = 0;
++    if (!format)
++        format = (CLIPFORMAT) RegisterClipboardFormatW(L"UniformResourceLocatorW");
++    return format;
++}
++
++static GLFWbool dropOffers(IDataObject* data, CLIPFORMAT format)
++{
++    FORMATETC fe = { format, NULL, DVASPECT_CONTENT, -1, TYMED_HGLOBAL };
++    return data->lpVtbl->QueryGetData(data, &fe) == S_OK;
++}
++
++static int dropKind(_GLFWwindow* window, IDataObject* data)
++{
++    if (dropOffers(data, CF_HDROP))
++        return DROP_FILES;
++    if (window->callbacks.droptext &&
++        (dropOffers(data, dropURLFormat()) || dropOffers(data, CF_UNICODETEXT)))
++    {
++        return DROP_TEXT;
++    }
++    return DROP_NOTHING;
++}
++
++static DWORD dropEffect(int kind, DWORD allowed)
++{
++    if (kind == DROP_NOTHING)
++        return DROPEFFECT_NONE;
++    if (allowed & DROPEFFECT_COPY)
++        return DROPEFFECT_COPY;
++    return allowed & DROPEFFECT_LINK;
++}
++
++// Returns the wide string in the data object in that format, or NULL
++//
++static char* dropString(IDataObject* data, CLIPFORMAT format)
++{
++    FORMATETC fe = { format, NULL, DVASPECT_CONTENT, -1, TYMED_HGLOBAL };
++    STGMEDIUM medium;
++    char* string = NULL;
++
++    if (data->lpVtbl->GetData(data, &fe, &medium) != S_OK)
++        return NULL;
++
++    const WCHAR* buffer = GlobalLock(medium.hGlobal);
++    if (buffer)
++    {
++        // The string need not be terminated inside the block
++        const SIZE_T max = GlobalSize(medium.hGlobal) / sizeof(WCHAR);
++        SIZE_T length = 0;
++        while (length < max && buffer[length])
++            length++;
++
++        WCHAR* copy = _glfw_calloc(length + 1, sizeof(WCHAR));
++        memcpy(copy, buffer, length * sizeof(WCHAR));
++        string = _glfwCreateUTF8FromWideStringWin32(copy);
++        _glfw_free(copy);
++        GlobalUnlock(medium.hGlobal);
++    }
++
++    ReleaseStgMedium(&medium);
++    return string;
++}
++
++static HRESULT STDMETHODCALLTYPE dropQueryInterface(IDropTarget* target,
++                                                    REFIID riid,
++                                                    void** object)
++{
++    if (IsEqualIID(riid, &_glfw_IID_IUnknown) || IsEqualIID(riid, &_glfw_IID_IDropTarget))
++    {
++        *object = target;
++        return S_OK;
++    }
++
++    *object = NULL;
++    return E_NOINTERFACE;
++}
++
++static ULONG STDMETHODCALLTYPE dropAddRef(IDropTarget* target)
++{
++    return 1;
++}
++
++static ULONG STDMETHODCALLTYPE dropRelease(IDropTarget* target)
++{
++    return 1;
++}
++
++static HRESULT STDMETHODCALLTYPE dropDragEnter(IDropTarget* target,
++                                               IDataObject* data,
++                                               DWORD keys,
++                                               POINTL pt,
++                                               DWORD* effect)
++{
++    _GLFWwindow* window = dropTargetWindow(target);
++    window->win32.drop.kind = dropKind(window, data);
++    *effect = dropEffect(window->win32.drop.kind, *effect);
++    return S_OK;
++}
++
++static HRESULT STDMETHODCALLTYPE dropDragOver(IDropTarget* target,
++                                              DWORD keys,
++                                              POINTL pt,
++                                              DWORD* effect)
++{
++    _GLFWwindow* window = dropTargetWindow(target);
++    *effect = dropEffect(window->win32.drop.kind, *effect);
++    return S_OK;
++}
++
++static HRESULT STDMETHODCALLTYPE dropDragLeave(IDropTarget* target)
++{
++    dropTargetWindow(target)->win32.drop.kind = DROP_NOTHING;
++    return S_OK;
++}
++
++static HRESULT STDMETHODCALLTYPE dropDrop(IDropTarget* target,
++                                          IDataObject* data,
++                                          DWORD keys,
++                                          POINTL pt,
++                                          DWORD* effect)
++{
++    _GLFWwindow* window = dropTargetWindow(target);
++    const int kind = dropKind(window, data);
++    POINT point = { pt.x, pt.y };
++
++    window->win32.drop.kind = DROP_NOTHING;
++    *effect = dropEffect(kind, *effect);
++    ScreenToClient(window->win32.handle, &point);
++
++    if (kind == DROP_FILES)
++    {
++        FORMATETC fe = { CF_HDROP, NULL, DVASPECT_CONTENT, -1, TYMED_HGLOBAL };
++        STGMEDIUM medium;
++
++        if (data->lpVtbl->GetData(data, &fe, &medium) == S_OK)
++        {
++            inputDropHDROP(window, (HDROP) medium.hGlobal, point);
++            ReleaseStgMedium(&medium);
++        }
++    }
++    else if (kind == DROP_TEXT)
++    {
++        char* url = dropString(data, dropURLFormat());
++        if (url && url[0])
++        {
++            const char* urls[] = { url };
++            _glfwInputDropText(window, point.x, point.y, NULL, 1, urls);
++        }
++        else
++        {
++            char* text = dropString(data, CF_UNICODETEXT);
++            if (text && text[0])
++                _glfwInputDropText(window, point.x, point.y, text, 0, NULL);
++            _glfw_free(text);
++        }
++        _glfw_free(url);
++    }
++
++    return S_OK;
++}
++
++static IDropTargetVtbl dropTargetVtbl =
++{
++    dropQueryInterface,
++    dropAddRef,
++    dropRelease,
++    dropDragEnter,
++    dropDragOver,
++    dropDragLeave,
++    dropDrop
++};
++
+ // Window procedure for user-created windows
+ //
+ static LRESULT CALLBACK windowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+@@ -1236,31 +1461,9 @@ static LRESULT CALLBACK windowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM l
+         {
+             HDROP drop = (HDROP) wParam;
+             POINT pt;
+-            int i;
+-
+-            const int count = DragQueryFileW(drop, 0xffffffff, NULL, 0);
+-            char** paths = _glfw_calloc(count, sizeof(char*));
+ 
+-            // Move the mouse to the position of the drop
+             DragQueryPoint(drop, &pt);
+-            _glfwInputCursorPos(window, pt.x, pt.y);
+-
+-            for (i = 0;  i < count;  i++)
+-            {
+-                const UINT length = DragQueryFileW(drop, i, NULL, 0);
+-                WCHAR* buffer = _glfw_calloc((size_t) length + 1, sizeof(WCHAR));
+-
+-                DragQueryFileW(drop, i, buffer, length + 1);
+-                paths[i] = _glfwCreateUTF8FromWideStringWin32(buffer);
+-
+-                _glfw_free(buffer);
+-            }
+-
+-            _glfwInputDrop(window, count, (const char**) paths);
+-
+-            for (i = 0;  i < count;  i++)
+-                _glfw_free(paths[i]);
+-            _glfw_free(paths);
++            inputDropHDROP(window, drop, pt);
+ 
+             DragFinish(drop);
+             return 0;
+@@ -1480,6 +1683,16 @@ static int createNativeWindow(_GLFWwindow* window,
+ 
+     DragAcceptFiles(window->win32.handle, TRUE);
+ 
++    // Sytue patch: the OLE drop target. Without OLE on this thread (already in
++    // the multithreaded apartment), the window keeps WM_DROPFILES and paths only
++    if (SUCCEEDED(OleInitialize(NULL)))
++    {
++        window->win32.drop.ole = GLFW_TRUE;
++        window->win32.drop.target.lpVtbl = &dropTargetVtbl;
++        window->win32.drop.window = window;
++        RegisterDragDrop(window->win32.handle, &window->win32.drop.target);
++    }
++
+     if (fbconfig->transparent)
+     {
+         updateFramebufferTransparency(window);
+@@ -1567,6 +1780,14 @@ void _glfwDestroyWindowWin32(_GLFWwindow* window)
+     if (_glfw.win32.capturedCursorWindow == window)
+         releaseCursor();
+ 
++    if (window->win32.drop.ole)
++    {
++        // Sytue patch: see the OLE drop target
++        RevokeDragDrop(window->win32.handle);
++        OleUninitialize();
++        window->win32.drop.ole = GLFW_FALSE;
++    }
++
+     if (window->win32.handle)
+     {
+         RemovePropW(window->win32.handle, L"GLFW");
+-- 
+2.54.0 (Apple Git-157)
+
+
+From a55430400fa2b9bdefa234806fe15dbd6b87d037 Mon Sep 17 00:00:00 2001
+From: Daniel Delgado Ramos <328510259+thinkddr@users.noreply.github.com>
+Date: Thu, 24 Sep 2026 18:29:04 +0200
+Subject: [PATCH 3/3] feat: aviso de arrastre de ficheros sobre una ventana
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+glfwSetDragCallback avisa cuando un arrastre de rutas entra en la
+ventana (GLFW_TRUE) y cuando deja de estar encima (GLFW_FALSE): porque
+sale, porque se cancela o porque se suelta, y en ese caso antes de
+entregar las rutas. Cada cambio llega una sola vez.
+
+- X11: XdndEnter con text/uri-list; XdndLeave (átomo nuevo) y XdndDrop.
+  Una lista de URI cuenta antes de saber si trae ficheros o enlaces.
+- Cocoa: draggingEntered: con NSPasteboardTypeFileURL; draggingExited:,
+  draggingEnded: y el principio de performDragOperation:.
+- Win32: DragEnter con CF_HDROP; DragLeave y Drop del IDropTarget.
+- Wayland: no avisa.
+
+En Go, SetDragCallback, global como SetDropTextCallback.
+
+Parte del borrador del agente de SyPhotos, ajustado a lo aprobado: solo
+ficheros, X11 en XdndEnter y sin Wayland.
+---
+ v3.4/glfw/FORK-NOTICE.md            | 15 ++++++-
+ v3.4/glfw/drag.go                   | 63 +++++++++++++++++++++++++++++
+ v3.4/glfw/droptext.c                |  5 +++
+ v3.4/glfw/glfw/include/GLFW/glfw3.h | 36 +++++++++++++++++
+ v3.4/glfw/glfw/src/cocoa_window.m   | 21 ++++++++++
+ v3.4/glfw/glfw/src/input.c          | 28 +++++++++++++
+ v3.4/glfw/glfw/src/internal.h       |  5 +++
+ v3.4/glfw/glfw/src/win32_window.c   |  6 +++
+ v3.4/glfw/glfw/src/x11_init.c       |  1 +
+ v3.4/glfw/glfw/src/x11_platform.h   |  1 +
+ v3.4/glfw/glfw/src/x11_window.c     | 17 ++++++++
+ v3.4/glfw/window.go                 |  3 ++
+ 12 files changed, 199 insertions(+), 2 deletions(-)
+ create mode 100644 v3.4/glfw/drag.go
+
+diff --git a/v3.4/glfw/FORK-NOTICE.md b/v3.4/glfw/FORK-NOTICE.md
+index e6828ed..7bc8e5e 100644
+--- a/v3.4/glfw/FORK-NOTICE.md
++++ b/v3.4/glfw/FORK-NOTICE.md
+@@ -2,8 +2,10 @@
+ 
+ Este repositorio es el módulo `github.com/go-gl/glfw/v3.4/glfw` en la versión que
+ requiere Fyne v2.8.1 (`v0.1.0-pre.1.0.20260707082822-2a407d02d01a`, GLFW C
+-`7b6aead9fb88b3623e3b3725ebb42670cbe4c579`), con un único parche: **una ventana puede
+-aceptar TEXTO y URL que no son ficheros soltados sobre ella**, además de las rutas.
++`7b6aead9fb88b3623e3b3725ebb42670cbe4c579`), con dos parches: **una ventana puede
++aceptar TEXTO y URL que no son ficheros soltados sobre ella**, además de las rutas, y
++**una ventana sabe cuándo le están arrastrando ficheros por encima** (para enseñar dónde
++soltarlos).
+ 
+ - C: `glfwSetDropTextCallback` y `GLFWdroptextfun` (`glfw/include/GLFW/glfw3.h`), el
+   reparto de `text/uri-list` entre ficheros y URL (`glfw/src/input.c`) y los cuatro
+@@ -11,6 +13,15 @@ aceptar TEXTO y URL que no son ficheros soltados sobre ella**, además de las ru
+   Cocoa y un `IDropTarget` de OLE en Win32 (que entrega también los ficheros, porque una
+   ventana registrada para OLE deja de recibir `WM_DROPFILES` del Explorador).
+ - Go: `SetDropTextCallback` (`droptext.go`), una retrollamada para todas las ventanas.
++- El arrastre por encima: `glfwSetDragCallback` y `GLFWdragfun`, avisados al entrar y al
++  salir (o al cancelarse o soltarse, y en ese caso antes de la entrega), y solo cuando
++  lo arrastrado son ficheros: `XdndEnter` con `text/uri-list` y `XdndLeave`/`XdndDrop` en
++  X11; `draggingEntered:` con `NSPasteboardTypeFileURL`, `draggingExited:`,
++  `draggingEnded:` y `performDragOperation:` en Cocoa; y `DragEnter` con `CF_HDROP`,
++  `DragLeave` y `Drop` del `IDropTarget` en Win32. Cada cambio llega una sola vez. En Go,
++  `SetDragCallback` (`drag.go`). En X11 una lista de URI cuenta antes de saber si trae
++  ficheros o enlaces; Wayland no avisa; y una ventana de Win32 sin OLE (hilo ya en el
++  apartamento multihilo) tampoco.
+ 
+ Una ventana sin retrollamada de texto se comporta EXACTAMENTE como sin el parche. Los
+ ficheros siguen llegando por la retrollamada de rutas de siempre.
+diff --git a/v3.4/glfw/drag.go b/v3.4/glfw/drag.go
+new file mode 100644
+index 0000000..fb70d8f
+--- /dev/null
++++ b/v3.4/glfw/drag.go
+@@ -0,0 +1,63 @@
++package glfw
++
++// Sytue patch: whether paths are being dragged over the window, so that the
++// application can show where to drop them.
++//
++// Like the text drop callback (droptext.go), it is a single callback for every
++// window, because the toolkit that owns the windows keeps its *Window private.
++
++//#define GLFW_INCLUDE_NONE
++//#include "glfw/include/GLFW/glfw3.h"
++//void glfwSetDragCallbackCB(GLFWwindow *window);
++import "C"
++
++import "unsafe"
++
++// DragCallback is told when a drag of paths starts hovering over w, and when
++// it stops: it left, it was cancelled or it was dropped. When it is dropped,
++// this comes before the drop callbacks. Each change is reported once. On X11
++// a URI list counts before it is known whether it holds files; on Wayland
++// nothing is reported.
++type DragCallback func(w *Window, hovering bool)
++
++// fDrag is guarded by windows.l.
++var fDrag DragCallback
++
++// SetDragCallback sets the drag hover callback of every window, the ones that
++// exist and the ones created afterwards. It does not change what the windows
++// accept.
++//
++// This function may only be called from the main thread.
++func SetDragCallback(cbfun DragCallback) {
++	windows.l.Lock()
++	fDrag = cbfun
++	for data := range windows.m {
++		setDrag(data)
++	}
++	n := len(windows.m)
++	windows.l.Unlock()
++	if n > 0 {
++		panicError()
++	}
++}
++
++// setDrag applies fDrag to one window; windows.l must be held.
++func setDrag(data *C.GLFWwindow) {
++	if fDrag == nil {
++		C.glfwSetDragCallback(data, nil)
++	} else {
++		C.glfwSetDragCallbackCB(data)
++	}
++}
++
++//export goDragCB
++func goDragCB(window unsafe.Pointer, hovering C.int) {
++	w := windows.get((*C.GLFWwindow)(window))
++	windows.l.Lock()
++	cb := fDrag
++	windows.l.Unlock()
++	if w == nil || cb == nil {
++		return
++	}
++	cb(w, hovering != 0)
++}
+diff --git a/v3.4/glfw/droptext.c b/v3.4/glfw/droptext.c
+index ff75170..f2ffee6 100644
+--- a/v3.4/glfw/droptext.c
++++ b/v3.4/glfw/droptext.c
+@@ -4,3 +4,8 @@
+ void glfwSetDropTextCallbackCB(GLFWwindow *window) {
+   glfwSetDropTextCallback(window, (GLFWdroptextfun)goDropTextCB);
+ }
++
++// Sytue patch: the C side of the drag hover callback (drag.go).
++void glfwSetDragCallbackCB(GLFWwindow *window) {
++  glfwSetDragCallback(window, (GLFWdragfun)goDragCB);
++}
+diff --git a/v3.4/glfw/glfw/include/GLFW/glfw3.h b/v3.4/glfw/glfw/include/GLFW/glfw3.h
+index 30553b3..79fab39 100644
+--- a/v3.4/glfw/glfw/include/GLFW/glfw3.h
++++ b/v3.4/glfw/glfw/include/GLFW/glfw3.h
+@@ -1992,6 +1992,25 @@ typedef void (* GLFWdropfun)(GLFWwindow* window, int path_count, const char* pat
+  */
+ typedef void (* GLFWdroptextfun)(GLFWwindow* window, double xpos, double ypos, const char* text, int url_count, const char* urls[]);
+ 
++/*! @brief The function pointer type for drag hover callbacks (Sytue patch).
++ *
++ *  Called when a drag of paths starts hovering over the window, and again
++ *  when it stops: because it left the window, because it was cancelled or
++ *  because it was dropped. In the last case this is called before the drop
++ *  callbacks. Each change is reported once. Text and URLs that are not files
++ *  do not count, except on X11, where a URI list is announced before it is
++ *  known whether it holds files. Not reported on Wayland.
++ *
++ *  @param[in] window The window that received the event.
++ *  @param[in] hovering `GLFW_TRUE` when the drag starts hovering over the
++ *  window, `GLFW_FALSE` when it stops.
++ *
++ *  @sa glfwSetDragCallback
++ *
++ *  @ingroup input
++ */
++typedef void (* GLFWdragfun)(GLFWwindow* window, int hovering);
++
+ /*! @brief The function pointer type for monitor configuration callbacks.
+  *
+  *  This is the function pointer type for monitor configuration callbacks.
+@@ -5492,6 +5511,23 @@ GLFWAPI GLFWdropfun glfwSetDropCallback(GLFWwindow* window, GLFWdropfun callback
+  */
+ GLFWAPI GLFWdroptextfun glfwSetDropTextCallback(GLFWwindow* window, GLFWdroptextfun callback);
+ 
++/*! @brief Sets the drag hover callback (Sytue patch).
++ *
++ *  It says when paths are being dragged over the window, so that the
++ *  application can show where they can be dropped. It does not change what
++ *  the window accepts.
++ *
++ *  @param[in] window The window whose callback to set.
++ *  @param[in] callback The new drag hover callback, or `NULL` to remove it.
++ *  @return The previously set callback, or `NULL` if no callback was set or
++ *  the library had not been [initialized](@ref intro_init).
++ *
++ *  @thread_safety This function must only be called from the main thread.
++ *
++ *  @ingroup input
++ */
++GLFWAPI GLFWdragfun glfwSetDragCallback(GLFWwindow* window, GLFWdragfun callback);
++
+ /*! @brief Returns whether the specified joystick is present.
+  *
+  *  This function returns whether the specified joystick is present.
+diff --git a/v3.4/glfw/glfw/src/cocoa_window.m b/v3.4/glfw/glfw/src/cocoa_window.m
+index 16e30da..1729d01 100644
+--- a/v3.4/glfw/glfw/src/cocoa_window.m
++++ b/v3.4/glfw/glfw/src/cocoa_window.m
+@@ -625,13 +625,34 @@ - (NSDragOperation)draggingEntered:(id <NSDraggingInfo>)sender
+         return NSDragOperationNone;
+     }
+ 
++    // Sytue patch: drag hover, for paths only
++    if ([[sender draggingPasteboard] availableTypeFromArray:@[NSPasteboardTypeFileURL]])
++        _glfwInputDrag(window, GLFW_TRUE);
++
+     // HACK: We don't know what to say here because we don't know what the
+     //       application wants to do with the paths
+     return NSDragOperationGeneric;
+ }
+ 
++// Sytue patch: drag hover. AppKit sends draggingExited: when the drag leaves
++// the view and draggingEnded: when the session finishes anywhere, so both
++// stop it (only the first change reaches the callback); performDragOperation:
++// does it before the drop is delivered
++- (void)draggingExited:(id <NSDraggingInfo>)sender
++{
++    _glfwInputDrag(window, GLFW_FALSE);
++}
++
++- (void)draggingEnded:(id <NSDraggingInfo>)sender
++{
++    _glfwInputDrag(window, GLFW_FALSE);
++}
++
+ - (BOOL)performDragOperation:(id <NSDraggingInfo>)sender
+ {
++    // Sytue patch: the drag stops hovering before the drop is delivered
++    _glfwInputDrag(window, GLFW_FALSE);
++
+     const NSRect contentRect = [window->ns.view frame];
+     // NOTE: The returned location uses base 0,1 not 0,0
+     const NSPoint pos = [sender draggingLocation];
+diff --git a/v3.4/glfw/glfw/src/input.c b/v3.4/glfw/glfw/src/input.c
+index a305744..6ac01d8 100644
+--- a/v3.4/glfw/glfw/src/input.c
++++ b/v3.4/glfw/glfw/src/input.c
+@@ -424,6 +424,24 @@ void _glfwInputDropText(_GLFWwindow* window, double xpos, double ypos,
+         window->callbacks.droptext((GLFWwindow*) window, xpos, ypos, text, count, urls);
+ }
+ 
++// Notifies shared code that an acceptable drag started or stopped hovering
++// over a window (Sytue patch). Backends may report the same state more than
++// once (a drop and the leave that some systems send after it): only the
++// changes reach the callback
++//
++void _glfwInputDrag(_GLFWwindow* window, GLFWbool hovering)
++{
++    assert(window != NULL);
++
++    hovering = hovering ? GLFW_TRUE : GLFW_FALSE;
++    if (window->dragHovering == hovering)
++        return;
++
++    window->dragHovering = hovering;
++    if (window->callbacks.drag)
++        window->callbacks.drag((GLFWwindow*) window, hovering);
++}
++
+ // Delivers a dropped text/uri-list (Sytue patch): the file URIs go to the
+ // path drop callback, as before, and the rest to the text drop callback.
+ // A window without a text drop callback gets the whole list as paths, which
+@@ -1121,6 +1139,16 @@ GLFWAPI GLFWdroptextfun glfwSetDropTextCallback(GLFWwindow* handle, GLFWdroptext
+     return cbfun;
+ }
+ 
++GLFWAPI GLFWdragfun glfwSetDragCallback(GLFWwindow* handle, GLFWdragfun cbfun)
++{
++    _GLFWwindow* window = (_GLFWwindow*) handle;
++    assert(window != NULL);
++
++    _GLFW_REQUIRE_INIT_OR_RETURN(NULL);
++    _GLFW_SWAP(GLFWdragfun, window->callbacks.drag, cbfun);
++    return cbfun;
++}
++
+ GLFWAPI int glfwJoystickPresent(int jid)
+ {
+     _GLFWjoystick* js;
+diff --git a/v3.4/glfw/glfw/src/internal.h b/v3.4/glfw/glfw/src/internal.h
+index 863792a..c7e6305 100644
+--- a/v3.4/glfw/glfw/src/internal.h
++++ b/v3.4/glfw/glfw/src/internal.h
+@@ -572,8 +572,12 @@ struct _GLFWwindow
+         GLFWcharmodsfun           charmods;
+         GLFWdropfun               drop;
+         GLFWdroptextfun           droptext;
++        GLFWdragfun               drag;
+     } callbacks;
+ 
++    // Sytue patch: whether an acceptable drag is hovering over the window
++    GLFWbool            dragHovering;
++
+     // This is defined in platform.h
+     GLFW_PLATFORM_WINDOW_STATE
+ };
+@@ -929,6 +933,7 @@ void _glfwInputCursorEnter(_GLFWwindow* window, GLFWbool entered);
+ void _glfwInputDrop(_GLFWwindow* window, int count, const char** names);
+ void _glfwInputDropText(_GLFWwindow* window, double xpos, double ypos, const char* text, int count, const char** urls);
+ void _glfwInputDropUriList(_GLFWwindow* window, double xpos, double ypos, char* list);
++void _glfwInputDrag(_GLFWwindow* window, GLFWbool hovering);
+ void _glfwInputJoystick(_GLFWjoystick* js, int event);
+ void _glfwInputJoystickAxis(_GLFWjoystick* js, int axis, float value);
+ void _glfwInputJoystickButton(_GLFWjoystick* js, int button, char value);
+diff --git a/v3.4/glfw/glfw/src/win32_window.c b/v3.4/glfw/glfw/src/win32_window.c
+index c263779..7722420 100644
+--- a/v3.4/glfw/glfw/src/win32_window.c
++++ b/v3.4/glfw/glfw/src/win32_window.c
+@@ -677,6 +677,8 @@ static HRESULT STDMETHODCALLTYPE dropDragEnter(IDropTarget* target,
+     _GLFWwindow* window = dropTargetWindow(target);
+     window->win32.drop.kind = dropKind(window, data);
+     *effect = dropEffect(window->win32.drop.kind, *effect);
++    // Sytue patch: drag hover, for paths only
++    _glfwInputDrag(window, window->win32.drop.kind == DROP_FILES);
+     return S_OK;
+ }
+ 
+@@ -693,6 +695,8 @@ static HRESULT STDMETHODCALLTYPE dropDragOver(IDropTarget* target,
+ static HRESULT STDMETHODCALLTYPE dropDragLeave(IDropTarget* target)
+ {
+     dropTargetWindow(target)->win32.drop.kind = DROP_NOTHING;
++    // Sytue patch: drag hover
++    _glfwInputDrag(dropTargetWindow(target), GLFW_FALSE);
+     return S_OK;
+ }
+ 
+@@ -709,6 +713,8 @@ static HRESULT STDMETHODCALLTYPE dropDrop(IDropTarget* target,
+     window->win32.drop.kind = DROP_NOTHING;
+     *effect = dropEffect(kind, *effect);
+     ScreenToClient(window->win32.handle, &point);
++    // Sytue patch: the drag stops hovering before the drop is delivered
++    _glfwInputDrag(window, GLFW_FALSE);
+ 
+     if (kind == DROP_FILES)
+     {
+diff --git a/v3.4/glfw/glfw/src/x11_init.c b/v3.4/glfw/glfw/src/x11_init.c
+index abaeefb..1a33678 100644
+--- a/v3.4/glfw/glfw/src/x11_init.c
++++ b/v3.4/glfw/glfw/src/x11_init.c
+@@ -942,6 +942,7 @@ static GLFWbool initExtensions(void)
+     _glfw.x11.XdndFinished = XInternAtom(_glfw.x11.display, "XdndFinished", False);
+     _glfw.x11.XdndSelection = XInternAtom(_glfw.x11.display, "XdndSelection", False);
+     _glfw.x11.XdndTypeList = XInternAtom(_glfw.x11.display, "XdndTypeList", False);
++    _glfw.x11.XdndLeave = XInternAtom(_glfw.x11.display, "XdndLeave", False);
+     _glfw.x11.text_uri_list = XInternAtom(_glfw.x11.display, "text/uri-list", False);
+     _glfw.x11.text_plain_utf8 = XInternAtom(_glfw.x11.display, "text/plain;charset=utf-8", False);
+     _glfw.x11.text_plain = XInternAtom(_glfw.x11.display, "text/plain", False);
+diff --git a/v3.4/glfw/glfw/src/x11_platform.h b/v3.4/glfw/glfw/src/x11_platform.h
+index c38f97a..22a49d7 100644
+--- a/v3.4/glfw/glfw/src/x11_platform.h
++++ b/v3.4/glfw/glfw/src/x11_platform.h
+@@ -626,6 +626,7 @@ typedef struct _GLFWlibraryX11
+     Atom            XdndFinished;
+     Atom            XdndSelection;
+     Atom            XdndTypeList;
++    Atom            XdndLeave; // Sytue patch: drag hover
+     Atom            text_uri_list;
+     Atom            text_plain_utf8;
+     Atom            text_plain;
+diff --git a/v3.4/glfw/glfw/src/x11_window.c b/v3.4/glfw/glfw/src/x11_window.c
+index 9f6b8e4..fd8769b 100644
+--- a/v3.4/glfw/glfw/src/x11_window.c
++++ b/v3.4/glfw/glfw/src/x11_window.c
+@@ -1630,6 +1630,12 @@ static void processEvent(XEvent *event)
+ 
+                 if (list && formats)
+                     XFree(formats);
++
++                // Sytue patch: drag hover, for paths only. A URI list may also
++                // carry URLs that are not files, but that is not known before
++                // the drop
++                if (_glfw.x11.xdnd.format == _glfw.x11.text_uri_list)
++                    _glfwInputDrag(window, GLFW_TRUE);
+             }
+             else if (event->xclient.message_type == _glfw.x11.XdndDrop)
+             {
+@@ -1639,6 +1645,9 @@ static void processEvent(XEvent *event)
+                 if (_glfw.x11.xdnd.version > _GLFW_XDND_VERSION)
+                     return;
+ 
++                // Sytue patch: the drag stops hovering before the drop arrives
++                _glfwInputDrag(window, GLFW_FALSE);
++
+                 if (_glfw.x11.xdnd.format)
+                 {
+                     if (_glfw.x11.xdnd.version >= 1)
+@@ -1667,6 +1676,14 @@ static void processEvent(XEvent *event)
+                     XFlush(_glfw.x11.display);
+                 }
+             }
++            else if (event->xclient.message_type == _glfw.x11.XdndLeave)
++            {
++                // Sytue patch: the drag left the window or was cancelled
++                if (_glfw.x11.xdnd.version > _GLFW_XDND_VERSION)
++                    return;
++
++                _glfwInputDrag(window, GLFW_FALSE);
++            }
+             else if (event->xclient.message_type == _glfw.x11.XdndPosition)
+             {
+                 // The drag operation has moved over the window
+diff --git a/v3.4/glfw/window.go b/v3.4/glfw/window.go
+index d05e573..e8af68e 100644
+--- a/v3.4/glfw/window.go
++++ b/v3.4/glfw/window.go
+@@ -402,6 +402,9 @@ func CreateWindow(width, height int, title string, monitor *Monitor, share *Wind
+ 	if fDropText != nil { // Sytue patch: see droptext.go
+ 		setDropText(w)
+ 	}
++	if fDrag != nil { // Sytue patch: see drag.go
++		setDrag(w)
++	}
+ 	windows.l.Unlock()
+ 	return wnd, nil
+ }
+-- 
+2.54.0 (Apple Git-157)
+

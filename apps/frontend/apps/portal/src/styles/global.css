@@ -1,0 +1,28 @@
+/**
+ * Sytue One — hoja global del portal.
+ *
+ * Tailwind v4 (CSS-first) + tema de marca Sytue (tokens en branding/, vía
+ * @sytue/config/theme.css). Se registran los globs de contenido de la app y de
+ * los paquetes compartidos (@sytue/ui, @sytue/shell) para que el JIT detecte
+ * sus clases. Modo claro/oscuro automático (colors.css reasigna roles).
+ */
+@import 'tailwindcss';
+@import '@sytue/config/theme.css';
+@import '@sytue/ui/styles.css';
+
+/* Cada acceso es una tarjeta de recurso: superficie blanca que se despega del lienzo con
+   sombra suave, y el color de la marca solo en su icono (la tesela del producto ya es
+   un relleno sólido). El tinte pastel de toda la tarjeta se retiró con la forma Carril.
+   Los paneles de actividad son `Card`, que ya trae la misma superficie.
+   El BORDE no va aquí sino en las clases del enlace (`border-border-subtle`): esta regla
+   está fuera de toda capa y gana a cualquier utilidad, también a su
+   `hover:border-border-strong`, así que la tarjeta no cambiaba al pasar el puntero. */
+.hub-product-card {
+  background: var(--sytue-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Contenido a escanear (las clases viven en .astro/.tsx de la app y paquetes). */
+@source './';
+@source '../../../../packages/ui/src';
+@source '../../../../packages/shell/src';

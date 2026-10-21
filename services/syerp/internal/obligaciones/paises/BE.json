@@ -1,0 +1,292 @@
+{
+ "pais": "BE",
+ "verificado": true,
+ "moneda": "EUR",
+ "formas": [
+  {
+   "clave": "independant",
+   "nombre": "Indépendant / Zelfstandige",
+   "tipo": "persona_fisica"
+  },
+  {
+   "clave": "srl",
+   "nombre": "SRL / BV",
+   "tipo": "sociedad"
+  },
+  {
+   "clave": "sa",
+   "nombre": "SA / NV",
+   "tipo": "sociedad"
+  },
+  {
+   "clave": "sc",
+   "nombre": "SC / CV",
+   "tipo": "sociedad"
+  }
+ ],
+ "portales": {
+  "intervat": {
+   "nombre": "Intervat (SPF Finances)",
+   "url": "https://eservices.minfin.fgov.be/intervat/"
+  },
+  "biztax": {
+   "nombre": "Biztax / MyMinfin",
+   "url": "https://eservices.minfin.fgov.be/biztax/"
+  },
+  "onss": {
+   "nombre": "ONSS / RSZ — portail de la sécurité sociale",
+   "url": "https://www.socialsecurity.be/"
+  },
+  "bnb": {
+   "nombre": "Centrale des bilans (BNB)",
+   "url": "https://www.nbb.be/fr/centrale-des-bilans"
+  }
+ },
+ "obligaciones": [
+  {
+   "clave": "be_tva_t",
+   "nombre": "Déclaration TVA trimestrielle",
+   "concepto": "iva_periodica",
+   "ambito": "fiscal",
+   "periodicidad": "trimestral",
+   "plazos": {
+    "T": "25"
+   },
+   "margen_dias": 7,
+   "portal": "intervat",
+   "aplica": {
+    "condiciones": [
+     "iva",
+     "!iva_mensual"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 10000,
+    "nota": "Amende de 100 € par déclaration et par mois de retard (max. 500 €) ; intérêts de retard de 8 % par an. Depuis 2025, le déclarant trimestriel dépose pour le 25 (AR n° 1, art. 17, § 2, modifié en 2024)."
+   },
+   "calculo": {
+    "tipo": "saldo_neto",
+    "haber": [
+     "477"
+    ],
+    "debe": [
+     "472"
+    ]
+   }
+  },
+  {
+   "clave": "be_tva_m",
+   "nombre": "Déclaration TVA mensuelle",
+   "concepto": "iva_periodica",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "20"
+   },
+   "margen_dias": 7,
+   "portal": "intervat",
+   "aplica": {
+    "condiciones": [
+     "iva",
+     "iva_mensual"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 10000,
+    "nota": "Amende de 100 € par déclaration et par mois de retard (max. 500 €) ; intérêts de retard de 8 % par an."
+   },
+   "calculo": {
+    "tipo": "saldo_neto",
+    "haber": [
+     "477"
+    ],
+    "debe": [
+     "472"
+    ]
+   }
+  },
+  {
+   "clave": "be_listing",
+   "nombre": "Listing annuel des clients assujettis",
+   "concepto": "listado_clientes",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "03-31+1"
+   },
+   "margen_dias": 14,
+   "portal": "intervat",
+   "aplica": {
+    "condiciones": [
+     "iva"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 30000,
+    "nota": "Amende de 3 000 € en cas d'absence de dépôt après rappel."
+   }
+  },
+  {
+   "clave": "be_intracom",
+   "nombre": "Relevé intracommunautaire",
+   "concepto": "operaciones_intracomunitarias",
+   "ambito": "fiscal",
+   "periodicidad": "trimestral",
+   "plazos": {
+    "T": "20"
+   },
+   "margen_dias": 7,
+   "portal": "intervat",
+   "aplica": {
+    "condiciones": [
+     "intracomunitario"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 10000,
+    "nota": "Amende de 100 € par mois de retard."
+   }
+  },
+  {
+   "clave": "be_precompte",
+   "nombre": "Précompte professionnel (274)",
+   "concepto": "retenciones_trabajo",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "15"
+   },
+   "margen_dias": 7,
+   "portal": "biztax",
+   "aplica": {
+    "condiciones": [
+     "empleados"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_pct_mes": 0.67,
+    "recargo_max_pct": 8,
+    "nota": "Intérêts de retard (8 % par an) et amende de 50 € à 1 250 €."
+   }
+  },
+  {
+   "clave": "be_onss",
+   "nombre": "Déclaration ONSS (DmfA)",
+   "concepto": "seguridad_social",
+   "ambito": "laboral",
+   "periodicidad": "trimestral",
+   "plazos": {
+    "T": "ultimo"
+   },
+   "margen_dias": 7,
+   "portal": "onss",
+   "aplica": {
+    "condiciones": [
+     "empleados"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_base_pct": 10,
+    "recargo_pct_mes": 0.58,
+    "nota": "Majoration de 10 % des cotisations dues et intérêts de 7 % par an. Provisions mensuelles le 5 du mois."
+   }
+  },
+  {
+   "clave": "be_isoc",
+   "nombre": "Déclaration à l'impôt des sociétés (Biztax)",
+   "concepto": "sociedades_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "09-30+1"
+   },
+   "margen_dias": 30,
+   "portal": "biztax",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 5000,
+    "nota": "Amende de 50 € à 1 250 € et accroissement d'impôt de 10 % à 200 % en cas de taxation d'office. Délai : dernier jour du septième mois suivant la clôture."
+   }
+  },
+  {
+   "clave": "be_va",
+   "nombre": "Versements anticipés (ISoc)",
+   "concepto": "pago_fraccionado_sociedades",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "1P": "04-10",
+    "2P": "07-10",
+    "3P": "10-10",
+    "4P": "12-20"
+   },
+   "margen_dias": 7,
+   "portal": "biztax",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_base_pct": 6.75,
+    "nota": "Majoration globale de 6,75 % (exercice 2025) de l'impôt dû en l'absence de versements anticipés."
+   }
+  },
+  {
+   "clave": "be_ipp",
+   "nombre": "Déclaration IPP (Tax-on-web)",
+   "concepto": "renta_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "07-15+1"
+   },
+   "margen_dias": 30,
+   "portal": "biztax",
+   "aplica": {
+    "tipos": [
+     "persona_fisica"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 5000,
+    "nota": "Amende de 50 € à 1 250 € et accroissement d'impôt de 10 % à 200 %."
+   }
+  },
+  {
+   "clave": "be_comptes",
+   "nombre": "Dépôt des comptes annuels (BNB)",
+   "concepto": "cuentas_anuales",
+   "ambito": "mercantil",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "07-31+1"
+   },
+   "margen_dias": 30,
+   "portal": "bnb",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 40000,
+    "nota": "Majoration des frais de dépôt (400 € après le 9e mois, 600 € après le 10e, 1 200 € après le 13e pour les grandes sociétés) ; dissolution judiciaire possible."
+   }
+  }
+ ]
+}

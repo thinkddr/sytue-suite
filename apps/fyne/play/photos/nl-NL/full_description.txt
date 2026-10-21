@@ -1,0 +1,18 @@
+Fotogalerij en -editor: je originelen in Drive, je bewerkingen als recept.
+
+• Een tijdlijn per maand met zoeken op naam.
+• Albums met een omslag; viewer op volledig scherm.
+• Een editor voor licht, kleur, draaien, spiegelen en bijsnijden, in realtime.
+• Elke bewerking is een recept: het origineel wordt nooit aangeraakt.
+• Een tijdlijn gegroepeerd per maand, met zoeken op naam en scherpe miniaturen.
+• Albums: aanmaken, hernoemen, omslag kiezen, toevoegen vanuit de viewer en verwijderen.
+• Een editor met vier schuifregelaars (belichting, contrast, verzadiging, kleurtemperatuur), draaien en spiegelen.
+• Elke bewerking is een apart opgeslagen recept: het origineel in Drive verandert nooit.
+• Exporteren in volledige resolutie, op de server gerenderd met dezelfde formules als in het voorbeeld.
+• Prullenbak met herstel.
+• De originelen staan in je Sytue Drive; afgeleide versies zijn een cache die opnieuw te maken is.
+• EXIF-gegevens uit het bestand zelf gelezen; alles in de Europese Unie.
+• Meervoudige selectie per maand: naar een nieuw album, naar de prullenbak of in één keer downloaden.
+• Diavoorstelling, volledige grootte, draaien vanuit de viewer en bijsnijden met vaste verhouding.
+
+Versleuteld tijdens transport (TLS 1.3). De infrastructuur van Sytue staat in de EU. De locatie van externe diensten hangt af van hun aanbieder.

@@ -1,0 +1,10 @@
+{
+  "order_paid_buyer_subject": "Orderbekräftelse {number}",
+  "order_paid_buyer_body": "Tack för ditt köp. Order {number} har bekräftats.",
+  "order_paid_store_subject": "Ny order mottagen: {number}",
+  "order_paid_store_body": "Du har tagit emot en ny order {number} på {total}.",
+  "withdrawal_ack_subject": "Ångrabekräftelse mottagen: {number}",
+  "withdrawal_ack_body": "Din ångrebegäran för order {number} har registrerats.",
+  "form_received_subject": "Formulärinlämning mottagen: {form_id}",
+  "form_received_body": "En ny inlämning har tagits emot för formulär {form_id}."
+}

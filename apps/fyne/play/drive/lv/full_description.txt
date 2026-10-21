@@ -1,0 +1,16 @@
+Faili un sadarbība ar jūsu zīmolu.
+
+• Augšupielāde, kārtošana un kopīgošana ar kontrolētām saitēm (atļaujas un derīguma termiņš).
+• Dokumentu un attēlu priekšskatījums tieši lapā.
+• Pievienošana Mail bez faila dublēšanas.
+• S3 krātuve Eiropas reģionos.
+• Mans disks, komandu diski, kopīgoti ar mani, nesenie, izlase un atkritne.
+• Kopīgošanas saites ar diviem līmeņiem (skatīt vai rediģēt), paroli un derīguma termiņu.
+• Versiju vēsture ar atjaunošanu.
+• Dokumentu, attēlu un PDF priekšskatījums bez lejupielādes.
+• Biroja dokumentu atvēršana un rediģēšana Docus, Calcus un Diapos; PDF – CertiPDF.
+• Sensitivitātes iezīmes, kas bloķē publiskas saites tur, kur tām nav vietas.
+• Kopīgošana Rooms kanālā vai pievienošana Mail bez faila dublēšanas.
+• S3 krātuve Eiropas reģionos, kvota vienmēr redzama.
+
+Šifrēts pārsūtīšanas laikā (TLS 1.3). Sytue infrastruktūra atrodas ES. Ārējo pakalpojumu atrašanās vieta ir atkarīga no to sniedzēja.

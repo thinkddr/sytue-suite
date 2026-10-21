@@ -1,0 +1,30 @@
+{
+  "ids": [
+    "left-value",
+    "right-value",
+    "ephemeral-value",
+    "destructured-missing-undefined",
+    "destructured-missing-null",
+    "destructured-null-undefined",
+    "destructured-null-null",
+    "object-missing-undefined",
+    "object-missing-null",
+    "object-null-undefined",
+    "object-null-null",
+    "short-and",
+    "short-or",
+    "short-nullish",
+    "selected-null",
+    "selected-missing",
+    "entity-conformance"
+  ],
+  "actions": [
+    "left-increment",
+    "left-batch",
+    "left-batch",
+    "ephemeral-increment",
+    "toggle-ephemeral",
+    "toggle-ephemeral",
+    "right-increment"
+  ]
+}

@@ -1,0 +1,153 @@
+[
+  {
+    "clave": "oportunidad", "modulo": "crm", "titulo": "nombre",
+    "etiqueta": {"en":"Opportunities","es":"Oportunidades","fr":"Opportunités","de":"Verkaufschancen","it":"Opportunità","bg":"Възможности","cs":"Příležitosti","da":"Salgsmuligheder","el":"Ευκαιρίες","et":"Müügivõimalused","fi":"Myyntimahdollisuudet","ga":"Deiseanna","hr":"Prilike","hu":"Lehetőségek","is":"Sölutækifæri","lt":"Galimybės","lv":"Iespējas","mt":"Opportunitajiet","nb":"Salgsmuligheter","nl":"Kansen","pl":"Szanse","pt":"Oportunidades","ro":"Oportunități","sk":"Príležitosti","sl":"Priložnosti","sv":"Affärsmöjligheter"},
+    "estados": ["nuevo","calificada","propuesta","ganada","perdida"],
+    "campos": [
+      {"clave":"nombre","tipo":"texto","requerido":true},
+      {"clave":"cliente","tipo":"relacion","modelo":"contacto","requerido":true},
+      {"clave":"importe","tipo":"dinero"},
+      {"clave":"probabilidad","tipo":"entero"},
+      {"clave":"vencimiento","tipo":"fecha"},
+      {"clave":"responsable","tipo":"texto"},
+      {"clave":"canal","tipo":"seleccion","opciones":["correo_valor","telefono_valor","web_valor","presencial"]},
+      {"clave":"motivo","tipo":"texto"},
+      {"clave":"notas","tipo":"texto_largo"},
+      {"clave":"externo_id","tipo":"texto"}
+    ],
+    "lista": ["nombre","cliente","importe","probabilidad","vencimiento","estado"]
+  },
+  {
+    "clave": "presupuesto", "modulo": "ventas", "secuencia": "PRE",
+    "etiqueta": {"en":"Quotations","es":"Presupuestos","fr":"Devis","de":"Angebote","it":"Preventivi","bg":"Оферти","cs":"Nabídky","da":"Tilbud","el":"Προσφορές","et":"Pakkumised","fi":"Tarjoukset","ga":"Meastacháin","hr":"Ponude","hu":"Árajánlatok","is":"Tilboð","lt":"Pasiūlymai","lv":"Piedāvājumi","mt":"Kwotazzjonijiet","nb":"Tilbud","nl":"Offertes","pl":"Oferty","pt":"Orçamentos","ro":"Oferte","sk":"Cenové ponuky","sl":"Ponudbe","sv":"Offerter"},
+    "estados": ["borrador","enviado","aceptado","rechazado"],
+    "campos": [
+      {"clave":"cliente","tipo":"relacion","modelo":"contacto","requerido":true},
+      {"clave":"oportunidad","tipo":"relacion","modelo":"oportunidad"},
+      {"clave":"fecha","tipo":"fecha","requerido":true},
+      {"clave":"vencimiento","tipo":"fecha"},
+      {"clave":"base","tipo":"dinero","requerido":true},
+      {"clave":"iva","tipo":"dinero"},
+      {"clave":"total","tipo":"dinero"},
+      {"clave":"notas","tipo":"texto_largo"},
+      {"clave":"externo_id","tipo":"texto"},
+      {"clave":"tpv_operacion","tipo":"texto"},
+      {"clave":"tpv_huella","tipo":"texto"}
+    ],
+    "lista": ["ref","cliente","fecha","total","estado"]
+  },
+  {
+    "clave": "pedido_venta", "modulo": "ventas", "secuencia": "PV",
+    "etiqueta": {"en":"Sales orders","es":"Pedidos de venta","fr":"Commandes clients","de":"Kundenaufträge","it":"Ordini di vendita","bg":"Поръчки за продажба","cs":"Prodejní objednávky","da":"Salgsordrer","el":"Παραγγελίες πώλησης","et":"Müügitellimused","fi":"Myyntitilaukset","ga":"Orduithe díolacháin","hr":"Prodajni nalozi","hu":"Vevői rendelések","is":"Sölupantanir","lt":"Pardavimo užsakymai","lv":"Pārdošanas pasūtījumi","mt":"Ordnijiet tal-bejgħ","nb":"Salgsordrer","nl":"Verkooporders","pl":"Zamówienia sprzedaży","pt":"Encomendas de venda","ro":"Comenzi de vânzare","sk":"Predajné objednávky","sl":"Prodajna naročila","sv":"Försäljningsorder"},
+    "estados": ["borrador","confirmado","entregado","facturado","cancelado"],
+    "campos": [
+      {"clave":"cliente","tipo":"relacion","modelo":"contacto","requerido":true},
+      {"clave":"presupuesto","tipo":"relacion","modelo":"presupuesto"},
+      {"clave":"fecha","tipo":"fecha","requerido":true},
+      {"clave":"vendedor","tipo":"texto"},
+      {"clave":"base","tipo":"dinero","requerido":true},
+      {"clave":"iva","tipo":"dinero"},
+      {"clave":"total","tipo":"dinero"},
+      {"clave":"notas","tipo":"texto_largo"},
+      {"clave":"externo_id","tipo":"texto"}
+    ],
+    "lista": ["ref","cliente","fecha","total","estado"]
+  },
+  {
+    "clave": "linea_venta", "modulo": "ventas", "titulo": "nombre",
+    "etiqueta": {"en":"Sales order lines","es":"Líneas de pedido","fr":"Lignes de commande","de":"Auftragspositionen","it":"Righe ordine","bg":"Редове на поръчки за продажба","cs":"Řádky prodejních objednávek","da":"Salgsordrelinjer","el":"Γραμμές παραγγελιών πώλησης","et":"Müügitellimuste read","fi":"Myyntitilausrivit","ga":"Línte orduithe díolacháin","hr":"Stavke prodajnih naloga","hu":"Vevői rendelés tételei","is":"Línur sölupantana","lt":"Pardavimo užsakymų eilutės","lv":"Pārdošanas pasūtījumu rindas","mt":"Linji tal-ordnijiet tal-bejgħ","nb":"Salgsordrelinjer","nl":"Verkooporderregels","pl":"Pozycje zamówień sprzedaży","pt":"Linhas de encomenda de venda","ro":"Linii comenzi de vânzare","sk":"Riadky predajných objednávok","sl":"Postavke prodajnih naročil","sv":"Orderrader"},
+    "campos": [
+      {"clave":"pedido","tipo":"relacion","modelo":"pedido_venta","requerido":true},
+      {"clave":"producto","tipo":"relacion","modelo":"producto","requerido":true},
+      {"clave":"nombre","tipo":"texto","requerido":true},
+      {"clave":"cantidad","tipo":"decimal","requerido":true},
+      {"clave":"precio","tipo":"dinero","requerido":true},
+      {"clave":"total","tipo":"dinero"},
+      {"clave":"precio_con_iva","tipo":"dinero"},
+      {"clave":"tipo_iva","tipo":"seleccion","opciones":["21","10","5","4","0"]}
+    ],
+    "lista": ["pedido","producto","cantidad","precio","total"]
+  }
+,
+{
+  "clave": "linea_presupuesto",
+  "modulo": "ventas",
+  "titulo": "nombre",
+  "etiqueta": {
+    "en": "Quotation lines",
+    "es": "Líneas de presupuesto",
+    "fr": "Lignes de devis",
+    "de": "Angebotspositionen",
+    "it": "Righe del preventivo",
+    "bg": "Редове на оферта",
+    "cs": "Položky nabídky",
+    "da": "Tilbudslinjer",
+    "el": "Γραμμές προσφοράς",
+    "et": "Pakkumise read",
+    "fi": "Tarjousrivit",
+    "ga": "Línte luachana",
+    "hr": "Stavke ponude",
+    "hu": "Ajánlati tételek",
+    "is": "Tilboðslínur",
+    "lt": "Pasiūlymo eilutės",
+    "lv": "Piedāvājuma rindas",
+    "mt": "Linji tal-kwotazzjoni",
+    "nb": "Tilbudslinjer",
+    "nl": "Offerteregels",
+    "pl": "Pozycje oferty",
+    "pt": "Linhas de orçamento",
+    "ro": "Linii de ofertă",
+    "sk": "Položky ponuky",
+    "sl": "Postavke ponudbe",
+    "sv": "Offertrader"
+  },
+  "campos": [
+    {
+      "clave": "presupuesto",
+      "tipo": "relacion",
+      "modelo": "presupuesto",
+      "requerido": true
+    },
+    {
+      "clave": "producto",
+      "tipo": "relacion",
+      "modelo": "producto",
+      "requerido": true
+    },
+    {
+      "clave": "nombre",
+      "tipo": "texto",
+      "requerido": true
+    },
+    {
+      "clave": "cantidad",
+      "tipo": "decimal",
+      "requerido": true
+    },
+    {
+      "clave": "precio_con_iva",
+      "tipo": "dinero",
+      "requerido": true
+    },
+    {
+      "clave": "tipo_iva",
+      "tipo": "seleccion",
+      "opciones": [
+        "21",
+        "10",
+        "5",
+        "4",
+        "0"
+      ],
+      "requerido": true
+    }
+  ],
+  "lista": [
+    "presupuesto",
+    "nombre",
+    "cantidad",
+    "precio_con_iva",
+    "tipo_iva"
+  ]
+}
+]

@@ -1,0 +1,1 @@
+Gedeelde relationele tabellen voor klanten, bestellingen of voorraad, in de EU.

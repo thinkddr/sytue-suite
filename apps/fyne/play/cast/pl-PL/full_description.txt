@@ -1,0 +1,17 @@
+Twoje filmy i twoje transmisje, na żądanie i w czasie rzeczywistym, bez opuszczania Europy.
+
+• Prześlij film, a zostanie przekodowany w kilku jakościach na każdy ekran.
+• Nadawaj na żywo z programu do nadawania, z przeglądarki lub z aplikacji.
+• Cztery poziomy widoczności: publiczny, niepubliczny, organizacja lub konkretne osoby.
+• Czat na żywo i komentarze, z podstawową moderacją przez osobę publikującą.
+• Przesyłaj filmy do 8 GiB; oryginał jest zachowywany.
+• Transmisja z programu do nadawania przez RTMP, z kluczem strumienia na osobę.
+• Na żywo z przeglądarki lub aplikacji: kamera, ekran i mikrofon.
+• Nagrania transmisji same stają się filmami na żądanie.
+• Publiczna strona główna i kanał na organizację, indeksowalne.
+• Linki niepubliczne, filmy tylko dla organizacji lub dostęp dla konkretnych osób przez @nazwę.
+• Czat na żywo i komentarze w wątkach, moderowane przez osobę publikującą i administrację organizacji.
+• Miejsce liczy się do twojego limitu w Sytue Drive; wszystko w Unii Europejskiej.
+• „Prześlij do Cast” z Sytue Drive: kopia filmu trafia do Cast, a plik zostaje w Drive.
+
+Szyfrowanie w transmisji (TLS 1.3). Infrastruktura Sytue znajduje się w UE. Lokalizacja usług zewnętrznych zależy od ich dostawcy.

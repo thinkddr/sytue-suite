@@ -1,0 +1,21 @@
+/**
+ * Sytue Docs — hoja global. Tailwind v4 + tema de marca Sytue (@sytue/config) +
+ * estilos del design system (@sytue/ui). Modo claro/oscuro automatico.
+ */
+@import 'tailwindcss';
+@import '@sytue/config/theme.css';
+@import '@sytue/ui/styles.css';
+
+/* La hoja vive en el paquete y la compila cada app que la monta: Tailwind solo explora
+   por su cuenta la carpeta de ESA app, así que las fuentes de este paquete se nombran. */
+@source '../';
+@source '../../../ui/src';
+@source '../../../shell/src';
+
+/* Lienzo del editor: guía visible mientras el documento editable está vacío.
+   Solo CSS (::before) para no interferir con el contenido sincronizado. */
+#sytue-docs-canvas[contenteditable='true']:empty::before {
+  content: 'Escribe aquí…';
+  color: var(--sytue-text-subtle);
+  pointer-events: none;
+}

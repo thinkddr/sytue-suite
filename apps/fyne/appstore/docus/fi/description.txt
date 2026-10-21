@@ -1,0 +1,16 @@
+Reaaliaikainen yhteismuokkaus
+
+• Kaikki tallennettuna eurooppalaiseen Driveesi.
+• Reaaliaikainen yhteismuokkaus läsnäolon kera ja toisten muutoksia sotkematta.
+• Välilehtinen valintanauha: Aloitus, Lisää, Viittaukset, Postitukset ja Tarkista.
+• Taulukot, kuvat, muodot, SmartArt, kaaviot, symbolit ja vesileimat.
+• Viittaukset: sisällysluettelo, alaviitteet, lainaukset ja lähdeluettelo.
+• Postitukset: joukkokirjeet ja tarrat tietojen yhdistämisellä.
+• Kommenttiketjut, muutosten tarkistus ja versiot.
+• Valinnainen tekoälyavustaja uudelleenkirjoittamiseen, kääntämiseen tai tiivistämiseen, vain jos organisaatiosi ottaa sen käyttöön.
+• Vienti ODT-, DOCX- ja PDF-muotoihin; Word-tiedostojen avaaminen Drivesta.
+• Ylä- ja alatunnisteet, sivunumerointi ja uudelleenkäytettävät lohkot.
+• Automaattinen tallennus eurooppalaiseen Driveesi historian kera.
+• Lataus etusivulta PDF-, HTML-, Markdown-, OpenDocument- tai Microsoft Office -muodossa.
+
+Salattu siirron aikana (TLS 1.3). Sytuen infrastruktuuri sijaitsee EU:ssa. Ulkoisten palvelujen sijainti riippuu niiden tarjoajasta.

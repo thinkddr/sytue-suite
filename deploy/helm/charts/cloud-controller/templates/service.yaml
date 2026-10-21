@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "sytue-cloud-controller.fullname" . }}
+  labels:
+    {{- include "sytue-cloud-controller.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - name: http
+      port: {{ .Values.service.port }}
+      targetPort: http
+      protocol: TCP
+  selector:
+    {{- include "sytue-cloud-controller.selectorLabels" . | nindent 4 }}

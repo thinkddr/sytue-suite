@@ -1,0 +1,45 @@
+{
+  "id": "typesense",
+  "name": "Typesense",
+  "description": "Buscador instantáneo con tolerancia a erratas, filtros y ordenación. Alternativa abierta a Algolia, y responde en milisegundos.",
+  "category": "search",
+  "license": "GPL-3.0-or-later",
+  "homepage": "https://typesense.org/",
+  "source": "https://github.com/typesense/typesense",
+  "upstream": "docker.io/typesense/typesense:29.0",
+  "upstream_digest": "sha256:316b7e71c21f7e5e5caa8daa150e1b3f2be8c876081ee1f77bc2d92cd7f137d0",
+  "version": "29.0",
+  "ports": [
+    {
+      "name": "http",
+      "port": 8108
+    }
+  ],
+  "exports": [
+    {
+      "key": "TYPESENSE_URL",
+      "value": "http://{host}:{port}"
+    }
+  ],
+  "env": [
+    {
+      "key": "TYPESENSE_DATA_DIR",
+      "value": "/data"
+    },
+    {
+      "key": "TYPESENSE_API_KEY",
+      "generate": true,
+      "export": true
+    },
+    {
+      "key": "TYPESENSE_ENABLE_CORS",
+      "value": "true"
+    }
+  ],
+  "disk_gib": 20,
+  "data_path": "/data",
+  "memory_mib": 2048,
+  "cpu_milli": 1000,
+  "run_as_user": 1000,
+  "health_path": "/health"
+}

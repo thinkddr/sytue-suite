@@ -1,0 +1,162 @@
+# sytue-syerp — defaults del subchart (servicio Go). global.* lo inyecta el umbrella.
+# Estado en PostgreSQL (RDB Scaleway, UE). Sin Redis/Valkey ni motores AGPL.
+#
+# Sin bucket propio y sin Drive: los módulos viven en su base de datos y el
+# catálogo que los declara va DENTRO de la imagen (internal/catalogo/modulos/*.json),
+# así que desplegar un módulo nuevo es desplegar una imagen nueva y no tocar nada
+# de esto. Los documentos adjuntos (la factura en PDF de un gasto, hasta 10 MiB)
+# van también en la base: entran en la copia de seguridad y en la RLS sin
+# credenciales nuevas.
+enabled: true
+subdomain: erp
+component: syerp
+replicaCount: 2
+
+image:
+  registry: ""                 # cae a global.imageRegistry (Scaleway Registry, UE)
+  repository: sytue-syerp
+  tag: "1.0.0"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8098             # puerto del SPEC (el siguiente libre tras Sytue Photos)
+
+ingress:
+  enabled: true
+  className: traefik
+  annotations: {}
+  # erp.sytue.eu: la app Astro (sytue-frontend) sirve "/"; el backend Go expone
+  # su API y los webhooks entrantes.
+  paths:
+    # `/api/v1` y NO `/api`: el BFF de la app Astro sirve sus propias rutas bajo
+    # /api/<recurso>, y un Prefix en /api se las quedaría TODAS mandándolas al
+    # servicio Go (el mismo fallo que ya se corrigió en contacts y en Fotos).
+    - path: /api/v1
+      pathType: Prefix
+    # El webhook de Stripe. Va al servicio Go DIRECTO y no pasa por el BFF de la
+    # app: Stripe no puede presentar una cookie de sesión ni un token de Sytue
+    # ID, así que su autenticación es la firma HMAC del cuerpo y el BFF no tiene
+    # nada que aportar en el camino salvo un salto más donde perder el cuerpo
+    # crudo — que es justo lo que se firma.
+    - path: /webhooks
+      pathType: Prefix
+  tls:
+    secretName: tls-erp-sytue-eu
+
+# CRUD y contabilidad: aritmética entera y consultas, nada de decodificar medios.
+# Mismo tamaño que Notepads, que hace el mismo tipo de trabajo; el de Fotos es
+# cuatro veces mayor porque abre imágenes de 24 megapíxeles y este no abre nada.
+#
+# Requests modestos a propósito: en Kubernetes la factura la fija lo RESERVADO,
+# y un request inflado obliga a un nodo más con el clúster al 3 % de CPU. El
+# límite deja cabecera para el pico de una importación de Salesforce.
+resources:
+  requests:
+    cpu: 15m
+    memory: 64Mi
+  limits:
+    cpu: "1"
+    memory: 192Mi
+
+autoscaling:
+  # Etiqueta `job` de la serie de metricas, para el HPA por demanda real.
+  # Es el ServiceName del BINARIO, que no siempre coincide con el nombre del
+  # chart ni con el del directorio; por eso se escribe y no se deduce.
+  metricJob: sytue-syerp
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 8
+  targetCPUUtilizationPercentage: 70
+  # Sin memoria: en Go la RSS queda alta tras el GC (mala señal de escalado) y
+  # GOMEMLIMIT (~85% de limits.memory) ya la acota -> se escala solo por CPU.
+
+networkPolicy:
+  enabled: true
+
+serviceMonitor:
+  enabled: true
+  path: /metrics
+  interval: 30s
+
+config:
+  # Tamano del pool pgx por replica (DB_MAX_CONNS). Prod lo baja (3-5):
+  # PgBouncer multiplexa hacia la RDB (ver values-prod.yaml del umbrella).
+  dbMaxConns: 10
+  logLevel: info
+  # Dónde vive el Sytue Integration Gateway dentro del clúster: por ahí sale
+  # TODO el tráfico hacia Salesforce, con su SSRF, su límite y su auditoría.
+  # Este servicio no abre conexiones a terceros por su cuenta.
+  #
+  # Vacío = se deriva del Release, como en el resto de los charts. Escribirlo a
+  # mano con el puerto del POD es como Fotos se quedó sin poder hablar con Drive:
+  # el Service expone el 80.
+  integrationsUrl: ""
+  # Avisos de obligaciones por correo. `from` es el buzón del ERP (p. ej.
+  # «Sytue ERP <erp@sytue.eu>») y su contraseña va en el secret `sytue-syerp`,
+  # claves `smtp-user` y `smtp-password`. Sin `from`, no sale ningún aviso.
+  # `addr` vacío = el MSA de Sytue Mail del Release; `tlsServerName`, el nombre del
+  # certificado del MTA (mx.<dominio>), porque se entra por el Service.
+  smtp:
+    addr: ""
+    from: ""
+    tlsServerName: ""
+  # VERI*FACTU. `entorno: produccion` manda los registros a la AEAT de verdad y
+  # pone en el QR la sede real; con `pruebas`, su entorno de pruebas. `sello: true`
+  # si el certificado es de sello de entidad. El certificado va en el secret
+  # `sytue-syerp`, claves `verifactu-cert-pem` y `verifactu-key-pem`.
+  verifactu:
+    entorno: pruebas
+    sello: false
+
+# Postgres EXTERNO (Scaleway RDB). DSN por secret (nunca en git).
+postgresql:
+  existingSecret: sytue-syerp-db
+  dsnKey: dsn
+  # DSN directo a la RDB (bypass PgBouncer) para LISTEN/migraciones; opcional.
+  dsnDirectKey: dsn-direct
+
+# Clave de sellado de los secretos de firma de los webhooks entrantes (AES-256 en
+# base64). Es lo ÚNICO que este servicio guarda cifrado, y es lo que impide que
+# alguien con acceso de lectura a la base pueda falsificar cobros de Stripe.
+#
+# Obligatoria en prod: el binario se niega a arrancar sin ella (config.Load), a
+# propósito. Un webhook cuyo secreto está en claro no es un webhook autenticado.
+secrets:
+  existingSecret: sytue-syerp
+  encKey: secret-enc-key
+  # También en este secret, opcionales: `smtp-user` y `smtp-password` (ver
+  # config.smtp) y `verifactu-cert-pem` y `verifactu-key-pem` (ver config.verifactu).
+
+# Sin credenciales OIDC de cliente: este servicio valida el JWT de Sytue ID por
+# JWKS y no ejecuta ningún flujo de código. Quien sí tiene client secret es el
+# BFF de la app Astro, y el suyo vive en `sytue-frontend-bff` (mismo caso que
+# Rooms, Integrations y Fotos).
+
+# PodDisruptionBudget: garantiza disponibilidad durante drains/upgrades del cluster.
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# Reparto anti-afinidad suave por zona y nodo (alta disponibilidad multi-AZ, UE).
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: ScheduleAnyway
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: ScheduleAnyway
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  fsGroup: 10001
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]

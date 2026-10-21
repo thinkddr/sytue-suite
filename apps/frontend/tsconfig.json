@@ -1,0 +1,32 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "paths": {
+      "@sytue/ui": ["./packages/ui/src/index.ts"],
+      "@sytue/ui/*": ["./packages/ui/src/*"],
+      "@sytue/shell": ["./packages/shell/src/index.ts"],
+      "@sytue/auth": ["./packages/auth/src/index.ts"],
+      "@sytue/api-clients": ["./packages/api-clients/src/index.ts"],
+      "@sytue/config": ["./packages/config/src/index.ts"],
+      "@sytue/i18n": ["./packages/i18n/src/index.ts"],
+      "@sytue/i18n/preact": ["./packages/i18n/src/preact.tsx"],
+      "@sytue/offline": ["./packages/offline/src/index.ts"],
+      "@sytue/offline/preact": ["./packages/offline/src/preact.ts"],
+      "@sytue/offline/worker": ["./packages/offline/src/worker.ts"],
+      "@sytue/pages-render": ["./packages/pages-render/src/index.ts"],
+      "@sytue/pages-render/*": ["./packages/pages-render/src/*"]
+    }
+  },
+  "files": [],
+  "references": [
+    { "path": "packages/config" },
+    { "path": "packages/i18n" },
+    { "path": "packages/ui" },
+    { "path": "packages/shell" },
+    { "path": "packages/auth" },
+    { "path": "packages/api-clients" },
+    { "path": "packages/offline" },
+    { "path": "packages/pages-render" }
+  ]
+}

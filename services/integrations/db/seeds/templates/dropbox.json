@@ -1,0 +1,22 @@
+{
+  "key": "dropbox",
+  "tier": "tier2",
+  "manifest": {
+    "name": "Dropbox Business",
+    "description": "Almacenamiento y sincronización de archivos de equipo, con inicio de sesión único.",
+    "category": "Almacenamiento",
+    "color": "#0061FF",
+    "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#0061FF\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M4 13v6h16v-6\"/><path d=\"M12 3v9m-3-3 3 3 3-3\"/></svg>",
+    "identity": {
+      "kind": "saml",
+      "entity_id": "Dropbox",
+      "acs_url": "https://www.dropbox.com/saml_login",
+      "name_id_format": "email"
+    },
+    "provisioning": "none",
+    "launch": {
+      "kind": "url",
+      "url": "https://www.dropbox.com/home"
+    }
+  }
+}

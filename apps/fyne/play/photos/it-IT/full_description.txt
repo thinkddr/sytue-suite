@@ -1,0 +1,18 @@
+Galleria ed editor di foto: i tuoi originali in Drive, le tue modifiche come ricetta.
+
+• Una linea del tempo per mesi con ricerca per nome.
+• Album con copertina; visualizzatore a schermo intero.
+• Un editor con luce, colore, rotazione, specchio e ritaglio, in tempo reale.
+• Ogni modifica è una ricetta: l’originale non si tocca mai.
+• Una linea del tempo raggruppata per mesi, con ricerca per nome e miniature nitide.
+• Album: creare, rinominare, scegliere la copertina, aggiungere dal visualizzatore e rimuovere.
+• Un editor con quattro cursori (esposizione, contrasto, saturazione, temperatura), rotazione e specchio.
+• Ogni modifica è una ricetta salvata a parte: l’originale in Drive non viene mai modificato.
+• Esportazione a piena risoluzione, calcolata sul server con le stesse formule che hai visto.
+• Cestino con ripristino.
+• Gli originali vivono nel tuo Sytue Drive; i derivati sono una cache rigenerabile.
+• Dati EXIF letti dal file stesso; tutto nell’Unione europea.
+• Selezione multipla per mese: in un nuovo album, nel cestino o scaricate in una volta.
+• Presentazione, dimensione reale, rotazione dal visore e ritaglio con proporzione fissa.
+
+Cifratura in transito (TLS 1.3). L’infrastruttura di Sytue si trova nell’UE. La posizione dei servizi esterni dipende dal loro fornitore.

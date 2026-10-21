@@ -1,0 +1,28 @@
+{
+  "key": "trello",
+  "tier": "tier2",
+  "manifest": {
+    "name": "Trello",
+    "description": "Tableros kanban de Trello. Su inicio de sesión único NO se configura por producto sino para toda la organización de Atlassian: conecta Jira Cloud o Confluence para eso y esta plantilla deja el acceso en el lanzador.",
+    "category": "Gestión de proyectos",
+    "color": "#0C66E4",
+    "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#0C66E4\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"3\" y=\"4\" width=\"18\" height=\"16\" rx=\"2\"/><rect x=\"6.5\" y=\"7.5\" width=\"4\" height=\"9\" rx=\"1\"/><rect x=\"13.5\" y=\"7.5\" width=\"4\" height=\"5\" rx=\"1\"/></svg>",
+    "identity": {
+      "kind": "none"
+    },
+    "provisioning": "none",
+    "launch": {
+      "kind": "url",
+      "url": "https://trello.com/w/{workspace}"
+    },
+    "fields": [
+      {
+        "key": "workspace",
+        "label": "Espacio de trabajo de Trello",
+        "placeholder": "acme",
+        "help": "El identificador que ves en la dirección de tu espacio: https://trello.com/w/ESPACIO",
+        "required": true
+      }
+    ]
+  }
+}

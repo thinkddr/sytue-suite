@@ -1,0 +1,18 @@
+Cuadernos que guardan cualquier cosa: texto, ficheros, eventos, documentos enteros.
+
+• Cuadernos anidados, en lienzo libre, en columnas o en lista.
+• Notas de cualquier tipo: texto, tareas, enlaces, ficheros, eventos de Calendar, documentos de Docs.
+• Tú decides qué entra en la búsqueda, y qué no entra nunca.
+• Cuadernos anidados con icono y color; tres disposiciones: libre, columnas y lista.
+• Doce tipos de nota: texto, tareas, enlaces, color, imagen y referencias a Drive, Docus, Calendar, Rooms y otras notas.
+• Editor con formato (negrita, listas, enlaces) que guarda al salir.
+• Etiquetas, fijar, duplicar, mover entre cuadernos, agrupar y arrastrar en el lienzo.
+• Visibilidad por cuaderno: privado, personal, organización o enlace público.
+• Tú decides qué cuadernos entran en la búsqueda de la suite.
+• Retroenlaces: ve qué notas apuntan a esta.
+• Exporta un cuaderno entero a HTML, PDF, Markdown y más; importa copias.
+• Comparte una nota a un canal de Rooms; suelta o pega para crear notas.
+• Tablas en el editor y atajos de Markdown al escribir: «- », «# », «> » y «```».
+• Mueve una nota a otro cuaderno, exporta una sola nota y ordena el cuaderno como quieras.
+
+Cifrado en tránsito (TLS 1.3). La infraestructura de Sytue está en la UE. Los servicios externos siguen la ubicación de su proveedor.

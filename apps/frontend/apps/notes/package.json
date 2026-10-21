@@ -1,0 +1,39 @@
+{
+  "name": "@sytue/notes",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sytue Notepads — gestor de notas y cuadernos (Astro 7 + Preact 10) sobre el servicio Go propio Sytue Notepads. Cuadernos anidados, lienzo libre/columnas/lista, notas de cualquier tipo, etiquetas con estado, cifrado extremo a extremo e integración con Rooms, Docs, Drive y Calendar. Monta la Sytue Shell y usa @sytue/ui. Producto Sytue-native, propietario. docs/CONVENTIONS.md §1.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "dev": "bun --bun astro dev --port 4331 --host",
+    "build": "bun --bun astro build",
+    "preview": "bun --bun astro preview --port 4331 --host",
+    "start": "bun ./dist/server/entry.mjs",
+    "test": "bun test",
+    "typecheck": "bun --bun astro check"
+  },
+  "dependencies": {
+    "@astrojs/node": "catalog:",
+    "@astrojs/preact": "catalog:",
+    "@fontsource-variable/figtree": "5.3.0",
+    "@sytue/ai": "workspace:*",
+    "@sytue/api-clients": "workspace:*",
+    "@sytue/auth": "workspace:*",
+    "@sytue/config": "workspace:*",
+    "@sytue/i18n": "workspace:*",
+    "@sytue/offline": "workspace:*",
+    "@sytue/shell": "workspace:*",
+    "@sytue/ui": "workspace:*",
+    "astro": "catalog:",
+    "preact": "10.29.8"
+  },
+  "devDependencies": {
+    "@astrojs/check": "catalog:",
+    "@happy-dom/global-registrator": "20.14.5",
+    "@tailwindcss/vite": "4.3.3",
+    "@types/bun": "1.4.2",
+    "tailwindcss": "4.3.3",
+    "typescript": "6.0.3"
+  }
+}

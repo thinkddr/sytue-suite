@@ -1,0 +1,31 @@
+---
+/**
+ * Banco de pruebas de la rejilla (dev/RejillaDemo.tsx) para la auditoría de accesibilidad
+ * de Playwright. SOLO en desarrollo: en producción es un 404 y nada lo enlaza.
+ */
+import '../../styles/app.css';
+import { RejillaDemo } from '../../dev/RejillaDemo.js';
+
+export const prerender = false;
+
+if (!import.meta.env.DEV) return new Response(null, { status: 404 });
+
+const q = Astro.url.searchParams;
+const lang = ['en', 'de', 'fr'].includes(q.get('lang') ?? '')
+  ? (q.get('lang') as 'en' | 'de' | 'fr')
+  : 'es';
+---
+
+<!doctype html>
+<html lang={lang} class="h-full">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Rejilla (banco de pruebas)</title>
+  </head>
+  <body class="bg-bg h-full">
+    <main>
+      <RejillaDemo client:only="preact" locale={lang} soloLectura={q.get('lectura') === '1'} />
+    </main>
+  </body>
+</html>

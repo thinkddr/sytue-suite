@@ -1,0 +1,18 @@
+Brojke koje imaju smisla, u tablici koja radi s vama.
+
+• Formule, uvjetno oblikovanje i provjera valjanosti podataka.
+• Uvezite vanjske podatke i postavljajte upite bez napuštanja tablice.
+• Grafikoni, minigrafikoni, rezači i tablice podataka.
+• Izvoz u ODS i XLSX; otvaranje datoteka programa Excel.
+• Formule s kontekstnom pomoći i trenutačnim ponovnim izračunom.
+• Uvjetno oblikovanje, provjera valjanosti podataka i oblici brojeva prema regionalnim postavkama.
+• Grafikoni raznih vrsta, minigrafikoni i rezači.
+• Tablice podataka sa zbrojevima i sortiranjem; zaokretna tablica.
+• Vanjski podaci: povežite izvor i postavljajte upite iz tablice.
+• Rješavač za pronalaženje vrijednosti koja ispunjava cilj.
+• Makronaredbe za automatizaciju ponavljajućih zadataka.
+• Suradnja u stvarnom vremenu s prisutnošću i komentarima.
+• Filtri, rezači i pretraživanje unutar tablice.
+• Izvoz u ODS, XLSX i PDF; otvaranje datoteka programa Excel iz Drivea.
+
+Šifrirano u prijenosu (TLS 1.3). Infrastruktura Sytuea nalazi se u EU-u. Lokacija vanjskih usluga ovisi o njihovu pružatelju.

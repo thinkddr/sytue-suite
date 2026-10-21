@@ -1,0 +1,239 @@
+{{- if .Values.enabled }}
+{{- /*
+Las dos dependencias se comprueban AQUÍ y no se dejan a la suerte del arranque.
+
+Un egress mal configurado no se cae: arranca, responde a sus sondas y se queda
+esperando trabajo que nunca llega, porque no expone API —todo entra por el store
+de routing—. Eso da un pod verde y una grabación que no funciona, que es
+exactamente la clase de fallo que cuesta días encontrar. Mejor no renderizar.
+*/ -}}
+{{- if not .Values.redis.address }}
+{{- fail "livekit-egress: falta redis.address (host:puerto de Dragonfly). Es el ÚNICO canal por el que el egress recibe trabajo: sin él el pod arranca sano y no graba nunca." }}
+{{- end }}
+{{- /*
+Y la tercera, que es la que se coló: la CPU. El egress compara el coste de cada
+tipo de grabación con la CPU de su contenedor ANTES de aceptar el trabajo, y una
+sala compuesta —lo único que usa Rooms— cuesta 4. Con menos, el pod arranca sano
+y rechaza todas las peticiones; el único rastro es un ERROR en el log del
+arranque que nadie mira. Producción corrió así, con el pod en verde.
+*/ -}}
+{{- /* Con paréntesis: `resources: {}` es un values legítimo y no puede reventar
+       el render con un nil pointer en vez de con el mensaje de abajo. */ -}}
+{{- $cpu := ((.Values.resources).limits).cpu | toString }}
+{{- if hasSuffix "m" $cpu }}
+{{- fail (printf "livekit-egress: resources.limits.cpu vale %s. Escríbelo en CPU enteras (4), no en milicores: el mínimo son 4 y en milicores se cuelan ceros." $cpu) }}
+{{- end }}
+{{- if lt (atoi $cpu) 4 }}
+{{- fail (printf "livekit-egress: resources.limits.cpu vale %s y el egress EXIGE 4 para grabar una sala compuesta (room_composite_cpu_cost). Con menos arranca, pasa sus sondas y rechaza TODAS las grabaciones. Y esas 4 tienen que caber en un nodo: con pop2_2c_8g (1800m asignables) no caben." $cpu) }}
+{{- end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "livekit-egress.fullname" . }}
+  labels:
+    {{- include "livekit-egress.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  # `Recreate`: durante un rollout, dos egress vivos compiten por el mismo trabajo
+  # del store y una grabación podría quedar partida entre dos ficheros. Un corte
+  # de segundos sin poder EMPEZAR una grabación es mucho menos malo.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "livekit-egress.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "livekit-egress.labels" . | nindent 8 }}
+      annotations:
+        # Reinicia el pod cuando cambia la config: el egress la lee al arrancar.
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      # El grabador no habla con la API de Kubernetes —recibe trabajo por el
+      # store de routing y sube el fichero a S3—, así que llevar dentro una
+      # credencial contra ella es superficie sin uso. Y es el proceso que MÁS
+      # expuesto está de la suite: mete un Chrome dentro del clúster a renderizar
+      # lo que haya en una sala.
+      automountServiceAccountToken: false
+      # 1001, que es el UID que la IMAGEN le da a su usuario `egress`
+      # (`egress:x:1001:0::/home/egress:/bin/bash` en su /etc/passwd). Con 1000 el
+      # proceso no es dueño de su propio `/home/egress`, y lo primero que hace el
+      # entrypoint es vaciar `/home/egress/tmp`: `rm: cannot remove ... Permission
+      # denied`, salida 1 y CrashLoopBackOff desde el primer arranque.
+      #
+      # El grupo va explícito a 0 por lo mismo: es el que declara la imagen, y sin
+      # él el proceso pierde el acceso de grupo a sus directorios. `fsGroup`
+      # da al UID 1001 acceso a los emptyDir sin un init privilegiado ni chown.
+      #
+      # No se elige un UID: se copia el de la imagen. Cualquier número redondo que
+      # no sea el suyo vuelve a romper esto igual.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 0
+        fsGroup: 1001
+        seccompProfile:
+          type: RuntimeDefault
+      {{- if include "livekit-egress.cacheSecret" . }}
+      # La contraseña de Dragonfly se inyecta AQUÍ, no en el ConfigMap: un
+      # ConfigMap lo lee cualquiera con acceso al namespace y esto es una
+      # credencial. Mismo mecanismo que el SFU (charts/livekit): el init la
+      # sustituye en la plantilla y deja el resultado en un emptyDir.
+      #
+      # Sin esto el egress arrancaba, pasaba sus sondas y moría contra Dragonfly
+      # con «NOAUTH Authentication required»: no graba NADA y el SFU no se entera.
+      initContainers:
+        - name: config
+          image: "{{ include "livekit-egress.image" . }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          command: ["/bin/sh", "-ec"]
+          args:
+            - |
+              # Por el entorno, no por la línea de órdenes: así no sale en `ps`.
+              sed "s|SYTUE_REDIS_PASSWORD|${REDIS_PASSWORD}|" \
+                /etc/egress-plantilla/config.yaml > /etc/egress/config.yaml
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "livekit-egress.cacheSecret" . | quote }}
+                  key: {{ include "livekit-egress.cacheSecretKey" . | quote }}
+                  optional: true
+          volumeMounts:
+            - name: plantilla
+              mountPath: /etc/egress-plantilla
+              readOnly: true
+            - name: config
+              mountPath: /etc/egress
+      {{- end }}
+      containers:
+        - name: egress
+          image: "{{ include "livekit-egress.image" . }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          # El emptyDir oculta los directorios creados durante el build. Se
+          # recrean con el UID del proceso y permisos privados para PulseAudio,
+          # y se conserva TODO el arranque oficial (limpieza, PulseAudio y tini).
+          command: ["/bin/sh", "-ec"]
+          args:
+            - |
+              mkdir -p /home/egress/tmp /home/egress/.cache/xdgr
+              chmod 700 /home/egress/.cache/xdgr
+              exec /entrypoint.sh
+          env:
+            - name: EGRESS_CONFIG_FILE
+              value: /etc/egress/config.yaml
+            # Las claves del SFU: el grabador se autentica como cualquier otro
+            # participante, así que necesita el mismo par que el resto.
+            - name: LIVEKIT_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.livekit.keysSecret }}
+                  key: api_key
+                  optional: true
+            - name: LIVEKIT_API_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.livekit.keysSecret }}
+                  key: api_secret
+                  optional: true
+          ports:
+            - name: health
+              containerPort: 7981
+          livenessProbe:
+            httpGet:
+              path: /
+              port: health
+            initialDelaySeconds: 20
+            periodSeconds: 20
+            timeoutSeconds: 3
+          readinessProbe:
+            httpGet:
+              path: /
+              port: health
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/egress
+              readOnly: true
+            # Memoria compartida para el Chrome que compone el mosaico. Con los
+            # 64 MiB por defecto de Kubernetes el navegador se cae a mitad de la
+            # grabación, y el fichero sale truncado sin decir por qué.
+            - name: dshm
+              mountPath: /dev/shm
+            # v1.14.0 fija TmpDir=/home/egress/tmp (pkg/config/base.go), NO
+            # /tmp. También viven aquí el estado de PulseAudio y las cachés del
+            # navegador/GStreamer. Un /tmp escribible por sí solo no basta.
+            # El home NO contiene binarios: Dockerfile copia egress a /bin,
+            # entrypoint a / y Chrome a /chrome (ARM) o su paquete (amd64).
+            # Las plantillas van embebidas en egress (cmd/server/main.go).
+            - name: trabajo
+              mountPath: /home/egress
+            - name: tmp
+              mountPath: /tmp
+            # El entrypoint oficial borra /var/run/pulse y /var/lib/pulse.
+            # Se montan los PADRES: montar pulse como volumen haría fallar rm
+            # por ser un punto de montaje. /var/run es un enlace a /run en la
+            # imagen Ubuntu. Son estado efímero, nunca binarios/configuración.
+            - name: runtime
+              mountPath: /run
+            - name: estado
+              mountPath: /var/lib
+      volumes:
+        {{- if include "livekit-egress.cacheSecret" . }}
+        # Con contraseña, `config` es el emptyDir que escribe el init y el
+        # ConfigMap pasa a ser la PLANTILLA. Sin ella, el ConfigMap se monta
+        # directamente y el init ni existe: un despliegue sin caché con
+        # contraseña —un efímero, por ejemplo— sigue funcionando igual.
+        - name: config
+          emptyDir: {}
+        - name: plantilla
+          configMap:
+            name: {{ include "livekit-egress.fullname" . }}
+        {{- else }}
+        - name: config
+          configMap:
+            name: {{ include "livekit-egress.fullname" . }}
+        {{- end }}
+        - name: dshm
+          emptyDir:
+            medium: Memory
+            sizeLimit: {{ .Values.shmSize }}
+        - name: trabajo
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+        - name: runtime
+          emptyDir: {}
+        - name: estado
+          emptyDir: {}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

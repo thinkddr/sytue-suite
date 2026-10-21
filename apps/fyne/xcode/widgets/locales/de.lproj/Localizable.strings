@@ -1,0 +1,17 @@
+"widgets.open" = "Öffnen";
+"widgets.compose" = "Verfassen";
+"widgets.create" = "Termin erstellen";
+"widgets.notes" = "Notizen";
+"widgets.rows" = "Zeilen";
+"widgets.pending" = "Ausstehend";
+"widgets.channels" = "Kanäle";
+"widgets.photos" = "Fotos";
+"widgets.episodes" = "Folgen";
+"widgets.apps" = "Apps";
+"widgets.calendars" = "Kalender";
+"widgets.address_books" = "Adressbücher";
+"search.label" = "Globale Suche";
+"dataflow.item.files" = "Dateien";
+"dataflow.item.events" = "Kalender";
+"dataflow.item.documents" = "Dokumente";
+"dataflow.item.contacts" = "Kontakte";

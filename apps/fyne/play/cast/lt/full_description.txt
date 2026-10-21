@@ -1,0 +1,17 @@
+Jūsų vaizdo įrašai ir tiesioginės transliacijos, pagal užklausą ir realiuoju laiku, neišvykstant iš Europos.
+
+• Įkelkite vaizdo įrašą ir jis perkoduojamas keliomis kokybėmis bet kokiam ekranui.
+• Transliuokite tiesiogiai iš transliavimo programos, naršyklės ar programėlės.
+• Keturi matomumo lygiai: viešas, neįtrauktas į sąrašą, organizacija arba konkretūs asmenys.
+• Tiesioginis pokalbis ir komentarai, su pagrindiniu paskelbusiojo moderavimu.
+• Įkelkite iki 8 GiB vaizdo įrašus; originalas išsaugomas.
+• Tiesioginė transliacija iš transliavimo programos per RTMP, su srauto raktu kiekvienam asmeniui.
+• Tiesiogiai iš naršyklės ar programėlės: kamera, ekranas ir mikrofonas.
+• Tiesioginių transliacijų įrašai automatiškai tampa vaizdo įrašais pagal užklausą.
+• Viešas pradinis puslapis ir kanalas kiekvienai organizacijai, indeksuojami.
+• Neįtrauktos į sąrašą nuorodos, vaizdo įrašai tik organizacijai arba prieiga konkretiems asmenims pagal @naudotoją.
+• Tiesioginis pokalbis ir komentarai gijomis, moderuojami paskelbusiojo ir organizacijos administracijos.
+• Saugykla skaičiuojama į jūsų „Sytue Drive“ kvotą; viskas Europos Sąjungoje.
+• „Įkelti į Cast“ iš „Sytue Drive“: vaizdo įrašo kopija perkeliama į „Cast“, o failas lieka „Drive“.
+
+Šifruojama perduodant (TLS 1.3). „Sytue“ infrastruktūra yra ES. Išorinių paslaugų vieta priklauso nuo jų teikėjo.

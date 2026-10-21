@@ -1,0 +1,18 @@
+Liczby, które mają sens, w arkuszu, który pracuje z Tobą.
+
+• Formuły, formatowanie warunkowe i sprawdzanie poprawności danych.
+• Pobieraj dane zewnętrzne i odpytuj je bez opuszczania arkusza.
+• Wykresy, wykresy mini, fragmentatory i tabele danych.
+• Eksport do ODS i XLSX; otwieranie plików Excela.
+• Formuły z pomocą kontekstową i natychmiastowym przeliczaniem.
+• Formatowanie warunkowe, sprawdzanie poprawności danych i formaty liczb zależne od ustawień regionalnych.
+• Wykresy różnych typów, wykresy mini i fragmentatory.
+• Tabele danych z sumami i sortowaniem; tabela przestawna.
+• Dane zewnętrzne: podłącz źródło i odpytuj je z arkusza.
+• Solver do znalezienia wartości spełniającej cel.
+• Makra do automatyzacji powtarzalnych zadań.
+• Współpraca w czasie rzeczywistym z obecnością i komentarzami.
+• Filtry, fragmentatory i wyszukiwanie w arkuszu.
+• Eksport do ODS, XLSX i PDF; otwieranie plików Excela z Dysku.
+
+Szyfrowanie w transmisji (TLS 1.3). Infrastruktura Sytue znajduje się w UE. Lokalizacja usług zewnętrznych zależy od ich dostawcy.

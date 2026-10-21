@@ -1,0 +1,18 @@
+Kontakti CardDAV, dijeljeni u cijeloj vašoj organizaciji.
+
+• Zajednički adresar za cijelu organizaciju.
+• Uvoz i izvoz u formatu vCard.
+• Spajanje duplikata bez gubitka podataka.
+• Radi sa svakim klijentom CardDAV.
+• Adresari, uključujući zajednički adresar vaše organizacije.
+• Potpuna kartica: telefoni, e-adrese, adrese, organizacija, rođendan, bilješke i fotografija.
+• Oznake i favoriti za grupiranje i pronalaženje.
+• Otkrivanje i spajanje duplikata bez gubitka podataka.
+• Uvoz i izvoz vCard i CSV; izvoz jednog kontakta.
+• Skupne radnje i smeće s oporavkom.
+• Trenutačno pretraživanje i automatsko dovršavanje pri pisanju u Mailu.
+• Radi sa svakim klijentom CardDAV.
+• Nadolazeći rođendani iz adresara, uz istaknute rođendane ovog mjeseca.
+• Zakazivanje sastanka s kontaktom ili kopiranje e-adrese kontakta bez napuštanja kartice.
+
+Šifrirano u prijenosu (TLS 1.3). Infrastruktura Sytuea nalazi se u EU-u. Lokacija vanjskih usluga ovisi o njihovu pružatelju.

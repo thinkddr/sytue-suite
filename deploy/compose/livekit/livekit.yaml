@@ -1,0 +1,50 @@
+# Sytue Meet — config de LiveKit server (dev local, Docker Compose).
+# Motor LiveKit (SFU WebRTC, Apache-2.0) ejecutado SIN modificar: única app de
+# terceros permitida (SFU de medios). Las claves de API llegan por la variable
+# de entorno LIVEKIT_KEYS (ver .env.example) — aquí NO se hardcodean secretos.
+#
+# El BFF sytue-meet (servicio Go) mintea el JWT de acceso a la sala TRAS validar
+# la sesión OIDC contra Sytue ID. En dev es un nodo único: SIN Redis/Valkey
+# (el routing multinodo no aplica). Ver docs/CONVENTIONS.md §0, §1, §6, §8.
+# Puertos §6: 7880 WS / 7881 TCP / 50000-50100 UDP.
+
+# Puerto de señalización WS/HTTP (lo enruta Traefik en meet.sytue.localhost).
+port: 7880
+
+log_level: info
+
+rtc:
+  # Fallback ICE/TCP de media.
+  tcp_port: 7881
+  # Rango UDP de media WebRTC (ICE/SRTP).
+  port_range_start: 50000
+  port_range_end: 50100
+  # En dev local el SFU anuncia 127.0.0.1 a los clientes del host.
+  use_external_ip: false
+  node_ip: "127.0.0.1"
+
+# Nodo único en dev: SIN Redis/Valkey. El estado de salas/participantes lo lleva
+# el propio servidor en memoria; el control plane de Meet (Go + PostgreSQL)
+# persiste salas/permisos. (En prod, el routing multinodo se resuelve en Helm.)
+
+# Avisos del SFU a Rooms y Cast: salas, participantes y grabaciones terminadas.
+# De aquí salen el cierre de la sala en PostgreSQL y la tarjeta de «la reunión ha
+# terminado» que Rooms publica en el canal de origen. Sin esta sección, `services/rooms`
+# monta y verifica /webhooks/livekit pero no recibe un solo evento: en dev la reunión
+# parece funcionar y luego la sala se queda abierta para siempre.
+# Cast necesita egress_ended para registrar el HLS y generar el vídeo bajo demanda.
+#
+# OJO: este fichero se monta como volumen, así que docker compose NO interpola aquí
+# `${VARIABLES}` — irían literales y el SFU firmaría con una clave inexistente, que es
+# justo el fallo silencioso que esta sección viene a arreglar. Por eso la api_key va
+# escrita, con el MISMO valor por defecto que `LIVEKIT_API_KEY` en .env.example: si
+# cambias esa variable, cambia también esta línea. El api_secret no aparece aquí (llega
+# por LIVEKIT_KEYS). `rooms` es el nombre del servicio en la red de compose.
+webhook:
+  api_key: ""
+  urls:
+    - http://rooms:8085/webhooks/livekit
+    - http://cast:8099/webhooks/livekit
+
+# Las claves api_key->api_secret se proveen por la variable LIVEKIT_KEYS del
+# entorno (formato "<API_KEY>: <API_SECRET>"); no se listan en este fichero.

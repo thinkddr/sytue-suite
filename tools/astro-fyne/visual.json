@@ -1,0 +1,12 @@
+{
+  "schema": 1,
+  "package": "generated",
+  "entries": [
+    {
+      "name": "Geometry",
+      "source": "example/src/pages/geometry.astro",
+      "output": "native/generated/geometry.gen.go",
+      "profile": { "state": "default", "width": 320, "height": 240, "scale": 1 }
+    }
+  ]
+}

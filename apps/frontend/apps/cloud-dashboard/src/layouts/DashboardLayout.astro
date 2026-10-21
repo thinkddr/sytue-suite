@@ -1,0 +1,244 @@
+---
+/**
+ * DashboardLayout — layout base de Sytue DevX. Exige sesión (guard), monta la
+ * Sytue Shell (topbar + app switcher + búsqueda + notificaciones + cuenta) y el
+ * armazón AppShell (sidebar + contenido) — todo desde @sytue/ui / @sytue/shell.
+ * Lenguaje visual Sytue, modo claro/oscuro. docs/CONVENTIONS.md §4, §5, §11.
+ */
+import '../styles/app.css';
+import { serverEnv } from '@sytue/auth/server';
+import {
+  SUFIJO_ICONOS,
+  basePathScript,
+  swRegisterScript,
+  themeInitScript,
+  withBase,
+} from '@sytue/ui';
+import { requireSession } from '@sytue/auth/server';
+import { htmlLangAttrs } from '@sytue/i18n';
+import { APP_VIEWPORT, brand } from '@sytue/config';
+import { getBff, toBffContext } from '../server/bff.js';
+import { useT } from '../i18n/index.js';
+import CloudShell from '../components/CloudShell';
+import DeniedState from '../components/DeniedState';
+
+interface Props {
+  /** Seccion activa del sidebar del proyecto. */
+  section?: string;
+  /** Slug del proyecto activo (si la vista es de un proyecto). */
+  project?: string;
+  /** El proyecto tiene Postgres gestionado (PostgREST activo) — estado real, no fijo. */
+  hasDb?: boolean;
+  title: string;
+  /**
+   * Error REAL del control-plane para las fuentes de esta pagina (Sourced.error,
+   * normalmente via firstSourceError). Con 401/403 el cuerpo se sustituye por
+   * DeniedState: sin permiso no hay datos que ensenar ni acciones que ofrecer.
+   */
+  error?: { status: number; code: string } | undefined;
+}
+
+const { section, project, hasDb, title, error } = Astro.props;
+
+// Solo el permiso corta la pagina. Un 500 o un 502 son fallos pasajeros y siguen
+// mostrando el banner de DemoBanner sobre el contenido degradado, que es lo que
+// permite reintentar; un 403 no se reintenta y la pagina no volvera sola.
+const denied = error?.status === 403 || error?.status === 401;
+
+const guard = await requireSession(getBff(), toBffContext(Astro));
+if (guard instanceof Response) return guard;
+const { session } = guard;
+
+const hubBaseUrl = serverEnv(import.meta.env).SYTUE_HUB_BASE_URL ?? 'https://hub.sytue.eu';
+
+// El idioma lo negocia `src/middleware.ts` una vez por peticion; aqui solo se
+// refleja en el <html> y baja a las islas por props (docs/CONVENTIONS.md §13.1).
+const locale = Astro.locals.locale;
+const { lang, dir } = htmlLangAttrs(locale);
+const t = useT(locale);
+
+// Prefijo REAL bajo el que se sirve esta superficie: el del host si el servidor
+// lo publica (SYTUE_BASE_PATH) y, si no, el del build. Los assets del <head> se
+// unen con `withBase` y NO con `${BASE_URL}fichero`: BASE_URL llega SIN barra
+// final (`/mail`) y esa concatenación daba `/mailfavicon.svg`, un 404 medido en
+// producción con el que ninguna app de la suite tenía icono. ID sí lo tenía
+// porque es Go y escribe `/favicon.svg` a mano; por eso el fallo parecía de ID.
+const prefijo = serverEnv(import.meta.env).SYTUE_BASE_PATH ?? import.meta.env.BASE_URL;
+---
+
+<!doctype html>
+<html lang={lang} dir={dir} class="h-full">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="color-scheme" content="light" />
+    <!-- `interactive-widget=resizes-content`: sin esto el teclado virtual NO encoge el
+         viewport de maquetación, así que el `100dvh` del armazón sigue midiendo la
+         pantalla entera y lo que se está escribiendo queda DEBAJO del teclado — el
+         navegador desplaza el viewport visual para enseñar el campo y se lleva por
+         delante los botones que van con él. Se vio en el redactor de Sytue Mail. Lo
+         declaraba solo Sytue Rooms, que fue donde se descubrió.
+         La carcasa común reserva las zonas seguras en las cuatro orientaciones. -->
+    <meta name="viewport" content={APP_VIEWPORT} />
+    <meta name="description" content={t('layout.meta.description')} />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>{title} · Sytue DevX</title>
+    <!-- El Hub es OTRO origen y la shell le hace 3 peticiones nada mas hidratar:
+         sin esto, la primera pagaba DNS + TCP + TLS enteros (3 RTT) DESPUES de
+         ejecutar el JS. Anonimo porque los clientes no mandan cookies (fetch
+         same-origin por defecto), que es lo que exige reutilizar la conexion. -->
+    <link rel="preconnect" href={hubBaseUrl} crossorigin />
+    <link rel="icon" href={withBase(prefijo, '/favicon.ico') + SUFIJO_ICONOS} sizes="32x32" />
+    <link
+      rel="icon"
+      href={withBase(prefijo, '/favicon-64.png') + SUFIJO_ICONOS}
+      type="image/png"
+      sizes="64x64"
+    />
+    <link
+      rel="icon"
+      href={withBase(prefijo, '/favicon.svg') + SUFIJO_ICONOS}
+      type="image/svg+xml"
+    />
+    <!-- PWA (Wave 5): instalable + tema del cromo (barra del SO en standalone), uno por
+         esquema: blanca en claro, tinta noche en oscuro. Espeja Sytue Rooms (apps/rooms). -->
+    <link rel="manifest" href={withBase(prefijo, '/manifest.webmanifest')} />
+    <meta name="theme-color" content={brand.neutral[0]} />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Sytue DevX" />
+    <link
+      rel="apple-touch-icon"
+      href={withBase(prefijo, '/apple-touch-icon.png') + SUFIJO_ICONOS}
+    />
+    <!-- Prefija /api y /auth con el `base` de esta app: en producción cada
+         app se sirve bajo su prefijo y la raíz del host es un 404. -->
+    <script
+      is:inline
+      set:html={basePathScript(
+        serverEnv(import.meta.env).SYTUE_BASE_PATH ?? import.meta.env.BASE_URL,
+      )}
+    ></script>
+    <script is:inline set:html={themeInitScript}></script>
+    <!-- Registra el Service Worker (app-shell offline + passthrough de /api y /auth). Tras
+         la carga para no competir con el arranque; no rompe el SSR (solo corre en cliente). -->
+    <script is:inline set:html={swRegisterScript(import.meta.env.BASE_URL)}></script>
+  </head>
+  <body class="bg-bg text-text h-full antialiased">
+    <CloudShell
+      client:load
+      user={session.user}
+      hubBaseUrl={hubBaseUrl}
+      locale={locale}
+      section={section}
+      project={project}
+      hasDb={hasDb}
+    >
+      {denied ? <DeniedState locale={locale} /> : <slot />}
+    </CloudShell>
+    {/* Instalar app (PWA · Wave 5): prompt discreto y descartable. Solo aparece si el
+        navegador ofrece instalación (beforeinstallprompt) y no está ya instalada ni
+        descartada. Estilo del design-system (tokens --sytue-*), no UI ad-hoc.
+        ponytail: prompt mínimo inline; promover a componente @sytue/ui si otra app lo pide. */}
+    <style is:inline>
+      #pwa-install {
+        position: fixed;
+        z-index: 60;
+        inset-block-end: max(1rem, env(safe-area-inset-bottom));
+        inset-inline-end: max(1rem, var(--sytue-safe-right, 0px));
+        max-width: min(
+          24rem,
+          calc(
+            100vw - max(1rem, var(--sytue-safe-left, 0px)) - max(1rem, var(--sytue-safe-right, 0px))
+          )
+        );
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.625rem 0.625rem 0.625rem 0.875rem;
+        border-radius: var(--radius-lg);
+        color: var(--sytue-text);
+        border: 1px solid var(--sytue-border);
+        box-shadow: var(--shadow-lg);
+        font: 500 var(--text-sm)/1.4 var(--font-sans);
+      }
+      #pwa-install:not([hidden]) {
+        display: flex;
+      }
+      [dir='rtl'] #pwa-install {
+        inset-inline-end: max(1rem, var(--sytue-safe-left, 0px));
+      }
+      #pwa-install span {
+        flex: 1 1 auto;
+      }
+      #pwa-install button {
+        flex: none;
+        cursor: pointer;
+        border: 0;
+        border-radius: var(--radius-md);
+        padding: 0.375rem 0.625rem;
+        font: inherit;
+      }
+      #pwa-install .pwa-install-cta {
+        background: var(--sytue-primary);
+        color: var(--sytue-on-primary);
+        font-weight: 600;
+      }
+      #pwa-install .pwa-install-dismiss {
+        background: transparent;
+        color: var(--sytue-text-muted);
+      }
+    </style>
+    <div
+      id="pwa-install"
+      class="sytue-popover-surface"
+      role="region"
+      aria-label={t('layout.pwa.region')}
+      hidden
+    >
+      <span>{t('layout.pwa.text')}</span>
+      <button type="button" class="pwa-install-dismiss" data-pwa="dismiss">
+        {t('layout.pwa.notNow')}
+      </button>
+      <button type="button" class="pwa-install-cta" data-pwa="install">
+        {t('layout.pwa.install')}
+      </button>
+    </div>
+    <script is:inline>
+      (() => {
+        const KEY = 'sytue-cloud-pwa-dismissed';
+        const el = document.getElementById('pwa-install');
+        if (!el) return;
+        const standalone =
+          matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+        let dismissed = false;
+        try {
+          dismissed = !!localStorage.getItem(KEY);
+        } catch {}
+        if (standalone || dismissed) return;
+        let deferred = null;
+        const hide = () => {
+          el.hidden = true;
+        };
+        const dismiss = () => {
+          try {
+            localStorage.setItem(KEY, '1');
+          } catch {}
+          hide();
+        };
+        window.addEventListener('beforeinstallprompt', (e) => {
+          e.preventDefault();
+          deferred = e;
+          el.hidden = false;
+        });
+        el.querySelector('[data-pwa="install"]').addEventListener('click', async () => {
+          hide();
+          if (!deferred) return;
+          deferred.prompt();
+          await deferred.userChoice.catch(() => {});
+          deferred = null;
+        });
+        el.querySelector('[data-pwa="dismiss"]').addEventListener('click', dismiss);
+        window.addEventListener('appinstalled', dismiss);
+      })();
+    </script>
+  </body>
+</html>

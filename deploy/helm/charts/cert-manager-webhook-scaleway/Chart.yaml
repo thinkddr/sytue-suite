@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Daniel Delgado Ramos
+apiVersion: v2
+name: cert-manager-webhook-scaleway
+description: >-
+  Solver DNS-01 de Scaleway para cert-manager. Sin él no hay certificado
+  comodín: ACME no valida `*.dominio` por HTTP-01.
+type: application
+version: 1.0.0
+appVersion: v0.1.3

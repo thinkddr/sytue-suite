@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: Apache-2.0
+     Copyright (c) 2026 Daniel Delgado Ramos
+     Fuente de la presentación «avanzada» del corpus: patrón con campos, fondo propio,
+     patrón oculto, transiciones, conectores y animaciones. Contenido inventado por Sytue.
+     De aquí salen diapos-avanzada.odp y diapos-avanzada.pptx con LibreOffice (ver
+     ../generar.sh). -->
+<office:document xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+  xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"
+  xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
+  xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"
+  xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0"
+  xmlns:xlink="http://www.w3.org/1999/xlink"
+  xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0"
+  xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0"
+  xmlns:smil="urn:oasis:names:tc:opendocument:xmlns:smil-compatible:1.0"
+  xmlns:anim="urn:oasis:names:tc:opendocument:xmlns:animation:1.0"
+  xmlns:xml="http://www.w3.org/XML/1998/namespace"
+  office:version="1.3" office:mimetype="application/vnd.oasis.opendocument.presentation">
+ <office:styles>
+  <style:style style:name="standard" style:family="graphic">
+   <style:graphic-properties draw:stroke="solid" svg:stroke-color="#3465a4" draw:fill="solid" draw:fill-color="#729fcf"/>
+   <style:text-properties fo:font-size="18pt" fo:color="#f4f1ea"/>
+  </style:style>
+  <draw:marker draw:name="Flecha" svg:viewBox="0 0 20 30" svg:d="m10 0-10 30h20z"/>
+ </office:styles>
+ <office:automatic-styles>
+  <style:page-layout style:name="PM1">
+   <style:page-layout-properties fo:margin-top="0cm" fo:margin-bottom="0cm" fo:margin-left="0cm" fo:margin-right="0cm" fo:page-width="28cm" fo:page-height="21cm" style:print-orientation="landscape"/>
+  </style:page-layout>
+  <style:style style:name="Mdp1" style:family="drawing-page">
+   <style:drawing-page-properties draw:background-size="full" draw:fill="solid" draw:fill-color="#1b2a41"/>
+  </style:style>
+  <style:style style:name="dp1" style:family="drawing-page">
+   <style:drawing-page-properties presentation:transition-type="automatic" presentation:transition-speed="medium" smil:type="fade" smil:subtype="crossfade"/>
+  </style:style>
+  <style:style style:name="dp2" style:family="drawing-page">
+   <style:drawing-page-properties presentation:transition-speed="medium" smil:type="pushWipe" smil:subtype="fromRight" draw:fill="solid" draw:fill-color="#e8efe0"/>
+  </style:style>
+  <style:style style:name="dp3" style:family="drawing-page">
+   <style:drawing-page-properties presentation:background-objects-visible="false" draw:fill="solid" draw:fill-color="#0f1b2d"/>
+  </style:style>
+  <style:style style:name="gr1" style:family="graphic" style:parent-style-name="standard">
+   <style:graphic-properties draw:stroke="none" draw:fill="none" draw:auto-grow-height="true" fo:min-height="1cm"/>
+  </style:style>
+  <style:style style:name="gr2" style:family="graphic" style:parent-style-name="standard">
+   <style:graphic-properties draw:stroke="solid" svg:stroke-color="#1b4f72" draw:fill="solid" draw:fill-color="#2e86ab"/>
+  </style:style>
+  <style:style style:name="gr3" style:family="graphic" style:parent-style-name="standard">
+   <style:graphic-properties draw:stroke="none" draw:fill="solid" draw:fill-color="#8c6239"/>
+  </style:style>
+  <style:style style:name="gr4" style:family="graphic" style:parent-style-name="standard">
+   <style:graphic-properties draw:stroke="solid" svg:stroke-color="#c0392b" svg:stroke-width="0.1cm" draw:marker-end="Flecha" draw:marker-end-width="0.3cm" draw:fill="none"/>
+  </style:style>
+ </office:automatic-styles>
+ <office:master-styles>
+  <style:master-page style:name="Vega" style:page-layout-name="PM1" draw:style-name="Mdp1">
+   <draw:frame draw:style-name="gr1" draw:layer="backgroundobjects" svg:width="12cm" svg:height="1.2cm" svg:x="1cm" svg:y="19.3cm">
+    <draw:text-box><text:p>Cooperativa La Vega</text:p></draw:text-box>
+   </draw:frame>
+   <draw:frame draw:style-name="gr1" draw:layer="backgroundobjects" svg:width="6cm" svg:height="1.2cm" svg:x="21cm" svg:y="19.3cm">
+    <draw:text-box><text:p><text:page-number>&lt;number&gt;</text:page-number> / <text:page-count>3</text:page-count></text:p></draw:text-box>
+   </draw:frame>
+  </style:master-page>
+ </office:master-styles>
+ <office:body>
+  <office:presentation>
+   <draw:page draw:name="Portada" draw:style-name="dp1" draw:master-page-name="Vega">
+    <draw:frame presentation:style-name="gr1" draw:layer="layout" svg:width="24cm" svg:height="3cm" svg:x="2cm" svg:y="2cm" presentation:class="title" presentation:user-transformed="true">
+     <draw:text-box><text:p>Plan de riego 2027</text:p></draw:text-box>
+    </draw:frame>
+   </draw:page>
+   <draw:page draw:name="Infraestructura" draw:style-name="dp2" draw:master-page-name="Vega">
+    <draw:custom-shape xml:id="id10" draw:id="id10" draw:style-name="gr2" draw:layer="layout" svg:width="8cm" svg:height="5cm" svg:x="2cm" svg:y="3cm">
+     <text:p>Depósito</text:p>
+     <draw:enhanced-geometry svg:viewBox="0 0 21600 21600" draw:type="rectangle" draw:enhanced-path="M 0 0 L 21600 0 21600 21600 0 21600 0 0 Z N"/>
+    </draw:custom-shape>
+    <draw:custom-shape xml:id="id11" draw:id="id11" draw:style-name="gr3" draw:layer="layout" svg:width="5cm" svg:height="5cm" svg:x="16cm" svg:y="3cm">
+     <text:p>Pozo</text:p>
+     <draw:enhanced-geometry svg:viewBox="0 0 21600 21600" draw:type="ellipse" draw:enhanced-path="U 10800 10800 10800 10800 0 360 Z N"/>
+    </draw:custom-shape>
+    <draw:connector draw:style-name="gr4" draw:layer="layout" draw:type="line" draw:start-shape="id10" draw:start-glue-point="3" draw:end-shape="id11" draw:end-glue-point="1" svg:x1="10cm" svg:y1="5.5cm" svg:x2="16cm" svg:y2="5.5cm">
+     <text:p/>
+    </draw:connector>
+    <anim:par presentation:node-type="timing-root">
+     <anim:seq presentation:node-type="main-sequence">
+      <anim:par smil:begin="next">
+       <anim:par smil:begin="0s">
+        <anim:par smil:begin="0s" smil:fill="hold" presentation:node-type="on-click" presentation:preset-id="ooo-entrance-fade-in" presentation:preset-class="entrance">
+         <anim:set smil:begin="0s" smil:dur="0.001s" smil:fill="hold" smil:targetElement="id10" smil:attributeName="visibility" smil:to="visible"/>
+         <anim:transitionFilter smil:dur="0.5s" smil:targetElement="id10" smil:type="fade" smil:subtype="crossfade"/>
+        </anim:par>
+        <anim:par smil:begin="0s" smil:fill="hold" presentation:node-type="with-previous" presentation:preset-id="ooo-emphasis-spin" presentation:preset-class="emphasis">
+         <anim:animateTransform smil:dur="1s" smil:fill="hold" smil:targetElement="id11" smil:by="360" smil:attributeName="transform" svg:type="rotate"/>
+        </anim:par>
+       </anim:par>
+      </anim:par>
+      <anim:par smil:begin="next">
+       <anim:par smil:begin="0s">
+        <anim:par smil:begin="0s" smil:fill="hold" presentation:node-type="on-click" presentation:preset-id="ooo-exit-fade-out" presentation:preset-class="exit">
+         <anim:transitionFilter smil:dur="0.5s" smil:targetElement="id11" smil:type="fade" smil:subtype="crossfade" smil:mode="out"/>
+         <anim:set smil:begin="0.499s" smil:dur="0.001s" smil:fill="hold" smil:targetElement="id11" smil:attributeName="visibility" smil:to="hidden"/>
+        </anim:par>
+       </anim:par>
+      </anim:par>
+     </anim:seq>
+    </anim:par>
+   </draw:page>
+   <draw:page draw:name="Cierre" draw:style-name="dp3" draw:master-page-name="Vega">
+    <draw:frame presentation:style-name="gr1" draw:layer="layout" svg:width="24cm" svg:height="3cm" svg:x="2cm" svg:y="8cm" presentation:class="title" presentation:user-transformed="true">
+     <draw:text-box><text:p>Gracias</text:p></draw:text-box>
+    </draw:frame>
+   </draw:page>
+  </office:presentation>
+ </office:body>
+</office:document>

@@ -1,0 +1,27 @@
+{
+  "key": "onedrive",
+  "tier": "tier2",
+  "manifest": {
+    "name": "Microsoft OneDrive",
+    "description": "Guarda los archivos nuevos de Sytue Drive en tu OneDrive. Las copias de seguridad y la recuperación de lo que vive allí son responsabilidad del cliente.",
+    "category": "Almacenamiento",
+    "color": "#0078D4",
+    "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#0078D4\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M7 18h11a4 4 0 0 0 .5-8A6 6 0 0 0 7 9a4.5 4.5 0 0 0 0 9z\"/></svg>",
+    "identity": {
+      "kind": "none"
+    },
+    "provisioning": "none",
+    "launch": {
+      "kind": "url",
+      "url": "https://onedrive.live.com"
+    },
+    "oauth": {
+      "authorize_url": "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
+      "token_url": "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+      "scopes": [
+        "Files.ReadWrite",
+        "offline_access"
+      ]
+    }
+  }
+}

@@ -1,0 +1,19 @@
+apiVersion: v2
+name: sytue-mail
+description: >-
+  Sytue Mail — servidor de correo Go propio: HTTP/JMAP (api) y SMTP/IMAP
+  (emersion/go-smtp, go-imap, go-message, MIT). Buzones/indices en PostgreSQL; cuerpos y
+  adjuntos en Object Storage S3 (UE). Código Apache-2.0, (c) 2026 Daniel Delgado Ramos. Reimplementacion clean-room;
+  NO usa Stalwart. Expuesto en mail.sytue.eu (JMAP/HTTP) y mx.sytue.eu (SMTP 25/465/587, IMAP 993).
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+kubeVersion: ">=1.31.0-0"
+home: https://sytue.eu
+keywords: [sytue, mail, jmap, smtp, imap, s3, go]
+maintainers:
+  - name: Sytue Platform
+    email: platform@sytue.eu
+annotations:
+  licenses: MIT
+  sytue.eu/stack: go

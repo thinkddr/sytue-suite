@@ -1,0 +1,39 @@
+{
+ "cells": {
+  "A1": "{{factura.subtotal}}",
+  "A2": "{{factura.iva}}",
+  "B2": "0.21",
+  "C2": "=C1*B2",
+  "A3": "<b>{{presupuesto.total}}</b>",
+  "C3": "=C1+C2"
+ },
+ "formats": {
+  "C1": {
+   "id": "currency",
+   "decimals": 2
+  },
+  "C2": {
+   "id": "currency",
+   "decimals": 2
+  },
+  "C3": {
+   "id": "currency",
+   "decimals": 2
+  },
+  "B2": {
+   "id": "percent",
+   "decimals": 0
+  }
+ },
+ "styles": {
+  "A3": {
+   "tema": "papel"
+  },
+  "B3": {
+   "tema": "papel"
+  },
+  "C3": {
+   "tema": "papel"
+  }
+ }
+}

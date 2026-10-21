@@ -1,0 +1,45 @@
+{
+  "key": "zoom",
+  "tier": "tier2",
+  "manifest": {
+    "name": "Zoom",
+    "description": "Reuniones y videollamadas, con inicio de sesión único.",
+    "category": "Comunicación",
+    "color": "#2D8CFF",
+    "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#2D8CFF\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"3\" y=\"6\" width=\"13\" height=\"12\" rx=\"2\"/><path d=\"m16 10 5-3v10l-5-3z\"/></svg>",
+    "identity": {
+      "kind": "saml",
+      "entity_id": "https://{vanity}.zoom.us",
+      "acs_url": "https://{vanity}.zoom.us/saml/SSO",
+      "name_id_format": "email"
+    },
+    "provisioning": "none",
+    "launch": {
+      "kind": "initiate"
+    },
+    "fields": [
+      {
+        "key": "vanity",
+        "label": "URL personalizada de Zoom",
+        "placeholder": "acme",
+        "help": "Tu «Vanity URL»: https://VANITY.zoom.us",
+        "required": true
+      }
+    ],
+    "oauth": {
+      "authorize_url": "https://zoom.us/oauth/authorize",
+      "token_url": "https://zoom.us/oauth/token",
+      "revoke_url": "https://zoom.us/oauth/revoke",
+      "scopes": [
+        "meeting:read",
+        "meeting:write"
+      ]
+    },
+    "substitutes": [
+      {
+        "product": "meet",
+        "open_url": "https://{vanity}.zoom.us/"
+      }
+    ]
+  }
+}

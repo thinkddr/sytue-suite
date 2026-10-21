@@ -1,0 +1,103 @@
+# Sytue Web: la API conserva los secretos; `sitios` solo sirve artefactos
+# publicados desde S3. No convertirlos en un único Deployment.
+enabled: true
+# Host del producto: `web.<dominio>` desde el 2026-10-04 (antes `pages.<dominio>`).
+# Es el que se anuncia en PUBLIC_URL, o sea el de los webhooks NUEVOS.
+subdomain: web
+# El host anterior sigue publicando `/webhooks` y `/_borde`, SIN redirigir y sin
+# interruptor: las direcciones de webhook ya dadas de alta en la pasarela de cada
+# organización lo nombran, y Stripe y Mollie no siguen redirecciones. Se retira
+# con una baja formal, no con el cambio de dirección. Vacío = un solo host.
+hostAnterior: pages
+component: pages
+replicaCount: 2
+
+image:
+  registry: ""
+  repository: sytue-pages
+  tag: "1.0.0"
+  pullPolicy: IfNotPresent
+
+service:
+  port: 80
+  targetPort: 8100
+sitios:
+  replicaCount: 2
+  service:
+    port: 80
+    targetPort: 8101
+  resources:
+    requests: { cpu: 50m, memory: 64Mi }
+    limits: { cpu: 500m, memory: 256Mi }
+
+resources:
+  requests: { cpu: 100m, memory: 256Mi }
+  limits: { cpu: "1", memory: 1Gi }
+
+postgresql:
+  existingSecret: sytue-pages-db
+  dsnKey: dsn
+secrets:
+  existingSecret: sytue-pages
+  encKey: secret-enc-key
+objectStorage:
+  existingSecret: sytue-object-storage
+  region: fr-par
+  useSSL: true
+  # Backend S3 dentro de otro namespace (piloto). Vacío: solo S3 externo HTTPS.
+  network: {}
+
+config:
+  dbMaxConns: 5
+  logLevel: info
+  s3Bucket: sytue-prod-pages-sitios
+  sitesDomain: sites.sytue.eu
+  castOrigin: https://cast.sytue.eu
+  mapaRefresco: 10s
+  publicadorSecret: sytue-pages-publicador
+  idEstadoOrgsSecret: sytue-id-estado-orgs
+  aiPagesSecret: sytue-ai-pages
+  syerpPedidosSecret: sytue-syerp-pedidos-tienda
+  # Avisos de la tienda por correo. `from` es el buzón de Sytue Web (p. ej.
+  # «Sytue Web <web@sytue.eu>»); su credencial va en el secret `secrets.existingSecret`,
+  # claves `smtp-user` y `smtp-password`. Sin `from`, no sale ningún correo (los avisos
+  # de la campana, sí). `addr` vacío = el MSA de Sytue Mail del Release; `tlsServerName`,
+  # el nombre del certificado del MTA (mx.<dominio>), porque se entra por el Service.
+  smtp: {}
+  #  addr: ""
+  #  from: ""
+  #  tlsServerName: ""
+  analyticsPagesSecret: sytue-analytics-pages
+  ipApex: ""
+  abuseEmail: abuse@sytue.eu
+  analyticsEnabled: true
+  # Vacío: servicio del subchart Analytics. El piloto usa el manifiesto externo.
+  analyticsApiURL: ""
+  # Vacío: colector del subchart; el piloto despliega Analytics fuera del release.
+  analyticsIngestService: ""
+
+networkPolicy:
+  enabled: true
+
+ingress:
+  className: traefik
+  tlsSecret: tls-pages-sytue-eu
+
+# Reparto anti-afinidad suave por zona y nodo (alta disponibilidad multi-AZ, UE).
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: ScheduleAnyway
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: ScheduleAnyway
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  fsGroup: 10001
+  seccompProfile: { type: RuntimeDefault }
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities: { drop: ["ALL"] }

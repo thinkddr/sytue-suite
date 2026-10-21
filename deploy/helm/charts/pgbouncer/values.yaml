@@ -1,0 +1,144 @@
+# =============================================================================
+# sytue-pgbouncer — pooler transaccional entre los servicios Go y la RDB.
+#
+# POR QUE: la RDB (Scaleway) tiene max_connections=200. Sin pooler, la suma de
+# pools pgx (replicas x DB_MAX_CONNS) supera ese tope ya en el suelo de
+# replicas y explota con el HPA. PgBouncer multiplexa: los clientes pueden ser
+# cientos; hacia la RDB solo sale el presupuesto acotado de abajo.
+#
+# CONTRATO DE DSN (prod):
+#   - Los secrets `sytue-<svc>-db` apuntan su clave `dsn` a ESTE Service
+#     (host=pgbouncer, port=6432, sslmode=disable — trafico
+#     intra-cluster protegido por NetworkPolicy; el TLS hacia la RDB lo pone
+#     PgBouncer con server_tls_sslmode=require).
+#   - La clave `dsn-direct` (nueva) conserva el DSN DIRECTO a la RDB y se
+#     inyecta como DATABASE_DIRECT_URL: la usa platform/pkg/pg para el trabajo
+#     con estado de SESION que un pooler transaccional NO soporta:
+#     LISTEN/NOTIFY del bus de eventos (chat/docs/hub) y los advisory locks de
+#     las migraciones golang-migrate del arranque.
+#
+# MODO: pool_mode=transaction. Compatible con el RLS de la suite porque
+# `SELECT set_config('app.tenant', $1, true)` es LOCAL y va DENTRO de la
+# transaccion (platform/pkg/pg/tx.go InTenantTx). NO usar statement (rompe
+# SET LOCAL) ni session (no ahorra conexiones).
+#
+# PREPARED STATEMENTS: pgx usa el protocolo extendido con statements con
+# nombre. Se mantiene el modo por defecto de pgx y se exige PgBouncer >= 1.21
+# con max_prepared_statements > 0 (desde 1.24 viene activado por defecto);
+# NO hace falta QueryExecModeSimple ni desactivar el statement cache.
+#
+# DEV: deploy/compose NO usa PgBouncer (1 replica por servicio contra el
+# Postgres local; el pool agregado es minusculo). Este chart es solo Helm.
+# =============================================================================
+enabled: true
+component: pgbouncer
+
+# ¡LA CUENTA DE CONEXIONES DEPENDE DE ESTO! Conexiones max hacia la RDB =
+# replicaCount x (numero de bases) x settings.maxDbConnections. Sin HPA a
+# proposito: escalar PgBouncer sin recalcular el presupuesto rompe el tope.
+replicaCount: 2
+
+image:
+  # Imagen comunitaria de PgBouncer (alpine, arranca no-root). >= 1.21
+  # obligatorio (prepared statements en transaction mode); se fija 1.25.x.
+  # Upstream para desarrollo; values-prod usa el mirror privado de Scaleway.
+  repository: edoburu/pgbouncer
+  tag: "v1.25.2-p0@sha256:7d7a27d9e90985cab5cf42256f5c13a3120baa4b055b69df37beb272b89b2340"
+  pullPolicy: IfNotPresent
+  useGlobalRegistry: false
+
+listenPort: 6432
+
+service:
+  # Contrato con deploy/production/02b-secretos.sh. Debe ser independiente del
+  # nombre de la release porque los DSN se materializan antes de instalar Helm.
+  name: pgbouncer
+  type: ClusterIP
+  port: 6432
+
+# RDB destino: host/port desde el secret `sytue-postgresql` (claves host,port;
+# mismo contrato que documenta deploy/helm/README.md). El endpoint privado lo
+# emite Terraform (modulo database) y se carga fuera de banda, nunca en git.
+postgresql:
+  existingSecret: sytue-postgresql
+  hostKey: host
+  portKey: port
+
+# Autenticacion: userlist.txt montado desde secret (fuera de banda, como el
+# resto de credenciales de la suite). Una linea por usuario de servicio:
+#   "sytue_id" "<password>"
+# Con la password en claro (mismo nivel de confianza que los secrets DSN),
+# PgBouncer autentica al cliente por SCRAM y responde el SCRAM de la RDB.
+auth:
+  existingSecret: sytue-pgbouncer
+  userlistKey: userlist.txt
+  type: scram-sha-256
+
+settings:
+  poolMode: transaction
+  # Clientes: muy alto (las replicas de la suite a HPA-max suman ~500 conexiones
+  # de cliente; ver values-prod.yaml del umbrella para la cuenta completa).
+  maxClientConn: 2000
+  # Servidor (POR base y POR replica de PgBouncer):
+  #   defaultPoolSize + reservePoolSize <= maxDbConnections.
+  #   Total RDB = replicaCount x bases x maxDbConnections (ver values-prod).
+  defaultPoolSize: 6
+  reservePoolSize: 1
+  reservePoolTimeout: 5
+  maxDbConnections: 7
+  # pgx (protocolo extendido): statements preparados gestionados por PgBouncer.
+  maxPreparedStatements: 200
+  # TLS hacia la RDB (Scaleway exige sslmode=require).
+  serverTlsSslmode: require
+  # Alineado con MaxConnLifetime/MaxConnIdleTime de platform/pkg/pg.
+  serverLifetime: 3600
+  serverIdleTimeout: 300
+  # Parametros de arranque de clientes a tolerar (inofensivo).
+  ignoreStartupParameters: extra_float_digits
+
+# Requests MEDIDOS en producción (kubectl top, 2026-08-09), no estimados: en
+# Kubernetes la factura la fija lo RESERVADO, no lo usado, y estos pods pedían
+# 25-75 veces su consumo real. Esa reserva inflada obligó a un tercer nodo cuando
+# la CPU real del clúster estaba al 3 %.
+#
+# El límite NO se toca: un pico sigue pudiendo usar toda la CPU que necesite. Y
+# bajar el request hace al HPA MÁS sensible —calcula el porcentaje sobre el
+# request—, que es justo lo que hace falta para escalar por demanda real.
+resources:
+  requests:
+    cpu: 25m
+    memory: 64Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+networkPolicy:
+  enabled: true
+
+# PDB: siempre al menos una instancia durante drains (los servicios pierden la
+# BD si PgBouncer desaparece).
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# Reparto anti-afinidad suave por zona y nodo (multi-AZ, UE).
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: ScheduleAnyway
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: ScheduleAnyway
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  fsGroup: 10001
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]

@@ -1,0 +1,10 @@
+{
+  "order_paid_buyer_subject": "Confirmare comandă {number}",
+  "order_paid_buyer_body": "Vă mulțumim pentru achiziție. Comanda {number} a fost confirmată.",
+  "order_paid_store_subject": "Comandă nouă primită: {number}",
+  "order_paid_store_body": "Ați primit o comandă nouă {number} în valoare de {total}.",
+  "withdrawal_ack_subject": "Confirmare retragere primită: {number}",
+  "withdrawal_ack_body": "Cererea dumneavoastră de retragere pentru comanda {number} a fost înregistrată.",
+  "form_received_subject": "Trimitere formular primită: {form_id}",
+  "form_received_body": "A fost primită o trimitere nouă pentru formularul {form_id}."
+}

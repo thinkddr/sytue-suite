@@ -1,0 +1,11 @@
+Susietos lentelės klientams, užsakymams ar atsargoms tvarkyti, su leidimais ir kiekvieno pakeitimo žurnalu.
+
+• Klientai, užsakymai ar atsargos susietose lentelėse, nieko neišmanant apie duomenų bazes.
+• Bendrinkite su organizacija pasirinktu vaidmeniu.
+• Kiekvienas pakeitimas užfiksuojamas: kas jį atliko ir kas buvo anksčiau.
+• Jūsų duomenys lieka ES, o eksportuoti galite, kada norite.
+• Lentelės su teksto, skaičiaus, datos, žymimojo langelio, vieno ir kelių pasirinkimų laukais.
+• Ryšiai tarp lentelių: susiekite užsakymą su klientu, o duomenų bazė neleis nutraukti ryšio.
+• Leidimai pagal duomenų bazę ir lentelę: savininkas, redaktorius, komentatorius ir skaitytojas.
+
+Šifruojama perduodant (TLS 1.3). „Sytue“ infrastruktūra yra ES. Išorinių paslaugų vieta priklauso nuo jų teikėjo.

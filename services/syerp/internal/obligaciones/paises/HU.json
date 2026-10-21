@@ -1,0 +1,241 @@
+{
+ "pais": "HU",
+ "verificado": true,
+ "moneda": "HUF",
+ "formas": [
+  {
+   "clave": "ev",
+   "nombre": "Egyéni vállalkozó",
+   "tipo": "persona_fisica"
+  },
+  {
+   "clave": "bt",
+   "nombre": "Betéti társaság (Bt.)",
+   "tipo": "persona_fisica"
+  },
+  {
+   "clave": "kft",
+   "nombre": "Korlátolt felelősségű társaság (Kft.)",
+   "tipo": "sociedad"
+  },
+  {
+   "clave": "zrt",
+   "nombre": "Zártkörűen működő részvénytársaság (Zrt.)",
+   "tipo": "sociedad"
+  }
+ ],
+ "portales": {
+  "nav": {
+   "nombre": "NAV — Ügyfélportál / ONYA",
+   "url": "https://nav.gov.hu/"
+  },
+  "ebeszamolo": {
+   "nombre": "e-Beszámoló (IM)",
+   "url": "https://e-beszamolo.im.gov.hu/"
+  }
+ },
+ "obligaciones": [
+  {
+   "clave": "hu_afa_m",
+   "nombre": "ÁFA bevallás (havi, 2465A)",
+   "concepto": "iva_periodica",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "20"
+   },
+   "margen_dias": 7,
+   "portal": "nav",
+   "aplica": {
+    "condiciones": [
+     "iva",
+     "iva_mensual"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 20000000,
+    "moneda": "HUF",
+    "nota": "Mulasztási bírság legfeljebb 200 000 Ft (magánszemély) vagy 500 000 Ft (más adózó); késedelmi pótlék a jegybanki alapkamat + 5 %."
+   },
+   "calculo": {
+    "tipo": "saldo_neto",
+    "haber": [
+     "477"
+    ],
+    "debe": [
+     "472"
+    ]
+   }
+  },
+  {
+   "clave": "hu_afa_q",
+   "nombre": "ÁFA bevallás (negyedéves)",
+   "concepto": "iva_periodica",
+   "ambito": "fiscal",
+   "periodicidad": "trimestral",
+   "plazos": {
+    "T": "20"
+   },
+   "margen_dias": 7,
+   "portal": "nav",
+   "aplica": {
+    "condiciones": [
+     "iva",
+     "!iva_mensual"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 20000000,
+    "moneda": "HUF",
+    "nota": "A tárgynegyedévet követő hó 20. napjáig; az éves bevallók február 25-ig — a naptár a negyedévet követi, ami sosem esik később. Mulasztási bírság legfeljebb 500 000 Ft; késedelmi pótlék."
+   },
+   "calculo": {
+    "tipo": "saldo_neto",
+    "haber": [
+     "477"
+    ],
+    "debe": [
+     "472"
+    ]
+   }
+  },
+  {
+   "clave": "hu_a60",
+   "nombre": "Összesítő nyilatkozat (A60)",
+   "concepto": "operaciones_intracomunitarias",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "20"
+   },
+   "margen_dias": 7,
+   "portal": "nav",
+   "aplica": {
+    "condiciones": [
+     "intracomunitario"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 20000000,
+    "moneda": "HUF",
+    "nota": "Mulasztási bírság legfeljebb 500 000 Ft."
+   }
+  },
+  {
+   "clave": "hu_08",
+   "nombre": "Havi járulékbevallás ('08)",
+   "concepto": "nominas",
+   "ambito": "laboral",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "12"
+   },
+   "margen_dias": 7,
+   "portal": "nav",
+   "aplica": {
+    "condiciones": [
+     "empleados"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 20000000,
+    "moneda": "HUF",
+    "nota": "Mulasztási bírság és késedelmi pótlék; szociális hozzájárulási adó és személyi jövedelemadó-előleg ugyanaznap."
+   }
+  },
+  {
+   "clave": "hu_tao",
+   "nombre": "Társasági adó bevallás (2429)",
+   "concepto": "sociedades_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "05-31+1"
+   },
+   "margen_dias": 30,
+   "portal": "nav",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 20000000,
+    "moneda": "HUF",
+    "nota": "Mulasztási bírság legfeljebb 500 000 Ft; adóbírság az adóhiány 50 %-a."
+   }
+  },
+  {
+   "clave": "hu_tao_eloleg",
+   "nombre": "Társasági adóelőleg",
+   "concepto": "pago_fraccionado_sociedades",
+   "ambito": "fiscal",
+   "periodicidad": "trimestral",
+   "plazos": {
+    "T": "20"
+   },
+   "margen_dias": 7,
+   "portal": "nav",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "nota",
+    "nota": "Késedelmi pótlék. Havi előleg 5 millió Ft feletti előző évi adó esetén."
+   }
+  },
+  {
+   "clave": "hu_szja",
+   "nombre": "Személyi jövedelemadó bevallás (2453)",
+   "concepto": "renta_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "05-20+1"
+   },
+   "margen_dias": 30,
+   "portal": "nav",
+   "aplica": {
+    "tipos": [
+     "persona_fisica"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 20000000,
+    "moneda": "HUF",
+    "nota": "Mulasztási bírság legfeljebb 200 000 Ft."
+   }
+  },
+  {
+   "clave": "hu_beszamolo",
+   "nombre": "Éves beszámoló közzététele",
+   "concepto": "cuentas_anuales",
+   "ambito": "mercantil",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "05-31+1"
+   },
+   "margen_dias": 30,
+   "portal": "ebeszamolo",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 20000000,
+    "moneda": "HUF",
+    "nota": "Mulasztási bírság 200 000 Ft-ig, majd 1 millió Ft-ig; végső soron adószám törlése. Az üzleti év mérlegfordulónapját követő ötödik hónap utolsó napjáig."
+   }
+  }
+ ]
+}

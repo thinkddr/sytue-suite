@@ -1,0 +1,292 @@
+{{- $root := . -}}
+{{- range $app, $cfg := .Values.apps }}
+{{- if $cfg.enabled }}
+{{- $d := $root.Values.defaults }}
+{{- $host := printf "%s.%s" $cfg.subdomain (include "sytue-frontend.domain" $root) }}
+{{/*
+  La URL CANÓNICA de la app, que es la que se anuncia y la que Sytue ID compara
+  literal contra el `redirect_uri` registrado. Con las dos direcciones válidas
+  hay que elegir una para anunciar, y es la de PRODUCTO (2026-09-26, ADR
+  «canónica por host de producto»): es la que ya usan los enlaces entre apps
+  (`appUrl`), los avisos (`hubnotify`) y las apps nativas, y loguear en el host
+  por el que se entró quita el 302 previo al IdP que costaba el host de
+  organización. La organización NO vive en el host —viaja en el token—, así que
+  nada de la sesión cambia.
+
+  ATENCIÓN AL DESPLEGAR: cambiar esto cambia el `redirect_uri`, y un redirect_uri
+  que no casa NO da error de despliegue — da un login que falla. Los clients OIDC
+  tienen que tener registrados LOS DOS (el de producto, migración 0099, y el de
+  organización, 0054 y hermanas, que sigue valiendo durante la transición) antes
+  de que esto llegue a producción.
+
+  Sin `path` (www, platform) la canónica sigue siendo su propio host. Con
+  `globalHost` (Mi cuenta) es ese host global, nunca el de una organización ni
+  el de producto (`account.sytue.eu` sigue sirviéndola, pero lo canónico es
+  `id.<dominio>/account`, migración 0097).
+*/}}
+{{- $canonica := $host -}}
+{{- if and $cfg.globalHost $cfg.path -}}
+{{- $canonica = printf "%s.%s%s" $cfg.globalHost (include "sytue-frontend.domain" $root) $cfg.path -}}
+{{- else if $cfg.path -}}
+{{- $canonica = printf "%s%s" $host $cfg.path -}}
+{{- end -}}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "sytue-frontend.appFullname" (dict "ctx" $root "app" $app) }}
+  labels:
+    {{- include "sytue-frontend.appLabels" (dict "ctx" $root "app" $app) | nindent 4 }}
+spec:
+  {{- if not $d.autoscaling.enabled }}
+  replicas: {{ $cfg.replicaCount | default $d.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "sytue-frontend.appSelectorLabels" (dict "ctx" $root "app" $app) | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "sytue-frontend.appLabels" (dict "ctx" $root "app" $app) | nindent 8 }}
+    spec:
+      automountServiceAccountToken: false
+      {{- with ($root.Values.global).imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml $root.Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: web
+          # `image` por app permite que dos superficies compartan binario. Lo usa
+          # platform.sytue.eu, que es la MISMA app Astro que la Console con otro
+          # client OIDC y otra puerta de entrada: publicar una imagen idéntica con
+          # otro nombre solo añadiría un build de 4 minutos y una etiqueta más que
+          # mantener sincronizada. Vacío ⇒ la convención sytue-<app>.
+          image: "{{ include "sytue-frontend.imageRegistry" $root }}/{{ $cfg.image | default (printf "%s-%s" $root.Values.image.repoBase $app) }}:{{ (($root.Values.global).image | default dict).tag | default $root.Values.image.tag }}"
+          imagePullPolicy: {{ $root.Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml $root.Values.containerSecurityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: {{ $d.port }}
+          env:
+            # NODE_ENV lo leen Astro/Vite; el runtime/bundler de la imagen es Bun (no Node).
+            - name: NODE_ENV
+              value: production
+            - name: PORT
+              value: {{ $d.port | quote }}
+            - name: HOST
+              value: "0.0.0.0"
+            - name: SYTUE_ENV
+              value: {{ include "sytue-frontend.env" $root | quote }}
+            - name: PUBLIC_DOMAIN
+              value: {{ include "sytue-frontend.domain" $root | quote }}
+            - name: PUBLIC_URL
+              value: "https://{{ $canonica }}"
+            - name: PUBLIC_HUB_URL
+              value: "https://hub.{{ include "sytue-frontend.domain" $root }}"
+            # Direcciones de los servicios de la suite, derivadas del dominio del
+            # despliegue. Sin ellas cada BFF cae a su `?? 'https://<algo>.sytue.eu'`
+            # y STAGING habla con PRODUCCIÓN. Van ANTES de `$cfg.env` a propósito:
+            # con el mismo nombre gana el último, así que una app puede seguir
+            # apuntando a otro sitio desde values sin tocar el helper.
+            {{- include "sytue-frontend.serviceUrls" $root | nindent 12 }}
+            {{- /*
+              PUBLIC_SYTUE_DOWNLOADS_BASE NO va aquí. `www` es SSG: su HTML se
+              genera al construir la imagen y luego solo lo sirve un servidor de
+              ficheros, así que una variable del contenedor no la lee nadie y la
+              página de descargas se quedaba en «próximamente» aunque el bucket
+              tuviera los binarios. Se hornea con --build-arg en el job de
+              release; `downloadsBase` de values.yaml documenta el destino.
+            */}}
+            {{- if $cfg.clientId }}
+            # ----- BFF / OIDC contra Sytue ID (PKCE + cookie __Host- host-only) -----
+            - name: SYTUE_OIDC_ISSUER
+              value: {{ include "sytue-frontend.oidcIssuer" $root | quote }}
+            - name: SYTUE_OIDC_INTERNAL_BASE_URL
+              value: {{ include "sytue-frontend.oidcInternalBaseUrl" $root | quote }}
+            - name: SYTUE_OIDC_CLIENT_ID
+              value: {{ $cfg.clientId | quote }}
+            - name: SYTUE_OIDC_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $root.Values.existingSecret }}
+                  key: {{ printf "%s-oidc-client-secret" $app }}
+            # EL PREFIJO BAJO EL QUE SE SIRVE ESTA SUPERFICIE, y no el que trae
+            # horneado la imagen. La misma imagen sirve dos: Sytue Admin cuelga de
+            # `/admin` y la consola de PLATAFORMA se sirve en la raíz de su host
+            # (por eso su `redirect_uri` es `/auth/callback` a secas). Con el valor
+            # del build a secas, el guard de platform.<dominio> redirigía a
+            # `/admin/auth/login` —que ahí no existe— y entrar era un 404.
+            #
+            # Vacío es un valor VÁLIDO y significa «en la raíz»: por eso se pasa
+            # siempre y no dentro de un `if`.
+            - name: SYTUE_BASE_PATH
+              value: {{ $cfg.path | default "" | quote }}
+            - name: SYTUE_OIDC_REDIRECT_URI
+              value: "https://{{ $canonica }}/auth/callback"
+            # Cerrar sesión devuelve al SITIO PÚBLICO, no a la app que se acaba
+            # de abandonar: volver a ella hacía que su guard mandara otra vez al
+            # formulario de acceso, y parecía que el logout no había funcionado.
+            # El destino tiene que estar registrado en el client (mig 0033) o
+            # Sytue ID lo rechaza como open-redirect.
+            - name: SYTUE_OIDC_POST_LOGOUT_URI
+              value: "https://www.{{ include "sytue-frontend.domain" $root }}/"
+            # `roles` NO es un scope: es un claim que Sytue ID emite siempre que
+            # el usuario tiene roles en el tenant, y no aparece en
+            # scopes_supported ni en los scopes de ningún client. Pedirlo hacía
+            # que authorize devolviera invalid_scope y el BFF reintentase el
+            # login en bucle. La lista la fija @sytue/auth en un solo sitio.
+            - name: SYTUE_OIDC_SCOPES
+              value: {{ $root.Values.oidcScopes | quote }}
+            - name: SYTUE_SESSION_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $root.Values.existingSecret }}
+                  key: cookie-secret
+            {{- end }}
+            {{- if $cfg.publicador }}
+            # La capacidad de publicar es de Pages; el secreto jamás se monta en
+            # otra superficie ni en el servidor público de sitios.
+            - name: PAGES_PUBLICADOR_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: sytue-pages-publicador
+                  key: secret
+            {{- end }}
+            {{- if $cfg.analytics }}
+            {{- with (include "sytue-frontend.analyticsApiUrl" $root) }}
+            # Solo el panel de Cloud lleva esta variable: es la unica app con una
+            # seccion de analitica. Sin ella la seccion se ensena apagada en vez de
+            # romperse, que es lo que debe pasar en un entorno sin Analytics.
+            - name: SYTUE_ANALYTICS_API_URL
+              value: {{ . | quote }}
+            {{- end }}
+            {{- end }}
+            {{- if $cfg.downloads }}
+            # Instaladores nativos, servidos DETRÁS DE LA SESIÓN por el portal.
+            #
+            # La credencial solo puede leer ESE bucket: su aplicación IAM no lleva
+            # ningún permission set —los de Object Storage de Scaleway son de
+            # proyecto entero— y lo que le da acceso es la política del propio
+            # bucket, que la nombra. Se descartó un token de la forja porque habría
+            # exigido `read:repository`, o sea lectura de TODO el código fuente,
+            # para poder bajar un .dmg.
+            #
+            # `optional: true`: sin credencial la página dice que este despliegue no
+            # sabe dónde buscar los instaladores, que es exactamente lo que pasa, en
+            # vez de romperse.
+            - name: SYTUE_DOWNLOADS_BUCKET
+              value: {{ $root.Values.downloadsBucket | quote }}
+            - name: SYTUE_DOWNLOADS_ENDPOINT
+              value: {{ $root.Values.downloadsEndpoint | quote }}
+            {{- if $root.Values.downloadsPublicEndpoint }}
+            # EL ENDPOINT QUE VE EL NAVEGADOR, cuando no es el mismo.
+            #
+            # El de arriba lo usa este proceso para listar el bucket; este otro es
+            # con el que se FIRMA la URL a la que se redirige a quien descarga.
+            # Con un S3 dentro del clúster los dos no pueden ser el mismo: el
+            # nombre interno no lo resuelve ningún navegador. Vacío ⇒ se usa el
+            # de arriba, que es lo correcto con un S3 ya público (Scaleway).
+            - name: SYTUE_DOWNLOADS_PUBLIC_ENDPOINT
+              value: {{ $root.Values.downloadsPublicEndpoint | quote }}
+            {{- end }}
+            - name: SYTUE_DOWNLOADS_REGION
+              value: {{ $root.Values.downloadsRegion | quote }}
+            - name: SYTUE_DOWNLOADS_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $root.Values.downloadsSecret | quote }}
+                  key: access-key
+                  optional: true
+            - name: SYTUE_DOWNLOADS_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $root.Values.downloadsSecret | quote }}
+                  key: secret-key
+                  optional: true
+            {{- end }}
+            {{- if $cfg.cloudApi }}
+            {{- with (include "sytue-frontend.cloudApiUrl" $root) }}
+            # Control-plane del PaaS. Solo el panel de Cloud la lleva. Sin ella el
+            # panel se anunciaba en «modo demostración» aunque el servicio
+            # estuviera corriendo: apuntaba a su propio host público.
+            - name: SYTUE_CLOUD_API_URL
+              value: {{ . | quote }}
+            {{- end }}
+            {{- end }}
+            {{- if $cfg.platformConnections }}
+            # Superficie de CONEXIONES CON TERCEROS: las credenciales con las que
+            # Sytue se presenta ante Google, Microsoft y demás. Habla con la
+            # superficie de OPERADOR de Sytue Integrations, que va con un token
+            # propio del despliegue y no con el JWT de la suite.
+            #
+            # Se referencia el secreto DEL SERVICIO en vez de copiar el valor a
+            # otro: una credencial duplicada en dos sitios acaba rotada en uno
+            # solo, y el que se queda atrás falla mucho después y sin relación
+            # aparente. `optional: true` porque sin token la pantalla lo dice en
+            # vez de romperse.
+            - name: SYTUE_INTEGRATIONS_OPERATOR_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $root.Values.integrationsSecret | quote }}
+                  key: operator-token
+                  optional: true
+            # Para componer el redirect_uri que hay que registrar ante cada
+            # proveedor. Sale de la CONFIGURACIÓN y no de la petición: es un dato
+            # que el operador va a copiar y pegar en la consola de Google o de
+            # Microsoft, y derivarlo de una cabecera dejaría que fuese distinto
+            # según por dónde entrara.
+            - name: SYTUE_INTEGRATIONS_PUBLIC_URL
+              value: "https://{{ $root.Values.integrationsSubdomain }}.{{ include "sytue-frontend.domain" $root }}"
+            - name: SYTUE_SUITE_APEX
+              value: {{ include "sytue-frontend.domain" $root | quote }}
+            {{- end }}
+            {{- range $k, $v := $cfg.env }}
+            - name: {{ $k }}
+              value: {{ $v | quote }}
+            {{- end }}
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 20
+            timeoutSeconds: 3
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+          resources:
+            {{- toYaml ($cfg.resources | default $d.resources) | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+      {{- with $root.Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- range . }}
+        - maxSkew: {{ .maxSkew }}
+          topologyKey: {{ .topologyKey }}
+          whenUnsatisfiable: {{ .whenUnsatisfiable }}
+          labelSelector:
+            matchLabels:
+              {{- include "sytue-frontend.appSelectorLabels" (dict "ctx" $root "app" $app) | nindent 14 }}
+        {{- end }}
+      {{- end }}
+{{- end }}
+{{- end }}

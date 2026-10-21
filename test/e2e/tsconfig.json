@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "display": "Sytue e2e (Playwright)",
+  /*
+   * Este harness vive FUERA del workspace Bun del frontend —solo necesita Playwright— y
+   * se había quedado sin tsconfig: el editor type-chequeaba sus 46 ficheros con la
+   * configuración por defecto, sin `lib` ni tipos de Node, y sacaba un muro de errores en
+   * rojo sobre los tipos de Playwright que no tenían nada que ver con este código. La
+   * consola no se enteraba porque aquí no llegaba ningún gate.
+   *
+   * `strict` sí, como el resto del repositorio; lo que no se hereda de la base del
+   * frontend son las opciones de Preact/JSX y el ruido de `noUnusedLocals` en un harness
+   * de sondas donde una variable a medias es parte del oficio.
+   */
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "moduleDetection": "force",
+    "types": ["node"],
+    "resolveJsonModule": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": ["playwright.config.ts", "tests/**/*.ts"]
+}

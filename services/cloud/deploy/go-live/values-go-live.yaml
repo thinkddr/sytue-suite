@@ -1,0 +1,98 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Daniel Delgado Ramos
+#
+# values-go-live.yaml — overlay de Helm para producción/go-live de Sytue Cloud.
+# Un solo fichero que se aplica POR CHART (Helm ignora las claves que un chart no
+# conoce). Solo contiene claves REALES que los templates leen hoy; los huecos que
+# aún no están cableados se marcan al final (no se ponen como claves que harían
+# no-op silencioso).
+#
+# Aplicar (namespace de control-plane sytue-paas):
+#   helm upgrade --install cloud-controller deploy/helm/charts/cloud-controller \
+#     -n sytue-paas -f services/cloud/deploy/go-live/values-go-live.yaml
+#   helm upgrade --install cloud-builder    deploy/helm/charts/cloud-builder \
+#     -n sytue-paas -f services/cloud/deploy/go-live/values-go-live.yaml
+#   helm upgrade --install cloud-api        deploy/helm/charts/cloud-api \
+#     -n sytue-paas -f services/cloud/deploy/go-live/values-go-live.yaml
+#
+# Los secretos NO van aquí (ver secrets.example.yaml): entran por los existingSecret
+# vía Scaleway Secret Manager + Sealed Secrets.
+
+# env=prod: los tres charts standalone lo emiten como el proceso ENV (config.Load →
+# pcfg.LoadBase con prefijo ""). El default del helper es "base", que
+# Environment.Valid() RECHAZA (dev|staging|prod) ⇒ el binario ABORTA al arrancar
+# (crashloop). Standalone (go-live) no hay global.env que lo fije (eso es del umbrella
+# values-prod.yaml), así que se fija aquí. Además, prod ⇒ Env.IsProd() ⇒ cloud-api
+# usa el runner Kapsule (client-go, logs/exec) sin necesitar RUNNER_MODE propio.
+env: prod
+
+# ── config.* — mapea a env por los templates/deployment.yaml de cada chart ─────
+# Cada chart lee solo su subárbol; los demás lo ignoran.
+config:
+  # RUNNER_MODE=kube: interruptor prod (client-go sobre Kapsule). Solo lo LEE el
+  # controller (config.UseKubeRunner). [cloud-controller: config.runnerMode -> RUNNER_MODE]
+  runnerMode: kube
+
+  # CERT_ISSUER: ClusterIssuer de cert-manager para el TLS de dominios de cliente.
+  # [cloud-controller: config.certIssuer -> CERT_ISSUER]. Por defecto sigue a
+  # global.tls.issuer; aquí se fija explícito al issuer PROD (no el -staging).
+  certIssuer: sytue-letsencrypt
+
+  # Dominios de runtime del PaaS (SPEC). APPS_DOMAIN / PREVIEW_DOMAIN / INGRESS_TARGET.
+  # Compartidos por cloud-api y cloud-controller (mismos nombres de env en ambos charts).
+  appsDomain: apps.sytue.eu
+  previewDomain: preview.sytue.eu
+  ingressTarget: ingress.sytue.eu     # -> INGRESS_TARGET (CNAME destino de dominios de cliente)
+
+  # Registry Scaleway PaaS. REGISTRY_URL en cloud-api, cloud-builder y cloud-controller.
+  registry: rg.fr-par.scw.cloud/sytue-paas
+
+  # Namespace de builds y periodo de reconciliación. [cloud-controller / cloud-builder]
+  buildNamespace: sytue-paas-builds
+  reconcileInterval: 15s
+
+  # Object Storage UE para cache de builds/logs. S3_ENDPOINT/REGION/BUCKET/USE_SSL.
+  # Compartido por los tres charts (config.s3.*).
+  s3:
+    endpoint: https://s3.fr-par.scw.cloud
+    region: fr-par
+    bucket: sytue-paas-build-cache
+    useSSL: true
+
+# ── buildkit.* / cnb.* — solo los lee el chart cloud-builder ─────────────────
+# BUILDKIT_IMAGE + CNB_* del builder. PLACEHOLDER por digest: re-pinnear con
+# crane/skopeo ANTES de prod (crane digest <ref:tag>).
+buildkit:
+  image: moby/buildkit:v0.32.1-rootless@sha256:<PIN>   # -> BUILDKIT_IMAGE; re-pin por digest
+cnb:
+  builderImage: paketobuildpacks/builder-jammy-base@sha256:<PIN>  # -> CNB_BUILDER_IMAGE
+  gitImage: alpine/git@sha256:<PIN>                                # -> CNB_GIT_IMAGE
+  # runImage: ""   # -> CNB_RUN_IMAGE (opcional; vacío ⇒ derivada del builder, como `pack`)
+
+# ── ingress.* — solo cloud-api ────────────────────────────────────────────────
+ingress:
+  enabled: true
+  className: traefik
+  tls:
+    secretName: tls-cloud-sytue-eu
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# TOGGLES POR SECRET (NO en claro): los tres charts ya cablean estas env como
+# secretKeyRef optional:true. Se ENCIENDEN rellenando la data-key en el existingSecret
+# correspondiente (ver secrets.example.yaml), no en este overlay:
+#
+#   GitHub App — Secret sytue-cloud-api (+ github-app-id/private-key en sytue-cloud-builder
+#   para clone de repos privados en el build; ver github-app-manifest.json):
+#     github-app-id / github-app-private-key / github-app-client-id /
+#     github-app-client-secret / webhook-secret
+#
+#   Scaleway IAM por-tenant + backup acotado — Secret sytue-cloud-controller:
+#     scw-secret-key -> SCW_SECRET_KEY (con config.scw.orgId -> SCW_ORG_ID)
+#     s3-backup-access-key / s3-backup-secret-key -> S3_BACKUP_* (CronJob de backup)
+#
+#   Registry privado (pull/push) — sytue-cloud-{api,builder,controller}:
+#     registry-username / registry-password -> REGISTRY_USERNAME / REGISTRY_PASSWORD
+#
+# Las 4 OBLIGATORIAS (database-url, secret-enc-key, s3-access-key, s3-secret-key)
+# van en el existingSecret de CADA chart: sin ellas config.Load aborta el arranque.
+# ═══════════════════════════════════════════════════════════════════════════════

@@ -1,0 +1,19 @@
+apiVersion: v2
+name: sytue-docs
+description: >-
+  Sytue Docs/Sheets/Slides — servicio Go propio de ofimatica colaborativa: modelo documental
+  + colaboracion CRDT/OT por WebSocket (coder/websocket, MIT). Estado en PostgreSQL; documentos
+  en Object Storage S3 (UE). Editor propio Astro+Preact. Código Apache-2.0, (c) 2026 Daniel Delgado Ramos.
+  Reimplementacion clean-room (OOXML/ODF); NO usa OnlyOffice. Expuesto en docs.sytue.eu (+colab WS).
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+kubeVersion: ">=1.31.0-0"
+home: https://sytue.eu
+keywords: [sytue, docs, office, crdt, collaboration, websocket, go]
+maintainers:
+  - name: Sytue Platform
+    email: platform@sytue.eu
+annotations:
+  licenses: MIT
+  sytue.eu/stack: go

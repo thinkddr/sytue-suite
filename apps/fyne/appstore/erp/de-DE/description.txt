@@ -1,0 +1,18 @@
+Vierundzwanzig Module und ein doppisches Buch, das die Datenbank nicht aus dem Gleichgewicht lässt.
+
+• Vierundzwanzig Module und sechsunddreißig Modelle: Kontakte, Verkauf, Einkauf, Lager, Fertigung, Fakturierung, Buchhaltung, Projekte und Personal.
+• Ein neues Modul ist eine JSON-Datei: ohne Migration, ohne neue Route und ohne Eingriff in die Oberfläche.
+• Beträge liegen in ganzen Cent vor, nie als Gleitkommazahl, und den Ausgleich erzwingt die Datenbank.
+• Gebuchtes bleibt unangetastet: korrigiert wird mit einer weiteren Buchung – das unterscheidet ein Buch von einer Tabelle.
+• Vierundzwanzig Module und sechsunddreißig Modelle in einem Dienst und einer Datenbank.
+• Der Modellkatalog ist Datum: Jedes Modul deklariert seine Felder, Zustände und Listenspalten.
+• Ein neues Modul ist eine JSON-Datei – kein DDL, keine Migration, keine Tabellensperre.
+• Eine API für alle sechsunddreißig Modelle und eine aus dem Katalog erzeugte Oberfläche.
+• Doppelte Buchführung mit Beträgen in ganzen Cent; keine einzige Gleitkommazahl.
+• Den Ausgleich prüft die Datenbank beim Commit, nicht der Anwendungscode.
+• Abgeschlossene Buchungen sind unveränderlich: kein Ändern, kein Löschen, keine neuen Zeilen.
+• Ein Beleg, eine Buchung: ein Wiederholversuch oder zwei Tabs können Erlöse nicht verdoppeln.
+• Gemeinsame Bezeichnungen liegen in 26 Sprachen vor; ein unübersetztes Feld verhindert den Start.
+• Listen über Index: Die erste Seite von zwanzigtausend Zeilen kommt in unter einer Millisekunde.
+
+Verschlüsselt bei der Übertragung (TLS 1.3). Die Infrastruktur von Sytue befindet sich in der EU. Der Standort externer Dienste hängt von ihrem Anbieter ab.

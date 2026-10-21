@@ -1,0 +1,434 @@
+{{- $globalObjectStorage := ((.Values.global).objectStorage | default dict) -}}
+{{- $objectStorage := .Values.objectStorage | default dict -}}
+{{- $remote := ((.Values.global).objectStorageRemote | default dict) -}}
+{{- $remoteSecret := $remote.existingSecret | default "sytue-object-storage-remote" -}}
+{{- $objectStorageSecret := $objectStorage.existingSecret | default $globalObjectStorage.existingSecret | default "sytue-object-storage" -}}
+{{- $objectStorageRegion := $objectStorage.region | default $globalObjectStorage.region | default "fr-par" -}}
+{{- $objectStorageUseSSL := true -}}
+{{- if hasKey $globalObjectStorage "useSSL" -}}
+  {{- $objectStorageUseSSL = $globalObjectStorage.useSSL -}}
+{{- end -}}
+{{- if hasKey $objectStorage "useSSL" -}}
+  {{- $objectStorageUseSSL = $objectStorage.useSSL -}}
+{{- end -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "sytue-mail.fullname" . }}
+  labels:
+    {{- include "sytue-mail.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "sytue-mail.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "sytue-mail.labels" . | nindent 8 }}
+      annotations:
+        kubectl.kubernetes.io/default-container: mail
+    spec:
+      automountServiceAccountToken: false
+      {{- with (.Values.global).imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: mail
+          image: "{{ include "sytue-mail.imageRegistry" . }}/{{ .Values.image.repository }}:{{ ((.Values.global).image | default dict).tag | default .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.targetPort }}
+            {{- if .Values.mailService.enabled }}
+            # Transporte de correo (SMTP/IMAP) — publicados por el Service mx (LoadBalancer).
+            - name: smtp
+              containerPort: {{ .Values.mailService.ports.smtp }}
+            - name: submissions
+              containerPort: {{ .Values.mailService.ports.submissions }}
+            - name: submission
+              containerPort: {{ .Values.mailService.ports.submission }}
+            - name: imaps
+              containerPort: {{ .Values.mailService.ports.imaps }}
+            {{- end }}
+          env:
+            {{- if (.Values.global).otlp }}
+            {{- if (.Values.global).otlp.endpoint }}
+            # Telemetria: metricas OTLP directas a Cockpit, sin agente intermedio.
+            # Sale del umbrella y no de este chart para que los catorce escriban al
+            # MISMO sitio; si cada uno apuntara al suyo, no habria con que comparar.
+            # Vacio => no se exporta y el servicio sigue sirviendo igual.
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ (.Values.global).otlp.endpoint | quote }}
+            {{- end }}
+            {{- if (.Values.global).otlp.tokenSecret }}
+            # Por Secret y nunca por values: aunque el token solo permita escribir,
+            # con el se puede envenenar la serie que decide un escalado.
+            - name: OTEL_EXPORTER_OTLP_HEADERS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ (.Values.global).otlp.tokenSecret }}
+                  key: {{ (.Values.global).otlp.tokenKey | default "otlp-headers" }}
+                  optional: true
+            {{- end }}
+            {{- end }}
+            # Runtime Go atado a los limites del pod (helper sytue.goRuntimeEnv del umbrella):
+            # GOMAXPROCS=techo(limits.cpu) via downward API; GOMEMLIMIT=~85% de limits.memory.
+            {{- include "sytue.goRuntimeEnv" (dict "container" "mail" "memLimit" .Values.resources.limits.memory) | nindent 12 }}
+            {{- include "sytue.logCollectorEnv" . | nindent 12 }}
+            - name: ENV
+              value: {{ include "sytue-mail.env" . | quote }}
+            - name: HTTP_ADDR
+              value: ":{{ .Values.service.targetPort }}"
+            - name: LOG_LEVEL
+              value: {{ .Values.config.logLevel | quote }}
+            # Avisos al centro de notificaciones de la suite (topBar y apps
+            # nativas): mismo patrón que syerp/cloud-api.
+            - name: HUB_BASE_URL
+              value: {{ .Values.config.hubUrl | default (printf "http://%s-hub" .Release.Name) | quote }}
+            # El secreto de la puerta interna del Hub (/internal/notifications), el MISMO en
+            # el Hub y en cada servicio que avisa. Lo genera el chart paraguas
+            # (sytue-one/templates/secretos-internos.yaml); sin él, fuera de dev, el
+            # servicio no arranca.
+            # Los REPLY de invitaciones de Sytue Calendar contestadas por correo (iMIP)
+            # se pasan a Calendar, con el mismo secreto interno que el Hub.
+            - name: CALENDAR_INTERNAL_URL
+              value: {{ .Values.config.calendarInternalUrl | default (printf "http://%s-calendar" .Release.Name) | quote }}
+            - name: HUB_INTERNAL_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: sytue-hub-internal
+                  key: secret
+            # «X pide editar» también por correo, desde la cuenta común de avisos
+            # (avisos@<dominio>): `config.smtp` y el helper común. El correo de quien
+            # concede sale de Sytue ID con la sesión de quien pide.
+            {{- include "sytue.correoEnv" (dict "root" . "prefijo" "") | nindent 12 }}
+            - name: PUBLIC_URL
+              value: "https://{{ include "sytue-mail.host" . }}"
+            # El dominio de correo SERVIDO. Sin esto caía al defecto del binario
+            # —sytue.localhost— y el daño no se veía desde dentro: la firma DKIM
+            # sale con d=sytue.localhost (el firmante toma PrimaryDomain), así que
+            # el destinatario busca sytue._domainkey.sytue.localhost, no lo
+            # encuentra y DKIM falla. Con el DMARC publicado (p=quarantine,
+            # adkim=s) eso es cuarentena: el MSA responde 250, el correo sale, y
+            # la invitación muere en el filtro del destinatario. De aquí cuelgan
+            # también imap./smtp.<dominio> de la autoconfiguración y el dominio
+            # que valida los alias.
+            - name: MAIL_DOMAIN
+              value: {{ include "sytue-mail.domain" . | quote }}
+            # Única organización que puede crear alias en el dominio raíz desnudo,
+            # donde viven las direcciones institucionales (security@, abuse@). Sin
+            # esto, el raíz se repartía por orden de llegada entre organizaciones.
+            # Vacío = de nadie.
+            - name: MAIL_ROOT_TENANT
+              value: {{ .Values.config.rootTenant | default "" | quote }}
+            # Alias de la suite que no son de nadie («alias=buzón,…»): Mail los crea
+            # al arrancar. calendario@<dominio>, el remitente de Calendar, va al buzón
+            # de operaciones para que sus rebotes no se pierdan.
+            {{- with .Values.config.systemAliases }}
+            - name: MAIL_SYSTEM_ALIASES
+              value: {{ . | quote }}
+            {{- end }}
+            # El MSA se presenta con el nombre del MTA —mx.<dominio>—, NO con el
+            # del webmail. Anunciaba mail.<dominio> mientras el registro MX y el
+            # PTR de su IP dedicada dicen mx.<dominio>, y con eso el FCrDNS que
+            # comprueban Gmail y Outlook no cierra: el correo acaba en spam o
+            # rechazado, con un 250 nuestro y sin pista de por qué no llegó.
+            # (Antes de esto caía al defecto del binario, mx.sytue.localhost.)
+            - name: MAIL_HOSTNAME
+              value: {{ include "sytue-mail.mtaHost" . | quote }}
+            - name: MTA_STS_MODE
+              value: {{ .Values.config.mtaStsMode | quote }}
+            # Sin material TLS el servidor NO anuncia STARTTLS, y entonces ningún
+            # cliente decente manda credenciales: el reseteo de contraseña —único
+            # camino de recuperación de una cuenta— no salía. Y como el 587 está
+            # publicado en una IP pública, servirlo sin cifrar tampoco es opción.
+            - name: TLS_CERT_FILE
+              value: /etc/sytue/tls/tls.crt
+            - name: TLS_KEY_FILE
+              value: /etc/sytue/tls/tls.key
+            # ----- Sytue ID (OIDC; validacion JWT via JWKS) -----
+            - name: OIDC_ISSUER
+              value: {{ include "sytue-mail.oidcIssuer" . | quote }}
+            - name: OIDC_JWKS_URL
+              value: {{ include "sytue.oidcJwksUrl" . | quote }}
+            # CONTRASENAS DE APLICACION: lo que la persona escribe en Thunderbird,
+            # Outlook, Apple Mail o el movil. El AUTH de IMAP/SMTP las verifica
+            # contra Sytue ID (POST /internal/app-passwords/verify), porque las
+            # credenciales viven alli y este servicio no guarda copia. Sin el
+            # secreto solo se acepta un JWT con scope `mail`, que dura minutos:
+            # ningun cliente de correo puede entrar. Mismo valor que
+            # SYTUE_ID_INTERNAL_SECRET, en un Secret compartido.
+            - name: ID_INTERNAL_URL
+              value: {{ .Values.config.idInternalUrl | default (printf "http://%s-id" .Release.Name) | quote }}
+            - name: ID_INTERNAL_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: sytue-id-internal
+                  key: token
+                  optional: true
+            # `OIDC_CLIENT_ID`/`OIDC_CLIENT_SECRET` vivieron aqui sin que ningun
+            # binario Go los leyera: este servicio valida el JWT por JWKS y no hace
+            # ningun flujo de codigo. Quien usa credenciales de cliente es el BFF, y
+            # las suyas se llaman SYTUE_OIDC_CLIENT_SECRET. Montaban un secreto real
+            # en un pod que no lo usa, y ademas tapaban el gate de prefijos.
+            {{- if .Values.config.inboundWebhook.enabled }}
+            # ----- Recepción por HTTPS cuando el 25 no llega ------------------
+            # Un tercero pone el MX y nos entrega el mensaje por el webhook. El
+            # token lo comparte con ese tercero; vacío ⇒ el servicio no monta la
+            # ruta, y entonces esto no existe. Ver services/mail/internal/inboundhook.
+            - name: INBOUND_WEBHOOK_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.config.inboundWebhook.existingSecret | default .Values.existingSecret }}
+                  key: {{ .Values.config.inboundWebhook.secretKey }}
+            {{- end }}
+            # ----- DKIM saliente (privada en Secret Manager/Kubernetes) ------
+            {{- /* APAGADO POR DEFECTO, porque el relé ya firma.
+
+                   Medido en un correo real el 2026-09-11: salía con DOS
+                   `DKIM-Signature` y el receptor validaba así:
+
+                     s=s2026  dkim=pass                          (opendkim, en el relé)
+                     s=sytue  dkim=permerror (no key for signature)  (este servicio)
+
+                   El selector por defecto de aquí es `sytue` y ese registro
+                   nunca se publicó, así que la segunda firma solo añadía un
+                   error a los informes DMARC —la entrega iba bien con la
+                   primera—.
+
+                   Y firmar dos veces no aporta: todo el correo de este servicio
+                   sale por el relé (se ve en los `Received:`), así que la firma
+                   de opendkim lo cubre entero. Una firma menos es también una
+                   clave menos que rotar, y una cosa menos que se rompa si el
+                   relé toca cabeceras después de firmar.
+
+                   Para volver a activarla hay que hacer LAS DOS cosas: poner
+                   `dkimSelfSign: true` y publicar el TXT del selector. Con una
+                   sola se vuelve al permerror. */}}
+            {{- if .Values.config.dkimSelfSign }}
+            - name: DKIM_SELECTOR
+              value: {{ .Values.config.dkimSelector | quote }}
+            - name: DKIM_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret }}
+                  key: dkim-private-key
+                  # Sin la clave el servicio no firma y sigue arrancando (así lo
+                  # dice su config: «si está vacía, la firma DKIM se omite»).
+                  # Sin `optional`, un secreto sin esa entrada deja el pod en
+                  # CreateContainerConfigError, que es un despliegue caído por
+                  # una firma que ni siquiera hace falta.
+                  optional: true
+            {{- end }}
+            # ----- S/MIME: firma del correo saliente -----
+            # KEK AES-256 con la que se sellan at-rest las claves privadas S/MIME.
+            #
+            # El S/MIME viene ACTIVADO por defecto en el codigo —es gratis y no
+            # depende de ninguna CA de pago— pero sin esta clave no se guarda
+            # ninguna privada y EL CORREO SALE SIN FIRMAR, sin error y sin aviso.
+            # Rooms y Docs ya recibian su KEK; este chart no, y el resultado era
+            # una funcion completa apagada en silencio: hasta la fusion de
+            # organizaciones tiene un gancho dedicado a `smime_authorities`.
+            #
+            # `optional: true` para no romper entornos que aun no la tengan
+            # materializada: ahi el correo sigue saliendo, solo que sin firmar,
+            # que es exactamente el comportamiento de antes.
+            - name: SYTUE_MAIL_KEY_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret }}
+                  key: key-encryption-key
+                  optional: true
+            # ----- Postgres EXTERNO (Scaleway RDB; unica fuente de verdad) -----
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgresql.existingSecret }}
+                  key: {{ .Values.postgresql.dsnKey }}
+            # Pool pgx POR replica (bajo en prod: PgBouncer multiplexa hacia la RDB).
+            - name: DB_MAX_CONNS
+              value: {{ .Values.config.dbMaxConns | quote }}
+            # Tope de tamano de un mensaje: explicito, para que no dependa del
+            # defecto del binario y se vea al lado de la memoria del pod.
+            - name: MAX_MESSAGE_MB
+              value: {{ .Values.config.maxMessageMb | default 50 | quote }}
+            {{- if .Values.config.relayHost }}
+            # Smarthost de salida. Sin esto se entrega contra el MX de cada
+            # destino, que es lo correcto con IP propia y PTR; desde una linea
+            # domestica no funciona: el ISP suele bloquear el 25 saliente y un
+            # rango residencial va a spam sin rebotar, que es peor que rebotar.
+            - name: SMTP_RELAY_HOST
+              value: {{ .Values.config.relayHost | quote }}
+            - name: SMTP_RELAY_PORT
+              value: {{ .Values.config.relayPort | default "587" | quote }}
+            - name: SMTP_RELAY_USERNAME
+              value: {{ .Values.config.relayUsername | quote }}
+            # La contrasena NO va en values: sale del Secret, como el resto.
+            - name: SMTP_RELAY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret | default (printf "%s-mail" .Release.Name) }}
+                  key: smtp-relay-password
+                  optional: true
+            {{- end }}
+            {{- if ne (toString .Values.config.smimeEnabled) "" }}
+            # Firma S/MIME del correo saliente. Se emite solo si el value trae
+            # algo: vacio deja mandar al defecto del servicio (firmar).
+            #
+            # `ne (toString ...) ""` y no `if .Values...`: en las plantillas de Go
+            # el BOOLEANO false es falso, asi que `smimeEnabled: false` —la forma
+            # natural de escribirlo en un values.yaml— no habria emitido nada y el
+            # correo habria seguido firmandose, sin un solo mensaje de error.
+            # Comparando contra vacio entran las dos formas, "false" y false.
+            - name: SMIME_ENABLED
+              value: {{ .Values.config.smimeEnabled | quote }}
+            {{- end }}
+            {{- if .Values.config.defaultMailboxQuotaGb }}
+            # Cuota de un buzon nuevo. Los cuerpos MIME van a S3, que en el
+            # perfil on-premise es el MISMO disco que PostgreSQL: sin techo, un
+            # buzon no se queda sin espacio el solo, se lleva la base por delante.
+            - name: DEFAULT_MAILBOX_QUOTA_GB
+              value: {{ .Values.config.defaultMailboxQuotaGb | quote }}
+            {{- end }}
+            # DSN DIRECTO a la RDB (bypass del pooler) para estado de sesion:
+            # LISTEN/NOTIFY y advisory locks de migraciones (platform/pkg/pg).
+            # Opcional: sin PgBouncer (staging/dev) no existe y se usa DATABASE_URL.
+            - name: DATABASE_DIRECT_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgresql.existingSecret }}
+                  key: {{ .Values.postgresql.dsnDirectKey }}
+                  optional: true
+            # ----- Object Storage S3 (Scaleway fr-par, UE) -----
+            - name: S3_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $objectStorageSecret }}
+                  key: endpoint
+            - name: S3_USE_SSL
+              value: {{ $objectStorageUseSSL | quote }}
+            - name: S3_REGION
+              value: {{ $objectStorageRegion | quote }}
+            - name: S3_BUCKET
+              value: {{ .Values.config.s3Bucket | quote }}
+            {{- with .Values.config.channelMailDomain }}
+            # ----- CORREO A CANAL de Sytue Rooms -----
+            # El correo a `<token-del-webhook>@<este dominio>` se publica en su canal
+            # en vez de entregarse a un buzon. Las dos variables se apagan juntas: sin
+            # dominio esas direcciones no existen para el MX, y sin Rooms no habria a
+            # quien entregar. El MISMO dominio va en el chart de Rooms, que lo publica.
+            - name: CHANNEL_MAIL_DOMAIN
+              value: {{ . | quote }}
+            - name: ROOMS_URL
+              value: {{ $.Values.config.roomsUrl | default (printf "http://%s-rooms" $.Release.Name) | quote }}
+            {{- end }}
+            - name: S3_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $objectStorageSecret }}
+                  key: access-key
+            - name: S3_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $objectStorageSecret }}
+                  key: secret-key
+            {{- if $remote.enabled }}
+            # ----- Almacén remoto: todo lo nuevo a Scaleway One Zone (ADR 0038) -----
+            - name: S3_REMOTE_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $remoteSecret }}
+                  key: endpoint
+            - name: S3_REMOTE_REGION
+              value: {{ $remote.region | default "fr-par" | quote }}
+            - name: S3_REMOTE_STORAGE_CLASS
+              value: {{ $remote.storageClass | default "ONEZONE_IA" | quote }}
+            - name: S3_REMOTE_BUCKET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $remoteSecret }}
+                  key: bucket
+            - name: S3_REMOTE_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $remoteSecret }}
+                  key: access-key
+            - name: S3_REMOTE_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $remoteSecret }}
+                  key: secret-key
+            - name: S3_LOCAL_TENANTS
+              value: {{ $remote.localTenants | default "" | quote }}
+            {{- end }}
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 3
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: tls
+              mountPath: /etc/sytue/tls
+              readOnly: true
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: {{ .Values.config.tmpSizeLimit | default "2Gi" }}
+        # El certificado que sirven SMTP e IMAP, que NO es el del Ingress.
+        #
+        # Lo era, y por eso ningún cliente de correo podía conectarse: el del
+        # Ingress se emite por HTTP-01 para mail./autoconfig./autodiscover./
+        # mta-sts.<dominio> —los nombres que resuelven al ingress— mientras que
+        # estos puertos viven en el balanceador del correo, al que apuntan
+        # smtp./imap./mx.<dominio>. O sea que Thunderbird y Outlook seguían la
+        # autoconfiguración hasta smtp.<dominio>:465, recibían un certificado a
+        # nombre de mail.<dominio> y cortaban por «hostname mismatch». Medido en
+        # producción el 2026-08-16: SAN = autoconfig/autodiscover/mail/mta-sts.
+        #
+        # El comodín *.<dominio> SÍ los cubre, ya está emitido por el mismo
+        # ClusterIssuer —con el solver DNS-01 de Scaleway, que es lo que permite
+        # certificar nombres que no apuntan al ingress— y sigue valiendo para el
+        # SNI que exige el IdP al hablar con el MSA.
+        - name: tls
+          secret:
+            secretName: {{ .Values.config.listenerTLSSecretName | default .Values.ingress.tls.secretName | quote }}
+      {{- with .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- range . }}
+        - maxSkew: {{ .maxSkew }}
+          topologyKey: {{ .topologyKey }}
+          whenUnsatisfiable: {{ .whenUnsatisfiable }}
+          labelSelector:
+            matchLabels:
+              {{- include "sytue-mail.selectorLabels" $ | nindent 14 }}
+        {{- end }}
+      {{- end }}

@@ -1,0 +1,47 @@
+{
+  "name": "@sytue/mobile",
+  "version": "0.1.0",
+  "packageManager": "bun@1.4.3",
+  "private": true,
+  "description": "Apps moviles de Sytue (Capacitor 8, MIT). UN proyecto, DIEZ apps: cada producto se publica por separado (appId, nombre, icono y esquema propios) y se elige con SYTUE_APP (tabla en products.ts). A proposito FUERA del workspace Bun del frontend: solo necesita la CLI de Capacitor.",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=26.8.1 <27",
+    "bun": ">=1.4.3"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "check": "bun run typecheck && node ../scripts/cap.mjs ls",
+    "sync": "node ../scripts/cap.mjs sync",
+    "ios": "node ../scripts/cap.mjs open ios",
+    "android": "node ../scripts/cap.mjs open android",
+    "assets": "capacitor-assets generate --iconBackgroundColor '#0A0A0A' --splashBackgroundColor '#faf9f6' --splashBackgroundColorDark '#0c0e10'",
+    "cap": "node ../scripts/cap.mjs",
+    "deeplinks": "bash scripts/setup-deeplinks.sh"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.5.2",
+    "@capacitor/app": "8.1.1",
+    "@capacitor/core": "8.5.2",
+    "@capacitor/ios": "8.5.2",
+    "@capacitor/local-notifications": "8.3.1"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "3.0.5",
+    "@capacitor/cli": "8.5.2",
+    "@types/node": "26.6.3",
+    "typescript": "6.0.3"
+  },
+  "overrides": {
+    "@capacitor/assets": {
+      "@capacitor/cli": "8.5.2",
+      "@trapezedev/project": "7.1.10",
+      "sharp": "0.35.5"
+    },
+    "@xmldom/xmldom": "0.9.12",
+    "brace-expansion": "5.0.12",
+    "minimatch": "10.2.6",
+    "tar": "7.5.22",
+    "uuid": "14.0.2"
+  }
+}

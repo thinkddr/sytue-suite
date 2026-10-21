@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="160" viewBox="0 0 200 160" fill="none" role="img" aria-label="Algo salió mal">
+  <title>Error, reintentar</title>
+  <line x1="46" y1="124" x2="154" y2="124" stroke="var(--sytue-border)" stroke-width="2" stroke-linecap="round"/>
+  <!-- Nube desconectada (line-art neutro) -->
+  <path d="M74 96h34a15 15 0 0 0 1.5-29.9 19 19 0 0 0-36.8-4.9A14.5 14.5 0 0 0 74 96z"
+        stroke="var(--sytue-neutral-400)" stroke-width="2.4" stroke-linejoin="round"/>
+  <!-- Signo de aviso: único acento en danger (semántico, con forma reconocible) -->
+  <path d="M108 34l16 28h-32z" stroke="var(--sytue-danger)" stroke-width="2.4" stroke-linejoin="round"/>
+  <line x1="108" y1="44" x2="108" y2="52" stroke="var(--sytue-danger)" stroke-width="2.4" stroke-linecap="round"/>
+  <circle cx="108" cy="57" r="1.6" fill="var(--sytue-danger)"/>
+</svg>

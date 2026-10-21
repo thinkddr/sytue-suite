@@ -1,0 +1,60 @@
+{
+  "id": "woodpecker",
+  "name": "Woodpecker CI",
+  "description": "Integración continua ligera que lee un fichero de tu repositorio y corre cada paso en su contenedor. Se conecta a tu forja y no pide más.",
+  "category": "devtools",
+  "license": "Apache-2.0",
+  "homepage": "https://woodpecker-ci.org/",
+  "source": "https://github.com/woodpecker-ci/woodpecker",
+  "upstream": "docker.io/woodpeckerci/woodpecker-server:v3.10.0",
+  "upstream_digest": "sha256:a9f2f5e82c6cef65856abf28e68afdedb706c8286b603341d94aba169225a656",
+  "version": "3.10.0",
+  "needs": [
+    "postgres"
+  ],
+  "ports": [
+    {
+      "name": "http",
+      "port": 8000
+    },
+    {
+      "name": "grpc",
+      "port": 9000
+    }
+  ],
+  "web_port": 8000,
+  "exports": [
+    {
+      "key": "WOODPECKER_URL",
+      "value": "http://{host}:{port}"
+    }
+  ],
+  "env": [
+    {
+      "key": "WOODPECKER_DATABASE_DRIVER",
+      "value": "postgres"
+    },
+    {
+      "key": "WOODPECKER_DATABASE_DATASOURCE",
+      "value": "{db_url}?sslmode=disable"
+    },
+    {
+      "key": "WOODPECKER_HOST",
+      "value": "{web_url}"
+    },
+    {
+      "key": "WOODPECKER_AGENT_SECRET",
+      "generate": true,
+      "export": true
+    },
+    {
+      "key": "WOODPECKER_OPEN",
+      "value": "false"
+    }
+  ],
+  "disk_gib": 0,
+  "memory_mib": 512,
+  "cpu_milli": 500,
+  "run_as_user": 1000,
+  "health_path": "/healthz"
+}

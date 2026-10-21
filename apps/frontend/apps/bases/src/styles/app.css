@@ -1,0 +1,37 @@
+/**
+ * Sytue Bases — entrada de estilos: importa el design system (Tailwind v4 +
+ * tokens de marca Sytue).
+ */
+@import '@sytue/ui/styles.css';
+
+@source '../**/*.{astro,ts,tsx}';
+
+/*
+ * Objetivos táctiles (WCAG 2.5.5): con puntero grueso —dedo— cada control de Bases mide al
+ * menos 44 × 44 px. Con ratón no cambia nada. Lo vigila test/e2e/accesibilidad-bases.mjs a
+ * 390 y 320 px. La cabecera es del marco común (`@sytue/shell`), no de esta app.
+ * `:where()` deja la especificidad en cero: una pantalla nueva no tiene que pelearse con esto.
+ *
+ * Lo oculto para la vista (`sr-only`) queda fuera mientras no tenga el foco: «Saltar al
+ * contenido» es un `a[href]`, y con esto pasaba de 1 × 1 a una caja invisible de 44 × 44 que
+ * recortaba 90 px de su propio texto. Con el foco se enseña, y entonces sí es una diana.
+ */
+@media (pointer: coarse) {
+  :where(button, select, a[href], input:not([type='checkbox'], [type='radio'])):not(
+    :where(header *),
+    :where(.sr-only:not(:focus))
+  ) {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  /* Un enlace es `inline`: sin caja propia, `min-height` no le hace nada. */
+  :where(a[href]):not(:where(header *)) {
+    display: inline-flex;
+    align-items: center;
+  }
+  /* La diana de una casilla es su etiqueta entera. */
+  :where(label:has(input[type='checkbox'], input[type='radio'])) {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}

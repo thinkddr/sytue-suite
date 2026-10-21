@@ -1,0 +1,11 @@
+Tablas enlazadas para llevar clientes, pedidos o existencias, con permisos y registro de cada cambio.
+
+• Clientes, pedidos o existencias en tablas enlazadas, sin saber nada de bases de datos.
+• Se comparte con tu organización con el rol que decidas.
+• Cada cambio queda registrado: quién lo hizo y qué valía antes.
+• Tus datos se quedan en la UE y los exportas cuando quieras.
+• Tablas con campos de texto, número, fecha, casilla, elección única y elección múltiple.
+• Relaciones entre tablas: enlaza un pedido con su cliente y la base de datos no deja romper el vínculo.
+• Permisos por base y por tabla: propietario, editor, comentarista y lector.
+
+Cifrado en tránsito (TLS 1.3). La infraestructura de Sytue está en la UE. Los servicios externos siguen la ubicación de su proveedor.

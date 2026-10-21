@@ -1,0 +1,16 @@
+Fájlok és együttműködés saját márkanév alatt.
+
+• Feltöltés, rendszerezés és megosztás ellenőrzött hivatkozásokkal (jogosultság és lejárat).
+• Dokumentumok és képek előnézete közvetlenül az oldalon.
+• Csatolás a Mailben a fájl megkettőzése nélkül.
+• S3-alapú tárhely európai régiókban.
+• Saját meghajtó, csapatmeghajtók, velem megosztott, legutóbbiak, kedvencek és kuka.
+• Megosztási hivatkozások két szinttel (megtekintés vagy szerkesztés), jelszóval és lejárattal.
+• Verzióelőzmények visszaállítással.
+• Dokumentumok, képek és PDF-ek előnézete letöltés nélkül.
+• Irodai dokumentumok megnyitása és szerkesztése a Docusban, Calcusban és Diaposban; PDF-ek a CertiPDF-ben.
+• Érzékenységi címkék, amelyek letiltják a nyilvános hivatkozásokat ott, ahová nem valók.
+• Megosztás egy Rooms-csatornán vagy csatolás a Mailben a fájl megkettőzése nélkül.
+• S3-tárhely európai régiókban, a kvóta mindig látható.
+
+Titkosítás átvitel közben (TLS 1.3). A Sytue infrastruktúrája az EU-ban található. A külső szolgáltatások helye a szolgáltatójuktól függ.

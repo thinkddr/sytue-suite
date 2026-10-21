@@ -1,0 +1,69 @@
+{{- if .Values.autoscaling.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "sytue-cast.fullname" . }}
+  labels:
+    {{- include "sytue-cast.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "sytue-cast.fullname" . }}
+  minReplicas: {{ .Values.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.autoscaling.maxReplicas }}
+  # Ritmo de escalado ASIMÉTRICO A PROPÓSITO: subir es urgente y bajar no (el
+  # porqué completo, en el HPA de syphotos). Aquí pesa más que en otros: una
+  # subida de vídeo a medias o un WebSocket de chat vivo son conexiones largas,
+  # y retirar el 100 % de las réplicas de golpe las cortaría.
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: {{ .Values.autoscaling.scaleUpStabilizationSeconds | default 0 }}
+      policies:
+        - type: Percent
+          value: {{ .Values.autoscaling.scaleUpPercent | default 100 }}
+          periodSeconds: 30
+        - type: Pods
+          value: 2
+          periodSeconds: 30
+      selectPolicy: Max
+    scaleDown:
+      stabilizationWindowSeconds: {{ .Values.autoscaling.scaleDownStabilizationSeconds | default 600 }}
+      policies:
+        - type: Percent
+          value: {{ .Values.autoscaling.scaleDownPercent | default 50 }}
+          periodSeconds: 120
+      selectPolicy: Max
+  metrics:
+    {{- if .Values.autoscaling.targetCPUUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.autoscaling.targetCPUUtilizationPercentage }}
+    {{- end }}
+    {{- if .Values.autoscaling.targetMemoryUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.autoscaling.targetMemoryUtilizationPercentage }}
+    {{- end }}
+    {{- if .Values.autoscaling.targetRequestsPerSecond }}
+    # DEMANDA REAL: peticiones por segundo y réplica, que publica prometheus-adapter
+    # con la etiqueta `job` = ServiceName del binario. Sin valor NO se emite: un
+    # HPA con una métrica que nadie sirve deja de escalar en silencio.
+    - type: External
+      external:
+        metric:
+          name: http_server_requests_per_second
+          selector:
+            matchLabels:
+              job: {{ .Values.autoscaling.metricJob | default .Chart.Name }}
+        target:
+          type: AverageValue
+          averageValue: "{{ .Values.autoscaling.targetRequestsPerSecond }}"
+    {{- end }}
+{{- end }}

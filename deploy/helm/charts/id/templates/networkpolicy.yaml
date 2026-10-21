@@ -1,0 +1,95 @@
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "sytue-id.fullname" . }}
+  labels:
+    {{- include "sytue-id.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "sytue-id.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Desde el ingress canonico (Traefik) — trafico publico id.sytue.eu.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              sytue.eu/role: ingress
+      ports:
+        - protocol: TCP
+          port: {{ .Values.service.targetPort }}
+    # Desde el resto de la suite (cada servicio Go valida JWT via JWKS de Sytue ID).
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/part-of: sytue-one
+      ports:
+        - protocol: TCP
+          port: {{ .Values.service.targetPort }}
+  egress:
+    # DNS
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Submission (MSA) de Sytue Mail: por ahí salen el reseteo de contraseña, las
+    # invitaciones y la verificación de dirección. Sin esta regla la baseline
+    # deny-all corta el diálogo SMTP y el correo se queda en la cola de nadie.
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: sytue-mail
+      ports:
+        - protocol: TCP
+          port: {{ .Values.config.mailSubmissionPort }}
+        # La API HTTP, no solo el SMTP: por aquí crea el reconciliador el buzón
+        # de cada usuario. El puerto es el del POD (8086) porque la política se
+        # evalúa después del DNAT del Service, así que el 80 que publica el
+        # Service no entra en la comparación.
+        - protocol: TCP
+          port: {{ .Values.config.mailApiPort }}
+    # La puerta interna de Sytue Hub (/internal/events): el aviso de «cambió la
+    # foto» a las barras abiertas. Puerto del POD, como el de Mail.
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: sytue-hub
+      ports:
+        - protocol: TCP
+          port: {{ .Values.config.hubApiPort }}
+    # La puerta interna de Sytue Contacts (/internal/avatar-sync): el reflejo de
+    # la foto propia en las fichas de contacto que coinciden por correo. Puerto
+    # del POD, como el de Mail.
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: sytue-contacts
+      ports:
+        - protocol: TCP
+          port: {{ .Values.config.contactsApiPort }}
+    # Acceso interno a Sytue Rooms (SYTUE_ID_ROOMS_CALL_ACCESS_URL). Puerto del POD.
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: sytue-rooms
+      ports:
+        - protocol: TCP
+          port: {{ .Values.config.roomsApiPort }}
+    # Postgres EXTERNO (Scaleway RDB) y Secret Manager / HTTPS (solo UE).
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 169.254.0.0/16
+      ports:
+        - protocol: TCP
+          port: 5432
+        - protocol: TCP
+          port: 443
+{{- end }}

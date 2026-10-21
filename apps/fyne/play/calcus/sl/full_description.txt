@@ -1,0 +1,18 @@
+Številke, ki imajo smisel, v preglednici, ki dela z vami.
+
+• Formule, pogojno oblikovanje in preverjanje veljavnosti podatkov.
+• Uvozite zunanje podatke in jih poizvedujte brez zapuščanja preglednice.
+• Grafikoni, grafikoni v celici, razčlenjevalniki in podatkovne tabele.
+• Izvoz v ODS in XLSX; odpiranje datotek Excel.
+• Formule s kontekstno pomočjo in takojšnjim preračunom.
+• Pogojno oblikovanje, preverjanje veljavnosti podatkov in oblike števil glede na področne nastavitve.
+• Grafikoni različnih vrst, grafikoni v celici in razčlenjevalniki.
+• Podatkovne tabele z vsotami in razvrščanjem; vrtilna tabela.
+• Zunanji podatki: povežite vir in ga poizvedujte iz preglednice.
+• Reševalec za iskanje vrednosti, ki doseže cilj.
+• Makri za avtomatizacijo ponavljajočih se opravil.
+• Sodelovanje v realnem času s prisotnostjo in komentarji.
+• Filtri, razčlenjevalniki in iskanje v preglednici.
+• Izvoz v ODS, XLSX in PDF; odpiranje datotek Excel iz Drive.
+
+Šifrirano med prenosom (TLS 1.3). Infrastruktura Sytue je v EU. Lokacija zunanjih storitev je odvisna od njihovega ponudnika.

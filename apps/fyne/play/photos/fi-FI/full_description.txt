@@ -1,0 +1,18 @@
+Kuvagalleria ja -editori: alkuperäiset Drivessa, muokkaukset reseptinä.
+
+• Kuukausittainen aikajana nimihaulla.
+• Albumit kansikuvineen; koko näytön katselu.
+• Editori valolle, värille, kierrolle, peilaukselle ja rajaukselle reaaliajassa.
+• Jokainen muokkaus on resepti: alkuperäiseen ei koskaan kosketa.
+• Kuukausittain ryhmitelty aikajana nimihaulla ja terävillä pikkukuvilla.
+• Albumit: luo, nimeä uudelleen, valitse kansikuva, lisää katselusta ja poista.
+• Editori neljällä liukusäätimellä (valotus, kontrasti, kylläisyys, lämpötila), kierrolla ja peilauksella.
+• Jokainen muokkaus on erikseen tallennettu resepti: Driven alkuperäistä ei koskaan muuteta.
+• Vienti täydellä resoluutiolla, renderöitynä palvelimella samoilla kaavoilla kuin esikatselussa.
+• Roskakori palautuksineen.
+• Alkuperäiset ovat Sytue Drivessasi; johdannaiset ovat uudelleen luotava välimuisti.
+• EXIF-tiedot luetaan itse tiedostosta; kaikki Euroopan unionissa.
+• Monivalinta kuukausittain: uuteen albumiin, roskakoriin tai ladattavaksi kerralla.
+• Diaesitys, täysi koko, kierto katselusta ja rajaus kiinteällä kuvasuhteella.
+
+Salattu siirron aikana (TLS 1.3). Sytuen infrastruktuuri sijaitsee EU:ssa. Ulkoisten palvelujen sijainti riippuu niiden tarjoajasta.

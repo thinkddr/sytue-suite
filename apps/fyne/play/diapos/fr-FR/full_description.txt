@@ -1,0 +1,16 @@
+Racontez l’histoire ; la diapositive suit.
+
+• Des thèmes de présentation à l’identité de votre organisation.
+• Vue du présentateur avec notes et diapositive suivante.
+• Images, formes, graphiques et SmartArt.
+• Export en ODP, PPTX et PDF ; ouverture des fichiers PowerPoint.
+• Thèmes et palettes cohérents avec la marque de votre organisation.
+• Un canevas avec formes, images, graphiques, SmartArt et connecteurs.
+• Présentez en plein écran avec vue du présentateur et notes.
+• Collaboration en temps réel avec présence et commentaires.
+• Diapositives avec arrière-plan, affiches et dispositions.
+• Export en ODP, PPTX et PDF.
+• Ouverture des fichiers PowerPoint depuis Drive.
+• Enregistrement automatique avec versions.
+
+Chiffrement en transit (TLS 1.3). L’infrastructure de Sytue se trouve dans l’UE. La localisation des services externes dépend de leur fournisseur.

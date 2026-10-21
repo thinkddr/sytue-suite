@@ -1,0 +1,1 @@
+Celý ERP, s katalogem modelů jako datovým souborem.

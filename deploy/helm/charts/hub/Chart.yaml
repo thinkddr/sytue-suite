@@ -1,0 +1,20 @@
+apiVersion: v2
+name: sytue-hub
+description: >-
+  Sytue Hub — servicio Go propio de integracion de la suite: busqueda federada sobre los
+  servicios (drive/mail/calendar/contacts/chat), notificaciones unificadas (SSE/WebSocket),
+  presencia e intents cross-app. Estado y fan-out sobre PostgreSQL (LISTEN/NOTIFY); SIN
+  Redis/Valkey. Valida tokens de Sytue ID (JWKS). Código Apache-2.0, (c) 2026 Daniel Delgado Ramos.
+  Expuesto en hub.sytue.eu.
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+kubeVersion: ">=1.31.0-0"
+home: https://sytue.eu
+keywords: [sytue, hub, integration, search, presence, notifications, go]
+maintainers:
+  - name: Sytue Platform
+    email: platform@sytue.eu
+annotations:
+  licenses: MIT
+  sytue.eu/stack: go

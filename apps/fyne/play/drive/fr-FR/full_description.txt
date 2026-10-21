@@ -1,0 +1,16 @@
+Fichiers et collaboration, aux couleurs de votre organisation.
+
+• Déposez, organisez et partagez par liens maîtrisés (droits et expiration).
+• Aperçu en ligne des documents et des images.
+• Joignez à Mail sans dupliquer le fichier.
+• Stockage adossé à S3, en régions européennes.
+• Mon espace, espaces d’équipe, partagés avec moi, récents, favoris et corbeille.
+• Liens de partage à deux niveaux (consulter ou modifier), mot de passe et expiration.
+• Historique des versions avec restauration.
+• Aperçu des documents, images et PDF sans téléchargement.
+• Ouvrez et modifiez les documents bureautiques dans Docus, Calcus et Diapos ; les PDF dans CertiPDF.
+• Étiquettes de confidentialité qui interdisent les liens publics là où il ne faut pas.
+• Partagez vers un canal Rooms ou joignez à Mail sans dupliquer le fichier.
+• Stockage S3 dans des régions européennes, avec le quota toujours visible.
+
+Chiffrement en transit (TLS 1.3). L’infrastructure de Sytue se trouve dans l’UE. La localisation des services externes dépend de leur fournisseur.

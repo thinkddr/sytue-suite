@@ -1,0 +1,17 @@
+PDF nuo pradžios iki galo, jūsų naršyklėje.
+
+• Žymėjimas, pabraukimas, komentarai ir piešimas dokumente.
+• Formos: laukų pildymas arba savų formų kūrimas.
+• Suliejimas, išskyrimas, pasukimas, numeravimas ir vandens ženklas.
+• Parašų skydelis, negrįžtamas užtušavimas ir slaptažodžiu apsaugoti dokumentai.
+• Greita peržiūros programa su struktūra, miniatiūromis, paieška ir mastelio keitimu pagal puslapį ar plotį.
+• Anotacijos: žymėjimas, pabraukimas, perbraukimas, komentarai, piešimas, figūros, rodyklės ir antspaudai.
+• Teksto laukai, matavimai ir srities momentinės kopijos.
+• Formos: esamų laukų pildymas arba savų laukų pridėjimas.
+• Dokumentų pasirašymo skydelis.
+• Negrįžtamas užtušavimas: tai, ką pažymite, dingsta iš failo, o ne tik iš rodinio.
+• Puslapiai: suliejimas, išskyrimas, šalinimas, pasukimas, numeravimas (taip pat Bates), antraštės ir poraštės.
+• Vandens ženklas, fonas ir redaguojami metaduomenys.
+• Slaptažodžiu apsaugoti dokumentai ir teisės.
+
+Šifruojama perduodant (TLS 1.3). „Sytue“ infrastruktūra yra ES. Išorinių paslaugų vieta priklauso nuo jų teikėjo.

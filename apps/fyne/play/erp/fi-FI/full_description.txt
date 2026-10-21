@@ -1,0 +1,18 @@
+Kaksikymmentäneljä moduulia ja kahdenkertainen kirjanpito, jota tietokanta ei päästä epätasapainoon.
+
+• Kaksikymmentäneljä moduulia ja kolmekymmentäkuusi mallia: yhteystiedot, myynti, ostot, varasto, valmistus, laskutus, kirjanpito, projektit ja henkilöstöhallinto.
+• Moduulin lisääminen tarkoittaa JSON-tiedoston kirjoittamista: ei migraatiota, ei uutta reittiä eikä käyttöliittymätyötä.
+• Rahamäärät tallennetaan kokonaisina sentteinä, ei koskaan liukulukuina, ja tietokanta valvoo tasapainoa.
+• Kirjatut viennit ovat koskemattomia: ne korjataan uudella viennillä, ja juuri se erottaa pääkirjan laskentataulukosta.
+• Kaksikymmentäneljä moduulia ja kolmekymmentäkuusi mallia yhdessä palvelussa ja yhdessä tietokannassa.
+• Mallikatalogi on dataa: jokainen moduuli määrittelee kenttänsä, tilansa ja luettelosarakkeensa.
+• Uusi moduuli on yksi JSON-tiedosto — ei DDL:ää, ei migraatiota eikä taululukitusta.
+• Yksi rajapinta kaikille kolmellekymmenellekuudelle mallille ja yksi katalogista generoitu käyttöliittymä.
+• Kahdenkertainen kirjanpito, jossa summat ovat kokonaisina sentteinä; ei yhtään liukulukua.
+• Tietokanta tarkistaa tasapainon tapahtuman vahvistuksessa, ei sovelluskoodi.
+• Suljetut viennit ovat muuttumattomia: niitä ei voi muokata, poistaa eikä niihin voi lisätä rivejä.
+• Yksi tosite, yksi vienti: uusintayritys tai kaksi avointa välilehteä ei voi kahdentaa tuottoja.
+• Yhteiset nimikkeet ovat kaikilla 26 kielellä, ja kääntämätön kenttä estää palvelua käynnistymästä.
+• Indekseihin perustuvat luettelot: kahdenkymmenentuhannen rivin ensimmäinen sivu palautetaan alle millisekunnissa.
+
+Salattu siirron aikana (TLS 1.3). Sytuen infrastruktuuri sijaitsee EU:ssa. Ulkoisten palvelujen sijainti riippuu niiden tarjoajasta.

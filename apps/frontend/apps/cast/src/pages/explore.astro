@@ -1,0 +1,36 @@
+---
+/**
+ * Sytue Cast — /explore, la portada pública. SIN sesión: la primera página se pinta
+ * en el servidor (por `/api/v1/public/explore` del servicio) para que se vea y se
+ * indexe sin JavaScript. Con sesión, la misma portada dentro de la Sytue Shell.
+ */
+import AppLayout from '../layouts/AppLayout.astro';
+import { ExploreApp } from '../islands/ExploreApp.js';
+import { consultar } from '../lib/servicio.js';
+import { falloDeStatus, hubBaseUrl, sesionDe } from '../lib/pagina.js';
+import type { Portada } from '../lib/tipos.js';
+import { useT } from '../i18n/index.js';
+
+export const prerender = false;
+
+const session = await sesionDe(Astro);
+const r = await consultar<Portada>('/api/v1/public/explore');
+const t = useT(Astro.locals.locale);
+---
+
+<AppLayout
+  title={`${t('explore.title')} · ${t('app.title')}`}
+  description={t('explore.subtitle')}
+  indexable
+  canonica={new URL(Astro.url.pathname, Astro.url.origin).toString()}
+>
+  <ExploreApp
+    slot="app"
+    client:load
+    locale={Astro.locals.locale}
+    user={session?.user ?? null}
+    hubBaseUrl={hubBaseUrl()}
+    inicial={r.ok ? r.datos : null}
+    fallo={r.ok ? null : falloDeStatus(r.status)}
+  />
+</AppLayout>

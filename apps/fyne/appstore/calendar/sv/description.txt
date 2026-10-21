@@ -1,0 +1,19 @@
+En CalDAV-kalender som hänger ihop med resten av sviten.
+
+• Dag-, vecko- och månadsvy.
+• Återkommande händelser och påminnelser.
+• Skapa händelser direkt från ett mejl i Mail.
+• Fungerar med alla CalDAV-klienter.
+• Månads-, vecko-, dags- och agendavy, med minikalender och ”I dag”.
+• Dagliga, veckovisa eller månatliga upprepningar med slut; redigera bara den här, den här och följande, eller alla.
+• Påminnelser per händelse och aviseringar i sviten.
+• Inbjudningar med svar (kommer, kanske, nej) och uppföljning.
+• ”Hitta en tid” som är ledig för alla deltagare.
+• Bokningsbara rum och resurser med tillgänglighet.
+• Delade kalendrar med behörigheter, och de som andra delar med dig.
+• Prenumerera på externa kalendrar (ICS) och ha flera färgkodade kalendrar.
+• Skapa en händelse från ett meddelande i Mail eller från en anteckning.
+• Fungerar med alla CalDAV-klienter: Apple Calendar, Thunderbird med flera.
+• Duplicera en händelse eller kopiera den till din kalender, och ladda ned den som .ics för alla utanför Sytue.
+
+Krypterat under överföring (TLS 1.3). Sytues infrastruktur finns i EU. Var externa tjänster finns beror på deras leverantör.

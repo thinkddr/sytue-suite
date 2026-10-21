@@ -1,0 +1,231 @@
+{
+ "pais": "SE",
+ "verificado": true,
+ "moneda": "SEK",
+ "formas": [
+  {
+   "clave": "enskild",
+   "nombre": "Enskild näringsidkare",
+   "tipo": "persona_fisica"
+  },
+  {
+   "clave": "hb",
+   "nombre": "Handelsbolag (HB)",
+   "tipo": "persona_fisica"
+  },
+  {
+   "clave": "ab",
+   "nombre": "Aktiebolag (AB)",
+   "tipo": "sociedad"
+  }
+ ],
+ "portales": {
+  "skatteverket": {
+   "nombre": "Skatteverket — Mina sidor",
+   "url": "https://www.skatteverket.se/"
+  },
+  "bolagsverket": {
+   "nombre": "Bolagsverket — årsredovisning",
+   "url": "https://www.bolagsverket.se/"
+  }
+ },
+ "obligaciones": [
+  {
+   "clave": "se_moms_q",
+   "nombre": "Momsdeklaration (kvartal)",
+   "concepto": "iva_periodica",
+   "ambito": "fiscal",
+   "periodicidad": "trimestral",
+   "plazos": {
+    "T": "12+2"
+   },
+   "margen_dias": 7,
+   "portal": "skatteverket",
+   "aplica": {
+    "condiciones": [
+     "iva",
+     "!iva_mensual"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 62500,
+    "moneda": "SEK",
+    "nota": "Senast den 12:e i andra månaden efter perioden (i augusti den 17:e; här alltid den 12:e). Förseningsavgift 625 kr per deklaration; kostnadsränta på skattekontot vid sen betalning."
+   },
+   "calculo": {
+    "tipo": "saldo_neto",
+    "haber": [
+     "477"
+    ],
+    "debe": [
+     "472"
+    ]
+   }
+  },
+  {
+   "clave": "se_moms_m",
+   "nombre": "Momsdeklaration (månad)",
+   "concepto": "iva_periodica",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "26"
+   },
+   "margen_dias": 7,
+   "portal": "skatteverket",
+   "aplica": {
+    "condiciones": [
+     "iva",
+     "iva_mensual"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 62500,
+    "moneda": "SEK",
+    "nota": "Över 40 miljoner kr: den 26:e i månaden efter (i december den 27:e); under 40 miljoner kr: den 12:e i andra månaden — här den 26:e, aldrig efter det lagliga datumet. Förseningsavgift 625 kr."
+   },
+   "calculo": {
+    "tipo": "saldo_neto",
+    "haber": [
+     "477"
+    ],
+    "debe": [
+     "472"
+    ]
+   }
+  },
+  {
+   "clave": "se_ps",
+   "nombre": "Periodisk sammanställning",
+   "concepto": "operaciones_intracomunitarias",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "25"
+   },
+   "margen_dias": 7,
+   "portal": "skatteverket",
+   "aplica": {
+    "condiciones": [
+     "intracomunitario"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 125000,
+    "moneda": "SEK",
+    "nota": "Förseningsavgift 1 250 kr."
+   }
+  },
+  {
+   "clave": "se_agi",
+   "nombre": "Arbetsgivardeklaration (AGI)",
+   "concepto": "nominas",
+   "ambito": "laboral",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "12"
+   },
+   "margen_dias": 7,
+   "portal": "skatteverket",
+   "aplica": {
+    "condiciones": [
+     "empleados"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 62500,
+    "moneda": "SEK",
+    "nota": "Förseningsavgift 625 kr per deklaration; arbetsgivaravgifter och avdragen skatt betalas samma dag."
+   }
+  },
+  {
+   "clave": "se_ink2",
+   "nombre": "Inkomstdeklaration 2 (AB)",
+   "concepto": "sociedades_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "07-01+1"
+   },
+   "margen_dias": 30,
+   "portal": "skatteverket",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 625000,
+    "moneda": "SEK",
+    "nota": "Förseningsavgift 6 250 kr, upp till tre gånger. Datum för räkenskapsår som slutar 31 december (digital inlämning: 1 augusti)."
+   }
+  },
+  {
+   "clave": "se_fskatt",
+   "nombre": "Preliminär skatt (F-skatt/debiterad)",
+   "concepto": "pago_fraccionado_sociedades",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "12+0"
+   },
+   "margen_dias": 7,
+   "portal": "skatteverket",
+   "sancion": {
+    "tipo": "nota",
+    "nota": "Kostnadsränta på skattekontot vid sen betalning."
+   }
+  },
+  {
+   "clave": "se_ink1",
+   "nombre": "Inkomstdeklaration 1 (NE-bilaga)",
+   "concepto": "renta_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "05-02+1"
+   },
+   "margen_dias": 30,
+   "portal": "skatteverket",
+   "aplica": {
+    "tipos": [
+     "persona_fisica"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 125000,
+    "moneda": "SEK",
+    "nota": "Förseningsavgift 1 250 kr, upp till tre gånger."
+   }
+  },
+  {
+   "clave": "se_arsredovisning",
+   "nombre": "Årsredovisning till Bolagsverket",
+   "concepto": "cuentas_anuales",
+   "ambito": "mercantil",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "07-31+1"
+   },
+   "margen_dias": 30,
+   "portal": "bolagsverket",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 500000,
+    "moneda": "SEK",
+    "nota": "Förseningsavgift 5 000 kr (privat AB), ytterligare 5 000 kr efter två månader och 10 000 kr efter fyra; likvidation efter elva månader. Senast sju månader efter räkenskapsårets slut."
+   }
+  }
+ ]
+}

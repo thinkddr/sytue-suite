@@ -1,0 +1,19 @@
+Privát, európai levelezés JMAP-on keresztül — nyomkövetők és hirdetések nélkül.
+
+• Gyors beérkező levelek szálakkal, címkékkel, szűrőkkel és kereséssel.
+• Fájlok csatolása közvetlenül a Sytue Drive-ból.
+• E-mail átalakítása Calendar-eseménnyé.
+• Titkosítás átvitel közben (TLS 1.3). A Sytue infrastruktúrája az EU-ban található. A külső szolgáltatások helye a szolgáltatójuktól függ.
+• Beszélgetésszálak olvasással, válasszal és továbbítással egy kattintásra.
+• Mappák, színes címkék és keresés operátorokkal (from:, has:attachment, is:unread…).
+• Automatikus szabályok, amelyek érkezéskor archiválják, címkézik vagy áthelyezik a leveleket.
+• Ütemezett küldés és „Küldés visszavonása”.
+• Aláírások, feladói álnevek és automatikus szabadságüzenet.
+• Megosztott és delegált postafiókok olvasási és küldési jogosultsággal.
+• Formázott szöveges szerkesztő, mellékletek a Sytue Drive-ból fájlmásolatok nélkül.
+• A távoli tartalom alapértelmezésben tiltva: senki sem tudja meg, mikor nyit meg egy e-mailt.
+• Az aláírt levelek (PGP és S/MIME) felismerése és jelölése; TLS átvitel közben.
+• Hozzáférés Thunderbirdből, Outlookból, Apple Mailből vagy telefonról is, alkalmazásjelszavakkal.
+• Címzettek címkeként, a Contacts címjegyzéke egy kattintásra, és figyelmeztetés, ha azt írja, „mellékelem”, de nem csatol semmit.
+
+Titkosítás átvitel közben (TLS 1.3). A Sytue infrastruktúrája az EU-ban található. A külső szolgáltatások helye a szolgáltatójuktól függ.

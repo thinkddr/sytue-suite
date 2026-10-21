@@ -1,0 +1,38 @@
+---
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: (c) 2026 Daniel Delgado Ramos
+ *
+ * Denuncias — la cola del OPERADOR de la plataforma (ADR 0073 y 0074, «Cola del
+ * operador»). Sección propia de Sytue Platform, como Conexiones.
+ *
+ * Mismo gate que el resto de la superficie: alcance global, segundo factor y
+ * elevación viva. Aquí solo se mira para decir CÓMO elevarse; las denuncias las
+ * pide la isla a Cast y a Rooms, y cada servicio vuelve a preguntárselo a Sytue ID
+ * en cada petición, que es quien deja la traza.
+ */
+import ConsoleLayout from '../layouts/ConsoleLayout.astro';
+import { useT } from '../i18n/index.js';
+import { requireSession } from '@sytue/auth/server';
+import { getBff, isPlatformSurface, toBffContext } from '../server/bff.js';
+import { accesoDePlataforma, loadPlatformActivation } from '../lib/platform.js';
+import PlatformModeration from '../components/PlatformModeration';
+
+export const prerender = false;
+
+// Fuera de su superficie esta pantalla no existe: en la consola de una
+// organización no hay puerta a las denuncias de todas.
+if (!isPlatformSurface()) return new Response(null, { status: 404 });
+
+const guard = await requireSession(getBff(), toBffContext(Astro));
+if (guard instanceof Response) return guard;
+
+const { problema } = accesoDePlataforma(await loadPlatformActivation(guard.session));
+
+const locale = Astro.locals.locale;
+const t = useT(locale);
+---
+
+<ConsoleLayout title={t('nav.moderation')} section="moderation">
+  <PlatformModeration client:load locale={locale} problema={problema} />
+</ConsoleLayout>

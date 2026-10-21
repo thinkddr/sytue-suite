@@ -1,0 +1,100 @@
+---
+/**
+ * Sytue Chat — vista principal. SSR: el layout exige sesion; la isla ChatApp
+ * (client:load) monta la Sytue Shell + lista de canales, vista de canal y
+ * redaccion contra el servicio Go Sytue Chat (REST + WebSocket). docs/CONVENTIONS.md §1.
+ */
+import AppLayout from '../layouts/AppLayout.astro';
+import { serverEnv } from '@sytue/auth/server';
+import { returnToCanonico, rutaConOrg } from '@sytue/config';
+import { RoomsApp } from '../components/RoomsApp.js';
+import { bff, toBffContext } from '../lib/bff.js';
+import { whatsAppSignupStatus, upstreamStatus } from '@sytue/api-clients';
+import type { WhatsAppSignup } from '@sytue/api-clients';
+import { appConnectionsClient } from '../lib/app-connections.js';
+import { WhatsAppNativeConsent } from '../components/WhatsAppNativeConsent.js';
+
+export const prerender = false;
+
+// ALIAS DE LECTURA: el enlace de una reunión llevaba el parámetro `meet` y ahora es `?rooms=<id>`
+// (`enlaceReunion`, @sytue/config). Los ya repartidos —en eventos, correos y chats—
+// tienen que seguir entrando, así que se redirigen aquí, ANTES del login, para que el
+// destino que guarde el login sea ya el nuevo. Nada genera ya `meet` (test/gates/enlace-de-reunion.test.ts).
+const meet = Astro.url.searchParams.get('meet');
+let redireccionAlias: Response | undefined;
+if (meet && !Astro.url.searchParams.has('rooms')) {
+  const params = new URLSearchParams(Astro.url.search);
+  params.delete('meet');
+  params.set('rooms', meet);
+  // CON la organización si la URL la lleva (ADR 0056): `Astro.locals.org` la deja
+  // el middleware en el rewrite que sirve esta página. Sin ella —anónimo, que
+  // entra por la forma sin org— el destino sale sin org, como siempre: la
+  // guarda manda al login y la redirección canónica del middleware entra sola.
+  redireccionAlias = Astro.redirect(
+    rutaConOrg(bff.basePath, Astro.locals.org, `/?${params.toString()}`),
+    301,
+  );
+}
+if (redireccionAlias) return redireccionAlias;
+
+// Guard: en .astro el redirect debe RETORNARSE (Astro no sigue un throw de
+// Response fuera de middleware). Sin sesion -> login SSO.
+const session = await bff.getSession(toBffContext(Astro));
+if (!session) {
+  // ADR 0056: la entrada org-ful llega reescrita con la marca ?__org=; el returnTo
+  // sale canónico, no en la forma interna, o tras el login la barra se queda con ella.
+  const returnTo = returnToCanonico(Astro.url, bff.basePath);
+  const redireccionLogin = Astro.redirect(
+    `${bff.basePath}/auth/login?returnTo=${encodeURIComponent(returnTo)}`,
+  );
+  redireccionLogin.headers.set('cache-control', 'no-store');
+  return redireccionLogin;
+}
+const hubBaseUrl = serverEnv(import.meta.env).SYTUE_HUB_BASE_URL ?? 'https://hub.sytue.eu';
+// El idioma lo negocia el middleware; la isla lo recibe por props (no lo detecta ella).
+const locale = Astro.locals.locale;
+const nativeWhatsApp = Astro.url.searchParams.get('native-whatsapp') === '1';
+let nativeSignup: WhatsAppSignup | null = null;
+let nativeMismatch = false;
+if (nativeWhatsApp && session.user.roles.some((role) => role === 'owner' || role === 'admin')) {
+  const instance = Astro.url.searchParams.get('instance') ?? '';
+  const state = Astro.url.searchParams.get('state') ?? '';
+  if (/^[a-f0-9-]{36}$/i.test(instance) && state.length > 0 && state.length <= 16384) {
+    // This checks the sealed native actor/tenant/instance without consuming its nonce.
+    const metadata = await whatsAppSignupStatus(appConnectionsClient(session.tokens.accessToken), {
+      state,
+      instance,
+    }).catch((error) => {
+      nativeMismatch = upstreamStatus(error) === 403;
+      return null;
+    });
+    if (metadata?.available && metadata.app_id && metadata.config_id && metadata.graph_version) {
+      nativeSignup = {
+        instance_id: instance,
+        state,
+        app_id: metadata.app_id,
+        config_id: metadata.config_id,
+        graph_version: metadata.graph_version,
+      };
+    }
+  }
+}
+if (nativeWhatsApp) {
+  Astro.response.headers.set('cache-control', 'no-store');
+  Astro.response.headers.set('referrer-policy', 'no-referrer');
+}
+---
+
+<AppLayout>
+  {nativeWhatsApp ? (
+    <WhatsAppNativeConsent
+      slot="app"
+      client:load
+      signup={nativeSignup}
+      mismatch={nativeMismatch}
+      locale={locale}
+    />
+  ) : (
+    <RoomsApp slot="app" client:load user={session.user} hubBaseUrl={hubBaseUrl} locale={locale} />
+  )}
+</AppLayout>

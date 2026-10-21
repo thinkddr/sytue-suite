@@ -1,0 +1,22 @@
+{
+  "searchRecords": [
+    {
+      "attributes": { "type": "Account", "url": "/services/data/v61.0/sobjects/Account/0015e00000AAA111" },
+      "Id": "0015e00000AAA111",
+      "Name": "Acme Corporation",
+      "Website": "https://acme.example.com"
+    },
+    {
+      "attributes": { "type": "Contact", "url": "/services/data/v61.0/sobjects/Contact/0035e00000DDD444" },
+      "Id": "0035e00000DDD444",
+      "Name": "Ada Lovelace",
+      "Email": "ada@acme.example.com"
+    },
+    {
+      "attributes": { "type": "Case", "url": "/services/data/v61.0/sobjects/Case/5005e00000EEE555" },
+      "Id": "5005e00000EEE555",
+      "CaseNumber": "00001234",
+      "Subject": "Acme: fallo de facturación"
+    }
+  ]
+}

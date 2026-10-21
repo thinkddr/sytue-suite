@@ -1,0 +1,18 @@
+Fireogtyve moduler og et dobbelt bogholderi, som databasen ikke lader komme ud af balance.
+
+• Fireogtyve moduler og seksogtredive modeller: kontakter, salg, indkøb, lager, produktion, fakturering, regnskab, projekter og HR.
+• At tilføje et modul betyder at skrive en JSON-fil: ingen migrering, ingen ny rute og intet arbejde på brugerfladen.
+• Beløb gemmes i hele cent, aldrig som flydende tal, og databasen håndhæver balancen.
+• Bogførte posteringer er urørlige: de rettes med en ny postering, og det er det, der adskiller en hovedbog fra et regneark.
+• Fireogtyve moduler og seksogtredive modeller i én tjeneste og én database.
+• Modelkataloget er data: hvert modul angiver sine felter, sine tilstande og sine listekolonner.
+• Et nyt modul er én JSON-fil — ingen DDL, ingen migrering og ingen tabellåsning.
+• Ét API til alle seksogtredive modeller og én brugerflade genereret fra kataloget.
+• Dobbelt bogholderi med beløb i hele cent; ikke ét eneste flydende tal.
+• Databasen kontrollerer balancen, når transaktionen bekræftes, ikke applikationskoden.
+• Afsluttede posteringer er uforanderlige: de kan ikke redigeres, slettes eller få nye linjer.
+• Ét bilag, én postering: et nyt forsøg eller to åbne faner kan ikke fordoble omsætningen.
+• Fælles betegnelser findes på alle 26 sprog, og et uoversat felt forhindrer tjenesten i at starte.
+• Indeksbaserede lister: den første side af tyve tusind rækker leveres på under et millisekund.
+
+Krypteret under overførsel (TLS 1.3). Sytues infrastruktur er i EU. Eksterne tjenesters placering afhænger af deres udbyder.

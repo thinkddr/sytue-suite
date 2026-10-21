@@ -1,0 +1,41 @@
+{{- if and .Values.enabled .Values.networkPolicy.enabled }}
+{{- /*
+Dragonfly NO tiene contrasena: dentro del clúster, quien alcanza el puerto lee y
+escribe todo. Esa es una decision consciente —una credencial mas que rotar para
+una cache efimera— pero SOLO se sostiene si la red la respalda, asi que esto no
+es opcional en produccion.
+
+Ingress: unicamente pods de la suite. Egress: NADA salvo DNS. Una cache no
+inicia conexiones hacia fuera; si alguna vez lo intenta, es que algo la esta
+usando para lo que no es.
+*/ -}}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "sytue-dragonfly.fullname" . }}
+  labels:
+    {{- include "sytue-dragonfly.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "sytue-dragonfly.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/part-of: sytue-one
+      ports:
+        - protocol: TCP
+          port: {{ .Values.service.port }}
+  egress:
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+{{- end }}

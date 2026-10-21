@@ -1,0 +1,14 @@
+{
+  "id": "go-api",
+  "name": "API en Go",
+  "description": "Empieza con estos ajustes para una API en Go (imagen distroless).",
+  "version": "1.0.0",
+  "license": "BSD-3-Clause",
+  "maintainer": "Sytue",
+  "framework": "go",
+  "build": {},
+  "app_port": 8080,
+  "health_path": "/healthz",
+  "docs_url": "https://go.dev/doc/",
+  "tags": ["api", "backend"]
+}

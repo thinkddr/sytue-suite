@@ -1,0 +1,40 @@
+{{- if and .Values.mailService.enabled .Values.mailService.publicIngressPolicy }}
+# Deja que el correo de Internet llegue al pod de Sytue Mail.
+#
+# Va SEPARADA de la NetworkPolicy del chart a propósito: esa se emite con
+# `networkPolicy.enabled` y describe el perímetro completo del servicio, mientras
+# que esta solo hace falta cuando el perímetro lo pone OTRO —un default-deny del
+# umbrella— y ese otro no sabe nada de los puertos de correo. Fundirlas obligaría
+# a elegir entre dos perímetros incompatibles; separadas, cada despliegue enciende
+# la que le corresponde y las dos suman sin estorbarse.
+#
+# Por qué hace falta y por qué está apagada por defecto: ver el comentario de
+# `mailService.publicIngressPolicy` en values.yaml.
+#
+# ALCANCE MÍNIMO: este pod, y solo los cuatro puertos que publica el Service mx.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "sytue-mail.fullname" . }}-mx-publico
+  labels:
+    {{- include "sytue-mail.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "sytue-mail.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - protocol: TCP
+          port: {{ .Values.mailService.ports.smtp }}
+        - protocol: TCP
+          port: {{ .Values.mailService.ports.submissions }}
+        - protocol: TCP
+          port: {{ .Values.mailService.ports.submission }}
+        - protocol: TCP
+          port: {{ .Values.mailService.ports.imaps }}
+{{- end }}

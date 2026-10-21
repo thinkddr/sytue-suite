@@ -1,0 +1,57 @@
+{{- /*
+pgbouncer.ini declarativo. La seccion [databases] NO va aqui: el host/port de
+la RDB viven en el secret sytue-postgresql y el arranque del contenedor la
+genera en /run/pgbouncer/databases.ini (ver deployment.yaml). El wildcard `*`
+reenvia cada base logica (id, drive, docs, ...) a la misma instancia RDB.
+*/ -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "sytue-pgbouncer.fullname" . }}
+  labels:
+    {{- include "sytue-pgbouncer.labels" . | nindent 4 }}
+data:
+  pgbouncer.ini: |
+    ;; [databases] generada en el arranque desde el secret {{ .Values.postgresql.existingSecret }} (host/port RDB).
+    %include /run/pgbouncer/databases.ini
+
+    [pgbouncer]
+    listen_addr = 0.0.0.0
+    listen_port = {{ .Values.listenPort }}
+    unix_socket_dir = /tmp
+
+    ;; Autenticacion de clientes (userlist desde secret {{ .Values.auth.existingSecret }}).
+    auth_type = {{ .Values.auth.type }}
+    auth_file = /etc/pgbouncer/userlist.txt
+
+    ;; TRANSACTION pooling: compatible con el RLS de la suite (SET LOCAL
+    ;; app.tenant DENTRO de la transaccion, platform/pkg/pg/tx.go). statement
+    ;; romperia SET LOCAL; session no ahorraria conexiones.
+    pool_mode = {{ .Values.settings.poolMode }}
+
+    ;; Clientes (todas las replicas de la suite multiplexadas aqui).
+    max_client_conn = {{ .Values.settings.maxClientConn }}
+
+    ;; Presupuesto hacia la RDB, POR base y POR replica de PgBouncer:
+    ;; total = replicas x bases x max_db_connections (la cuenta completa esta
+    ;; en values-prod.yaml del umbrella). Se deja margen bajo max_connections
+    ;; de la RDB para migraciones/LISTEN directos y mantenimiento.
+    default_pool_size = {{ .Values.settings.defaultPoolSize }}
+    reserve_pool_size = {{ .Values.settings.reservePoolSize }}
+    reserve_pool_timeout = {{ .Values.settings.reservePoolTimeout }}
+    max_db_connections = {{ .Values.settings.maxDbConnections }}
+
+    ;; pgx habla protocolo extendido con prepared statements con nombre:
+    ;; PgBouncer >= 1.21 los rastrea por conexion de servidor (esta opcion).
+    ;; Asi NO hace falta pgx en QueryExecModeSimple ni cache off.
+    max_prepared_statements = {{ .Values.settings.maxPreparedStatements }}
+
+    ;; TLS hacia la RDB (Scaleway exige TLS); los clientes llegan en claro
+    ;; DENTRO del cluster (NetworkPolicy) => sslmode=disable en los DSN.
+    server_tls_sslmode = {{ .Values.settings.serverTlsSslmode }}
+
+    ;; Reciclaje de conexiones de servidor (alineado con platform/pkg/pg).
+    server_lifetime = {{ .Values.settings.serverLifetime }}
+    server_idle_timeout = {{ .Values.settings.serverIdleTimeout }}
+
+    ignore_startup_parameters = {{ .Values.settings.ignoreStartupParameters }}

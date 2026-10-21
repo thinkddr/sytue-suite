@@ -1,0 +1,235 @@
+{
+ "pais": "NO",
+ "verificado": true,
+ "moneda": "NOK",
+ "formas": [
+  {
+   "clave": "enk",
+   "nombre": "Enkeltpersonforetak (ENK)",
+   "tipo": "persona_fisica"
+  },
+  {
+   "clave": "ans",
+   "nombre": "Ansvarlig selskap (ANS/DA)",
+   "tipo": "persona_fisica"
+  },
+  {
+   "clave": "as",
+   "nombre": "Aksjeselskap (AS)",
+   "tipo": "sociedad"
+  },
+  {
+   "clave": "asa",
+   "nombre": "Allmennaksjeselskap (ASA)",
+   "tipo": "sociedad"
+  }
+ ],
+ "portales": {
+  "skatteetaten": {
+   "nombre": "Skatteetaten — Min side",
+   "url": "https://www.skatteetaten.no/"
+  },
+  "altinn": {
+   "nombre": "Altinn",
+   "url": "https://www.altinn.no/"
+  },
+  "brreg": {
+   "nombre": "Brønnøysundregistrene — Regnskapsregisteret",
+   "url": "https://www.brreg.no/"
+  }
+ },
+ "obligaciones": [
+  {
+   "clave": "no_mva",
+   "nombre": "Mva-melding (annenhver måned)",
+   "concepto": "iva_periodica",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "1P": "04-10",
+    "2P": "06-10",
+    "3P": "08-31",
+    "4P": "10-10",
+    "5P": "12-10",
+    "6P": "02-10+1"
+   },
+   "margen_dias": 7,
+   "portal": "skatteetaten",
+   "aplica": {
+    "condiciones": [
+     "iva"
+    ]
+   },
+   "sancion": {
+    "tipo": "nota",
+    "nota": "Frist én måned og ti dager etter terminen (3. termin 31. august). Under 1 million kr i omsetning kan det søkes om årlig mva-melding (frist 10. mars). Tvangsmulkt ved for sen levering (1/2 rettsgebyr per dag, opptil 50 rettsgebyr) og forsinkelsesrente ved for sen betaling."
+   },
+   "calculo": {
+    "tipo": "saldo_neto",
+    "haber": [
+     "477"
+    ],
+    "debe": [
+     "472"
+    ]
+   }
+  },
+  {
+   "clave": "no_amelding",
+   "nombre": "A-melding",
+   "concepto": "nominas",
+   "ambito": "laboral",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "5"
+   },
+   "margen_dias": 3,
+   "portal": "altinn",
+   "aplica": {
+    "condiciones": [
+     "empleados"
+    ]
+   },
+   "sancion": {
+    "tipo": "nota",
+    "nota": "Innen den 5. i måneden etter utbetaling, via lønnssystem eller Altinn. Tvangsmulkt per dag ved manglende eller mangelfull a-melding (1/10 rettsgebyr per inntektsmottaker per dag, opptil 1 000 rettsgebyr)."
+   }
+  },
+  {
+   "clave": "no_aga",
+   "nombre": "Arbeidsgiveravgift og forskuddstrekk (betaling)",
+   "concepto": "seguridad_social",
+   "ambito": "laboral",
+   "periodicidad": "anual",
+   "plazos": {
+    "1P": "03-15",
+    "2P": "05-15",
+    "3P": "07-15",
+    "4P": "09-15",
+    "5P": "11-15",
+    "6P": "01-15+1"
+   },
+   "margen_dias": 5,
+   "portal": "skatteetaten",
+   "aplica": {
+    "condiciones": [
+     "empleados"
+    ]
+   },
+   "sancion": {
+    "tipo": "nota",
+    "nota": "Betales annenhver måned, den 15. i måneden etter tomånedersterminen. Forskuddstrekket skal stå på egen skattetrekkskonto; forsinkelsesrente etter forsinkelsesrenteloven ved for sen betaling."
+   }
+  },
+  {
+   "clave": "no_forskudd_as",
+   "nombre": "Forskuddsskatt (aksjeselskap)",
+   "concepto": "pago_fraccionado_sociedades",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "1P": "02-15",
+    "2P": "04-15"
+   },
+   "margen_dias": 7,
+   "portal": "skatteetaten",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "nota",
+    "nota": "To like terminer, 15. februar og 15. april året etter inntektsåret, basert på forventet skatt. Forsinkelsesrente ved for sen betaling; restskatt med rentetillegg."
+   }
+  },
+  {
+   "clave": "no_forskudd_enk",
+   "nombre": "Forskuddsskatt (enkeltpersonforetak)",
+   "concepto": "pago_fraccionado_renta",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "1P": "03-15",
+    "2P": "06-15",
+    "3P": "09-15",
+    "4P": "12-15"
+   },
+   "margen_dias": 7,
+   "portal": "skatteetaten",
+   "aplica": {
+    "tipos": [
+     "persona_fisica"
+    ]
+   },
+   "sancion": {
+    "tipo": "nota",
+    "nota": "Fire terminer: 15. mars, 15. juni, 15. september og 15. desember. Betales ikke én termin i tide, forfaller hele resten av forskuddsskatten."
+   }
+  },
+  {
+   "clave": "no_skattemelding_as",
+   "nombre": "Skattemelding for aksjeselskap (med næringsspesifikasjon)",
+   "concepto": "sociedades_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "05-31+1"
+   },
+   "margen_dias": 30,
+   "portal": "altinn",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "nota",
+    "nota": "Frist 31. mai; utsettelse til 30. juni må søkes før fristen. Leveres gjennom regnskaps- eller årsoppgjørsprogram. Tvangsmulkt (1/2 rettsgebyr per dag, opptil 50 rettsgebyr) og tilleggsskatt ved manglende levering."
+   }
+  },
+  {
+   "clave": "no_skattemelding_enk",
+   "nombre": "Skattemelding med næringsspesifikasjon (ENK)",
+   "concepto": "renta_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "05-31+1"
+   },
+   "margen_dias": 30,
+   "portal": "altinn",
+   "aplica": {
+    "tipos": [
+     "persona_fisica"
+    ]
+   },
+   "sancion": {
+    "tipo": "nota",
+    "nota": "Frist 31. mai for næringsdrivende; utsettelse til 30. juni må søkes før fristen. Tvangsmulkt ved for sen levering."
+   }
+  },
+  {
+   "clave": "no_arsregnskap",
+   "nombre": "Årsregnskap til Regnskapsregisteret",
+   "concepto": "cuentas_anuales",
+   "ambito": "mercantil",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "07-31+1"
+   },
+   "margen_dias": 30,
+   "portal": "brreg",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 132000,
+    "nota": "Frist 31. juli, kan ikke utsettes. Forsinkelsesgebyr: ett rettsgebyr per uke de første åtte ukene, deretter mer, opptil 69 940 kr; styret hefter solidarisk, og til slutt tvangsoppløsning."
+   }
+  }
+ ]
+}

@@ -1,0 +1,37 @@
+{
+  "key": "monday",
+  "tier": "tier2",
+  "manifest": {
+    "name": "monday.com",
+    "description": "Tableros y flujos de trabajo de monday.com, con inicio de sesión único.",
+    "category": "Gestión de proyectos",
+    "color": "#C42A40",
+    "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#C42A40\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"6\" cy=\"14\" r=\"3\"/><circle cx=\"12\" cy=\"14\" r=\"3\"/><circle cx=\"18\" cy=\"14\" r=\"3\"/></svg>",
+    "identity": {
+      "kind": "saml",
+      "entity_id": "{entity_id}",
+      "acs_url": "{acs_url}",
+      "name_id_format": "email"
+    },
+    "provisioning": "none",
+    "launch": {
+      "kind": "initiate"
+    },
+    "fields": [
+      {
+        "key": "entity_id",
+        "label": "Identificador de entidad (Entity ID)",
+        "placeholder": "https://auth.monday.com/saml/saml_callback",
+        "help": "Lo tienes en la administración de monday.com, en Seguridad → Inicio de sesión único (SAML). Ahí se llama «Entity ID / Audience URI».",
+        "required": true
+      },
+      {
+        "key": "acs_url",
+        "label": "URL de consumo de aserciones (ACS)",
+        "placeholder": "https://auth.monday.com/saml/saml_callback",
+        "help": "Lo tienes en la administración de monday.com, en Seguridad → Inicio de sesión único (SAML). Ahí se llama «ACS URL».",
+        "required": true
+      }
+    ]
+  }
+}

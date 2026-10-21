@@ -1,0 +1,17 @@
+"widgets.open" = "Отваряне";
+"widgets.compose" = "Писане";
+"widgets.create" = "Създаване на събитие";
+"widgets.notes" = "Бележки";
+"widgets.rows" = "Редове";
+"widgets.pending" = "Чакащи";
+"widgets.channels" = "Канали";
+"widgets.photos" = "Снимки";
+"widgets.episodes" = "Епизоди";
+"widgets.apps" = "Приложения";
+"widgets.calendars" = "Календари";
+"widgets.address_books" = "Адресни книги";
+"search.label" = "Глобално търсене";
+"dataflow.item.files" = "Файлове";
+"dataflow.item.events" = "Календар";
+"dataflow.item.documents" = "Документи";
+"dataflow.item.contacts" = "Контакти";

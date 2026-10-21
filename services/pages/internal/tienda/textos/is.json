@@ -1,0 +1,10 @@
+{
+  "order_paid_buyer_subject": "Pöntunarstaðfesting {number}",
+  "order_paid_buyer_body": "Takk fyrir kaupin. Pöntun {number} hefur verið staðfest.",
+  "order_paid_store_subject": "Ný pöntun móttekin: {number}",
+  "order_paid_store_body": "Þú hefur fengið nýja pöntun {number} að upphæð {total}.",
+  "withdrawal_ack_subject": "Staðfesting á afturköllun móttekin: {number}",
+  "withdrawal_ack_body": "Afturköllunarbeiðni þín fyrir pöntun {number} hefur verið skráð.",
+  "form_received_subject": "Eyðublað móttekið: {form_id}",
+  "form_received_body": "Ný innsending hefur borist fyrir eyðublað {form_id}."
+}

@@ -1,0 +1,37 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Daniel Delgado Ramos
+#
+# METADATOS DE ESTA APP, en el formato propio de Fyne: los lee `fyne package` él
+# solo, así que `apps/fyne/scripts/empaquetar.sh` no tiene una segunda tabla de
+# productos que se desincronice. Que este fichero exista es lo que hace que la
+# cadena empaquete este directorio: cada app futura trae el suyo y entra sola.
+#
+# EL ICONO es el del Hub (`../hub/Icon.png`): la demo no es un producto y no lleva
+# marca propia. La ruta es relativa a ESTE fichero, que es como la resuelve Fyne.
+#
+# `ID` lleva `.fyne.` a propósito: esto es la demostración de los cimientos, NO un
+# producto. Un identificador de paquete no se puede cambiar una vez subido a una
+# tienda, así que el de la demo no puede parecerse al de la suite.
+Website = "https://sytue.eu"
+
+[Details]
+  Name = "Sytue Fyne Demo"
+  ID = "eu.sytue.fyne.demo"
+  Icon = "../hub/Icon.png"
+  Version = "0.1.0"
+  Build = 1
+
+# CÓMO LA LLAMAN LAS DEMÁS. Las apps son INDEPENDIENTES —una instalación por
+# producto, como en la web un subdominio por producto— y se invocan entre sí por
+# su esquema de URL. `empaquetar.sh` lo lee de aquí y lo escribe donde cada
+# sistema lo busca: el intent-filter del AndroidManifest, `CFBundleURLTypes` en
+# macOS y iOS, `MimeType=x-scheme-handler/…` en el .desktop de Linux y la clave
+# de registro del instalador de Windows. Una sola declaración, cinco destinos.
+#
+# Va en `[Development]`, que es la tabla de metadatos propios de Fyne, así que el
+# programa lo lee además en tiempo de ejecución
+# (`fyne.CurrentApp().Metadata().Custom["esquema"]`) — que es donde hace falta:
+# es el redirect_uri del login (RFC 8252 §7.1) y tiene que coincidir con lo
+# registrado en Sytue ID.
+[Development]
+  esquema = "sytue-fyne-demo"

@@ -1,0 +1,11 @@
+Tengdar töflur til að halda utan um viðskiptavini, pantanir eða birgðir, með heimildum og skrá yfir hverja breytingu.
+
+• Viðskiptavinir, pantanir eða birgðir í tengdum töflum, án þekkingar á gagnagrunnum.
+• Deildu með stofnuninni þinni með því hlutverki sem þú velur.
+• Hver breyting er skráð: hver gerði hana og hvað var áður.
+• Gögnin þín haldast innan ESB og þú flytur þau út þegar þú vilt.
+• Töflur með reitum fyrir texta, tölu, dagsetningu, gátreit, eitt val og mörg val.
+• Tengsl milli taflna: tengdu pöntun við viðskiptavininn og gagnagrunnurinn leyfir ekki að tengingin rofni.
+• Heimildir á gagnagrunn og töflu: eigandi, ritstjóri, álitsgjafi og lesandi.
+
+Dulkóðað í flutningi (TLS 1.3). Innviðir Sytue eru innan ESB. Staðsetning ytri þjónustu fer eftir þjónustuveitanda hennar.

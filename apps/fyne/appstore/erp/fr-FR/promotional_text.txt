@@ -1,0 +1,1 @@
+Tout l’ERP, et le catalogue de modèles tient dans un fichier de données.

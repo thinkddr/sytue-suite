@@ -1,0 +1,11 @@
+Koblede tabeller for kunder, bestillinger eller lager, med tilganger og logg over hver endring.
+
+• Kunder, bestillinger eller lager i koblede tabeller, uten å kunne noe om databaser.
+• Del med organisasjonen din med den rollen du velger.
+• Hver endring logges: hvem som gjorde den, og hva som sto før.
+• Dataene dine blir i EU, og du eksporterer dem når du vil.
+• Tabeller med felt for tekst, tall, dato, avmerking, enkeltvalg og flervalg.
+• Relasjoner mellom tabeller: koble en bestilling til kunden, og databasen lar ikke koblingen brytes.
+• Tilganger per database og per tabell: eier, redaktør, kommentator og leser.
+
+Kryptert under overføring (TLS 1.3). Sytues infrastruktur er i EU. Plasseringen av eksterne tjenester avhenger av leverandøren deres.

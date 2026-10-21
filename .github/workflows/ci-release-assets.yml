@@ -1,0 +1,43 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Daniel Delgado Ramos
+name: ci-release-assets
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag de una release existente (incluidos borradores)
+        type: string
+        required: false
+permissions:
+  # GitHub exige escritura para leer releases en borrador. El paso es solo lectura.
+  contents: write
+defaults:
+  run:
+    shell: bash
+jobs:
+  comprobar:
+    runs-on: sytue-arm64
+    timeout-minutes: 5
+    container:
+      image: node:24-bookworm@sha256:64af3819f9275802414d7cdc38c27e9d82bd564dec4d4da87d008255d36c63b4
+      env:
+        DOCKER_HOST: unix:///run/sytue-ci/docker.sock
+      volumes:
+        - /srv/ci/run/proxy.sock:/run/sytue-ci/docker.sock
+    steps:
+      - name: Diagnosticar publicación sin compilar ni cambiar assets
+        env:
+          SYTUE_GIT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          find . -mindepth 1 -delete
+          git init -q .
+          git config safe.directory "$GITHUB_WORKSPACE"
+          git remote add origin "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
+          git -c "http.extraHeader=Authorization: Basic $(printf 'x-access-token:%s' "$SYTUE_GIT_TOKEN" | base64 -w0)" \
+            fetch -q --depth 1 origin "$GITHUB_SHA"
+          git checkout -q FETCH_HEAD -- deploy/sytue-git/bin/publicar-asset.sh
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends jq
+          bash deploy/sytue-git/bin/publicar-asset.sh --comprobar "$TAG"

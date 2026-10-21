@@ -1,0 +1,18 @@
+Números que se entienden, en una hoja que trabaja contigo.
+
+• Fórmulas, formato condicional y validación de datos.
+• Trae datos de fuera y consúltalos sin salir de la hoja.
+• Gráficos, minigráficos, segmentaciones y tablas de datos.
+• Exporta a ODS y XLSX; abre ficheros de Excel.
+• Fórmulas con ayuda contextual y recálculo instantáneo.
+• Formato condicional, validación de datos y formatos numéricos por región.
+• Gráficos de varios tipos, minigráficos y segmentaciones.
+• Tablas de datos con totales y ordenación; tabla dinámica.
+• Datos externos: conecta una fuente y consúltala desde la hoja.
+• Solver para encontrar el valor que cumple un objetivo.
+• Macros para automatizar tareas repetidas.
+• Colaboración en tiempo real con presencia y comentarios.
+• Filtros, segmentaciones y búsqueda dentro de la hoja.
+• Exporta a ODS, XLSX y PDF; abre ficheros de Excel desde Drive.
+
+Cifrado en tránsito (TLS 1.3). La infraestructura de Sytue está en la UE. Los servicios externos siguen la ubicación de su proveedor.

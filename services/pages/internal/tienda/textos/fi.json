@@ -1,0 +1,10 @@
+{
+  "order_paid_buyer_subject": "Tilausvahvistus {number}",
+  "order_paid_buyer_body": "Kiitos ostoksestasi. Tilaus {number} on vahvistettu.",
+  "order_paid_store_subject": "Uusi tilaus vastaanotettu: {number}",
+  "order_paid_store_body": "Olet saanut uuden tilauksen {number}, summa {total}.",
+  "withdrawal_ack_subject": "Peruuttamisvahvistus vastaanotettu: {number}",
+  "withdrawal_ack_body": "Tilauksen {number} peruuttamispyyntösi on tallennettu.",
+  "form_received_subject": "Lomakkeen lähetys vastaanotettu: {form_id}",
+  "form_received_body": "Lomakkeelle {form_id} on vastaanotettu uusi lähetys."
+}

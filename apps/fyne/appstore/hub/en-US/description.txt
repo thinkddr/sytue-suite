@@ -1,0 +1,14 @@
+All of Sytue One one click away, through the same door.
+
+• A launcher with all your apps and the ones your organisation connects.
+• Today’s agenda and unread mail on the front page, next to what is recent across the suite and your notifications.
+• Connect your devices and download the native apps.
+• A launcher with the suite’s apps and the third-party ones your organisation connects.
+• Quick actions: write an email, new document, upload to Drive, create an event.
+• Recent across the suite: the last things you touched in Drive, Docus, Mail or Rooms.
+• Notification centre and presence shared across the suite.
+• Connect your devices: a profile for iPhone and Mac, Android and desktop, in two steps.
+• Downloads of the native desktop and mobile apps.
+• A welcome assistant that gets the organisation ready without manuals.
+
+Encrypted in transit (TLS 1.3). Sytue’s infrastructure is in the EU. The location of external services depends on their provider.

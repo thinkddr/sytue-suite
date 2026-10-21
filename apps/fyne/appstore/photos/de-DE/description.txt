@@ -1,0 +1,18 @@
+Fotogalerie und -editor: Ihre Originale in Drive, Ihre Bearbeitung als Rezept.
+
+• Eine Zeitleiste nach Monaten mit Suche nach Namen.
+• Alben mit Titelbild; Vollbildansicht.
+• Ein Editor mit Licht, Farbe, Drehen, Spiegeln und Zuschneiden, in Echtzeit.
+• Jede Bearbeitung ist ein Rezept: das Original wird nie angetastet.
+• Eine nach Monaten gruppierte Zeitleiste mit Namenssuche und scharfen Miniaturen.
+• Alben: anlegen, umbenennen, Titelbild wählen, aus der Ansicht hinzufügen und entfernen.
+• Ein Editor mit vier Reglern (Belichtung, Kontrast, Sättigung, Temperatur), Drehen und Spiegeln.
+• Jede Bearbeitung ist ein separat gespeichertes Rezept: das Original in Drive wird nie verändert.
+• Export in voller Auflösung, auf dem Server mit denselben Formeln gerechnet, die Sie gesehen haben.
+• Papierkorb mit Wiederherstellung.
+• Die Originale liegen in Ihrem Sytue Drive; Ableitungen sind ein regenerierbarer Cache.
+• EXIF-Daten direkt aus der Datei gelesen; alles in der Europäischen Union.
+• Mehrfachauswahl nach Monat: in ein neues Album, in den Papierkorb oder auf einmal heruntergeladen.
+• Diashow, Originalgröße, Drehen im Betrachter und Zuschnitt mit festem Seitenverhältnis.
+
+Verschlüsselt bei der Übertragung (TLS 1.3). Die Infrastruktur von Sytue befindet sich in der EU. Der Standort externer Dienste hängt von ihrem Anbieter ab.

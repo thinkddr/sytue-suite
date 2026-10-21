@@ -1,0 +1,111 @@
+{
+  "slides": [
+    {
+      "id": "r1",
+      "boxes": [
+        { "id": "t1", "x": 8, "y": 8, "w": 84, "h": 16, "html": "<h1>Resultados del trimestre</h1>" },
+        {
+          "id": "t2",
+          "x": 8,
+          "y": 30,
+          "w": 84,
+          "h": 60,
+          "html": "<ul><li>Ingresos: 1,2 M€, un 18 % más que el año pasado y por encima de lo previsto en el plan anual</li><li>Clientes nuevos: 340</li></ul><p style=\"text-align: center;\">Texto centrado debajo de la lista</p><p style=\"text-align: right;\">A la derecha</p>"
+        }
+      ],
+      "transition": "fade",
+      "notes": "Presentar en dos minutos."
+    },
+    {
+      "id": "r2",
+      "boxes": [
+        { "id": "f1", "x": 5, "y": 8, "w": 18, "h": 26, "html": "", "kind": "shape", "shape": "ellipse" },
+        { "id": "f2", "x": 30, "y": 8, "w": 18, "h": 26, "html": "", "kind": "shape", "shape": "star", "fill": "#F97316" },
+        { "id": "f3", "x": 55, "y": 8, "w": 18, "h": 26, "html": "", "kind": "shape", "shape": "cylinder", "fill": "transparent" },
+        { "id": "f4", "x": 78, "y": 12, "w": 18, "h": 16, "html": "", "kind": "shape", "shape": "arrow", "stroke": "#2563EB" },
+        {
+          "id": "g1",
+          "x": 5,
+          "y": 42,
+          "w": 44,
+          "h": 50,
+          "html": "",
+          "kind": "chart",
+          "chart": { "type": "bar", "grid": [["", "2025", "2026"], ["UE", "12", "18"], ["EEE", "7,5", "9"], ["Resto", "3", "4"]] }
+        },
+        {
+          "id": "s1",
+          "x": 53,
+          "y": 42,
+          "w": 43,
+          "h": 50,
+          "html": "",
+          "kind": "smartart",
+          "smartart": { "layout": "process", "items": [{ "text": "Idea" }, { "text": "Prototipo" }, { "text": "Lanzamiento al mercado" }] }
+        }
+      ],
+      "connectors": [
+        { "id": "c1", "kind": "straight", "from": { "boxId": "f1" }, "to": { "boxId": "f2" }, "endArrow": true },
+        { "id": "c2", "kind": "curved", "from": { "boxId": "f2", "anchor": "bottom" }, "to": { "boxId": "f3", "anchor": "bottom" }, "startArrow": true, "endArrow": true, "stroke": "#DC2626" }
+      ]
+    },
+    {
+      "id": "r3",
+      "boxes": [
+        { "id": "h2", "x": 6, "y": 6, "w": 88, "h": 12, "html": "<h2 style=\"text-align: center;\">Ciclo y reparto</h2>" },
+        {
+          "id": "s2",
+          "x": 4,
+          "y": 22,
+          "w": 46,
+          "h": 72,
+          "html": "",
+          "kind": "smartart",
+          "smartart": { "layout": "cycle", "items": [{ "text": "Plan" }, { "text": "Hacer" }, { "text": "Medir" }, { "text": "Ajustar" }] }
+        },
+        {
+          "id": "g2",
+          "x": 54,
+          "y": 22,
+          "w": 42,
+          "h": 50,
+          "html": "",
+          "kind": "chart",
+          "chart": { "type": "pie", "grid": [["", "Cuota"], ["A", "50"], ["B", "30"], ["C", "20"]] }
+        },
+        {
+          "id": "g3",
+          "x": 54,
+          "y": 74,
+          "w": 42,
+          "h": 22,
+          "html": "",
+          "kind": "chart",
+          "chart": { "type": "line", "grid": [["", "Visitas"], ["L", "3"], ["M", "5"], ["X", "4"], ["J", "8"], ["V", "6"]] }
+        }
+      ],
+      "bg": "#BFDBFE"
+    },
+    {
+      "id": "r4",
+      "boxes": [
+        { "id": "a", "x": 8, "y": 8, "w": 84, "h": 16, "html": "<h1>Dos columnas</h1>" },
+        { "id": "b", "x": 8, "y": 30, "w": 40, "h": 60, "html": "<h3>Primero</h3><ol><li>Uno</li><li>Dos</li><li>Tres</li></ol>" },
+        {
+          "id": "c",
+          "x": 52,
+          "y": 30,
+          "w": 40,
+          "h": 60,
+          "html": "",
+          "kind": "smartart",
+          "smartart": {
+            "layout": "hierarchy",
+            "items": [{ "text": "Dirección" }, { "text": "Ventas", "level": 1 }, { "text": "Producto", "level": 1 }, { "text": "Diseño", "level": 2 }]
+          }
+        }
+      ]
+    }
+  ],
+  "theme": "carbon"
+}

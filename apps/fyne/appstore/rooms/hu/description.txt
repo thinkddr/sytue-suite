@@ -1,0 +1,20 @@
+Csatornák, üzenetek és csapat-videohívások egy helyen.
+
+• Csatornák csapatonként vagy projektenként.
+• Minden csatornába beépített videohívás.
+• Említések és értesítések egységesen a teljes programcsomagban.
+• Kereshető előzmények a Sytue One bármely pontjáról.
+• Nyilvános és privát csatornák kategóriákban; közvetlen üzenetek és csoportok.
+• Szálak, reakciók, említések, kitűzött és mentett üzenetek, valamint piszkozatok.
+• Formázás „Aa” sávval és billentyűparancsokkal: félkövér, dőlt, kód, idézetek, listák és hivatkozások.
+• Mellékletek, képek, GIF-ek és egyéni emojik; fájlok a Drive-ból.
+• Ütemezett küldés, prioritás, olvasási visszaigazolás és „látták”.
+• Perjeles parancsok és kártyák: szavazások és kiosztható feladatok.
+• Videohívások a csatornán belül: kamera, képernyő, kézfeltartás, csevegés és felvétel.
+• Ütemezett megbeszélések és meghívási hivatkozások.
+• Botok, webhookok és integrációk más eszközökkel.
+• Jelenlét és egyéni állapot; csatornánkénti értesítési beállítások.
+• Keresés az előzményekben, a teljes programcsomagból is.
+• Valós idő WebSocketen, újracsatlakozással és elveszett üzenetek nélkül.
+
+Titkosítás átvitel közben (TLS 1.3). A Sytue infrastruktúrája az EU-ban található. A külső szolgáltatások helye a szolgáltatójuktól függ.

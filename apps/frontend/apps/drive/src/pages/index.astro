@@ -1,0 +1,30 @@
+---
+/**
+ * Sytue Drive — inicio. El explorador (sidebar de ubicaciones + navegador) se
+ * compone dentro de la Sytue Shell en <Shell> (una sola isla Preact), de modo
+ * que comparte el ToastProvider de la shell y queda montado bajo la topbar
+ * global (app switcher + cuenta). Aqui solo se resuelve la sesion.
+ */
+import { returnToCanonico } from '@sytue/config';
+import AppLayout from '../layouts/AppLayout.astro';
+import { useT } from '../i18n';
+import { bff, toBffContext } from '../lib/auth';
+
+export const prerender = false;
+
+const session = await bff.getSession(toBffContext(Astro));
+if (!session) {
+  // ADR 0056: la entrada org-ful llega reescrita con la marca ?__org=; el returnTo
+  // sale canónico, no en la forma interna, o tras el login la barra se queda con ella.
+  const returnTo = returnToCanonico(Astro.url, bff.basePath);
+  const redireccionLogin = Astro.redirect(
+    `${bff.basePath}/auth/login?returnTo=${encodeURIComponent(returnTo)}`,
+  );
+  redireccionLogin.headers.set('cache-control', 'no-store');
+  return redireccionLogin;
+}
+
+const t = useT(Astro.locals.locale);
+---
+
+<AppLayout title={t('page.files')} />

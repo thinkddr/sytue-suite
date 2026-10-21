@@ -1,0 +1,16 @@
+Editare comună în timp real
+
+• Totul salvat în Drive-ul dumneavoastră european.
+• Editare comună în timp real, cu prezență și fără suprapuneri.
+• Panglică cu file: Pornire, Inserare, Referințe, Corespondență și Revizuire.
+• Tabele, imagini, forme, SmartArt, diagrame, simboluri și filigrane.
+• Referințe: cuprins, note de subsol, citări și bibliografie.
+• Corespondență: îmbinare de date pentru scrisori și etichete.
+• Comentarii în fir, revizuirea modificărilor și versiuni.
+• Asistent IA opțional pentru reformulare, traducere sau rezumare, doar dacă organizația îl activează.
+• Export în ODT, DOCX și PDF; deschiderea fișierelor Word din Drive.
+• Anteturi, subsoluri, numerotarea paginilor și blocuri reutilizabile.
+• Salvare automată în Drive-ul european, cu istoric.
+• Descărcare de pe pagina de start ca PDF, HTML, Markdown, OpenDocument sau Microsoft Office.
+
+Criptare în tranzit (TLS 1.3). Infrastructura Sytue se află în UE. Locația serviciilor externe depinde de furnizorul lor.

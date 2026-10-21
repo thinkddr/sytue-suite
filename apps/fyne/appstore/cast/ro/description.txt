@@ -1,0 +1,17 @@
+Videoclipurile și transmisiunile dumneavoastră, la cerere și în timp real, fără a părăsi Europa.
+
+• Încărcați un videoclip și este transcodat în mai multe calități pentru orice ecran.
+• Intrați în direct dintr-un program de difuzare, din navigator sau din aplicație.
+• Patru niveluri de vizibilitate: public, nelistat, organizație sau persoane anume.
+• Chat în direct și comentarii, cu moderare de bază de către cine publică.
+• Încărcați videoclipuri de până la 8 GiB; originalul se păstrează.
+• Transmisiune dintr-un program de difuzare prin RTMP, cu o cheie de flux pentru fiecare persoană.
+• În direct din navigator sau din aplicație: cameră, ecran și microfon.
+• Înregistrările transmisiunilor devin automat videoclipuri la cerere.
+• O pagină principală publică și un canal pentru fiecare organizație, indexabile.
+• Linkuri nelistate, videoclipuri doar pentru organizație sau acces pentru persoane anume după @utilizator.
+• Chat în direct și comentarii în fire, moderate de cine publică și de administrația organizației.
+• Spațiul se contorizează în cota dumneavoastră din Sytue Drive; totul în Uniunea Europeană.
+• „Încărcați în Cast” din Sytue Drive: o copie a videoclipului ajunge în Cast, iar fișierul rămâne în Drive.
+
+Criptare în tranzit (TLS 1.3). Infrastructura Sytue se află în UE. Locația serviciilor externe depinde de furnizorul lor.

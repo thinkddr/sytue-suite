@@ -1,0 +1,11 @@
+Länkade tabeller för kunder, beställningar eller lager, med behörigheter och logg över varje ändring.
+
+• Kunder, beställningar eller lager i länkade tabeller, utan att kunna något om databaser.
+• Dela med din organisation med den roll du väljer.
+• Varje ändring loggas: vem som gjorde den och vad som gällde förut.
+• Dina data stannar inom EU och du exporterar dem när du vill.
+• Tabeller med fält för text, tal, datum, kryssruta, enkelval och flerval.
+• Relationer mellan tabeller: länka en beställning till sin kund så låter databasen inte länken brytas.
+• Behörigheter per databas och per tabell: ägare, redigerare, kommentator och läsare.
+
+Krypterat under överföring (TLS 1.3). Sytues infrastruktur finns i EU. Var externa tjänster finns beror på deras leverantör.

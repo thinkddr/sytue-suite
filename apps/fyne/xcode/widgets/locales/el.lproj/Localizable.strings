@@ -1,0 +1,17 @@
+"widgets.open" = "Άνοιγμα";
+"widgets.compose" = "Σύνταξη";
+"widgets.create" = "Δημιουργία συμβάντος";
+"widgets.notes" = "Σημειώσεις";
+"widgets.rows" = "Γραμμές";
+"widgets.pending" = "Σε αναμονή";
+"widgets.channels" = "Κανάλια";
+"widgets.photos" = "Φωτογραφίες";
+"widgets.episodes" = "Επεισόδια";
+"widgets.apps" = "Εφαρμογές";
+"widgets.calendars" = "Ημερολόγια";
+"widgets.address_books" = "Βιβλία διευθύνσεων";
+"search.label" = "Καθολική αναζήτηση";
+"dataflow.item.files" = "Αρχεία";
+"dataflow.item.events" = "Ημερολόγιο";
+"dataflow.item.documents" = "Έγγραφα";
+"dataflow.item.contacts" = "Επαφές";

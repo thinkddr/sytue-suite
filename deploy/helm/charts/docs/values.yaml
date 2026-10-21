@@ -1,0 +1,202 @@
+# sytue-docs — defaults del subchart (servicio Go). global.* lo inyecta el umbrella.
+# Estado en PostgreSQL (RDB Scaleway, UE). Sin Redis/Valkey ni motores AGPL.
+enabled: true
+subdomain: docs
+component: docs
+replicaCount: 2
+
+image:
+  registry: ""                 # cae a global.imageRegistry (Scaleway Registry, UE)
+  repository: sytue-docs
+  tag: "1.0.0"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8083             # puerto del SPEC
+
+ingress:
+  enabled: true
+  className: traefik
+  annotations: {}
+  # docs.sytue.eu: el editor Astro (sytue-frontend) sirve "/"; el backend Go expone
+  # todo bajo /api/v1, incluida la colaboración por WebSocket
+  # (/api/v1/documents/{id}/ws, handler.go): no hay ningún prefijo /colab que servir.
+  paths:
+    # `/api/v1` y NO `/api`: el BFF de la app Astro sirve sus propias rutas
+    # bajo /api/<recurso>, y un Prefix en /api se las quedaba TODAS y se las
+    # mandaba al servicio Go, que solo expone /api/v1. El navegador recibía
+    # 404 en cada carga y la app decía «no se pudieron cargar los datos».
+    - path: /api/v1
+      pathType: Prefix
+    # WOPI. Son rutas del servicio Go, NO de la app Astro, y van una a una con
+    # `Exact`: un Prefix en /wopi se quedaría también con /wopi/editor, que es la
+    # página del editor y la sirve el frontend.
+    #
+    # Sin estas tres entradas el catálogo y el formulario del host caen en la app
+    # Astro y devuelven 404: «abrir en el editor» no llegaría a existir.
+    - path: /wopi/discovery.xml
+      pathType: Exact
+    - path: /wopi/view
+      pathType: Exact
+    - path: /wopi/edit
+      pathType: Exact
+  tls:
+    secretName: tls-docs-sytue-eu
+
+# Right-sized al footprint MEDIDO (Go ~6-40MiB RSS idle): requests modestos para
+# densidad/coste; limits con cabecera para picos (modelo doc + colab; burstable).
+# Requests MEDIDOS en producción (kubectl top, 2026-08-09), no estimados: en
+# Kubernetes la factura la fija lo RESERVADO, no lo usado, y estos pods pedían
+# 25-75 veces su consumo real. Esa reserva inflada obligó a un tercer nodo cuando
+# la CPU real del clúster estaba al 3 %.
+#
+# El límite NO se toca: un pico sigue pudiendo usar toda la CPU que necesite. Y
+# bajar el request hace al HPA MÁS sensible —calcula el porcentaje sobre el
+# request—, que es justo lo que hace falta para escalar por demanda real.
+resources:
+  requests:
+    cpu: 15m
+    memory: 64Mi
+  limits:
+    cpu: "2"
+    memory: 512Mi
+
+autoscaling:
+  # Etiqueta `job` de la serie de metricas, para el HPA por demanda real.
+  # Es el ServiceName del BINARIO, que no siempre coincide con el nombre del
+  # chart ni con el del directorio; por eso se escribe y no se deduce.
+  metricJob: sytue-docs
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 8
+  targetCPUUtilizationPercentage: 70
+  # Sin memoria: en Go la RSS queda alta tras el GC (mala señal de escalado) y
+  # GOMEMLIMIT (~85% de limits.memory) ya la acota -> se escala solo por CPU.
+
+networkPolicy:
+  enabled: true
+
+serviceMonitor:
+  enabled: true
+  path: /metrics
+  interval: 30s
+
+config:
+  # Correo al dueño cuando alguien le pide editar un documento. `from` es el buzón
+  # de Docs («Sytue Docs <docs@…>») y su contraseña va en el secret `sytue-docs`,
+  # claves `smtp-user` y `smtp-password`. Sin `from`, no sale ninguno.
+  smtp: {}
+  #  addr: ""          # vacío: <release>-mail-mx:587
+  #  from: ""
+  #  tlsServerName: "" # el certificado del MTA (mx.<dominio>)
+  #  user: ""          # usuario SASL en claro; vacío: `smtp-user` de existingSecret
+  #  passwordSecret: "" # Secret con `smtp-password`; vacío: existingSecret
+  # Autoridad de sellado de tiempo de las firmas (RFC 3161).
+  #
+  # IZENPE (Izenpe S.A., sector público vasco), docs/decisions.md#0051. Medido el
+  # 2026-09-24 contra la lista de confianza de la UE: su TSA es un servicio de
+  # sellado CUALIFICADO en vigor («Qualified TimeStamp issued by tsa.izenpe.com
+  # 2025»), abierto y sin registro, y el certificado que firma cada token es el
+  # que la lista declara. El Certum gratuito de antes NO es cualificado (no está
+  # en la lista como QTST). Su política dice que hay un número de peticiones al
+  # mes gratis y que a partir de ahí se contrata; el número no lo publica.
+  #
+  # Solo viaja la huella SHA-256 de la firma: ni el documento, ni la firma, ni
+  # quién firma (docs/security.md#111-plan-de-cumplimiento-rgpd).
+  selloUrl: "http://tsa.izenpe.com"
+  # Raíz de la cadena de la TSA de Izenpe, «ROOT CA QC IZENPE» (válida hasta
+  # 2045; SHA-256 8E:5B:8B:AE:DC:4D:58:BE:0E:30:1C:CC:B6:ED:17:3C:08:D7:C7:7C:E4:
+  # 35:09:73:38:9F:F1:AF:A1:1D:7A:65), bajada de izenpe.eus por HTTPS y comprobada
+  # contra la cadena de un token real. Con ella se autentica cada sello: la
+  # autoridad habla HTTP plano y sin ancla un intermediario podría colar uno
+  # fabricado. Cambiar de autoridad es cambiar las DOS cosas a la vez.
+  selloAnclas: |
+    -----BEGIN CERTIFICATE-----
+    MIIFTTCCAzWgAwIBAgIQRuzenfBTFJtfayoOnKtHlTANBgkqhkiG9w0BAQsFADA/
+    MQswCQYDVQQGEwJFUzEUMBIGA1UECgwLSVpFTlBFIFMuQS4xGjAYBgNVBAMMEVJP
+    T1QgQ0EgUUMgSVpFTlBFMB4XDTIwMDkyMzEwNTcxOFoXDTQ1MDkyMzEwNTcxOFow
+    PzELMAkGA1UEBhMCRVMxFDASBgNVBAoMC0laRU5QRSBTLkEuMRowGAYDVQQDDBFS
+    T09UIENBIFFDIElaRU5QRTCCAiIwDQYJKoZIhvcNAQEBBQADggIPADCCAgoCggIB
+    AJnyFLxfdOzqOUYTsK5N/z4502F8TUK8OvMgBi0HRgl3yrdu6EvILdCvH3u6Zkg2
+    SVAhkvcZKB4BJyhYZLbs7llGC6kRl6vE4WwwuYlNT7ImdkESElZznjavckAaMrSV
+    buMPACYQ8u8lA2BYZJrDJuHNErsSY4nzNTOqaq3AVcgzttTLPsoWbRWrfqtdQeYY
+    1ga0v6In3T8d/kuYwnv+6XQMys8PiPi/a/TS3zKvZwkVRELNw6kH7AUe87LqAAvR
+    7C734/3HxE8upI0W+C/woD/9qL72Se94NwCa2yiOBqX/YFuYu6jsSXYJpl1vH9or
+    26A3P7DQu5nTagWRzyuKVh9oLDdSsygfm18+wrij2QKpNQgepGlmCkgpdZcYp5hB
+    bc5sAlLuX3gm63wFSS/gFEflwEc+z/teyrr5l35paEViP4AHd7a4TTg7AT5tI8Og
+    PXYlPLYv9wCa+OLibdmTEFfrj540uN5d0cPdjxCVDkUdPvh+r0+eoSvhJcEOSylE
+    994VtpdsmXOj782g0FbY5aOznKd658FXOunYFl0hGnp1gqaZkeqeoflwdF8AzRtK
+    +KM6xTzPDAxijxjTvyYR0HuMiZlMpNXZ9nMwj+Z7g0JscRfG9KkxDFKmfFviI8Ar
+    3xOPJG9OliAOo+njohDynT0A152D0S9Qir8ekNcTsfBPAgMBAAGjRTBDMBIGA1Ud
+    EwEB/wQIMAYBAf8CAQEwDgYDVR0PAQH/BAQDAgEGMB0GA1UdDgQWBBSpaDXCgLGl
+    1LpSIRUXG9ib44aGlzANBgkqhkiG9w0BAQsFAAOCAgEAiIGlwlMiDOuaDrLPgdcU
+    q5eQAt/oG5wWZKs2LHL0+Af7PY7QueRUa0csh3TWBzs9pD2ir0s4JqcVpVKi0y1m
+    mYQ6vFzxRrY8ZWFLCClZMeRGUCrdU9tRy95wUfrG3la+oJrnJawPi9z2UhsZaFN+
+    tXn+9h74hirI0HNvIdKD50AcBXSmqwXE15EnehzUCwF+gSKvTCeYCmYgRgbzPwNo
+    Fyoe690QT+Llym7w+ugDO7nrpWs9B2JLAHmUzlP1D97fO/6wPN0W9n/AGsiucG0F
+    06x0FctgSZh2HR5J06QEtibOeTsETQlRdk7+5avtaDnFqvh+XcSBOMxZxluMAlGj
+    Md8K2LRd/GYX9nsM7GRPEXRq46yz44AzjxIwDsXrZz5FQUUFMwlyoE9SpX4eXA7K
+    X7G160cgwissfSsc0OgG1SIxX+dIEt1P5aRaHZdNX7Ozk1qeyBsWQACjgX5mzUR9
+    LG4u1xbDTMiOca+QdHX18xlqr+xEeGLK+/Q+DVY1b+7ztW+8/KZbvizufHVqo0rg
+    nUY3yBKhqyAjq3gkogE38Plc2wxgPpHNLmR6Mb1JSIl+UwY4ozybvJdam5Yura2q
+    pLswTsIN/Xaip8Z4fpJeeOEMp1JWPAy7pSDKTT6Yh1V1GnOYouO5lgV4pZozue/X
+    UnBj1JGLKpfnKKgsOJHinrI=
+    -----END CERTIFICATE-----
+  # OID de política, si la autoridad elegida exige uno.
+  selloPolitica: ""
+  # Secret con `sello-usuario` y `sello-clave` para las autoridades que piden
+  # autenticación básica. La credencial NUNCA en values: con ella se emiten sellos
+  # a nombre de la organización.
+  selloSecret: ""
+
+  # Raíz pública de Sytue Docs para el catálogo WOPI. Vacía => se deriva del host
+  # del propio chart, que es lo correcto en cualquier despliegue normal.
+  publicUrl: ""
+  # Hosts WOPI admitidos, separados por comas (se admite `*.dominio`). Vacío =>
+  # solo el Sytue Drive de esta suite.
+  wopiAllowedHosts: ""
+  # Tamano del pool pgx por replica (DB_MAX_CONNS). Prod lo baja (3-5):
+  # PgBouncer multiplexa hacia la RDB (ver values-prod.yaml del umbrella).
+  dbMaxConns: 10
+  logLevel: info
+  s3Bucket: docs-blobs
+# Postgres EXTERNO (Scaleway RDB). DSN por secret (nunca en git).
+postgresql:
+  existingSecret: sytue-docs-db
+  dsnKey: dsn
+
+# Object Storage S3 (blobs grandes). Hereda global.objectStorage; puede aislarse
+# por servicio en despliegues híbridos.
+objectStorage: {}
+# Secretos de la app (OIDC client secret y especificos del servicio).
+existingSecret: sytue-docs
+
+# PodDisruptionBudget: garantiza disponibilidad durante drains/upgrades del cluster.
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+  # maxUnavailable: 1   # alternativa a minAvailable (usar uno u otro)
+
+# Reparto anti-afinidad suave por zona y nodo (alta disponibilidad multi-AZ, UE).
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: ScheduleAnyway
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: ScheduleAnyway
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  fsGroup: 10001
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]

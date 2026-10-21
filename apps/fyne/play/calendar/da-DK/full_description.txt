@@ -1,0 +1,19 @@
+En CalDAV-kalender, der hænger sammen med resten af pakken.
+
+• Dags-, uge- og månedsvisning.
+• Gentagne begivenheder og påmindelser.
+• Opret begivenheder direkte fra en mail i Mail.
+• Virker med alle CalDAV-klienter.
+• Måneds-, uge-, dags- og agendavisning, med minikalender og “I dag”.
+• Daglig, ugentlig eller månedlig gentagelse med slutdato; rediger kun denne, denne og følgende eller alle.
+• Påmindelser pr. begivenhed og notifikationer i pakken.
+• Invitationer med svar (deltager, måske, nej) og opfølgning.
+• “Find et tidspunkt”, der er ledigt for alle deltagere.
+• Lokaler og ressourcer, der kan bookes, med tilgængelighed.
+• Delte kalendere med tilladelser og dem, andre deler med dig.
+• Abonner på eksterne kalendere (ICS), og hav flere farvekodede kalendere.
+• Opret en begivenhed fra en besked i Mail eller fra en note.
+• Virker med alle CalDAV-klienter: Apple Calendar, Thunderbird og flere.
+• Dupliker en begivenhed eller kopiér den til din kalender, og download den som .ics til alle uden for Sytue.
+
+Krypteret under overførsel (TLS 1.3). Sytues infrastruktur er i EU. Eksterne tjenesters placering afhænger af deres udbyder.

@@ -1,0 +1,102 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Daniel Delgado Ramos
+
+# Excepción temporal y revisable. GO-2026-5932 marca el paquete legacy
+# golang.org/x/crypto/openpgp como no mantenido, pero ninguno de los binarios de
+# Sytue lo importa ni lo alcanza (govulncheck ./... = 0). x/crypto no ofrece una
+# versión corregida; se mantiene actualizado porque otros paquetes sí se usan.
+[[IgnoredVulns]]
+id = "GO-2026-5932"
+ignoreUntil = 2026-11-01
+reason = "openpgp no se importa ni se alcanza; confirmado por govulncheck en root y clientes nativos"
+
+# `extract-zip` 2.0.1 (GHSA-jmr9-qjv8-65gv y GHSA-7pqw-9j4j-h8q3) YA NO SE IGNORA:
+# no está en el lockfile. Llegaba por @lhci/cli → lighthouse 12 → puppeteer-core 24
+# → @puppeteer/browsers 2.x, sin versión corregida; @puppeteer/browsers 3 lo
+# sustituyó por el unzip del sistema y `overrides` de apps/frontend/package.json
+# lo fuerza a 3.2.2 (exporta todo lo que importa puppeteer-core 24). Si vuelve a
+# aparecer es que alguien quitó ese override, no que haga falta otra excepción.
+
+# `github.com/aws/aws-sdk-go` v1.55.5 — DOS AVISOS DEL CLIENTE DE CIFRADO DE S3
+# que no usamos. GO-2022-0635 and GO-2022-0646 afectan a `s3crypto`, el cliente de
+# cifrado del lado del cliente; comprobado el 2026-09-05: `s3crypto` no se importa
+# en NINGÚN fichero del repositorio, y el propio aws-sdk-go v1 no lo importa
+# ningún `.go` nuestro —entra como dependencia INDIRECTA del provider de
+# Crossplane—.
+#
+# No hay versión que los corrija: `FIXED VERSION: --`. La v1 del SDK está en
+# mantenimiento y el arreglo real es migrar a aws-sdk-go-v2, que ese mismo módulo
+# ya trae por otro lado. La migración la decide upstream (Crossplane), no
+# nosotros.
+#
+# Los dos avisos acotan los símbolos afectados a `NewEncryptionClient` y
+# `NewDecryptionClient` de `service/s3/s3crypto`. Es lo que hace comprobable esta
+# exclusión sin depender de govulncheck: basta con que no aparezca un import de
+# `s3crypto`, y hoy no aparece en ningún `.go` del repositorio.
+[[IgnoredVulns]]
+id = "GO-2022-0635"
+ignoreUntil = 2026-12-01
+reason = "afecta a s3crypto, que no se importa en ningún sitio; entra como indirecta del provider de Crossplane y no hay versión corregida en aws-sdk-go v1"
+
+[[IgnoredVulns]]
+id = "GO-2022-0646"
+ignoreUntil = 2026-12-01
+reason = "afecta a s3crypto, que no se importa en ningún sitio; entra como indirecta del provider de Crossplane y no hay versión corregida en aws-sdk-go v1"
+
+
+# `github.com/docker/docker` v28.3.3 y v28.5.2 (+incompatible) — CINCO AVISOS
+# NUEVOS publicados después del último barrido (GO-2026-4883, -4887, -5617,
+# -5668 y -5746, con sus alias GHSA) que afectan al demonio y al builder de
+# Docker. Ninguno de los binarios de Sytue habla con un demonio Docker: el
+# paquete entra como INDIRECTA de los providers (Crossplane y
+# terraform-provider-sytuecloud), que solo compilan contra sus tipos.
+#
+# No hay versión que los corrija (FIXED VERSION: --): v28.5.2+incompatible es
+# la última publicada. El arreglo real lo decide upstream (los providers), no
+# nosotros. Revisar si aparece una v28.6 o v29 con corrección.
+#
+# OJO, 2026-10-12: el escaneo de lockfiles ya no las ve y avisa de «unused ignores»,
+# pero el SBOM CycloneDX de la release (syft sobre el directorio, que lee también los
+# go.sum del provider de Crossplane y de la raíz) SÍ trae docker/docker. Quitarlas
+# (#574) dejó `security` en rojo en la v3.12.0. Se quedan mientras el SBOM la vea.
+[[IgnoredVulns]]
+id = "GO-2026-4883"
+ignoreUntil = 2026-12-01
+reason = "docker/docker indirecta de los providers de Crossplane y sytuecloud; sin versión corregida publicada y sin uso de ningún demonio Docker"
+
+[[IgnoredVulns]]
+id = "GO-2026-4887"
+ignoreUntil = 2026-12-01
+reason = "docker/docker indirecta de los providers de Crossplane y sytuecloud; sin versión corregida publicada y sin uso de ningún demonio Docker"
+
+[[IgnoredVulns]]
+id = "GO-2026-5617"
+ignoreUntil = 2026-12-01
+reason = "docker/docker indirecta de los providers de Crossplane y sytuecloud; sin versión corregida publicada y sin uso de ningún demonio Docker"
+
+[[IgnoredVulns]]
+id = "GO-2026-5668"
+ignoreUntil = 2026-12-01
+reason = "docker/docker indirecta de los providers de Crossplane y sytuecloud; sin versión corregida publicada y sin uso de ningún demonio Docker"
+
+[[IgnoredVulns]]
+id = "GO-2026-5746"
+ignoreUntil = 2026-12-01
+reason = "docker/docker indirecta de los providers de Crossplane y sytuecloud; sin versión corregida publicada y sin uso de ningún demonio Docker"
+
+# Revisadas el 2026-10-03 contra los paquetes npm publicados y los avisos GHSA.
+# No hay versión corregida. braces entra solo por micromatch → @parcel/watcher:
+# los patrones los fija el tooling del build, no una petición ni contenido de usuario.
+[[IgnoredVulns]]
+id = "GHSA-vfj7-8cjw-p6xm"
+ignoreUntil = 2026-12-01
+reason = "braces 3.0.3, sin parche publicado: solo globs del tooling @parcel/watcher; ningún import en código de producto ni patrones controlados por usuarios"
+
+# sprintf-js 1.1.3 llega al árbol fijado de Renovate (tools/renovate/bun.lock, #540) por
+# global-agent → roarr, el registro de su proxy, que solo se activa con GLOBAL_AGENT_* y
+# dependencias.yml no lo define. Sin versión corregida; decisión del dueño (15/10/2026):
+# fusionar CI-02 con esta excepción y que vuelva a avisar a los 60 días.
+[[IgnoredVulns]]
+id = "GHSA-hp3w-g68c-fv3c"
+ignoreUntil = 2026-12-14
+reason = "sprintf-js solo lo usa el registro del proxy de Renovate (global-agent/roarr), inactivo sin GLOBAL_AGENT_*; sin versión corregida"

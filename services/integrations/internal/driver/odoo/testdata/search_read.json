@@ -1,0 +1,20 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": [
+    {
+      "id": 7,
+      "name": "Acme Corp",
+      "email": "info@acme.test",
+      "is_company": true,
+      "credit_limit": 5000.0
+    },
+    {
+      "id": 8,
+      "name": "Jane Doe",
+      "email": "jane@acme.test",
+      "is_company": false,
+      "credit_limit": 0.0
+    }
+  ]
+}

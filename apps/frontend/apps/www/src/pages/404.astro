@@ -1,0 +1,43 @@
+---
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: (c) 2026 Daniel Delgado Ramos
+ *
+ * 404 — queda FUERA del esquema `[...locale]` a propósito: el servidor estático
+ * sirve un único `404.html` para cualquier ruta que no exista, así que una
+ * versión por idioma nunca llegaría a mostrarse. Va en inglés (idioma base) y
+ * `noindex`, sin alternos: no hay nada que declarar como traducción.
+ */
+import { DEFAULT_LOCALE } from '@sytue/i18n';
+import { Button } from '@sytue/ui';
+import MarketingLayout from '../layouts/MarketingLayout.astro';
+import { localePath, useT } from '../i18n';
+
+const t = useT(DEFAULT_LOCALE);
+---
+
+<MarketingLayout
+  locale={DEFAULT_LOCALE}
+  path="/404"
+  title={t('meta.notFound.title')}
+  description={t('notFound.body')}
+  noindex={true}
+>
+  <section class="mx-auto flex max-w-2xl flex-col items-center px-6 py-28 text-center">
+    <span class="sytue-overline text-primary-text">{t('notFound.overline')}</span>
+    <h1 class="sytue-h1 text-text mt-3 text-balance">{t('notFound.title')}</h1>
+    <p class="text-text-muted mx-auto mt-3 max-w-md text-base text-pretty">{t('notFound.body')}</p>
+    <div class="mt-8 flex flex-wrap items-center justify-center gap-3">
+      {/* Los dos iban a mano con las clases del botón copiadas, y las dos copias ya
+          habían divergido: el primario arrastraba la `shadow-xs` que el Button canónico
+          quitó a propósito y solo dos de los tres anillos de foco; el secundario se había
+          quedado SIN foco visible. Copiar clases no copia lo que se corrige después. */}
+      <Button href={localePath(DEFAULT_LOCALE, '/')} size="lg">
+        {t('notFound.home')}
+      </Button>
+      <Button href={`${localePath(DEFAULT_LOCALE, '/')}#products`} variant="secondary" size="lg">
+        {t('cta.seeSuite')}
+      </Button>
+    </div>
+  </section>
+</MarketingLayout>

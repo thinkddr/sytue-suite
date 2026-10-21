@@ -1,0 +1,51 @@
+{
+  "key": "slack",
+  "tier": "tier2",
+  "manifest": {
+    "name": "Slack",
+    "description": "Mensajería y canales de equipo, con inicio de sesión único y aprovisionamiento SCIM.",
+    "category": "Comunicación",
+    "color": "#4A154B",
+    "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#4A154B\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><line x1=\"9\" y1=\"4\" x2=\"7\" y2=\"20\"/><line x1=\"17\" y1=\"4\" x2=\"15\" y2=\"20\"/><line x1=\"4\" y1=\"9\" x2=\"20\" y2=\"7\"/><line x1=\"4\" y1=\"17\" x2=\"20\" y2=\"15\"/></svg>",
+    "identity": {
+      "kind": "saml",
+      "entity_id": "https://slack.com",
+      "acs_url": "https://{workspace}.slack.com/sso/saml",
+      "name_id_format": "email"
+    },
+    "provisioning": "scim",
+    "scim_base_url": "https://api.slack.com/scim/v2",
+    "launch": {
+      "kind": "initiate"
+    },
+    "fields": [
+      {
+        "key": "workspace",
+        "label": "Workspace de Slack",
+        "placeholder": "acme",
+        "help": "El nombre de tu workspace: https://WORKSPACE.slack.com",
+        "required": true
+      }
+    ],
+    "oauth": {
+      "authorize_url": "https://slack.com/oauth/v2/authorize",
+      "token_url": "https://slack.com/api/oauth.v2.access",
+      "revoke_url": "https://slack.com/api/auth.revoke",
+      "scopes": [
+        "channels:read",
+        "chat:write",
+        "incoming-webhook"
+      ]
+    },
+    "secret": {
+      "label": "Token SCIM de Slack",
+      "help": "Token de la API SCIM (https://api.slack.com/scim/v2): lo usa el aprovisionamiento de usuarios y grupos."
+    },
+    "substitutes": [
+      {
+        "product": "rooms",
+        "open_url": "https://{workspace}.slack.com/"
+      }
+    ]
+  }
+}

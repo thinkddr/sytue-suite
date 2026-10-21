@@ -1,0 +1,166 @@
+# Sytue Cloud API — plano de control del PaaS. global.* lo inyecta el umbrella.
+enabled: true
+subdomain: cloud           # API servida bajo cloud.sytue.eu/api/v1 (mismo host que dashboard)
+replicaCount: 2
+
+image:
+  registry: ""
+  repository: sytue-cloud-api
+  tag: "1.0.0"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8090          # puerto del SPEC (Sytue Cloud API)
+
+ingress:
+  enabled: true
+  className: traefik
+  # Lista, como en el resto de los charts: este servicio no sirve solo /api/v1.
+  paths:
+    # `/api/v1` y NO `/api`: el dashboard (sytue-frontend cloud) sirve "/" y
+    # además tiene su propio BFF en /api/<recurso>. Un Prefix en /api se lo
+    # quedaba entero y lo mandaba al servicio Go, que solo expone /api/v1.
+    - path: /api/v1
+      pathType: Prefix
+    # Contrato público de la API (server.go: r.Get("/openapi.yaml"), spec.go la
+    # empotra en el binario). Es lo que consulta quien programa contra Sytue
+    # Cloud —el propio proveedor de Terraform cita esta ruta— y sin la regla se
+    # la quedaba el dashboard Astro: 404 HTML medido en cloud.sytue.eu.
+    - path: /openapi.yaml
+      pathType: Exact
+  annotations: {}
+  tls:
+    secretName: tls-cloud-sytue-eu
+
+# Requests MEDIDOS en producción (kubectl top, 2026-08-09), no estimados: en
+# Kubernetes la factura la fija lo RESERVADO, no lo usado, y estos pods pedían
+# 25-75 veces su consumo real. Esa reserva inflada obligó a un tercer nodo cuando
+# la CPU real del clúster estaba al 3 %.
+#
+# El límite NO se toca: un pico sigue pudiendo usar toda la CPU que necesite. Y
+# bajar el request hace al HPA MÁS sensible —calcula el porcentaje sobre el
+# request—, que es justo lo que hace falta para escalar por demanda real.
+resources:
+  requests:
+    cpu: 25m
+    memory: 96Mi
+  limits:
+    cpu: "1"
+    memory: 768Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+
+networkPolicy:
+  enabled: true
+
+serviceMonitor:
+  enabled: true
+  path: /metrics
+  interval: 30s
+
+# Nombres de env: services/cloud/internal/config/config.go. No-secretos por value.
+config:
+  logLevel: info
+  # OIDC de Sytue ID (validación JWKS). El issuer lo deriva el helper (id.<domain>).
+  #
+  # `sytue-cloud` —el client del PANEL— y no `sytue-cloud-api`. Sytue ID compone
+  # el `aud` de un access token como [resource_audience, client_id]
+  # (`accessAudience`, services/id/internal/oidc/token.go:178), así que
+  # `sytue-cloud-api` es una audiencia que NADIE emite nunca: el control-plane
+  # rechazaba con 401 cada llamada del panel, el panel lo tragaba en su `catch` y
+  # producción se anunciaba en «modo demostración» con el servicio sano, la red
+  # buena y la URL correcta. Medido el 2026-08-11 contra prod.
+  #
+  # Este servicio era además el ÚNICO de los 21 que fijaba OIDC_AUDIENCE.
+  oidcAudience: sytue-cloud
+  # Vacío = Service interno de Sytue ID. En un despliegue híbrido Cloud puede
+  # residir en otro clúster y usar https://id.<dominio>.
+  identityApiUrl: ""
+  # IDENTITY_API_URL se deriva en el Deployment al Service interno <release>-id.
+  # Registry Scaleway donde el builder publica imágenes de proyectos (REGISTRY_URL).
+  # Namespace del PaaS en el Container Registry. Lo crea Terraform como
+  # `sytue-<env>-paas` (infra/terraform/modules/registry): decía `sytue-paas`,
+  # que NO existe, así que en producción cada build de cliente fallaba al
+  # publicar con un 401 —Scaleway responde 401 y no 404 a un namespace que no
+  # está—. El overlay de cada entorno lo fija; este es el de prod.
+  registry: rg.fr-par.scw.cloud/sytue-prod-paas
+  # Alertas por correo. VACÍO = apagado: las de webhook siguen funcionando y las
+  # de `mailto:` se omiten con un aviso en el registro, en vez de reintentar
+  # contra un servidor que no existe.
+  #
+  # El remitente sale del BUZÓN configurado y no de quien dispara la alerta: el
+  # correo de la casa rechaza un From que no sea suyo (lección del incidente de
+  # `ops@sytue.com` enviando como la sesión).
+  smtp:
+    host: ""
+    port: "587"
+    from: cloud@sytue.eu
+  dbMaxConns: 10
+  # Hosts de runtime del PaaS (SPEC): APPS_DOMAIN / PREVIEW_DOMAIN / INGRESS_TARGET.
+  appsDomain: apps.sytue.eu
+  previewDomain: preview.sytue.eu
+  ingressTarget: ingress.sytue.eu
+  # Forja donde Cloud le crea el repositorio a quien no tiene ninguno (tercera vía
+  # del alta): la URL raíz de una forja Forgejo/Gitea; el client id/secret de la
+  # aplicación OAuth2 van en el Secret, no aquí. Vacía, la vía está apagada: ya no
+  # apunta a git.gay, que dejó de ser nuestra forja (retirada el 2026-10-17).
+  #
+  # Son las TRES (esta URL y las dos credenciales) o ninguna, y el arranque lo dice.
+  forgeUrl: ""
+  # Object Storage (S3 UE): el API lee logs de build de aquí. S3_ENDPOINT/REGION/BUCKET/USE_SSL.
+  s3:
+    endpoint: https://s3.fr-par.scw.cloud
+    region: fr-par
+    bucket: sytue-paas-build-cache
+    useSSL: true
+
+# Secret (existingSecret) sytue-cloud-api. OBLIGATORIAS (config.Load l.Require):
+# database-url, secret-enc-key, s3-access-key, s3-secret-key. OPCIONALES (feature-env,
+# secretKeyRef optional:true): github-app-id, github-app-private-key,
+# github-app-client-id, github-app-client-secret, webhook-secret,
+# registry-username, registry-password, forge-client-id, forge-client-secret.
+existingSecret: sytue-cloud-api
+
+# RBAC: cloud-api sirve logs (SSE) y terminal (WS exec) vía client-go
+# (internal/runtime). El ClusterRole es un CATÁLOGO sin binding global: el
+# controller lo vincula solo dentro de los namespaces de tenant. El rol permite
+# pods (get/list), pods/log (get) y pods/exec (create). El ClusterRole de WORKLOAD
+# (deployments/services/ingress/…) es del controller, no de cloud-api.
+rbac:
+  create: true
+serviceAccount:
+  create: true
+  name: ""
+
+# PodDisruptionBudget: mantiene el control-plane disponible durante drains/upgrades.
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# Reparto anti-afinidad suave por zona y nodo (alta disponibilidad multi-AZ, UE).
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: ScheduleAnyway
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: ScheduleAnyway
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10002
+  fsGroup: 10002
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]

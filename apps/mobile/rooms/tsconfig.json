@@ -1,0 +1,14 @@
+{
+  "//": "Solo para `tsc --noEmit` de capacitor.config.ts (Capacitor lo carga en runtime via su propio loader). www/native.js es JS plano inyectable (se valida con `node --check`).",
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "types": ["node"]
+  },
+  "include": ["capacitor.config.ts"]
+}

@@ -1,0 +1,142 @@
+{{- /*
+NetworkPolicy baseline a nivel de namespace de la plataforma.
+Por defecto deny-all de ingress; el tráfico se abre explícitamente por componente
+(las plantillas de cada subchart añaden sus propias NetworkPolicy de ingreso).
+Se permite siempre el egress a DNS y la resolución intra-cluster.
+Solo se aplica si global.networkPolicy.enabled=true.
+*/ -}}
+{{- if .Values.global.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "sytue-one.fullname" . }}-default-deny
+  labels:
+    {{- include "sytue-one.labels" (dict "context" . "component" "baseline") | nindent 4 }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Permitir tráfico desde pods del mismo release (intra-suite).
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/part-of: sytue-one
+    # Permitir tráfico desde el namespace del controlador de ingress.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              sytue.eu/role: ingress
+    {{- with .Values.global.networkPolicy.nodeCIDRs }}
+    # EL KUBELET SONDEA DESDE EL NODO, no desde un pod, así que ningún selector
+    # de pods o de namespace lo describe. Sin esta regla las sondas httpGet y
+    # tcpSocket se descartan, los pods quedan NotReady y salen de sus Services
+    # —y si no tienen livenessProbe ni se reinician, así que no hay ni un
+    # CrashLoop que delate el porqué—. Sin puertos a propósito: cada carga sondea
+    # el suyo.
+    - from:
+        {{- range . }}
+        - ipBlock:
+            cidr: {{ . | quote }}
+        {{- end }}
+    {{- end }}
+    {{- $slb := .Values.global.networkPolicy.serviceLB | default dict }}
+    {{- if $slb.namespace }}
+    # BALANCEADOR IMPLEMENTADO DENTRO DEL CLÚSTER (klipper-lb, MetalLB). El
+    # tráfico de los Service LoadBalancer no llega de una red privada sino de un
+    # pod de otro namespace, con IP de pod. Sin esta regla se caen a la vez todas
+    # las superficies publicadas: web, correo y videollamadas.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ $slb.namespace | quote }}
+          {{- with $slb.podLabels }}
+          podSelector:
+            matchLabels:
+              {{- toYaml . | nindent 14 }}
+          {{- end }}
+    {{- end }}
+  egress:
+    # DNS (CoreDNS) siempre permitido.
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Tráfico intra-suite.
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/part-of: sytue-one
+    {{- $np := .Values.global.networkPolicy }}
+    {{- if and $np.dataNamespace $np.dataPorts }}
+    # DATOS DENTRO DEL PROPIO CLÚSTER. La regla intra-suite de arriba lleva un
+    # podSelector desnudo, que solo alcanza al MISMO namespace; y allowExternalEgress
+    # abre 443 y 5432, que valen para un PostgreSQL gestionado y un S3 por HTTPS,
+    # pero no para un SeaweedFS que sirve S3 en claro por el 8333 ni para un
+    # Dragonfly en el 6379. Sin esta regla, Drive, Mail y Docs se quedan sin
+    # almacenamiento y media suite sin caché.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ $np.dataNamespace | quote }}
+      ports:
+        {{- range $np.dataPorts }}
+        - { protocol: TCP, port: {{ . }} }
+        {{- end }}
+    {{- end }}
+    {{- with $np.apiServer }}
+    {{- if .cidrs }}
+    # API SERVER DEL PROPIO CLÚSTER. El porqué completo está en el comentario del
+    # valor: kube-router compara el destino TRAS el DNAT, así que aquí se nombra
+    # la IP real del nodo y el puerto real del API, no la ClusterIP ni el 443.
+    # Sin esto Traefik no lista Ingress y la suite entera responde 404.
+    - to:
+        {{- range .cidrs }}
+        - ipBlock:
+            cidr: {{ . | quote }}
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: {{ .port | default 6443 }}
+    {{- end }}
+    {{- end }}
+    # Egress a los servicios gestionados de Scaleway: RDB, Object Storage,
+    # Secret Manager y SMTP.
+    #
+    # OJO CON LO QUE ESTA REGLA HACE DE VERDAD. Hasta el 2026-08-11 este
+    # comentario decía «solo UE» y no era cierto: el destino es `0.0.0.0/0`. Lo
+    # único que se acota son los PUERTOS. Cualquier pod de la suite puede abrir
+    # una conexión a cualquier host de internet por el 443, y la red no lo
+    # impide.
+    #
+    # Se deja así a propósito, no por descuido: restringirlo exige la lista de
+    # rangos de RDB, Object Storage, Secret Manager y los relés de correo, y esos
+    # rangos los cambia el proveedor sin avisar. Una lista equivocada no falla al
+    # desplegar —falla más tarde, cuando un servicio deja de alcanzar su base de
+    # datos—, así que hay que sacarla del proveedor y probarla en el efímero, no
+    # escribirla de memoria.
+    #
+    # Mientras tanto, esto NO es el control que impide que un servicio nuevo
+    # llame adonde no debe. Ese control hoy no existe, y por eso las fugas de
+    # salida se han encontrado leyendo código y no viéndolas bloqueadas.
+    {{- if .Values.global.networkPolicy.allowExternalEgress }}
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 169.254.0.0/16
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 5432
+        - protocol: TCP
+          port: 587
+        - protocol: TCP
+          port: 465
+    {{- end }}
+{{- end }}

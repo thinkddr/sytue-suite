@@ -1,0 +1,573 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Daniel Delgado Ramos
+openapi: 3.1.0
+info:
+  title: Sytue Hub API
+  version: "1.0"
+  description: >
+    API de integración seamless de Sytue One (shell backend): búsqueda federada
+    sobre los servicios de la suite, notificaciones unificadas (con stream SSE en
+    tiempo real sobre LISTEN/NOTIFY), presencia e intents cross-app que devuelven
+    deep-links. Autenticación: Bearer JWT de Sytue ID (client `sytue-hub`).
+    Aislamiento multi-tenant por RLS en PostgreSQL. Sin Redis/Valkey.
+  license:
+    name: MIT
+servers:
+  - url: https://hub.sytue.eu
+    description: Producción
+  - url: https://hub.sytue.localhost
+    description: Desarrollo local (Traefik)
+security:
+  - bearerAuth: []
+tags:
+  - name: search
+  - name: notifications
+  - name: presence
+  - name: intents
+  - name: health
+
+paths:
+  /healthz:
+    get:
+      tags: [health]
+      summary: Liveness
+      security: []
+      responses:
+        "200": { description: Proceso vivo }
+  /readyz:
+    get:
+      tags: [health]
+      summary: Readiness (comprueba dependencias)
+      security: []
+      responses:
+        "200": { description: Listo }
+        "503": { description: No listo }
+
+  /api/v1/search:
+    get:
+      tags: [search]
+      summary: Búsqueda federada
+      description: >
+        Consulta en paralelo a los servicios drive/mail/calendar/contacts/chat
+        EN NOMBRE del usuario (propaga su Bearer JWT) y normaliza los resultados.
+        Degrada con elegancia: un origen caído se reporta como error parcial.
+      parameters:
+        - { name: q, in: query, required: true, schema: { type: string, minLength: 1 }, description: Término de búsqueda }
+        - name: sources
+          in: query
+          required: false
+          description: Lista CSV de orígenes a consultar (vacío = todos)
+          schema: { type: string, example: "drive,mail,chat" }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 200 }, description: Tamaño de la página del agregado }
+        - name: offset
+          in: query
+          required: false
+          description: >
+            Descarta los N primeros resultados del AGREGADO ya ordenado por relevancia.
+            Se pagina sobre el conjunto de TODOS los orígenes, no por origen: el orden
+            que le importa a quien busca es el global, y un cursor por servicio no puede
+            reproducirlo.
+          schema: { type: integer, minimum: 0 }
+        - name: from
+          in: query
+          required: false
+          description: >
+            Acota por fecha del recurso (RFC 3339). Un resultado SIN fecha se descarta
+            cuando se filtra por fecha: no se puede afirmar que caiga en el rango. Una
+            fecha mal formada se rechaza con 400 en vez de ignorarse en silencio.
+          schema: { type: string, format: date-time }
+        - name: to
+          in: query
+          required: false
+          description: Extremo superior del rango de fechas (RFC 3339).
+          schema: { type: string, format: date-time }
+        - name: kinds
+          in: query
+          required: false
+          description: Lista CSV de tipos de entidad dentro del origen (vacío = todos)
+          schema: { type: string, example: "file,message" }
+      responses:
+        "200":
+          description: Resultados agregados
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SearchResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/v1/notifications/prefs:
+    get:
+      tags: [notifications]
+      summary: Preferencias de notificación del usuario
+      description: >
+        Devuelve las EXCEPCIONES del usuario: solo lo que ha cambiado. La ausencia de una
+        regla significa «que llegue», así que una app nueva no nace muda esperando a que
+        alguien la habilite. Siempre del usuario del token.
+      responses:
+        "200":
+          description: Lista de excepciones
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  prefs:
+                    type: array
+                    items: { $ref: "#/components/schemas/NotificationPref" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    put:
+      tags: [notifications]
+      summary: Silenciar (o volver a permitir) un origen o un tipo
+      description: >
+        `kind` vacío aplica a TODO el origen; con valor, solo a ese tipo de aviso, y la
+        regla más específica gana. Volver al estado por defecto (`muted=false` sobre un
+        origen) BORRA la regla en vez de guardar un «no silenciado».
+
+        El filtro se aplica al ENTREGAR: un aviso silenciado no se persiste, para que el
+        contador de no leídos siga diciendo la verdad.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NotificationPref" }
+      responses:
+        "200":
+          description: Preferencia aplicada
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/NotificationPref" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/v1/recent:
+    get:
+      tags: [search]
+      summary: Actividad reciente cross-app
+      description: >
+        Devuelve los ítems más recientes del usuario en cada servicio
+        drive/mail/calendar/contacts/chat SIN término de búsqueda (llamadas EN
+        NOMBRE del usuario, propaga su Bearer JWT), agregados y ordenados por
+        recencia. Mismo fan-out federado que /search y la misma degradación
+        elegante: un origen sin recientes o caído no rompe el resto (se reporta
+        como error parcial por origen). El campo `query` de la respuesta va vacío.
+      parameters:
+        - name: sources
+          in: query
+          required: false
+          description: Lista CSV de orígenes a consultar (vacío = todos)
+          schema: { type: string, example: "drive,mail,chat" }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 200 }, description: Máximo de ítems recientes por origen }
+      responses:
+        "200":
+          description: Actividad reciente agregada
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SearchResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/v1/notifications:
+    get:
+      tags: [notifications]
+      summary: Listar notificaciones del usuario
+      parameters:
+        - { name: unread, in: query, schema: { type: boolean }, description: Solo no leídas }
+        - { name: before, in: query, schema: { type: string, format: date-time }, description: Paginación keyset (created_at < before) }
+        - { name: before_id, in: query, schema: { type: string, format: uuid }, description: "Con before, el id del último de la página: (created_at, id) < (before, before_id)" }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100 } }
+      responses:
+        "200":
+          description: Listado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  notifications:
+                    type: array
+                    items: { $ref: "#/components/schemas/Notification" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [notifications]
+      summary: Emitir una notificación
+      description: >
+        La emiten los servicios de la suite o Console. Notificar a un usuario
+        distinto del emisor requiere el scope `notifications:write`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NewNotification" }
+      responses:
+        "201":
+          description: Creada
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Notification" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/v1/notifications/unread_count:
+    get:
+      tags: [notifications]
+      summary: Contador de no leídas
+      responses:
+        "200":
+          description: Contador
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { unread: { type: integer } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/v1/notifications/stream:
+    get:
+      tags: [notifications]
+      summary: Stream SSE de notificaciones en tiempo real
+      description: >
+        Devuelve `text/event-stream`. Eventos: `ready` (handshake con `unread`),
+        `notification` (notificación nueva en `data`), y comentarios `: keep-alive`
+        periódicos. El fan-out se hace sobre LISTEN/NOTIFY de PostgreSQL.
+      responses:
+        "200":
+          description: Flujo SSE
+          content:
+            text/event-stream:
+              schema: { type: string }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/v1/notifications/{id}/read:
+    post:
+      tags: [notifications]
+      summary: Marcar una notificación como leída
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "204": { description: Marcada }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/notifications/read_all:
+    post:
+      tags: [notifications]
+      summary: Marcar todas como leídas
+      responses:
+        "200":
+          description: Número actualizado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { updated: { type: integer } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/v1/presence:
+    get:
+      tags: [presence]
+      summary: Consultar presencia de usuarios
+      parameters:
+        - name: subjects
+          in: query
+          description: Lista CSV de subjects (vacío = el propio usuario)
+          schema: { type: string }
+      responses:
+        "200":
+          description: Presencia agregada (offline derivado por TTL)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  presence:
+                    type: array
+                    items: { $ref: "#/components/schemas/Presence" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    put:
+      tags: [presence]
+      summary: Heartbeat de presencia
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                state: { type: string, enum: [online, away, busy] }
+                status: { type: string, maxLength: 140 }
+      responses:
+        "200":
+          description: Renovada (incluye intervalo sugerido de heartbeat)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  heartbeat_seconds: { type: integer }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    delete:
+      tags: [presence]
+      summary: Marcar offline (logout/cierre)
+      responses:
+        "204": { description: Offline }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/v1/intents:
+    post:
+      tags: [intents]
+      summary: Resolver un intent cross-app (devuelve deep-links)
+      description: >
+        Compone deep-links de cara al usuario para conectar dos productos de la
+        suite. Hub no ejecuta la acción: el shell abre el enlace y el servicio
+        destino aplica su autorización y ejecución.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/IntentRequest" }
+      responses:
+        "200":
+          description: Deep-links del intent
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/IntentResult" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/v1/instaladores:
+    get:
+      tags: [instaladores]
+      summary: Instaladores nativos publicados, de una plataforma o de todas
+      description: >
+        Lo que pregunta el actualizador de las apps de escritorio. Mismo bucket y
+        mismo criterio que la página de descargas del portal: tener sesión ya es
+        tener derecho. La versión y la SHA-256 salen de los metadatos que deja
+        quien sube cada instalador; sin suma, la app no lo instala. `url` es una
+        URL firmada de cinco minutos cuando el almacén se alcanza desde fuera; si
+        falta, el instalador se baja por la ruta de abajo. Sin `plataforma`, los
+        de todas: es la página de descargas de la app nativa del Hub.
+      parameters:
+        - name: plataforma
+          in: query
+          required: false
+          schema: { type: string, enum: [macos, windows, linux] }
+      responses:
+        "200":
+          description: Instaladores
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  instaladores:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        app: { type: string, example: hub }
+                        plataforma: { type: string }
+                        arquitectura: { type: string, enum: [amd64, arm64, universal], description: Procesador que dice el nombre del fichero; ausente si no lo dice }
+                        fichero: { type: string, example: sytue-hub-macos-universal.dmg }
+                        version: { type: string, example: 3.6.0 }
+                        bytes: { type: integer }
+                        sha256: { type: string }
+                        url: { type: string, format: uri }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "503":
+          description: >
+            `installers_unconfigured` si este despliegue no tiene bucket de
+            instaladores; `unavailable` si lo tiene y no contesta.
+
+  /api/v1/instaladores/sumas:
+    get:
+      tags: [instaladores]
+      summary: SHA256SUMS de los instaladores publicados y su firma
+      description: >
+        Para que el actualizador de las apps compruebe con la clave de publicación
+        que lleva embebida lo que va a instalar. El Hub no verifica nada. `firma`
+        va vacía si la versión no se firmó.
+      responses:
+        "200":
+          description: SHA256SUMS y firma
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sumas: { type: string }
+                  firma: { type: string, description: ECDSA P-256 en base64 (ASN.1 DER), o vacía }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "503": { description: Este despliegue no tiene bucket de instaladores }
+
+  /api/v1/instaladores/{fichero}:
+    get:
+      tags: [instaladores]
+      summary: Bajar un instalador por el Hub
+      parameters:
+        - { name: fichero, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: El instalador, en flujo
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "503": { description: Este despliegue no tiene bucket de instaladores }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT de Sytue ID validado vía JWKS.
+
+  responses:
+    BadRequest:
+      description: Solicitud inválida
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    Unauthorized:
+      description: Autenticación requerida
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    Forbidden:
+      description: Sin permiso
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    NotFound:
+      description: No encontrado
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code: { type: string }
+            message: { type: string }
+            details: {}
+        request_id: { type: string }
+
+    SearchHit:
+      type: object
+      properties:
+        source: { type: string, enum: [drive, mail, calendar, contacts, chat] }
+        kind: { type: string }
+        id: { type: string }
+        title: { type: string }
+        snippet: { type: string }
+        url: { type: string, format: uri }
+        icon: { type: string }
+        timestamp: { type: string, format: date-time, nullable: true }
+        score: { type: number }
+      required: [source, kind, id, title, url]
+
+    SourceResult:
+      type: object
+      properties:
+        source: { type: string }
+        hits: { type: array, items: { $ref: "#/components/schemas/SearchHit" } }
+        took_ms: { type: integer }
+        error: { type: string }
+      required: [source, took_ms]
+
+    SearchResponse:
+      type: object
+      properties:
+        query: { type: string }
+        hits: { type: array, items: { $ref: "#/components/schemas/SearchHit" } }
+        sources: { type: array, items: { $ref: "#/components/schemas/SourceResult" } }
+        took_ms: { type: integer }
+        total:
+          type: integer
+          description: >
+            Resultados del agregado ANTES de recortar la página. Es lo que permite decir
+            «23 resultados» y saber si ofrecer más, cosa imposible mirando solo `hits`.
+        has_more: { type: boolean, description: Quedan resultados más allá de esta página }
+
+    NotificationPref:
+      type: object
+      required: [source]
+      properties:
+        source: { type: string, enum: [drive, mail, calendar, contacts, chat] }
+        kind: { type: string, description: "Tipo de aviso dentro del origen ('' = todos)" }
+        muted: { type: boolean }
+
+    NewNotification:
+      type: object
+      required: [source, type, title]
+      properties:
+        subject: { type: string, description: "Destinatario (sub). Vacío = el emisor." }
+        source: { type: string, enum: [drive, mail, calendar, contacts, chat] }
+        type: { type: string }
+        level: { type: string, enum: [info, success, warning, error], default: info }
+        title: { type: string, maxLength: 200 }
+        body: { type: string, maxLength: 4000 }
+        url: { type: string, format: uri }
+
+    Notification:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        source: { type: string }
+        type: { type: string }
+        level: { type: string, enum: [info, success, warning, error] }
+        title: { type: string }
+        body: { type: string }
+        url: { type: string, format: uri }
+        read: { type: boolean }
+        created_at: { type: string, format: date-time }
+        read_at: { type: string, format: date-time, nullable: true }
+      required: [id, source, type, level, title, read, created_at]
+
+    Presence:
+      type: object
+      properties:
+        subject: { type: string }
+        state: { type: string, enum: [online, away, busy, offline] }
+        status: { type: string }
+        last_seen: { type: string, format: date-time }
+      required: [subject, state]
+
+    IntentRequest:
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [attach-drive-to-mail, create-event-from-mail, share-to-chat]
+        params:
+          type: object
+          additionalProperties: { type: string }
+          description: >
+            Parámetros por intent. attach-drive-to-mail: to, subject (+ ids de
+            ficheros). create-event-from-mail: message_id, subject, body, start,
+            attendees (emails separados por coma). share-to-chat: source, id,
+            channel_id, text.
+        ids:
+          type: array
+          items: { type: string }
+          description: Identificadores múltiples (p. ej. ficheros a adjuntar)
+
+    IntentResult:
+      type: object
+      properties:
+        type: { type: string }
+        url: { type: string, format: uri, description: Deep-link primario }
+        target: { type: string, enum: [drive, mail, calendar, contacts, chat] }
+        label: { type: string }
+        links:
+          type: array
+          items:
+            type: object
+            properties:
+              rel: { type: string }
+              source: { type: string }
+              url: { type: string, format: uri }
+      required: [type, url, target, label]

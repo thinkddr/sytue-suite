@@ -1,0 +1,18 @@
+Vingt-quatre modules et un livre en partie double que la base de données refuse de déséquilibrer.
+
+• Vingt-quatre modules et trente-six modèles : contacts, ventes, achats, stocks, production, facturation, comptabilité, projets et RH.
+• Ajouter un module, c’est écrire un JSON : sans migration, sans nouvelle route et sans toucher à l’interface.
+• Les montants sont en centimes entiers, jamais en virgule flottante, et l’équilibre est imposé par la base.
+• Ce qui est comptabilisé ne se retouche pas : on corrige par une autre écriture, ce qui distingue un livre d’un tableur.
+• Vingt-quatre modules et trente-six modèles dans un seul service et une seule base de données.
+• Le catalogue de modèles est une donnée : chaque module déclare ses champs, ses états et ses colonnes.
+• Un nouveau module tient dans un fichier JSON — sans DDL, sans migration et sans verrou de table.
+• Une seule API pour les trente-six modèles, et une interface engendrée depuis le catalogue.
+• Comptabilité en partie double avec des montants en centimes entiers ; pas un seul flottant.
+• L’équilibre est vérifié par la base au moment de valider la transaction, pas par le code applicatif.
+• Les écritures clôturées sont immuables : ni modification, ni suppression, ni ligne supplémentaire.
+• Un document, une écriture : une nouvelle tentative ou deux onglets ne peuvent pas dupliquer un produit.
+• Les libellés communs existent dans les 26 langues, et un champ non traduit empêche le démarrage.
+• Listes servies par index : la première page de vingt mille lignes arrive en moins d’une milliseconde.
+
+Chiffrement en transit (TLS 1.3). L’infrastructure de Sytue se trouve dans l’UE. La localisation des services externes dépend de leur fournisseur.

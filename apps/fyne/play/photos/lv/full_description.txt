@@ -1,0 +1,18 @@
+Fotoattēlu galerija un redaktors: oriģināli Drive, labojumi kā recepte.
+
+• Laika josla pa mēnešiem ar meklēšanu pēc nosaukuma.
+• Albumi ar vāku; pilnekrāna skatītājs.
+• Redaktors gaismai, krāsām, pagriešanai, spoguļošanai un apgriešanai reāllaikā.
+• Katrs labojums ir recepte: oriģināls netiek aizskarts.
+• Laika josla, grupēta pa mēnešiem, ar meklēšanu pēc nosaukuma un asiem sīktēliem.
+• Albumi: izveide, pārdēvēšana, vāka izvēle, pievienošana no skatītāja un noņemšana.
+• Redaktors ar četriem slīdņiem (ekspozīcija, kontrasts, piesātinājums, temperatūra), pagriešanu un spoguļošanu.
+• Katrs labojums ir atsevišķi glabāta recepte: oriģināls Drive nekad netiek mainīts.
+• Eksports pilnā izšķirtspējā, renderēts serverī ar tām pašām formulām kā priekšskatījumā.
+• Atkritne ar atjaunošanu.
+• Oriģināli atrodas jūsu Sytue Drive; atvasinājumi ir atjaunojama kešatmiņa.
+• EXIF dati tiek nolasīti no paša faila; viss Eiropas Savienībā.
+• Vairāku attēlu atlase pa mēnešiem: uz jaunu albumu, uz atkritni vai lejupielāde vienā reizē.
+• Slaidrāde, pilns izmērs, pagriešana no skatītāja un apgriešana ar fiksētu malu attiecību.
+
+Šifrēts pārsūtīšanas laikā (TLS 1.3). Sytue infrastruktūra atrodas ES. Ārējo pakalpojumu atrašanās vieta ir atkarīga no to sniedzēja.

@@ -1,0 +1,25 @@
+[
+  { "nombre": "sytue-one-linux-amd64.tar.xz", "plataforma": "linux", "arquitectura": "amd64" },
+  { "nombre": "sytue-one-linux-arm64.tar.xz", "plataforma": "linux", "arquitectura": "arm64" },
+  {
+    "nombre": "sytue-drive-windows-amd64-installer.exe",
+    "plataforma": "windows",
+    "arquitectura": "amd64"
+  },
+  {
+    "nombre": "sytue-drive-windows-arm64-installer.exe",
+    "plataforma": "windows",
+    "arquitectura": "arm64"
+  },
+  { "nombre": "sytue-one-macos-universal.dmg", "plataforma": "macos", "arquitectura": "universal" },
+  { "nombre": "sytue-one-macos-arm64.dmg", "plataforma": "macos", "arquitectura": "arm64" },
+  { "nombre": "sytue-calcus-macos-amd64.dmg", "plataforma": "macos", "arquitectura": "amd64" },
+  { "nombre": "sytue-one-linux-amd64.tar.gz", "plataforma": null, "arquitectura": null },
+  { "nombre": "sytue-one-linux-riscv64.tar.xz", "plataforma": null, "arquitectura": null },
+  { "nombre": "sytue-calcus-windows-amd64.exe", "plataforma": null, "arquitectura": null },
+  { "nombre": "sytue-hub-android.apk", "plataforma": null, "arquitectura": null },
+  { "nombre": "SytueOne-macos-universal.dmg", "plataforma": null, "arquitectura": null },
+  { "nombre": "sytue-one-macos-universal.dmg.sig", "plataforma": null, "arquitectura": null },
+  { "nombre": "../sytue-hub-macos-universal.dmg", "plataforma": null, "arquitectura": null },
+  { "nombre": "SHA256SUMS", "plataforma": null, "arquitectura": null }
+]

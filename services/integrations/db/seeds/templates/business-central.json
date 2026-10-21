@@ -1,0 +1,37 @@
+{
+  "key": "business-central",
+  "tier": "tier2",
+  "manifest": {
+    "name": "Microsoft Dynamics 365 Business Central",
+    "description": "ERP de Microsoft: importa en Sytue ERP clientes, proveedores, artículos y facturas de venta y compra por su API OData.",
+    "category": "ERP",
+    "color": "#00A99D",
+    "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#00A99D\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M4 7h16v12H4zM8 7V5h8v2M4 12h16\"/></svg>",
+    "identity": {
+      "kind": "none"
+    },
+    "provisioning": "none",
+    "data": "odata",
+    "launch": {
+      "kind": "url",
+      "url": "https://businesscentral.dynamics.com"
+    },
+    "fields": [
+      {
+        "key": "service_url",
+        "label": "Raíz de la API de la empresa",
+        "placeholder": "https://api.businesscentral.dynamics.com/v2.0/<tenant>/Production/api/v2.0/companies(<id>)/",
+        "help": "La URL de la API v2.0 de UNA empresa: inquilino de Entra, entorno (Production o Sandbox) e id de la empresa.",
+        "required": true
+      }
+    ],
+    "oauth": {
+      "authorize_url": "https://login.microsoftonline.com/organizations/oauth2/v2.0/authorize",
+      "token_url": "https://login.microsoftonline.com/organizations/oauth2/v2.0/token",
+      "scopes": [
+        "https://api.businesscentral.dynamics.com/Financials.ReadWrite.All",
+        "offline_access"
+      ]
+    }
+  }
+}

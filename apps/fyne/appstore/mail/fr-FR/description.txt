@@ -1,0 +1,19 @@
+Messagerie privée et européenne en JMAP, sans traqueurs ni publicité.
+
+• Boîte de réception rapide : fils, libellés, filtres et recherche.
+• Joignez des fichiers directement depuis Sytue Drive.
+• Transformez un e-mail en évènement Calendar.
+• Chiffrement en transit (TLS 1.3). L’infrastructure de Sytue se trouve dans l’UE. La localisation des services externes dépend de leur fournisseur.
+• Fils de conversation avec lecture, réponse et transfert en un clic.
+• Dossiers, étiquettes de couleur et recherche avec opérateurs (from:, has:attachment, is:unread…).
+• Règles automatiques qui archivent, étiquettent ou déplacent le courrier à l’arrivée.
+• Envoi programmé et « Annuler l’envoi ».
+• Signatures, alias d’adresse et réponse automatique d’absence.
+• Boîtes partagées et déléguées avec droits de lecture et d’envoi.
+• Éditeur de texte enrichi avec pièces jointes depuis Sytue Drive sans dupliquer les fichiers.
+• Contenu distant bloqué par défaut : personne ne sait quand vous ouvrez un courriel.
+• Courrier signé (PGP et S/MIME) reconnu et signalé ; TLS en transit.
+• Accès aussi depuis Thunderbird, Outlook, Apple Mail ou le mobile, avec des mots de passe d’application.
+• Adresses en pastilles avec le carnet d’adresses de Contacts à un clic, et alerte si vous dites « ci-joint » sans rien joindre.
+
+Chiffrement en transit (TLS 1.3). L’infrastructure de Sytue se trouve dans l’UE. La localisation des services externes dépend de leur fournisseur.

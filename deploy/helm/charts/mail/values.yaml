@@ -1,0 +1,309 @@
+# sytue-mail — defaults del subchart (servicio Go). global.* lo inyecta el umbrella.
+# Estado en PostgreSQL (RDB Scaleway, UE). Sin Redis/Valkey ni motores AGPL.
+enabled: true
+subdomain: mail
+component: mail
+replicaCount: 2
+
+image:
+  registry: ""                 # cae a global.imageRegistry (Scaleway Registry, UE)
+  repository: sytue-mail
+  tag: "1.0.0"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8086             # puerto del SPEC
+
+ingress:
+  enabled: true
+  className: traefik
+  annotations: {}
+  # mail.sytue.eu: el webmail Astro (sytue-frontend) sirve "/"; el backend Go expone
+  # JMAP/HTTP y API bajo prefijos (SMTP/IMAP van por el Service mx, LoadBalancer).
+  paths:
+    # Recepción por HTTPS. Solo tiene sentido con config.inboundWebhook.enabled,
+    # pero la ruta se publica igual: sin token el servicio devuelve 404, que es
+    # la misma respuesta que daría si no estuviera, y así no hay dos sitios que
+    # tengan que estar de acuerdo para que la recepción funcione.
+    - path: /hooks/inbound
+      pathType: Exact
+    - path: /jmap
+      pathType: Prefix
+    # `/api/v1` y NO `/api`: el BFF de la app Astro sirve sus propias rutas
+    # bajo /api/<recurso>, y un Prefix en /api se las quedaba TODAS y se las
+    # mandaba al servicio Go, que solo expone /api/v1. El navegador recibía
+    # 404 en cada carga y la app decía «no se pudieron cargar los datos».
+    - path: /api/v1
+      pathType: Prefix
+    - path: /.well-known/jmap
+      pathType: Exact
+    # Autodescubrimiento de clientes de correo (services/mail/internal/autoconfig):
+    # el usuario escribe solo su direccion y el cliente se configura solo.
+    # Thunderbird / Mozilla autoconfig:
+    - path: /.well-known/autoconfig
+      pathType: Prefix
+    - path: /mail/config-v1.1.xml
+      pathType: Exact
+    # Outlook Autodiscover (POX). Outlook prueba AMBAS capitalizaciones y el
+    # matching de rutas del Ingress distingue mayusculas: van las dos.
+    - path: /autodiscover
+      pathType: Prefix
+    - path: /Autodiscover
+      pathType: Prefix
+    # Politica MTA-STS (RFC 8461). El TXT _mta-sts se publicaba desde el primer
+    # dia sin que nadie sirviera este fichero: se anunciaba una proteccion
+    # contra downgrade que ningun remitente podia llegar a aplicar.
+    - path: /.well-known/mta-sts.txt
+      pathType: Exact
+    # Ancla S/MIME: el certificado PUBLICO de la CA de una organizacion, para que
+    # quien recibe un correo firmado pueda validarlo. Prefix y no Exact porque la
+    # organizacion va en la ruta (/.well-known/smime/<slug>.pem).
+    - path: /.well-known/smime
+      pathType: Prefix
+  # Hosts extra que sirven estas mismas rutas (ver docs/CONVENTIONS.md §3.4.7):
+  # Thunderbird consulta autoconfig.<dominio>/mail/config-v1.1.xml y Outlook
+  # autodiscover.<dominio>/autodiscover/autodiscover.xml. Sus CNAME ya apuntan al
+  # ingress; sin esto el ingress no los enruta a ningun backend (404).
+  # mta-sts.<dominio> es el host del que el remitente descarga la politica, y el
+  # RFC exige HTTPS con certificado valido: por eso entra aqui y no en el LB de
+  # SMTP —este host SI resuelve al ingress, asi que el reto HTTP-01 funciona—.
+  extraSubdomains:
+    - autoconfig
+    - autodiscover
+    - mta-sts
+  tls:
+    secretName: tls-mail-sytue-eu
+  # El ancla S/MIME, ademas, en el DOMINIO RAIZ (sytue.eu y www.sytue.eu). Quien
+  # tiene que descargarla es el destinatario de un correo firmado: alguien de
+  # fuera, sin cuenta, que no sabe que existe mail.sytue.eu pero si conoce el
+  # dominio del remitente. Publicarla solo en el host del webmail la deja donde
+  # nadie la busca.
+  #
+  # El secreto TLS es el de `www` (sytue-frontend), no uno propio: son los mismos
+  # dos nombres, y pedir un segundo certificado para ellos duplicaria emisiones
+  # contra los limites de ACME. Vacio = no se publica en el raiz.
+  anchorHosts: ["@", "www"]
+  anchorTlsSecret: tls-www-sytue-eu
+
+# Right-sized al footprint MEDIDO (Go ~6-40MiB RSS idle): requests modestos para
+# densidad/coste; limits con cabecera para picos (MIME/adjuntos; burstable).
+# Requests MEDIDOS en producción (kubectl top, 2026-08-09), no estimados: en
+# Kubernetes la factura la fija lo RESERVADO, no lo usado, y estos pods pedían
+# 25-75 veces su consumo real. Esa reserva inflada obligó a un tercer nodo cuando
+# la CPU real del clúster estaba al 3 %.
+#
+# El límite NO se toca: un pico sigue pudiendo usar toda la CPU que necesite. Y
+# bajar el request hace al HPA MÁS sensible —calcula el porcentaje sobre el
+# request—, que es justo lo que hace falta para escalar por demanda real.
+resources:
+  requests:
+    cpu: 20m
+    memory: 64Mi
+  limits:
+    cpu: "2"
+    memory: 512Mi
+
+autoscaling:
+  # Etiqueta `job` de la serie de metricas, para el HPA por demanda real.
+  # Es el ServiceName del BINARIO, que no siempre coincide con el nombre del
+  # chart ni con el del directorio; por eso se escribe y no se deduce.
+  metricJob: sytue-mail
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 8
+  targetCPUUtilizationPercentage: 70
+  # Sin memoria: en Go la RSS queda alta tras el GC (mala señal de escalado) y
+  # GOMEMLIMIT (~85% de limits.memory) ya la acota -> se escala solo por CPU.
+
+networkPolicy:
+  enabled: true
+
+serviceMonitor:
+  enabled: true
+  path: /metrics
+  interval: 30s
+
+config:
+  # Correo de «X pide editar», desde la cuenta común de avisos (sytue.correoEnv):
+  # addr, from, tlsServerName, user y passwordSecret. Sin `from`, no sale ninguno.
+  smtp: {}
+  # Organización dueña del dominio raíz para alias de correo. Solo ella puede
+  # crear direcciones como security@<dominio> o abuse@<dominio>; el resto se
+  # queda en su <slug>.<dominio> o en los dominios que haya verificado. Vacío
+  # deja el raíz sin dueño, que es el lado seguro de equivocarse.
+  rootTenant: "corporate"
+  # Alias de sistema, «alias=buzón» separados por comas; el buzón tiene que existir.
+  # Mail los crea en cada arranque y no le quita una dirección a nadie.
+  systemAliases: ""
+  # RECEPCIÓN POR HTTPS. Apagada por defecto, y debe seguir así: solo hace falta
+  # donde el puerto 25 no es alcanzable desde internet —proveedores de acceso
+  # residenciales lo bloquean de serie—. Donde el MX propio funciona, esto sería
+  # una segunda puerta de entrada sin ninguna ventaja.
+  #
+  # Con `enabled`, el token se inyecta desde el Secret y el servicio monta
+  # /hooks/inbound. Ese token lo comparte con quien reenvía (Brevo Inbound
+  # Parsing, un Email Worker de Cloudflare, lo que sea), y es lo único que
+  # separa la recepción de correo de un relé abierto.
+  inboundWebhook:
+    enabled: false
+    existingSecret: ""            # vacío ⇒ el Secret general del servicio
+    secretKey: inbound-webhook-token
+
+  # Certificado que sirven SMTP e IMAP. NO es el del Ingress: ese se emite para
+  # los nombres que resuelven al ingress (mail./autoconfig./autodiscover./
+  # mta-sts.) y estos puertos viven en el balanceador del correo, al que apuntan
+  # smtp./imap./mx. Con el del Ingress, Thunderbird y Outlook seguian la
+  # autoconfiguracion hasta smtp.<dominio>:465 y cortaban con «hostname
+  # mismatch»: ningun cliente de correo podia enviar ni recibir.
+  #
+  # El comodin lo emite el MISMO ClusterIssuer por DNS-01 (webhook de Scaleway),
+  # que es lo que permite certificar nombres que no apuntan al ingress. Vacio =
+  # se cae al del Ingress, que es el comportamiento anterior.
+  listenerTLSSecretName: tls-wildcard-sytue-eu
+  # URL INTERNA de Sytue ID: contra ella se verifican las CONTRASENAS DE
+  # APLICACION en cada AUTH de IMAP/SMTP. Vacia = el Service del propio release
+  # ({release}-id), que es trafico dentro del cluster y no da la vuelta por el
+  # ingress. El secreto va aparte, en el Secret compartido sytue-id-internal.
+  idInternalUrl: ""
+  # Tamano del pool pgx por replica (DB_MAX_CONNS). Prod lo baja (3-5):
+  # PgBouncer multiplexa hacia la RDB (ver values-prod.yaml del umbrella).
+  dbMaxConns: 10
+  # FIRMA S/MIME DEL CORREO SALIENTE. Vacio = el defecto del servicio, que es
+  # firmar. Ponlo a "false" para que el correo salga SIN firmar.
+  #
+  # Por que se puede querer apagar: la autoridad de aqui no esta en el almacen de
+  # confianza de nadie, asi que Gmail, Outlook y Apple Mail ensenan la firma como
+  # NO VERIFICADA. Para quien recibe, un aviso de firma invalida se parece mas a
+  # una suplantacion que a una garantia, y hasta que haya certificado de una CA
+  # publica puede salir mas a cuenta no firmar.
+  #
+  # No hay estado que limpiar: el firmador no se cablea y el mensaje sale tal
+  # cual (delivery/outbound.go, `smime == nil`). Los certificados ya emitidos se
+  # quedan donde estan y volver a encenderlo es cambiar esto y desplegar.
+  smimeEnabled: ""
+  # Cuota de un buzon nuevo, en GB. Vacio = el defecto del servicio (10 GB).
+  # Importa donde los blobs comparten disco con PostgreSQL: ver el comentario
+  # de DEFAULT_MAILBOX_QUOTA_GB en el deployment.
+  defaultMailboxQuotaGb: ""
+  # Smarthost de salida. Vacio = entrega directa por MX (lo correcto con IP
+  # propia y PTR). Con relay se entrega TODO por el, y la contrasena sale del
+  # Secret en la clave `smtp-relay-password`, nunca de aqui.
+  relayHost: ""
+  relayPort: "587"
+  relayUsername: ""
+  logLevel: info
+  # Modo de la politica MTA-STS que se sirve en mta-sts.<dominio>: none, testing
+  # o enforce. `enforce` hace que un remitente que no pueda validar el
+  # certificado del MX contra mx.<dominio> NO entregue el correo. Ese era el
+  # bloqueo: se servia el del Ingress, a nombre de mail.<dominio>. Con
+  # `listenerTLSSecretName` apuntando al comodin, mx.<dominio> YA queda cubierto,
+  # asi que subir a `enforce` pasa a ser una decision y no un imposible. Se deja
+  # en `testing` a proposito: se sube cuando los informes TLS-RPT confirmen que
+  # los remitentes validan, no a la vez que el cambio que lo permite.
+  mtaStsMode: testing
+  s3Bucket: mail-blobs
+  # Tamano maximo de un mensaje, en MB, entrante o saliente. El servicio lo procesa
+  # en memoria, asi que este numero y `resources.limits.memory` van juntos: con 512Mi
+  # caben 50. Subirlo sin subir la memoria deja que un solo correo tumbe el pod.
+  maxMessageMb: 50
+  # Techo del /tmp del pod, donde el MX vuelca cada mensaje mientras llega (hasta 16 a
+  # la vez de maxMessageMb cada uno: 800Mi con 50). Sin techo, quien llena ese disco
+  # es el nodo, y el kubelet desaloja a los vecinos (postgres incluido).
+  tmpSizeLimit: 2Gi
+  # Dominio de las direcciones de canal de Sytue Rooms (`<token>@<dominio>`): el correo
+  # que llegue ahi se publica en el canal en vez de entregarse a un buzon. Vacio =
+  # apagado (esas direcciones no existen para el MX). DEBE coincidir con el
+  # `config.channelMailDomain` del chart de Rooms, que es quien publica la direccion.
+  channelMailDomain: ""
+  # URL interna de Sytue Rooms a donde se publica (vacio = http://<release>-rooms).
+  roomsUrl: ""
+  # Firma DKIM DEL PROPIO SERVICIO. APAGADA, y que siga así.
+  #
+  # Quien firma es el relé de salida (`deploy/mail-relay/`), que es el último
+  # que toca el mensaje y el único que puede garantizar que la firma cubre lo
+  # que sale por el cable. Un tiempo firmaron LOS DOS y se vio en un informe
+  # DMARC de Google del 2026-09-10: dos firmas sobre el mismo mensaje, la del
+  # relé válida y esta no. Dos firmas no suman; la que falla ensucia el informe.
+  #
+  # Encenderla exige publicar el TXT de su selector Y apagar la del relé. Con
+  # las dos puestas se vuelve exactamente al fallo de arriba.
+  dkimSelfSign: false
+  dkimSelector: sytue
+  # Dominio MX publico (SPF/DKIM/DMARC/MTA-STS/TLS-RPT se gestionan en DNS/Terraform).
+  mxHost: mx
+# Postgres EXTERNO (Scaleway RDB). DSN por secret (nunca en git).
+postgresql:
+  existingSecret: sytue-mail-db
+  dsnKey: dsn
+  # DSN directo a la RDB (bypass PgBouncer) para LISTEN/migraciones; opcional.
+  dsnDirectKey: dsn-direct
+
+# Object Storage S3 (blobs grandes). Hereda global.objectStorage; puede aislarse
+# por servicio en despliegues híbridos.
+objectStorage: {}
+
+# Servicio de correo expuesto (SMTP/IMAP) via LoadBalancer Scaleway (UE). El JMAP/HTTP
+# va por el Ingress (mail.sytue.eu); SMTP/IMAP por IP dedicada (mx.sytue.eu).
+mailService:
+  enabled: true
+  type: LoadBalancer
+  externalTrafficPolicy: Local
+  host: mx
+  annotations:
+    service.beta.kubernetes.io/scw-loadbalancer-type: "lb-s"
+  ports:
+    smtp: 25
+    submissions: 465
+    submission: 587
+    imaps: 993
+  # ¿Hay en el namespace un default-deny que NO deja pasar el correo de Internet?
+  # Entonces enciéndelo: emite una NetworkPolicy que abre esos cuatro puertos al
+  # pod de correo, y SOLO a él.
+  #
+  # Hace falta cuando el Service usa externalTrafficPolicy: Local —arriba, y se
+  # quiere así: preserva la IP del cliente, que es lo que necesita el antispam—.
+  # Con la IP intacta y pública, el paquete no casa con ninguno de los orígenes
+  # que admite un default-deny al uso, y kube-router lo rechaza con
+  # icmp-port-unreachable: el emisor lee «Connection refused», no un timeout, y
+  # todo apunta a un servicio caído en vez de a una política. Costó una mañana
+  # el 2026-09-07, con el MX publicado y el 25 abierto en el router.
+  #
+  # APAGADO POR DEFECTO, y no por prudencia decorativa: en un namespace SIN
+  # ninguna política, todo está permitido, y crear la primera que seleccione este
+  # pod lo pasaría a denegar por omisión todo lo que no esté aquí listado —el
+  # Ingress y las sondas del kubelet incluidos—. Es decir, encenderlo donde no
+  # hace falta rompe justo lo que pretende arreglar. Con un default-deny delante
+  # es puramente aditivo, porque las NetworkPolicies solo SUMAN ingresos.
+  publicIngressPolicy: false
+# Secretos de la app (OIDC client secret y especificos del servicio).
+existingSecret: sytue-mail
+
+# PodDisruptionBudget: garantiza disponibilidad durante drains/upgrades del cluster.
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+  # maxUnavailable: 1   # alternativa a minAvailable (usar uno u otro)
+
+# Reparto anti-afinidad suave por zona y nodo (alta disponibilidad multi-AZ, UE).
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: ScheduleAnyway
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: ScheduleAnyway
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  fsGroup: 10001
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]

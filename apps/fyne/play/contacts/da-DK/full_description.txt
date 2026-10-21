@@ -1,0 +1,18 @@
+CardDAV-kontakter, delt i hele din organisation.
+
+• En fælles adressebog for hele organisationen.
+• Import og eksport i vCard.
+• Flet dubletter uden at miste data.
+• Virker med alle CardDAV-klienter.
+• Adressebøger, inklusive din organisations fælles adressebog.
+• Et komplet kort: telefoner, mails, adresser, organisation, fødselsdag, noter og foto.
+• Etiketter og favoritter til at gruppere og finde.
+• Registrering og fletning af dubletter uden at miste data.
+• Import og eksport af vCard og CSV; eksport af en enkelt kontakt.
+• Massehandlinger og en papirkurv med gendannelse.
+• Øjeblikkelig søgning og autofuldførelse, mens du skriver i Mail.
+• Virker med alle CardDAV-klienter.
+• Kommende fødselsdage fra din adressebog, med denne måneds markeret.
+• Opret et møde med en kontakt, eller kopiér kontaktens mail uden at forlade kortet.
+
+Krypteret under overførsel (TLS 1.3). Sytues infrastruktur er i EU. Eksterne tjenesters placering afhænger af deres udbyder.

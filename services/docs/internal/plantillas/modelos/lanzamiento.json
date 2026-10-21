@@ -1,0 +1,138 @@
+{
+ "slides": [
+  {
+   "id": "s1",
+   "boxes": [
+    {
+     "id": "s1-titulo",
+     "x": 10,
+     "y": 35,
+     "w": 80,
+     "h": 20,
+     "html": "<h1>{{lanzamiento.titulo}}</h1>"
+    },
+    {
+     "id": "s1-subtitulo",
+     "x": 10,
+     "y": 58,
+     "w": 80,
+     "h": 10,
+     "html": "<p>{{lanzamiento.subtitulo}}</p>"
+    }
+   ]
+  },
+  {
+   "id": "s2",
+   "boxes": [
+    {
+     "id": "s2-titulo",
+     "x": 8,
+     "y": 8,
+     "w": 84,
+     "h": 16,
+     "html": "<h1>{{lanzamiento.producto}}</h1>"
+    },
+    {
+     "id": "s2-cuerpo",
+     "x": 8,
+     "y": 30,
+     "w": 84,
+     "h": 60,
+     "html": "<ul><li>{{lanzamiento.producto1}}</li><li>{{lanzamiento.producto2}}</li><li>{{lanzamiento.producto3}}</li></ul>"
+    }
+   ]
+  },
+  {
+   "id": "s3",
+   "boxes": [
+    {
+     "id": "s3-titulo",
+     "x": 8,
+     "y": 8,
+     "w": 84,
+     "h": 16,
+     "html": "<h1>{{lanzamiento.publico}}</h1>"
+    },
+    {
+     "id": "s3-izquierda",
+     "x": 8,
+     "y": 30,
+     "w": 40,
+     "h": 60,
+     "html": "<h2>{{lanzamiento.necesidad}}</h2><ul><li>{{lanzamiento.publico1}}</li><li>{{lanzamiento.publico2}}</li></ul>"
+    },
+    {
+     "id": "s3-derecha",
+     "x": 52,
+     "y": 30,
+     "w": 40,
+     "h": 60,
+     "html": "<h2>{{lanzamiento.canal}}</h2><ul><li>{{lanzamiento.canal1}}</li><li>{{lanzamiento.canal1}}</li></ul>"
+    }
+   ]
+  },
+  {
+   "id": "s4",
+   "boxes": [
+    {
+     "id": "s4-titulo",
+     "x": 8,
+     "y": 8,
+     "w": 84,
+     "h": 16,
+     "html": "<h1>{{lanzamiento.plan}}</h1>"
+    },
+    {
+     "id": "s4-cuerpo",
+     "x": 8,
+     "y": 30,
+     "w": 84,
+     "h": 60,
+     "html": "<ul><li>{{lanzamiento.hito}}</li><li>{{lanzamiento.hito}}</li><li>{{lanzamiento.hito}}</li></ul>"
+    }
+   ]
+  },
+  {
+   "id": "s5",
+   "boxes": [
+    {
+     "id": "s5-titulo",
+     "x": 8,
+     "y": 8,
+     "w": 84,
+     "h": 16,
+     "html": "<h1>{{lanzamiento.mensajes}}</h1>"
+    },
+    {
+     "id": "s5-cuerpo",
+     "x": 8,
+     "y": 30,
+     "w": 84,
+     "h": 60,
+     "html": "<ul><li>{{lanzamiento.mensaje1}}</li><li>{{lanzamiento.mensaje2}}</li><li>{{lanzamiento.mensaje3}}</li></ul>"
+    }
+   ]
+  },
+  {
+   "id": "s6",
+   "boxes": [
+    {
+     "id": "s6-titulo",
+     "x": 8,
+     "y": 8,
+     "w": 84,
+     "h": 16,
+     "html": "<h1>{{lanzamiento.medidas}}</h1>"
+    },
+    {
+     "id": "s6-cuerpo",
+     "x": 8,
+     "y": 30,
+     "w": 84,
+     "h": 60,
+     "html": "<ul><li>{{lanzamiento.medida}}</li><li>{{lanzamiento.medida}}</li><li>{{lanzamiento.medida}}</li></ul>"
+    }
+   ]
+  }
+ ]
+}

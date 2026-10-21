@@ -1,0 +1,71 @@
+From e68f4a18032b49bcfbc5392cfec031a08da3bcf6 Mon Sep 17 00:00:00 2001
+From: Daniel Delgado <admin@sytue.eu>
+Date: Sat, 17 Oct 2026 20:25:00 +0200
+Subject: [PATCH] fix(mobile/ios): use UIDocumentPickerModeImport and access
+ security-scoped files
+
+UIDocumentPickerModeOpen and UIDocumentPickerModeMoveToService require
+the iCloud Documents entitlement (com.apple.developer.icloud-container-identifiers).
+When invoked in an application without iCloud entitlements, UIKit throws an
+uncaught NSInternalInconsistencyException terminating the app.
+Switching to UIDocumentPickerModeImport and UIDocumentPickerModeExportToService
+enables opening and saving documents from Files, cloud drives and local storage
+without iCloud container entitlement.
+Additionally, wrap reading in startAccessingSecurityScopedResource so
+sandboxed security-scoped URLs can be read into memory safely.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+---
+ internal/driver/mobile/app/darwin_ios.m | 4 ++--
+ internal/driver/mobile/file_ios.m       | 10 ++++++++++
+ 2 files changed, 12 insertions(+), 2 deletions(-)
+
+diff --git a/internal/driver/mobile/app/darwin_ios.m b/internal/driver/mobile/app/darwin_ios.m
+index 5533ae5..8f6a9b1 100644
+--- a/internal/driver/mobile/app/darwin_ios.m
++++ b/internal/driver/mobile/app/darwin_ios.m
+@@ -478,7 +478,7 @@ void showFileOpenPicker(char* mimes, char *exts) {
+     NSMutableArray *docTypes = docTypesForMimeExts(mimes, exts);
+ 
+     UIDocumentPickerViewController *documentPicker = [[UIDocumentPickerViewController alloc]
+-        initWithDocumentTypes:docTypes inMode:UIDocumentPickerModeOpen];
++        initWithDocumentTypes:docTypes inMode:UIDocumentPickerModeImport];
+     documentPicker.delegate = (id) appDelegate;
+ 
+     dispatch_async(dispatch_get_main_queue(), ^{
+@@ -499,7 +499,7 @@ void showFileSavePicker(char* mimes, char *exts) {
+     BOOL ok = [data writeToURL:temporaryFileURL atomically:YES];
+ 
+     UIDocumentPickerViewController *documentPicker = [[UIDocumentPickerViewController alloc]
+-        initWithURL:temporaryFileURL inMode:UIDocumentPickerModeMoveToService];
++        initWithURL:temporaryFileURL inMode:UIDocumentPickerModeExportToService];
+     documentPicker.delegate = (id) appDelegate;
+ 
+     dispatch_async(dispatch_get_main_queue(), ^{
+diff --git a/internal/driver/mobile/file_ios.m b/internal/driver/mobile/file_ios.m
+index b3d3e33..7a8c991 100644
+--- a/internal/driver/mobile/file_ios.m
++++ b/internal/driver/mobile/file_ios.m
+@@ -23,6 +23,16 @@ void* iosParseUrl(const char* url) {
+ const void* iosReadFromURL(void* urlPtr, int* len)  {
+     NSURL* url = (NSURL*)urlPtr;
++    BOOL secured = NO;
++    @try {
++        secured = [url startAccessingSecurityScopedResource];
++    } @catch (NSException *e) {
++        secured = NO;
++    }
+     NSData* data = [NSData dataWithContentsOfURL:url];
++    if (secured) {
++        [url stopAccessingSecurityScopedResource];
++    }
++    if (!data) {
++        *len = 0;
++        return NULL;
++    }
+ 
+     *len = data.length;
+     return data.bytes;
+ }
+-- 
+2.54.0 (Apple Git-157)

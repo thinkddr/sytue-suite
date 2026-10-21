@@ -1,0 +1,17 @@
+Vídeo bajo demanda y directo: sube, emite y comparte, en la UE.
+
+• Sube un vídeo y se transcodifica en varias calidades para cualquier pantalla.
+• Emite en directo desde un programa de emisión, desde el navegador o desde la app.
+• Cuatro niveles de visibilidad: público, oculto, organización o personas concretas.
+• Chat en directo y comentarios, con moderación básica de quien publica.
+• Sube vídeos de hasta 8 GiB; el original se conserva.
+• Directo desde un programa de emisión por RTMP, con una clave de emisión por persona.
+• Directo desde el navegador o la app: cámara, pantalla y micrófono.
+• Las grabaciones de los directos se convierten en vídeos bajo demanda solas.
+• Portada pública y un canal por organización, indexables.
+• Enlaces ocultos, vídeos solo para la organización o acceso a personas concretas por @usuario.
+• Chat en directo y comentarios en hilo, moderados por quien publica y por la administración de la organización.
+• El almacenamiento cuenta en tu cuota de Sytue Drive; todo en la Unión Europea.
+• «Subir a Cast» desde Sytue Drive: una copia del vídeo pasa a Cast y el fichero se queda en Drive.
+
+Cifrado en tránsito (TLS 1.3). La infraestructura de Sytue está en la UE. Los servicios externos siguen la ubicación de su proveedor.

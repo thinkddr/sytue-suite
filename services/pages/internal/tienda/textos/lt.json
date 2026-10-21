@@ -1,0 +1,10 @@
+{
+  "order_paid_buyer_subject": "Užsakymo patvirtinimas {number}",
+  "order_paid_buyer_body": "Dėkojame už pirkinį. Užsakymas {number} patvirtintas.",
+  "order_paid_store_subject": "Gautas naujas užsakymas: {number}",
+  "order_paid_store_body": "Gavote naują užsakymą {number}, suma: {total}.",
+  "withdrawal_ack_subject": "Atsisakymo patvirtinimas gautas: {number}",
+  "withdrawal_ack_body": "Jūsų prašymas atsisakyti užsakymo {number} užregistruotas.",
+  "form_received_subject": "Gautas formos pateikimas: {form_id}",
+  "form_received_body": "Gautas naujas formos {form_id} pateikimas."
+}

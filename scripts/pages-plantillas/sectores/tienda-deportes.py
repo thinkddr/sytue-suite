@@ -1,0 +1,246 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Daniel Delgado Ramos
+from lib import *
+
+KEY = "tienda-deportes"
+
+# Paleta propia: amarillo mantequilla de cancha de parqué con ciruela oscura, y titulares en mayúsculas.
+CANCHA = dict(colores=dict(background="#fbf3cf", surface="#f4e8ae", text="#241626", muted="#56405a",
+                           primary="#7a1f6b", on_primary="#ffffff", border="#e0d08a", inverse="#2a0f27",
+                           on_inverse="#fbf3cf"),
+              fuentes=("montserrat", "manrope"), peso=800, mayus="uppercase", ls=0.02, h1=(46, 36, 28),
+              radio=(2, 4, 8))
+
+NOTA = ("Precios de ejemplo: cámbialos por los tuyos. Incluyen IVA.", "Example prices: replace them with your own. VAT included.")
+
+
+def build():
+    nueva(KEY)
+    look = CANCHA
+    malos = comprobar_paleta("cancha", look["colores"])
+    assert not malos, malos
+    nav = [("inicio", ("Inicio", "Home")), ("tienda", ("Tienda", "Shop")),
+           ("tallas", ("Tallas y cambios", "Sizes and returns")), ("equipos", ("Equipaciones", "Team kits")),
+           ("contacto", ("Contacto", "Contact"))]
+    horas = [(("Lunes a viernes", "Monday to Friday"),
+              ("10:00 a 14:00 y 17:00 a 20:30", "10:00 am to 2:00 pm and 5:00 pm to 8:30 pm")),
+             (("Sábado", "Saturday"), ("10:00 a 14:00", "10:00 am to 2:00 pm")),
+             (("Domingo", "Sunday"), ("Cerrado", "Closed"))]
+    cta_cab = marco([llamar(t=("Llamar", "Call")), whatsapp("ghost", t=("WhatsApp", "WhatsApp"))],
+                    dir="row", gap=8, wrap=True)
+    a_tienda = a_pagina("tienda", "catalogo")
+
+    inicio = pagina("inicio", ("", ""), ("Tienda de deportes", "Sports shop"),
+                    ("Tienda de material deportivo con catálogo y carrito, ajuste de calzado, guía de tallas y equipaciones para equipos.",
+                     "Sports equipment shop with a catalogue and cart, shoe fitting, a size guide and team kits."), [
+        hero(("Material deportivo bien elegido y bien ajustado", "Sports kit that is well chosen and well fitted"),
+             ("Dinos qué deporte haces y cuánto, y te enseñamos lo que necesitas. Pruébatelo en la tienda o pídelo online.",
+              "Tell us which sport you play and how often, and we will show you what you need. Try it on in the shop or order online."),
+             [boton(("Ver la tienda", "Browse the shop"), a_tienda), llamar("secondary"), whatsapp("ghost")],
+             eyebrow=("Tienda de deportes", "Sports shop"),
+             imagen_=("photo", ("Zapatillas y balones colocados en las estanterías de la tienda", "Trainers and balls arranged on the shop shelves"))),
+        bloque_valores(("Por deportes", "By sport"), [
+            (("Running", "Running"), ("Zapatillas, ropa técnica, cinturones y relojes.", "Trainers, technical clothing, belts and watches.")),
+            (("Fútbol y fútbol sala", "Football and five-a-side"), ("Botas, balones, espinilleras, guantes y equipaciones.", "Boots, balls, shin pads, gloves and kits.")),
+            (("Baloncesto", "Basketball"), ("Zapatillas, balones, canastas y ropa de juego.", "Shoes, balls, hoops and playing kit.")),
+            (("Pádel y tenis", "Padel and tennis"), ("Palas, raquetas, pelotas, grips y calzado de pista.", "Padel bats, rackets, balls, grips and court shoes.")),
+            (("Natación", "Swimming"), ("Bañadores, gafas, gorros, tablas y bolsas.", "Swimsuits, goggles, caps, kickboards and bags.")),
+            (("Montaña y senderismo", "Hiking and trekking"), ("Botas, mochilas, bastones, chaquetas y calcetines técnicos.", "Boots, rucksacks, poles, jackets and technical socks.")),
+            (("Fitness y gimnasio", "Fitness and gym"), ("Pesas, gomas, esterillas, ropa y guantes.", "Weights, bands, mats, clothing and gloves.")),
+            (("Ciclismo y patines", "Cycling and skating"), ("Cascos, ropa, protecciones y patines.", "Helmets, clothing, pads and skates.")),
+        ], cols=4, tono="relleno", estilo="borde", anchor="deportes"),
+        bloque_productos(("Novedades", "New in"),
+                         ("Lo último que ha llegado a la tienda. En Tienda tienes todo el catálogo.",
+                          "The latest arrivals in the shop. The full catalogue is on the Shop page."),
+                         limite=4, cols=4, anchor="novedades",
+                         boton_=boton(("Ver todo el catálogo", "See the whole catalogue"), a_tienda, "secondary")),
+        bloque_texto(("Te ajustamos el calzado y el material", "We fit your footwear and kit"),
+                     [("Con unas zapatillas o unas botas mal elegidas se acaba doliendo algo. Por eso te medimos el pie, vemos cómo pisas y probamos con el calcetín que usarás.",
+                       "With badly chosen trainers or boots, something ends up hurting. That is why we measure your foot, look at how you step and try on with the sock you will use."),
+                      ("También encordamos raquetas, cambiamos grips e inflamos balones. Las tarifas están en la página de tallas.",
+                       "We also string rackets, change grips and inflate balls. The rates are on the sizes page.")],
+                     eyebrow=("Asesoramiento", "Advice"),
+                     imagen_=("photo", ("Una persona probándose unas zapatillas de correr en la tienda con ayuda de una dependienta", "A person trying on running shoes in the shop with help from an assistant")),
+                     anchor="ajuste", invertir=True),
+        bloque_valores(("Para equipos y clubes", "For teams and clubs"), [
+            (("Equipaciones del equipo", "Team kits"),
+             ("Camisetas, pantalones y medias con los colores, el escudo y los dorsales de tu equipo.", "Shirts, shorts and socks with your team's colours, crest and numbers.")),
+            (("Pedido único", "One order"),
+             ("Recogemos las tallas de todos en una lista y entregamos el pedido junto.", "We collect everyone's sizes in one list and deliver the order together.")),
+        ], cols=2, tono="relleno", estilo="relleno", anchor="clubes",
+            intro=("Todo en la página Equipaciones.", "Everything is on the Team kits page.")),
+        bloque_opiniones(("Lo que dicen nuestros clientes", "What our customers say"),
+                         [("las zapatillas", "the trainers"), ("el asesoramiento", "the advice"), ("la equipación del equipo", "the team kit")], tono="base"),
+        bloque_cta(("¿Qué deporte haces?", "Which sport do you play?"),
+                   ("Escríbenos por WhatsApp con tu deporte y tu talla y te decimos qué tenemos.",
+                    "Message us on WhatsApp with your sport and size and we will tell you what we have."), tono="relleno"),
+    ])
+
+    tienda = pagina("tienda", ("tienda", "shop"), ("Tienda", "Shop"),
+                    ("Catálogo de material deportivo con carrito. Recogida en tienda o envío a domicilio.",
+                     "Sports equipment catalogue with a cart. In-store pickup or home delivery."), [
+        hero(("Tienda", "Shop"),
+             ("Añade al carrito y paga online. Si dudas con la talla, mira la guía o escríbenos antes de comprar.",
+              "Add to the cart and pay online. If you are unsure about the size, check the guide or message us before you buy."),
+             [boton(("Guía de tallas", "Size guide"), a_pagina("tallas", "medidas"), "secondary"), whatsapp("ghost")],
+             variante="texto"),
+        bloque_productos(("Todo el catálogo", "Full catalogue"), None, limite=24, cols=4, anchor="catalogo"),
+        bloque_checks(("Antes de pagar", "Before you pay"), [
+            ("Recogida en tienda gratis, normalmente en 24 horas.", "Free in-store pickup, usually within 24 hours."),
+            ("Envío a domicilio con número de seguimiento.", "Home delivery with a tracking number."),
+            ("Puedes probarte el calzado en tienda y cambiar la talla si no te va bien.", "You can try footwear on in the shop and swap the size if it does not fit."),
+            ("Cambios y devoluciones en 14 días, con las condiciones de la página Tallas y cambios.", "Exchanges and returns within 14 days, under the conditions on the Sizes and returns page.")],
+            eyebrow=("Compra con calma", "Shop calmly"), tono="relleno", anchor="condiciones"),
+        bloque_cta(("¿No lo ves en el catálogo?", "Cannot see it in the catalogue?"),
+                   ("No todo lo que tenemos en la tienda está subido. Pregúntanos por WhatsApp.",
+                    "Not everything we have in the shop is uploaded. Ask us on WhatsApp."),
+                   [whatsapp("primary"), llamar("ghost")], tono="base"),
+    ])
+
+    tallas = pagina("tallas", ("tallas", "sizes"), ("Tallas y cambios", "Sizes and returns"),
+                    ("Cómo medirte el pie y el cuerpo, tabla de tallas, servicios de ajuste con tarifas y cómo cambiar o devolver.",
+                     "How to measure your foot and body, a size chart, fitting services with rates, and how to exchange or return."), [
+        hero(("Tallas, ajuste y cambios", "Sizes, fitting and returns"),
+             ("Acertar con la talla evita devoluciones. Aquí tienes cómo medirte, qué ajustes hacemos y qué pasa si no te va bien.",
+              "Getting the size right avoids returns. Here is how to measure, what fitting we do and what happens if it does not suit you."),
+             [boton(("Cómo medirme", "How to measure"), a_ancla("medidas"), "secondary"), whatsapp("ghost")],
+             variante="texto"),
+        bloque_pasos(("Cómo medirte el pie", "How to measure your foot"), [
+            (("Al final del día", "At the end of the day"),
+             ("El pie se hincha un poco durante el día. Mídete por la tarde, y con el calcetín que usarás.", "Feet swell a little during the day. Measure in the afternoon, wearing the sock you will use.")),
+            (("Apoya el talón en la pared", "Put your heel against the wall"),
+             ("De pie sobre un folio, con el talón pegado a la pared y el peso repartido.", "Standing on a sheet of paper, with your heel against the wall and your weight evenly spread.")),
+            (("Marca el dedo más largo", "Mark your longest toe"),
+             ("Haz una marca delante del dedo que más sobresalga y mide hasta la pared, en centímetros.", "Mark in front of your longest toe and measure to the wall, in centimetres.")),
+            (("Compara con la tabla", "Compare with the chart"),
+             ("Mide los dos pies y usa el mayor. Deja un dedo de holgura en calzado de correr.", "Measure both feet and use the larger one. Leave a thumb's width of room in running shoes.")),
+        ], tono="base", anchor="medidas"),
+        seccion("pricing", [
+            titular(("Tabla de tallas", "Size chart"),
+                    ("Son equivalencias orientativas: cada fabricante hace su horma. En la ficha de cada producto decimos si calza grande o pequeño.",
+                     "These are approximate equivalents: each maker uses its own last. On each product page we say if it runs large or small.")),
+            tabla(("Largo del pie y talla europea de calzado", "Foot length and European shoe size"),
+                  [("Largo del pie (cm)", "Foot length (cm)"), ("Talla", "Size")],
+                  [(("24,0", "24.0"), ("38", "38")), (("24,7", "24.7"), ("39", "39")), (("25,3", "25.3"), ("40", "40")),
+                   (("26,0", "26.0"), ("41", "41")), (("26,7", "26.7"), ("42", "42")), (("27,3", "27.3"), ("43", "43")),
+                   (("28,0", "28.0"), ("44", "44")), (("28,7", "28.7"), ("45", "45"))]),
+            tabla(("Medidas del cuerpo por talla de ropa, en centímetros", "Body measurements by clothing size, in centimetres"),
+                  [("Talla", "Size"), ("Pecho", "Chest"), ("Cintura", "Waist")],
+                  [(("S", "S"), ("88 a 94", "88 to 94"), ("72 a 78", "72 to 78")),
+                   (("M", "M"), ("94 a 102", "94 to 102"), ("78 a 86", "78 to 86")),
+                   (("L", "L"), ("102 a 110", "102 to 110"), ("86 a 94", "86 to 94")),
+                   (("XL", "XL"), ("110 a 118", "110 to 118"), ("94 a 102", "94 to 102"))]),
+        ], anchor="tabla", tono="relleno", gap=28),
+        bloque_precios(("Ajuste y servicios", "Fitting and services"), ("Tarifas de ajuste y servicios de la tienda", "Shop fitting and service rates"),
+                       [("Servicio", "Service"), ("Precio", "Price")],
+                       [(("Medición del pie y prueba de calzado", "Foot measuring and shoe fitting"), ("Gratis al comprar", "Free with a purchase")),
+                        (("Encordado de raqueta", "Racket stringing"), desde(15)),
+                        (("Cambio de grip", "Grip change"), eur(4)),
+                        (("Inflado y ajuste de balones", "Ball inflating and adjusting"), ("Gratis", "Free")),
+                        (("Estampado de nombre y dorsal en una prenda", "Name and number print on a garment"), desde(6))],
+                       nota=NOTA, anchor="servicios", tono="base"),
+        bloque_pasos(("Cambios y devoluciones", "Exchanges and returns"), [
+            (("Avísanos en 14 días", "Tell us within 14 days"),
+             ("Escríbenos o llámanos en los 14 días siguientes a recibir o recoger el pedido.", "Message or call us within 14 days of receiving or collecting your order.")),
+            (("Prepáralo", "Get it ready"),
+             ("Sin usar, con etiquetas y en su caja. El calzado, solo probado en interior y sin marcas de suelo.", "Unused, with tags and in its box. Footwear only tried on indoors, with no marks from the ground.")),
+            (("Tráelo o envíalo", "Bring or send it"),
+             ("En tienda no cuesta nada. Por correo, el envío de vuelta lo pagas tú, salvo que llegue defectuoso.", "In the shop it costs nothing. By post, you pay the return shipping, unless it arrives faulty.")),
+            (("Cambio o reembolso", "Exchange or refund"),
+             ("Te damos otra talla u otro producto, o te devolvemos el dinero por el mismo medio de pago en un máximo de 14 días.", "We give you another size or product, or refund you by the original payment method within 14 days at most.")),
+        ], intro=("Los bañadores y la ropa interior solo se devuelven con el precinto de higiene. Lo personalizado con tu nombre o con el de tu equipo no se devuelve, salvo defecto.",
+                  "Swimsuits and underwear can only be returned with the hygiene seal intact. Items personalised with your name or your team's cannot be returned, unless faulty."),
+            tono="relleno", anchor="devoluciones"),
+        bloque_faq(("Preguntas frecuentes", "Frequently asked questions"), [
+            (("¿Qué talla pido si estoy entre dos?", "Which size should I order if I am between two?"),
+             ("En calzado de correr, la mayor. En ropa ajustada, la menor. Y si dudas, escríbenos con tus medidas.",
+              "In running shoes, the larger. In fitted clothing, the smaller. And if you are unsure, message us with your measurements.")),
+            (("¿Puedo cambiar en tienda algo que compré online?", "Can I exchange in the shop something I bought online?"),
+             ("Sí. Trae el artículo con la etiqueta y el justificante del pedido y lo cambiamos al momento.",
+              "Yes. Bring the item with its tag and the order confirmation and we swap it on the spot.")),
+            (("¿Cuándo debo cambiar mis zapatillas de correr?", "When should I replace my running shoes?"),
+             ("No hay una cifra única: depende de tu peso, el terreno y cuánto corres. Tráelas y te decimos cómo las ves.",
+              "There is no single figure: it depends on your weight, the terrain and how much you run. Bring them in and we will tell you how they look.")),
+        ], tono="base"),
+    ])
+
+    equipos = pagina("equipos", ("equipaciones", "team-kits"), ("Equipaciones", "Team kits"),
+                     ("Equipaciones para equipos y clubes: cómo se pide, qué se personaliza, plazos y precio por prenda.",
+                      "Kits for teams and clubs: how to order, what can be personalised, lead times and price per item."), [
+        hero(("Equipaciones para tu equipo", "Kits for your team"),
+             ("Para equipos de cualquier deporte, colegios y peñas. Escogemos modelo y colores contigo, y recogemos las tallas de todos.",
+              "For teams in any sport, schools and groups of friends. We choose the model and colours with you, and collect everyone's sizes."),
+             [boton(("Pedir presupuesto", "Request a quote"), a_pagina("contacto", "contacto")), whatsapp("ghost")],
+             eyebrow=("Club de equipaciones", "Team kit club"), variante="texto"),
+        bloque_pasos(("Cómo se pide", "How to order"), [
+            (("Cuéntanos tu equipo", "Tell us about your team"),
+             ("El deporte, cuántas personas sois y los colores. Si tenéis escudo, mándanoslo.", "The sport, how many of you there are and your colours. If you have a crest, send it to us.")),
+            (("Te enseñamos el boceto", "We show you a mock-up"),
+             ("Una imagen del modelo con vuestros colores y el presupuesto por prenda.", "An image of the model in your colours and the price per item.")),
+            (("Recogemos las tallas", "We collect the sizes"),
+             ("Una lista con nombre, talla y dorsal de cada jugador. Os damos un modelo de lista y una prenda de prueba para medir.", "A list with each player's name, size and number. We give you a list template and a sample garment to try.")),
+            (("Entrega del pedido", "Order delivery"),
+             ("Vais a recoger todo junto a la tienda o lo llevamos al club. Se paga una señal al empezar.", "You collect everything together at the shop or we take it to the club. A deposit is paid at the start.")),
+        ], tono="base", anchor="como"),
+        bloque_checks(("Qué se puede personalizar", "What can be personalised"), [
+            ("Colores de camiseta, pantalón y medias.", "Colours of shirt, shorts and socks."),
+            ("Escudo o logotipo del equipo.", "Team crest or logo."),
+            ("Nombre y dorsal de cada jugador.", "Each player's name and number."),
+            ("Patrocinadores en la camiseta, si los tenéis.", "Sponsors on the shirt, if you have any."),
+            ("Equipación de portero distinta del resto.", "A goalkeeper kit different from the rest."),
+            ("Chándales, sudaderas y bolsas a juego.", "Matching tracksuits, sweatshirts and bags.")],
+            tono="relleno", cols=2, anchor="personalizar"),
+        bloque_precios(("Precios de equipaciones", "Team kit prices"), ("Precio por prenda de equipación de equipo", "Price per team kit item"),
+                       [("Prenda", "Item"), ("Precio", "Price")],
+                       [(("Camiseta de juego", "Playing shirt"), desde(14)),
+                        (("Pantalón de juego", "Playing shorts"), desde(10)),
+                        (("Medias", "Socks"), desde(5)),
+                        (("Dorsal y nombre estampados", "Printed number and name"), desde(4)),
+                        (("Escudo estampado", "Printed crest"), desde(3))],
+                       intro=("El precio baja según el número de prendas y se confirma en el presupuesto. Hay un mínimo de unidades por modelo que te decimos al pedir.",
+                              "The price drops with the number of items and is confirmed in the quote. There is a minimum quantity per model that we tell you when you order."),
+                       nota=NOTA, anchor="precios", tono="base"),
+        bloque_faq(("Preguntas frecuentes", "Frequently asked questions"), [
+            (("¿Cuánto tarda el pedido?", "How long does an order take?"),
+             ("Entre 3 y 5 semanas desde que cerramos las tallas y el boceto. Si tenéis una fecha de inicio de liga, dínosla al pedir.",
+              "Between 3 and 5 weeks from when the sizes and mock-up are confirmed. If you have a league start date, tell us when you order.")),
+            (("¿Y si un jugador cambia de talla?", "What if a player changes size?"),
+             ("Antes de cerrar el pedido, sin problema. Una vez impreso con nombre y dorsal no se puede cambiar.",
+              "Before the order is closed, no problem. Once printed with a name and number it cannot be changed.")),
+            (("¿Podéis hacer equipaciones de niños?", "Can you do children's kits?"),
+             ("Sí, desde tallas infantiles. Para categorías de base, pide la prenda de prueba y que se la prueben.",
+              "Yes, from children's sizes. For youth teams, ask for the sample garment and have them try it on.")),
+        ], tono="relleno"),
+        bloque_cta(("¿Montamos la equipación del equipo?", "Shall we sort out the team kit?"),
+                   ("Dinos el deporte y cuántos sois y te mandamos un presupuesto.",
+                    "Tell us the sport and how many of you there are and we will send you a quote."), tono="base"),
+    ])
+
+    cont = pagina("contacto", ("contacto", "contact"), ("Contacto", "Contact"),
+                  ("Horario de la tienda de deportes, cómo llegar, teléfono, WhatsApp y formulario para pedidos, tallas y equipaciones.",
+                   "Sports shop hours, how to get here, phone, WhatsApp and a form for orders, sizes and team kits."), [
+        hero(("Contacto", "Contact"),
+             ("Llámanos, escríbenos por WhatsApp o pasa por la tienda. Para dudas de talla, tus medidas y tu deporte nos ayudan mucho.",
+              "Call us, message us on WhatsApp or come by the shop. For size questions, your measurements and your sport help a lot."),
+             [llamar(), whatsapp()], variante="texto"),
+        bloque_contacto(("Estamos en la tienda", "We are at the shop"),
+                        ("Si ya has hecho un pedido, dinos el número que te llegó por correo.",
+                         "If you have already placed an order, tell us the number you received by email."),
+                        campos_consulta(servicios=[("Un pedido", "An order"), ("Talla o medidas", "Size or measurements"),
+                                                   ("Cambio o devolución", "Exchange or return"), ("Equipaciones de equipo", "Team kits"),
+                                                   ("Otra cosa", "Something else")],
+                                        extra=[campo("deporte", "text", ("Deporte (opcional)", "Sport (optional)"), False, maxlen=60)]),
+                        ("Enviar consulta", "Send enquiry"), horas),
+        bloque_mapa(("Cómo llegar a la tienda", "How to get to the shop"), tono="relleno"),
+    ])
+
+    return plantilla(KEY, ("Tienda de deportes", "Sports shop"),
+                     ("Tienda de material deportivo con catálogo y carrito por deportes, ajuste de calzado, guía de tallas, cambios en 14 días y equipaciones de equipo.",
+                      "Sports equipment shop with a catalogue and cart by sport, shoe fitting, a size guide, 14-day exchanges and team kits."),
+                     "comercio", ("tienda de deportes deportes material deportivo zapatillas running futbol padel baloncesto equipaciones ropa deportiva tienda online tallas",
+                                  "sports shop sports store sports equipment trainers running football padel basketball team kits sportswear online shop sizes"),
+                     look, cabecera(nav, cta_cab, tienda=True),
+                     pie(nav, ("Material deportivo, ajuste de calzado y equipaciones para equipos.", "Sports equipment, shoe fitting and team kits."),
+                         ("Lunes a viernes 10:00 a 14:00 y 17:00 a 20:30. Sábado 10:00 a 14:00.",
+                          "Monday to Friday 10 am to 2 pm and 5 pm to 8:30 pm. Saturday 10 am to 2 pm.")),
+                     [inicio, tienda, tallas, equipos, cont], tienda=True)

@@ -1,0 +1,40 @@
+---
+/**
+ * Sytue Cast — /c/<org>, el canal público de una organización. Sin sesión, pintado
+ * en el servidor. Una organización sin canal contesta 404 (y la página lo dice).
+ */
+import { RE_SLUG_ORG } from '@sytue/config';
+import AppLayout from '../../layouts/AppLayout.astro';
+import { ChannelApp } from '../../islands/ChannelApp.js';
+import { consultar } from '../../lib/servicio.js';
+import { falloDeStatus, hubBaseUrl, sesionDe } from '../../lib/pagina.js';
+import type { Canal } from '../../lib/tipos.js';
+import { useT } from '../../i18n/index.js';
+
+export const prerender = false;
+
+const org = Astro.params.org ?? '';
+if (!RE_SLUG_ORG.test(org)) return new Response(null, { status: 404 });
+const session = await sesionDe(Astro);
+const r = await consultar<Canal>(`/api/v1/public/c/${encodeURIComponent(org)}`);
+if (!r.ok) Astro.response.status = r.status === 404 ? 404 : 503;
+const t = useT(Astro.locals.locale);
+const nombre = r.ok ? r.datos.name : org;
+---
+
+<AppLayout
+  title={`${nombre} · ${t('app.title')}`}
+  indexable={r.ok}
+  canonica={new URL(Astro.url.pathname, Astro.url.origin).toString()}
+>
+  <ChannelApp
+    slot="app"
+    client:load
+    locale={Astro.locals.locale}
+    user={session?.user ?? null}
+    hubBaseUrl={hubBaseUrl()}
+    org={org}
+    inicial={r.ok ? r.datos : null}
+    fallo={r.ok ? null : falloDeStatus(r.status)}
+  />
+</AppLayout>

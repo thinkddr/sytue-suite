@@ -1,0 +1,31 @@
+{
+  "key": "gitlab",
+  "tier": "tier2",
+  "manifest": {
+    "name": "GitLab.com",
+    "description": "Repositorios y CI de GitLab.com con inicio de sesión único para tu grupo (SAML SSO for groups, planes Premium y Ultimate).",
+    "category": "Ingeniería",
+    "color": "#FC6D26",
+    "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#FC6D26\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 21 3 14l2-9 3 6h8l3-6 2 9z\"/></svg>",
+    "identity": {
+      "kind": "saml",
+      "entity_id": "https://gitlab.com/groups/{group}",
+      "acs_url": "https://gitlab.com/groups/{group}/-/saml/callback",
+      "name_id_format": "persistent"
+    },
+    "provisioning": "none",
+    "launch": {
+      "kind": "url",
+      "url": "https://gitlab.com/groups/{group}/-/saml/sso"
+    },
+    "fields": [
+      {
+        "key": "group",
+        "label": "Grupo de GitLab.com",
+        "placeholder": "acme",
+        "help": "El nombre del grupo de nivel superior: https://gitlab.com/groups/GRUPO. El SSO SAML se configura en Settings → SAML SSO del grupo.",
+        "required": true
+      }
+    ]
+  }
+}

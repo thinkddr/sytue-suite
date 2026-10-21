@@ -1,0 +1,20 @@
+Canale, mesaje și apeluri video de echipă într-un singur loc.
+
+• Canale pe echipă sau proiect.
+• Un apel video integrat în fiecare canal.
+• Mențiuni și notificări unificate în toată suita.
+• Istoric în care se poate căuta din orice punct al Sytue One.
+• Canale publice și private pe categorii; mesaje directe și grupuri.
+• Fire, reacții, mențiuni, mesaje fixate și salvate și ciorne.
+• Formatare cu bara „Aa” și scurtături: aldin, cursiv, cod, citate, liste și linkuri.
+• Atașamente, imagini, GIF-uri și emoji personalizate; fișiere din Drive.
+• Trimitere programată, prioritate, confirmare de citire și „văzut de”.
+• Comenzi cu bară oblică și carduri: sondaje și sarcini atribuibile.
+• Apeluri video în canal: cameră, ecran, mână ridicată, chat și înregistrare.
+• Întâlniri programate și linkuri de invitație.
+• Boți, webhookuri și integrări cu alte instrumente.
+• Prezență și stare personalizată; setări de notificare pentru fiecare canal.
+• Căutare în istoric, inclusiv din toată suita.
+• Timp real prin WebSocket, cu reconectare și fără mesaje pierdute.
+
+Criptare în tranzit (TLS 1.3). Infrastructura Sytue se află în UE. Locația serviciilor externe depinde de furnizorul lor.

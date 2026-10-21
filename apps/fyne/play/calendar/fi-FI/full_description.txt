@@ -1,0 +1,19 @@
+CalDAV-kalenteri, joka on kytketty muuhun kokonaisuuteen.
+
+• Päivä-, viikko- ja kuukausinäkymät.
+• Toistuvat tapahtumat ja muistutukset.
+• Luo tapahtumia suoraan Mailin sähköpostista.
+• Toimii minkä tahansa CalDAV-asiakasohjelman kanssa.
+• Kuukausi-, viikko-, päivä- ja esityslistanäkymät, minikalenteri ja ”Tänään”.
+• Päivittäinen, viikoittainen tai kuukausittainen toisto päättymispäivällä; muokkaa vain tätä, tätä ja seuraavia tai kaikkia.
+• Tapahtumakohtaiset muistutukset ja ilmoitukset kokonaisuudessa.
+• Kutsut vastauksineen (osallistun, ehkä, en) ja seurannalla.
+• ”Etsi aika”, joka sopii kaikille osallistujille.
+• Varattavat tilat ja resurssit saatavuustietoineen.
+• Jaetut kalenterit oikeuksineen sekä kanssasi jaetut kalenterit.
+• Tilaa ulkoisia kalentereita (ICS) ja käytä useita värikoodattuja kalentereita.
+• Luo tapahtuma Mailin viestistä tai muistiinpanosta.
+• Toimii minkä tahansa CalDAV-asiakasohjelman kanssa: Apple Calendar, Thunderbird ja muut.
+• Monista tapahtuma tai kopioi se kalenteriisi ja lataa .ics-tiedostona Sytuen ulkopuolisille.
+
+Salattu siirron aikana (TLS 1.3). Sytuen infrastruktuuri sijaitsee EU:ssa. Ulkoisten palvelujen sijainti riippuu niiden tarjoajasta.

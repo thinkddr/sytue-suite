@@ -1,0 +1,99 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Daniel Delgado Ramos
+#
+# Sytue Cast — TRANSCODIFICADOR. Imagen multi-stage; el contexto de build es la
+# RAÍZ del repo (módulo único git.sytue.eu/sytue/one con go.mod en la raíz).
+#
+# Es el MISMO binario que services/cast/Dockerfile (sytue-cast), arrancado con el
+# subcomando `transcoder`, sobre una base distinta: el trabajador convierte
+# vídeo con ffmpeg —un binario en C con sus códecs (x264, libvpx, opus, libwebp)
+# y sus bibliotecas compartidas—, y distroless no tiene gestor de paquetes con el
+# que instalarlo. Mismo caso y mismo patrón que services/ocr/Dockerfile
+# (Tesseract): la SEGUNDA imagen de la suite que no es distroless, y por lo
+# mismo. A cambio se sostiene todo lo demás: base fijada por DIGEST de índice
+# multiarco, `upgrade` de la base, sin recomendados, sin cachés de apt, proceso
+# no-root con el uid de distroless y ninguna llamada saliente en ejecución.
+
+# --- Stage 1: build del binario Go ---
+FROM golang:1.27.3@sha256:f24164268fc1e741bbdc0066dbadcf1c8426c5a8489f0729c02c3905a53032fd AS build
+WORKDIR /src
+
+COPY go.mod go.sum ./
+# apps/nucleo es un módulo aparte que el raíz usa con `replace` (el motor de fórmulas con
+# el que Docs exporta las hojas): sin su go.mod, `go mod download` ni arranca.
+COPY apps/nucleo/go.mod apps/nucleo/
+RUN go mod download
+
+COPY . .
+
+ARG VERSION=dev
+RUN CGO_ENABLED=0 GOOS=linux go build \
+    -trimpath \
+    -ldflags "-s -w -X git.sytue.eu/sytue/one/services/cast/internal/config.Version=${VERSION}" \
+    -o /out/cast ./services/cast/cmd/cast
+
+# --- Stage 2: runtime con ffmpeg ---
+#
+# EL DIGEST ES EL DEL ÍNDICE MULTIARCO, no el del manifiesto de amd64: los
+# runners son de dos arquitecturas (ARM64 en sytue-rooms-media, amd64 en los
+# compartidos) y con el digest de una sola la etapa de runtime muere en la otra
+# con «exec format error». Es el mismo índice que fija services/ocr/Dockerfile;
+# se mueven juntos.
+FROM debian:bookworm-slim@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251 AS runtime
+
+# ffmpeg de Debian 12 (5.1): trae x264, libvpx (VP9), libopus, libwebp y el muxer
+# de HLS fMP4 con `-cues_to_front`, que es todo lo que internal/transcoder pide.
+#
+# --no-install-recommends es obligatorio: sin él ffmpeg arrastra decenas de
+# paquetes de escritorio (X11, ALSA, SDL, fuentes) que multiplican el tamaño y la
+# superficie sin que ningún trabajo los use.
+#
+# EL `upgrade` NO SOBRA: esta base lleva bibliotecas del sistema (las de ffmpeg
+# son decenas) y Debian publica los parches en apt sin reconstruir la imagen, así
+# que fijar un digest más nuevo no los trae. Lo aprendió el OCR con dos HIGH de
+# libpcre2 el 2026-09-13; aquí la superficie es mayor.
+ARG SYTUE_SECURITY_REFRESH=2026-10-01
+RUN : "$SYTUE_SECURITY_REFRESH" \
+ && apt-get update \
+ && apt-get upgrade -y --no-install-recommends \
+ && apt-get install -y --no-install-recommends \
+      ffmpeg \
+ && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY --from=build /out/cast /app/cast
+
+ARG VERSION
+ARG COMMIT
+ENV SYTUE_BUILD_VERSION=${VERSION}
+ENV SYTUE_BUILD_COMMIT=${COMMIT}
+
+# Usuario no-root con el MISMO uid que usa distroless en el resto de la suite, para
+# que las políticas de PodSecurity y los `runAsUser` del chart valgan igual aquí.
+RUN groupadd --gid 65532 nonroot \
+ && useradd --uid 65532 --gid 65532 --no-create-home --shell /usr/sbin/nologin nonroot
+USER 65532:65532
+
+# El trabajador NO escucha en ningún puerto: no hay EXPOSE ni Service. Lee la
+# misma configuración que el servicio (DATABASE_URL, S3_*, DRIVE_URL,
+# CAST_INTERNAL_SECRET) más la suya: TRANSCODER_THREADS (2), TRANSCODER_MAX_MINUTES
+# (120) y TRANSCODER_TMPDIR (por defecto TMPDIR).
+
+# El sistema de ficheros del contenedor va de solo lectura desde el chart: los
+# originales se descargan y ffmpeg escribe en un emptyDir montado en /tmp (el
+# chart le da 20 GiB: un original puede pesar 8 GiB y sus derivadas otro tanto).
+ENV TMPDIR=/tmp
+
+# SONDA DE VIDA POR FICHERO DE LATIDO. El subcomando `healthcheck` del binario
+# pide /healthz a un puerto, y el trabajador no tiene ninguno. En su lugar el
+# bucle refresca ${TMPDIR}/sytue-cast-transcoder.latido (transcoder.NombreLatido)
+# en cada vuelta —cada 3 s sin trabajos— y cada 15 s mientras ffmpeg corre; la
+# sonda comprueba que exista y que se haya tocado hace menos de 300 s
+# (transcoder.EdadMaximaLatido). Un bucle colgado deja de latir y el contenedor
+# se reinicia. La comprobación la hace el propio binario (`transcoder-healthcheck`,
+# que llama a transcoder.ComprobarLatido): sin shell, y el chart usa el mismo
+# `exec` como livenessProbe.
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 --start-period=30s \
+    CMD ["/app/cast", "transcoder-healthcheck"]
+
+ENTRYPOINT ["/app/cast", "transcoder"]

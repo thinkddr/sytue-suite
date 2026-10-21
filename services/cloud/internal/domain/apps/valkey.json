@@ -1,0 +1,32 @@
+{
+  "id": "valkey",
+  "name": "Valkey",
+  "description": "Caché y almacén clave-valor en memoria. El sucesor de Redis mantenido por la Linux Foundation, y compatible con sus clientes.",
+  "category": "cache",
+  "license": "BSD-3-Clause",
+  "homepage": "https://valkey.io/",
+  "upstream": "docker.io/valkey/valkey:9.1.1-alpine",
+  "upstream_digest": "sha256:ee91f7a174ac4d6a6b0685b3a60e321f0a9dbbb691f9b0e285be2ba1d1be8328",
+  "version": "9.1.1",
+  "ports": [
+    {
+      "name": "valkey",
+      "port": 6379
+    }
+  ],
+  "exports": [
+    {
+      "key": "VALKEY_URL",
+      "value": "redis://{host}:{port}"
+    },
+    {
+      "key": "REDIS_URL",
+      "value": "redis://{host}:{port}"
+    }
+  ],
+  "disk_gib": 0,
+  "memory_mib": 512,
+  "cpu_milli": 500,
+  "run_as_user": 999,
+  "mirrored_digest": "sha256:ee91f7a174ac4d6a6b0685b3a60e321f0a9dbbb691f9b0e285be2ba1d1be8328"
+}

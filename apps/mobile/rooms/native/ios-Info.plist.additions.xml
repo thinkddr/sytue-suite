@@ -1,0 +1,22 @@
+<!--
+  Fragmento para ios/App/App/Info.plist (tras `npx cap add ios`). Pega estas claves
+  dentro del <dict> raiz. Registra el esquema sytue-rooms:// para deep-links (cold-start y
+  con la app abierta -> Capacitor App emite `appUrlOpen`, que native.js enruta).
+
+  Universal Links (https://rooms.sytue.eu/...) y push NO van aqui, sino en
+  entitlements (App/App.entitlements), en Xcode:
+    - Associated Domains: applinks:rooms.sytue.eu   (requiere apple-app-site-association
+      servido por el dominio de Rooms; ver README).
+    - Push Notifications: aps-environment = development | production.
+-->
+<key>CFBundleURLTypes</key>
+<array>
+	<dict>
+		<key>CFBundleURLName</key>
+		<string>eu.sytue.rooms</string>
+		<key>CFBundleURLSchemes</key>
+		<array>
+			<string>sytue-rooms</string>
+		</array>
+	</dict>
+</array>

@@ -1,0 +1,33 @@
+# componente	estado	licencia	repositorio	revisado	exencion_hasta
+# estado: activo | mantenimiento | abandonado
+# Revisar en cada ola. `abandonado` rompe el gate a propósito: un componente sin
+# mantenimiento no se rompe el día que lo archivan, sino el día que aparece una
+# CVE que ya no va a arreglar nadie.
+traefik	activo	MIT	traefik/traefik	2026-08-03
+pgbouncer	activo	MIT	edoburu/docker-pgbouncer	2026-08-03
+livekit	activo	Apache-2.0	livekit/livekit	2026-08-03
+livekit-egress	activo	Apache-2.0	livekit/egress	2026-08-11
+cert-manager-controller	activo	Apache-2.0	cert-manager/cert-manager	2026-08-03
+cert-manager-cainjector	activo	Apache-2.0	cert-manager/cert-manager	2026-08-03
+cert-manager-webhook	activo	Apache-2.0	cert-manager/cert-manager	2026-08-03
+cert-manager-acmesolver	activo	Apache-2.0	cert-manager/cert-manager	2026-08-03
+cert-manager-startupapicheck	activo	Apache-2.0	cert-manager/cert-manager	2026-08-03
+buildkit	activo	Apache-2.0	moby/buildkit	2026-08-03
+buildkit-rootless	activo	Apache-2.0	moby/buildkit	2026-08-03
+crane	activo	Apache-2.0	google/go-containerregistry	2026-08-03
+cnb-builder	activo	Apache-2.0	paketo-buildpacks/builder-jammy-base	2026-08-03
+cnb-run	activo	Apache-2.0	paketo-buildpacks/run-jammy-base	2026-08-03
+git-clone	activo	MIT	alpinelinux/docker-alpine	2026-08-03
+managed-postgres	activo	PostgreSQL	postgres/postgres	2026-08-03
+managed-postgrest	activo	MIT	PostgREST/postgrest	2026-08-03
+managed-rclone	activo	MIT	rclone/rclone	2026-08-03
+managed-http-task	activo	curl	curl/curl	2026-08-04
+dragonfly	activo	BUSL-1.1	dragonflydb/dragonfly	2026-08-07
+prometheus-adapter	activo	Apache-2.0	https://github.com/kubernetes-sigs/prometheus-metrics-adapter	2026-08-13	-
+cert-manager-webhook-scaleway	activo	Apache-2.0	https://github.com/scaleway/cert-manager-webhook-scaleway	2026-08-13	-
+seaweedfs	activo	Apache-2.0	seaweedfs/seaweedfs	2026-08-18	
+registry	activo	Apache-2.0	distribution/distribution	2026-08-18	
+minio	mantenimiento	AGPL-3.0	minio/minio	2026-08-18	2026-12-31
+descheduler	activo	Apache-2.0	kubernetes-sigs/descheduler	2026-08-20
+mesa-dist-win	activo	MIT	pal1000/mesa-dist-win	2026-09-28
+synapse	activo	AGPL-3.0-only	element-hq/synapse	2026-10-16

@@ -1,0 +1,91 @@
+[
+  {
+    "clave": "campana", "modulo": "marketing", "titulo": "nombre",
+    "etiqueta": {"en":"Campaigns","es":"Campañas","fr":"Campagnes","de":"Kampagnen","it":"Campagne","bg":"Кампании","cs":"Kampaně","da":"Kampagner","el":"Καμπάνιες","et":"Kampaaniad","fi":"Kampanjat","ga":"Feachtais","hr":"Kampanje","hu":"Kampányok","is":"Herferðir","lt":"Kampanijos","lv":"Kampaņas","mt":"Kampanji","nb":"Kampanjer","nl":"Campagnes","pl":"Kampanie","pt":"Campanhas","ro":"Campanii","sk":"Kampane","sl":"Kampanje","sv":"Kampanjer"},
+    "estados": ["borrador","planificado","en_curso","hecho","cancelado"],
+    "campos": [
+      {"clave":"nombre","tipo":"texto","requerido":true},
+      {"clave":"canal","tipo":"seleccion","opciones":["correo_valor","telefono_valor","web_valor","presencial"],"requerido":true},
+      {"clave":"fecha_inicio","tipo":"fecha"},
+      {"clave":"fecha_fin","tipo":"fecha"},
+      {"clave":"importe","tipo":"dinero"},
+      {"clave":"responsable","tipo":"texto"},
+      {"clave":"descripcion","tipo":"texto_largo"}
+    ],
+    "lista": ["nombre","canal","fecha_inicio","importe","estado"]
+  },
+  {
+    "clave": "evento", "modulo": "eventos", "titulo": "nombre",
+    "etiqueta": {"en":"Events","es":"Eventos","fr":"Événements","de":"Veranstaltungen","it":"Eventi","bg":"Събития","cs":"Události","da":"Begivenheder","el":"Εκδηλώσεις","et":"Sündmused","fi":"Tapahtumat","ga":"Imeachtaí","hr":"Događanja","hu":"Események","is":"Viðburðir","lt":"Renginiai","lv":"Pasākumi","mt":"Avvenimenti","nb":"Arrangementer","nl":"Evenementen","pl":"Wydarzenia","pt":"Eventos","ro":"Evenimente","sk":"Udalosti","sl":"Dogodki","sv":"Evenemang"},
+    "estados": ["borrador","publicado","en_curso","hecho","cancelado"],
+    "campos": [
+      {"clave":"nombre","tipo":"texto","requerido":true},
+      {"clave":"fecha_inicio","tipo":"fechahora","requerido":true},
+      {"clave":"fecha_fin","tipo":"fechahora"},
+      {"clave":"direccion","tipo":"texto"},
+      {"clave":"ciudad","tipo":"texto"},
+      {"clave":"aforo","tipo":"entero"},
+      {"clave":"precio","tipo":"dinero"},
+      {"clave":"responsable","tipo":"texto"},
+      {"clave":"descripcion","tipo":"texto_largo"}
+    ],
+    "lista": ["nombre","fecha_inicio","ciudad","aforo","estado"]
+  },
+  {
+    "clave": "inscripcion", "modulo": "eventos", "titulo": "asistente",
+    "etiqueta": {"en":"Registrations","es":"Inscripciones","fr":"Inscriptions","de":"Anmeldungen","it":"Iscrizioni","bg":"Регистрации","cs":"Registrace","da":"Tilmeldinger","el":"Εγγραφές","et":"Registreerumised","fi":"Ilmoittautumiset","ga":"Clárúcháin","hr":"Prijave","hu":"Regisztrációk","is":"Skráningar","lt":"Registracijos","lv":"Reģistrācijas","mt":"Reġistrazzjonijiet","nb":"Påmeldinger","nl":"Inschrijvingen","pl":"Rejestracje","pt":"Inscrições","ro":"Înscrieri","sk":"Registrácie","sl":"Prijave","sv":"Anmälningar"},
+    "estados": ["pendiente","confirmado","cancelado"],
+    "campos": [
+      {"clave":"evento","tipo":"relacion","modelo":"evento","requerido":true},
+      {"clave":"asistente","tipo":"texto","requerido":true},
+      {"clave":"correo","tipo":"correo"},
+      {"clave":"contacto","tipo":"relacion","modelo":"contacto"},
+      {"clave":"fecha","tipo":"fecha"},
+      {"clave":"importe","tipo":"dinero"}
+    ],
+    "lista": ["evento","asistente","correo","fecha","estado"]
+  },
+  {
+    "clave": "encuesta", "modulo": "encuestas", "titulo": "nombre",
+    "etiqueta": {"en":"Surveys","es":"Encuestas","fr":"Sondages","de":"Umfragen","it":"Sondaggi","bg":"Анкети","cs":"Průzkumy","da":"Spørgeskemaer","el":"Έρευνες","et":"Küsitlused","fi":"Kyselyt","ga":"Suirbhéanna","hr":"Ankete","hu":"Felmérések","is":"Kannanir","lt":"Apklausos","lv":"Aptaujas","mt":"Stħarriġ","nb":"Undersøkelser","nl":"Enquêtes","pl":"Ankiety","pt":"Inquéritos","ro":"Sondaje","sk":"Prieskumy","sl":"Ankete","sv":"Enkäter"},
+    "estados": ["borrador","publicado","cerrado"],
+    "campos": [
+      {"clave":"nombre","tipo":"texto","requerido":true},
+      {"clave":"fecha_inicio","tipo":"fecha"},
+      {"clave":"fecha_fin","tipo":"fecha"},
+      {"clave":"responsable","tipo":"texto"},
+      {"clave":"descripcion","tipo":"texto_largo"}
+    ],
+    "lista": ["nombre","fecha_inicio","fecha_fin","estado"]
+  },
+  {
+    "clave": "suscripcion", "modulo": "suscripciones", "secuencia": "SUS",
+    "etiqueta": {"en":"Subscriptions","es":"Suscripciones","fr":"Abonnements","de":"Abonnements","it":"Abbonamenti","bg":"Абонаменти","cs":"Předplatná","da":"Abonnementer","el":"Συνδρομές","et":"Tellimused","fi":"Tilaukset","ga":"Síntiúis","hr":"Pretplate","hu":"Előfizetések","is":"Áskriftir","lt":"Prenumeratos","lv":"Abonementi","mt":"Abbonamenti","nb":"Abonnementer","nl":"Abonnementen","pl":"Subskrypcje","pt":"Subscrições","ro":"Abonamente","sk":"Predplatné","sl":"Naročnine","sv":"Prenumerationer"},
+    "estados": ["borrador","activa","pausada","cancelado"],
+    "campos": [
+      {"clave":"cliente","tipo":"relacion","modelo":"contacto","requerido":true},
+      {"clave":"producto","tipo":"relacion","modelo":"producto","requerido":true},
+      {"clave":"periodicidad","tipo":"seleccion","opciones":["mensual","anual"],"requerido":true},
+      {"clave":"importe","tipo":"dinero","requerido":true},
+      {"clave":"fecha_inicio","tipo":"fecha","requerido":true},
+      {"clave":"renovacion","tipo":"fecha"},
+      {"clave":"externo_id","tipo":"texto"}
+    ],
+    "lista": ["ref","cliente","producto","periodicidad","renovacion","estado"]
+  },
+  {
+    "clave": "sesion_tpv", "modulo": "tpv", "secuencia": "TPV",
+    "etiqueta": {"en":"POS sessions","es":"Sesiones de caja","fr":"Sessions de caisse","de":"Kassensitzungen","it":"Sessioni di cassa","bg":"Касови сесии","cs":"Pokladní relace","da":"Kassesessioner","el":"Συνεδρίες ταμείου","et":"Kassaseansid","fi":"Kassaistunnot","ga":"Seisiúin phointe díola","hr":"Blagajničke sesije","hu":"Pénztári munkamenetek","is":"Kassalotur","lt":"Kasos seansai","lv":"Kases sesijas","mt":"Sessjonijiet tal-POS","nb":"Kasseøkter","nl":"Kassasessies","pl":"Sesje kasowe","pt":"Sessões de POS","ro":"Sesiuni de casă","sk":"Pokladničné relácie","sl":"Blagajniške seje","sv":"Kassapass"},
+    "estados": ["abierto","cerrado"],
+    "campos": [
+      {"clave":"caja","tipo":"texto","requerido":true},
+      {"clave":"vendedor","tipo":"texto","requerido":true},
+      {"clave":"fecha_inicio","tipo":"fechahora","requerido":true},
+      {"clave":"fecha_fin","tipo":"fechahora"},
+      {"clave":"efectivo","tipo":"dinero"},
+      {"clave":"tarjeta","tipo":"dinero"},
+      {"clave":"total","tipo":"dinero"}
+    ],
+    "lista": ["ref","caja","vendedor","fecha_inicio","total","estado"]
+  }
+]

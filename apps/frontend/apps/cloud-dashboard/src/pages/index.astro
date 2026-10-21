@@ -1,0 +1,24 @@
+---
+import DashboardLayout from '../layouts/DashboardLayout.astro';
+import ProjectsList from '../components/ProjectsList';
+import { requireSession } from '@sytue/auth/server';
+import { getBff, toBffContext } from '../server/bff.js';
+import { loadProjects } from '../lib/cloud.js';
+import { useT } from '../i18n/index.js';
+
+export const prerender = false;
+
+// El idioma lo negocia el middleware una vez por petición y baja a la isla por
+// props: detectarlo en el cliente desajustaría la hidratación.
+const locale = Astro.locals.locale;
+const t = useT(locale);
+
+const guard = await requireSession(getBff(), toBffContext(Astro));
+if (guard instanceof Response) return guard;
+
+const { live, data: projects, error } = await loadProjects(guard.session);
+---
+
+<DashboardLayout title={t('nav.projects')} section="projects" error={error}>
+  <ProjectsList client:load projects={projects} live={live} locale={locale} error={error} />
+</DashboardLayout>

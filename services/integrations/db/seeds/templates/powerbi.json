@@ -1,0 +1,36 @@
+{
+  "key": "powerbi",
+  "tier": "tier1",
+  "manifest": {
+    "name": "Power BI",
+    "description": "Resultados de consultas DAX en Sytue Sheets e informes incrustados en la suite (app-owns-data). El inicio de sesión lo gobierna Entra; aquí Sytue no actúa de IdP.",
+    "category": "Datos",
+    "color": "#F2C811",
+    "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#F2C811\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"4\" y=\"13\" width=\"4\" height=\"7\" rx=\"1\"/><rect x=\"10\" y=\"9\" width=\"4\" height=\"11\" rx=\"1\"/><rect x=\"16\" y=\"4\" width=\"4\" height=\"16\" rx=\"1\"/></svg>",
+    "identity": { "kind": "none" },
+    "provisioning": "none",
+    "data": "powerbi",
+    "embed": true,
+    "launch": { "kind": "url", "url": "https://app.powerbi.com/" },
+    "fields": [
+      {
+        "key": "dataset_id",
+        "label": "Conjunto de datos por defecto",
+        "placeholder": "00000000-0000-0000-0000-000000000000",
+        "help": "El dataset contra el que se ejecuta el DAX cuando la consulta no indica otro. Los informes a incrustar se eligen al pedir el embed.",
+        "required": false
+      },
+      {
+        "key": "api_base",
+        "label": "Raíz de la API (solo nubes soberanas)",
+        "placeholder": "https://api.powerbi.com",
+        "help": "Déjalo vacío salvo que uses una nube soberana (US Gov, China): entonces, la raíz de la API de esa nube.",
+        "required": false
+      }
+    ],
+    "secret": {
+      "label": "Token del service principal",
+      "help": "El Bearer de Entra del service principal con acceso al área de trabajo. La pasarela lo inyecta en cada llamada (datos DAX y mint de embed); el conector nunca lo ve."
+    }
+  }
+}

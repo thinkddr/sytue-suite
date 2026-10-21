@@ -1,0 +1,242 @@
+{
+ "pais": "DK",
+ "verificado": true,
+ "moneda": "DKK",
+ "formas": [
+  {
+   "clave": "enkeltmand",
+   "nombre": "Enkeltmandsvirksomhed",
+   "tipo": "persona_fisica"
+  },
+  {
+   "clave": "is",
+   "nombre": "Interessentskab (I/S)",
+   "tipo": "persona_fisica"
+  },
+  {
+   "clave": "aps",
+   "nombre": "Anpartsselskab (ApS)",
+   "tipo": "sociedad"
+  },
+  {
+   "clave": "as",
+   "nombre": "Aktieselskab (A/S)",
+   "tipo": "sociedad"
+  }
+ ],
+ "portales": {
+  "skat": {
+   "nombre": "TastSelv Erhverv (skat.dk)",
+   "url": "https://skat.dk/erhverv"
+  },
+  "virk": {
+   "nombre": "Virk — Erhvervsstyrelsen",
+   "url": "https://virk.dk/"
+  }
+ },
+ "obligaciones": [
+  {
+   "clave": "dk_moms_q",
+   "nombre": "Momsangivelse (kvartal)",
+   "concepto": "iva_periodica",
+   "ambito": "fiscal",
+   "periodicidad": "trimestral",
+   "plazos": {
+    "T": "01+3"
+   },
+   "margen_dias": 7,
+   "portal": "skat",
+   "aplica": {
+    "condiciones": [
+     "iva",
+     "!iva_mensual"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 80000,
+    "moneda": "DKK",
+    "nota": "Kvartal (omsætning 5-50 mio. kr.): den 1. i den tredje måned efter kvartalet (1. juni, 1. september, 1. december, 1. marts). Under 5 mio. kr. afregnes halvårligt den 1. september og den 1. marts — kalenderen her følger kvartalet, som aldrig falder senere. Afgift på 800 kr. pr. for sen angivelse og rente ved for sen betaling (0,7 % pr. måned i 2025)."
+   },
+   "calculo": {
+    "tipo": "saldo_neto",
+    "haber": [
+     "477"
+    ],
+    "debe": [
+     "472"
+    ]
+   }
+  },
+  {
+   "clave": "dk_moms_m",
+   "nombre": "Momsangivelse (måned)",
+   "concepto": "iva_periodica",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "25"
+   },
+   "margen_dias": 7,
+   "portal": "skat",
+   "aplica": {
+    "condiciones": [
+     "iva",
+     "iva_mensual"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 80000,
+    "moneda": "DKK",
+    "nota": "Over 50 mio. kr.: den 25. i måneden efter perioden. Afgift på 800 kr. og rente pr. påbegyndt måned."
+   },
+   "calculo": {
+    "tipo": "saldo_neto",
+    "haber": [
+     "477"
+    ],
+    "debe": [
+     "472"
+    ]
+   }
+  },
+  {
+   "clave": "dk_eu_salg",
+   "nombre": "EU-salg uden moms",
+   "concepto": "operaciones_intracomunitarias",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "25"
+   },
+   "margen_dias": 7,
+   "portal": "skat",
+   "aplica": {
+    "condiciones": [
+     "intracomunitario"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 80000,
+    "moneda": "DKK",
+    "nota": "Afgift på 800 kr. pr. indberetning."
+   }
+  },
+  {
+   "clave": "dk_askat",
+   "nombre": "A-skat og AM-bidrag (eIndkomst)",
+   "concepto": "retenciones_trabajo",
+   "ambito": "laboral",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "10"
+   },
+   "margen_dias": 7,
+   "portal": "skat",
+   "aplica": {
+    "condiciones": [
+     "empleados"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 80000,
+    "moneda": "DKK",
+    "nota": "Afgift på 800 kr. og rente; store virksomheder afregner sidste bankdag i måneden."
+   }
+  },
+  {
+   "clave": "dk_selskab",
+   "nombre": "Selskabsselvangivelse (oplysningsskema)",
+   "concepto": "sociedades_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "06-30+1"
+   },
+   "margen_dias": 30,
+   "portal": "skat",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 20000,
+    "moneda": "DKK",
+    "nota": "Skattetillæg på 200 kr. pr. dag, højst 5.000 kr. Seks måneder efter regnskabsårets udløb."
+   }
+  },
+  {
+   "clave": "dk_aconto",
+   "nombre": "Acontoskat",
+   "concepto": "pago_fraccionado_sociedades",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "1P": "03-20",
+    "2P": "11-20"
+   },
+   "margen_dias": 7,
+   "portal": "skat",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "nota",
+    "nota": "Restskattetillæg ved for lidt betalt acontoskat."
+   }
+  },
+  {
+   "clave": "dk_selvangivelse",
+   "nombre": "Oplysningsskema (selvstændige)",
+   "concepto": "renta_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "07-01+1"
+   },
+   "margen_dias": 30,
+   "portal": "skat",
+   "aplica": {
+    "tipos": [
+     "persona_fisica"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 20000,
+    "moneda": "DKK",
+    "nota": "Skattetillæg på 200 kr. pr. dag, højst 5.000 kr."
+   }
+  },
+  {
+   "clave": "dk_arsrapport",
+   "nombre": "Årsrapport til Erhvervsstyrelsen",
+   "concepto": "cuentas_anuales",
+   "ambito": "mercantil",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "06-30+1"
+   },
+   "margen_dias": 30,
+   "portal": "virk",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 50000,
+    "moneda": "DKK",
+    "nota": "Afgift til hvert ledelsesmedlem (500 kr. første måned, op til 3.000 kr.) og tvangsopløsning. Seks måneder efter regnskabsårets afslutning (regnskabsklasse B og C) (regnskabsklasse B og C; klasse D fire måneder)."
+   }
+  }
+ ]
+}

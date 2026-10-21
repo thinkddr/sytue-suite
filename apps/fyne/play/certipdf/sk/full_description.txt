@@ -1,0 +1,17 @@
+PDF od začiatku do konca, v prehliadači.
+
+• Zvýrazňovanie, podčiarkovanie, komentáre a kreslenie v dokumente.
+• Formuláre: vypĺňanie polí alebo tvorba vlastných.
+• Zlučovanie, extrakcia, otáčanie, číslovanie a vodoznaky.
+• Panel podpisov, trvalé začiernenie a dokumenty chránené heslom.
+• Rýchly prehliadač s osnovou, miniatúrami, vyhľadávaním a priblížením na stranu alebo šírku.
+• Anotácie: zvýraznenie, podčiarknutie, prečiarknutie, komentáre, kresba, tvary, šípky a pečiatky.
+• Textové polia, merania a snímky oblasti.
+• Formuláre: vypĺňanie existujúcich polí alebo pridanie vlastných.
+• Panel na podpisovanie dokumentov.
+• Trvalé začiernenie: označený obsah zmizne zo súboru, nielen zo zobrazenia.
+• Strany: zlúčenie, extrakcia, odstránenie, otočenie, číslovanie (aj Bates), hlavičky a päty.
+• Vodoznak, pozadie a upraviteľné metadáta.
+• Dokumenty a oprávnenia chránené heslom.
+
+Šifrovanie pri prenose (TLS 1.3). Infraštruktúra Sytue je v EÚ. Umiestnenie externých služieb závisí od ich poskytovateľa.

@@ -1,0 +1,17 @@
+Das PDF, von Anfang bis Ende, in Ihrem Browser.
+
+• Markieren, unterstreichen, kommentieren und auf dem Dokument zeichnen.
+• Formulare: Felder ausfüllen oder eigene anlegen.
+• Zusammenführen, extrahieren, drehen, nummerieren und mit Wasserzeichen versehen.
+• Signaturbereich, endgültiges Schwärzen und passwortgeschützte Dokumente.
+• Schneller Viewer mit Gliederung, Miniaturen, Suche und Zoom auf Seite oder Breite.
+• Anmerkungen: markieren, unterstreichen, durchstreichen, kommentieren, zeichnen, Formen, Pfeile und Stempel.
+• Textfelder, Messungen und Bereichsausschnitte.
+• Formulare: vorhandene Felder ausfüllen oder eigene hinzufügen.
+• Signaturbereich des Dokuments.
+• Endgültiges Schwärzen: das Markierte verschwindet aus der Datei, nicht nur aus der Ansicht.
+• Seiten: zusammenführen, extrahieren, löschen, drehen, nummerieren (auch Bates), Kopf- und Fußzeilen.
+• Wasserzeichen, Hintergrund und bearbeitbare Metadaten.
+• Passwortgeschützte Dokumente und Berechtigungen.
+
+Verschlüsselt bei der Übertragung (TLS 1.3). Die Infrastruktur von Sytue befindet sich in der EU. Der Standort externer Dienste hängt von ihrem Anbieter ab.

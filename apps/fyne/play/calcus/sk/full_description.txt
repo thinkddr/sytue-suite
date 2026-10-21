@@ -1,0 +1,18 @@
+Čísla, ktoré dávajú zmysel, v tabuľke, ktorá pracuje s vami.
+
+• Vzorce, podmienené formátovanie a overovanie údajov.
+• Načítajte externé dáta a dopytujte sa na ne bez opustenia tabuľky.
+• Grafy, mikrografy, rýchle filtre a údajové tabuľky.
+• Export do ODS a XLSX; otváranie súborov Excel.
+• Vzorce s kontextovou nápovedou a okamžitým prepočtom.
+• Podmienené formátovanie, overovanie údajov a formáty čísel podľa miestnych nastavení.
+• Grafy rôznych typov, mikrografy a rýchle filtre.
+• Údajové tabuľky so súčtami a triedením; kontingenčná tabuľka.
+• Externé dáta: pripojte zdroj a dopytujte sa naň z tabuľky.
+• Riešiteľ na nájdenie hodnoty, ktorá splní cieľ.
+• Makrá na automatizáciu opakovaných úloh.
+• Spolupráca v reálnom čase s prítomnosťou a komentármi.
+• Filtre, rýchle filtre a vyhľadávanie v tabuľke.
+• Export do ODS, XLSX a PDF; otváranie súborov Excel z Drive.
+
+Šifrovanie pri prenose (TLS 1.3). Infraštruktúra Sytue je v EÚ. Umiestnenie externých služieb závisí od ich poskytovateľa.

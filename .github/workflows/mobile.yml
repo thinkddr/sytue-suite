@@ -1,0 +1,351 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Daniel Delgado Ramos
+#
+# Puerta de VISTA MÓVIL contra producción. Existe porque no había ninguna: en
+# .github/workflows/ no corría un solo navegador, ci-frontend se queda en
+# build/typecheck/lint/test/format + Lighthouse, y una regresión de layout móvil
+# entraba sin que nada la parase. Es exactamente lo que pasó en agosto de 2026:
+# el centro de notificaciones se salía 86 px por la izquierda en las diez apps y
+# los titulares de www desbordaban el documento en 23 rutas localizadas.
+#
+# Por qué NO es una puerta de PR:
+#   Las DIEZ APPS CON SESIÓN son `output: 'server'` con adaptador node y todas
+#   redirigen al IdP, así que no hay build estático que auditar ni entorno
+#   efímero donde levantarlas: el objetivo real es producción. Esto es una
+#   puerta POST-despliegue —pone la rama en rojo como hace security.yml con una
+#   CVE nueva—, no un bloqueo del PR.
+#
+#   www es la excepción y SÍ tiene puerta de PR: es `output: 'static'`, o sea
+#   que hay un dist que auditar sin credenciales ni entorno, y es justo donde
+#   estuvo la regresión de agosto de 2026. La corre el job `lighthouse` de
+#   ci-frontend.yml —que ya construía ese dist— con `audit-www-estatico.mjs`.
+#   Lo demás lo bloquean las reglas 5 y 6 de apps/frontend/scripts/lint-design.sh,
+#   que cazan el patrón sin navegador.
+#
+# Por qué no hay spec de Playwright aparte:
+#   `test/e2e/mobile-audit.mjs` ya recorre 18 perfiles × 14 apps, distingue el
+#   scroll deliberado (`data-scroll-x`) del defecto, mide también lo que se sale
+#   por la IZQUIERDA (que no genera scroll y por eso no lo ve `scrollWidth`) y
+#   YA sale con código 1. Un spec en test/e2e/tests/ sería una segunda copia del
+#   detector para diverger con la primera. El detector vive en
+#   `test/e2e/detector-desbordamiento.mjs` y lo importan las DOS puertas.
+name: mobile
+
+on:
+  schedule:
+    # Mide lo que hay DESPLEGADO, no lo que hay en la rama. Va detrás de
+    # `security` (06:00, ~50 min) y delante de `escritorio` (08:45), que es el
+    # orden en que caben en el runner único sin solaparse.
+    - cron: "0 7 * * *"
+  # Tras un despliegue de producción se lanza a mano: Forgejo no encadena
+  # workflows y el despliegue de la suite tampoco vive aquí.
+  workflow_dispatch:
+    inputs:
+      contrato_cobertura:
+        description: "Comprobar solo el contrato de exclusiones DEV, sin navegador ni producción"
+        type: boolean
+        default: false
+      apps:
+        description: "Apps a barrer (vacío = todas)"
+        type: string
+        required: false
+      reproductor:
+        description: "Reproductor de test/e2e a ejecutar (vacío = ninguno). Ej: repro-enviar-api.mjs"
+        type: string
+        required: false
+
+# Lo que puede hacer GITHUB_TOKEN en este flujo, y nada más (GitHub lo
+# aplica; en Forgejo este campo se ignoraba y mandaba el token de cada paso).
+permissions:
+  contents: read
+
+# `bash` EXPLÍCITO. Dentro de un `container:` GitHub ejecuta los `run:` con
+# `sh -e` y no con bash: `set -o pipefail`, `[[`, los arrays y `<<<` mueren
+# con «Illegal option» (cancelar-al-cerrar, 2026-09-27). Con `shell: bash`
+# es `bash --noprofile --norc -eo pipefail`, que es lo que corría en la forja.
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  # El contrato breve no cancela un barrido de producción, ni siquiera en main.
+  group: mobile-${{ github.workflow }}-${{ github.ref }}${{ github.event_name == 'workflow_dispatch' && inputs.contrato_cobertura && '-contrato-cobertura' || '' }}
+  cancel-in-progress: true
+
+# QUÉ ÁRBOL SE CLONA, Y POR QUÉ NO SIEMPRE `github.sha`.
+#
+# La forja registra cada programación con el commit en el que vio ESTE fichero y
+# lo reutiliza en todos los disparos: mientras nadie lo toque, el cron sigue
+# clonando el mismo árbol y la rama avanza sin él. Medido el 2026-09-11:
+# `security` y `mobile` corrían sobre b0372642 con `main` ya en 0bc05e1e, y los
+# dos fallaban por un lockfile que llevaba un día arreglado. Un nocturno que
+# escanea un árbol viejo no está mirando lo que se despliega, que es justo lo
+# único que tenía que hacer.
+#
+# En push y en pull request manda `github.sha`, que ahí sí es lo correcto: se
+# comprueba el commit concreto que llegó, no la cabeza de la rama.
+env:
+  # El checkout lo escribe el runner (uid 1001) y los pasos corren como root dentro
+  # del `container:`: git ve un propietario ajeno, se niega («dubious ownership»)
+  # y `go build` muere con «error obtaining VCS status». La forja montaba el
+  # workspace con el mismo usuario y no lo notaba.
+  GIT_CONFIG_COUNT: "1"
+  GIT_CONFIG_KEY_0: safe.directory
+  GIT_CONFIG_VALUE_0: "*"
+  REF_A_CLONAR: ${{ github.event_name == 'schedule' && (github.ref_name || 'main') || github.sha }}
+
+jobs:
+  contrato-cobertura:
+    name: contrato de exclusiones de cobertura móvil
+    if: github.event_name == 'workflow_dispatch' && inputs.contrato_cobertura
+    runs-on: sytue-arm64
+    timeout-minutes: 5
+    container:
+      image: node:24-bookworm@sha256:64af3819f9275802414d7cdc38c27e9d82bd564dec4d4da87d008255d36c63b4
+    steps:
+      - name: Clonar el repositorio
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.REF_A_CLONAR }}
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Preparar Bun
+        run: $GITHUB_WORKSPACE/.github/actions/toolchain/accion.sh bun
+      - name: Comprobar el matcher real y sus controles negativos
+        run: bun test ./apps/frontend/packages/config/src/paridad-pantallas.test.ts --test-name-pattern 'la auditoría móvil excluye el banco de superposiciones'
+
+  desbordamiento:
+    name: barrido de desbordamiento móvil (producción)
+    if: github.event_name != 'workflow_dispatch' || !inputs.contrato_cobertura
+    runs-on: sytue-arm64
+    # Los runners propios del frontal (.github/RUNNERS.md): cada job en un
+    # contenedor del Docker del CI, con el proxy filtrado como socket de Docker
+    # y la caché de Go del host (con varios jobs, ancla `&ci` y `*ci`).
+    container:
+      image: node:24-bookworm@sha256:64af3819f9275802414d7cdc38c27e9d82bd564dec4d4da87d008255d36c63b4
+      env:
+        DOCKER_HOST: unix:///run/sytue-ci/docker.sock
+      volumes:
+        - /srv/ci/run/proxy.sock:/run/sytue-ci/docker.sock
+        - /var/cache/sytue-ci/go-build:/github/home/.cache/go-build
+        - /var/cache/sytue-ci/go-mod:/github/home/go/pkg/mod
+    # 190: el run 37119125131 completó el barrido móvil en 87m40s y el job
+    # entero en 94m27s (11:21:58Z → 12:56:25Z), superando el antiguo tope de 90.
+    # Hay que contar también el sembrado y el barrido funcional, que corre aun
+    # si falla el de desbordamiento. El margen es 2× lo medido, como exige
+    # scripts/ci-margen-de-reloj.sh; no cambia ningún umbral de las mediciones.
+    # Sin tiempo para el resumen no se distingue una caída de una interrupción.
+    # Sin partir en matriz: los tres turnos entrarían A LA VEZ por el
+    # login del IdP con la MISMA cuenta, que corta por ráfaga (5/min) — el propio
+    # mobile-audit.mjs guarda la sesión justo para no repetirlo 18 veces.
+    timeout-minutes: 190
+    steps:
+      - name: Clonar el repositorio
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.REF_A_CLONAR }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      # La cuenta de auditoría es un EMPLEADO sin privilegios (ops@sytue.com) y
+      # el barrido SOLO LEE: navega, abre desplegables y mide.
+      #
+      # Sin el secreto dado de alta, ROMPE. Antes se saltaba con un `echo` y
+      # todos los pasos siguientes iban condicionados a `hay == 'si'`, así que el
+      # job terminaba en VERDE sin haber instalado el navegador ni abierto una
+      # sola página: la puerta podía llevar meses sin ejecutarse nunca y nadie se
+      # enteraba. Una puerta que no puede correr es un fallo de configuración,
+      # no un aprobado.
+
+      # La imagen del runner compartido de git.gay no trae Go ni Bun.
+      # Se instalan con la MISMA versión y sha256 que la imagen propia.
+      - name: Preparar toolchain
+        run: $GITHUB_WORKSPACE/.github/actions/toolchain/accion.sh bun
+
+      - name: ¿Hay credenciales de la cuenta de auditoría?
+        env:
+          EMAIL: ${{ secrets.SYTUE_AUDIT_EMAIL }}
+          PASS: ${{ secrets.SYTUE_AUDIT_PASS }}
+          TOTP: ${{ secrets.SYTUE_AUDIT_TOTP }}
+        run: |
+          if [ -z "$EMAIL" ] || [ -z "$PASS" ]; then
+            echo "Sin SYTUE_AUDIT_EMAIL/SYTUE_AUDIT_PASS: no se puede entrar en prod."
+            echo "Dar de alta los secretos del repositorio para activar esta puerta."
+            exit 1
+          fi
+          # EL SEGUNDO FACTOR TAMBIÉN, y faltaba. La cuenta de auditoría lo tiene
+          # activado, así que sin la semilla el login no pasa del segundo paso:
+          # esta puerta daba el visto bueno y el barrido moría después con «la
+          # cuenta pide segundo factor y no hay TOTP», ya dentro del trabajo. El
+          # fallo aparecía como pantallas vacías y `fill: Timeout` —o sea, con
+          # toda la pinta de que la aplicación no carga— cuando lo que faltaba
+          # era un secreto del repositorio. Comprobarlo aquí lo dice en una línea.
+          if [ -z "$TOTP" ]; then
+            echo "Sin SYTUE_AUDIT_TOTP: la cuenta tiene segundo factor y el login se queda a medias." >&2
+            echo "  El barrido mediría pantallas SIN SESIÓN y las contaría como fallos de producto." >&2
+            echo "  Dar de alta el secreto SYTUE_AUDIT_TOTP (la semilla, no un código de 6 dígitos)." >&2
+            exit 1
+          fi
+          # Y QUE SEA UNA SEMILLA, no cualquier cosa. Se comprueba la FORMA —cuántos
+          # caracteres y si están en el alfabeto base32 (A-Z y 2-7)— sin imprimir
+          # nada del valor: con eso basta para distinguir una semilla de un código
+          # de seis dígitos o de una contraseña pegada por error, que es lo que
+          # había, y para saber si el secreto que llega al runner es el que se
+          # subió. Diagnosticarlo desde fuera costó cuatro ejecuciones.
+          n=${#TOTP}
+          limpio=$(printf '%s' "$TOTP" | tr -d '[:space:]' | tr 'a-z' 'A-Z')
+          malos=$(printf '%s' "$limpio" | tr -d 'A-Z2-7')
+          # Huella corta para poder comparar con la de quien la subió SIN que el
+          # valor aparezca en ningún sitio. Ocho hexadecimales de un SHA-256 no
+          # permiten reconstruir la semilla, y bastan para responder la única
+          # pregunta que importa cuando el código se rechaza: ¿es esta la misma
+          # semilla que funciona a mano, o el secreto se quedó con otra?
+          huella=$(printf '%s' "$limpio" | shasum -a 256 2>/dev/null | cut -c1-8) || \
+            huella=$(printf '%s' "$limpio" | sha256sum | cut -c1-8)
+          echo "· SYTUE_AUDIT_TOTP: $n caracteres, ${#limpio} sin espacios, huella $huella"
+          # EL RELOJ, que es la otra mitad de un TOTP. Un código vale 30 s: si el
+          # reloj del runner se aparta más de eso, ninguna semilla funcionará por
+          # correcta que sea, y el fallo dirá «código rechazado» señalando al
+          # sitio equivocado. Se imprime el instante y el PASO (unix/30), que es
+          # justo lo que entra en el cálculo: comparar el paso con el de otra
+          # máquina responde en una línea si el problema es la hora.
+          echo "· reloj del runner: $(date -u +%Y-%m-%dT%H:%M:%SZ) · paso TOTP $(( $(date -u +%s) / 30 ))"
+          if [ -n "$malos" ]; then
+            echo "✗ no es base32: sobran ${#malos} caracteres fuera de A-Z y 2-7." >&2
+            echo "  Hace falta la SEMILLA que Sytue ID enseña junto al QR, no un código." >&2
+            echo "  La rota y la sube: test/e2e/rotar-totp-auditoria.sh" >&2
+            exit 1
+          fi
+
+      - working-directory: test/e2e
+        run: bun install --frozen-lockfile
+
+      # El navegador, desde el paquete del lockfile. `bunx playwright@…` lo
+      # bajaría del registro sin verificar en cada ejecución, igual que se
+      # decidió para lhci en ci-frontend.
+      - working-directory: test/e2e
+        # `--with-deps` NO es adorno: instala el binario Y las bibliotecas del
+        # sistema que necesita. La imagen del runner propio las traía; la genérica
+        # de git.gay no, así que Chromium se instalaba bien y moría al arrancar con
+        # «error while loading shared libraries: libglib-2.0.so.0» — que se lee
+        # como un fallo de la sonda o de la página medida, y es un runner pelado
+        # (lo dice la propia sonda-runner). Usa apt, y el runner corre como root.
+        run: ./node_modules/.bin/playwright install --with-deps chromium
+
+      # SEMBRAR ANTES DE MEDIR. La ruta del editor (`/edit?id=…`) no se puede
+      # alcanzar sin un documento, y era el punto ciego del barrido: se contaba como
+      # «saltada», que no es aprobado, justo en la pantalla donde se pasa el día
+      # quien usa la suite.
+      #
+      # ESCRIBE EN PRODUCCIÓN. Está autorizado expresamente para la cuenta de
+      # auditoría hasta el 2026-11-13, y es idempotente: el documento tiene un
+      # título fijo y no se crea si ya está. Un sembrado que acumula deja el buzón
+      # con cuatrocientos documentos en un mes y acaba desactivado.
+      - name: Sembrar el contenido mínimo de la cuenta de auditoría
+        working-directory: test/e2e
+        env:
+          SYTUE_BASE_DOMAIN: sytue.eu
+          SYTUE_AUDIT_EMAIL: ${{ secrets.SYTUE_AUDIT_EMAIL }}
+          SYTUE_AUDIT_PASS: ${{ secrets.SYTUE_AUDIT_PASS }}
+          SYTUE_AUDIT_TOTP: ${{ secrets.SYTUE_AUDIT_TOTP }}
+          # Bypass del captcha de login (ADR 0056): OPCIONAL. Si el secreto existe,
+          # el barrido firma la cabecera X-Sytue-Test-Auth y no resuelve el PoW;
+          # si no existe, el barrido resuelve el ALTCHA como cualquier persona.
+          SYTUE_LOGIN_BYPASS_KEY: ${{ secrets.SYTUE_LOGIN_BYPASS_KEY }}
+        run: bun run sembrar-auditoria.mjs
+
+      - name: Barrido móvil contra producción
+        working-directory: test/e2e
+        env:
+          SYTUE_BASE_DOMAIN: sytue.eu
+          SYTUE_AUDIT_EMAIL: ${{ secrets.SYTUE_AUDIT_EMAIL }}
+          SYTUE_AUDIT_PASS: ${{ secrets.SYTUE_AUDIT_PASS }}
+          SYTUE_AUDIT_TOTP: ${{ secrets.SYTUE_AUDIT_TOTP }}
+          # Bypass del captcha de login (ADR 0056): OPCIONAL. Si el secreto existe,
+          # el barrido firma la cabecera X-Sytue-Test-Auth y no resuelve el PoW;
+          # si no existe, el barrido resuelve el ALTCHA como cualquier persona.
+          SYTUE_LOGIN_BYPASS_KEY: ${{ secrets.SYTUE_LOGIN_BYPASS_KEY }}
+          # El barrido medía SIEMPRE en español y las diez apps con sesión no se
+          # habían visto nunca en alemán, que es el idioma de palabras más largas
+          # y el que reventó los titulares de www. No cambia el recuento de
+          # medidas: cambia el peor caso que se mide. Si un día hace falta el
+          # español, `LOCALE=es-ES bun run mobile-audit.mjs` a mano.
+          LOCALE: de-DE
+          # Por entorno y NO interpolado dentro del `run`: una expresión ${{ }}
+          # se sustituye ANTES de que exista el shell, así que lo que venga en
+          # el input se ejecutaría como código.
+          APPS: ${{ inputs.apps }}
+        # Sin `auditar-prod.sh`: ese saca la credencial del llavero de macOS y
+        # aquí viene de los secretos del repositorio. El log ya lista cada
+        # combinación desbordada con su elemento culpable y cuánto se sale.
+        run: bun run mobile-audit.mjs $APPS
+
+      # PASO Y NO WORKFLOW APARTE: el montaje que necesita —credenciales,
+      # navegador, sesión— es EXACTAMENTE el de arriba, así que un fichero nuevo
+      # solo duplicaría cuatro pasos y una lista de secretos que mantener en dos
+      # sitios.
+      #
+      # `always()` porque mide otra cosa: el de arriba mira si la página se sale
+      # a lo ancho, este si la página CARGA. Un desbordamiento no puede impedir
+      # que se compruebe lo segundo — y el 2026-08-13 se vio por qué importa:
+      # `rooms/share` llevaba rota devolviendo «Internal server error» dentro de
+      # un 200, y el barrido móvil la aprobaba, porque una página que no carga
+      # tampoco desborda.
+      - name: Barrido de pantallas contra producción (consola, red, contenido)
+        if: always()
+        working-directory: test/e2e
+        env:
+          SYTUE_BASE_DOMAIN: sytue.eu
+          SYTUE_AUDIT_EMAIL: ${{ secrets.SYTUE_AUDIT_EMAIL }}
+          SYTUE_AUDIT_PASS: ${{ secrets.SYTUE_AUDIT_PASS }}
+          SYTUE_AUDIT_TOTP: ${{ secrets.SYTUE_AUDIT_TOTP }}
+          # Bypass del captcha de login (ADR 0056): OPCIONAL. Si el secreto existe,
+          # el barrido firma la cabecera X-Sytue-Test-Auth y no resuelve el PoW;
+          # si no existe, el barrido resuelve el ALTCHA como cualquier persona.
+          SYTUE_LOGIN_BYPASS_KEY: ${{ secrets.SYTUE_LOGIN_BYPASS_KEY }}
+          APPS: ${{ inputs.apps }}
+        run: bun run barrido-pantallas.mjs $APPS
+
+      # UN REPRODUCTOR PUNTUAL, EN LA NUBE Y NO EN UN PORTÁTIL.
+      #
+      # Existe porque el 2026-08-14 diagnostiqué «los correos no se envían»
+      # lanzando `repro-enviar-api.mjs` con `bun run` desde el Mac. El
+      # razonamiento —«apunta a producción, así que da igual desde dónde corra el
+      # Chromium»— es falso: lo que decide es DÓNDE CORRE EL NAVEGADOR. Aquello
+      # dio con el fallo (un 403 del servicio por el remitente equivocado) y ese
+      # diagnóstico no quedó en ningún log que otro pudiera abrir, ni es
+      # repetible sin mi llavero y mi Mac despierto.
+      #
+      # Con esto, un reproductor se escribe, se commitea en test/e2e/ y se lanza
+      # aquí con `workflow_dispatch`. Mismo montaje que el barrido —credenciales,
+      # navegador, sesión—, así que es un paso y no un workflow nuevo.
+      #
+      # Sin `reproductor` no hace nada: el barrido nocturno no debe ejecutar
+      # guiones sueltos por su cuenta.
+      # `always()`: una sonda dirigida existe para diagnosticar un entorno ROTO, así
+      # que no puede depender de que la siembra o el barrido hayan pasado. Sin esto,
+      # el paso se saltaba justo el día que hacía falta —el login fallando bloqueaba
+      # la única herramienta que sirve para averiguar por qué falla—.
+      - name: Reproductor puntual contra producción
+        if: always() && inputs.reproductor != ''
+        working-directory: test/e2e
+        env:
+          SYTUE_BASE_DOMAIN: sytue.eu
+          SYTUE_AUDIT_EMAIL: ${{ secrets.SYTUE_AUDIT_EMAIL }}
+          SYTUE_AUDIT_PASS: ${{ secrets.SYTUE_AUDIT_PASS }}
+          SYTUE_AUDIT_TOTP: ${{ secrets.SYTUE_AUDIT_TOTP }}
+          # Bypass del captcha de login (ADR 0056): OPCIONAL. Si el secreto existe,
+          # el barrido firma la cabecera X-Sytue-Test-Auth y no resuelve el PoW;
+          # si no existe, el barrido resuelve el ALTCHA como cualquier persona.
+          SYTUE_LOGIN_BYPASS_KEY: ${{ secrets.SYTUE_LOGIN_BYPASS_KEY }}
+          GUION: ${{ inputs.reproductor }}
+        run: |
+          set -euo pipefail
+          # Solo un fichero de test/e2e, sin rutas ni saltos hacia arriba: este
+          # job tiene las credenciales de producción y su entrada la escribe una
+          # persona en un formulario.
+          case "$GUION" in
+            */*|..*|"") echo "Nombre de guion inválido: $GUION" >&2; exit 2 ;;
+          esac
+          [ -f "$GUION" ] || { echo "No existe test/e2e/$GUION" >&2; exit 2; }
+          bun run "$GUION"

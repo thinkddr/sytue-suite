@@ -1,0 +1,424 @@
+From 2430cc176a7491b929857ab826325f5948d0ccbe Mon Sep 17 00:00:00 2001
+From: Daniel Delgado <328510259+thinkddr@users.noreply.github.com>
+Date: Tue, 22 Sep 2026 16:26:38 +0200
+Subject: [PATCH] feat: receive incoming URLs on every native platform
+
+---
+ app.go                                        | 12 +++++
+ app/app.go                                    | 20 +++++++
+ app/incoming_urls.go                          |  7 +++
+ app/incoming_urls_darwin.go                   | 24 +++++++++
+ app/incoming_urls_darwin.m                    | 30 +++++++++++
+ app/incoming_urls_mobile.go                   |  6 +++
+ .../driver/mobile/app/GoNativeActivity.java   | 13 +++++
+ internal/driver/mobile/app/android.c          |  6 +++
+ internal/driver/mobile/app/android.go         |  8 +++
+ internal/driver/mobile/app/darwin_ios.go      |  8 +++
+ internal/driver/mobile/app/darwin_ios.m       | 12 +++++
+ internal/urlhandler/urlhandler.go             | 54 +++++++++++++++++++
+ internal/urlhandler/urlhandler_test.go        | 35 ++++++++++++
+ 13 files changed, 235 insertions(+)
+ create mode 100644 app/incoming_urls.go
+ create mode 100644 app/incoming_urls_darwin.go
+ create mode 100644 app/incoming_urls_darwin.m
+ create mode 100644 app/incoming_urls_mobile.go
+ create mode 100644 internal/urlhandler/urlhandler.go
+ create mode 100644 internal/urlhandler/urlhandler_test.go
+
+diff --git a/app.go b/app.go
+index d7bcee54a..d1dea0d56 100644
+--- a/app.go
++++ b/app.go
+@@ -113,6 +113,18 @@ type App interface {
+ 	Cache() Cache
+ }
+ 
++// URLHandler is implemented by applications that can receive URLs opened by the
++// operating system. It is separate from [App] to preserve compatibility with
++// existing third-party App implementations.
++//
++// The callback always runs in the graphical context. URLs received before this
++// method is called are retained and delivered after registration.
++//
++// Since: 2.8.1-sytue.1
++type URLHandler interface {
++	SetOnOpenURL(func(*url.URL))
++}
++
+ var app atomic.Pointer[App]
+ 
+ // SetCurrentApp is an internal function to set the app instance currently running.
+diff --git a/app/app.go b/app/app.go
+index 0257dec34..50bd6a614 100644
+--- a/app/app.go
++++ b/app/app.go
+@@ -4,6 +4,8 @@
+ package app // import "fyne.io/fyne/v2/app"
+ 
+ import (
++	"net/url"
++	"os"
+ 	"strconv"
+ 	"time"
+ 
+@@ -14,6 +16,7 @@ import (
+ 	"fyne.io/fyne/v2/internal/build"
+ 	intRepo "fyne.io/fyne/v2/internal/repository"
+ 	"fyne.io/fyne/v2/internal/scheduler"
++	"fyne.io/fyne/v2/internal/urlhandler"
+ 	"fyne.io/fyne/v2/storage"
+ 	"fyne.io/fyne/v2/storage/repository"
+ )
+@@ -73,6 +76,19 @@ func (a *fyneApp) NewWindow(title string) fyne.Window {
+ 	return a.driver.CreateWindow(title)
+ }
+ 
++// SetOnOpenURL registers the function called when the operating system opens a
++// URL for this application. It also receives a URL that arrived while the app was
++// starting, which is essential for custom-scheme OAuth redirects on mobile.
++func (a *fyneApp) SetOnOpenURL(handler func(*url.URL)) {
++	urlhandler.Set(handler, func(fn func()) {
++		if a.driver == nil {
++			fn()
++			return
++		}
++		a.driver.DoFromGoroutine(fn, false)
++	})
++}
++
+ func (a *fyneApp) Run() {
+ 	go a.lifecycle.RunEventQueue(a.driver.DoFromGoroutine)
+ 
+@@ -174,6 +190,10 @@ func makeStoreDocs(id string, s *store) *internal.Docs {
+ func newAppWithDriver(d fyne.Driver, clipboard fyne.Clipboard, id string) fyne.App {
+ 	newApp := &fyneApp{uniqueID: id, clipboard: clipboard, driver: d}
+ 	fyne.SetCurrentApp(newApp)
++	for _, arg := range os.Args[1:] {
++		urlhandler.Deliver(arg)
++	}
++	registerIncomingURLs()
+ 
+ 	newApp.prefs = newApp.newDefaultPreferences()
+ 	newApp.lifecycle.InitEventQueue()
+diff --git a/app/incoming_urls.go b/app/incoming_urls.go
+new file mode 100644
+index 000000000..676d173e7
+--- /dev/null
++++ b/app/incoming_urls.go
+@@ -0,0 +1,7 @@
++//go:build (!darwin || mobile || ci || wasm || test_web_driver || tinygo) && !android && !ios
++
++package app
++
++// registerIncomingURLs lets platform drivers install their native URL callback.
++// The generic desktop path is handled from os.Args in newAppWithDriver.
++func registerIncomingURLs() {}
+diff --git a/app/incoming_urls_darwin.go b/app/incoming_urls_darwin.go
+new file mode 100644
+index 000000000..d6270f9f2
+--- /dev/null
++++ b/app/incoming_urls_darwin.go
+@@ -0,0 +1,24 @@
++//go:build darwin && !ios && !mobile && !ci && !wasm && !test_web_driver
++
++package app
++
++/*
++#cgo CFLAGS: -x objective-c
++#cgo LDFLAGS: -framework Foundation -framework AppKit -framework Carbon
++
++void watchIncomingURLs(void);
++*/
++import "C"
++
++import "fyne.io/fyne/v2/internal/urlhandler"
++
++// registerIncomingURLs installs the kAEGetURL handler before the application has
++// a window. macOS sends custom-scheme launches as Apple events, not argv.
++func registerIncomingURLs() { C.watchIncomingURLs() }
++
++//export incomingURL
++func incomingURL(raw *C.char) {
++	if raw != nil {
++		urlhandler.Deliver(C.GoString(raw))
++	}
++}
+diff --git a/app/incoming_urls_darwin.m b/app/incoming_urls_darwin.m
+new file mode 100644
+index 000000000..f02b81a68
+--- /dev/null
++++ b/app/incoming_urls_darwin.m
+@@ -0,0 +1,30 @@
++//go:build darwin && !ios && !mobile && !ci && !wasm && !test_web_driver
++
++#include "_cgo_export.h"
++#import <AppKit/AppKit.h>
++#import <Carbon/Carbon.h>
++
++@interface FyneIncomingURLHandler : NSObject
++@end
++
++@implementation FyneIncomingURLHandler
++- (void)handleURL:(NSAppleEventDescriptor *)event withReplyEvent:(NSAppleEventDescriptor *)reply {
++	NSString *value = [[event paramDescriptorForKeyword:keyDirectObject] stringValue];
++	if (value != nil) {
++		incomingURL((char *)[value UTF8String]);
++	}
++}
++@end
++
++void watchIncomingURLs(void) {
++	static FyneIncomingURLHandler *handler;
++	if (handler != nil) {
++		return;
++	}
++	handler = [FyneIncomingURLHandler new];
++	[[NSAppleEventManager sharedAppleEventManager]
++		setEventHandler:handler
++		andSelector:@selector(handleURL:withReplyEvent:)
++		forEventClass:kInternetEventClass
++		andEventID:kAEGetURL];
++}
+diff --git a/app/incoming_urls_mobile.go b/app/incoming_urls_mobile.go
+new file mode 100644
+index 000000000..2e88d85a4
+--- /dev/null
++++ b/app/incoming_urls_mobile.go
+@@ -0,0 +1,6 @@
++//go:build android || ios
++
++package app
++
++// Android and iOS deliver URLs through their native activity/delegate bridges.
++func registerIncomingURLs() {}
+diff --git a/internal/driver/mobile/app/GoNativeActivity.java b/internal/driver/mobile/app/GoNativeActivity.java
+index 1f6ec2581..3085e5616 100644
+--- a/internal/driver/mobile/app/GoNativeActivity.java
++++ b/internal/driver/mobile/app/GoNativeActivity.java
+@@ -50,6 +50,7 @@ public class GoNativeActivity extends NativeActivity {
+ 	private static final int PASSWORD_KEYBOARD_CODE = 3;
+ 
+     private native void filePickerReturned(String str);
++	private native void urlOpened(String str);
+     private native void insetsChanged(int top, int bottom, int left, int right);
+     private native void keyboardTyped(String str);
+     private native void keyboardDelete();
+@@ -393,6 +394,9 @@ public class GoNativeActivity extends NativeActivity {
+ 	public void onCreate(Bundle savedInstanceState) {
+ 		load();
+ 		super.onCreate(savedInstanceState);
++		if (getIntent().getDataString() != null) {
++			urlOpened(getIntent().getDataString());
++		}
+ 		setupEntry();
+ 		updateTheme(getResources().getConfiguration());
+ 
+@@ -405,6 +409,15 @@ public class GoNativeActivity extends NativeActivity {
+ 		});
+     }
+ 
++	@Override
++	public void onNewIntent(Intent intent) {
++		super.onNewIntent(intent);
++		setIntent(intent);
++		if (intent.getDataString() != null) {
++			urlOpened(intent.getDataString());
++		}
++	}
++
+     private void setupEntry() {
+         runOnUiThread(new Runnable() {
+             @Override
+diff --git a/internal/driver/mobile/app/android.c b/internal/driver/mobile/app/android.c
+index 81452f41d..625198b4f 100644
+--- a/internal/driver/mobile/app/android.c
++++ b/internal/driver/mobile/app/android.c
+@@ -286,6 +286,12 @@ void Java_org_golang_app_GoNativeActivity_filePickerReturned(JNIEnv *env, jclass
+ 	filePickerReturned((char*)cstr);
+ }
+ 
++void Java_org_golang_app_GoNativeActivity_urlOpened(JNIEnv *env, jclass clazz, jstring str) {
++	const char* cstr = (*env)->GetStringUTFChars(env, str, JNI_FALSE);
++	urlOpened((char*)cstr);
++	(*env)->ReleaseStringUTFChars(env, str, cstr);
++}
++
+ void Java_org_golang_app_GoNativeActivity_insetsChanged(JNIEnv *env, jclass clazz, int top, int bottom, int left, int right) {
+     insetsChanged(top, bottom, left, right);
+ }
+diff --git a/internal/driver/mobile/app/android.go b/internal/driver/mobile/app/android.go
+index 604e9f5f4..4fb6c6cbe 100644
+--- a/internal/driver/mobile/app/android.go
++++ b/internal/driver/mobile/app/android.go
+@@ -70,6 +70,7 @@ import (
+ 	"fyne.io/fyne/v2/internal/driver/mobile/event/size"
+ 	"fyne.io/fyne/v2/internal/driver/mobile/event/touch"
+ 	"fyne.io/fyne/v2/internal/driver/mobile/mobileinit"
++	"fyne.io/fyne/v2/internal/urlhandler"
+ )
+ 
+ // mimeMap contains standard mime entries that are missing on Android
+@@ -356,6 +357,13 @@ func filePickerReturned(str *C.char) {
+ 	fileCallback = nil
+ }
+ 
++//export urlOpened
++func urlOpened(str *C.char) {
++	if str != nil {
++		urlhandler.Deliver(C.GoString(str))
++	}
++}
++
+ //export insetsChanged
+ func insetsChanged(top, bottom, left, right int) {
+ 	currentSize.InsetTopPx = top
+diff --git a/internal/driver/mobile/app/darwin_ios.go b/internal/driver/mobile/app/darwin_ios.go
+index c018acf0c..782bfdcae 100644
+--- a/internal/driver/mobile/app/darwin_ios.go
++++ b/internal/driver/mobile/app/darwin_ios.go
+@@ -45,6 +45,7 @@ import (
+ 	"fyne.io/fyne/v2/internal/driver/mobile/event/paint"
+ 	"fyne.io/fyne/v2/internal/driver/mobile/event/size"
+ 	"fyne.io/fyne/v2/internal/driver/mobile/event/touch"
++	"fyne.io/fyne/v2/internal/urlhandler"
+ )
+ 
+ var initThreadID uint64
+@@ -218,6 +219,13 @@ func lifecycleMemoryWarning() {
+ 	cleanCaches()
+ }
+ 
++//export urlOpened
++func urlOpened(raw *C.char) {
++	if raw != nil {
++		urlhandler.Deliver(C.GoString(raw))
++	}
++}
++
+ //export drawloop
+ func drawloop() {
+ 	runtime.LockOSThread()
+diff --git a/internal/driver/mobile/app/darwin_ios.m b/internal/driver/mobile/app/darwin_ios.m
+index bfdfbdeb6..c0d68204e 100644
+--- a/internal/driver/mobile/app/darwin_ios.m
++++ b/internal/driver/mobile/app/darwin_ios.m
+@@ -51,6 +51,18 @@ static CGFloat keyboardHeight;
+ 	UNUserNotificationCenter *center = [UNUserNotificationCenter currentNotificationCenter];
+ 	center.delegate = (id) self;
+ 
++	NSURL *incoming = launchOptions[UIApplicationLaunchOptionsURLKey];
++	if (incoming != nil) {
++		urlOpened((char *)[[incoming absoluteString] UTF8String]);
++	}
++
++	return YES;
++}
++
++- (BOOL)application:(UIApplication *)application openURL:(NSURL *)url options:(NSDictionary<UIApplicationOpenURLOptionsKey,id> *)options {
++	if (url != nil) {
++		urlOpened((char *)[[url absoluteString] UTF8String]);
++	}
+ 	return YES;
+ }
+ 
+diff --git a/internal/urlhandler/urlhandler.go b/internal/urlhandler/urlhandler.go
+new file mode 100644
+index 000000000..9548fd589
+--- /dev/null
++++ b/internal/urlhandler/urlhandler.go
+@@ -0,0 +1,54 @@
++// Package urlhandler bridges incoming OS URLs to the application that registered
++// for them. It intentionally has no dependency on the public fyne package so the
++// mobile and desktop drivers can use it without creating an import cycle.
++package urlhandler
++
++import (
++	"net/url"
++	"sync"
++)
++
++var state struct {
++	sync.Mutex
++	handler  func(*url.URL)
++	dispatch func(func())
++	pending  []*url.URL
++}
++
++// Set installs the receiver and delivers URLs which reached the process before
++// the application had finished initialising. The dispatcher must run callbacks in
++// the driver's graphical context.
++func Set(handler func(*url.URL), dispatch func(func())) {
++	state.Lock()
++	state.handler, state.dispatch = handler, dispatch
++	pending := state.pending
++	state.pending = nil
++	state.Unlock()
++
++	if handler == nil || dispatch == nil {
++		return
++	}
++	for _, incoming := range pending {
++		u := incoming
++		dispatch(func() { handler(u) })
++	}
++}
++
++// Deliver parses and queues an URL from the operating system. Invalid strings and
++// ordinary command-line flags are not URLs and are deliberately ignored.
++func Deliver(raw string) {
++	incoming, err := url.Parse(raw)
++	if err != nil || incoming.Scheme == "" {
++		return
++	}
++
++	state.Lock()
++	handler, dispatch := state.handler, state.dispatch
++	if handler == nil || dispatch == nil {
++		state.pending = append(state.pending, incoming)
++		state.Unlock()
++		return
++	}
++	state.Unlock()
++	dispatch(func() { handler(incoming) })
++}
+diff --git a/internal/urlhandler/urlhandler_test.go b/internal/urlhandler/urlhandler_test.go
+new file mode 100644
+index 000000000..b0624e192
+--- /dev/null
++++ b/internal/urlhandler/urlhandler_test.go
+@@ -0,0 +1,35 @@
++package urlhandler
++
++import (
++	"net/url"
++	"testing"
++)
++
++func reset() {
++	state.Lock()
++	state.handler, state.dispatch, state.pending = nil, nil, nil
++	state.Unlock()
++}
++
++func TestQueuesURLUntilAHandlerIsInstalled(t *testing.T) {
++	reset()
++	t.Cleanup(reset)
++	Deliver("sytue-mail://auth/callback?code=one")
++
++	var got string
++	Set(func(u *url.URL) { got = u.String() }, func(f func()) { f() })
++	if got != "sytue-mail://auth/callback?code=one" {
++		t.Fatalf("URL entregada = %q", got)
++	}
++}
++
++func TestRejectsArgumentsThatAreNotURLs(t *testing.T) {
++	reset()
++	t.Cleanup(reset)
++	Deliver("-psn_0_12345")
++	called := false
++	Set(func(*url.URL) { called = true }, func(f func()) { f() })
++	if called {
++		t.Fatal("un argumento normal no puede llegar al handler")
++	}
++}

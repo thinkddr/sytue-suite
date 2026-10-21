@@ -1,0 +1,891 @@
+{
+  "ahora": "2026-12-01T00:00:00Z",
+  "casos": [
+    {
+      "id": "sin-firmas",
+      "fichero": "sin-firmas.pdf",
+      "descripcion": "PDF de LibreOffice sin firmar: no hay nada que verificar",
+      "anclas": [
+        "raiz-a"
+      ],
+      "anclas_sello": [
+        "raiz-sello"
+      ],
+      "firmas": []
+    },
+    {
+      "id": "sin-firmas-flujos",
+      "fichero": "sin-firmas-flujos.pdf",
+      "descripcion": "PDF con flujo de referencias cruzadas y de objetos, sin firmar",
+      "anclas": [
+        "raiz-a"
+      ],
+      "anclas_sello": [
+        "raiz-sello"
+      ],
+      "firmas": []
+    },
+    {
+      "id": "valida-rsa",
+      "fichero": "firma-valida-rsa.pdf",
+      "descripcion": "(a) una firma PAdES RSA-2048 con cadena intermedia y raíz embebidas, sin sello: válida",
+      "anclas": [
+        "raiz-a"
+      ],
+      "anclas_sello": [
+        "raiz-sello"
+      ],
+      "firmas": [
+        {
+          "campo": "Firma1",
+          "tipo": "pades",
+          "veredicto": "valida",
+          "motivos": [],
+          "integra": true,
+          "confianza": "confiable",
+          "firmante": "Ana Pérez",
+          "alcance": "ninguno"
+        }
+      ]
+    },
+    {
+      "id": "valida-rsa-sin-anclas",
+      "fichero": "firma-valida-rsa.pdf",
+      "descripcion": "el mismo fichero sin anclas configuradas: íntegro pero no se sabe quién es",
+      "anclas": [],
+      "anclas_sello": [],
+      "firmas": [
+        {
+          "campo": "Firma1",
+          "tipo": "pades",
+          "veredicto": "indeterminada",
+          "motivos": [
+            "sin_anclas"
+          ],
+          "integra": true,
+          "confianza": "sin_anclas",
+          "firmante": "Ana Pérez",
+          "alcance": "ninguno"
+        }
+      ]
+    },
+    {
+      "id": "valida-rsa-ancla-ajena",
+      "fichero": "firma-valida-rsa.pdf",
+      "descripcion": "el mismo fichero contra una raíz que no es la suya: no confiable",
+      "anclas": [
+        "raiz-b"
+      ],
+      "anclas_sello": [
+        "raiz-sello"
+      ],
+      "firmas": [
+        {
+          "campo": "Firma1",
+          "tipo": "pades",
+          "veredicto": "indeterminada",
+          "motivos": [
+            "no_confiable"
+          ],
+          "integra": true,
+          "confianza": "no_confiable",
+          "firmante": "Ana Pérez",
+          "alcance": "ninguno"
+        }
+      ]
+    },
+    {
+      "id": "valida-ecdsa-sello",
+      "fichero": "firma-valida-ecdsa-sello.pdf",
+      "descripcion": "(e) ECDSA P-256 con sello RFC 3161 de OpenSSL y la raíz fuera de la firma: válida con sello de confianza",
+      "anclas": [
+        "raiz-a"
+      ],
+      "anclas_sello": [
+        "raiz-sello"
+      ],
+      "firmas": [
+        {
+          "campo": "Firma1",
+          "tipo": "pades",
+          "veredicto": "valida",
+          "motivos": [],
+          "integra": true,
+          "confianza": "confiable",
+          "firmante": "Bruno Gómez",
+          "alcance": "ninguno",
+          "sello": {
+            "integro": true,
+            "confianza": "confiable",
+            "autoridad": "TSA de prueba"
+          }
+        }
+      ]
+    },
+    {
+      "id": "valida-sha384",
+      "fichero": "firma-valida-sha384.pdf",
+      "descripcion": "firma con SHA-384",
+      "anclas": [
+        "raiz-a"
+      ],
+      "anclas_sello": [
+        "raiz-sello"
+      ],
+      "firmas": [
+        {
+          "campo": "Firma1",
+          "tipo": "pades",
+          "veredicto": "valida",
+          "motivos": [],
+          "integra": true,
+          "confianza": "confiable",
+          "firmante": "Ana Pérez",
+          "alcance": "ninguno"
+        }
+      ]
+    },
+    {
+      "id": "valida-pkcs7",
+      "fichero": "firma-pkcs7-detached.pdf",
+      "descripcion": "/SubFilter adbe.pkcs7.detached (el de Acrobat antiguo, sin atributos CAdES)",
+      "anclas": [
+        "raiz-a"
+      ],
+      "anclas_sello": [
+        "raiz-sello"
+      ],
+      "firmas": [
+        {
+          "campo": "Firma1",
+          "tipo": "pkcs7",
+          "veredicto": "valida",
+          "motivos": [],
+          "integra": true,
+          "confianza": "confiable",
+          "firmante": "Ana Pérez",
+          "alcance": "ninguno"
+        }
+      ]
+    },
+    {
+      "id": "valida-rsa-pss",
+      "fichero": "firma-valida-rsa-pss.pdf",
+      "descripcion": "firma RSASSA-PSS (la que prefieren algunas tarjetas y HSM) sobre un certificado RSA",
+      "anclas": [
+        "raiz-a"
+      ],
+      "anclas_sello": [
+        "raiz-sello"
+      ],
+      "firmas": [
+        {
+          "campo": "Firma1",
+          "tipo": "pades",
+          "veredicto": "valida",
+          "motivos": [],
+          "integra": true,
+          "confianza": "confiable",
+          "firmante": "Ana Pérez",
+          "alcance": "ninguno"
+        }
+      ]
+    },
+    {
+      "id": "valida-flujos",
+      "fichero": "firma-valida-flujos.pdf",
+      "descripcion": "firma sobre un PDF con xref y objetos en flujos (la forma de Word y Acrobat)",
+      "anclas": [
+        "raiz-a"
+      ],
+      "anclas_sello": [
+        "raiz-sello"
+      ],
+      "firmas": [
+        {
+          "campo": "Firma1",
+          "tipo": "pades",
+          "veredicto": "valida",
+          "motivos": [],
+          "integra": true,
+          "confianza": "confiable",
+          "firmante": "Bruno Gómez",
+          "alcance": "ninguno"
+        }
+      ]
+    },
+    {
+      "id": "valida-openssl-cms",
+      "fichero": "firma-openssl-cms.pdf",
+      "descripcion": "el CMS lo produjo `openssl cms -sign -cades` sobre los dos tramos, sin biblioteca de PDF",
+      "anclas": [
+        "raiz-a"
+      ],
+      "anclas_sello": [
+        "raiz-sello"
+      ],
+      "firmas": [
+        {
+          "campo": "Firma1",
+          "tipo": "pades",
+          "veredicto": "valida",
+          "motivos": [],
+          "integra": true,
+          "confianza": "confiable",
+          "firmante": "Ana Pérez",
+          "alcance": "ninguno"
+        }
+      ]
+    },
+    {
+      "id": "manipulado-contenido",
+      "fichero": "manipulado-contenido.pdf",
+      "descripcion": "(b) un byte cambiado DENTRO de lo firmado: la firma ya no corresponde",
+      "anclas": [
+        "raiz-a"
+      ],
+      "anclas_sello": [
+        "raiz-sello"
+      ],
+      "firmas": [
+        {
+          "campo": "Firma1",
+          "tipo": "pades",
+          "veredicto": "invalida",
+          "motivos": [
+            "integridad"
+          ],
+          "integra": false,
+          "confianza": "sin_anclas",
+          "firmante": "",
+          "alcance": "ninguno"
+        }
+      ]
+    },
+    {
+      "id": "manipulado-subfiltro",
+      "fichero": "manipulado-subfiltro.pdf",
+      "descripcion": "/SubFilter adbe.pkcs7.sha1 (SHA-1): no se sabe comprobar y se dice, no se adivina",
+      "anclas": [
+        "raiz-a"
+      ],
+      "anclas_sello": [
+        "raiz-sello"
+      ],
+      "firmas": [
+        {
+          "campo": "Firma1",
+          "tipo": "adbe.pkcs7.sha1",
+          "veredicto": "invalida",
+          "motivos": [
+            "formato"
+          ],
+          "integra": false,
+          "confianza": "sin_anclas",
+          "firmante": "",
+          "alcance": "ninguno"
+        }
+      ]
+    },
+    {
+      "id": "manipulado-byterange",
+      "fichero": "manipulado-byterange.pdf",
+      "descripcion": "(b) /ByteRange desplazado un byte: no es el de esta firma",
+      "anclas": [
+        "raiz-a"
+      ],
+      "anclas_sello": [
+        "raiz-sello"
+      ],
+      "firmas": [
+        {
+          "campo": "Firma1",
+          "tipo": "pades",
+          "veredicto": "invalida",
+          "motivos": [
+            "rango"
+          ],
+          "integra": false,
+          "confianza": "sin_anclas",
+          "firmante": "",
+          "alcance": ""
+        }
+      ]
+    },
+    {
+      "id": "cambio-posterior-pagina",
+      "fichero": "cambio-posterior-pagina.pdf",
+      "descripcion": "(c) actualización incremental que pinta sobre la página 2 tras firmar",
+      "anclas": [
+        "raiz-a"
+      ],
+      "anclas_sello": [
+        "raiz-sello"
+      ],
+      "firmas": [
+        {
+          "campo": "Firma1",
+          "tipo": "pades",
+          "veredicto": "modificada",
+          "motivos": [
+            "cambios"
+          ],
+          "integra": true,
+          "confianza": "confiable",
+          "firmante": "Ana Pérez",
+          "alcance": "otros",
+          "paginas": [
+            2
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cambio-posterior-info",
+      "fichero": "cambio-posterior-info.pdf",
+      "descripcion": "(c) actualización incremental que cambia el /Title del /Info",
+      "anclas": [
+        "raiz-a"
+      ],
+      "anclas_sello": [
+        "raiz-sello"
+      ],
+      "firmas": [
+        {
+          "campo": "Firma1",
+          "tipo": "pades",
+          "veredicto": "modificada",
+          "motivos": [
+            "cambios"
+          ],
+          "integra": true,
+          "confianza": "confiable",
+          "firmante": "Ana Pérez",
+          "alcance": "otros"
+        }
+      ]
+    },
+    {
+      "id": "cambio-posterior-anotacion",
+      "fichero": "cambio-posterior-anotacion.pdf",
+      "descripcion": "(c) actualización incremental que añade un comentario a la página 1",
+      "anclas": [
+        "raiz-a"
+      ],
+      "anclas_sello": [
+        "raiz-sello"
+      ],
+      "firmas": [
+        {
+          "campo": "Firma1",
+          "tipo": "pades",
+          "veredicto": "modificada",
+          "motivos": [
+            "cambios"
+          ],
+          "integra": true,
+          "confianza": "confiable",
+          "firmante": "Ana Pérez",
+          "alcance": "otros",
+          "paginas": [
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "caducado-sin-sello",
+      "fichero": "caducado-sin-sello.pdf",
+      "descripcion": "(d) certificado caducado el 2026-03-01 y verificado el 2026-12-01 sin sello: indeterminada",
+      "anclas": [
+        "raiz-a"
+      ],
+      "anclas_sello": [
+        "raiz-sello"
+      ],
+      "firmas": [
+        {
+          "campo": "Firma1",
+          "tipo": "pades",
+          "veredicto": "indeterminada",
+          "motivos": [
+            "caducado"
+          ],
+          "integra": true,
+          "confianza": "confiable",
+          "firmante": "Carla Díaz (caducada)",
+          "alcance": "ninguno"
+        }
+      ]
+    },
+    {
+      "id": "caducado-con-sello-de-su-epoca",
+      "fichero": "caducado-con-sello-de-su-epoca.pdf",
+      "descripcion": "(d)+(e) el mismo certificado con sello de 2026-02-01 (vigente entonces) de una TSA de confianza: válida",
+      "anclas": [
+        "raiz-a"
+      ],
+      "anclas_sello": [
+        "raiz-sello"
+      ],
+      "firmas": [
+        {
+          "campo": "Firma1",
+          "tipo": "pades",
+          "veredicto": "valida",
+          "motivos": [],
+          "integra": true,
+          "confianza": "confiable",
+          "firmante": "Carla Díaz (caducada)",
+          "alcance": "ninguno",
+          "sello": {
+            "integro": true,
+            "confianza": "confiable",
+            "autoridad": "TSA de prueba"
+          },
+          "hora_referencia": "2026-02-01T12:00:00Z"
+        }
+      ]
+    },
+    {
+      "id": "aun-no-vigente",
+      "fichero": "aun-no-vigente.pdf",
+      "descripcion": "(d) certificado que empieza a valer en 2040: aún no vigente",
+      "anclas": [
+        "raiz-a"
+      ],
+      "anclas_sello": [
+        "raiz-sello"
+      ],
+      "firmas": [
+        {
+          "campo": "Firma1",
+          "tipo": "pades",
+          "veredicto": "indeterminada",
+          "motivos": [
+            "caducado"
+          ],
+          "integra": true,
+          "confianza": "confiable",
+          "firmante": "Darío Vega (futuro)",
+          "alcance": "ninguno"
+        }
+      ]
+    },
+    {
+      "id": "sello-de-otra-firma",
+      "fichero": "sello-de-otra-firma.pdf",
+      "descripcion": "(e) sello auténtico de la TSA de confianza, pero del resumen de otra cosa: el sello no vale y la firma queda indeterminada",
+      "anclas": [
+        "raiz-a"
+      ],
+      "anclas_sello": [
+        "raiz-sello"
+      ],
+      "firmas": [
+        {
+          "campo": "Firma1",
+          "tipo": "pades",
+          "veredicto": "indeterminada",
+          "motivos": [
+            "sello_invalido"
+          ],
+          "integra": true,
+          "confianza": "confiable",
+          "firmante": "Ana Pérez",
+          "alcance": "ninguno",
+          "sello": {
+            "integro": false,
+            "confianza": "sin_anclas",
+            "autoridad": ""
+          }
+        }
+      ]
+    },
+    {
+      "id": "sello-no-confiable",
+      "fichero": "sello-no-confiable.pdf",
+      "descripcion": "(e) el sello es íntegro pero de una TSA cuya raíz no está en las anclas de sello",
+      "anclas": [
+        "raiz-a"
+      ],
+      "anclas_sello": [
+        "raiz-sello"
+      ],
+      "firmas": [
+        {
+          "campo": "Firma1",
+          "tipo": "pades",
+          "veredicto": "indeterminada",
+          "motivos": [
+            "sello_no_confiable"
+          ],
+          "integra": true,
+          "confianza": "confiable",
+          "firmante": "Ana Pérez",
+          "alcance": "ninguno",
+          "sello": {
+            "integro": true,
+            "confianza": "no_confiable",
+            "autoridad": "TSA ajena"
+          }
+        }
+      ]
+    },
+    {
+      "id": "certificacion-p1",
+      "fichero": "certificacion-p1.pdf",
+      "descripcion": "(f) firma de certificación DocMDP /P 1 (ningún cambio) y nada detrás: válida",
+      "anclas": [
+        "raiz-a"
+      ],
+      "anclas_sello": [
+        "raiz-sello"
+      ],
+      "firmas": [
+        {
+          "campo": "Certificacion",
+          "tipo": "pades",
+          "veredicto": "valida",
+          "motivos": [],
+          "integra": true,
+          "confianza": "confiable",
+          "firmante": "Ana Pérez",
+          "alcance": "ninguno",
+          "certificacion": 1
+        }
+      ]
+    },
+    {
+      "id": "certificacion-p1-con-segunda-firma",
+      "fichero": "certificacion-p1-con-segunda-firma.pdf",
+      "descripcion": "(f) /P 1 prohíbe incluso otra firma: la certificación se invalida y la segunda firma, en sí, es válida",
+      "anclas": [
+        "raiz-a"
+      ],
+      "anclas_sello": [
+        "raiz-sello"
+      ],
+      "firmas": [
+        {
+          "campo": "Certificacion",
+          "tipo": "pades",
+          "veredicto": "invalida",
+          "motivos": [
+            "certificacion"
+          ],
+          "integra": true,
+          "confianza": "confiable",
+          "firmante": "Ana Pérez",
+          "alcance": "permitidos",
+          "certificacion": 1
+        },
+        {
+          "campo": "Firma2",
+          "tipo": "pades",
+          "veredicto": "valida",
+          "motivos": [],
+          "integra": true,
+          "confianza": "confiable",
+          "firmante": "Bruno Gómez",
+          "alcance": "ninguno"
+        }
+      ]
+    },
+    {
+      "id": "certificacion-p2-con-segunda-firma",
+      "fichero": "certificacion-p2-con-segunda-firma.pdf",
+      "descripcion": "(f) /P 2 admite firmar otra vez: las dos válidas",
+      "anclas": [
+        "raiz-a"
+      ],
+      "anclas_sello": [
+        "raiz-sello"
+      ],
+      "firmas": [
+        {
+          "campo": "Certificacion",
+          "tipo": "pades",
+          "veredicto": "valida",
+          "motivos": [],
+          "integra": true,
+          "confianza": "confiable",
+          "firmante": "Ana Pérez",
+          "alcance": "permitidos",
+          "certificacion": 2
+        },
+        {
+          "campo": "Firma2",
+          "tipo": "pades",
+          "veredicto": "valida",
+          "motivos": [],
+          "integra": true,
+          "confianza": "confiable",
+          "firmante": "Bruno Gómez",
+          "alcance": "ninguno"
+        }
+      ]
+    },
+    {
+      "id": "certificacion-p2-con-cambio-de-pagina",
+      "fichero": "certificacion-p2-con-cambio-de-pagina.pdf",
+      "descripcion": "(f) /P 2 no admite cambiar una página",
+      "anclas": [
+        "raiz-a"
+      ],
+      "anclas_sello": [
+        "raiz-sello"
+      ],
+      "firmas": [
+        {
+          "campo": "Certificacion",
+          "tipo": "pades",
+          "veredicto": "invalida",
+          "motivos": [
+            "cambios",
+            "certificacion"
+          ],
+          "integra": true,
+          "confianza": "confiable",
+          "firmante": "Ana Pérez",
+          "alcance": "otros",
+          "paginas": [
+            1
+          ],
+          "certificacion": 2
+        }
+      ]
+    },
+    {
+      "id": "certificacion-p3-con-comentario",
+      "fichero": "certificacion-p3-con-comentario.pdf",
+      "descripcion": "(f) /P 3 SÍ admite comentarios (anotaciones): la certificación sigue válida",
+      "anclas": [
+        "raiz-a"
+      ],
+      "anclas_sello": [
+        "raiz-sello"
+      ],
+      "firmas": [
+        {
+          "campo": "Certificacion",
+          "tipo": "pades",
+          "veredicto": "valida",
+          "motivos": [],
+          "integra": true,
+          "confianza": "confiable",
+          "firmante": "Ana Pérez",
+          "alcance": "permitidos",
+          "certificacion": 3
+        }
+      ]
+    },
+    {
+      "id": "certificacion-p3-con-cambio-de-pagina",
+      "fichero": "certificacion-p3-con-cambio-de-pagina.pdf",
+      "descripcion": "(f) /P 3 admite comentarios pero NO cambiar una página",
+      "anclas": [
+        "raiz-a"
+      ],
+      "anclas_sello": [
+        "raiz-sello"
+      ],
+      "firmas": [
+        {
+          "campo": "Certificacion",
+          "tipo": "pades",
+          "veredicto": "invalida",
+          "motivos": [
+            "cambios",
+            "certificacion"
+          ],
+          "integra": true,
+          "confianza": "confiable",
+          "firmante": "Ana Pérez",
+          "alcance": "otros",
+          "paginas": [
+            1
+          ],
+          "certificacion": 3
+        }
+      ]
+    },
+    {
+      "id": "firma-y-contrafirma",
+      "fichero": "firma-y-contrafirma.pdf",
+      "descripcion": "(g) dos firmas encadenadas: la primera solo ve añadirse la segunda",
+      "anclas": [
+        "raiz-a"
+      ],
+      "anclas_sello": [
+        "raiz-sello"
+      ],
+      "firmas": [
+        {
+          "campo": "Firma1",
+          "tipo": "pades",
+          "veredicto": "valida",
+          "motivos": [],
+          "integra": true,
+          "confianza": "confiable",
+          "firmante": "Ana Pérez",
+          "alcance": "permitidos"
+        },
+        {
+          "campo": "Firma2",
+          "tipo": "pades",
+          "veredicto": "valida",
+          "motivos": [],
+          "integra": true,
+          "confianza": "confiable",
+          "firmante": "Bruno Gómez",
+          "alcance": "ninguno",
+          "sello": {
+            "integro": true,
+            "confianza": "confiable",
+            "autoridad": "TSA de prueba"
+          }
+        }
+      ]
+    },
+    {
+      "id": "tres-firmas-y-sello-de-documento",
+      "fichero": "tres-firmas-y-sello-de-documento.pdf",
+      "descripcion": "(g) dos firmas y un sello de documento ETSI.RFC3161 (PAdES B-LTA)",
+      "anclas": [
+        "raiz-a"
+      ],
+      "anclas_sello": [
+        "raiz-sello"
+      ],
+      "firmas": [
+        {
+          "campo": "Firma1",
+          "tipo": "pades",
+          "veredicto": "valida",
+          "motivos": [],
+          "integra": true,
+          "confianza": "confiable",
+          "firmante": "Ana Pérez",
+          "alcance": "permitidos"
+        },
+        {
+          "campo": "Firma2",
+          "tipo": "pades",
+          "veredicto": "valida",
+          "motivos": [],
+          "integra": true,
+          "confianza": "confiable",
+          "firmante": "Bruno Gómez",
+          "alcance": "permitidos",
+          "sello": {
+            "integro": true,
+            "confianza": "confiable",
+            "autoridad": "TSA de prueba"
+          }
+        },
+        {
+          "campo": "Timestamp-*",
+          "tipo": "sello_documento",
+          "veredicto": "valida",
+          "motivos": [],
+          "integra": true,
+          "confianza": "confiable",
+          "firmante": "TSA de prueba",
+          "alcance": "ninguno",
+          "sello": {
+            "integro": true,
+            "confianza": "confiable",
+            "autoridad": "TSA de prueba"
+          }
+        }
+      ]
+    },
+    {
+      "id": "firma-tras-cambio-de-pagina",
+      "fichero": "firma-tras-cambio-de-pagina.pdf",
+      "descripcion": "(g) la segunda firma se pone DESPUÉS de que alguien cambiara la página 2: solo la primera queda en entredicho",
+      "anclas": [
+        "raiz-a"
+      ],
+      "anclas_sello": [
+        "raiz-sello"
+      ],
+      "firmas": [
+        {
+          "campo": "Firma1",
+          "tipo": "pades",
+          "veredicto": "modificada",
+          "motivos": [
+            "cambios"
+          ],
+          "integra": true,
+          "confianza": "confiable",
+          "firmante": "Ana Pérez",
+          "alcance": "otros",
+          "paginas": [
+            2
+          ]
+        },
+        {
+          "campo": "Firma2",
+          "tipo": "pades",
+          "veredicto": "valida",
+          "motivos": [],
+          "integra": true,
+          "confianza": "confiable",
+          "firmante": "Elena Ruiz",
+          "alcance": "ninguno"
+        }
+      ]
+    },
+    {
+      "id": "raiz-desconocida",
+      "fichero": "raiz-desconocida.pdf",
+      "descripcion": "(h) la cadena acaba en una raíz que no está en las anclas",
+      "anclas": [
+        "raiz-a"
+      ],
+      "anclas_sello": [
+        "raiz-sello"
+      ],
+      "firmas": [
+        {
+          "campo": "Firma1",
+          "tipo": "pades",
+          "veredicto": "indeterminada",
+          "motivos": [
+            "no_confiable"
+          ],
+          "integra": true,
+          "confianza": "no_confiable",
+          "firmante": "Ivo Intruso",
+          "alcance": "ninguno"
+        }
+      ]
+    },
+    {
+      "id": "raiz-desconocida-con-su-ancla",
+      "fichero": "raiz-desconocida.pdf",
+      "descripcion": "el mismo fichero con SU raíz como ancla: válida (el fichero está bien; faltaba la confianza)",
+      "anclas": [
+        "raiz-b"
+      ],
+      "anclas_sello": [
+        "raiz-sello"
+      ],
+      "firmas": [
+        {
+          "campo": "Firma1",
+          "tipo": "pades",
+          "veredicto": "valida",
+          "motivos": [],
+          "integra": true,
+          "confianza": "confiable",
+          "firmante": "Ivo Intruso",
+          "alcance": "ninguno"
+        }
+      ]
+    }
+  ]
+}

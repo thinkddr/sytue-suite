@@ -1,0 +1,64 @@
+[
+  {
+    "clave": "intervencion", "modulo": "servicio_campo", "secuencia": "INT",
+    "etiqueta": {"en":"Field service tasks","es":"Intervenciones","fr":"Interventions","de":"Einsätze","it":"Interventi","bg":"Задачи за теренно обслужване","cs":"Zakázky terénního servisu","da":"Feltserviceopgaver","el":"Εργασίες τεχνικής εξυπηρέτησης","et":"Välihoolduse ülesanded","fi":"Kenttähuoltotehtävät","ga":"Tascanna seirbhíse allamuigh","hr":"Zadaci terenskog servisa","hu":"Helyszíni szervizfeladatok","is":"Vettvangsþjónustuverk","lt":"Aptarnavimo vietoje užduotys","lv":"Izbraukuma servisa uzdevumi","mt":"Xogħlijiet ta' servizz fuq il-post","nb":"Feltserviceoppdrag","nl":"Buitendiensttaken","pl":"Zlecenia serwisu terenowego","pt":"Intervenções de serviço de campo","ro":"Intervenții de service pe teren","sk":"Zákazky terénneho servisu","sl":"Naloge terenskega servisa","sv":"Fältserviceuppdrag"},
+    "estados": ["nuevo","planificado","en_curso","hecho","cancelado"],
+    "campos": [
+      {"clave":"asunto","tipo":"texto","requerido":true},
+      {"clave":"cliente","tipo":"relacion","modelo":"contacto","requerido":true},
+      {"clave":"tecnico","tipo":"relacion","modelo":"empleado"},
+      {"clave":"equipo","tipo":"relacion","modelo":"equipo"},
+      {"clave":"direccion","tipo":"texto"},
+      {"clave":"fecha_inicio","tipo":"fechahora","requerido":true},
+      {"clave":"fecha_fin","tipo":"fechahora"},
+      {"clave":"duracion","tipo":"decimal"},
+      {"clave":"descripcion","tipo":"texto_largo"}
+    ],
+    "lista": ["ref","asunto","cliente","tecnico","fecha_inicio","estado"]
+  },
+  {
+    "clave": "parte_intervencion", "modulo": "servicio_campo", "titulo": "descripcion",
+    "etiqueta": {"en":"Worksheets","es":"Partes de trabajo","fr":"Rapports d'intervention","de":"Arbeitsberichte","it":"Rapporti di intervento","bg":"Работни листове","cs":"Pracovní listy","da":"Arbejdssedler","el":"Φύλλα εργασίας","et":"Töölehed","fi":"Työraportit","ga":"Bileoga oibre","hr":"Radni listovi","hu":"Munkalapok","is":"Verkblöð","lt":"Darbo lapai","lv":"Darba lapas","mt":"Worksheets","nb":"Arbeidssedler","nl":"Werkbonnen","pl":"Karty pracy","pt":"Folhas de trabalho","ro":"Fișe de lucru","sk":"Pracovné listy","sl":"Delovni listi","sv":"Arbetsrapporter"},
+    "estados": ["borrador","confirmado","facturado"],
+    "campos": [
+      {"clave":"intervencion","tipo":"relacion","modelo":"intervencion","requerido":true},
+      {"clave":"descripcion","tipo":"texto","requerido":true},
+      {"clave":"fecha","tipo":"fecha","requerido":true},
+      {"clave":"horas","tipo":"decimal"},
+      {"clave":"producto","tipo":"relacion","modelo":"producto"},
+      {"clave":"cantidad","tipo":"decimal"},
+      {"clave":"importe","tipo":"dinero"},
+      {"clave":"firma","tipo":"texto"}
+    ],
+    "lista": ["descripcion","intervencion","fecha","horas","importe","estado"]
+  },
+  {
+    "clave": "curso", "modulo": "elearning", "titulo": "nombre",
+    "etiqueta": {"en":"Courses","es":"Cursos","fr":"Cours","de":"Kurse","it":"Corsi","bg":"Курсове","cs":"Kurzy","da":"Kurser","el":"Μαθήματα","et":"Kursused","fi":"Kurssit","ga":"Cúrsaí","hr":"Tečajevi","hu":"Tanfolyamok","is":"Námskeið","lt":"Kursai","lv":"Kursi","mt":"Korsijiet","nb":"Kurs","nl":"Cursussen","pl":"Kursy","pt":"Cursos","ro":"Cursuri","sk":"Kurzy","sl":"Tečaji","sv":"Kurser"},
+    "estados": ["borrador","publicado","cerrado"],
+    "campos": [
+      {"clave":"nombre","tipo":"texto","requerido":true},
+      {"clave":"categoria","tipo":"texto"},
+      {"clave":"responsable","tipo":"texto"},
+      {"clave":"duracion","tipo":"decimal"},
+      {"clave":"aforo","tipo":"entero"},
+      {"clave":"precio","tipo":"dinero"},
+      {"clave":"descripcion","tipo":"texto_largo"}
+    ],
+    "lista": ["nombre","categoria","responsable","duracion","precio","estado"]
+  },
+  {
+    "clave": "inscripcion_curso", "modulo": "elearning", "titulo": "asistente",
+    "etiqueta": {"en":"Course enrolments","es":"Matrículas","fr":"Inscriptions aux cours","de":"Kursanmeldungen","it":"Iscrizioni ai corsi","bg":"Записвания за курсове","cs":"Zápisy do kurzů","da":"Kursustilmeldinger","el":"Εγγραφές σε μαθήματα","et":"Kursustele registreerumised","fi":"Kurssi-ilmoittautumiset","ga":"Rollúcháin chúrsa","hr":"Upisi na tečajeve","hu":"Tanfolyami jelentkezések","is":"Skráningar á námskeið","lt":"Registracijos į kursus","lv":"Pieteikumi kursiem","mt":"Reġistrazzjonijiet għall-korsijiet","nb":"Kurspåmeldinger","nl":"Cursusinschrijvingen","pl":"Zapisy na kursy","pt":"Inscrições em cursos","ro":"Înscrieri la cursuri","sk":"Zápisy do kurzov","sl":"Vpisi na tečaje","sv":"Kursanmälningar"},
+    "estados": ["pendiente","en_curso","hecho","cancelado"],
+    "campos": [
+      {"clave":"curso","tipo":"relacion","modelo":"curso","requerido":true},
+      {"clave":"asistente","tipo":"texto","requerido":true},
+      {"clave":"contacto","tipo":"relacion","modelo":"contacto"},
+      {"clave":"fecha","tipo":"fecha"},
+      {"clave":"avance","tipo":"entero"},
+      {"clave":"puntuacion","tipo":"entero"}
+    ],
+    "lista": ["curso","asistente","fecha","avance","estado"]
+  }
+]

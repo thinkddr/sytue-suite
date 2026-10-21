@@ -1,0 +1,75 @@
+# Las capturas de `test/e2e/shots/` que son ANTERIORES al último cambio de la paleta
+# (`branding/tokens/colors.css`) y que, por tanto, MIENTEN EN EL COLOR.
+#
+# VALEN PARA GEOMETRÍA Y REPARTO, NO PARA COLOR. Para color, la hoja de tokens o una
+# medida contra producción.
+#
+# Las 59 de esta lista son del 2026-09-04 y el rediseño «Tinta y papel» que cambió la
+# paleta es del 2026-09-15. Ya costó un diagnóstico falso: un agente concluyó que
+# `tema.Color("primary")` estaba mal porque su captura pintaba NARANJA donde el token
+# da tinta. El token era correcto.
+#
+# El trinquete es `scripts/capturas-rancias.sh`, y compara esta lista POR IGUALDAD: se
+# pone rojo tanto si aparece una rancia sin registrar como si una registrada deja de
+# serlo y nadie borra su línea. Se vacía regenerando las capturas
+# (`test/e2e/medidas-web.mjs` y el barrido de Playwright, en el piloto), no editando
+# este fichero.
+calendar.png
+chat.png
+cloud.png
+console.png
+contacts.png
+docs-editor-presentation.png
+docs-editor-smoke.png
+docs-editor-spreadsheet.png
+docs-editor.png
+docs.png
+drive.png
+hr-1280-disposicion.png
+hr-1280-header.png
+hr-1280-inicio.png
+hr-1440-colaboracion.png
+hr-1440-disposicion.png
+hr-1440-focus-boton.png
+hr-1440-focus-tab.png
+hr-1440-header-guardado.png
+hr-1440-inicio-pressed-hover.png
+hr-1440-inicio.png
+hr-1440-insertar.png
+hr-1440-menu-archivo.png
+hr-1440-popover-color.png
+hr-1440-popover-tabla.png
+hr-1440-referencias.png
+hr-1440-vista.png
+hr-zoom-colaboracion.png
+hr-zoom-compartir-colab.png
+hr-zoom-header.png
+hr-zoom-historial.png
+hr-zoom-popover-color.png
+hr-zoom-popover-comentario.png
+hr-zoom-popover-tabla.png
+hr-zoom-tabs-hover.png
+hr-zoom-vista.png
+id-account.png
+id-login.png
+mail.png
+meet.png
+persist-colab-1280-contextoB.png
+persist-colab-1280-export.png
+persist-colab-1280-main.png
+persist-colab-1440-export.png
+persist-colab-1440-header.png
+persist-colab-1440-main.png
+persist-colab-1440-postexport.png
+portal.png
+verify-sheet-1280.png
+verify-sheet-1440.png
+verify-sheet-dark-1440.png
+verify-sheet-dark-vista.png
+verify-sheet-reload.png
+verify-sheet-vista-panel.png
+verify-sheet-zoom120.png
+verify-slides-1280.png
+verify-slides-1440.png
+verify-slides-dark-1440.png
+verify-slides-reload.png

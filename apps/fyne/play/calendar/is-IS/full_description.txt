@@ -1,0 +1,19 @@
+CalDAV-dagatal tengt við restina af pakkanum.
+
+• Dags-, viku- og mánaðaryfirlit.
+• Endurteknir viðburðir og áminningar.
+• Búðu til viðburði beint úr tölvupósti í Mail.
+• Virkar með hvaða CalDAV-biðlara sem er.
+• Mánaðar-, viku-, dags- og dagskráryfirlit, með litlu dagatali og „Í dag“.
+• Dagleg, vikuleg eða mánaðarleg endurtekning með lokum; breyttu aðeins þessum, þessum og þeim næstu, eða öllum.
+• Áminningar fyrir hvern viðburð og tilkynningar innan pakkans.
+• Boð með svari (mæti, kannski, nei) og eftirfylgni.
+• „Finna tíma“ sem hentar öllum sem er boðið.
+• Bókanleg herbergi og tilföng með lausum tímum.
+• Sameiginleg dagatöl með heimildum og dagatöl sem deilt er með þér.
+• Áskrift að ytri dagatölum (ICS) og nokkur dagatöl með litakóðum.
+• Búðu til viðburð úr skilaboðum í Mail eða úr glósu.
+• Virkar með hvaða CalDAV-biðlara sem er: Apple Calendar, Thunderbird og fleiri.
+• Tvítaktu viðburð eða afritaðu hann í dagatalið þitt og sæktu hann sem .ics fyrir fólk utan Sytue.
+
+Dulkóðað í flutningi (TLS 1.3). Innviðir Sytue eru innan ESB. Staðsetning ytri þjónustu fer eftir þjónustuveitanda hennar.

@@ -1,0 +1,673 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sytue · Swiss Grid — Rooms</title>
+<style>
+/* ============================================================================
+   SYTUE — SWISS GRID
+   Territorio: International Typographic Style (estilo suizo).
+   Blanco puro · tinta negra · un único rojo señal (#E1281F).
+   Neue Haas Grotesk / Helvetica. Rejilla estricta, hairlines, números tabulares.
+   Autocontenido: un único <style>, SVG inline (símbolos + use), sin JS.
+   ========================================================================== */
+
+/* --- Tokens ---------------------------------------------------------------- */
+:root{
+  /* Superficie */
+  --paper:#FFFFFF;        /* Papel — superficie base */
+  --wash:#F6F6F5;         /* Lavado — hover de fila */
+  --wash-2:#EFEFEE;       /* Lavado activo / press */
+  /* Tinta */
+  --ink:#0A0A0A;          /* Tinta — texto primario (19.8:1) */
+  --ink-70:#2B2B2B;       /* Tinta 70 — nombres de canal (14.1:1) */
+  --ink-mid:#565656;      /* Gris medio — secundario (7.3:1) */
+  --ink-sub:#6E6E6E;      /* Gris sutil — meta / timestamps (5.1:1) */
+  /* Señal */
+  --signal:#E1281F;       /* Rojo señal — relleno / barra / punto (blanco encima 4.6:1) */
+  --signal-text:#C21F17;  /* Rojo texto — @mención / conteo sobre blanco (6.0:1) */
+  --signal-wash:#FCEBEA;  /* Rojo lavado — realce de mención al usuario */
+  --signal-hair:#F1C9C6;  /* Rojo hairline */
+  /* Rejilla */
+  --hair:#E4E4E2;         /* Hairline — separador fino */
+  --hair-2:#D2D2CF;       /* Hairline fuerte — regla / borde de control */
+  /* Métricas */
+  --rail:60px;
+  --panel:284px;
+  --sp:8px;
+  --font:"Neue Haas Grotesk Display Pro","Neue Haas Grotesk Display","Helvetica Neue",Helvetica,Arial,"Inter","Liberation Sans",sans-serif;
+}
+
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;
+  background:var(--paper);
+  color:var(--ink);
+  font-family:var(--font);
+  font-size:14px;
+  line-height:1.45;
+  font-variant-numeric:tabular-nums;
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+  letter-spacing:.005em;
+}
+
+/* Iconografía: 24-grid, geometría estricta, un solo grosor, remates rectos. */
+.ic{fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:square;stroke-linejoin:miter;display:block;flex:none}
+.ic-fill path,.ic-fill circle{fill:currentColor;stroke:none}
+
+:focus-visible{outline:2px solid var(--signal);outline-offset:2px}
+button{font:inherit;color:inherit;letter-spacing:inherit;cursor:pointer;background:none;border:0;padding:0}
+input,textarea{font:inherit;color:inherit;letter-spacing:inherit}
+.tnum{font-variant-numeric:tabular-nums}
+.over{ /* overline */
+  font-size:10.5px;font-weight:600;letter-spacing:.11em;text-transform:uppercase;color:var(--ink-sub);
+}
+
+.skip{position:absolute;left:-999px;top:0;background:var(--ink);color:#fff;padding:8px 14px;z-index:50;font-weight:600}
+.skip:focus{left:8px;top:8px}
+
+/* --- Marco de la aplicación ----------------------------------------------- */
+.app{
+  display:grid;
+  grid-template-columns:var(--rail) var(--panel) minmax(0,1fr);
+  height:100vh;
+  min-height:660px;
+  max-height:920px;
+  border-bottom:1px solid var(--hair);
+  overflow:hidden;
+}
+
+/* ====================== RAIL — cambio de módulo ============================ */
+.rail{
+  display:flex;flex-direction:column;align-items:center;
+  border-right:1px solid var(--hair);
+  padding:14px 0 12px;
+}
+.brand{
+  width:34px;height:34px;background:var(--signal);color:#fff;
+  display:grid;place-items:center;font-weight:700;font-size:19px;line-height:1;
+  letter-spacing:-.02em;margin-bottom:20px;
+}
+.rail nav{display:flex;flex-direction:column;gap:4px;flex:1}
+.mod{
+  position:relative;width:40px;height:40px;display:grid;place-items:center;
+  color:var(--ink-mid);border-radius:2px;transition:color .12s,background .12s;
+}
+.mod .ic{width:21px;height:21px}
+.mod:hover{background:var(--wash);color:var(--ink)}
+.mod[aria-current="page"]{color:var(--ink);background:var(--wash-2)}
+.mod[aria-current="page"]::before{ /* barra roja de módulo activo */
+  content:"";position:absolute;left:-14px;top:8px;bottom:8px;width:3px;background:var(--signal);
+}
+.mod-lab{position:absolute;left:52px;top:50%;transform:translateY(-50%);
+  background:var(--ink);color:#fff;font-size:11px;font-weight:600;letter-spacing:.04em;
+  padding:4px 8px;white-space:nowrap;opacity:0;pointer-events:none;z-index:40}
+.mod:hover .mod-lab,.mod:focus-visible .mod-lab{opacity:1}
+.rail .sep{width:22px;height:1px;background:var(--hair);margin:8px 0}
+.rail-me{width:32px;height:32px;background:var(--ink);color:#fff;display:grid;place-items:center;
+  font-size:11.5px;font-weight:600;border-radius:2px;position:relative}
+.rail-me .pz{position:absolute;right:-2px;bottom:-2px;box-shadow:0 0 0 2px var(--paper)}
+
+/* ====================== PANEL — canales =================================== */
+.panel{display:flex;flex-direction:column;border-right:1px solid var(--hair);min-width:0;background:var(--paper)}
+.ws{display:flex;align-items:center;gap:8px;height:56px;padding:0 14px;border-bottom:1px solid var(--hair)}
+.ws-name{font-weight:700;font-size:15px;letter-spacing:-.01em;flex:1;min-width:0;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ws-sub{display:block;font-weight:500;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-sub)}
+.ico-btn{width:28px;height:28px;display:grid;place-items:center;color:var(--ink-mid);border-radius:2px;
+  transition:background .12s,color .12s}
+.ico-btn:hover{background:var(--wash);color:var(--ink)}
+.ico-btn .ic{width:17px;height:17px}
+
+.search{padding:12px 14px;border-bottom:1px solid var(--hair)}
+.search label{display:flex;align-items:center;gap:8px;height:32px;padding:0 10px;
+  border:1px solid var(--hair-2);background:var(--paper)}
+.search .ic{width:15px;height:15px;color:var(--ink-sub)}
+.search input{border:0;outline:0;flex:1;min-width:0;font-size:13px;background:transparent}
+.search input::placeholder{color:var(--ink-sub)}
+.search kbd{font-family:var(--font);font-size:10.5px;font-weight:600;color:var(--ink-sub);
+  border:1px solid var(--hair-2);padding:1px 5px;letter-spacing:.02em}
+
+.nav-scroll{flex:1;overflow-y:auto;padding:4px 0 16px}
+.grp{margin-top:14px}
+.grp-h{display:flex;align-items:center;gap:6px;height:26px;padding:0 14px 0 12px}
+.grp-h .ic{width:14px;height:14px;color:var(--ink-sub)}
+.grp-h .over{flex:1}
+.grp-h .n{font-size:10.5px;font-weight:600;color:var(--ink-sub)}
+.grp-h .add{margin-left:auto;width:20px;height:20px;display:grid;place-items:center;color:var(--ink-sub);border-radius:2px}
+.grp-h .add:hover{background:var(--wash);color:var(--ink)}
+.grp-h .add .ic{width:14px;height:14px}
+
+.ch{display:flex;align-items:center;gap:8px;height:30px;padding:0 12px;color:var(--ink-70);
+  position:relative;transition:background .12s;min-width:0}
+.ch:hover{background:var(--wash)}
+.ch .g{width:16px;display:grid;place-items:center;color:var(--ink-sub);flex:none}
+.ch .g .ic{width:14px;height:14px}
+.ch .hash{font-size:15px;font-weight:500;color:var(--ink-sub);line-height:1}
+.ch .lab{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13.5px}
+.ch--unread .lab{font-weight:700;color:var(--ink)}
+.ch--unread .g{color:var(--ink)}
+.ch--active{background:var(--wash-2)}
+.ch--active .lab{font-weight:700;color:var(--ink)}
+.ch--active .hash,.ch--active .g{color:var(--ink)}
+.ch--active::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--signal)}
+.count{min-width:18px;height:18px;padding:0 5px;display:grid;place-items:center;
+  font-size:11px;font-weight:700;line-height:1;background:var(--signal);color:#fff;border-radius:2px;flex:none}
+.dot{width:7px;height:7px;background:var(--signal);border-radius:1px;flex:none}
+
+.dm{display:flex;align-items:center;gap:8px;height:30px;padding:0 12px;color:var(--ink-70);transition:background .12s}
+.dm:hover{background:var(--wash)}
+.dm .av{width:20px;height:20px;font-size:9.5px;border-radius:2px}
+.dm .lab{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13.5px}
+.dm .pz{margin-left:auto}
+
+/* Presencia — forma + color (nunca solo color) */
+.pz{width:8px;height:8px;border-radius:1px;flex:none}
+.pz--on{background:var(--ink)}
+.pz--dnd{background:var(--signal)}
+.pz--off{background:var(--paper);box-shadow:inset 0 0 0 1.4px var(--hair-2)}
+
+/* ====================== CONVERSACIÓN ====================================== */
+.conv{display:flex;flex-direction:column;min-width:0;background:var(--paper)}
+
+.chead{display:flex;align-items:center;gap:14px;padding:0 20px;height:56px;border-bottom:1px solid var(--hair)}
+.chead .title{display:flex;align-items:baseline;gap:8px;min-width:0}
+.chead .hash{font-size:18px;font-weight:600;color:var(--ink-sub);line-height:1}
+.chead h1{font-size:16px;font-weight:700;letter-spacing:-.01em;margin:0;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.chead .fav{color:var(--ink-sub)}
+.chead .fav .ic{width:16px;height:16px}
+.chead .topic{color:var(--ink-mid);font-size:12.5px;border-left:1px solid var(--hair);padding-left:14px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1}
+.chead .meta{display:flex;align-items:center;gap:16px;margin-left:auto;flex:none}
+.chead .stat{display:flex;align-items:center;gap:6px;color:var(--ink-mid);font-size:12px}
+.chead .stat .ic{width:15px;height:15px;color:var(--ink-sub)}
+.chead .stat b{color:var(--ink);font-weight:600}
+.stack{display:flex}
+.stack .av{width:26px;height:26px;font-size:10px;border-radius:2px;box-shadow:0 0 0 2px var(--paper)}
+.stack .av+.av{margin-left:-7px}
+.stack .more{width:26px;height:26px;margin-left:-7px;background:var(--wash-2);color:var(--ink-mid);
+  display:grid;place-items:center;font-size:10px;font-weight:600;border-radius:2px;box-shadow:0 0 0 2px var(--paper)}
+.chead .acts{display:flex;align-items:center;gap:2px;padding-left:14px;border-left:1px solid var(--hair)}
+.chead .acts .ico-btn{width:30px;height:30px}
+.chead .acts .ico-btn .ic{width:18px;height:18px}
+
+/* --- Historial ------------------------------------------------------------ */
+.thread{flex:1;overflow-y:auto;padding:6px 0 14px}
+.day{display:flex;align-items:center;gap:14px;margin:14px 20px 6px}
+.day::before,.day::after{content:"";height:1px;background:var(--hair);flex:1}
+.day span{font-size:10.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-sub)}
+
+.msg{position:relative;display:grid;grid-template-columns:36px minmax(0,1fr);gap:12px;
+  padding:3px 20px;transition:background .12s}
+.msg--lead{margin-top:10px}
+.msg:hover{background:var(--wash)}
+.msg .gutter{grid-column:1}
+.msg .stamp-in{display:none;text-align:right;font-size:10.5px;color:var(--ink-sub);padding-top:2px;line-height:1.5}
+.msg:hover .stamp-in{display:block}
+.body{grid-column:2;min-width:0}
+.who{display:flex;align-items:baseline;gap:8px;margin-bottom:1px}
+.who .name{font-weight:700;font-size:13.5px;color:var(--ink)}
+.who .stamp{font-size:11px;color:var(--ink-sub)}
+.who .role{font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--ink-sub);border:1px solid var(--hair);padding:0 5px;line-height:15px}
+.text{font-size:14px;color:var(--ink);line-height:1.5;overflow-wrap:anywhere}
+.text .edited{font-size:11px;color:var(--ink-sub);margin-left:4px}
+.mention{color:var(--signal-text);font-weight:600;text-decoration:none}
+.mention--me{background:var(--signal-wash);box-shadow:inset 0 0 0 1px var(--signal-hair);
+  padding:0 3px;border-radius:2px}
+.mention--all{color:var(--signal-text);font-weight:700}
+a.lnk{color:var(--signal-text);font-weight:500;text-decoration:none;border-bottom:1px solid var(--signal-hair)}
+a.lnk:hover{border-bottom-color:var(--signal-text)}
+
+/* Avatares monocromos — la forma y la inicial distinguen, el color no */
+.av{width:36px;height:36px;display:grid;place-items:center;font-weight:600;font-size:12.5px;
+  letter-spacing:.01em;border-radius:2px;flex:none;user-select:none}
+.av--solid{background:var(--ink);color:#fff}
+.av--ghost{background:var(--paper);color:var(--ink);box-shadow:inset 0 0 0 1px var(--hair-2)}
+
+/* Adjunto enriquecido — documento de Sytue Sheets compartido */
+.card{margin-top:8px;max-width:440px;display:flex;align-items:stretch;
+  border:1px solid var(--hair-2);background:var(--paper)}
+.card::before{content:"";width:3px;background:var(--signal);flex:none}
+.card .tile{width:52px;display:grid;place-items:center;color:var(--ink);border-right:1px solid var(--hair)}
+.card .tile .ic{width:22px;height:22px}
+.card .info{flex:1;min-width:0;padding:10px 12px}
+.card .info .t{font-weight:600;font-size:13.5px;color:var(--ink);white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.card .info .m{font-size:11.5px;color:var(--ink-sub);margin-top:2px}
+.card .info .m b{color:var(--ink-mid);font-weight:600}
+.card .go{display:flex;align-items:center;gap:6px;padding:0 14px;border-left:1px solid var(--hair);
+  color:var(--ink-mid);font-size:12px;font-weight:600;white-space:nowrap;transition:background .12s,color .12s}
+.card .go:hover{background:var(--wash);color:var(--ink)}
+.card .go .ic{width:15px;height:15px}
+
+/* Reacciones + hilo */
+.rx{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:7px}
+.chip{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 8px;
+  border:1px solid var(--hair-2);background:var(--paper);font-size:11.5px;font-weight:600;color:var(--ink-mid);
+  transition:background .12s,border-color .12s}
+.chip:hover{background:var(--wash)}
+.chip .ic{width:14px;height:14px}
+.chip--mine{border-color:var(--signal);color:var(--signal-text);background:var(--signal-wash)}
+.chip--add{color:var(--ink-sub);padding:0 6px}
+.chip--add .ic{width:15px;height:15px}
+
+.threadref{display:inline-flex;align-items:center;gap:8px;margin-top:8px;padding:4px 10px 4px 6px;
+  border:1px solid var(--hair);background:var(--paper);transition:background .12s,border-color .12s}
+.threadref:hover{background:var(--wash);border-color:var(--hair-2)}
+.threadref .mini{display:flex}
+.threadref .mini .av{width:20px;height:20px;font-size:9px;border-radius:2px;box-shadow:0 0 0 1.5px var(--paper)}
+.threadref .mini .av+.av{margin-left:-6px}
+.threadref .rep{font-size:12px;font-weight:700;color:var(--signal-text)}
+.threadref .last{font-size:11px;color:var(--ink-sub)}
+.threadref .ic{width:14px;height:14px;color:var(--ink-sub)}
+
+/* Barra de acciones al pasar el cursor */
+.hoverbar{position:absolute;top:-13px;right:20px;display:flex;align-items:center;
+  border:1px solid var(--hair-2);background:var(--paper);opacity:0;pointer-events:none;
+  transition:opacity .12s;z-index:10}
+.msg:hover .hoverbar,.msg:focus-within .hoverbar{opacity:1;pointer-events:auto}
+.hoverbar button{width:28px;height:28px;display:grid;place-items:center;color:var(--ink-mid);
+  border-left:1px solid var(--hair);transition:background .12s,color .12s}
+.hoverbar button:first-child{border-left:0}
+.hoverbar button:hover{background:var(--wash);color:var(--ink)}
+.hoverbar .ic{width:16px;height:16px}
+.hoverbar .rq{font-size:14px;line-height:1;color:var(--ink-mid)}
+
+/* --- Composer ------------------------------------------------------------- */
+.composer{padding:0 20px 16px;flex:none}
+.cbox{border:1px solid var(--hair-2);background:var(--paper)}
+.cbox:focus-within{border-color:var(--ink)}
+.fmt{display:flex;align-items:center;gap:1px;height:38px;padding:0 6px;border-bottom:1px solid var(--hair)}
+.fmt button{height:26px;min-width:26px;padding:0 6px;display:grid;place-items:center;color:var(--ink-mid);
+  border-radius:2px;transition:background .12s,color .12s;font-size:13px}
+.fmt button:hover{background:var(--wash);color:var(--ink)}
+.fmt .ic{width:16px;height:16px}
+.fmt .b{font-weight:700}
+.fmt .i{font-style:italic;font-family:Georgia,"Times New Roman",serif;font-weight:600}
+.fmt .s{text-decoration:line-through;font-weight:600}
+.fmt .div{width:1px;height:18px;background:var(--hair);margin:0 5px}
+.cbox textarea{display:block;width:100%;border:0;outline:0;resize:none;background:transparent;
+  padding:12px 14px;font-size:14px;line-height:1.5;min-height:46px}
+.cbox textarea::placeholder{color:var(--ink-sub)}
+.crow{display:flex;align-items:center;gap:10px;height:44px;padding:0 8px 0 12px;border-top:1px solid var(--hair)}
+.crow .hint{font-size:11px;color:var(--ink-sub)}
+.crow .hint kbd{font-family:var(--font);font-weight:600;color:var(--ink-mid)}
+.crow .spacer{flex:1}
+.crow .ico-btn .ic{width:17px;height:17px}
+.send{display:flex;align-items:center;gap:8px;height:30px;padding:0 14px;background:var(--signal);color:#fff;
+  font-size:12.5px;font-weight:700;letter-spacing:.01em;transition:background .12s}
+.send:hover{background:#c8241c}
+.send .ic{width:15px;height:15px}
+
+/* ====================== MINI STYLE-GUIDE ================================== */
+.guide{border-top:1px solid var(--hair-2);padding:28px 32px 40px;background:var(--paper)}
+.guide-h{display:flex;align-items:baseline;gap:12px;margin-bottom:22px}
+.guide-h .idx{color:var(--signal-text);font-weight:700;font-size:12px}
+.guide-h h2{margin:0;font-size:14px;font-weight:700;letter-spacing:.01em}
+.guide-h .r{flex:1;height:1px;background:var(--hair);align-self:center;margin:0 4px}
+.guide-h .tag{font-size:10.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-sub)}
+.guide-grid{display:grid;grid-template-columns:1.15fr 1fr;gap:40px}
+@media (max-width:900px){.guide-grid{grid-template-columns:1fr}}
+
+.swatches{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--hair);border:1px solid var(--hair)}
+.sw{background:var(--paper);padding:12px 12px 14px}
+.sw .chipc{height:52px;border:1px solid var(--hair)}
+.sw .role{margin-top:10px;font-size:11px;font-weight:700;letter-spacing:.01em;color:var(--ink)}
+.sw .hex{font-size:11px;color:var(--ink-sub);letter-spacing:.02em}
+.sw .aa{display:inline-block;margin-top:4px;font-size:9.5px;font-weight:600;letter-spacing:.04em;
+  text-transform:uppercase;color:var(--ink-mid);border:1px solid var(--hair-2);padding:0 4px;line-height:14px}
+
+.type .row{display:flex;align-items:baseline;gap:16px;padding:9px 0;border-bottom:1px solid var(--hair)}
+.type .row:last-child{border-bottom:0}
+.type .k{width:120px;flex:none;font-size:10.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-sub)}
+.type .v{color:var(--ink);min-width:0}
+.type .w4{font-weight:400}
+.type .w5{font-weight:500}
+.type .w7{font-weight:700}
+.type .disp{font-size:26px;letter-spacing:-.02em;line-height:1}
+.type .over-s{font-size:11px;font-weight:600;letter-spacing:.11em;text-transform:uppercase;color:var(--ink-mid)}
+.type .tab{font-size:17px;letter-spacing:.02em}
+.type .note{margin-top:14px;font-size:11px;color:var(--ink-sub);line-height:1.5}
+.iconstrip{display:flex;flex-wrap:wrap;gap:14px;margin-top:16px;color:var(--ink)}
+.iconstrip .ic{width:20px;height:20px}
+
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<a class="skip" href="#hist">Saltar al contenido</a>
+
+<!-- ============ Iconografía: definición única (métrica coherente) ========= -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
+  <symbol id="i-rooms" viewBox="0 0 24 24"><path d="M3 4H21V16H10L6 20V16H3Z"/></symbol>
+  <symbol id="i-docs" viewBox="0 0 24 24"><path d="M6 3H15L19 7V21H6Z"/><path d="M15 3V7H19"/><path d="M9 12H16M9 15.5H16M9 19H13"/></symbol>
+  <symbol id="i-sheets" viewBox="0 0 24 24"><path d="M4 4H20V20H4Z"/><path d="M4 9.33H20M4 14.66H20M9.33 4V20M14.66 4V20"/></symbol>
+  <symbol id="i-slides" viewBox="0 0 24 24"><path d="M3 5H21V17H3Z"/><path d="M12 17V20M8.5 20H15.5"/></symbol>
+  <symbol id="i-meet" viewBox="0 0 24 24"><path d="M3 7H15V17H3Z"/><path d="M15 10.5L21 7V17L15 13.5"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M20 20L16 16"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><path d="M6 11H18V20H6Z"/><path d="M9 11V7.5A3 3 0 0 1 15 7.5V11"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M9 3H15V9L18 12H6L9 9Z"/><path d="M12 12V21"/></symbol>
+  <symbol id="i-members" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.1"/><path d="M3.5 20V18.6A5.5 5.5 0 0 1 14.5 18.6V20"/><path d="M16 5.3A3.1 3.1 0 0 1 16 11M17.5 20V18.6A5.5 5.5 0 0 0 15.2 14.1"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><path d="M5 12H5.01M12 12H12.01M19 12H19.01"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 3.5L14.7 9L20.5 9.85L16.3 13.95L17.3 19.7L12 16.98L6.7 19.7L7.7 13.95L3.5 9.85L9.3 9Z"/></symbol>
+  <symbol id="i-thread" viewBox="0 0 24 24"><path d="M3 4H21V15H9L4 19V15H3Z"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5V19M5 12H19"/></symbol>
+  <symbol id="i-caret" viewBox="0 0 24 24"><path d="M6 9L12 15L18 9"/></symbol>
+  <symbol id="i-chevron" viewBox="0 0 24 24"><path d="M9 5L16 12L9 19"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13.5A4 4 0 0 0 15.5 13.5L18.5 10.5A4 4 0 0 0 12.9 4.9L11.4 6.4"/><path d="M14 10.5A4 4 0 0 0 8.5 10.5L5.5 13.5A4 4 0 0 0 11.1 19.1L12.6 17.6"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M8 6H20M8 12H20M8 18H20"/><path d="M4 6H4.01M4 12H4.01M4 18H4.01"/></symbol>
+  <symbol id="i-code" viewBox="0 0 24 24"><path d="M9 8L5 12L9 16M15 8L19 12L15 16"/></symbol>
+  <symbol id="i-emoji" viewBox="0 0 24 24"><path d="M4 4H20V20H4Z"/><path d="M9 10H9.01M15 10H15.01"/><path d="M8.5 15H15.5"/></symbol>
+  <symbol id="i-at" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.4"/><path d="M15.4 9.6V13.5A2.5 2.5 0 0 0 20 12A8 8 0 1 0 16.5 18.6"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><path d="M12 20V5M6 11L12 5L18 11"/></symbol>
+  <symbol id="i-thumb" viewBox="0 0 24 24"><path d="M14 9V5A3 3 0 0 0 11 2L7 11V22H18.3A2 2 0 0 0 20.3 20.3L21.66 11.3A2 2 0 0 0 19.66 9Z"/><path d="M7 22H4A2 2 0 0 1 2 20V13A2 2 0 0 1 4 11H7"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M4 12.5L9.5 18L20 6.5"/></symbol>
+  <symbol id="i-open" viewBox="0 0 24 24"><path d="M14 4H20V10M20 4L11 13"/><path d="M18 14V19H5V6H10"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12L15 14"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3V6M12 18V21M4.2 7L6.6 8.4M17.4 15.6L19.8 17M4.2 17L6.6 15.6M17.4 8.4L19.8 7"/></symbol>
+</defs></svg>
+
+<div class="app">
+
+  <!-- ===================== RAIL ===================== -->
+  <div class="rail" role="navigation" aria-label="Módulos de Sytue">
+    <div class="brand" aria-hidden="true">S</div>
+    <nav>
+      <a class="mod" href="#" aria-current="page" aria-label="Rooms"><svg class="ic"><use href="#i-rooms"/></svg><span class="mod-lab">Rooms</span></a>
+      <a class="mod" href="#" aria-label="Docs"><svg class="ic"><use href="#i-docs"/></svg><span class="mod-lab">Docs</span></a>
+      <a class="mod" href="#" aria-label="Sheets"><svg class="ic"><use href="#i-sheets"/></svg><span class="mod-lab">Sheets</span></a>
+      <a class="mod" href="#" aria-label="Slides"><svg class="ic"><use href="#i-slides"/></svg><span class="mod-lab">Slides</span></a>
+      <div class="sep" aria-hidden="true"></div>
+      <a class="mod" href="#" aria-label="Meet"><svg class="ic"><use href="#i-meet"/></svg><span class="mod-lab">Meet</span></a>
+    </nav>
+    <button class="mod" aria-label="Preferencias"><svg class="ic"><use href="#i-gear"/></svg><span class="mod-lab">Preferencias</span></button>
+    <div class="rail-me" title="Daniel Delgado — activo" aria-label="Tu cuenta: Daniel Delgado, activo">DD<span class="pz pz--on"></span></div>
+  </div>
+
+  <!-- ===================== PANEL DE CANALES ===================== -->
+  <aside class="panel" aria-label="Canales">
+    <div class="ws">
+      <div class="ws-name">Grupo Levante<span class="ws-sub">Finanzas · Legal</span></div>
+      <button class="ico-btn" aria-label="Nuevo mensaje"><svg class="ic"><use href="#i-plus"/></svg></button>
+      <button class="ico-btn" aria-label="Menú del espacio"><svg class="ic"><use href="#i-caret"/></svg></button>
+    </div>
+
+    <div class="search">
+      <label>
+        <svg class="ic"><use href="#i-search"/></svg>
+        <input type="search" placeholder="Buscar en Grupo Levante" aria-label="Buscar">
+        <kbd>⌘K</kbd>
+      </label>
+    </div>
+
+    <nav class="nav-scroll" aria-label="Lista de canales">
+      <div class="grp">
+        <div class="grp-h">
+          <button class="ico-btn" style="width:20px;height:20px" aria-label="Contraer canales"><svg class="ic" style="width:13px;height:13px"><use href="#i-caret"/></svg></button>
+          <span class="over">Canales</span>
+          <span class="n tnum">08</span>
+          <button class="add" aria-label="Crear canal"><svg class="ic"><use href="#i-plus"/></svg></button>
+        </div>
+        <a class="ch ch--unread" href="#"><span class="g hash">#</span><span class="lab">Anuncios</span><span class="count tnum" aria-label="3 menciones sin leer">3</span></a>
+        <a class="ch" href="#"><span class="g"><svg class="ic"><use href="#i-lock"/></svg></span><span class="lab">Comité de Dirección</span></a>
+        <a class="ch ch--active" href="#" aria-current="true"><span class="g hash">#</span><span class="lab">Dirección Financiera</span></a>
+        <a class="ch" href="#"><span class="g"><svg class="ic"><use href="#i-lock"/></svg></span><span class="lab">Legal — Contratos</span></a>
+        <a class="ch" href="#"><span class="g hash">#</span><span class="lab">Operaciones</span></a>
+        <a class="ch ch--unread" href="#"><span class="g hash">#</span><span class="lab">Riesgos y Cumplimiento</span><span class="dot" aria-label="mensajes sin leer"></span></a>
+        <a class="ch" href="#"><span class="g hash">#</span><span class="lab">Tesorería</span></a>
+        <a class="ch ch--unread" href="#"><span class="g hash">#</span><span class="lab">IT — Incidencias</span><span class="count tnum" aria-label="12 menciones sin leer">12</span></a>
+      </div>
+
+      <div class="grp">
+        <div class="grp-h">
+          <button class="ico-btn" style="width:20px;height:20px" aria-label="Contraer directos"><svg class="ic" style="width:13px;height:13px"><use href="#i-caret"/></svg></button>
+          <span class="over">Mensajes directos</span>
+          <span class="n tnum">05</span>
+          <button class="add" aria-label="Nuevo directo"><svg class="ic"><use href="#i-plus"/></svg></button>
+        </div>
+        <a class="dm" href="#"><span class="av av--ghost">AV</span><span class="lab">Ana Vidal</span><span class="pz pz--on" title="Activa"></span></a>
+        <a class="dm" href="#"><span class="av av--solid">MP</span><span class="lab">Marc Puig</span><span class="pz pz--on" title="Activo"></span></a>
+        <a class="dm" href="#"><span class="av av--ghost">NC</span><span class="lab">Núria Camps</span><span class="pz pz--dnd" title="No molestar"></span></a>
+        <a class="dm" href="#"><span class="av av--solid">PF</span><span class="lab">Pau Ferrer</span><span class="pz pz--off" title="Desconectado"></span></a>
+        <a class="dm" href="#"><span class="av av--ghost">SR</span><span class="lab">Sergio Ríos</span><span class="pz pz--off" title="Desconectado"></span></a>
+      </div>
+    </nav>
+  </aside>
+
+  <!-- ===================== CONVERSACIÓN ===================== -->
+  <main class="conv">
+    <header class="chead">
+      <div class="title">
+        <span class="hash" aria-hidden="true">#</span>
+        <h1>Dirección Financiera</h1>
+        <button class="fav" aria-label="Marcar como favorito"><svg class="ic"><use href="#i-star"/></svg></button>
+      </div>
+      <div class="topic">Cierre trimestral Q2 · reporting al Consejo del jueves</div>
+      <div class="meta">
+        <div class="stack" aria-hidden="true">
+          <span class="av av--solid">MP</span>
+          <span class="av av--ghost">AV</span>
+          <span class="av av--solid">ES</span>
+          <span class="av av--ghost">JM</span>
+          <span class="more tnum">+20</span>
+        </div>
+        <div class="stat"><svg class="ic"><use href="#i-members"/></svg><span class="tnum"><b>24</b> miembros</span></div>
+        <div class="acts">
+          <button class="ico-btn" aria-label="Iniciar reunión Meet"><svg class="ic"><use href="#i-meet"/></svg></button>
+          <button class="ico-btn" aria-label="Mensajes fijados: 5"><svg class="ic"><use href="#i-pin"/></svg></button>
+          <button class="ico-btn" aria-label="Buscar en el canal"><svg class="ic"><use href="#i-search"/></svg></button>
+          <button class="ico-btn" aria-label="Más acciones"><svg class="ic"><use href="#i-more"/></svg></button>
+        </div>
+      </div>
+    </header>
+
+    <section class="thread" id="hist" aria-label="Mensajes">
+
+      <!-- Mensaje de ayer (muestra el separador de día) -->
+      <article class="msg msg--lead">
+        <div class="gutter"><span class="av av--solid">ES</span></div>
+        <div class="body">
+          <div class="who"><span class="name">Elena Serrano</span><span class="stamp tnum">Ayer 17:42</span><span class="role">Tesorería</span></div>
+          <div class="text">Dejo agendada la reunión de cierre para mañana a las 09:00 en la Sala Comité 3. Añado el enlace de <a class="lnk" href="#">Meet</a> al evento del calendario por si alguien se conecta en remoto.</div>
+        </div>
+        <div class="hoverbar" role="toolbar" aria-label="Acciones del mensaje">
+          <button aria-label="Reaccionar con aprobado"><svg class="ic"><use href="#i-check"/></svg></button>
+          <button aria-label="Responder en hilo"><svg class="ic"><use href="#i-thread"/></svg></button>
+          <button aria-label="Fijar mensaje"><svg class="ic"><use href="#i-pin"/></svg></button>
+          <button aria-label="Más acciones"><svg class="ic"><use href="#i-more"/></svg></button>
+        </div>
+      </article>
+
+      <div class="day" role="separator"><span>Hoy · miércoles 8 de julio</span></div>
+
+      <!-- Marc Puig — con adjunto enriquecido + hilo -->
+      <article class="msg msg--lead">
+        <div class="gutter"><span class="av av--solid">MP</span></div>
+        <div class="body">
+          <div class="who"><span class="name">Marc Puig</span><span class="stamp tnum">09:12</span><span class="role">Controlling</span></div>
+          <div class="text">Buenos días. Adjunto el borrador consolidado del cierre de Q2 para revisión antes del Consejo del jueves. Los pendientes están marcados en rojo en la pestaña «Resumen»; el resto de hojas ya están conciliadas.</div>
+
+          <a class="card" href="#" aria-label="Documento de Sytue Sheets: Cierre Q2 2026 — Consolidado">
+            <span class="tile" aria-hidden="true"><svg class="ic"><use href="#i-sheets"/></svg></span>
+            <span class="info">
+              <span class="t">Cierre Q2 2026 — Consolidado</span>
+              <span class="m tnum">Sytue Sheets · 6 pestañas · <b>2,4&nbsp;MB</b> · actualizado hoy 09:10</span>
+            </span>
+            <span class="go">Abrir en Sheets <svg class="ic"><use href="#i-open"/></svg></span>
+          </a>
+
+          <button class="threadref" aria-label="Hilo: 3 respuestas, última hoy a las 10:14">
+            <span class="mini" aria-hidden="true"><span class="av av--ghost">AV</span><span class="av av--solid">ES</span><span class="av av--ghost">JM</span></span>
+            <span class="rep tnum">3 respuestas</span>
+            <span class="last tnum">Última hoy 10:14</span>
+            <svg class="ic"><use href="#i-chevron"/></svg>
+          </button>
+        </div>
+        <div class="hoverbar" role="toolbar" aria-label="Acciones del mensaje">
+          <button aria-label="Reaccionar con me gusta" class="rq"><svg class="ic"><use href="#i-thumb"/></svg></button>
+          <button aria-label="Reaccionar con aprobado"><svg class="ic"><use href="#i-check"/></svg></button>
+          <button aria-label="Responder en hilo"><svg class="ic"><use href="#i-thread"/></svg></button>
+          <button aria-label="Fijar mensaje"><svg class="ic"><use href="#i-pin"/></svg></button>
+          <button aria-label="Más acciones"><svg class="ic"><use href="#i-more"/></svg></button>
+        </div>
+      </article>
+
+      <!-- Ana Vidal — con @mención y reacción -->
+      <article class="msg msg--lead">
+        <div class="gutter"><span class="av av--ghost">AV</span></div>
+        <div class="body">
+          <div class="who"><span class="name">Ana Vidal</span><span class="stamp tnum">09:20</span><span class="role">CFO</span></div>
+          <div class="text"><a class="mention" href="#">@Marc&nbsp;Puig</a> revisado, gracias. He cruzado el EBITDA con Tesorería y cuadra al céntimo. Falta el desglose de provisiones y la nota&nbsp;14 del anexo — sin eso no lo damos por cerrado.</div>
+          <div class="rx">
+            <button class="chip chip--mine" aria-pressed="true" aria-label="Me gusta, 4 personas, incluida tú"><svg class="ic"><use href="#i-thumb"/></svg><span class="tnum">4</span></button>
+            <button class="chip" aria-label="Aprobado, 2 personas"><svg class="ic"><use href="#i-check"/></svg><span class="tnum">2</span></button>
+            <button class="chip chip--add" aria-label="Añadir reacción"><svg class="ic"><use href="#i-emoji"/></svg></button>
+          </div>
+        </div>
+        <div class="hoverbar" role="toolbar" aria-label="Acciones del mensaje">
+          <button aria-label="Reaccionar con me gusta"><svg class="ic"><use href="#i-thumb"/></svg></button>
+          <button aria-label="Reaccionar con aprobado"><svg class="ic"><use href="#i-check"/></svg></button>
+          <button aria-label="Responder en hilo"><svg class="ic"><use href="#i-thread"/></svg></button>
+          <button aria-label="Fijar mensaje"><svg class="ic"><use href="#i-pin"/></svg></button>
+          <button aria-label="Más acciones"><svg class="ic"><use href="#i-more"/></svg></button>
+        </div>
+      </article>
+
+      <!-- Ana Vidal — segundo mensaje agrupado (sin cabecera) -->
+      <article class="msg">
+        <div class="gutter"><span class="stamp-in tnum">09:21</span></div>
+        <div class="body">
+          <div class="text">Propongo consolidar a las 14:00 para tener margen antes de imprimir la carpeta del Consejo.</div>
+        </div>
+        <div class="hoverbar" role="toolbar" aria-label="Acciones del mensaje">
+          <button aria-label="Reaccionar con aprobado"><svg class="ic"><use href="#i-check"/></svg></button>
+          <button aria-label="Responder en hilo"><svg class="ic"><use href="#i-thread"/></svg></button>
+          <button aria-label="Más acciones"><svg class="ic"><use href="#i-more"/></svg></button>
+        </div>
+      </article>
+
+      <!-- Javier Molina — @mención al usuario (realce) + @canal -->
+      <article class="msg msg--lead">
+        <div class="gutter"><span class="av av--ghost">JM</span></div>
+        <div class="body">
+          <div class="who"><span class="name">Javier Molina</span><span class="stamp tnum">10:14</span><span class="role">FP&amp;A</span></div>
+          <div class="text"><a class="mention mention--me" href="#">@Daniel&nbsp;Delgado</a> ¿me confirmas la cifra de circulante neto antes de consolidar? La tengo en 18,7&nbsp;M€ pero difiere de la del último forecast. <span class="edited">(editado)</span></div>
+        </div>
+        <div class="hoverbar" role="toolbar" aria-label="Acciones del mensaje">
+          <button aria-label="Reaccionar con me gusta"><svg class="ic"><use href="#i-thumb"/></svg></button>
+          <button aria-label="Responder en hilo"><svg class="ic"><use href="#i-thread"/></svg></button>
+          <button aria-label="Fijar mensaje"><svg class="ic"><use href="#i-pin"/></svg></button>
+          <button aria-label="Más acciones"><svg class="ic"><use href="#i-more"/></svg></button>
+        </div>
+      </article>
+
+      <!-- Elena Serrano — @canal -->
+      <article class="msg msg--lead">
+        <div class="gutter"><span class="av av--solid">ES</span></div>
+        <div class="body">
+          <div class="who"><span class="name">Elena Serrano</span><span class="stamp tnum">10:26</span><span class="role">Tesorería</span></div>
+          <div class="text"><a class="mention mention--all" href="#">@canal</a> subo la conciliación de Tesorería en cuanto cierre con auditoría, hacia el mediodía. Dejad vuestros comentarios en el hilo del borrador para no perder el rastro. Gracias.</div>
+          <div class="rx">
+            <button class="chip" aria-label="Aprobado, 5 personas"><svg class="ic"><use href="#i-check"/></svg><span class="tnum">5</span></button>
+            <button class="chip chip--add" aria-label="Añadir reacción"><svg class="ic"><use href="#i-emoji"/></svg></button>
+          </div>
+        </div>
+        <div class="hoverbar" role="toolbar" aria-label="Acciones del mensaje">
+          <button aria-label="Reaccionar con me gusta"><svg class="ic"><use href="#i-thumb"/></svg></button>
+          <button aria-label="Reaccionar con aprobado"><svg class="ic"><use href="#i-check"/></svg></button>
+          <button aria-label="Responder en hilo"><svg class="ic"><use href="#i-thread"/></svg></button>
+          <button aria-label="Más acciones"><svg class="ic"><use href="#i-more"/></svg></button>
+        </div>
+      </article>
+
+    </section>
+
+    <!-- ===================== COMPOSER ===================== -->
+    <footer class="composer">
+      <div class="cbox">
+        <div class="fmt" role="toolbar" aria-label="Formato de texto">
+          <button class="b" aria-label="Negrita">B</button>
+          <button class="i" aria-label="Cursiva">I</button>
+          <button class="s" aria-label="Tachado">S</button>
+          <span class="div" aria-hidden="true"></span>
+          <button aria-label="Enlace"><svg class="ic"><use href="#i-link"/></svg></button>
+          <button aria-label="Lista"><svg class="ic"><use href="#i-list"/></svg></button>
+          <button aria-label="Código"><svg class="ic"><use href="#i-code"/></svg></button>
+          <span class="div" aria-hidden="true"></span>
+          <button aria-label="Emoji"><svg class="ic"><use href="#i-emoji"/></svg></button>
+          <button aria-label="Mencionar a alguien"><svg class="ic"><use href="#i-at"/></svg></button>
+        </div>
+        <textarea rows="1" placeholder="Escribe en #Dirección Financiera" aria-label="Escribe un mensaje en Dirección Financiera"></textarea>
+        <div class="crow">
+          <button class="ico-btn" aria-label="Adjuntar archivo"><svg class="ic"><use href="#i-plus"/></svg></button>
+          <span class="hint"><kbd>Intro</kbd> para enviar · <kbd>Mayús + Intro</kbd> para salto de línea</span>
+          <span class="spacer"></span>
+          <button class="send"><svg class="ic"><use href="#i-send"/></svg>Enviar</button>
+        </div>
+      </div>
+    </footer>
+  </main>
+</div>
+
+<!-- ============ MINI STYLE-GUIDE ============ -->
+<section class="guide" aria-label="Guía de estilo">
+  <div class="guide-h">
+    <span class="idx tnum">01</span>
+    <h2>Sytue — Swiss Grid</h2>
+    <span class="r" aria-hidden="true"></span>
+    <span class="tag">International Typographic Style</span>
+  </div>
+
+  <div class="guide-grid">
+    <!-- Color -->
+    <div>
+      <div class="over" style="margin-bottom:10px">Paleta · rol / hex / contraste sobre papel</div>
+      <div class="swatches">
+        <div class="sw"><div class="chipc" style="background:#FFFFFF"></div><div class="role">Papel</div><div class="hex">#FFFFFF</div><span class="aa">Superficie</span></div>
+        <div class="sw"><div class="chipc" style="background:#0A0A0A;border-color:#0A0A0A"></div><div class="role">Tinta</div><div class="hex">#0A0A0A</div><span class="aa">19.8:1 · AAA</span></div>
+        <div class="sw"><div class="chipc" style="background:#E1281F;border-color:#E1281F"></div><div class="role">Rojo señal</div><div class="hex">#E1281F</div><span class="aa">Relleno · blanco 4.6:1</span></div>
+        <div class="sw"><div class="chipc" style="background:#C21F17;border-color:#C21F17"></div><div class="role">Rojo texto</div><div class="hex">#C21F17</div><span class="aa">6.0:1 · AA</span></div>
+        <div class="sw"><div class="chipc" style="background:#565656;border-color:#565656"></div><div class="role">Gris medio</div><div class="hex">#565656</div><span class="aa">7.3:1 · AA</span></div>
+        <div class="sw"><div class="chipc" style="background:#6E6E6E;border-color:#6E6E6E"></div><div class="role">Gris sutil</div><div class="hex">#6E6E6E</div><span class="aa">5.1:1 · AA</span></div>
+        <div class="sw"><div class="chipc" style="background:#E4E4E2"></div><div class="role">Hairline</div><div class="hex">#E4E4E2</div><span class="aa">Separador</span></div>
+        <div class="sw"><div class="chipc" style="background:#D2D2CF"></div><div class="role">Hairline fuerte</div><div class="hex">#D2D2CF</div><span class="aa">Regla · borde</span></div>
+      </div>
+      <div class="iconstrip" aria-hidden="true">
+        <svg class="ic"><use href="#i-rooms"/></svg>
+        <svg class="ic"><use href="#i-docs"/></svg>
+        <svg class="ic"><use href="#i-sheets"/></svg>
+        <svg class="ic"><use href="#i-slides"/></svg>
+        <svg class="ic"><use href="#i-meet"/></svg>
+        <svg class="ic"><use href="#i-search"/></svg>
+        <svg class="ic"><use href="#i-pin"/></svg>
+        <svg class="ic"><use href="#i-thread"/></svg>
+        <svg class="ic"><use href="#i-members"/></svg>
+        <svg class="ic"><use href="#i-lock"/></svg>
+        <svg class="ic"><use href="#i-link"/></svg>
+        <svg class="ic"><use href="#i-at"/></svg>
+        <svg class="ic"><use href="#i-thumb"/></svg>
+        <svg class="ic"><use href="#i-send"/></svg>
+      </div>
+    </div>
+
+    <!-- Tipografía -->
+    <div class="type">
+      <div class="over" style="margin-bottom:6px">Tipografía · Neue Haas Grotesk / Helvetica</div>
+      <div class="row"><span class="k">Display 700</span><span class="v w7 disp">Rigor y claridad</span></div>
+      <div class="row"><span class="k">Título 700</span><span class="v w7" style="font-size:16px;letter-spacing:-.01em">Dirección Financiera</span></div>
+      <div class="row"><span class="k">Cuerpo 400</span><span class="v w4" style="font-size:14px">El color no sobra: blanco, tinta y un único rojo señal.</span></div>
+      <div class="row"><span class="k">Medium 500</span><span class="v w5" style="font-size:14px">Alineación implacable, hairlines finas, espacio negativo.</span></div>
+      <div class="row"><span class="k">Overline 600</span><span class="v over-s">Mensajes directos</span></div>
+      <div class="row"><span class="k">Tabular</span><span class="v tab tnum">0123456789 · 24 miembros · 09:12</span></div>
+      <p class="note">Un único grosor de icono (24-grid, trazo 1,75, remates rectos). Números tabulares en conteos, horas y métricas. Contraste AA verificado en todo el texto; el rojo señal aparece solo en marca, acción y estado — nunca como decorado.</p>
+    </div>
+  </div>
+</section>
+
+</body>
+</html>

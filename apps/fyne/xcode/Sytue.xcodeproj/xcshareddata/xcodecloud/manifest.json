@@ -1,0 +1,65 @@
+{
+  "id" : "34c067ab-8b6c-48ea-9360-ac47be0e8f3d",
+  "targets" : [
+    {
+      "id" : "683d1fe6-317e-46b2-b1cd-4cfd808ce644",
+      "name" : "bases"
+    },
+    {
+      "id" : "e0aeb5d8-8d7f-47eb-a62d-6e5eba75c58b",
+      "name" : "calcus"
+    },
+    {
+      "id" : "7ef5e72f-9d15-44b9-9941-829e1e69da30",
+      "name" : "calendar"
+    },
+    {
+      "id" : "3e2167d7-0f17-47d5-9e9d-afa76815dbb3",
+      "name" : "cast"
+    },
+    {
+      "id" : "b6410f11-2f6c-454b-88b9-11dbed4176aa",
+      "name" : "certipdf"
+    },
+    {
+      "id" : "fc859560-6c6d-4b1d-bb92-a661b9eb5be2",
+      "name" : "contacts"
+    },
+    {
+      "id" : "dfb2e514-6669-4d31-8e48-c9fa9449c781",
+      "name" : "diapos"
+    },
+    {
+      "id" : "488bd14d-865f-406a-86e1-4105b5d454c8",
+      "name" : "docus"
+    },
+    {
+      "id" : "85fb7e27-47df-4ad4-8fe2-cc18c8299b30",
+      "name" : "drive"
+    },
+    {
+      "id" : "219f9f1e-069b-4cfb-af57-61d433948884",
+      "name" : "erp"
+    },
+    {
+      "id" : "99449a98-05e8-4cff-a58e-232949ea49e9",
+      "name" : "hub"
+    },
+    {
+      "id" : "04134a77-5857-4632-9d55-5bb0cfe038a2",
+      "name" : "mail"
+    },
+    {
+      "id" : "1449e6b9-0b76-45e8-8c59-34f8dfd08201",
+      "name" : "notes"
+    },
+    {
+      "id" : "27b0ec7b-8aa8-4446-8ff6-370eeb2797d2",
+      "name" : "photos"
+    },
+    {
+      "id" : "5190a10e-5d71-4bec-8d77-e5601ca9f1fe",
+      "name" : "rooms"
+    }
+  ]
+}

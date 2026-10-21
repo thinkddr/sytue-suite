@@ -1,0 +1,8 @@
+{
+  "kind": "admin#directory#users",
+  "users": [
+    { "id": "101", "primaryEmail": "ada@acme.com", "isAdmin": true, "suspended": false },
+    { "id": "102", "primaryEmail": "alan@acme.com", "isAdmin": false, "suspended": false }
+  ],
+  "nextPageToken": "TOKEN2"
+}

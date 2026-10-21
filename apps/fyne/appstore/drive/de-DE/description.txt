@@ -1,0 +1,16 @@
+Dateien und Zusammenarbeit im Design Ihrer Organisation.
+
+• Hochladen, ordnen und über kontrollierte Links teilen (Rechte und Ablaufdatum).
+• Inline-Vorschau für Dokumente und Bilder.
+• An Mail anhängen, ohne die Datei zu duplizieren.
+• Speicher auf S3-Basis in europäischen Regionen.
+• Meine Ablage, Team-Ablagen, Mit mir geteilt, Zuletzt, Favoriten und Papierkorb.
+• Freigabelinks mit zwei Stufen (ansehen oder bearbeiten), Passwort und Ablauf.
+• Versionsverlauf mit Wiederherstellung.
+• Vorschau von Dokumenten, Bildern und PDFs ohne Download.
+• Office-Dokumente in Docus, Calcus und Diapos öffnen und bearbeiten; PDFs in CertiPDF.
+• Vertraulichkeitslabels, die öffentliche Links unterbinden, wo sie nicht hingehören.
+• In einen Rooms-Kanal teilen oder an Mail anhängen, ohne die Datei zu duplizieren.
+• S3-Speicher in europäischen Regionen, mit stets sichtbarem Kontingent.
+
+Verschlüsselt bei der Übertragung (TLS 1.3). Die Infrastruktur von Sytue befindet sich in der EU. Der Standort externer Dienste hängt von ihrem Anbieter ab.

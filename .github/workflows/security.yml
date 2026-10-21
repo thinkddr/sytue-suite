@@ -1,0 +1,1886 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Daniel Delgado Ramos
+#
+# Seguridad y cadena de suministro en Sytue Git — paridad con el `security` que
+# corría en la forja anterior, menos lo que exige construir imágenes.
+#
+# Diferencias inevitables, y por qué NO son una rebaja:
+#   – Sin `uses:` de terceros. El runner no tiene catálogo de acciones, así que
+#     cada herramienta se descarga por URL y se verifica por SHA-256. Es una
+#     cadena de suministro MÁS corta que confiar en una acción de un tercero.
+#   – Sin subida de SARIF a code scanning: no existe fuera de aquella forja. El
+#     gate real siempre fue el código de salida de cada herramienta, no el
+#     informe: la única pérdida es el visor.
+#   – `trivy image` SÍ está desde 2026-08-04. Construye con el BuildKit del CI
+#     (ADR 0066), que exporta un tar en formato `docker save`, y trivy lo escanea
+#     con `--input`.
+name: security
+
+# NO SE EJECUTA AL EMPUJAR NI AL FUSIONAR EN `main`, y es deliberado: en PR y al
+# publicar una release. Lo que llega a `main` ya pasó por su pull request, así
+# que repetir la misma comprobación sobre el commit de fusión gasta runner —el de
+# git.gay es compartido y hace cola— sin decir nada nuevo. La red de seguridad
+# local sigue siendo el hook de pre-push (.githooks/pre-push), que corre estos
+# mismos gates antes de dejar empujar.
+on:
+  # SIN `pull_request`, A PROPOSITO (2026-09-12). En fase piloto se abren
+  # demasiadas y el runner es UNO y va en serie: se midio una cola de 412 jobs
+  # —unas 20 horas—, y el efecto real no fue esperar, fue que los gates NO
+  # LLEGABAN A CORRER y las PRs se fusionaban sin ellos. Asi salio a produccion
+  # una migracion que no aplicaba, y Sytue ID quedo tres releases sin arrancar.
+  #
+  # El gate vive ahora donde pasa algo irreversible: `imagenes-produccion` mira
+  # el estado COMBINADO del commit y se niega a publicar si no esta en verde.
+  # Lo que se pierde es aviso temprano; lo que se gana es un gate que de verdad
+  # corre. Antes de fusionar, el hook de pre-push ya valida en local.
+  # Y al publicar una release: es la última oportunidad de ver un fallo antes
+  # de que la versión salga con él.
+  release:
+    types:
+      - published
+  schedule:
+    # Una CVE nueva sobre una versión ya fijada pone la rama en rojo sin que
+    # nadie haya tocado nada: eso es exactamente lo que se quiere saber.
+    #
+    # HOY NO SE DISPARA, Y NO ES CULPA DE ESTE FICHERO. Aquí ponía «SÍ SE
+    # EJECUTA», con el run 2872 del 2026-08-17 como prueba. Esa prueba era de la
+    # forja ANTERIOR: los runs de git.gay iban por el 788 el 2026-09-09, así que
+    # el 2872 no puede ser de esta instancia.
+    #
+    # Medido el 2026-09-09 contra git.gay con el mismo filtro que se usó
+    # entonces, `/actions/runs?event=schedule`: total_count = 0. Ni un solo run
+    # programado desde la migración, mientras que pull_request va por 247, push
+    # por 87, release por 66 y workflow_dispatch por 64.
+    #
+    # Descartado lo que dependía de nosotros: el cron está en `main`, `main` es
+    # la rama por defecto, Actions está activo y el repo no está archivado; la
+    # instancia es 16.0.3-dotgay+gitea-1.22.0, que soporta `schedule`. Y como el
+    # run NI SE CREA, tampoco es falta de runner: eso dejaría runs encolados.
+    # Queda por descartar lo que no se ve por API: que el operador de git.gay
+    # tenga apagado el cron de Actions programadas.
+    #
+    # El horario se deja correcto para cuando vuelva a dispararse. Mientras
+    # tanto, este barrido solo corre por `push`, `pull_request`, `release` o a
+    # mano, así que una CVE nueva sobre una versión ya fijada NO aparece sola:
+    # hay que lanzarlo por `workflow_dispatch`.
+    - cron: "0 6 * * *"
+
+  # Escaneo A DEMANDA, que es lo que faltaba.
+  #
+  # Sirve para preguntar «¿tenemos vulnerabilidades hoy?» sin esperar al cron de
+  # las 03:17 ni empujar un commit: permite obtener un veredicto actual aunque no
+  # cambie el código. En la medición original, los runs de una rama de trabajo se
+  # cancelaban al fusionar y se perdía su resultado: de los 100 medidos, UNO
+  # terminó con éxito. Un gate que casi nunca llega al final no informa de nada,
+  # y su verde se lee igual que el de uno que sí corre.
+  workflow_dispatch:
+
+# Lo que puede hacer GITHUB_TOKEN en este flujo, y nada más (GitHub lo
+# aplica; en Forgejo este campo se ignoraba y mandaba el token de cada paso).
+permissions:
+  contents: read
+  issues: write
+  actions: write
+
+# `bash` EXPLÍCITO. Dentro de un `container:` GitHub ejecuta los `run:` con
+# `sh -e` y no con bash: `set -o pipefail`, `[[`, los arrays y `<<<` mueren
+# con «Illegal option» (cancelar-al-cerrar, 2026-09-27). Con `shell: bash`
+# es `bash --noprofile --norc -eo pipefail`, que es lo que corría en la forja.
+defaults:
+  run:
+    shell: bash
+
+# El grupo se construye con la RAMA DE ORIGEN, no con `github.ref`.
+#
+# Esto se escribió cuando el workflow disparaba TAMBIÉN en `push`, y entonces
+# `github.ref` valía distinto en cada caso —`refs/heads/sytue-native` para el
+# push y `refs/pull/38/head` para la PR—: dos grupos distintos, o sea DOS COPIAS
+# de todo corriendo a la vez sobre dos runners, sin que ninguna cancelara a la
+# otra. Ya no hay push, pero el grupo sigue construyéndose así porque el mismo
+# razonamiento vale para los otros eventos que quedan (release, dispatch).
+#
+# `github.head_ref` está vacío fuera de una PR, así que en un push cae a
+# `github.ref_name` —que ya es el nombre pelado de la rama—. Push y PR de la
+# misma rama comparten grupo y el nuevo cancela al viejo.
+concurrency:
+  # UN DESPACHO A MANO NO CANCELA A OTRO (2026-09-27). El grupo lleva el `run_id`
+  # solo cuando el evento es `workflow_dispatch`: en GitHub dos despachos de la
+  # misma rama caían en el mismo grupo y el segundo cancelaba al primero, así
+  # que lanzar el CI sobre dos commits seguidos dejaba el primero sin veredicto
+  # (ci-go del 44d9b1bd, cancelado al lanzar el del 209f58f6). En push y en PR
+  # el sufijo vale vacío y todo sigue como antes.
+  group: security-${{ github.workflow }}-${{ github.event_name }}-${{ github.head_ref || github.ref_name }}${{ github.event_name == 'workflow_dispatch' && format('-{0}', github.run_id) || '' }}
+  # El EVENTO va en el grupo, así que push y pull request de la misma rama NUNCA
+  # comparten cola.
+  #
+  # Compartirlo ahorraba un runner —una copia en vez de dos— y a cambio hacía
+  # `main` INFUSIONABLE: el run del PR llega después y cancelaba al del push, y un
+  # run cancelado deja sus jobs con estado `failure` pegados al commit. La
+  # protección de `main` mira el estado COMBINADO, no solo los checks del PR, así
+  # que la fusión se rechazaba con «Not all required status checks successful»
+  # teniendo todo en verde. El PR no se podía fusionar porque existía el PR.
+  #
+  # Se intentó antes con `cancel-in-progress: ${{ github.event_name == 'push' }}`
+  # y NO sirve: Forgejo no evalúa esa expresión como booleano y la cadena «false»
+  # cuenta como verdadera, así que seguía cancelando. Por eso la separación va en
+  # el nombre del grupo, que es texto y no depende de que nadie lo interprete.
+  #
+  # El coste que esto tenía —dos copias mientras hubiera un PR abierto desde esta
+  # rama— ya no se paga (2026-08-15): cada job lleva
+  #
+  #     if: github.event_name != 'pull_request' || github.head_ref != 'sytue-native'
+  #
+  # así que la PR de sincronía no repite un trabajo hecho sobre EL MISMO commit.
+  # Las PR de cualquier otra rama sí corren enteras, que es donde el push no ha
+  # validado nada.
+  #
+  # Lo que hay que vigilar: la protección de `main` exige cuatro checks de
+  # `security`, y ahora los produce el PUSH a la rama, no la PR. Con historia
+  # lineal el commit es el mismo y el estado combinado los tiene; si alguna vez la
+  # fusión se rechaza con «Not all required status checks successful» teniendo todo
+  # en verde, ES ESTO: basta con devolverle el `if` a los cuatro jobs de security.
+  #
+  # HUBO un intento de agrupar por `github.sha` fuera de una pull request, para
+  # que cada commit de `main` quedara escaneado. Se revierte el 2026-08-17 porque
+  # sobra: la forja tiene ahora una regla GLOBAL —en el servicio on-demand, no en
+  # los workflows— que deja una sola ejecución viva por workflow y referencia, y
+  # esa regla cancela igualmente las anteriores de `main`. Con las dos cosas a la
+  # vez, la de aquí no conseguía nada y solo servía para que en una ráfaga de
+  # fusiones se acumularan doce ejecuciones esperando plaza.
+  #
+  # Lo que se acepta a cambio, dicho claro: solo queda escaneado el ÚLTIMO commit
+  # de una ráfaga. Una dependencia vulnerable introducida y retirada entre dos
+  # fusiones seguidas no aparecería. La ventana es estrecha y el barrido nocturno
+  # la cubre —cuando dispare, que hoy no lo hace: ver el comentario del cron—.
+  #
+  # El párrafo original, que sigue explicando por qué NO basta con la rama a
+  # secas si algún día se quita la regla global:
+  # Con el nombre de la rama, TODOS los push a `main` caían en el mismo grupo y
+  # `cancel-in-progress: true` mataba el escaneo anterior en cada fusión: medido
+  # el 2026-08-17, de los últimos 100 runs de este workflow UNO terminó. En días
+  # de varias fusiones seguidas, `main` no llegaba a escanearse nunca y su verde
+  # significaba «no dio tiempo», no «no hay vulnerabilidades».
+  #
+  # `github.head_ref` está vacío fuera de una PR, así que:
+  #   · push y schedule → grupo por COMMIT: cada uno llega hasta el final;
+  #   · pull request     → grupo por RAMA:  un push nuevo cancela al anterior,
+  #     que es lo que se quiere, porque el commit viejo ya no se va a fusionar.
+  #
+  # Se deja `cancel-in-progress: true` a propósito: ponerlo en `false` arreglaría
+  # `main` pero también encolaría cada push de cada PR, y eso son runners que hoy
+  # no sobran. La separación va en el grupo, que es texto.
+  cancel-in-progress: true
+
+# QUÉ ÁRBOL SE CLONA, Y POR QUÉ NO SIEMPRE `github.sha`.
+#
+# La forja registra cada programación con el commit en el que vio ESTE fichero y
+# lo reutiliza en todos los disparos: mientras nadie lo toque, el cron sigue
+# clonando el mismo árbol y la rama avanza sin él. Medido el 2026-09-11:
+# `security` y `mobile` corrían sobre b0372642 con `main` ya en 0bc05e1e, y los
+# dos fallaban por un lockfile que llevaba un día arreglado. Un nocturno que
+# escanea un árbol viejo no está mirando lo que se despliega, que es justo lo
+# único que tenía que hacer.
+#
+# En push y en pull request manda `github.sha`, que ahí sí es lo correcto: se
+# comprueba el commit concreto que llegó, no la cabeza de la rama.
+env:
+  # El checkout lo escribe el runner (uid 1001) y los pasos corren como root dentro
+  # del `container:`: git ve un propietario ajeno, se niega («dubious ownership»)
+  # y `go build` muere con «error obtaining VCS status». La forja montaba el
+  # workspace con el mismo usuario y no lo notaba.
+  GIT_CONFIG_COUNT: "1"
+  GIT_CONFIG_KEY_0: safe.directory
+  GIT_CONFIG_VALUE_0: "*"
+  REF_A_CLONAR: ${{ github.event_name == 'schedule' && (github.ref_name || 'main') || github.sha }}
+  GOTOOLCHAIN: local
+
+jobs:
+  production-scripts:
+    # La rama `sytue-native` queda fuera del CI de pull request: es la de la
+    # migración y arrastra un árbol que no compila con esta cadena.
+    if: (github.event_name != 'pull_request' || github.head_ref != 'sytue-native')
+    name: scripts de producción (02b/03 Registry)
+    runs-on: sytue-arm64
+    # Los runners propios del frontal (.github/RUNNERS.md): cada job en un
+    # contenedor del Docker del CI, con el proxy filtrado como socket de Docker
+    # y la caché de Go del host (con varios jobs, ancla `&ci` y `*ci`).
+    # Y el BuildKit del CI por SU socket (ADR 0066): con él construyen los
+    # `trivy image`, sin pasar por la API de Docker.
+    container: &ci
+      image: node:24-bookworm@sha256:64af3819f9275802414d7cdc38c27e9d82bd564dec4d4da87d008255d36c63b4
+      env:
+        DOCKER_HOST: unix:///run/sytue-ci/docker.sock
+        BUILDKIT_HOST: unix:///run/sytue-ci/buildkitd.sock
+      volumes:
+        - /srv/ci/run/proxy.sock:/run/sytue-ci/docker.sock
+        - /srv/ci/run/buildkitd.sock:/run/sytue-ci/buildkitd.sock
+        - /var/cache/sytue-ci/go-build:/github/home/.cache/go-build
+        - /var/cache/sytue-ci/go-mod:/github/home/go/pkg/mod
+    timeout-minutes: 15
+    steps:
+      - name: Clonar el repositorio
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.REF_A_CLONAR }}
+          fetch-depth: 1
+          persist-credentials: false
+      # LAS HERRAMIENTAS QUE ESTOS TESTS DAN POR HECHAS. Las traía la imagen del
+      # runner propio; la de git.gay no. Sin ellas fallaban CUATRO comprobaciones
+      # —alertas, helm-render, helm-so y release-workflow— con
+      # «No module named 'yaml'» y «falta helm», que se leen como una regresión
+      # del despliegue y no como lo que son: un runner sin herramientas.
+      # bun, además de helm y PyYAML: helm-render-test.sh migró a `Bun.YAML.parse`
+      # justamente porque el runner no trae PyYAML —y su comentario da por hecho
+      # que «bun ya está en la imagen»—, pero la imagen que usa este runner es
+      # git.gay/gitgay/docker_images:24.04, que tampoco lo trae. Se pedía helm y
+      # pyyaml y no bun, así que el gate moría con `bun: command not found` DESPUÉS
+      # de haber pasado media docena de comprobaciones, que es lo que hacía parecer
+      # que el fallo estaba en el despliegue y no en el runner.
+      #
+      # PYYAML YA NO HACE FALTA (2026-09-05): los cinco sitios que lo usaban
+      # —alertas-test, release-workflow-test y tres puntos de helm-render-test—
+      # leen el YAML con `tools/yamlq`, que es Go y sale del compilador que este
+      # repositorio ya necesita para todo lo demás. Una dependencia menos en el
+      # camino crítico del CI, y una herramienta menos que instalar en cada job.
+      # `go` y `envsubst` además de helm y bun:
+      #   · go, porque los gates leen YAML con `tools/yamlq` desde que dejaron
+      #     de usar PyYAML. Sin él, `alertas-test` y `release-workflow-test`
+      #     mueren con «go: command not found» dentro de la comprobación, que se
+      #     lee como «el fichero es inválido» y no como «falta una herramienta».
+      #   · envsubst, del paquete gettext-base, que `helm-so-test`
+      #     usa para renderizar el values del piloto. Faltaba, y su ausencia se
+      #     leía como que el interruptor de Sytue Cloud no funciona: un fallo de
+      #     producto que no existía. Lo destapó el propio gate al dejar de
+      #     tragarse el error.
+      - name: Herramientas del runner (helm · bun · go · envsubst · jq)
+        run: $GITHUB_WORKSPACE/.github/actions/toolchain/accion.sh helm bun go envsubst jq
+      - name: Sintaxis y regresiones del despliegue
+        run: make production-script-test
+      - name: Coherencia de toolchains
+        run: make toolchain-check
+      - name: Cadena de suministro UE (deny-by-default)
+        run: make eu-supply-chain-check
+
+  vulnerabilidades:
+    # La rama `sytue-native` queda fuera del CI de pull request: es la de la
+    # migración y arrastra un árbol que no compila con esta cadena.
+    if: (github.event_name != 'pull_request' || github.head_ref != 'sytue-native')
+    name: osv-scanner + govulncheck (deps Go + Bun)
+    runs-on: sytue-arm64
+    container: *ci
+    timeout-minutes: 20
+    # Lee apps/fyne/go.mod. Hoy sin análisis de llamadas no baja módulos, pero el
+    # día que se quite `--no-call-analysis=go` compila apps/fyne, y ese día no
+    # tiene que descubrirse en rojo que faltan los forks.
+    env:
+      GOPRIVATE: github.com/thinkddr/*
+    steps:
+      - name: Clonar el repositorio
+        working-directory: .
+        env:
+          SYTUE_GIT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SYTUE_GIT_FORKS_TOKEN: ${{ secrets.SYTUE_GIT_FORKS_TOKEN }}
+        run: |
+          # Runner propio: el workspace SOBREVIVE entre jobs (lo deja el anterior,
+          # con su .git), así que se vacía antes de clonar (.github/RUNNERS.md).
+          find . -mindepth 1 -delete
+          git init -q .
+          git remote add origin "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
+          git -c "http.extraHeader=Authorization: Basic $(printf 'x-access-token:%s' "$SYTUE_GIT_TOKEN" | base64 -w0)" \
+            fetch -q --depth 1 origin "$REF_A_CLONAR"
+          git checkout -q FETCH_HEAD
+          git config --global "http.$GITHUB_SERVER_URL/.extraHeader" \
+            "Authorization: Basic $(printf 'x-access-token:%s' "$SYTUE_GIT_TOKEN" | base64 -w0)"
+          # apps/fyne tira de los dos forks PRIVADOS de Fyne. Sin esto el job solo
+          # pasaba en el runner que ya los tenía en su caché de módulos: el 2706 cayó
+          # en el pool de git.gay y salió verde al repetirlo en el frontal.
+          "$GITHUB_WORKSPACE/.github/actions/toolchain/forks.sh"
+
+      # La imagen del runner compartido de git.gay no trae Go ni Bun.
+      # Se instalan con la MISMA versión y sha256 que la imagen propia.
+      - name: Preparar toolchain
+        run: $GITHUB_WORKSPACE/.github/actions/toolchain/accion.sh go bun govulncheck osv-scanner
+
+      - name: OSV-Scanner (recursivo, rompe el build ante vulns)
+        env:
+          # Para leer del espejo de la forja. Si falta, `bajar-herramienta.sh` cae
+          # al origen avisando: el CI no se queda sin escáner por una credencial.
+          SYTUE_GIT_PACKAGES_TOKEN: ${{ secrets.SYTUE_GIT_PACKAGES_TOKEN }}
+        run: |
+          set -euo pipefail
+          # DE `versions.env`, no copiado aquí. Era la TERCERA copia del mismo
+          # número —Containerfile del runner, este workflow y ahora la acción de
+          # toolchain— y con tres copias la deriva es cuestión de tiempo: pasó
+          # con Go 1.26.6, que quedó con el sha viejo al lado del número nuevo.
+          OSV_VERSION="$(awk -F= '$1 == "OSV_SCANNER_VERSION" { print $2 }' deploy/sytue-git/versions.env)"
+          OSV_SHA256="$(awk -F= '$1 == "OSV_SCANNER_SHA256" { print $2 }' deploy/sytue-git/versions.env)"
+          [ -n "$OSV_VERSION" ] && [ -n "$OSV_SHA256" ] || {
+            echo "versions.env no declara OSV_SCANNER_VERSION/SHA256" >&2; exit 1; }
+          case "$(uname -m)" in
+            x86_64|amd64) OSV_ARCH=amd64 ;;
+            aarch64|arm64)
+              OSV_ARCH=arm64
+              OSV_SHA256="$(awk -F= '$1 == "OSV_SCANNER_LINUX_ARM64_SHA256" { print $2 }' deploy/sytue-git/versions.env)"
+              ;;
+            *) echo "arquitectura no soportada: $(uname -m)" >&2; exit 1 ;;
+          esac
+          [ -n "$OSV_SHA256" ] || { echo "versions.env no declara checksum OSV para $OSV_ARCH" >&2; exit 1; }
+          # PRIMERO LA IMAGEN DEL RUNNER. Trae esta misma versión, verificada por
+          # sha256 al construirla (deploy/sytue-git/runner/Containerfile), así que
+          # bajarla otra vez en cada job es una conexión de salida a github.com por
+          # nada. Si no está —runner con imagen vieja, o versión que no cuadra— se
+          # descarga como siempre: este cambio NO depende de haber actualizado ya
+          # los runners, y por eso puede entrar antes que ellos.
+          if command -v osv-scanner >/dev/null 2>&1 &&
+             grep -q "$OSV_VERSION" <<<"$(osv-scanner --version 2>/dev/null)"; then
+            OSV_BIN="$(command -v osv-scanner)"
+            echo "osv-scanner $OSV_VERSION ya en la imagen del runner: no se descarga"
+          else
+            OSV_BIN="$(mktemp -d)/osv-scanner"
+            deploy/sytue-git/bin/bajar-herramienta.sh osv-scanner "$OSV_VERSION" \
+              "osv-scanner_linux_${OSV_ARCH}" "$OSV_SHA256" \
+              "https://github.com/google/osv-scanner/releases/download/v${OSV_VERSION}/osv-scanner_linux_${OSV_ARCH}" \
+              "$OSV_BIN"
+            chmod 0755 "$OSV_BIN"
+          fi
+          # SIN CONSULTAR LA API, y ese es el cambio que importa. Por defecto
+          # `scan source` envía a api.osv.dev el inventario completo de
+          # dependencias del proyecto —cada paquete con su versión, de los once
+          # lockfiles de abajo— en CADA ejecución: push, PR y el barrido
+          # nocturno. Eso es información nuestra saliendo a un servicio de
+          # EE. UU. tres veces al día.
+          #
+          # Con la base descargada, el cotejo ocurre aquí dentro y el veredicto
+          # es el mismo. La base se baja en este mismo paso, así que sigue al
+          # día; lo que ya no sale es QUÉ tenemos. Es la diferencia entre
+          # traerse el listado de vulnerabilidades y contarle a alguien el tuyo.
+          #
+          # LOS ONCE LOCKFILES DEL REPOSITORIO, no siete. Los dos últimos
+          # —provider-scaleway y terraform-provider-sytuecloud— faltaban, y ese
+          # hueco es el que hacía que este job dijera «Total 0» mientras el job
+          # `sbom` encontraba tres paquetes afectados sobre el MISMO commit: no se
+          # contradecían, es que syft recorre el árbol entero y esta lista no.
+          # De ahí salían aws-sdk-go v1.55.5 y docker/docker, que no aparecen en
+          # ningún otro manifiesto.
+          #
+          # La lista es manual y por eso se quedó corta sin que nadie se enterara.
+          # El job `pin-gate` la compara ahora con `git ls-files`: si aparece un
+          # módulo nuevo y no se añade aquí, ese gate lo canta.
+          # `--no-call-analysis=go` MIENTRAS x/tools NO ENTIENDA Go 1.27, y es lo que
+          # tumbaba este job: con `=go`, osv-scanner ejecuta govulncheck POR DENTRO
+          # para cada uno de los once lockfiles, y en los seis de Go falla con
+          # «Loading packages failed, possibly due to a mismatch between the Go
+          # version used to build govulncheck». El escaneo termina —dice «Total 0
+          # packages affected»— y aun así el paso sale con error. Las 709 líneas del
+          # log eran suyas: el paso siguiente, el del govulncheck suelto, ni llegaba
+          # a arrancar, y por eso el «exitcode 127» no cuadraba con nada.
+          #
+          # Lo que se pierde es la reachability —«esa función no la llamamos»—, no
+          # la detección: osv-scanner sigue diciendo qué dependencias tienen CVE
+          # conocido, que es para lo que está aquí. Y lo que se afinaba con
+          # reachability ya está declarado a mano en `osv-scanner.toml`, con su
+          # motivo y su fecha, incluido GO-2026-5932.
+          #
+          # LA BANDERA ES `--no-call-analysis` Y NO `--call-analysis=none`: la
+          # primera desactiva, la segunda ACTIVA para los lenguajes que se le
+          # listen. `=none` pedía análisis para un lenguaje llamado «none»
+          # mientras el de Go seguía encendido por defecto, así que el job siguió
+          # cayendo igual y con el mismo log de 709 líneas. Comprobado con
+          # `osv-scanner scan source --help` de la versión que usa el CI, no
+          # supuesto.
+          #
+          # SE QUITA ESTA BANDERA en cuanto x/tools publique soporte de 1.27: es
+          # la misma condición que documenta el envoltorio del paso siguiente.
+          "$OSV_BIN" scan source \
+            --offline-vulnerabilities \
+            --download-offline-databases \
+            --config=osv-scanner.toml \
+            --no-call-analysis=go \
+            --lockfile=go.mod \
+            --lockfile=apps/frontend/bun.lock \
+            --lockfile=test/e2e/bun.lock \
+            --lockfile=tools/astro-fyne/bun.lock \
+            --lockfile=tools/renovate/bun.lock \
+            --lockfile=tools/astro-fyne/native/go.mod \
+            --lockfile=apps/nucleo/go.mod \
+            --lockfile=apps/fyne/go.mod \
+            --lockfile=apps/fyne/upstream/go.mod \
+            --lockfile=apps/mobile/suite/bun.lock \
+            --lockfile=apps/mobile/rooms/bun.lock \
+            --lockfile=infra/crossplane/provider-scaleway/go.mod \
+            --lockfile=services/cloud/terraform-provider-sytuecloud/go.mod \
+            2>&1 | tee /tmp/seguridad.log
+          # `pipefail` está puesto arriba, así que el `tee` no se traga el fallo.
+
+      # govulncheck mira las funciones que el binario REALMENTE alcanza, así que
+      # descarta el ruido que osv-scanner no puede descartar.
+      - name: govulncheck (módulo principal)
+        run: |
+          # SE INTENTA EL ANÁLISIS DE VERDAD Y SE DEGRADA SOLO SI NO PUEDE.
+          #
+          # govulncheck compila el código para saber si la función vulnerable se
+          # ALCANZA, y para eso usa `golang.org/x/tools`. La última publicada
+          # —v0.49.0— todavía no entiende las fuentes de Go 1.27: falla con
+          # «Loading packages failed, possibly due to a mismatch between the Go
+          # version used to build govulncheck and the Go version on PATH». No hay
+          # versión de govulncheck que lo arregle: el que va por detrás es
+          # x/tools, y eso es de aguas arriba.
+          #
+          # NO SE FIJA `-scan=module` COMO APAÑO. Se probó: exige ficheros Go en
+          # el propio directorio —falla en la raíz, que solo tiene
+          # subcarpetas—, no lee `osv-scanner.toml`, y vuelve a levantar
+          # GO-2026-5932, que ya está analizada y no tiene arreglo publicado. Ese
+          # nivel ya lo cubre osv-scanner en este mismo workflow, respetando las
+          # exclusiones declaradas.
+          #
+          # Así que se INTENTA, y solo el fallo CONOCIDO de aguas arriba se
+          # perdona. Cualquier otro fallo, y cualquier vulnerabilidad encontrada,
+          # siguen tumbando el job. El día que x/tools publique soporte de 1.27
+          # esto vuelve a ser un gate completo sin que nadie tenga que acordarse.
+          # LA HERRAMIENTA SE ASEGURA EN EL PASO QUE LA USA. El paso de toolchain
+          # la instala en /usr/local/bin y la anuncia por $GITHUB_PATH, pero este
+          # job murió tres veces seguidas con «exitcode 127» aquí, sin una línea
+          # que dijera qué comando faltaba: la propagación de PATH entre pasos
+          # depende del runner y depurarla a ciegas cuesta una ejecución por
+          # intento.
+          #
+          # Volver a llamar a la acción es idempotente —si ya está, lo dice y
+          # sale— y deja el PATH correcto en ESTE shell, que es lo único que hace
+          # falta. Y si de verdad no se puede, el diagnóstico sale aquí y no tres
+          # pasos más allá.
+          export PATH="/usr/local/bin:$PATH"
+          if ! command -v govulncheck >/dev/null 2>&1; then
+            echo "govulncheck no está en el PATH de este paso; se asegura:"
+            echo "  PATH=$PATH"
+            "$GITHUB_WORKSPACE/.github/actions/toolchain/accion.sh" govulncheck
+            command -v govulncheck >/dev/null 2>&1 || {
+              echo "✗ govulncheck sigue sin estar tras instalarlo. Dónde quedó:" >&2
+              ls -l /usr/local/bin/govulncheck "$(go env GOPATH)/bin/govulncheck" 2>&1 | sed 's/^/    /' >&2
+              exit 1
+            }
+          fi
+
+          intentar_govulncheck() {  # <directorio>
+            local dir="$1" salida codigo
+            salida="$(cd "$dir" && govulncheck ./... 2>&1)" && codigo=0 || codigo=$?
+            if [ "$codigo" -eq 0 ]; then
+              printf '%s\n' "$salida"
+              return 0
+            fi
+            # `case` y no `printf | grep -q`: grep cierra la tubería al primer
+            # acierto y el printf recibe SIGPIPE, que con `pipefail` tumbaría el
+            # paso. Sin tuberías no hay SIGPIPE que valga.
+            # LOS PATRONES SON LOS QUE IMPRIME govulncheck, no los de osv-scanner.
+            # «Loading packages failed / mismatch between the Go version» lo dice
+            # OSV-SCANNER cuando su análisis interno falla; el govulncheck suelto
+            # imprime otra cosa —«uses version go1.26 of the source-processing
+            # packages» y «requires newer Go version»— así que el envoltorio no
+            # reconocía su propio caso y el job seguía en rojo.
+            #
+            # El patrón que decide es «source-processing packages»: lo emite el
+            # aviso de x/tools desfasado y NADA más. «requires newer Go version» a
+            # secas no sirve como única señal: también saldría si nuestro código
+            # pidiera un Go que el runner no tiene, que es un problema real y no
+            # se debe perdonar.
+            case "$salida" in
+              *"source-processing packages"*|*"Loading packages failed"*|*"mismatch between the Go version"*)
+              echo "⚠ govulncheck no puede analizar $(go env GOVERSION) en $dir: x/tools aún no lo entiende."
+              echo "  Es de aguas arriba. El nivel de módulo lo cubre osv-scanner, que corre en este"
+              echo "  mismo workflow y sí respeta osv-scanner.toml. Se recupera solo al actualizarse."
+              return 0 ;;
+            esac
+            printf '%s\n' "$salida" >&2
+            printf '%s\n' "$salida" >> /tmp/seguridad.log
+            return "$codigo"
+          }
+          intentar_govulncheck .
+
+      # UNA CVE NUEVA SOBRE UNA VERSIÓN YA FIJADA no la trae ninguna pull request:
+      # aparece sola cuando el escáner actualiza su base. La ejecución diaria es
+      # quien la ve, y un job en rojo dentro de una lista que nadie abre es lo
+      # mismo que no verla —los logs de git.gay no se leen por API: 404—. Así que
+      # se cuenta por el único canal que sí se consulta y sí llega a la bandeja.
+      #
+      # En una pull request NO se informa: ahí la equis roja ya se la lleva quien
+      # la abrió, y abrir una incidencia por cada intento sería ruido.
+      - name: Informe si el escaneo de dependencias falla
+        if: failure() && github.event_name != 'pull_request'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          "$GITHUB_WORKSPACE/.github/actions/informe/accion.sh" \
+            /tmp/seguridad.log "seguridad: dependencias con CVE sin resolver ($GITHUB_SHA)"
+
+  trivy-fs:
+    # La rama `sytue-native` queda fuera del CI de pull request: es la de la
+    # migración y arrastra un árbol que no compila con esta cadena.
+    if: (github.event_name != 'pull_request' || github.head_ref != 'sytue-native')
+    name: trivy fs (deps · IaC · misconfig · secrets)
+    runs-on: sytue-arm64
+    container: *ci
+    timeout-minutes: 25
+    steps:
+      - name: Clonar el repositorio
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.REF_A_CLONAR }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      # Falla ante CRITICAL/HIGH CON ARREGLO disponible: un aviso que nadie
+      # puede resolver hoy no sirve para bloquear a todo el mundo.
+      - name: Trivy filesystem y Helm renderizado (rompe el build)
+        env:
+          SYTUE_GIT_PACKAGES_TOKEN: ${{ secrets.SYTUE_GIT_PACKAGES_TOKEN }}
+        run: |
+          set -euo pipefail
+          TMPD="$(mktemp -d)"
+          trap 'rm -rf "$TMPD"' EXIT
+
+          "$GITHUB_WORKSPACE/.github/actions/toolchain/accion.sh" trivy helm jq
+          TRIVY="$(command -v trivy)"
+          # Primero el árbol fuente, antes de crear los .tgz y .vendor ignorados
+          # de Helm. Así el fs mantiene exactamente su perímetro anterior.
+          # --ignorefile EXPLÍCITO: sin él, Trivy 0.73 no aplica `.trivyignore.yaml`
+          # aunque esté en la raíz del repo. Es un fallo mudo —no avisa de que hay un
+          # fichero de excepciones que no está leyendo—, y por eso las excepciones
+          # añadidas ayer no surtieron ningún efecto y el job siguió en rojo.
+          "$TRIVY" fs . \
+            --ignorefile .trivyignore.yaml \
+            --scanners vuln,misconfig,secret \
+            --severity CRITICAL,HIGH \
+            --ignore-unfixed \
+            --exit-code 1 \
+            --format table
+
+          # Los subcharts solos no conocen los helpers globales y Trivy los
+          # omite con "Skipping chart". Helm resuelve el umbrella con los mismos
+          # values versionados del despliegue y deja un fichero por plantilla.
+          source "$GITHUB_WORKSPACE/deploy/production/lib-helm-deps.sh"
+          source "$GITHUB_WORKSPACE/deploy/production/lib-helm-render.sh"
+          sytue_helm_dependency_build "$GITHUB_WORKSPACE/deploy/helm/sytue-one"
+          sytue_helm_render_security_manifests "$GITHUB_WORKSPACE" "$TMPD/helm"
+          HELM_STATUS=0
+          "$TRIVY" config "$TMPD/helm" \
+            --misconfig-scanners kubernetes \
+            --ignorefile "$GITHUB_WORKSPACE/.trivyignore.yaml" \
+            --severity CRITICAL,HIGH \
+            --include-non-failures \
+            --exit-code 1 \
+            --format json \
+            --output "$TMPD/helm.json" || HELM_STATUS=$?
+          if [ -s "$TMPD/helm.json" ]; then
+            "$TRIVY" convert --format table --severity CRITICAL,HIGH "$TMPD/helm.json"
+          fi
+          [ "$HELM_STATUS" -eq 0 ] || exit "$HELM_STATUS"
+          sytue_helm_check_scan_coverage "$TMPD/helm" "$TMPD/helm.json"
+
+  # EL HUECO POR EL QUE SE COLÓ CVE-2026-62357.
+  #
+  # `trivy image` escanea LAS NUESTRAS: las once que construimos. Las de terceros
+  # que fijamos en `deploy/production/upstream-images.txt` —Dragonfly, Postgres,
+  # Traefik, PgBouncer, LiveKit, cert-manager…— no las miraba NADIE, ni siquiera
+  # el `schedule` nocturno. Y es justo donde más falta hace: nuestras imágenes las
+  # arregla actualizar una dependencia y volver a construir, mientras que una CVE
+  # sobre una versión fijada de un tercero no se mueve sola y no la ve ningún gate
+  # hasta que alguien va a mirar a mano.
+  #
+  # Dragonfly estuvo un mes en v1.39.0 con un fallo de corrupción de memoria
+  # explotable sin autenticar, publicado y con versión corregida disponible, y el
+  # CI llevaba todo ese mes en verde.
+  #
+  # Escanea POR DIGEST y no por tag: es lo que fija el fichero y lo que se
+  # despliega de verdad. Si un tag se moviera por detrás, escanear el tag daría un
+  # resultado que no corresponde a lo que corre en producción.
+  trivy-upstream:
+    name: trivy image (imágenes upstream fijadas)
+    # En el nocturno SIEMPRE, que es el caso que importa: una CVE nueva sobre una
+    # versión que nadie ha tocado. En un push, solo si el commit toca el fichero.
+    if: github.event_name != 'pull_request' || github.head_ref != 'sytue-native'
+    runs-on: sytue-arm64
+    container: *ci
+    timeout-minutes: 45
+    steps:
+      - name: Clonar el repositorio
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.REF_A_CLONAR }}
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Escanear cada imagen fijada
+        env:
+          EVENTO: ${{ github.event_name }}
+          SYTUE_GIT_PACKAGES_TOKEN: ${{ secrets.SYTUE_GIT_PACKAGES_TOKEN }}
+        run: |
+          set -euo pipefail
+          LISTA=deploy/production/upstream-images.txt
+          # Las que se bajan del ORIGEN entran también, y con más motivo: no
+          # tienen copia propia ni firma, así que el escaneo es el único control
+          # que les queda además del digest.
+          DIRECTO=deploy/production/upstream-directo.txt
+
+          # Fuera del nocturno solo se escanea si el commit toca alguna lista. Sin
+          # esto, cada push pagaría el pull de veintitrés imágenes de terceros
+          # para volver a decir lo mismo que dijo el nocturno hace unas horas.
+          if [ "$EVENTO" != "schedule" ]; then
+            if git rev-parse HEAD~1 >/dev/null 2>&1 &&
+               git diff --quiet HEAD~1 HEAD -- "$LISTA" "$DIRECTO"; then
+              echo "el commit no toca las listas de imágenes y no es el nocturno: nada que escanear"
+              exit 0
+            fi
+          fi
+
+          "$GITHUB_WORKSPACE/.github/actions/toolchain/accion.sh" trivy
+          TRIVY="$(command -v trivy)"
+
+          # NO se corta en el primer fallo: interesa el parte completo de las
+          # veintitrés, no la primera que salte. El código de salida se acumula y
+          # se decide al final.
+          fallos=0
+          escaneadas=0
+          avisos=0
+          while read -r nombre tag origen digest _resto; do
+            case "$nombre" in ''|\#*) continue ;; esac
+            [ -n "${digest:-}" ] || { echo "::error::$nombre ($tag) no tiene digest en $LISTA"; fallos=1; continue; }
+            echo "── $nombre $tag ──────────────────────────────────────────" | tee -a /tmp/trivy-upstream.log
+            escaneadas=$((escaneadas + 1))
+            "$TRIVY" image "${origen}@${digest}" \
+              --ignorefile .trivyignore.yaml \
+              --scanners vuln \
+              --severity CRITICAL,HIGH \
+              --ignore-unfixed \
+              --exit-code 1 \
+              --format table 2>&1 | tee -a /tmp/trivy-upstream.log && continue
+
+            # HAY HALLAZGOS. Que sea ROJO o AVISO depende de una sola pregunta:
+            # ¿podemos hacer algo? `--ignore-unfixed` ya deja fuera lo que no
+            # tiene parche EN EL PAQUETE, pero un paquete parcheado dentro de una
+            # imagen ajena no nos sirve hasta que ELLOS la reconstruyan. Con la
+            # última versión puesta y el CVE todavía dentro, no hay nada que
+            # subir; y un rojo sobre el que no se puede actuar se queda encendido
+            # semanas, enseña a saltárselo, y el día que llega uno de verdad
+            # tampoco se mira.
+            #
+            # Quien SÍ actúa cuando hay versión nueva es Renovate: desde 2026-09-07
+            # vigila este fichero con un customManager y abre su PR. Esto de aquí
+            # es la red por si esa PR no se ha mirado.
+            # `|| codigo=$?` y no `case "$?"` a secas: con `set -e` un guion que
+            # devuelve 1 —que aquí es una RESPUESTA, «no hay nada más nuevo», no
+            # un fallo— abortaría el paso entero antes de llegar al case.
+            codigo=0
+            deploy/production/bin/hay-imagen-mas-nueva.sh "$origen" "$tag" >"$TMPD/nueva" 2>/dev/null || codigo=$?
+            case "$codigo" in
+              0) echo "::error::$nombre: hay $(cat "$TMPD/nueva") publicada y seguimos en $tag — sube el digest en $LISTA"
+                 fallos=1 ;;
+              1) echo "::warning::$nombre $tag: hallazgos SIN imagen parcheada arriba; es la última estable de su serie. Nada que subir todavía."
+                 avisos=$((avisos + 1)) ;;
+              *) echo "::error::$nombre: no se ha podido consultar el registro; se cuenta como rojo para no confundir un fallo de red con «no hay nada que hacer»"
+                 fallos=1 ;;
+            esac
+          done < "$LISTA"
+
+          # Y las del origen. Aquí la referencia ya viene completa en el campo 2
+          # (`repo:tag@sha256:…`), así que no hay que recomponerla.
+          if [ -f "$DIRECTO" ]; then
+            while read -r nombre referencia _caducidad _motivo; do
+              case "$nombre" in ''|\#*) continue ;; esac
+              echo "── $nombre (del origen, sin espejo) ──────────────────────"
+              escaneadas=$((escaneadas + 1))
+              "$TRIVY" image "$referencia" \
+                --ignorefile .trivyignore.yaml \
+                --scanners vuln \
+                --severity CRITICAL,HIGH \
+                --ignore-unfixed \
+                --exit-code 1 \
+                --format table || fallos=1
+            done < "$DIRECTO"
+          fi
+
+          # Que la lista se quede vacía por un cambio de formato no puede salir en
+          # verde: sería el mismo punto ciego, con el job existiendo y todo.
+          [ "$escaneadas" -gt 0 ] || { echo "::error::no se escaneó ninguna imagen; ¿cambió el formato de $LISTA?"; exit 1; }
+          echo "escaneadas $escaneadas imágenes upstream ($avisos con hallazgos que no podemos resolver aún)"
+          exit "$fallos"
+
+      # UN ROJO QUE NADIE PUEDE LEER NO ES UN AVISO. El log de una ejecución no
+      # se puede consultar desde fuera de git.gay (API 404, web 403), así que
+      # este escaneo llevaba semanas en rojo y para saber QUÉ imagen y QUÉ CVE
+      # había que abrir el navegador. La incidencia sí se ve en la bandeja, se
+      # consulta por API y se cierra al resolverse.
+      #
+      # Solo cuando FALLA, que ahora significa algo concreto: hay versión
+      # publicada más nueva y seguimos atrás. Los hallazgos sin parche arriba
+      # salen como aviso y no abren nada, porque no hay nada que hacer con ellos.
+      - name: Informe si el escaneo upstream falla
+        if: failure()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          "$GITHUB_WORKSPACE/.github/actions/informe/accion.sh" \
+            /tmp/trivy-upstream.log "seguridad: imágenes upstream con versión más nueva ($GITHUB_SHA)"
+
+  # Las once imágenes se construyen y escanean SOLO si el commit puede haberlas
+  # cambiado. La forja tiene dos runners y este workflow lanza diecinueve jobs:
+  # un commit que toca un script de shell tenía a `trivy image` compilando once
+  # binarios Go para escanear once imágenes idénticas a las de ayer, y dejaba en
+  # cola durante media hora al resto del CI (y a los demás commits).
+  #
+  # NO es una rebaja de seguridad, y el motivo está tres líneas más arriba: el
+  # `schedule` nocturno vuelve a escanearlo todo aunque nadie haya tocado nada,
+  # que es justo el caso de la CVE nueva sobre una versión ya fijada. Lo que se
+  # evita aquí es reescanear lo mismo dos veces el mismo día, no dejar de mirar.
+  #
+  # Ante la duda, escanea: si el evento no es un push, si no se sabe con qué
+  # comparar o si el commit anterior no es alcanzable —force-push, rama nueva,
+  # historial recortado—, la salida es `true`.
+  cambios:
+    # La rama `sytue-native` queda fuera del CI de pull request: es la de la
+    # migración y arrastra un árbol que no compila con esta cadena.
+    if: (github.event_name != 'pull_request' || github.head_ref != 'sytue-native')
+    name: ¿el commit toca las imágenes?
+    runs-on: sytue-arm64
+    container: *ci
+    timeout-minutes: 5
+    outputs:
+      imagenes: ${{ steps.decidir.outputs.imagenes }}
+    steps:
+      - name: Traer el commit y con el que comparar
+        working-directory: .
+        env:
+          SYTUE_GIT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ANTES: ${{ github.event.before }}
+        run: |
+          # Runner propio: el workspace SOBREVIVE entre jobs (lo deja el anterior,
+          # con su .git), así que se vacía antes de clonar (.github/RUNNERS.md).
+          find . -mindepth 1 -delete
+          git init -q .
+          git remote add origin "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
+          git -c "http.extraHeader=Authorization: Basic $(printf 'x-access-token:%s' "$SYTUE_GIT_TOKEN" | base64 -w0)" \
+            fetch -q --depth 1 origin "$REF_A_CLONAR"
+          git checkout -q FETCH_HEAD
+          # Un segundo fetch superficial basta: `git diff A B` compara dos
+          # árboles y no necesita que compartan ancestro en el clon.
+          if [ -n "${ANTES:-}" ] && [ "$ANTES" != "0000000000000000000000000000000000000000" ]; then
+            git -c "http.extraHeader=Authorization: Basic $(printf 'x-access-token:%s' "$SYTUE_GIT_TOKEN" | base64 -w0)" \
+              fetch -q --depth 1 origin "$ANTES" || true
+          fi
+          # En una pull request `github.event.before` viene vacío, así que sin
+          # esto no hay con qué comparar y el paso siguiente escanea siempre.
+          #
+          # Se usa la VARIABLE DE ENTORNO `GITHUB_BASE_REF`, no
+          # `github.event.pull_request.*` (con la sintaxis de expresión, que aquí
+          # no se escribe ni en un comentario): ese objeto no existe fuera de
+          # un evento de pull request y basta con NOMBRARLO para que Sytue Git no
+          # cree el run —el dispatch responde 500 y el push, nada—. Está avisado
+          # comprobado, y cuesta una release descubrirlo.
+          # La variable, en cambio, simplemente viene vacía fuera de una PR.
+          if [ -n "${GITHUB_BASE_REF:-}" ]; then
+            git -c "http.extraHeader=Authorization: Basic $(printf 'x-access-token:%s' "$SYTUE_GIT_TOKEN" | base64 -w0)" \
+              fetch -q --depth 1 origin "$GITHUB_BASE_REF" || true
+          fi
+
+      - name: Decidir
+        id: decidir
+        env:
+          ANTES: ${{ github.event.before }}
+        run: |
+          escanear() { echo "imagenes=true" >> "$GITHUB_OUTPUT"; echo "→ se escanean las imágenes: $1"; exit 0; }
+          # En una pull request se compara contra su RAMA BASE en vez de escanear
+          # a ciegas. Antes, todo lo que no fuera `push` caía directo en «escanea
+          # todo», y eso multiplicaba la cola: cada PR lanzaba sus tres `trivy
+          # image` aunque solo cambiara un fichero de texto. Medido el 2026-08-17
+          # con la cola encima: de 118 jobs esperando runner, 35 eran `trivy
+          # image`, y `sytue-build` estaba lleno mientras CI tenía plazas libres.
+          #
+          # No se pierde cobertura: se aplica el MISMO filtro de rutas que en un
+          # push, y cualquier duda —sin base, base inalcanzable— cae a escanear.
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            [ -n "${GITHUB_BASE_REF:-}" ] || escanear "la pull request no trae rama base"
+            ANTES="$(git rev-parse FETCH_HEAD 2>/dev/null || true)"
+            [ -n "$ANTES" ] || escanear "no se pudo resolver la base ($GITHUB_BASE_REF)"
+          elif [ "$GITHUB_EVENT_NAME" != "push" ]; then
+            escanear "el evento es $GITHUB_EVENT_NAME, ni push ni pull request"
+          fi
+          [ -n "${ANTES:-}" ] && [ "$ANTES" != "0000000000000000000000000000000000000000" ] \
+            || escanear "no hay commit anterior con el que comparar"
+          git cat-file -e "$ANTES^{commit}" 2>/dev/null \
+            || escanear "el commit anterior ($ANTES) no es alcanzable"
+          # SOLO LOS DOCKERFILES, y esto es más estrecho de lo que parece a
+          # primera vista. Lo que `trivy image` mide y nadie más ve son los
+          # paquetes del SISTEMA de la imagen: la base y lo que instale el
+          # Dockerfile. Eso no cambia porque cambie el código Go de un servicio.
+          #
+          # Antes bastaba con tocar `services/` para reconstruir y escanear las
+          # once imágenes: ~55 min del runner de BUILD —que es uno solo y además
+          # publica las releases— para volver a mirar unos paquetes idénticos a
+          # los de ayer. Lo que sí cambia con `go.mod` son las librerías del
+          # binario, y de eso ya se ocupan osv-scanner y govulncheck en 32-57 s,
+          # en cada push y también en las ramas de trabajo.
+          #
+          # Lo que se deja de cubrir aquí lo coge `trivy-image-nocturno`, que es
+          # además quien detecta lo único que aparece sin que nadie toque nada: un
+          # CVE publicado esta madrugada.
+          #
+          # El límite conocido: un `apt-get install` que viva en un script COPIADO
+          # por el Dockerfile en vez de en el propio Dockerfile no dispara esto. El
+          # barrido nocturno lo ve igual, con menos de un día de retraso.
+          # En una variable y no en tubería: con `| grep -q`, grep sale al primer
+          # acierto, `git diff` recibe SIGPIPE y pipefail da por NO tocado justo lo
+          # que sí se tocó (docs/operations.md#ci-sin-azar).
+          tocados="$(git diff --name-only "$ANTES" HEAD)"
+          if grep -qE '(^|/)Dockerfile|^\.github/workflows/security\.yml$' <<<"$tocados"; then
+            escanear "el commit toca un Dockerfile o este workflow"
+          fi
+          echo "imagenes=false" >> "$GITHUB_OUTPUT"
+          echo "→ no se tocó nada que entre en una imagen; las escanea el barrido nocturno"
+          git diff --name-only "$ANTES" HEAD | sed 's/^/    /'
+
+  trivy-image:
+    # CONSTRUYE CON EL BUILDKIT DEL CI (ADR 0066), el mismo con el que
+    # `imagenes-produccion` publica: un `buildkitd` sin root en el frontal,
+    # compartido por los jobs a través de su propio socket. No con uno levantado
+    # dentro del job —el contenedor no trae `buildkitd` ni permisos para montar sus
+    # capas— ni con el builder clásico por el proxy de Docker, que era lo de antes
+    # y no protegía lo que un build estaba usando de la poda del host. Y con la
+    # misma caché que la publicación: lo que escanea un turno ya no se reconstruye.
+    name: trivy image (${{ matrix.grupo.nombre }})
+    runs-on: sytue-arm64
+    container: *ci
+    needs: cambios
+    # Y solo donde hace falta: en `main`, en las PR hacia ella y en el barrido
+    # nocturno. Construir las once imágenes en CADA push de la rama de trabajo
+    # ocupaba el runner de build media hora por commit —con varias sesiones
+    # empujando, la cola no se vaciaba nunca— para escanear lo que el `schedule`
+    # vuelve a mirar entero esa misma noche. El código sí se escanea en la rama:
+    # osv, trivy fs, gitleaks y las licencias no dependen de esto.
+    if: >-
+      needs.cambios.outputs.imagenes == 'true' &&
+      (github.event_name != 'push' || github.ref == 'refs/heads/main') &&
+      (github.event_name != 'pull_request' || github.head_ref != 'sytue-native')
+    # Hasta 4 imágenes en serie por job, a ~5 min cada una.
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      # Las once imágenes en TRES jobs, cada uno construyendo las suyas en serie.
+      #
+      # `max-parallel` NO sirve aquí: Forgejo Actions lo ignora. Se probó (ejecución
+      # 703, con `max-parallel: 3`) y arrancaron OCHO jobs de la matriz en tres
+      # segundos. El runner es `capacity: 1` por instancia, así que la flota
+      # levanta una instancia por job y todas caen en la misma máquina de build:
+      # el límite real lo pone el tamaño de la flota, no el workflow.
+      #
+      # Y esa concurrencia agota el disco: cada job trae su Docker, su copia
+      # extraída de golang:1.26.6 y sus cachés, y los builds mueren al copiar el
+      # binario final con «no space left on device» —ResourceExhausted, no un
+      # fallo del código—. En la 703 pasaron las ocho primeras y cayeron las tres
+      # que arrancaron encima.
+      #
+      # Lo que sí se controla desde aquí es CUÁNTOS JOBS hay. Tres, con las
+      # imágenes agrupadas dentro y limpiando entre una y otra.
+      matrix:
+        grupo:
+          - nombre: identidad-y-ficheros
+            imagenes: >-
+              id:services/id/Dockerfile
+              drive:services/drive/Dockerfile
+              docs:services/docs/Dockerfile
+              mail:services/mail/Dockerfile
+          - nombre: colaboracion
+            imagenes: >-
+              calendar:services/calendar/Dockerfile
+              contacts:services/contacts/Dockerfile
+              notes:services/notes/Dockerfile
+              rooms:services/rooms/Dockerfile
+              hub:services/hub/Dockerfile
+              ai:services/ai/Dockerfile
+          - nombre: cloud
+            imagenes: >-
+              cloud-api:services/cloud/Dockerfile.api
+              cloud-builder:services/cloud/Dockerfile.builder
+              cloud-controller:services/cloud/Dockerfile.controller
+    steps:
+      - name: Clonar el repositorio
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.REF_A_CLONAR }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      # El disco se limpia AL EMPEZAR, no solo al terminar: un job cancelado —y
+      # aquí se cancelan a menudo— o uno que revienta a mitad deja su
+      # `/tmp/buildkit` entero, y el siguiente que caiga en ese runner arranca ya
+      # sin sitio. Medido el 2026-08-11 en imagenes-rama.yml: ocho builds en rojo
+      # con `ResourceExhausted` y `no space left on device`, en un runner que
+      # empezó al 92 % mientras otro de la misma tanda iba al 48 %.
+      - name: Recuperar disco antes de construir
+        run: |
+          set -euo pipefail
+          # Se miran BLOQUES E INODOS. El 2026-08-12 un build murió con «no space
+          # left on device» teniendo 31 GB libres: con 138 G de overlay y capas de
+          # contenedor —cientos de miles de ficheros diminutos— lo que se agota
+          # primero puede ser la tabla de inodos, y `df -h` no la enseña. Sin este
+          # dato el fallo es inexplicable y se le echa la culpa al tamaño.
+          estado() { echo "  bloques: $(df -h / | tail -1)"; echo "  inodos:  $(df -i / | tail -1)"; }
+          echo "antes:"; estado
+          rm -rf /tmp/buildkit* 2>/dev/null || true
+          echo "después:"; estado
+          # AQUÍ NO SE PODA DOCKER, y antes tampoco se podaba: había un
+          # `docker system prune -af --volumes` tras un umbral del 70 %, pero
+          # este paso corre ANTES de que el siguiente instale el cliente Docker
+          # —en la ejecución 2499: poda a las 14:05:48, «instalando cliente
+          # Docker» a las 14:05:51—, así que el `2>/dev/null || true` se lo
+          # tragaba entero. Definirlo no lo aplicaba.
+          #
+          # No se ha «arreglado» moviéndolo: escrito así era además la poda
+          # EQUIVOCADA. `-af` borra toda imagen que no use un contenedor, y en
+          # este runner eso incluye las `sytue-ci/*:ci` de los otros dos grupos
+          # de la matriz, que corren a la vez contra el mismo daemon; y
+          # `--volumes` apunta a un host que también sirve Pangolin y el SFU de
+          # Rooms. Y ninguna poda, ni filtrada, es inocua con un vecino
+          # construyendo: ver el paso final.
+          #
+          # Lo que SÍ: sin sitio, fallar YA y diciéndolo, no a media
+          # construcción. El 28/09, con /srv/ci al 100 %, los tres grupos de la
+          # v3.7.14 cayeron con «no space left» (docs/operations.md#poda-ci-frontal).
+          scripts/ci-disco-libre.sh 20
+
+      - name: Construir y escanear ${{ matrix.grupo.nombre }}
+        env:
+          SYTUE_GIT_PACKAGES_TOKEN: ${{ secrets.SYTUE_GIT_PACKAGES_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          # La acción central selecciona el artefacto correcto de la CPU y lo
+          # verifica; un único binario sirve para todas las imágenes del job.
+          # `buildctl` es el cliente del BuildKit del CI (ADR 0066).
+          "$GITHUB_WORKSPACE/.github/actions/toolchain/accion.sh" trivy buildctl
+          TRIVY="$(command -v trivy)"
+
+          # QUE NO SE PUEDA VOLVER A «ESCANEAR» SIN ESCANEAR. Trivy lee un tar en
+          # formato Docker —con su `manifest.json` dentro— o un DIRECTORIO OCI,
+          # pero no un *tar* OCI, que es lo que exportaba el montaje anterior:
+          # fallaba con «unable to open … as a Docker image: file manifest.json
+          # not found in tar» y las once imágenes de servicios llevaron sin
+          # mirarse de verdad desde que existe este job. No es que salieran
+          # limpias: es que el escáner nunca llegaba a abrirlas.
+          #
+          # Se comprueba ANTES de invocarlo, y con el mensaje que dice qué mirar,
+          # para que el día que alguien cambie el exportador el fallo sea este y
+          # no un error del escáner sobre formatos de imagen.
+          #
+          # EL GUARDIÁN VIVE EN `scripts/comprobar-tar-docker.sh`, no aquí: era
+          # una función copiada en este job y en su gemelo nocturno, y además se
+          # quedaba corta —miraba que estuviera `manifest.json` y no que
+          # estuvieran los blobs que ese manifiesto declara, que es justo por
+          # donde se coló el fallo de `contacts` del 2026-09-21—. Su test lo
+          # ve en rojo: `deploy/production/tests/comprobar-tar-docker-test.sh`.
+          GUARDIAN_TAR="$GITHUB_WORKSPACE/scripts/comprobar-tar-docker.sh"
+
+          # NO se corta en la primera imagen con hallazgo, igual que en
+          # `trivy-upstream`: interesa el parte de las cuatro, no la primera que
+          # salte. Sin esto, un CVE en la imagen 1 dejaba las otras tres SIN
+          # CONSTRUIR ni escanear, y el job en rojo no distinguía «una mala» de
+          # «cuatro malas». Pasó el 2026-09-05 en el barrido nocturno: cayó en
+          # `www` y `calendar` —la primera de cada grupo— y las ocho restantes no
+          # se llegaron a mirar.
+          #
+          # Solo se acumula el veredicto de TRIVY. Una construcción que revienta
+          # sigue abortando el bucle con `set -e`, y es lo que se quiere: cuando
+          # falla por «no space left on device» —que es como falla aquí—, seguir
+          # con tres builds más solo empeora el disco que causó el fallo.
+          fallos=0
+          for par in ${{ matrix.grupo.imagenes }}; do
+            imagen="${par%%:*}"
+            receta="${par#*:}"
+            echo "::group::$imagen"
+            df -h /tmp | tail -1
+
+            # `--tar` exporta en formato `docker save` —con su `manifest.json`
+            # dentro—, que es el que trivy sabe leer. Un *tar* OCI no lo lee: solo
+            # un DIRECTORIO OCI. Con el export de hace meses fallaba con «unable to
+            # open … as a Docker image: file manifest.json not found in tar», así
+            # que las once imágenes de los servicios llevaron SIN ESCANEAR desde
+            # que existía este job: no es que salieran limpias, es que el escáner
+            # nunca llegaba a mirarlas. La imagen no pasa por ningún daemon: del
+            # BuildKit al tar, y del tar a trivy.
+            timeout 1500 scripts/construir-imagen.sh -f "$receta" --tar "sytue-ci/$imagen:ci" "/tmp/$imagen.tar" .
+            "$GUARDIAN_TAR" "/tmp/$imagen.tar"
+
+            # `--ignorefile` EXPLÍCITO, igual que en `trivy fs`: sin él Trivy no
+            # aplica `.trivyignore.yaml` y las excepciones declaradas —con su
+            # motivo y su fecha— no surten efecto. Es lo que dejaba el barrido en
+            # rojo por CVE-2026-14456: un openssl de la imagen base que upstream
+            # todavía no ha reconstruido y que además no nos alcanza.
+            "$TRIVY" image --input "/tmp/$imagen.tar" \
+              --ignorefile .trivyignore.yaml \
+              --scanners vuln \
+              --severity CRITICAL,HIGH \
+              --ignore-unfixed \
+              --exit-code 1 \
+              --format table || fallos=1
+
+            # El tar se devuelve ANTES de pasar a la siguiente, también cuando
+            # trivy encuentra algo: pesa cientos de megas. La caché de BuildKit
+            # no se toca aquí: la comparten todos los jobs y la poda el host.
+            rm -f "/tmp/$imagen.tar"
+            echo "::endgroup::"
+          done
+          exit "$fallos"
+
+      # Solo los tars: la imagen no pasa por ningún daemon, así que no queda
+      # etiqueta que borrar. `always()` porque el job que más deja es el que
+      # falla a medias.
+      - name: Liberar el disco
+        if: always()
+        run: |
+          rm -f /tmp/*.tar || true
+          # AQUÍ NO SE PODA NADA. La caché de BuildKit la comparten todos los jobs:
+          # podarla desde uno no rompe el build de otro —BuildKit respeta sus
+          # leases, que era lo que faltaba con el builder clásico (la ejecución
+          # 2503 murió con «lease does not exist» por una poda así)—, pero le
+          # tira la caché a media construcción. La poda el temporizador del host
+          # (docs/operations.md#poda-ci-frontal).
+          df -h /tmp | tail -1
+
+  # Las TRECE imágenes que no mira ningún otro escáner: las diez superficies
+  # Astro, analytics, integrations y ocr.
+  #
+  # `trivy-image` cubre once servicios Go; la release publica veinticuatro
+  # imágenes. Estas trece iban a producción sin que nadie mirase dentro, y las
+  # del frontend son justo las que exponen HTTP al público.
+  #
+  # SOLO DE NOCHE, y por eso es un job aparte en vez de más grupos en la matriz
+  # de al lado: construirlas son ~65 min del runner de BUILD, que es uno y también
+  # publica las releases. En cada push a `main` dejaría la cola
+  # inservible; una vez al día es suficiente para vulnerabilidades que se publican
+  # a ese ritmo.
+  #
+  # El SBOM de estas mismas imágenes sí se coteja en cada release (`release.yml`),
+  # así que entre lo uno y lo otro no queda ninguna sin mirar: aquí se gana la
+  # profundidad de trivy —paquetes del sistema con la base de las distribuciones—
+  # sobre lo que allí ve osv-scanner.
+  trivy-image-nocturno:
+    name: trivy image nocturno (${{ matrix.grupo.nombre }})
+    runs-on: sytue-arm64
+    container: *ci
+    # Las condiciones van en UNA sola clave `if`: en YAML la segunda pisa a la
+    # primera sin avisar, y el fallo no se ve hasta que algo no corre.
+    if: (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      # Cinco por job: a ~5 min cada una son ~25 min, dentro del timeout y sin
+      # ocupar el runner de build media hora larga de una sentada.
+      matrix:
+        grupo:
+          - nombre: suite
+            imagenes: >-
+              sytue-frontend-www|apps/frontend|apps/frontend/Dockerfile|www
+              sytue-frontend-portal|apps/frontend|apps/frontend/Dockerfile|portal
+              sytue-frontend-mail|apps/frontend|apps/frontend/Dockerfile|mail
+              sytue-frontend-drive|apps/frontend|apps/frontend/Dockerfile|drive
+              sytue-frontend-docus|apps/frontend|apps/frontend/Dockerfile|docus
+              sytue-frontend-calcus|apps/frontend|apps/frontend/Dockerfile|calcus
+              sytue-frontend-diapos|apps/frontend|apps/frontend/Dockerfile|diapos
+              sytue-frontend-certipdf|apps/frontend|apps/frontend/Dockerfile|certipdf
+          - nombre: colaboracion-y-consolas
+            imagenes: >-
+              sytue-frontend-calendar|apps/frontend|apps/frontend/Dockerfile|calendar
+              sytue-frontend-contacts|apps/frontend|apps/frontend/Dockerfile|contacts
+              sytue-frontend-notes|apps/frontend|apps/frontend/Dockerfile|notes
+              sytue-frontend-rooms|apps/frontend|apps/frontend/Dockerfile|rooms
+              sytue-frontend-account|apps/frontend|apps/frontend/Dockerfile|account
+              sytue-frontend-console|apps/frontend|apps/frontend/Dockerfile|console
+              sytue-frontend-cloud-dashboard|apps/frontend|apps/frontend/Dockerfile|cloud-dashboard
+          # Los tres servicios Go que se quedaron fuera de `trivy-image` cuando se
+          # repartió su matriz. Mismo formato de cuatro campos que el resto: el
+          # cuarto va vacío porque no llevan `build-arg:APP`, y el bucle ya
+          # distingue ese caso.
+          - nombre: servicios-sin-cobertura
+            imagenes: >-
+              sytue-analytics|.|services/analytics/Dockerfile|
+              sytue-integrations|.|services/integrations/Dockerfile|
+              sytue-ocr|.|services/ocr/Dockerfile|
+    steps:
+      - name: Clonar el repositorio
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.REF_A_CLONAR }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Construir y escanear ${{ matrix.grupo.nombre }}
+        env:
+          SYTUE_GIT_PACKAGES_TOKEN: ${{ secrets.SYTUE_GIT_PACKAGES_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          "$GITHUB_WORKSPACE/.github/actions/toolchain/accion.sh" trivy buildctl
+          TRIVY="$(command -v trivy)"
+
+          # El MISMO formato que release.yml —nombre|contexto|receta|app— y no el
+          # `nombre:Dockerfile` del job de servicios: estas diez salen de un solo
+          # Dockerfile con el contexto en apps/frontend y la superficie elegida por
+          # `build-arg:APP`. Con dos campos no se pueden expresar.
+          # QUE NO SE PUEDA VOLVER A «ESCANEAR» SIN ESCANEAR. Trivy lee un tar en
+          # formato Docker —con su `manifest.json` dentro— o un DIRECTORIO OCI,
+          # pero no un *tar* OCI, que es lo que exportaba el montaje anterior:
+          # fallaba con «unable to open … as a Docker image: file manifest.json
+          # not found in tar» y las once imágenes de servicios llevaron sin
+          # mirarse de verdad desde que existe este job. No es que salieran
+          # limpias: es que el escáner nunca llegaba a abrirlas.
+          #
+          # Se comprueba ANTES de invocarlo, y con el mensaje que dice qué mirar,
+          # para que el día que alguien cambie el exportador el fallo sea este y
+          # no un error del escáner sobre formatos de imagen.
+          #
+          # EL GUARDIÁN VIVE EN `scripts/comprobar-tar-docker.sh`, no aquí: era
+          # una función copiada en este job y en su gemelo nocturno, y además se
+          # quedaba corta —miraba que estuviera `manifest.json` y no que
+          # estuvieran los blobs que ese manifiesto declara, que es justo por
+          # donde se coló el fallo de `contacts` del 2026-09-21—. Su test lo
+          # ve en rojo: `deploy/production/tests/comprobar-tar-docker-test.sh`.
+          GUARDIAN_TAR="$GITHUB_WORKSPACE/scripts/comprobar-tar-docker.sh"
+
+          # A UNA VARIABLE PRIMERO, y no es estilo: estas especificaciones llevan
+          # `|` de separador —`nombre|contexto|receta|app`— y expandidas
+          # directamente en el `for`, bash los lee como TUBERÍAS. El job moría
+          # con «syntax error near unexpected token `|`» en la primera línea del
+          # bucle, así que este barrido nunca ha llegado a escanear una sola
+          # imagen de frontend. Corre de madrugada y en rojo, que es donde nadie
+          # mira. Tras una expansión bash ya no busca operadores, así que con la
+          # variable de por medio el `|` es un carácter más.
+          #
+          # NO se corta en la primera con hallazgo; el porqué está en el job
+          # `trivy-image`, y aquí pesa MÁS: este barrido es el único que mira las
+          # trece imágenes de frontend, corre de madrugada y nadie está delante.
+          # El 2026-09-05 cayó en `www` y en `calendar` —la primera de cada
+          # grupo— por un CVE de openssl de la imagen base, y las otras ocho no
+          # se construyeron siquiera: el rojo del job decía «hay algo», no «hay
+          # esto y nada más».
+          fallos=0
+          IMAGENES="${{ matrix.grupo.imagenes }}"
+          for spec in $IMAGENES; do
+            IFS='|' read -r imagen contexto receta app <<< "$spec"
+            echo "::group::$imagen"
+            df -h /tmp | tail -1
+
+            args=(-f "${receta}" --tar "sytue-ci/${imagen}:ci" "/tmp/${imagen}.tar")
+            if [ -n "$app" ]; then
+              args+=(--build-arg "APP=$app")
+            fi
+
+            timeout 1500 scripts/construir-imagen.sh "${args[@]}" "${contexto}"
+            "$GUARDIAN_TAR" "/tmp/${imagen}.tar"
+
+            "$TRIVY" image --input "/tmp/${imagen}.tar" \
+              --ignorefile .trivyignore.yaml \
+              --scanners vuln \
+              --severity CRITICAL,HIGH \
+              --ignore-unfixed \
+              --exit-code 1 \
+              --format table || fallos=1
+
+            rm -f "/tmp/${imagen}.tar"
+            echo "::endgroup::"
+          done
+          exit "$fallos"
+
+      # Solo los tars: la imagen no pasa por ningún daemon, así que no queda
+      # etiqueta que borrar. `always()` porque el job que más deja es el que
+      # falla a medias.
+      - name: Liberar el disco
+        if: always()
+        run: |
+          rm -f /tmp/*.tar || true
+          # AQUÍ NO SE PODA NADA. La caché de BuildKit la comparten todos los jobs:
+          # podarla desde uno no rompe el build de otro —BuildKit respeta sus
+          # leases, que era lo que faltaba con el builder clásico (la ejecución
+          # 2503 murió con «lease does not exist» por una poda así)—, pero le
+          # tira la caché a media construcción. La poda el temporizador del host
+          # (docs/operations.md#poda-ci-frontal).
+          df -h /tmp | tail -1
+
+  native-security:
+    # La rama `sytue-native` queda fuera del CI de pull request: es la de la
+    # migración y arrastra un árbol que no compila con esta cadena.
+    if: (github.event_name != 'pull_request' || github.head_ref != 'sytue-native')
+    name: clientes nativos (audit + govulncheck)
+    runs-on: sytue-arm64
+    container: *ci
+    timeout-minutes: 25
+    env:
+      GOPRIVATE: github.com/thinkddr/*
+    steps:
+      - name: Clonar el repositorio
+        working-directory: .
+        env:
+          SYTUE_GIT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SYTUE_GIT_FORKS_TOKEN: ${{ secrets.SYTUE_GIT_FORKS_TOKEN }}
+        run: |
+          # Runner propio: el workspace SOBREVIVE entre jobs (lo deja el anterior,
+          # con su .git), así que se vacía antes de clonar (.github/RUNNERS.md).
+          find . -mindepth 1 -delete
+          git init -q .
+          git remote add origin "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
+          git -c "http.extraHeader=Authorization: Basic $(printf 'x-access-token:%s' "$SYTUE_GIT_TOKEN" | base64 -w0)" \
+            fetch -q --depth 1 origin "$REF_A_CLONAR"
+          git checkout -q FETCH_HEAD
+          git config --global "http.$GITHUB_SERVER_URL/.extraHeader" \
+            "Authorization: Basic $(printf 'x-access-token:%s' "$SYTUE_GIT_TOKEN" | base64 -w0)"
+          # apps/fyne tira de los dos forks PRIVADOS de Fyne. Sin esto el job solo
+          # pasaba en el runner que ya los tenía en su caché de módulos: el 2706 cayó
+          # en el pool de git.gay y salió verde al repetirlo en el frontal.
+          "$GITHUB_WORKSPACE/.github/actions/toolchain/forks.sh"
+
+      # La imagen del runner compartido de git.gay no trae Go ni Bun.
+      # Se instalan con la MISMA versión y sha256 que la imagen propia.
+      - name: Preparar toolchain
+        run: $GITHUB_WORKSPACE/.github/actions/toolchain/accion.sh go bun govulncheck escritorio
+
+      - name: Auditoría de dependencias nativas
+        run: |
+          set -euo pipefail
+          for app in suite rooms; do
+            (cd "apps/mobile/$app" && bun install --frozen-lockfile && bun audit --audit-level=high)
+          done
+
+      - name: govulncheck (núcleo + Fyne)
+        run: |
+          set -euo pipefail
+          # SE INTENTA EL ANÁLISIS DE VERDAD Y SE DEGRADA SOLO SI NO PUEDE.
+          #
+          # govulncheck compila el código para saber si la función vulnerable se
+          # ALCANZA, y para eso usa `golang.org/x/tools`. La última publicada
+          # —v0.49.0— todavía no entiende las fuentes de Go 1.27: falla con
+          # «Loading packages failed, possibly due to a mismatch between the Go
+          # version used to build govulncheck and the Go version on PATH». No hay
+          # versión de govulncheck que lo arregle: el que va por detrás es
+          # x/tools, y eso es de aguas arriba.
+          #
+          # NO SE FIJA `-scan=module` COMO APAÑO. Se probó: exige ficheros Go en
+          # el propio directorio —falla en la raíz, que solo tiene
+          # subcarpetas—, no lee `osv-scanner.toml`, y vuelve a levantar
+          # GO-2026-5932, que ya está analizada y no tiene arreglo publicado. Ese
+          # nivel ya lo cubre osv-scanner en este mismo workflow, respetando las
+          # exclusiones declaradas.
+          #
+          # Así que se INTENTA, y solo el fallo CONOCIDO de aguas arriba se
+          # perdona. Cualquier otro fallo, y cualquier vulnerabilidad encontrada,
+          # siguen tumbando el job. El día que x/tools publique soporte de 1.27
+          # esto vuelve a ser un gate completo sin que nadie tenga que acordarse.
+          # LA HERRAMIENTA SE ASEGURA EN EL PASO QUE LA USA. El paso de toolchain
+          # la instala en /usr/local/bin y la anuncia por $GITHUB_PATH, pero este
+          # job murió tres veces seguidas con «exitcode 127» aquí, sin una línea
+          # que dijera qué comando faltaba: la propagación de PATH entre pasos
+          # depende del runner y depurarla a ciegas cuesta una ejecución por
+          # intento.
+          #
+          # Volver a llamar a la acción es idempotente —si ya está, lo dice y
+          # sale— y deja el PATH correcto en ESTE shell, que es lo único que hace
+          # falta. Y si de verdad no se puede, el diagnóstico sale aquí y no tres
+          # pasos más allá.
+          export PATH="/usr/local/bin:$PATH"
+          if ! command -v govulncheck >/dev/null 2>&1; then
+            echo "govulncheck no está en el PATH de este paso; se asegura:"
+            echo "  PATH=$PATH"
+            "$GITHUB_WORKSPACE/.github/actions/toolchain/accion.sh" govulncheck
+            command -v govulncheck >/dev/null 2>&1 || {
+              echo "✗ govulncheck sigue sin estar tras instalarlo. Dónde quedó:" >&2
+              ls -l /usr/local/bin/govulncheck "$(go env GOPATH)/bin/govulncheck" 2>&1 | sed 's/^/    /' >&2
+              exit 1
+            }
+          fi
+
+          # Con los mismos tags con los que se construyen los clientes nativos.
+          #
+          # govulncheck compila para saber si la función vulnerable se ALCANZA, así
+          # que sin tags analiza un binario que nadie construye ni publica: entran
+          # los backends de Vulkan y de Wayland. El job murió el 2026-09-20 en
+          # el backend de Vulkan con «fatal error: vulkan/vulkan.h: No such file
+          # or directory», la única cabecera que `escritorio` NO instala, y
+          # justamente porque `novulkan` la sobra.
+          #
+          # Instalar la cabecera habría hecho pasar el job analizando código que no
+          # se envía. Esto analiza el que sí, y son los mismos tags de ci-desktop,
+          # ci-go, ci-mobile, el hook de pre-push y `empaquetar.sh`.
+          intentar_govulncheck() {  # <directorio>
+            local dir="$1" salida codigo
+            salida="$(cd "$dir" && govulncheck -tags=nowayland,novulkan,goolm ./... 2>&1)" && codigo=0 || codigo=$?
+            if [ "$codigo" -eq 0 ]; then
+              printf '%s\n' "$salida"
+              return 0
+            fi
+            # `case` y no `printf | grep -q`: grep cierra la tubería al primer
+            # acierto y el printf recibe SIGPIPE, que con `pipefail` tumbaría el
+            # paso. Sin tuberías no hay SIGPIPE que valga.
+            # LOS PATRONES SON LOS QUE IMPRIME govulncheck, no los de osv-scanner.
+            # «Loading packages failed / mismatch between the Go version» lo dice
+            # OSV-SCANNER cuando su análisis interno falla; el govulncheck suelto
+            # imprime otra cosa —«uses version go1.26 of the source-processing
+            # packages» y «requires newer Go version»— así que el envoltorio no
+            # reconocía su propio caso y el job seguía en rojo.
+            #
+            # El patrón que decide es «source-processing packages»: lo emite el
+            # aviso de x/tools desfasado y NADA más. «requires newer Go version» a
+            # secas no sirve como única señal: también saldría si nuestro código
+            # pidiera un Go que el runner no tiene, que es un problema real y no
+            # se debe perdonar.
+            case "$salida" in
+              *"source-processing packages"*|*"Loading packages failed"*|*"mismatch between the Go version"*)
+              echo "⚠ govulncheck no puede analizar $(go env GOVERSION) en $dir: x/tools aún no lo entiende."
+              echo "  Es de aguas arriba. El nivel de módulo lo cubre osv-scanner, que corre en este"
+              echo "  mismo workflow y sí respeta osv-scanner.toml. Se recupera solo al actualizarse."
+              return 0 ;;
+            esac
+            printf '%s\n' "$salida" >&2
+            return "$codigo"
+          }
+          intentar_govulncheck apps/nucleo
+          intentar_govulncheck apps/fyne
+
+  pin-gate:
+    # La rama `sytue-native` queda fuera del CI de pull request: es la de la
+    # migración y arrastra un árbol que no compila con esta cadena.
+    if: (github.event_name != 'pull_request' || github.head_ref != 'sytue-native')
+    name: Herramientas e imágenes base fijadas por SHA/digest
+    runs-on: sytue-arm64
+    container: *ci
+    timeout-minutes: 10
+    steps:
+      - name: Clonar el repositorio
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.REF_A_CLONAR }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      # Un workflow que no PARSEA no falla: no nace. El 2026-08-17 `ci-go`,
+      # `ci-frontend` y `ci-integration` llevaban en main una clave `if`
+      # duplicada (una condición añadida debajo de `runs-on` sin fusionarla con
+      # la de encima); yaml.v3 —el de la forja— rechaza el fichero entero, así
+      # que en main y en TODO pull request solo corría este workflow. Ni Go, ni
+      # frontend, ni integración, y ni un solo run en rojo que lo delatara.
+      #
+      # Va aquí y no en `ci-go` a propósito: el gate que vigila los workflows no
+      # puede vivir en uno de los que se apagan. Y en awk porque la imagen del
+      # runner no trae Python.
+      #
+      # MIRA A CUALQUIER PROFUNDIDAD, no solo las claves de job. La primera
+      # versión solo comparaba a cuatro espacios —el nivel donde ocurrió el
+      # incidente— y se le escapaba lo que pasa un nivel más abajo: dos `run:` en
+      # el mismo step rompen el fichero igual de entero, y salía en verde.
+      - name: Los workflows tienen que parsear (claves duplicadas)
+        run: |
+          set -euo pipefail
+          awk '
+            function olvidar(desde,   k, p) {
+              for (k in vistas) { split(k, p, SUBSEP); if (p[1] + 0 >= desde) delete vistas[k] }
+            }
+            BEGIN { malo = 0 }
+            {
+              if (FNR == 1) { delete vistas; enBloque = 0 }
+              if ($0 ~ /^[[:space:]]*$/) next
+              sangria = match($0, /[^ ]/) - 1
+              if (enBloque) { if (sangria > bloque) next; enBloque = 0 }
+              resto = substr($0, sangria + 1)
+              if (resto ~ /^#/) next
+              if (resto ~ /^- /)                  { olvidar(sangria); sangria += 2; resto = substr(resto, 3) }
+              else if (resto ~ /^-[[:space:]]*$/) { olvidar(sangria); next }
+              # Salir de lo más anidado va SIEMPRE, case o no la línea como clave.
+              # Si solo se hiciera al reconocerla, una clave con forma rara
+              # —`/usuarios:` de un OpenAPI— dejaría vivas las de su bloque y el
+              # `get:` de la ruta siguiente saldría como duplicado del anterior.
+              olvidar(sangria + 1)
+              # Dos puntos seguidos de espacio o de fin de línea: sin esa
+              # exigencia, un elemento de lista con una URL —`- https://x`— se
+              # leería como la clave «https».
+              if (resto !~ /^[^ :]+:([[:space:]]|$)/) next
+              clave = resto; sub(/:.*$/, "", clave)
+              if ((sangria, clave) in vistas) {
+                printf "%s:%d  clave duplicada «%s» (ya estaba en la línea %d)\n", FILENAME, FNR, clave, vistas[sangria, clave]
+                malo = 1
+              }
+              vistas[sangria, clave] = FNR
+              if (resto ~ /:[[:space:]]*[|>]/) { enBloque = 1; bloque = sangria }
+            }
+            END { exit malo }
+          ' .github/workflows/*.yml || {
+            echo "::error::Hay claves duplicadas: la forja rechazará el fichero ENTERO y ese workflow dejará de existir (sin ponerse en rojo)."
+            exit 1
+          }
+
+      # Aquí no se usan acciones de terceros, y así se queda: una `uses:` de un
+      # tercero mete código ajeno en el runner que construye nuestra release.
+      # Solo las acciones OFICIALES de GitHub que fija `versions.env`, y por SHA de
+      # commit (lo comprueba contra ese fichero `check-toolchain-versions.sh`). Nada
+      # de terceros ni de etiquetas que se mueven: para una herramienta, el binario
+      # con su sha256, como en la forja.
+      - name: Rechazar Actions externas
+        run: |
+          set -euo pipefail
+          bad="$(grep -RInE '^[[:space:]]*(- )?uses:[[:space:]]+' .github/workflows 2>/dev/null \
+            | grep -vE 'uses:[[:space:]]+(\./|actions/(checkout|upload-artifact|cache/restore|cache/save)@[0-9a-f]{40}([[:space:]]|$))' || true)"
+          if [ -n "$bad" ]; then
+            printf '%s\n' "$bad"
+            echo '::error::Solo actions/checkout, upload-artifact y cache, fijadas por SHA de commit: lo demás, el binario con su sha256.'
+            exit 1
+          fi
+
+      # Cada descarga de herramienta va con su SHA-256 comprobado. Sin esto, un
+      # binario cambiado en origen entra en el CI sin que nadie se entere.
+      - name: Toda descarga de herramienta se verifica por SHA-256
+        run: |
+          set -euo pipefail
+          fallo=0
+          for wf in .github/workflows/*.yml; do
+            descargas="$(grep -cE 'releases/download/' "$wf" || true)"
+            # `bajar-herramienta.sh` cuenta como comprobación porque SIEMPRE
+            # verifica el sha256 —venga del espejo de la forja o del origen— y el
+            # gate no puede leer dentro de él. Sin esta línea, mover una descarga
+            # al helper dejaba el contador en cero y el gate en rojo… o peor, si
+            # alguien lo «arreglaba» quitando el `grep`, mirando a nada.
+            comprobaciones="$(grep -cE 'sha256sum -c|bajar-herramienta\.sh' "$wf" || true)"
+            if [ "$descargas" -gt 0 ] && [ "$comprobaciones" -lt "$descargas" ]; then
+              echo "$wf: $descargas descarga(s) y solo $comprobaciones comprobación(es) de SHA"
+              fallo=1
+            fi
+          done
+          [ "$fallo" -eq 0 ] || {
+            echo '::error::Una herramienta se descarga sin verificar su SHA-256.'
+            exit 1
+          }
+
+      # UN MÓDULO NUEVO NO PUEDE QUEDARSE FUERA DEL ESCÁNER SIN QUE SE NOTE.
+      #
+      # La lista de `--lockfile` del job `vulnerabilidades` se escribe a mano, y
+      # se quedó corta: `infra/crossplane/provider-scaleway/go.mod` y
+      # `services/cloud/terraform-provider-sytuecloud/go.mod` no estaban, así que
+      # el job salía «Total 0» mientras el SBOM —que recorre el árbol— encontraba
+      # tres paquetes afectados en esos mismos módulos. Un gate en verde que no
+      # miraba la mitad del grafo.
+      #
+      # Se compara contra `git ls-files` y no contra un `find`: lo que importa es
+      # lo que está VERSIONADO. Así no cuentan los lockfiles que aparecen dentro
+      # de node_modules ni los que deje un build.
+      - name: Todo lockfile versionado se escanea
+        run: |
+          set -euo pipefail
+          # ANCLADO A INICIO DE LÍNEA. Sin el `^[[:space:]]*`, este mismo paso se
+          # cuenta a sí mismo: la orden de abajo lleva el texto «--lockfile=»
+          # dentro, y el gate se acusaba de declarar un lockfile llamado «//'».
+          declarados="$(grep -oE '^[[:space:]]*--lockfile=[^ \\]+' .github/workflows/security.yml \
+            | sed 's/^[[:space:]]*--lockfile=//' | sort -u)"
+          reales="$(git ls-files \
+            | grep -E '(^|/)(go\.mod|bun\.lock)$' \
+            | grep -v node_modules | sort -u)"
+          faltan="$(comm -23 <(printf '%s\n' "$reales") <(printf '%s\n' "$declarados"))"
+          if [ -n "$faltan" ]; then
+            printf '%s\n' "$faltan" | sed 's/^/    /'
+            echo "::error::Estos lockfiles están versionados y NO los escanea el job «vulnerabilidades». Añádelos a su lista de --lockfile."
+            exit 1
+          fi
+          # Al revés también: un --lockfile que ya no existe se lo traga
+          # osv-scanner sin rechistar, y la lista se queda mintiendo.
+          sobran="$(comm -13 <(printf '%s\n' "$reales") <(printf '%s\n' "$declarados"))"
+          if [ -n "$sobran" ]; then
+            printf '%s\n' "$sobran" | sed 's/^/    /'
+            echo "::error::Estos --lockfile ya no existen en el repositorio: la lista apunta a ficheros que no están."
+            exit 1
+          fi
+          echo "OK — los $(printf '%s\n' "$reales" | wc -l | tr -d ' ') lockfiles versionados están en la lista."
+
+      - name: Rechazar FROM externos sin digest
+        run: |
+          set -euo pipefail
+          # El programa awk debe recibir $1/$2 literalmente.
+          # shellcheck disable=SC2016
+          bad="$({
+            git ls-files -z '*Dockerfile*' '*Containerfile*' |
+              xargs -0 awk '
+                # El awk de la imagen node:lts no acepta necesariamente
+                # cuantificadores `{64}`. Se cuenta el digest explícitamente
+                # para que un FROM correctamente fijado no se rechace solo por
+                # la implementación de awk que haya tocado al runner.
+                function es_sha256(s, d) {
+                  d = s
+                  sub(/^.*sha256:/, "", d)
+                  return length(d) == 64 && d ~ /^[0-9a-f]+$/
+                }
+                function tiene_digest(s) {
+                  return s ~ /@sha256:/ && es_sha256(s)
+                }
+                # Un digest puede venir de un ARG con valor por defecto
+                # (ARG X=sha256:… + FROM img:tag@${X}), que es pinning REAL y además el
+                # único sitio donde actualizarlo con una sola edición. Se apunta qué ARG
+                # fija un digest completo; Docker exige que el ARG vaya antes del FROM
+                # que lo usa, así que al llegar al FROM ya está visto.
+                toupper($1) == "ARG" && $2 ~ /^[A-Za-z_][A-Za-z0-9_]*=sha256:/ && es_sha256($2) {
+                  split($2, kv, "=")
+                  fijado[FILENAME "/" kv[1]] = 1
+                }
+                toupper($1) == "FROM" &&
+                $2 ~ /[\/:]/ &&
+                !tiene_digest($2) &&
+                $2 !~ /^\$\{/ {
+                  # Solo se acepta la variable si su ARG fija un digest de verdad: un
+                  # ${X} sin valor por defecto NO es pinning y debe seguir cayendo.
+                  if (match($2, /@\$\{[A-Za-z_][A-Za-z0-9_]*\}$/)) {
+                    var = substr($2, RSTART + 3, RLENGTH - 4)
+                    if (fijado[FILENAME "/" var]) next
+                  }
+                  print FILENAME ":" FNR ":" $0
+                }'
+          } || true)"
+          if [ -n "$bad" ]; then
+            printf '%s\n' "$bad"
+            echo '::error::Toda imagen base externa debe conservar tag legible y digest sha256 inmutable.'
+            exit 1
+          fi
+
+  gitleaks:
+    # La rama `sytue-native` queda fuera del CI de pull request: es la de la
+    # migración y arrastra un árbol que no compila con esta cadena.
+    if: (github.event_name != 'pull_request' || github.head_ref != 'sytue-native')
+    name: gitleaks (secret scan)
+    runs-on: sytue-arm64
+    container: *ci
+    timeout-minutes: 15
+    steps:
+      # Historial COMPLETO: un secreto borrado en el commit siguiente sigue en el
+      # historial y sigue siendo un secreto filtrado.
+      - name: Clonar el repositorio con su historial
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.REF_A_CLONAR }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Gitleaks (rompe el build ante secretos)
+        env:
+          SYTUE_GIT_PACKAGES_TOKEN: ${{ secrets.SYTUE_GIT_PACKAGES_TOKEN }}
+        run: |
+          set -euo pipefail
+          VER=8.30.1
+          case "$(uname -m)" in
+            x86_64|amd64)
+              ARCHIVO="gitleaks_${VER}_linux_x64.tar.gz"
+              SHA256=551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+              ;;
+            aarch64|arm64)
+              ARCHIVO="gitleaks_${VER}_linux_arm64.tar.gz"
+              SHA256=e4a487ee7ccd7d3a7f7ec08657610aa3606637dab924210b3aee62570fb4b080
+              ;;
+            *) echo "Arquitectura no soportada: $(uname -m)" >&2; exit 1 ;;
+          esac
+          # La imagen del runner ya trae este gitleaks; ver el paso del job
+          # osv-scanner. Si no coincide, se descarga.
+          if command -v gitleaks >/dev/null 2>&1 && grep -q "$VER" <<<"$(gitleaks version 2>/dev/null)"; then
+            GITLEAKS="$(command -v gitleaks)"
+            echo "gitleaks $VER ya en la imagen del runner: no se descarga"
+          else
+            TMP="$(mktemp -d)"
+            deploy/sytue-git/bin/bajar-herramienta.sh gitleaks "$VER" \
+              "$ARCHIVO" "$SHA256" \
+              "https://github.com/gitleaks/gitleaks/releases/download/v${VER}/${ARCHIVO}" \
+              "$TMP/gitleaks.tar.gz"
+            tar -xzf "$TMP/gitleaks.tar.gz" -C "$TMP" gitleaks
+            GITLEAKS="$TMP/gitleaks"
+          fi
+          # Todo el historial de la revisión comprobada, incluidas eliminaciones;
+          # --all también escaneaba ramas paralelas ajenas al tag o a main.
+          "$GITLEAKS" git . --log-opts='--full-history HEAD --diff-filter=tuxdb' --redact --exit-code=1 --verbose
+
+  sbom:
+    # NO en cada pull request, y esto es lo que más runner ahorra de todo el
+    # workflow: medido el 2026-08-17, el SBOM es el job MÁS LENTO —372 s y 359 s,
+    # seis minutos— frente a los 32-57 s de los escaneos. Con 27 ejecuciones de
+    # `security` en el histórico reciente eran ~2,7 h de runner, y el 44 % de esos
+    # runs se cancela antes de terminar.
+    #
+    # Lo que se pierde es NADA que nadie mire: un inventario de dependencias de
+    # una rama de trabajo no lo consume nadie. El que importa es el de la versión
+    # publicada, y ese lo genera `release.yml` como asset de la release. Aquí
+    # queda para `main`, el cron y el disparo a mano, que es donde un inventario
+    # tiene lector.
+    #
+    # Las condiciones van en UNA sola clave `if`: en YAML la segunda pisa a la
+    # primera sin avisar, y el fallo no se ve hasta que algo no corre.
+    if: github.event_name != 'pull_request' && github.event_name != 'release'
+    name: SBOM CycloneDX del repositorio
+    runs-on: sytue-arm64
+    container: *ci
+    timeout-minutes: 20
+    # EN UNA RELEASE NO CORRE ESTE, corre `sbom-release`: los mismos pasos con
+    # permiso de escritura para adjuntar. `permissions` no admite expresiones, así
+    # que la única forma de que el token de escritura exista SOLO en una release es
+    # que el job que lo lleva solo corra entonces. Antes lo llevaba este, y el cron
+    # diario y cualquier despacho sobre una rama corrían syft, osv-scanner y
+    # `go run` con un token capaz de crear etiquetas (CI-07).
+    permissions:
+      contents: read
+    steps: &pasos-sbom
+      - name: Clonar el repositorio
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.REF_A_CLONAR }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      # syft viene en la imagen del runner con su SHA fijado (ver
+      # deploy/sytue-git/runner/Containerfile), así que no hay descarga que
+      # verificar aquí.
+      # `.cdx.json` y no `.cyclonedx.json`, y no es cosmético: osv-scanner
+      # reconoce los SBOM POR EL NOMBRE del fichero —`bom.json`, `*.cdx.json`,
+      # `bom.xml`, `*.cdx.xml`— y con cualquier otro no lo trata como SBOM. Con el
+      # nombre viejo el escaneo de abajo no habría mirado nada y habría salido en
+      # verde, que es la peor forma de tener un gate.
+      # Go además de syft: el VEX lo genera `tools/vex`, que es Go. syft se baja
+      # como binario con su SHA y no necesitaba compilador; ahora sí hace falta.
+      # jq, por `publicar-asset.sh` en el último paso: la imagen del runner no lo trae.
+      # Sin él la v3.11.4 cortó la cadena («jq: command not found» al adjuntar).
+      - name: Herramientas del runner (syft · go · osv-scanner)
+        run: $GITHUB_WORKSPACE/.github/actions/toolchain/accion.sh syft go osv-scanner jq
+
+      - name: SBOM (syft)
+        run: syft . --exclude './.deps/**' -o cyclonedx-json > sbom.cdx.json
+
+      # Un SBOM que nadie lee es un adjunto, no un control. Esto lo convierte en
+      # una decisión: si el inventario contiene algo con vulnerabilidad conocida,
+      # el job se rompe.
+      #
+      # No sustituye al job `osv`: aquel lee los LOCKFILES —lo que declaramos— y
+      # este lee lo que syft encuentra de verdad en el árbol, que no siempre es lo
+      # mismo. Un binario comprometido, un vendorizado o una dependencia que no
+      # aparece en ningún manifiesto solo se ven por aquí.
+      #
+      # Mismos flags de privacidad que el job `osv`: la base se descarga y el
+      # cotejo ocurre en local, así que no se le cuenta a nadie de fuera qué
+      # tenemos instalado.
+      - name: Vulnerabilidades del SBOM (osv-scanner)
+        run: |
+          set -euo pipefail
+          osv-scanner scan source \
+            --offline-vulnerabilities \
+            --download-offline-databases \
+            --config=osv-scanner.toml \
+            -L sbom.cdx.json
+
+      # El SBOM dice qué llevamos dentro; el VEX dice qué de eso NO nos afecta y
+      # por qué. Sin él, quien escanee nuestras imágenes por su cuenta ve los
+      # mismos hallazgos que nosotros ya analizamos y da por hecho que no los ha
+      # mirado nadie.
+      #
+      # Se DERIVA de osv-scanner.toml en vez de escribirse aparte: las razones y
+      # las fechas de revisión ya están ahí, y dos registros de lo mismo acaban
+      # contradiciéndose.
+      #
+      # EN GO desde el 2026-09-05: era el último Python que ejecutaba el CI, y
+      # dependía de que la imagen del runner —que no es nuestra— traiga un
+      # intérprete. La salida es la misma, comprobada contra la del guion que
+      # sustituye, y hay tests que la fijan.
+      - name: VEX (derivado de osv-scanner.toml)
+        run: go run ./tools/vex osv-scanner.toml > vex.openvex.json
+
+      # EVIDENCIA, NO VEREDICTO. El veredicto es el escaneo de arriba, que sigue
+      # rompiendo el job. Estas dos subidas dependen del almacén de artefactos de la
+      # cuenta, y el 2026-10-06 su cuota se llenó («Artifact storage quota has been
+      # hit»): `security` salió en rojo con el escaneo limpio y la cadena dejó de
+      # publicar. Un almacén lleno no es un problema de seguridad, así que la subida
+      # avisa y no tumba. Lo exige `release-workflow-test.sh`.
+      - name: Publicar el SBOM
+        id: subir-sbom
+        continue-on-error: true
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: sbom-cyclonedx
+          path: sbom.cdx.json
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Publicar el VEX
+        id: subir-vex
+        continue-on-error: true
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: vex-openvex
+          path: vex.openvex.json
+          if-no-files-found: error
+          retention-days: 90
+
+      # Que no tumbe no puede querer decir que no se vea: sale como aviso en la
+      # ejecución y en su resumen, con el motivo en el paso de subida.
+      - name: Avisar si el SBOM o el VEX no se guardaron
+        if: steps.subir-sbom.outcome == 'failure' || steps.subir-vex.outcome == 'failure'
+        run: |
+          mensaje="El SBOM o el VEX no se guardaron como artefacto (SBOM: ${{ steps.subir-sbom.outcome }}, VEX: ${{ steps.subir-vex.outcome }}). El escaneo no se ve afectado; el motivo está en el paso de subida."
+          echo "::warning title=SBOM y VEX sin guardar::$mensaje"
+          echo "AVISO: $mensaje" >> "$GITHUB_STEP_SUMMARY"
+
+      # En una release la evidencia va además a la propia release, que no depende de
+      # esa cuota y es donde vive lo publicado, igual que los instaladores. Aquí sí
+      # es rojo si falla: una versión sin su inventario no es un aviso.
+      - name: Adjuntar el SBOM y el VEX a la release
+        if: github.event_name == 'release'
+        env:
+          SYTUE_GIT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: bash deploy/sytue-git/bin/publicar-asset.sh "$TAG" sbom.cdx.json vex.openvex.json
+
+  sbom-release:
+    # EL MISMO JOB QUE `sbom`, CON `contents: write`, Y SOLO EN UNA RELEASE: es el
+    # único de este flujo que puede escribir en el repositorio, y lo usa su último
+    # paso para adjuntar el SBOM y el VEX. El checkout no deja la credencial en el
+    # árbol (`persist-credentials: false`) y el token solo entra en ese paso.
+    if: github.event_name == 'release'
+    name: SBOM CycloneDX del repositorio (release)
+    runs-on: sytue-arm64
+    container: *ci
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps: *pasos-sbom
+
+  license-gate:
+    # La rama `sytue-native` queda fuera del CI de pull request: es la de la
+    # migración y arrastra un árbol que no compila con esta cadena.
+    if: (github.event_name != 'pull_request' || github.head_ref != 'sytue-native')
+    name: gate de licencias del producto
+    runs-on: sytue-arm64
+    container: *ci
+    timeout-minutes: 20
+    steps:
+      - name: Clonar el repositorio
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.REF_A_CLONAR }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      # `GOBIN` y no `go install` a secas: sin él la herramienta aterriza en
+      # $(go env GOPATH)/bin, que en esta imagen NO está en el PATH, y el paso
+      # siguiente muere con «go-licenses: command not found» —exit 127— después
+      # de haber descargado medio grafo de módulos sin una queja. En GitHub no
+      # pasa porque `setup-go` añade esa ruta; aquí no hay `setup-go`. Es el
+      # mismo tropiezo que tuvo la CLI de Wails, retirada el 2026-09-23.
+      #
+      # /opt/gotools/bin es donde la imagen del runner deja golangci-lint,
+      # govulncheck y crane, y ya está en el PATH.
+
+      # La imagen del runner compartido de git.gay no trae Go ni Bun.
+      # Se instalan con la MISMA versión y sha256 que la imagen propia.
+      - name: Preparar toolchain
+        run: $GITHUB_WORKSPACE/.github/actions/toolchain/accion.sh go bun
+
+      - name: Install go-licenses
+        # /usr/local/bin y no /opt/gotools/bin: aquel está en el PATH de NUESTRA
+        # imagen de runner, no en la de git.gay que ejecuta esto. Instalado allí,
+        # el paso siguiente moría con «go-licenses: command not found» pese a que
+        # la instalación había ido bien.
+        run: GOBIN=/usr/local/bin go install github.com/google/go-licenses@v1.6.0
+
+      # 'restricted' cubre (A)GPL/LGPL/MPL con obligaciones fuertes; 'forbidden'
+      # cubre licencias sin uso comercial. Cualquier match ROMPE el build.
+      - name: License gate (Go modules)
+        run: |
+          set -euo pipefail
+          go-licenses check ./... \
+            --disallowed_types=forbidden,restricted,unknown \
+            --ignore git.sytue.eu/sytue/one
+
+      # Excepción nominal autorizada: el SDK nativo Matrix y su utilidad MPL,
+      # sin permitir MPL para ninguna otra dependencia. Las versiones y avisos
+      # están fijados; el resto del grafo conserva exactamente el mismo rechazo.
+      - name: License gate (native Matrix SDK)
+        working-directory: apps/nucleo
+        env:
+          GOFLAGS: "-tags=goolm"
+          CGO_ENABLED: "0"
+        run: |
+          set -euo pipefail
+          [ "$(go list -m -f '{{.Version}}' maunium.net/go/mautrix)" = v0.32.0 ]
+          [ "$(go list -m -f '{{.Version}}' go.mau.fi/util)" = v0.11.0 ]
+          test -s matrix/NOTICE
+          grep -q 'Mozilla Public License Version 2.0' matrix/NOTICE
+          go-licenses check ./matrix \
+            --disallowed_types=forbidden,restricted,unknown \
+            --ignore git.sytue.eu/sytue/one/apps/nucleo,maunium.net/go/mautrix,go.mau.fi/util
+
+      # Refuerzo textual sobre los manifests/lockfile Bun del producto: rechaza
+      # SSPL/BSL/Elastic/RSAL y AGPL/GPL (no cubiertas por go-licenses).
+      - name: Deny-list textual (source-available / copyleft)
+        run: |
+          set -euo pipefail
+          PATTERN='AGPL|GNU Affero|(^|[^L])GPL-[0-9]|SSPL|Server Side Public|Business Source|BUSL|Elastic License|RSAL|Redis Source Available'
+          FOUND=0
+          if grep -RInE "\"license\"[[:space:]]*:" apps/frontend --include="package.json" 2>/dev/null \
+              | grep -EI "$PATTERN"; then
+            FOUND=1
+          fi
+          if [ -f apps/frontend/bun.lock ] && grep -EI "$PATTERN" apps/frontend/bun.lock; then
+            FOUND=1
+          fi
+          if [ "$FOUND" -ne 0 ]; then
+            echo "::error::Licencia prohibida detectada en el grafo de producto (AGPL/GPL/source-available). Gate §12."
+            exit 1
+          fi
+          echo "OK — sin licencias prohibidas en dependencias frontend."
+
+  publicar-imagenes:
+    # La publicación es irreversible: este job crea la dependencia real entre
+    # workflows. Una release termina security completo antes de que se construya
+    # una imagen de producción.
+    #
+    # `trivy-image-nocturno` no aparece en `needs` porque solo corre por
+    # schedule; todos los jobs que forman parte de una release están aquí.
+    name: Encadenar imágenes de producción
+    needs:
+      - production-scripts
+      - vulnerabilidades
+      - trivy-fs
+      - trivy-upstream
+      - cambios
+      - trivy-image
+      - native-security
+      - pin-gate
+      - gitleaks
+      - sbom-release
+      - license-gate
+    if: >-
+      github.event_name == 'release' &&
+      needs.production-scripts.result == 'success' &&
+      needs.vulnerabilidades.result == 'success' &&
+      needs.trivy-fs.result == 'success' &&
+      needs.trivy-upstream.result == 'success' &&
+      needs.cambios.result == 'success' &&
+      needs.trivy-image.result == 'success' &&
+      needs.native-security.result == 'success' &&
+      needs.pin-gate.result == 'success' &&
+      needs.gitleaks.result == 'success' &&
+      needs.sbom-release.result == 'success' &&
+      needs.license-gate.result == 'success'
+    runs-on: sytue-arm64
+    container: *ci
+    timeout-minutes: 5
+    steps:
+      - name: Despachar imágenes sobre el tag publicado
+        env:
+          TOKEN: ${{ secrets.SYTUE_GIT_TOKEN || github.token }}
+        run: |
+          set -euo pipefail
+          API="$GITHUB_API_URL/repos/$GITHUB_REPOSITORY"
+          node -e 'process.stdout.write(JSON.stringify({ref: process.argv[1], inputs: {pipeline_release: "true"}}))' \
+            "$GITHUB_REF_NAME" > /tmp/imagenes-produccion.json
+          codigo="$(curl -sS -o /tmp/imagenes-produccion-respuesta.json -w '%{http_code}' --max-time 60 \
+            -X POST -H "Authorization: token $TOKEN" -H 'Content-Type: application/json' \
+            --data @/tmp/imagenes-produccion.json \
+            "$API/actions/workflows/imagenes-produccion.yml/dispatches" || true)"
+          case "$codigo" in
+            200|201|204)
+              echo "✓ security terminó en verde; imágenes-produccion queda despachado para $GITHUB_REF_NAME" ;;
+            *)
+              echo "::error::No se pudo despachar imagenes-produccion (HTTP $codigo)." >&2
+              cat /tmp/imagenes-produccion-respuesta.json >&2 || true
+              exit 1 ;;
+          esac

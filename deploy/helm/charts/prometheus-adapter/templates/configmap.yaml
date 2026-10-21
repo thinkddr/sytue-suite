@@ -1,0 +1,83 @@
+{{- if .Values.enabled }}
+{{/*
+  LA REGLA VIVE EN SU PROPIO FICHERO para que el Deployment pueda firmarla:
+  `prometheus-adapter` lee la configuración AL ARRANCAR y no vigila el
+  ConfigMap, así que su pod necesita una anotación `checksum/config` que
+  cambie con ella, y esa anotación no puede incluir el fichero donde está el
+  propio Deployment sin entrar en recursión.
+*/}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-adapter
+  namespace: {{ .Release.Namespace }}
+data:
+  config.yaml: |
+    # LA REGLA, Y SU FILTRO, QUE ES TODO EL ASUNTO.
+    #
+    # `http_route!~"/healthz|/readyz"` no es una optimización: sin él la métrica
+    # es inservible. Medido el 2026-08-13 en producción, el 94 % de las
+    # peticiones son sondas —/readyz 78,2 %, /healthz 16,1 %— y las hace el
+    # kubelet POR POD. O sea que su tasa crece con las réplicas: al escalar sube
+    # el numerador igual que el denominador, el valor medio por réplica NO baja
+    # nunca, y un HPA con `AverageValue` se queda clavado en `maxReplicas` sin
+    # desescalar jamás.
+    #
+    # Se filtra AQUÍ y no en el middleware a propósito: las sondas se siguen
+    # midiendo —hacen falta el día que un `readinessProbe` se dispare por un
+    # periodo mal puesto— y solo se excluyen de lo que decide un escalado.
+    #
+    # `job` es el nombre del servicio: el exportador manda `service.name` y la
+    # pasarela OTLP→Prometheus de Cockpit lo convierte en `job`. Por eso cada
+    # chart lleva su `autoscaling.metricJob` explícito y no el nombre del chart.
+    externalRules:
+      - seriesQuery: 'http_server_requests{job!=""}'
+        resources:
+          namespaced: false
+        name:
+          matches: "^http_server_requests$"
+          as: "http_server_requests_per_second"
+        # `<<.LabelMatchers>>` NO es adorno: es lo que inyecta el selector del HPA
+        # (`job="sytue-id"`) dentro de la consulta. Sin él el adapter ejecuta la
+        # query TAL CUAL y devuelve todas las series, así que cada HPA recibe la
+        # lista entera y escala por el tráfico de TODA la plataforma en vez del
+        # suyo.
+        #
+        # Se vio en producción el 2026-08-14, y el síntoma engañaba: los nueve HPA
+        # marcaban el MISMO valor —43 req/s clavados— y parecía una métrica
+        # inflada. No lo estaba; era la suma de todos los servicios repetida nueve
+        # veces. `kubectl get --raw …?labelSelector=job%3Dsytue-id` devolvía
+        # también `sytue-drive`, `sytue-mail` y `sytue-docs`: ahí se cazó.
+        # `<<.Series>>` y `<<.LabelMatchers>>` son la forma canónica, y hacen falta
+        # LOS DOS. Con el nombre de la métrica escrito a mano, el adapter no
+        # reconoce la plantilla y ejecuta la consulta tal cual.
+        # EL RESPALDO A CERO NO ES DEFENSIVO: sin él la métrica no existe para
+        # ningún servicio en reposo. El filtro de sondas de arriba deja la
+        # consulta SIN SERIES —que en PromQL no es lo mismo que un cero—, así que
+        # un servicio cuyas únicas peticiones de los últimos 2 min fueron
+        # /healthz y /readyz devuelve lista vacía, el adapter contesta
+        # `items: []` y el HPA se queda en `<unknown>`.
+        #
+        # Medido en producción el 2026-08-15, y no era un caso raro: los SIETE
+        # HPA con esta métrica estaban en `<unknown>` a la vez. `sytue-docs` solo
+        # había servido /healthz y /readyz, y la misma consulta sin el filtro sí
+        # daba serie (0,155 req/s). O sea que la métrica de carga de la
+        # plataforma llevaba desde su despliegue sin decidir un solo escalado:
+        # todo colgaba de la CPU, que en servicios de IO se queda plana mientras
+        # las peticiones se acumulan.
+        #
+        # La segunda rama vale cero SIEMPRE (`* 0`) y solo está por su etiqueta:
+        # conserva el `job` que el selector del HPA necesita para casar, cosa que
+        # `or vector(0)` no hace —devuelve una serie sin etiquetas y el HPA la
+        # descarta—. Cuando hay tráfico real gana la primera rama y la segunda no
+        # se mira: comprobado a la vez contra `sytue-id`, que devolvía 62,96
+        # req/s antes y después.
+        metricsQuery: |
+          sum by (job) (
+            rate(<<.Series>>{<<.LabelMatchers>>,http_route!~"/healthz|/readyz"}[2m])
+          )
+          or
+          sum by (job) (
+            rate(<<.Series>>{<<.LabelMatchers>>}[2m]) * 0
+          )
+{{- end }}

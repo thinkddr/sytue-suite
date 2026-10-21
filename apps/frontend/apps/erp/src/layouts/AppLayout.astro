@@ -1,0 +1,73 @@
+---
+/**
+ * Layout base de ERP. Guarda de sesión del lado servidor, script de tema (sin
+ * flash) y slot para la isla raíz que monta la Sytue Shell + la app. El access
+ * token NO se envía al navegador. docs/design.md §1.
+ */
+import { APP_VIEWPORT, appDomains, returnToCanonico } from '@sytue/config';
+import { serverEnv } from '@sytue/auth/server';
+import '../styles/app.css';
+import { SUFIJO_ICONOS, basePathScript, themeInitScript, withBase } from '@sytue/ui';
+import { bff, toBffContext } from '../lib/bff.js';
+import { htmlLangAttrs } from '@sytue/i18n';
+
+interface Props {
+  title?: string;
+}
+
+const { title = 'ERP' } = Astro.props;
+const { lang, dir } = htmlLangAttrs(Astro.locals.locale);
+
+if (!(await bff.getSession(toBffContext(Astro)))) {
+  // ADR 0056: la entrada org-ful llega reescrita con la marca ?__org=; el returnTo
+  // sale canónico, no en la forma interna, o tras el login la barra se queda con ella.
+  const returnTo = returnToCanonico(Astro.url, bff.basePath);
+  const redireccionLogin = Astro.redirect(
+    `${bff.basePath}/auth/login?returnTo=${encodeURIComponent(returnTo)}`,
+  );
+  redireccionLogin.headers.set('cache-control', 'no-store');
+  return redireccionLogin;
+}
+
+const prefijo = serverEnv(import.meta.env).SYTUE_BASE_PATH ?? import.meta.env.BASE_URL;
+---
+
+<!doctype html>
+<html lang={lang} dir={dir} class="h-full">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="color-scheme" content="light" />
+    <meta name="viewport" content={APP_VIEWPORT} />
+    <!-- Superficie autenticada: nunca se indexa (el SEO vive solo en www). -->
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="description" content="ERP — la gestión de la empresa dentro de Sytue One." />
+    <title>{title}</title>
+    <link rel="preconnect" href={appDomains.hub} crossorigin />
+    <link rel="icon" href={withBase(prefijo, '/favicon.ico') + SUFIJO_ICONOS} sizes="32x32" />
+    <link
+      rel="icon"
+      href={withBase(prefijo, '/favicon-64.png') + SUFIJO_ICONOS}
+      type="image/png"
+      sizes="64x64"
+    />
+    <link
+      rel="icon"
+      href={withBase(prefijo, '/favicon.svg') + SUFIJO_ICONOS}
+      type="image/svg+xml"
+    />
+    <link
+      rel="apple-touch-icon"
+      href={withBase(prefijo, '/apple-touch-icon.png') + SUFIJO_ICONOS}
+    />
+    <script
+      is:inline
+      set:html={basePathScript(
+        serverEnv(import.meta.env).SYTUE_BASE_PATH ?? import.meta.env.BASE_URL,
+      )}
+    ></script>
+    <script is:inline set:html={themeInitScript}></script>
+  </head>
+  <body class="bg-bg text-text h-full antialiased">
+    <slot name="app" />
+  </body>
+</html>

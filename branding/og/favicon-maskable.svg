@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Sytue">
+  <title>Sytue</title>
+  <!-- Icono maskable PWA: fondo a sangre + símbolo dentro de la safe-zone (80%). -->
+  <rect width="512" height="512" fill="#2b6cff"/>
+  <path d="M170 340c50 40 210 40 210-48 0-80-164-52-164-121 0-61 138-65 185-27"
+        fill="none" stroke="#ffffff" stroke-width="48" stroke-linecap="round"/>
+</svg>

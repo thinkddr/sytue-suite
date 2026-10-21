@@ -1,0 +1,24 @@
+{
+  "key": "github",
+  "tier": "tier1",
+  "manifest": {
+    "name": "GitHub",
+    "description": "Traer a Sytue Git los repositorios de GitHub.com con su historia, ramas, etiquetas, issues, pull requests, wiki y releases, y los gists a Sytue Drive. Se conecta con un solo inicio de sesión: autorizas en GitHub y el asistente migra todo lo que esa cuenta alcanza. Sytue solo lee; el permiso «repo» que pide GitHub es el único que abre los repositorios privados y no tiene variante de solo lectura.",
+    "category": "Ingeniería",
+    "color": "#6E7681",
+    "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#6E7681\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><line x1=\"6\" y1=\"3\" x2=\"6\" y2=\"15\"/><circle cx=\"18\" cy=\"6\" r=\"3\"/><circle cx=\"6\" cy=\"18\" r=\"3\"/><path d=\"M18 9a9 9 0 0 1-9 9\"/></svg>",
+    "identity": {
+      "kind": "none"
+    },
+    "provisioning": "none",
+    "launch": {
+      "kind": "url",
+      "url": "https://github.com"
+    },
+    "oauth": {
+      "authorize_url": "https://github.com/login/oauth/authorize",
+      "token_url": "https://github.com/login/oauth/access_token",
+      "scopes": ["read:user", "user:email", "repo", "read:org", "gist"]
+    }
+  }
+}

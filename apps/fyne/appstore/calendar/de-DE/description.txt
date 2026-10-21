@@ -1,0 +1,19 @@
+Ein CalDAV-Kalender, verzahnt mit der restlichen Suite.
+
+• Tages-, Wochen- und Monatsansicht.
+• Serientermine und Erinnerungen.
+• Termine direkt aus einer E-Mail in Mail anlegen.
+• Kompatibel mit jedem CalDAV-Client.
+• Monats-, Wochen-, Tages- und Agendaansicht, mit Minikalender und „Heute“.
+• Tägliche, wöchentliche oder monatliche Wiederholung mit Ende; nur diesen, diesen und folgende oder alle bearbeiten.
+• Erinnerungen pro Termin und Benachrichtigungen in der Suite.
+• Einladungen mit Antwort (zusagen, vielleicht, absagen) und Nachverfolgung.
+• „Freien Termin finden“ unter den Teilnehmenden.
+• Buchbare Räume und Ressourcen mit Verfügbarkeit.
+• Geteilte Kalender mit Berechtigungen, und die, die andere mit Ihnen teilen.
+• Externe Kalender abonnieren (ICS) und mehrere farbige Kalender führen.
+• Einen Termin aus einer Mail oder aus einer Notiz anlegen.
+• Kompatibel mit jedem CalDAV-Client: Apple Kalender, Thunderbird und mehr.
+• Dupliziere einen Termin oder kopiere ihn in deinen Kalender, und lade ihn als .ics für alle außerhalb von Sytue.
+
+Verschlüsselt bei der Übertragung (TLS 1.3). Die Infrastruktur von Sytue befindet sich in der EU. Der Standort externer Dienste hängt von ihrem Anbieter ab.

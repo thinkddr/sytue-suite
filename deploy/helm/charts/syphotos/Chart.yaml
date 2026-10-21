@@ -1,0 +1,19 @@
+apiVersion: v2
+name: sytue-syphotos
+description: >-
+  Sytue Photos — servicio Go propio de galería y editor de imágenes: notas de cualquier tipo,
+  etiquetas con estado, cifrado extremo a extremo y referencias cruzadas con el resto
+  de la suite (Calendar, Rooms, Docs, Drive). Estado en PostgreSQL. Codigo
+  MIT, (c) 2026 Daniel Delgado Ramos. Expuesto en photos.sytue.eu.
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+kubeVersion: ">=1.31.0-0"
+home: https://sytue.eu
+keywords: [sytue, syphotos, notebooks, go]
+maintainers:
+  - name: Sytue Platform
+    email: platform@sytue.eu
+annotations:
+  licenses: MIT
+  sytue.eu/stack: go

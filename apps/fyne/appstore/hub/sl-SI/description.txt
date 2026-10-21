@@ -1,0 +1,14 @@
+Ves Sytue One na en klik, skozi ista vrata.
+
+• Zaganjalnik z vsemi vašimi aplikacijami in tistimi, ki jih poveže vaša organizacija.
+• Današnji urnik in neprebrana e-pošta na začetni strani, poleg novosti v naboru in vaših obvestil.
+• Povežite svoje naprave in prenesite izvorne aplikacije.
+• Zaganjalnik z aplikacijami nabora in aplikacijami tretjih oseb, ki jih poveže vaša organizacija.
+• Hitra dejanja: napiši e-poštno sporočilo, nov dokument, naloži v Drive, ustvari dogodek.
+• Nedavno v celotnem naboru: zadnji elementi iz Drive, Docus, Mail ali Rooms.
+• Središče obvestil in prisotnost, skupna za celoten nabor.
+• Povezovanje naprav: profil za iPhone in Mac, Android in računalnik, v dveh korakih.
+• Prenosi izvornih aplikacij za računalnik in mobilne naprave.
+• Pozdravni čarovnik, ki pripravi organizacijo brez priročnikov.
+
+Šifrirano med prenosom (TLS 1.3). Infrastruktura Sytue je v EU. Lokacija zunanjih storitev je odvisna od njihovega ponudnika.

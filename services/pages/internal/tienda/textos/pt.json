@@ -1,0 +1,10 @@
+{
+  "order_paid_buyer_subject": "Confirmação de encomenda {number}",
+  "order_paid_buyer_body": "Obrigado pela sua compra. A encomenda {number} foi confirmada.",
+  "order_paid_store_subject": "Nova encomenda recebida: {number}",
+  "order_paid_store_body": "Recebeu uma nova encomenda {number} no valor de {total}.",
+  "withdrawal_ack_subject": "Confirmação de cancelamento recebida: {number}",
+  "withdrawal_ack_body": "O seu pedido de cancelamento para a encomenda {number} foi registado.",
+  "form_received_subject": "Envio de formulário recebido: {form_id}",
+  "form_received_body": "Foi recebido um novo envio para o formulário {form_id}."
+}

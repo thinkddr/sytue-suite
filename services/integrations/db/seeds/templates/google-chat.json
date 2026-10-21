@@ -1,0 +1,38 @@
+{
+  "key": "google-chat",
+  "tier": "tier2",
+  "manifest": {
+    "name": "Google Chat",
+    "description": "Comparte los mensajes nuevos de un canal de Sytue Rooms en un destino que elijas, con tu autorización.",
+    "category": "Comunicación",
+    "color": "#00832D",
+    "icon": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#00832D\" stroke-width=\"2\" stroke-linejoin=\"round\"><path d=\"M4 4h16v12H9l-5 5V4Z\"/><path d=\"M8 8h8M8 12h5\"/></svg>",
+    "identity": {
+      "kind": "none"
+    },
+    "provisioning": "none",
+    "launch": {
+      "kind": "url",
+      "url": "https://chat.google.com/"
+    },
+    "oauth": {
+      "authorize_url": "https://accounts.google.com/o/oauth2/v2/auth",
+      "token_url": "https://oauth2.googleapis.com/token",
+      "scopes": [
+        "https://www.googleapis.com/auth/chat.spaces.readonly",
+        "https://www.googleapis.com/auth/chat.messages.create"
+      ],
+      "authorize_params": {
+        "access_type": "offline",
+        "prompt": "consent"
+      },
+      "revoke_url": "https://oauth2.googleapis.com/revoke"
+    },
+    "substitutes": [
+      {
+        "product": "rooms",
+        "open_url": "https://chat.google.com/"
+      }
+    ]
+  }
+}

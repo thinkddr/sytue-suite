@@ -1,0 +1,70 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "livekit.fullname" . }}
+  labels:
+    {{- include "livekit.labels" . | nindent 4 }}
+data:
+  # Config de LiveKit server (sin claves: las api keys llegan por --key-file desde
+  # el secret existingSecret). SIN store de routing (sin Redis/Valkey, por contrato):
+  # el SFU opera single-node.
+  config.yaml: |
+    port: {{ .Values.ports.http }}
+    bind_addresses:
+      - ""
+    log_level: info
+    rtc:
+      tcp_port: {{ .Values.ports.rtcTcp }}
+      udp_port: {{ .Values.ports.rtcUdp }}
+    {{- if .Values.rtc.nodeIP }}
+      # La IP pública es la flexible del LB de medios. Fijarla elimina la
+      # autodetección STUN (y con ella dependencias de Google/Twilio).
+      use_external_ip: false
+      node_ip: {{ .Values.rtc.nodeIP | quote }}
+    {{- else }}
+      use_external_ip: true
+    {{- end }}
+    {{- if .Values.webhook.enabled }}
+    {{- if not .Values.webhook.apiKey }}
+    {{- fail "livekit: webhook.enabled exige webhook.apiKey (una de las claves de keys.existingSecret). Sin ella el SFU no firma los avisos de Rooms y Cast. Si de verdad no los quieres, pon webhook.enabled=false a conciencia." }}
+    {{- end }}
+    webhook:
+      api_key: {{ .Values.webhook.apiKey | quote }}
+      urls:
+        {{- if .Values.webhook.urls }}
+        {{- range .Values.webhook.urls }}
+        - {{ . | quote }}
+        {{- end }}
+        {{- else if .Values.webhook.url }}
+        - {{ .Values.webhook.url | quote }}
+        {{- else }}
+        - {{ printf "http://%s-rooms/webhooks/livekit" .Release.Name | quote }}
+        - {{ printf "http://%s-cast/webhooks/livekit" .Release.Name | quote }}
+        {{- end }}
+    {{- end }}
+    {{- if .Values.redis.enabled }}
+    {{- if not .Values.redis.address }}
+    {{- fail "livekit: redis.enabled exige redis.address (host:puerto de Dragonfly). Sin él el SFU arranca sin store de routing y el egress se queda sin canal: la grabación no arranca y el error no menciona la grabación por ningún lado." }}
+    {{- end }}
+    # Store de routing SOLO para que el egress reciba trabajo. El SFU sigue
+    # siendo single-node: esto no reparte salas entre nodos.
+    redis:
+      address: {{ .Values.redis.address | quote }}
+      db: {{ .Values.redis.db }}
+      {{- if (include "livekit.cacheSecret" .) }}
+      # El marcador lo sustituye el initContainer con el valor del Secret. NO se
+      # escribe aquí: un ConfigMap lo lee cualquiera con `get configmap`, y esta
+      # es la MISMA contraseña que usan Dragonfly y los siete servicios de la
+      # suite. Ver el initContainer `config` del deployment.
+      password: "SYTUE_REDIS_PASSWORD"
+      {{- end }}
+    {{- end }}
+    {{- if .Values.turn.enabled }}
+    turn:
+      enabled: true
+      domain: {{ include "livekit.turnDomain" . | quote }}
+      tls_port: {{ .Values.turn.tlsPort }}
+      udp_port: {{ .Values.turn.udpPort }}
+      # Traefik termina el TLS con el Certificate de turn-route.yaml.
+      external_tls: true
+    {{- end }}

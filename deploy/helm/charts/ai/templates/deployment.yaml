@@ -1,0 +1,222 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "sytue-ai.fullname" . }}
+  labels:
+    {{- include "sytue-ai.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "sytue-ai.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "sytue-ai.labels" . | nindent 8 }}
+      annotations:
+        kubectl.kubernetes.io/default-container: ai
+    spec:
+      automountServiceAccountToken: false
+      {{- with (.Values.global).imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: ai
+          image: "{{ include "sytue-ai.imageRegistry" . }}/{{ .Values.image.repository }}:{{ ((.Values.global).image | default dict).tag | default .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.targetPort }}
+          env:
+            {{- if (.Values.global).otlp }}
+            {{- if (.Values.global).otlp.endpoint }}
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ (.Values.global).otlp.endpoint | quote }}
+            {{- end }}
+            {{- if (.Values.global).otlp.tokenSecret }}
+            - name: OTEL_EXPORTER_OTLP_HEADERS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ (.Values.global).otlp.tokenSecret }}
+                  key: {{ (.Values.global).otlp.tokenKey | default "otlp-headers" }}
+                  optional: true
+            {{- end }}
+            {{- end }}
+            # Runtime Go atado a los limites del pod.
+            {{- include "sytue.goRuntimeEnv" (dict "container" "ai" "memLimit" .Values.resources.limits.memory) | nindent 12 }}
+            {{- include "sytue.logCollectorEnv" . | nindent 12 }}
+            # Este servicio lee el entorno SIN PREFIJO (pcfg.NewLoader("")), al
+            # contrario que sytue-ocr y compania: los nombres van tal cual.
+            - name: ENV
+              value: {{ include "sytue-ai.env" . | quote }}
+            - name: HTTP_ADDR
+              value: ":{{ .Values.service.targetPort }}"
+            # PORT lo lee el subcomando `ai healthcheck` del HEALTHCHECK de Docker,
+            # que no comparte el cargador de config con el servidor.
+            - name: PORT
+              value: "{{ .Values.service.targetPort }}"
+            - name: LOG_LEVEL
+              value: {{ .Values.config.logLevel | quote }}
+            - name: PUBLIC_URL
+              value: {{ printf "https://ai.%s" (include "sytue-ai.domain" .) | quote }}
+            # ----- Sytue ID (OIDC; validacion del JWT que reenvia el BFF) -----
+            - name: OIDC_ISSUER
+              value: {{ include "sytue-ai.oidcIssuer" . | quote }}
+            - name: OIDC_JWKS_URL
+              value: {{ include "sytue.oidcJwksUrl" . | quote }}
+            # OIDC_ACCEPTED_AUDIENCES NO SE FIJA AQUI, A PROPOSITO.
+            #
+            # La suite comparte sesion: el token que llega trae la audiencia del
+            # app que llama (sytue-docs, sytue-notes...), no la de este servicio,
+            # asi que sin aceptarlas TODA peticion se rechazaria con 401. La lista
+            # la pone el servicio con pcfg.FirstPartyAudiences("sytue-ai"), que es
+            # la UNICA copia y esta cubierta por tests.
+            #
+            # Aqui habia una copia escrita a mano, y divergio: decia `sytue-photos`
+            # cuando el client_id registrado es `sytue-syphotos`. Como el `aud` del
+            # token ES el client_id, la IA contestaba 401 a Sytue Fotos y solo a
+            # ella —«No se pudo describir la foto»— mientras funcionaba en Docs,
+            # Mail, Calendar y Contactos. Medido en produccion el 2026-09-12.
+            #
+            # Es la SEGUNDA vez que pasa por el mismo motivo: ver el comentario de
+            # `firstPartyAudiences` en platform/pkg/config.
+            # ----- Proveedor LLM -----
+            - name: AI_PROVIDER
+              value: {{ .Values.config.provider | quote }}
+            - name: AI_BASE_URL
+              value: {{ .Values.config.baseURL | quote }}
+            - name: AI_MODEL
+              value: {{ .Values.config.model | quote }}
+            - name: AI_MAX_TOKENS
+              value: "{{ .Values.config.maxTokens }}"
+            - name: AI_TIMEOUT
+              value: {{ .Values.config.timeout | quote }}
+            {{- if .Values.config.modelCalidad }}
+            # Modo calidad. Si se deja vacio NO se rompe nada: "calidad" cae al
+            # modelo interactivo, que responde peor pero responde.
+            - name: AI_MODEL_CALIDAD
+              value: {{ .Values.config.modelCalidad | quote }}
+            - name: AI_MAX_TOKENS_CALIDAD
+              value: "{{ .Values.config.maxTokensCalidad }}"
+            - name: AI_TIMEOUT_CALIDAD
+              value: {{ .Values.config.timeoutCalidad | quote }}
+            - name: AI_ESFUERZO_CALIDAD
+              value: {{ .Values.config.esfuerzoCalidad | quote }}
+            {{- end }}
+            {{- if .Values.config.modelAudio }}
+            # Transcripción (whisper). NO entra en el presupuesto: se factura por
+            # minuto de audio y no por token.
+            - name: AI_MODEL_AUDIO
+              value: {{ .Values.config.modelAudio | quote }}
+            {{- end }}
+            {{- if .Values.config.modelEmbeddings }}
+            - name: AI_MODEL_EMBEDDINGS
+              value: {{ .Values.config.modelEmbeddings | quote }}
+            {{- end }}
+            # ----- Presupuesto por usuario -----
+            #
+            # El contador vive en la MISMA cache que el resto de la suite. Sin
+            # `global.dragonflyUrl` no hay contador y el modelo de calidad queda
+            # SIN tope por usuario: el servicio lo avisa al arrancar, porque
+            # degradar abierto en silencio es como no tener tope y creer que si.
+            - name: AI_PRESUPUESTO_MENSUAL_EUR
+              value: {{ .Values.config.presupuestoMensualEur | quote }}
+            - name: AI_TARIFAS
+              value: {{ .Values.config.tarifas | quote }}
+            {{- if (.Values.global).dragonflyUrl }}
+            - name: DRAGONFLY_URL
+              value: {{ (.Values.global).dragonflyUrl | quote }}
+            {{- if ((.Values.global).cache).secretName }}
+            - name: DRAGONFLY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ ((.Values.global).cache).secretName }}
+                  key: {{ ((.Values.global).cache).passwordKey | default "dragonfly-password" }}
+                  optional: true
+            {{- end }}
+            {{- end }}
+            # La clave del proveedor, SOLO desde un Secret y `optional: true`: sin
+            # ella el servicio arranca sano y /assist responde 503, que es lo que
+            # el panel ya sabe interpretar para ocultarse. Un secreto obligatorio
+            # dejaria el pod en CreateContainerConfigError, que no se parece en
+            # nada a "falta configurar la IA".
+            {{- $secret := .Values.apiKeySecret.name | default ((.Values.global).ai | default dict).apiKeySecret }}
+            {{- if $secret }}
+            - name: AI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $secret | quote }}
+                  key: {{ .Values.apiKeySecret.key | quote }}
+                  optional: true
+            {{- end }}
+            # ----- Integración con Sytue Web (§9.1) -----
+            - name: AI_TIMEOUT_PAGES
+              value: {{ .Values.config.timeoutPages | default "300s" | quote }}
+            - name: AI_MAX_TOKENS_TOPE
+              value: "{{ .Values.config.maxTokensTope | default 16384 }}"
+            - name: AI_MODEL_CODIGO
+              value: {{ .Values.config.modelCodigo | default "qwen3.5-397b-a17b" | quote }}
+            {{- $pagesSecret := .Values.pagesSecret.name | default (((.Values.global).ai | default dict).pagesSecret) | default "sytue-ai-pages" }}
+            - name: AI_PAGES_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $pagesSecret | quote }}
+                  key: {{ .Values.pagesSecret.key | default "pages-secret" | quote }}
+                  optional: true
+
+            # ----- Frontera de confianza y limite de tasa -----
+            - name: AI_MAX_INSTRUCTION_BYTES
+              value: "{{ .Values.config.maxInstructionBytes }}"
+            - name: AI_MAX_CONTEXT_BYTES
+              value: "{{ .Values.config.maxContextBytes }}"
+            - name: AI_RATE_LIMIT_PER_MIN
+              value: "{{ .Values.config.rateLimitPerMinute }}"
+            - name: AI_RATE_LIMIT_BURST
+              value: "{{ .Values.config.rateLimitBurst }}"
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 20
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      # SIN volumen /tmp, al contrario que sytue-ocr: este servicio no escribe un
+      # solo byte en disco. El texto del documento vive en memoria el tiempo de
+      # la peticion y se va con ella.
+      {{- with .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- range . }}
+        - maxSkew: {{ .maxSkew }}
+          topologyKey: {{ .topologyKey }}
+          whenUnsatisfiable: {{ .whenUnsatisfiable }}
+          labelSelector:
+            matchLabels:
+              {{- include "sytue-ai.selectorLabels" $ | nindent 14 }}
+        {{- end }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

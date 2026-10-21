@@ -1,0 +1,14 @@
+A programcsomag kezdőlapja: alkalmazások, gyorsműveletek, legutóbbi tevékenység és értesítések.
+
+• Indító az összes alkalmazásával és azokkal, amelyeket szervezete csatlakoztat.
+• A mai napirend és az olvasatlan levelek a kezdőlapon, a programcsomag legutóbbi eseményei és az értesítései mellett.
+• Csatlakoztassa eszközeit, és töltse le a natív alkalmazásokat.
+• Indító a programcsomag alkalmazásaival és a szervezete által csatlakoztatott külső alkalmazásokkal.
+• Gyorsműveletek: e-mail írása, új dokumentum, feltöltés a Drive-ba, esemény létrehozása.
+• Legutóbbiak a programcsomagban: a legutóbbi elemek a Drive-ból, Docusból, Mailből vagy Roomsból.
+• Értesítési központ és jelenlét, közösen a teljes programcsomagban.
+• Eszközök csatlakoztatása: profil iPhone-ra és Macre, Androidra és asztali gépre, két lépésben.
+• A natív asztali és mobilalkalmazások letöltése.
+• Üdvözlő varázsló, amely kézikönyvek nélkül készíti fel a szervezetet.
+
+Titkosítás átvitel közben (TLS 1.3). A Sytue infrastruktúrája az EU-ban található. A külső szolgáltatások helye a szolgáltatójuktól függ.

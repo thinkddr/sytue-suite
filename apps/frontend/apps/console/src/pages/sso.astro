@@ -1,0 +1,51 @@
+---
+import ConsoleLayout from '../layouts/ConsoleLayout.astro';
+import { useT } from '../i18n/index.js';
+import SsoPanel from '../components/SsoPanel';
+import { requireSession } from '@sytue/auth/server';
+import { canonicaConOrg } from '@sytue/config';
+import { getBff, toBffContext } from '../server/bff.js';
+import ScimStatusCard from '../components/ScimStatusCard';
+import { loadOidcApps, loadSamlSps, loadScimStatus, loadSsoProviders } from '../lib/admin.js';
+
+export const prerender = false;
+
+const guard = await requireSession(getBff(), toBffContext(Astro), {
+  roles: ['admin', 'owner'],
+  perms: ['sso.manage'],
+});
+if (guard instanceof Response) return guard;
+// Ruta en `sinOrg` (su nombre colisiona con el namespace de organizaciones):
+// con sesión, un salto local a la canónica con la org activa (ADR 0056).
+const canonica = canonicaConOrg(Astro.url, getBff().basePath, guard.session.user.tenant);
+if (canonica) return Astro.redirect(canonica);
+
+const [{ live, data }, apps, samlSps, scim] = await Promise.all([
+  loadSsoProviders(guard.session),
+  loadOidcApps(guard.session),
+  loadSamlSps(guard.session),
+  loadScimStatus(guard.session),
+]);
+
+// El idioma lo negoció el middleware; la isla lo recibe por props (nunca lo detecta).
+const locale = Astro.locals.locale;
+const t = useT(locale);
+---
+
+<ConsoleLayout title={t('page.sso')} section="sso">
+  <SsoPanel
+    client:load
+    locale={locale}
+    providers={data}
+    apps={apps.data}
+    samlSps={samlSps.data}
+    samlSpsLive={samlSps.live}
+    live={live}
+  />
+  {/* El aprovisionamiento es la otra mitad de la conexión con el IdP
+      corporativo: quien acaba de configurar el inicio de sesión federado tiene
+      aquí, sin cambiar de pantalla, si las altas y las BAJAS llegan solas. */}
+  <div class="mt-6">
+    <ScimStatusCard status={scim.data} live={scim.live} locale={locale} t={t} />
+  </div>
+</ConsoleLayout>

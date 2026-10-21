@@ -1,0 +1,29 @@
+{{- if .Values.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "sytue-pages.fullname" . }}
+  labels: {{- include "sytue-pages.labels" . | nindent 4 }}
+spec:
+  selector:
+    {{- include "sytue-pages.selector" . | nindent 4 }}
+    app.kubernetes.io/component: pages
+  ports:
+    - name: http
+      port: {{ .Values.service.port }}
+      targetPort: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "sytue-pages.sitiosFullname" . }}
+  labels: {{- include "sytue-pages.labels" . | nindent 4 }}
+spec:
+  selector:
+    {{- include "sytue-pages.selector" . | nindent 4 }}
+    app.kubernetes.io/component: sitios
+  ports:
+    - name: http
+      port: {{ .Values.sitios.service.port }}
+      targetPort: http
+{{- end }}

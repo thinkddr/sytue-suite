@@ -1,0 +1,210 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Daniel Delgado Ramos
+from lib import *
+from looks import LOOKS
+
+KEY = "escuela-idiomas"
+
+
+def build():
+    nueva(KEY)
+    look = dict(LOOKS["celeste"], fuentes=("manrope", "inter"))
+    nav = [("inicio", ("Inicio", "Home")), ("cursos", ("Cursos", "Courses")),
+           ("matricula", ("Matrícula", "Enrolment")), ("contacto", ("Contacto", "Contact"))]
+    horas = [(("Lunes a jueves", "Monday to Thursday"),
+              ("9:30 a 13:30 y 16:00 a 21:00", "9:30 am to 1:30 pm and 4:00 pm to 9:00 pm")),
+             (("Viernes", "Friday"), ("9:30 a 14:00 y 16:00 a 19:00", "9:30 am to 2:00 pm and 4:00 pm to 7:00 pm")),
+             (("Sábado y domingo", "Saturday and Sunday"), ("Cerrado", "Closed"))]
+    def S(x):
+        return (x, x)
+
+    nota = ("Precios de ejemplo: cámbialos por los tuyos.", "Example prices: replace them with your own.")
+
+    def prueba(var="primary"):
+        return boton(("Pedir prueba de nivel gratis", "Book a free level test"), a_pagina("contacto", "contacto"), var)
+
+    inicio = pagina("inicio", ("", ""), ("Escuela de idiomas", "Language school"),
+                    ("Escuela de idiomas con grupos reducidos, cursos intensivos, clases para niños y prueba de nivel gratuita. Llama o escribe por WhatsApp.",
+                     "Language school with small groups, intensive courses, classes for children and a free level test. Call or message us on WhatsApp."), [
+        hero(("Habla el idioma en clase, no solo lo estudies", "Speak the language in class, don't just study it"),
+             ("Grupos pequeños para que todos hablen en cada clase. Empiezas con una prueba de nivel gratuita y te decimos en qué grupo encajas.",
+              "Small groups so everyone speaks in every class. You start with a free level test and we tell you which group suits you."),
+             [prueba(), llamar("secondary"), whatsapp("ghost")],
+             eyebrow=("Escuela de idiomas", "Language school"),
+             imagen_=("photo", ("Alumnos conversando en el aula con la profesora", "Students talking in the classroom with their teacher"))),
+        bloque_checks(("Idiomas que enseñamos", "Languages we teach"), [
+            ("Inglés", "English"), ("Francés", "French"), ("Alemán", "German"),
+            ("Italiano", "Italian"), ("Español para extranjeros", "Spanish for foreigners"),
+            ("Otros idiomas bajo petición", "Other languages on request"),
+        ], intro=("Todos con profesorado que los habla a diario. Cámbialos por los idiomas de tu escuela.",
+                  "All with teachers who use the language every day. Replace them with your school's languages."),
+            tono="relleno", cols=3),
+        bloque_pasos(("Cómo aprendemos", "How we learn"), [
+            (("Prueba de nivel", "Level test"),
+             ("Una prueba escrita y una charla corta. No se aprueba ni se suspende: sirve para ponerte en tu grupo.",
+              "A short written test and a chat. You do not pass or fail: it just places you in your group.")),
+            (("Clases para hablar", "Classes to speak"),
+             ("Se habla desde el primer día, también en nivel básico. La gramática se explica cuando hace falta.",
+              "You speak from day one, even at beginner level. Grammar is explained when it is needed.")),
+            (("Práctica entre clases", "Practice between classes"),
+             ("Cada semana, tareas breves de escuchar, leer o escribir que puedes hacer en 20 minutos.",
+              "Each week, short listening, reading or writing tasks you can do in 20 minutes.")),
+            (("Revisión cada trimestre", "A review each term"),
+             ("Cada trimestre te decimos qué has avanzado y qué toca reforzar.",
+              "Each term we tell you what you have improved and what to work on next.")),
+        ], tono="base"),
+        bloque_opiniones(("Lo que dicen nuestros alumnos", "What our students say"),
+                         [("las clases", "the classes"), ("el profesorado", "the teachers"), ("el ambiente", "the atmosphere")]),
+        bloque_cta(("¿En qué nivel estás?", "What level are you at?"),
+                   ("La prueba de nivel es gratuita y no te compromete a nada. Pídela hoy y te damos hora.",
+                    "The level test is free and commits you to nothing. Ask for it today and we will give you a time."),
+                   [prueba(), llamar("ghost")], tono="base"),
+    ])
+
+    cab_nivel = [("Nivel", "Level"), ("Cómo lo llamamos", "What we call it"), ("Qué sabes hacer", "What you can do")]
+    cursos = pagina("cursos", ("cursos", "courses"), ("Cursos y horarios", "Courses and timetables"),
+                    ("Niveles A1 a C1 explicados en llano, tipos de curso, horarios de los grupos y preparación de exámenes oficiales.",
+                     "Levels A1 to C1 explained plainly, course types, group timetables and preparation for official exams."), [
+        hero(("Cursos y horarios", "Courses and timetables"),
+             ("Mira qué nivel tienes, qué tipo de curso te conviene y en qué horario hay grupo.",
+              "See what level you are, which kind of course suits you and which timetable has a group."),
+             [prueba()], variante="texto"),
+        bloque_precios(("Tu nivel, en llano", "Your level, in plain words"), ("Niveles del Marco Común Europeo de Referencia", "Levels of the Common European Framework of Reference"),
+                       cab_nivel,
+                       [(S("A1"), ("Principiante", "Beginner"), ("Te presentas, pides lo básico y entiendes frases muy sencillas.",
+                                                              "You introduce yourself, ask for basics and understand very simple sentences.")),
+                        (S("A2"), ("Elemental", "Elementary"), ("Te manejas en tareas cotidianas: comprar, preguntar una dirección, hablar de tu día.",
+                                                             "You manage everyday tasks: shopping, asking directions, talking about your day.")),
+                        (S("B1"), ("Intermedio", "Intermediate"), ("Te defiendes viajando y puedes contar una experiencia o dar tu opinión.",
+                                                                "You get by when travelling and can tell a story or give your opinion.")),
+                        (S("B2"), ("Intermedio alto", "Upper intermediate"), ("Hablas con soltura con nativos y sigues una película sin subtítulos casi siempre.",
+                                                                           "You talk fluently with native speakers and usually follow a film without subtitles.")),
+                        (S("C1"), ("Avanzado", "Advanced"), ("Trabajas y estudias en el idioma, con matices y casi sin buscar palabras.",
+                                                          "You work and study in the language, with nuance and hardly searching for words."))],
+                       intro=("El Marco Común Europeo es la escala que usan todas las escuelas de Europa. Si no sabes tu nivel, la prueba es gratuita.",
+                              "The Common European Framework is the scale used by language schools across Europe. If you do not know your level, the test is free."),
+                       anchor="niveles", kind="text", tono="base"),
+        bloque_valores(("Tipos de curso", "Types of course"), [
+            (("Grupos reducidos", "Small groups"),
+             ("Pocas personas por grupo, del mismo nivel. Dos o tres clases por semana, todo el curso.",
+              "Few people per group, all at the same level. Two or three classes a week, all year.")),
+            (("Intensivos", "Intensive courses"),
+             ("Más horas por semana durante pocas semanas, en verano o a mitad de curso.",
+              "More hours a week for a few weeks, in summer or mid-year.")),
+            (("Niños y jóvenes", "Children and teenagers"),
+             ("Clases por edades, con juegos y conversación, y con una hora que no choque con el cole.",
+              "Classes by age, with games and conversation, at a time that does not clash with school.")),
+            (("Preparación de exámenes oficiales", "Official exam preparation"),
+             ("Practicas el formato de la prueba, los tiempos y los errores más comunes. No prometemos aprobar: sí que sabrás qué te van a pedir.",
+              "You practise the exam format, timing and the most common mistakes. We do not promise a pass, but you will know what you will be asked.")),
+            (("Clases individuales", "One-to-one classes"),
+             ("Para ir a tu ritmo o con un objetivo concreto: una entrevista, un viaje, una mudanza.",
+              "To go at your own pace or towards a specific goal: an interview, a trip, a move.")),
+            (("Para empresas", "For companies"),
+             ("Grupos en tu oficina o en la escuela, con vocabulario de vuestro trabajo.",
+              "Groups at your office or at the school, with vocabulary from your work.")),
+        ], eyebrow=("Cursos", "Courses"), estilo="relleno", tono="relleno", anchor="tipos"),
+        bloque_precios(("Horarios de los grupos", "Group timetables"), ("Horarios de ejemplo de los grupos", "Example group timetables"),
+                       [("Grupo", "Group"), ("Nivel", "Level"), ("Días", "Days"), ("Hora", "Time")],
+                       [(("Inglés", "English"), S("A1"), ("Lunes y miércoles", "Monday and Wednesday"), S("10:00 a 11:30")),
+                        (("Inglés", "English"), S("B1"), ("Martes y jueves", "Tuesday and Thursday"), S("19:00 a 20:30")),
+                        (("Inglés", "English"), S("B2"), ("Lunes y miércoles", "Monday and Wednesday"), S("20:00 a 21:30")),
+                        (("Francés", "French"), S("A2"), ("Martes y jueves", "Tuesday and Thursday"), S("17:30 a 19:00")),
+                        (("Alemán", "German"), S("A1"), ("Lunes y miércoles", "Monday and Wednesday"), S("18:00 a 19:30")),
+                        (("Italiano", "Italian"), S("B1"), ("Miércoles y viernes", "Wednesday and Friday"), S("19:30 a 21:00")),
+                        (("Inglés para niños", "English for children"), ("8 a 10 años", "Ages 8 to 10"), ("Martes y jueves", "Tuesday and Thursday"), S("17:00 a 18:00"))],
+                       nota=("Horarios de ejemplo: cámbialos por los tuyos. Si no hay grupo a tu hora, apúntate a la lista y te avisamos al abrir uno.",
+                             "Example timetables: replace them with your own. If there is no group at your time, join the waiting list and we will tell you when one opens."),
+                       anchor="horarios", kind="text", tono="base"),
+        bloque_cta(("¿Qué grupo te toca?", "Which group is yours?"), None, [prueba(), whatsapp("ghost")], tono="relleno"),
+    ])
+
+    matricula = pagina("matricula", ("matricula", "enrolment"), ("Matrícula y cuotas", "Enrolment and fees"),
+                       ("Cómo apuntarte, cuotas de ejemplo, materiales y respuestas a las dudas más habituales sobre la matrícula.",
+                        "How to enrol, example fees, materials and answers to the most common questions about enrolment."), [
+        hero(("Matrícula y cuotas", "Enrolment and fees"),
+             ("Apuntarte lleva diez minutos. Pagas una matrícula al año y una cuota al mes.",
+              "Enrolling takes ten minutes. You pay one enrolment fee a year and a monthly fee."),
+             [prueba(), llamar("secondary")], variante="texto"),
+        bloque_pasos(("Cómo te apuntas", "How to enrol"), [
+            (("Haces la prueba", "Take the test"),
+             ("Gratuita y sin compromiso. Si empiezas de cero, te saltas la prueba.",
+              "Free and with no commitment. If you are starting from scratch, you skip it.")),
+            (("Eliges grupo", "Choose a group"),
+             ("Te proponemos uno o dos grupos de tu nivel y horario.", "We suggest one or two groups at your level and timetable.")),
+            (("Pagas la matrícula", "Pay the enrolment fee"),
+             ("En la escuela, con tarjeta o por transferencia. Te damos recibo.",
+              "At the school, by card or bank transfer. We give you a receipt.")),
+            (("Empiezas", "Start"),
+             ("Te enviamos el material y el aula. Y vienes el primer día.",
+              "We send you the materials and the room. Then you come on day one.")),
+        ], tono="base"),
+        bloque_precios(("Cuotas de ejemplo", "Example fees"), ("Cuotas mensuales de ejemplo", "Example monthly fees"),
+                       [("Curso", "Course"), ("Horas a la semana", "Hours a week"), ("Cuota al mes", "Fee per month")],
+                       [(("Grupo reducido, adultos", "Small group, adults"), ("3 horas", "3 hours"), eur(58)),
+                        (("Grupo reducido, adultos", "Small group, adults"), ("4 horas y media", "4.5 hours"), eur(78)),
+                        (("Niños y jóvenes", "Children and teenagers"), ("1 hora y media", "1.5 hours"), eur(38)),
+                        (("Preparación de examen oficial", "Official exam preparation"), ("3 horas", "3 hours"), eur(65)),
+                        (("Clase individual", "One-to-one class"), ("Por clase de 1 hora", "Per 1 hour class"), eur(28)),
+                        (("Matrícula (una vez al año)", "Enrolment fee (once a year)"), ("—", "—"), eur(25))],
+                       nota=("Precios de ejemplo: cámbialos por los tuyos. Indica aquí si el material va incluido y si hay descuento por traer a un familiar.",
+                             "Example prices: replace them with your own. Say here whether materials are included and whether there is a discount for bringing a relative."),
+                       anchor="cuotas", tono="relleno"),
+        bloque_faq(("Preguntas frecuentes", "Frequently asked questions"), [
+            (("¿Puedo empezar a mitad de curso?", "Can I start mid-year?"),
+             ("Sí, si hay plaza en un grupo de tu nivel. Si no, te ponemos en lista de espera o te proponemos clases individuales para ponerte al día.",
+              "Yes, if there is a place in a group at your level. If not, we put you on a waiting list or suggest one-to-one classes to catch up.")),
+            (("¿Y si falto a una clase?", "What if I miss a class?"),
+             ("Te pasamos lo que se ha hecho. Si avisas con tiempo, puedes recuperar en otro grupo del mismo nivel cuando haya hueco.",
+              "We send you what was covered. If you let us know in advance, you can make it up in another group at the same level when there is space.")),
+            (("¿Puedo cambiar de grupo?", "Can I change group?"),
+             ("Sí, durante el primer mes, si tu nivel o tu horario no encajan.",
+              "Yes, during the first month, if your level or timetable do not fit.")),
+            (("¿Qué pasa si me doy de baja?", "What if I drop out?"),
+             ("Avisa antes de fin de mes y no pagas el siguiente. La matrícula no se devuelve.",
+              "Let us know before the end of the month and you do not pay the next one. The enrolment fee is not refundable.")),
+            (("¿Hay clases para niños?", "Are there classes for children?"),
+             ("Sí, por edades y con una hora de salida del colegio. Pregúntanos por los grupos disponibles.",
+              "Yes, by age and at a time after school. Ask us which groups are available.")),
+        ], tono="base"),
+        bloque_cta(("¿Te apuntamos?", "Shall we sign you up?"), None, [prueba(), whatsapp("ghost")], tono="relleno"),
+    ])
+
+    cont = pagina("contacto", ("contacto", "contact"), ("Prueba de nivel y contacto", "Level test and contact"),
+                  ("Pide tu prueba de nivel gratuita con el formulario, por teléfono o por WhatsApp. Horario y cómo llegar a la escuela.",
+                   "Book your free level test with the form, by phone or on WhatsApp. Opening hours and how to find the school."), [
+        hero(("Pide tu prueba de nivel gratuita", "Book your free level test"),
+             ("Dinos qué idioma quieres y qué horario te viene bien. Te llamamos para darte hora.",
+              "Tell us which language you want and which times suit you. We will call you to set a time."),
+             [llamar(), whatsapp()], variante="texto"),
+        bloque_contacto(("Cómo encontrarnos", "How to find us"),
+                        ("Estamos cerca del transporte público. En la prueba no hace falta traer nada.",
+                         "We are near public transport. You do not need to bring anything to the test."),
+                        campos_cita(
+                            servicios=None, fecha=False,
+                            extra=[campo("idioma", "select", ("Idioma", "Language"), True,
+                                         opciones=[("Inglés", "English"), ("Francés", "French"), ("Alemán", "German"),
+                                                   ("Italiano", "Italian"), ("Español para extranjeros", "Spanish for foreigners"),
+                                                   ("Otro", "Other")]),
+                                   campo("nivel", "select", ("Tu nivel", "Your level"), False,
+                                         opciones=[("Empiezo de cero", "Starting from scratch"), ("Sé algo", "I know a little"),
+                                                   ("No lo sé", "I do not know")]),
+                                   campo("franja", "select", ("Horario preferido", "Preferred time"), False,
+                                         opciones=[("Mañanas", "Mornings"), ("Tardes", "Afternoons"), ("Cualquiera", "Any")])]),
+                        ("Pedir prueba de nivel", "Request level test"), horas,
+                        exito=("Gracias. Te llamamos o te escribimos para darte hora para la prueba.",
+                               "Thank you. We will call or message you to give you a time for the test.")),
+        bloque_mapa(tono="relleno"),
+    ])
+
+    return plantilla(KEY, ("Escuela de idiomas", "Language school"),
+                     ("Escuela de idiomas con niveles A1 a C1, tipos de curso, horarios de grupos, matrícula y cuotas, y prueba de nivel gratuita con formulario.",
+                      "Language school with levels A1 to C1, course types, group timetables, enrolment and fees, and a free level test form."),
+                     "educacion", ("escuela de idiomas idiomas academia ingles frances aleman italiano clases particulares prueba de nivel niveles a1 b1 b2 examenes oficiales",
+                                   "language school languages academy english french german italian private lessons level test cefr exam preparation"),
+                     look, cabecera(nav, marco([llamar(), whatsapp("ghost")], dir="row", gap=12, wrap=True)),
+                     pie(nav, ("Escuela de idiomas con grupos reducidos y prueba de nivel gratuita.",
+                               "Language school with small groups and a free level test."),
+                         ("Lunes a jueves 9:30 a 13:30 y 16:00 a 21:00. Viernes 9:30 a 14:00 y 16:00 a 19:00.",
+                          "Monday to Thursday 9:30 am to 1:30 pm and 4 pm to 9 pm. Friday 9:30 am to 2 pm and 4 pm to 7 pm.")),
+                     [inicio, cursos, matricula, cont])

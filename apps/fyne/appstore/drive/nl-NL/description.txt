@@ -1,0 +1,16 @@
+Bestanden en samenwerking, onder je eigen merk.
+
+• Uploaden, ordenen en delen met gecontroleerde links (rechten en vervaldatum).
+• Voorbeeld van documenten en afbeeldingen direct op de pagina.
+• Als bijlage in Mail zonder het bestand te dupliceren.
+• Opslag op basis van S3 in Europese regio's.
+• Mijn drive, teamdrives, gedeeld met mij, recent, favorieten en prullenbak.
+• Deellinks met twee niveaus (bekijken of bewerken), wachtwoord en vervaldatum.
+• Versiegeschiedenis met herstel.
+• Voorbeeld van documenten, afbeeldingen en pdf's zonder te downloaden.
+• Kantoordocumenten openen en bewerken in Docus, Calcus en Diapos; pdf's in CertiPDF.
+• Gevoeligheidslabels die openbare links blokkeren waar ze niet horen.
+• Delen in een Rooms-kanaal of als bijlage in Mail zonder het bestand te dupliceren.
+• S3-opslag in Europese regio's, met je quotum altijd in beeld.
+
+Versleuteld tijdens transport (TLS 1.3). De infrastructuur van Sytue staat in de EU. De locatie van externe diensten hangt af van hun aanbieder.

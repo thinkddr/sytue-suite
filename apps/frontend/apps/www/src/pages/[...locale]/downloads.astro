@@ -1,0 +1,177 @@
+---
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: (c) 2026 Daniel Delgado Ramos
+ *
+ * Descargas — apps NATIVAS de Sytue One para escritorio y móvil. El contenido
+ * describe solo lo que las apps hacen hoy (ADR-0024): shell nativa online, con
+ * las integraciones del sistema que cada plataforma ya trae implementadas.
+ *
+ * El SLUG es `/downloads` en todos los idiomas (no `/es/descargas`): traducirlo
+ * daría un pelín de palabra clave en la URL a cambio de una tabla de rutas por
+ * idioma que hay que mantener en cada página y en el selector. Con hreflang
+ * recíproco, Google ya entiende que son la misma página en otra lengua.
+ */
+import { LOCALES } from '@sytue/i18n';
+import { appDomains, appUrl } from '@sytue/config';
+import MarketingLayout from '../../layouts/MarketingLayout.astro';
+import DownloadPanel from '../../components/DownloadPanel';
+import { localeFromParam, localeParams, localePath, useT } from '../../i18n';
+import { BUNDLES, DESKTOP, MOBILE, appsDe, bundleDisponible } from '../../lib/downloads';
+import { SITE_ORIGIN, absoluteUrl } from '../../lib/seo';
+
+export const getStaticPaths = localeParams;
+
+const locale = localeFromParam(Astro.params.locale);
+const t = useT(locale);
+const pageUrl = absoluteUrl(localePath(locale, '/downloads'));
+
+// Aquí ya no se comprueba si un fichero existe, y no hace falta: esta página no enlaza a
+// ningún artefacto. El bucket de descargas dejó de ser público —lo lee el portal, que
+// firma una URL de cinco minutos— así que todo lo que hay son enlaces al portal, y quien
+// sabe qué se publicó de verdad es él, que lista el bucket en cada visita.
+
+// El texto de las tarjetas se resuelve AQUÍ, en el servidor: la isla solo detecta
+// la plataforma y reordena, así que no necesita —ni debe cargar— el catálogo.
+// LOS BINARIOS YA NO SE SIRVEN DESDE AQUÍ. Los instaladores son producto y se
+// bajan con cuenta y suscripción viva, así que viven detrás de Sytue ID, en el
+// portal. Este sitio es anónimo y estático por diseño: sigue contando qué son las
+// apps —que es su trabajo— y manda a iniciar sesión para bajarlas.
+//
+// El botón se ofrece SIEMPRE, haya o no binario publicado: al otro lado hay una
+// página que dice con precisión qué hay para cada plataforma, y decidir aquí que
+// «no hay» obligaría a este sitio estático a saber qué se publicó en la última
+// release, que es justo lo que no puede saber sin dejar de ser estático.
+const portalDescargas = appUrl('one', 'descargas');
+const desktop = DESKTOP.map((target) => ({
+  id: target.id,
+  label: target.label,
+  requirement: t(`platform.${target.id}.req`),
+  cta: t('downloads.signInToGet'),
+  href: portalDescargas,
+}));
+
+const mobile = MOBILE.map((target) => ({
+  id: target.id,
+  label: target.label,
+  requirement: t(`platform.${target.id}.req`),
+  // Sin ficha de tienda publicada, el botón dice «próximamente» en vez de mentir.
+  cta: t(target.href ? 'downloads.store' : 'downloads.soon', { format: target.store }),
+  href: target.href,
+}));
+
+// Los instaladores se reparten en BUNDLES. El panel de arriba ya ofrece el de la suite
+// —es lo que quiere la mayoría—, así que aquí se listan los demás, con lo que trae cada
+// uno.
+//
+// Qué se enseña lo decide el CATÁLOGO y no una lista de excepciones: un bundle que
+// lleva el nombre de un producto que todavía no existe no se ofrece. Antes esto era un
+// `b.key !== 'cloud'` escrito a mano, que había que acordarse de quitar el día que DevX
+// saliera; ahora basta con cambiar su `disponibilidad` y el instalador aparece solo.
+//
+// El enlace va al PORTAL, no al fichero. El bucket de descargas dejó de ser público
+// —ahora solo lo leen el portal, que firma una URL de cinco minutos, y el CI, que
+// publica—, así que un enlace directo al objeto da 403 a cualquier visitante. Las
+// plataformas se enseñan como TEXTO, que es lo que aporta la línea: saber que ese
+// bundle existe para tu sistema antes de iniciar sesión.
+const bundles = BUNDLES.filter((b) => b.key !== 'one' && bundleDisponible(b.key)).map((b) => ({
+  name: b.name,
+  incluye: appsDe(b),
+  plataformas: DESKTOP.map((target) => target.label),
+  href: portalDescargas,
+}));
+
+// Lo que trae el bundle de la suite, para la ficha del panel de arriba.
+const incluyeOne = appsDe(BUNDLES.find((b) => b.key === 'one')!);
+
+const panelLabels = {
+  desktopTitle: t('downloads.desktop.title'),
+  desktopBody: t('downloads.desktop.body'),
+  mobileTitle: t('downloads.mobile.title'),
+  mobileBody: t('downloads.mobile.body'),
+  selfhostTitle: t('downloads.selfhost.title'),
+  selfhostBody: t('downloads.selfhost.body'),
+  yourSystem: t('downloads.yourSystem'),
+};
+
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'SoftwareApplication',
+  '@id': `${pageUrl}#app`,
+  name: 'Sytue One',
+  applicationCategory: 'BusinessApplication',
+  operatingSystem: 'macOS, Windows, Linux, iOS, Android',
+  url: pageUrl,
+  description: t('seo.downloads.description'),
+  isPartOf: { '@id': `${SITE_ORIGIN}/#software` },
+  provider: { '@id': `${SITE_ORIGIN}/#organization` },
+};
+---
+
+<MarketingLayout
+  locale={locale}
+  path="/downloads"
+  title={t('meta.downloads.title')}
+  description={t('meta.downloads.description')}
+  alternates={LOCALES}
+  jsonLd={[jsonLd]}
+>
+  <div class="mx-auto max-w-4xl px-6 py-16 md:py-20">
+    <header>
+      <span class="sytue-overline text-primary-text">{t('downloads.overline')}</span>
+      <h1 class="sytue-h1 text-text mt-3 text-balance">{t('downloads.h1')}</h1>
+      <p class="text-text-muted mt-4 max-w-2xl text-lg leading-relaxed text-pretty">
+        {t('downloads.intro')}
+      </p>
+    </header>
+
+    <div class="mt-12">
+      <DownloadPanel client:load desktop={desktop} mobile={mobile} labels={panelLabels} />
+    </div>
+
+    <p class="text-text-muted mt-4 text-sm">
+      {t('downloads.includes')} {/* Los nombres de producto son marca: no se traducen. */}
+      <span class="text-text">{incluyeOne.join(' · ')}</span>
+    </p>
+
+    {bundles.length > 0 && (
+      <section class="mt-16">
+        <h2 class="sytue-h2 text-text">{t('downloads.apps.title')}</h2>
+        <p class="text-text-muted mt-3 max-w-2xl leading-relaxed text-pretty">
+          {t('downloads.apps.body')}
+        </p>
+        <ul class="border-border divide-border mt-6 divide-y rounded-xl border">
+          {bundles.map((bundle) => (
+            <li class="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
+              <span class="min-w-40 grow">
+                {/* El nombre del bundle es marca: no se traduce. */}
+                <span class="text-text block font-semibold">{bundle.name}</span>
+                {bundle.incluye.length > 1 && (
+                  <span class="text-text-muted block text-sm">{bundle.incluye.join(' · ')}</span>
+                )}
+                <span class="sytue-meta">{bundle.plataformas.join(' · ')}</span>
+              </span>
+              <a
+                href={bundle.href}
+                class="text-primary-text sytue-focus-ring shrink-0 rounded text-sm font-medium hover:underline"
+              >
+                {/* Sin esto, el mismo texto repetido en cada fila no dice a un lector
+                      de pantalla de qué descarga es. */}
+                <span class="sr-only">{`${bundle.name} — `}</span>
+                {t('downloads.signInToGet')}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </section>
+    )}
+
+    <p class="text-text-muted mt-12 text-sm">
+      {t('downloads.browser.text')}{' '}
+      <a href={appDomains.one} class="text-primary-text font-semibold hover:underline">
+        {t('downloads.browser.link')}
+      </a>
+      .
+    </p>
+  </div>
+</MarketingLayout>

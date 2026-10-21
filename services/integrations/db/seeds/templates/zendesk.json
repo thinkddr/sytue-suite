@@ -1,0 +1,37 @@
+{
+  "key": "zendesk",
+  "tier": "tier2",
+  "manifest": {
+    "name": "Zendesk",
+    "description": "Centro de soporte y tickets de Zendesk, con inicio de sesión único.",
+    "category": "Soporte",
+    "color": "#03363D",
+    "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#03363D\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M4 6h8v12z\"/><path d=\"M20 18h-8V6z\"/></svg>",
+    "identity": {
+      "kind": "saml",
+      "entity_id": "{entity_id}",
+      "acs_url": "{acs_url}",
+      "name_id_format": "email"
+    },
+    "provisioning": "none",
+    "launch": {
+      "kind": "initiate"
+    },
+    "fields": [
+      {
+        "key": "entity_id",
+        "label": "Identificador de entidad (Entity ID)",
+        "placeholder": "https://acme.zendesk.com",
+        "help": "Lo tienes en el Centro de administración de Zendesk, en Cuenta → Seguridad → Inicio de sesión único → SAML. Ahí se llama «Entity ID».",
+        "required": true
+      },
+      {
+        "key": "acs_url",
+        "label": "URL de consumo de aserciones (ACS)",
+        "placeholder": "https://acme.zendesk.com/access/saml",
+        "help": "Lo tienes en el Centro de administración de Zendesk, en Cuenta → Seguridad → Inicio de sesión único → SAML. Ahí se llama «SAML SSO URL».",
+        "required": true
+      }
+    ]
+  }
+}

@@ -1,0 +1,17 @@
+"widgets.open" = "Megnyitás";
+"widgets.compose" = "Levélírás";
+"widgets.create" = "Esemény létrehozása";
+"widgets.notes" = "Jegyzetek";
+"widgets.rows" = "Sorok";
+"widgets.pending" = "Függőben";
+"widgets.channels" = "Csatornák";
+"widgets.photos" = "Fotók";
+"widgets.episodes" = "Epizódok";
+"widgets.apps" = "Alkalmazások";
+"widgets.calendars" = "Naptárak";
+"widgets.address_books" = "Címjegyzékek";
+"search.label" = "Globális keresés";
+"dataflow.item.files" = "Fájlok";
+"dataflow.item.events" = "Naptár";
+"dataflow.item.documents" = "Dokumentumok";
+"dataflow.item.contacts" = "Névjegyek";

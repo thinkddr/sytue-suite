@@ -1,0 +1,30 @@
+{
+  "key": "snowflake",
+  "tier": "tier2",
+  "manifest": {
+    "name": "Snowflake",
+    "description": "Data cloud y almacén analítico, con inicio de sesión único.",
+    "category": "Datos",
+    "color": "#29B5E8",
+    "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#29B5E8\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><line x1=\"12\" y1=\"3\" x2=\"12\" y2=\"21\"/><line x1=\"4.2\" y1=\"7.5\" x2=\"19.8\" y2=\"16.5\"/><line x1=\"4.2\" y1=\"16.5\" x2=\"19.8\" y2=\"7.5\"/></svg>",
+    "identity": {
+      "kind": "saml",
+      "entity_id": "https://{account}.snowflakecomputing.com",
+      "acs_url": "https://{account}.snowflakecomputing.com/fed/login",
+      "name_id_format": "email"
+    },
+    "provisioning": "none",
+    "launch": {
+      "kind": "initiate"
+    },
+    "fields": [
+      {
+        "key": "account",
+        "label": "Cuenta de Snowflake",
+        "placeholder": "acme-prod",
+        "help": "El identificador de cuenta: https://CUENTA.snowflakecomputing.com",
+        "required": true
+      }
+    ]
+  }
+}

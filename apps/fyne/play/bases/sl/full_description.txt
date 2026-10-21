@@ -1,0 +1,11 @@
+Povezane tabele za vodenje strank, naročil ali zalog, z dovoljenji in zapisom vsake spremembe.
+
+• Stranke, naročila ali zaloge v povezanih tabelah, brez znanja o zbirkah podatkov.
+• Delite z organizacijo z vlogo, ki jo izberete.
+• Vsaka sprememba je zabeležena: kdo jo je naredil in kakšna je bila prej.
+• Vaši podatki ostanejo v EU, izvozite jih, kadar želite.
+• Tabele s polji za besedilo, število, datum, potrditveno polje, eno izbiro in več izbir.
+• Povezave med tabelami: povežite naročilo s stranko in zbirka podatkov ne dovoli pretrgati povezave.
+• Dovoljenja za zbirko in za tabelo: lastnik, urejevalec, komentator in bralec.
+
+Šifrirano med prenosom (TLS 1.3). Infrastruktura Sytue je v EU. Lokacija zunanjih storitev je odvisna od njihovega ponudnika.

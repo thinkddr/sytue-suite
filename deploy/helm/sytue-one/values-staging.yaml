@@ -1,0 +1,173 @@
+# =============================================================================
+# Sytue One — overlay STAGING (Scaleway Kapsule, region UE fr-par).
+# Uso: helm upgrade --install sytue-one deploy/helm/sytue-one \
+#        -n sytue-staging --create-namespace \
+#        -f deploy/helm/sytue-one/values.yaml \
+#        -f deploy/helm/sytue-one/values-staging.yaml
+#
+# Dominio de staging: staging.sytue.eu (subdominios id., drive., mail., ...).
+# Escala reducida; ACME staging (certificados de prueba).
+# Sin valores secretos: todo por existingSecret, materializado desde Scaleway Secret Manager.
+# =============================================================================
+
+global:
+  env: staging
+  domain: staging.sytue.eu
+  region: fr-par
+  imageRegistry: rg.fr-par.scw.cloud/sytue-staging-platform
+  networkPolicy:
+    # CIDR del module.network en infra/terraform/environments/staging/main.tf.
+    # 03-desplegar.sh lo recibe del output private_network_cidr y lo inyecta
+    # también al desplegar; declararlo aquí permite renderizar este perfil
+    # fuera del clúster sin inventar una red ni apagar su política.
+    loadBalancerSourceCIDRs: ["10.30.0.0/22"]
+  tls:
+    issuer: sytue-letsencrypt-staging
+    issuers:
+      sytue-letsencrypt-staging:
+        enabled: true
+        server: https://acme-staging-v02.api.letsencrypt.org/directory
+      sytue-letsencrypt-prod:
+        enabled: false
+  # En `false`, igual que producción y por el mismo motivo: el CRD
+  # el grupo `monitoring.coreos.com` (v1) lo aporta el operador de Prometheus, y aquí no
+  # está instalado. Con esto en `true` el despliegue entero se cae ANTES de
+  # aplicar nada:
+  #
+  #   Error: execution error at (sytue-one/charts/traefik/templates/
+  #   servicemonitor.yaml:5:10): ERROR: You have to deploy
+  #   ese grupo de API primero
+  #
+  # Estaba en `true` desde siempre, así que este entorno NO se podía desplegar:
+  # se descubrió al montarlo de verdad. Se enciende junto con el operador, en el
+  # mismo cambio, no antes.
+  metrics:
+    serviceMonitor:
+      enabled: false
+      labels:
+        release: kube-prometheus-stack
+
+# Ingress canonico Traefik (escala reducida).
+traefik:
+  deployment:
+    replicas: 1
+  # El subchart de Traefik trae su propio ServiceMonitor y no mira el global:
+  # hay que apagarlo aparte, como ya hace values-prod.yaml.
+  metrics:
+    prometheus:
+      serviceMonitor:
+        enabled: false
+
+# -----------------------------------------------------------------------------
+# Servicios Go (escala reducida; HPA desactivado en staging).
+# Las imagenes pueden fijarse por digest via Renovate; aqui solo escala/replicas.
+# -----------------------------------------------------------------------------
+id:
+  replicaCount: 1
+  autoscaling: { enabled: false }
+drive:
+  replicaCount: 1
+  autoscaling: { enabled: false }
+docs:
+  replicaCount: 1
+  autoscaling: { enabled: false }
+mail:
+  replicaCount: 1
+  autoscaling: { enabled: false }
+  config:
+    # Correo a canal de Sytue Rooms. Debe coincidir con rooms.config.channelMailDomain
+    # (abajo), que lo publica, y con el MX de `rooms` del modulo dns.
+    channelMailDomain: rooms.staging.sytue.eu
+calendar:
+  replicaCount: 1
+  autoscaling: { enabled: false }
+contacts:
+  replicaCount: 1
+  autoscaling: { enabled: false }
+notes:
+  replicaCount: 1
+  autoscaling: { enabled: false }
+rooms:
+  replicaCount: 1
+  autoscaling: { enabled: false }
+  config:
+    # Mismo bucket que prod pero del entorno de staging (módulo object-storage).
+    recordingBucket: sytue-staging-recordings
+    # El MISMO dominio que mail.config.channelMailDomain.
+    channelMailDomain: rooms.staging.sytue.eu
+# Sytue Bases, APAGADA en este entorno (decisión pendiente del dueño, 2026-10-04). El
+# defecto del chart es encendida, pero aquí los guiones de deploy/production todavía no
+# crean sus secretos (`sytue-bases`, `bases-oidc-client-secret`) ni existen el DNS
+# `bases.<dominio>` y su certificado: encenderla dejaría el pod en
+# CreateContainerConfigError. Pasos en docs/operations.md#bases-encendido.
+bases:
+  enabled: false
+hub:
+  replicaCount: 1
+  autoscaling: { enabled: false }
+  config:
+    # Sin `bases`: aquí está apagada (ver arriba) y el Hub no anuncia lo que no hay.
+    apps: [one, mail, drive, calendar, contacts, docs, notes, photos, rooms, cast, pages, erp, cloud, console, id]
+cloud-api:
+  replicaCount: 1
+  autoscaling: { enabled: false }
+cloud-builder:
+  replicaCount: 1
+
+# PgBouncer, con una sola réplica. Va ACTIVADO aunque el base lo deje en false:
+# `02b-secretos.sh` materializa los DSN de las trece aplicaciones apuntando SIEMPRE
+# a `pgbouncer:6432` —el nombre DNS estable del Service, decidido antes de que
+# exista la release de Helm—, así que con el subchart apagado los secretos apuntan
+# a un servicio que no existe y ninguna aplicación conecta con la base. Es lo que
+# hacía que el despliegue de staging fallara en su contrato de PgBouncer: el gate
+# buscaba el Service en el manifiesto renderizado y no lo encontraba.
+pgbouncer:
+  enabled: true
+  replicaCount: 1
+  image:
+    # Del espejo del proyecto, NO de Docker Hub. Sin esto el chart renderiza
+    # `edoburu/pgbouncer:...` y el despliegue se traería la imagen de un registro
+    # fuera de la UE, que es justo lo que la política de cadena de suministro
+    # persigue. Producción ya lo hace así.
+    repository: pgbouncer
+    useGlobalRegistry: true
+
+# Dragonfly y LiveKit, del espejo del proyecto igual que PgBouncer. Sin
+# `useGlobalRegistry` el chart renderiza `docker.dragonflydb.io/...` y
+# `livekit/livekit-server`, o sea descargas desde fuera de la UE, y el gate de la
+# release las rechaza («imagen externa no permitida»). Producción ya lo hacía así;
+# staging arrastraba el defecto de los tres subcharts a la vez.
+dragonfly:
+  enabled: true
+  image:
+    repository: dragonfly
+    useGlobalRegistry: true
+
+# SFU LiveKit (single node en staging).
+livekit:
+  replicaCount: 1
+  image:
+    repository: livekit
+    tag: v1.13.5
+    useGlobalRegistry: true
+  # Canal SFU→egress: sin él la grabación no arranca. Ver values-prod.yaml.
+  redis:
+    enabled: true
+    address: "dragonfly:6379"
+
+# Grabador de reuniones. Se prueba AQUÍ antes que en prod: el egress levanta un
+# Chrome por grabación y es la pieza con más formas de fallar en silencio.
+sytue-livekit-egress:
+  enabled: true
+  redis:
+    address: "dragonfly:6379"
+
+# Frontends (1 replica, sin autoscaling).
+sytue-frontend:
+  # Bases, apagada como su servicio (ver `bases:` más arriba).
+  apps:
+    bases:
+      enabled: false
+  defaults:
+    replicaCount: 1
+    autoscaling: { enabled: false }

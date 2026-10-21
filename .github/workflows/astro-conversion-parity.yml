@@ -1,0 +1,72 @@
+# SPDX-License-Identifier: Apache-2.0
+name: astro-conversion-parity
+on:
+  push:
+    branches: [codex/astro-conversion-parity]
+  workflow_dispatch:
+    inputs:
+      compiler_ref:
+        description: 'Public compiler commit to compare (empty uses the verified pin)'
+        required: false
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: astro-conversion-parity-${{ github.ref }}-${{ inputs.compiler_ref || 'pinned' }}
+  cancel-in-progress: true
+defaults:
+  run:
+    shell: bash
+jobs:
+  real-product-conversion:
+    runs-on: sytue-arm64
+    timeout-minutes: 35
+    container:
+      image: node:24-bookworm@sha256:64af3819f9275802414d7cdc38c27e9d82bd564dec4d4da87d008255d36c63b4
+      volumes:
+        - /var/cache/sytue-ci/go-build:/github/home/.cache/go-build
+        - /var/cache/sytue-ci/go-mod:/github/home/go/pkg/mod
+    env:
+      GOPRIVATE: github.com/thinkddr/*,git.sytue.eu/*
+      GIT_CONFIG_COUNT: '1'
+      GIT_CONFIG_KEY_0: safe.directory
+      GIT_CONFIG_VALUE_0: '*'
+      GOMAXPROCS: '2'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Repository toolchains
+        run: .github/actions/toolchain/accion.sh go bun escritorio
+      - name: Authenticate existing private forks
+        env:
+          SYTUE_GIT_FORKS_TOKEN: ${{ secrets.SYTUE_GIT_FORKS_TOKEN }}
+        run: .github/actions/toolchain/forks.sh
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: thinkddr/astro-fyne
+          ref: ${{ inputs.compiler_ref || '620a1a2f6518a4779d4aef57b36b29109ccf25e6' }}
+          path: parity/compiler
+      - name: Install locked compiler dependencies
+        working-directory: parity/compiler
+        run: |
+          bun install --frozen-lockfile --ignore-scripts
+          bun audit --audit-level=high
+          bunx --no-install playwright install --with-deps chromium
+      # Compare the committed product assets. Favicon regeneration is unrelated
+      # to this conversion probe and needs the design team's ImageMagick 7.
+      - name: Prepare original frontend dependencies
+        run: |
+          cd apps/frontend
+          bun install --frozen-lockfile --ignore-scripts
+      - name: Exercise real source conversions and original references
+        run: bun tools/astro-fyne-parity/run.ts parity/compiler
+      - name: Preserve private conversion evidence
+        if: always()
+        # The measured report also lives in private job logs. An exhausted
+        # account artifact quota must not erase that independent test result.
+        continue-on-error: true
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: astro-conversion-parity-${{ github.sha }}
+          path: artifacts/astro-conversion-parity
+          if-no-files-found: warn
+          retention-days: 3

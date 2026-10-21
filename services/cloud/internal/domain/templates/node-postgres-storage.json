@@ -1,0 +1,54 @@
+{
+  "id": "node-postgres-storage",
+  "name": "App Node + Postgres + Almacenamiento",
+  "description": "App Node/Bun con base Sytue Postgres y un bucket de objetos aprovisionados.",
+  "version": "1.0.0",
+  "license": "Apache-2.0",
+  "maintainer": "Sytue",
+  "framework": "node",
+  "build": {
+    "strategy": "buildpacks",
+    "install": "bun install --frozen-lockfile",
+    "build": "bun run build"
+  },
+  "instance_size": "standard",
+  "services": ["postgres", "storage"],
+  "env": [
+    {
+      "key": "DATABASE_URL",
+      "origin": "from_service",
+      "service": "postgres"
+    },
+    {
+      "key": "S3_ENDPOINT",
+      "origin": "from_service",
+      "service": "storage"
+    },
+    {
+      "key": "S3_REGION",
+      "origin": "from_service",
+      "service": "storage"
+    },
+    {
+      "key": "S3_BUCKET",
+      "origin": "from_service",
+      "service": "storage"
+    },
+    {
+      "key": "S3_ACCESS_KEY",
+      "origin": "from_service",
+      "service": "storage"
+    },
+    {
+      "key": "S3_SECRET_KEY",
+      "origin": "from_service",
+      "service": "storage"
+    },
+    {
+      "key": "SESSION_SECRET",
+      "origin": "generate"
+    }
+  ],
+  "docs_url": "https://nodejs.org/en/docs",
+  "tags": ["node", "fullstack", "storage"]
+}

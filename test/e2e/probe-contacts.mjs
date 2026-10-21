@@ -1,0 +1,11 @@
+import { chromium } from 'playwright';
+import { fileURLToPath } from 'node:url';
+const STORAGE = fileURLToPath(new URL('/Users/ddr/Documents/Sytue/sytueOne/test/e2e/.auth/admin.json', import.meta.url));
+const b = await chromium.launch();
+const c = await b.newContext({ storageState: STORAGE, ignoreHTTPSErrors: true, viewport: { width: 1440, height: 900 } });
+const p = await c.newPage();
+await p.goto('https://contacts.sytue.localhost/', { waitUntil: 'domcontentloaded' });
+await p.waitForTimeout(6000);
+const lis = await p.locator('li').allInnerTexts();
+console.log(JSON.stringify(lis.slice(0, 12)));
+await b.close();

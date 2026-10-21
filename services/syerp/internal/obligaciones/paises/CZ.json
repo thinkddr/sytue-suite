@@ -1,0 +1,318 @@
+{
+ "pais": "CZ",
+ "verificado": true,
+ "moneda": "CZK",
+ "formas": [
+  {
+   "clave": "osvc",
+   "nombre": "OSVČ (živnostník)",
+   "tipo": "persona_fisica"
+  },
+  {
+   "clave": "vos",
+   "nombre": "Veřejná obchodní společnost (v.o.s.)",
+   "tipo": "persona_fisica"
+  },
+  {
+   "clave": "sro",
+   "nombre": "Společnost s ručením omezeným (s.r.o.)",
+   "tipo": "sociedad"
+  },
+  {
+   "clave": "as",
+   "nombre": "Akciová společnost (a.s.)",
+   "tipo": "sociedad"
+  }
+ ],
+ "portales": {
+  "mojedane": {
+   "nombre": "Moje daně (Finanční správa)",
+   "url": "https://www.mojedane.cz/"
+  },
+  "cssz": {
+   "nombre": "ePortál ČSSZ",
+   "url": "https://eportal.cssz.cz/"
+  },
+  "justice": {
+   "nombre": "Sbírka listin (justice.cz)",
+   "url": "https://or.justice.cz/"
+  }
+ },
+ "obligaciones": [
+  {
+   "clave": "cz_dph_m",
+   "nombre": "Přiznání k DPH (měsíční)",
+   "concepto": "iva_periodica",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "25"
+   },
+   "margen_dias": 7,
+   "portal": "mojedane",
+   "aplica": {
+    "condiciones": [
+     "iva",
+     "iva_mensual"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_pct_mes": 0.05,
+    "recargo_max_pct": 5,
+    "fija_centimos": 100000,
+    "moneda": "CZK",
+    "nota": "Pokuta za opožděné tvrzení 0,05 % daně za každý den (max. 5 %, min. 1 000 Kč po 5 pracovních dnech); úrok z prodlení repo + 8 %."
+   },
+   "calculo": {
+    "tipo": "saldo_neto",
+    "haber": [
+     "477"
+    ],
+    "debe": [
+     "472"
+    ]
+   }
+  },
+  {
+   "clave": "cz_dph_q",
+   "nombre": "Přiznání k DPH (čtvrtletní)",
+   "concepto": "iva_periodica",
+   "ambito": "fiscal",
+   "periodicidad": "trimestral",
+   "plazos": {
+    "T": "25"
+   },
+   "margen_dias": 7,
+   "portal": "mojedane",
+   "aplica": {
+    "condiciones": [
+     "iva",
+     "!iva_mensual"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_pct_mes": 0.05,
+    "recargo_max_pct": 5,
+    "moneda": "CZK",
+    "nota": "Pokuta 0,05 % daně za den (max. 5 %); úrok z prodlení."
+   },
+   "calculo": {
+    "tipo": "saldo_neto",
+    "haber": [
+     "477"
+    ],
+    "debe": [
+     "472"
+    ]
+   }
+  },
+  {
+   "clave": "cz_kh",
+   "nombre": "Kontrolní hlášení",
+   "concepto": "control_iva",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "25"
+   },
+   "margen_dias": 7,
+   "portal": "mojedane",
+   "aplica": {
+    "condiciones": [
+     "iva"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 100000,
+    "moneda": "CZK",
+    "nota": "Právnické osoby měsíčně do 25 dnů po skončení měsíce i při čtvrtletním zdaňovacím období; fyzické osoby se čtvrtletním obdobím spolu s přiznáním. Pokuta 1 000 Kč (podáno bez výzvy), 10 000 Kč po výzvě, až 50 000 Kč."
+   }
+  },
+  {
+   "clave": "cz_sh",
+   "nombre": "Souhrnné hlášení",
+   "concepto": "operaciones_intracomunitarias",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "25"
+   },
+   "margen_dias": 7,
+   "portal": "mojedane",
+   "aplica": {
+    "condiciones": [
+     "intracomunitario"
+    ]
+   },
+   "sancion": {
+    "tipo": "nota",
+    "nota": "Pokuta za nesplnění povinnosti nepeněžité povahy až 500 000 Kč."
+   }
+  },
+  {
+   "clave": "cz_zalohy",
+   "nombre": "Záloha na daň z příjmů ze závislé činnosti",
+   "concepto": "retenciones_trabajo",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "20"
+   },
+   "margen_dias": 7,
+   "portal": "mojedane",
+   "aplica": {
+    "condiciones": [
+     "empleados"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_pct_mes": 1,
+    "recargo_max_pct": 12,
+    "moneda": "CZK",
+    "nota": "Úrok z prodlení (repo sazba + 8 % ročně)."
+   }
+  },
+  {
+   "clave": "cz_pojistne",
+   "nombre": "Pojistné na sociální a zdravotní pojištění (zaměstnanci)",
+   "concepto": "seguridad_social",
+   "ambito": "laboral",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "20"
+   },
+   "margen_dias": 7,
+   "portal": "cssz",
+   "aplica": {
+    "condiciones": [
+     "empleados"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_pct_mes": 1,
+    "recargo_max_pct": 12,
+    "moneda": "CZK",
+    "nota": "Penále 0,0411 % dlužné částky za každý den prodlení (od 2022)."
+   }
+  },
+  {
+   "clave": "cz_osvc",
+   "nombre": "Zálohy OSVČ (sociální a zdravotní)",
+   "concepto": "cuota_autonomos",
+   "ambito": "laboral",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "ultimo+0"
+   },
+   "margen_dias": 7,
+   "portal": "cssz",
+   "aplica": {
+    "tipos": [
+     "persona_fisica"
+    ]
+   },
+   "sancion": {
+    "tipo": "nota",
+    "nota": "Penále 0,0411 % dlužné částky za každý den prodlení."
+   }
+  },
+  {
+   "clave": "cz_dppo",
+   "nombre": "Přiznání k dani z příjmů právnických osob",
+   "concepto": "sociedades_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "05-02+1"
+   },
+   "margen_dias": 30,
+   "portal": "mojedane",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_pct_mes": 0.05,
+    "recargo_max_pct": 5,
+    "moneda": "CZK",
+    "nota": "Pokuta 0,05 % daně za den (max. 5 %). Lhůta 1. dubna (papírově), 1. května (elektronicky; svátek, proto zde 2. května) nebo 1. července (s poradcem)."
+   }
+  },
+  {
+   "clave": "cz_zalohy_dppo",
+   "nombre": "Zálohy na daň z příjmů právnických osob",
+   "concepto": "pago_fraccionado_sociedades",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "1P": "03-15",
+    "2P": "06-15",
+    "3P": "09-15",
+    "4P": "12-15"
+   },
+   "margen_dias": 7,
+   "portal": "mojedane",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "nota",
+    "nota": "Čtvrtletně při poslední dani nad 150 000 Kč, pololetně mezi 30 000 a 150 000 Kč."
+   }
+  },
+  {
+   "clave": "cz_dpfo",
+   "nombre": "Přiznání k dani z příjmů fyzických osob",
+   "concepto": "renta_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "05-02+1"
+   },
+   "margen_dias": 30,
+   "portal": "mojedane",
+   "aplica": {
+    "tipos": [
+     "persona_fisica"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_pct_mes": 0.05,
+    "recargo_max_pct": 5,
+    "moneda": "CZK",
+    "nota": "Pokuta 0,05 % daně za den (max. 5 %). Přehledy pro ČSSZ a zdravotní pojišťovnu do jednoho měsíce po přiznání."
+   }
+  },
+  {
+   "clave": "cz_ucetni",
+   "nombre": "Účetní závěrka do sbírky listin",
+   "concepto": "cuentas_anuales",
+   "ambito": "mercantil",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "12-31+1"
+   },
+   "margen_dias": 60,
+   "portal": "justice",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "nota",
+    "nota": "Pokuta až 3 % hodnoty aktiv (zákon o účetnictví) a pořádková pokuta rejstříkového soudu až 100 000 Kč; do 30 dnů od schválení, nejpozději do 12 měsíců od rozvahového dne."
+   }
+  }
+ ]
+}

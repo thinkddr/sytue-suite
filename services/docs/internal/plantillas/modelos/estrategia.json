@@ -1,0 +1,164 @@
+{
+ "slides": [
+  {
+   "id": "s1",
+   "boxes": [
+    {
+     "id": "s1-titulo",
+     "x": 10,
+     "y": 35,
+     "w": 80,
+     "h": 20,
+     "html": "<h1>{{estrategia.titulo}}</h1>"
+    },
+    {
+     "id": "s1-subtitulo",
+     "x": 10,
+     "y": 58,
+     "w": 80,
+     "h": 10,
+     "html": "<p>{{estrategia.subtitulo}}</p>"
+    }
+   ]
+  },
+  {
+   "id": "s2",
+   "boxes": [
+    {
+     "id": "s2-titulo",
+     "x": 8,
+     "y": 8,
+     "w": 84,
+     "h": 16,
+     "html": "<h1>{{estrategia.situacion}}</h1>"
+    },
+    {
+     "id": "s2-cuerpo",
+     "x": 8,
+     "y": 30,
+     "w": 84,
+     "h": 60,
+     "html": "<ul><li>{{estrategia.situacion1}}</li><li>{{estrategia.situacion2}}</li><li>{{estrategia.situacion3}}</li></ul>"
+    }
+   ]
+  },
+  {
+   "id": "s3",
+   "boxes": [
+    {
+     "id": "s3-titulo",
+     "x": 8,
+     "y": 8,
+     "w": 84,
+     "h": 16,
+     "html": "<h1>{{estrategia.prioridades}}</h1>"
+    },
+    {
+     "id": "s3-cuerpo",
+     "x": 8,
+     "y": 30,
+     "w": 84,
+     "h": 60,
+     "html": "<ul><li>{{estrategia.prioridad1}}</li><li>{{estrategia.prioridad2}}</li><li>{{estrategia.prioridad3}}</li></ul>"
+    }
+   ]
+  },
+  {
+   "id": "s4",
+   "boxes": [
+    {
+     "id": "s4-titulo",
+     "x": 8,
+     "y": 8,
+     "w": 84,
+     "h": 16,
+     "html": "<h1>{{estrategia.metas}}</h1>"
+    },
+    {
+     "id": "s4-grafico",
+     "x": 8,
+     "y": 28,
+     "w": 56,
+     "h": 64,
+     "html": "",
+     "kind": "chart",
+     "chart": {
+      "type": "bar",
+      "grid": [
+       [
+        "",
+        "{{=estrategia.serie}}"
+       ],
+       [
+        "{{=trimestral.t1}}",
+        "100"
+       ],
+       [
+        "{{=trimestral.t2}}",
+        "120"
+       ],
+       [
+        "{{=trimestral.t3}}",
+        "140"
+       ],
+       [
+        "{{=trimestral.t4}}",
+        "170"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "s4-nota",
+     "x": 68,
+     "y": 30,
+     "w": 24,
+     "h": 60,
+     "html": "<p>{{estrategia.metas_nota}}</p>"
+    }
+   ]
+  },
+  {
+   "id": "s5",
+   "boxes": [
+    {
+     "id": "s5-titulo",
+     "x": 8,
+     "y": 8,
+     "w": 84,
+     "h": 16,
+     "html": "<h1>{{estrategia.iniciativas}}</h1>"
+    },
+    {
+     "id": "s5-cuerpo",
+     "x": 8,
+     "y": 30,
+     "w": 84,
+     "h": 60,
+     "html": "<ul><li>{{estrategia.iniciativa}}</li><li>{{estrategia.iniciativa}}</li><li>{{estrategia.iniciativa}}</li></ul>"
+    }
+   ]
+  },
+  {
+   "id": "s6",
+   "boxes": [
+    {
+     "id": "s6-titulo",
+     "x": 8,
+     "y": 8,
+     "w": 84,
+     "h": 16,
+     "html": "<h1>{{estrategia.riesgos}}</h1>"
+    },
+    {
+     "id": "s6-cuerpo",
+     "x": 8,
+     "y": 30,
+     "w": 84,
+     "h": 60,
+     "html": "<ul><li>{{estrategia.riesgo}}</li><li>{{estrategia.riesgo}}</li></ul>"
+    }
+   ]
+  }
+ ]
+}

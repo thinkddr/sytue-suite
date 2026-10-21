@@ -1,0 +1,213 @@
+{
+ "active": 0,
+ "sheets": [
+  {
+   "name": "{{contactos.hoja}}",
+   "cells": {
+    "A1": "<b>{{contactos.titulo}}</b>",
+    "A3": "<b>{{contactos.persona}}</b>",
+    "B3": "<b>{{contactos.organizacion}}</b>",
+    "C3": "<b>{{contactos.cargo}}</b>",
+    "D3": "<b>{{contactos.correo}}</b>",
+    "E3": "<b>{{contactos.telefono}}</b>",
+    "F3": "<b>{{contactos.ultimo}}</b>",
+    "G3": "<b>{{planificacion.notas}}</b>",
+    "A4": "{{contactos.ej_nombre}}",
+    "B4": "{{contactos.ej_organizacion}}"
+   },
+   "formats": {
+    "F4": {
+     "id": "date"
+    },
+    "F5": {
+     "id": "date"
+    },
+    "F6": {
+     "id": "date"
+    },
+    "F7": {
+     "id": "date"
+    },
+    "F8": {
+     "id": "date"
+    },
+    "F9": {
+     "id": "date"
+    },
+    "F10": {
+     "id": "date"
+    },
+    "F11": {
+     "id": "date"
+    },
+    "F12": {
+     "id": "date"
+    },
+    "F13": {
+     "id": "date"
+    },
+    "F14": {
+     "id": "date"
+    },
+    "F15": {
+     "id": "date"
+    },
+    "F16": {
+     "id": "date"
+    },
+    "F17": {
+     "id": "date"
+    },
+    "F18": {
+     "id": "date"
+    },
+    "F19": {
+     "id": "date"
+    },
+    "F20": {
+     "id": "date"
+    },
+    "F21": {
+     "id": "date"
+    },
+    "F22": {
+     "id": "date"
+    },
+    "F23": {
+     "id": "date"
+    },
+    "F24": {
+     "id": "date"
+    },
+    "F25": {
+     "id": "date"
+    },
+    "F26": {
+     "id": "date"
+    },
+    "F27": {
+     "id": "date"
+    },
+    "F28": {
+     "id": "date"
+    },
+    "F29": {
+     "id": "date"
+    },
+    "F30": {
+     "id": "date"
+    },
+    "F31": {
+     "id": "date"
+    },
+    "F32": {
+     "id": "date"
+    },
+    "F33": {
+     "id": "date"
+    },
+    "F34": {
+     "id": "date"
+    },
+    "F35": {
+     "id": "date"
+    },
+    "F36": {
+     "id": "date"
+    },
+    "F37": {
+     "id": "date"
+    },
+    "F38": {
+     "id": "date"
+    },
+    "F39": {
+     "id": "date"
+    },
+    "F40": {
+     "id": "date"
+    },
+    "F41": {
+     "id": "date"
+    },
+    "F42": {
+     "id": "date"
+    },
+    "F43": {
+     "id": "date"
+    },
+    "F44": {
+     "id": "date"
+    },
+    "F45": {
+     "id": "date"
+    },
+    "F46": {
+     "id": "date"
+    },
+    "F47": {
+     "id": "date"
+    },
+    "F48": {
+     "id": "date"
+    },
+    "F49": {
+     "id": "date"
+    },
+    "F50": {
+     "id": "date"
+    },
+    "F51": {
+     "id": "date"
+    },
+    "F52": {
+     "id": "date"
+    },
+    "F53": {
+     "id": "date"
+    }
+   },
+   "styles": {
+    "A3": {
+     "border": {
+      "b": true
+     }
+    },
+    "B3": {
+     "border": {
+      "b": true
+     }
+    },
+    "C3": {
+     "border": {
+      "b": true
+     }
+    },
+    "D3": {
+     "border": {
+      "b": true
+     }
+    },
+    "E3": {
+     "border": {
+      "b": true
+     }
+    },
+    "F3": {
+     "border": {
+      "b": true
+     }
+    },
+    "G3": {
+     "border": {
+      "b": true
+     }
+    }
+   },
+   "freeze": {
+    "cols": 0,
+    "rows": 3
+   }
+  }
+ ]
+}

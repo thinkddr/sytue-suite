@@ -1,0 +1,386 @@
+From 77c580ac405d9d6a6ac777eb201e98a7e87ff8af Mon Sep 17 00:00:00 2001
+From: Daniel Delgado <admin@sytue.eu>
+Date: Sun, 27 Sep 2026 22:59:11 +0000
+Subject: [PATCH 1/2] cache, container, painter, test: stop keeping everything
+ ever themed alive
+
+Three leaks, measured on the Sytue test suite (apps/mail, 78 screens): every
+screen stayed in memory until the process ended, 1 GB after one run and
++~180 MB per -count; with this change the heap after the run is 145 MB, 44 MB
+once the renderer cache expires, and it no longer grows with -count.
+
+- ThemeOverride: the override scope kept against every covered object holds
+  the theme, and the theme (featureTheme) pointed back at the container, which
+  holds those same objects. It now points at a small themeFeatures struct.
+- internal/cache: the override scopes were in a map keyed by the objects
+  themselves. Only widgets were ever deleted (when their renderer expired), so
+  canvas primitives under an override lived for good. With Go 1.24 the key is
+  a weak pointer; older toolchains keep the previous map.
+- internal/painter: the font cache was keyed by override scope, so every new
+  ThemeOverride parsed the theme, emoji and symbol fonts again and kept them
+  (55 % of that heap). It is keyed by the font the widget's theme gives.
+- test: the queue of fyne.Do calls cleared each slot as it ran; reslicing kept
+  the finished calls reachable from the backing array.
+
+TestThemeOverride_DoesNotRetainContent and
+TestCachedFontFace_SharedAcrossOverrideScopes fail with each change reverted.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+---
+ container/theme.go              | 21 ++++++++++----
+ container/theme_retain_test.go  | 31 +++++++++++++++++++++
+ internal/cache/overrides.go     | 49 +++++++++++++++++++++++++++++++++
+ internal/cache/overrides_old.go | 13 +++++++++
+ internal/cache/theme.go         |  3 +-
+ internal/painter/font.go        | 21 +++++++-------
+ internal/painter/font_test.go   | 24 ++++++++++++++++
+ test/driver.go                  |  1 +
+ 8 files changed, 145 insertions(+), 18 deletions(-)
+ create mode 100644 container/theme_retain_test.go
+ create mode 100644 internal/cache/overrides.go
+ create mode 100644 internal/cache/overrides_old.go
+
+diff --git a/container/theme.go b/container/theme.go
+index b6f8177fd..729fc859e 100644
+--- a/container/theme.go
++++ b/container/theme.go
+@@ -20,7 +20,7 @@ type ThemeOverride struct {
+ 
+ 	holder *fyne.Container
+ 
+-	mobile bool
++	features *themeFeatures
+ }
+ 
+ // NewThemeOverride provides a container where the child widgets are themed by the specified theme.
+@@ -32,7 +32,7 @@ type ThemeOverride struct {
+ //
+ // Since: 2.5
+ func NewThemeOverride(obj fyne.CanvasObject, th fyne.Theme) *ThemeOverride {
+-	t := &ThemeOverride{Content: obj, Theme: th, holder: NewStack(obj)}
++	t := &ThemeOverride{Content: obj, Theme: th, holder: NewStack(obj), features: &themeFeatures{}}
+ 	t.ExtendBaseWidget(t)
+ 
+ 	cache.OverrideTheme(obj, addFeatures(th, t))
+@@ -63,18 +63,29 @@ func (t *ThemeOverride) Refresh() {
+ //
+ // Since: 2.6
+ func (t *ThemeOverride) SetDeviceIsMobile(on bool) {
+-	t.mobile = on
++	t.features.mobile = on
+ 	t.Refresh()
+ }
+ 
++// themeFeatures is what a ThemeOverride tells the themed objects about itself. The
++// theme holds this and not the container: the theme is kept against every object it
++// covers, and a pointer back to the container (and so to those same objects) kept them
++// all alive for good.
++type themeFeatures struct {
++	mobile bool
++}
++
+ type featureTheme struct {
+ 	fyne.Theme
+ 
+-	over *ThemeOverride
++	over *themeFeatures
+ }
+ 
+ func addFeatures(th fyne.Theme, o *ThemeOverride) fyne.Theme {
+-	return &featureTheme{Theme: th, over: o}
++	if o.features == nil {
++		o.features = &themeFeatures{}
++	}
++	return &featureTheme{Theme: th, over: o.features}
+ }
+ 
+ func (f *featureTheme) Feature(n intTheme.FeatureName) any {
+diff --git a/container/theme_retain_test.go b/container/theme_retain_test.go
+new file mode 100644
+index 000000000..e5c01de46
+--- /dev/null
++++ b/container/theme_retain_test.go
+@@ -0,0 +1,31 @@
++//go:build go1.24
++
++package container
++
++import (
++	"image/color"
++	"runtime"
++	"testing"
++	"weak"
++
++	"fyne.io/fyne/v2/canvas"
++	"fyne.io/fyne/v2/test"
++)
++
++// A ThemeOverride must not keep what it covers alive once nothing else uses it. The
++// override scope is kept against every covered object, and it used to point back at the
++// container, so every object ever placed under an override stayed in memory for good.
++func TestThemeOverride_DoesNotRetainContent(t *testing.T) {
++	test.NewTempApp(t)
++	content := func() weak.Pointer[canvas.Rectangle] {
++		r := canvas.NewRectangle(color.Black)
++		NewThemeOverride(NewStack(r), test.Theme())
++		return weak.Make(r)
++	}()
++	for range 3 {
++		runtime.GC()
++	}
++	if content.Value() != nil {
++		t.Error("the content of a discarded ThemeOverride is still alive")
++	}
++}
+diff --git a/internal/cache/overrides.go b/internal/cache/overrides.go
+new file mode 100644
+index 000000000..a42ed4834
+--- /dev/null
++++ b/internal/cache/overrides.go
+@@ -0,0 +1,49 @@
++//go:build go1.24
++
++package cache
++
++import (
++	"reflect"
++	"sync"
++	"weak"
++
++	"fyne.io/fyne/v2"
++)
++
++// overrideMap maps a canvas object to its theme override scope without keeping the
++// object alive. A plain map kept every object ever placed under a ThemeOverride for good:
++// canvas primitives are never deleted (only widgets are, when their renderer expires),
++// and a primitive's closures (a Raster generator, say) held the whole screen that built it.
++type overrideMap struct{ m sync.Map } // weak.Pointer[byte] → *overrideScope
++
++func overrideKey(o fyne.CanvasObject) (weak.Pointer[byte], bool) {
++	v := reflect.ValueOf(o)
++	if o == nil || v.Kind() != reflect.Pointer || v.IsNil() {
++		return weak.Pointer[byte]{}, false
++	}
++	return weak.Make((*byte)(v.UnsafePointer())), true
++}
++
++func (m *overrideMap) Load(o fyne.CanvasObject) (*overrideScope, bool) {
++	k, ok := overrideKey(o)
++	if !ok {
++		return nil, false
++	}
++	v, ok := m.m.Load(k)
++	if !ok {
++		return nil, false
++	}
++	return v.(*overrideScope), true
++}
++
++func (m *overrideMap) Store(o fyne.CanvasObject, s *overrideScope) {
++	if k, ok := overrideKey(o); ok {
++		m.m.Store(k, s)
++	}
++}
++
++func (m *overrideMap) Delete(o fyne.CanvasObject) {
++	if k, ok := overrideKey(o); ok {
++		m.m.Delete(k)
++	}
++}
+diff --git a/internal/cache/overrides_old.go b/internal/cache/overrides_old.go
+new file mode 100644
+index 000000000..8ff740635
+--- /dev/null
++++ b/internal/cache/overrides_old.go
+@@ -0,0 +1,13 @@
++//go:build !go1.24
++
++package cache
++
++import (
++	"fyne.io/fyne/v2"
++	"fyne.io/fyne/v2/internal/async"
++)
++
++// overrideMap without weak pointers (before Go 1.24) keeps its objects alive.
++type overrideMap struct {
++	async.Map[fyne.CanvasObject, *overrideScope]
++}
+diff --git a/internal/cache/theme.go b/internal/cache/theme.go
+index f199843d0..200beec95 100644
+--- a/internal/cache/theme.go
++++ b/internal/cache/theme.go
+@@ -5,11 +5,10 @@ import (
+ 	"sync/atomic"
+ 
+ 	"fyne.io/fyne/v2"
+-	"fyne.io/fyne/v2/internal/async"
+ )
+ 
+ var (
+-	overrides     async.Map[fyne.CanvasObject, *overrideScope]
++	overrides     overrideMap
+ 	overrideCount atomic.Uint32
+ )
+ 
+diff --git a/internal/painter/font.go b/internal/painter/font.go
+index 826668616..a4b7d8733 100644
+--- a/internal/painter/font.go
++++ b/internal/painter/font.go
+@@ -135,18 +135,17 @@ func CachedFontFace(style fyne.TextStyle, source fyne.Resource, o fyne.CanvasObj
+ 		return val
+ 	}
+ 
+-	scope := ""
+-	if o != nil { // for overridden themes get the cache key right
+-		scope = cache.WidgetScopeID(o)
+-	}
+-
+-	val, ok := fontCache.Load(cacheID{style: style, scope: scope})
++	// The faces depend only on the style and on the font the widget's theme gives for it,
++	// so that is the key. Keyed by override scope, every new ThemeOverride parsed the
++	// theme, emoji and symbol fonts again and kept them for good.
++	th := theme.CurrentForWidget(o)
++	font1 := th.Font(style)
++	id := cacheID{style: style, font: font1}
++
++	val, ok := fontCache.Load(id)
+ 	if !ok {
+ 		var faces *dynamicFontMap
+ 
+-		th := theme.CurrentForWidget(o)
+-		font1 := th.Font(style)
+-
+ 		// Skip any nil fallback fonts — they can be nil when built with
+ 		// -tags no_emoji, and the lookupFaces loop expects non-nil entries.
+ 		var fallbacks []fyne.Resource
+@@ -181,7 +180,7 @@ func CachedFontFace(style fyne.TextStyle, source fyne.Resource, o fyne.CanvasObj
+ 		}
+ 
+ 		val = &FontCacheItem{Fonts: faces}
+-		fontCache.Store(cacheID{style: style, scope: scope}, val)
++		fontCache.Store(id, val)
+ 	}
+ 
+ 	return val
+@@ -500,7 +499,7 @@ type FontCacheItem struct {
+ 
+ type cacheID struct {
+ 	style fyne.TextStyle
+-	scope string
++	font  fyne.Resource
+ }
+ 
+ var (
+diff --git a/internal/painter/font_test.go b/internal/painter/font_test.go
+index e66177281..e520082ae 100644
+--- a/internal/painter/font_test.go
++++ b/internal/painter/font_test.go
+@@ -10,6 +10,7 @@ import (
+ 
+ 	"fyne.io/fyne/v2"
+ 	"fyne.io/fyne/v2/canvas"
++	"fyne.io/fyne/v2/container"
+ 	"fyne.io/fyne/v2/internal/painter"
+ 	intTest "fyne.io/fyne/v2/internal/test"
+ 	"fyne.io/fyne/v2/test"
+@@ -178,3 +179,26 @@ func TestRenderedTextSize(t *testing.T) {
+ 	assert.Equal(t, size1.Height, size2.Height)
+ 	assert.Equal(t, baseline1, baseline2)
+ }
++
++// Two overrides with the same theme are two scopes but the same fonts, so they share the
++// parsed faces; an override whose theme gives another font gets its own. Keyed by scope,
++// every new ThemeOverride parsed and kept a whole set of fonts again.
++func TestCachedFontFace_SharedAcrossOverrideScopes(t *testing.T) {
++	test.NewTempApp(t)
++	first, second := canvas.NewText("a", color.Black), canvas.NewText("b", color.Black)
++	container.NewThemeOverride(container.NewStack(first), test.Theme())
++	container.NewThemeOverride(container.NewStack(second), test.Theme())
++	assert.Same(t, painter.CachedFontFace(fyne.TextStyle{}, nil, first),
++		painter.CachedFontFace(fyne.TextStyle{}, nil, second), "same theme, same fonts")
++
++	other := canvas.NewText("c", color.Black)
++	container.NewThemeOverride(container.NewStack(other), &monoTheme{test.Theme()})
++	assert.NotSame(t, painter.CachedFontFace(fyne.TextStyle{}, nil, first),
++		painter.CachedFontFace(fyne.TextStyle{}, nil, other), "another font, other faces")
++}
++
++type monoTheme struct{ fyne.Theme }
++
++func (m *monoTheme) Font(fyne.TextStyle) fyne.Resource {
++	return m.Theme.Font(fyne.TextStyle{Monospace: true})
++}
+diff --git a/test/driver.go b/test/driver.go
+index a2354ebda..b960e319c 100644
+--- a/test/driver.go
++++ b/test/driver.go
+@@ -102,6 +102,7 @@ func (d *driver) runQueue() {
+ 			return
+ 		}
+ 		call := d.queue[0]
++		d.queue[0] = queuedCall{} // the backing array must not keep what already ran alive
+ 		d.queue = d.queue[1:]
+ 		d.queueLock.Unlock()
+ 
+-- 
+2.43.0
+
+
+From 5a25290dbdb573e331794be64e2a3c2e94f41872 Mon Sep 17 00:00:00 2001
+From: Daniel Delgado <admin@sytue.eu>
+Date: Mon, 28 Sep 2026 08:41:41 +0200
+Subject: [PATCH 2/2] painter/gl: keep the framebuffer alpha opaque
+
+With srcAlpha/oneMinusSrcAlpha on the alpha channel too, every antialiased
+edge left alpha below 1 over colours that are not premultiplied. A Wayland
+compositor (KWin) blends the surface as premultiplied and showed coloured
+fringes on every rounded or stroked edge. Colour keeps the requested factors;
+alpha uses ONE for the source so it always accumulates towards 1. Checked on a
+real Plasma session.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+---
+ internal/painter/gl/gl_core.go | 7 ++++++-
+ internal/painter/gl/gl_es.go   | 7 ++++++-
+ 2 files changed, 12 insertions(+), 2 deletions(-)
+
+diff --git a/internal/painter/gl/gl_core.go b/internal/painter/gl/gl_core.go
+index 26631846d..106ca119a 100644
+--- a/internal/painter/gl/gl_core.go
++++ b/internal/painter/gl/gl_core.go
+@@ -176,7 +176,12 @@ func (c *coreContext) BlendColor(r, g, b, a float32) {
+ }
+ 
+ func (c *coreContext) BlendFunc(srcFactor, destFactor uint32) {
+-	gl.BlendFunc(srcFactor, destFactor)
++	// The alpha channel of the framebuffer must stay opaque: with srcAlpha/oneMinusSrcAlpha
++	// on alpha too, every antialiased edge left alpha below 1 over colours that are not
++	// premultiplied, and a Wayland compositor (KWin), which blends the surface as
++	// premultiplied, showed coloured fringes on every rounded or stroked edge. The colour
++	// keeps the requested factors; alpha always accumulates towards 1.
++	gl.BlendFuncSeparate(srcFactor, destFactor, gl.ONE, destFactor)
+ }
+ 
+ func (c *coreContext) BufferData(target uint32, points []float32, usage uint32) {
+diff --git a/internal/painter/gl/gl_es.go b/internal/painter/gl/gl_es.go
+index 18e5cb49d..2e682192f 100644
+--- a/internal/painter/gl/gl_es.go
++++ b/internal/painter/gl/gl_es.go
+@@ -176,7 +176,12 @@ func (c *esContext) BlendColor(r, g, b, a float32) {
+ }
+ 
+ func (c *esContext) BlendFunc(srcFactor, destFactor uint32) {
+-	gl.BlendFunc(srcFactor, destFactor)
++	// The alpha channel of the framebuffer must stay opaque: with srcAlpha/oneMinusSrcAlpha
++	// on alpha too, every antialiased edge left alpha below 1 over colours that are not
++	// premultiplied, and a Wayland compositor (KWin), which blends the surface as
++	// premultiplied, showed coloured fringes on every rounded or stroked edge. The colour
++	// keeps the requested factors; alpha always accumulates towards 1.
++	gl.BlendFuncSeparate(srcFactor, destFactor, gl.ONE, destFactor)
+ }
+ 
+ func (c *esContext) BufferData(target uint32, points []float32, usage uint32) {
+-- 
+2.43.0
+

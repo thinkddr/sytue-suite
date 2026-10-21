@@ -1,0 +1,19 @@
+{
+  "name": "@sytue/e2e",
+  "private": true,
+  "type": "module",
+  "description": "Harness e2e (Playwright) para trazar errores de render/consola/red por producto.",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "bun test ./totp.test.ts",
+    "audit:pages-pilot": "bun run auditar-pages-piloto.mjs"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
+    "@playwright/test": "1.63.0",
+    "@types/node": "26.6.1",
+    "otplib": "12.0.1",
+    "playwright": "1.63.0",
+    "typescript": "6.0.3"
+  }
+}

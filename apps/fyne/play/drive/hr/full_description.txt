@@ -1,0 +1,16 @@
+Datoteke i suradnja pod vašim vlastitim brendom.
+
+• Prijenos, organizacija i dijeljenje uz kontrolirane poveznice (dopuštenja i istek).
+• Pretpregled dokumenata i slika izravno na stranici.
+• Prilaganje u Mailu bez dupliciranja datoteke.
+• Pohrana na S3 u europskim regijama.
+• Moj disk, timski diskovi, podijeljeno sa mnom, nedavno, favoriti i smeće.
+• Poveznice za dijeljenje s dvije razine (pregled ili uređivanje), zaporkom i istekom.
+• Povijest verzija s vraćanjem.
+• Pretpregled dokumenata, slika i PDF-ova bez preuzimanja.
+• Otvaranje i uređivanje uredskih dokumenata u Docusu, Calcusu i Diaposu; PDF-ova u CertiPDF-u.
+• Oznake osjetljivosti koje blokiraju javne poveznice tamo gdje im nije mjesto.
+• Dijeljenje u kanal Roomsa ili prilaganje u Mailu bez dupliciranja datoteke.
+• Pohrana S3 u europskim regijama, s kvotom uvijek na vidiku.
+
+Šifrirano u prijenosu (TLS 1.3). Infrastruktura Sytuea nalazi se u EU-u. Lokacija vanjskih usluga ovisi o njihovu pružatelju.

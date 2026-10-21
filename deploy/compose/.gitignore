@@ -1,0 +1,7 @@
+# Sytue One dev (compose) — artefactos locales, NUNCA versionar
+.env
+.env.*
+!.env.example
+
+# Certificados TLS locales (mkcert)
+traefik/certs/*.pem

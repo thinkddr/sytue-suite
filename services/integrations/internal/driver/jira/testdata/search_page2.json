@@ -1,0 +1,22 @@
+{
+  "startAt": 2,
+  "maxResults": 2,
+  "total": 3,
+  "issues": [
+    {
+      "id": "10003",
+      "key": "SUITE-103",
+      "fields": {
+        "summary": "Migrar el conector de Jira a la pasarela",
+        "status": { "name": "Hecho" },
+        "assignee": { "displayName": "Alan Turing" },
+        "priority": { "name": "Baja" },
+        "issuetype": { "name": "Historia" },
+        "project": { "key": "SUITE", "name": "Sytue Suite" },
+        "created": "2026-07-01T10:00:00.000+0200",
+        "updated": "2026-07-25T12:30:00.000+0200",
+        "labels": ["integraciones"]
+      }
+    }
+  ]
+}

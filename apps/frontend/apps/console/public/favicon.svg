@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" width="40" height="40" role="img" aria-label="Sytue Admin">
+  <!-- GENERADO por scripts/gen-marks.sh: cambia la paleta o el script, no este fichero. -->
+  <rect width="40" height="40" rx="9" fill="#506782"/>
+  <path d="M40 14V31a9 9 0 0 1-9 9H14Z" fill="#000000" fill-opacity="0.22"/>
+  <g transform="translate(20 20) scale(0.9932) translate(-20.025 -20.025)"><path fill-rule="evenodd" fill="#fff" d="M11.9 11.4h16.2a2.9 2.9 0 0 1 0 5.8H11.9a2.9 2.9 0 0 1 0-5.8Zm3.9 4.8a1.9 1.9 0 1 0 0-3.8 1.9 1.9 0 0 0 0 3.8Z"/><path fill-rule="evenodd" fill="#fff" d="M11.9 22.8h16.2a2.9 2.9 0 0 1 0 5.8H11.9a2.9 2.9 0 0 1 0-5.8Zm12.3 4.8a1.9 1.9 0 1 0 0-3.8 1.9 1.9 0 0 0 0 3.8Z"/></g>
+</svg>

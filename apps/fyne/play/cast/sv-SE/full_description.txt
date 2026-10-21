@@ -1,0 +1,17 @@
+Dina videor och dina livesändningar, på begäran och i realtid, utan att lämna Europa.
+
+• Ladda upp en video så omkodas den i flera kvaliteter för alla skärmar.
+• Sänd live från sändningsprogramvara, från webbläsaren eller från appen.
+• Fyra synlighetsnivåer: offentlig, olistad, organisation eller utvalda personer.
+• Livechatt och kommentarer, med grundläggande moderering av den som publicerar.
+• Ladda upp videor på upp till 8 GiB; originalet behålls.
+• Livesändning från sändningsprogramvara via RTMP, med en strömnyckel per person.
+• Live från webbläsaren eller appen: kamera, skärm och mikrofon.
+• Inspelningar av livesändningar blir automatiskt videor på begäran.
+• En offentlig startsida och en kanal per organisation, indexerbara.
+• Olistade länkar, videor bara för organisationen eller åtkomst för utvalda personer via @användarnamn.
+• Livechatt och trådade kommentarer, modererade av den som publicerar och organisationens administratörer.
+• Lagringen räknas mot din kvot i Sytue Drive; allt i Europeiska unionen.
+• ”Ladda upp till Cast” från Sytue Drive: en kopia av videon går till Cast och filen stannar i Drive.
+
+Krypterat under överföring (TLS 1.3). Sytues infrastruktur finns i EU. Var externa tjänster finns beror på deras leverantör.

@@ -1,0 +1,27 @@
+{
+  "statement_id": "stmt-01ef",
+  "status": { "state": "SUCCEEDED" },
+  "manifest": {
+    "format": "JSON_ARRAY",
+    "schema": {
+      "column_count": 4,
+      "columns": [
+        { "name": "id", "type_name": "LONG", "position": 0 },
+        { "name": "name", "type_name": "STRING", "position": 1 },
+        { "name": "active", "type_name": "BOOLEAN", "position": 2 },
+        { "name": "amount", "type_name": "DECIMAL", "position": 3 }
+      ]
+    },
+    "total_chunk_count": 2
+  },
+  "result": {
+    "chunk_index": 0,
+    "row_offset": 0,
+    "row_count": 2,
+    "data_array": [
+      ["1", "Alice", "true", "9.99"],
+      ["2", "Bob", "false", null]
+    ],
+    "next_chunk_index": 1
+  }
+}

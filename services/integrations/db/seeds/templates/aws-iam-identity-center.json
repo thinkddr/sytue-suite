@@ -1,0 +1,49 @@
+{
+  "key": "aws-iam-identity-center",
+  "tier": "tier2",
+  "manifest": {
+    "name": "AWS IAM Identity Center",
+    "description": "Acceso único a cuentas y aplicaciones de AWS, con Sytue como IdP SAML y aprovisionamiento SCIM.",
+    "category": "Identidad",
+    "color": "#FF9900",
+    "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#FF9900\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 3 5 6v5c0 4 3 7 7 8 4-1 7-4 7-8V6z\"/><circle cx=\"12\" cy=\"10\" r=\"1.5\"/><path d=\"M12 11.5v3\"/></svg>",
+    "identity": {
+      "kind": "saml",
+      "entity_id": "https://{region}.signin.aws.amazon.com/platform/saml/{saml_id}",
+      "acs_url": "https://{region}.signin.aws.amazon.com/platform/saml/acs/{saml_id}",
+      "name_id_format": "email"
+    },
+    "provisioning": "scim",
+    "scim_base_url": "{scim_endpoint}",
+    "launch": {
+      "kind": "initiate"
+    },
+    "fields": [
+      {
+        "key": "region",
+        "label": "Región de AWS",
+        "placeholder": "us-east-1",
+        "help": "La región de tu instancia de IAM Identity Center.",
+        "required": true
+      },
+      {
+        "key": "saml_id",
+        "label": "ID de aplicación SAML",
+        "placeholder": "ins-0123456789abcdef",
+        "help": "El identificador que aparece en la ACS URL / issuer que muestra AWS.",
+        "required": true
+      },
+      {
+        "key": "scim_endpoint",
+        "label": "Endpoint SCIM de AWS",
+        "placeholder": "https://scim.us-east-1.amazonaws.com/XXXX/scim/v2",
+        "help": "La URL SCIM que AWS genera al habilitar el aprovisionamiento automático.",
+        "required": true
+      }
+    ],
+    "secret": {
+      "label": "Token SCIM de AWS",
+      "help": "El «access token» que AWS genera junto al endpoint SCIM: lo usa el aprovisionamiento de usuarios y grupos."
+    }
+  }
+}

@@ -1,0 +1,3260 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: (c) 2026 Daniel Delgado Ramos
+ *
+ * Catálogo ESPAÑOL de Sytue Admin. Traducción del inglés (`en.ts`), que es la
+ * fuente de verdad: el tipo se deriva de él y falta/sobra clave rompe la
+ * compilación (docs/CONVENTIONS.md §13.1).
+ */
+import type { AppCatalog } from '@sytue/i18n';
+import type { en } from './en.js';
+
+export const es: AppCatalog<typeof en> = {
+  // --- Cromo: navegación y armazón ---------------------------------------
+  'nav.dashboard': 'Panel',
+  'nav.tenants': 'Organizaciones',
+  'nav.users': 'Personas',
+  'nav.groups': 'Grupos',
+  'nav.roles': 'Roles',
+  'nav.pim': 'Acceso privilegiado',
+  'nav.sso': 'Inicio de sesión único (SSO)',
+  'nav.access': 'Acceso condicional',
+  'nav.devices': 'Dispositivos',
+  'nav.apps': 'Integraciones',
+  // Editor de documentos de la organizacion: era una variable de entorno de Drive.
+  'nav.documentEditor': 'Editor de documentos',
+  'nav.externalSignatures': 'Firmas de fuera',
+  'page.documentEditor': 'Editor de documentos',
+  'page.externalSignatures': 'Firmas de fuera',
+  'externalSignatures.title': 'Peticiones de firma de otras organizaciones',
+  'externalSignatures.description':
+    'Decide qué pasa cuando alguien de otra organización pide a una persona de aquí que firme un PDF en CertiPDF.',
+  'externalSignatures.policy': 'Quién puede pedir',
+  'externalSignatures.mode.abierta': 'Cualquiera',
+  'externalSignatures.mode.abierta.help':
+    'Llegan las de cualquier organización. Es lo predeterminado.',
+  'externalSignatures.mode.cerrada': 'Nadie de fuera',
+  'externalSignatures.mode.cerrada.help':
+    'Las de otras organizaciones no llegan aquí ni se pueden abrir desde aquí. Quien tenga además una cuenta personal puede recibirlas en ella.',
+  'externalSignatures.mode.confianza': 'Solo organizaciones de confianza',
+  'externalSignatures.mode.confianza.help':
+    'Solo llegan las de las organizaciones que pongas en la lista.',
+  'externalSignatures.trusted': 'Organizaciones de confianza',
+  'externalSignatures.trustedHelp':
+    'Una por línea: el nombre de su dirección, como «acme» en …/docs/acme/.',
+  'externalSignatures.silent': 'La otra parte no se entera',
+  'externalSignatures.silentHelp':
+    'A quien pidió, una petición que no llega le sigue pareciendo enviada. Así nadie averigua en qué organizaciones está una persona.',
+  'externalSignatures.save': 'Guardar',
+  'externalSignatures.saved': 'Guardado',
+  'externalSignatures.saveFailed': 'No se pudo guardar. Vuelve a intentarlo.',
+  'externalSignatures.badOrg': '«{org}» no es un nombre de organización.',
+  'externalSignatures.loadFailed': 'No se pudo cargar',
+  'externalSignatures.loadFailedHelp': 'Sytue Docs no responde. Vuelve a intentarlo en un momento.',
+  'editor.title': 'Editor de documentos',
+  'editor.description':
+    'Elige con qué editor se abren los documentos de Office guardados en tu organización.',
+  'editor.current': 'Editor actual',
+  'editor.none': 'Ningún editor externo conectado',
+  'editor.noneHelp':
+    'Los documentos de Sytue ya se editan en Sytue. Conecta uno solo si tu organización ya tiene un editor —Collabora, ONLYOFFICE— y quiere seguir usándolo para los ficheros de Word, Excel y PowerPoint.',
+  'editor.connect': 'Conectar un editor',
+  'editor.change': 'Cambiar',
+  'editor.disconnect': 'Desconectar',
+  'editor.disconnectConfirm': '¿Desconectar el editor? Esos ficheros dejarán de abrirse en él.',
+  'editor.disconnected': 'Editor desconectado',
+  'editor.disconnectFailed': 'No se ha podido desconectar.',
+  'editor.unnamed': 'Editor externo',
+  'editor.responding': 'Responde',
+  'editor.notResponding': 'No responde',
+  'editor.paused': 'En pausa',
+  'editor.notRespondingTitle': 'El editor no contesta ahora mismo',
+  'editor.notRespondingUnknown': 'No dio más detalle.',
+  'editor.opens': 'Abre: {list}',
+  'editor.opensNothing': 'No declaró ningún tipo de fichero.',
+  'editor.wizard.description': 'Tres pasos. No cambia nada hasta el último.',
+  'editor.step1': 'Cuál',
+  'editor.step1.heading': '¿Qué editor tienes?',
+  'editor.step1.description': 'Elige el tuyo y el resto de la dirección la componemos nosotros.',
+  'editor.kind.collabora': 'Collabora Online',
+  'editor.kind.collabora.desc': 'El más habitual en instalaciones propias. Basado en LibreOffice.',
+  'editor.kind.onlyoffice': 'ONLYOFFICE',
+  'editor.kind.onlyoffice.desc': 'El más parecido a Microsoft Office por fuera.',
+  'editor.kind.manual': 'Otro',
+  'editor.kind.manual.desc': 'Cualquier editor que hable WOPI. La dirección la pones tú entera.',
+  'editor.step2': 'Dónde',
+  'editor.step2.heading': '¿Dónde está?',
+  'editor.step2.description': 'La dirección con la que entras a él, nada más.',
+  'editor.hostLabel': 'Dirección de tu editor',
+  'editor.urlLabel': 'Dirección de su catálogo (discovery)',
+  'editor.hostHint':
+    'Solo la dirección, como https://office.tuempresa.com — el resto lo añadimos nosotros.',
+  'editor.urlHint': 'La dirección completa de su documento de discovery.',
+  'editor.willUse': 'Preguntaremos a: {url}',
+  'editor.check': 'Comprobar',
+  'editor.checkFailed': 'No se ha podido llegar a él.',
+  'editor.checkFailedTitle': 'Ese editor no ha contestado',
+  'editor.step3': 'Confirmar',
+  'editor.step3.heading': 'Ha contestado. Esto es lo que se va a dejar puesto.',
+  'editor.step3.description': 'Todavía no se ha guardado nada.',
+  'editor.step3.headingFailed': 'No ha contestado',
+  'editor.step3.descriptionFailed': 'Vuelve atrás y revisa la dirección. No se ha guardado nada.',
+  'editor.summary.kind': 'Editor',
+  'editor.summary.url': 'Dirección',
+  'editor.summary.opens': 'Abre',
+  'editor.save': 'Conectarlo',
+  'editor.connected': 'Editor conectado',
+  'editor.hostDisabled': 'Esta instalación no puede abrir ficheros en un editor externo',
+  'editor.hostDisabledHelp':
+    'Sytue Drive no tiene clave WOPI, así que no puede acuñar los tokens con los que un editor abre un fichero. Tu editor queda guardado, pero nadie verá «abrir en el editor» hasta que quien administra esta instalación ponga esa clave.',
+  'editor.saveFailed': 'No se ha podido guardar.',
+  'nav.migrations': 'Traer contenido',
+  // Administración de los canales de Rooms de la organización.
+  'nav.rooms': 'Canales de Rooms',
+  'rooms.channels.title': 'Canales',
+  'rooms.channels.subtitle':
+    'Todos los canales de la organización, incluidos los privados. Los mensajes directos no se listan nunca.',
+  'rooms.filter.placeholder': 'Filtrar por canal o equipo',
+  'rooms.showArchived': 'Ver archivados',
+  'rooms.col.channel': 'Canal',
+  'rooms.col.kind': 'Tipo',
+  'rooms.col.members': 'Personas',
+  'rooms.col.lastActivity': 'Última actividad',
+  'rooms.col.state': 'Estado',
+  'rooms.kind.public': 'Público',
+  'rooms.kind.private': 'Privado',
+  'rooms.state.active': 'Activo',
+  'rooms.state.archived': 'Archivado',
+  'rooms.action.archive': 'Archivar',
+  'rooms.action.restore': 'Restaurar',
+  'rooms.stat.channels': 'Canales',
+  'rooms.stat.private': 'Privados',
+  'rooms.stat.archived': 'Archivados',
+  'rooms.stat.teams': 'Equipos',
+  'rooms.empty': 'Ningún canal coincide',
+  'rooms.emptyBody': 'Cambia el filtro, o activa «Ver archivados» si buscas uno que se retiró.',
+  'rooms.toast.archived': 'Canal archivado',
+  'rooms.toast.restored': 'Canal restaurado',
+  'rooms.toast.failed': 'No se pudo aplicar el cambio',
+  'rooms.error.forbidden': 'No puedes administrar Rooms',
+  'rooms.error.forbiddenBody': 'Esta pantalla es para quien posee o administra la organización.',
+  'rooms.error.unavailable': 'Rooms no contesta',
+  'rooms.error.unavailableBody':
+    'No se han podido leer los canales. Puede que el servicio esté reiniciándose; inténtalo en un momento.',
+  'nav.erp': 'Permisos del ERP',
+  'erp.people.title': 'Personas',
+  'erp.people.subtitle': 'Toda la organización, haya abierto ya el ERP o no.',
+  'erp.filter': 'Filtrar por nombre o correo',
+  'erp.admin': 'Administra todo',
+  'erp.adminBody':
+    'Las cuentas con la propiedad o la administración de la organización administran todos los módulos del ERP. Para limitarlas, cambia su rol en Personas.',
+  'erp.pick': 'Elige una persona',
+  'erp.levels.help':
+    'Sin acceso: no ve el módulo · Lectura: lo ve, pero no cambia nada · Uso: crea y edita · Administración: todo, incluido anular asientos.',
+  'erp.modules.title': 'Acceso por módulo',
+  'erp.modules.subtitle':
+    'Qué puede ver y hacer esta persona en cada módulo. Un nivel igual al de por defecto no se guarda: si el defecto cambia, alcanza a quien no se tocó a mano.',
+  'erp.col.module': 'Módulo',
+  'erp.col.level': 'Nivel',
+  'erp.default': 'por defecto',
+  'erp.level.ninguno': 'Sin acceso',
+  'erp.level.lectura': 'Lectura',
+  'erp.level.usuario': 'Uso',
+  'erp.level.administrador': 'Administración',
+  'erp.obligationsNote':
+    'Quien tenga acceso a Obligaciones recibe un correo 10 días antes de cada fecha.',
+  'erp.toast.saved': 'Permisos guardados',
+  'erp.toast.failed': 'No se han podido guardar los permisos',
+  'erp.error.forbidden': 'No puedes administrar los permisos del ERP',
+  'erp.error.forbiddenBody':
+    'Esta pantalla es para las cuentas con la propiedad o la administración de la organización.',
+  'erp.error.unavailable': 'Sytue ERP no responde',
+  'erp.error.unavailableBody':
+    'No se han podido leer los permisos. Puede que el servicio esté reiniciándose; inténtalo en un momento.',
+  'nav.governance': 'Gobernanza',
+  'nav.compliance': 'Cumplimiento',
+  'nav.sensitivityLabels': 'Etiquetas de confidencialidad',
+  'nav.audit': 'Auditoría',
+  'nav.account': 'Mi cuenta',
+  'shell.brand': 'Sytue Admin',
+  'org.active': 'Organización activa',
+  'org.switch': 'Cambiar de organización',
+  'org.none': 'Sin organización',
+  'org.switchFailed': 'No se pudo cambiar. Inténtalo de nuevo.',
+  'scim.title': 'Aprovisionamiento automático (SCIM)',
+  'scim.on': 'Activo',
+  'scim.off': 'Sin configurar',
+  'scim.unknown': 'Se desconoce',
+  'scim.onHint':
+    'Tu proveedor de identidad crea, actualiza y DESACTIVA cuentas en Sytue automáticamente.',
+  'scim.offHint':
+    'Las cuentas se gestionan a mano: quien se va sigue activo hasta que alguien lo quite aquí.',
+  'scim.unknownHint':
+    'Sytue ID no ha respondido, así que se desconoce el estado. Vuelve a cargar en un momento.',
+  'scim.provisioned': 'Personas aprovisionadas',
+  'scim.lastEvent': 'Último cambio del proveedor',
+  'scim.lastEventNever': 'Nunca',
+  'scim.endpoint': 'Punto de acceso SCIM',
+  'platform.org.protected': 'Organización de la plataforma — protegida',
+  'scim.copy': 'Copiar',
+  'scim.copied': 'Copiado',
+  'scim.step1': 'Pega esta dirección en tu proveedor de identidad',
+  'scim.step2': 'Genera el token y cópialo',
+  'scim.step3': 'Activa el aprovisionamiento en tu proveedor',
+  'scim.step3Hint':
+    'En Microsoft Entra ID: Aplicaciones empresariales → tu aplicación → Aprovisionamiento → Automático, pega la URL de inquilino y el token secreto, y pulsa Probar conexión. En Okta: Applications → tu aplicación → Provisioning → Configure API Integration. Del lado de Sytue no hace falta nada más.',
+  'scim.token': 'Token secreto',
+  'scim.tokenOnce':
+    'Cópialo ahora: se muestra una sola vez y no se puede recuperar. Si lo pierdes, genera otro y revoca este.',
+  'scim.tokenLabel': 'Nombre (opcional)',
+  'scim.tokenLabelHint': 'Para distinguirlo después, p. ej. «Entra ID».',
+  'scim.generate': 'Generar token',
+  'scim.tokenFailed': 'No se pudo generar el token',
+  'scim.tokensLive': 'Tokens activos',
+  'scim.tokenNoLabel': 'Token sin nombre',
+  'scim.tokenUsed': 'último uso {when}',
+  'scim.tokenNeverUsed': 'sin usar todavía',
+  'scim.revoke': 'Revocar',
+  'scim.tokenRevoked': 'Token revocado',
+  'scim.tokenRevokeFailed': 'No se pudo revocar el token',
+  'platform.admins.add': 'Conceder alcance global',
+  'platform.admins.email': 'Correo de la persona',
+  'platform.admins.reason': 'Motivo',
+  'platform.admins.reasonHint': 'Por qué esta persona necesita administrar toda la plataforma.',
+  'platform.admins.grant': 'Conceder',
+  'platform.admins.granted': 'Alcance global concedido',
+  'platform.approval.pending': 'Esperando la aprobación de otra cuenta de administración',
+  'platform.action.cancel': 'Cancelar',
+  'conn.error.catalog':
+    'No se ha podido cargar el catálogo de conectores, así que no se puede añadir ningún proveedor.',
+  'shell.sectionAdmin': 'Administración',
+  'shell.sectionAccount': 'Cuenta',
+  'shell.metaDescription': 'Sytue Admin — administración de organizaciones, personas y grupos.',
+
+  // --- Títulos de página --------------------------------------------------
+  'page.dashboard': 'Panel',
+  'page.tenants': 'Organizaciones',
+  'page.users': 'Personas',
+  'page.groups': 'Grupos',
+  'page.roles': 'Roles',
+  'page.pim': 'Acceso privilegiado',
+  'page.sso': 'Inicio de sesión único',
+  'page.access': 'Acceso condicional',
+  'page.devices': 'Dispositivos',
+  'page.apps': 'Integraciones',
+  'page.migrations': 'Traer contenido',
+  'page.governance': 'Gobernanza',
+  'page.compliance': 'Cumplimiento',
+  'page.sensitivityLabels': 'Etiquetas de confidencialidad',
+  'page.audit': 'Auditoría',
+  'page.account': 'Mi cuenta',
+  'page.tenantNotFound': 'Organización no encontrada.',
+
+  // --- Acciones y textos compartidos --------------------------------------
+  'common.save': 'Guardar',
+  'common.cancel': 'Cancelar',
+  'common.create': 'Crear',
+  'common.delete': 'Eliminar',
+  'common.edit': 'Editar',
+  'common.close': 'Cerrar',
+  'common.retry': 'Reintentar',
+  'common.next': 'Siguiente',
+  'common.search': 'Buscar',
+  'common.loading': 'Cargando…',
+  'common.loadMore': 'Cargar más',
+  'common.copy': 'Copiar',
+  'common.copied': 'Copiado',
+  'common.enabled': 'Activado',
+  'common.disabled': 'Desactivado',
+  'common.yes': 'Sí',
+  'common.no': 'No',
+  'common.all': 'Todos',
+  'common.optional': 'opcional',
+  'common.saveFailed': 'No se pudo guardar',
+  'common.tryAgain': 'Reintenta en unos segundos.',
+  // --- Etiquetas de dominio (roles, aprovisionamiento) --------------------
+  'role.owner': 'Propietario',
+  'role.admin': 'Administrador',
+  'role.member': 'Miembro',
+  'role.billing': 'Facturación',
+  'provision.synced': 'sincronizado',
+  'provision.pending': 'pendiente',
+  'provision.error': 'error',
+
+  // --- Panel --------------------------------------------------------------
+  'dashboard.subtitle': 'Estado del realm {realm} y aprovisionamiento de la suite.',
+  'dashboard.metric.tenants': 'Organizaciones',
+  'dashboard.metric.tenantsHint': 'tenants activos',
+  'dashboard.metric.users': 'Personas en total',
+  'dashboard.metric.usersHint': 'en Sytue ID',
+  'dashboard.metric.mfa': 'MFA habilitado',
+  'dashboard.metric.mfaHint': 'obligatorio para admin/owner',
+  // Qué hay que mirar hoy (portada accionable).
+  'dashboard.todo.title': 'Merece un vistazo hoy',
+  'dashboard.todo.review': 'Revisar',
+  'dashboard.todo.reinvite': 'Volver a invitar',
+  'dashboard.todo.withoutMfa': {
+    one: '{count} persona no tiene segundo factor',
+    other: '{count} personas no tienen segundo factor',
+  },
+  'dashboard.todo.invitationsExpired': {
+    one: '{count} invitación caducó sin que nadie la aceptara',
+    other: '{count} invitaciones caducaron sin que nadie las aceptara',
+  },
+  'dashboard.todo.unverified': {
+    one: '{count} dirección de correo sigue sin verificar',
+    other: '{count} direcciones de correo siguen sin verificar',
+  },
+  'dashboard.todo.suspended': {
+    one: '{count} cuenta suspendida sigue sin cerrar',
+    other: '{count} cuentas suspendidas siguen sin cerrar',
+  },
+
+  // Destino SIEM de la auditoría (mig 0035, sin pantalla hasta ahora).
+  'sink.title': 'Enviar esta auditoría a tu SIEM',
+  'sink.intro':
+    'Los eventos se envían por lotes, en orden y firmados, desde donde se quedó la última entrega. Si tu SIEM se cae no se pierde nada: el lote se reintenta.',
+  'sink.url': 'Destino (HTTPS)',
+  'sink.authHeader': 'Cabecera de autorización',
+  'sink.signingSecret': 'Secreto de firma',
+  'sink.signingHint':
+    'Se usa en la cabecera X-Sytue-Signature (HMAC-SHA256), para que puedas comprobar que el lote viene de Sytue.',
+  'sink.keepSecret': 'Guardado — déjalo vacío para conservarlo',
+  'sink.enabled': 'Envío activado',
+  'sink.remove': 'Quitar el destino',
+  'sink.state.on': 'Enviando',
+  'sink.state.off': 'En pausa',
+  'sink.state.failing': 'Fallando',
+  'sink.lastSent': 'Última entrega: {when}',
+  'sink.toast.saved': 'Destino guardado.',
+  'sink.toast.removed': 'Destino retirado.',
+  'sink.toast.failed': 'No se ha podido guardar.',
+
+  'dashboard.tenants.title': 'Organizaciones',
+  'dashboard.tenants.viewAll': 'Ver todas',
+  'dashboard.tenants.emptyTitle': 'Sin organizaciones',
+  'dashboard.tenants.emptyDescription': 'Crea la primera organización para aprovisionar la suite.',
+  'dashboard.tenants.newTenant': 'Nueva organización',
+  'dashboard.tenants.userCount': { one: '{count} persona', other: '{count} personas' },
+  'dashboard.activity.title': 'Actividad reciente',
+  'dashboard.activity.viewAudit': 'Ver auditoría',
+  'dashboard.activity.emptyTitle': 'Sin actividad todavía',
+  'dashboard.activity.emptyDescription':
+    'Los eventos de identidad y aprovisionamiento aparecerán aquí.',
+  'dashboard.activity.ok': ' — correcto',
+  'dashboard.activity.failed': ' — fallido',
+
+  // --- Verificación de correo --------------------------------------------
+  'verifyEmail.region': 'Verificación de correo',
+  'verifyEmail.sent':
+    'Te hemos enviado un enlace de verificación a {email}. Revisa tu bandeja de entrada.',
+  'verifyEmail.pending':
+    'Tu correo {email} no está verificado. Verifícalo para asegurar tu cuenta.',
+  'verifyEmail.sentAnnouncement': 'Enlace de verificación enviado.',
+  'verifyEmail.errorAnnouncement': 'No se pudo enviar el enlace de verificación.',
+  'verifyEmail.resend': 'Reenviar verificación',
+  'verifyEmail.errorHint': 'No se pudo enviar. Reintenta en unos segundos.',
+
+  // --- Mi perfil ----------------------------------------------------------
+  'profile.title': 'Perfil',
+  'profile.displayName': 'Nombre visible',
+  'profile.nameEmpty': 'El nombre no puede estar vacío.',
+  'profile.email': 'Correo',
+  'profile.emailHint': 'El correo se cambia desde un flujo de verificación aparte.',
+  'profile.saved': 'Perfil actualizado',
+  'profile.invalidName': 'El nombre no es válido.',
+
+  // --- Política de contraseñas -------------------------------------------
+  'passwordPolicy.title': 'Política de contraseñas',
+  'passwordPolicy.description':
+    'Requisitos mínimos que Sytue ID exige al fijar o cambiar cualquier contraseña de la organización.',
+  'passwordPolicy.offline':
+    'Sin conexión con Sytue ID: se muestran los valores por defecto y no se pueden guardar cambios.',
+  'passwordPolicy.minLength': 'Longitud mínima',
+  'passwordPolicy.range': {
+    one: 'Debe estar entre {min} y {count} carácter.',
+    other: 'Debe estar entre {min} y {count} caracteres.',
+  },
+  'passwordPolicy.complexity': 'Exigir complejidad',
+  'passwordPolicy.complexityHint': 'Exige al menos una letra y un número.',
+  'passwordPolicy.save': 'Guardar política',
+  'passwordPolicy.saved': 'Política guardada',
+  'passwordPolicy.savedHint': 'Se aplicará la próxima vez que alguien fije o cambie su contraseña.',
+  'passwordPolicy.saveFailed': 'No se pudo guardar la política',
+  'passwordPolicy.forbidden': 'No tienes permiso para cambiar la política de la organización.',
+
+  // --- Dominio de correo de la organización -------------------------------
+  'orgColor.title': 'Color de la organización',
+  'orgColor.description':
+    'El color de la suite: barras, botones y enlaces en todas las apps. Cada persona puede elegir el suyo en su menú de cuenta; este es el que ve quien no ha elegido.',
+  'orgColor.error': 'No se ha podido guardar el color. Inténtalo de nuevo.',
+  'orgForma.title': 'Forma de la organización',
+  'orgForma.description':
+    'La forma de la suite: «Marco», con la barra y el menú formando un marco de color y el contenido en una hoja, o «Carril», con el color solo en el menú lateral. Cada persona puede elegir la suya en su menú de cuenta; esta es la que ve quien no ha elegido.',
+  'orgForma.error': 'No se ha podido guardar la forma. Inténtalo de nuevo.',
+  'logo.title': 'Logotipo de la organización',
+  'logo.description':
+    'Sustituye la marca de Sytue en la barra superior de todas las aplicaciones. Sin logotipo propio se usa la nuestra, con un color propio de tu organización.',
+  'logo.previewDark': 'Tema oscuro',
+  'logo.previewLight': 'Tema claro',
+  'logo.previewApp': 'Sytue Drive',
+  'logo.choose': 'Elegir imagen…',
+  'logo.save': 'Guardar logotipo',
+  'logo.reset': 'Volver al de Sytue',
+  'logo.formats':
+    'PNG, JPEG o GIF, hasta 1 MB. Si tu logotipo está en SVG, expórtalo a PNG con fondo transparente.',
+  'logo.trimmed': 'Se ha quitado el margen sobrante',
+  'logo.trimmedHint':
+    'La imagen traía espacio vacío alrededor y se ha recortado para que el logotipo se vea al mayor tamaño posible. Comprueba arriba que la composición es la que esperas.',
+  'logo.opaqueBox': 'El logotipo lleva su propio fondo',
+  'logo.opaqueBoxHint':
+    'La imagen no es transparente, así que se verá como un recuadro sobre la barra. Si no es lo que quieres, exporta el logotipo en PNG con fondo transparente.',
+  'logo.trimCapped': 'Se ha recortado solo una parte del margen',
+  'logo.trimCappedHint':
+    'La imagen traía mucho espacio vacío alrededor. Se ha quitado hasta el límite que el sistema se permite, para no arriesgarse a recortar parte del logotipo. Si quieres que se vea más grande, recorta tú el margen y vuelve a subirlo.',
+  'logo.error.svg':
+    'No se pudo leer ese SVG. Ábrelo en tu editor de diseño y expórtalo como PNG con fondo transparente.',
+  'logo.error.title': 'No se pudo usar esa imagen',
+  'logo.error.generic': 'No se pudo procesar la imagen. Inténtalo de nuevo.',
+  'logo.error.delete': 'No se pudo quitar el logotipo. Inténtalo de nuevo.',
+  'orgDomain.title': 'Dominio de correo',
+  'orgDomain.description':
+    'Dónde vive el correo de tu organización. Todo el mundo tiene siempre una dirección en el subdominio de Sytue; conectar el tuyo propio es opcional.',
+  'orgDomain.offline':
+    'Sin conexión con Sytue ID: ahora mismo no se puede leer ni cambiar el dominio.',
+  'orgDomain.base': 'Subdominio de Sytue',
+  'orgDomain.baseHint':
+    'Existe siempre y no se puede quitar. Todo el mundo en la organización tiene una dirección aquí, y es la que usa el resto de la suite para entregar el correo interno.',
+  'orgDomain.own': 'Tu propio dominio',
+  'orgDomain.connect': 'Conectar',
+  'orgDomain.connectHint':
+    'Escríbelo como acme.com, sin «https://» ni «@». Te damos el registro DNS exacto para demostrar que es tuyo.',
+  'orgDomain.badgeOwn': 'Dominio propio',
+  'orgDomain.recordHint':
+    'Añade este registro TXT donde tengas contratado tu dominio. Busca la sección «DNS» o «Registros»: es el mismo procedimiento en todos.',
+  'orgDomain.recordType': 'Tipo',
+  'orgDomain.recordName': 'Nombre',
+  'orgDomain.recordValue': 'Valor',
+  'orgDomain.copy': 'Copiar',
+  'orgDomain.copied': 'Copiado',
+  'orgDomain.copyFailed': 'No se pudo copiar: selecciona el valor y cópialo a mano.',
+  'orgDomain.check': 'Guardar y comprobar',
+  'orgDomain.recheck': 'Comprobar otra vez',
+  'orgDomain.verified': 'Dominio verificado',
+  'orgDomain.verifiedHint': 'Hemos encontrado el registro: {host} es tuyo.',
+  'orgDomain.movedHint':
+    'Las direcciones nuevas ya usan tu dominio, y quien ya estaba en la organización conserva su dirección anterior como alias.',
+  'orgDomain.pending': 'Todavía no se ve',
+  'orgDomain.pendingHint':
+    'Si acabas de crearlo, es normal: los cambios de DNS tardan entre unos minutos y unas horas. Puedes volver a comprobarlo cuando quieras.',
+  'orgDomain.mismatch': 'Hay publicado otro registro',
+  'orgDomain.mismatchHint':
+    'En {name} encontramos «{found}». Revisa que hayas copiado el valor entero y que no se haya quedado uno antiguo.',
+  'orgDomain.unreachable': 'No hemos podido consultar el DNS',
+  'orgDomain.unreachableHint':
+    'No es culpa de tu registro: el servidor de nombres no ha respondido. Inténtalo otra vez en un momento.',
+  'orgDomain.disconnect': 'Desconectar',
+  'orgDomain.disconnected': 'Dominio desconectado',
+  'orgDomain.disconnectedHint':
+    'Las direcciones nuevas vuelven al subdominio de Sytue. Los buzones que ya existen siguen funcionando.',
+  'orgDomain.primary': 'Principal',
+  'orgDomain.badgePending': 'Pendiente',
+  'orgDomain.addAnother': 'Añadir otro dominio',
+  'orgDomain.addedHint':
+    'Ya recibe correo y se puede enviar desde él. Las direcciones nuevas se siguen creando en tu dominio principal.',
+  'orgDomain.makePrimary': 'Hacer principal',
+  'orgDomain.makePrimaryConfirm':
+    'Las direcciones nuevas se crearán en {host}, y toda la organización se muda a él. Cada persona conserva su dirección actual como alias, así que no deja de llegarle nada. ¿Continuar?',
+  'orgDomain.primaryChanged': 'Dominio principal cambiado',
+  'orgDomain.disconnectConfirm':
+    'Sytue dejará de servir el correo de {host}. Las direcciones que ya existen ahí siguen funcionando. ¿Continuar?',
+  'orgDomain.saveFailed': 'No se pudo guardar el dominio',
+
+  // --- Usuarios -----------------------------------------------------------
+  'users.subtitle': 'Directorio de Sytue ID. Cada alta da acceso a toda la suite.',
+  'users.offline':
+    'Sin conexión con Sytue ID: se muestran datos de ejemplo. Los cambios no se guardarán.',
+  'users.searchPlaceholder': 'Buscar persona o correo',
+  'users.attrs.title': 'Atributos del directorio',
+  'users.attrs.hint':
+    'Los grupos dinámicos deciden quién entra a partir de estos tres. Al guardar se reevalúan sus grupos al momento.',
+  'users.attrs.saved': 'Atributos guardados',
+  'users.attrs.savedHint': 'Se han reevaluado los grupos dinámicos de {email}.',
+  'users.searchLabel': 'Buscar persona',
+  'users.filterTenant': 'Filtrar por organización',
+  'users.allTenants': 'Todas las organizaciones',
+  'users.invite': 'Invitar a una persona',
+  'users.listLabel': 'Cuentas de Sytue ID',
+  'users.openRecord': 'Abrir la ficha de {name}',
+  'users.mfaOn': 'activo',
+  'users.mfaOff': 'sin MFA',
+  'users.statusActive': 'activo',
+  'users.statusDisabled': 'inhabilitado',
+  'users.modalFallbackTitle': 'Persona',
+  'users.col.user': 'Persona',
+  'users.col.roles': 'Roles',
+  'users.col.tenant': 'Organización',
+  'users.col.provisioning': 'Aprovisionamiento',
+  'users.col.status': 'Estado',
+  'users.empty.title': 'Nadie coincide',
+  'users.empty.description': 'Revisa el texto de búsqueda o el filtro de organización.',
+  'users.empty.clearFilters': 'Limpiar filtros',
+
+  // Acciones sobre varias personas a la vez.
+  'users.bulk.select': 'Seleccionar a {name}',
+  'users.bulk.selected': { one: '{count} seleccionada', other: '{count} seleccionadas' },
+  'users.bulk.suspend': 'Suspender',
+  'users.bulk.reactivate': 'Reactivar',
+  'users.bulk.revokeSessions': 'Cerrar sesiones',
+  'users.bulk.setRole': 'Cambiar rol…',
+  'users.bulk.clear': 'Quitar la selección',
+  'users.bulk.done': { one: 'Aplicado a {count} persona', other: 'Aplicado a {count} personas' },
+  'users.bulk.partial': {
+    one: '{count} se quedó fuera (no puedes hacerlo, o ya no está aquí).',
+    other: '{count} se quedaron fuera (no puedes hacerlo, o ya no están aquí).',
+  },
+  'users.bulk.failed': 'No se ha podido aplicar la acción en lote',
+
+  // Impacto real antes de confirmar (sesiones, grupos, último propietario).
+  'users.suspend.question': '¿Cortar el acceso a {email}?',
+  'users.suspend.action': 'Suspender el acceso',
+  'users.impact.sessions': {
+    one: 'Se cerrará {count} sesión abierta',
+    other: 'Se cerrarán {count} sesiones abiertas',
+  },
+  'users.impact.groups': { one: 'Está en {count} grupo', other: 'Está en {count} grupos' },
+  'users.impact.lastOwner':
+    'Es la única persona propietaria: sin ella nadie puede administrar esta organización.',
+  'users.empty.noMatch': 'Nadie de esta organización coincide con lo que has escrito.',
+  'users.toast.searchFailed': 'No se ha podido buscar',
+  'users.detail.lastLogin': 'Último acceso',
+  'users.detail.created': 'Alta',
+  'users.detail.emailVerified': 'Correo verificado',
+  'users.detail.provisioning': 'Aprovisionamiento (SCIM)',
+  'users.roleInOrg': 'Rol en la organización',
+  'users.accessEnabled': 'Acceso habilitado',
+  'users.action.forceLogout': 'Cerrar sesiones',
+  'users.action.resetPassword': 'Restablecer contraseña',
+  'users.action.sendResetLink': 'Enviar enlace de restablecimiento',
+  'users.action.resetMfa': 'Restablecer MFA',
+  'users.resetMfa.warning':
+    'Se borrarán el TOTP y las llaves de seguridad de {email}. Su cuenta quedará sin segundo factor hasta que vuelva a configurar el MFA. Es una acción destructiva.',
+  'users.resetPw.intro':
+    'Fija una contraseña temporal y cierra las sesiones de {email}. Compártela por un canal seguro.',
+  'users.resetPw.new': 'Nueva contraseña',
+  'users.resetPw.repeat': 'Repite la contraseña',
+  'users.resetPw.tooShort': {
+    one: 'La contraseña debe tener al menos {count} carácter.',
+    other: 'La contraseña debe tener al menos {count} caracteres.',
+  },
+  'users.resetPw.mismatch': 'Las contraseñas no coinciden.',
+  'users.remove.confirmQuestion':
+    '¿Quitar a {email} de la organización? Se cerrarán sus sesiones y dejará de tener acceso; la cuenta no se elimina.',
+  'users.remove.action': 'Quitar de la organización',
+  'users.inviteIntro':
+    'Enviaremos a esta dirección un enlace para crear su cuenta y entrar en la organización.',
+  'users.inviteEmail': 'Correo electrónico',
+  'users.inviteEmailPlaceholder': 'persona@empresa.com',
+  // Alta directa con contraseña: la salida cuando el correo no llega.
+  'users.invitePassword': 'Contraseña inicial (opcional)',
+  'users.invitePasswordPlaceholder': 'Déjalo vacío para enviar una invitación',
+  'users.invitePasswordHint':
+    'Con contraseña la cuenta se crea al momento y no se envía ningún correo — útil cuando el correo falla. Si lo dejas vacío, la elige esa persona desde el enlace de invitación, que es más seguro: la contraseña no viaja.',
+  'users.toast.created': 'Cuenta creada',
+  'users.toast.createdHint':
+    '{email} ya puede entrar con la contraseña que has puesto. No se ha enviado ningún correo, así que tendrás que dársela tú.',
+
+  'users.inviteRoleLabel': 'Rol',
+  'users.inviteMailbox': 'Dirección del buzón',
+  'users.inviteMailboxPlaceholder': 'nombre.apellidos',
+  'users.inviteMailboxHint': 'Déjalo vacío para usar nombre.apellidos automáticamente.',
+  'users.pending.title': 'Invitaciones pendientes',
+  'users.pending.hint':
+    'Enviadas y todavía sin aceptar. Caducan solas; revocarlas invalida el enlace al momento.',
+  'users.pending.expires': 'Caduca el {date}',
+  'users.pending.revoke': 'Revocar',
+  'users.pending.revoked': 'Invitación revocada',
+  'users.pending.revokedHint': 'El enlace enviado a {email} ya no sirve.',
+  'users.pending.gone': 'Esa invitación ya no estaba',
+  'users.pending.goneHint': 'O se aceptó, o había caducado. La lista se ha actualizado.',
+  'users.pending.revokeFailed': 'No se ha podido revocar',
+  'users.mailbox.title': 'Direcciones de correo',
+  'users.mailbox.primary': 'Principal',
+  'users.mailbox.none': 'Todavía no tiene buzón asignado.',
+  'users.mailbox.addAlias': 'Añadir alias',
+  'users.mailbox.addPlaceholder': 'alias',
+  'users.mailbox.makePrimary': 'Hacer principal',
+  'users.mailbox.remove': 'Quitar alias',
+  'users.mailbox.hint':
+    'Los alias entregan en el mismo buzón. Al cambiar la principal, la anterior se conserva como alias para que el correo que iba a ella siga llegando.',
+  'users.mailbox.changed': 'Dirección principal cambiada',
+  'users.mailbox.aliasAdded': 'Alias añadido',
+  'users.mailbox.aliasRemoved': 'Alias quitado',
+  'users.mailbox.failed': 'No se pudo actualizar la dirección',
+  'users.mailbox.taken': 'Esa dirección ya está en uso. Elige otra.',
+  'users.mailbox.invalid': 'Esa dirección no es válida para esta organización.',
+  'users.inviteSubmit': 'Enviar invitación',
+  'users.sessionsRevoked': {
+    one: 'Se ha cerrado {count} sesión.',
+    other: 'Se han cerrado {count} sesiones.',
+  },
+  'users.toast.loadMoreFailed': 'No se pudo cargar más',
+  'users.toast.loadMoreFailedHint':
+    'Reintenta en unos segundos; el directorio continúa donde estaba.',
+  'users.toast.forbiddenUser': 'No tienes permiso para esta acción sobre esta cuenta.',
+  'users.toast.suspended': 'Cuenta suspendida',
+  'users.toast.suspendedHint': '{email} ya no puede acceder.',
+  'users.toast.reactivated': 'Cuenta reactivada',
+  'users.toast.reactivatedHint': '{email} vuelve a tener acceso a la suite.',
+  'users.toast.statusFailed': 'No se pudo cambiar el estado',
+  'users.toast.sessionsClosed': 'Sesiones cerradas',
+  'users.toast.sessionsClosedHint': {
+    one: '{email}: {count} sesión cerrada. Tendrá que volver a iniciar sesión.',
+    other: '{email}: {count} sesiones cerradas. Tendrá que volver a iniciar sesión.',
+  },
+  'users.toast.sessionsFailed': 'No se pudieron cerrar las sesiones',
+  'users.toast.pwReset': 'Contraseña restablecida',
+  'users.toast.pwResetHint': '{email} deberá usar la nueva contraseña.',
+  'users.toast.pwResetFailed': 'No se pudo restablecer la contraseña',
+  'users.toast.linkSent': 'Enlace enviado',
+  'users.toast.linkSentHint': '{email} recibirá un enlace para elegir una nueva contraseña.',
+  'users.toast.linkFailed': 'No se pudo enviar el enlace',
+  'users.toast.ssoOnly': 'La cuenta no usa contraseña (acceso por SSO).',
+  'users.toast.mfaReset': 'MFA restablecido',
+  'users.toast.mfaResetHint':
+    '{email} deberá volver a configurar su 2FA en el próximo inicio de sesión.',
+  'users.toast.mfaResetFailed': 'No se pudo restablecer el MFA',
+  'users.toast.notInOrg': 'Esta cuenta no pertenece a esta organización.',
+  'users.toast.roleUpdated': 'Rol actualizado',
+  'users.toast.roleUpdatedHint': '{email} tiene ahora el rol {role}.',
+  'users.toast.roleFailed': 'No se pudo cambiar el rol',
+  'users.toast.lastAdmin': 'No puedes dejar la organización sin nadie que la administre.',
+  'users.toast.removed': 'Cuenta quitada',
+  'users.toast.removedHint': '{email} ya no pertenece a la organización.',
+  'users.toast.removeFailed': 'No se pudo quitar la cuenta',
+  'users.toast.removeLastAdmin':
+    'No puedes quitar a la última persona que administra la organización.',
+  'users.toast.invited': 'Invitación enviada',
+  'users.toast.invitedHint': '{email} recibirá un enlace para unirse con el rol {role}.',
+  'users.toast.inviteFailed': 'No se pudo invitar',
+  'users.toast.alreadyMember': 'Ese correo ya está en la organización.',
+  'users.toast.roleForbidden': 'No tienes permiso para conceder ese rol.',
+  'users.toast.checkEmail': 'Revisa el correo e inténtalo de nuevo.',
+  'users.toast.inviteNotSent': 'Invitación creada, pero el correo no ha salido',
+  'users.toast.inviteNotSentHint':
+    'La dirección está bien: lo que ha fallado es nuestro sistema de correo. La invitación ya está en la lista — vuelve a invitar cuando el correo funcione y sustituirá a esta.',
+
+  // --- Organizaciones (tenants) -------------------------------------------
+  'tenants.subtitle': 'Tenants de Sytue ID. Un alta aprovisiona toda la suite (SCIM).',
+  'tenants.searchPlaceholder': 'Buscar organización',
+  'tenants.statusActive': 'activa',
+  'tenants.statusSuspended': 'suspendida',
+  'tenants.mailDomain': 'Dominio de correo',
+  'tenants.region': 'Región',
+  'tenants.col.plan': 'Plan',
+  'tenants.col.namespace': 'Namespace',
+  'tenants.settings': 'Ajustes',
+  'tenants.settingsFor': 'Ajustes de {name}',
+  'tenants.settingsOf': 'Ajustes · {name}',
+  'tenants.empty.title': 'Todavía no hay organizaciones',
+  'tenants.empty.description':
+    'Crea la primera: un alta aprovisiona grupo, namespace y toda la suite vía SCIM.',
+  'tenants.noResults': 'Sin resultados para «{query}»',
+  'tenants.noResultsHint': 'Prueba con otro nombre o slug, o limpia la búsqueda.',
+  'tenants.clearSearch': 'Limpiar búsqueda',
+  'tenants.form.name': 'Nombre',
+  'tenants.form.namePlaceholder': 'ACME Europa',
+  'tenants.form.slug': 'Slug (org/<slug>)',
+  'tenants.form.slugHelp':
+    'Identificador en minúsculas; define grupo y namespace. No se puede cambiar después.',
+  'tenants.form.slugImmutable':
+    'El slug {slug} es la identidad de la organización y no se puede cambiar.',
+  'tenants.detail.usersTitle': 'Personas de la organización',
+  'tenants.detail.usersCaption': 'Personas de {name}',
+  'tenants.detail.usersEmptyTitle': 'Todavía no hay nadie',
+  'tenants.detail.usersEmptyDescription':
+    'Las altas de esta organización aparecerán aquí al aprovisionarse vía SCIM.',
+  'tenants.detail.groupsEmptyTitle': 'Sin grupos todavía',
+  'tenants.detail.groupsEmptyDescription':
+    'El grupo org/<slug> y sus subgrupos aparecerán aquí al crearse.',
+  'tenants.detail.workspace': 'workspace: {name}',
+  'tenants.toast.loadMoreFailedHint': 'Reintenta en unos segundos; la lista continúa donde estaba.',
+  'tenants.toast.created': 'Organización creada',
+  'tenants.toast.createdHint': 'org/{slug} · {namespace}. La propiedad es tuya.',
+  'tenants.toast.createFailed': 'No se pudo crear la organización',
+  'tenants.toast.slugTaken': 'Ese slug ya está en uso; elige otro.',
+  'tenants.toast.invalidSlug': 'Revisa el slug (minúsculas, dígitos y guiones) y el nombre.',
+  'tenants.toast.settingsSaved': 'Ajustes guardados',
+  'tenants.toast.settingsFailed': 'No se pudieron guardar los ajustes',
+  'tenants.toast.noAccess': 'No tienes permiso sobre esta organización.',
+  // Multi-pertenencia: añadir a alguien que YA tiene cuenta a otra organización.
+  'tenants.member.action': 'Añadir persona',
+  'tenants.member.actionFor': 'Añadir una persona a {name}',
+  'tenants.member.title': 'Añadir una persona a {name}',
+  'tenants.member.person': 'Persona',
+  'tenants.member.personPlaceholder': 'Nombre o correo',
+  'tenants.member.personHelp':
+    'Tiene que tener ya cuenta en Sytue: esto la añade, no la crea. Si no aparece, escribe su correo completo.',
+  'tenants.member.noCandidates': 'Nadie de este directorio coincide. Escribe el correo completo.',
+  'tenants.member.role': 'Rol en esta organización',
+  'tenants.member.roleHelp':
+    'Solo vale aquí: lo que sea en sus otras organizaciones se queda como está.',
+  'tenants.member.roleHelpAdmin':
+    'Solo vale aquí. Conceder el rol de propietario está reservado a una cuenta con la propiedad de {name}.',
+  'tenants.member.submit': 'Añadir',
+  'tenants.member.added': 'Persona añadida',
+  'tenants.member.addedHint': '{email} pertenece también a {org}.',
+  'tenants.member.failed': 'No se ha podido añadir a la persona',
+  'tenants.member.noAccount': 'Ninguna cuenta de Sytue usa {email}. Invítala en su lugar.',
+
+  // --- Auditoría unificada -------------------------------------------------
+  'audit.title': 'Auditoría unificada',
+  'audit.subtitle':
+    'Traza de todos los servicios (Identidad, Correo, Archivos, Integraciones) en una vista. Export CSV/JSON normalizado para SIEM.',
+  'audit.source.all': 'Todos los servicios',
+  'audit.source.id': 'Identidad',
+  'audit.source.mail': 'Correo',
+  'audit.source.drive': 'Archivos',
+  'audit.source.notes': 'Notas',
+  'audit.source.integrations': 'Integraciones',
+  'audit.filterService': 'Filtrar por servicio',
+  'audit.filterAction': 'Filtrar por acción',
+  'audit.filterActor': 'Filtrar por actor u objetivo',
+  'audit.actionPlaceholder': 'Acción (p. ej. policy., ediscovery.)',
+  'audit.actorPlaceholder': 'Actor u objetivo',
+  'audit.since': 'Desde',
+  'audit.until': 'Hasta',
+  'audit.apply': 'Aplicar',
+  'audit.applying': 'Aplicando…',
+  'audit.allSourcesDown':
+    'Ninguna fuente de auditoría respondió: no hay conexión con los servicios.',
+  'audit.someSourcesDown': 'Sin respuesta de: {sources}. La vista puede estar incompleta.',
+  'audit.loadFailed': 'No se pudo cargar la auditoría. Ajusta los filtros y reintenta.',
+  'audit.col.date': 'Fecha',
+  'audit.col.service': 'Servicio',
+  'audit.col.action': 'Acción',
+  'audit.col.actor': 'Actor',
+  'audit.col.target': 'Objetivo',
+  'audit.empty.title': 'Sin eventos que mostrar',
+  'audit.empty.description':
+    'No hay registros de auditoría para ese filtro. Amplía el rango de fechas o limpia los filtros.',
+  'audit.listLabel': 'Registros de auditoría unificada',
+  'groups.memberCount': { one: '{count} persona', other: '{count} personas' },
+
+  // --- Dispositivos --------------------------------------------------------
+  'devices.subtitle':
+    'Dispositivos desde los que se inicia sesión. Marca de confianza el tuyo actual para cumplir las reglas de acceso condicional que exijan un dispositivo gestionado.',
+  'devices.offline':
+    'Sin conexión con Sytue ID: no se pueden cargar ni gestionar los dispositivos.',
+  'devices.trusted': 'De confianza',
+  'devices.untrusted': 'Sin confianza',
+  'devices.thisDevice': 'Este dispositivo',
+  'devices.trust': 'Confiar',
+  'devices.revoke': 'Revocar',
+  'devices.revokeAria': 'Revocar {name}',
+  'devices.revokeOfAria': 'Revocar el dispositivo de {user}',
+  'devices.revokeTitle': 'Revocar dispositivo',
+  'devices.revokeConfirm':
+    'Se revocará {name}. Dejará de reconocerse y perderá la confianza; en el próximo inicio de sesión se registrará de nuevo como desconocido.',
+  'devices.lastActivity': 'última actividad {when}',
+  'devices.fallbackUser': 'Persona',
+  'devices.mine.title': 'Mis dispositivos',
+  'devices.mine.emptyTitle': 'Sin dispositivos registrados',
+  'devices.mine.emptyDescription':
+    'Cuando inicies sesión desde un navegador, aparecerá aquí para que puedas marcarlo de confianza.',
+  'devices.org.title': 'Dispositivos de la organización',
+  'devices.org.emptyTitle': 'Sin dispositivos en la organización',
+  'devices.org.emptyDescription':
+    'Los dispositivos aparecerán aquí a medida que la gente inicie sesión.',
+  'devices.col.userDevice': 'Persona · Dispositivo',
+  'devices.col.trust': 'Confianza',
+  'devices.col.manage': 'Gestionar',
+  'devices.toast.trusted': 'Dispositivo de confianza',
+  'devices.toast.trustFailed': 'No se pudo marcar de confianza',
+  'devices.toast.trustOnlyCurrent':
+    'Solo puedes marcar de confianza el dispositivo desde el que accedes ahora.',
+  'devices.toast.revoked': 'Dispositivo revocado',
+  'devices.toast.revokeFailed': 'No se pudo revocar',
+
+  // --- Etiquetas de sensibilidad -------------------------------------------
+  'labels.description':
+    'Marca los archivos según lo delicados que sean —público, interno, confidencial— y decide cuáles no pueden salir de la organización. Quien trabaja con el archivo ve la etiqueta; Sytue se encarga de que no se comparta fuera si tú lo has dicho.',
+  'labels.new': 'Nueva etiqueta',
+  'common.offlineIdTitle': 'No podemos hablar con Sytue ID',
+  'labels.offlineBody':
+    'Las etiquetas no se pueden cargar ni editar ahora mismo. Vuelve a intentarlo en unos minutos.',
+  'labels.scale.title': 'Tu escala',
+  'labels.scale.description':
+    'De menos a más sensible. El orden es tuyo: sirve para que todo el mundo entienda de un vistazo qué es más delicado que qué.',
+  'labels.empty.title': 'Todavía no hay etiquetas',
+  'labels.empty.description':
+    'Sin etiquetas, todos los archivos se tratan igual. La escala que casi todo el mundo empieza usando: Público, Interno y Confidencial — y solo la última impide compartir fuera.',
+  'labels.empty.action': 'Crear la primera',
+  'labels.noDescription': 'Sin explicación',
+  'labels.blocksExternal': 'No sale de la organización',
+  'labels.informational': 'Solo informa',
+  'common.editName': 'Editar {name}',
+  'common.deleteName': 'Borrar {name}',
+  'labels.manualNote':
+    'Etiquetar es manual: cada persona elige la etiqueta al trabajar con el archivo. Sytue no clasifica nada por su cuenta.',
+  'labels.wizard.editTitle': 'Editar «{name}»',
+  'labels.wizard.description':
+    'Tres preguntas y un resumen: cómo se llama, cómo de sensible es y qué debe impedir.',
+  'labels.delete.title': 'Borrar la etiqueta',
+  'labels.delete.intro': '{name} dejará de poder elegirse al clasificar archivos.',
+  'labels.delete.keep':
+    'Los archivos que ya la lleven no cambian: conservan la etiqueta que se les puso. Es a propósito: borrar una etiqueta no debe desclasificar lo que ya estaba clasificado.',
+  'labels.delete.keepBlocking':
+    'Los archivos que ya la lleven no cambian: conservan la etiqueta que se les puso y seguirán sin poder compartirse fuera de la organización. Es a propósito: borrar una etiqueta no debe desclasificar lo que ya estaba clasificado.',
+  'labels.toast.deleted': 'Etiqueta borrada',
+  'labels.toast.deleteFailed': 'No se ha podido borrar',
+
+  // --- Acceso condicional ---------------------------------------------------
+  'access.title': 'Reglas de acceso',
+  'access.subtitle':
+    'Decide qué hace falta para entrar en Sytue según la situación: desde dónde se conectan, con qué equipo y a qué hora. Sin reglas, todo el mundo entra como siempre.',
+  'access.new': 'Nueva regla',
+  'access.offlineBody':
+    'Ni las reglas ni su estado se pueden cargar o editar ahora mismo. Vuelve a intentarlo en unos minutos.',
+  'access.rules.title': 'Tus reglas',
+  'access.rules.description':
+    'Se miran de arriba abajo en cada inicio de sesión. Si varias se cumplen, manda la más estricta: no dejar entrar gana a pedir verificación, y pedir verificación gana a dejar pasar.',
+  'access.empty.title': 'Todavía no hay ninguna regla',
+  'access.empty.description':
+    'Sin reglas, cualquiera con su contraseña entra desde donde sea. La primera que suele crearse: pedir una verificación más a quien se conecte desde fuera de la oficina.',
+  'access.empty.action': 'Crear la primera',
+  'access.action.block': 'No deja entrar',
+  'access.action.mfa': 'Pide verificación',
+  'access.action.allow': 'Deja pasar',
+  'access.applies.everyone': 'A todo el mundo',
+  'access.applies.groups': { one: '{count} grupo', other: '{count} grupos' },
+  'access.applies.users': { one: '{count} persona', other: '{count} personas' },
+  'access.applies.to': 'A {what}',
+  'access.cond.fromNetworks': 'desde tus redes',
+  'access.cond.outsideNetworks': 'fuera de tus redes',
+  'access.cond.untrustedDevices': 'en equipos no confiables',
+  'access.cond.apps': { one: 'en {count} app', other: 'en {count} apps' },
+  'access.cond.schedule': 'en cierto horario',
+  'access.cond.always': 'siempre',
+  'access.cond.exempt': { one: '{count} exento', other: '{count} exentos' },
+  'access.moveUp': 'Subir {name}',
+  'access.moveDown': 'Bajar {name}',
+  'access.on': 'Activa',
+  'access.off': 'Apagada',
+  'common.switchAria': '{state}: {name}',
+  'access.tip':
+    'Consejo: deja siempre exenta a tu administración en al menos una regla. Es tu salida de emergencia si alguna te deja fuera.',
+  'access.delete.title': 'Borrar la regla',
+  'access.delete.body':
+    '{name} dejará de mirarse al iniciar sesión. Quien estuviera afectado por ella entrará como todos los demás. No se puede deshacer, pero puedes volver a crearla.',
+  'access.wizard.editTitle': 'Editar «{name}»',
+  'access.wizard.newTitle': 'Nueva regla de acceso',
+  'access.wizard.description':
+    'Tres preguntas y un resumen. Antes de guardar te decimos, en una frase, a quién afecta y a quién dejaría fuera.',
+  'common.toggleFailed': 'No se ha podido cambiar',
+  'common.toggleFailedHint': '{name} sigue como estaba.',
+  'access.toast.reorderFailed': 'No se ha podido cambiar el orden',
+  'access.toast.deleted': 'Regla borrada',
+  'access.toast.deleteFailed': 'No se ha podido borrar',
+
+  // --- Traer contenido (migraciones) ---------------------------------------
+  'migrations.subtitle':
+    'Múdate desde Microsoft 365 o Google Workspace sin que nadie pierda sus ficheros ni su agenda: cada persona recibe lo suyo en su propia cuenta de Sytue.',
+  'migrations.outStart': 'Llevarme mi contenido',
+  'migrations.out.title': 'Llevarte tu contenido',
+  'migrations.out.description':
+    'Copia los ficheros y los contactos de las personas que elijas a una cuenta de Google Workspace o de Microsoft 365. Nada se borra de Sytue: es una copia, y puedes pararla cuando quieras.',
+  'wizard.migrate.step.destination': 'Destino',
+  'wizard.migrate.out.heading': '¿A qué cuenta te lo llevas?',
+  'wizard.migrate.out.description':
+    'Elige la conexión de destino. Se escribirá con el permiso que esa cuenta haya autorizado, y solo en una carpeta creada por Sytue.',
+  'wizard.migrate.out.noticeTitle': 'Tus datos son tuyos',
+  'wizard.migrate.out.noticeBody':
+    'Esto COPIA a la cuenta de destino: en Sytue no se borra nada. Los ficheros aterrizan en una carpeta «Sytue» del Drive o del OneDrive de destino —no se mezclan con lo que ya haya— y los contactos se añaden a su agenda. Si el trabajo se corta, se reanuda donde estaba y no duplica nada.',
+  'wizard.migrate.out.authTitle': 'Antes, deja que Sytue escriba en {provider}',
+  'wizard.migrate.out.authBody':
+    'La conexión que sirve para traer contenido solo puede leer. Para llevarlo, {provider} te pedirá permiso para crear archivos, contactos, correo y calendarios en la cuenta. Si ya lo autorizaste, sigue adelante.',
+  'wizard.migrate.out.authAction': 'Autorizar escritura',
+  'wizard.migrate.out.authFailed':
+    'No se ha podido abrir la autorización. Inténtalo de nuevo en unos segundos.',
+  'wizard.migrate.out.whatHeading': '¿Qué te llevas?',
+  'wizard.migrate.out.whoHeading': '¿De quién es el contenido que se lleva?',
+  'wizard.migrate.out.whoDescription':
+    'De cada persona que elijas se copia lo suyo a la cuenta de destino. Puedes elegir una o varias.',
+  'migrations.self.description':
+    'Copia tus ficheros, tus contactos, tu correo y tu agenda a una cuenta de Google Workspace o de Microsoft 365. Nada se borra de Sytue: es una copia, y puedes pararla cuando quieras.',
+  'wizard.migrate.self.description':
+    'Elige la conexión de destino. Se escribirá con el permiso que esa cuenta haya autorizado.',
+  'wizard.migrate.self.others': 'Llevar lo de otras personas',
+  'wizard.migrate.self.noticeBody':
+    'Esto COPIA a la cuenta de destino: en Sytue no se borra nada. Los ficheros aterrizan en una carpeta «Sytue», el correo en la carpeta que le corresponde (entrada, enviados…) y cada calendario llega como uno nuevo. Si la copia se corta, vuelve a lanzarla: sigue donde estaba y no duplica nada.',
+  'wizard.migrate.self.gets.mail': 'El correo con sus carpetas, sus fechas y sus adjuntos.',
+  'wizard.migrate.self.gets.calendar':
+    'Los calendarios y sus eventos, con sus repeticiones y sus excepciones.',
+  'wizard.migrate.self.nots.outlookDrafts':
+    'En Outlook, un correo con más de 3 MB de adjuntos llega marcado como borrador. Llega entero: es la única forma en que Microsoft admite adjuntos grandes.',
+  'wizard.migrate.self.nots.invites':
+    'Las invitaciones: nadie recibe un aviso. En Outlook, quién asiste queda anotado en la descripción del evento.',
+  'wizard.migrate.self.nots.outlookRepeats':
+    'En Outlook, los eventos cancelados y las repeticiones que no sabe representar. Se omiten uno a uno y te decimos cuáles.',
+  'wizard.migrate.self.safeBody':
+    'De Sytue solo leemos: aquí no cambia nada. Si vuelves a lanzar la copia, trae lo nuevo y no duplica lo que ya llegó.',
+  'wizard.migrate.self.launch': 'Empezar la copia',
+  'wizard.migrate.self.reviewTitle': 'Se copia con tu propia sesión',
+  'wizard.migrate.self.reviewBody':
+    'Sytue lee tu contenido igual que cuando descargas «Tus datos» y lo escribe en {provider} con el permiso que autorizaste. Puedes cerrar esta página: la copia sigue en segundo plano.',
+  'wizard.migrate.self.conflict':
+    'Ya se está copiando. Si parece atascada, párala y vuelve a lanzarla: sigue donde se quedó.',
+  'common.offlineGatewayTitle': 'No podemos hablar con el servicio de integraciones',
+  'migrations.offlineBody':
+    'Los traslados no se pueden consultar ni lanzar ahora mismo. Vuelve a intentarlo en unos minutos.',
+  'migrations.domain.drive': 'Ficheros',
+  'migrations.domain.contacts': 'Contactos',
+  // --- Asistente automático (AutoMigrateWizard) -----------------------------
+  'migrations.domain.repos': 'Repositorios',
+  'migrations.domain.gists': 'Gists',
+  'migrations.domain.teams': 'Equipos y canales',
+  'migrations.domain.team_files': 'Ficheros e historial de los canales',
+  'migrations.domain.mail': 'Correo',
+  'migrations.domain.calendar': 'Agenda',
+  'migrations.domain.cloud': 'Aplicaciones (Cloud y Firebase)',
+  'wizard.auto.source.microsoftDesc':
+    'Tu OneDrive y tus contactos, y tu Microsoft Teams: los equipos, canales y quién está en ellos van a Sytue Rooms, y los ficheros y el historial de conversación de cada canal van a Sytue Drive.',
+  'wizard.auto.item.teams': 'Equipos y canales',
+  'wizard.auto.item.teamFiles': 'Ficheros e historial de los canales',
+  'wizard.auto.nots.teamsHistory':
+    'Los mensajes de Teams no se vuelven a publicar en Rooms. Rooms publica un mensaje como quien lo escribe ahora, así que ponerlos allí falsificaría el autor o la fecha. El historial de cada canal viaja como transcripción fiel en Drive, con el autor y la fecha reales dentro.',
+  'wizard.auto.nots.teamsGuests':
+    'Las personas invitadas de otras organizaciones y los canales compartidos con ellas: no tienen cuenta aquí, así que se quedan fuera en vez de inventarles una.',
+  'wizard.auto.scope.orgHintMicrosoft':
+    'Un inicio de sesión solo abre tu propio contenido. Para toda la empresa, alguien con administración aprueba una única pantalla: ni cuentas de servicio ni nada que pegar. Te llevamos directo allí.',
+  'wizard.auto.delegation.microsoftBody':
+    'Abre con una cuenta de administrador la pantalla de Microsoft que enlazamos abajo y apruébala. Ese es todo el paso: la misma aplicación pasa a leer la organización, con los mismos permisos de solo lectura.',
+  'wizard.auto.delegation.whyMicrosoft':
+    'Aprobarlo no le da a Sytue nada nuevo: son los mismos permisos de lectura, ahora para la organización en vez de solo para tu cuenta. La administración puede revocarlo en Entra cuando quiera.',
+  'migrations.autoStart': 'Traerlo todo',
+  'migrations.manualStart': 'Elegir a mano',
+  'migrations.auto.title': 'Tráetelo todo con un inicio de sesión',
+  'migrations.auto.description':
+    'Inicia sesión en el servicio que dejas y traemos todo lo que esa cuenta alcance. Verás el plan antes de que se copie nada.',
+  'wizard.auto.connected': 'Conectado',
+  'wizard.auto.source.googleDesc':
+    'Tus ficheros y contactos, tu Gmail, tu agenda y tus aplicaciones de Google Cloud y Firebase. Inicias sesión una vez y los leemos; en Google no se cambia nada.',
+  'wizard.auto.source.githubDesc':
+    'Tus repositorios van a Sytue Git con su historia, ramas, etiquetas, issues, pull requests, wiki y releases. Tus gists van a Sytue Drive.',
+  'wizard.auto.item.drive': 'Ficheros',
+  'wizard.auto.item.contacts': 'Contactos',
+  'wizard.auto.item.repos': 'Repositorios',
+  'wizard.auto.item.gists': 'Gists',
+  'wizard.auto.item.mail': 'Correo',
+  'wizard.auto.item.calendar': 'Agenda',
+  'wizard.auto.item.cloud': 'Aplicaciones de Google Cloud y Firebase',
+  'wizard.auto.nots.cloudDatabases':
+    'Las bases de datos (Cloud SQL, Firestore, BigQuery). No se copian por una API de control: hay que exportarlas y restaurarlas, y quien decide cuándo se para la escritura eres tú. Te las enumeramos una a una con lo que hay que hacer con cada una.',
+  'wizard.auto.nots.cloudImages':
+    'Las imágenes de contenedor que ya corren en Google. Sytue DevX construye desde tu repositorio: conéctalo al proyecto y el primer despliegue las reemplaza.',
+  'wizard.auto.nots.actions':
+    'Las ejecuciones de GitHub Actions y sus registros. Los ficheros de los flujos viajan con el código; el historial de ejecuciones se queda allí.',
+  'wizard.auto.nots.forgeAccount':
+    'Quien todavía no haya entrado nunca en Sytue Git. Sus repositorios esperan a que entre una vez; luego reanudas el trabajo.',
+  'wizard.auto.nots.settings':
+    'Los ajustes que solo existen en GitHub: protección de ramas, secretos, aplicaciones y webhooks.',
+  'wizard.auto.step.origin': 'De dónde',
+  'wizard.auto.step.connect': 'Iniciar sesión',
+  'wizard.auto.step.review': 'Qué traemos',
+  'wizard.auto.origin.heading': '¿Qué servicio estás dejando?',
+  'wizard.auto.origin.description':
+    'Elige cuál. Lo único que te vamos a pedir es que inicies sesión en él.',
+  'wizard.auto.connect.heading': 'Inicia sesión en {source}',
+  'wizard.auto.connect.description':
+    'Apruebas los permisos en su pantalla. Solo leemos: en el servicio que dejas no escribimos nunca.',
+  'wizard.auto.connect.action': 'Iniciar sesión en {source}',
+  'wizard.auto.connect.readOnly':
+    'Acceso de solo lectura. Puedes revocarlo cuando quieras, desde aquí o desde el propio proveedor.',
+  'wizard.auto.connect.readOnlyGithub':
+    'GitHub no tiene un permiso de solo lectura para los repositorios privados: el que ofrece (repo) permite también escribir. Sytue solo lee, y el permiso lo revocas tú cuando quieras desde GitHub.',
+  'wizard.auto.connect.checking': 'Comprobando qué hay…',
+  'wizard.auto.connect.doneTitle': 'Sesión iniciada',
+  'wizard.auto.connect.doneBody': 'Estamos conectados a {source} como {account}.',
+  'wizard.auto.scope.mine': 'Solo mi cuenta',
+  'wizard.auto.scope.mineHint':
+    'Todo lo que tenga la cuenta con la que inicies sesión. Un inicio de sesión y nada más: es lo habitual, y cada persona puede hacer lo mismo con lo suyo.',
+  'wizard.auto.scope.oneClick': 'Un inicio de sesión',
+  'wizard.auto.scope.org': 'Toda la organización',
+  'wizard.auto.scope.orgHint':
+    'Google no deja que un inicio de sesión lea el contenido de otras personas, así que para toda la empresa pide un permiso más. Te llevamos directo a la pantalla donde se concede.',
+  'wizard.auto.delegation.title': 'Un permiso más para toda la organización',
+  'wizard.auto.delegation.step1':
+    'En la consola de Google Cloud, crea una cuenta de servicio y descarga su clave JSON.',
+  'wizard.auto.delegation.step2': 'Pega aquí ese JSON y guárdalo.',
+  'wizard.auto.delegation.step3':
+    'Abre la pantalla de Google que enlazamos abajo: el cliente y los permisos van ya rellenos, así que solo tienes que autorizar.',
+  'wizard.auto.delegation.keyLabel': 'Clave JSON de la cuenta de servicio',
+  'wizard.auto.delegation.save': 'Guardar la clave',
+  'wizard.auto.delegation.open': 'Abrir la pantalla de Google',
+  'wizard.auto.delegation.recheck': 'Volver a comprobar',
+  'wizard.auto.delegation.why':
+    'La clave se guarda cifrada y solo se usa para leer, en nombre de cada persona, lo que es suyo.',
+  'wizard.auto.delegation.readyTitle': 'Permiso concedido',
+  'wizard.auto.delegation.readyBody': {
+    one: 'Ya podemos traer el contenido de {count} persona.',
+    other: 'Ya podemos traer el contenido de {count} personas.',
+  },
+  'wizard.auto.review.heading': 'Esto es lo que traemos',
+  'wizard.auto.review.description':
+    'Todavía no se ha copiado nada. Al lanzarlo, la copia corre en segundo plano y puedes cerrar esta página.',
+  'wizard.auto.review.account': 'Sesión iniciada como',
+  'wizard.auto.review.who': 'Para quién',
+  'wizard.auto.review.people': {
+    one: '{count} persona, en su propia cuenta',
+    other: '{count} personas, cada una en su cuenta',
+  },
+  'wizard.auto.review.what': 'Qué se trae',
+  'wizard.auto.review.jobs': 'Trabajos que se lanzan',
+  'wizard.auto.review.jobsValue': {
+    one: '{count} (uno por persona y tipo de contenido)',
+    other: '{count} (uno por persona y tipo de contenido)',
+  },
+  'wizard.auto.review.launch': 'Traerlo todo',
+  'wizard.auto.unmatched.title': 'Cuentas que no sabemos emparejar',
+  'wizard.auto.unmatched.body': {
+    one: '{count} cuenta del servicio antiguo no tiene equivalente en Sytue, así que la dejamos fuera en vez de copiarla en el buzón equivocado. Crea a esa persona en el directorio y vuelve a lanzarlo.',
+    other:
+      '{count} cuentas del servicio antiguo no tienen equivalente en Sytue, así que las dejamos fuera en vez de copiarlas en el buzón equivocado. Crea a esas personas en el directorio y vuelve a lanzarlo.',
+  },
+  'wizard.auto.limits.title': 'Qué no se trae',
+  'wizard.auto.safe.title': 'Nada se pierde en el origen',
+  'wizard.auto.safe.body':
+    'Solo leemos. El servicio que dejas se queda exactamente como está, y puedes volver a lanzarlo: lo ya copiado no se duplica.',
+  'wizard.auto.error.title': 'No ha salido bien',
+  'wizard.auto.error.plan':
+    'No hemos podido comprobar qué hay. Puede que la sesión haya caducado: vuelve a iniciarla.',
+  'wizard.auto.error.connect':
+    'No hemos podido iniciar la sesión. Vuelve a intentarlo en unos segundos.',
+  'wizard.auto.error.noProviderApp':
+    'Sytue todavía no está registrada como aplicación en {source}, así que no hay ninguna pantalla de inicio de sesión a la que mandarte. La da de alta un operador en Administración de plataforma → Conexiones con terceros; hasta entonces, reintentar no cambia nada.',
+  'wizard.auto.error.noKek':
+    'Este despliegue no tiene configurada la clave de cifrado, así que no puede guardar lo que devuelva {source}. Lo configura un operador.',
+  'wizard.auto.error.serviceKey':
+    'No hemos podido guardar esa clave. Comprueba que es el JSON completo de la cuenta de servicio.',
+  'wizard.auto.error.launch':
+    'No hemos podido lanzar la migración. Vuelve a intentarlo en unos segundos.',
+  'migrations.status.done': 'Terminado',
+  'migrations.status.running': 'Copiando',
+  'migrations.status.queued': 'En cola',
+  'migrations.status.canceled': 'Detenido',
+  'migrations.status.error': 'Con problemas',
+  'migrations.counts.migrated': { one: '{count} copiado', other: '{count} copiados' },
+  'migrations.counts.skipped': { one: '{count} omitido', other: '{count} omitidos' },
+  'migrations.counts.errors': { one: '{count} con error', other: '{count} con error' },
+  'migrations.from': 'Desde {user}',
+  'migrations.viewReport': 'Ver informe',
+  'migrations.stop': 'Detener',
+  'migrations.resume': 'Retomar',
+  'migrations.wizard.title': 'Traer contenido de Microsoft 365 o Google',
+  'migrations.wizard.description':
+    'Te acompañamos paso a paso. Nada se copia hasta el último paso.',
+  'migrations.toast.launched': 'Traslado en marcha',
+  'migrations.toast.launchedHint': {
+    one: '{count} traslado se está copiando en segundo plano. Puedes cerrar esta página.',
+    other: '{count} traslados se están copiando en segundo plano. Puedes cerrar esta página.',
+  },
+  'migrations.toast.stopped': 'Traslado detenido',
+  'migrations.toast.stoppedHint':
+    'Lo ya copiado se queda en su sitio. Puedes retomarlo cuando quieras.',
+  'migrations.toast.resumed': 'Traslado retomado',
+  'migrations.toast.resumedHint': 'Continúa donde se quedó; lo ya copiado no se duplica.',
+  'migrations.toast.actionFailed': 'No se ha podido completar',
+  'migrations.toast.reportFailed': 'No hemos podido abrir el informe',
+  'migrations.active.title': 'En curso',
+  'migrations.active.description':
+    'Los contadores suben conforme se copia. Puedes cerrar esta página: sigue en segundo plano.',
+  'migrations.finished.title': 'Terminados',
+  'migrations.list.title': 'Traslados',
+  'migrations.list.description':
+    'Cada persona tiene su propio traslado, con su informe de lo que llegó y lo que no.',
+  'migrations.empty.titleActive': 'Todavía no ha terminado ninguno',
+  'migrations.empty.title': 'Aún no has traído contenido',
+  'migrations.empty.description':
+    'Cuando lances el primer traslado, aquí verás qué llegó a cada cuenta y, con la misma claridad, qué no se pudo copiar y por qué.',
+  'migrations.empty.action': 'Traer el primero',
+  'migrations.report.title': 'Informe del traslado',
+  'migrations.report.migrated': 'copiados a su cuenta',
+  'migrations.report.skipped': 'omitidos (con motivo)',
+  'migrations.report.content': 'de contenido',
+  'migrations.report.whatFailed': 'Qué falló',
+  'migrations.report.nothingLostTitle': 'No se quedó nada por el camino',
+  'migrations.report.nothingLostBody': 'Todo lo que había en el origen llegó a su cuenta.',
+  'migrations.report.skippedTitle': 'Lo que NO se copió, y por qué',
+
+  // --- Integraciones --------------------------------------------------------
+  'apps.subtitle':
+    'Conecta las aplicaciones que ya usa tu equipo para que entren con su cuenta de Sytue y sus altas y bajas se hagan solas.',
+  'apps.connect': 'Conectar una aplicación',
+
+  // Registro dinámico de apps (RFC 7591), que no tenía pantalla.
+  'apps.dcr.action': 'Token de registro',
+  'apps.dcr.title': 'Dejar que una app se registre sola',
+  'apps.dcr.onceTitle': 'Cópialo ahora',
+  'apps.dcr.onceBody':
+    'Este token se enseña una vez. Sytue ID solo guarda su hash, así que cerrar esta ventana sin copiarlo significa pedir otro.',
+  'apps.dcr.token': 'Token de acceso inicial',
+  'apps.dcr.endpoint': 'Destino de registro',
+  'apps.dcr.expires': 'Vale hasta {when}',
+  'apps.dcr.copy': 'Copiar el token',
+  'apps.dcr.copied': 'Copiado.',
+  'apps.dcr.failed': 'No se ha podido emitir el token',
+  'apps.connectOne': 'Conectar',
+  'apps.wizard.description':
+    'Te acompañamos paso a paso. Puedes volver atrás en cualquier momento; nada se aplica hasta el último paso.',
+  'apps.offlineBody':
+    'Ni el catálogo ni las conexiones se pueden cargar o editar ahora mismo. Vuelve a intentarlo en unos minutos.',
+  'apps.status.active': 'Conectada',
+  'apps.status.error': 'Con error',
+  'apps.status.disabled': 'Desactivada',
+  'apps.status.draft': 'Sin terminar',
+  'apps.cap.sso': 'inicio de sesión único',
+  'apps.cap.provisioning': 'altas y bajas automáticas',
+  'apps.cap.data': 'datos para informes',
+  'apps.cap.line': 'Aporta {what}.',
+  'apps.cap.none': 'Acceso desde el portal de aplicaciones de tu equipo.',
+  'apps.builtin.title': 'Integraciones de serie',
+  'apps.builtin.description':
+    'Cada persona conecta sus nubes (Google Drive, OneDrive, Dropbox, Box), sus chats (Slack, Teams, Google Chat) y sus videollamadas desde la propia app, con solo dar su consentimiento. Aquí solo puedes apagarlas para toda la organización.',
+  'apps.builtin.failed': 'No se pudo guardar el cambio. Inténtalo de nuevo.',
+  'apps.map.title': 'Quién sirve cada producto',
+  'apps.map.description':
+    'Arrastra una aplicación conectada hasta un producto, o pulsa el producto para elegir. El cambio vale para toda la organización.',
+  'apps.connected.title': 'Aplicaciones conectadas',
+  'apps.connected.description': 'Las que ya funcionan con la cuenta de Sytue de tu equipo.',
+  'apps.empty.title': 'Todavía no has conectado ninguna aplicación',
+  'apps.empty.description':
+    'Cuando conectes la primera, tu equipo entrará en ella con su cuenta de Sytue y no tendrás que dar de alta a nadie a mano.',
+  'apps.empty.action': 'Conectar la primera',
+  'apps.configured': 'Conexión configurada.',
+  'apps.runs.none': 'Todavía no hay ninguna sincronización registrada.',
+  'apps.runs.last':
+    'Última sincronización: {created} altas, {updated} cambios, {deactivated} bajas',
+  'apps.runs.errors': { one: '{count} con error', other: '{count} con error' },
+  'apps.open': 'Abrir',
+  'apps.test': 'Probar',
+  'apps.sync': 'Sincronizar',
+  'apps.syncStatus': 'Estado',
+  'apps.deactivate': 'Desactivar',
+  'apps.delete': 'Eliminar',
+  'apps.catalog.title': 'Puedes conectar',
+  'apps.catalog.description':
+    'Elige una y te guiamos: en cinco pasos queda lista, sin leer documentación.',
+  'apps.catalog.emptyTitle': 'El catálogo no está disponible',
+  'apps.catalog.emptyDescription':
+    'En cuanto el servicio de integraciones responda, aquí verás todas las aplicaciones que puedes conectar.',
+  'apps.catalog.allConnected': 'Ya has conectado todas las aplicaciones del catálogo.',
+  'apps.deactivate.title': 'Desactivar la integración',
+  'apps.deactivate.body':
+    '{name} dejará de aparecer en el portal y su inicio de sesión con Sytue se dará de baja. No se borra nada dentro de la aplicación y puedes volver a conectarla cuando quieras.',
+  'apps.delete.title': 'Eliminar la integración',
+  'apps.delete.body':
+    'Se eliminará la integración {name} y se revocarán sus credenciales con el proveedor. Para volver a usarla tendrás que configurarla desde el principio.',
+  'apps.toast.deactivated': 'Desactivada',
+  'apps.toast.deactivatedHint': '{name} ya no aparece en el portal.',
+  'apps.toast.deleted': 'Eliminada',
+  'apps.toast.deletedHint': '{name} se ha eliminado correctamente.',
+  'apps.toast.deleteFailed': 'No se ha podido eliminar la integración',
+  'apps.toast.oauthConnected': 'Integración conectada',
+  'apps.toast.oauthConnectedHint': '{name} se ha conectado por OAuth2 correctamente.',
+  'apps.toast.testOk': 'Conexión correcta',
+  'apps.toast.testOkHint': '{name} responde: {what}.',
+  'apps.toast.testSsoOnly':
+    '{name} solo usa el inicio de sesión con Sytue: no hay credencial que comprobar.',
+  'apps.toast.syncStarted': 'Sincronización en marcha',
+  'apps.toast.syncStartedHint':
+    'Se ejecuta en segundo plano; puedes ver el estado en unos minutos.',
+  'apps.toast.testFailed': 'La conexión ha fallado',
+  'apps.toast.actionFailed': 'No se ha podido completar',
+  'apps.toast.gatewayDown': 'El servicio de la aplicación o Sytue ID no responden ahora mismo.',
+
+  // --- Inicio de sesión único (SSO) -----------------------------------------
+  'sso.subtitle':
+    'Deja que tu equipo entre en Sytue con la cuenta de la empresa (Microsoft Entra ID, Google Workspace, Okta…). Tú sigues decidiendo quién puede pasar.',
+  'sso.connectProvider': 'Conectar un proveedor',
+  'sso.offlineBody':
+    'Ni los proveedores ni su configuración se pueden cargar o editar ahora mismo. Vuelve a intentarlo en unos minutos.',
+  'sso.wizardDescription':
+    'Te acompañamos paso a paso. Puedes volver atrás en cualquier momento; nadie podrá entrar por aquí hasta que lo actives.',
+  'sso.providers.title': 'Proveedores conectados',
+  'sso.providers.description':
+    'Cada proveedor añade un botón «Entrar con tu organización» en la pantalla de acceso. Quien ya tenga contraseña de Sytue puede seguir usándola.',
+  'sso.providers.emptyTitle': 'Todavía no has conectado ningún proveedor',
+  'sso.providers.emptyDescription':
+    'Cuando conectes el primero, tu equipo entrará con la cuenta de la empresa y no tendrás que gestionar contraseñas aparte.',
+  'sso.providers.emptyAction': 'Conectar el primero',
+  'sso.providers.caption': 'Proveedores de identidad',
+  'sso.col.provider': 'Proveedor',
+  'sso.col.connection': 'Conexión',
+  'sso.col.whoCanSignIn': 'Quién puede entrar',
+  'sso.col.status': 'Estado',
+  'sso.unverified': 'Sin comprobar',
+  'sso.anyEmail': 'cualquier correo del proveedor',
+  'sso.test': 'Comprobar',
+  'sso.testAria': 'Comprobar {name}',
+  'sso.delete': 'Eliminar',
+  'sso.deleteAria': 'Eliminar {name}',
+  'sso.deleteTitle': 'Eliminar el proveedor',
+  'sso.deleteBody':
+    '{name} dejará de aparecer en la pantalla de acceso y se romperá el enlace entre las cuentas de Sytue y las de tu proveedor. Quien tenga contraseña de Sytue podrá seguir entrando con ella; el resto tendrá que recuperar la suya.',
+  'sso.apps.title': 'Aplicaciones que entran con Sytue',
+  'sso.apps.description':
+    'Al revés que arriba: aquí registras las herramientas de tu equipo para que su botón de acceso lleve a Sytue, en vez de a Google o Microsoft.',
+  'sso.apps.register': 'Registrar una aplicación',
+  'sso.apps.wizardDescription':
+    'Te acompañamos paso a paso. Al final te damos los datos que hay que pegar en la aplicación.',
+  'sso.apps.emptyTitle': 'Todavía no has registrado ninguna aplicación',
+  'sso.apps.emptyDescription':
+    'Si una herramienta que ya usáis permite «iniciar sesión con» un proveedor propio, puede usar Sytue. Te guiamos en tres pasos y te damos los datos que hay que pegar en ella.',
+  'sso.apps.emptyAction': 'Registrar la primera',
+  'sso.apps.caption': 'Aplicaciones que inician sesión con Sytue',
+  'sso.apps.col.app': 'Aplicación',
+  'sso.apps.col.runsOn': 'Dónde se ejecuta',
+  'sso.apps.col.redirect': 'Vuelve a',
+  'sso.apps.runsPublic': 'Navegador o móvil (PKCE)',
+  'sso.apps.runsConfidential': 'Servidor propio (con secreto)',
+  'sso.apps.rotate': 'Secreto nuevo',
+  'sso.apps.rotateAria': 'Generar un secreto nuevo para {name}',
+  'sso.apps.deleteTitle': 'Eliminar la aplicación',
+  'sso.apps.deleteBody':
+    '{name} dejará de poder iniciar sesión con Sytue de inmediato, y quien esté dentro tendrá que volver a entrar por otra vía. No se borra nada dentro de la aplicación; puedes volver a registrarla cuando quieras (con datos nuevos).',
+  // SP SAML: apps de terceros para las que Sytue ID hace de IdP.
+  'sso.saml.title': 'Aplicaciones que entran con Sytue por SAML',
+  'sso.saml.description':
+    'Sytue ID es el proveedor de identidad de estas aplicaciones. Aparecen aquí al activar una app del catálogo, y puedes apagar cada una sin perder su configuración.',
+  'sso.saml.caption': 'Aplicaciones que inician sesión con Sytue por SAML',
+  'sso.saml.col.app': 'Aplicación',
+  'sso.saml.col.acs': 'Envía la respuesta a',
+  'sso.saml.emptyTitle': 'Ninguna aplicación usa todavía Sytue como proveedor SAML',
+  'sso.saml.emptyDescription':
+    'Activa una aplicación del catálogo y aparecerá aquí, lista para apagarla o eliminarla.',
+  'sso.saml.incomplete': 'Incompleta',
+  'sso.saml.details': 'Datos de conexión',
+  'sso.saml.detailsAria': 'Datos de conexión de {name}',
+  'sso.saml.detailsBody':
+    'Pega estos valores en {name} para que confíe en Sytue ID. Son los mismos para todas las aplicaciones de tu organización.',
+  'sso.saml.entityId': 'Proveedor de identidad (entity ID)',
+  'sso.saml.metadataUrl': 'URL de metadatos',
+  'sso.saml.ssoUrl': 'URL de entrada (SSO)',
+  'sso.saml.sloUrl': 'URL de salida (SLO)',
+  'sso.saml.initiateUrl': 'Entrar desde Sytue',
+  'sso.saml.deleteTitle': 'Eliminar la aplicación',
+  'sso.saml.deleteBody':
+    '{name} dejará de poder iniciar sesión con Sytue de inmediato. No se borra nada dentro de la aplicación, pero tendrás que volver a registrarla para devolverle el acceso.',
+  'sso.saml.toast.toggleFailed': 'No se ha podido cambiar el estado',
+  'sso.saml.toast.deleted': 'Aplicación eliminada',
+  'sso.secret.title': 'Copia el secreto ahora',
+  'sso.secret.body':
+    'Este es el secreto nuevo de {name}. El anterior ya no vale: pega este en la aplicación cuanto antes. No podremos volver a enseñártelo.',
+  'sso.secret.label': 'Secreto de cliente',
+  'sso.secret.copied': 'Secreto copiado',
+  'sso.secret.copyFailed': 'No se ha podido copiar',
+  'sso.secret.copyFailedHint': 'Selecciónalo y cópialo a mano.',
+  'sso.secret.done': 'Ya lo he copiado',
+  'sso.toast.testOk': 'Todo correcto',
+  'sso.toast.testOkSaml': 'Los datos de tu proveedor son válidos.',
+  'sso.toast.testOkOidc': 'Tu proveedor ha respondido.',
+  'sso.toast.testOkOidcPkce': 'Tu proveedor ha respondido (con PKCE, el modo más seguro).',
+  'sso.toast.testFailed': 'No hemos podido comprobarlo',
+  'sso.toast.testBadSaml':
+    'Revisa el Entity ID, la URL de inicio de sesión (https) y el certificado. Edítalo para corregirlo.',
+  'sso.toast.testBadOidc':
+    'La dirección del proveedor no responde con su configuración. Edítalo y revísala.',
+  'sso.toast.idpDown': 'Sytue ID no responde ahora mismo. Vuelve a intentarlo en un minuto.',
+  'sso.toast.providerDeleted': 'Proveedor eliminado',
+  'sso.toast.deleteFailed': 'No se ha podido eliminar',
+  'sso.toast.rotateFailed': 'No se ha podido generar un secreto nuevo',
+  'sso.toast.rotateFailedHint': '{name} conserva el que tenía.',
+  'sso.toast.appDeleted': 'Aplicación eliminada',
+  'sso.toast.appDeletedHint': '{name} ya no puede iniciar sesión con Sytue.',
+
+  // --- Roles personalizados y permisos delegables ---------------------------
+  'roles.subtitle':
+    'Roles personalizados con permisos granulares (admin delegada). Asígnalos a personas para delegar tareas concretas sin dar acceso total.',
+  'roles.offline': 'Sin conexión con Sytue ID: no se pueden cargar ni editar los roles.',
+  'roles.searchPlaceholder': 'Buscar rol',
+  'roles.create': 'Crear rol',
+  'roles.delete': 'Eliminar rol',
+  'roles.permissions': 'Permisos',
+  'roles.notDelegable':
+    'La gestión de roles queda reservada a la propiedad y la administración (no se puede delegar).',
+  'roles.empty.title': 'Todavía no hay roles',
+  'roles.empty.description':
+    'Crea un rol (p. ej. «Help Desk») para delegar tareas concretas sin conceder acceso total.',
+  'roles.noResults': 'Ningún rol coincide',
+  'roles.noResultsHint': 'Prueba con otro texto de búsqueda.',
+  'roles.openAria': 'Abrir el rol {name}',
+  'roles.noPermissions': 'Sin permisos',
+  'roles.namePlaceholder': 'p. ej. Help Desk',
+  'roles.fallbackTitle': 'Rol',
+  'roles.saveChanges': 'Guardar cambios',
+  'roles.discard': 'Descartar',
+  'roles.assigned': 'Asignados',
+  'roles.noAssignees': 'Este rol aún no está asignado a nadie.',
+  'roles.unassignAria': 'Quitar el rol a {name}',
+  'roles.assignTo': 'Asignar a una persona',
+  'roles.assignPlaceholder': 'Buscar persona de la organización',
+  'roles.noCandidates': 'Nadie sin el rol coincide.',
+  'roles.assignHint': 'Escribe para buscar entre las personas de la organización.',
+  'roles.deleteConfirm':
+    '¿Eliminar el rol «{name}»? Se quitará a todos sus asignados y perderán esos permisos. Esta acción no se puede deshacer.',
+  'roles.toast.membersFailed': 'No se pudieron cargar los asignados',
+  'roles.toast.created': 'Rol creado',
+  'roles.toast.createdHint': '«{name}» ya existe.',
+  'roles.toast.createFailed': 'No se pudo crear el rol',
+  'roles.toast.nameTaken': 'Ya existe un rol con ese nombre.',
+  'roles.toast.checkNameAndPerms': 'Revisa el nombre y los permisos seleccionados.',
+  'roles.toast.checkPerms': 'Revisa los permisos seleccionados.',
+  'roles.toast.updated': 'Rol actualizado',
+  'roles.toast.assignFailed': 'No se pudo asignar',
+  'roles.toast.alreadyAssigned': 'Esa persona ya tiene el rol.',
+  'roles.toast.unassignFailed': 'No se pudo quitar el rol',
+  'roles.toast.deleted': 'Rol eliminado',
+  'roles.toast.deletedHint': '«{name}» ya no existe.',
+  'roles.toast.deleteFailed': 'No se pudo eliminar el rol',
+  'perm.usersManage': 'Gestionar cuentas',
+  'perm.usersManageHint': 'Alta/baja, rol, reseteo de contraseña y MFA, sesiones.',
+  'perm.usersRead': 'Ver cuentas',
+  'perm.usersReadHint': 'Directorio y sesiones (solo lectura).',
+  'perm.groupsManage': 'Gestionar grupos',
+  'perm.groupsManageHint': 'Grupos de la organización y su membresía.',
+  'perm.ssoManage': 'Gestionar SSO',
+  'perm.ssoManageHint': 'Proveedores de inicio de sesión (OIDC/SAML).',
+  'perm.accessManage': 'Acceso condicional',
+  'perm.accessManageHint': 'Reglas evaluadas en el inicio de sesión.',
+  'perm.appsManage': 'Integraciones',
+  'perm.appsManageHint': 'Apps de terceros (SAML/OIDC salientes, DCR).',
+  'perm.auditView': 'Ver auditoría',
+  'perm.auditViewHint': 'Registro de auditoría de la organización.',
+  'perm.billingManage': 'Facturación',
+  'perm.billingManageHint': 'Facturación de la organización.',
+
+  // --- Acceso privilegiado (PIM) --------------------------------------------
+  'pim.subtitle':
+    'Elevación de privilegios just-in-time (PIM). Las personas elegibles activan un rol por una ventana acotada, con justificación y —si procede— aprobación. Solo mientras está activo concede permisos.',
+  'pim.offline': 'Sin conexión con Sytue ID: no se puede cargar ni operar el acceso privilegiado.',
+  'pim.status.pending': 'Pendiente',
+  'pim.status.active': 'Activo',
+  'pim.status.revoked': 'Revocado',
+  'pim.status.denied': 'Denegado',
+  'pim.status.expired': 'Expirado',
+  'pim.tab.me': 'Mi acceso',
+  'pim.tab.admin': 'Administración',
+  'pim.me.eligibleTitle': 'Roles que puedo activar',
+  'pim.me.emptyTitle': 'No eres elegible para ningún rol',
+  'pim.me.emptyDescription':
+    'Cuando la administración te declare elegible, podrás elevar privilegios aquí por una ventana acotada.',
+  'pim.me.activationsTitle': 'Mis activaciones',
+  'pim.me.noActivations': 'Aún no has activado ningún rol.',
+  'pim.requiresApproval': 'Requiere aprobación',
+  'pim.directActivation': 'Activación directa',
+  'pim.withApproval': 'con aprobación',
+  'pim.directActivationShort': 'activación directa',
+  'pim.maxDuration': 'máx. {minutes} min',
+  'pim.minutes': '{minutes} min',
+  'pim.minutesLeft': 'quedan ~{minutes} min',
+  'pim.expiresAt': 'Expira {when}',
+  'pim.activate': 'Activar',
+  'pim.request': 'Solicitar',
+  'pim.deactivate': 'Desactivar',
+  'pim.approve': 'Aprobar',
+  'pim.deny': 'Denegar',
+  'pim.noJustification': 'sin justificación',
+  'pim.admin.pendingTitle': 'Solicitudes pendientes',
+  'pim.admin.noPending': 'No hay solicitudes pendientes de aprobación.',
+  'pim.admin.activeTitle': 'Activaciones vigentes',
+  'pim.admin.noActive': 'Ningún rol privilegiado está activo ahora mismo.',
+  'pim.admin.eligibilitiesTitle': 'Elegibilidades',
+  'pim.admin.newEligibility': 'Nueva elegibilidad',
+  'pim.admin.emptyTitle': 'Aún no hay elegibilidades',
+  'pim.admin.emptyDescription':
+    'Declara a una persona elegible para un rol (p. ej. «Help Desk» o administración) y podrá elevar privilegios just-in-time, con o sin aprobación.',
+  'pim.removeEligibilityAria': 'Retirar la elegibilidad de {user} para {role}',
+  'pim.activateTitle': 'Activar «{name}»',
+  'pim.activateFallbackTitle': 'Activar rol',
+  'pim.approvalNotice':
+    'Este rol requiere aprobación: quedará pendiente hasta que la administración la conceda.',
+  'pim.justification': 'Justificación',
+  'pim.justificationPlaceholder': 'Motivo de la elevación (queda auditado)',
+  'pim.durationLabel': 'Duración (minutos)',
+  'pim.durationHelp': 'Máximo {minutes} min para este rol.',
+  'pim.newElig.user': 'Persona',
+  'pim.newElig.selectUser': 'Selecciona una persona…',
+  'pim.newElig.role': 'Rol',
+  'pim.newElig.selectRole': 'Selecciona un rol…',
+  'pim.newElig.customRoles': 'Roles personalizados',
+  'pim.newElig.builtinRoles': 'Roles integrados',
+  'pim.newElig.builtinAdmin': 'admin (superusuario)',
+  'pim.newElig.builtinOwner': 'owner (superusuario)',
+  'pim.newElig.maxLabel': 'Duración máxima (minutos)',
+  'pim.newElig.maxHelp': 'Ventana máxima de cada activación (1–1440).',
+  'pim.newElig.requiresApproval': 'Requiere aprobación de la administración',
+  'pim.newElig.submit': 'Crear elegibilidad',
+  'pim.toast.requested': 'Solicitud enviada',
+  'pim.toast.requestedHint': 'La administración tiene que aprobarla.',
+  'pim.toast.activated': 'Rol activado',
+  'pim.toast.activatedHint': 'Vigente durante {minutes} min.',
+  'pim.toast.activateFailed': 'No se pudo activar',
+  'pim.toast.notEligible': 'Ya no eres elegible para ese rol.',
+  'pim.toast.checkDuration': 'Revisa la duración (excede el máximo) y la justificación.',
+  'pim.toast.deactivated': 'Rol desactivado',
+  'pim.toast.deactivateFailed': 'No se pudo desactivar',
+  'pim.toast.approved': 'Solicitud aprobada',
+  'pim.toast.denied': 'Solicitud denegada',
+  'pim.toast.decideFailed': 'No se pudo completar',
+  'pim.toast.eligCreated': 'Elegibilidad creada',
+  'pim.toast.eligCreateFailed': 'No se pudo crear',
+  'pim.toast.eligDuplicate': 'Esa persona ya es elegible para ese rol.',
+  'pim.toast.eligCheckFields': 'Revisa la persona, el rol y la duración máxima.',
+  'pim.toast.eligRemoved': 'Elegibilidad retirada',
+  'pim.toast.eligRemoveFailed': 'No se pudo retirar',
+
+  // --- Grupos y reglas de membresía dinámica --------------------------------
+  'groups.subtitle':
+    'Grupos de la organización en Sytue ID. Rigen el share por-grupo de Sytue Drive.',
+  'groups.offline':
+    'Sin conexión con Sytue ID: se muestran datos de ejemplo. Los cambios no se guardarán.',
+  'groups.searchPlaceholder': 'Buscar grupo',
+  'groups.create': 'Crear grupo',
+  'groups.delete': 'Eliminar grupo',
+  'groups.fallbackTitle': 'Grupo',
+  'groups.empty.title': 'Todavía no hay grupos',
+  'groups.empty.description':
+    'Crea un grupo para organizar a las personas de la organización y compartir recursos por grupo.',
+  'groups.noResults': 'Ningún grupo coincide',
+  'groups.openAria': 'Abrir el grupo {name}',
+  'groups.dynamic': 'Dinámico',
+  'groups.noDescription': 'Sin descripción',
+  'groups.description': 'Descripción',
+  'groups.namePlaceholder': 'p. ej. Ingeniería',
+  'groups.dynamicSwitch': 'Grupo dinámico (membresía por regla)',
+  'groups.dynamicHelp':
+    'La membresía se calcula sobre los atributos de cada cuenta (departamento, puesto, ubicación…). No se añade a nadie a mano.',
+  'groups.ruleMembership': 'Membresía por regla',
+  'groups.ruleMembershipHelp':
+    'La membresía la calcula esta regla sobre los atributos de cada cuenta.',
+  'groups.convertSwitch': 'Convertir en grupo dinámico (membresía por regla)',
+  'groups.convertWarning':
+    'Al guardar la regla, este grupo pasará a ser dinámico y quien esté ahora se reemplazará por quien dicte la regla.',
+  'groups.saveRule': 'Guardar regla',
+  'groups.convert': 'Convertir en dinámico',
+  'groups.recompute': 'Recalcular ahora',
+  'groups.recomputeAll': 'Recalcular todos',
+  'groups.recomputeHelp':
+    'La membresía se actualiza sola cuando cambian los atributos de la cuenta (incluida la sincronización desde tu directorio por SCIM). Recalcula si quieres comprobarla ahora mismo.',
+  'groups.members': 'Personas',
+  'groups.computedMembers': 'Personas calculadas',
+  'groups.noMembers': 'En el grupo aún no hay nadie.',
+  'groups.noRuleMatches': 'Nadie cumple la regla todavía.',
+  'groups.removeMemberAria': 'Quitar a {name} del grupo',
+  'groups.addMember': 'Añadir a una persona',
+  'groups.deleteConfirm':
+    '¿Eliminar el grupo «{name}»? Se quitará a todas las personas que tiene y se perderá el share por-grupo asociado. Esta acción no se puede deshacer.',
+  'groups.rule.include': 'Incluir a quien cumpla',
+  'groups.rule.matchAll': 'TODAS las condiciones',
+  'groups.rule.matchAny': 'ALGUNA condición',
+  'groups.rule.attribute': 'Atributo',
+  'groups.rule.operator': 'Operador',
+  'groups.rule.value': 'valor',
+  'groups.rule.valueListHint': 'valor1, valor2, …',
+  'groups.rule.removeCondition': 'Quitar condición',
+  'groups.rule.addCondition': 'Añadir condición',
+  'groups.rule.preview': 'Ver quién entraría',
+  'groups.rule.previewNone': 'Nadie coincide.',
+  'groups.rule.previewCount': {
+    one: 'Coincidiría {count} persona.',
+    other: 'Coincidirían {count} personas.',
+  },
+  'groups.toast.membersFailed': 'No se pudo cargar la lista de personas',
+  'groups.toast.sampleData': 'Sin conexión con Sytue ID: mostrando datos de ejemplo.',
+  'groups.toast.previewFailed': 'No se pudo previsualizar',
+  'groups.toast.previewFailedHint': 'Revisa que cada condición tenga un valor.',
+  'groups.toast.created': 'Grupo creado',
+  'groups.toast.dynamicCreated': 'Grupo dinámico creado',
+  'groups.toast.createdHint': '«{name}» ya existe.',
+  'groups.toast.createFailed': 'No se pudo crear el grupo',
+  'groups.toast.nameTaken': 'Ya existe un grupo con ese nombre.',
+  'groups.toast.checkName': 'Revisa el nombre e inténtalo de nuevo.',
+  'groups.toast.checkNameAndRule': 'Revisa el nombre y la regla e inténtalo de nuevo.',
+  'groups.toast.updated': 'Grupo actualizado',
+  'groups.toast.alreadyUpToDate': 'La membresía ya estaba al día',
+  'groups.toast.recomputed': 'Membresía recalculada',
+  'groups.toast.recomputedSame': {
+    one: '{count} persona según la regla.',
+    other: '{count} personas según la regla.',
+  },
+  'groups.toast.recomputedAdded': { one: '{count} alta', other: '{count} altas' },
+  'groups.toast.recomputedRemoved': { one: '{count} baja', other: '{count} bajas' },
+  'groups.toast.recomputedAllGroups': {
+    one: '{count} grupo dinámico',
+    other: '{count} grupos dinámicos',
+  },
+  'groups.toast.recomputeFailed': 'No se pudo recalcular',
+  'groups.toast.ruleSaved': 'Regla guardada',
+  'groups.toast.ruleSavedHint': 'Membresía recalculada.',
+  'groups.toast.ruleSaveFailed': 'No se pudo guardar la regla',
+  'groups.toast.ruleInvalid': 'La regla no es válida: revisa condiciones y valores.',
+  'groups.toast.addFailed': 'No se pudo añadir',
+  'groups.toast.alreadyMember': 'Esa persona ya está en el grupo.',
+  'groups.toast.removeMemberFailed': 'No se pudo quitar a la persona',
+  'groups.toast.deleted': 'Grupo eliminado',
+  'groups.toast.deletedHint': '«{name}» ya no existe.',
+  'groups.toast.deleteFailed': 'No se pudo eliminar el grupo',
+  'rule.attr.department': 'Departamento',
+  'rule.attr.title': 'Puesto',
+  'rule.attr.location': 'Ubicación',
+  'rule.attr.email': 'Email',
+  'rule.attr.name': 'Nombre',
+  'rule.op.eq': 'es igual a',
+  'rule.op.ne': 'no es',
+  'rule.op.contains': 'contiene',
+  'rule.op.startsWith': 'empieza por',
+  'rule.op.in': 'está en (lista)',
+
+  // --- Gobernanza (política de egress) --------------------------------------
+  'gov.subtitle':
+    'Controla qué pueden enviar fuera tus integraciones. Toda llamada a un servicio de terceros pasa por aquí, queda registrada y no se puede esquivar.',
+  'gov.offlineTitle': 'No podemos hablar con el gateway de integraciones',
+  'gov.offlineBody':
+    'Ni las reglas ni los registros se pueden cargar o editar ahora mismo. Vuelve a intentarlo en unos minutos.',
+  'gov.tab.rules': 'Reglas',
+  'gov.tab.egress': 'Registro de egress',
+  'gov.tab.decisions': 'Decisiones',
+  'gov.badge.block': 'Bloquea',
+  'gov.badge.warn': 'Avisa',
+  'gov.badge.allow': 'Deja pasar',
+  'gov.act.warn': 'Dejarla pasar, pero avisarte',
+  'gov.act.warnBody':
+    'La llamada sale igual y la integración sigue funcionando, pero queda apuntada en «Decisiones». Es la forma de probar una regla antes de cortar nada.',
+  'gov.act.warnBadge': 'Lo más seguro para empezar',
+  'gov.act.block': 'Bloquear la llamada',
+  'gov.act.blockBody':
+    'La llamada no sale de Sytue. La integración recibirá un error y esa función suya dejará de funcionar. Úsalo cuando ese dato no deba salir nunca.',
+  'gov.act.allow': 'Dejarla pasar sin más',
+  'gov.act.allowBody':
+    'Sale con normalidad y no se apunta ninguna decisión. Sirve para hacer una excepción a otra regla más estricta.',
+  'gov.field.host': 'El sitio al que se llama',
+  'gov.field.hostHelp':
+    'El dominio del servicio, por ejemplo api.salesforce.com. Si lo empiezas por un punto (.salesforce.com) incluye todos sus subdominios.',
+  'gov.field.family': 'La integración',
+  'gov.field.familyHelp':
+    'La clave de la plantilla con la que conectaste el servicio. Úsala cuando te dé igual el dominio concreto al que llame.',
+  'gov.field.method': 'El tipo de llamada',
+  'gov.field.methodHelp':
+    'GET solo lee; POST, PUT, PATCH y DELETE escriben o borran. Déjalo vacío para cualquiera.',
+  'gov.field.path': 'La parte de la API',
+  'gov.field.pathHelp':
+    'El principio de la ruta, por si solo quieres una parte del servicio. Déjalo vacío para toda la API.',
+  'gov.field.body': 'Un texto dentro de lo que se envía',
+  'gov.field.bodyHelp':
+    'Para fugas de datos: actúa si el contenido enviado incluye esa palabra. Solo se puede mirar en envíos pequeños, así que no la uses como única condición.',
+  'gov.cond.any': 'Cualquier egress',
+  'gov.cond.all': 'todas las llamadas a terceros, sin excepción',
+  'gov.cond.calls': 'las llamadas {what}',
+  'gov.cond.subdomain': 'a cualquier subdominio de {host}',
+  'gov.cond.host': 'a {host}',
+  'gov.cond.family': 'de la integración {family}',
+  'gov.cond.method': 'con método {method}',
+  'gov.cond.path': 'cuya ruta empiece por {path}',
+  'gov.cond.body': 'que envíen «{text}» en el contenido',
+  'gov.suggest.block': 'Bloquear {what}',
+  'gov.suggest.warn': 'Avisar de {what}',
+  'gov.suggest.allow': 'Permitir {what}',
+  'gov.impact.allowTitle': 'Esta regla no puede cortar nada',
+  'gov.impact.allowBody':
+    'Las reglas que dejan pasar nunca rompen una integración: solo hacen excepción a otra más estricta.',
+  'gov.impact.wideTitle': 'Esta regla cortaría TODAS tus integraciones',
+  'gov.impact.wideBody':
+    'Sin ninguna condición, la regla alcanza cualquier llamada a terceros: los datos dejarían de sincronizarse y el inicio de sesión en las apps conectadas fallaría. Vuelve al primer paso y acota al menos el sitio al que se llama.',
+  'gov.impact.unknownTitle': 'No podemos estimar el impacto',
+  'gov.impact.unknownBody':
+    'El registro de egress está vacío, así que no sabemos qué integraciones se verían afectadas. Si tienes dudas, créala como aviso y mírala unos días antes de bloquear.',
+  'gov.impact.noneTitle': 'Nada de lo que funciona ahora se vería afectado',
+  'gov.impact.noneBody': {
+    one: 'Hay {count} llamada registrada y no encaja con esta regla.',
+    other: 'Ninguna de las últimas {count} llamadas registradas encaja con esta regla.',
+  },
+  'gov.impact.blockTitle': {
+    one: 'Esta regla cortaría tráfico que se está usando ({matched} de {count} llamada)',
+    other:
+      'Esta regla cortaría tráfico que se está usando ({matched} de las últimas {count} llamadas)',
+  },
+  'gov.impact.warnTitle': {
+    one: 'Esta regla marcaría {matched} de {count} llamada',
+    other: 'Esta regla marcaría {matched} de las últimas {count} llamadas',
+  },
+  'gov.impact.blockBody':
+    'Habría bloqueado: {hosts}. Si alguna es de una integración en uso, esa función dejará de funcionar en cuanto guardes. Créala primero como aviso si prefieres comprobarlo sin romper nada.',
+  'gov.impact.warnBody':
+    'Habría marcado: {hosts}. Si alguna es de una integración en uso, esa función dejará de funcionar en cuanto guardes.',
+  'gov.impact.upperBound':
+    'La cuenta es un tope: la ruta y el contenido no se pueden comprobar desde el registro.',
+  'gov.step.traffic': 'Qué tráfico',
+  'gov.step.trafficHeading': '¿A qué llamadas quieres que afecte?',
+  'gov.step.trafficDescription':
+    'Rellena solo lo que necesites: cada campo que dejes vacío es un comodín. Lo más habitual es acotar por el sitio al que se llama.',
+  'gov.step.wideTitle': 'Sin condiciones, afecta a todo',
+  'gov.step.wideBody':
+    'Tal y como está, la regla alcanza todas las llamadas a terceros de toda la organización. Es lo que quieres para una regla de aviso general, pero rara vez para una de bloqueo.',
+  'gov.step.willMatch': 'Esta regla mirará',
+  'gov.step.action': 'Qué hacer',
+  'gov.step.actionHeading': '¿Qué quieres que pase con esas llamadas?',
+  'gov.step.actionDescription': 'Elige por la consecuencia, no por el nombre técnico.',
+  'gov.step.orderNote':
+    'Las reglas se miran en orden. Una regla de «dejar pasar» colocada antes actúa como excepción de las que vienen después.',
+  'gov.step.review': 'Resumen',
+  'gov.step.reviewNew': 'Revisa y guarda la regla',
+  'gov.step.reviewEdit': 'Revisa los cambios',
+  'gov.step.reviewDescription':
+    'Comprobamos contra el registro reciente qué tráfico real tocaría esta regla.',
+  'gov.step.done': 'Listo',
+  'gov.step.savedChanges': 'Cambios guardados',
+  'gov.review.affects': 'A qué afecta',
+  'gov.review.happens': 'Qué ocurre',
+  'gov.review.willApply': 'Se aplicará desde que la guardes',
+  'gov.review.savedOff': 'Guardada sin aplicar',
+  'gov.createRule': 'Crear la regla',
+  'gov.newRuleTitle': 'Nueva regla de tráfico',
+  'gov.wizardDescription':
+    'Dos preguntas y un resumen. Antes de guardar te decimos si la regla estaría cortando llamadas que se están haciendo ahora mismo.',
+  'gov.ruleName': 'Nombre de la regla',
+  'gov.ruleNameHint':
+    'Es como la verás en la lista. Si lo dejas vacío la llamaremos «{suggested}».',
+  'gov.applyNow': 'Aplicar la regla desde ya',
+  'gov.applyNowOn': 'Empezará a evaluarse en la siguiente llamada a terceros.',
+  'gov.applyNowOff':
+    'Se guardará apagada: puedes prepararla ahora y encenderla cuando quieras desde la lista.',
+  'gov.done.on': 'Ya se está evaluando en cada llamada a terceros: {what}.',
+  'gov.done.off': 'Está guardada pero apagada: enciéndela desde la lista cuando quieras.',
+  'gov.done.checkTitle': 'Compruébalo antes de irte',
+  'gov.done.checkBodyBlock':
+    'Abre la pestaña «Decisiones» dentro de un rato: ahí verás cada llamada que la regla haya bloqueado. Si aparece una integración que tenía que seguir funcionando, apaga la regla desde la lista y acota la condición.',
+  'gov.done.checkBodyWarn':
+    'Abre la pestaña «Decisiones» dentro de un rato: ahí verás cada llamada que la regla haya marcado. Si aparece una integración que tenía que seguir funcionando, apaga la regla desde la lista y acota la condición.',
+  'gov.done.back': 'Volver a las reglas',
+  'gov.rules.title': 'Reglas de tráfico saliente',
+  'gov.rules.description':
+    'Se miran de arriba abajo en cada llamada que una integración hace a un servicio de fuera. Sin reglas, todo sale (y se registra igualmente).',
+  'gov.rules.emptyDescription':
+    'Sin reglas, cualquier integración conectada puede llamar a donde quiera. La primera que suele crearse: avisar cuando algo se envía fuera, para ver el tráfico real antes de bloquear nada.',
+  'gov.rules.emptyAction': 'Crear la primera regla',
+  'gov.col.action': 'Acción',
+  'gov.col.rule': 'Regla',
+  'gov.col.enabled': 'Activa',
+  'gov.col.site': 'Sitio',
+  'gov.col.call': 'Llamada',
+  'gov.col.response': 'Respuesta',
+  'gov.col.took': 'Tardó',
+  'gov.col.decision': 'Decisión',
+  'gov.col.destination': 'Destino',
+  'gov.toggleAria': 'Aplicar la regla {name}',
+  'gov.toast.toggleFailed': 'No se ha podido cambiar el estado',
+  'gov.toast.badCondition':
+    'El gateway ha rechazado algún dato. Revisa las condiciones del primer paso.',
+  'gov.toast.forbidden': 'Tu cuenta no tiene permiso para cambiar las reglas de esta organización.',
+  'gov.toast.gatewayDown': 'El gateway no responde ahora mismo. Vuelve a intentarlo en un minuto.',
+  'gov.toast.created': 'Regla creada',
+  'gov.delete.intro': 'Se borrará {name}.',
+  'gov.delete.afterTitle': 'A partir de ese momento',
+  'gov.delete.afterBlock':
+    'El tráfico que esta regla bloqueaba volverá a salir de Sytue con normalidad. Si solo quieres pausarla, apágala desde la lista en vez de borrarla: así conservas la condición.',
+  'gov.delete.afterWarn':
+    'Ese tráfico dejará de apuntarse en «Decisiones». Lo ya registrado se conserva.',
+  'gov.delete.confirm': 'Borrar la regla',
+  'gov.networkError': 'error red',
+  'gov.egress.title': 'Registro de egress',
+  'gov.egress.description':
+    'Cada llamada que una integración ha hecho a un servicio de fuera: a dónde, cuándo y cómo respondió. Solo metadatos, nunca el contenido ni las credenciales.',
+  'gov.egress.offline': 'Sin conexión con el gateway: no se puede cargar el registro de egress.',
+  'gov.egress.loadFailed':
+    'No se ha podido cargar el registro. Ajusta los filtros y vuelve a intentarlo.',
+  'gov.egress.emptyTitle': 'Nada registrado todavía',
+  'gov.egress.emptyDescription':
+    'Aún no hay llamadas a terceros para ese filtro. En cuanto una integración salga a la red, aparecerá aquí.',
+  'gov.exportCsv': 'Exportar CSV',
+  'gov.filterHost': 'Sitio destino',
+  'gov.filterHostAria': 'Filtrar por sitio destino',
+  'gov.filterStatusAria': 'Filtrar por código de respuesta HTTP',
+  'gov.applyFilters': 'Aplicar filtros',
+  'gov.decisions.title': 'Qué han hecho tus reglas',
+  'gov.decisions.description':
+    'Cada vez que una regla bloquea o marca una llamada, queda aquí. Un bloqueo no deja rastro en el registro de egress (la llamada nunca salió): esta es su única evidencia.',
+  'gov.decisions.filterAria': 'Filtrar por tipo de decisión',
+  'gov.decisions.onlyBlocks': 'Solo bloqueos',
+  'gov.decisions.onlyWarnings': 'Solo avisos',
+  'gov.decisions.offline': 'Sin conexión con el gateway: no se pueden cargar las decisiones.',
+  'gov.decisions.loadFailed':
+    'No se han podido cargar las decisiones. Vuelve a intentarlo en unos segundos.',
+  'gov.decisions.emptyTitle': 'Ninguna regla ha actuado todavía',
+  'gov.decisions.emptyDescription':
+    'Nada se ha bloqueado ni marcado. Cuando una regla actúe sobre una llamada, la verás aquí con su fecha y su destino.',
+  'gov.decision.blocked': 'Bloqueada',
+  'gov.decision.warned': 'Avisada',
+
+  // --- Cumplimiento (retención legal + eDiscovery) --------------------------
+  'comp.subtitle':
+    'Preserva el correo y los archivos de alguien mientras dure un caso, y busca o descarga su contenido cuando la ley te obligue. Es acceso a datos ajenos: todo lo que hagas aquí queda registrado con tu nombre.',
+  'comp.tab.holds': 'Retenciones legales',
+  'comp.service.mail': 'Correo',
+  'comp.service.drive': 'Archivos',
+  'comp.service.notes': 'Notepads',
+  'comp.noun.mail': 'el correo',
+  'comp.noun.drive': 'los archivos',
+  'comp.noun.notes': 'sus cuadernos',
+  'comp.offline.all': 'No podemos contactar con Correo, Archivos ni Notepads',
+  'comp.offline.one': 'No podemos hablar con {service}',
+  'comp.offline.body':
+    'Lo que se muestre puede estar incompleto y las acciones sobre ese servicio fallarán. Vuelve a intentarlo en unos minutos.',
+  'comp.scope.title': 'Qué se preserva',
+  'comp.scope.help':
+    'Lo que no marques aquí se sigue borrando con normalidad, así que en caso de duda preserva de más: liberar luego es inmediato, recuperar lo purgado no.',
+  'comp.scope.usual': 'Lo más habitual',
+  'comp.scope.bothLabel': 'Su correo y sus archivos',
+  'comp.scope.bothShort': 'Correo y archivos',
+  'comp.scope.bothNoun': 'su correo y sus archivos',
+  'comp.scope.bothBody':
+    'Lo habitual en un litigio: nada de lo que esa cuenta borre desaparece de verdad, ni en el buzón ni en Drive.',
+  'comp.scope.mailLabel': 'Solo su correo',
+  'comp.scope.mailShort': 'Correo',
+  'comp.scope.mailNoun': 'su correo',
+  'comp.scope.mailBody':
+    'Se preserva el buzón. Los archivos de Drive se seguirán borrando como siempre, también los que ya estén en la papelera.',
+  'comp.scope.driveLabel': 'Solo sus archivos',
+  'comp.scope.driveShort': 'Archivos',
+  'comp.scope.driveNoun': 'sus archivos',
+  'comp.scope.driveBody':
+    'Se preservan los archivos de Drive. El correo se seguirá borrando como siempre, también lo que ya esté en la papelera.',
+  'comp.scope.notesLabel': 'Solo sus cuadernos',
+  'comp.scope.notesShort': 'Notepads',
+  'comp.scope.notesNoun': 'sus cuadernos',
+  'comp.scope.notesBody':
+    'Se preservan los cuadernos de Notepads. El correo y los archivos de Drive siguen borrándose como siempre, incluido lo que ya está en la papelera.',
+  'comp.scope.offlineTitle': '{services} no responde',
+  'comp.scope.offlineBody':
+    'Esa parte de la retención fallará. Puedes crearla igual (lo que sí responda quedará preservado) y repetirla después para lo que falte.',
+  'comp.subject.wholeOrg': 'Toda la organización',
+  'comp.subject.wholeOrgInline': 'toda tu organización',
+  'comp.subject.thatPerson': 'esa persona',
+  'comp.subject.notChosen': 'Sin elegir',
+  'comp.sentence': 'Se preservará {what} de {subject} hasta que liberes la retención.',
+  'comp.step.who': 'A quién',
+  'comp.step.whoHeading': '¿De quién hay que preservar los datos?',
+  'comp.step.whoDescription': 'Empieza por decidir a qué cuenta afecta y qué se preserva de ella.',
+  'comp.who.person': 'Una persona',
+  'comp.who.personBody':
+    'Solo se preserva lo de esa cuenta. Es lo normal cuando el caso señala a alguien concreto.',
+  'comp.who.orgBody':
+    'Se preserva lo de todas las cuentas. Úsalo solo si el caso alcanza a toda la empresa: nada se purgará mientras esté activa y el almacenamiento seguirá creciendo.',
+  'comp.who.selectFromDirectory': 'Selecciona a alguien del directorio…',
+  'comp.who.thisAccount': 'esta cuenta',
+  'comp.who.willPreserve': 'Se preservará lo de {email}.',
+  'comp.who.pickHint':
+    'Elígela del directorio: la retención se ata a su identidad, no a su dirección de correo, así que sigue valiendo si le cambia el nombre.',
+  'comp.step.impact': 'Qué implica',
+  'comp.step.impactHeading': 'Esto es lo que cambia mientras esté activa',
+  'comp.step.impactDescription':
+    'Nada de esto se aplica todavía. Léelo y sigue si es lo que buscas.',
+  'comp.impact.noDeleteTitle': 'Nada se borra de verdad',
+  'comp.impact.noDeleteBody':
+    'Mientras esté activa, ni {subject} ni tú ni nadie más con administración puede eliminar definitivamente {what}. Puede seguir borrando lo que quiera: se guarda una copia que solo se ve desde eDiscovery.',
+  'comp.impact.silentTitle': 'La persona no se entera',
+  'comp.impact.silentBody':
+    'Su cuenta funciona exactamente igual y no ve ningún aviso. Es lo que suelen exigir los procedimientos: nadie debe saber que se está preservando.',
+  'comp.impact.auditedTitle': 'Queda registrado a tu nombre',
+  'comp.impact.auditedBody':
+    'Se apunta quién la crea, cuándo y por qué. Ese registro es la prueba de que preservaste a tiempo, así que el motivo importa.',
+  'comp.impact.releaseTitle': 'Se libera cuando acabe el caso',
+  'comp.impact.releaseBody':
+    'La liberas desde la lista y vuelve el borrado normal. Lo que estuviera en la papelera pasará a poder purgarse.',
+  'comp.impact.orgWideTitle': 'Vas a retener a toda la organización',
+  'comp.impact.orgWideBody':
+    'Ninguna cuenta podrá purgar nada mientras la retención siga activa, y el espacio ocupado solo puede crecer. Si el caso apunta a personas concretas, vuelve atrás y elígelas: es más barato y más fácil de defender.',
+  'comp.impact.whatForTitle': 'Para qué sirve una retención legal',
+  'comp.impact.whatForBody':
+    'Para litigios, investigaciones internas y requerimientos legales: congela la prueba antes de que alguien la borre. No es una copia de seguridad ni sirve para archivar.',
+  'comp.reason.label': 'Motivo',
+  'comp.reason.required': 'Escribe por qué se retiene: es lo que verá la auditoría.',
+  'comp.reason.placeholder': 'Demanda laboral de un exempleado, requerimiento del juzgado nº 4',
+  'comp.reason.ok': 'Queda guardado tal cual en la auditoría.',
+  'comp.reason.hint':
+    'Hace falta para continuar. Describe el caso, no la acción: «retención» no le dice nada a nadie.',
+  'comp.step.reasonHeading': '¿Por qué se retiene?',
+  'comp.step.reasonDescription':
+    'Es lo primero que leerá quien revise el caso dentro de dos años, tú incluido. Una frase concreta basta.',
+  'comp.case.label': 'Referencia de caso',
+  'comp.case.none': 'Sin referencia',
+  'comp.case.hint':
+    'Opcional. El identificador que uses en tu gestor de casos: sirve para agrupar varias retenciones del mismo asunto y para etiquetar los exports de eDiscovery.',
+  'comp.tipTitle': 'Consejo',
+  'comp.tipBody':
+    'Si el caso alcanza a varias personas, crea una retención por persona con la misma referencia: podrás liberarlas por separado según vaya cerrando cada parte.',
+  'comp.review.who': 'A quién afecta',
+  'comp.review.starts': 'Cuándo empieza',
+  'comp.review.startsNow': 'En cuanto la crees',
+  'comp.review.sentenceTitle': 'La retención, en una frase',
+  'comp.review.immediateTitle': 'Se aplica al momento y queda registrado',
+  'comp.review.immediateBody':
+    'Desde que la crees, nada de {what} se puede purgar. La acción se apunta en la auditoría con tu nombre, la fecha y el motivo.',
+  'comp.step.reviewHeading': 'Revisa y crea la retención',
+  'comp.step.reviewDescription':
+    'Esto es lo que vamos a preservar. Puedes cambiar cualquier cosa antes de crearla.',
+  'comp.create': 'Crear la retención',
+  'comp.newHold': 'Nueva retención legal',
+  'comp.newHoldShort': 'Nueva retención',
+  'comp.wizardDescription':
+    'Tres preguntas y un resumen. Antes de crearla te decimos exactamente qué deja de poder borrarse.',
+  'comp.done.heading': 'Retención activa',
+  'comp.done.rejectedTitle': '{services} no la ha aceptado',
+  'comp.done.rejectedBody':
+    'Esa parte NO está preservada. Cuando el servicio vuelva, crea otra retención con el mismo motivo y referencia solo para {services}.',
+  'comp.done.nextTitle': 'Qué suele venir ahora',
+  'comp.done.nextSearch':
+    'Busca el contenido del caso desde la pestaña eDiscovery: la retención garantiza que sigue ahí aunque se borre.',
+  'comp.done.nextRelease':
+    'Cuando el caso cierre, libérala desde la lista. Hasta entonces, no la toques: liberar y volver a crear deja un hueco en el que sí se pudo purgar.',
+  'comp.done.back': 'Volver a las retenciones',
+  'comp.holds.title': 'Retenciones',
+  'comp.holds.descriptionActive': 'Las que están preservando datos ahora mismo.',
+  'comp.holds.descriptionAll':
+    'Activas y ya liberadas. Las liberadas se conservan como prueba de cuándo dejó de preservarse.',
+  'comp.holds.showReleased': 'Ver también las liberadas',
+  'comp.holds.whatTitle': 'Qué hace una retención legal',
+  'comp.holds.whatBody':
+    'Congela lo que hay en una cuenta para un litigio: la persona puede seguir borrando su correo y sus archivos, pero nada se elimina de verdad hasta que tú liberes la retención. Crearlas y liberarlas es acceso privilegiado y queda registrado a tu nombre.',
+  'comp.holds.emptyActive': 'No hay ninguna activa',
+  'comp.holds.emptyEver': 'Nunca se ha creado ninguna',
+  'comp.holds.emptyDescription':
+    'Una retención preserva el correo y los archivos de alguien mientras dure un caso. Se crea en un minuto y se libera cuando el caso cierra.',
+  'comp.holds.emptyAction': 'Crear la primera retención',
+  'comp.col.source': 'Fuente',
+  'comp.col.subject': 'Sujeto',
+  'comp.col.case': 'Caso',
+  'comp.col.created': 'Creada',
+  'comp.col.item': 'Elemento',
+  'comp.col.size': 'Tamaño',
+  'comp.status.preserving': 'Preservando',
+  'comp.status.released': 'Liberada',
+  'comp.status.deletedPreserved': 'Borrado, preservado',
+  'comp.release': 'Liberar',
+  'comp.releaseAria': 'Liberar la retención de {subject} en {service}',
+  'comp.release.title': 'Liberar la retención',
+  'comp.release.intro': 'Dejarás de preservar {what} de {subject}.',
+  'comp.release.point1': 'Vuelve a aplicarse el borrado normal de la cuenta.',
+  'comp.release.point2':
+    'Lo que esté en la papelera podrá purgarse y dejará de aparecer en eDiscovery.',
+  'comp.release.point3':
+    'Lo ya purgado no se recupera: si el caso sigue abierto, no la liberes todavía.',
+  'comp.release.audited':
+    'La liberación queda registrada con tu nombre y la fecha. La retención se conserva en el historial (verla: «Ver también las liberadas»).',
+  'comp.release.confirm': 'Liberar y volver al borrado normal',
+  'comp.toast.createFailed': 'No se ha podido crear',
+  'comp.toast.createRejected':
+    'Ni Correo ni Archivos han aceptado la retención. Vuelve a intentarlo.',
+  'comp.toast.badSubject':
+    'El servicio ha rechazado algún dato. Revisa a quién afecta en el primer paso.',
+  'comp.toast.forbidden': 'Tu cuenta no tiene permiso para crear retenciones en esta organización.',
+  'comp.toast.serviceDown':
+    'El servicio no responde ahora mismo. Vuelve a intentarlo en un minuto.',
+  'comp.toast.reloadFailed': 'No se ha podido recargar la lista',
+  'comp.toast.released': 'Retención liberada',
+  'comp.toast.releasedHint': '{subject} vuelve al borrado normal.',
+  'comp.toast.releaseFailed': 'No se ha podido liberar',
+  'comp.toast.releaseFailedHint': 'Sigue activa. Vuelve a intentarlo en unos segundos.',
+  'comp.toast.noSubject': 'Falta decir de quién',
+  'comp.toast.noSubjectHint': 'Elige en la lista la persona cuyo contenido vas a mirar.',
+  'comp.toast.searchFailed': 'No se ha podido buscar',
+  'comp.toast.badFilters': 'Algún filtro no cuadra. Revisa las fechas y vuelve a probar.',
+  'comp.search.warningTitle': 'Vas a mirar el contenido de otra persona',
+  'comp.search.warningBody':
+    'Aquí se ve y se descarga el correo y los archivos de alguien de tu organización, sin que esa persona lo sepa. Cada búsqueda y cada descarga queda registrada con tu nombre, la fecha y a quién miraste. Úsalo solo con un caso detrás.',
+  'comp.search.title': 'Buscar en el contenido de una persona',
+  'comp.search.description':
+    'Los resultados combinan correo y archivos y solo muestran los datos de cabecera: quién, cuándo y cuánto ocupa. Para ver el contenido hay que exportar.',
+  'comp.search.where': 'Dónde buscar',
+  'comp.search.keyword': 'Palabra clave',
+  'comp.search.keywordHelp':
+    'En el correo busca en asunto, remitente y cuerpo; en los archivos, en el nombre. Déjalo vacío para verlo todo.',
+  'comp.search.keywordPlaceholder': 'contrato',
+  'comp.search.caseHelp': 'Se guarda en la auditoría junto a la búsqueda.',
+  'comp.search.bothDown':
+    'Ni Correo ni Archivos responden ahora mismo: la búsqueda no devolverá nada.',
+  'comp.search.oneDown': '{service} no responde ahora mismo: faltará esa mitad de los resultados.',
+  'comp.search.partialTitle': 'No se ha podido buscar en {services}',
+  'comp.search.partialBody':
+    'Lo que ves abajo está incompleto. Vuelve a lanzar la búsqueda en unos minutos antes de dar el caso por revisado.',
+  'comp.search.searching': 'Buscando en el contenido de {subject}…',
+  'comp.search.emptyTitle': 'Todavía no has buscado nada',
+  'comp.search.emptyDescription':
+    'Elige a la persona y, si lo sabes, acota el período. Cuanto más acotes, menos contenido ajeno acabas viendo.',
+  'comp.search.noResultsTitle': 'Nada coincide con esos filtros',
+  'comp.search.noResultsDescription':
+    'Ni un correo ni un archivo de esa persona encaja. Prueba a ampliar el período o a quitar la palabra clave.',
+  'comp.search.resultCount': {
+    one: '{count} elemento de {subject}.',
+    other: '{count} elementos de {subject}.',
+  },
+  'comp.search.downloadFull': 'Descargar el contenido completo:',
+  'comp.period.range': 'del {from} al {to}',
+  'comp.period.from': 'desde el {from}',
+  'comp.period.to': 'hasta el {to}',
+  'comp.period.all': 'de todo el histórico',
+  'comp.export.title': 'Descargar el contenido',
+  'comp.export.intro':
+    'Esto no es un listado: es el contenido íntegro, legible fuera de Sytue. Revisa qué vas a bajar.',
+  'comp.export.what': 'Qué se descarga',
+  'comp.export.whatMail': 'Todo su correo del período, con adjuntos, en un fichero .mbox',
+  'comp.export.whatDrive': 'Todos sus archivos del período, en un .zip',
+  'comp.export.whose': 'De quién',
+  'comp.export.period': 'Período',
+  'comp.export.textFilter': 'Filtro de texto',
+  'comp.export.noFilter': 'Sin filtro (todo el contenido)',
+  'comp.export.mailBtn': 'Correo (.mbox)',
+  'comp.export.driveBtn': 'Archivos (.zip)',
+  'comp.export.downloadMbox': 'Descargar el .mbox',
+  'comp.export.downloadZip': 'Descargar el .zip',
+  'comp.export.auditedTitle': 'Queda registrado y sale de Sytue',
+  'comp.export.auditedBody':
+    'La descarga se apunta en la auditoría con tu nombre, la fecha y de quién es el contenido. A partir de ahí el fichero vive en tu equipo: guárdalo donde exija tu procedimiento y bórralo cuando el caso cierre.',
+
+  // --- Mapa de la suite: quién sirve cada producto (AppMap) ---------------
+  'appmap.column.apps': 'Aplicaciones conectadas',
+  'appmap.column.products': 'Productos de la suite',
+  'appmap.dragHint': 'Arrastra hasta un producto para que lo sirva esta aplicación',
+  'appmap.menuAria': 'Quién sirve {product}',
+  'appmap.nativeHint': 'El producto nativo de la suite',
+  'appmap.handoff.full': 'Abre la aplicación y también cada documento',
+  'appmap.handoff.appOnly': 'Abre la aplicación; los documentos siguen en Sytue',
+  'appmap.footer':
+    'Elige quién sirve cada producto. El cambio afecta a toda la organización: el lanzador y el conmutador de aplicaciones abrirán la aplicación elegida. Los datos que ya están en Sytue se quedan donde están.',
+  'appmap.offline.title': 'No se ha podido leer el mapa',
+  'appmap.offline.description':
+    'La pasarela de integraciones no responde ahora mismo. Vuelve a intentarlo en unos minutos.',
+  'appmap.empty.title': 'Todos los productos los sirve Sytue',
+  'appmap.empty.description':
+    'Cuando conectes una aplicación que pueda sustituir a un producto de la suite —Google Workspace, Microsoft 365, Slack…— aparecerá aquí para que elijas.',
+  'appmap.toast.switched': '{product} lo sirve ahora la aplicación conectada',
+  'appmap.toast.reverted': '{product} vuelve a Sytue',
+  'appmap.toast.failed': 'No se ha podido cambiar',
+  'appmap.toast.failedHint': 'Inténtalo de nuevo en unos segundos.',
+
+  // --- Asistente: traer contenido (MigrateWizard) --------------------------
+  'wizard.migrate.goToApps': 'Ir a Integraciones',
+  'wizard.migrate.empty.title': 'Primero conecta el origen',
+  'wizard.migrate.empty.description':
+    'Para traerte el contenido de Microsoft 365 o Google Workspace hay que conectarlo en Integraciones. Se hace una vez y sirve para toda la organización.',
+  'wizard.migrate.bring.drive': 'Ficheros',
+  'wizard.migrate.bring.contacts': 'Contactos',
+  'wizard.migrate.bring.both': 'Ficheros y contactos',
+  'wizard.migrate.gets.files':
+    'Las carpetas y los ficheros, con su nombre y en la misma ruta que tenían.',
+  'wizard.migrate.gets.contacts':
+    'Los contactos con su nombre, sus correos, sus teléfonos y su organización.',
+  'wizard.migrate.nots.googleNative':
+    'Los documentos nativos de Google (Documentos, Hojas de cálculo, Presentaciones). No son ficheros: hay que exportarlos primero. Se omiten uno a uno y te decimos cuáles.',
+  'wizard.migrate.nots.tooBig':
+    'Los ficheros de más de 2 GiB. Se omiten enteros; nunca se suben a medias.',
+  'wizard.migrate.nots.modifiedDate':
+    'La fecha de modificación original: en Sytue todo aparecerá con la fecha de hoy. El contenido y la ruta sí se conservan.',
+  'wizard.migrate.nots.permissions':
+    'Los permisos y elementos compartidos del origen: cada persona recibe lo suyo.',
+  'wizard.migrate.nots.namelessContacts':
+    'Los contactos sin ningún nombre visible: Sytue Contacts exige un nombre.',
+  'wizard.migrate.nots.mailCalendar':
+    'El correo y el calendario. Todavía no se migran; llegarán más adelante.',
+  'wizard.migrate.error.forbidden':
+    'Tu cuenta no tiene permiso para migrar contenido en esta organización.',
+  'wizard.migrate.error.sourceGone':
+    'La conexión de origen ya no existe. Vuelve a Integraciones y compruébala.',
+  'wizard.migrate.error.generic':
+    'No hemos podido lanzar la migración. Vuelve a intentarlo en unos segundos.',
+  'wizard.migrate.step.origin': 'Origen',
+  'wizard.migrate.step.what': 'Qué traer',
+  'wizard.migrate.step.who': 'Para quién',
+  'wizard.migrate.step.limits': 'Qué se trae',
+  'wizard.migrate.step.review': 'Resumen',
+  'wizard.migrate.origin.heading': '¿De dónde traemos el contenido?',
+  'wizard.migrate.origin.description':
+    'Usamos la conexión que ya configuraste en Integraciones. No hay nada que instalar.',
+  'wizard.migrate.origin.noneTitle': 'Todavía no hay ninguna conexión de origen',
+  'wizard.migrate.origin.noneBody':
+    'Para traerte el contenido primero hay que conectar Microsoft 365 o Google Workspace en Integraciones. Es un asistente de cinco pasos y solo se hace una vez.',
+  'wizard.migrate.origin.connection':
+    'Leeremos el contenido con la conexión «{name}», la que ya usa tu organización.',
+  'wizard.migrate.what.heading': '¿Qué quieres traerte?',
+  'wizard.migrate.what.description':
+    'Puedes lanzar el resto más adelante: cada cosa va por su cuenta.',
+  'wizard.migrate.what.bothHint':
+    'Lo habitual en una mudanza: la carpeta personal y la agenda de cada persona.',
+  'wizard.migrate.what.driveHint':
+    'Las carpetas y los ficheros de la unidad personal, con la misma estructura.',
+  'wizard.migrate.what.contactsHint': 'La agenda personal: nombres, correos y teléfonos.',
+  'wizard.migrate.what.mostCommon': 'Lo más habitual',
+  'wizard.migrate.who.heading': '¿A quién le traemos su contenido?',
+  'wizard.migrate.who.description':
+    'Cada persona recibe lo suyo EN SU PROPIA CUENTA de Sytue. Puedes elegir una o varias.',
+  'wizard.migrate.who.searchPlaceholder': 'Buscar por nombre o correo',
+  'wizard.migrate.who.searchAria': 'Buscar personas',
+  'wizard.migrate.who.loadedHint': {
+    one: 'Buscamos entre la {count} persona ya cargada de tu organización. Si no aparece quien buscas, carga más abajo.',
+    other:
+      'Buscamos entre las {count} personas ya cargadas de tu organización. Si no aparece quien buscas, carga más abajo.',
+  },
+  'wizard.migrate.who.loading': 'Cargando el directorio…',
+  'wizard.migrate.who.noMatch': 'Nadie coincide con esa búsqueda.',
+  'wizard.migrate.who.suspended': 'Suspendida',
+  'wizard.migrate.who.loadMore': 'Cargar más personas',
+  'wizard.migrate.who.pickHelp':
+    'Marca a quién quieres migrarle su contenido. Si sois pocos, empieza por una persona y comprueba el resultado antes de lanzar el resto.',
+  'wizard.migrate.who.sourceTitle': {
+    one: 'De qué cuenta se copia ({count} persona)',
+    other: 'De qué cuenta se copia ({count} personas)',
+  },
+  'wizard.migrate.who.sourceHint':
+    'Ponemos su correo de Sytue por defecto. Cámbialo si en {product} tenía otra dirección.',
+  'wizard.migrate.who.sourceAria': 'Cuenta de origen de {name}',
+  'wizard.migrate.who.missingSource': {
+    one: 'Falta la cuenta de origen de {count} persona.',
+    other: 'Falta la cuenta de origen de {count} personas.',
+  },
+  'wizard.migrate.limits.heading': 'Esto es lo que llega y esto es lo que no',
+  'wizard.migrate.limits.description':
+    'Preferimos decírtelo ahora que dejarte una sorpresa dentro de dos horas.',
+  'wizard.migrate.limits.yes': 'Se trae',
+  'wizard.migrate.limits.no': 'No se trae',
+  'wizard.migrate.limits.safeTitle': 'Nada se pierde en el origen',
+  'wizard.migrate.limits.safeBody':
+    'Solo leemos. Tu Microsoft 365 o tu Google Workspace se quedan exactamente como están, y puedes volver a lanzar la migración: lo ya copiado no se duplica.',
+  'wizard.migrate.summary.source': '{product} · {name}',
+  'wizard.migrate.summary.what': 'Qué se trae',
+  'wizard.migrate.summary.who': 'Para quién',
+  'wizard.migrate.summary.whoOne': '{name} ({email})',
+  'wizard.migrate.summary.whoMany': {
+    one: '{count} persona, en su propia cuenta',
+    other: '{count} personas, cada una en su cuenta',
+  },
+  'wizard.migrate.summary.jobs': 'Trabajos que se lanzan',
+  'wizard.migrate.summary.jobsValue': {
+    one: '{count} (uno por persona y tipo de contenido)',
+    other: '{count} (uno por persona y tipo de contenido)',
+  },
+  'wizard.migrate.summary.skipped': 'Se omitirá',
+  'wizard.migrate.summary.skippedValue': {
+    one: '{count} cosa, con su motivo en el informe',
+    other: '{count} cosas, con su motivo en el informe',
+  },
+  'wizard.migrate.summary.skippedNone': 'Nada',
+  'wizard.migrate.review.heading': 'Revisa y lanza',
+  'wizard.migrate.review.description':
+    'Al lanzar, la copia corre en segundo plano. Puedes cerrar esta página.',
+  'wizard.migrate.review.launch': {
+    one: 'Migrar el contenido',
+    other: 'Migrar a {count} personas',
+  },
+  'wizard.migrate.review.failedTitle': 'No se ha podido lanzar',
+  'wizard.migrate.review.ownAccountTitle': 'Cada persona recibe lo suyo en SU cuenta',
+  'wizard.migrate.review.ownAccountBody':
+    'El contenido no pasa por tu cuenta en ningún momento. Sytue pide permiso para escribir en nombre de cada persona, ese permiso dura minutos y queda registrado en la auditoría.',
+
+  // --- Asistente: etiqueta de confidencialidad (SensitivityLabelWizard) -----
+  'wizard.label.color.none': 'Sin color',
+  'wizard.label.color.grey': 'Gris',
+  'wizard.label.color.blue': 'Azul',
+  'wizard.label.color.green': 'Verde',
+  'wizard.label.color.amber': 'Ámbar',
+  'wizard.label.color.red': 'Rojo',
+  'wizard.label.toast.saveFailed': 'No se ha podido guardar',
+  'wizard.label.toast.nameTaken': 'Ya tienes una etiqueta con ese nombre. Elige otro.',
+  'wizard.label.toast.retry': 'Vuelve a intentarlo en unos segundos.',
+  'wizard.label.step.what': 'Qué es',
+  'wizard.label.step.level': 'Nivel',
+  'wizard.label.step.effect': 'Qué impide',
+  'wizard.label.step.review': 'Resumen',
+  'wizard.label.step.done': 'Listo',
+  'wizard.label.what.heading': '¿Cómo se llama y para qué sirve?',
+  'wizard.label.what.description':
+    'El nombre y la explicación los verá todo el mundo al etiquetar un archivo. Escríbelos como se los contarías a alguien que empieza hoy.',
+  'wizard.label.what.nameLabel': 'Nombre de la etiqueta',
+  'wizard.label.what.namePlaceholder': 'Confidencial',
+  'wizard.label.what.nameHint':
+    'Corto y reconocible. Los más habituales: Público, Interno, Confidencial, Restringido.',
+  'wizard.label.what.purposeLabel': 'Para qué es',
+  'wizard.label.what.purposePlaceholder':
+    'Información del negocio que no debe salir de la empresa: contratos, nóminas, datos de clientes.',
+  'wizard.label.what.purposeHint':
+    'Opcional, pero muy recomendable: es la pista que decide si alguien la usa bien.',
+  'wizard.label.what.colourLegend': 'Color (opcional)',
+  'wizard.label.what.colourHint': 'Solo sirve para reconocerla de un vistazo en las listas.',
+  'wizard.label.level.heading': '¿Cómo de sensible es, comparada con las demás?',
+  'wizard.label.level.description':
+    'Colócala en tu escala. Solo sirve para ordenarlas de menos a más delicadas; no cambia por sí sola lo que se puede hacer con los archivos.',
+  'wizard.label.level.firstTitle': 'Es tu primera etiqueta',
+  'wizard.label.level.firstBody':
+    'Cuando crees más, podrás colocarlas por encima o por debajo de esta.',
+  'wizard.label.level.first': 'Es la primera etiqueta de tu organización',
+  'wizard.label.level.lowest': 'La menos sensible de todas (por debajo de «{name}»)',
+  'wizard.label.level.highest': 'La más sensible de todas (por encima de «{name}»)',
+  'wizard.label.level.between': 'Entre «{lower}» y «{upper}»',
+  'wizard.label.level.hintLowest': 'La usarán para lo más abierto.',
+  'wizard.label.level.hintHighest': 'La usarán para lo más delicado.',
+  'wizard.label.level.hintMiddle': 'Un escalón intermedio.',
+  'wizard.label.level.scale': 'Tu escala actual, de menos a más sensible: {scale}.',
+  'wizard.label.level.scaleEmpty': 'todavía vacía',
+  'wizard.label.effect.heading': '¿Qué debe impedir esta etiqueta?',
+  'wizard.label.effect.description':
+    'Elige por lo que ocurre de verdad cuando alguien intente compartir el archivo.',
+  'wizard.label.effect.informTitle': 'Solo informa',
+  'wizard.label.effect.informBody':
+    'La etiqueta se ve junto al archivo y sirve para que la gente sepa lo que tiene entre manos, pero no impide nada. Es la opción para «Público» o «Interno».',
+  'wizard.label.effect.blockTitle': 'Impide compartir fuera de la organización',
+  'wizard.label.effect.blockBody':
+    'Nadie podrá crear un enlace público para un archivo con esta etiqueta, y quien lo intente verá el motivo. Los enlaces que ya existieran dejarán de abrir esos archivos. Compartir con personas o grupos de tu organización sigue funcionando igual.',
+  'wizard.label.effect.warnTitle': 'Antes de activarlo',
+  'wizard.label.effect.warnBody':
+    'Si tu equipo ya comparte estos archivos con clientes o proveedores por enlace, avísales: en cuanto etiquetes un archivo, su enlace deja de funcionar.',
+  'wizard.label.effect.summaryInform': 'Solo informa: no impide nada',
+  'wizard.label.effect.summaryBlock': 'Impide compartir el archivo fuera de la organización',
+  'wizard.label.summary.name': 'Nombre',
+  'wizard.label.summary.purpose': 'Para qué es',
+  'wizard.label.summary.noPurpose': 'Sin explicación',
+  'wizard.label.summary.level': 'Nivel',
+  'wizard.label.summary.effect': 'Qué impide',
+  'wizard.label.review.headingNew': 'Revisa y crea la etiqueta',
+  'wizard.label.review.headingEdit': 'Revisa los cambios',
+  'wizard.label.review.description':
+    'Esto es lo que vamos a guardar. Puedes cambiar cualquier cosa antes.',
+  'wizard.label.review.saveNew': 'Crear la etiqueta',
+  'wizard.label.review.saveEdit': 'Guardar cambios',
+  'wizard.label.review.editNoteTitle': 'Los archivos ya etiquetados no cambian',
+  'wizard.label.review.editNoteBody':
+    'Un archivo guarda la etiqueta tal y como estaba cuando se la pusieron. Si cambias el nombre o lo que impide, lo que ya está etiquetado se queda como estaba: así un archivo clasificado hace un año se sigue leyendo igual. Para actualizarlo, vuelve a etiquetarlo.',
+  'wizard.label.review.newNoteTitle': 'Qué pasa después',
+  'wizard.label.review.newNoteBody':
+    'La etiqueta aparecerá para elegir al clasificar archivos en Sytue Drive. Etiquetar es manual: nada se clasifica solo.',
+  'wizard.label.done.headingNew': 'Etiqueta creada',
+  'wizard.label.done.headingEdit': 'Cambios guardados',
+  'wizard.label.done.bodyBlock':
+    'Ya se puede elegir al clasificar archivos. Los que la lleven no podrán compartirse por enlace público.',
+  'wizard.label.done.bodyInform':
+    'Ya se puede elegir al clasificar archivos. Solo informa: no impide compartir.',
+  'wizard.label.done.back': 'Volver a las etiquetas',
+
+  // --- Asistente: conectar proveedor de identidad (ConnectIdpWizard) --------
+  'wizard.idp.kind.oidcBlurb':
+    'Lo que usan casi todos los proveedores de hoy. Te piden una dirección y dos claves, y listo.',
+  'wizard.idp.kind.oidcExamples': 'Microsoft Entra ID · Google Workspace · Okta · Auth0 · Keycloak',
+  'wizard.idp.kind.samlBlurb':
+    'El estándar clásico de las empresas. Tu proveedor te da un XML de metadatos (o un certificado y dos direcciones).',
+  'wizard.idp.kind.samlExamples': 'AD FS · Okta o OneLogin en modo SAML · proveedores antiguos',
+  'wizard.idp.kind.mostCommon': 'Lo más habitual',
+  'wizard.idp.kind.bothTitle': '¿Tu proveedor te ofrece los dos?',
+  'wizard.idp.kind.bothBody':
+    'Elige OpenID Connect: se configura con menos datos y no hay certificados que renovar cada pocos años.',
+  'wizard.idp.effect.signInTitle': 'Entran con la cuenta de la empresa',
+  'wizard.idp.effect.signInBody':
+    'Tu equipo usará el botón «Entrar con tu organización» y su contraseña corporativa de siempre. Una menos que recordar.',
+  'wizard.idp.effect.noLossTitle': 'Nadie pierde el acceso',
+  'wizard.idp.effect.noLossBody':
+    'Quien ya tenga contraseña de Sytue puede seguir usándola. Esto añade una vía de entrada, no la sustituye.',
+  'wizard.idp.effect.whoTitle': 'Tú decides quién pasa',
+  'wizard.idp.effect.whoBody':
+    'Puedes limitar la entrada a los dominios de correo de tu organización, aunque tu proveedor tenga más gente.',
+  'wizard.idp.effect.offTitle': 'No se activa hasta que tú lo digas',
+  'wizard.idp.effect.offBody':
+    'Lo configuras, lo pruebas y lo activas al final. Mientras tanto, nadie lo ve en la pantalla de acceso.',
+  'wizard.idp.need.samlXml': 'Los metadatos del proveedor (un XML)',
+  'wizard.idp.need.samlXmlWhere':
+    'En la aplicación SAML de tu proveedor: «Descargar metadatos de federación XML» en Microsoft Entra ID, «Identity Provider metadata» en Okta. Es la vía rápida: lo pegas y rellenamos el resto por ti.',
+  'wizard.idp.need.samlManual': 'O bien: Entity ID, URL de inicio de sesión y certificado',
+  'wizard.idp.need.samlManualWhere':
+    'Están en esa misma pantalla, sueltos, por si tu proveedor no deja descargar el XML. El certificado es el de firma del proveedor (empieza por «-----BEGIN CERTIFICATE-----»).',
+  'wizard.idp.need.domains': 'Los dominios de correo de tu organización',
+  'wizard.idp.need.domainsWhere':
+    'Los de las direcciones de tu equipo, por ejemplo acme.com. Puedes indicar varios.',
+  'wizard.idp.need.issuer': 'La dirección de tu proveedor (issuer)',
+  'wizard.idp.need.issuerWhere':
+    'Microsoft Entra ID: tu registro de aplicación → «Puntos de conexión» → copia el documento de metadatos de OpenID Connect y quítale el final «/.well-known/openid-configuration». Google Workspace: es https://accounts.google.com. Okta: https://tu-empresa.okta.com.',
+  'wizard.idp.need.client': 'El ID de cliente y su secreto',
+  'wizard.idp.need.clientWhere':
+    'Se crean al registrar una aplicación en tu proveedor (en Entra ID, «Registros de aplicaciones» → Nuevo registro → «Certificados y secretos»). Copia el secreto nada más crearlo: casi todos lo enseñan una sola vez.',
+  'wizard.idp.err.issuerRequired': 'Necesitamos la dirección de tu proveedor.',
+  'wizard.idp.err.hasSpace': 'Se ha colado un espacio. Pega solo la dirección.',
+  'wizard.idp.err.wellKnown':
+    'Quítale el final «/.well-known/openid-configuration»: aquí va solo la parte de delante.',
+  'wizard.idp.err.insecure': 'Tiene que empezar por https:// (con ese http:// no es seguro).',
+  'wizard.idp.err.needHttps': 'Escríbela entera, empezando por https://',
+  'wizard.idp.err.noDomain': 'Falta el dominio: revisa la dirección.',
+  'wizard.idp.err.badIssuerUrl':
+    'Esa dirección no es válida. Revísala: suele ser un error de escritura.',
+  'wizard.idp.err.urlRequired': 'Necesitamos esta dirección.',
+  'wizard.idp.err.mustBeHttps': 'Tiene que ser una dirección https://',
+  'wizard.idp.err.badUrl': 'Esa dirección no es válida. Revísala.',
+  'wizard.idp.err.badDomain':
+    'Esto no parece un dominio: «{domain}». Escríbelo sin «@» ni «https://», solo acme.com.',
+  'wizard.idp.err.certRequired': 'Necesitamos el certificado de firma del proveedor.',
+  'wizard.idp.err.notCert':
+    'Esto no parece un certificado. Pégalo tal cual te lo da tu proveedor, incluidas las líneas «-----BEGIN CERTIFICATE-----».',
+  'wizard.idp.err.nameRequired': 'Ponle un nombre para reconocerlo.',
+  'wizard.idp.err.slugRequired': 'Necesitamos un identificador.',
+  'wizard.idp.err.slugFormat': 'Solo minúsculas, números y guiones (sin espacios ni acentos).',
+  'wizard.idp.err.slugTaken': 'Ya hay otro proveedor con este identificador.',
+  'wizard.idp.err.clientIdRequired': 'Necesitamos el ID de cliente.',
+  'wizard.idp.err.xmlRequired': 'Pega aquí los metadatos que te descargues del proveedor.',
+  'wizard.idp.err.xmlFormat':
+    'Esto no parece el XML de metadatos: debe contener «EntityDescriptor». Pégalo entero, tal cual te lo da tu proveedor.',
+  'wizard.idp.err.entityRequired': 'Necesitamos el Entity ID.',
+  'wizard.idp.fix.samlData':
+    'Los datos del proveedor no cuadran. Revisa el Entity ID, que la URL de inicio de sesión empiece por https:// y que el certificado esté completo (con sus líneas BEGIN y END).',
+  'wizard.idp.fix.oidcDiscovery':
+    'No hemos podido leer la configuración en esa dirección. Casi siempre es la dirección del proveedor: cópiala de nuevo desde tu proveedor y quítale el final «/.well-known/openid-configuration».',
+  'wizard.idp.fix.slugTaken':
+    'Ya hay otro proveedor con ese identificador en tu organización. Cambia el identificador en el paso anterior.',
+  'wizard.idp.fix.forbidden':
+    'Tu cuenta no tiene permiso para configurar el inicio de sesión en esta organización.',
+  'wizard.idp.fix.idpDown':
+    'Sytue ID no responde ahora mismo. No es culpa de tus datos: vuelve a probar en un minuto.',
+  'wizard.idp.fix.generic':
+    'No hemos podido comprobarlo. Revisa los datos del paso anterior y prueba otra vez.',
+  'wizard.idp.step.type': 'Tipo',
+  'wizard.idp.step.explain': 'Qué va a pasar',
+  'wizard.idp.step.configure': 'Configurar',
+  'wizard.idp.step.test': 'Probar',
+  'wizard.idp.step.review': 'Resumen',
+  'wizard.idp.step.done': 'Listo',
+  'wizard.idp.type.heading': '¿Con qué se conecta tu proveedor de identidad?',
+  'wizard.idp.type.description':
+    'Es lo único técnico que te vamos a preguntar. Si no lo sabes, mira el nombre de tu proveedor en la lista de ejemplos.',
+  'wizard.idp.explain.heading': 'Esto es lo que cambiará para tu equipo',
+  'wizard.idp.explain.description':
+    'Nada de esto se aplica todavía: primero lo configuras y lo pruebas.',
+  'wizard.idp.explain.needTitle': 'Ten esto a mano antes de seguir',
+  'wizard.idp.configure.headingOidc': 'Datos de tu proveedor OIDC',
+  'wizard.idp.configure.headingSaml': 'Datos de tu proveedor SAML',
+  'wizard.idp.configure.description':
+    'Debajo de cada campo te decimos dónde encontrarlo, y comprobamos lo que escribes al vuelo.',
+  'wizard.idp.field.name': 'Nombre',
+  'wizard.idp.field.nameHint':
+    'Es lo que verá tu equipo en el botón de acceso. Vale el nombre de tu proveedor.',
+  'wizard.idp.field.slug': 'Identificador',
+  'wizard.idp.field.slugHint':
+    'Nombre corto interno, se usa en las direcciones de acceso. Te proponemos uno a partir del nombre.',
+  'wizard.idp.field.issuer': 'Dirección del proveedor (issuer)',
+  'wizard.idp.field.issuerHint':
+    'La dirección base, sin «/.well-known/openid-configuration» al final. Google Workspace: https://accounts.google.com',
+  'wizard.idp.field.issuerOk': 'Tiene buena pinta. Lo comprobaremos en el paso siguiente.',
+  'wizard.idp.field.clientId': 'ID de cliente',
+  'wizard.idp.field.clientIdHint':
+    'Te lo da tu proveedor al registrar la aplicación («Application (client) ID» en Entra ID).',
+  'wizard.idp.field.secret': 'Secreto de cliente',
+  'wizard.idp.field.secretPlaceholder': '•••••••• (guardado, sin cambios)',
+  'wizard.idp.field.secretKeepHint': 'Déjalo vacío para conservar el que ya tienes guardado.',
+  'wizard.idp.field.secretHint':
+    'Déjalo vacío solo si tu proveedor no te da ninguno (aplicación pública con PKCE).',
+  'wizard.idp.field.secretStored':
+    'Se guarda cifrado y no vuelve a mostrarse, ni a ti ni a nosotros. Si algún día caduca, escribes uno nuevo aquí y ya está.',
+  'wizard.idp.field.xml': 'Metadatos del proveedor (XML)',
+  'wizard.idp.field.xmlHint':
+    'Descárgalo de tu proveedor («metadatos de federación XML») y pégalo entero. Nosotros extraemos lo demás.',
+  'wizard.idp.field.xmlOk': 'Tiene buena pinta. Sacaremos de aquí la dirección y el certificado.',
+  'wizard.idp.field.noXmlLink': 'Mi proveedor no me da el XML',
+  'wizard.idp.field.entity': 'Entity ID del proveedor',
+  'wizard.idp.field.entityHint':
+    'También lo llaman «Identificador de Azure AD» o «Issuer». Suele parecer una dirección web.',
+  'wizard.idp.field.ssoUrl': 'URL de inicio de sesión del proveedor',
+  'wizard.idp.field.ssoUrlHint':
+    'La dirección a la que enviaremos a tu equipo para que se identifique («SAML SSO endpoint»).',
+  'wizard.idp.field.cert': 'Certificado de firma',
+  'wizard.idp.field.certHint':
+    'Es público: sirve para comprobar que la respuesta viene de verdad de tu proveedor. Descárgalo de la misma pantalla.',
+  'wizard.idp.field.useXmlLink': 'Mejor pego el XML de metadatos',
+  'wizard.idp.field.domains': 'Dominios de correo permitidos',
+  'wizard.idp.field.domainsHint':
+    'Solo entrará quien tenga el correo en estos dominios. Sepáralos por comas. Vacío = cualquiera que tu proveedor deje pasar.',
+  'wizard.idp.field.advanced': 'Opciones avanzadas',
+  'wizard.idp.field.advancedHint':
+    'No hace falta tocar nada de esto salvo que tu proveedor use nombres distintos a los estándar.',
+  'wizard.idp.field.scopes': 'Permisos solicitados (scopes)',
+  'wizard.idp.field.scopesHint': 'Separados por espacios. «openid» es obligatorio.',
+  'wizard.idp.mapping.legend': 'De dónde sacamos los datos de cada persona',
+  'wizard.idp.mapping.hint':
+    'Deja los campos vacíos y usaremos los nombres estándar (email, name, groups).',
+  'wizard.idp.mapping.emailAria': 'Nombre del dato del correo',
+  'wizard.idp.mapping.nameAria': 'Nombre del dato del nombre completo',
+  'wizard.idp.mapping.groupsAria': 'Nombre del dato de los grupos',
+  'wizard.idp.test.headingOidc': 'Comprobemos que Sytue llega a tu proveedor',
+  'wizard.idp.test.headingSaml': 'Comprobemos los datos de tu proveedor',
+  'wizard.idp.test.descriptionOidc':
+    'Le preguntamos a tu proveedor por su configuración. Nadie inicia sesión todavía.',
+  'wizard.idp.test.descriptionSaml':
+    'Revisamos el Entity ID, la dirección de acceso y el certificado. Nadie inicia sesión todavía.',
+  'wizard.idp.test.okTitle': 'Todo correcto',
+  'wizard.idp.test.okOidc': 'Tu proveedor nos ha respondido y hemos leído su configuración.',
+  'wizard.idp.test.okOidcPkce':
+    'Tu proveedor nos ha respondido y hemos leído su configuración (con PKCE, el modo más seguro).',
+  'wizard.idp.test.okSaml':
+    'Los datos del proveedor son válidos: el certificado se lee bien y la dirección de acceso es correcta.',
+  'wizard.idp.test.failTitle': 'No hemos podido comprobarlo',
+  'wizard.idp.test.reviewData': 'Revisar datos',
+  'wizard.idp.test.idleHelp':
+    'Pulsa «Comprobar» y verificamos los datos que has puesto. Si algo no cuadra, te decimos exactamente qué cambiar.',
+  'wizard.idp.test.run': 'Comprobar',
+  'wizard.idp.test.rerun': 'Volver a comprobar',
+  'wizard.idp.test.skipHint':
+    'Puedes seguir sin comprobar, pero es mejor detectar ahora un error de escritura.',
+  'wizard.idp.test.draftNote':
+    'Para poder comprobarlo lo hemos guardado desactivado. Nadie puede entrar por él hasta que lo actives en el paso siguiente.',
+  'wizard.idp.summary.type': 'Tipo de conexión',
+  'wizard.idp.summary.name': 'Nombre',
+  'wizard.idp.summary.slug': 'Identificador',
+  'wizard.idp.summary.issuer': 'Dirección del proveedor',
+  'wizard.idp.summary.clientId': 'ID de cliente',
+  'wizard.idp.summary.secret': 'Secreto de cliente',
+  'wizard.idp.summary.secretSaved': 'Guardado (no se muestra)',
+  'wizard.idp.summary.secretKept': 'Se conserva el que ya tenías',
+  'wizard.idp.summary.secretNone': 'Sin secreto (PKCE)',
+  'wizard.idp.summary.samlData': 'Datos del proveedor',
+  'wizard.idp.summary.fromXml': 'Los leemos del XML de metadatos que has pegado',
+  'wizard.idp.summary.entityValue': 'Entity ID {id}',
+  'wizard.idp.summary.ssoUrl': 'URL de inicio de sesión',
+  'wizard.idp.summary.cert': 'Certificado de firma',
+  'wizard.idp.summary.certPasted': 'Pegado',
+  'wizard.idp.summary.who': 'Quién puede entrar',
+  'wizard.idp.summary.whoDomains': 'Solo correos de {domains}',
+  'wizard.idp.summary.whoAny': 'Cualquiera que tu proveedor deje pasar',
+  'wizard.idp.summary.test': 'Comprobación',
+  'wizard.idp.summary.testOk': 'Correcta',
+  'wizard.idp.summary.testFail': 'Falló (puedes guardar igualmente y arreglarlo luego)',
+  'wizard.idp.summary.testNone': 'Sin comprobar',
+  'wizard.idp.review.headingNew': 'Revisa y guarda',
+  'wizard.idp.review.headingEdit': 'Revisa los cambios',
+  'wizard.idp.review.description':
+    'Esto es lo que vamos a aplicar. Puedes cambiar cualquier dato antes de seguir.',
+  'wizard.idp.review.saveEdit': 'Guardar cambios',
+  'wizard.idp.review.saveEnable': 'Guardar y activar',
+  'wizard.idp.review.save': 'Guardar',
+  'wizard.idp.review.enableLabel': 'Permitir ya el acceso con este proveedor',
+  'wizard.idp.review.enableOn':
+    'Aparecerá el botón «Entrar con tu organización» en la pantalla de acceso de tu equipo.',
+  'wizard.idp.review.enableOff':
+    'Se guardará desactivado: nadie lo verá hasta que lo actives desde la lista.',
+  'wizard.idp.review.pendingTitle': 'Queda un paso en TU proveedor',
+  'wizard.idp.review.pendingOidc':
+    'Al guardar te daremos la dirección de retorno que tienes que registrar en tu proveedor. Sin ella, el inicio de sesión no funcionará.',
+  'wizard.idp.review.pendingSaml':
+    'Al guardar te daremos la URL de respuesta (ACS) y el identificador de Sytue, que tienes que registrar en tu aplicación SAML. Sin ellos, el inicio de sesión no funcionará.',
+  'wizard.idp.done.headingEdit': 'Cambios guardados',
+  'wizard.idp.done.headingNew': '{name} ya está listo',
+  'wizard.idp.done.fallbackName': 'Tu proveedor',
+  'wizard.idp.done.savedTitle': 'Guardado',
+  'wizard.idp.done.savedOn':
+    'El proveedor está activo. En cuanto completes el paso de abajo, tu equipo podrá entrar con la cuenta de la empresa.',
+  'wizard.idp.done.savedOff':
+    'El proveedor está guardado pero desactivado. Actívalo desde la lista cuando hayas terminado el paso de abajo.',
+  'wizard.idp.done.pasteTitle': 'Pega esto en la configuración de tu proveedor',
+  'wizard.idp.done.pasteOidc':
+    'Tu proveedor solo devolverá a tu equipo a Sytue si esta dirección está registrada en la aplicación que creaste.',
+  'wizard.idp.done.pasteSaml':
+    'Regístralo en tu aplicación SAML: sin esto, tu proveedor no sabe a dónde responder.',
+  'wizard.idp.done.redirectUri': 'URL de redirección',
+  'wizard.idp.done.acsUrl': 'URL de respuesta (ACS)',
+  'wizard.idp.done.spEntityId': 'Identificador de Sytue (Entity ID)',
+  'wizard.idp.done.metadataUrl': 'Metadatos de Sytue',
+  'wizard.idp.done.nextTitle': 'Qué hacer ahora',
+  'wizard.idp.done.step1Title': 'Registra los datos de arriba en tu proveedor',
+  'wizard.idp.done.step1Oidc':
+    'En tu registro de aplicación, en el apartado de URI de redirección (tipo web). Pégala tal cual, sin barra final de más.',
+  'wizard.idp.done.step1Saml':
+    'En tu aplicación SAML, en «URL de respuesta» e «Identificador». Pégalos tal cual.',
+  'wizard.idp.done.step2Title': 'Pruébalo con tu propia cuenta',
+  'wizard.idp.done.step2Body':
+    'Abre una ventana privada del navegador, ve a la pantalla de acceso de Sytue y usa «Entrar con tu organización». Si entras sin que te pidamos contraseña de Sytue, está bien configurado.',
+  'wizard.idp.done.step3Title': 'Avisa a tu equipo',
+  'wizard.idp.done.step3Body':
+    'A partir de ahora entran con la cuenta de la empresa. Quien ya tuviera contraseña de Sytue puede seguir usándola.',
+  'wizard.idp.done.back': 'Volver a los proveedores',
+
+  // --- Asistente: registrar aplicación que entra con Sytue (RegisterOidcAppWizard) ---
+  'wizard.oidc.kind.serverTitle': 'Una aplicación con servidor propio',
+  'wizard.oidc.kind.serverBlurb':
+    'La aplicación corre en un servidor y puede guardar una contraseña en secreto. Te daremos una.',
+  'wizard.oidc.kind.serverExamples':
+    'Grafana · GitLab · Jenkins · Nextcloud · una herramienta interna con backend',
+  'wizard.oidc.kind.browserTitle': 'Una aplicación que corre en el navegador o en el móvil',
+  'wizard.oidc.kind.browserBlurb':
+    'Todo su código está en el dispositivo de quien la usa, así que no puede guardar secretos. Usará PKCE, que es igual de seguro para este caso.',
+  'wizard.oidc.kind.browserExamples':
+    'Una web hecha en React o Vue · una app de iOS o Android · una app de escritorio',
+  'wizard.oidc.kind.mostCommon': 'Lo más habitual',
+  'wizard.oidc.effect.signInTitle': 'Tu equipo entra con su cuenta de Sytue',
+  'wizard.oidc.effect.signInBody':
+    'En la aplicación aparecerá un botón de acceso que lleva a Sytue. Nadie necesita una contraseña aparte.',
+  'wizard.oidc.effect.controlTitle': 'Tú controlas el acceso desde aquí',
+  'wizard.oidc.effect.controlBody':
+    'Si alguien deja la organización, deja de entrar en la aplicación. Y puedes retirarle el acceso a la aplicación entera cuando quieras.',
+  'wizard.oidc.effect.minimalTitle': 'La aplicación solo ve lo básico',
+  'wizard.oidc.effect.minimalBody':
+    'Nombre, correo e identificador. Nada más: ni tus documentos, ni tu correo, ni tus archivos.',
+  'wizard.oidc.err.hasSpace': '«{url}» tiene un espacio. Pega solo la dirección.',
+  'wizard.oidc.err.noWildcards':
+    'No se admiten comodines (*). Escribe la dirección exacta: es lo que impide que un tercero se cuele.',
+  'wizard.oidc.err.noFragment':
+    'Quita todo lo que va detrás de «#»: esa parte no llega al servidor y no vale aquí.',
+  'wizard.oidc.err.notUrl':
+    '«{url}» no es una dirección válida. Tiene que empezar por https:// e incluir el dominio.',
+  'wizard.oidc.err.insecure':
+    'Tiene que empezar por https:// (solo se admite http:// en localhost, para pruebas).',
+  'wizard.oidc.err.notWeb': '«{url}» no es una dirección web. Debe empezar por https://',
+  'wizard.oidc.err.noDomain': 'A «{url}» le falta el dominio. Revísala.',
+  'wizard.oidc.err.redirectRequired': 'Necesitamos al menos una dirección de retorno.',
+  'wizard.oidc.err.nameRequired': 'Ponle un nombre para reconocerla en la lista.',
+  'wizard.oidc.fix.badUrls':
+    'Sytue ID ha rechazado alguna dirección. Repásalas: tienen que empezar por https://, sin «#» ni comodines.',
+  'wizard.oidc.fix.forbidden':
+    'Tu cuenta no tiene permiso para registrar aplicaciones en esta organización.',
+  'wizard.oidc.fix.idpDown':
+    'Sytue ID no responde ahora mismo. No es culpa de tus datos: prueba en un minuto.',
+  'wizard.oidc.fix.generic': 'No hemos podido registrarla. Revisa los datos y prueba otra vez.',
+  'wizard.oidc.toast.saveFailed': 'No se ha podido registrar',
+  'wizard.oidc.step.app': 'La aplicación',
+  'wizard.oidc.step.urls': 'Direcciones',
+  'wizard.oidc.step.review': 'Resumen',
+  'wizard.oidc.step.done': 'Listo',
+  'wizard.oidc.app.heading': '¿Qué aplicación quieres conectar?',
+  'wizard.oidc.app.description':
+    'Con esto tu equipo podrá entrar en ella con su cuenta de Sytue, sin una contraseña más.',
+  'wizard.oidc.app.nameLabel': 'Nombre de la aplicación',
+  'wizard.oidc.app.namePlaceholder': 'Grafana del equipo de datos',
+  'wizard.oidc.app.nameHint':
+    'Solo para que la reconozcas aquí. Puedes poner el nombre que usa tu equipo.',
+  'wizard.oidc.app.whereLegend': '¿Dónde se ejecuta?',
+  'wizard.oidc.app.whereHint':
+    'Si dudas, elige la primera: es lo normal en las herramientas que se instalan en un servidor.',
+  'wizard.oidc.urls.heading': '¿A dónde vuelve tu equipo después de identificarse?',
+  'wizard.oidc.urls.description':
+    'La aplicación te dice esta dirección: búscala como «URL de redirección», «Redirect URI» o «Callback URL» en su pantalla de configuración de inicio de sesión.',
+  'wizard.oidc.urls.redirectLabel': 'URL de redirección',
+  'wizard.oidc.urls.redirectOk': {
+    one: 'La dirección tiene buena pinta.',
+    other: 'Las direcciones tienen buena pinta.',
+  },
+  'wizard.oidc.urls.redirectHint':
+    'Una por línea, si la aplicación tiene varias (por ejemplo, una de pruebas).',
+  'wizard.oidc.urls.slashTitle': 'El fallo más común: sobra o falta una barra',
+  'wizard.oidc.urls.slashBody':
+    'Comparamos la dirección carácter a carácter. Si la aplicación envía «…/callback» y aquí pones «…/callback/», el acceso fallará con «redirect_uri no registrado». Cópiala tal cual de la aplicación, sin añadir ni quitar nada. Es a propósito: esa comparación exacta es lo que impide que alguien desvíe el inicio de sesión a otro sitio.',
+  'wizard.oidc.urls.advanced': 'Opciones avanzadas',
+  'wizard.oidc.google.title': 'Acceso a datos como una cuenta de Google',
+  'wizard.oidc.google.body':
+    'Para apps escritas para Google Calendar, Drive, Contactos o el directorio de Workspace: pedirán los permisos de Google y recibirán los datos de Sytue. Google no interviene ni ve nada. Cada persona que inicie sesión en la app le dará este acceso a sus datos.',
+  'wizard.oidc.google.calendar': 'Calendario',
+  'wizard.oidc.google.drive': 'Drive',
+  'wizard.oidc.google.contacts': 'Contactos',
+  'wizard.oidc.google.none': 'Sin acceso',
+  'wizard.oidc.google.read': 'Solo lectura',
+  'wizard.oidc.google.write': 'Lectura y escritura',
+  'wizard.oidc.google.directory': 'Directorio de la organización',
+  'wizard.oidc.google.directoryUsers': 'Personas',
+  'wizard.oidc.google.directoryGroups': 'Grupos y quién está en ellos',
+  'wizard.oidc.google.directoryHint':
+    'Solo de lectura, y solo cuando quien inicia sesión en la app administra la organización.',
+  'wizard.oidc.summary.google': 'Acceso como cuenta de Google',
+  'wizard.oidc.done.googleDiscovery': 'Discovery con forma de Google',
+  'wizard.oidc.urls.logoutLabel': 'URL tras cerrar sesión',
+  'wizard.oidc.urls.logoutHint':
+    'Opcional. A dónde llevamos a tu equipo si cierra sesión desde la aplicación. Si lo dejas vacío, se queda en Sytue.',
+  'wizard.oidc.summary.app': 'Aplicación',
+  'wizard.oidc.summary.runsOn': 'Dónde se ejecuta',
+  'wizard.oidc.summary.runsServer': 'En un servidor propio (con secreto)',
+  'wizard.oidc.summary.runsBrowser': 'En el navegador o el móvil (sin secreto, PKCE)',
+  'wizard.oidc.summary.redirect': 'URL de redirección',
+  'wizard.oidc.summary.logout': 'URL tras cerrar sesión',
+  'wizard.oidc.summary.sees': 'Datos que verá',
+  'wizard.oidc.summary.seesValue': 'Nombre, correo e identificador',
+  'wizard.oidc.review.heading': 'Revisa y registra',
+  'wizard.oidc.review.description':
+    'Nada se ha creado todavía. Puedes cambiar cualquier dato antes de seguir.',
+  'wizard.oidc.review.submit': 'Registrar la aplicación',
+  'wizard.oidc.review.secretTitle': 'El secreto se enseña UNA sola vez',
+  'wizard.oidc.review.secretBody':
+    'Al registrar te daremos una contraseña para la aplicación. No la guardamos en claro y no podremos volver a enseñártela: cópiala en ese momento. Si se pierde, se genera otra desde la lista y listo.',
+  'wizard.oidc.review.pkceTitle': 'Sin secreto, y está bien',
+  'wizard.oidc.review.pkceBody':
+    'Una aplicación que corre en el dispositivo de quien la usa no puede guardar secretos. Usará PKCE, que protege el intercambio sin necesidad de uno.',
+  'wizard.oidc.done.heading': '{name} ya puede usar Sytue',
+  'wizard.oidc.done.fallbackName': 'La aplicación',
+  'wizard.oidc.done.secretTitle': 'Copia el secreto ahora: no volverá a mostrarse',
+  'wizard.oidc.done.secretBody':
+    'Pégalo en la aplicación junto al identificador de cliente. Si lo pierdes, genera uno nuevo desde la lista (el anterior dejará de funcionar).',
+  'wizard.oidc.done.secretLabel': 'Secreto de cliente',
+  'wizard.oidc.done.pasteTitle': 'Pega esto en la aplicación',
+  'wizard.oidc.done.pasteBody':
+    'Casi todas piden solo los dos primeros: con la dirección de Sytue rellenan el resto solas. Si la tuya pide cada dirección por separado, las tienes debajo.',
+  'wizard.oidc.done.issuer': 'Dirección de Sytue (issuer)',
+  'wizard.oidc.done.clientId': 'Identificador de cliente',
+  'wizard.oidc.done.discovery': 'Configuración automática',
+  'wizard.oidc.done.separateTitle': 'Direcciones sueltas (si tu aplicación las pide una a una)',
+  'wizard.oidc.done.authorization': 'Autorización',
+  'wizard.oidc.done.token': 'Token',
+  'wizard.oidc.done.userinfo': 'Datos de la persona',
+  'wizard.oidc.done.jwks': 'Claves de firma (JWKS)',
+  'wizard.oidc.done.endSession': 'Cierre de sesión',
+  'wizard.oidc.done.scopes': 'Permisos (scopes)',
+  'wizard.oidc.done.nextTitle': 'Qué hacer ahora',
+  'wizard.oidc.done.step1Title': 'Pega los datos de arriba en la aplicación',
+  'wizard.oidc.done.step1Body':
+    'Busca en ella el apartado de inicio de sesión con OpenID Connect (u OAuth) y rellénalo con la dirección de Sytue y el identificador de cliente.',
+  'wizard.oidc.done.step1BodySecret':
+    'Busca en ella el apartado de inicio de sesión con OpenID Connect (u OAuth) y rellénalo con la dirección de Sytue, el identificador de cliente y el secreto.',
+  'wizard.oidc.done.step2Title': 'Pruébalo con tu propia cuenta',
+  'wizard.oidc.done.step2Body':
+    'Abre una ventana privada del navegador y entra en la aplicación con el botón de acceso con Sytue. Si te devuelve a la aplicación ya identificado, está listo.',
+  'wizard.oidc.done.step3Title': 'Avísale a tu equipo',
+  'wizard.oidc.done.step3Body':
+    'A partir de ahora entran con su cuenta de Sytue. Si alguien deja la organización, pierde el acceso a esta aplicación automáticamente.',
+  'wizard.oidc.done.back': 'Volver a las aplicaciones',
+
+  // --- Asistente: conectar una aplicación (ConnectAppWizard) -----------------
+  'wizard.app.effect.portalTitle': 'Aparece en el portal',
+  'wizard.app.effect.portalBody':
+    'Tu equipo verá {app} entre sus aplicaciones al iniciar sesión en Sytue.',
+  'wizard.app.effect.ssoTitle': 'Entran con su cuenta de Sytue',
+  'wizard.app.effect.ssoBody':
+    'Ya no hace falta una contraseña aparte para {app}: se entra con la cuenta de Sytue y se aplican tus políticas de acceso.',
+  'wizard.app.effect.scimTitle': 'Altas y bajas automáticas',
+  'wizard.app.effect.scimBody':
+    'Cuando alguien entra o sale de tu organización, su cuenta de {app} se crea o se desactiva sola.',
+  'wizard.app.effect.dataTitle': 'Lectura de datos',
+  'wizard.app.effect.dataBody':
+    'Sytue podrá leer datos de {app} para informes. Nunca escribe ni borra nada.',
+  'wizard.app.need.fieldWhere': 'Lo encontrarás en la configuración de tu cuenta de {app}.',
+  'wizard.app.need.secretWhere':
+    'Se genera en el panel de administración de {app}. Necesitas permisos de administración allí.',
+  'wizard.app.err.required': 'Necesitamos este dato para continuar.',
+  'wizard.app.err.noSpaces': 'No puede llevar espacios.',
+  'wizard.app.err.noScheme': 'Escríbelo sin «https://», solo el nombre.',
+  'wizard.app.err.noPath': 'Solo el nombre o el dominio, sin barras ni rutas.',
+  'wizard.app.fix.fieldFallback': 'los datos de la conexión',
+  'wizard.app.fix.badData': 'Los datos no cuadran. Revisa «{field}» en el paso anterior.',
+  'wizard.app.fix.rejectedSecret':
+    '{app} ha rechazado el «{secret}»: puede haber caducado o no tener permisos suficientes. Genera uno nuevo y vuelve a pegarlo.',
+  'wizard.app.fix.rejected':
+    '{app} ha rechazado la conexión. Revisa que la aplicación permita el acceso desde Sytue.',
+  'wizard.app.fix.notFound':
+    'No hemos encontrado esa cuenta de {app}. Revisa «{field}»: suele ser un error de escritura.',
+  'wizard.app.fix.down':
+    '{app} no responde ahora mismo. No es culpa de tus datos: vuelve a probar en un minuto.',
+  'wizard.app.fix.generic':
+    'No hemos podido conectar. Revisa los datos del paso anterior y prueba otra vez.',
+  'wizard.app.toast.activateFailed': 'No se ha podido activar',
+  'wizard.app.fix.activateBadData':
+    'Revisa los datos del paso «Configurar»: no hemos podido dar de alta el inicio de sesión.',
+  'wizard.app.fix.activateIdpDown':
+    'Sytue ID no responde ahora mismo. Vuelve a intentarlo en un minuto.',
+  'wizard.app.fix.activateGeneric': 'Algo ha fallado por el camino. Vuelve a intentarlo.',
+  'wizard.app.step.choose': 'Elegir',
+  'wizard.app.step.explain': 'Qué va a pasar',
+  'wizard.app.step.configure': 'Configurar',
+  'wizard.app.step.test': 'Probar',
+  'wizard.app.step.review': 'Resumen',
+  'wizard.app.step.done': 'Listo',
+  'wizard.app.choose.heading': '¿Qué aplicación quieres conectar?',
+  'wizard.app.choose.description':
+    'Elige una de las aplicaciones que ya usa tu equipo. Te guiamos en el resto: no hace falta saber de SSO ni de SCIM.',
+  'wizard.app.choose.searchAria': 'Buscar aplicación',
+  'wizard.app.choose.searchPlaceholder': 'Buscar por nombre o categoría…',
+  'wizard.app.choose.noResults':
+    'No hay ninguna aplicación que se llame así. Prueba con otro nombre.',
+  'wizard.app.choose.alreadyConnected': 'Ya conectada',
+  'wizard.app.explain.heading': 'Esto es lo que activarás en {app}',
+  'wizard.app.explain.headingFallback': 'Esto es lo que pasará',
+  'wizard.app.explain.description':
+    'Nada de esto se aplica todavía: primero lo configuras y lo pruebas.',
+  'wizard.app.explain.needTitle': 'Ten esto a mano antes de seguir',
+  'wizard.app.configure.heading': 'Datos de tu {app}',
+  'wizard.app.configure.headingFallback': 'Datos de la conexión',
+  'wizard.app.configure.description':
+    'Solo lo imprescindible. Debajo de cada campo te decimos dónde encontrarlo, y comprobamos lo que escribes al vuelo.',
+  'wizard.app.configure.nameLabel': 'Nombre de la conexión',
+  'wizard.app.configure.nameError': 'Ponle un nombre para reconocerla.',
+  'wizard.app.configure.nameHint':
+    'Solo se ve aquí, en la consola. Puedes dejar el que te proponemos.',
+  'wizard.app.configure.formatOk': 'Formato correcto.',
+  'wizard.app.configure.secretStored':
+    'Se guarda cifrado y no vuelve a mostrarse: ni nosotros podemos leerlo. Si algún día cambia, lo sustituyes por uno nuevo.',
+  'wizard.app.oauth.title': 'Conecta con tu cuenta de {app}',
+  'wizard.app.oauth.body':
+    'Te llevaremos a {app} para que apruebes el acceso. No tienes que crear ni pegar ninguna credencial.',
+  'wizard.app.oauth.willAuthorize': 'Vas a autorizar:',
+  'wizard.app.oauth.revocable':
+    'El permiso caduca solo y puedes retirarlo cuando quieras, desde aquí o desde {app}.',
+  'wizard.app.test.heading': 'Comprobemos que Sytue llega a {app}',
+  'wizard.app.test.headingFallback': 'Comprobemos la conexión',
+  'wizard.app.test.description':
+    'Es una llamada de prueba con los datos que has puesto. Todavía no se activa nada para tu equipo.',
+  'wizard.app.test.okTitle': 'Conexión correcta',
+  'wizard.app.test.okBody': 'Hemos hablado con {app} y nos ha respondido. Ya puedes activarla.',
+  'wizard.app.test.failTitle': 'No hemos podido conectar',
+  'wizard.app.test.reviewData': 'Revisar datos',
+  'wizard.app.test.idleHelp':
+    'Pulsa «Probar conexión» y verificamos los datos contra {app}. Si algo no cuadra, te decimos exactamente qué cambiar.',
+  'wizard.app.test.run': 'Probar conexión',
+  'wizard.app.test.rerun': 'Volver a probar',
+  'wizard.app.test.skipHint': 'Puedes seguir sin probar, pero es mejor comprobarlo ahora.',
+  'wizard.app.summary.app': 'Aplicación',
+  'wizard.app.summary.name': 'Nombre de la conexión',
+  'wizard.app.summary.secretSaved': 'Guardado (no se muestra)',
+  'wizard.app.summary.secretNone': 'Sin token',
+  'wizard.app.summary.willEnable': 'Se activará',
+  'wizard.app.summary.test': 'Comprobación',
+  'wizard.app.summary.testOk': 'Conexión probada con éxito',
+  'wizard.app.summary.testFail': 'La prueba falló',
+  'wizard.app.summary.testNone': 'Sin probar',
+  'wizard.app.review.heading': 'Revisa y activa',
+  'wizard.app.review.description':
+    'Esto es lo que vamos a aplicar. Puedes cambiar cualquier dato antes de seguir.',
+  'wizard.app.review.activate': 'Activar {app}',
+  'wizard.app.review.activateFallback': 'Activar',
+  'wizard.app.review.note':
+    'Al activar, {app} aparece en el portal de tu equipo y damos de alta el inicio de sesión. Puedes desactivarla cuando quieras: no se borra nada de {app}.',
+  'wizard.app.done.heading': '{app} ya está conectada',
+  'wizard.app.done.headingFallback': 'Conexión lista',
+  'wizard.app.done.okTitle': 'Todo ha ido bien',
+  'wizard.app.done.okBody': 'La conexión está activa y tu equipo ya la tiene disponible.',
+  'wizard.app.done.nextTitle': 'Qué hacer ahora',
+  'wizard.app.done.step1Title': 'Comprueba que aparece en el portal',
+  'wizard.app.done.step1Body':
+    'Abre el lanzador de aplicaciones de Sytue: {app} sale junto al resto de la suite para todo el que tenga acceso.',
+  'wizard.app.done.step2Title': 'Prueba el inicio de sesión',
+  'wizard.app.done.step2Body':
+    'Entra en {app} con tu cuenta de Sytue. Si te deja pasar sin pedirte contraseña de {app}, está bien configurado.',
+  'wizard.app.done.step2BodyLaunch':
+    'Entra en {app} desde el botón de abajo con tu cuenta de Sytue. Si te deja pasar sin pedirte contraseña de {app}, está bien configurado.',
+  'wizard.app.done.step3Title': 'Deja que se sincronicen las cuentas',
+  'wizard.app.done.step3Body':
+    'La primera sincronización se lanza sola. Desde la tarjeta de {app} puedes ver el estado o forzar otra.',
+  'wizard.app.done.oidcTitle': 'Cópialas ahora: no se vuelven a mostrar',
+  'wizard.app.done.oidcBody':
+    'Pega estas credenciales en la configuración de inicio de sesión OIDC de {app}.',
+  'wizard.app.done.samlTitle': 'Metadata SAML de Sytue',
+  'wizard.app.done.samlBody': 'Registra esta dirección en la configuración de SSO de {app}.',
+  'wizard.app.done.back': 'Volver a Integraciones',
+  'wizard.app.done.open': 'Abrir {app}',
+
+  // --- Asistente: regla de acceso condicional (AccessPolicyWizard) -----------
+  'wizard.accessPolicy.andMore': { one: '{count} más', other: '{count} más' },
+  'wizard.accessPolicy.aGroup': 'un grupo',
+  'wizard.accessPolicy.aUser': 'una persona',
+  'wizard.accessPolicy.who.everyone': 'cualquier persona de tu organización',
+  'wizard.accessPolicy.who.nobodyYet': 'nadie todavía (no has elegido a quién)',
+  'wizard.accessPolicy.cond.outside': {
+    one: 'la conexión viene de fuera de la red que has indicado (por ejemplo desde casa, un hotel o el móvil)',
+    other:
+      'la conexión viene de fuera de las redes que has indicado (por ejemplo desde casa, un hotel o el móvil)',
+  },
+  'wizard.accessPolicy.cond.inside': {
+    one: 'la conexión viene de la red que has indicado',
+    other: 'la conexión viene de las redes que has indicado',
+  },
+  'wizard.accessPolicy.cond.untrusted': 'el equipo no está marcado como de confianza',
+  'wizard.accessPolicy.cond.apps': 'la aplicación a la que se entra es {apps}',
+  'wizard.accessPolicy.cond.anyDay': 'cualquier día',
+  'wizard.accessPolicy.cond.scheduleDays': 'el intento ocurre en {days}',
+  'wizard.accessPolicy.cond.scheduleHours':
+    'el intento ocurre en {days} entre las {from} y las {to} (UTC)',
+  'wizard.accessPolicy.what.block': 'no podrá entrar',
+  'wizard.accessPolicy.what.mfa': 'tendrá que confirmar su identidad con un segundo factor',
+  'wizard.accessPolicy.what.allow': 'entrará sin más comprobaciones',
+  'wizard.accessPolicy.sentence.always':
+    'Con esta regla, {who} {what} en cada intento de inicio de sesión.',
+  'wizard.accessPolicy.sentence.when': 'Con esta regla, {who} {what} si {when}.',
+  'wizard.accessPolicy.sentenceTitle': 'La regla, en una frase',
+  'wizard.accessPolicy.suggest.block': 'Bloquear',
+  'wizard.accessPolicy.suggest.mfa': 'Exigir verificación',
+  'wizard.accessPolicy.suggest.allow': 'Permitir',
+  'wizard.accessPolicy.suggest.withCondition': '{verb} si {condition}',
+  'wizard.accessPolicy.suggest.plain': '{verb} el acceso',
+  'wizard.accessPolicy.err.badCidr':
+    '«{range}» no es un rango de red válido. Escribe la red y su tamaño: 203.0.113.0/24 para toda una oficina, o 198.51.100.7/32 para una sola dirección.',
+  'wizard.accessPolicy.err.bothTimes': 'Indica las dos horas: desde cuándo y hasta cuándo.',
+  'wizard.accessPolicy.fix.badData':
+    'El servicio ha rechazado algún dato. Revisa los rangos de red en el paso «Cuándo».',
+  'wizard.accessPolicy.fix.forbidden':
+    'Tu cuenta no tiene permiso para cambiar las reglas de acceso de esta organización.',
+  'wizard.accessPolicy.fix.idpDown':
+    'Sytue ID no responde ahora mismo. Vuelve a intentarlo en un minuto.',
+  'wizard.accessPolicy.risk.allowTitle': 'Esta regla no deja a nadie fuera',
+  'wizard.accessPolicy.risk.allowBody':
+    'Las reglas que dejan pasar no pueden cerrarte el acceso: solo hacen excepciones a otras más estrictas.',
+  'wizard.accessPolicy.risk.lockoutTitle': 'Esta regla dejaría fuera a toda tu organización',
+  'wizard.accessPolicy.risk.lockoutBody':
+    '{sentence} Nadie podría volver a iniciar sesión en Sytue, ni siquiera tú, y tampoco podrías entrar en esta consola para deshacerlo. Añade alguna condición en el paso «Cuándo», o excluye a tu grupo de administración en el paso «A quién».',
+  'wizard.accessPolicy.risk.affectsYouTitle': 'Esta regla también te afecta a ti',
+  'wizard.accessPolicy.risk.noExitTitle': 'No has dejado ninguna salida de emergencia',
+  'wizard.accessPolicy.risk.noExitBody':
+    '{sentence} Si algún día te toca a ti, te quedarás fuera de la consola y nadie podrá corregirlo. Vuelve al paso «A quién» y excluye a tu grupo de administración: seguirá entrando aunque la regla se cumpla.',
+  'wizard.accessPolicy.risk.noExitBodyMfa':
+    '{sentence} Si algún día te toca a ti, te quedarás fuera de la consola y nadie podrá corregirlo. Ojo: quien todavía no tenga configurada la verificación en dos pasos tendrá que configurarla para poder entrar. Vuelve al paso «A quién» y excluye a tu grupo de administración: seguirá entrando aunque la regla se cumpla.',
+  'wizard.accessPolicy.risk.hasExitTitle': 'Tienes salida de emergencia',
+  'wizard.accessPolicy.risk.hasExitBody':
+    '{sentence} Quedan exentos: {exempt}. Podrán entrar aunque la regla se cumpla. Comprueba que puedes iniciar sesión con alguna de esas cuentas antes de irte.',
+  'wizard.accessPolicy.risk.hasExitBodyMfa':
+    '{sentence} Quedan exentos: {exempt}. Podrán entrar aunque la regla se cumpla. Ojo: quien todavía no tenga configurada la verificación en dos pasos tendrá que configurarla para poder entrar. Comprueba que puedes iniciar sesión con alguna de esas cuentas antes de irte.',
+  'wizard.accessPolicy.pick.filterPlaceholder': 'Filtrar…',
+  'wizard.accessPolicy.pick.filterAria': 'Filtrar la lista',
+  'wizard.accessPolicy.pick.noMatches': 'Sin coincidencias.',
+  'wizard.accessPolicy.action.mfaTitle': 'Pedirle una comprobación más',
+  'wizard.accessPolicy.action.mfaBody':
+    'Entra, pero antes tiene que confirmar que es quien dice con su segundo factor (la app del móvil o la llave de seguridad). Es lo más habitual.',
+  'wizard.accessPolicy.action.blockTitle': 'No dejarle entrar',
+  'wizard.accessPolicy.action.blockBody':
+    'Verá un mensaje de acceso denegado y no podrá continuar. Úsalo para cortar situaciones que nunca deberían darse.',
+  'wizard.accessPolicy.action.allowTitle': 'Dejarle pasar sin más',
+  'wizard.accessPolicy.action.allowBody':
+    'Entra directamente. Sirve para hacer una excepción a otra regla más estricta, por ejemplo desde la red de la oficina.',
+  'wizard.accessPolicy.step.who': 'A quién',
+  'wizard.accessPolicy.step.when': 'Cuándo',
+  'wizard.accessPolicy.step.what': 'Qué pasa',
+  'wizard.accessPolicy.step.review': 'Resumen',
+  'wizard.accessPolicy.step.done': 'Listo',
+  'wizard.accessPolicy.who.heading': '¿A quién afecta esta regla?',
+  'wizard.accessPolicy.who.description':
+    'Empieza por decidir sobre quién se aplica. Debajo puedes dejar fuera a las personas que nunca deben verse afectadas.',
+  'wizard.accessPolicy.who.allTitle': 'A todo el mundo',
+  'wizard.accessPolicy.who.allBody': 'Se aplica a cualquiera que inicie sesión en tu organización.',
+  'wizard.accessPolicy.who.someTitle': 'Solo a algunas personas o grupos',
+  'wizard.accessPolicy.who.someBody': 'Se aplica únicamente a quien elijas. El resto no la nota.',
+  'wizard.accessPolicy.who.groupsLabel': 'Grupos afectados',
+  'wizard.accessPolicy.who.usersLabel': 'Personas afectadas',
+  'wizard.accessPolicy.who.noGroups': 'Todavía no hay grupos en tu organización.',
+  'wizard.accessPolicy.who.noUsers': 'No hay nadie que mostrar.',
+  'wizard.accessPolicy.who.pickAtLeastOne':
+    'Elige al menos un grupo o una persona, o vuelve a «A todo el mundo».',
+  'wizard.accessPolicy.exempt.heading': 'Quién queda siempre exento',
+  'wizard.accessPolicy.exempt.description':
+    'Es tu salida de emergencia: estas cuentas entran aunque la regla se cumpla. Excluye aquí a tu grupo de administración para no cerrarte fuera de la consola.',
+  'wizard.accessPolicy.exempt.groupsLabel': 'Grupos exentos',
+  'wizard.accessPolicy.exempt.usersLabel': 'Personas exentas',
+  'wizard.accessPolicy.exempt.none':
+    'No has dejado a nadie exento. Si esta regla acaba afectándote, te quedarás fuera y no podrás deshacerla.',
+  'wizard.accessPolicy.exempt.some': 'Quedan exentos: {names}. Podrán entrar siempre.',
+  'wizard.accessPolicy.when.heading': '¿En qué situaciones se aplica?',
+  'wizard.accessPolicy.when.description':
+    'Marca solo lo que necesites. Si no marcas nada, la regla se aplica siempre que esa gente intente entrar.',
+  'wizard.accessPolicy.when.networkTitle': 'Desde qué red se conectan',
+  'wizard.accessPolicy.when.networkBody':
+    'Escribe las redes que conoces (la de tu oficina, la VPN…) y elige si la regla debe actuar dentro o fuera de ellas.',
+  'wizard.accessPolicy.when.networksLabel': 'Redes conocidas',
+  'wizard.accessPolicy.when.networksOk': {
+    one: '{count} red reconocida.',
+    other: '{count} redes reconocidas.',
+  },
+  'wizard.accessPolicy.when.networksHint':
+    'Una por línea. Te la da quien lleve la red de tu empresa. Déjalo vacío para no mirar la red.',
+  'wizard.accessPolicy.when.outsideTitle': 'Cuando estén FUERA de esas redes',
+  'wizard.accessPolicy.when.outsideBody':
+    'Es lo normal: proteger lo que pasa fuera de la oficina (casa, hoteles, redes públicas).',
+  'wizard.accessPolicy.when.insideTitle': 'Cuando estén DENTRO de esas redes',
+  'wizard.accessPolicy.when.insideBody':
+    'Solo se aplica a quien se conecte desde esas redes. Útil junto a la acción «dejarle pasar sin más».',
+  'wizard.accessPolicy.when.deviceTitle': 'Desde qué equipo',
+  'wizard.accessPolicy.when.deviceSwitch': 'Solo cuando el equipo no sea de confianza',
+  'wizard.accessPolicy.when.deviceBody':
+    'Cada persona marca sus equipos habituales como de confianza desde «Dispositivos». Con esto activado, la regla actúa solo cuando entren desde uno que no hayan marcado: un ordenador prestado, un móvil nuevo, un locutorio.',
+  'wizard.accessPolicy.when.appsTitle': 'En qué aplicaciones',
+  'wizard.accessPolicy.when.appsLabel': 'Aplicaciones',
+  'wizard.accessPolicy.when.appsHint':
+    'Identificadores de las aplicaciones, separados por espacios. Déjalo vacío para aplicarlo a todas (lo más habitual).',
+  'wizard.accessPolicy.when.timeTitle': 'En qué momento',
+  'wizard.accessPolicy.when.timeBody':
+    'Deja los días sin marcar y las horas vacías para no mirar el calendario. Las horas van en UTC, no en la hora local de cada persona.',
+  'wizard.accessPolicy.when.daysLegend': 'Días',
+  'wizard.accessPolicy.when.from': 'Desde',
+  'wizard.accessPolicy.when.to': 'Hasta',
+  'wizard.accessPolicy.when.soFarTitle': 'Así queda por ahora',
+  'wizard.accessPolicy.when.soFarNone':
+    'Sin condiciones, la regla se aplicará siempre que esa gente intente entrar.',
+  'wizard.accessPolicy.when.soFarSome': 'Se aplicará si {when}.',
+  'wizard.accessPolicy.what.heading': '¿Qué quieres que ocurra en esos casos?',
+  'wizard.accessPolicy.what.description':
+    'Elige qué se encuentra la persona cuando la regla se cumple.',
+  'wizard.accessPolicy.what.strictestWins':
+    'Si varias reglas se cumplen a la vez, manda la más estricta: bloquear gana a pedir verificación, y pedir verificación gana a dejar pasar.',
+  'wizard.accessPolicy.summary.who': 'A quién afecta',
+  'wizard.accessPolicy.summary.exempt': 'Quién queda exento',
+  'wizard.accessPolicy.summary.nobody': 'Nadie',
+  'wizard.accessPolicy.summary.when': 'Cuándo se aplica',
+  'wizard.accessPolicy.summary.whenAlways': 'Siempre que intenten entrar',
+  'wizard.accessPolicy.summary.whenSome': 'Si {when}',
+  'wizard.accessPolicy.summary.what': 'Qué ocurre',
+  'wizard.accessPolicy.summary.state': 'Estado',
+  'wizard.accessPolicy.summary.stateOn': 'Se aplicará desde que la guardes',
+  'wizard.accessPolicy.summary.stateOff': 'Guardada sin aplicar',
+  'wizard.accessPolicy.review.headingNew': 'Revisa y guarda la regla',
+  'wizard.accessPolicy.review.headingEdit': 'Revisa los cambios',
+  'wizard.accessPolicy.review.description':
+    'Esto es lo que vamos a aplicar. Puedes cambiar cualquier cosa antes de guardar.',
+  'wizard.accessPolicy.review.saveNew': 'Crear la regla',
+  'wizard.accessPolicy.review.saveEdit': 'Guardar cambios',
+  'wizard.accessPolicy.review.understood':
+    'Entiendo que nadie podrá iniciar sesión y quiero guardarla igualmente',
+  'wizard.accessPolicy.review.nameLabel': 'Nombre de la regla',
+  'wizard.accessPolicy.review.nameHint':
+    'Es como la verás en la lista. Si lo dejas vacío la llamaremos «{suggested}».',
+  'wizard.accessPolicy.review.priorityLabel': 'Orden de evaluación',
+  'wizard.accessPolicy.review.priorityHint':
+    'Solo cambia el orden en el que se miran las reglas: el número más bajo va primero. Puedes moverla luego desde la lista con las flechas.',
+  'wizard.accessPolicy.review.enableLabel': 'Aplicar la regla desde ya',
+  'wizard.accessPolicy.review.enableOn': 'Empezará a evaluarse en el próximo inicio de sesión.',
+  'wizard.accessPolicy.review.enableOff':
+    'Se guardará apagada: puedes prepararla ahora y encenderla cuando quieras desde la lista.',
+  'wizard.accessPolicy.done.headingNew': 'Regla creada',
+  'wizard.accessPolicy.done.headingEdit': 'Cambios guardados',
+  'wizard.accessPolicy.done.bodyOn': '{sentence} Ya se está evaluando en cada inicio de sesión.',
+  'wizard.accessPolicy.done.bodyOff':
+    '{sentence} Está guardada pero apagada: enciéndela desde la lista cuando quieras.',
+  'wizard.accessPolicy.done.checkTitle': 'Compruébalo antes de irte',
+  'wizard.accessPolicy.done.checkBody':
+    'Abre una ventana privada del navegador e inicia sesión con una cuenta a la que afecte la regla. Así ves lo mismo que verá tu equipo y confirmas que sigues teniendo acceso.',
+  'wizard.accessPolicy.done.checkBodyExempt':
+    'Abre una ventana privada del navegador e inicia sesión con una cuenta a la que afecte la regla. Así ves lo mismo que verá tu equipo y confirmas que sigues teniendo acceso con las cuentas exentas ({names}).',
+  'wizard.accessPolicy.done.back': 'Volver a las reglas',
+
+  // --- Administración de plataforma (alcance global) ---
+  'nav.platform': 'Plataforma',
+  'page.platform': 'Administración de plataforma',
+  // Conexiones con terceros (credenciales OAuth de la plataforma)
+  'conn.title': 'Conexiones con terceros',
+  'conn.intro':
+    'Credenciales con las que Sytue se identifica ante cada proveedor. Con ellas, conectar o migrar desde Google Workspace o Microsoft 365 es un clic para tus clientes. Sin ellas, cada organización tiene que registrar su propia aplicación ante el proveedor.',
+  'conn.add': 'Añadir proveedor',
+  'conn.edit': 'Editar',
+  'conn.remove': 'Quitar',
+  'conn.empty': 'Todavía no hay ningún proveedor configurado',
+  'conn.emptyBody':
+    'Mientras no registres al menos uno, todas las conexiones dependen de que cada cliente aporte sus propias credenciales.',
+  'conn.redirectUri': 'URI de retorno que registrar ante el proveedor',
+  'conn.redirectUriHelp':
+    'La misma para todos. Que no coincida es la causa más frecuente de un consentimiento fallido, y el proveedor solo lo cuenta como «redirect_uri_mismatch».',
+  // Cómo conseguir el par de credenciales de cada proveedor: cuatro pasos dentro
+  // del propio diálogo, que es donde hacen falta.
+  'conn.guide.step1': 'Abre la consola de desarrollador de {provider} y crea una aplicación OAuth.',
+  'conn.guide.open': 'Abrir consola',
+  'conn.guide.type': 'Tipo de aplicación',
+  'conn.guide.step2': 'Registra allí esta URL de vuelta, tal y como se lee:',
+  'conn.guide.copy': 'Copiar',
+  'conn.guide.copied': 'Copiada',
+  'conn.guide.step3': 'Copia el ID de cliente y el secreto que te dé.',
+  'conn.guide.step4':
+    'Pégalos aquí abajo y guarda. El secreto se guarda cifrado y no se vuelve a mostrar.',
+  'conn.guide.troubleshoot':
+    '«invalid_client» significa que el ID de cliente no coincide con el de allí; «redirect_uri_mismatch», que no coincide la URL de arriba.',
+  'nav.connections': 'Conexiones',
+  'conn.col.provider': 'Proveedor',
+  'conn.col.secret': 'Secreto',
+  'conn.col.updated': 'Último cambio',
+  'conn.secret.set': 'Guardado',
+  'conn.secret.public': 'Cliente público (PKCE)',
+  'conn.addTitle': 'Registrar la aplicación de un proveedor',
+  'conn.editTitle': 'Editar credenciales',
+  'conn.field.provider': 'Proveedor',
+  'conn.field.secretHelp':
+    'Déjalo vacío si el proveedor registró la aplicación como cliente público y se apoya solo en PKCE.',
+  'conn.field.secretKeepHelp':
+    'Déjalo vacío para conservar el secreto guardado. Muchos proveedores solo lo enseñan una vez.',
+  'conn.toast.removed': 'Proveedor retirado',
+  'conn.toast.failed': 'No se pudo guardar',
+  'conn.error.forbidden': 'Solo para la administración de la plataforma',
+  'conn.error.forbiddenBody':
+    'Estas credenciales sirven a todos los clientes, así que exigen la allowlist de plataforma y un segundo factor.',
+  'conn.error.unavailable': 'Sin configurar en este despliegue',
+  'conn.error.unavailableBody':
+    'Falta el token de operador de Sytue Integrations, así que desde aquí no se pueden gestionar las credenciales.',
+  'conn.templates.title': 'Disponibilidad de integraciones en la suite',
+  'conn.templates.intro':
+    'Activa o desactiva la disponibilidad de cada conector para toda la suite y organizaciones. En Sytue Admin sólo aparecerán y podrán conectarse o migrarse las integraciones habilitadas aquí.',
+  'conn.templates.empty': 'No hay integraciones en el catálogo',
+  'conn.templates.emptyBody': 'El catálogo global de conectores no tiene plantillas registradas.',
+  'conn.templates.tableCaption': 'Disponibilidad de integraciones',
+
+  'platform.tab.orgs': 'Organizaciones',
+  'platform.tab.usage': 'Uso',
+  'platform.tab.merges': 'Fusiones',
+
+  // Visor de lo que está fallando (mig 0049): problemas agrupados, no líneas.
+  'platform.tab.versions': 'Versiones',
+  'platform.versions.title': 'Qué está corriendo',
+  'platform.versions.unavailable': 'No se han podido leer las versiones',
+  'platform.versions.empty': 'No hay componentes que comprobar',
+  'platform.versions.emptyHint':
+    'El chart no pasó ningún catálogo de componentes, así que no hay a quién preguntar. Revisa global.components en el chart paraguas.',
+  'platform.versions.refresh': 'Actualizar',
+  'platform.versions.upToDate': 'A la par',
+  'platform.versions.behind': 'Desacompasada',
+  'platform.versions.kind.service': 'servicio',
+  'platform.versions.kind.surface': 'web',
+  'platform.versions.col.component': 'Componente',
+  'platform.versions.col.release': 'Versión',
+  'platform.versions.col.commit': 'Commit',
+  'platform.versions.col.status': 'Estado',
+  'platform.versions.kpi.expected': 'Versión mayoritaria',
+  'platform.versions.kpi.upToDate': 'A la par',
+  'platform.versions.kpi.behind': 'Desacompasadas',
+  'platform.versions.kpi.silent': 'Sin respuesta',
+  'platform.tab.logs': 'Qué está fallando',
+  'logs.kpi.errors1h': 'Errores en la última hora',
+  'logs.kpi.errors1hHint': 'Si esto no es cero, está pasando algo ahora mismo.',
+  'logs.kpi.errors24h': 'Errores (24 h)',
+  'logs.kpi.warns24h': 'Avisos (24 h)',
+  'logs.kpi.services': 'Servicios afectados',
+  'logs.kpi.servicesHint': 'De los once de la suite.',
+  'logs.trend.title': 'Últimas 24 horas',
+  'logs.trend.label': 'Errores y avisos por hora en las últimas 24 horas',
+  'logs.trend.footer': 'Errores en rojo, avisos debajo. Las horas sin nada también se dibujan.',
+  'logs.trend.errors': {
+    one: '{count} error',
+    other: '{count} errores',
+  },
+  'logs.trend.warns': {
+    one: '{count} aviso',
+    other: '{count} avisos',
+  },
+  'logs.list.title': 'Problemas, agrupados',
+  'logs.filter.level': 'Nivel',
+  'logs.filter.allLevels': 'Errores y avisos',
+  'logs.filter.service': 'Servicio',
+  'logs.filter.allServices': 'Todos los servicios',
+  'logs.filter.search': 'Buscar en el mensaje',
+  'logs.level.error': 'Error',
+  'logs.level.warn': 'Aviso',
+  'logs.times': 'veces',
+  'logs.since': 'desde {when}',
+  'logs.last': 'última {when}',
+  'logs.showDetail': 'Detalle',
+  'logs.hideDetail': 'Ocultar',
+  'logs.empty': 'No está fallando nada',
+  'logs.emptyHint': 'Ni un error ni un aviso en la ventana elegida.',
+  'logs.unavailable': 'No se puede leer el registro',
+  'logs.unavailableHint':
+    'Sytue ID no ha respondido. Los servicios siguen escribiendo en él; lo que está caído es esta vista.',
+  'platform.tab.admins': 'Admins globales',
+  'platform.orgs.title': 'Todas las organizaciones',
+  'platform.orgs.filter': 'Filtrar por nombre o identificador',
+  'platform.orgs.empty': 'Ninguna organización coincide con el filtro.',
+  'platform.col.org': 'Organización',
+  'platform.col.status': 'Estado',
+  'platform.col.capacity': 'Personas / plazas',
+  'platform.col.owner': 'Propiedad',
+  'platform.col.actions': 'Acciones',
+  'platform.col.merge': 'Fusión',
+  'platform.col.progress': 'Progreso',
+  'platform.col.email': 'Correo',
+  'platform.col.reason': 'Motivo',
+  'platform.col.since': 'Desde',
+  'platform.status.active': 'Activa',
+  'platform.status.suspended': 'Suspendida',
+  'platform.status.deleted': 'Eliminada',
+  'platform.status.merged': 'Fusionada',
+  'platform.action.grantSeats': 'Conceder plazas',
+  'platform.action.suspend': 'Suspender',
+  'platform.action.delete': 'Eliminar',
+  'platform.prompt.deleteTitle': 'Eliminar esta organización',
+  'platform.prompt.deleteHint':
+    'Deja de dar servicio y desaparece de la operación diaria. Su rastro se conserva para poder responder qué fue de ella, y reactivarla la devuelve. Necesita la firma de otro admin global.',
+  'platform.action.reactivate': 'Reactivar',
+  'platform.action.merge': 'Fusionar',
+  'platform.action.resume': 'Reanudar',
+  'platform.usage.orgs': 'Organizaciones',
+  'platform.usage.orgsActive': 'Activas',
+  'platform.usage.orgsSuspended': 'Suspendidas',
+  'platform.usage.users': 'Personas activas',
+  'platform.usage.users30d': 'Con sesión (30 días)',
+  'platform.usage.seatsSold': 'Plazas vendidas',
+  'platform.usage.seatsGranted': 'Plazas regaladas',
+  'platform.usage.subs': 'Suscripciones activas',
+  'platform.merges.title': 'Fusiones de organizaciones',
+  'platform.merges.empty': 'Todavía no se ha ejecutado ninguna fusión.',
+  'platform.merge.state.pending': 'Pendiente',
+  'platform.merge.state.running': 'En curso',
+  'platform.merge.state.completed': 'Completada',
+  'platform.merge.state.failed': 'Ha fallado',
+  'platform.merge.state.aborted': 'Detenida',
+  'platform.admins.title': 'Administración de la plataforma',
+  'platform.seats.count': 'Plazas',
+  'platform.seats.kind': 'Tipo',
+  'platform.seats.kind.goodwill': 'Gesto comercial',
+  'platform.seats.kind.employee': 'Empleado de Sytue',
+  'platform.seats.kind.trial': 'Prueba',
+  'platform.seats.kind.migration': 'Migración',
+  'platform.seats.reason': 'Motivo (obligatorio)',
+  'platform.seats.expires': 'Caduca (opcional)',
+  'platform.merge.warning':
+    'La fusión es irreversible: las personas y todos los datos de la organización de origen pasan a la de destino, y la de origen queda cerrada.',
+  'platform.merge.target': 'Organización de destino',
+  'platform.merge.confirm': 'Escribe {slug} para confirmar',
+  'platform.prompt.statusReason': 'Motivo de este cambio:',
+  'platform.toast.statusSaved': 'Estado actualizado.',
+  'platform.toast.seatsGranted': 'Plazas concedidas.',
+  'platform.toast.mergeStarted': 'Fusión iniciada.',
+  'platform.toast.failed': 'No se pudo completar la operación.',
+  'platform.error.forbidden': 'No puedes acceder a la administración de plataforma',
+  'platform.error.unavailable': 'La administración de plataforma no está disponible',
+  'platform.error.unavailableHint': 'Sytue ID no ha respondido. Inténtalo de nuevo en un momento.',
+
+  // Los tres 403 de esta API, separados: llevan a sitios distintos.
+  'platform.error.mfa': 'Vuelve a entrar con tu segundo factor',
+  'platform.error.mfaHint':
+    'Tienes administración global, pero esta sesión no usó verificación en dos pasos. Cierra la sesión y vuelve a entrar con ella.',
+  'platform.error.signOut': 'Cerrar sesión',
+  'platform.error.notAllowlisted':
+    'Esta cuenta no está en la allowlist de plataforma. Tiene que añadirla otra cuenta de administración global; un segundo factor no cambia esto.',
+
+  // Elevación temporal del alcance global (PIM).
+  'platform.pim.gateTitle': 'Elévate para administrar la plataforma',
+  'platform.pim.gateBody':
+    'Tener administración global significa que puedes elevarte, no que lo estés. Pide una ventana, di para qué la necesitas y se acaba sola.',
+  'platform.pim.elevate': 'Elevarme',
+  'platform.pim.stepDown': 'Bajar el alcance',
+  'platform.pim.modalTitle': 'Elevarte al alcance de plataforma',
+  'platform.pim.justification': 'Para qué lo necesitas (obligatorio)',
+  'platform.pim.justificationHint':
+    'Queda en el registro. Dentro de unos meses es la única respuesta a por qué alguien estuvo elevado.',
+  'platform.pim.duration': 'Durante cuánto',
+  'platform.pim.duration.minutes': { one: '{count} minuto', other: '{count} minutos' },
+  'platform.pim.duration.hours': { one: '{count} hora', other: '{count} horas' },
+  'platform.pim.active': 'Alcance de plataforma activo',
+  'platform.pim.remaining': { one: 'Queda {count} minuto', other: 'Quedan {count} minutos' },
+  'platform.pim.expiringSoon': 'Queda menos de un minuto',
+  'platform.pim.toast.elevated': 'Ya estás elevado. Se acaba solo.',
+  'platform.pim.toast.steppedDown': 'Ya no estás elevado.',
+  'platform.pim.history': 'Histórico de elevaciones',
+  'platform.pim.history.empty': 'Todavía no se ha elevado nadie.',
+  'platform.pim.col.who': 'Quién',
+  'platform.pim.col.when': 'Cuándo',
+  'platform.pim.col.window': 'Ventana',
+  'platform.pim.state.active': 'Activa',
+  'platform.pim.state.expired': 'Terminada',
+  'platform.pim.state.revoked': 'Bajada',
+
+  // Detalle de una organización y sus plazas regaladas.
+  'platform.detail.namespace': 'Espacio de nombres',
+  'platform.detail.grants': 'Plazas regaladas',
+  'platform.detail.noGrants': 'A esta organización no se le ha regalado ninguna plaza.',
+  'platform.detail.grantForever': 'Sin fecha de fin',
+  'platform.detail.grantExpired': 'Caducada',
+  'platform.detail.grantRevoked': 'Retirada',
+  'platform.detail.revokeGrant': 'Retirar',
+  'platform.seats.revoked': 'Plazas retiradas.',
+
+  // Qué está desplegado (release y commit horneados en la imagen).
+  'platform.version.unbuilt': 'Construida a mano',
+  'platform.version.unreachable': 'No ha respondido',
+
+  // Revisión periódica del alcance global (mig 0047).
+  'platform.review.col.reviewed': 'Última revisión',
+  'platform.review.confirm': 'Sigue haciendo falta',
+  'platform.review.done': 'Revisado.',
+  'platform.review.notYourself': 'Tu propio alcance lo revisa otra cuenta de administración global',
+  'platform.review.overdue': { one: 'Más de {count} día', other: 'Más de {count} días' },
+  'platform.review.pending': {
+    one: '{count} acceso global por revisar',
+    other: '{count} accesos globales por revisar',
+  },
+  'platform.review.pendingHint':
+    'No se ha retirado nada. Alguien tiene que mirar si siguen teniendo sentido.',
+
+  // Segunda persona para lo irreversible (mig 0046).
+  'platform.tab.approvals': 'Aprobaciones',
+  'platform.approval.title': 'Operaciones esperando a una segunda persona',
+  'platform.approval.intro':
+    'Suspender una organización deja fuera a toda una empresa y fusionar no se puede deshacer. Quien pide una de estas no puede ser quien la aprueba.',
+  'platform.approval.empty': 'No hay nada esperando aprobación.',
+  'platform.approval.approve': 'Aprobar y ejecutar',
+  'platform.approval.reject': 'Rechazar',
+  'platform.approval.col.requester': 'Lo pidió',
+  'platform.approval.action.org.suspend': 'Suspender organización',
+  'platform.approval.action.org.delete': 'Eliminar organización',
+  'platform.approval.action.org.merge': 'Fusionar organizaciones',
+  'platform.approval.action.platform.admin.grant': 'Conceder alcance global',
+  'platform.approval.state.pending': 'Esperando',
+  'platform.approval.state.executed': 'Hecha',
+  'platform.approval.state.rejected': 'Rechazada',
+  'platform.approval.state.expired': 'Caducada',
+  'platform.approval.queued': 'Queda esperando a una segunda persona',
+  'platform.approval.queuedHint':
+    'Todavía no ha pasado nada. Tiene que aprobarlo otra cuenta de administración global, y caduca en un día.',
+  'platform.approval.samePerson': 'No puedes aprobar lo que has pedido tú',
+  'platform.approval.waiting': {
+    one: '{count} operación esperando',
+    other: '{count} operaciones esperando',
+  },
+  'platform.approval.waitingHint': 'Alguien ha pedido algo que necesita tu aprobación.',
+
+  // Registro de la plataforma (mig 0045).
+  'platform.tab.audit': 'Registro',
+  'platform.audit.title': 'Lo que ha hecho la administración global',
+  'platform.audit.filter': 'Tipo de acción',
+  'platform.audit.empty': 'Todavía no se ha hecho nada desde la administración de la plataforma.',
+  'platform.audit.noOrg': 'Ninguna organización',
+  'platform.audit.col.action': 'Acción',
+  'platform.audit.col.detail': 'Detalle',
+  'platform.audit.family.all': 'Todo',
+  'platform.audit.family.platform.org.': 'Organizaciones',
+  'platform.audit.family.platform.seats.': 'Plazas',
+  'platform.audit.family.platform.merge.': 'Fusiones',
+  'platform.audit.family.platform.admin.': 'Alcance global',
+  'platform.audit.family.platform.pim.': 'Elevaciones',
+  'platform.audit.family.platform.approval.': 'Aprobaciones',
+
+  'platform.education.badge': 'Educación (50 %)',
+  'platform.education.toggle': 'Institución educativa',
+  'platform.education.enable': 'Marcar como educativa',
+  'platform.education.disable': 'Desmarcar como educativa',
+  'platform.prompt.educationReason': 'Motivo del cambio de condición educativa:',
+  'platform.toast.educationSaved': 'Condición educativa actualizada.',
+
+  'platform.admins.revoke': 'Retirar alcance',
+  'platform.prompt.revokeAdminTitle': 'Retirar alcance global',
+  'platform.prompt.revokeAdminHint':
+    'Esta persona dejará de poder administrar toda la plataforma. Conservará su cuenta y membresías.',
+  'platform.toast.adminRevoked': 'Alcance global retirado.',
+  'platform.create.open': 'Crear organización',
+  'platform.create.title': 'Crear una organización',
+  'platform.create.submit': 'Crear',
+  'platform.create.slug': 'Identificador',
+  'platform.create.slugHelp': 'Minúsculas, cifras y guiones. Aparece en la dirección.',
+  'platform.create.name': 'Nombre',
+  'platform.create.owner': 'Correo de la persona propietaria',
+  'platform.create.ownerHelp':
+    'Tiene que existir ya como cuenta de Sytue. Déjalo vacío para asignarla más tarde.',
+  'platform.create.trial': 'Plazas de prueba (opcional)',
+  'platform.create.trialEnds': 'Fin de la prueba',
+  'platform.create.done': 'Organización «{slug}» creada.',
+  'platform.create.doneTrial': {
+    one: '{count} plaza de prueba concedida.',
+    other: '{count} plazas de prueba concedidas.',
+  },
+  'platform.create.error.forbidden':
+    'Sin permiso. Puede que la elevación haya caducado: vuelve a elevarte y repite.',
+  'platform.create.error.conflict': 'Ese identificador ya existe o está reservado.',
+  'platform.create.error.invalid':
+    'Revisa el identificador y que el correo sea de una cuenta que ya exista.',
+  'platform.create.error.trial':
+    'La organización se creó, pero las plazas de prueba no: concédelas desde su detalle.',
+
+  // Propietarios y cuentas de una organización desde plataforma (mig 0113).
+  'platform.members.title': 'Personas',
+  'platform.members.search': 'Buscar por nombre o correo',
+  'platform.members.empty': 'No hay nadie que coincida.',
+  'platform.members.col.person': 'Persona',
+  'platform.members.col.role': 'Rol',
+  'platform.members.status.active': 'Activa',
+  'platform.members.status.suspended': 'Bloqueada',
+  'platform.members.status.deleted': 'Eliminada',
+  'platform.members.ownersHint':
+    'Una organización puede tener varios propietarios. Asignar uno no quita a los demás: eso se hace desde la consola de la propia organización.',
+  'platform.members.assignOwner': 'Asignar propietario',
+  'platform.members.inviteOwner': 'Crear propietario',
+  'platform.members.makeOwner': 'Hacer propietario',
+  'platform.members.assignTitle': 'Asignar la propiedad',
+  'platform.members.assignHelp':
+    'La cuenta tiene que existir ya. Si no es miembro de esta organización, entra como propietario.',
+  'platform.members.inviteTitle': 'Invitar a una persona propietaria',
+  'platform.members.inviteHelp':
+    'Recibe una invitación por correo y elige su propia contraseña al aceptarla.',
+  'platform.members.name': 'Nombre completo',
+  'platform.members.resetPassword': 'Restablecer contraseña',
+  'platform.members.passwordTitle': 'Restablecer la contraseña de {email}',
+  'platform.members.passwordMode': 'Cómo',
+  'platform.members.passwordLink': 'Enviar un enlace por correo',
+  'platform.members.passwordTemporary': 'Fijar una contraseña temporal',
+  'platform.members.passwordHint':
+    'En los dos casos se cierran sus sesiones y se revocan sus tokens. La contraseña temporal se muestra una sola vez y hay que cambiarla en el siguiente inicio de sesión.',
+  'platform.members.temporaryTitle': 'Contraseña temporal',
+  'platform.members.temporaryOnce':
+    'Cópiala ahora: no se vuelve a mostrar ni se guarda en ningún sitio. Dásela a {email} por un canal de confianza.',
+  'platform.members.block': 'Bloquear',
+  'platform.members.unblock': 'Desbloquear',
+  'platform.members.blockTitle': 'Bloquear a {email}',
+  'platform.members.blockHint':
+    'Pierde el acceso al momento: se cierran sus sesiones y se revocan sus tokens. No se borra nada y puedes desbloquearla.',
+  'platform.members.unblockTitle': 'Desbloquear a {email}',
+  'platform.members.deleteTitle': 'Eliminar a {email}',
+  'platform.members.deleteHint':
+    'La cuenta se da de baja y pierde todo acceso. La organización puede restaurarla durante 30 días; después ya no se puede deshacer.',
+  'platform.members.deleteConfirm': 'Escribe {email} para confirmar',
+  'platform.members.sessionsClosed': {
+    one: 'Se cerró {count} sesión.',
+    other: 'Se cerraron {count} sesiones.',
+  },
+  'platform.members.toast.ownerAssigned': 'Propietario asignado.',
+  'platform.members.toast.alreadyOwner': 'Esa cuenta ya era propietaria.',
+  'platform.members.toast.ownerInvited': 'Invitación enviada a {email}.',
+  'platform.members.toast.linkSent': 'Enlace de restablecimiento enviado.',
+  'platform.members.toast.blocked': 'Cuenta bloqueada.',
+  'platform.members.toast.unblocked': 'Cuenta desbloqueada.',
+  'platform.members.toast.deleted': 'Cuenta eliminada.',
+  'platform.members.error.stepUp':
+    'Confirma que eres tú: cierra sesión, vuelve a entrar con tu segundo factor y repite la acción.',
+  'platform.members.error.soleOwner':
+    'Esta persona es la única propietaria de {orgs}. Asigna antes otro propietario allí.',
+  'platform.members.error.noSuchUser':
+    'No hay ninguna cuenta con ese correo. Créala como propietario nuevo.',
+  'platform.members.error.accountExists': 'Ese correo ya tiene cuenta. Asígnala como propietario.',
+  'platform.members.error.inactive':
+    'Esa cuenta está bloqueada o dada de baja. Desbloquéala antes.',
+  'platform.members.error.platformAdmin':
+    'Esta cuenta administra la plataforma. Retírale antes el alcance global.',
+  'platform.audit.family.platform.user.': 'Cuentas',
+  'nav.moderation': 'Denuncias',
+  'mod.intro':
+    'Las denuncias de Sytue Cast y de Sytue Rooms llegan a esta cola y a la de quien administra la organización dueña del contenido. Resolver una aquí la cierra allí, marcada como hecha por Sytue. Cada consulta y cada acción queda en el registro de la plataforma y en el de la organización.',
+  'mod.suspend': 'Para suspender una organización, ve a Plataforma.',
+  'mod.service.cast': 'Sytue Cast',
+  'mod.service.rooms': 'Sytue Rooms',
+  'mod.status.open': 'Abiertas',
+  'mod.status.resolved': 'Resueltas',
+  'mod.loading': 'Cargando…',
+  'mod.empty': 'No hay denuncias aquí.',
+  'mod.col.date': 'Fecha',
+  'mod.col.org': 'Organización',
+  'mod.col.what': 'Denunciado',
+  'mod.col.reason': 'Motivo',
+  'mod.col.content': 'Lo que guarda la denuncia',
+  'mod.col.actions': 'Acción',
+  'mod.kind.video': 'Vídeo',
+  'mod.kind.comment': 'Comentario',
+  'mod.kind.chat': 'Mensaje del chat en directo',
+  'mod.kind.person': 'Persona',
+  'mod.kind.channel': 'Canal',
+  'mod.kind.message': 'Mensaje',
+  'mod.kind.member': 'Persona en una conversación',
+  'mod.reason.harassment': 'Acoso',
+  'mod.reason.sexual': 'Contenido sexual o desnudos',
+  'mod.reason.violence': 'Violencia',
+  'mod.reason.spam': 'Spam o engaño',
+  'mod.reason.copyright': 'Derechos de autor',
+  'mod.reason.other': 'Otro',
+  'mod.action.dismiss': 'Descartar',
+  'mod.action.delete': 'Borrar',
+  'mod.action.unlist': 'Retirar de la portada',
+  'mod.action.unpublish': 'Despublicar',
+  'mod.action.block': 'Bloquear en la organización',
+  'mod.action.remove': 'Expulsar del canal',
+  'mod.from.platform': 'por Sytue',
+  'mod.from.org': 'por la organización',
+  'mod.confirm.title': '¿{action}?',
+  'mod.confirm.body':
+    'Queda a tu nombre, como Sytue, en el registro de {org}, y la denuncia se cierra también en su cola.',
+  'mod.toast.done': 'Denuncia resuelta.',
+  'mod.toast.failed': 'No se ha podido. Puede que tu elevación haya caducado.',
+  'mod.error.forbidden': 'Primero eleva tu alcance de plataforma',
+  'mod.error.forbiddenBody':
+    'La cola de denuncias se abre como el resto de la consola de plataforma: con verificación en dos pasos y una elevación activa. Elévate desde Plataforma y vuelve.',
+  'mod.error.unavailable': 'El servicio no responde',
+  'mod.error.unavailableBody':
+    'Sytue ID no ha podido confirmar tu acceso, o el servicio no ha contestado. Sin esa confirmación no se enseña nada. Vuelve a probar en un momento.',
+};

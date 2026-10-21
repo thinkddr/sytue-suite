@@ -1,0 +1,5 @@
+# La versión y el número de build de cada build de Xcode Cloud (ci_scripts/ci_post_clone.sh).
+version.xcconfig
+# Lo que Xcode guarda por persona al abrir el proyecto.
+xcuserdata/
+build/

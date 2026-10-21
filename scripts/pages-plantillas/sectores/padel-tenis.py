@@ -1,0 +1,225 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Daniel Delgado Ramos
+from lib import *
+
+KEY = "padel-tenis"
+
+# Paleta propia: verde pelota de tenis claro con azul marino de pista. Pasa AA. Sin fondo $inverse (primary/inverse < 3).
+PELOTA = dict(background="#e6efb4", surface="#d6e39a", text="#141a3a", muted="#3f4630", primary="#1b2a6b",
+              on_primary="#ffffff", border="#c0d07c", inverse="#141c4a", on_inverse="#eef2c8")
+
+
+def build():
+    nueva(KEY)
+    look = dict(colores=PELOTA, fuentes=("dm-sans", "manrope"), peso=800, h1=(52, 42, 34), radio=(10, 16, 24))
+    malos = comprobar_paleta(KEY, PELOTA)
+    assert not malos, malos
+    nav = [("inicio", ("Inicio", "Home")), ("pistas", ("Pistas y tarifas", "Courts and rates")),
+           ("clases", ("Clases y torneos", "Lessons and tournaments")), ("contacto", ("Reservar y contacto", "Book and contact"))]
+    horas = [(("Lunes a viernes", "Monday to Friday"), ("9:00 a 23:00", "9:00 am to 11:00 pm")),
+             (("Sábado y domingo", "Saturday and Sunday"), ("9:00 a 21:00", "9:00 am to 9:00 pm")),
+             (("Festivos", "Bank holidays"), ("9:00 a 14:00", "9:00 am to 2:00 pm"))]
+    nota = ("Precios de ejemplo: cámbialos por los tuyos. Incluyen IVA.",
+            "Example prices: replace them with your own. VAT included.")
+
+    def reservar(var="primary"):
+        return boton(("Reservar pista", "Book a court"), a_pagina("contacto", "contacto"), var)
+
+    inicio = pagina("inicio", ("", ""), ("Club de pádel y tenis", "Padel and tennis club"),
+                    ("Club de pádel y tenis con pistas por franjas, clases para todas las edades, ligas y torneos. Reserva por teléfono o WhatsApp.",
+                     "Padel and tennis club with courts by time slot, lessons for all ages, leagues and tournaments. Book by phone or on WhatsApp."), [
+        hero(("Pistas libres cuando tú puedes jugar", "Courts free when you can play"),
+             ("Reserva tu pista de pádel o de tenis por teléfono o por WhatsApp. Si quieres mejorar, tenemos clases individuales, en grupo y para niños.",
+              "Book your padel or tennis court by phone or on WhatsApp. If you want to improve, we have private, group and children's lessons."),
+             [reservar(), llamar("secondary"), whatsapp("ghost")],
+             eyebrow=("Pádel y tenis", "Padel and tennis"), variante="centro", tono="relleno"),
+        bloque_pasos(("Cómo reservar una pista", "How to book a court"), [
+            (("Elige día y hora", "Pick a day and time"),
+             ("Dinos si quieres pádel o tenis, cuándo y cuántos sois.", "Tell us padel or tennis, when and how many of you are playing.")),
+            (("Te confirmamos", "We confirm"),
+             ("Te respondemos por teléfono o WhatsApp con la pista y la hora.", "We reply by phone or WhatsApp with the court and the time.")),
+            (("Pagas al llegar", "You pay when you arrive"),
+             ("En recepción, antes de jugar. Se puede dividir entre los jugadores.", "At reception, before you play. It can be split between players.")),
+            (("A jugar", "Time to play"),
+             ("Si no puedes venir, avísanos con unas horas de antelación y la anulamos sin coste.",
+              "If you cannot come, tell us a few hours ahead and we cancel it at no cost.")),
+        ], eyebrow=("Reservas", "Bookings"), tono="base"),
+        bloque_precios(("Tarifas por franja", "Rates by time slot"), ("Tarifas de pistas por franja", "Court rates by time slot"),
+                       [("Franja", "Time slot"), ("Pádel, 1 h 30", "Padel, 1 h 30"), ("Tenis, 1 h", "Tennis, 1 h")],
+                       [(("Mañana, lunes a viernes", "Morning, Monday to Friday"), eur(16), eur(9)),
+                        (("Tarde, lunes a viernes", "Afternoon, Monday to Friday"), eur(24), eur(12)),
+                        (("Fines de semana y festivos", "Weekends and bank holidays"), eur(26), eur(14))],
+                       nota=nota, boton_=boton(("Ver pistas y material", "See courts and equipment"), a_pagina("pistas"), "secondary"),
+                       anchor="precios", tono="relleno"),
+        bloque_valores(("Para jugar a tu nivel", "Play at your level"), [
+            (("Clases individuales", "Private lessons"),
+             ("Una hora con el entrenador para trabajar lo que más te cuesta: saque, volea, bandeja o revés.",
+              "An hour with the coach on what you find hardest: serve, volley, bandeja or backhand.")),
+            (("Clases en grupo", "Group lessons"),
+             ("De tres a cuatro jugadores del mismo nivel por pista. Se aprende y se juega.",
+              "Three to four players of the same level per court. You learn and you play.")),
+            (("Escuela para niños", "Children's school"),
+             ("Mini pádel y mini tenis con pelotas blandas y juegos, a partir de los cinco años.",
+              "Mini padel and mini tennis with soft balls and games, from age five.")),
+        ], eyebrow=("Clases", "Lessons"), tono="base", estilo="borde"),
+        bloque_galeria(("Las pistas", "The courts"), [
+            ("Pista de pádel del club", "One of the club's padel courts"),
+            ("Pista de tenis del club", "One of the club's tennis courts"),
+            ("Recepción y zona de descanso del club", "The club's reception and rest area"),
+            ("Palas, raquetas y pelotas para alquilar", "Rackets, paddles and balls for hire")],
+            tipo="landscape", cols=2, tono="relleno", ratio=1.6),
+        bloque_opiniones(("Lo que dicen los jugadores", "What players say"),
+                         [("las pistas", "the courts"), ("las clases", "the lessons"), ("el trato", "the staff")], tono="base"),
+        bloque_cta(("¿Jugamos esta semana?", "Shall we play this week?"),
+                   ("Dinos el día y la hora que te vienen bien y buscamos pista. Si no tienes con quién jugar, pregúntanos.",
+                    "Tell us the day and time that suit you and we will find a court. If you have nobody to play with, ask us."),
+                   [reservar(), llamar("secondary")]),
+    ])
+
+    pistas = pagina("pistas", ("pistas", "courts"), ("Pistas y tarifas", "Courts and rates"),
+                    ("Cómo reservar pista, tarifas de pádel y tenis por franja horaria, alquiler de material, tienda del club y normas.",
+                     "How to book a court, padel and tennis rates by time slot, equipment hire, the club shop and rules."), [
+        hero(("Pistas y tarifas", "Courts and rates"),
+             ("Las pistas se reservan por franjas. Estas son las tarifas, el material que puedes alquilar y las normas para que jugar sea fácil para todos.",
+              "Courts are booked by time slot. Here are the rates, the equipment you can hire and the rules that make playing easy for everyone."),
+             [reservar()], variante="texto"),
+        bloque_precios(("Tarifas de pistas", "Court rates"), ("Tarifas de pistas por franja horaria", "Court rates by time slot"),
+                       [("Franja", "Time slot"), ("Horas", "Hours"), ("Pádel, 1 h 30", "Padel, 1 h 30"), ("Tenis, 1 h", "Tennis, 1 h")],
+                       [(("Mañana", "Morning"), ("Lunes a viernes, 9:00 a 17:00", "Monday to Friday, 9 am to 5 pm"), eur(16), eur(9)),
+                        (("Tarde", "Afternoon"), ("Lunes a viernes, 17:00 a 21:00", "Monday to Friday, 5 pm to 9 pm"), eur(24), eur(12)),
+                        (("Noche", "Evening"), ("Lunes a viernes, 21:00 a 23:00", "Monday to Friday, 9 pm to 11 pm"), eur(20), eur(10)),
+                        (("Fines de semana y festivos", "Weekends and bank holidays"), ("Todo el día", "All day"), eur(26), eur(14)),
+                        (("Socios", "Members"), ("Cualquier franja", "Any time slot"), ("4 € menos", "€4 off"), ("2 € menos", "€2 off"))],
+                       intro=("El precio es por pista. Si sois cuatro en pádel, sale a una cuarta parte por persona.",
+                              "The price is per court. With four players at padel, it works out at a quarter each."),
+                       nota=nota, anchor="tarifas", tono="base"),
+        bloque_precios(("Alquiler de material", "Equipment hire"), ("Precios de alquiler de material", "Equipment hire prices"),
+                       [("Material", "Item"), ("Precio por partido", "Price per match")],
+                       [(("Pala de pádel", "Padel racket"), eur(3)), (("Raqueta de tenis", "Tennis racket"), eur(3)),
+                        (("Bote de pelotas nuevas", "Can of new balls"), eur(5)),
+                        (("Fianza por el material alquilado", "Deposit for hired equipment"), eur(10))],
+                       intro=("Para probar el deporte no hace falta comprar nada: te prestamos pala o raqueta y pelotas.",
+                              "To try the sport you do not need to buy anything: we lend you a racket or paddle and balls."),
+                       nota=nota, anchor="material", tono="base"),
+        bloque_texto(("La tienda del club", "The club shop"), [
+            ("En recepción tenemos pelotas, overgrips, muñequeras y alguna pala y raqueta para quien necesita cambiar de material. No vendemos por internet.",
+             "At reception we have balls, overgrips, wristbands and a few rackets and paddles for anyone who needs new equipment. We do not sell online."),
+            ("Si buscas algo concreto, pregúntanos. Antes de comprar una pala, prueba las nuestras: así sabes si te gusta cómo pesa.",
+             "If you are looking for something specific, ask us. Before buying a paddle, try ours: that way you know whether you like the weight."),
+        ], tono="relleno", anchor="tienda"),
+        bloque_checks(("Normas de las pistas", "Court rules"), [
+            ("Calzado deportivo con suela que no marque ni dañe la superficie.", "Sports shoes with soles that do not mark or damage the surface."),
+            ("Respeta tu hora: al terminar, deja la pista libre para el siguiente turno.", "Keep to your time: when you finish, leave the court free for the next slot."),
+            ("Las pelotas y la basura, a su papelera.", "Balls and rubbish go in the bins."),
+            ("Los niños juegan siempre acompañados por un adulto responsable.", "Children always play with a responsible adult present."),
+            ("Si llueve, las pistas descubiertas se pueden cambiar de día sin coste.", "If it rains, outdoor courts can be moved to another day at no cost."),
+        ], tono="base", cols=2, anchor="normas"),
+        bloque_faq(("Preguntas frecuentes", "Frequently asked questions"), [
+            (("¿Necesito ser socio para reservar?", "Do I need to be a member to book?"),
+             ("No. Cualquiera puede reservar. Los socios tienen una tarifa más baja y pueden reservar con más días de antelación.",
+              "No. Anyone can book. Members get a lower rate and can book further ahead.")),
+            (("¿Cuánto tiempo se mantiene la reserva?", "How long is a booking held?"),
+             ("Diez minutos desde su hora. Si no puedes venir, avísanos con 12 horas de antelación y no se cobra.",
+              "Ten minutes from its start time. If you cannot come, tell us 12 hours ahead and there is no charge.")),
+            (("¿Y si no tengo con quién jugar?", "What if I have nobody to play with?"),
+             ("Dínoslo y te avisamos si otros jugadores de tu nivel buscan pareja o partido.",
+              "Tell us and we will let you know if other players of your level are looking for a partner or a match.")),
+            (("¿Hay luz por la noche?", "Are there lights in the evening?"),
+             ("Las pistas tienen iluminación para jugar hasta que cierra el club.", "The courts have lighting so you can play until the club closes.")),
+        ], tono="relleno"),
+        bloque_cta(("¿Qué hora te viene bien?", "What time suits you?"), None, [reservar(), whatsapp("ghost")], tono="base"),
+    ])
+
+    clases = pagina("clases", ("clases", "lessons"), ("Clases y torneos", "Lessons and tournaments"),
+                    ("Clases individuales, en grupo y para niños de pádel y tenis, precios, horario de la escuela, ligas y torneos de ejemplo.",
+                     "Private, group and children's padel and tennis lessons, prices, school timetable, and example leagues and tournaments."), [
+        hero(("Clases y torneos", "Lessons and tournaments"),
+             ("Aprender, mejorar o competir un poco. Elige la clase que encaje con tu nivel y con tu horario.",
+              "Learn, improve or compete a little. Choose the lesson that suits your level and your schedule."),
+             [boton(("Pedir una clase", "Ask for a lesson"), a_pagina("contacto", "contacto"))], variante="texto"),
+        bloque_valores(("Tipos de clase", "Types of lesson"), [
+            (("Individual", "Private"),
+             ("Una persona y un entrenador, una hora. Ideal para corregir golpes o para empezar rápido.",
+              "One person and a coach, one hour. Ideal for correcting strokes or getting started quickly.")),
+            (("En grupo", "Group"),
+             ("De tres a cuatro jugadores del mismo nivel. Se trabaja un golpe por sesión y se acaba jugando un partido.",
+              "Three to four players of the same level. One stroke per session, finishing with a match.")),
+            (("Para niños", "For children"),
+             ("Desde los cinco años, con material adaptado. Se juega, se aprende a coordinarse y se pasa un buen rato.",
+              "From age five, with adapted equipment. They play, learn coordination and have a good time.")),
+        ], eyebrow=("La escuela", "The school"), tono="base", estilo="relleno"),
+        bloque_precios(("Precios de las clases", "Lesson prices"), ("Precios de las clases", "Lesson prices"),
+                       [("Clase", "Lesson"), ("Duración", "Duration"), ("Precio", "Price")],
+                       [(("Individual", "Private"), ("1 hora", "1 hour"), eur(30)),
+                        (("Individual, bono de 5", "Private, pack of 5"), ("5 horas", "5 hours"), eur(135)),
+                        (("En grupo, al mes (1 clase por semana)", "Group, per month (1 lesson a week)"), ("1 hora", "1 hour"), eur(40)),
+                        (("En grupo, al mes (2 clases por semana)", "Group, per month (2 lessons a week)"), ("1 hora", "1 hour"), eur(70)),
+                        (("Niños, al mes (1 clase por semana)", "Children, per month (1 lesson a week)"), ("1 hora", "1 hour"), eur(32))],
+                       intro=("Las clases individuales incluyen la pista. En grupo, la pista está dentro de la cuota.",
+                              "Private lessons include the court. For groups, the court is included in the fee."),
+                       nota=nota, anchor="precios", tono="relleno"),
+        bloque_precios(("Horario de la escuela", "School timetable"), ("Horario semanal de la escuela", "Weekly school timetable"),
+                       [("Grupo", "Group"), ("Días", "Days"), ("Hora", "Time")],
+                       [(("Niños de 5 a 8 años", "Children aged 5 to 8"), ("Martes y jueves", "Tuesday and Thursday"), ("17:30 a 18:30", "5:30 pm to 6:30 pm")),
+                        (("Niños de 9 a 13 años", "Children aged 9 to 13"), ("Lunes y miércoles", "Monday and Wednesday"), ("17:30 a 18:30", "5:30 pm to 6:30 pm")),
+                        (("Adultos, iniciación", "Adults, beginners"), ("Martes y jueves", "Tuesday and Thursday"), ("19:00 a 20:00", "7:00 pm to 8:00 pm")),
+                        (("Adultos, intermedio", "Adults, intermediate"), ("Lunes y miércoles", "Monday and Wednesday"), ("20:00 a 21:00", "8:00 pm to 9:00 pm")),
+                        (("Adultos, avanzado", "Adults, advanced"), ("Sábado", "Saturday"), ("10:00 a 11:30", "10:00 am to 11:30 am"))],
+                       intro=("Horario de ejemplo: cámbialo por el tuyo.", "Example timetable: replace it with your own."),
+                       anchor="horario", tono="base"),
+        bloque_texto(("Ligas y torneos", "Leagues and tournaments"), [
+            ("Texto de ejemplo: cámbialo por las fechas y las reglas de tus competiciones.",
+             "Example text: replace it with the dates and rules of your competitions."),
+            ("Liga interna: se juega por niveles, un partido a la semana, a la hora que acordéis entre las dos parejas o los dos jugadores. Dura unas diez semanas y acaba con una final.",
+             "In-house league: played by level, one match a week, at a time agreed between the two pairs or players. It lasts about ten weeks and finishes with a final."),
+            ("Torneo de fin de semana: una jornada por la mañana y otra por la tarde, con cuadro por niveles. Se avisa de las fechas con unas semanas de antelación y se apuntan las parejas en recepción.",
+             "Weekend tournament: one session in the morning and one in the afternoon, with a draw by level. Dates are announced a few weeks ahead and pairs sign up at reception."),
+        ], tono="relleno", anchor="torneos"),
+        bloque_faq(("Preguntas frecuentes", "Frequently asked questions"), [
+            (("¿Tengo que traer material?", "Do I need to bring equipment?"),
+             ("No para empezar. Te prestamos pala o raqueta y pelotas hasta que decidas qué comprar.",
+              "Not to start with. We lend you a paddle or racket and balls until you decide what to buy.")),
+            (("¿Cómo sé cuál es mi nivel?", "How do I know my level?"),
+             ("Con la primera clase se ve. Si dudas entre dos grupos, empiezas por el más sencillo y cambias cuando haga falta.",
+              "The first lesson shows it. If you are between two groups, start with the easier one and move up when needed.")),
+            (("¿Puedo recuperar una clase?", "Can I make up a lesson?"),
+             ("Si avisas con 24 horas, sí, en otro grupo de tu nivel con plaza libre.",
+              "If you tell us 24 hours ahead, yes, in another group at your level with a free place.")),
+        ], tono="base"),
+        bloque_cta(("¿Empezamos con una clase?", "Shall we start with a lesson?"), None,
+                   [boton(("Pedir una clase", "Ask for a lesson"), a_pagina("contacto", "contacto")), whatsapp("ghost")]),
+    ])
+
+    cont = pagina("contacto", ("contacto", "contact"), ("Reservar y contacto", "Book and contact"),
+                  ("Reserva pista o clase por teléfono, WhatsApp o con el formulario. Horario del club y cómo llegar.",
+                   "Book a court or lesson by phone, WhatsApp or with the form. Club opening hours and how to get here."), [
+        hero(("Reserva tu pista o tu clase", "Book your court or lesson"),
+             ("Llámanos, escríbenos por WhatsApp o rellena el formulario. Te confirmamos la pista y la hora en el mismo día.",
+              "Call us, message us on WhatsApp or fill in the form. We confirm the court and time the same day."),
+             [llamar(), whatsapp()], variante="texto"),
+        bloque_contacto(("Cómo encontrarnos", "How to find us"),
+                        ("Tenemos aparcamiento cerca y una parada de autobús a pocos minutos andando.",
+                         "There is parking nearby and a bus stop a few minutes' walk away."),
+                        campos_cita(servicios=[("Pista de pádel", "Padel court"), ("Pista de tenis", "Tennis court"),
+                                               ("Clase individual", "Private lesson"), ("Clase en grupo", "Group lesson"),
+                                               ("Clase para niños", "Children's lesson"), ("Ligas y torneos", "Leagues and tournaments")],
+                                    extra=[campo("franja", "select", ("Franja que te viene bien", "Time slot that suits you"), False,
+                                                 opciones=[("Mañana", "Morning"), ("Tarde", "Afternoon"), ("Noche", "Evening")]),
+                                           campo("jugadores", "text", ("Número de jugadores", "Number of players"), False, maxlen=2)]),
+                        ("Pedir reserva", "Request booking"), horas,
+                        exito=("Gracias. Te confirmamos la reserva por teléfono o WhatsApp en cuanto la tengamos.",
+                               "Thank you. We will confirm your booking by phone or WhatsApp as soon as we have it.")),
+        bloque_mapa(tono="relleno"),
+    ])
+
+    return plantilla(KEY, ("Club de pádel y tenis", "Padel and tennis club"),
+                     ("Club de pádel y tenis con tarifas de pistas por franja, cómo reservar, clases, alquiler de material, formulario de reserva y botones de llamar y WhatsApp.",
+                      "Padel and tennis club with court rates by time slot, how to book, lessons, equipment hire, a booking form and call and WhatsApp buttons."),
+                     "deporte", ("padel tenis club de padel club de tenis pistas de padel pistas de tenis reservar pista escuela de padel escuela de tenis clases de padel clases de tenis torneos liga alquiler de palas",
+                                 "padel tennis padel club tennis club padel courts tennis courts book a court padel school tennis school padel lessons tennis lessons tournaments league racket hire"),
+                     look, cabecera(nav, reservar()),
+                     pie(nav, ("Club de pádel y tenis. Pistas, clases, ligas y torneos.",
+                               "Padel and tennis club. Courts, lessons, leagues and tournaments."),
+                         ("Lunes a viernes 9:00 a 23:00. Sábado y domingo 9:00 a 21:00.",
+                          "Monday to Friday 9 am to 11 pm. Saturday and Sunday 9 am to 9 pm.")),
+                     [inicio, pistas, clases, cont])

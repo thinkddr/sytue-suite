@@ -1,0 +1,1644 @@
+{
+  "$defs": {
+    "button": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "$ref": "#/$defs/enlace"
+        },
+        "breakpoints": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/puntos"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "icon": {
+          "anyOf": [
+            {
+              "enum": [
+                "phone",
+                "mail",
+                "map-pin",
+                "clock",
+                "calendar",
+                "check",
+                "star",
+                "heart",
+                "cart",
+                "bag",
+                "truck",
+                "gift",
+                "tag",
+                "user",
+                "users",
+                "building",
+                "home",
+                "globe",
+                "shield",
+                "leaf",
+                "wrench",
+                "hammer",
+                "stethoscope",
+                "bed",
+                "utensils",
+                "graduation",
+                "briefcase",
+                "camera",
+                "image",
+                "play",
+                "quote",
+                "chat",
+                "arrow-right",
+                "arrow-left",
+                "chevron-down",
+                "menu",
+                "close",
+                "plus",
+                "minus",
+                "external",
+                "download",
+                "info",
+                "whatsapp",
+                "instagram",
+                "facebook",
+                "linkedin",
+                "tiktok",
+                "x",
+                "youtube"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "icon_position": {
+          "anyOf": [
+            {
+              "enum": [
+                "start",
+                "end"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "size": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/tamano"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "style": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/estilo"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "type": {
+          "const": "button",
+          "type": "string"
+        },
+        "variant": {
+          "enum": [
+            "primary",
+            "secondary",
+            "ghost"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "label",
+        "variant",
+        "action"
+      ],
+      "type": "object"
+    },
+    "campo_formulario": {
+      "additionalProperties": false,
+      "properties": {
+        "autocomplete": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "text",
+            "email",
+            "tel",
+            "textarea",
+            "select",
+            "checkbox",
+            "date",
+            "time",
+            "number"
+          ],
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "max": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "max_length": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "min": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "options": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "required": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "label"
+      ],
+      "type": "object"
+    },
+    "delta": {
+      "additionalProperties": false,
+      "properties": {
+        "columns": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "hidden": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "layout": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/layout"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "size": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/tamano"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "style": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/estilo"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "enlace": {
+      "additionalProperties": false,
+      "properties": {
+        "anchor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cart": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "file": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "legal": {
+          "anyOf": [
+            {
+              "enum": [
+                "notice",
+                "privacy",
+                "cookies",
+                "terms",
+                "withdrawal"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "new_tab": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "page": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "product": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "estilo": {
+      "additionalProperties": false,
+      "properties": {
+        "background": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "border": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "color": {
+                  "type": "string"
+                },
+                "style": {
+                  "enum": [
+                    "solid",
+                    "dashed",
+                    "dotted"
+                  ],
+                  "type": "string"
+                },
+                "width": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "width",
+                "color",
+                "style"
+              ],
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "color": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "opacity": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "overflow": {
+          "anyOf": [
+            {
+              "enum": [
+                "visible",
+                "hidden"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "radius": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "enum": [
+                    "$sm",
+                    "$md",
+                    "$lg"
+                  ],
+                  "type": "string"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "text": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/estilo_texto"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "estilo_texto": {
+      "additionalProperties": false,
+      "properties": {
+        "align": {
+          "anyOf": [
+            {
+              "enum": [
+                "start",
+                "center",
+                "end",
+                "justify"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "font": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "italic": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "letter_spacing": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "line_height": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "preset": {
+          "anyOf": [
+            {
+              "enum": [
+                "h1",
+                "h2",
+                "h3",
+                "h4",
+                "h5",
+                "h6",
+                "body",
+                "small",
+                "label",
+                "button"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "size": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "transform": {
+          "anyOf": [
+            {
+              "enum": [
+                "none",
+                "uppercase"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "weight": {
+          "anyOf": [
+            {
+              "enum": [
+                "400",
+                "500",
+                "600",
+                "700"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "form": {
+      "additionalProperties": false,
+      "properties": {
+        "breakpoints": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/puntos"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "consent": {
+          "type": "string"
+        },
+        "fields": {
+          "items": {
+            "$ref": "#/$defs/campo_formulario"
+          },
+          "type": "array"
+        },
+        "form": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "layout": {
+          "$ref": "#/$defs/layout"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "size": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/tamano"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "style": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/estilo"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "submit": {
+          "type": "string"
+        },
+        "success": {
+          "type": "string"
+        },
+        "type": {
+          "const": "form",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "form",
+        "layout",
+        "fields",
+        "submit",
+        "success",
+        "consent"
+      ],
+      "type": "object"
+    },
+    "frame": {
+      "additionalProperties": false,
+      "properties": {
+        "breakpoints": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/puntos"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "children": {
+          "items": {
+            "$ref": "#/$defs/nodo"
+          },
+          "type": "array"
+        },
+        "id": {
+          "type": "string"
+        },
+        "layout": {
+          "$ref": "#/$defs/layout"
+        },
+        "link": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/enlace"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "size": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/tamano"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "style": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/estilo"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tag": {
+          "enum": [
+            "div",
+            "header",
+            "footer",
+            "nav",
+            "article",
+            "aside",
+            "ul",
+            "ol",
+            "li"
+          ],
+          "type": "string"
+        },
+        "type": {
+          "const": "frame",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "tag",
+        "layout",
+        "children"
+      ],
+      "type": "object"
+    },
+    "icon": {
+      "additionalProperties": false,
+      "properties": {
+        "breakpoints": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/puntos"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "name": {
+          "enum": [
+            "phone",
+            "mail",
+            "map-pin",
+            "clock",
+            "calendar",
+            "check",
+            "star",
+            "heart",
+            "cart",
+            "bag",
+            "truck",
+            "gift",
+            "tag",
+            "user",
+            "users",
+            "building",
+            "home",
+            "globe",
+            "shield",
+            "leaf",
+            "wrench",
+            "hammer",
+            "stethoscope",
+            "bed",
+            "utensils",
+            "graduation",
+            "briefcase",
+            "camera",
+            "image",
+            "play",
+            "quote",
+            "chat",
+            "arrow-right",
+            "arrow-left",
+            "chevron-down",
+            "menu",
+            "close",
+            "plus",
+            "minus",
+            "external",
+            "download",
+            "info",
+            "whatsapp",
+            "instagram",
+            "facebook",
+            "linkedin",
+            "tiktok",
+            "x",
+            "youtube"
+          ],
+          "type": "string"
+        },
+        "size": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/tamano"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "style": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/estilo"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "type": {
+          "const": "icon",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "name"
+      ],
+      "type": "object"
+    },
+    "image": {
+      "additionalProperties": false,
+      "properties": {
+        "alt": {
+          "type": "string"
+        },
+        "breakpoints": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/puntos"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "decorative": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "fit": {
+          "enum": [
+            "cover",
+            "contain"
+          ],
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "link": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/enlace"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "priority": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "size": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/tamano"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "src": {
+          "additionalProperties": false,
+          "properties": {
+            "library": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "placeholder": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "photo",
+                    "portrait",
+                    "product",
+                    "landscape",
+                    "logo"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "type": "object"
+        },
+        "style": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/estilo"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "type": {
+          "const": "image",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "src",
+        "alt",
+        "fit"
+      ],
+      "type": "object"
+    },
+    "layout": {
+      "additionalProperties": false,
+      "properties": {
+        "align": {
+          "enum": [
+            "start",
+            "center",
+            "end",
+            "stretch"
+          ],
+          "type": "string"
+        },
+        "columns": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "direction": {
+          "enum": [
+            "row",
+            "column"
+          ],
+          "type": "string"
+        },
+        "gap": {
+          "type": "integer"
+        },
+        "justify": {
+          "enum": [
+            "start",
+            "center",
+            "end",
+            "space-between",
+            "space-around"
+          ],
+          "type": "string"
+        },
+        "padding": {
+          "items": {
+            "type": "integer"
+          },
+          "maxItems": 4,
+          "minItems": 4,
+          "type": "array"
+        },
+        "row_gap": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "wrap": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "direction",
+        "gap",
+        "padding",
+        "align",
+        "justify",
+        "wrap"
+      ],
+      "type": "object"
+    },
+    "medida": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "enum": [
+            "fill",
+            "hug"
+          ],
+          "type": "string"
+        }
+      ]
+    },
+    "nodo": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/section"
+        },
+        {
+          "$ref": "#/$defs/frame"
+        },
+        {
+          "$ref": "#/$defs/text"
+        },
+        {
+          "$ref": "#/$defs/image"
+        },
+        {
+          "$ref": "#/$defs/button"
+        },
+        {
+          "$ref": "#/$defs/icon"
+        },
+        {
+          "$ref": "#/$defs/form"
+        },
+        {
+          "$ref": "#/$defs/table"
+        },
+        {
+          "$ref": "#/$defs/product_grid"
+        }
+      ]
+    },
+    "product_grid": {
+      "additionalProperties": false,
+      "properties": {
+        "breakpoints": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/puntos"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "columns": {
+          "type": "integer"
+        },
+        "id": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "integer"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "show_add_to_cart": {
+          "type": "boolean"
+        },
+        "show_price": {
+          "type": "boolean"
+        },
+        "size": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/tamano"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "source": {
+          "additionalProperties": false,
+          "properties": {
+            "all": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "category": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "products": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "type": "object"
+        },
+        "style": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/estilo"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "type": {
+          "const": "product_grid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "source",
+        "limit",
+        "columns",
+        "show_price",
+        "show_add_to_cart"
+      ],
+      "type": "object"
+    },
+    "puntos": {
+      "additionalProperties": false,
+      "properties": {
+        "mobile": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/delta"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tablet": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/delta"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "section": {
+      "additionalProperties": false,
+      "properties": {
+        "anchor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "breakpoints": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/puntos"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "children": {
+          "items": {
+            "$ref": "#/$defs/nodo"
+          },
+          "type": "array"
+        },
+        "full_bleed": {
+          "type": "boolean"
+        },
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "header",
+            "footer",
+            "hero",
+            "features",
+            "gallery",
+            "text",
+            "cta",
+            "contact",
+            "map",
+            "testimonials",
+            "faq",
+            "pricing",
+            "team",
+            "products",
+            "logos",
+            "custom"
+          ],
+          "type": "string"
+        },
+        "layout": {
+          "$ref": "#/$defs/layout"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "style": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/estilo"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "type": {
+          "const": "section",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "kind",
+        "full_bleed",
+        "layout",
+        "children"
+      ],
+      "type": "object"
+    },
+    "table": {
+      "additionalProperties": false,
+      "properties": {
+        "breakpoints": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/puntos"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "caption": {
+          "type": "string"
+        },
+        "header": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rows": {
+          "items": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "size": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/tamano"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "style": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/estilo"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "type": {
+          "const": "table",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "caption",
+        "header",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "tamano": {
+      "additionalProperties": false,
+      "properties": {
+        "aspect_ratio": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "height": {
+          "$ref": "#/$defs/medida"
+        },
+        "max_height": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "max_width": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "min_height": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "min_width": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "width": {
+          "$ref": "#/$defs/medida"
+        }
+      },
+      "required": [
+        "width",
+        "height"
+      ],
+      "type": "object"
+    },
+    "text": {
+      "additionalProperties": false,
+      "properties": {
+        "breakpoints": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/puntos"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "content": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "size": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/tamano"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "style": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/estilo"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tag": {
+          "enum": [
+            "h1",
+            "h2",
+            "h3",
+            "h4",
+            "h5",
+            "h6",
+            "p",
+            "span",
+            "blockquote"
+          ],
+          "type": "string"
+        },
+        "type": {
+          "const": "text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "tag",
+        "content"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Subconjunto estricto del IR de Sytue Web para generación de secciones mediante IA",
+  "properties": {
+    "sections": {
+      "items": {
+        "$ref": "#/$defs/section"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "sections"
+  ],
+  "title": "EsquemaSeccionesIA",
+  "type": "object"
+}

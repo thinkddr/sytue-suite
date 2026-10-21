@@ -1,0 +1,117 @@
+---
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: (c) 2026 Daniel Delgado Ramos
+ *
+ * Términos del servicio — estructura honesta de condiciones (prestador, objeto,
+ * cuentas, datos, contacto) SIN cláusulas contractuales inventadas: solo hechos
+ * que el resto del sitio ya afirma, con aviso visible de «texto en revisión legal».
+ *
+ * El texto es JURÍDICO: sale tal cual del catálogo en los 26 idiomas. Esta
+ * plantilla pone la estructura y los enlaces; no reescribe ni resume nada.
+ */
+import { LOCALES } from '@sytue/i18n';
+import MarketingLayout from '../../layouts/MarketingLayout.astro';
+import { localeFromParam, localeParams, localePath, useT } from '../../i18n';
+
+export const getStaticPaths = localeParams;
+
+const locale = localeFromParam(Astro.params.locale);
+const t = useT(locale);
+
+const SUPPORT_MAIL = 'soporte@sytue.eu';
+const SALES_MAIL = 'ventas@sytue.eu';
+
+// Secciones de solo título + cuerpo, en el orden del texto legal. Las que llevan
+// enlace van escritas aparte para no inventarles una plantilla.
+const opening = ['provider', 'scope', 'accounts', 'use'] as const;
+const middle = ['ip', 'liability'] as const;
+const closing = ['changes', 'law'] as const;
+---
+
+<MarketingLayout
+  locale={locale}
+  path="/terms"
+  title={t('meta.terms.title')}
+  description={t('meta.terms.description')}
+  alternates={LOCALES}
+>
+  <article class="mx-auto max-w-2xl px-6 py-16 md:py-20">
+    <span class="sytue-overline text-primary-text">{t('legal.overline')}</span>
+    <h1 class="sytue-h1 text-text mt-3 text-balance">{t('terms.title')}</h1>
+
+    <p class="text-text-muted mt-3 text-base">{t('legal.updated')}</p>
+
+    <div
+      role="note"
+      class="border-border bg-warning-bg text-warning-text mt-6 rounded-md border px-4 py-3 text-sm leading-relaxed"
+    >
+      <strong>{t('legal.review.title')}</strong> {t('terms.review.body')}
+    </div>
+
+    <div class="text-text mt-8 flex flex-col gap-8 text-base leading-relaxed">
+      {opening.map((key) => (
+        <section>
+          <h2 class="sytue-h3 text-text text-balance">{t(`terms.${key}.title`)}</h2>
+          <p class="text-text-muted mt-2">{t(`terms.${key}.body`)}</p>
+        </section>
+      ))}
+
+      <section>
+        <h2 class="sytue-h3 text-text text-balance">{t('terms.availability.title')}</h2>
+        <p class="text-text-muted mt-2">
+          {t('terms.availability.body1')}{' '}
+          <a
+            href={`mailto:${SUPPORT_MAIL}`}
+            class="text-primary-text font-semibold break-words hover:underline"
+          >
+            {SUPPORT_MAIL}
+          </a>
+          .
+        </p>
+      </section>
+
+      <section>
+        <h2 class="sytue-h3 text-text text-balance">{t('terms.data.title')}</h2>
+        <p class="text-text-muted mt-2">
+          {t('terms.data.body1')}{' '}
+          <a
+            href={localePath(locale, '/privacy')}
+            class="text-primary-text font-semibold hover:underline"
+          >
+            {t('privacy.title')}
+          </a>
+          .
+        </p>
+      </section>
+
+      {middle.map((key) => (
+        <section>
+          <h2 class="sytue-h3 text-text text-balance">{t(`terms.${key}.title`)}</h2>
+          <p class="text-text-muted mt-2">{t(`terms.${key}.body`)}</p>
+        </section>
+      ))}
+
+      <section>
+        <h2 class="sytue-h3 text-text text-balance">{t('terms.contact.title')}</h2>
+        <p class="text-text-muted mt-2">
+          {t('terms.contact.body1')}{' '}
+          <a
+            href={`mailto:${SALES_MAIL}`}
+            class="text-primary-text font-semibold break-words hover:underline"
+          >
+            {SALES_MAIL}
+          </a>
+          .
+        </p>
+      </section>
+
+      {closing.map((key) => (
+        <section>
+          <h2 class="sytue-h3 text-text text-balance">{t(`terms.${key}.title`)}</h2>
+          <p class="text-text-muted mt-2">{t(`terms.${key}.body`)}</p>
+        </section>
+      ))}
+    </div>
+  </article>
+</MarketingLayout>

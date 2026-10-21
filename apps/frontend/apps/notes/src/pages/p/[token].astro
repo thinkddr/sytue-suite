@@ -1,0 +1,80 @@
+---
+/**
+ * /p/{token} — un cuaderno PUBLICADO, en solo lectura y SIN sesión.
+ *
+ * La credencial es el token del enlace, así que aquí no se monta la Sytue Shell
+ * ni se pide identidad: quien abre esto puede no tener cuenta. El servicio Go
+ * sirve el cuaderno y sus notas por `/public/notebooks/{token}` con su propio
+ * tope por IP; una nota marcada privada NO sale, aunque el cuaderno lo sea.
+ *
+ * `noindex` en la página además de en la respuesta del servicio: «cualquiera con
+ * el enlace» no es «cualquiera», y un cuaderno de equipo indexado por Google
+ * sería exactamente lo que nadie pidió al pulsar «publicar».
+ */
+import '../../styles/app.css';
+import { SUFIJO_ICONOS, themeInitScript, withBase } from '@sytue/ui';
+import { htmlLangAttrs } from '@sytue/i18n';
+import { serverEnv } from '@sytue/auth/server';
+import { useT } from '../../i18n/index.js';
+import { PublicNotebook } from '../../components/PublicNotebook.js';
+
+export const prerender = false;
+
+const env = serverEnv(import.meta.env);
+const base = (env.SYTUE_NOTES_BASE_URL ?? 'https://notes.sytue.eu').replace(/\/$/, '');
+const token = Astro.params.token ?? '';
+
+let datos: { notebook: { title: string; emoji?: string; color: string }; notes: unknown[] } | null =
+  null;
+try {
+  const res = await fetch(`${base}/public/notebooks/${encodeURIComponent(token)}`, {
+    headers: { accept: 'application/json' },
+  });
+  if (res.ok) datos = await res.json();
+} catch {
+  // Sin servicio detrás no hay nada que enseñar: se responde 404 igual que si el
+  // enlace no existiera. Distinguirlo diría qué tokens son válidos.
+}
+if (!datos) return new Response(null, { status: 404 });
+
+const { lang, dir } = htmlLangAttrs(Astro.locals.locale);
+const t = useT(Astro.locals.locale);
+
+// Prefijo REAL bajo el que se sirve esta superficie: el del host si el servidor
+// lo publica (SYTUE_BASE_PATH) y, si no, el del build. Los assets del <head> se
+// unen con `withBase` y NO con `${BASE_URL}fichero`: BASE_URL llega SIN barra
+// final (`/mail`) y esa concatenación daba `/mailfavicon.svg`, un 404 medido en
+// producción con el que ninguna app de la suite tenía icono. ID sí lo tenía
+// porque es Go y escribe `/favicon.svg` a mano; por eso el fallo parecía de ID.
+const prefijo = serverEnv(import.meta.env).SYTUE_BASE_PATH ?? import.meta.env.BASE_URL;
+---
+
+<!doctype html>
+<html lang={lang} dir={dir} class="h-full">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>{datos.notebook.title} — Sytue Notepads</title>
+    <link rel="icon" href={withBase(prefijo, '/favicon.ico') + SUFIJO_ICONOS} sizes="32x32" />
+    <link
+      rel="icon"
+      href={withBase(prefijo, '/favicon.svg') + SUFIJO_ICONOS}
+      type="image/svg+xml"
+    />
+    <link
+      rel="apple-touch-icon"
+      href={withBase(prefijo, '/apple-touch-icon.png') + SUFIJO_ICONOS}
+    />
+    <script is:inline set:html={themeInitScript}></script>
+  </head>
+  <body class="bg-bg text-text h-full antialiased">
+    <PublicNotebook
+      client:load
+      locale={Astro.locals.locale}
+      notebook={datos.notebook as never}
+      notes={datos.notes as never}
+    />
+    <p class="sr-only">{t('public.readOnly')}</p>
+  </body>
+</html>

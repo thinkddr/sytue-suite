@@ -1,0 +1,18 @@
+Sešity, do kterých se vejde cokoli: text, soubory, události i celé dokumenty.
+
+• Vnořené sešity na volném plátně, ve sloupcích nebo jako seznam.
+• Poznámky všeho druhu: text, úkoly, odkazy, soubory, události z Calendar, dokumenty z Docs.
+• Rozhodujete, co se dostane do vyhledávání — a co nikdy.
+• Vnořené sešity s ikonou a barvou; tři rozvržení: volné, sloupce a seznam.
+• Dvanáct typů poznámek: text, úkoly, odkazy, barva, obrázek a odkazy na Drive, Docus, Calendar, Rooms a další poznámky.
+• Editor s formátováním (tučné písmo, seznamy, odkazy), který ukládá při odchodu.
+• Štítky, připnutí, duplikování, přesun mezi sešity, seskupování a přetahování na plátně.
+• Viditelnost pro každý sešit: soukromý, osobní, organizace nebo veřejný odkaz.
+• Rozhodujete, které sešity se dostanou do vyhledávání v sadě.
+• Zpětné odkazy: které poznámky odkazují na tuto.
+• Export celého sešitu do HTML, PDF, Markdown a dalších; import kopií.
+• Sdílení poznámky do kanálu Rooms; přetažením nebo vložením vznikají poznámky.
+• Tabulky v editoru a zkratky Markdown při psaní: „- “, „# “, „> “ a „```“.
+• Přesun poznámky do jiného sešitu, export jedné poznámky a řazení sešitu podle potřeby.
+
+Šifrování při přenosu (TLS 1.3). Infrastruktura Sytue je v EU. Umístění externích služeb závisí na jejich poskytovateli.

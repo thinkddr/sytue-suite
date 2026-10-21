@@ -1,0 +1,19 @@
+Kalendar CalDAV povezan s ostatkom paketa.
+
+• Prikazi dana, tjedna i mjeseca.
+• Ponavljajući događaji i podsjetnici.
+• Stvaranje događaja izravno iz e-poruke u Mailu.
+• Radi sa svakim klijentom CalDAV.
+• Prikazi mjeseca, tjedna, dana i rasporeda, s malim kalendarom i gumbom „Danas”.
+• Dnevno, tjedno ili mjesečno ponavljanje sa završetkom; uređivanje samo ovog, ovog i sljedećih ili svih.
+• Podsjetnici po događaju i obavijesti unutar paketa.
+• Pozivnice s odgovorom (dolazim, možda, ne) i praćenjem.
+• „Pronađi termin” slobodan za sve pozvane osobe.
+• Dvorane i resursi za rezervaciju s dostupnošću.
+• Dijeljeni kalendari s dopuštenjima i kalendari podijeljeni s vama.
+• Pretplata na vanjske kalendare (ICS) i više kalendara označenih bojama.
+• Stvaranje događaja iz poruke u Mailu ili iz bilješke.
+• Radi sa svakim klijentom CalDAV: Apple Calendar, Thunderbird i drugi.
+• Dupliciranje događaja ili kopiranje u vaš kalendar te preuzimanje kao .ics za osobe izvan Sytuea.
+
+Šifrirano u prijenosu (TLS 1.3). Infrastruktura Sytuea nalazi se u EU-u. Lokacija vanjskih usluga ovisi o njihovu pružatelju.

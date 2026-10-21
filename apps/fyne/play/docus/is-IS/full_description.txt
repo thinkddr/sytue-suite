@@ -1,0 +1,16 @@
+Samtímis ritvinnsla í rauntíma
+
+• Allt vistað í evrópska Drive-inu þínu.
+• Samtímis ritvinnsla í rauntíma, með viðveru og án þess að rekast hvert á annað.
+• Borði með flipum: Heim, Setja inn, Tilvísanir, Póstsendingar og Yfirferð.
+• Töflur, myndir, form, SmartArt, gröf, tákn og vatnsmerki.
+• Tilvísanir: efnisyfirlit, neðanmálsgreinar, tilvitnanir og heimildaskrá.
+• Póstsendingar: gagnasamruni fyrir bréf og merkimiða.
+• Athugasemdaþræðir, yfirferð breytinga og útgáfur.
+• Valfrjáls gervigreindaraðstoð til að umorða, þýða eða draga saman, aðeins ef fyrirtækið kveikir á henni.
+• Útflutningur í ODT, DOCX og PDF; opnaðu Word-skrár úr Drive.
+• Síðuhausar, síðufætur, blaðsíðutal og endurnýtanlegar einingar.
+• Sjálfvirk vistun í evrópska Drive-inu þínu, með ferli.
+• Niðurhal af forsíðunni sem PDF, HTML, Markdown, OpenDocument eða Microsoft Office.
+
+Dulkóðað í flutningi (TLS 1.3). Innviðir Sytue eru innan ESB. Staðsetning ytri þjónustu fer eftir þjónustuveitanda hennar.

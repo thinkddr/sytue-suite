@@ -1,0 +1,19 @@
+# Build context del monorepo frontend (Astro + Bun). Los node_modules se
+# instalan DENTRO de la imagen (Linux) con `bun install`; nunca se copian los
+# del host (macOS). dist/.astro son artefactos regenerables.
+node_modules
+**/node_modules
+dist
+**/dist
+.astro
+**/.astro
+**/*.tsbuildinfo
+.turbo
+coverage
+**/.DS_Store
+# Instaladores de escritorio: NO se sirven desde el sitio público (ver
+# apps/www/src/pages/[...locale]/downloads.astro — son producto y se bajan con
+# cuenta y suscripción viva; sytue.eu/descargas/*.dmg responde 404). Está
+# gitignorada, así que el CI no la ve, pero un build local metía 85 MB de .dmg
+# caducados en el contexto y en el dist/ de la imagen.
+apps/www/public/descargas

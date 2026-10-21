@@ -1,0 +1,61 @@
+{
+  "id": "mailpit",
+  "name": "Mailpit",
+  "description": "Buzón de pruebas para el correo de tu aplicación: recoge todo lo que envía y lo enseña en una bandeja web, sin que salga ni un mensaje a nadie de verdad.",
+  "category": "devtools",
+  "license": "Apache-2.0",
+  "homepage": "https://mailpit.axllent.org/",
+  "source": "https://github.com/axllent/mailpit",
+  "upstream": "docker.io/axllent/mailpit:v1.29.0",
+  "upstream_digest": "sha256:0f93f36075f5f6fe428655d94299dda59b9a533d3fe9ce62909a72ac6fe455a9",
+  "version": "1.29.0",
+  "ports": [
+    {
+      "name": "http",
+      "port": 8025
+    },
+    {
+      "name": "smtp",
+      "port": 1025
+    }
+  ],
+  "web_port": 8025,
+  "exports": [
+    {
+      "key": "SMTP_HOST",
+      "value": "{host}"
+    },
+    {
+      "key": "SMTP_PORT",
+      "value": "1025"
+    },
+    {
+      "key": "MAILPIT_URL",
+      "value": "http://{host}:{port}"
+    }
+  ],
+  "env": [
+    {
+      "key": "MP_SMTP_BIND_ADDR",
+      "value": "0.0.0.0:1025"
+    },
+    {
+      "key": "MP_UI_BIND_ADDR",
+      "value": "0.0.0.0:8025"
+    },
+    {
+      "key": "MP_DATABASE",
+      "value": "/data/mailpit.db"
+    },
+    {
+      "key": "MP_MAX_MESSAGES",
+      "value": "5000"
+    }
+  ],
+  "disk_gib": 5,
+  "data_path": "/data",
+  "memory_mib": 256,
+  "cpu_milli": 500,
+  "run_as_user": 1000,
+  "health_path": "/readyz"
+}

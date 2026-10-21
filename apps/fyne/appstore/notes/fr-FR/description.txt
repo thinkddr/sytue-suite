@@ -1,0 +1,18 @@
+Des carnets qui gardent tout : texte, fichiers, événements, documents entiers.
+
+• Carnets imbriqués, en toile libre, en colonnes ou en liste.
+• Des notes de tout type : texte, tâches, liens, fichiers, événements d’Agenda, documents Docs.
+• Vous décidez ce qui entre dans la recherche, et ce qui n’y entre jamais.
+• Carnets imbriqués avec icône et couleur ; trois dispositions : libre, colonnes et liste.
+• Douze types de notes : texte, tâches, liens, couleur, image et références vers Drive, Docus, Calendar, Rooms et d’autres notes.
+• Un éditeur avec mise en forme (gras, listes, liens) qui enregistre à la sortie.
+• Étiquettes, épingler, dupliquer, déplacer entre carnets, grouper et glisser sur le canevas.
+• Visibilité par carnet : privé, personnel, organisation ou lien public.
+• Vous décidez quels carnets entrent dans la recherche de la suite.
+• Rétroliens : voyez quelles notes pointent vers celle-ci.
+• Exportez un carnet entier en HTML, PDF, Markdown et plus ; importez des copies.
+• Partagez une note vers un canal Rooms ; déposez ou collez pour créer des notes.
+• Tableaux dans l’éditeur et raccourcis Markdown en écrivant : « - », « # », « > » et « ``` ».
+• Déplacez une note vers un autre carnet, exportez une seule note et triez le carnet à votre guise.
+
+Chiffrement en transit (TLS 1.3). L’infrastructure de Sytue se trouve dans l’UE. La localisation des services externes dépend de leur fournisseur.

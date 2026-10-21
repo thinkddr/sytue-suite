@@ -1,0 +1,18 @@
+Vierentwintig modules en een dubbele boekhouding die de database niet uit balans laat raken.
+
+• Vierentwintig modules en zesendertig modellen: contacten, verkoop, inkoop, voorraad, productie, facturering, boekhouding, projecten en HR.
+• Een module toevoegen betekent een JSON-bestand schrijven: geen migratie, geen nieuwe route en geen werk aan de interface.
+• Bedragen worden in hele centen opgeslagen, nooit als drijvende komma, en de database bewaakt de balans.
+• Geboekte posten zijn onaantastbaar: je corrigeert ze met een nieuwe post, en dat onderscheidt een grootboek van een spreadsheet.
+• Vierentwintig modules en zesendertig modellen in één service en één database.
+• De modelcatalogus is data: elke module legt zijn velden, statussen en lijstkolommen vast.
+• Een nieuwe module is één JSON-bestand — geen DDL, geen migratie en geen tabelvergrendeling.
+• Eén API voor alle zesendertig modellen, en één interface gegenereerd uit de catalogus.
+• Dubbel boekhouden met bedragen in hele centen; geen enkel getal met drijvende komma.
+• De database controleert de balans bij het vastleggen van de transactie, niet de applicatiecode.
+• Afgesloten boekingen zijn onveranderlijk: ze kunnen niet worden bewerkt, verwijderd of met regels uitgebreid.
+• Eén document, één boeking: een nieuwe poging of twee open tabbladen kunnen de omzet niet verdubbelen.
+• Gedeelde labels zijn er in alle 26 talen, en een onvertaald veld verhindert dat de service start.
+• Lijsten op indexen: de eerste pagina van twintigduizend rijen komt in minder dan een milliseconde.
+
+Versleuteld tijdens transport (TLS 1.3). De infrastructuur van Sytue staat in de EU. De locatie van externe diensten hangt af van hun aanbieder.

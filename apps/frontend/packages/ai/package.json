@@ -1,0 +1,25 @@
+{
+  "name": "@sytue/ai",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sytue One — lo que comparten todas las superficies del asistente: el contrato de la petición al BFF y el analizador del Markdown que devuelve el modelo. Sin DOM: cada app decide cómo pinta los bloques que salen de aquí.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./astro": "./src/astro.ts"
+  },
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.lib.json",
+    "typecheck": "tsc -p tsconfig.lib.json --noEmit",
+    "test": "bun test"
+  },
+  "devDependencies": {
+    "@types/bun": "1.4.2",
+    "@types/node": "catalog:",
+    "typescript": "6.0.3"
+  }
+}

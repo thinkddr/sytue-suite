@@ -1,0 +1,52 @@
+{{- if .Values.networkPolicy.enabled }}
+{{- $root := . -}}
+{{- range $app, $cfg := .Values.apps }}
+{{- if $cfg.enabled }}
+{{- $d := $root.Values.defaults }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "sytue-frontend.appFullname" (dict "ctx" $root "app" $app) }}
+  labels:
+    {{- include "sytue-frontend.appLabels" (dict "ctx" $root "app" $app) | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "sytue-frontend.appSelectorLabels" (dict "ctx" $root "app" $app) | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              sytue.eu/role: ingress
+      ports:
+        - protocol: TCP
+          port: {{ $d.port }}
+  egress:
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # BFF llama a Sytue Hub y motores intra-suite.
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/part-of: sytue-one
+    # Sytue ID (token endpoint) y APIs HTTPS.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 169.254.0.0/16
+      ports:
+        - protocol: TCP
+          port: 443
+{{- end }}
+{{- end }}
+{{- end }}

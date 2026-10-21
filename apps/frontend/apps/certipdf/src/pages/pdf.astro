@@ -1,0 +1,14 @@
+---
+/** Sytue CertiPDF — /pdf?path=<ruta en Drive>, el estudio de un PDF (`@sytue/office`, vista `Pdf`). */
+import Pdf from '@sytue/office/vistas/Pdf.astro';
+import { entrar } from '@sytue/office/vistas';
+
+export const prerender = false;
+
+// `pdf` está en `sinOrg` (colisiona con el namespace de organizaciones): con sesión,
+// salto a la forma con la org activa.
+const sesion = await entrar(Astro, { canonica: true });
+if (sesion instanceof Response) return sesion;
+---
+
+<Pdf sesion={sesion} />

@@ -1,0 +1,17 @@
+Ihre Videos und Ihre Livestreams, auf Abruf und in Echtzeit, ohne Europa zu verlassen.
+
+• Ein Video hochladen, und es wird in mehreren Qualitäten für jeden Bildschirm umgewandelt.
+• Live gehen aus einer Sendesoftware, aus dem Browser oder aus der App.
+• Vier Sichtbarkeitsstufen: öffentlich, ungelistet, Organisation oder bestimmte Personen.
+• Live-Chat und Kommentare, mit einfacher Moderation durch die veröffentlichende Person.
+• Videos bis 8 GiB hochladen; das Original bleibt erhalten.
+• Livestreaming aus einer Sendesoftware über RTMP, mit einem Streamschlüssel pro Person.
+• Live aus dem Browser oder der App: Kamera, Bildschirm und Mikrofon.
+• Aufzeichnungen von Livestreams werden automatisch zu Videos auf Abruf.
+• Eine öffentliche Startseite und ein Kanal pro Organisation, indexierbar.
+• Ungelistete Links, Videos nur für die Organisation oder Zugriff für bestimmte Personen per @Benutzername.
+• Live-Chat und Kommentare in Threads, moderiert von der veröffentlichenden Person und der Organisationsverwaltung.
+• Der Speicher zählt zu Ihrem Kontingent in Sytue Drive; alles in der Europäischen Union.
+• „In Cast hochladen“ aus Sytue Drive: Eine Kopie des Videos geht an Cast, die Datei bleibt in Drive.
+
+Verschlüsselt bei der Übertragung (TLS 1.3). Die Infrastruktur von Sytue befindet sich in der EU. Der Standort externer Dienste hängt von ihrem Anbieter ab.

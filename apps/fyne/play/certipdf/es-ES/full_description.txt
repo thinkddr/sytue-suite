@@ -1,0 +1,17 @@
+El PDF, de principio a fin, en tu navegador.
+
+• Resaltar, subrayar, comentar y dibujar sobre el documento.
+• Formularios: rellena campos o crea los tuyos.
+• Combinar, extraer, girar, numerar y poner marcas de agua.
+• Panel de firmas, censura definitiva y documentos protegidos con contraseña.
+• Visor rápido con índice, miniaturas, búsqueda y zoom a página o a anchura.
+• Anotaciones: resaltar, subrayar, tachar, comentar, dibujar, formas, flechas y sellos.
+• Cuadros de texto, medidas y recortes de zona.
+• Formularios: rellena los campos existentes o añade los tuyos.
+• Panel de firmas del documento.
+• Censura definitiva: lo marcado desaparece del fichero, no solo de la vista.
+• Páginas: combinar, extraer, eliminar, girar, numerar (también Bates), encabezados y pies.
+• Marca de agua, fondo y metadatos editables.
+• Documentos protegidos con contraseña y permisos.
+
+Cifrado en tránsito (TLS 1.3). La infraestructura de Sytue está en la UE. Los servicios externos siguen la ubicación de su proveedor.

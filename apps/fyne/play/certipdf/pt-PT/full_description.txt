@@ -1,0 +1,17 @@
+PDF do princípio ao fim, no seu browser.
+
+• Realçar, sublinhar, comentar e desenhar sobre o documento.
+• Formulários: preencher campos ou criar os seus.
+• Juntar, extrair, rodar, numerar e marca de água.
+• Painel de assinaturas, rasura permanente e documentos protegidos por palavra-passe.
+• Visualizador rápido com índice, miniaturas, pesquisa e zoom à página ou à largura.
+• Anotações: realçar, sublinhar, rasurar, comentar, desenhar, formas, setas e carimbos.
+• Caixas de texto, medições e capturas de áreas.
+• Formulários: preencher campos existentes ou adicionar os seus.
+• Painel de assinatura de documentos.
+• Rasura permanente: o que marcar desaparece do ficheiro, não só da vista.
+• Páginas: juntar, extrair, eliminar, rodar, numerar (também Bates), cabeçalhos e rodapés.
+• Marca de água, fundo e metadados editáveis.
+• Documentos e permissões protegidos por palavra-passe.
+
+Cifrado em trânsito (TLS 1.3). A infraestrutura da Sytue está na UE. A localização dos serviços externos depende do respetivo fornecedor.

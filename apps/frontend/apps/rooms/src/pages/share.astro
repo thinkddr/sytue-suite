@@ -1,0 +1,57 @@
+---
+/**
+ * Sytue Rooms — landing «Compartir» por deep-link (intent share-to-chat,
+ * docs/CONVENTIONS.md §11). El Hub compone esta URL desde el origen (p. ej. Drive:
+ * /share?action=share&share_source=drive&share_id=…&text=…); la isla ShareLanding
+ * lee la query, deja elegir canal/DM (solo los del usuario) y publica el recurso.
+ * SSR: el layout exige sesión.
+ */
+import AppLayout from '../layouts/AppLayout.astro';
+import { serverEnv } from '@sytue/auth/server';
+import { canonicaConOrg, returnToCanonico } from '@sytue/config';
+import { EncryptedShareLanding } from '../components/ShareLanding.js';
+import { bff, toBffContext } from '../lib/bff.js';
+import { roomsT } from '../i18n/index.js';
+
+export const prerender = false;
+
+const session = await bff.getSession(toBffContext(Astro));
+if (!session) {
+  // ADR 0056: la entrada org-ful llega reescrita con la marca ?__org=; el returnTo
+  // sale canónico, no en la forma interna, o tras el login la barra se queda con ella.
+  const returnTo = returnToCanonico(Astro.url, bff.basePath);
+  const redireccionLogin = Astro.redirect(
+    `${bff.basePath}/auth/login?returnTo=${encodeURIComponent(returnTo)}`,
+  );
+  redireccionLogin.headers.set('cache-control', 'no-store');
+  return redireccionLogin;
+}
+// Ruta en `sinOrg` (su nombre colisiona con el namespace de organizaciones):
+// con sesión, un salto local a la canónica con la org activa.
+const canonica = canonicaConOrg(Astro.url, bff.basePath, session.user.tenant);
+if (canonica) return Astro.redirect(canonica);
+const hubBaseUrl = serverEnv(import.meta.env).SYTUE_HUB_BASE_URL ?? 'https://hub.sytue.eu';
+const locale = Astro.locals.locale;
+const t = roomsT(locale);
+---
+
+<AppLayout title={t('share.title')}>
+  {/*
+    `client:only` y NO `client:load`: con `client:load` Astro renderiza la isla
+    en el SERVIDOR antes de hidratarla, y ShareLanding lee `window.location.search`
+    en el inicializador de su `useState`. En el servidor no hay `window`, así que
+    reventaba con `ReferenceError` — y como el fallo ocurre con la respuesta ya
+    empezada, el adaptador de Node lo escribía DENTRO de un 200: la página
+    devolvía «Internal server error» con código 200, el navegador se quedaba en
+    `readyState: loading` para siempre y ningún monitor lo veía, porque para todo
+    el mundo era un 200. Esta pantalla no tiene nada que renderizar en servidor:
+    existe para leer la query del deep-link.
+  */}
+  <EncryptedShareLanding
+    slot="app"
+    client:only="preact"
+    user={session.user}
+    hubBaseUrl={hubBaseUrl}
+    locale={locale}
+  />
+</AppLayout>

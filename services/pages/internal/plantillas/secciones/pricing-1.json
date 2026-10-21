@@ -1,0 +1,55 @@
+{
+  "children": [
+    {
+      "content": {
+        "en": [
+          {
+            "text": "Plans and Pricing"
+          }
+        ],
+        "es": [
+          {
+            "text": "Tarifas y planes"
+          }
+        ]
+      },
+      "id": "tex0000001",
+      "tag": "h2",
+      "type": "text"
+    },
+    {
+      "content": {
+        "en": [
+          {
+            "text": "Standard Plan — 49 € / month"
+          }
+        ],
+        "es": [
+          {
+            "text": "Plan Estándar — 49 € / mes"
+          }
+        ]
+      },
+      "id": "tex0000002",
+      "tag": "h3",
+      "type": "text"
+    }
+  ],
+  "full_bleed": false,
+  "id": "sec0000001",
+  "kind": "pricing",
+  "layout": {
+    "direction": "column",
+    "gap": 24,
+    "padding": [
+      32,
+      32,
+      32,
+      32
+    ],
+    "align": "center",
+    "justify": "center",
+    "wrap": false
+  },
+  "type": "section"
+}

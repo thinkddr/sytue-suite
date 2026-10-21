@@ -1,0 +1,53 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Daniel Delgado Ramos
+//
+// LO COMÚN DE LOS QUINCE TARGETS DE Sytue.xcodeproj (Xcode Cloud). Lo propio de cada app
+// —nombre, App ID, derechos— lo escribe generar.py en el proyecto a partir de su
+// FyneApp.toml. Ver «Xcode Cloud» en docs/operations.md.
+
+// UN TARGET POR APP PARA iOS Y macOS: mismo App ID en las dos, así que Xcode Cloud ve
+// UN producto por app, con un flujo que archiva para cada plataforma.
+SDKROOT = auto
+SUPPORTED_PLATFORMS = iphoneos iphonesimulator macosx
+SUPPORTS_MACCATALYST = NO
+SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO
+SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO
+TARGETED_DEVICE_FAMILY = 1,2
+// Los mismos mínimos que empaquetar.sh: iOS 15 (plist_simulador) y macOS 13 (Go 1.27).
+IPHONEOS_DEPLOYMENT_TARGET = 15.0
+MACOSX_DEPLOYMENT_TARGET = 13.0
+
+// Firma automática: la exige Xcode Cloud, que guarda los certificados y crea los perfiles.
+DEVELOPMENT_TEAM = VHC5QW7BZ3
+CODE_SIGN_STYLE = Automatic
+// Lo que pide la Mac App Store; en iOS no tiene efecto.
+ENABLE_HARDENED_RUNTIME = YES
+
+GENERATE_INFOPLIST_FILE = NO
+INFOPLIST_FILE = Info-ios.plist
+INFOPLIST_FILE[sdk=macosx*] = Info-macos.plist
+ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon
+
+// El ejecutable lo pone la fase «Compilar el Go» (empaquetar.sh xcode), que lee todo
+// apps/fyne: fuera del sandbox de guiones. Ni dSYM ni strip: no hay nada que enlace Xcode,
+// y el binario de Go ya sale sin DWARF.
+ENABLE_USER_SCRIPT_SANDBOXING = NO
+ALWAYS_SEARCH_USER_PATHS = NO
+DEBUG_INFORMATION_FORMAT = dwarf
+STRIP_INSTALLED_PRODUCT = NO
+
+// EL INTERRUPTOR ÚNICO DE LOS WIDGETS DE APPLE (WidgetKit en iOS y macOS) y del App Group
+// `group.eu.sytue.suite` que comparten con sus apps. NO: los hosts se firman y empaquetan
+// como antes de los widgets (sin extensión, sin el App Group y sin perfiles Developer ID).
+// YES solo después de los pasos del dueño en Developer Portal: «Activar los widgets de
+// Apple» en docs/operations.md. Lo leen empaquetar.sh (`widgets-apple`), generar.py,
+// widgetkit-apple.py y release-desktop.yml, y viaja con el tag: uno anterior sale apagado.
+// Cambiarlo pide regenerar el proyecto (`python3 generar.py`) en el mismo commit.
+SYTUE_WIDGETS_APPLE = NO
+
+// La versión del tag y el número de build de Xcode Cloud los escribe
+// ci_scripts/ci_post_clone.sh en version.xcconfig (no versionado). Sin él, en un Mac de
+// desarrollo, queda esto.
+MARKETING_VERSION = 0.0.0
+CURRENT_PROJECT_VERSION = 1
+#include? "version.xcconfig"

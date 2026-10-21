@@ -1,0 +1,11 @@
+{
+  "schema": 1,
+  "package": "generated",
+  "entries": [
+    {
+      "name": "Counter",
+      "source": "example/src/pages/index.astro",
+      "output": "native/generated/counter.gen.go"
+    }
+  ]
+}

@@ -1,0 +1,68 @@
+---
+/**
+ * Sytue Docs — /edit?id=<id>. Editor ofimático NATIVO de Sytue Docs para el
+ * documento indicado (BLUEPRINT.md: cabecera + ribbon + lienzo + paneles +
+ * barra de estado). Persistencia y colaboración vía proxies BFF same-origin
+ * (/api/state, /api/ops…) contra el servicio Go propio. Montado a pantalla
+ * completa bajo la Sytue Shell. Implementación clean-room: SIN motores de
+ * terceros.
+ */
+import type { DocKind } from '@sytue/api-clients';
+import type { SytueSession } from '@sytue/auth';
+import AppLayout from '../layouts/AppLayout.astro';
+import { EditorApp } from '../editor/EditorApp';
+import { docsT } from '../i18n';
+import { NOMBRE, productoDeKind } from '../lib/producto';
+import { serverEnv } from '@sytue/auth/server';
+import { volverA } from '@sytue/config';
+
+interface Props {
+  /** La de `entrar(Astro, { canonica: true })`: login y forma canónica ya resueltos. */
+  sesion: SytueSession;
+  documentId: string;
+  /** El tipo del documento, si el servicio lo dijo (`entrarEnDocumento`). */
+  kind: DocKind | null;
+}
+
+const { sesion: session, documentId, kind } = Astro.props;
+
+const volver = volverA(Astro.url.searchParams.get('volver'));
+const locale = Astro.locals.locale;
+const producto = productoDeKind(kind);
+const title = docsT(locale)('page.edit.title').replace('Sytue Docus', NOMBRE[producto]);
+
+// El asistente de IA solo se enseña si hay servicio detrás (services/ai apuntado
+// por SYTUE_AI_URL). Sin él, /api/ai responde 503 y pintar el botón sería
+// prometer algo que no ocurre. La decisión es del SERVIDOR: la URL nunca sale al
+// navegador, solo el booleano.
+const aiEnabled = Boolean(serverEnv(import.meta.env).SYTUE_AI_URL);
+---
+
+<AppLayout title={title} producto={producto}>
+  {/* EL EDITOR TIENE UN SUELO DE ALTO (`min-h-[32rem]`), y por debajo de él es la PÁGINA la
+      que desplaza. Era una caja del alto justo de la pantalla y sin suelo: su cromo —cabecera,
+      pestañas, la banda de herramientas si está abierta, barra de estado— no encoge, así que
+      en una pantalla baja el lienzo se quedaba en nada y lo que no cabía se salía de la caja.
+      Medido: en un móvil apaisado con la banda abierta, el editor de presentaciones se salía
+      78 px (iPhone 12) y el campo de notas quedaba fuera; en la pantalla de tapa de un
+      plegable (360×298), los tres editores, hasta 237 px. Con la hoja de «Marco» recortando
+      era contenido inalcanzable; sin el recorte, el marco se acababa antes que la página.
+
+      32rem (448 px) y no menos: el caso más exigente —presentación en <640 px con la banda
+      abierta: tira de diapositivas, barra, notas y todo el cromo— pide 423. Un móvil en
+      vertical (512 px de caja en el más bajo) y cualquier ventana de escritorio miden más y
+      no cambian; un móvil apaisado sí: el editor ya no se encoge hasta caber y se llega a su
+      barra de estado desplazando la página. */}
+  {/* El main de la shell reserva el inset inferior fuera del editor. Su alto
+      descuenta ese mismo espacio para mantener la barra de estado a la vista. */}
+  <div class="h-[calc(100dvh-var(--spacing-topbar)-var(--sytue-safe-bottom,0px))] min-h-[32rem]">
+    <EditorApp
+      client:only="preact"
+      documentId={documentId}
+      userId={session.user.id}
+      locale={locale}
+      aiEnabled={aiEnabled}
+      volverA={volver}
+    />
+  </div>
+</AppLayout>

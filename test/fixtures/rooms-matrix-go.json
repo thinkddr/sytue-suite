@@ -1,0 +1,56 @@
+{
+  "artificial": true,
+  "attachment": {
+    "ciphertext": "LVmr3BxNvl1NZK2b/B+mEGrXqh3zgNUxcn09VCJBOOft5BKxhzqC1DlR8oK6KJqprdeJlyE=",
+    "descriptor": {
+      "key": {
+        "k": "HDkHbQZVViCga891x_T-Z-9sTDCAHml96by6T0miHDs",
+        "alg": "A256CTR",
+        "ext": true,
+        "kty": "oct",
+        "key_ops": [
+          "encrypt",
+          "decrypt"
+        ]
+      },
+      "iv": "ikCb3JyW8XgAAAAAAAAAAA",
+      "hashes": {
+        "sha256": "aOBJ2kOHi0xeHTsC0VFLH8Y3RN61/EejMgUiWvzzFvU"
+      },
+      "v": "v2",
+      "url": "mxc://matrix.test/uploaded"
+    },
+    "plaintext": "QXJ0aWZpY2lhbCBHbyDihpIgSlMgZW5jcnlwdGVkIGF0dGFjaG1lbnQgwrcgw4HDqfCfmYI="
+  },
+  "events": [
+    {
+      "sender": "@person:matrix.test",
+      "type": "m.room.encrypted",
+      "origin_server_ts": 1792152000000,
+      "event_id": "$event",
+      "room_id": "!room:matrix.test",
+      "content": {
+        "algorithm": "m.megolm.v1.aes-sha2",
+        "sender_key": "PqNx8bmKegW4NoGB2v1+uLaTsBgQiynTREuJ9316Cm0",
+        "device_id": "DEVICE",
+        "session_id": "Zs2+69CDQwNHvYB9SLz59QZNEjcIoNwp1d6CAlGDgME",
+        "ciphertext": "AwgAEqABHeilJFCFjAR0qkWVUgRx5w5iQoFSjaOtzzPrHg1LrUaA29OKy/BxWb6xN1PUpqJE9gsLfiF0vNaDvUe/5VAIDpSRygdNYhmEf3YmGQq7ZERoP9fPc126+4qK7g9sdKYA/oWszvhtR4RH9ogpdtAS1eoLyMTjeENTQIY+wN1UQFwSRU5cwbjy1HXShPZs3lJ/xraJpvsQlQ9wTbmLxbHVgxTQ2GUhZYt7H2XXHdwX6mkJDB4C59RQ+GAsm1ITYSvXeOYj3Bw7k/ZsxsqoFJ1qIPpjbFlj0gBuxnc5ueS9gtDvFdTnaGF9BA"
+      }
+    }
+  ],
+  "generator": "mautrix-go v0.32.0/goolm; ARTIFICIAL TEST DEVICE ONLY",
+  "plaintext": "Artificial Go → JS encrypted message · Áé🙂",
+  "sessions": [
+    {
+      "algorithm": "m.megolm.v1.aes-sha2",
+      "room_id": "!room:matrix.test",
+      "sender_key": "PqNx8bmKegW4NoGB2v1+uLaTsBgQiynTREuJ9316Cm0",
+      "sender_claimed_keys": {
+        "ed25519": "ipSQZKMv/ZiK0HV+HJhlRkKDgmToaHc1W3SPSW8jWjY"
+      },
+      "session_id": "Zs2+69CDQwNHvYB9SLz59QZNEjcIoNwp1d6CAlGDgME",
+      "session_key": "AQAAAAC25e27qfp1lMaC+WGnouIHeCGPI+7MlEpiULyG5pe8Q4V0Kv562b6DlzeSmO48TjVCWS66YLtooKYZQdquQnUu5fV4M5KYQshF2IMWfEjdR+jQ5xc3bVo/gfVDgTD8Ka+k8nF/s6ZOczBzIYfrFMgOvNJNVVnqkchZ0smBPKBZaWbNvuvQg0MDR72AfUi8+fUGTRI3CKDcKdXeggJRg4DB",
+      "forwarding_curve25519_key_chain": []
+    }
+  ]
+}

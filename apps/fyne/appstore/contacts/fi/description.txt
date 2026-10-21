@@ -1,0 +1,18 @@
+CardDAV-yhteystiedot jaettuna koko organisaatiossasi.
+
+• Yhteinen osoitekirja koko organisaatiolle.
+• Tuonti ja vienti vCard-muodossa.
+• Yhdistä kaksoiskappaleet menettämättä tietoja.
+• Toimii minkä tahansa CardDAV-asiakasohjelman kanssa.
+• Osoitekirjat, myös organisaatiosi yhteinen osoitekirja.
+• Täydellinen kortti: puhelinnumerot, sähköpostit, osoitteet, organisaatio, syntymäpäivä, muistiinpanot ja kuva.
+• Tunnisteet ja suosikit ryhmittelyyn ja löytämiseen.
+• Kaksoiskappaleiden tunnistus ja yhdistäminen tietoja menettämättä.
+• vCard- ja CSV-tuonti ja -vienti; yksittäisen yhteystiedon vienti.
+• Joukkotoiminnot ja palautuksen mahdollistava roskakori.
+• Välitön haku ja automaattinen täydennys, kun kirjoitat Mailissa.
+• Toimii minkä tahansa CardDAV-asiakasohjelman kanssa.
+• Tulevat syntymäpäivät osoitekirjastasi, tämän kuun päivät korostettuina.
+• Luo tapaaminen yhteystiedon kanssa tai kopioi yhteystiedon sähköposti poistumatta kortilta.
+
+Salattu siirron aikana (TLS 1.3). Sytuen infrastruktuuri sijaitsee EU:ssa. Ulkoisten palvelujen sijainti riippuu niiden tarjoajasta.

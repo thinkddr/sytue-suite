@@ -1,0 +1,18 @@
+Contacte CardDAV, partajate în toată organizația.
+
+• O agendă comună pentru toată organizația.
+• Import și export în vCard.
+• Îmbinarea duplicatelor fără pierdere de date.
+• Funcționează cu orice client CardDAV.
+• Agende, inclusiv agenda comună a organizației.
+• Fișă completă: telefoane, e-mailuri, adrese, organizație, zi de naștere, notițe și fotografie.
+• Etichete și favorite pentru grupare și găsire.
+• Detectarea și îmbinarea duplicatelor fără pierdere de date.
+• Import și export vCard și CSV; exportul unui singur contact.
+• Acțiuni în masă și coș cu recuperare.
+• Căutare instantanee și completare automată în timp ce scrieți în Mail.
+• Funcționează cu orice client CardDAV.
+• Zile de naștere apropiate din agendă, cu cele din luna curentă evidențiate.
+• Crearea unei întâlniri cu un contact sau copierea adresei de e-mail a contactului fără a părăsi fișa.
+
+Criptare în tranzit (TLS 1.3). Infrastructura Sytue se află în UE. Locația serviciilor externe depinde de furnizorul lor.

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Sytue Hub">
+  <!-- GENERADO por scripts/gen-marks.sh: cambia la paleta o el script, no este fichero. -->
+  <rect width="512" height="512" fill="#c2410c"/>
+  <path d="M512 179V512H179Z" fill="#000000" fill-opacity="0.22"/>
+  <g transform="translate(256 256) scale(10.9) translate(-20 -20)"><g transform="translate(20 20) scale(1.0526) translate(-20.000 -20.000)"><rect x="9.6" y="9.6" width="9" height="9" rx="2.4" fill="#fff"/><rect x="21.4" y="9.6" width="9" height="9" rx="2.4" fill="#fff"/><rect x="9.6" y="21.4" width="9" height="9" rx="2.4" fill="#fff"/><rect x="21.4" y="21.4" width="9" height="9" rx="2.4" fill="#fff"/></g></g>
+</svg>

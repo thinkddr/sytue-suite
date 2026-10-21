@@ -1,0 +1,18 @@
+Numbers that make sense, in a sheet that works with you.
+
+• Formulas, conditional formatting and data validation.
+• Bring in outside data and query it without leaving the sheet.
+• Charts, sparklines, slicers and data tables.
+• Export to ODS and XLSX; open Excel files.
+• Formulas with contextual help and instant recalculation.
+• Conditional formatting, data validation and locale-aware number formats.
+• Charts of several kinds, sparklines and slicers.
+• Data tables with totals and sorting; pivot table.
+• External data: connect a source and query it from the sheet.
+• Solver to find the value that meets a target.
+• Macros to automate repetitive tasks.
+• Real-time collaboration with presence and comments.
+• Filters, slicers and search inside the sheet.
+• Export to ODS, XLSX and PDF; open Excel files from Drive.
+
+Encrypted in transit (TLS 1.3). Sytue’s infrastructure is in the EU. The location of external services depends on their provider.

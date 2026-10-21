@@ -1,0 +1,897 @@
+{{- $root := . -}}
+{{- $domain := include "sytue-frontend.domain" $root -}}
+{{- $orgHost := $root.Values.orgHost | default dict -}}
+{{- $retirar := $orgHost.retirarComodin | default false -}}
+{{/*
+  UN SOLO Ingress comodín para todas las organizaciones, y los hosts por producto
+  a su lado. LAS DOS DIRECCIONES SON VÁLIDAS (decisión del propietario del
+  2026-08-14): `mail.sytue.eu` no se retira, convive con `corporation.sytue.eu/mail`.
+
+  El comodín no es una simplificación, es la única forma que escala: una
+  organización no puede traer consigo un objeto de Kubernetes si el objetivo son
+  cientos de miles, porque el ingreso reconstruye su tabla de rutas en cada
+  cambio. Con `*.<dominio>`, dar de alta un cliente es una fila en la base y un
+  registro DNS que ya existe.
+
+  `*.<dominio>` casa UNA etiqueta, y los hosts exactos —`www`, `id`, `mail`…—
+  ganan al comodín, pero NO porque Traefik lo haga solo: lo hace la prioridad
+  escrita en este Ingress (ver la anotación). Traefik no mira si un host es exacto;
+  ordena por la LONGITUD de la regla, y `Host("*.sytue.eu") && PathPrefix("/account")`
+  es más larga que `Host("id.sytue.eu") && PathPrefix("/")`. Hasta el 2026-09-24
+  eso le daba a la app «Mi cuenta» todo `id.sytue.eu/account/*`: el avatar, el
+  perfil de Apple y los formularios de contraseña, MFA y sesiones de Sytue ID no
+  llegaban al IdP, y las doce apps se servían DENTRO del origen del IdP con su
+  cookie de sesión. Lo vigila `deploy/production/tests/ingress-comodin-test.sh`.
+*/}}
+{{- $orgPaths := list -}}
+{{- $orgRaiz := "" -}}
+{{- $orgRaizSub := "" -}}
+{{- $orgRaizPath := "" -}}
+{{- range $app, $cfg := .Values.apps }}
+{{- if and $cfg.enabled $cfg.path (not $cfg.globalHost) }}
+{{- $orgPaths = append $orgPaths (dict "path" $cfg.path "svc" (include "sytue-frontend.appFullname" (dict "ctx" $root "app" $app))) }}
+{{- if eq $app "portal" }}{{- $orgRaiz = include "sytue-frontend.appFullname" (dict "ctx" $root "app" $app) }}{{- $orgRaizSub = $cfg.subdomain }}{{- $orgRaizPath = $cfg.path }}{{- end }}
+{{- end }}
+{{- end }}
+{{- if and $orgPaths $orgHost.tlsSecret }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ printf "%s-fe-org" $root.Release.Name }}
+  labels:
+    {{- include "sytue-frontend.appLabels" (dict "ctx" $root "app" "org") | nindent 4 }}
+  annotations:
+    cert-manager.io/cluster-issuer: {{ include "sytue-frontend.clusterIssuer" $root | quote }}
+    {{- with $root.Values.defaults.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+    # EL COMODÍN, EL PENÚLTIMO. Por debajo de cualquier regla de un host exacto
+    # —la más corta que se genera mide ~30, y Traefik usa esa longitud como
+    # prioridad— y por encima solo de los `-bff` (1), con los que no comparte
+    # ruta. Así un host exacto se queda con todo lo que reclama, y el comodín solo
+    # sirve lo que nadie más reclamó. Sus rutas no se solapan entre sí, así que
+    # compartir un mismo número no cambia cuál de ellas atiende una petición.
+    traefik.ingress.kubernetes.io/router.priority: "2"
+spec:
+  ingressClassName: {{ $root.Values.defaults.ingress.className }}
+  tls:
+    - hosts:
+        - {{ printf "*.%s" $domain | quote }}
+      secretName: {{ $orgHost.tlsSecret }}
+  rules:
+    - host: {{ printf "*.%s" $domain | quote }}
+      http:
+        paths:
+          {{- range $p := $orgPaths }}
+          - path: {{ $p.path }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $p.svc }}
+                port:
+                  name: http
+          {{- end }}
+          {{/*
+            VALIDACIÓN DE DOMINIO PARA S/MIME. Una CA pública viene a leer un
+            fichero aquí para creerse que `<slug>.<dominio>` es nuestro, y solo
+            entonces emite el certificado con el que el correo firmado se valida
+            SOLO en Gmail, Outlook y Apple Mail. Sin esta ruta, el reto acaba en
+            el 404 del portal y la emisión no pasa de ahí.
+
+            Como prefijo propio: no se solapa con la raíz del portal, que es
+            `Exact`, así que compartir prioridad con ella no le quita nada.
+
+            A SYTUE ID, que es quien guarda el reto: la emisión es por
+            organización y las organizaciones viven ahí.
+          */}}
+          - path: /.well-known/pki-validation
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ printf "%s-id" $root.Release.Name }}
+                port:
+                  name: http
+          {{/*
+            La raíz del host de organización: sin esto `corporation.sytue.eu/` es
+            un 404, porque ninguna app cuelga de `/`. Sirve el PORTAL, que es la
+            entrada de la suite.
+
+            Y el portal por su nombre, no `(first $orgPaths)`. `range` sobre un
+            diccionario en Helm recorre las claves ORDENADAS, así que la primera
+            era `calendar` y la raíz del host de organización servía Calendar —el
+            comentario que había aquí decía «sirve el portal» y llevaba tiempo sin
+            ser verdad—. Medido en producción: `corporate.sytue.eu/` respondía
+            302 a `/calendar/auth/login`, o sea que quien escribía la dirección de
+            su organización aterrizaba en la agenda en vez de en la suite.
+
+            `Exact` y no `Prefix`: así atiende SOLO `/` y no le roba nada a los
+            prefijos de al lado. Y no hace falta redirigir —el portal se construye
+            con `base: /one`, así que su HTML pide los assets a `/one/_astro/…`,
+            que este mismo Ingress ya enruta—.
+
+            El `default` mantiene el comportamiento anterior si alguien despliega
+            sin portal: sigue habiendo raíz, en vez de romper el render.
+          */}}
+          - path: /
+            pathType: Exact
+            backend:
+              service:
+                name: {{ $orgRaiz | default (first $orgPaths).svc }}
+                port:
+                  name: http
+          {{/*
+            Los iconos que se piden A LA RAÍZ DEL HOST sin leer el HTML: Safari
+            cae a `/favicon.ico` cuando no le vale el SVG declarado, y a
+            `/apple-touch-icon.png` para Favoritos y «añadir a inicio». Medido el
+            2026-09-08: 404 los dos, y en Safari solo tenían icono las superficies
+            con `.ico` en la raíz (Sytue ID). Van al portal, que los redirige a
+            los suyos bajo `/one` (src/middleware.ts): no son un backend nuevo,
+            son cuatro rutas exactas más hacia el mismo servicio.
+          */}}
+          {{- range $icono := list "/favicon.ico" "/favicon.svg" "/apple-touch-icon.png" "/apple-touch-icon-precomposed.png" }}
+          - path: {{ $icono }}
+            pathType: Exact
+            backend:
+              service:
+                name: {{ $orgRaiz | default (first $orgPaths).svc }}
+                port:
+                  name: http
+          {{- end }}
+{{- if and $retirar $orgRaizSub }}
+---
+{{/*
+  FASE FINAL DE LA TRANSICIÓN (ADR 0056): LA RAÍZ DEL HOST DE ORGANIZACIÓN,
+  AL PORTAL POR SU HOST DE PRODUCTO. Con `orgHost.retirarComodin` encendido,
+  escribir `<slug>.<dominio>/` ya no sirve la portada en el propio host: 301 a
+  `https://one.<dominio>/one/` —la misma raíz que sirve el comodín hoy, ahora
+  en la canónica—, conservando la query. El destino sale del propio portal
+  (`$orgRaizSub`/`$orgRaizPath`, capturados arriba junto a `$orgRaiz`), no
+  escrito a mano. El 301 y no el 302 del hermano de «Mi cuenta» porque esta
+  fase es la final: la dirección canónica no va a volver a cambiar.
+
+  Este Ingress solo reclama `/` Exact, así que los DEMÁS paths que no son de
+  app —la validación S/MIME y los iconos de arriba— siguen casando con el
+  comodín general y comportándose como siempre. La entrada `/` de ese comodín
+  queda por debajo (prioridad 2) y en la práctica sombreada: se conserva a
+  propósito, para que apagar el flag devuelva el render exacto de antes.
+
+  Prioridad 10, la de todos los 301 del cierre: en la ventana entre el
+  comodín general (2) y las reglas de host exacto. La más corta que se
+  genera hoy es la del ápex (`Host("sytue.eu") && PathPrefix("/")`, 35) y en
+  `id.<dominio>` los routers de «Mi cuenta» y del IdP van en 100 y 200, así
+  que en ningún host de producto gana este redirect al dueño de su raíz.
+*/}}
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ printf "%s-org-raiz-al-producto" $root.Release.Name }}
+  labels:
+    {{- include "sytue-frontend.appLabels" (dict "ctx" $root "app" "org") | nindent 4 }}
+spec:
+  redirectRegex:
+    regex: '^https?://[^/]+/(\?.*)?$'
+    replacement: {{ printf "https://%s.%s%s/${1}" $orgRaizSub $domain $orgRaizPath | quote }}
+    permanent: true
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ printf "%s-fe-org-raiz" $root.Release.Name }}
+  labels:
+    {{- include "sytue-frontend.appLabels" (dict "ctx" $root "app" "org") | nindent 4 }}
+  annotations:
+    traefik.ingress.kubernetes.io/router.middlewares: {{ printf "%s-%s-org-raiz-al-producto@kubernetescrd" $root.Release.Namespace $root.Release.Name | quote }}
+    # La ventana del cierre: ver el comentario del middleware de arriba.
+    traefik.ingress.kubernetes.io/router.priority: "10"
+spec:
+  ingressClassName: {{ $root.Values.defaults.ingress.className }}
+  tls:
+    - hosts:
+        - {{ printf "*.%s" $domain | quote }}
+      secretName: {{ $orgHost.tlsSecret }}
+  rules:
+    - host: {{ printf "*.%s" $domain | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Exact
+            backend:
+              service:
+                name: {{ $orgRaiz | default (first $orgPaths).svc }}
+                port:
+                  name: http
+{{- end }}
+{{- end }}
+{{- range $app, $cfg := .Values.apps }}
+{{- if $cfg.enabled }}
+{{- $d := $root.Values.defaults }}
+{{- $host := printf "%s.%s" $cfg.subdomain $domain }}
+{{- $svc := include "sytue-frontend.appFullname" (dict "ctx" $root "app" $app) }}
+{{- $hosts := list $host }}
+{{- range $eh := ($cfg.extraHosts | default list) }}
+  {{- if eq $eh "@" }}
+    {{- $hosts = append $hosts $domain }}
+  {{- else }}
+    {{- $hosts = append $hosts (printf "%s.%s" $eh $domain) }}
+  {{- end }}
+{{- end }}
+{{/*
+  EL HOST ANTERIOR DE UNA APP QUE CAMBIÓ DE DIRECCIÓN (`hostAnterior`; hoy solo
+  Sytue Web, que fue `pages.<dominio>`). Dos estados y un interruptor:
+
+  · `redirigirHostAnterior: false` (por defecto): el host anterior SIRVE la app,
+    como un host más de sus tres Ingress. Es lo que permite desplegar el cambio
+    de dirección sin que nadie se quede fuera.
+  · `true`: deja de servirla y responde 302 al host nuevo (bloque
+    `-host-anterior`, al final de la app).
+
+  El certificado NO depende del interruptor: `$tlsHosts` lleva siempre los dos
+  nombres. El secreto TLS se comparte con el Ingress del servicio Go del mismo
+  host, que sigue publicando sus rutas en el anterior, y cert-manager crea UN
+  Certificate por secreto con los nombres del Ingress que llegó primero: dos
+  Ingress con el mismo secreto y listas distintas dejan fuera un nombre según
+  el orden en que se apliquen.
+*/}}
+{{- $anterior := "" }}
+{{- with $cfg.hostAnterior }}{{- $anterior = printf "%s.%s" . $domain }}{{- end }}
+{{- $redirigeAnterior := and $anterior $cfg.redirigirHostAnterior }}
+{{- $tlsHosts := $hosts }}
+{{- if $anterior }}
+  {{- $tlsHosts = append $hosts $anterior }}
+  {{- if not $redirigeAnterior }}{{- $hosts = $tlsHosts }}{{- end }}
+{{- end }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $svc }}
+  labels:
+    {{- include "sytue-frontend.appLabels" (dict "ctx" $root "app" $app) | nindent 4 }}
+  annotations:
+    cert-manager.io/cluster-issuer: {{ include "sytue-frontend.clusterIssuer" $root | quote }}
+    {{- with $d.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- if $cfg.allowedSourceIPs }}
+    traefik.ingress.kubernetes.io/router.middlewares: {{ printf "%s-%s-ip-allowlist@kubernetescrd" $root.Release.Namespace $svc }}
+    {{- end }}
+spec:
+  ingressClassName: {{ $d.ingress.className }}
+  tls:
+    - hosts:
+        {{- range $h := $tlsHosts }}
+        - {{ $h | quote }}
+        {{- end }}
+      secretName: {{ $cfg.tlsSecret }}
+  rules:
+    {{- range $h := $hosts }}
+    - host: {{ $h | quote }}
+      http:
+        paths:
+          {{/*
+            Con `path`, el host propio sirve el MISMO prefijo que el comodín y su
+            raíz redirige. No es una preferencia: el `base` de Astro se hornea al
+            construir y decide la URL de los assets del HTML, así que una imagen
+            con `base: '/mail'` pide `/mail/_astro/…` y en `/` no hay nada que
+            servirle. Un `stripPrefix` tampoco lo salva —el documento llegaría,
+            pero los assets los pide el navegador por la URL ya escrita—.
+
+            Sin `path` (www, platform) se sigue sirviendo en la raíz, como siempre.
+          */}}
+          - path: {{ $cfg.path | default "/" }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $svc }}
+                port:
+                  name: http
+    {{- end }}
+{{- if $cfg.allowedSourceIPs }}
+---
+{{/*
+  Superficie restringida por IP de origen.
+
+  Funciona porque el balanceador habla PROXY protocol v2 con Traefik
+  (`scw-loadbalancer-proxy-protocol-v2`) y Traefik confía en la red privada
+  (`proxyProtocol.trustedIPs`), así que lo que se compara aquí es la dirección
+  REAL del cliente y no la del balanceador. Sin esas dos piezas esta lista
+  filtraría a todo el mundo o a nadie, y en los dos casos parecería aplicada.
+
+  Sin `ipStrategy` a propósito: se mira el origen de la conexión, no un
+  `X-Forwarded-For` que cualquiera puede escribir.
+*/}}
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ $svc }}-ip-allowlist
+  labels:
+    {{- include "sytue-frontend.appLabels" (dict "ctx" $root "app" $app) | nindent 4 }}
+spec:
+  ipAllowList:
+    sourceRange:
+      {{- range $cidr := $cfg.allowedSourceIPs }}
+      - {{ $cidr | quote }}
+      {{- end }}
+{{- end }}
+{{- $portada := $cfg.path | default $cfg.homePath }}
+{{- if $portada }}
+---
+{{/*
+  El 301 de la raíz del host propio a su portada. Preserva la query, que es lo
+  que distingue una redirección útil de una que pierde el `?returnTo=` y deja al
+  usuario en la portada tras autenticarse.
+
+  Traefik compara el regex con la URL ENTERA, query incluida: con `/?$` a secas,
+  `rooms.sytue.eu/?rooms=X` no casaba, llegaba a la app sin el prefijo y el login
+  volvía a `corporate.sytue.eu/?rooms=X`, el Hub (medido el 2026-09-25).
+*/}}
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ $svc }}-raiz-al-prefijo
+  labels:
+    {{- include "sytue-frontend.appLabels" (dict "ctx" $root "app" $app) | nindent 4 }}
+spec:
+  redirectRegex:
+    regex: {{ printf "^https?://([^/]+)/?(\\?.*)?$" | quote }}
+    replacement: {{ printf "https://${1}%s${2}" $portada | quote }}
+    permanent: true
+{{- if $cfg.path }}
+---
+{{/*
+  LOS ICONOS DE LA RAÍZ DEL HOST, AL PREFIJO DE SU APP.
+
+  Safari pide `/favicon.ico` a pelo, sin leer el HTML, y lo cachea con ganas. En
+  un host con prefijo esa ruta no casaba con nada: ni con `<path>/…` ni con el
+  `/` exacto de aquí al lado. Caía al comodín `*.<dominio>`, cuya raíz sirve el
+  PORTAL, así que las diez superficies devolvían el icono del portal.
+
+  Medido contra producción el 2026-09-09:
+
+      https://mail.sytue.eu/mail/favicon.ico   -> el de Mail        (correcto)
+      https://mail.sytue.eu/favicon.ico        -> el del PORTAL     (mal)
+
+  Y lo mismo en drive, rooms, notes, photos y contacts: las seis servían el mismo
+  fichero, byte a byte el del portal. El HTML sí declara el icono bueno, por eso
+  la pestaña acierta a veces y la barra de título no: dependía de cuál de los dos
+  hubiera pedido el navegador primero, y de lo que tuviera cacheado.
+
+  Un 301 y no un `stripPrefix` porque el fichero existe con su ruta real: lo que
+  falta es decirle al navegador dónde. Los cuatro nombres son los que declaran
+  los layouts —ico, svg, el PNG de 64 y el apple-touch-icon—; el resto de assets
+  ya los pide el HTML con el prefijo horneado por Astro.
+*/}}
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ $svc }}-iconos-al-prefijo
+  labels:
+    {{- include "sytue-frontend.appLabels" (dict "ctx" $root "app" $app) | nindent 4 }}
+spec:
+  redirectRegex:
+    regex: {{ printf "^https?://([^/]+)/(favicon\\.ico|favicon\\.svg|favicon-64\\.png|apple-touch-icon\\.png)$" | quote }}
+    replacement: {{ printf "https://${1}%s/${2}" $cfg.path | quote }}
+    permanent: true
+{{- end }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $svc }}-raiz
+  labels:
+    {{- include "sytue-frontend.appLabels" (dict "ctx" $root "app" $app) | nindent 4 }}
+  annotations:
+    {{/*
+      El allowlist va DELANTE del 301: si no, la redirección se sirve a cualquiera
+      y el filtro solo actuaría en el segundo salto. Una sola clave con los dos
+      encadenados, porque dos annotations con el mismo nombre se pisan en silencio.
+    */}}
+    traefik.ingress.kubernetes.io/router.middlewares: {{ if $cfg.allowedSourceIPs }}{{ printf "%s-%s-ip-allowlist@kubernetescrd," $root.Release.Namespace $svc }}{{ end }}{{ printf "%s-%s-raiz-al-prefijo@kubernetescrd" $root.Release.Namespace $svc }}{{ if $cfg.path }}{{ printf ",%s-%s-iconos-al-prefijo@kubernetescrd" $root.Release.Namespace $svc }}{{ end }}
+    # PRIORIDAD EXPLÍCITA, y no es decorativa. Traefik ordena los routers por la
+    # LONGITUD de su regla, así que `PathPrefix(/)` —el del Ingress principal de
+    # una superficie que se sirve en la raíz— gana a este `Path(/)` por ser una
+    # cadena más larga, y el 301 no se aplica nunca. En los hosts con prefijo no
+    # se notaba porque su Ingress principal atiende `/admin`, no `/`.
+    traefik.ingress.kubernetes.io/router.priority: "1000"
+spec:
+  ingressClassName: {{ $d.ingress.className }}
+  tls:
+    - hosts:
+        {{- range $h := $tlsHosts }}
+        - {{ $h | quote }}
+        {{- end }}
+      secretName: {{ $cfg.tlsSecret }}
+  rules:
+    {{- range $h := $hosts }}
+    - host: {{ $h | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Exact
+            backend:
+              service:
+                name: {{ $svc }}
+                port:
+                  name: http
+          {{- if $cfg.path }}
+          {{/* Los cuatro iconos que el navegador pide en la raíz sin leer el HTML.
+               Van en ESTE Ingress y no en otro nuevo porque es el que ya lleva la
+               prioridad 1000: sin ella `PathPrefix(/)` del comodín gana por regla
+               más larga y el 301 no llegaría a aplicarse nunca. */}}
+          {{- range $icono := list "/favicon.ico" "/favicon.svg" "/favicon-64.png" "/apple-touch-icon.png" }}
+          - path: {{ $icono }}
+            pathType: Exact
+            backend:
+              service:
+                name: {{ $svc }}
+                port:
+                  name: http
+          {{- end }}
+          {{- end }}
+    {{- end }}
+---
+{{/*
+  EL BFF EN LA RAÍZ DEL HOST. Sin esto no se puede iniciar sesión en NINGUNA app,
+  y así estuvo producción: `/auth/login` no casaba con ninguna regla —los dos
+  Ingress de arriba atienden `<path>/…` y `/` a secas— así que Traefik devolvía su
+  propio 404 («404 page not found», 19 bytes en texto plano) a todo el que
+  intentara entrar. El síntoma engaña: los pods están sanos, `/healthz` en 200 y
+  la portada responde; lo que no funciona es exactamente el paso siguiente.
+
+  El desajuste nace de que las páginas se sirven bajo el `base` de Astro
+  (`/docs/auth/login`) y el BFF emite sus rutas en absoluto (`/auth/login`), en
+  el cliente y en el servidor: sesión, refresco, token, logout y callback, no
+  solo el login. Se arregla AQUÍ y no en las veinte llamadas del código porque es
+  un solo objeto por app en vez de nueve imágenes que reconstruir, y porque desde
+  fuera `docs.sytue.eu/auth/login` es la dirección natural: la que ya está escrita
+  en los clientes OAuth de Sytue ID.
+
+  `addPrefix` y no `replacePathRegex`: el prefijo es constante por host —cada host
+  sirve UNA app— así que no hay nada que capturar. Las cookies de sesión van con
+  `path: /`, de modo que valen igual por esta puerta que por la del prefijo.
+
+  Y `/api` con el mismo problema, que resultó ser MUCHO más grande que el login:
+  cada app tiene decenas de endpoints propios en `src/pages/api/` —docs 22, drive
+  33, mail 31— y el navegador los pide en absoluto (`fetch('/api/create')`). Sin
+  esta regla, NINGUNA app podía hablar con su propio BFF: crear un documento,
+  listar ficheros, abrir el buzón. Medido: `docs.sytue.eu/api/create` daba 404 y
+  `docs.sytue.eu/docs/api/create` un 405 —o sea que el endpoint existe y solo
+  faltaba llegar a él—.
+
+  `/api/v1` NO se lo lleva esta regla aunque empiece igual: los backends de Go lo
+  declaran en su propio Ingress y, entre dos reglas que casan, gana la más
+  específica —`/api/v1` es más larga que `/api`—. Ningún backend sirve rutas
+  `/api/…` fuera de `v1`, así que el reparto es limpio.
+*/}}
+{{- if $cfg.path }}
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ $svc }}-bff-al-prefijo
+  labels:
+    {{- include "sytue-frontend.appLabels" (dict "ctx" $root "app" $app) | nindent 4 }}
+spec:
+  addPrefix:
+    prefix: {{ $cfg.path | quote }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $svc }}-bff
+  labels:
+    {{- include "sytue-frontend.appLabels" (dict "ctx" $root "app" $app) | nindent 4 }}
+  annotations:
+    traefik.ingress.kubernetes.io/router.middlewares: {{ printf "%s-%s-bff-al-prefijo@kubernetescrd" $root.Release.Namespace $svc | quote }}
+    # LA ÚLTIMA EN EVALUARSE, a propósito. Por defecto Traefik ordena por longitud
+    # de la regla, así que `/api/v1` (los backends de Go) y `/api/bot` (Rooms) ya
+    # ganarían a `/api`. Pero eso es una propiedad emergente, y si algún día deja
+    # de cumplirse el fallo sería del peor tipo: TODAS las llamadas al backend
+    # entrarían en el frontend, que las serviría con un 404 en vez de con un error
+    # que se note. Con la prioridad más baja escrita, este Ingress solo atiende lo
+    # que no reclamó nadie, que es exactamente su papel.
+    traefik.ingress.kubernetes.io/router.priority: "1"
+spec:
+  ingressClassName: {{ $d.ingress.className }}
+  tls:
+    - hosts:
+        {{- range $h := $tlsHosts }}
+        - {{ $h | quote }}
+        {{- end }}
+      secretName: {{ $cfg.tlsSecret }}
+  rules:
+    {{- range $h := $hosts }}
+    - host: {{ $h | quote }}
+      http:
+        paths:
+          - path: /auth
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $svc }}
+                port:
+                  name: http
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $svc }}
+                port:
+                  name: http
+          {{- if $cfg.enlacesApp }}
+          {{/*
+            APP LINKS Y UNIVERSAL LINKS. Android e iOS piden estos dos ficheros a la
+            RAÍZ del host, sin seguir redirecciones, para creerse que la app nativa es
+            dueña de sus enlaces (los de reunión de Rooms, `?rooms=<id>`). Sin estas
+            rutas caían al portal por el comodín y el enlace no abría nunca la app.
+            Por esta puerta porque es la que ya lleva el `addPrefix` al `base` de Astro.
+          */}}
+          {{- range $f := list "/.well-known/assetlinks.json" "/.well-known/apple-app-site-association" }}
+          - path: {{ $f }}
+            pathType: Exact
+            backend:
+              service:
+                name: {{ $svc }}
+                port:
+                  name: http
+          {{- end }}
+          {{- end }}
+    {{- end }}
+{{- end }}
+{{- end }}
+{{- if and $cfg.globalHost $cfg.path }}
+{{- $global := printf "%s.%s" $cfg.globalHost $domain }}
+---
+{{/*
+  LA DIRECCIÓN GLOBAL DE UNA APP QUE ES DE LA PERSONA (Mi cuenta en
+  `id.<dominio>/account`). Prioridad 100: por encima del `/` del servicio dueño
+  del host (Sytue ID, 38 por longitud) y por debajo de sus rutas exactas (200, en
+  el chart de `id`). Sin cert-manager: el certificado es del Ingress de ese host.
+*/}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $svc }}-global
+  labels:
+    {{- include "sytue-frontend.appLabels" (dict "ctx" $root "app" $app) | nindent 4 }}
+  annotations:
+    traefik.ingress.kubernetes.io/router.priority: "100"
+spec:
+  ingressClassName: {{ $d.ingress.className }}
+  tls:
+    - hosts:
+        - {{ $global | quote }}
+      secretName: {{ $cfg.globalTlsSecret }}
+  rules:
+    - host: {{ $global | quote }}
+      http:
+        paths:
+          - path: {{ $cfg.path }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $svc }}
+                port:
+                  name: http
+{{- if $orgHost.tlsSecret }}
+---
+{{/*
+  Y EN EL HOST DE ORGANIZACIÓN, SOLO UN ALIAS. `<slug>.<dominio>/account` lleva a
+  la dirección global conservando ruta y query; nunca al revés. 302 y no 301: una
+  redirección permanente se queda en la caché del navegador si algún día cambia.
+*/}}
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ $svc }}-al-host-global
+  labels:
+    {{- include "sytue-frontend.appLabels" (dict "ctx" $root "app" $app) | nindent 4 }}
+spec:
+  redirectRegex:
+    regex: '^https?://[^/]+(/.*)$'
+    replacement: {{ printf "https://%s${1}" $global | quote }}
+    permanent: false
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $svc }}-org-al-global
+  labels:
+    {{- include "sytue-frontend.appLabels" (dict "ctx" $root "app" $app) | nindent 4 }}
+  annotations:
+    traefik.ingress.kubernetes.io/router.middlewares: {{ printf "%s-%s-al-host-global@kubernetescrd" $root.Release.Namespace $svc | quote }}
+    # La misma que el resto del comodín: por debajo de cualquier host exacto.
+    traefik.ingress.kubernetes.io/router.priority: "2"
+spec:
+  ingressClassName: {{ $d.ingress.className }}
+  tls:
+    - hosts:
+        - {{ printf "*.%s" $domain | quote }}
+      secretName: {{ $orgHost.tlsSecret }}
+  rules:
+    - host: {{ printf "*.%s" $domain | quote }}
+      http:
+        paths:
+          - path: {{ $cfg.path }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $svc }}
+                port:
+                  name: http
+{{- end }}
+{{- end }}
+{{- if and $cfg.path (not $cfg.globalHost) $retirar }}
+---
+{{/*
+  CIERRE DE LA TRANSICIÓN (ADR 0056): EL COMODÍN DEJA DE SERVIR ESTA APP,
+  REDIRIGE. Mismo patrón que el hermano de arriba (`-al-host-global` +
+  `-org-al-global` de «Mi cuenta»), ampliado a los doce productos con
+  prefijo: un Middleware redirectRegex y UN Ingress por app en el comodín,
+  y no una cadena de middlewares sobre un router único, para que el mapa
+  path→redirect sea explícito router a router y poder quitar cada app por
+  separado el día que se retire el comodín.
+
+  El regex NO ancla el prefijo, a propósito, y es la decisión del fichero:
+  el Ingress ya filtra por `PathPrefix`, así que toda petición que llega al
+  middleware ES de esta app y el 301 conserva path y query tal cual
+  (`(/.*)$` se come también el `?`, que Traefik compara contra la URL
+  ENTERA — ver `-raiz-al-prefijo`). Anclar el prefijo en el regex —la
+  alternativa considerada— dejaría fuera `<slug>.<dominio>/mail?query`,
+  que seguiría sirviéndose en el host de organización cuando ya no debe.
+
+  `permanent: true` (301) y no el 302 del hermano: esa dirección es de
+  transición, esta es la fase final y la canónica no va a volver a cambiar.
+
+  La prioridad 10 vive en la ventana entre el comodín general (2) y las
+  reglas de host exacto —la más corta que se genera hoy es la del ápex
+  (`Host("sytue.eu") && PathPrefix("/")`, 35), y en `id.<dominio>` los
+  routers de «Mi cuenta» y del IdP van en 100 y 200—. Así, sobre el host de
+  producto gana el Ingress exacto de la app y el 301 no se aplica nunca, y
+  sobre el host de organización gana este router y el prefijo deja de
+  servirse. Sin el número escrito, la comparación sería por LONGITUD de
+  regla y `Host("*.sytue.eu") && PathPrefix("/mail")` competiría de tú a tú
+  con las exactas: prioridad explícita, como el resto del fichero.
+*/}}
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ $svc }}-al-host-producto
+  labels:
+    {{- include "sytue-frontend.appLabels" (dict "ctx" $root "app" $app) | nindent 4 }}
+spec:
+  redirectRegex:
+    regex: '^https?://[^/]+(/.*)$'
+    replacement: {{ printf "https://%s.%s${1}" $cfg.subdomain $domain | quote }}
+    permanent: true
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $svc }}-org-al-producto
+  labels:
+    {{- include "sytue-frontend.appLabels" (dict "ctx" $root "app" $app) | nindent 4 }}
+  annotations:
+    traefik.ingress.kubernetes.io/router.middlewares: {{ printf "%s-%s-al-host-producto@kubernetescrd" $root.Release.Namespace $svc | quote }}
+    # La ventana del cierre: ver el comentario del middleware de arriba.
+    traefik.ingress.kubernetes.io/router.priority: "10"
+spec:
+  ingressClassName: {{ $d.ingress.className }}
+  tls:
+    - hosts:
+        - {{ printf "*.%s" $domain | quote }}
+      secretName: {{ $orgHost.tlsSecret }}
+  rules:
+    - host: {{ printf "*.%s" $domain | quote }}
+      http:
+        paths:
+          - path: {{ $cfg.path }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $svc }}
+                port:
+                  name: http
+{{- end }}
+{{- if and $cfg.path $cfg.pathAnterior }}
+---
+{{/*
+  EL PREFIJO ANTERIOR DE UNA APP QUE CAMBIÓ DE DIRECCIÓN (`pathAnterior`; hoy
+  solo Sytue Web, que se sirvió bajo `/pages`). El `base` de Astro se hornea al
+  construir: una imagen responde bajo UN prefijo, así que el anterior no puede
+  «seguir sirviendo» — o redirige o es un 404. Redirige, y sin interruptor: el
+  destino es el MISMO host, que ya resuelve, con el prefijo nuevo.
+
+  302 y no 301, por la vuelta atrás: la release anterior sirve bajo el prefijo
+  viejo, y un 301 en la caché de un navegador mandaría a quien lo tenga a un
+  prefijo que esa release no conoce.
+
+  El regex SÍ ancla el prefijo, al revés que `-al-host-producto`: aquí hay que
+  cambiar ese segmento y conservar lo que sigue. `(/.*|\?.*)?$` cubre el prefijo
+  a secas, con ruta y con query pegada (Traefik compara contra la URL ENTERA).
+  Un `/pagesalgo` no casa, y no debe: no es de esta app.
+
+  Dos Ingress porque son dos certificados: el de los hosts de producto (sin
+  prioridad escrita: en ellos nadie más reclama el prefijo anterior) y el del
+  comodín de organización (prioridad 2, la del resto del comodín).
+*/}}
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ $svc }}-prefijo-anterior
+  labels:
+    {{- include "sytue-frontend.appLabels" (dict "ctx" $root "app" $app) | nindent 4 }}
+spec:
+  redirectRegex:
+    regex: {{ printf "^https?://([^/]+)%s(/.*|\\?.*)?$" $cfg.pathAnterior | quote }}
+    replacement: {{ printf "https://${1}%s${2}" $cfg.path | quote }}
+    permanent: false
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $svc }}-prefijo-anterior
+  labels:
+    {{- include "sytue-frontend.appLabels" (dict "ctx" $root "app" $app) | nindent 4 }}
+  annotations:
+    traefik.ingress.kubernetes.io/router.middlewares: {{ printf "%s-%s-prefijo-anterior@kubernetescrd" $root.Release.Namespace $svc | quote }}
+spec:
+  ingressClassName: {{ $d.ingress.className }}
+  tls:
+    - hosts:
+        {{- range $h := $tlsHosts }}
+        - {{ $h | quote }}
+        {{- end }}
+      secretName: {{ $cfg.tlsSecret }}
+  rules:
+    {{- range $h := $hosts }}
+    - host: {{ $h | quote }}
+      http:
+        paths:
+          - path: {{ $cfg.pathAnterior }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $svc }}
+                port:
+                  name: http
+    {{- end }}
+{{- if $orgHost.tlsSecret }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $svc }}-org-prefijo-anterior
+  labels:
+    {{- include "sytue-frontend.appLabels" (dict "ctx" $root "app" $app) | nindent 4 }}
+  annotations:
+    traefik.ingress.kubernetes.io/router.middlewares: {{ printf "%s-%s-prefijo-anterior@kubernetescrd" $root.Release.Namespace $svc | quote }}
+    # La misma que el resto del comodín: por debajo de cualquier host exacto.
+    traefik.ingress.kubernetes.io/router.priority: "2"
+spec:
+  ingressClassName: {{ $d.ingress.className }}
+  tls:
+    - hosts:
+        - {{ printf "*.%s" $domain | quote }}
+      secretName: {{ $orgHost.tlsSecret }}
+  rules:
+    - host: {{ printf "*.%s" $domain | quote }}
+      http:
+        paths:
+          - path: {{ $cfg.pathAnterior }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $svc }}
+                port:
+                  name: http
+{{- end }}
+{{- end }}
+{{- if $redirigeAnterior }}
+---
+{{/*
+  EL HOST ANTERIOR, YA SOLO REDIRECCIÓN (`redirigirHostAnterior: true`).
+
+  302 y no 301, como el alias de «Mi cuenta»: una redirección permanente se
+  queda en la caché del navegador, y apagar el interruptor tiene que devolver el
+  host anterior a servir la app sin que nadie se quede enganchado al salto.
+
+  Sin prioridad escrita, a propósito: la regla es
+  `Host("<anterior>") && PathPrefix("/")`, más corta que cualquier otra de host
+  exacto, así que el servicio Go que comparte este host se queda con sus rutas
+  (`/webhooks`, `/_borde`) y esta solo atiende lo que servía el frontend. Y gana
+  al comodín de organización, que va con prioridad 2.
+
+  Sin anotación de cert-manager: el certificado lo piden los Ingress de arriba,
+  que ya llevan los dos nombres.
+*/}}
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ $svc }}-host-anterior
+  labels:
+    {{- include "sytue-frontend.appLabels" (dict "ctx" $root "app" $app) | nindent 4 }}
+spec:
+  redirectRegex:
+    regex: '^https?://[^/]+/(.*)'
+    replacement: {{ printf "https://%s/${1}" $host | quote }}
+    permanent: false
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $svc }}-host-anterior
+  labels:
+    {{- include "sytue-frontend.appLabels" (dict "ctx" $root "app" $app) | nindent 4 }}
+  annotations:
+    traefik.ingress.kubernetes.io/router.middlewares: {{ printf "%s-%s-host-anterior@kubernetescrd" $root.Release.Namespace $svc | quote }}
+spec:
+  ingressClassName: {{ $d.ingress.className }}
+  tls:
+    - hosts:
+        {{- range $h := $tlsHosts }}
+        - {{ $h | quote }}
+        {{- end }}
+      secretName: {{ $cfg.tlsSecret }}
+  rules:
+    - host: {{ $anterior | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $svc }}
+                port:
+                  name: http
+{{- end }}
+{{- $legacyHosts := $cfg.legacyHosts | default list }}
+{{- if gt (len $legacyHosts) 0 }}
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ $svc }}-legacy-redirect
+  labels:
+    {{- include "sytue-frontend.appLabels" (dict "ctx" $root "app" $app) | nindent 4 }}
+spec:
+  redirectRegex:
+    # El Ingress limita este middleware a legacyHosts; el regex puede centrarse
+    # en conservar exactamente path+query sin duplicar la lista de hosts.
+    regex: '^https?://[^/]+/(.*)'
+    replacement: {{ printf "https://%s/${1}" $host | quote }}
+    permanent: true
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $svc }}-legacy
+  labels:
+    {{- include "sytue-frontend.appLabels" (dict "ctx" $root "app" $app) | nindent 4 }}
+  annotations:
+    cert-manager.io/cluster-issuer: {{ include "sytue-frontend.clusterIssuer" $root | quote }}
+    traefik.ingress.kubernetes.io/router.middlewares: {{ printf "%s-%s-legacy-redirect@kubernetescrd" $root.Release.Namespace $svc | quote }}
+spec:
+  ingressClassName: {{ $d.ingress.className }}
+  tls:
+    - hosts:
+        {{- range $legacy := $legacyHosts }}
+        - {{ printf "%s.%s" $legacy $domain | quote }}
+        {{- end }}
+      secretName: {{ $cfg.legacyTlsSecret | quote }}
+  rules:
+    {{- range $legacy := $legacyHosts }}
+    - host: {{ printf "%s.%s" $legacy $domain | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $svc }}
+                port:
+                  name: http
+    {{- end }}
+{{- end }}
+{{- end }}
+{{- end }}

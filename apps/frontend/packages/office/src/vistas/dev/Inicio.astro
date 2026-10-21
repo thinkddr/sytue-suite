@@ -1,0 +1,29 @@
+---
+/** Inicio real de Docus/Calcus/Diapos bajo la Shell; la prueba intercepta las API. */
+import { APP_VIEWPORT } from '@sytue/config';
+import { themeInitScript } from '@sytue/ui';
+import '../../styles/global.css';
+import { InicioDemo } from '../../editor/dev/InicioDemo';
+import { productoDeKind } from '../../lib/producto';
+
+const q = Astro.url.searchParams;
+const kind = ['spreadsheet', 'presentation'].includes(q.get('kind') ?? '')
+  ? (q.get('kind') as 'spreadsheet' | 'presentation')
+  : 'document';
+const lang = ['en', 'de', 'fr'].includes(q.get('lang') ?? '')
+  ? (q.get('lang') as 'en' | 'de' | 'fr')
+  : 'es';
+---
+
+<!doctype html>
+<html lang={lang} class="h-full" data-app={productoDeKind(kind)}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content={APP_VIEWPORT} />
+    <title>Inicio de Office (banco de pruebas)</title>
+    <script is:inline set:html={themeInitScript}></script>
+  </head>
+  <body class="bg-bg text-text h-full antialiased">
+    <InicioDemo client:only="preact" kind={kind} locale={lang} />
+  </body>
+</html>

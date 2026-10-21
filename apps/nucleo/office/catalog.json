@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "exports": [
+    {
+      "id": "pdf",
+      "online": true,
+      "labels": {
+        "document": "file.downloadPdf",
+        "spreadsheet": "file.downloadPdf",
+        "presentation": "file.downloadPdf"
+      },
+      "option": { "id": "accessible", "label": "file.pdfAccessible", "default": true }
+    },
+    {
+      "id": "ooxml",
+      "online": true,
+      "labels": {
+        "document": "file.downloadDocx",
+        "spreadsheet": "file.downloadXlsx",
+        "presentation": "file.downloadPptx"
+      }
+    },
+    {
+      "id": "odf",
+      "online": true,
+      "labels": {
+        "document": "file.downloadOdt",
+        "spreadsheet": "file.downloadOds",
+        "presentation": "file.downloadOdp"
+      }
+    },
+    {
+      "id": "html",
+      "online": true,
+      "labels": {
+        "document": "file.downloadHtml",
+        "spreadsheet": "file.downloadHtml",
+        "presentation": "file.downloadHtml"
+      }
+    },
+    {
+      "id": "markdown",
+      "online": true,
+      "labels": {
+        "document": "file.downloadMarkdown",
+        "spreadsheet": "file.downloadMarkdown",
+        "presentation": "file.downloadMarkdown"
+      }
+    }
+  ]
+}

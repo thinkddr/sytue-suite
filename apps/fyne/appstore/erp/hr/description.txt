@@ -1,0 +1,18 @@
+Dvadeset i četiri modula i dvojno knjigovodstvo koje baza podataka ne dopušta izbaciti iz ravnoteže.
+
+• Dvadeset i četiri modula i trideset i šest modela: kontakti, prodaja, nabava, skladište, proizvodnja, fakturiranje, računovodstvo, projekti i ljudski resursi.
+• Dodavanje modula znači pisanje datoteke JSON: bez migracije, bez nove rute i bez rada na sučelju.
+• Novac se pohranjuje u cijelim centima, nikad u pomičnom zarezu, a ravnotežu jamči baza podataka.
+• Proknjižene stavke su nedodirljive: ispravljaju se novom stavkom, i to razlikuje glavnu knjigu od proračunske tablice.
+• Dvadeset i četiri modula i trideset i šest modela u jednoj usluzi i jednoj bazi podataka.
+• Katalog modela su podaci: svaki modul navodi svoja polja, stanja i stupce popisa.
+• Novi modul je jedna datoteka JSON — bez DDL-a, bez migracije i bez zaključavanja tablica.
+• Jedan API za svih trideset i šest modela i jedno sučelje generirano iz kataloga.
+• Dvojno knjigovodstvo s iznosima u cijelim centima; nijedan broj s pomičnim zarezom.
+• Baza podataka provjerava ravnotežu pri potvrdi transakcije, a ne kod aplikacije.
+• Zatvorene stavke su nepromjenjive: ne mogu se uređivati, brisati niti dobiti nove retke.
+• Jedan dokument, jedna stavka: ponovni pokušaj ili dvije otvorene kartice ne mogu udvostručiti prihod.
+• Zajednički nazivi dostupni su na svih 26 jezika, a neprevedeno polje sprečava pokretanje usluge.
+• Popisi s indeksima: prva stranica od dvadeset tisuća redaka poslužuje se za manje od milisekunde.
+
+Šifrirano u prijenosu (TLS 1.3). Infrastruktura Sytuea nalazi se u EU-u. Lokacija vanjskih usluga ovisi o njihovu pružatelju.

@@ -1,0 +1,22 @@
+apiVersion: v2
+name: sytue-pgbouncer
+description: >-
+  PgBouncer (ISC, permisiva) en pool_mode=transaction entre los servicios Go de la
+  suite y la instancia PostgreSQL EXTERNA (Scaleway RDB). Multiplexa los pools pgx
+  de todas las replicas (cientos de conexiones de cliente) en un presupuesto acotado
+  de conexiones de servidor MUY por debajo de max_connections de la RDB. Compatible
+  con el RLS de la suite (SET LOCAL app.tenant vive DENTRO de la transaccion) y con
+  pgx en protocolo extendido (max_prepared_statements, PgBouncer >= 1.21). SOLO
+  entornos Helm (staging/prod): dev (deploy/compose) NO usa PgBouncer.
+type: application
+version: 1.0.0
+appVersion: "1.25"
+kubeVersion: ">=1.31.0-0"
+home: https://www.pgbouncer.org
+keywords: [sytue, pgbouncer, postgresql, pooling, isc]
+maintainers:
+  - name: Sytue Platform
+    email: platform@sytue.eu
+annotations:
+  # PgBouncer: licencia ISC (permisiva). Sin motores AGPL.
+  licenses: ISC

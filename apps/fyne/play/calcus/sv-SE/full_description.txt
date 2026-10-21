@@ -1,0 +1,18 @@
+Siffror som går ihop, i ett kalkylblad som jobbar med dig.
+
+• Formler, villkorsstyrd formatering och dataverifiering.
+• Hämta in externa data och fråga dem utan att lämna kalkylbladet.
+• Diagram, miniatyrdiagram, utsnitt och datatabeller.
+• Export till ODS och XLSX; öppna Excel-filer.
+• Formler med kontextuell hjälp och omedelbar omräkning.
+• Villkorsstyrd formatering, dataverifiering och talformat efter nationella inställningar.
+• Diagram av flera slag, miniatyrdiagram och utsnitt.
+• Datatabeller med summor och sortering; pivottabell.
+• Externa data: koppla en källa och fråga den från kalkylbladet.
+• Problemlösare för att hitta värdet som uppfyller ett mål.
+• Makron för att automatisera återkommande uppgifter.
+• Samarbete i realtid med närvaro och kommentarer.
+• Filter, utsnitt och sökning i kalkylbladet.
+• Export till ODS, XLSX och PDF; öppna Excel-filer från Drive.
+
+Krypterat under överföring (TLS 1.3). Sytues infrastruktur finns i EU. Var externa tjänster finns beror på deras leverantör.

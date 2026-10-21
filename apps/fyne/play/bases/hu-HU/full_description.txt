@@ -1,0 +1,11 @@
+Összekapcsolt táblák ügyfelek, rendelések vagy készlet vezetéséhez, jogosultságokkal és minden változás naplójával.
+
+• Ügyfelek, rendelések vagy készlet összekapcsolt táblákban, adatbázis-ismeret nélkül.
+• Oszd meg a szervezeteddel az általad választott szereppel.
+• Minden változás naplózva van: ki végezte, és mi volt korábban.
+• Az adataid az EU-ban maradnak, és bármikor exportálhatod őket.
+• Táblák szöveg-, szám-, dátum-, jelölőnégyzet-, egyszeres és többszörös választású mezőkkel.
+• Kapcsolatok a táblák között: kösd a rendelést az ügyfeléhez, és az adatbázis nem engedi megszakítani a kapcsolatot.
+• Jogosultságok adatbázisonként és táblánként: tulajdonos, szerkesztő, hozzászóló és olvasó.
+
+Titkosítás átvitel közben (TLS 1.3). A Sytue infrastruktúrája az EU-ban található. A külső szolgáltatások helye a szolgáltatójuktól függ.

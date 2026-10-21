@@ -1,0 +1,85 @@
+From b2a8bdfcbdfdfb51a85a9374cca7fb99e391695a Mon Sep 17 00:00:00 2001
+From: Daniel Delgado <328510259+thinkddr@users.noreply.github.com>
+Date: Sat, 26 Sep 2026 00:10:36 +0200
+Subject: [PATCH] feat(app/darwin): deliver opened documents (kAEOpenDocuments)
+ as file:// URLs
+
+Finder, open(1) and Open With send kAEOpenDocuments, not argv, so an app that
+declares CFBundleDocumentTypes was launched without its document. The handler
+goes in at applicationWillFinishLaunching, after AppKit's default one.
+---
+ app/incoming_urls_darwin.go |  5 +++--
+ app/incoming_urls_darwin.m  | 36 ++++++++++++++++++++++++++++++++++++
+ 2 files changed, 39 insertions(+), 2 deletions(-)
+
+diff --git a/app/incoming_urls_darwin.go b/app/incoming_urls_darwin.go
+index fb854bd7e..133664a92 100644
+--- a/app/incoming_urls_darwin.go
++++ b/app/incoming_urls_darwin.go
+@@ -16,8 +16,9 @@ import "C"
+ 
+ import "fyne.io/fyne/v2/internal/urlhandler"
+ 
+-// registerIncomingURLs installs the kAEGetURL handler before the application has
+-// a window. macOS sends custom-scheme launches as Apple events, not argv.
++// registerIncomingURLs installs the kAEGetURL and kAEOpenDocuments handlers before
++// the application has a window. macOS sends custom-scheme launches and opened
++// documents as Apple events, not argv; documents arrive as file:// URLs.
+ func registerIncomingURLs() { C.watchIncomingURLs() }
+ 
+ //export incomingURL
+diff --git a/app/incoming_urls_darwin.m b/app/incoming_urls_darwin.m
+index 9dcfcc2fb..f8e95e198 100644
+--- a/app/incoming_urls_darwin.m
++++ b/app/incoming_urls_darwin.m
+@@ -18,6 +18,32 @@ - (void)handleURL:(NSAppleEventDescriptor *)event withReplyEvent:(NSAppleEventDe
+ 		incomingURL((char *)[value UTF8String]);
+ 	}
+ }
++
++// Finder, `open file.ext` and "Open With" send kAEOpenDocuments with a list of files,
++// not argv. Each one is delivered as a file:// URL through the same handler.
++- (void)handleOpenDocuments:(NSAppleEventDescriptor *)event withReplyEvent:(NSAppleEventDescriptor *)reply {
++	NSAppleEventDescriptor *list = [event paramDescriptorForKeyword:keyDirectObject];
++	NSInteger count = [list numberOfItems];
++	for (NSInteger i = count == 0 ? 0 : 1; i <= count; i++) {
++		NSAppleEventDescriptor *item = count == 0 ? list : [list descriptorAtIndex:i];
++		NSAppleEventDescriptor *file = [item coerceToDescriptorType:typeFileURL];
++		if (file == nil) {
++			continue;
++		}
++		NSString *value = [[[NSString alloc] initWithData:[file data] encoding:NSUTF8StringEncoding] autorelease];
++		if (value != nil) {
++			incomingURL((char *)[value UTF8String]);
++		}
++	}
++}
++
++- (void)installOpenDocuments {
++	[[NSAppleEventManager sharedAppleEventManager]
++		setEventHandler:self
++		andSelector:@selector(handleOpenDocuments:withReplyEvent:)
++		forEventClass:kCoreEventClass
++		andEventID:kAEOpenDocuments];
++}
+ @end
+ 
+ void watchIncomingURLs(void) {
+@@ -31,4 +57,14 @@ void watchIncomingURLs(void) {
+ 		andSelector:@selector(handleURL:withReplyEvent:)
+ 		forEventClass:kInternetEventClass
+ 		andEventID:kAEGetURL];
++	// AppKit installs its own kAEOpenDocuments handler while finishing launching, which
++	// would replace one installed now; the documents of the launch arrive right after
++	// applicationWillFinishLaunching, so that is where ours goes. Installed now too, for
++	// an application that has already finished launching.
++	[handler installOpenDocuments];
++	[[NSNotificationCenter defaultCenter]
++		addObserver:handler
++		selector:@selector(installOpenDocuments)
++		name:NSApplicationWillFinishLaunchingNotification
++		object:nil];
+ }
+-- 
+2.54.0 (Apple Git-157)
+

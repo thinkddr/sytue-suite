@@ -1,0 +1,210 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Daniel Delgado Ramos
+from lib import *
+from looks import LOOKS
+
+KEY = "gimnasio"
+
+
+def build():
+    nueva(KEY)
+    look = LOOKS["pizarra-oscura"]
+    nav = [("inicio", ("Inicio", "Home")), ("clases", ("Clases y sala", "Classes and gym floor")),
+           ("cuotas", ("Cuotas y normas", "Fees and rules")), ("contacto", ("Contacto", "Contact"))]
+    horas = [(("Lunes a viernes", "Monday to Friday"), ("7:00 a 22:00", "7:00 am to 10:00 pm")),
+             (("Sábado", "Saturday"), ("9:00 a 14:00", "9:00 am to 2:00 pm")),
+             (("Domingo y festivos", "Sundays and bank holidays"), ("10:00 a 13:00", "10:00 am to 1:00 pm"))]
+    nota = ("Precios de ejemplo: cámbialos por los tuyos. Incluyen IVA.",
+            "Example prices: replace them with your own. VAT included.")
+
+    def prueba():
+        return boton(("Pedir clase de bienvenida", "Book a welcome class"), a_pagina("contacto", "contacto"))
+
+    inicio = pagina("inicio", ("", ""), ("Gimnasio", "Gym"),
+                    ("Gimnasio de barrio con sala de musculación, clases dirigidas, cuotas claras y clase de bienvenida gratis. Llama o escribe por WhatsApp.",
+                     "Neighbourhood gym with a weights floor, group classes, clear fees and a free welcome class. Call or message us on WhatsApp."), [
+        hero(("Entrena cerca de casa", "Train close to home"),
+             ("Sala de musculación, clases dirigidas y vestuarios con duchas. Un gimnasio de barrio donde te conocen por tu nombre y nadie te mira raro.",
+              "A weights floor, group classes and changing rooms with showers. A neighbourhood gym where people know your name and nobody stares."),
+             [prueba(), whatsapp("secondary")],
+             eyebrow=("Gimnasio de barrio", "Neighbourhood gym"), variante="centro", tono="oscuro"),
+        bloque_valores(("Lo que encuentras dentro", "What you will find inside"), [
+            (("Sala de musculación", "Weights floor"),
+             ("Máquinas, mancuernas, barras y una zona de cardio. Te enseñamos a usarlas el primer día.",
+              "Machines, dumbbells, barbells and a cardio area. We show you how to use them on your first day.")),
+            (("Clases dirigidas", "Group classes"),
+             ("Ciclo indoor, entrenamiento funcional, baile fitness y pilates, con monitor y por la mañana y por la tarde.",
+              "Indoor cycling, functional training, dance fitness and pilates, with an instructor, morning and evening.")),
+            (("Vestuarios y duchas", "Changing rooms and showers"),
+             ("Taquillas, duchas con agua caliente y vestuarios separados.",
+              "Lockers, hot showers and separate changing rooms.")),
+        ], eyebrow=("El gimnasio", "The gym"), estilo="linea", tono="base"),
+        bloque_precios(("Cuotas sin sorpresas", "Fees with no surprises"), ("Cuotas principales", "Main fees"),
+                       [("Cuota", "Fee"), ("Precio al mes", "Price per month")],
+                       [(("Solo sala de musculación", "Weights floor only"), eur(29.9)),
+                        (("Sala y clases dirigidas", "Weights floor and classes"), eur(39.9)),
+                        (("Matrícula (pago único)", "Joining fee (one-off)"), eur(30))],
+                       nota=nota, boton_=boton(("Ver todas las cuotas", "See all fees"), a_pagina("cuotas"), "secondary"),
+                       anchor="precios", tono="relleno"),
+        bloque_pasos(("Tu primera semana", "Your first week"), [
+            (("Pides tu clase de bienvenida", "Book your welcome class"),
+             ("Por el formulario, por WhatsApp o pasando por recepción.", "Through the form, on WhatsApp or at reception.")),
+            (("Conoces la sala", "See the floor"),
+             ("Un monitor te la enseña y te explica cómo se usa cada máquina.",
+              "An instructor shows you around and how each machine works.")),
+            (("Pruebas una clase", "Try a class"),
+             ("Te apuntamos a la que mejor encaje con tu horario.", "We sign you up for the one that best fits your schedule.")),
+            (("Decides", "You decide"),
+             ("Si te gusta, eliges cuota. Si no, no hay compromiso.", "If you like it, you pick a fee. If not, there is no commitment.")),
+        ], tono="base"),
+        bloque_opiniones(("Lo que dicen los socios", "What members say"),
+                         [("la sala", "the weights floor"), ("las clases", "the classes"), ("el trato", "the service")]),
+        bloque_cta(("Ven a probarlo", "Come and try it"),
+                   ("La primera clase es de bienvenida y no tiene coste. Trae ropa cómoda y una toalla.",
+                    "Your first class is a welcome class at no cost. Bring comfortable clothes and a towel."),
+                   [prueba(), llamar("secondary")], tono="oscuro"),
+    ])
+
+    clases = pagina("clases", ("clases", "classes"), ("Clases y sala", "Classes and gym floor"),
+                    ("Horario semanal de clases dirigidas y cómo funciona la sala de musculación. Reserva tu clase de bienvenida.",
+                     "Weekly timetable of group classes and how the weights floor works. Book your welcome class."), [
+        hero(("Clases y sala", "Classes and gym floor"),
+             ("Este es el horario de clases de la semana. La sala de musculación está abierta todo el horario del gimnasio.",
+              "This is the class timetable for the week. The weights floor is open all the gym's opening hours."),
+             [prueba()], variante="texto"),
+        seccion("pricing", [
+            titular(("Horario semanal de clases", "Weekly class timetable"),
+                    ("Las plazas son limitadas. Reserva en recepción o por WhatsApp.",
+                     "Places are limited. Book at reception or on WhatsApp.")),
+            tabla(("Horario semanal de clases dirigidas", "Weekly timetable of group classes"),
+                  [("Hora", "Time"), ("Lunes", "Monday"), ("Martes", "Tuesday"), ("Miércoles", "Wednesday"),
+                   ("Jueves", "Thursday"), ("Viernes", "Friday")],
+                  [(("9:30", "9:30 am"), ("Pilates", "Pilates"), ("Funcional", "Functional"), ("Pilates", "Pilates"),
+                    ("Funcional", "Functional"), ("Estiramientos", "Stretching")),
+                   (("18:30", "6:30 pm"), ("Ciclo indoor", "Indoor cycling"), ("Baile fitness", "Dance fitness"),
+                    ("Ciclo indoor", "Indoor cycling"), ("Baile fitness", "Dance fitness"), ("Funcional", "Functional")),
+                   (("19:30", "7:30 pm"), ("Funcional", "Functional"), ("Pilates", "Pilates"),
+                    ("Funcional", "Functional"), ("Ciclo indoor", "Indoor cycling"), ("Baile fitness", "Dance fitness"))]),
+            peq(("Los sábados, ciclo indoor a las 10:00. Cada clase dura 50 minutos.",
+                 "On Saturdays, indoor cycling at 10:00 am. Each class lasts 50 minutes."),
+                color="$muted"),
+        ], anchor="horario", gap=28),
+        bloque_valores(("Qué es cada clase", "What each class is"), [
+            (("Ciclo indoor", "Indoor cycling"), ("Bici estática al ritmo de la música. Tú regulas la resistencia.",
+                                                  "Stationary bike to the beat of the music. You set the resistance.")),
+            (("Funcional", "Functional"), ("Circuito con tu propio peso, gomas y mancuernas ligeras.",
+                                           "A circuit with your own body weight, bands and light dumbbells.")),
+            (("Baile fitness", "Dance fitness"), ("Coreografías sencillas que se aprenden sobre la marcha.",
+                                                  "Simple routines you pick up as you go.")),
+            (("Pilates", "Pilates"), ("Ejercicios de suelo para la espalda, el abdomen y la postura.",
+                                      "Floor exercises for the back, abs and posture.")),
+        ], cols=4, tono="relleno", estilo="borde", eyebrow=("Las clases", "The classes")),
+        bloque_texto(("La sala de musculación", "The weights floor"), [
+            ("Tienes máquinas guiadas para empezar, mancuernas y barras para cuando cojas confianza, y una zona de cardio con cintas y bicis.",
+             "There are guided machines to start with, dumbbells and barbells for when you gain confidence, and a cardio area with treadmills and bikes."),
+            ("Un monitor está en sala en horas punta. Si no sabes por dónde empezar, pídele que te monte una rutina sencilla.",
+             "An instructor is on the floor at peak times. If you do not know where to start, ask for a simple routine."),
+        ], imagen_=("photo", ("Sala de musculación con mancuernas y máquinas", "Weights floor with dumbbells and machines")),
+            tono="base", anchor="sala"),
+        bloque_faq(("Preguntas frecuentes", "Frequently asked questions"), [
+            (("¿Tengo que reservar las clases?", "Do I have to book the classes?"),
+             ("Sí, porque las plazas son limitadas. Si no puedes venir, avísanos para liberar tu sitio.",
+              "Yes, because places are limited. If you cannot come, let us know so we can free your spot.")),
+            (("¿Puedo ir si nunca he entrenado?", "Can I come if I have never trained?"),
+             ("Claro. Empieza por la clase de bienvenida y te decimos por dónde seguir. Si tienes alguna lesión o duda de salud, consúltala antes con tu médico.",
+              "Of course. Start with the welcome class and we will tell you where to go from there. If you have an injury or a health concern, check with your doctor first.")),
+            (("¿Qué pasa si llego tarde a una clase?", "What if I am late for a class?"),
+             ("Pasados diez minutos desde el inicio no se puede entrar, para no interrumpir al grupo.",
+              "Ten minutes after the start, entry is closed so the group is not interrupted.")),
+        ], tono="relleno"),
+        bloque_cta(("¿Probamos una clase?", "Shall we try a class?"), None, [prueba(), whatsapp("ghost")], tono="base"),
+    ])
+
+    cuotas = pagina("cuotas", ("cuotas", "fees"), ("Cuotas y normas", "Fees and rules"),
+                    ("Cuotas mensuales y matrícula, qué traer, normas de la sala y vestuarios. Pide tu clase de bienvenida.",
+                     "Monthly fees and joining fee, what to bring, floor rules and changing rooms. Book your welcome class."), [
+        hero(("Cuotas y normas", "Fees and rules"),
+             ("Lo que pagas cada mes y lo que pedimos a cambio: un poco de orden para que todos entrenemos a gusto.",
+              "What you pay each month and what we ask in return: a bit of order so everyone can train comfortably."),
+             [prueba()], variante="texto"),
+        bloque_precios(("Cuotas y matrícula", "Fees and joining fee"), ("Cuotas del gimnasio", "Gym fees"),
+                       [("Cuota", "Fee"), ("Incluye", "Includes"), ("Precio", "Price")],
+                       [(("Matrícula", "Joining fee"), ("Se paga una vez, al hacerte socio", "Paid once, when you join"), eur(30)),
+                        (("Sala", "Floor"), ("Sala de musculación y vestuarios, al mes", "Weights floor and changing rooms, per month"), eur(29.9)),
+                        (("Sala y clases", "Floor and classes"), ("Sala y todas las clases dirigidas, al mes", "Floor and all group classes, per month"), eur(39.9)),
+                        (("Estudiantes y mayores de 65", "Students and over-65s"), ("Sala y clases, al mes, con acreditación", "Floor and classes, per month, with proof"), eur(32.9)),
+                        (("Bono de 10 entradas", "10-entry pass"), ("Sala, sin cuota mensual", "Weights floor, no monthly fee"), eur(40))],
+                       nota=nota, anchor="tarifas", tono="base"),
+        bloque_checks(("Qué traer", "What to bring"), [
+            ("Ropa cómoda y zapatillas limpias solo para la sala.", "Comfortable clothes and clean trainers kept for the gym."),
+            ("Una toalla pequeña para el banco o la máquina.", "A small towel for the bench or machine."),
+            ("Una botella de agua.", "A water bottle."),
+            ("Un candado para la taquilla, o una moneda si usa ficha.", "A padlock for the locker, or a coin if it takes a token."),
+            ("Chanclas para la ducha.", "Flip-flops for the shower."),
+            ("Tu documento de identidad el primer día, para la ficha de socio.", "Your ID on the first day, for the membership form."),
+        ], tono="relleno", cols=2, anchor="traer"),
+        bloque_checks(("Normas básicas", "Basic rules"), [
+            ("Deja las pesas en su sitio al terminar.", "Put weights back when you finish."),
+            ("Limpia el banco o la máquina después de usarlos.", "Wipe the bench or machine after use."),
+            ("No hace falta ocupar una máquina entre series: deja que otros se turnen.", "Do not hold a machine between sets: let others share."),
+            ("Se entra con camiseta y calzado deportivo.", "Wear a T-shirt and sports shoes inside."),
+            ("Los menores de 16 entran solo con un adulto.", "Under-16s only come in with an adult."),
+            ("Las taquillas son para usar durante el entrenamiento, no para dejar cosas de un día para otro.", "Lockers are for use during your workout, not for leaving things overnight."),
+        ], tono="base", cols=2, anchor="normas"),
+        bloque_valores(("Vestuarios y duchas", "Changing rooms and showers"), [
+            (("Taquillas", "Lockers"), ("Una por persona mientras entrenas. Se vacían al cerrar.", "One per person while you train. They are emptied at closing time.")),
+            (("Duchas", "Showers"), ("Con agua caliente y cabinas individuales.", "With hot water and individual cubicles.")),
+            (("Secadores", "Hairdryers"), ("A tu disposición en los espejos, para antes de salir.", "Available at the mirrors, for before you leave.")),
+        ], tono="relleno", estilo="borde", anchor="vestuarios"),
+        bloque_faq(("Preguntas frecuentes", "Frequently asked questions"), [
+            (("¿Hay permanencia?", "Is there a minimum term?"),
+             ("No. Pagas mes a mes y te das de baja avisando antes de que acabe el mes anterior.",
+              "No. You pay month to month and cancel by letting us know before the previous month ends.")),
+            (("¿Puedo congelar la cuota?", "Can I freeze my membership?"),
+             ("Sí, si te vas de viaje, te lesionas o tienes una baja. Nos lo dices en recepción y la pausamos.",
+              "Yes, if you travel, get injured or are on leave. Tell us at reception and we pause it.")),
+            (("¿Cómo se paga?", "How do I pay?"),
+             ("Con domiciliación bancaria, con tarjeta o en efectivo en recepción. Te damos factura si la necesitas.",
+              "By direct debit, by card or in cash at reception. We give you an invoice if you need one.")),
+        ], tono="base"),
+        bloque_cta(("¿Te enseñamos el gimnasio?", "Shall we show you around?"), None, [prueba(), llamar("secondary")],
+                   tono="oscuro"),
+    ])
+
+    cont = pagina("contacto", ("contacto", "contact"), ("Contacto y clase de bienvenida", "Contact and welcome class"),
+                  ("Pide tu clase de bienvenida por teléfono, WhatsApp o con el formulario. Horario y cómo llegar al gimnasio.",
+                   "Book your welcome class by phone, WhatsApp or with the form. Opening hours and how to find the gym."), [
+        hero(("Pide tu clase de bienvenida", "Book your welcome class"),
+             ("Llámanos, escríbenos por WhatsApp o rellena el formulario. Te decimos qué días y a qué hora puedes venir.",
+              "Call us, message us on WhatsApp or fill in the form. We tell you which days and times you can come."),
+             [llamar(), whatsapp()], variante="texto"),
+        bloque_contacto(("Cómo encontrarnos", "How to find us"),
+                        ("Estamos en el barrio, con aparcamiento de bicis en la puerta.",
+                         "We are in the neighbourhood, with bike parking at the door."),
+                        campos_cita(servicios=[("Clase de bienvenida", "Welcome class"),
+                                               ("Sala de musculación", "Weights floor"),
+                                               ("Clases dirigidas", "Group classes"),
+                                               ("Información de cuotas", "Information about fees")],
+                                    extra=[campo("experiencia", "select", ("¿Has entrenado antes?", "Have you trained before?"),
+                                                 False, opciones=[("Nunca", "Never"), ("Alguna vez", "Now and then"),
+                                                                  ("Entreno con regularidad", "I train regularly")]),
+                                           campo("avisos", "text", ("Lesión o molestia que debamos saber (opcional)",
+                                                                    "Injury or problem we should know about (optional)"),
+                                                 False, maxlen=200)]),
+                        ("Pedir clase", "Request class"), horas,
+                        exito=("Gracias. Te confirmamos la clase de bienvenida por teléfono o WhatsApp en cuanto la tengamos.",
+                               "Thank you. We will confirm your welcome class by phone or WhatsApp as soon as we have it.")),
+        bloque_mapa(tono="relleno"),
+    ])
+
+    return plantilla(KEY, ("Gimnasio", "Gym"),
+                     ("Gimnasio de barrio con horario semanal de clases, cuotas y matrícula, normas, formulario de clase de bienvenida y botones de llamar y WhatsApp.",
+                      "Neighbourhood gym with a weekly class timetable, fees and joining fee, rules, a welcome class form and call and WhatsApp buttons."),
+                     "deporte", ("gimnasio gym gimnasios sala musculacion pesas fitness clases dirigidas spinning ciclo indoor funcional pilates cuotas matricula entrenar",
+                                 "gym gymnasium fitness weights floor group classes indoor cycling functional pilates membership fees joining fee workout"),
+                     look, cabecera(nav, llamar()),
+                     pie(nav, ("Gimnasio de barrio. Sala de musculación, clases dirigidas y vestuarios.",
+                               "Neighbourhood gym. Weights floor, group classes and changing rooms."),
+                         ("Lunes a viernes 7:00 a 22:00. Sábado 9:00 a 14:00.",
+                          "Monday to Friday 7 am to 10 pm. Saturday 9 am to 2 pm.")),
+                     [inicio, clases, cuotas, cont])

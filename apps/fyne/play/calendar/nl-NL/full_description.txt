@@ -1,0 +1,19 @@
+Een CalDAV-agenda die aansluit op de rest van de suite.
+
+• Dag-, week- en maandweergave.
+• Terugkerende afspraken en herinneringen.
+• Maak afspraken direct vanuit een e-mail in Mail.
+• Werkt met elke CalDAV-client.
+• Maand-, week-, dag- en agendaweergave, met een minikalender en “Vandaag”.
+• Dagelijkse, wekelijkse of maandelijkse herhaling met einde; alleen deze, deze en volgende, of alle bewerken.
+• Herinneringen per afspraak en meldingen binnen de suite.
+• Uitnodigingen met antwoord (ik kom, misschien, nee) en opvolging.
+• “Tijd zoeken” die vrij is voor alle deelnemers.
+• Te reserveren ruimtes en middelen met beschikbaarheid.
+• Gedeelde agenda's met rechten, en de agenda's die anderen met je delen.
+• Abonneren op externe agenda's (ICS) en meerdere agenda's met kleurcodes.
+• Een afspraak maken vanuit een bericht in Mail of vanuit een notitie.
+• Werkt met elke CalDAV-client: Apple Calendar, Thunderbird en meer.
+• Een afspraak dupliceren of naar je agenda kopiëren, en downloaden als .ics voor iedereen buiten Sytue.
+
+Versleuteld tijdens transport (TLS 1.3). De infrastructuur van Sytue staat in de EU. De locatie van externe diensten hangt af van hun aanbieder.

@@ -1,0 +1,14 @@
+Ihre Startseite der Suite: Anwendungen, Schnellzugriffe, letzte Aktivität und Hinweise.
+
+• Ein Launcher mit allen Ihren Anwendungen und denen, die Ihre Organisation anbindet.
+• Deine heutige Agenda und ungelesene Mails auf der Startseite, neben dem Neuesten aus der ganzen Suite und den Benachrichtigungen.
+• Verbinden Sie Ihre Geräte und laden Sie die nativen Apps.
+• Ein Launcher mit den Anwendungen der Suite und den Drittanbieter-Apps, die Ihre Organisation anbindet.
+• Schnellzugriffe: E-Mail schreiben, neues Dokument, in Drive hochladen, Termin anlegen.
+• Zuletzt verwendet in der ganzen Suite: das Letzte aus Drive, Docus, Mail oder Rooms.
+• Benachrichtigungszentrum und Präsenz, geteilt in der ganzen Suite.
+• Geräte verbinden: Profil für iPhone und Mac, Android und Desktop, in zwei Schritten.
+• Downloads der nativen Desktop- und Mobil-Apps.
+• Ein Willkommensassistent, der die Organisation ohne Handbuch einrichtet.
+
+Verschlüsselt bei der Übertragung (TLS 1.3). Die Infrastruktur von Sytue befindet sich in der EU. Der Standort externer Dienste hängt von ihrem Anbieter ab.

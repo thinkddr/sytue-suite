@@ -1,0 +1,90 @@
+---
+/**
+ * Sytue Rooms — LA LLAMADA EN SU PROPIA VENTANA.
+ *
+ * Existe para que cambiar de app no cuelgue: cada producto de la suite es su
+ * propio documento, así que la sesión de LiveKit no sobrevive a navegar. Una
+ * ventana emergente sí, porque es un documento aparte. La abre el botón «seguir
+ * en una ventana» de la barra de la llamada (VideoRoom), que además cuelga en la
+ * pestaña de origen para no aparecer dos veces en la sala.
+ *
+ * SIN LA SHELL NI EL CHAT: aquí no hay conmutador de apps, ni buscador, ni lista
+ * de canales. Es una ventana de 420x320 que solo tiene que enseñar quién habla y
+ * dejar colgar; meter el cromo de la suite dentro sería llenarla de controles que
+ * no caben y que ya están en la pestaña grande.
+ *
+ * Los parámetros van por la URL porque es lo único que sobrevive a `window.open`,
+ * y no llevan nada que proteger: el id del canal (que el servicio reautoriza con
+ * la cookie de sesión, como cualquier otra ruta) y dos booleanos de micro/cámara.
+ */
+import { bff, toBffContext } from '../lib/bff.js';
+import { EncryptedPipCall } from '../components/PipCall.js';
+import { htmlLangAttrs } from '@sytue/i18n';
+import { roomsT } from '../i18n/index.js';
+import { themeInitScript } from '@sytue/ui';
+import { canonicaConOrg, returnToCanonico, rutaConOrg } from '@sytue/config';
+import '../styles/app.css';
+
+export const prerender = false;
+
+const session = await bff.getSession(toBffContext(Astro));
+if (!session) {
+  // ADR 0056: la entrada org-ful llega reescrita con la marca ?__org=; el returnTo
+  // sale canónico, no en la forma interna, o tras el login la barra se queda con ella.
+  const returnTo = returnToCanonico(Astro.url, bff.basePath);
+  const redireccionLogin = Astro.redirect(
+    `${bff.basePath}/auth/login?returnTo=${encodeURIComponent(returnTo)}`,
+  );
+  redireccionLogin.headers.set('cache-control', 'no-store');
+  return redireccionLogin;
+}
+// Ruta en `sinOrg` (su nombre colisiona con el namespace de organizaciones):
+// con sesión, un salto local a la canónica con la org activa.
+const canonica = canonicaConOrg(Astro.url, bff.basePath, session.user.tenant);
+if (canonica) return Astro.redirect(canonica);
+
+const canal = Astro.url.searchParams.get('canal')?.trim() ?? '';
+// «Llamar desde el documento» (Sytue Docs): la ventana sigue la sala de un documento, no
+// la de un canal. Solo su id; el servicio comprueba con Docs que puede verlo.
+const documento = Astro.url.searchParams.get('documento')?.trim() ?? '';
+// Sin canal ni documento no hay nada que seguir: a la app, que es de donde se debería venir.
+// Con la org de la URL si la lleva (ADR 0056, `Astro.locals.org` la deja el
+// middleware del rewrite), para no devolver a la barra la forma sin org.
+let redireccionSinCanal: Response | undefined;
+if (!canal && !documento) {
+  redireccionSinCanal = Astro.redirect(rutaConOrg(bff.basePath, Astro.locals.org, '/'));
+}
+if (redireccionSinCanal) return redireccionSinCanal;
+
+const titulo =
+  Astro.url.searchParams.get('titulo')?.trim() || (documento ? 'Documento' : 'Sala del canal');
+const micOn = Astro.url.searchParams.get('mic') !== '0';
+const camOn = Astro.url.searchParams.get('cam') === '1';
+const locale = Astro.locals.locale;
+const { lang, dir } = htmlLangAttrs(locale);
+const t = roomsT(locale);
+const esAdmin = session.user.roles?.includes('admin') || session.user.roles?.includes('owner');
+---
+
+<!doctype html>
+<html lang={lang} dir={dir}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{t('meet.pip.title', { room: titulo })}</title>
+    <script is:inline set:html={themeInitScript}></script>
+  </head>
+  <!-- `overflow-hidden`: la ventana es del tamaño de la llamada, no se desplaza. -->
+  <body class="bg-neutral-1000 h-dvh overflow-auto">
+    <EncryptedPipCall
+      actor={session.user.id}
+      client:load
+      {...(documento ? { documentId: documento } : { channelId: canal })}
+      title={titulo}
+      locale={locale}
+      micOn={micOn}
+      camOn={camOn}
+      orgAdmin={esAdmin ?? false}
+    />
+  </body>
+</html>

@@ -1,0 +1,18 @@
+CardDAV-kontaktid, mida jagatakse kogu organisatsioonis.
+
+• Ühine aadressiraamat kogu organisatsioonile.
+• Import ja eksport vCard-vormingus.
+• Duplikaatide ühendamine ilma andmeid kaotamata.
+• Töötab iga CardDAV-kliendiga.
+• Aadressiraamatud, sealhulgas teie organisatsiooni ühine.
+• Täielik kaart: telefonid, e-postid, aadressid, organisatsioon, sünnipäev, märkmed ja foto.
+• Sildid ja lemmikud rühmitamiseks ja leidmiseks.
+• Duplikaatide tuvastamine ja ühendamine ilma andmeid kaotamata.
+• vCardi ja CSV import ja eksport; üksiku kontakti eksport.
+• Hulgitoimingud ja taastamisvõimalusega prügikast.
+• Kohene otsing ja automaatne täitmine Mailis kirjutamise ajal.
+• Töötab iga CardDAV-kliendiga.
+• Eelseisvad sünnipäevad aadressiraamatust, selle kuu omad esile tõstetud.
+• Kohtumise loomine kontaktiga või kontakti e-posti kopeerimine kaardilt lahkumata.
+
+Krüpteeritud edastamisel (TLS 1.3). Sytue taristu asub ELis. Väliste teenuste asukoht sõltub nende pakkujast.

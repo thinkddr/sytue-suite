@@ -1,0 +1,18 @@
+Notizbücher für alles: Text, Dateien, Termine, ganze Dokumente.
+
+• Verschachtelte Notizbücher: freie Fläche, Spalten oder Liste.
+• Notizen jeder Art: Text, Aufgaben, Links, Dateien, Kalendertermine, Docs-Dokumente.
+• Sie entscheiden, was in die Suche kommt — und was nie.
+• Verschachtelte Notizbücher mit Symbol und Farbe; drei Layouts: frei, Spalten und Liste.
+• Zwölf Notiztypen: Text, Aufgaben, Links, Farbe, Bild und Verweise auf Drive, Docus, Calendar, Rooms und andere Notizen.
+• Ein Editor mit Formatierung (fett, Listen, Links), der beim Verlassen speichert.
+• Schlagwörter, anheften, duplizieren, zwischen Notizbüchern verschieben, gruppieren und auf der Leinwand ziehen.
+• Sichtbarkeit pro Notizbuch: privat, persönlich, Organisation oder öffentlicher Link.
+• Sie entscheiden, welche Notizbücher in die Suite-Suche eingehen.
+• Rückverweise: sehen, welche Notizen auf diese zeigen.
+• Ein ganzes Notizbuch als HTML, PDF, Markdown und mehr exportieren; Kopien importieren.
+• Eine Notiz in einen Rooms-Kanal teilen; ablegen oder einfügen, um Notizen anzulegen.
+• Tabellen im Editor und Markdown-Kürzel beim Schreiben: «- », «# », «> » und «```».
+• Verschiebe eine Notiz in ein anderes Notizbuch, exportiere eine einzelne Notiz und sortiere das Notizbuch nach Wunsch.
+
+Verschlüsselt bei der Übertragung (TLS 1.3). Die Infrastruktur von Sytue befindet sich in der EU. Der Standort externer Dienste hängt von ihrem Anbieter ab.

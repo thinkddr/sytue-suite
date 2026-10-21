@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40" role="img" aria-label="Sytue Meet">
+  <title>Sytue Meet</title>
+  <rect x="4" y="4" width="32" height="32" rx="9" fill="var(--sytue-product-meet, #8b34ca)"/>
+  <rect x="4.5" y="4.5" width="31" height="31" rx="8.5" fill="none" stroke="#ffffff" stroke-opacity="0.1" stroke-width="1"/>
+  <!-- Detalles interiores de la lente (translúcido) -->
+  <circle cx="16" cy="20" r="2" fill="none" stroke="#ffffff" stroke-opacity="0.35" stroke-width="2.4"/>
+  <!-- Cuerpo de la cámara de video (sólido) -->
+  <rect x="11" y="14" width="10" height="12" rx="2" fill="none" stroke="#ffffff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M21 17.5l7-3.5v12l-7-3.5" fill="none" stroke="#ffffff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

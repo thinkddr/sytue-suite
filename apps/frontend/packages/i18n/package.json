@@ -1,0 +1,29 @@
+{
+  "name": "@sytue/i18n",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sytue One — cimientos de i18n: catalogo tipado (ingles = fuente de verdad) para en/es/fr/de/it, traduccion con interpolacion y plurales via Intl.PluralRules, formato de fecha/numero/moneda/listas por locale y negociacion Accept-Language + cookie. docs/CONVENTIONS.md §13.1.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./preact": "./src/preact.tsx",
+    "./claves-usadas": "./src/claves-usadas.ts"
+  },
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.lib.json",
+    "typecheck": "tsc -p tsconfig.lib.json --noEmit",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "preact": "10.29.8"
+  },
+  "devDependencies": {
+    "@types/bun": "1.4.2",
+    "@types/node": "catalog:",
+    "typescript": "6.0.3"
+  }
+}

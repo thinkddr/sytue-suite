@@ -1,0 +1,16 @@
+Tiedostot ja yhteistyö omalla brändilläsi.
+
+• Lataa, järjestä ja jaa hallituilla linkeillä (oikeudet ja vanhentuminen).
+• Asiakirjojen ja kuvien esikatselu suoraan sivulla.
+• Liitä Mailiin ilman tiedoston kopiointia.
+• S3-pohjainen tallennus eurooppalaisilla alueilla.
+• Oma asema, tiimiasemat, kanssani jaetut, viimeaikaiset, suosikit ja roskakori.
+• Jakolinkit kahdella tasolla (katselu tai muokkaus), salasanalla ja vanhentumisella.
+• Versiohistoria palautuksineen.
+• Asiakirjojen, kuvien ja PDF-tiedostojen esikatselu lataamatta.
+• Toimistoasiakirjojen avaaminen ja muokkaus Docusissa, Calcusissa ja Diaposissa; PDF:t CertiPDF:ssä.
+• Luottamuksellisuustunnisteet, jotka estävät julkiset linkit sieltä, minne ne eivät kuulu.
+• Jaa Roomsin kanavalle tai liitä Mailiin ilman tiedoston kopiointia.
+• S3-tallennus eurooppalaisilla alueilla, kiintiö aina näkyvissä.
+
+Salattu siirron aikana (TLS 1.3). Sytuen infrastruktuuri sijaitsee EU:ssa. Ulkoisten palvelujen sijainti riippuu niiden tarjoajasta.

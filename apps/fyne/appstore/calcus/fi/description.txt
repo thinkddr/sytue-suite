@@ -1,0 +1,18 @@
+Järkeviä lukuja taulukossa, joka tekee töitä kanssasi.
+
+• Kaavat, ehdollinen muotoilu ja tietojen kelpoisuustarkistus.
+• Tuo ulkoisia tietoja ja tee niihin kyselyjä poistumatta taulukosta.
+• Kaaviot, minikaaviot, osittajat ja tietotaulukot.
+• Vienti ODS- ja XLSX-muotoihin; Excel-tiedostojen avaaminen.
+• Kaavat asiayhteyteen sopivalla ohjeella ja välittömällä uudelleenlaskennalla.
+• Ehdollinen muotoilu, tietojen kelpoisuustarkistus ja alueasetusten mukaiset lukumuodot.
+• Monenlaiset kaaviot, minikaaviot ja osittajat.
+• Tietotaulukot summineen ja lajitteluineen; pivot-taulukko.
+• Ulkoiset tiedot: yhdistä lähde ja tee siihen kyselyjä taulukosta.
+• Ratkaisin tavoitteen täyttävän arvon löytämiseen.
+• Makrot toistuvien tehtävien automatisointiin.
+• Reaaliaikainen yhteistyö läsnäolon ja kommenttien kera.
+• Suodattimet, osittajat ja haku taulukossa.
+• Vienti ODS-, XLSX- ja PDF-muotoihin; Excel-tiedostojen avaaminen Drivesta.
+
+Salattu siirron aikana (TLS 1.3). Sytuen infrastruktuuri sijaitsee EU:ssa. Ulkoisten palvelujen sijainti riippuu niiden tarjoajasta.

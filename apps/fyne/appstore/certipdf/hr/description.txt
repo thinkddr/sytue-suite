@@ -1,0 +1,17 @@
+PDF od početka do kraja, u vašem pregledniku.
+
+• Isticanje, podcrtavanje, komentari i crtanje po dokumentu.
+• Obrasci: ispunjavanje polja ili izrada vlastitih.
+• Spajanje, izdvajanje, zakretanje, numeriranje i vodeni žig.
+• Ploča s potpisima, trajno zatamnjivanje i dokumenti zaštićeni zaporkom.
+• Brzi preglednik sa strukturom, minijaturama, pretraživanjem i zumiranjem na stranicu ili širinu.
+• Bilješke: isticanje, podcrtavanje, precrtavanje, komentari, crtanje, oblici, strelice i žigovi.
+• Tekstni okviri, mjerenja i snimke područja.
+• Obrasci: ispunjavanje postojećih polja ili dodavanje vlastitih.
+• Ploča za potpisivanje dokumenata.
+• Trajno zatamnjivanje: označeni sadržaj nestaje iz datoteke, a ne samo iz prikaza.
+• Stranice: spajanje, izdvajanje, brisanje, zakretanje, numeriranje (i Bates), zaglavlja i podnožja.
+• Vodeni žig, pozadina i metapodaci koji se mogu uređivati.
+• Dokumenti i dopuštenja zaštićeni zaporkom.
+
+Šifrirano u prijenosu (TLS 1.3). Infrastruktura Sytuea nalazi se u EU-u. Lokacija vanjskih usluga ovisi o njihovu pružatelju.

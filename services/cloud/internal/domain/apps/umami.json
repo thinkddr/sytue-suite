@@ -1,0 +1,51 @@
+{
+  "id": "umami",
+  "name": "Umami",
+  "description": "Analítica web sin cookies y sin recoger datos personales: visitas, páginas y referentes, en una pantalla. Alternativa a Google Analytics que no necesita banner.",
+  "category": "observability",
+  "license": "Apache-2.0",
+  "homepage": "https://umami.is/",
+  "source": "https://github.com/umami-software/umami",
+  "upstream": "ghcr.io/umami-software/umami:postgresql-v2.20.2",
+  "upstream_digest": "sha256:950133e4158949061b84fa29ce1a87f734655dca5a49a08e727eb23c4e3582cd",
+  "version": "2.20.2",
+  "needs": [
+    "postgres"
+  ],
+  "ports": [
+    {
+      "name": "http",
+      "port": 3000
+    }
+  ],
+  "web_port": 3000,
+  "exports": [
+    {
+      "key": "UMAMI_URL",
+      "value": "http://{host}:{port}"
+    }
+  ],
+  "env": [
+    {
+      "key": "DATABASE_URL",
+      "value": "{db_url}"
+    },
+    {
+      "key": "DATABASE_TYPE",
+      "value": "postgresql"
+    },
+    {
+      "key": "APP_SECRET",
+      "generate": true
+    },
+    {
+      "key": "DISABLE_TELEMETRY",
+      "value": "1"
+    }
+  ],
+  "disk_gib": 0,
+  "memory_mib": 1024,
+  "cpu_milli": 1000,
+  "run_as_user": 1001,
+  "health_path": "/api/heartbeat"
+}

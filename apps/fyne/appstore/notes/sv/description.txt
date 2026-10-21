@@ -1,0 +1,18 @@
+Anteckningsböcker som rymmer allt: text, filer, händelser, hela dokument.
+
+• Kapslade anteckningsböcker på en fri arbetsyta, i kolumner eller som lista.
+• Anteckningar av alla slag: text, uppgifter, länkar, filer, händelser från Calendar, dokument från Docs.
+• Du bestämmer vad som hamnar i sökningen — och vad som aldrig gör det.
+• Kapslade anteckningsböcker med ikon och färg; tre layouter: fri, kolumner och lista.
+• Tolv typer av anteckningar: text, uppgifter, länkar, färg, bild och referenser till Drive, Docus, Calendar, Rooms och andra anteckningar.
+• En redigerare med formatering (fetstil, listor, länkar) som sparar när du lämnar.
+• Taggar, fäst, duplicera, flytta mellan anteckningsböcker, gruppera och dra på arbetsytan.
+• Synlighet per anteckningsbok: privat, personlig, organisation eller offentlig länk.
+• Du bestämmer vilka anteckningsböcker som kommer med i svitens sökning.
+• Bakåtlänkar: se vilka anteckningar som pekar hit.
+• Exportera en hel anteckningsbok till HTML, PDF, Markdown med mera; importera kopior.
+• Dela en anteckning till en kanal i Rooms; släpp eller klistra in för att skapa anteckningar.
+• Tabeller i redigeraren och Markdown-genvägar medan du skriver: ”- ”, ”# ”, ”> ” och ”```”.
+• Flytta en anteckning till en annan anteckningsbok, exportera en enskild anteckning och sortera anteckningsboken som du vill.
+
+Krypterat under överföring (TLS 1.3). Sytues infrastruktur finns i EU. Var externa tjänster finns beror på deras leverantör.

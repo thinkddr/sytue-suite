@@ -1,0 +1,26 @@
+{
+  "key": "whatsapp-business",
+  "tier": "tier2",
+  "manifest": {
+    "name": "WhatsApp Business",
+    "description": "Conecta un número de WhatsApp Business a tu equipo de Rooms.",
+    "category": "Comunicación",
+    "color": "#25D366",
+    "icon": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#25D366\" stroke-width=\"2\"><path d=\"M21 11.5a8.5 8.5 0 0 1-12.6 7.4L3 21l1.9-5.4A8.5 8.5 0 1 1 21 11.5Z\"/></svg>",
+    "identity": {
+      "kind": "none"
+    },
+    "provisioning": "none",
+    "launch": {
+      "kind": "none"
+    },
+    "oauth": {
+      "authorize_url": "https://www.facebook.com/v26.0/dialog/oauth",
+      "token_url": "https://graph.facebook.com/v26.0/oauth/access_token",
+      "scopes": [
+        "whatsapp_business_management",
+        "whatsapp_business_messaging"
+      ]
+    }
+  }
+}

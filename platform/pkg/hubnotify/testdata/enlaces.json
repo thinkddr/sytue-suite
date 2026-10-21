@@ -1,0 +1,142 @@
+[
+  {
+    "tipo": "mail.message.received",
+    "producto": "mail",
+    "url": "https://mail.sytue.eu/mail/acme/?thread=0b6a4c8e-1f2d-4e3a-9b5c-7d8e9f0a1b2c"
+  },
+  {
+    "tipo": "mail.access.requested",
+    "producto": "mail",
+    "url": "https://mail.sytue.eu/mail/acme/?mailbox=0b6a4c8e-1f2d-4e3a-9b5c-7d8e9f0a1b2c"
+  },
+  {
+    "tipo": "calendar.reminder.due",
+    "producto": "calendar",
+    "url": "https://mail.sytue.eu/calendar/acme/events/0b6a4c8e-1f2d-4e3a-9b5c-7d8e9f0a1b2c"
+  },
+  {
+    "tipo": "calendar.invitation",
+    "producto": "calendar",
+    "url": "https://mail.sytue.eu/calendar/acme/?invitations=1"
+  },
+  {
+    "tipo": "calendar.access.requested",
+    "producto": "calendar",
+    "url": "https://mail.sytue.eu/calendar/acme/?calendar=0b6a4c8e-1f2d-4e3a-9b5c-7d8e9f0a1b2c"
+  },
+  {
+    "tipo": "rooms.mention",
+    "producto": "rooms",
+    "url": "https://mail.sytue.eu/rooms/acme/channels/0b6a4c8e-1f2d-4e3a-9b5c-7d8e9f0a1b2c?message=0b6a4c8e-1f2d-4e3a-9b5c-7d8e9f0a1b2c"
+  },
+  {
+    "tipo": "rooms.report",
+    "producto": "rooms",
+    "url": "https://mail.sytue.eu/rooms/acme/?moderation=1"
+  },
+  {
+    "tipo": "rooms.invitation",
+    "producto": "rooms",
+    "url": "https://mail.sytue.eu/rooms/acme/?invitations=1"
+  },
+  {
+    "tipo": "rooms.invitation.direct",
+    "producto": "rooms",
+    "url": "https://mail.sytue.eu/rooms/acme/?invitations=1"
+  },
+  {
+    "tipo": "drive.share.created",
+    "producto": "drive",
+    "url": "https://mail.sytue.eu/drive/acme/?section=shared\u0026shared=0b6a4c8e-1f2d-4e3a-9b5c-7d8e9f0a1b2c"
+  },
+  {
+    "tipo": "drive.access.requested",
+    "producto": "drive",
+    "url": "https://mail.sytue.eu/drive/acme/?request=0b6a4c8e-1f2d-4e3a-9b5c-7d8e9f0a1b2c"
+  },
+  {
+    "tipo": "docs.shared",
+    "producto": "docs",
+    "url": "https://docus.sytue.eu/docus/acme/edit?id=0b6a4c8e-1f2d-4e3a-9b5c-7d8e9f0a1b2c"
+  },
+  {
+    "tipo": "docs.shared",
+    "producto": "sheets",
+    "url": "https://calcus.sytue.eu/calcus/acme/edit?id=0b6a4c8e-1f2d-4e3a-9b5c-7d8e9f0a1b2c"
+  },
+  {
+    "tipo": "docs.shared",
+    "producto": "slides",
+    "url": "https://diapos.sytue.eu/diapos/acme/edit?id=0b6a4c8e-1f2d-4e3a-9b5c-7d8e9f0a1b2c"
+  },
+  {
+    "tipo": "docs.comment",
+    "producto": "docs",
+    "url": "https://docus.sytue.eu/docus/acme/edit?id=0b6a4c8e-1f2d-4e3a-9b5c-7d8e9f0a1b2c"
+  },
+  {
+    "tipo": "docs.signature.requested",
+    "producto": "pdf",
+    "url": "https://certipdf.sytue.eu/certipdf/acme/pdf?path=%2FPDF%2FContrato+de+servicios.pdf"
+  },
+  {
+    "tipo": "erp.task.assigned",
+    "producto": "erp",
+    "url": "https://mail.sytue.eu/erp/acme/?vista=tareas"
+  },
+  {
+    "tipo": "erp.access.requested",
+    "producto": "erp",
+    "url": "https://mail.sytue.eu/erp/acme/?peticion=clientes"
+  },
+  {
+    "tipo": "notes.access.requested",
+    "producto": "notes",
+    "url": "https://mail.sytue.eu/notes/acme/?notebook=0b6a4c8e-1f2d-4e3a-9b5c-7d8e9f0a1b2c"
+  },
+  {
+    "tipo": "notes.shared",
+    "producto": "notes",
+    "url": "https://mail.sytue.eu/notes/acme/?notebook=0b6a4c8e-1f2d-4e3a-9b5c-7d8e9f0a1b2c"
+  },
+  {
+    "tipo": "notes.shared",
+    "producto": "notes",
+    "url": "https://mail.sytue.eu/notes/acme/?shared=0b6a4c8e-1f2d-4e3a-9b5c-7d8e9f0a1b2c"
+  },
+  {
+    "tipo": "notes.reminder.due",
+    "producto": "notes",
+    "url": "https://mail.sytue.eu/notes/acme/?note=0b6a4c8e-1f2d-4e3a-9b5c-7d8e9f0a1b2c\u0026notebook=0b6a4c8e-1f2d-4e3a-9b5c-7d8e9f0a1b2c"
+  },
+  {
+    "tipo": "notes.reminder.due",
+    "producto": "notes",
+    "url": "https://mail.sytue.eu/notes/acme/?shared=0b6a4c8e-1f2d-4e3a-9b5c-7d8e9f0a1b2c"
+  },
+  {
+    "tipo": "notes.mention",
+    "producto": "notes",
+    "url": "https://mail.sytue.eu/notes/acme/?note=0b6a4c8e-1f2d-4e3a-9b5c-7d8e9f0a1b2c\u0026notebook=0b6a4c8e-1f2d-4e3a-9b5c-7d8e9f0a1b2c"
+  },
+  {
+    "tipo": "notes.mention",
+    "producto": "notes",
+    "url": "https://mail.sytue.eu/notes/acme/?shared=0b6a4c8e-1f2d-4e3a-9b5c-7d8e9f0a1b2c"
+  },
+  {
+    "tipo": "photos.shared",
+    "producto": "photos",
+    "url": "https://mail.sytue.eu/photos/acme/shared?album=0b6a4c8e-1f2d-4e3a-9b5c-7d8e9f0a1b2c"
+  },
+  {
+    "tipo": "photos.album.added",
+    "producto": "photos",
+    "url": "https://mail.sytue.eu/photos/acme/album?id=0b6a4c8e-1f2d-4e3a-9b5c-7d8e9f0a1b2c"
+  },
+  {
+    "tipo": "photos.album.renamed",
+    "producto": "photos",
+    "url": "https://mail.sytue.eu/photos/acme/album?id=0b6a4c8e-1f2d-4e3a-9b5c-7d8e9f0a1b2c"
+  }
+]

@@ -1,0 +1,14 @@
+import { chromium } from 'playwright';
+import { fileURLToPath } from 'node:url';
+const S = fileURLToPath(new URL('/Users/ddr/Documents/Sytue/sytueOne/test/e2e/.auth/admin.json', import.meta.url));
+const b = await chromium.launch();
+const c = await b.newContext({ storageState: S, ignoreHTTPSErrors: true, viewport: { width: 1440, height: 900 } });
+const p = await c.newPage();
+p.on('pageerror', (e) => console.log('PAGEERROR:', String(e).slice(0, 140)));
+const r = await p.goto('https://calendar.sytue.localhost/', { waitUntil: 'domcontentloaded', timeout: 60000 });
+console.log('status', r?.status(), p.url());
+await p.waitForTimeout(8000);
+console.log('botones con haspopup=menu:', await p.locator('button[aria-haspopup="menu"]').count());
+console.log('¿hay topbar?', await p.locator('header').count());
+console.log('logos img:', await p.locator('header img').count());
+await b.close();

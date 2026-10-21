@@ -1,0 +1,20 @@
+Canaux, messages et visioconférences d’équipe au même endroit.
+
+• Des canaux par équipe ou par projet.
+• Une visioconférence intégrée à chaque canal.
+• Mentions et notifications unifiées dans toute la suite.
+• Historique consultable depuis tout Sytue One.
+• Canaux publics et privés en catégories ; messages directs et groupes.
+• Fils, réactions, mentions, épinglés, enregistrés et brouillons.
+• Mise en forme avec la barre « Aa » et des raccourcis : gras, italique, code, citations, listes et liens.
+• Pièces jointes, images, GIF et emoji personnalisés ; fichiers depuis Drive.
+• Envoi programmé, priorité, accusé de réception et « vu par ».
+• Commandes « / » et cartes : sondages et tâches attribuables.
+• Appels vidéo dans le canal : caméra, écran, main levée, chat et enregistrement.
+• Réunions programmées et liens d’invitation.
+• Bots, webhooks et intégrations avec d’autres outils.
+• Présence et statut personnalisé ; notifications par canal sur mesure.
+• Recherche dans l’historique et depuis toute la suite.
+• Temps réel par WebSocket, avec reconnexion sans perdre de messages.
+
+Chiffrement en transit (TLS 1.3). L’infrastructure de Sytue se trouve dans l’UE. La localisation des services externes dépend de leur fournisseur.

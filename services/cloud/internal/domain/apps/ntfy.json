@@ -1,0 +1,61 @@
+{
+  "id": "ntfy",
+  "name": "ntfy",
+  "description": "Avisos al móvil desde un script: un POST a una URL y suena el teléfono. Sin cuenta, sin SDK y con app en Android, iOS y navegador.",
+  "category": "tools",
+  "license": "Apache-2.0",
+  "homepage": "https://ntfy.sh/",
+  "source": "https://github.com/binwiederhier/ntfy",
+  "upstream": "docker.io/binwiederhier/ntfy:v2.15.0",
+  "upstream_digest": "sha256:aa10e84da624f65be107f9317dbf6e212fa812e0ebf62e74d032d0762eccc930",
+  "version": "2.15.0",
+  "ports": [
+    {
+      "name": "http",
+      "port": 8080
+    }
+  ],
+  "web_port": 8080,
+  "exports": [
+    {
+      "key": "NTFY_URL",
+      "value": "http://{host}:{port}"
+    }
+  ],
+  "env": [
+    {
+      "key": "NTFY_LISTEN_HTTP",
+      "value": ":8080"
+    },
+    {
+      "key": "NTFY_BASE_URL",
+      "value": "{web_url}"
+    },
+    {
+      "key": "NTFY_CACHE_FILE",
+      "value": "/var/lib/ntfy/cache.db"
+    },
+    {
+      "key": "NTFY_AUTH_FILE",
+      "value": "/var/lib/ntfy/auth.db"
+    },
+    {
+      "key": "NTFY_AUTH_DEFAULT_ACCESS",
+      "value": "deny-all"
+    },
+    {
+      "key": "NTFY_ATTACHMENT_CACHE_DIR",
+      "value": "/var/lib/ntfy/attachments"
+    },
+    {
+      "key": "NTFY_BEHIND_PROXY",
+      "value": "true"
+    }
+  ],
+  "disk_gib": 10,
+  "data_path": "/var/lib/ntfy",
+  "memory_mib": 512,
+  "cpu_milli": 500,
+  "run_as_user": 1000,
+  "health_path": "/v1/health"
+}

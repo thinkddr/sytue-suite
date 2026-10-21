@@ -1,0 +1,111 @@
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "sytue-cloud-builder.fullname" . }}
+  labels:
+    {{- include "sytue-cloud-builder.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "sytue-cloud-builder.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Solo el control-plane (cloud-api) puede invocar al builder.
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: cloud-api
+      ports:
+        - protocol: TCP
+          port: {{ .Values.service.targetPort }}
+  egress:
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Kubernetes API (crear Jobs Kaniko), Registry y S3 cache.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 169.254.0.0/16
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 6443
+    # El recolector de logs de Sytue ID (sytue.logCollectorEnv): los avisos y
+    # errores de este servicio van a la pantalla «qué está fallando». Solo ese
+    # destino y solo el puerto del POD del IdP.
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: sytue-id
+      ports:
+        - protocol: TCP
+          port: {{ .Values.config.idApiPort }}
+---
+# ---- Namespace de BUILDS ({{ .Values.config.buildNamespace }}) ----
+# Los Jobs Kaniko/CNB ejecutan código no confiable de tenant: misma postura de
+# red que los namespaces de tenant (ensureNetworkPolicies, kubeplatform.go) —
+# deny-by-default + egress solo DNS e Internet público, nunca metadata
+# (169.254.0.0/16), RFC1918 ni los CIDR de pods/servicios del clúster.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: {{ .Values.config.buildNamespace }}
+  labels:
+    {{- include "sytue-cloud-builder.labels" . | nindent 4 }}
+    sytue.eu/role: paas-builds
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-build-egress
+  namespace: {{ .Values.config.buildNamespace }}
+  labels:
+    {{- include "sytue-cloud-builder.labels" . | nindent 4 }}
+    sytue.eu/role: paas-builds
+spec:
+  podSelector: {}
+  # Sin regla de ingress: nadie llama a un pod de build (logs/exec van por kubelet).
+  policyTypes:
+    - Egress
+  egress:
+    # DNS (kube-dns).
+    - ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Internet público en cualquier puerto (registry/git/S3 por 443, git-ssh 22);
+    # nunca redes privadas, metadata ni pods/servicios del clúster.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+              - 169.254.0.0/16
+              {{- range .Values.networkPolicy.clusterCidrs }}
+              - {{ . }}
+              {{- end }}
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 22
+{{- end }}

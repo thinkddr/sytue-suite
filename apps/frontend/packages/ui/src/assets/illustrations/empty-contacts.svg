@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="160" viewBox="0 0 200 160" fill="none" role="img" aria-label="Sin contactos">
+  <title>Sin contactos</title>
+  <line x1="46" y1="122" x2="154" y2="122" stroke="var(--sytue-border)" stroke-width="2" stroke-linecap="round"/>
+  <!-- Tarjeta de contacto -->
+  <rect x="56" y="50" width="88" height="62" rx="8" stroke="var(--sytue-neutral-400)" stroke-width="2.4"/>
+  <!-- Persona (retrato) -->
+  <circle cx="82" cy="72" r="9" stroke="var(--sytue-neutral-400)" stroke-width="2.4"/>
+  <path d="M69 100c0-8 6-12 13-12s13 4 13 12" stroke="var(--sytue-neutral-400)" stroke-width="2.4" stroke-linecap="round"/>
+  <!-- Líneas de datos: acento teal -->
+  <line x1="106" y1="70" x2="132" y2="70" stroke="var(--sytue-accent-500)" stroke-width="2.4" stroke-linecap="round"/>
+  <line x1="106" y1="82" x2="126" y2="82" stroke="var(--sytue-neutral-300)" stroke-width="2.4" stroke-linecap="round"/>
+</svg>

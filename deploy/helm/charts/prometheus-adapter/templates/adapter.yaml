@@ -1,0 +1,260 @@
+{{- if .Values.enabled }}
+{{- $reg := (.Values.global).imageRegistry | default "" -}}
+{{- $img := printf "%s/%s:%s" $reg .Values.image.repository .Values.image.tag -}}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: prometheus-adapter
+  namespace: {{ .Release.Namespace }}
+---
+# Los tres enlaces que exige un servidor de API agregado, y no son ceremonia:
+# sin `auth-delegator` no puede preguntar al apiserver quién le llama, y sin el
+# lector de `extension-apiserver-authentication` no puede validar el certificado
+# de cliente con el que llega. Faltando cualquiera, el HPA recibe 401 y deja de
+# escalar sin decir por qué.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: prometheus-adapter-auth-delegator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:auth-delegator
+subjects:
+  - kind: ServiceAccount
+    name: prometheus-adapter
+    namespace: {{ .Release.Namespace }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: prometheus-adapter-auth-reader
+  namespace: kube-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: extension-apiserver-authentication-reader
+subjects:
+  - kind: ServiceAccount
+    name: prometheus-adapter
+    namespace: {{ .Release.Namespace }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: prometheus-adapter-recursos
+rules:
+  - apiGroups: [""]
+    resources: [namespaces, pods, services]
+    verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: prometheus-adapter-recursos
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: prometheus-adapter-recursos
+subjects:
+  - kind: ServiceAccount
+    name: prometheus-adapter
+    namespace: {{ .Release.Namespace }}
+---
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus-adapter
+  namespace: {{ .Release.Namespace }}
+spec:
+  selector:
+    app.kubernetes.io/name: prometheus-adapter
+  ports:
+    - name: https
+      port: 443
+      targetPort: 6443
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus-adapter
+  namespace: {{ .Release.Namespace }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: prometheus-adapter
+  template:
+    metadata:
+      annotations:
+        # REINICIA LOS PODS CUANDO CAMBIA LA REGLA. `prometheus-adapter` lee su
+        # configuración AL ARRANCAR y no vigila el ConfigMap, así que sin esto un
+        # `helm upgrade` deja el objeto actualizado y el proceso sirviendo la
+        # consulta vieja: sale «deployed», el ConfigMap enseña lo nuevo y el
+        # comportamiento no cambia. Es el peor tipo de fallo silencioso, y ya
+        # pasó: el 2026-08-15 el arreglo del respaldo a cero estaba desplegado y
+        # los HPA seguían en `<unknown>` porque los pods eran del día anterior.
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+      labels:
+        app.kubernetes.io/name: prometheus-adapter
+    spec:
+      # Las dos réplicas, en nodos DISTINTOS.
+      #
+      # De este adaptador cuelgan los 23 HPA de la suite: sin él, `kubectl get
+      # hpa` devuelve `<unknown>` y nada escala. Con el pool en su suelo de dos
+      # nodos, tener las dos réplicas en el mismo —que es como estaban el
+      # 2026-08-17, por casualidad del planificador— significa que perder ese
+      # nodo deja al clúster sin autoescalado de pods justo en el momento en que
+      # es la única red que queda.
+      #
+      # `ScheduleAnyway` y no `DoNotSchedule` a propósito: si en algún momento
+      # solo hay un nodo disponible, es mejor tener las dos réplicas juntas que
+      # una en Pending.
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus-adapter
+      serviceAccountName: prometheus-adapter
+      {{- with (.Values.global).imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: adapter
+          image: {{ $img | quote }}
+          args:
+            - --cert-dir=/tmp/cert
+            - --secure-port=6443
+            - --config=/etc/adapter/config.yaml
+            - --prometheus-url={{ .Values.prometheus.url }}
+            - --prometheus-token-file=/etc/cockpit/token
+            - --metrics-relist-interval=1m
+            # Con 2 los logs solo traen los traces del LIST; la PromQL que se
+            # ejecuta de verdad aparece a partir de 6, y es lo único que dice si
+            # el selector del HPA llegó a la consulta o se quedó por el camino.
+            - --v={{ .Values.logLevel | default 2 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          ports:
+            - name: https
+              containerPort: 6443
+          volumeMounts:
+            - { name: config, mountPath: /etc/adapter, readOnly: true }
+            - { name: token, mountPath: /etc/cockpit, readOnly: true }
+            - { name: cert, mountPath: /tmp/cert }
+          livenessProbe:
+            httpGet: { path: /livez, port: https, scheme: HTTPS }
+            initialDelaySeconds: 30
+          readinessProbe:
+            httpGet: { path: /readyz, port: https, scheme: HTTPS }
+            initialDelaySeconds: 30
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: config
+          configMap: { name: prometheus-adapter }
+        - name: token
+          secret:
+            secretName: {{ .Values.prometheus.tokenSecret }}
+            items:
+              - key: {{ .Values.prometheus.tokenKey }}
+                path: token
+        - name: cert
+          emptyDir: {}
+---
+# `insecureSkipTLSVerify` porque el adapter se firma su propio certificado al
+# arrancar (`--cert-dir`) y el tráfico no sale del clúster: va del apiserver al
+# Service por la red interna. La alternativa —emitirlo con cert-manager y
+# publicar el CA bundle— añade una dependencia de arranque entre dos cosas que
+# ya se necesitan mutuamente.
+apiVersion: apiregistration.k8s.io/v1
+kind: APIService
+metadata:
+  name: v1beta1.external.metrics.k8s.io
+spec:
+  service:
+    name: prometheus-adapter
+    namespace: {{ .Release.Namespace }}
+    port: 443
+  group: external.metrics.k8s.io
+  version: v1beta1
+  insecureSkipTLSVerify: true
+  groupPriorityMinimum: 100
+  versionPriority: 100
+{{- end }}
+{{- if .Values.enabled }}
+---
+# SIN ESTO EL ADAPTER NO ARRANCA, y el error no lo dice: el `default-deny` del
+# namespace permite salir por 443 a `0.0.0.0/0` pero EXCLUYE los rangos
+# privados, y el apiserver vive justo ahí. El adapter necesita hablar con él
+# —construye su RESTMapper contra `/api` antes de servir nada— y sin ruta se
+# queda esperando hasta que el `dial tcp 10.32.0.1:443: i/o timeout` lo mata con
+# salida 255, en bucle.
+#
+# Los demás pods de la suite no lo notaron nunca porque ninguno llama al
+# apiserver: hablan entre ellos y con la RDB.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: prometheus-adapter-apiserver
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: prometheus-adapter
+  policyTypes: [Egress]
+  egress:
+    # Los DOS destinos, y hacen falta los dos.
+    #
+    # `10.32.0.1` es la ClusterIP del servicio `kubernetes`, que es virtual:
+    # kube-proxy la traduce por DNAT al endpoint REAL del control plane antes de
+    # que el paquete salga. Una NetworkPolicy con `ipBlock` sobre la ClusterIP no
+    # casa nunca —el CNI ve la dirección ya traducida—, así que hay que nombrar
+    # también el endpoint. En Kapsule vive en la red privada del clúster, que es
+    # justo el rango que el `default-deny` excluye de su regla de salida por 443.
+    - to:
+        - ipBlock:
+            cidr: {{ .Values.apiserverCIDR | quote }}
+        - ipBlock:
+            cidr: {{ .Values.apiserverEndpointCIDR | quote }}
+      ports:
+        - { protocol: TCP, port: 443 }
+{{- end }}
+{{- if and .Values.enabled (.Capabilities.APIVersions.Has "cilium.io/v2") }}
+---
+# LA POLÍTICA QUE DE VERDAD ABRE EL APISERVER, y no es la de arriba.
+#
+# El CNI es Cilium, y Cilium NO trata al apiserver como una IP: lo clasifica
+# como la entidad reservada `kube-apiserver`. Una NetworkPolicy estándar con
+# `ipBlock` —ni la ClusterIP 10.32.0.1, ni el endpoint real de la red privada—
+# no casa nunca con ese tráfico, así que el adapter seguía muriendo con `dial
+# tcp 10.32.0.1:443: i/o timeout` y salida 255 aunque la política estuviera
+# aplicada y pareciese correcta.
+#
+# La NetworkPolicy de arriba se conserva: sirve en cualquier CNI que sí resuelva
+# por IP, y este chart no debería depender de cuál hay debajo.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: prometheus-adapter-apiserver
+  namespace: {{ .Release.Namespace }}
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: prometheus-adapter
+  egress:
+    - toEntities:
+        - kube-apiserver
+{{- end }}

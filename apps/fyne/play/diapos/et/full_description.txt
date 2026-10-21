@@ -1,0 +1,16 @@
+Jutustage lugu; slaid peab sammu.
+
+• Esitlusteemad teie organisatsiooni identiteediga.
+• Esitaja vaade märkmete ja järgmise slaidiga.
+• Pildid, kujundid, diagrammid ja SmartArt.
+• Eksport ODP-, PPTX- ja PDF-vormingusse; PowerPointi failide avamine.
+• Teemad ja paletid kooskõlas teie organisatsiooni kaubamärgiga.
+• Lõuend kujundite, piltide, diagrammide, SmartArti ja ühendusjoontega.
+• Täisekraanesitlus esitaja vaate ja märkmetega.
+• Koostöö reaalajas kohaloleku ja kommentaaridega.
+• Slaidid taustade, plakatite ja paigutustega.
+• Eksport ODP-, PPTX- ja PDF-vormingusse.
+• PowerPointi failide avamine Drive’ist.
+• Automaatne salvestamine koos versioonidega.
+
+Krüpteeritud edastamisel (TLS 1.3). Sytue taristu asub ELis. Väliste teenuste asukoht sõltub nende pakkujast.

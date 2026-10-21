@@ -1,0 +1,301 @@
+{
+ "pais": "AT",
+ "verificado": true,
+ "moneda": "EUR",
+ "formas": [
+  {
+   "clave": "einzelunternehmer",
+   "nombre": "Einzelunternehmer",
+   "tipo": "persona_fisica"
+  },
+  {
+   "clave": "og",
+   "nombre": "OG",
+   "tipo": "persona_fisica"
+  },
+  {
+   "clave": "gmbh",
+   "nombre": "GmbH",
+   "tipo": "sociedad"
+  },
+  {
+   "clave": "flexco",
+   "nombre": "FlexKapG (FlexCo)",
+   "tipo": "sociedad"
+  },
+  {
+   "clave": "ag",
+   "nombre": "AG",
+   "tipo": "sociedad"
+  },
+  {
+   "clave": "kg",
+   "nombre": "KG",
+   "tipo": "sociedad"
+  }
+ ],
+ "portales": {
+  "finanzonline": {
+   "nombre": "FinanzOnline",
+   "url": "https://finanzonline.bmf.gv.at/"
+  },
+  "oegk": {
+   "nombre": "ÖGK — WEBEKU",
+   "url": "https://www.gesundheitskasse.at/"
+  },
+  "firmenbuch": {
+   "nombre": "Firmenbuch (Justiz)",
+   "url": "https://www.justiz.gv.at/"
+  }
+ },
+ "obligaciones": [
+  {
+   "clave": "at_uva_q",
+   "nombre": "Umsatzsteuervoranmeldung (vierteljährlich)",
+   "concepto": "iva_periodica",
+   "ambito": "fiscal",
+   "periodicidad": "trimestral",
+   "plazos": {
+    "T": "15+2"
+   },
+   "margen_dias": 7,
+   "portal": "finanzonline",
+   "aplica": {
+    "condiciones": [
+     "iva",
+     "!iva_mensual"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_base_pct": 2,
+    "recargo_max_pct": 10,
+    "nota": "Säumniszuschlag 2 % (plus 1 % nach drei und sechs Monaten); Verspätungszuschlag bis 10 % (§ 135 BAO). Vierteljährlich bei Vorjahresumsatz bis 100.000 €."
+   },
+   "calculo": {
+    "tipo": "saldo_neto",
+    "haber": [
+     "477"
+    ],
+    "debe": [
+     "472"
+    ]
+   }
+  },
+  {
+   "clave": "at_uva_m",
+   "nombre": "Umsatzsteuervoranmeldung (monatlich)",
+   "concepto": "iva_periodica",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "15+2"
+   },
+   "margen_dias": 7,
+   "portal": "finanzonline",
+   "aplica": {
+    "condiciones": [
+     "iva",
+     "iva_mensual"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_base_pct": 2,
+    "recargo_max_pct": 10,
+    "nota": "Säumniszuschlag 2 %; Verspätungszuschlag bis 10 %."
+   },
+   "calculo": {
+    "tipo": "saldo_neto",
+    "haber": [
+     "477"
+    ],
+    "debe": [
+     "472"
+    ]
+   }
+  },
+  {
+   "clave": "at_u1",
+   "nombre": "Umsatzsteuererklärung (U1)",
+   "concepto": "iva_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "06-30+1"
+   },
+   "margen_dias": 30,
+   "portal": "finanzonline",
+   "aplica": {
+    "condiciones": [
+     "iva"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_max_pct": 10,
+    "nota": "Bis 30. April, elektronisch über FinanzOnline bis 30. Juni des Folgejahres. Verspätungszuschlag bis 10 % der Abgabe (§ 135 BAO)."
+   }
+  },
+  {
+   "clave": "at_zm",
+   "nombre": "Zusammenfassende Meldung",
+   "concepto": "operaciones_intracomunitarias",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "ultimo"
+   },
+   "margen_dias": 7,
+   "portal": "finanzonline",
+   "aplica": {
+    "condiciones": [
+     "intracomunitario"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_max_pct": 1,
+    "fija_centimos": 220000,
+    "nota": "Verspätungszuschlag bis 1 % der Bemessungsgrundlage, höchstens 2.200 €."
+   }
+  },
+  {
+   "clave": "at_lohn",
+   "nombre": "Lohnsteuer, DB, DZ",
+   "concepto": "retenciones_trabajo",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "15"
+   },
+   "margen_dias": 7,
+   "portal": "finanzonline",
+   "aplica": {
+    "condiciones": [
+     "empleados"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_base_pct": 2,
+    "recargo_max_pct": 4,
+    "nota": "Säumniszuschlag 2 %, plus je 1 % nach drei und sechs Monaten."
+   }
+  },
+  {
+   "clave": "at_sv",
+   "nombre": "Sozialversicherungsbeiträge (ÖGK)",
+   "concepto": "seguridad_social",
+   "ambito": "laboral",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "15"
+   },
+   "margen_dias": 7,
+   "portal": "oegk",
+   "aplica": {
+    "condiciones": [
+     "empleados"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_pct_mes": 0.33,
+    "recargo_max_pct": 8,
+    "nota": "Verzugszinsen (2025: 7,03 % p. a.) und Beitragszuschläge."
+   }
+  },
+  {
+   "clave": "at_koest",
+   "nombre": "Körperschaftsteuererklärung (K1)",
+   "concepto": "sociedades_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "06-30+1"
+   },
+   "margen_dias": 30,
+   "portal": "finanzonline",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_max_pct": 10,
+    "nota": "Verspätungszuschlag bis 10 % (§ 135 BAO); Quotenregelung über Steuerberater möglich."
+   }
+  },
+  {
+   "clave": "at_koest_vz",
+   "nombre": "Körperschaftsteuer-Vorauszahlungen",
+   "concepto": "pago_fraccionado_sociedades",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "1P": "02-15",
+    "2P": "05-15",
+    "3P": "08-15",
+    "4P": "11-15"
+   },
+   "margen_dias": 7,
+   "portal": "finanzonline",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_base_pct": 2,
+    "nota": "Säumniszuschlag 2 %."
+   }
+  },
+  {
+   "clave": "at_est",
+   "nombre": "Einkommensteuererklärung (E1)",
+   "concepto": "renta_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "06-30+1"
+   },
+   "margen_dias": 30,
+   "portal": "finanzonline",
+   "aplica": {
+    "tipos": [
+     "persona_fisica"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_max_pct": 10,
+    "nota": "Verspätungszuschlag bis 10 %."
+   }
+  },
+  {
+   "clave": "at_firmenbuch",
+   "nombre": "Jahresabschluss beim Firmenbuch einreichen",
+   "concepto": "cuentas_anuales",
+   "ambito": "mercantil",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "09-30+1"
+   },
+   "margen_dias": 30,
+   "portal": "firmenbuch",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 70000,
+    "nota": "Zwangsstrafe von 700 € je Geschäftsführer und Gesellschaft, alle zwei Monate wiederholbar (§ 283 UGB). Frist: neun Monate nach Bilanzstichtag."
+   }
+  }
+ ]
+}

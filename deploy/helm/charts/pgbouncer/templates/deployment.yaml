@@ -1,0 +1,111 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "sytue-pgbouncer.fullname" . }}
+  labels:
+    {{- include "sytue-pgbouncer.labels" . | nindent 4 }}
+spec:
+  # Sin HPA a proposito: el presupuesto de conexiones hacia la RDB es
+  # replicas x bases x max_db_connections; escalar sin recalcular lo rompe.
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "sytue-pgbouncer.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "sytue-pgbouncer.labels" . | nindent 8 }}
+      annotations:
+        kubectl.kubernetes.io/default-container: pgbouncer
+        # Reinicia los pods cuando cambia la config (rollout en upgrade).
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    spec:
+      automountServiceAccountToken: false
+      {{- with (.Values.global).imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: pgbouncer
+          image: "{{ include "sytue-pgbouncer.image" . }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          # La [databases] se genera en el arranque desde el secret con el
+          # endpoint RDB (pgbouncer.ini no expande variables de entorno).
+          command: ["/bin/sh", "-ec"]
+          args:
+            - |
+              printf '[databases]\n* = host=%s port=%s\n' "$PGB_DB_HOST" "$PGB_DB_PORT" > /run/pgbouncer/databases.ini
+              exec pgbouncer /etc/pgbouncer/pgbouncer.ini
+          env:
+            # Endpoint PRIVADO de la RDB (Scaleway, UE) — nunca en git.
+            - name: PGB_DB_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgresql.existingSecret }}
+                  key: {{ .Values.postgresql.hostKey }}
+            - name: PGB_DB_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgresql.existingSecret }}
+                  key: {{ .Values.postgresql.portKey }}
+          ports:
+            - name: pgbouncer
+              containerPort: {{ .Values.listenPort }}
+              protocol: TCP
+          startupProbe:
+            tcpSocket:
+              port: pgbouncer
+            initialDelaySeconds: 2
+            periodSeconds: 3
+            failureThreshold: 20
+          readinessProbe:
+            tcpSocket:
+              port: pgbouncer
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: pgbouncer
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/pgbouncer/pgbouncer.ini
+              subPath: pgbouncer.ini
+              readOnly: true
+            - name: auth
+              mountPath: /etc/pgbouncer/userlist.txt
+              subPath: {{ .Values.auth.userlistKey }}
+              readOnly: true
+            # rootfs de solo lectura: escrituras efimeras (databases.ini, socket).
+            - name: run
+              mountPath: /run/pgbouncer
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "sytue-pgbouncer.fullname" . }}
+        - name: auth
+          secret:
+            secretName: {{ .Values.auth.existingSecret }}
+        - name: run
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+      {{- with .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- range . }}
+        - maxSkew: {{ .maxSkew }}
+          topologyKey: {{ .topologyKey }}
+          whenUnsatisfiable: {{ .whenUnsatisfiable }}
+          labelSelector:
+            matchLabels:
+              {{- include "sytue-pgbouncer.selectorLabels" $ | nindent 14 }}
+        {{- end }}
+      {{- end }}

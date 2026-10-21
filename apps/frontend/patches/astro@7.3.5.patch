@@ -1,0 +1,26 @@
+diff --git a/dist/core/app/node.js b/dist/core/app/node.js
+index 7c6caa6c28eb0eecff2aa02d55f9ef2f95b036f5..311064a79bc43d07c7c196ca507f40f35802e6d6 100644
+--- a/dist/core/app/node.js
++++ b/dist/core/app/node.js
+@@ -168,7 +168,20 @@ async function writeResponse(source, destination) {
+     });
+     let result = await reader.read();
+     while (!result.done) {
+-      destination.write(result.value);
++      // sytue: respetar la contrapresión. Sin esperar a «drain», un cliente más lento
++      // que el origen hace que el proceso acumule el cuerpo ENTERO en memoria: un
++      // instalador de 660 MB mataba el pod del portal por OOM (apps/frontend/patches/).
++      if (!destination.write(result.value) && !destination.destroyed) {
++        await new Promise((resolve) => {
++          const seguir = () => {
++            destination.off("drain", seguir);
++            destination.off("close", seguir);
++            resolve();
++          };
++          destination.on("drain", seguir);
++          destination.on("close", seguir);
++        });
++      }
+       result = await reader.read();
+     }
+     destination.end();

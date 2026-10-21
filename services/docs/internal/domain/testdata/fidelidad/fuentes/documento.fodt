@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: Apache-2.0
+     Copyright (c) 2026 Daniel Delgado Ramos
+     Fuente del corpus de fidelidad (documento). Texto original de Sytue: la
+     cooperativa La Vega es inventada. De aquí salen documento.docx y documento.odt
+     con LibreOffice (ver ../generar.sh); cada característica lleva un texto propio
+     que las sondas de fidelidad_test.go buscan después de importar. -->
+<office:document xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+  xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"
+  xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
+  xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"
+  xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"
+  xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0"
+  xmlns:xlink="http://www.w3.org/1999/xlink"
+  xmlns:dc="http://purl.org/dc/elements/1.1/"
+  xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0"
+  office:version="1.3" office:mimetype="application/vnd.oasis.opendocument.text">
+ <office:styles>
+  <style:style style:name="Standard" style:family="paragraph" style:class="text"/>
+  <style:style style:name="Heading" style:family="paragraph" style:parent-style-name="Standard" style:class="text">
+   <style:paragraph-properties fo:margin-top="0.42cm" fo:margin-bottom="0.21cm" fo:keep-with-next="always"/>
+   <style:text-properties fo:font-weight="bold"/>
+  </style:style>
+  <style:style style:name="Heading_20_1" style:display-name="Heading 1" style:family="paragraph" style:parent-style-name="Heading" style:default-outline-level="1" style:class="text">
+   <style:text-properties fo:font-size="18pt"/>
+  </style:style>
+  <style:style style:name="Heading_20_2" style:display-name="Heading 2" style:family="paragraph" style:parent-style-name="Heading" style:default-outline-level="2" style:class="text">
+   <style:text-properties fo:font-size="15pt"/>
+  </style:style>
+  <style:style style:name="Heading_20_3" style:display-name="Heading 3" style:family="paragraph" style:parent-style-name="Heading" style:default-outline-level="3" style:class="text">
+   <style:text-properties fo:font-size="13pt"/>
+  </style:style>
+  <style:style style:name="Quotations" style:family="paragraph" style:parent-style-name="Standard" style:class="html">
+   <style:paragraph-properties fo:margin-left="1cm" fo:margin-right="1cm"/>
+   <style:text-properties fo:font-style="italic"/>
+  </style:style>
+  <style:style style:name="Header" style:family="paragraph" style:parent-style-name="Standard" style:class="extra"/>
+  <style:style style:name="Footer" style:family="paragraph" style:parent-style-name="Standard" style:class="extra"/>
+ </office:styles>
+ <office:automatic-styles>
+  <style:style style:name="T1" style:family="text"><style:text-properties fo:font-weight="bold"/></style:style>
+  <style:style style:name="T2" style:family="text"><style:text-properties fo:font-style="italic"/></style:style>
+  <style:style style:name="T3" style:family="text"><style:text-properties style:text-underline-style="solid" style:text-underline-width="auto" style:text-underline-color="font-color"/></style:style>
+  <style:style style:name="T4" style:family="text"><style:text-properties style:text-line-through-style="solid" style:text-line-through-type="single"/></style:style>
+  <style:style style:name="T5" style:family="text"><style:text-properties fo:color="#c0392b"/></style:style>
+  <style:style style:name="P1" style:family="paragraph" style:parent-style-name="Standard"><style:paragraph-properties fo:text-align="center"/></style:style>
+  <style:style style:name="P2" style:family="paragraph" style:parent-style-name="Standard"><style:paragraph-properties fo:text-align="end"/></style:style>
+  <style:style style:name="P3" style:family="paragraph" style:parent-style-name="Standard"><style:paragraph-properties fo:text-align="justify"/></style:style>
+  <style:style style:name="fr1" style:family="graphic"><style:graphic-properties style:vertical-pos="top" style:vertical-rel="baseline"/></style:style>
+  <text:list-style style:name="L1">
+   <text:list-level-style-bullet text:level="1" text:bullet-char="•"><style:list-level-properties text:list-level-position-and-space-mode="label-alignment"><style:list-level-label-alignment text:label-followed-by="listtab" fo:text-indent="-0.635cm" fo:margin-left="1.27cm"/></style:list-level-properties></text:list-level-style-bullet>
+  </text:list-style>
+  <text:list-style style:name="L2">
+   <text:list-level-style-number text:level="1" style:num-suffix="." style:num-format="1"><style:list-level-properties text:list-level-position-and-space-mode="label-alignment"><style:list-level-label-alignment text:label-followed-by="listtab" fo:text-indent="-0.635cm" fo:margin-left="1.27cm"/></style:list-level-properties></text:list-level-style-number>
+   <text:list-level-style-number text:level="2" style:num-suffix="." style:num-format="a"><style:list-level-properties text:list-level-position-and-space-mode="label-alignment"><style:list-level-label-alignment text:label-followed-by="listtab" fo:text-indent="-0.635cm" fo:margin-left="1.905cm"/></style:list-level-properties></text:list-level-style-number>
+  </text:list-style>
+  <style:page-layout style:name="pm1">
+   <style:page-layout-properties fo:page-width="21cm" fo:page-height="29.7cm" fo:margin-top="2cm" fo:margin-bottom="2cm" fo:margin-left="2cm" fo:margin-right="2cm"/>
+   <style:header-style><style:header-footer-properties fo:min-height="0cm" fo:margin-bottom="0.5cm"/></style:header-style>
+   <style:footer-style><style:header-footer-properties fo:min-height="0cm" fo:margin-top="0.5cm"/></style:footer-style>
+  </style:page-layout>
+ </office:automatic-styles>
+ <office:master-styles>
+  <style:master-page style:name="Standard" style:page-layout-name="pm1">
+   <style:header><text:p text:style-name="Header">Cooperativa La Vega, uso interno</text:p></style:header>
+   <style:footer><text:p text:style-name="Footer">Pie del informe trimestral</text:p></style:footer>
+  </style:master-page>
+ </office:master-styles>
+ <office:body>
+  <office:text>
+   <text:tracked-changes>
+    <text:changed-region text:id="ct1">
+     <text:insertion><office:change-info><dc:creator>Lucía Prieto</dc:creator><dc:date>2026-09-30T10:00:00</dc:date></office:change-info></text:insertion>
+    </text:changed-region>
+    <text:changed-region text:id="ct2">
+     <text:deletion><office:change-info><dc:creator>Lucía Prieto</dc:creator><dc:date>2026-09-30T10:05:00</dc:date></office:change-info><text:p>texto retirado</text:p></text:deletion>
+    </text:changed-region>
+   </text:tracked-changes>
+   <text:h text:style-name="Heading_20_1" text:outline-level="1">Informe trimestral de la cooperativa</text:h>
+   <text:p text:style-name="Standard">Este trimestre hubo una <text:span text:style-name="T1">cosecha récord</text:span>, leída <text:span text:style-name="T2">con matices</text:span>, con un dato <text:span text:style-name="T3">subrayado</text:span>, un <text:span text:style-name="T4">precio antiguo</text:span> y una cifra <text:span text:style-name="T5">en rojo</text:span>.</text:p>
+   <text:p text:style-name="Standard">Consulte la <text:a xlink:type="simple" xlink:href="https://www.sytue.eu/cooperativa">web de la cooperativa</text:a> para el detalle.</text:p>
+   <text:h text:style-name="Heading_20_2" text:outline-level="2">Resultados del huerto</text:h>
+   <text:p text:style-name="P1">Texto centrado del resumen</text:p>
+   <text:p text:style-name="P2">Texto a la derecha del resumen</text:p>
+   <text:p text:style-name="P3">Texto justificado del resumen, con la longitud suficiente para que el reparto de espacios se note en la línea.</text:p>
+   <text:p text:style-name="Quotations">La tierra no se hereda, se toma prestada.</text:p>
+   <text:list text:style-name="L1">
+    <text:list-item><text:p>Tomates</text:p></text:list-item>
+    <text:list-item><text:p>Pimientos</text:p></text:list-item>
+   </text:list>
+   <text:list text:style-name="L2">
+    <text:list-item><text:p>Preparar la tierra</text:p>
+     <text:list>
+      <text:list-item><text:p>Abonar el bancal</text:p></text:list-item>
+     </text:list>
+    </text:list-item>
+    <text:list-item><text:p>Sembrar</text:p></text:list-item>
+   </text:list>
+   <text:h text:style-name="Heading_20_3" text:outline-level="3">Detalle por parcela</text:h>
+   <table:table table:name="Parcelas">
+    <table:table-column table:number-columns-repeated="2"/>
+    <table:table-row>
+     <table:table-cell office:value-type="string"><text:p>Parcela</text:p></table:table-cell>
+     <table:table-cell office:value-type="string"><text:p>Kilos</text:p></table:table-cell>
+    </table:table-row>
+    <table:table-row>
+     <table:table-cell office:value-type="string"><text:p>Norte</text:p></table:table-cell>
+     <table:table-cell office:value-type="string"><text:p><office:annotation office:name="c1"><dc:creator>Marta Gil</dc:creator><dc:date>2026-09-29T09:00:00</dc:date><text:p>Revisar esta cifra con tesorería</text:p></office:annotation>1200<office:annotation-end office:name="c1"/></text:p></table:table-cell>
+    </table:table-row>
+    <table:table-row>
+     <table:table-cell table:number-rows-spanned="2" office:value-type="string"><text:p>Zona sur</text:p></table:table-cell>
+     <table:table-cell office:value-type="string"><text:p>900</text:p></table:table-cell>
+    </table:table-row>
+    <table:table-row>
+     <table:covered-table-cell/>
+     <table:table-cell office:value-type="string"><text:p>850</text:p></table:table-cell>
+    </table:table-row>
+    <table:table-row>
+     <table:table-cell table:number-columns-spanned="2" office:value-type="string"><text:p>Total anual de las parcelas</text:p></table:table-cell>
+     <table:covered-table-cell/>
+    </table:table-row>
+   </table:table>
+   <text:p text:style-name="Standard">La parcela norte en planta: <draw:frame draw:style-name="fr1" draw:name="Parcela" text:anchor-type="as-char" svg:width="2cm" svg:height="2cm" draw:z-index="0"><draw:image><office:binary-data>iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAHUlEQVR42mPQa1tNEmIY1UATDT1JliShUQ000QAAFExDEHL4q6wAAAAASUVORK5CYII=</office:binary-data></draw:image></draw:frame></text:p>
+   <text:p text:style-name="Standard">El peso declarado<text:note text:id="ftn1" text:note-class="footnote"><text:note-citation>1</text:note-citation><text:note-body><text:p>Datos de la báscula municipal.</text:p></text:note-body></text:note> cuadra con el registro<text:note text:id="edn1" text:note-class="endnote"><text:note-citation>i</text:note-citation><text:note-body><text:p>Fuente: libro de registro de la cooperativa.</text:p></text:note-body></text:note>.</text:p>
+   <text:p text:style-name="Standard">En la revisión se dejó un párrafo <text:change-start text:change-id="ct1"/>añadido en revisión<text:change-end text:change-id="ct1"/> y se quitó <text:change text:change-id="ct2"/>el resto.</text:p>
+  </office:text>
+ </office:body>
+</office:document>

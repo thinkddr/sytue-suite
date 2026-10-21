@@ -1,0 +1,18 @@
+Čísla, která dávají smysl, v tabulce, která pracuje s vámi.
+
+• Vzorce, podmíněné formátování a ověřování dat.
+• Načtěte externí data a dotazujte se na ně bez opuštění tabulky.
+• Grafy, minigrafy, průřezy a datové tabulky.
+• Export do ODS a XLSX; otevírání souborů Excel.
+• Vzorce s kontextovou nápovědou a okamžitým přepočtem.
+• Podmíněné formátování, ověřování dat a formáty čísel podle národního prostředí.
+• Grafy různých typů, minigrafy a průřezy.
+• Datové tabulky se součty a řazením; kontingenční tabulka.
+• Externí data: připojte zdroj a dotazujte se na něj z tabulky.
+• Řešitel pro nalezení hodnoty, která splní cíl.
+• Makra pro automatizaci opakovaných úloh.
+• Spolupráce v reálném čase s přítomností a komentáři.
+• Filtry, průřezy a vyhledávání v tabulce.
+• Export do ODS, XLSX a PDF; otevírání souborů Excel z Drive.
+
+Šifrování při přenosu (TLS 1.3). Infrastruktura Sytue je v EU. Umístění externích služeb závisí na jejich poskytovateli.

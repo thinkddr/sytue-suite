@@ -1,0 +1,64 @@
+{{- /*
+Catálogo de piezas a las que el panel de versiones de la consola les pregunta su
+`/healthz`. Lo lee Sytue ID (`SYTUE_ID_COMPONENTS`, ver charts/id).
+
+SE DEDUCE DE LO QUE ESTE RELEASE DESPLIEGA, no de una lista escrita a mano. La
+lista a mano (`global.components`) enseñaba en el piloto siete filas «no
+contesta» —cloud-dashboard, los tres de Cloud, OCR y los dos de Analytics— que
+ese perfil apaga: el panel preguntaba por Services que no existen. Solo el
+paraguas ve a la vez todos los subcharts, así que es aquí donde se calcula:
+
+  - servicio: cada subchart ENCENDIDO cuya imagen es nuestra (`sytue-<algo>`, sin
+    barra: el Traefik de producción sale de `sytue-prod-platform/traefik`). Los
+    de terceros (Traefik, PgBouncer, Dragonfly, LiveKit) no sirven nuestra versión.
+  - superficie: cada app ENCENDIDA del subchart de frontends.
+
+El nombre del Service sigue la convención de cada chart (`<release>-<alias>` y
+`<release>-fe-<app>`); el gate de helm-render-test.sh comprueba que cada entrada
+es un Service del mismo render, en producción y en el piloto.
+
+ponytail: Sytue ID lo lee como variable de entorno, así que un cambio de
+catálogo sin cambio de imagen se ve cuando rote su pod (cada release lo hace).
+*/ -}}
+{{- $entradas := list }}
+{{- range $nombre, $sub := .Subcharts }}
+{{- $repo := toString (($sub.Values.image | default dict).repository | default "") }}
+{{- if regexMatch "^sytue-[a-z0-9-]+$" $repo }}
+{{- $entradas = append $entradas (printf "%s|service|http://%s-%s" $nombre $.Release.Name $nombre) }}
+{{- if and (eq $nombre "pages") ($sub.Values.sitios).service }}
+{{- $entradas = append $entradas (printf "pages-sitios|service|http://%s-pages-sitios" $.Release.Name) }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- with index .Subcharts "sytue-frontend" }}
+{{- range $app, $cfg := .Values.apps }}
+{{- if $cfg.enabled }}
+{{- $entradas = append $entradas (printf "%s|surface|http://%s-fe-%s" $app $.Release.Name $app) }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- /*
+El piloto despliega Analytics FUERA del chart, con su propio
+manifiesto (deploy/helm/manifests/analytics.yaml.tpl, Services
+`sytue-analytics-api` e `-ingest` sin prefijo de release). El chart no puede
+verlo, así que el perfil lo declara con `global.analyticsFueraDelChart`, atado
+a ANALYTICS_ENABLED igual que el manifiesto en deploy.sh.
+*/ -}}
+{{- if (.Values.global | default dict).analyticsFueraDelChart }}
+{{- range $s := list "analytics-api" "analytics-ingest" }}
+{{- $entradas = append $entradas (printf "%s|service|http://sytue-%s" $s $s) }}
+{{- end }}
+{{- end }}
+{{- with $entradas }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $.Release.Name }}-componentes
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    app.kubernetes.io/managed-by: {{ $.Release.Service }}
+    app.kubernetes.io/part-of: sytue-one
+data:
+  componentes: {{ join "," . | quote }}
+{{- end }}

@@ -1,0 +1,18 @@
+Cifre cu sens, într-o foaie care lucrează cu dumneavoastră.
+
+• Formule, formatare condiționată și validarea datelor.
+• Aduceți date externe și interogați-le fără să părăsiți foaia.
+• Diagrame, minidiagrame, slicere și tabele de date.
+• Export în ODS și XLSX; deschiderea fișierelor Excel.
+• Formule cu ajutor contextual și recalculare instantanee.
+• Formatare condiționată, validarea datelor și formate numerice în funcție de setările regionale.
+• Diagrame de mai multe tipuri, minidiagrame și slicere.
+• Tabele de date cu totaluri și sortare; tabel pivot.
+• Date externe: conectați o sursă și interogați-o din foaie.
+• Solver pentru a găsi valoarea care atinge un obiectiv.
+• Macrocomenzi pentru automatizarea sarcinilor repetitive.
+• Colaborare în timp real cu prezență și comentarii.
+• Filtre, slicere și căutare în foaie.
+• Export în ODS, XLSX și PDF; deschiderea fișierelor Excel din Drive.
+
+Criptare în tranzit (TLS 1.3). Infrastructura Sytue se află în UE. Locația serviciilor externe depinde de furnizorul lor.

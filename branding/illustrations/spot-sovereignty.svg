@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120" fill="none" role="img" aria-label="Datos en Europa">
+  <title>Soberanía europea</title>
+  <!-- Escudo/dato protegido, line-art neutro -->
+  <path d="M60 22l28 10v22c0 20-13 34-28 40-15-6-28-20-28-40V32l28-10z"
+        stroke="var(--sytue-neutral-400)" stroke-width="2.4" stroke-linejoin="round"/>
+  <!-- Círculo de estrellas UE dentro: acento teal -->
+  <g fill="var(--sytue-accent-500)">
+    <circle cx="60" cy="46" r="1.8"/><circle cx="69" cy="49" r="1.8"/><circle cx="73" cy="58" r="1.8"/>
+    <circle cx="69" cy="67" r="1.8"/><circle cx="60" cy="70" r="1.8"/><circle cx="51" cy="67" r="1.8"/>
+    <circle cx="47" cy="58" r="1.8"/><circle cx="51" cy="49" r="1.8"/>
+  </g>
+</svg>

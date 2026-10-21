@@ -1,0 +1,8 @@
+Astro Fyne
+Copyright 2026 the Astro Fyne contributors.
+Portions copyright (c) Sytue, licensed under Apache-2.0.
+
+This project is licensed under the Apache License, Version 2.0.
+The optional Sytue adapter is maintained outside this distribution and is not
+part of the public compiler or native runtime. Astro, Preact, TypeScript and
+Fyne retain their respective upstream licenses.

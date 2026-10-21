@@ -1,0 +1,56 @@
+---
+/**
+ * «Bienvenido a Sytue» — alta inicial guiada (el primer contacto con el producto).
+ *
+ * La isla lee su estado de Sytue ID a través del BFF (/api/onboarding) y lo guarda
+ * en cada paso: si el usuario cierra el navegador, al volver aquí retoma donde lo
+ * dejó. La página no decide nada del flujo; solo lo enmarca.
+ */
+import AppLayout from '../layouts/AppLayout.astro';
+import { useT } from '../i18n/index.js';
+import { Onboarding } from '../components/Onboarding';
+import { bff, toBffContext } from '../lib/auth';
+import { esCuentaPersonal } from '@sytue/auth';
+import { appDomains, canonicaConOrg, returnToCanonico } from '@sytue/config';
+
+export const prerender = false;
+
+const session = await bff.getSession(toBffContext(Astro));
+if (!session) {
+  // ADR 0056: la entrada org-ful llega reescrita con la marca ?__org=; el returnTo
+  // sale canónico, no en la forma interna, o tras el login la barra se queda con ella.
+  const returnTo = returnToCanonico(Astro.url, bff.basePath);
+  const redireccionLogin = Astro.redirect(
+    `${bff.basePath}/auth/login?returnTo=${encodeURIComponent(returnTo)}`,
+  );
+  redireccionLogin.headers.set('cache-control', 'no-store');
+  return redireccionLogin;
+}
+// Ruta en `sinOrg` (su nombre colisiona con el namespace de organizaciones):
+// con sesión con org, un salto local a la canónica. Los recién llegados no
+// tienen org activa aún y se quedan en la forma sin org, que es la suya.
+const canonica = canonicaConOrg(Astro.url, bff.basePath, session.user.tenant);
+if (canonica) return Astro.redirect(canonica);
+// Una cuenta personal no tiene alta guiada que hacer —nació hecha— y esta es
+// también la página a la que Mollie devuelve tras un pago: lo que esa persona
+// quiere ver es su plan, que vive en su cuenta.
+//
+// El destino se calcula FUERA del `return`: `astro check` no ve lo que se usa
+// dentro de un `return` del frontmatter y marca el import como no leído
+// (ts6133), igual que le pasa a `r()` en index.astro.
+const cuentaPersonal = esCuentaPersonal(session.user) ? `${appDomains.id}/account` : null;
+if (cuentaPersonal) {
+  return Astro.redirect(cuentaPersonal);
+}
+const t = useT(Astro.locals.locale);
+---
+
+<AppLayout title={t('page.welcome')}>
+  <div class="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6 sm:py-12">
+    <header class="mb-8">
+      <h1 class="sytue-h2 text-text">{t('page.welcome')}</h1>
+      <p class="text-text-muted mt-1 text-base">{t('ob.lead')}</p>
+    </header>
+    <Onboarding client:load locale={Astro.locals.locale} />
+  </div>
+</AppLayout>

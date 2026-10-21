@@ -1,0 +1,12 @@
+-- CONFERENCE por evento (RFC 7986): la URL de la videollamada del evento, y la que
+-- hace que Apple Calendar, Outlook y Thunderbird muestren su botón «Unirse» al
+-- sincronizar por CalDAV. En LOCATION la URL es solo texto; en CONFERENCE es una
+-- acción, que es la diferencia entre «hay un enlace escrito» y «se entra desde aquí».
+--
+-- Proyección consultable, como `color`: el recurso CalDAV se sirve verbatim desde
+-- calendar_objects.data, así que el round-trip no depende de esta columna — aquí se
+-- expone a la API REST para que el frontend pinte el botón sin releer el ICS.
+--
+-- '' = el evento no tiene videollamada. Se guarda la URL tal cual; el saneo (que no
+-- lleve ':' de más, CR/LF ni parámetros inyectados) va en el dominio, igual que el color.
+ALTER TABLE events ADD COLUMN conference_url text NOT NULL DEFAULT '';

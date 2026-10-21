@@ -1,0 +1,18 @@
+Divdesmit četri moduļi un divkāršā grāmatvedība, ko datubāze neļauj izjaukt.
+
+• Divdesmit četri moduļi un trīsdesmit seši modeļi: kontakti, pārdošana, iepirkumi, krājumi, ražošana, rēķini, grāmatvedība, projekti un personāls.
+• Moduļa pievienošana nozīmē JSON faila rakstīšanu: bez migrācijas, bez jauna maršruta un bez darba pie saskarnes.
+• Naudas summas tiek glabātas veselos centos, nekad peldošajā komatā, un bilanci nodrošina datubāze.
+• Iegrāmatotie ieraksti ir neaizskarami: tos labo ar citu ierakstu, un tieši tas atšķir virsgrāmatu no izklājlapas.
+• Divdesmit četri moduļi un trīsdesmit seši modeļi vienā pakalpojumā un vienā datubāzē.
+• Modeļu katalogs ir dati: katrs modulis deklarē savus laukus, stāvokļus un saraksta kolonnas.
+• Jauns modulis ir viens JSON fails — bez DDL, bez migrācijas un bez tabulu bloķēšanas.
+• Viena API visiem trīsdesmit sešiem modeļiem un viena no kataloga ģenerēta saskarne.
+• Divkāršā grāmatvedība ar summām veselos centos; neviena skaitļa peldošajā komatā.
+• Bilanci pārbauda datubāze transakcijas apstiprināšanas brīdī, nevis lietotnes kods.
+• Slēgtie ieraksti ir nemaināmi: tos nevar rediģēt, dzēst vai papildināt ar jaunām rindām.
+• Viens dokuments, viens ieraksts: atkārtots mēģinājums vai divas atvērtas cilnes nevar dubultot ieņēmumus.
+• Kopīgie nosaukumi ir pieejami visās 26 valodās, un netulkots lauks neļauj pakalpojumam startēt.
+• Indeksēti saraksti: pirmā lappuse no divdesmit tūkstošiem rindu tiek atgriezta ātrāk nekā milisekundē.
+
+Šifrēts pārsūtīšanas laikā (TLS 1.3). Sytue infrastruktūra atrodas ES. Ārējo pakalpojumu atrašanās vieta ir atkarīga no to sniedzēja.

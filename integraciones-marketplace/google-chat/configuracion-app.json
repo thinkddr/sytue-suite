@@ -1,0 +1,12 @@
+{
+  "producto": "Sytue — Google Chat",
+  "chat_app": {
+    "connection": "HTTP endpoint",
+    "scopes": [
+      "https://www.googleapis.com/auth/chat.messages.readonly",
+      "https://www.googleapis.com/auth/chat.spaces.readonly"
+    ],
+    "redirect_uri_oauth": "https://integrations.sytue.eu/api/v1/oauth/callback"
+  },
+  "nota": "Sin semilla en el catálogo todavía (llega con la ola de integraciones de Chat); el endpoint HTTP y el dominio verificado son los del Integration Gateway."
+}

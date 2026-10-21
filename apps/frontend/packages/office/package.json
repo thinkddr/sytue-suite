@@ -1,0 +1,42 @@
+{
+  "name": "@sytue/office",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sytue One — la ofimática común de Docus, Calcus, Diapos y CertiPDF: editor nativo (documentos, hojas y presentaciones con colaboración CRDT/OT), CertiPDF, el BFF que habla con el servicio Go de documentos y las vistas que cada app monta en sus páginas. Se consume como fuente desde las apps; no se compila aparte.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    "./astro": "./src/astro.ts",
+    "./auth": "./src/lib/auth.ts",
+    "./middleware": "./src/middleware.ts",
+    "./vistas": "./src/vistas/entrar.ts",
+    "./vistas/*": "./src/vistas/*"
+  },
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "bun --bun astro check"
+  },
+  "dependencies": {
+    "@astrojs/preact": "catalog:",
+    "@sytue/ai": "workspace:*",
+    "@sytue/api-clients": "workspace:*",
+    "@sytue/auth": "workspace:*",
+    "@sytue/config": "workspace:*",
+    "@sytue/escena": "workspace:*",
+    "@sytue/formula": "workspace:*",
+    "@sytue/i18n": "workspace:*",
+    "@sytue/offline": "workspace:*",
+    "@sytue/scripts": "workspace:*",
+    "@sytue/shell": "workspace:*",
+    "@sytue/ui": "workspace:*",
+    "astro": "catalog:",
+    "preact": "10.29.8"
+  },
+  "devDependencies": {
+    "@astrojs/check": "catalog:",
+    "@happy-dom/global-registrator": "20.14.5",
+    "@types/node": "catalog:",
+    "tailwindcss": "4.3.3",
+    "typescript": "6.0.3"
+  }
+}

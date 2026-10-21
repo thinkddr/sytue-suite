@@ -1,0 +1,1039 @@
+{
+  "version": 1,
+  "fotos": [
+    {
+      "id": "met-10771",
+      "fichero": "met-10771.jpg",
+      "sha256": "ad72aff8a0261dc80cc4d51a94ed8d986dbe03067ab9ecc57a26e0c6b9905cec",
+      "ancho": 600,
+      "alto": 421,
+      "licencia": "CC0-1.0",
+      "fuente": "https://www.metmuseum.org/art/collection/search/10771",
+      "autor": "Thomas Doughty",
+      "prueba": "https://www.metmuseum.org/information/terms-and-conditions",
+      "prueba_texto": "The Met Open Access data and public-domain images are available under the Creative Commons Zero (CC0) license.",
+      "descargada": "2026-09-29",
+      "etiquetas": [
+        "arte",
+        "dominio-publico"
+      ],
+      "alt": {
+        "es": "Imagen de dominio público: Spring Landscape",
+        "en": "Public-domain image: Spring Landscape"
+      },
+      "verticales": [
+        "alojamiento",
+        "servicios",
+        "portfolio"
+      ]
+    },
+    {
+      "id": "met-13565",
+      "fichero": "met-13565.jpg",
+      "sha256": "43f83195113dd0d2745a89d64d156660ef612c632a1836c4e41d45f1116439f9",
+      "ancho": 593,
+      "alto": 625,
+      "licencia": "CC0-1.0",
+      "fuente": "https://www.metmuseum.org/art/collection/search/13565",
+      "autor": "N. L.",
+      "prueba": "https://www.metmuseum.org/information/terms-and-conditions",
+      "prueba_texto": "The Met Open Access data and public-domain images are available under the Creative Commons Zero (CC0) license.",
+      "descargada": "2026-09-29",
+      "etiquetas": [
+        "arte",
+        "dominio-publico"
+      ],
+      "alt": {
+        "es": "Imagen de dominio público: Bed rug",
+        "en": "Public-domain image: Bed rug"
+      },
+      "verticales": [
+        "tienda",
+        "reformas",
+        "portfolio"
+      ]
+    },
+    {
+      "id": "met-13576",
+      "fichero": "met-13576.jpg",
+      "sha256": "c15f708d710bcbb82ac29a99ede6e0247ad33e491875fdd5bd75a83bf1dd6d87",
+      "ancho": 585,
+      "alto": 625,
+      "licencia": "CC0-1.0",
+      "fuente": "https://www.metmuseum.org/art/collection/search/13576",
+      "autor": "Zeruah H. Guernsey Caswell",
+      "prueba": "https://www.metmuseum.org/information/terms-and-conditions",
+      "prueba_texto": "The Met Open Access data and public-domain images are available under the Creative Commons Zero (CC0) license.",
+      "descargada": "2026-09-29",
+      "etiquetas": [
+        "arte",
+        "dominio-publico"
+      ],
+      "alt": {
+        "es": "Imagen de dominio público: Embroidered Carpet",
+        "en": "Public-domain image: Embroidered Carpet"
+      },
+      "verticales": [
+        "tienda",
+        "reformas",
+        "fabrica",
+        "portfolio"
+      ]
+    },
+    {
+      "id": "met-13607",
+      "fichero": "met-13607.jpg",
+      "sha256": "7321250b4b4321a4bf48cbbac503bc200be2058f52590646823ff187dee21808",
+      "ancho": 599,
+      "alto": 560,
+      "licencia": "CC0-1.0",
+      "fuente": "https://www.metmuseum.org/art/collection/search/13607",
+      "autor": "Mary Breed",
+      "prueba": "https://www.metmuseum.org/information/terms-and-conditions",
+      "prueba_texto": "The Met Open Access data and public-domain images are available under the Creative Commons Zero (CC0) license.",
+      "descargada": "2026-09-29",
+      "etiquetas": [
+        "arte",
+        "dominio-publico"
+      ],
+      "alt": {
+        "es": "Imagen de dominio público: Embroidered coverlet",
+        "en": "Public-domain image: Embroidered coverlet"
+      },
+      "verticales": [
+        "tienda",
+        "alojamiento",
+        "producto"
+      ]
+    },
+    {
+      "id": "met-13756",
+      "fichero": "met-13756.jpg",
+      "sha256": "ffe19cf567a548533367aa850ffcbb145633cf869bdf61bcce27423055c513eb",
+      "ancho": 496,
+      "alto": 625,
+      "licencia": "CC0-1.0",
+      "fuente": "https://www.metmuseum.org/art/collection/search/13756",
+      "autor": "Mary Waine",
+      "prueba": "https://www.metmuseum.org/information/terms-and-conditions",
+      "prueba_texto": "The Met Open Access data and public-domain images are available under the Creative Commons Zero (CC0) license.",
+      "descargada": "2026-09-29",
+      "etiquetas": [
+        "arte",
+        "dominio-publico"
+      ],
+      "alt": {
+        "es": "Imagen de dominio público: Sampler",
+        "en": "Public-domain image: Sampler"
+      },
+      "verticales": [
+        "academia",
+        "fabrica",
+        "portfolio"
+      ]
+    },
+    {
+      "id": "met-13875",
+      "fichero": "met-13875.jpg",
+      "sha256": "d58965d9c6723422bcdd751fe1d53dba705b7577f58065f139f8f7bbc424504d",
+      "ancho": 599,
+      "alto": 611,
+      "licencia": "CC0-1.0",
+      "fuente": "https://www.metmuseum.org/art/collection/search/13875",
+      "autor": "Mary Hergenroder Simon",
+      "prueba": "https://www.metmuseum.org/information/terms-and-conditions",
+      "prueba_texto": "The Met Open Access data and public-domain images are available under the Creative Commons Zero (CC0) license.",
+      "descargada": "2026-09-29",
+      "etiquetas": [
+        "arte",
+        "dominio-publico"
+      ],
+      "alt": {
+        "es": "Imagen de dominio público: Quilt, Presentation pattern",
+        "en": "Public-domain image: Quilt, Presentation pattern"
+      },
+      "verticales": [
+        "tienda",
+        "producto",
+        "reformas"
+      ]
+    },
+    {
+      "id": "met-20615",
+      "fichero": "met-20615.jpg",
+      "sha256": "c558f7802a5f63516abc2043655664f0151ed9a0e8a8dd75b449d106ba381301",
+      "ancho": 548,
+      "alto": 625,
+      "licencia": "CC0-1.0",
+      "fuente": "https://www.metmuseum.org/art/collection/search/20615",
+      "autor": "Julia Ann Fitch",
+      "prueba": "https://www.metmuseum.org/information/terms-and-conditions",
+      "prueba_texto": "The Met Open Access data and public-domain images are available under the Creative Commons Zero (CC0) license.",
+      "descargada": "2026-09-29",
+      "etiquetas": [
+        "arte",
+        "dominio-publico"
+      ],
+      "alt": {
+        "es": "Imagen de dominio público: Sampler",
+        "en": "Public-domain image: Sampler"
+      },
+      "verticales": [
+        "academia",
+        "portfolio"
+      ]
+    },
+    {
+      "id": "met-36131",
+      "fichero": "met-36131.jpg",
+      "sha256": "be29f031b446bc59920e8da36addbc7584b1923bf549553caec641917d2130c9",
+      "ancho": 600,
+      "alto": 415,
+      "licencia": "CC0-1.0",
+      "fuente": "https://www.metmuseum.org/art/collection/search/36131",
+      "autor": "Gong Xian",
+      "prueba": "https://www.metmuseum.org/information/terms-and-conditions",
+      "prueba_texto": "The Met Open Access data and public-domain images are available under the Creative Commons Zero (CC0) license.",
+      "descargada": "2026-09-29",
+      "etiquetas": [
+        "arte",
+        "dominio-publico"
+      ],
+      "alt": {
+        "es": "Imagen de dominio público: Landscapes with poems",
+        "en": "Public-domain image: Landscapes with poems"
+      },
+      "verticales": [
+        "academia",
+        "servicios",
+        "portfolio"
+      ]
+    },
+    {
+      "id": "met-36157",
+      "fichero": "met-36157.jpg",
+      "sha256": "9da9ddd858f23661ed57b497e2b754df74aaeca2032c9a1ff5e773ef95452f2e",
+      "ancho": 598,
+      "alto": 297,
+      "licencia": "CC0-1.0",
+      "fuente": "https://www.metmuseum.org/art/collection/search/36157",
+      "autor": "Liu Deliu",
+      "prueba": "https://www.metmuseum.org/information/terms-and-conditions",
+      "prueba_texto": "The Met Open Access data and public-domain images are available under the Creative Commons Zero (CC0) license.",
+      "descargada": "2026-09-29",
+      "etiquetas": [
+        "arte",
+        "dominio-publico"
+      ],
+      "alt": {
+        "es": "Imagen de dominio público: Squirrel and Grape",
+        "en": "Public-domain image: Squirrel and Grape"
+      },
+      "verticales": [
+        "restaurante",
+        "alojamiento",
+        "portfolio"
+      ]
+    },
+    {
+      "id": "met-36161",
+      "fichero": "met-36161.jpg",
+      "sha256": "e72196a536a20ff6558efe0e016c9b2400bf34eda64b70e152b710ee346c4837",
+      "ancho": 599,
+      "alto": 303,
+      "licencia": "CC0-1.0",
+      "fuente": "https://www.metmuseum.org/art/collection/search/36161",
+      "autor": "Zhao Zhiqian",
+      "prueba": "https://www.metmuseum.org/information/terms-and-conditions",
+      "prueba_texto": "The Met Open Access data and public-domain images are available under the Creative Commons Zero (CC0) license.",
+      "descargada": "2026-09-29",
+      "etiquetas": [
+        "arte",
+        "dominio-publico"
+      ],
+      "alt": {
+        "es": "Imagen de dominio público: Peony",
+        "en": "Public-domain image: Peony"
+      },
+      "verticales": [
+        "clinica",
+        "restaurante",
+        "portfolio"
+      ]
+    },
+    {
+      "id": "met-36432",
+      "fichero": "met-36432.jpg",
+      "sha256": "125d657cfb21b561ed20e3b2e43b60133a0fd6f638dd38ae4022a182157143e3",
+      "ancho": 600,
+      "alto": 505,
+      "licencia": "CC0-1.0",
+      "fuente": "https://www.metmuseum.org/art/collection/search/36432",
+      "autor": "Jin Nong",
+      "prueba": "https://www.metmuseum.org/information/terms-and-conditions",
+      "prueba_texto": "The Met Open Access data and public-domain images are available under the Creative Commons Zero (CC0) license.",
+      "descargada": "2026-09-29",
+      "etiquetas": [
+        "arte",
+        "dominio-publico"
+      ],
+      "alt": {
+        "es": "Imagen de dominio público: Plum blossoms",
+        "en": "Public-domain image: Plum blossoms"
+      },
+      "verticales": [
+        "clinica",
+        "restaurante",
+        "portfolio"
+      ]
+    },
+    {
+      "id": "met-36436",
+      "fichero": "met-36436.jpg",
+      "sha256": "215c6a2274199e02ec12e8ddb4bd57d6fb1c31037f19d11574a4d056208da079",
+      "ancho": 600,
+      "alto": 406,
+      "licencia": "CC0-1.0",
+      "fuente": "https://www.metmuseum.org/art/collection/search/36436",
+      "autor": "Zhang Feng",
+      "prueba": "https://www.metmuseum.org/information/terms-and-conditions",
+      "prueba_texto": "The Met Open Access data and public-domain images are available under the Creative Commons Zero (CC0) license.",
+      "descargada": "2026-09-29",
+      "etiquetas": [
+        "arte",
+        "dominio-publico"
+      ],
+      "alt": {
+        "es": "Imagen de dominio público: Landscapes",
+        "en": "Public-domain image: Landscapes"
+      },
+      "verticales": [
+        "alojamiento",
+        "servicios",
+        "portfolio"
+      ]
+    },
+    {
+      "id": "met-36543",
+      "fichero": "met-36543.jpg",
+      "sha256": "e6c78a201548b148e4da68ec8a68183e73d50636517ed6cb63ac003dd42b967e",
+      "ancho": 415,
+      "alto": 625,
+      "licencia": "CC0-1.0",
+      "fuente": "https://www.metmuseum.org/art/collection/search/36543",
+      "autor": "Utagawa Hiroshige",
+      "prueba": "https://www.metmuseum.org/information/terms-and-conditions",
+      "prueba_texto": "The Met Open Access data and public-domain images are available under the Creative Commons Zero (CC0) license.",
+      "descargada": "2026-09-29",
+      "etiquetas": [
+        "arte",
+        "dominio-publico"
+      ],
+      "alt": {
+        "es": "Imagen de dominio público: The Suijin Temple Grove, Uchikawa, and the Village of Sekiya",
+        "en": "Public-domain image: The Suijin Temple Grove, Uchikawa, and the Village of Sekiya"
+      },
+      "verticales": [
+        "alojamiento",
+        "portfolio",
+        "servicios"
+      ]
+    },
+    {
+      "id": "met-39654",
+      "fichero": "met-39654.jpg",
+      "sha256": "51a8a9809a33484239ee355235468765e5bde9feb9146e2bf5410ac9f6aa8dcb",
+      "ancho": 600,
+      "alto": 571,
+      "licencia": "CC0-1.0",
+      "fuente": "https://www.metmuseum.org/art/collection/search/39654",
+      "autor": "Wen Zhengming",
+      "prueba": "https://www.metmuseum.org/information/terms-and-conditions",
+      "prueba_texto": "The Met Open Access data and public-domain images are available under the Creative Commons Zero (CC0) license.",
+      "descargada": "2026-09-29",
+      "etiquetas": [
+        "arte",
+        "dominio-publico"
+      ],
+      "alt": {
+        "es": "Imagen de dominio público: Garden of the Inept Administrator",
+        "en": "Public-domain image: Garden of the Inept Administrator"
+      },
+      "verticales": [
+        "alojamiento",
+        "reformas",
+        "portfolio"
+      ]
+    },
+    {
+      "id": "met-39668",
+      "fichero": "met-39668.jpg",
+      "sha256": "1112eb30b089b9644c83510a42b67e710ac3623d02848fb7497138fd62020398",
+      "ancho": 600,
+      "alto": 320,
+      "licencia": "CC0-1.0",
+      "fuente": "https://www.metmuseum.org/art/collection/search/39668",
+      "autor": "Guo Xi",
+      "prueba": "https://www.metmuseum.org/information/terms-and-conditions",
+      "prueba_texto": "The Met Open Access data and public-domain images are available under the Creative Commons Zero (CC0) license.",
+      "descargada": "2026-09-29",
+      "etiquetas": [
+        "arte",
+        "dominio-publico"
+      ],
+      "alt": {
+        "es": "Imagen de dominio público: Old Trees, Level Distance",
+        "en": "Public-domain image: Old Trees, Level Distance"
+      },
+      "verticales": [
+        "alojamiento",
+        "servicios",
+        "portfolio"
+      ]
+    },
+    {
+      "id": "met-39895",
+      "fichero": "met-39895.jpg",
+      "sha256": "9a4b8c64f8386f8d803349b9c520c8d2b756d0486b6ed41a79ee044e5341daa7",
+      "ancho": 510,
+      "alto": 624,
+      "licencia": "CC0-1.0",
+      "fuente": "https://www.metmuseum.org/art/collection/search/39895",
+      "autor": "Li Gonglin",
+      "prueba": "https://www.metmuseum.org/information/terms-and-conditions",
+      "prueba_texto": "The Met Open Access data and public-domain images are available under the Creative Commons Zero (CC0) license.",
+      "descargada": "2026-09-29",
+      "etiquetas": [
+        "arte",
+        "dominio-publico"
+      ],
+      "alt": {
+        "es": "Imagen de dominio público: The Classic of Filial Piety",
+        "en": "Public-domain image: The Classic of Filial Piety"
+      },
+      "verticales": [
+        "academia",
+        "servicios"
+      ]
+    },
+    {
+      "id": "met-39901",
+      "fichero": "met-39901.jpg",
+      "sha256": "a0258ec4a516ed370df665974f442f0fcadf60862270c4f3cf095ec4cdd20837",
+      "ancho": 600,
+      "alto": 450,
+      "licencia": "CC0-1.0",
+      "fuente": "https://www.metmuseum.org/art/collection/search/39901",
+      "autor": "Han Gan",
+      "prueba": "https://www.metmuseum.org/information/terms-and-conditions",
+      "prueba_texto": "The Met Open Access data and public-domain images are available under the Creative Commons Zero (CC0) license.",
+      "descargada": "2026-09-29",
+      "etiquetas": [
+        "arte",
+        "dominio-publico"
+      ],
+      "alt": {
+        "es": "Imagen de dominio público: Night-Shining White",
+        "en": "Public-domain image: Night-Shining White"
+      },
+      "verticales": [
+        "portfolio",
+        "servicios"
+      ]
+    },
+    {
+      "id": "met-39931",
+      "fichero": "met-39931.jpg",
+      "sha256": "d6e644a304d921fb48dfa5f0fcb1ef3ee79920f43a66c2c1a45d3e63452c477f",
+      "ancho": 490,
+      "alto": 625,
+      "licencia": "CC0-1.0",
+      "fuente": "https://www.metmuseum.org/art/collection/search/39931",
+      "autor": "Dai Benxiao",
+      "prueba": "https://www.metmuseum.org/information/terms-and-conditions",
+      "prueba_texto": "The Met Open Access data and public-domain images are available under the Creative Commons Zero (CC0) license.",
+      "descargada": "2026-09-29",
+      "etiquetas": [
+        "arte",
+        "dominio-publico"
+      ],
+      "alt": {
+        "es": "Imagen de dominio público: Landscapes",
+        "en": "Public-domain image: Landscapes"
+      },
+      "verticales": [
+        "alojamiento",
+        "portfolio"
+      ]
+    },
+    {
+      "id": "met-40007",
+      "fichero": "met-40007.jpg",
+      "sha256": "e9b39693e56d4bfc59f28080a0c41db21945c5e2f864547236f8b88e6634c836",
+      "ancho": 598,
+      "alto": 257,
+      "licencia": "CC0-1.0",
+      "fuente": "https://www.metmuseum.org/art/collection/search/40007",
+      "autor": "Mi Youren",
+      "prueba": "https://www.metmuseum.org/information/terms-and-conditions",
+      "prueba_texto": "The Met Open Access data and public-domain images are available under the Creative Commons Zero (CC0) license.",
+      "descargada": "2026-09-29",
+      "etiquetas": [
+        "arte",
+        "dominio-publico"
+      ],
+      "alt": {
+        "es": "Imagen de dominio público: Cloudy Mountains",
+        "en": "Public-domain image: Cloudy Mountains"
+      },
+      "verticales": [
+        "alojamiento",
+        "portfolio",
+        "servicios"
+      ]
+    },
+    {
+      "id": "met-40080",
+      "fichero": "met-40080.jpg",
+      "sha256": "01db79621abdf0c0c0ffbabaa337d0a06cfc29b3d2761c8c4962013af7d24be8",
+      "ancho": 332,
+      "alto": 624,
+      "licencia": "CC0-1.0",
+      "fuente": "https://www.metmuseum.org/art/collection/search/40080",
+      "autor": "Wang Mian",
+      "prueba": "https://www.metmuseum.org/information/terms-and-conditions",
+      "prueba_texto": "The Met Open Access data and public-domain images are available under the Creative Commons Zero (CC0) license.",
+      "descargada": "2026-09-29",
+      "etiquetas": [
+        "arte",
+        "dominio-publico"
+      ],
+      "alt": {
+        "es": "Imagen de dominio público: Fragrant Snow at Broken Bridge",
+        "en": "Public-domain image: Fragrant Snow at Broken Bridge"
+      },
+      "verticales": [
+        "clinica",
+        "restaurante",
+        "portfolio"
+      ]
+    },
+    {
+      "id": "met-40285",
+      "fichero": "met-40285.jpg",
+      "sha256": "066d3c19da66262982634c70d9fd5ffd0be87f651ed12d6f4641853152e2e3e4",
+      "ancho": 600,
+      "alto": 357,
+      "licencia": "CC0-1.0",
+      "fuente": "https://www.metmuseum.org/art/collection/search/40285",
+      "autor": "Zhao Mengjian",
+      "prueba": "https://www.metmuseum.org/information/terms-and-conditions",
+      "prueba_texto": "The Met Open Access data and public-domain images are available under the Creative Commons Zero (CC0) license.",
+      "descargada": "2026-09-29",
+      "etiquetas": [
+        "arte",
+        "dominio-publico"
+      ],
+      "alt": {
+        "es": "Imagen de dominio público: Poems on painting plum blossoms and bamboo",
+        "en": "Public-domain image: Poems on painting plum blossoms and bamboo"
+      },
+      "verticales": [
+        "academia",
+        "clinica",
+        "portfolio"
+      ]
+    },
+    {
+      "id": "met-40512",
+      "fichero": "met-40512.jpg",
+      "sha256": "4c7812dc358cf322d347fc7f35d51301d9eca0c980da3e8db66d27fbac0edf82",
+      "ancho": 599,
+      "alto": 398,
+      "licencia": "CC0-1.0",
+      "fuente": "https://www.metmuseum.org/art/collection/search/40512",
+      "autor": "Xianyu Shu",
+      "prueba": "https://www.metmuseum.org/information/terms-and-conditions",
+      "prueba_texto": "The Met Open Access data and public-domain images are available under the Creative Commons Zero (CC0) license.",
+      "descargada": "2026-09-29",
+      "etiquetas": [
+        "arte",
+        "dominio-publico"
+      ],
+      "alt": {
+        "es": "Imagen de dominio público: Song of the Stone Drums",
+        "en": "Public-domain image: Song of the Stone Drums"
+      },
+      "verticales": [
+        "academia",
+        "fabrica",
+        "servicios"
+      ]
+    },
+    {
+      "id": "met-40706",
+      "fichero": "met-40706.jpg",
+      "sha256": "4f933bd1e15d7e008f77534ef52d140ec39af9ae906c17bb6b73de7a66b252f0",
+      "ancho": 599,
+      "alto": 428,
+      "licencia": "CC0-1.0",
+      "fuente": "https://www.metmuseum.org/art/collection/search/40706",
+      "autor": "The Metropolitan Museum of Art",
+      "prueba": "https://www.metmuseum.org/information/terms-and-conditions",
+      "prueba_texto": "The Met Open Access data and public-domain images are available under the Creative Commons Zero (CC0) license.",
+      "descargada": "2026-09-29",
+      "etiquetas": [
+        "arte",
+        "dominio-publico"
+      ],
+      "alt": {
+        "es": "Imagen de dominio público: One of a Pair of Vases with Dragon Handles",
+        "en": "Public-domain image: One of a Pair of Vases with Dragon Handles"
+      },
+      "verticales": [
+        "tienda",
+        "producto",
+        "fabrica",
+        "portfolio"
+      ]
+    },
+    {
+      "id": "met-42115",
+      "fichero": "met-42115.jpg",
+      "sha256": "d70d524b28bce7d92b84550c27f8de8951c84e5c752aad6c1b85021216bbcc8b",
+      "ancho": 327,
+      "alto": 624,
+      "licencia": "CC0-1.0",
+      "fuente": "https://www.metmuseum.org/art/collection/search/42115",
+      "autor": "The Metropolitan Museum of Art",
+      "prueba": "https://www.metmuseum.org/information/terms-and-conditions",
+      "prueba_texto": "The Met Open Access data and public-domain images are available under the Creative Commons Zero (CC0) license.",
+      "descargada": "2026-09-29",
+      "etiquetas": [
+        "arte",
+        "dominio-publico"
+      ],
+      "alt": {
+        "es": "Imagen de dominio público: Decorative pendant with the Five Offerings",
+        "en": "Public-domain image: Decorative pendant with the Five Offerings"
+      },
+      "verticales": [
+        "tienda",
+        "producto",
+        "portfolio"
+      ]
+    },
+    {
+      "id": "met-44849",
+      "fichero": "met-44849.jpg",
+      "sha256": "2caab524595d0c37558e8a200db09137059d76ca4588fa169d0c6c239244329d",
+      "ancho": 599,
+      "alto": 301,
+      "licencia": "CC0-1.0",
+      "fuente": "https://www.metmuseum.org/art/collection/search/44849",
+      "autor": "Sugawara Mitsushige",
+      "prueba": "https://www.metmuseum.org/information/terms-and-conditions",
+      "prueba_texto": "The Met Open Access data and public-domain images are available under the Creative Commons Zero (CC0) license.",
+      "descargada": "2026-09-29",
+      "etiquetas": [
+        "arte",
+        "dominio-publico"
+      ],
+      "alt": {
+        "es": "Imagen de dominio público: “Universal Gateway,” Chapter 25 of the Lotus Sutra",
+        "en": "Public-domain image: “Universal Gateway,” Chapter 25 of the Lotus Sutra"
+      },
+      "verticales": [
+        "academia",
+        "portfolio"
+      ]
+    },
+    {
+      "id": "met-44918",
+      "fichero": "met-44918.jpg",
+      "sha256": "c6a01335f5210dc1d4f0ac46725e2a45e067e7f4721bcefe2f23419ce3fc84e5",
+      "ancho": 599,
+      "alto": 534,
+      "licencia": "CC0-1.0",
+      "fuente": "https://www.metmuseum.org/art/collection/search/44918",
+      "autor": "Ogata Kōrin",
+      "prueba": "https://www.metmuseum.org/information/terms-and-conditions",
+      "prueba_texto": "The Met Open Access data and public-domain images are available under the Creative Commons Zero (CC0) license.",
+      "descargada": "2026-09-29",
+      "etiquetas": [
+        "arte",
+        "dominio-publico"
+      ],
+      "alt": {
+        "es": "Imagen de dominio público: Rough Waves",
+        "en": "Public-domain image: Rough Waves"
+      },
+      "verticales": [
+        "portfolio",
+        "reformas"
+      ]
+    },
+    {
+      "id": "met-45258",
+      "fichero": "met-45258.jpg",
+      "sha256": "3fb68f45fe95aed0f850df78c3cdaa054e5b211ba1a129b125ca6543442c749e",
+      "ancho": 600,
+      "alto": 283,
+      "licencia": "CC0-1.0",
+      "fuente": "https://www.metmuseum.org/art/collection/search/45258",
+      "autor": "Tosa Mitsunobu",
+      "prueba": "https://www.metmuseum.org/information/terms-and-conditions",
+      "prueba_texto": "The Met Open Access data and public-domain images are available under the Creative Commons Zero (CC0) license.",
+      "descargada": "2026-09-29",
+      "etiquetas": [
+        "arte",
+        "dominio-publico"
+      ],
+      "alt": {
+        "es": "Imagen de dominio público: Bamboo in the Four Seasons",
+        "en": "Public-domain image: Bamboo in the Four Seasons"
+      },
+      "verticales": [
+        "clinica",
+        "reformas",
+        "portfolio"
+      ]
+    },
+    {
+      "id": "met-45262",
+      "fichero": "met-45262.jpg",
+      "sha256": "4811c31aa6dc1caad9f9817a494a450e6f579a7825e201b3987c1e5b3dfd88f5",
+      "ancho": 599,
+      "alto": 276,
+      "licencia": "CC0-1.0",
+      "fuente": "https://www.metmuseum.org/art/collection/search/45262",
+      "autor": "The Metropolitan Museum of Art",
+      "prueba": "https://www.metmuseum.org/information/terms-and-conditions",
+      "prueba_texto": "The Met Open Access data and public-domain images are available under the Creative Commons Zero (CC0) license.",
+      "descargada": "2026-09-29",
+      "etiquetas": [
+        "arte",
+        "dominio-publico"
+      ],
+      "alt": {
+        "es": "Imagen de dominio público: The Plains of Musashi",
+        "en": "Public-domain image: The Plains of Musashi"
+      },
+      "verticales": [
+        "alojamiento",
+        "portfolio"
+      ]
+    },
+    {
+      "id": "met-45396",
+      "fichero": "met-45396.jpg",
+      "sha256": "f2c1cdf4347015300213f118f352ff29c2bd7f5b6fffe46347dcf29ae5a02437",
+      "ancho": 424,
+      "alto": 624,
+      "licencia": "CC0-1.0",
+      "fuente": "https://www.metmuseum.org/art/collection/search/45396",
+      "autor": "Isoda Koryūsai",
+      "prueba": "https://www.metmuseum.org/information/terms-and-conditions",
+      "prueba_texto": "The Met Open Access data and public-domain images are available under the Creative Commons Zero (CC0) license.",
+      "descargada": "2026-09-29",
+      "etiquetas": [
+        "arte",
+        "dominio-publico"
+      ],
+      "alt": {
+        "es": "Imagen de dominio público: Painting the Eyes on a Snow Rabbit",
+        "en": "Public-domain image: Painting the Eyes on a Snow Rabbit"
+      },
+      "verticales": [
+        "academia",
+        "portfolio"
+      ]
+    },
+    {
+      "id": "met-4832",
+      "fichero": "met-4832.jpg",
+      "sha256": "c09c8ee36d2add16404cd5869a774c346d8a96f02002f45fcb1a6d13df005c80",
+      "ancho": 486,
+      "alto": 624,
+      "licencia": "CC0-1.0",
+      "fuente": "https://www.metmuseum.org/art/collection/search/4832",
+      "autor": "Wood and Hughes",
+      "prueba": "https://www.metmuseum.org/information/terms-and-conditions",
+      "prueba_texto": "The Met Open Access data and public-domain images are available under the Creative Commons Zero (CC0) license.",
+      "descargada": "2026-09-29",
+      "etiquetas": [
+        "arte",
+        "dominio-publico"
+      ],
+      "alt": {
+        "es": "Imagen de dominio público: Sugar bowl",
+        "en": "Public-domain image: Sugar bowl"
+      },
+      "verticales": [
+        "tienda",
+        "producto",
+        "restaurante",
+        "fabrica"
+      ]
+    },
+    {
+      "id": "met-4895",
+      "fichero": "met-4895.jpg",
+      "sha256": "37f9754a41f1d624c1dd84a0e104d3820b3fc96eb20a81ad199f947173885fb9",
+      "ancho": 468,
+      "alto": 624,
+      "licencia": "CC0-1.0",
+      "fuente": "https://www.metmuseum.org/art/collection/search/4895",
+      "autor": "M. Louise McLaughlin",
+      "prueba": "https://www.metmuseum.org/information/terms-and-conditions",
+      "prueba_texto": "The Met Open Access data and public-domain images are available under the Creative Commons Zero (CC0) license.",
+      "descargada": "2026-09-29",
+      "etiquetas": [
+        "arte",
+        "dominio-publico"
+      ],
+      "alt": {
+        "es": "Imagen de dominio público: Vase",
+        "en": "Public-domain image: Vase"
+      },
+      "verticales": [
+        "tienda",
+        "producto",
+        "reformas",
+        "portfolio"
+      ]
+    },
+    {
+      "id": "met-49156",
+      "fichero": "met-49156.jpg",
+      "sha256": "4d3e7277573a88b10de7d013df84890cedadaca328a46412c3510eada933a7ae",
+      "ancho": 599,
+      "alto": 274,
+      "licencia": "CC0-1.0",
+      "fuente": "https://www.metmuseum.org/art/collection/search/49156",
+      "autor": "Wang Hui",
+      "prueba": "https://www.metmuseum.org/information/terms-and-conditions",
+      "prueba_texto": "The Met Open Access data and public-domain images are available under the Creative Commons Zero (CC0) license.",
+      "descargada": "2026-09-29",
+      "etiquetas": [
+        "arte",
+        "dominio-publico"
+      ],
+      "alt": {
+        "es": "Imagen de dominio público: The Kangxi Emperor's Southern Inspection Tour, Scroll Three: Ji'nan to Mount Tai",
+        "en": "Public-domain image: The Kangxi Emperor's Southern Inspection Tour, Scroll Three: Ji'nan to Mount Tai"
+      },
+      "verticales": [
+        "academia",
+        "servicios",
+        "portfolio"
+      ]
+    },
+    {
+      "id": "met-49187",
+      "fichero": "met-49187.jpg",
+      "sha256": "d3a48dca8d1ee1b2ae65e8ebdc1fee25ee740a8f8f75a9abbf845e9da6f18883",
+      "ancho": 599,
+      "alto": 353,
+      "licencia": "CC0-1.0",
+      "fuente": "https://www.metmuseum.org/art/collection/search/49187",
+      "autor": "Wang Yuanqi",
+      "prueba": "https://www.metmuseum.org/information/terms-and-conditions",
+      "prueba_texto": "The Met Open Access data and public-domain images are available under the Creative Commons Zero (CC0) license.",
+      "descargada": "2026-09-29",
+      "etiquetas": [
+        "arte",
+        "dominio-publico"
+      ],
+      "alt": {
+        "es": "Imagen de dominio público: Wangchuan Villa",
+        "en": "Public-domain image: Wangchuan Villa"
+      },
+      "verticales": [
+        "alojamiento",
+        "reformas",
+        "portfolio"
+      ]
+    },
+    {
+      "id": "met-49456",
+      "fichero": "met-49456.jpg",
+      "sha256": "219d72e4069712dd28056a9300015ba94c501a23a5bba931fc715d602ad258d5",
+      "ancho": 599,
+      "alto": 361,
+      "licencia": "CC0-1.0",
+      "fuente": "https://www.metmuseum.org/art/collection/search/49456",
+      "autor": "Hu Yuan",
+      "prueba": "https://www.metmuseum.org/information/terms-and-conditions",
+      "prueba_texto": "The Met Open Access data and public-domain images are available under the Creative Commons Zero (CC0) license.",
+      "descargada": "2026-09-29",
+      "etiquetas": [
+        "arte",
+        "dominio-publico"
+      ],
+      "alt": {
+        "es": "Imagen de dominio público: Herbaceous Peony",
+        "en": "Public-domain image: Herbaceous Peony"
+      },
+      "verticales": [
+        "clinica",
+        "restaurante",
+        "portfolio"
+      ]
+    },
+    {
+      "id": "met-53002",
+      "fichero": "met-53002.jpg",
+      "sha256": "25c7008f4410288be55f8303f8163660c42c75a7909973d42c6c4bfa19baac54",
+      "ancho": 599,
+      "alto": 337,
+      "licencia": "CC0-1.0",
+      "fuente": "https://www.metmuseum.org/art/collection/search/53002",
+      "autor": "The Metropolitan Museum of Art",
+      "prueba": "https://www.metmuseum.org/information/terms-and-conditions",
+      "prueba_texto": "The Met Open Access data and public-domain images are available under the Creative Commons Zero (CC0) license.",
+      "descargada": "2026-09-29",
+      "etiquetas": [
+        "arte",
+        "dominio-publico"
+      ],
+      "alt": {
+        "es": "Imagen de dominio público: Shino Tea Bowl with Bridge and Shrine, Known as “Bridge of the Gods” (Shinkyō)",
+        "en": "Public-domain image: Shino Tea Bowl with Bridge and Shrine, Known as “Bridge of the Gods” (Shinkyō)"
+      },
+      "verticales": [
+        "tienda",
+        "producto",
+        "restaurante",
+        "alojamiento"
+      ]
+    },
+    {
+      "id": "met-53158",
+      "fichero": "met-53158.jpg",
+      "sha256": "1ee4bb6d491b24ab881f7457b546602098213c09c4074df480669a9ffbd3bd75",
+      "ancho": 466,
+      "alto": 624,
+      "licencia": "CC0-1.0",
+      "fuente": "https://www.metmuseum.org/art/collection/search/53158",
+      "autor": "The Metropolitan Museum of Art",
+      "prueba": "https://www.metmuseum.org/information/terms-and-conditions",
+      "prueba_texto": "The Met Open Access data and public-domain images are available under the Creative Commons Zero (CC0) license.",
+      "descargada": "2026-09-29",
+      "etiquetas": [
+        "arte",
+        "dominio-publico"
+      ],
+      "alt": {
+        "es": "Imagen de dominio público: Tile with Buddha Triad",
+        "en": "Public-domain image: Tile with Buddha Triad"
+      },
+      "verticales": [
+        "reformas",
+        "fabrica",
+        "portfolio"
+      ]
+    },
+    {
+      "id": "met-53162",
+      "fichero": "met-53162.jpg",
+      "sha256": "6501ecdd45a4783a85bba6e7b43de9691a4720e56c82589e2ed3c4cb2cbfe758",
+      "ancho": 468,
+      "alto": 624,
+      "licencia": "CC0-1.0",
+      "fuente": "https://www.metmuseum.org/art/collection/search/53162",
+      "autor": "The Metropolitan Museum of Art",
+      "prueba": "https://www.metmuseum.org/information/terms-and-conditions",
+      "prueba_texto": "The Met Open Access data and public-domain images are available under the Creative Commons Zero (CC0) license.",
+      "descargada": "2026-09-29",
+      "etiquetas": [
+        "arte",
+        "dominio-publico"
+      ],
+      "alt": {
+        "es": "Imagen de dominio público: Tobatsu Bishamonten",
+        "en": "Public-domain image: Tobatsu Bishamonten"
+      },
+      "verticales": [
+        "portfolio",
+        "academia"
+      ]
+    },
+    {
+      "id": "met-53176",
+      "fichero": "met-53176.jpg",
+      "sha256": "31595070fed21ad7b8ec8828d0932d1cd56081e354076e175345f0e74316dba4",
+      "ancho": 468,
+      "alto": 624,
+      "licencia": "CC0-1.0",
+      "fuente": "https://www.metmuseum.org/art/collection/search/53176",
+      "autor": "Kaikei",
+      "prueba": "https://www.metmuseum.org/information/terms-and-conditions",
+      "prueba_texto": "The Met Open Access data and public-domain images are available under the Creative Commons Zero (CC0) license.",
+      "descargada": "2026-09-29",
+      "etiquetas": [
+        "arte",
+        "dominio-publico"
+      ],
+      "alt": {
+        "es": "Imagen de dominio público: Fudō Myōō, the Immovable Wisdom King (Achala Vidyaraja)",
+        "en": "Public-domain image: Fudō Myōō, the Immovable Wisdom King (Achala Vidyaraja)"
+      },
+      "verticales": [
+        "portfolio",
+        "academia"
+      ]
+    },
+    {
+      "id": "met-53189",
+      "fichero": "met-53189.jpg",
+      "sha256": "f3df07d44cdad529a6181d381fff713890b7362197705fe90160189873967c24",
+      "ancho": 468,
+      "alto": 624,
+      "licencia": "CC0-1.0",
+      "fuente": "https://www.metmuseum.org/art/collection/search/53189",
+      "autor": "The Metropolitan Museum of Art",
+      "prueba": "https://www.metmuseum.org/information/terms-and-conditions",
+      "prueba_texto": "The Met Open Access data and public-domain images are available under the Creative Commons Zero (CC0) license.",
+      "descargada": "2026-09-29",
+      "etiquetas": [
+        "arte",
+        "dominio-publico"
+      ],
+      "alt": {
+        "es": "Imagen de dominio público: Seiryū Gongen",
+        "en": "Public-domain image: Seiryū Gongen"
+      },
+      "verticales": [
+        "portfolio",
+        "academia"
+      ]
+    },
+    {
+      "id": "met-53190",
+      "fichero": "met-53190.jpg",
+      "sha256": "adec8e55e94b94c4713bbc697d9f07a30a7ac1a3f1b3f28d01523fc8c7118cb4",
+      "ancho": 599,
+      "alto": 449,
+      "licencia": "CC0-1.0",
+      "fuente": "https://www.metmuseum.org/art/collection/search/53190",
+      "autor": "The Metropolitan Museum of Art",
+      "prueba": "https://www.metmuseum.org/information/terms-and-conditions",
+      "prueba_texto": "The Met Open Access data and public-domain images are available under the Creative Commons Zero (CC0) license.",
+      "descargada": "2026-09-29",
+      "etiquetas": [
+        "arte",
+        "dominio-publico"
+      ],
+      "alt": {
+        "es": "Imagen de dominio público: Guardian Lion-Dogs",
+        "en": "Public-domain image: Guardian Lion-Dogs"
+      },
+      "verticales": [
+        "portfolio",
+        "reformas",
+        "fabrica"
+      ]
+    }
+  ]
+}

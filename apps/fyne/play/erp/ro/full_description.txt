@@ -1,0 +1,18 @@
+Douăzeci și patru de module și o contabilitate în partidă dublă pe care baza de date nu o lasă să se dezechilibreze.
+
+• Douăzeci și patru de module și treizeci și șase de modele: contacte, vânzări, achiziții, stocuri, producție, facturare, contabilitate, proiecte și resurse umane.
+• Adăugarea unui modul înseamnă scrierea unui fișier JSON: fără migrare, fără rută nouă și fără muncă la interfață.
+• Sumele se stochează în cenți întregi, niciodată în virgulă mobilă, iar baza de date impune echilibrul.
+• Înregistrările contabilizate sunt de neatins: se corectează printr-o altă înregistrare, iar asta deosebește un registru de o foaie de calcul.
+• Douăzeci și patru de module și treizeci și șase de modele într-un singur serviciu și o singură bază de date.
+• Catalogul de modele este date: fiecare modul își declară câmpurile, stările și coloanele listei.
+• Un modul nou este un singur fișier JSON — fără DDL, fără migrare și fără blocarea tabelelor.
+• Un singur API pentru toate cele treizeci și șase de modele și o interfață generată din catalog.
+• Contabilitate în partidă dublă cu sume în cenți întregi; nicio cifră în virgulă mobilă.
+• Baza de date verifică echilibrul la confirmarea tranzacției, nu codul aplicației.
+• Înregistrările închise sunt imuabile: nu pot fi editate, șterse și nu pot primi rânduri noi.
+• Un document, o înregistrare: o reîncercare sau două file deschise nu pot dubla veniturile.
+• Denumirile comune există în toate cele 26 de limbi, iar un câmp netradus împiedică pornirea serviciului.
+• Liste pe indecși: prima pagină din douăzeci de mii de rânduri este servită în mai puțin de o milisecundă.
+
+Criptare în tranzit (TLS 1.3). Infrastructura Sytue se află în UE. Locația serviciilor externe depinde de furnizorul lor.

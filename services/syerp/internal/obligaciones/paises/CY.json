@@ -1,0 +1,251 @@
+{
+ "pais": "CY",
+ "verificado": true,
+ "moneda": "EUR",
+ "formas": [
+  {
+   "clave": "sole_trader",
+   "nombre": "Sole trader",
+   "tipo": "persona_fisica"
+  },
+  {
+   "clave": "partnership",
+   "nombre": "Partnership",
+   "tipo": "persona_fisica"
+  },
+  {
+   "clave": "ltd",
+   "nombre": "Private company limited by shares (Ltd)",
+   "tipo": "sociedad"
+  },
+  {
+   "clave": "plc",
+   "nombre": "Public company (PLC)",
+   "tipo": "sociedad"
+  }
+ ],
+ "portales": {
+  "tfa": {
+   "nombre": "Tax For All (TFA) — Tax Department",
+   "url": "https://tfa.tax.gov.cy/"
+  },
+  "sisnet": {
+   "nombre": "SISnet — Social Insurance Services",
+   "url": "https://www.sisnet.gov.cy/"
+  },
+  "registrar": {
+   "nombre": "Registrar of Companies (e-filing)",
+   "url": "https://efiling.drcor.mcit.gov.cy/"
+  }
+ },
+ "obligaciones": [
+  {
+   "clave": "cy_vat",
+   "nombre": "VAT return (quarterly)",
+   "concepto": "iva_periodica",
+   "ambito": "fiscal",
+   "periodicidad": "trimestral",
+   "plazos": {
+    "T": "10+2"
+   },
+   "margen_dias": 7,
+   "portal": "tfa",
+   "aplica": {
+    "condiciones": [
+     "iva"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_base_pct": 10,
+    "recargo_pct_mes": 0.42,
+    "fija_centimos": 10000,
+    "nota": "€100 penalty per late return, 10 % additional tax on late payment plus interest (5 % per year for 2025)."
+   },
+   "calculo": {
+    "tipo": "saldo_neto",
+    "haber": [
+     "477"
+    ],
+    "debe": [
+     "472"
+    ]
+   }
+  },
+  {
+   "clave": "cy_vies",
+   "nombre": "VIES recapitulative statement",
+   "concepto": "operaciones_intracomunitarias",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "15"
+   },
+   "margen_dias": 7,
+   "portal": "tfa",
+   "aplica": {
+    "condiciones": [
+     "intracomunitario"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 5000,
+    "nota": "€50 penalty per late statement."
+   }
+  },
+  {
+   "clave": "cy_paye",
+   "nombre": "PAYE withholding (TD61)",
+   "concepto": "retenciones_trabajo",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "ultimo"
+   },
+   "margen_dias": 7,
+   "portal": "tfa",
+   "aplica": {
+    "condiciones": [
+     "empleados"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_base_pct": 5,
+    "recargo_pct_mes": 0.42,
+    "nota": "5 % penalty on late payment plus interest; employer's return TD7 by 31 May of the following year."
+   }
+  },
+  {
+   "clave": "cy_sis",
+   "nombre": "Social insurance contributions",
+   "concepto": "seguridad_social",
+   "ambito": "laboral",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "ultimo"
+   },
+   "margen_dias": 7,
+   "portal": "sisnet",
+   "aplica": {
+    "condiciones": [
+     "empleados"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_pct_mes": 3,
+    "recargo_max_pct": 27,
+    "nota": "3 % surcharge per month of delay, up to 27 %."
+   }
+  },
+  {
+   "clave": "cy_sis_self",
+   "nombre": "Self-employed social insurance (quarterly)",
+   "concepto": "cuota_autonomos",
+   "ambito": "laboral",
+   "periodicidad": "trimestral",
+   "plazos": {
+    "T": "10+1"
+   },
+   "margen_dias": 7,
+   "portal": "sisnet",
+   "aplica": {
+    "tipos": [
+     "persona_fisica"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_pct_mes": 3,
+    "recargo_max_pct": 27,
+    "nota": "Payable by the 10th of the month following the end of each quarter; 3 % surcharge per month."
+   }
+  },
+  {
+   "clave": "cy_td4",
+   "nombre": "Corporate income tax return (TD4)",
+   "concepto": "sociedades_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "03-31+2"
+   },
+   "margen_dias": 60,
+   "portal": "tfa",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 10000,
+    "nota": "Fifteen months after the end of the tax year, via TAXISnet. €100 penalty for late filing (€200 after a demand); 5 % additional tax on late payment. Filed electronically by 31 March of the second year after the tax year."
+   }
+  },
+  {
+   "clave": "cy_temporary",
+   "nombre": "Provisional (temporary) tax instalments",
+   "concepto": "pago_fraccionado_sociedades",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "1P": "07-31",
+    "2P": "12-31"
+   },
+   "margen_dias": 7,
+   "portal": "tfa",
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_base_pct": 10,
+    "nota": "10 % additional tax if the provisional income declared is less than 75 % of the final taxable income."
+   }
+  },
+  {
+   "clave": "cy_td1",
+   "nombre": "Personal income tax return (TD1, self-employed)",
+   "concepto": "renta_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "07-31+1"
+   },
+   "margen_dias": 30,
+   "portal": "tfa",
+   "aplica": {
+    "tipos": [
+     "persona_fisica"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 10000,
+    "nota": "€100 penalty; self-employed with audited accounts file by 31 March of the second year."
+   }
+  },
+  {
+   "clave": "cy_he32",
+   "nombre": "Annual return (HE32) with financial statements",
+   "concepto": "cuentas_anuales",
+   "ambito": "mercantil",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "12-31+1"
+   },
+   "margen_dias": 30,
+   "portal": "registrar",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 5000,
+    "nota": "€50 fixed penalty plus €1 per day for the first six months and €2 per day thereafter, up to €500; the annual return date is the company's own anniversary date."
+   }
+  }
+ ]
+}

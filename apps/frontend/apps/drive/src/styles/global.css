@@ -1,0 +1,11 @@
+/**
+ * Sytue Drive — hoja global. Tailwind v4 + tema de marca Sytue (@sytue/config)
+ * + estilos del design system (@sytue/ui). Modo claro/oscuro automatico.
+ */
+@import 'tailwindcss';
+@import '@sytue/config/theme.css';
+@import '@sytue/ui/styles.css';
+
+@source './';
+@source '../../../../packages/ui/src';
+@source '../../../../packages/shell/src';

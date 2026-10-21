@@ -1,0 +1,463 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Daniel Delgado Ramos
+openapi: 3.1.0
+info:
+  title: Sytue Contacts API
+  description: >-
+    API REST propia de Sytue Contacts (servidor de contactos Sytue-native).
+    Gestiona libretas de direcciones, contactos (vCard 4.0) y grupos por tenant.
+    El estado vive en PostgreSQL (única fuente de verdad). CardDAV (RFC 6352) se
+    expone bajo /dav (no documentado aquí; usa el mismo Bearer JWT).
+    Clean-room, © 2026 Daniel Delgado Ramos (thinkddr) sobre vCard 4.0 (RFC 6350) y CardDAV (RFC 6352); sin
+    motores AGPL.
+  version: "1.0.0"
+  license:
+    name: MIT
+servers:
+  - url: https://contacts.sytue.eu
+    description: Producción
+  - url: https://contacts.sytue.localhost
+    description: Desarrollo (Traefik + mkcert)
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: address-books
+  - name: contacts
+  - name: groups
+
+paths:
+  /healthz:
+    get:
+      summary: Liveness
+      security: []
+      responses:
+        "200": { description: Proceso vivo }
+  /readyz:
+    get:
+      summary: Readiness (PostgreSQL)
+      security: []
+      responses:
+        "200": { description: Listo }
+        "503": { description: Dependencia no disponible }
+
+  /api/v1/address-books:
+    get:
+      tags: [address-books]
+      summary: Listar libretas del usuario (crea la por defecto si no existe)
+      responses:
+        "200":
+          description: Libretas
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  address_books:
+                    type: array
+                    items: { $ref: "#/components/schemas/AddressBook" }
+    post:
+      tags: [address-books]
+      summary: Crear libreta de direcciones
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateAddressBook" }
+      responses:
+        "201":
+          description: Libreta creada
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AddressBook" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /api/v1/address-books/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [address-books]
+      summary: Obtener libreta
+      responses:
+        "200":
+          description: Libreta
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AddressBook" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [address-books]
+      summary: Actualizar libreta (parcial)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateAddressBook" }
+      responses:
+        "200":
+          description: Libreta actualizada
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AddressBook" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [address-books]
+      summary: Borrar libreta (no la por defecto)
+      responses:
+        "204": { description: Borrada }
+        "400": { description: La libreta por defecto no se puede borrar }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/address-books/{id}/contacts:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [contacts]
+      summary: Listar contactos de una libreta
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 500, default: 100 }
+      responses:
+        "200":
+          description: Contactos
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  contacts:
+                    type: array
+                    items: { $ref: "#/components/schemas/Contact" }
+    post:
+      tags: [contacts]
+      summary: Crear contacto (genera su vCard 4.0)
+      description: >-
+        Con `application/json`, la vCard se genera de los campos. Con `text/vcard`, el
+        cuerpo es UNA tarjeta de fuera (vCard 3.0 o 4.0, hasta 1 MiB) y se importa
+        entera: se conserva lo que no se proyecta (X-*, URL, IMPP…), la foto binaria de
+        vCard 3.0 pasa a data URI y el UID es nuevo.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ContactInput" }
+          text/vcard:
+            schema: { type: string }
+      responses:
+        "201":
+          description: Contacto creado (ETag en cabecera)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Contact" }
+
+  /api/v1/contacts:
+    get:
+      tags: [contacts]
+      summary: Buscar contactos del tenant (full-text)
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema: { type: string }
+        - name: address_book_id
+          in: query
+          schema: { type: string, format: uuid }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+      responses:
+        "200":
+          description: Resultados
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  contacts:
+                    type: array
+                    items: { $ref: "#/components/schemas/Contact" }
+
+  /api/v1/contacts/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [contacts]
+      summary: Obtener contacto
+      responses:
+        "200":
+          description: Contacto (ETag en cabecera)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Contact" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [contacts]
+      summary: Reemplazar contacto (regenera la vCard, condicional por If-Match)
+      parameters:
+        - name: If-Match
+          in: header
+          schema: { type: string }
+          description: ETag esperado para escritura condicional (opcional).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ContactInput" }
+      responses:
+        "200":
+          description: Contacto actualizado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Contact" }
+        "412": { description: Precondición ETag fallida }
+    delete:
+      tags: [contacts]
+      summary: Borrar contacto
+      responses:
+        "204": { description: Borrado }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/contacts/{id}/vcard:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [contacts]
+      summary: Exportar la vCard 4.0 canónica del contacto
+      responses:
+        "200":
+          description: vCard
+          content:
+            text/vcard:
+              schema: { type: string }
+
+  /api/v1/address-books/{id}/groups:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [groups]
+      summary: Listar grupos de una libreta
+      responses:
+        "200":
+          description: Grupos
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  groups:
+                    type: array
+                    items: { $ref: "#/components/schemas/Group" }
+    post:
+      tags: [groups]
+      summary: Crear grupo (vCard KIND=group)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/GroupInput" }
+      responses:
+        "201":
+          description: Grupo creado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Group" }
+
+  /api/v1/groups/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [groups]
+      summary: Obtener grupo
+      responses:
+        "200":
+          description: Grupo
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Group" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [groups]
+      summary: Reemplazar nombre y miembros del grupo
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/GroupInput" }
+      responses:
+        "200":
+          description: Grupo actualizado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Group" }
+    delete:
+      tags: [groups]
+      summary: Borrar grupo
+      responses:
+        "204": { description: Borrado }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT de Sytue ID validado vía JWKS.
+
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+
+  responses:
+    NotFound:
+      description: Recurso no encontrado
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Conflict:
+      description: Conflicto de unicidad
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code: { type: string }
+            message: { type: string }
+            details: {}
+        request_id: { type: string }
+
+    AddressBook:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        owner_sub: { type: string }
+        name: { type: string, description: "Segmento de ruta CardDAV (URL-safe)" }
+        display_name: { type: string }
+        description: { type: string }
+        color: { type: string, example: "#3B82F6" }
+        is_default: { type: boolean }
+        ctag: { type: string, format: uuid }
+        sync_token: { type: integer, format: int64 }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    CreateAddressBook:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        display_name: { type: string }
+        description: { type: string }
+        color: { type: string }
+
+    UpdateAddressBook:
+      type: object
+      properties:
+        display_name: { type: string }
+        description: { type: string }
+        color: { type: string }
+
+    Email:
+      type: object
+      properties:
+        email: { type: string, format: email }
+        type: { type: string, enum: [home, work, other] }
+        is_primary: { type: boolean }
+
+    Phone:
+      type: object
+      properties:
+        phone: { type: string }
+        type: { type: string, enum: [cell, home, work, fax, other] }
+        is_primary: { type: boolean }
+
+    Contact:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        address_book_id: { type: string, format: uuid }
+        object_id: { type: string, format: uuid }
+        uid: { type: string }
+        formatted_name: { type: string }
+        family_name: { type: string }
+        given_name: { type: string }
+        additional_name: { type: string }
+        honorific_prefix: { type: string }
+        honorific_suffix: { type: string }
+        organization: { type: string }
+        title: { type: string }
+        nickname: { type: string }
+        note: { type: string }
+        birthday: { type: string, format: date }
+        photo_url: { type: string }
+        has_photo:
+          type: boolean
+          readOnly: true
+          description: La tarjeta lleva una PHOTO embebida (la que sirve GET /api/v1/contacts/photo).
+        emails:
+          type: array
+          items: { $ref: "#/components/schemas/Email" }
+        phones:
+          type: array
+          items: { $ref: "#/components/schemas/Phone" }
+        etag: { type: string, format: uuid }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    ContactInput:
+      type: object
+      required: [formatted_name]
+      properties:
+        formatted_name: { type: string }
+        family_name: { type: string }
+        given_name: { type: string }
+        additional_name: { type: string }
+        honorific_prefix: { type: string }
+        honorific_suffix: { type: string }
+        organization: { type: string }
+        title: { type: string }
+        nickname: { type: string }
+        note: { type: string }
+        birthday: { type: string, description: "YYYY-MM-DD o RFC3339" }
+        photo_url: { type: string }
+        emails:
+          type: array
+          items: { $ref: "#/components/schemas/Email" }
+        phones:
+          type: array
+          items: { $ref: "#/components/schemas/Phone" }
+
+    Group:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        address_book_id: { type: string, format: uuid }
+        object_id: { type: string, format: uuid }
+        uid: { type: string }
+        name: { type: string }
+        members:
+          type: array
+          items: { type: string, description: "UID de contacto miembro" }
+        etag: { type: string, format: uuid }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    GroupInput:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        members:
+          type: array
+          items: { type: string, description: "UID de contacto miembro" }

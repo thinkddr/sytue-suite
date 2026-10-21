@@ -1,0 +1,37 @@
+/**
+ * Sytue One (www) — entrada de estilos. Importa el design system (Tailwind v4 +
+ * tokens de marca Sytue) desde @sytue/ui; las apps NO definen tema propio.
+ * Diseño moderno Sytue. docs/design.md §1.
+ */
+@import '@sytue/ui/styles.css';
+
+/* Detectar clases usadas en las páginas e islas Preact de esta app. */
+@source '../**/*.{astro,ts,tsx}';
+
+/*
+ * LA CABECERA DEL PORTAL ES CLARA, y en la suite no.
+ *
+ * `TopBar` pinta el cromo grafito de las aplicaciones: ahí la barra es el marco
+ * de una herramienta, con el rail del mismo color debajo. El portal no tiene
+ * rail ni marco —es un escaparate—, así que ese grafito quedaba como una banda
+ * oscura flotando sobre el crema de la página.
+ *
+ * Y el contenido de la cabecera ya estaba escrito para fondo claro: los enlaces
+ * usan `text-text-muted` con `hover:bg-bg-subtle`, y la marca es `logos.suite`,
+ * que es la versión para fondo claro (la de fondo oscuro es `suiteWhite`). Sobre
+ * el grafito se leían apagados y sin contraste. Esto no cambia el diseño: lo
+ * devuelve al que su propio marcado da por hecho.
+ *
+ * Crema (`--sytue-bg`) y no blanco: es el mismo papel que el cuerpo de la
+ * página, así que la cabecera se lee como parte del escaparate y no como una
+ * barra pegada encima. Lo que la separa es su línea inferior, que ya pone TopBar.
+ *
+ * Se hace reasignando los tokens y no con una clase encima: `bg-topbar` y
+ * `bg-surface` son las dos utilidades de fondo, y cuál gana depende del orden en
+ * la hoja generada, no del orden en el atributo. El token es el mecanismo que el
+ * design system tiene para esto.
+ */
+:root {
+  --sytue-topbar-bg: var(--sytue-bg);
+  --sytue-topbar-fg: var(--sytue-text);
+}

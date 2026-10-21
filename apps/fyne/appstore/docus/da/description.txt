@@ -1,0 +1,16 @@
+Samtidig redigering i realtid
+
+• Alt gemt i dit europæiske Drive.
+• Samtidig redigering i realtid, med tilstedeværelse og uden at komme i vejen for hinanden.
+• Et båndmenu med faner: Hjem, Indsæt, Referencer, Forsendelser og Korrektur.
+• Tabeller, billeder, figurer, SmartArt, diagrammer, symboler og vandmærker.
+• Referencer: indholdsfortegnelse, fodnoter, citater og litteraturliste.
+• Forsendelser: brevfletning til breve og etiketter.
+• Kommentartråde, gennemgang af ændringer og versioner.
+• Valgfri AI-assistent til at omskrive, oversætte eller opsummere, kun hvis din organisation slår den til.
+• Eksport til ODT, DOCX og PDF; åbn Word-filer fra Drive.
+• Sidehoveder, sidefødder, sidenummerering og genbrugelige blokke.
+• Automatisk lagring i dit europæiske Drive, med historik.
+• Download fra forsiden som PDF, HTML, Markdown, OpenDocument eller Microsoft Office.
+
+Krypteret under overførsel (TLS 1.3). Sytues infrastruktur er i EU. Eksterne tjenesters placering afhænger af deres udbyder.

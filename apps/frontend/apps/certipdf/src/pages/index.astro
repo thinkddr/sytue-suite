@@ -1,0 +1,12 @@
+---
+/** Sytue CertiPDF — la portada: abrir un PDF y los recientes (`@sytue/office`, vista `Pdf`). */
+import Pdf from '@sytue/office/vistas/Pdf.astro';
+import { entrar } from '@sytue/office/vistas';
+
+export const prerender = false;
+
+const sesion = await entrar(Astro);
+if (sesion instanceof Response) return sesion;
+---
+
+<Pdf sesion={sesion} />

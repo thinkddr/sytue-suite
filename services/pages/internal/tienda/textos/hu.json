@@ -1,0 +1,10 @@
+{
+  "order_paid_buyer_subject": "Rendelés visszaigazolása: {number}",
+  "order_paid_buyer_body": "Köszönjük a vásárlást. A(z) {number} számú rendelést megerősítettük.",
+  "order_paid_store_subject": "Új rendelés érkezett: {number}",
+  "order_paid_store_body": "Új rendelést kapott ({number}) {total} összegben.",
+  "withdrawal_ack_subject": "Elállási megerősítés beérkezett: {number}",
+  "withdrawal_ack_body": "A(z) {number} számú rendelésre vonatkozó elállási kérelmét rögzítettük.",
+  "form_received_subject": "Űrlapbeküldés érkezett: {form_id}",
+  "form_received_body": "Új beküldés érkezett a(z) {form_id} űrlaphoz."
+}

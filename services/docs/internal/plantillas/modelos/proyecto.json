@@ -1,0 +1,138 @@
+{
+ "slides": [
+  {
+   "id": "s1",
+   "boxes": [
+    {
+     "id": "s1-titulo",
+     "x": 10,
+     "y": 35,
+     "w": 80,
+     "h": 20,
+     "html": "<h1>{{proyecto.titulo}}</h1>"
+    },
+    {
+     "id": "s1-subtitulo",
+     "x": 10,
+     "y": 58,
+     "w": 80,
+     "h": 10,
+     "html": "<p>{{proyecto.subtitulo}}</p>"
+    }
+   ]
+  },
+  {
+   "id": "s2",
+   "boxes": [
+    {
+     "id": "s2-titulo",
+     "x": 8,
+     "y": 8,
+     "w": 84,
+     "h": 16,
+     "html": "<h1>{{proyecto.contexto}}</h1>"
+    },
+    {
+     "id": "s2-cuerpo",
+     "x": 8,
+     "y": 30,
+     "w": 84,
+     "h": 60,
+     "html": "<ul><li>{{proyecto.contexto1}}</li><li>{{proyecto.contexto2}}</li><li>{{proyecto.contexto3}}</li></ul>"
+    }
+   ]
+  },
+  {
+   "id": "s3",
+   "boxes": [
+    {
+     "id": "s3-titulo",
+     "x": 8,
+     "y": 8,
+     "w": 84,
+     "h": 16,
+     "html": "<h1>{{proyecto.objetivos}}</h1>"
+    },
+    {
+     "id": "s3-cuerpo",
+     "x": 8,
+     "y": 30,
+     "w": 84,
+     "h": 60,
+     "html": "<ul><li>{{proyecto.objetivo}}</li><li>{{proyecto.objetivo}}</li><li>{{proyecto.objetivo}}</li></ul>"
+    }
+   ]
+  },
+  {
+   "id": "s4",
+   "boxes": [
+    {
+     "id": "s4-titulo",
+     "x": 8,
+     "y": 8,
+     "w": 84,
+     "h": 16,
+     "html": "<h1>{{proyecto.plan}}</h1>"
+    },
+    {
+     "id": "s4-cuerpo",
+     "x": 8,
+     "y": 30,
+     "w": 84,
+     "h": 60,
+     "html": "<ul><li>{{proyecto.fase}}</li><li>{{proyecto.fase}}</li><li>{{proyecto.fase}}</li></ul>"
+    }
+   ]
+  },
+  {
+   "id": "s5",
+   "boxes": [
+    {
+     "id": "s5-titulo",
+     "x": 8,
+     "y": 8,
+     "w": 84,
+     "h": 16,
+     "html": "<h1>{{proyecto.equipo}}</h1>"
+    },
+    {
+     "id": "s5-izquierda",
+     "x": 8,
+     "y": 30,
+     "w": 40,
+     "h": 60,
+     "html": "<h2>{{proyecto.equipo_personas}}</h2><ul><li>{{proyecto.persona}}</li><li>{{proyecto.persona}}</li></ul>"
+    },
+    {
+     "id": "s5-derecha",
+     "x": 52,
+     "y": 30,
+     "w": 40,
+     "h": 60,
+     "html": "<h2>{{proyecto.equipo_recursos}}</h2><ul><li>{{proyecto.recurso1}}</li><li>{{proyecto.recurso2}}</li></ul>"
+    }
+   ]
+  },
+  {
+   "id": "s6",
+   "boxes": [
+    {
+     "id": "s6-titulo",
+     "x": 8,
+     "y": 8,
+     "w": 84,
+     "h": 16,
+     "html": "<h1>{{proyecto.pasos}}</h1>"
+    },
+    {
+     "id": "s6-cuerpo",
+     "x": 8,
+     "y": 30,
+     "w": 84,
+     "h": 60,
+     "html": "<ul><li>{{proyecto.paso1}}</li><li>{{proyecto.paso2}}</li></ul>"
+    }
+   ]
+  }
+ ]
+}

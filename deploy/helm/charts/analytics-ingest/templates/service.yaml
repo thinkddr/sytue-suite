@@ -1,0 +1,21 @@
+{{- /*
+El nombre DNS de este Service es el contrato con el controlador de Cloud:
+ANALYTICS_INGEST_HOST (chart cloud-controller) apunta aqui y de ahi sale el
+Service ExternalName que cada namespace de tenant usa como backend de /_sytue.
+Si cambia el nombre o el puerto, hay que cambiarlo alli tambien.
+*/ -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "sytue-analytics-ingest.fullname" . }}
+  labels:
+    {{- include "sytue-analytics-ingest.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - name: http
+      port: {{ .Values.service.port }}
+      targetPort: http
+      protocol: TCP
+  selector:
+    {{- include "sytue-analytics-ingest.selectorLabels" . | nindent 4 }}

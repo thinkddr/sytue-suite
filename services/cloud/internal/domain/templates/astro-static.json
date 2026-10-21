@@ -1,0 +1,16 @@
+{
+  "id": "astro-static",
+  "name": "Sitio estático (Astro)",
+  "description": "Empieza con estos ajustes para un sitio Astro generado estáticamente.",
+  "version": "1.0.0",
+  "license": "Apache-2.0",
+  "maintainer": "Sytue",
+  "framework": "astro",
+  "build": {
+    "install": "bun install --frozen-lockfile",
+    "build": "bun run build",
+    "output_dir": "dist"
+  },
+  "docs_url": "https://docs.astro.build",
+  "tags": ["static", "ssg"]
+}

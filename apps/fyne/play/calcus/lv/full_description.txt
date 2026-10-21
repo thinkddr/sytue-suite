@@ -1,0 +1,18 @@
+Jēgpilni skaitļi tabulā, kas strādā kopā ar jums.
+
+• Formulas, nosacījumformatēšana un datu validācija.
+• Ienesiet ārējus datus un veiciet vaicājumus, nepametot tabulu.
+• Diagrammas, mini diagrammas, sagriezumi un datu tabulas.
+• Eksports uz ODS un XLSX; Excel failu atvēršana.
+• Formulas ar kontekstuālu palīdzību un tūlītēju pārrēķinu.
+• Nosacījumformatēšana, datu validācija un reģionālajiem iestatījumiem atbilstoši skaitļu formāti.
+• Dažādu veidu diagrammas, mini diagrammas un sagriezumi.
+• Datu tabulas ar kopsummām un kārtošanu; rakurstabula.
+• Ārējie dati: pievienojiet avotu un veiciet vaicājumus no tabulas.
+• Risinātājs vērtības atrašanai, kas atbilst mērķim.
+• Makro atkārtotu uzdevumu automatizēšanai.
+• Sadarbība reāllaikā ar klātbūtni un komentāriem.
+• Filtri, sagriezumi un meklēšana tabulā.
+• Eksports uz ODS, XLSX un PDF; Excel failu atvēršana no Drive.
+
+Šifrēts pārsūtīšanas laikā (TLS 1.3). Sytue infrastruktūra atrodas ES. Ārējo pakalpojumu atrašanās vieta ir atkarīga no to sniedzēja.

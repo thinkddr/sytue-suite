@@ -1,0 +1,12 @@
+---
+/** Sytue Docus — la papelera, solo con lo suyo (`@sytue/office`, vista `Papelera`). */
+import Papelera from '@sytue/office/vistas/Papelera.astro';
+import { entrar } from '@sytue/office/vistas';
+
+export const prerender = false;
+
+const sesion = await entrar(Astro, { canonica: true });
+if (sesion instanceof Response) return sesion;
+---
+
+<Papelera sesion={sesion} kind="document" />

@@ -1,0 +1,57 @@
+[
+  {
+    "clave": "campana_sms", "modulo": "marketing", "titulo": "nombre",
+    "etiqueta": {"en":"SMS campaigns","es":"Campañas de SMS","fr":"Campagnes SMS","de":"SMS-Kampagnen","it":"Campagne SMS","bg":"SMS кампании","cs":"SMS kampaně","da":"SMS-kampagner","el":"Καμπάνιες SMS","et":"SMS-kampaaniad","fi":"Tekstiviestikampanjat","ga":"Feachtais SMS","hr":"SMS kampanje","hu":"SMS-kampányok","is":"SMS-herferðir","lt":"SMS kampanijos","lv":"SMS kampaņas","mt":"Kampanji SMS","nb":"SMS-kampanjer","nl":"Sms-campagnes","pl":"Kampanie SMS","pt":"Campanhas de SMS","ro":"Campanii SMS","sk":"SMS kampane","sl":"Kampanje SMS","sv":"SMS-kampanjer"},
+    "estados": ["borrador","planificado","en_curso","hecho","cancelado"],
+    "campos": [
+      {"clave":"nombre","tipo":"texto","requerido":true},
+      {"clave":"campana","tipo":"relacion","modelo":"campana"},
+      {"clave":"mensaje","tipo":"texto_largo","requerido":true},
+      {"clave":"fecha","tipo":"fechahora"},
+      {"clave":"destinatarios","tipo":"entero"},
+      {"clave":"coste","tipo":"dinero"}
+    ],
+    "lista": ["nombre","campana","fecha","destinatarios","estado"]
+  },
+  {
+    "clave": "automatizacion", "modulo": "marketing", "titulo": "nombre",
+    "etiqueta": {"en":"Marketing automation","es":"Automatizaciones","fr":"Automatisations","de":"Automatisierungen","it":"Automazioni","bg":"Маркетингова автоматизация","cs":"Marketingová automatizace","da":"Marketingautomatisering","el":"Αυτοματοποίηση μάρκετινγκ","et":"Turunduse automatiseerimine","fi":"Markkinoinnin automaatio","ga":"Uathoibriú margaíochta","hr":"Marketinška automatizacija","hu":"Marketingautomatizálás","is":"Sjálfvirk markaðssetning","lt":"Rinkodaros automatizavimas","lv":"Mārketinga automatizācija","mt":"Awtomazzjoni tal-marketing","nb":"Markedsautomatisering","nl":"Marketingautomatisering","pl":"Automatyzacja marketingu","pt":"Automatização de marketing","ro":"Automatizare de marketing","sk":"Marketingová automatizácia","sl":"Avtomatizacija trženja","sv":"Marknadsautomation"},
+    "estados": ["borrador","activa","pausada"],
+    "campos": [
+      {"clave":"nombre","tipo":"texto","requerido":true},
+      {"clave":"campana","tipo":"relacion","modelo":"campana"},
+      {"clave":"disparador","tipo":"seleccion","opciones":["alta_contacto","formulario","inactividad"],"requerido":true},
+      {"clave":"retraso","tipo":"entero"},
+      {"clave":"mensaje","tipo":"texto_largo"}
+    ],
+    "lista": ["nombre","campana","disparador","retraso","estado"]
+  },
+  {
+    "clave": "mesa", "modulo": "tpv", "titulo": "nombre",
+    "etiqueta": {"en":"Tables","es":"Mesas","fr":"Tables","de":"Tische","it":"Tavoli","bg":"Маси","cs":"Stoly","da":"Borde","el":"Τραπέζια","et":"Lauad","fi":"Pöydät","ga":"Táblaí","hr":"Stolovi","hu":"Asztalok","is":"Borð","lt":"Stalai","lv":"Galdi","mt":"Imwejjed","nb":"Bord","nl":"Tafels","pl":"Stoliki","pt":"Mesas","ro":"Mese","sk":"Stoly","sl":"Mize","sv":"Bord"},
+    "estados": ["disponible","ocupada","reservado"],
+    "campos": [
+      {"clave":"nombre","tipo":"texto","requerido":true},
+      {"clave":"zona","tipo":"texto"},
+      {"clave":"aforo","tipo":"entero"}
+    ],
+    "lista": ["nombre","zona","aforo","estado"]
+  },
+  {
+    "clave": "comanda", "modulo": "tpv", "secuencia": "CMD",
+    "etiqueta": {"en":"Restaurant orders","es":"Comandas","fr":"Commandes en salle","de":"Tischbestellungen","it":"Comande","bg":"Ресторантски поръчки","cs":"Restaurační objednávky","da":"Restaurantordrer","el":"Παραγγελίες εστιατορίου","et":"Restorani tellimused","fi":"Ravintolatilaukset","ga":"Orduithe bialainne","hr":"Narudžbe u restoranu","hu":"Éttermi rendelések","is":"Veitingapantanir","lt":"Restorano užsakymai","lv":"Restorāna pasūtījumi","mt":"Ordnijiet tar-ristorant","nb":"Restaurantbestillinger","nl":"Restaurantbestellingen","pl":"Zamówienia restauracyjne","pt":"Pedidos de restaurante","ro":"Comenzi de restaurant","sk":"Reštauračné objednávky","sl":"Naročila v restavraciji","sv":"Restaurangbeställningar"},
+    "estados": ["abierto","confirmado","pagado","cancelado"],
+    "campos": [
+      {"clave":"mesa","tipo":"relacion","modelo":"mesa","requerido":true},
+      {"clave":"sesion","tipo":"relacion","modelo":"sesion_tpv"},
+      {"clave":"vendedor","tipo":"texto"},
+      {"clave":"comensales","tipo":"entero"},
+      {"clave":"fecha","tipo":"fechahora","requerido":true},
+      {"clave":"base","tipo":"dinero"},
+      {"clave":"iva","tipo":"dinero"},
+      {"clave":"total","tipo":"dinero"},
+      {"clave":"notas","tipo":"texto_largo"}
+    ],
+    "lista": ["ref","mesa","vendedor","comensales","total","estado"]
+  }
+]

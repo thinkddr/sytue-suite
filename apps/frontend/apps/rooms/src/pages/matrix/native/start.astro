@@ -1,0 +1,70 @@
+---
+import { bff, toBffContext } from '../../../lib/bff.js';
+import { chatSdk } from '../../../lib/chat.js';
+import { roomsT } from '../../../i18n/index.js';
+import { opaqueMatrixNative } from '../../../client/matrix/native.js';
+export const prerender = false;
+Astro.response.headers.set('cache-control', 'no-store');
+Astro.response.headers.set('referrer-policy', 'no-referrer');
+const state = Astro.url.searchParams.get('state');
+const t = roomsT(Astro.locals.locale);
+if (!opaqueMatrixNative(state) || Astro.url.searchParams.getAll('state').length !== 1)
+  return new Response(null, { status: 400 });
+const session = await bff.getSession(toBffContext(Astro));
+if (!session) {
+  const returnTo = `${bff.basePath}/matrix/native/start?state=${encodeURIComponent(state)}`;
+  const destination = new URL(`${bff.basePath}/auth/login`, Astro.url.origin);
+  destination.searchParams.set('returnTo', returnTo);
+  const response = Astro.redirect(destination.href);
+  response.headers.set('cache-control', 'no-store');
+  response.headers.set('referrer-policy', 'no-referrer');
+  return response;
+}
+let failed = false;
+try {
+  const sdk = chatSdk(session.tokens.accessToken);
+  const [preview, bootstrap] = await Promise.all([
+    sdk.previewMatrixNative(state),
+    sdk.matrixBootstrap(),
+  ]);
+  const target = new URL(preview.authorize_url);
+  const home = new URL(bootstrap.homeserver_url);
+  const callback = new URL(target.searchParams.get('redirectUrl') ?? '');
+  if (
+    preview.actor !== session.user.id ||
+    preview.actor !== bootstrap.actor ||
+    preview.tenant !== bootstrap.tenant ||
+    preview.state !== state ||
+    target.origin !== home.origin ||
+    target.pathname !== `/_matrix/client/v3/login/sso/redirect/${bootstrap.sso_provider_id}` ||
+    target.username ||
+    target.password ||
+    target.hash ||
+    callback.origin !== Astro.url.origin ||
+    callback.pathname !== `${bff.basePath}/matrix/native/callback` ||
+    callback.searchParams.get('state') !== state ||
+    [...callback.searchParams.keys()].join(',') !== 'state'
+  )
+    throw new Error('matrix_identity');
+  const response = Astro.redirect(target.href);
+  response.headers.set('cache-control', 'no-store');
+  response.headers.set('referrer-policy', 'no-referrer');
+  return response;
+} catch {
+  failed = true;
+}
+---
+
+<!doctype html>
+<html lang={Astro.locals.locale}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <title>Sytue Rooms</title>
+  </head>
+  <body>
+    <main>
+      <p role="alert">{failed ? t('whatsappConnection.sameAccount') : t('state.loading')}</p>
+    </main>
+  </body>
+</html>

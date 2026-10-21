@@ -1,0 +1,102 @@
+{
+  "=SUM(E1:E10)": {
+    "quien": "libreoffice",
+    "motivo": "LibreOffice cuenta como número el lógico guardado en una celda (TRUE = 1); Excel lo ignora en los rangos, y Calcus hace como Excel."
+  },
+  "=SUM(A1:A3,E6,TRUE)": {
+    "quien": "libreoffice",
+    "motivo": "LibreOffice cuenta como número el lógico guardado en una celda (TRUE = 1); Excel lo ignora en los rangos, y Calcus hace como Excel."
+  },
+  "=AVERAGE(E1:E10)": {
+    "quien": "libreoffice",
+    "motivo": "LibreOffice cuenta como número el lógico guardado en una celda (TRUE = 1); Excel lo ignora en los rangos, y Calcus hace como Excel."
+  },
+  "=COUNT(A1:E10)": {
+    "quien": "libreoffice",
+    "motivo": "LibreOffice cuenta como número el lógico guardado en una celda (TRUE = 1); Excel lo ignora en los rangos, y Calcus hace como Excel."
+  },
+  "=PERCENTRANK.EXC(A1:A10,4)": {
+    "quien": "libreoffice",
+    "motivo": "Excel trunca el resultado a las cifras significativas pedidas (el ejemplo de Microsoft de PERCENTRANK da 0,666 para 2/3); LibreOffice redondea."
+  },
+  "=ASC(\"ＡＢＣ　１２３\")": {
+    "quien": "libreoffice",
+    "motivo": "LibreOffice no convierte el espacio ideográfico (U+3000) a ancho medio; Excel sí."
+  },
+  "=JIS(\"ABC 123\")": {
+    "quien": "libreoffice",
+    "motivo": "LibreOffice no convierte el espacio a ancho completo; Excel sí."
+  },
+  "=CONCATENATE(\"a\",1,TRUE)": {
+    "quien": "libreoffice",
+    "motivo": "LibreOffice escribe 1 donde Excel escribe TRUE al concatenar un lógico."
+  },
+  "=DURATION(45306,46402,0.08,0.09,2,1)": {
+    "quien": "libreoffice",
+    "motivo": "Con las bases 1 y 3 LibreOffice calcula la fracción de año con la base (YEARFRAC) y no con los periodos de cupón; el ejemplo documentado de Excel (DURATION(2008-01-01; 2016-01-01; 8 %; 9 %; 2; 1) = 5,993775) da el de los periodos de cupón, que es el de Calcus."
+  },
+  "=MDURATION(45306,46402,0.08,0.09,2,1)": {
+    "quien": "libreoffice",
+    "motivo": "Con las bases 1 y 3 LibreOffice calcula la fracción de año con la base (YEARFRAC) y no con los periodos de cupón; el ejemplo documentado de Excel (DURATION(2008-01-01; 2016-01-01; 8 %; 9 %; 2; 1) = 5,993775) da el de los periodos de cupón, que es el de Calcus."
+  },
+  "=DURATION(45330,46402,0.08,0.09,2,3)": {
+    "quien": "libreoffice",
+    "motivo": "Con las bases 1 y 3 LibreOffice calcula la fracción de año con la base (YEARFRAC) y no con los periodos de cupón; el ejemplo documentado de Excel (DURATION(2008-01-01; 2016-01-01; 8 %; 9 %; 2; 1) = 5,993775) da el de los periodos de cupón, que es el de Calcus."
+  },
+  "=DURATION(45330,46402,0.08,0.09,4,1)": {
+    "quien": "libreoffice",
+    "motivo": "Con las bases 1 y 3 LibreOffice calcula la fracción de año con la base (YEARFRAC) y no con los periodos de cupón; el ejemplo documentado de Excel (DURATION(2008-01-01; 2016-01-01; 8 %; 9 %; 2; 1) = 5,993775) da el de los periodos de cupón, que es el de Calcus."
+  },
+  "=MDURATION(45330,46402,0.08,0.09,2,1)": {
+    "quien": "libreoffice",
+    "motivo": "Con las bases 1 y 3 LibreOffice calcula la fracción de año con la base (YEARFRAC) y no con los periodos de cupón; el ejemplo documentado de Excel (DURATION(2008-01-01; 2016-01-01; 8 %; 9 %; 2; 1) = 5,993775) da el de los periodos de cupón, que es el de Calcus."
+  },
+  "=DURATION(45330,45600,0.08,0.09,2,1)": {
+    "quien": "libreoffice",
+    "motivo": "Con las bases 1 y 3 LibreOffice calcula la fracción de año con la base (YEARFRAC) y no con los periodos de cupón; el ejemplo documentado de Excel (DURATION(2008-01-01; 2016-01-01; 8 %; 9 %; 2; 1) = 5,993775) da el de los periodos de cupón, que es el de Calcus."
+  },
+  "=TBILLEQ(45306,45600,0.0914)": {
+    "quien": "sin-referencia",
+    "motivo": "Más de 182 días: la documentación de Excel no da la fórmula. Calcus resuelve la ecuación de segundo grado del rendimiento equivalente a un bono; LibreOffice da otro valor (equivale a 365·d/(360−d·290), con 290 días a base 30/360) y no hay Excel con el que decidir."
+  },
+  "=ADDRESS(2,3,4,TRUE,\"Hoja1\")": {
+    "quien": "libreoffice",
+    "motivo": "LibreOffice separa la hoja con «.» en su propia sintaxis; Excel con «!»."
+  },
+  "=BESSELK(1.5,1)": {
+    "quien": "libreoffice",
+    "motivo": "Calcus integra Kn(x) = ∫ e^(−x·cosh t)·cosh(nt) dt por trapecios (error exponencialmente pequeño: ~1e-16, comprobado contra la serie en precisión arbitraria en bessel.test.ts); LibreOffice usa una aproximación polinómica y da 0,2773878036 donde el valor exacto es 0,2773878004568 (diferencia de 3,1e-9)."
+  },
+  "=SUM(1,\"2\")": {
+    "quien": "libreoffice",
+    "motivo": "Excel convierte a número el texto escrito como argumento («2»): SUM(1;\"2\") = 3, y Calcus hace lo mismo desde el catálogo v4 (el motor distingue el texto escrito en la fórmula de lo que devuelve una referencia o una función, que se sigue ignorando). LibreOffice da #VALUE!."
+  },
+  "=SUM(A1:A2,\"2\")": {
+    "quien": "libreoffice",
+    "motivo": "Excel convierte a número el texto escrito como argumento («2»): SUM(1;\"2\") = 3, y Calcus hace lo mismo desde el catálogo v4 (el motor distingue el texto escrito en la fórmula de lo que devuelve una referencia o una función, que se sigue ignorando). LibreOffice da #VALUE!."
+  },
+  "=ODDFPRICE(45306,46595,45200,45500,0.0785,0.0625,100,2,1)": {
+    "quien": "libreoffice",
+    "motivo": "LibreOffice 7.4 devuelve #VALUE! en ODDFPRICE y ODDFYIELD con cualquier argumento (se probaron primer periodo corto y largo, todas las frecuencias y bases y los ejemplos de Microsoft); Calcus da el valor de la documentación de Microsoft donde la hay (ODDFPRICE 113,597717; ODDFYIELD 7,72 %) y cumple las identidades: con la emisión un periodo regular antes da exactamente PRICE, y ODDFYIELD invierte ODDFPRICE."
+  },
+  "=ODDFYIELD(45306,46595,45200,45500,0.0785,98,100,2,1)": {
+    "quien": "libreoffice",
+    "motivo": "LibreOffice 7.4 devuelve #VALUE! en ODDFPRICE y ODDFYIELD con cualquier argumento (se probaron primer periodo corto y largo, todas las frecuencias y bases y los ejemplos de Microsoft); Calcus da el valor de la documentación de Microsoft donde la hay (ODDFPRICE 113,597717; ODDFYIELD 7,72 %) y cumple las identidades: con la emisión un periodo regular antes da exactamente PRICE, y ODDFYIELD invierte ODDFPRICE."
+  },
+  "=ODDFPRICE(DATE(2008,11,11),DATE(2021,3,1),DATE(2008,10,15),DATE(2009,3,1),0.0785,0.0625,100,2,1)": {
+    "quien": "libreoffice",
+    "motivo": "LibreOffice 7.4 devuelve #VALUE! en ODDFPRICE y ODDFYIELD con cualquier argumento (se probaron primer periodo corto y largo, todas las frecuencias y bases y los ejemplos de Microsoft); Calcus da el valor de la documentación de Microsoft donde la hay (ODDFPRICE 113,597717; ODDFYIELD 7,72 %) y cumple las identidades: con la emisión un periodo regular antes da exactamente PRICE, y ODDFYIELD invierte ODDFPRICE."
+  },
+  "=ODDFYIELD(DATE(2008,11,11),DATE(2021,3,1),DATE(2008,10,15),DATE(2009,3,1),0.0575,84.5,100,2,0)": {
+    "quien": "libreoffice",
+    "motivo": "LibreOffice 7.4 devuelve #VALUE! en ODDFPRICE y ODDFYIELD con cualquier argumento (se probaron primer periodo corto y largo, todas las frecuencias y bases y los ejemplos de Microsoft); Calcus da el valor de la documentación de Microsoft donde la hay (ODDFPRICE 113,597717; ODDFYIELD 7,72 %) y cumple las identidades: con la emisión un periodo regular antes da exactamente PRICE, y ODDFYIELD invierte ODDFPRICE."
+  },
+  "=ODDLPRICE(45306,46595,45200,0.0785,0.0625,100,2,1)": {
+    "quien": "libreoffice",
+    "motivo": "Con la base 1 (real/real) Calcus mide cada periodo en días reales sobre el periodo de cupón, como Excel (DCi/NLi de ECMA-376); LibreOffice usa YEARFRAC por la frecuencia, y las dos cuentas difieren en la 7.ª cifra (precio, 1,4e-7 relativo) o la 5.ª (rendimiento). Con las bases 0, 2, 3 y 4 coinciden a 1e-9."
+  },
+  "=ODDLYIELD(45306,46595,45200,0.0785,98,100,2,1)": {
+    "quien": "libreoffice",
+    "motivo": "Con la base 1 (real/real) Calcus mide cada periodo en días reales sobre el periodo de cupón, como Excel (DCi/NLi de ECMA-376); LibreOffice usa YEARFRAC por la frecuencia, y las dos cuentas difieren en la 7.ª cifra (precio, 1,4e-7 relativo) o la 5.ª (rendimiento). Con las bases 0, 2, 3 y 4 coinciden a 1e-9."
+  }
+}

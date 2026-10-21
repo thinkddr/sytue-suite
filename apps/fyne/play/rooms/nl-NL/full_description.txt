@@ -1,0 +1,20 @@
+Kanalen, berichten en videogesprekken voor teams op één plek.
+
+• Kanalen per team of project.
+• Een videogesprek ingebouwd in elk kanaal.
+• Vermeldingen en meldingen samengebracht in de hele suite.
+• Doorzoekbare geschiedenis vanaf elke plek in Sytue One.
+• Openbare en privékanalen in categorieën; directe berichten en groepen.
+• Gesprekken, reacties, vermeldingen, vastgezette en opgeslagen berichten en concepten.
+• Opmaak met een “Aa”-balk en sneltoetsen: vet, cursief, code, citaten, lijsten en links.
+• Bijlagen, afbeeldingen, GIF's en eigen emoji; bestanden uit Drive.
+• Gepland verzenden, prioriteit, leesbevestiging en “gezien door”.
+• Slash-opdrachten en kaarten: peilingen en toewijsbare taken.
+• Videogesprekken in het kanaal: camera, scherm, hand opsteken, chat en opnemen.
+• Geplande vergaderingen en uitnodigingslinks.
+• Bots, webhooks en integraties met andere tools.
+• Aanwezigheid en aangepaste status; meldingsinstellingen per kanaal.
+• Zoeken in de geschiedenis, ook vanuit de hele suite.
+• Realtime via WebSocket, met opnieuw verbinden en zonder verloren berichten.
+
+Versleuteld tijdens transport (TLS 1.3). De infrastructuur van Sytue staat in de EU. De locatie van externe diensten hangt af van hun aanbieder.

@@ -1,0 +1,14 @@
+Cijeli Sytue One na jedan klik, kroz ista vrata.
+
+• Pokretač sa svim vašim aplikacijama i onima koje poveže vaša organizacija.
+• Današnji raspored i nepročitana pošta na naslovnici, uz nedavne aktivnosti u paketu i vaše obavijesti.
+• Povežite svoje uređaje i preuzmite izvorne aplikacije.
+• Pokretač s aplikacijama paketa i aplikacijama trećih strana koje poveže vaša organizacija.
+• Brze radnje: napiši e-poruku, novi dokument, prenesi u Drive, stvori događaj.
+• Nedavno u cijelom paketu: posljednje stavke iz Drivea, Docusa, Maila ili Roomsa.
+• Centar za obavijesti i prisutnost zajednički za cijeli paket.
+• Povezivanje uređaja: profil za iPhone i Mac, Android i računalo, u dva koraka.
+• Preuzimanja izvornih aplikacija za računalo i mobitel.
+• Pomoćnik dobrodošlice koji priprema organizaciju bez priručnika.
+
+Šifrirano u prijenosu (TLS 1.3). Infrastruktura Sytuea nalazi se u EU-u. Lokacija vanjskih usluga ovisi o njihovu pružatelju.

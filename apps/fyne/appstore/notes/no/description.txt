@@ -1,0 +1,18 @@
+Notatbøker som rommer alt: tekst, filer, hendelser, hele dokumenter.
+
+• Nestede notatbøker på et fritt lerret, i kolonner eller som liste.
+• Notater av alle slag: tekst, oppgaver, lenker, filer, hendelser fra Calendar, dokumenter fra Docs.
+• Du bestemmer hva som kommer med i søket — og hva som aldri gjør det.
+• Nestede notatbøker med ikon og farge; tre oppsett: fritt, kolonner og liste.
+• Tolv typer notater: tekst, oppgaver, lenker, farge, bilde og henvisninger til Drive, Docus, Calendar, Rooms og andre notater.
+• En redigerer med formatering (fet, lister, lenker) som lagrer når du går ut.
+• Tagger, fest, dupliser, flytt mellom notatbøker, grupper og dra rundt på lerretet.
+• Synlighet per notatbok: privat, personlig, organisasjon eller offentlig lenke.
+• Du bestemmer hvilke notatbøker som kommer med i pakkens søk.
+• Tilbakekoblinger: se hvilke notater som peker hit.
+• Eksporter en hel notatbok til HTML, PDF, Markdown og mer; importer kopier.
+• Del et notat til en kanal i Rooms; slipp eller lim inn for å lage notater.
+• Tabeller i redigereren og Markdown-snarveier mens du skriver: «- », «# », «> » og «```».
+• Flytt et notat til en annen notatbok, eksporter ett enkelt notat og sorter notatboken slik du vil.
+
+Kryptert under overføring (TLS 1.3). Sytues infrastruktur er i EU. Plasseringen av eksterne tjenester avhenger av leverandøren deres.

@@ -1,0 +1,226 @@
+{
+ "pais": "MT",
+ "verificado": true,
+ "moneda": "EUR",
+ "formas": [
+  {
+   "clave": "self_employed",
+   "nombre": "Self-employed",
+   "tipo": "persona_fisica"
+  },
+  {
+   "clave": "partnership",
+   "nombre": "Partnership",
+   "tipo": "persona_fisica"
+  },
+  {
+   "clave": "ltd",
+   "nombre": "Private limited liability company (Ltd)",
+   "tipo": "sociedad"
+  },
+  {
+   "clave": "plc",
+   "nombre": "Public limited company (p.l.c.)",
+   "tipo": "sociedad"
+  }
+ ],
+ "portales": {
+  "cfr": {
+   "nombre": "Malta Tax and Customs Administration (CFR services)",
+   "url": "https://cfr.gov.mt/"
+  },
+  "mbr": {
+   "nombre": "Malta Business Registry",
+   "url": "https://mbr.mt/"
+  }
+ },
+ "obligaciones": [
+  {
+   "clave": "mt_vat",
+   "nombre": "VAT return (quarterly)",
+   "concepto": "iva_periodica",
+   "ambito": "fiscal",
+   "periodicidad": "trimestral",
+   "plazos": {
+    "T": "15+2"
+   },
+   "margen_dias": 7,
+   "portal": "cfr",
+   "aplica": {
+    "condiciones": [
+     "iva"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_base_pct": 1,
+    "recargo_pct_mes": 0.6,
+    "fija_centimos": 2000,
+    "nota": "Due by the 15th of the second month after the quarter (sole proprietors filing online get 7 more days). Administrative penalty of the higher of 1 % of the tax due per month (max 20 %) and €20 per month; interest of 0.6 % per month on late payment."
+   },
+   "calculo": {
+    "tipo": "saldo_neto",
+    "haber": [
+     "477"
+    ],
+    "debe": [
+     "472"
+    ]
+   }
+  },
+  {
+   "clave": "mt_recap",
+   "nombre": "Recapitulative statement",
+   "concepto": "operaciones_intracomunitarias",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "15"
+   },
+   "margen_dias": 7,
+   "portal": "cfr",
+   "aplica": {
+    "condiciones": [
+     "intracomunitario"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 1000,
+    "nota": "€10 per month of delay, max €120 per statement."
+   }
+  },
+  {
+   "clave": "mt_fs5",
+   "nombre": "FS5 payer's monthly payment advice (FSS and SSC)",
+   "concepto": "retenciones_trabajo",
+   "ambito": "laboral",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "ultimo"
+   },
+   "margen_dias": 7,
+   "portal": "cfr",
+   "aplica": {
+    "condiciones": [
+     "empleados"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_pct_mes": 0.6,
+    "recargo_max_pct": 10,
+    "nota": "Interest at 0.6 % per month; FS3/FS7 annual reconciliation by 15 February of the following year."
+   }
+  },
+  {
+   "clave": "mt_ssc_self",
+   "nombre": "Self-employed social security contributions (Class 2)",
+   "concepto": "cuota_autonomos",
+   "ambito": "laboral",
+   "periodicidad": "anual",
+   "plazos": {
+    "1P": "04-30",
+    "2P": "08-31",
+    "3P": "12-21"
+   },
+   "margen_dias": 7,
+   "portal": "cfr",
+   "aplica": {
+    "tipos": [
+     "persona_fisica"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_pct_mes": 0.6,
+    "nota": "Paid with the provisional tax instalments (30 April, 31 August, 21 December)."
+   }
+  },
+  {
+   "clave": "mt_it_company",
+   "nombre": "Company income tax return",
+   "concepto": "sociedades_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "09-30+1"
+   },
+   "margen_dias": 30,
+   "portal": "cfr",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 5000,
+    "nota": "Additional tax of €50 to €1,500 depending on the delay (max 24 months); nine months after the financial year end, with electronic filing extensions."
+   }
+  },
+  {
+   "clave": "mt_pt",
+   "nombre": "Provisional tax instalments",
+   "concepto": "pago_fraccionado_sociedades",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "1P": "04-30",
+    "2P": "08-31",
+    "3P": "12-21"
+   },
+   "margen_dias": 7,
+   "portal": "cfr",
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_pct_mes": 0.6,
+    "nota": "Interest at 0.6 % per month on late payment (20 %, 30 % and 50 % of the previous year's tax)."
+   }
+  },
+  {
+   "clave": "mt_ta22",
+   "nombre": "Self-employed income tax return (TA22 / IT return)",
+   "concepto": "renta_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "06-30+1"
+   },
+   "margen_dias": 30,
+   "portal": "cfr",
+   "aplica": {
+    "tipos": [
+     "persona_fisica"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 5000,
+    "nota": "Additional tax of €50 to €500 depending on the delay."
+   }
+  },
+  {
+   "clave": "mt_accounts",
+   "nombre": "Annual return and accounts (MBR)",
+   "concepto": "cuentas_anuales",
+   "ambito": "mercantil",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "12-31+1"
+   },
+   "margen_dias": 60,
+   "portal": "mbr",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 5000,
+    "nota": "Penalty of €50 plus €1 per day of default for late accounts; 10 months and 42 days after the year end for private companies."
+   }
+  }
+ ]
+}

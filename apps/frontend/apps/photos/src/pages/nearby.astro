@@ -1,0 +1,45 @@
+---
+/**
+ * Sytue Fotos — «fotos de por aquí». SSR: el layout exige sesión; la isla monta
+ * la Sytue Shell y la cuadrícula de las hechas cerca de la foto de `?id=`.
+ */
+import AppLayout from '../layouts/AppLayout.astro';
+import { Cerca } from '../components/Cerca.js';
+import { serverEnv } from '@sytue/auth/server';
+import { bff, toBffContext } from '../lib/bff.js';
+import { canonicaConOrg, returnToCanonico } from '@sytue/config';
+
+export const prerender = false;
+
+const session = await bff.getSession(toBffContext(Astro));
+if (!session) {
+  // ADR 0056: la entrada org-ful llega reescrita con la marca ?__org=; el returnTo
+  // sale canónico, no en la forma interna, o tras el login la barra se queda con ella.
+  const returnTo = returnToCanonico(Astro.url, bff.basePath);
+  const redireccionLogin = Astro.redirect(
+    `${bff.basePath}/auth/login?returnTo=${encodeURIComponent(returnTo)}`,
+  );
+  redireccionLogin.headers.set('cache-control', 'no-store');
+  return redireccionLogin;
+}
+// Ruta en `sinOrg` (su nombre colisiona con el namespace de organizaciones):
+// con sesión, un salto local a la canónica con la org activa.
+const canonica = canonicaConOrg(Astro.url, bff.basePath, session.user.tenant);
+if (canonica) return Astro.redirect(canonica);
+const id = Astro.url.searchParams.get('id');
+if (!id) {
+  return Astro.redirect(`${import.meta.env.BASE_URL}`);
+}
+const hubBaseUrl = serverEnv(import.meta.env).SYTUE_HUB_BASE_URL ?? 'https://hub.sytue.eu';
+---
+
+<AppLayout title="Sytue Fotos">
+  <Cerca
+    slot="app"
+    client:load
+    locale={Astro.locals.locale}
+    user={session.user}
+    hubBaseUrl={hubBaseUrl}
+    id={id}
+  />
+</AppLayout>

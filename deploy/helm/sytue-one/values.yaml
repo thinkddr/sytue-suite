@@ -1,0 +1,730 @@
+# =============================================================================
+# Sytue One — values.yaml BASE (umbrella chart)
+# Fuente de verdad: docs/CONVENTIONS.md (v4 "Sytue Native"). Solo regiones UE (Scaleway).
+#
+# Suite 100% Sytue-native en Go + Astro/Preact + PostgreSQL. SIN motores AGPL
+# (Keycloak/Nextcloud/OnlyOffice/Mattermost/Stalwart) y SIN Redis/Valkey. Unica app de
+# terceros: LiveKit (Apache-2.0) como SFU de medios de Sytue Rooms.
+#
+# Cada entorno aporta su overlay: values-staging.yaml y values-prod.yaml.
+#
+# IMPORTANTE: NUNCA poner secretos reales aqui. Los secretos se inyectan via
+#   Scaleway Secret Manager los materializa el paso 02b y los charts los
+#   referencian por existingSecret.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# global: valores compartidos por el umbrella y todos los subcharts (Helm los
+# propaga automaticamente a las dependencias).
+# -----------------------------------------------------------------------------
+global:
+  # Enabled only after both Docs and Rooms have the synchronous access guard.
+  documentCalls:
+    enabled: false
+    secretName: sytue-docs-rooms-access
+    secretKey: secret
+  env: base                     # base | staging | prod (lo sobrescribe el overlay)
+  domain: sytue.eu              # dominio raiz (overlay puede usar staging.sytue.eu)
+  # Dominio de CONTENIDO DE CLIENTES (decisión del dueño, 2026-10-06): lo que publica
+  # un cliente (hoy, el túnel de su NAS) va a un dominio REGISTRABLE aparte, nunca a
+  # un subdominio de `domain`, que podría poner cookies a toda la suite. Vacío = esas
+  # funciones apagadas. Llega a los servicios como SYTUE_CLIENT_CONTENT_DOMAIN.
+  dominioDeClientes: ""
+  region: fr-par                # region principal Scaleway (UE). DR: nl-ams
+  imageRegistry: rg.fr-par.scw.cloud/sytue-prod-platform # el script usa el output real de OpenTofu
+  imagePullSecrets:
+    - name: sytue-registry
+
+  # Prefijo de la app «Mi cuenta», que se sirve en la dirección GLOBAL
+  # `id.<dominio>/account` (nunca en la de una organización). Con él, el
+  # `/account` de Sytue ID, si llega a Go, redirige a la app en vez de servir su
+  # propio HTML.
+  #
+  # VACÍO LO APAGA, y esa es la razón de que sea un valor y no una constante en el
+  # código: una instalación que no despliegue la superficie `account` y recibiera
+  # el 302 dejaría a su gente sin pantalla de cuenta —y sin forma de cambiar la
+  # contraseña—. Va en `global` porque lo necesita el chart de `id`, que no ve la
+  # configuración de `sytue-frontend`.
+  accountAppPath: /account
+
+  # Cache efimera compartida (Dragonfly). Un solo valor para los tres servicios
+  # que la usan —Hub, Rooms y Docs—: si cada chart lo trajera por su cuenta,
+  # podrian acabar apuntando a sitios distintos y la presencia se partiria igual
+  # que si no hubiera cache.
+  #
+  # Vacia ⇒ los servicios degradan a no-op (platform/pkg/cache) y siguen
+  # sirviendo con estado en memoria del proceso, que SOLO es correcto con una
+  # replica. El nombre del Service es estable y coincide con el del compose de
+  # desarrollo, para que la URL sea la misma en los dos entornos.
+  dragonflyUrl: "redis://dragonfly:6379"
+
+  # Secret COMPARTIDO de la cache: contraseña de Dragonfly y clave de firma.
+  #
+  # Va en un Secret aparte y no en cada `existingSecret` de servicio porque los
+  # ocho que lo usan —Dragonfly y los siete que hablan con él— tienen que ver
+  # EXACTAMENTE el mismo valor. Repartido en ocho Secrets, rotar la contraseña
+  # serían ocho ediciones y la primera que se olvide deja a un servicio fuera.
+  #
+  # VACÍO ⇒ comportamiento previo: Dragonfly sin contraseña y sin firmar los
+  # valores. Es lo que había hasta el 2026-08-16 y solo se sostiene si la
+  # NetworkPolicy acota de verdad quién llega al puerto.
+  #
+  # Las dos claves son independientes y las referencias van con `optional: true`,
+  # así que se pueden poner por separado: primero la firma —que no requiere
+  # coordinación, porque un servicio sin ella simplemente no cachea— y después la
+  # contraseña, que sí hay que poner en Dragonfly y en los siete a la vez.
+  #
+  # Se crea fuera del chart (nunca en git):
+  #   kubectl -n <ns> create secret generic sytue-one-cache \
+  #     --from-literal=dragonfly-password="$(openssl rand -base64 32)" \
+  #     --from-literal=cache-signing-key="$(openssl rand -base64 32)"
+  cache:
+    secretName: ""
+    passwordKey: dragonfly-password
+    signingKeyKey: cache-signing-key
+
+  # Sytue AI. Global y no del subchart porque lo miran DOS sitios que tienen que
+  # coincidir: el chart `ai` (que despliega el servicio) y el de frontend (que le
+  # pasa SYTUE_AI_URL al BFF de cada app). Con el valor en un solo subchart, el
+  # frontend no puede saber si el servicio existe y acabaria apuntando a un
+  # Service que no esta, con un 502 en vez del 503 que el panel sabe leer.
+  #
+  # `enabled: false` ⇒ el BFF no recibe la URL, responde 503 ai_not_configured y
+  # el panel del editor SE OCULTA. Es la degradacion buena: la suite entera
+  # funciona igual, simplemente sin asistente.
+  #
+  # El Secret con la clave del proveedor se crea FUERA del chart (nunca en git):
+  #   kubectl -n <ns> create secret generic sytue-one-ai \
+  #     --from-literal=api-key="<SECRET KEY de Scaleway, el UUID>"
+  #
+  # Va la SECRET KEY sola, no el par. Scaleway emite las API keys como access key
+  # + secret key, pero Generative APIs solo acepta la secret key como Bearer
+  # (comprobado el 2026-09-09: con la access key devuelve 403, y con las dos
+  # juntas tambien). Sin el Secret, el servicio arranca sano y responde 503 igual.
+  ai:
+    enabled: true
+    apiKeySecret: ""
+
+  # Telemetria: a donde manda cada servicio sus metricas (OTLP/HTTP).
+  #
+  # Va directo a Scaleway Cockpit, SIN agente ni operador ni ServiceMonitor. Se
+  # comprobo el 2026-08-11 que su ruta de ingesta OTLP existe y que su API de
+  # consulta responde PromQL en 0,26 s, asi que el rodeo por un Prometheus dentro
+  # del cluster sobra: es una pieza menos que mantener y que auditar.
+  #
+  # El endpoint termina en /otlp porque el exportador de la casa hace
+  # POST {endpoint}/v1/metrics (platform/pkg/telemetry/exporter.go).
+  #
+  # OJO CON EL <id>: tiene que ser el de una data source `origin: custom`, no el
+  # de las que trae Cockpit de serie. Las suyas son de origen `scaleway` —las
+  # rellena el con metricas de SU infraestructura— y escribir en ellas devuelve
+  # 403 aunque la cabecera y el scope sean correctos. Se creo `sytue-app-metrics`
+  # para esto; su URL sale de `scw cockpit data-source list`.
+  #
+  # Vacio ⇒ NO se exporta nada y no se monta el bucle periodico: el servicio sigue
+  # midiendo en memoria y sirviendo igual. La telemetria nunca puede ser requisito
+  # para atender una peticion.
+  otlp:
+    endpoint: ""
+    # El token va por Secret y NUNCA aqui. Aunque solo permita escribir, con el se
+    # puede envenenar la serie que decide un escalado. Contenido esperado de la
+    # clave: `X-Token=<secreto>` (formato de OTEL_EXPORTER_OTLP_HEADERS).
+    tokenSecret: ""
+    tokenKey: otlp-headers
+
+  # El catálogo de la tabla de versiones del panel de plataforma ya no vive aquí:
+  # lo deduce templates/componentes.yaml de los subcharts y superficies
+  # encendidos. La lista a mano (`components`) se quedaba adelantada en los
+  # perfiles que apagan piezas y el panel las daba por caídas.
+
+  # Identidad (Sytue ID — servicio Go propio, NUCLEAR). Realm logico de la suite
+  # (etiqueta interna de tenancy; NO forma parte del issuer — eso era Keycloak, retirado).
+  identity:
+    realm: sytue
+    # Issuer OIDC = https://id.<domain> (discovery estandar en
+    # /.well-known/openid-configuration; SIN /realms/). Cada servicio valida
+    # los JWT de Sytue ID via JWKS (middleware authn de platform).
+    # El tráfico servidor-a-servidor NO sale por ingress: mantiene el issuer
+    # público para validar `iss`, pero usa el Service privado del mismo release.
+    # Solo se sobreescriben al usar un Sytue ID externo al clúster.
+    internalBaseUrl: ""
+    jwksUrl: ""
+
+  # Ingress canonico: Traefik (ver bloque traefik mas abajo).
+  ingress:
+    enabled: true
+    className: traefik
+    annotations: {}
+
+  # TLS automatico via cert-manager (1.21).
+  tls:
+    enabled: true
+    createIssuers: true
+    email: tls@sytue.eu
+    # issuer por defecto que usan los Ingress (lo fija el overlay por entorno).
+    issuer: sytue-letsencrypt-staging
+    issuers:
+      sytue-letsencrypt-staging:
+        enabled: true
+        server: https://acme-staging-v02.api.letsencrypt.org/directory
+      sytue-letsencrypt-prod:
+        enabled: false
+        server: https://acme-v02.api.letsencrypt.org/directory
+
+    # Reto DNS-01, imprescindible para los certificados COMODÍN. APAGADO, y no
+    # basta con encenderlo aquí: ver la lista de abajo.
+    #
+    # PARA QUÉ. Cada hostname de cliente de Sytue Cloud pide hoy su propio
+    # certificado, y todo certificado de una CA pública acaba en los registros de
+    # Certificate Transparency: públicos, permanentes y consultables por
+    # cualquiera. Ahí queda el nombre de cada función y el proyecto de cada
+    # cliente. Un comodín `*.fn.<dominio>` lo sustituye por UNA entrada que no
+    # dice nada de nadie. Los hostnames ya se aplanaron a un solo segmento para
+    # que un comodín pueda cubrirlos —ver
+    # services/cloud/internal/controller/hostname_funcion.go—; esto es la otra
+    # mitad del cambio.
+    #
+    # LO QUE FALTA ANTES DE PONER ESTO EN true, y no es configuración:
+    #
+    #   1. cert-manager NO trae solver de Scaleway. Hay que desplegar
+    #      `cert-manager-webhook-scaleway`, fijar su imagen por digest en
+    #      deploy/production/upstream-images.txt y darlo de alta en
+    #      compliance/supply-chain/providers.tsv como cualquier dependencia.
+    #   2. Una clave de API de Scaleway con permiso de ESCRITURA en DNS, como
+    #      Secret. Es más poderosa que la que basta para HTTP-01: quien la tenga
+    #      puede emitir certificados de cualquier subdominio nuestro.
+    #   3. Probarlo en el efímero contra el endpoint de STAGING de ACME. El
+    #      rate-limit de producción es duro y un comodín mal pedido lo gasta
+    #      igual; y si el solver falla, los certificados dejan de RENOVARSE y eso
+    #      no se nota hasta que caducan, semanas después.
+    #
+    # Mientras esté en false no cambia nada: los Ingress siguen pidiendo su
+    # certificado por HTTP-01, exactamente como hasta ahora.
+    dns01:
+      enabled: false
+      # Zona donde el solver crea los TXT del reto.
+      zona: sytue.eu
+      # Secret con la clave de API de Scaleway (clave `secret-key`).
+      secretName: scaleway-dns-api-key
+      # Un comodín POR NIVEL: ACME no emite comodines de varios niveles, que es
+      # justo la razón de haber aplanado los hostnames de las funciones.
+      comodines:
+        # El de las ORGANIZACIONES. Faltaba, y es el que hace falta para el
+        # ingreso por `<slug>.sytue.eu`: sin él el solver existe pero no cubre
+        # ese nombre, que da exactamente el mismo resultado que no tenerlo.
+        - "*.sytue.eu"
+        - "*.fn.apps.sytue.eu"
+        - "*.db.apps.sytue.eu"
+        - "*.apps.sytue.eu"
+
+  # NetworkPolicy baseline.
+  networkPolicy:
+    enabled: true
+    # Abre la salida por 443/5432/465/587 para RDB, Object Storage, Secret
+    # Manager y correo. NO acota el destino: es 0.0.0.0/0 y solo limita los
+    # puertos. Decía «UE» hasta el 2026-08-11 y era falso; el porqué de dejarlo
+    # así, en el comentario de templates/networkpolicy-baseline.yaml.
+    allowExternalEgress: true
+    # Redes privadas desde las que el Load Balancer gestionado alcanza los
+    # NodePort de Traefik. Cada overlay de producción debe fijarlo a su VPC.
+    loadBalancerSourceCIDRs: []
+
+    # --- Clústeres donde el balanceador y las sondas NO vienen de una red
+    # --- externa. Todo lo de aquí va vacío por defecto: con los valores por
+    # --- defecto, lo renderizado es idéntico a lo de antes.
+
+    # CIDRs desde los que el kubelet sondea los pods. En un clúster gestionado
+    # las sondas ya pasan y esto sobra; en bare-metal el kubelet ataca al pod
+    # DESDE EL NODO —en k3s, la puerta de enlace de la red de pods, típicamente
+    # 10.42.0.1/32— y sin esta regla la baseline las descarta: los pods quedan
+    # NotReady, salen de sus Services y, si no tienen livenessProbe, ni siquiera
+    # se reinician para delatarlo.
+    nodeCIDRs: []
+
+    # Pods que implementan los Service de tipo LoadBalancer DENTRO del clúster
+    # (klipper-lb en k3s, speaker en MetalLB). En Scaleway el tráfico llega de
+    # una red privada y basta loadBalancerSourceCIDRs; en bare-metal llega de un
+    # pod de OTRO namespace, con IP de pod, y ningún CIDR razonable lo describe
+    # sin abrir de paso toda la red de pods.
+    serviceLB:
+      namespace: ""
+      podLabels: {}
+
+    # Namespace de datos alcanzable en egress, y sus puertos. En los clústeres
+    # gestionados PostgreSQL y el S3 son servicios externos y los cubre
+    # allowExternalEgress por 5432/443. En bare-metal viven en un namespace del
+    # propio clúster y hablan por puertos que no están en esa lista: SeaweedFS
+    # sirve S3 en HTTP plano por el 8333 y Dragonfly escucha en el 6379.
+    dataNamespace: ""
+    dataPorts: []
+
+    # API SERVER DEL PROPIO CLÚSTER, para los pods que hablan con él: Traefik,
+    # cert-manager, cualquier controlador. En un clúster gestionado lo cubre la
+    # salida a 443 de allowExternalEgress. En bare-metal NO, y el motivo es sutil:
+    # kube-router compara el destino DESPUÉS del DNAT, así que una conexión a la
+    # ClusterIP 10.43.0.1:443 se evalúa contra la IP REAL del nodo y el puerto
+    # REAL del API —6443 en k3s—, que no está en esa lista de puertos.
+    #
+    # Medido el 2026-09-05: permitiendo solo <nodo>/32:6443, responden tanto
+    # https://10.43.0.1:443 como https://<nodo>:6443. Sin la regla, Traefik no
+    # puede listar Ingress, no construye NINGUNA ruta y sirve 404 a todos los
+    # hosts. Y no falla al desplegar, sino en el primer reinicio de su pod, con
+    # lo que el fallo aparece desconectado de la causa.
+    apiServer:
+      cidrs: []
+      port: 6443
+
+  # Protección L7 conservadora compartida por la suite y las publicaciones
+  # Cloud. No fija CSP ni framing global para no romper contenido de usuarios.
+  edgeSecurity:
+    enabled: true
+    hstsSeconds: 63072000
+    rateLimit:
+      average: 100
+      period: 1s
+      burst: 250
+    maxInFlight: 500
+
+  # Postgres EXTERNO (Scaleway RDB). NO se despliega Postgres en el chart: fuente
+  # de verdad unica (estado + colas + cache sobre Postgres; sin Redis/Valkey).
+  postgresql:
+    host: ""                    # endpoint RDB (lo fija el overlay / secret)
+    port: 5432
+    sslMode: require
+    existingSecret: sytue-postgresql
+
+  # Object Storage (S3 Scaleway, fr-par, versionado). Credenciales por secret.
+  objectStorage:
+    endpoint: s3.fr-par.scw.cloud
+    region: fr-par
+    existingSecret: sytue-object-storage
+
+  # Almacén REMOTO (ADR 0038, 2026-09-13): todo lo nuevo va a Scaleway One Zone
+  # —la clase más barata que sirve en vivo— y lo que ya estaba se queda en
+  # objectStorage: `localTenants` es la lista (CSV) de tenants que siguen en
+  # local; una cuenta personal nunca lo está. Lo leen Drive, Mail, Docs y
+  # Sytue Photos. El Secret lleva endpoint, bucket, access-key y secret-key.
+  # Apagado = todo al mismo almacén.
+  objectStorageRemote:
+    enabled: false
+    region: fr-par
+    storageClass: ONEZONE_IA
+    existingSecret: sytue-object-storage-remote
+    localTenants: ""
+
+  # ServiceMonitor (prometheus-operator, instalado cluster-wide aparte).
+  metrics:
+    serviceMonitor:
+      enabled: true
+      namespace: ""             # vacio = mismo namespace
+      interval: 30s
+      labels: {}                # p.ej. release: kube-prometheus-stack
+
+  # Defaults de seguridad de pod.
+  securityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+
+# Secretos de las puertas internas que genera el propio chart en el clúster
+# (templates/secretos-internos.yaml): nombre del Secret → clave. Solo los que no
+# crea ningún script; los charts los montan con `optional: true`, así que uno
+# que falte no rompe nada visible: apaga la función en silencio.
+secretosInternos:
+  sytue-docs-rooms-access: secret
+  sytue-hub-internal: secret
+  sytue-pages-publicador: secret
+  sytue-id-estado-orgs: secret
+  sytue-syerp-pedidos-tienda: secret
+  sytue-ai-pages: secret
+  sytue-analytics-pages: secret
+  sytue-contacts-internal: token
+  # Sytue ID (/internal/directory/resolve) y Docs, que lo usa solo para reconstruir
+  # las menciones de los avisos históricos (`docs avisos-historicos`).
+  sytue-id-directorio: secret
+  # Sytue ID (/internal/people/orgs) y Docs: en qué organizaciones está quien recibe
+  # una petición de firma de fuera, para aplicar su política (ADR 0059). Propio: la del
+  # directorio se retira con la reconstrucción de avisos.
+  sytue-id-orgs-persona: secret
+  # Sytue ID (/internal/orgs/names), el Hub, Rooms y Calendar: el nombre visible de
+  # las organizaciones de fuera que avisan o invitan a una persona.
+  sytue-id-nombres-orgs: secret
+  # Sytue Docs y Sytue Drive: la papelera compartida (Drive mig 0027). Propio y no el
+  # del Hub, que tienen todos los servicios, porque estas dos puertas borran.
+  sytue-docs-drive-internal: secret
+
+# -----------------------------------------------------------------------------
+# platformNamespace: gobierna el namespace de la plataforma (Release.Namespace).
+#   - Pod Security Admission en modo "restricted" (deny-by-default de pods
+#     privilegiados): etiquetas pod-security.kubernetes.io/{enforce,audit,warn}.
+#   - Etiqueta sytue.eu/role=ingress cuando el namespace tambien aloja Traefik
+#     (para que las NetworkPolicy de ingreso lo seleccionen).
+#   - ResourceQuota + LimitRange para acotar el consumo del namespace.
+# manageNamespace: si true, el chart crea/etiqueta el Namespace (requiere que Helm
+#   lo gestione: instalar SIN --create-namespace y con el nombre exacto). Si el
+#   namespace lo crea otra herramienta (Argo/Tofu), poner manageNamespace=false y
+#   aplicar estas etiquetas fuera del chart.
+# -----------------------------------------------------------------------------
+platformNamespace:
+  manageNamespace: false
+  # Pod Security Standards (https://kubernetes.io/docs/concepts/security/pod-security-standards/)
+  podSecurity:
+    enabled: true
+    enforce: restricted
+    enforceVersion: latest
+    audit: restricted
+    auditVersion: latest
+    warn: restricted
+    warnVersion: latest
+  # El namespace de plataforma tambien aloja el ingress (Traefik) por defecto.
+  ingressRole: true
+  # Cuota agregada del namespace de plataforma, dimensionada para que el HPA
+  # llegue a su MAXIMO sin ahogarse (suma real con los overlays de prod):
+  #   limits.cpu   ~253 = servicios Go a HPA-max 183 (id/drive/docs/rooms 12x2,
+  #                 mail 8x2, calendar/contacts 8x1, hub 12x1, cloud-api
+  #                 15x1, cloud-builder 2x0.5, analytics-ingest 10x1,
+  #                 analytics-api 1x1) + livekit 8 + frontends 11 apps
+  #                 x10x0.5=55 + pgbouncer 1 + traefik/cert-manager ~6.
+  #   limits.memory ~134Gi por el mismo calculo => 192Gi con margen.
+  #   requests (32 cpu / 64Gi) ya cubren la suma real a HPA-max (~24 cpu/44Gi).
+  resourceQuota:
+    enabled: true
+    hard:
+      requests.cpu: "32"
+      requests.memory: 64Gi
+      limits.cpu: "256"
+      limits.memory: 192Gi
+      pods: "300"
+      services.loadbalancers: "4"
+      persistentvolumeclaims: "20"
+  # LimitRange: obliga requests/limits por contenedor (evita pods sin limites).
+  limitRange:
+    enabled: true
+    default:
+      cpu: "1"
+      memory: 512Mi
+    defaultRequest:
+      cpu: 50m
+      memory: 128Mi
+    max:
+      cpu: "8"
+      memory: 8Gi
+
+# -----------------------------------------------------------------------------
+# Catalogo de hosts (subdominios del SPEC). Documenta el reparto; cada subchart
+# deriva su host de global.domain + su subdomain.
+# -----------------------------------------------------------------------------
+hosts:
+  portal: one
+  id: id
+  drive: drive
+  docs: docs          # API del servicio de documentos (la web, en docus/calcus/diapos/certipdf)
+  docus: docus
+  calcus: calcus
+  diapos: diapos
+  certipdf: certipdf
+  mail: mail
+  mx: mx
+  calendar: calendar
+  contacts: contacts
+  rooms: rooms
+  cloud: cloud
+  admin: admin
+  console: console    # legado: 301 a admin
+  chat: chat          # legado: 301 a rooms
+  meet: meet          # legado: 301 a rooms
+  hub: hub
+  www: www
+  apps: apps          # PaaS runtime: <app>.apps.sytue.eu
+  preview: preview    # PaaS previews: <proyecto>-pr-<n>.preview.sytue.eu
+  ingress: ingress    # dominios propios CNAME -> ingress.sytue.eu
+
+# =============================================================================
+# Charts UPSTREAM (permisivos)
+# =============================================================================
+
+# ----- Ingress CANONICO: Traefik 3 (MIT) -----
+traefik:
+  enabled: true
+  ingressClass:
+    enabled: true
+    isDefaultClass: true          # IngressClass por defecto del cluster
+    # Los charts propios y cert-manager referencian literalmente `traefik`.
+    # Sin nombre explícito el chart upstream usa el fullname del release
+    # (`sytue-one-traefik`) y Kubernetes ignora todos los Ingress con className.
+    name: traefik
+  deployment:
+    replicas: 2
+    # traefik chart >=34: las pod labels viven bajo deployment.podLabels
+    # (el schema rechaza podLabels en la raiz).
+    podLabels:
+      sytue.eu/role: ingress
+  service:
+    annotations:
+      # El Cloud Controller de Kapsule crea y gobierna el LB en zona UE.
+      service.beta.kubernetes.io/scw-loadbalancer-type: "lb-s"
+      # El LB llega a los nodos por el Private Network y conserva la IP real del
+      # cliente. Traefik solo confía Proxy Protocol desde ese CIDR, nunca desde
+      # Internet directamente.
+      service.beta.kubernetes.io/scw-loadbalancer-use-hostname: "true"
+      service.beta.kubernetes.io/scw-loadbalancer-proxy-protocol-v2: "true"
+      # El pool de nodos autoescala (2..6), así que un nodo DESAPARECE cada vez
+      # que baja la carga. Entre que se va y el Cloud Controller lo saca del
+      # backend hay una ventana, y en esa ventana el LB seguía mandándole
+      # conexiones. Con los valores por defecto —cero redispatch y diez minutos
+      # de timeout de conexión— la petición que caía en el nodo muerto no se
+      # reintentaba en NINGÚN otro y se quedaba colgada: desde el navegador, la
+      # suite «perdía» conexiones sin que fallara nada en Traefik ni en los
+      # servicios. El redispatch reduce el daño, pero NO es la causa: la causa
+      # está en `values-prod.yaml`, en el bloque `traefik:` —el salto entre nodos
+      # que `externalTrafficPolicy: Cluster` provoca y la NetworkPolicy descarta—.
+      # Este ajuste es la red de seguridad, no el arreglo.
+      #
+      # redispatch: al fallar, prueba OTRO servidor del backend.
+      #
+      # TIENE QUE SER "1". Es el máximo que acepta la API («RedispatchAttemptCount
+      # does not respect constraint, must be lte»), y un valor mayor no degrada:
+      # hace que el Cloud Controller falle la actualización ENTERA del backend y
+      # se quede reintentando. El 2026-08-09 estuvo así 5 h 13 min —68 syncs
+      # fallidos seguidos— con el balanceador a medio configurar y la suite
+      # perdiendo el 92 % de las conexiones; al volver a "1" el CCM sincronizó a
+      # la primera y la pérdida cayó a 3/20. El razonamiento de subirlo a dos
+      # para cubrir «que el LB elija mal las dos veces» es correcto sobre el
+      # papel y no lo permite el proveedor: con dos servidores en el backend, un
+      # redispatch ya prueba el otro.
+      #
+      # Y no se nota mirando el Service: la anotación se queda escrita tal cual,
+      # `kubectl get svc` la enseña, y el LB sigue con la configuración vieja. El
+      # error solo sale en los eventos del Service.
+      # UNO, y no dos. Las mediciones de aquel día decían que con dos se perdía el
+      # 4 % en vez del 15-36 %, y por eso se volvió a subir; el problema es que
+      # con dos el balanceador NO SE CONFIGURA, así que ese 4 % nunca llega a
+      # existir. Es la tercera vez que pasa —2026-08-09 y 2026-08-17, esta con el
+      # LB 156 minutos sin sincronizar y el puerto 7881 de LiveKit sin crear—, y
+      # las tres con el aviso escrito cuatro líneas más arriba.
+      #
+      # Si algún día hace falta el segundo reintento, no se consigue con esta
+      # anotación: se consigue con más servidores en el backend.
+      service.beta.kubernetes.io/scw-loadbalancer-redispatch-attempt-count: "1"
+      # Un TCP connect dentro del Private Network es de milisegundos: diez
+      # minutos no es un timeout, es un cuelgue con otro nombre.
+      service.beta.kubernetes.io/scw-loadbalancer-timeout-connect: "3s"
+      # El health check se queda en los valores por defecto del Cloud Controller
+      # (5 s/5 s/5) A PROPÓSITO, y esto es una advertencia, no una omisión.
+      #
+      # Apretarlo a 3 s/2 s/2 para sacar antes al nodo que se va parecía la
+      # continuación lógica del redispatch y fue lo que tiró la suite: con ese
+      # margen los nodePort fallan checks sueltos, el LB marca los servidores
+      # `stopped` y —con solo dos— se queda sin backend al que mandar. Medido el
+      # 2026-08-09: con 3 s/2 s/2, docs.sytue.eu fallaba 20 de 20 peticiones y
+      # los dos servidores salían `stopped` con Traefik sano desde hacía 6 h; al
+      # devolverlos al defecto, 0 de 20.
+      #
+      # La lección: con un backend de dos servidores, un health check impaciente
+      # no adelanta la salida del nodo muerto, adelanta la del nodo sano.
+  ports:
+    web:
+      # cert-manager publica routers HTTP-01 propios. Sin este bypass, la
+      # redirección global a HTTPS captura también /.well-known/acme-challenge,
+      # donde todavía no existe certificado, y el self-check termina en 404.
+      # Traefik excluye únicamente esa ruta ACME; todo el resto sigue forzando
+      # HTTPS mediante la redirección de entrypoint inferior.
+      allowACMEByPass: true
+      http:
+        redirections:
+          entryPoint:
+            to: websecure
+            scheme: https
+            permanent: true
+      proxyProtocol:
+        trustedIPs: ["10.20.0.0/22"]
+      forwardedHeaders:
+        trustedIPs: ["10.20.0.0/22"]
+    websecure:
+      http:
+        maxHeaderBytes: 65536
+        sanitizePath: true
+        # Elimina cabeceras con underscore en vez de rechazar toda la petición:
+        # conserva la defensa ante smuggling sin tumbar publicaciones legítimas.
+        underscoreHeadersStrategy: delete
+      proxyProtocol:
+        trustedIPs: ["10.20.0.0/22"]
+      forwardedHeaders:
+        trustedIPs: ["10.20.0.0/22"]
+      transport:
+        respondingTimeouts:
+          readTimeout: 300s
+          idleTimeout: 180s
+    # TURN de LiveKit comparte el ingress público: TLS termina en Traefik y
+    # UDP se reenvía sin alterar. Los CRD de ruta viven en el chart livekit.
+    turntls:
+      port: 5349
+      expose:
+        default: true
+      exposedPort: 5349
+      protocol: TCP
+      proxyProtocol:
+        trustedIPs: ["10.20.0.0/22"]
+    turnudp:
+      port: 3478
+      expose:
+        default: true
+      exposedPort: 3478
+      protocol: UDP
+  metrics:
+    prometheus:
+      serviceMonitor:
+        enabled: true
+  # Sin este bloque Traefik usa la lista de suites por defecto de Go, que para
+  # TLS 1.2 conserva ECDHE-RSA-AES128-SHA y ECDHE-RSA-AES256-SHA por
+  # compatibilidad: CBC + HMAC-SHA1, sin AEAD. Medido contra id.sytue.eu el
+  # 2026-08-13, handshake completo y `HTTP/1.1 302` de vuelta. `docs/security.md`
+  # promete «cipher suites fuertes» y para el nivel `confidential` promete AEAD,
+  # así que la afirmación no se sostenía en el borde.
+  #
+  # El nombre `default` es especial en Traefik: se aplica a TODO router que no
+  # referencie un TLSOption, en cualquier namespace, así que no hay que tocar ni
+  # un IngressRoute.
+  #
+  # NO se fija `curvePreferences`: la lista por defecto de Go ya antepone el
+  # híbrido post-cuántico X25519MLKEM768, y escribirla a mano lo APAGARÍA.
+  # `cipherSuites` solo gobierna TLS 1.2 —las de TLS 1.3 no son configurables en
+  # Go—, así que 1.3 sigue exactamente igual.
+  #
+  # `minVersion` se queda en 1.2 y no en 1.3 a propósito: el TURN de LiveKit y
+  # los clientes de escritorio antiguos negocian 1.2, y ahí lo que sobraba eran
+  # las suites sin AEAD, no la versión.
+  tlsOptions:
+    default:
+      minVersion: VersionTLS12
+      cipherSuites:
+        - TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
+        - TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
+        - TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256
+        - TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+        - TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+        - TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256
+
+# ----- cert-manager 1.21 (Apache-2.0) -----
+# Es un release cluster-wide independiente; no debe ser subchart de la suite.
+# Este bloque se conserva como guardia para que un chart antiguo no lo reactive
+# al reutilizar values. 03-desplegar.sh lo instala antes y espera sus CRD.
+cert-manager:
+  enabled: false
+  prometheus:
+    enabled: true
+    servicemonitor:
+      enabled: true
+
+# =============================================================================
+# Servicios Go propios (ver charts/<svc>/values.yaml para defaults completos).
+# Cada uno: Deployment + Service + Ingress(traefik) + HPA + NetworkPolicy +
+# ServiceMonitor. Labels obligatorias app.kubernetes.io/part-of=sytue-one,
+# sytue.eu/env, sytue.eu/stack=go.
+# =============================================================================
+
+id:
+  enabled: true            # Sytue ID (NUCLEAR) — id.sytue.eu (8081)
+drive:
+  enabled: true            # Sytue Drive — drive.sytue.eu (+WebDAV, 8082)
+docs:
+  enabled: true            # Sytue Docs — docs.sytue.eu (+colab WS, 8083)
+ocr:
+  enabled: true            # Sytue OCR — INTERNO (8096), reconocimiento para Sytue PDF
+# Sytue AI no lleva interruptor aqui: el suyo es `global.ai.enabled` (arriba),
+# porque tambien lo mira el chart de frontend. Ver el comentario del Chart.yaml.
+mail:
+  enabled: true            # Sytue Mail — mail.sytue.eu (JMAP/HTTP 8086; mx SMTP/IMAP)
+calendar:
+  enabled: true            # Sytue Calendar — calendar.sytue.eu (+CalDAV, 8087)
+contacts:
+  enabled: true            # Sytue Contacts — contacts.sytue.eu (+CardDAV, 8088)
+notes:
+  enabled: true            # Sytue Notepads — notes.sytue.eu (cuadernos y notas, 8089)
+syphotos:
+  enabled: true            # Sytue Photos — photos.sytue.eu (galería y editor de imágenes, 8097)
+syerp:
+  enabled: true            # SyERP — erp.sytue.eu (el ERP de la suite, 8098)
+cast:
+  enabled: true            # Sytue Cast — cast.sytue.eu (vídeo bajo demanda y directo, 8099; + cast-transcoder)
+bases:
+  # Sytue Bases — bases.sytue.eu (API 8102; por el ingress solo `/api/v1`). Encendida por defecto
+  # desde el 2026-10-04; values-prod y values-staging la apagan hasta que sus guiones
+  # creen sus secretos (docs/operations.md#bases-encendido).
+  enabled: true
+pages:
+  enabled: true            # Sytue Web — web.sytue.eu (API 8100; sitios públicos 8101)
+rooms:
+  enabled: true            # Sytue Rooms — rooms.sytue.eu (mensajería + videollamada, +WS, 8085)
+hub:
+  enabled: true            # Sytue Hub — hub.sytue.eu (8092)
+  config:
+    # Los productos que este despliegue levanta, tal y como los nombra el
+    # conmutador de aplicaciones. Es lo que el frontal consulta para no ofrecer
+    # accesos a lo que no está: `helm-render-test.sh` comprueba que esta lista y
+    # los subcharts habilitados dicen lo mismo.
+    apps: [one, mail, drive, calendar, contacts, docs, notes, photos, rooms, cast, pages, bases, erp, cloud, console, id]
+integrations:
+  enabled: true            # Sytue Integration Gateway — integrations.sytue.eu (8093)
+cloud-api:
+  enabled: true            # Sytue Cloud API — cloud.sytue.eu/api/v1 (8090)
+cloud-builder:
+  enabled: true            # Sytue Cloud Builder — interno (Kaniko Jobs, 8091)
+cloud-controller:
+  enabled: true            # Sytue Cloud Controller — reconciliador PaaS, client-go (interno, 8093)
+
+# ----- Sytue Analytics (ADR 0026) — medicion en primera parte, anonima por construccion -----
+# Dos procesos y una sola imagen. El COLECTOR no publica hostname propio: la ruta
+# /_sytue la añade cloud-controller al Ingress de cada app de cliente (interruptor en
+# cloud-controller.config.analytics). La API de LECTURA es interna y la consume el BFF
+# del panel. Los crons (sal diaria, particiones, rollup) corren DENTRO de la API: no
+# hay CronJob. Requiere los secrets sytue-analytics-db y sytue-analytics.
+analytics-ingest:
+  enabled: true            # colector publico, sin autenticar (8094) — el de mas volumen
+analytics-api:
+  enabled: true            # API de lectura + crons, interna y con OIDC (8095)
+  config:
+    reservedHostSuffixes: sites.sytue.eu
+
+# ----- PgBouncer (ISC) — pooler transaccional hacia la RDB externa -----
+# La RDB tiene max_connections=200: sin pooler, la suma de pools pgx
+# (replicas x DB_MAX_CONNS) lo supera ya en el suelo de replicas de prod.
+# Activado por los overlays Helm que apuntan sus DSN a el (prod). DEV
+# (deploy/compose) NO usa PgBouncer: 1 replica por servicio contra el Postgres
+# local (pool agregado minusculo) — NO añadirlo al compose.
+# Ver charts/pgbouncer/values.yaml (modo transaction, compatible RLS y pgx) y
+# values-prod.yaml (la cuenta de conexiones).
+# Cache efimera compartida entre replicas. Ver deploy/helm/charts/dragonfly.
+dragonfly:
+  enabled: true
+
+pgbouncer:
+  enabled: false
+
+# ----- Sytue Meet — SFU de medios LiveKit (Apache-2.0; unica app de terceros) -----
+# Señalizacion en rooms.sytue.eu/rtc; el servicio Go (sytue-rooms) mintea el JWT de acceso.
+# Grabación de reuniones. APAGADA por defecto: enciende un proceso que compone
+# vídeo con Chrome —caro— y exige bucket donde dejar los ficheros. Encenderla
+# obliga además a poner `livekit.redis.enabled`, que es el canal por el que el
+# SFU le manda trabajo.
+sytue-livekit-egress:
+  enabled: false
+  redis:
+    address: "dragonfly:6379"
+  livekit:
+    wsUrl: ""
+
+livekit:
+  enabled: true
+  # El SFU avisa al BFF de Meet cuando una sala TERMINA (y de quién entra y sale): de
+  # ahí salen el cierre de la sala en la base de datos y la tarjeta de «reunión
+  # terminada» que Rooms publica en el canal de origen. Firma con esta api_key, que
+  # debe ser la MISMA que la del secret `sytue-livekit-keys` (entrada api-key) que
+  # verifica Meet. Sin ella el chart no renderiza, a propósito: desplegar un SFU que no
+  # notifica es peor que no desplegarlo, porque el fallo es silencioso.
+  webhook:
+    apiKey: ""
+
+# ----- Frontends Astro+Preact (superficies repuntadas a los servicios Go) -----
+sytue-frontend:
+  enabled: true

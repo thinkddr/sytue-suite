@@ -1,0 +1,17 @@
+"widgets.open" = "Apri";
+"widgets.compose" = "Scrivi";
+"widgets.create" = "Crea evento";
+"widgets.notes" = "Note";
+"widgets.rows" = "Righe";
+"widgets.pending" = "In sospeso";
+"widgets.channels" = "Canali";
+"widgets.photos" = "Foto";
+"widgets.episodes" = "Episodi";
+"widgets.apps" = "App";
+"widgets.calendars" = "Calendari";
+"widgets.address_books" = "Rubriche";
+"search.label" = "Ricerca globale";
+"dataflow.item.files" = "File";
+"dataflow.item.events" = "Calendario";
+"dataflow.item.documents" = "Documenti";
+"dataflow.item.contacts" = "Contatti";

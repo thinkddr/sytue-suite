@@ -1,0 +1,36 @@
+{
+  "name": "@sytue/portal",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sytue One — portal/lanzador unificado de la suite (Astro 7 + Preact 10). Cara de Sytue One: AppGrid hacia todos los productos, accesos rapidos y shell global. Producto Sytue-native, propietario. one.sytue.eu.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev --port 4321",
+    "build": "astro build",
+    "preview": "astro preview --port 4321",
+    "start": "bun ./dist/server/entry.mjs",
+    "astro": "astro",
+    "test": "bun test",
+    "typecheck": "astro check"
+  },
+  "dependencies": {
+    "@sytue/api-clients": "workspace:*",
+    "@sytue/auth": "workspace:*",
+    "@sytue/config": "workspace:*",
+    "@sytue/i18n": "workspace:*",
+    "@sytue/shell": "workspace:*",
+    "@sytue/ui": "workspace:*",
+    "@astrojs/node": "catalog:",
+    "@astrojs/preact": "catalog:",
+    "astro": "catalog:",
+    "preact": "10.29.8"
+  },
+  "devDependencies": {
+    "@astrojs/check": "catalog:",
+    "@tailwindcss/vite": "4.3.3",
+    "@types/node": "catalog:",
+    "tailwindcss": "4.3.3",
+    "typescript": "6.0.3"
+  }
+}

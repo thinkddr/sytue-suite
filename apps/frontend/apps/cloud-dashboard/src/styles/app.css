@@ -1,0 +1,18 @@
+/**
+ * Sytue DevX — entrada de estilos. Importa el design system (Tailwind v4 +
+ * componentes desde @sytue/ui y superficie blanca con acento azul.
+ */
+@import '@sytue/ui/styles.css';
+
+/* Detectar clases usadas en las islas Preact y páginas de esta app. */
+@source '../**/*.{astro,ts,tsx}';
+
+/* Ancho de contenido canónico de cada panel/página (design-system §: contentMaxWidth
+   1280 · gutter 24). Un único origen para que todas las vistas respiren igual, en
+   vez de repetir literales max-w-[…] divergentes por archivo. */
+.cloud-content {
+  margin-inline: auto;
+  width: 100%;
+  max-width: 1280px;
+  padding: 1.5rem;
+}

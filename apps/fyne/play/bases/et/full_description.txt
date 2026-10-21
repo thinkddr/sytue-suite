@@ -1,0 +1,11 @@
+Seotud tabelid klientide, tellimuste või lao pidamiseks, õiguste ja iga muudatuse logiga.
+
+• Kliendid, tellimused või ladu seotud tabelites, ilma andmebaaside tundmiseta.
+• Jaga oma organisatsiooniga sinu valitud rolliga.
+• Iga muudatus logitakse: kes selle tegi ja mis oli enne.
+• Sinu andmed jäävad ELi ja saad neid eksportida millal tahes.
+• Tabelid teksti-, arvu-, kuupäeva-, märkeruudu-, üksikvaliku- ja mitmikvalikuväljadega.
+• Seosed tabelite vahel: seo tellimus kliendiga ja andmebaas ei lase seost katkestada.
+• Õigused andmebaasi ja tabeli kaupa: omanik, toimetaja, kommenteerija ja lugeja.
+
+Krüpteeritud edastamisel (TLS 1.3). Sytue taristu asub ELis. Väliste teenuste asukoht sõltub nende pakkujast.

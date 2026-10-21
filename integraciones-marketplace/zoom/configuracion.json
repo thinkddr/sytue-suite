@@ -1,0 +1,15 @@
+{
+  "producto": "Sytue — Zoom",
+  "oauth_app": {
+    "redirect_uri": "https://integrations.sytue.eu/api/v1/oauth/callback",
+    "scopes": ["meeting:read", "meeting:write"]
+  },
+  "sso_saml": {
+    "sign_in_url": "https://integrations.sytue.eu/saml/metadata",
+    "entity_id": "https://integrations.sytue.eu/saml/metadata",
+    "acs_url_del_vendor": "https://{vanity}.zoom.us/saml/SSO",
+    "name_id_format": "email",
+    "nota": "Los metadatos SAML de Sytue ID salen de tu instancia; el ACS es el de tu Vanity URL de Zoom."
+  },
+  "semilla_equivalente": "services/integrations/db/seeds/templates/zoom.json"
+}

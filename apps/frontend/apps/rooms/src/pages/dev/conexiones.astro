@@ -1,0 +1,31 @@
+---
+/** Real Rooms integration UI for remote browser checks. Production returns 404. */
+import '../../styles/app.css';
+import { basePathScript } from '@sytue/ui';
+import { AppConnectionsDemo } from '../../components/dev/AppConnectionsDemo';
+
+export const prerender = false;
+
+if (!import.meta.env.DEV) return new Response(null, { status: 404 });
+
+const requested = Astro.url.searchParams.get('lang');
+const locale = requested === 'es' || requested === 'de' ? requested : 'en';
+---
+
+<!doctype html>
+<html lang={locale} class="h-full">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, interactive-widget=resizes-content"
+    />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Sytue Rooms</title>
+    <script is:inline set:html={basePathScript('/rooms')}></script>
+  </head>
+  <body class="bg-bg text-text min-h-dvh antialiased">
+    <AppConnectionsDemo client:only="preact" locale={locale} />
+  </body>
+</html>

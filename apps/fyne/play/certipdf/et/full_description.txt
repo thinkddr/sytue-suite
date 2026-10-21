@@ -1,0 +1,17 @@
+PDF algusest lõpuni, teie brauseris.
+
+• Esiletõstmine, allajoonimine, kommentaarid ja joonistamine dokumendil.
+• Vormid: väljade täitmine või oma vormide loomine.
+• Ühendamine, eraldamine, pööramine, nummerdamine ja vesimärk.
+• Allkirjapaneel, jäädav varjamine ja parooliga kaitstud dokumendid.
+• Kiire vaatur liigenduse, pisipiltide, otsingu ja lehe või laiuse järgi suumimisega.
+• Märkused: esiletõstmine, allajoonimine, läbikriipsutus, kommentaarid, joonistus, kujundid, nooled ja templid.
+• Tekstikastid, mõõtmised ja alade hetktõmmised.
+• Vormid: olemasolevate väljade täitmine või oma väljade lisamine.
+• Dokumendi allkirjapaneel.
+• Jäädav varjamine: märgitud sisu kaob failist, mitte ainult vaatest.
+• Leheküljed: ühendamine, eraldamine, kustutamine, pööramine, nummerdamine (ka Bates), päised ja jalused.
+• Vesimärk, taust ja muudetavad metaandmed.
+• Parooliga kaitstud dokumendid ja õigused.
+
+Krüpteeritud edastamisel (TLS 1.3). Sytue taristu asub ELis. Väliste teenuste asukoht sõltub nende pakkujast.

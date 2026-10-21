@@ -1,0 +1,19 @@
+Privatna, europska e-pošta preko JMAP-a — bez praćenja i bez oglasa.
+
+• Brza ulazna pošta s nitima, oznakama, filtrima i pretraživanjem.
+• Prilaganje datoteka izravno iz Sytue Drivea.
+• Pretvaranje e-poruke u događaj u Calendaru.
+• Šifrirano u prijenosu (TLS 1.3). Infrastruktura Sytuea nalazi se u EU-u. Lokacija vanjskih usluga ovisi o njihovu pružatelju.
+• Niti razgovora s čitanjem, odgovorom i prosljeđivanjem jednim klikom.
+• Mape, obojene oznake i pretraživanje s operatorima (from:, has:attachment, is:unread…).
+• Automatska pravila koja poštu pri dolasku arhiviraju, označe ili premjeste.
+• Zakazano slanje i „Poništi slanje”.
+• Potpisi, pseudonimi adresa i automatski odgovor o odsutnosti.
+• Dijeljeni i delegirani sandučići s dopuštenjima za čitanje i slanje.
+• Uređivač oblikovanog teksta s privicima iz Sytue Drivea bez dupliciranja datoteka.
+• Udaljeni sadržaj zadano je blokiran: nitko ne saznaje kada otvorite e-poruku.
+• Potpisana pošta (PGP i S/MIME) prepoznaje se i označava; TLS u prijenosu.
+• Pristup i iz Thunderbirda, Outlooka, Apple Maila ili s telefona, uz zaporke aplikacija.
+• Adrese kao oznake, adresar Contactsa na jedan klik i upozorenje ako napišete „u privitku” bez privitka.
+
+Šifrirano u prijenosu (TLS 1.3). Infrastruktura Sytuea nalazi se u EU-u. Lokacija vanjskih usluga ovisi o njihovu pružatelju.

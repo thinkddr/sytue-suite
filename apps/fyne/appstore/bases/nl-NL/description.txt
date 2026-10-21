@@ -1,0 +1,11 @@
+Gekoppelde tabellen voor klanten, bestellingen of voorraad, met rechten en een logboek van elke wijziging.
+
+• Klanten, bestellingen of voorraad in gekoppelde tabellen, zonder kennis van databases.
+• Deel met je organisatie met de rol die jij kiest.
+• Elke wijziging wordt vastgelegd: wie het deed en wat het eerder was.
+• Je gegevens blijven in de EU en je exporteert ze wanneer je wilt.
+• Tabellen met velden voor tekst, getal, datum, selectievakje, enkele keuze en meerdere keuzes.
+• Relaties tussen tabellen: koppel een bestelling aan haar klant en de database laat de koppeling niet verbreken.
+• Rechten per database en per tabel: eigenaar, bewerker, reageerder en lezer.
+
+Versleuteld tijdens transport (TLS 1.3). De infrastructuur van Sytue staat in de EU. De locatie van externe diensten hangt af van hun aanbieder.

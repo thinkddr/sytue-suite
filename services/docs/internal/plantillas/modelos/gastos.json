@@ -1,0 +1,277 @@
+{
+ "active": 0,
+ "sheets": [
+  {
+   "cells": {
+    "A1": "<b>{{gastos.titulo}}</b>",
+    "A3": "<b>{{gastos.fecha}}</b>",
+    "B3": "<b>{{gastos.concepto}}</b>",
+    "C1": "<b>{{gastos.total}}</b>",
+    "C3": "<b>{{gastos.categoria}}</b>",
+    "D1": "=SUM(D4:D33)",
+    "D3": "<b>{{gastos.importe}}</b>",
+    "E3": "<b>{{gastos.notas}}</b>"
+   },
+   "formats": {
+    "A10": {
+     "id": "date"
+    },
+    "A11": {
+     "id": "date"
+    },
+    "A12": {
+     "id": "date"
+    },
+    "A13": {
+     "id": "date"
+    },
+    "A14": {
+     "id": "date"
+    },
+    "A15": {
+     "id": "date"
+    },
+    "A16": {
+     "id": "date"
+    },
+    "A17": {
+     "id": "date"
+    },
+    "A18": {
+     "id": "date"
+    },
+    "A19": {
+     "id": "date"
+    },
+    "A20": {
+     "id": "date"
+    },
+    "A21": {
+     "id": "date"
+    },
+    "A22": {
+     "id": "date"
+    },
+    "A23": {
+     "id": "date"
+    },
+    "A24": {
+     "id": "date"
+    },
+    "A25": {
+     "id": "date"
+    },
+    "A26": {
+     "id": "date"
+    },
+    "A27": {
+     "id": "date"
+    },
+    "A28": {
+     "id": "date"
+    },
+    "A29": {
+     "id": "date"
+    },
+    "A30": {
+     "id": "date"
+    },
+    "A31": {
+     "id": "date"
+    },
+    "A32": {
+     "id": "date"
+    },
+    "A33": {
+     "id": "date"
+    },
+    "A4": {
+     "id": "date"
+    },
+    "A5": {
+     "id": "date"
+    },
+    "A6": {
+     "id": "date"
+    },
+    "A7": {
+     "id": "date"
+    },
+    "A8": {
+     "id": "date"
+    },
+    "A9": {
+     "id": "date"
+    },
+    "D1": {
+     "decimals": 2,
+     "id": "currency"
+    },
+    "D10": {
+     "decimals": 2,
+     "id": "currency"
+    },
+    "D11": {
+     "decimals": 2,
+     "id": "currency"
+    },
+    "D12": {
+     "decimals": 2,
+     "id": "currency"
+    },
+    "D13": {
+     "decimals": 2,
+     "id": "currency"
+    },
+    "D14": {
+     "decimals": 2,
+     "id": "currency"
+    },
+    "D15": {
+     "decimals": 2,
+     "id": "currency"
+    },
+    "D16": {
+     "decimals": 2,
+     "id": "currency"
+    },
+    "D17": {
+     "decimals": 2,
+     "id": "currency"
+    },
+    "D18": {
+     "decimals": 2,
+     "id": "currency"
+    },
+    "D19": {
+     "decimals": 2,
+     "id": "currency"
+    },
+    "D20": {
+     "decimals": 2,
+     "id": "currency"
+    },
+    "D21": {
+     "decimals": 2,
+     "id": "currency"
+    },
+    "D22": {
+     "decimals": 2,
+     "id": "currency"
+    },
+    "D23": {
+     "decimals": 2,
+     "id": "currency"
+    },
+    "D24": {
+     "decimals": 2,
+     "id": "currency"
+    },
+    "D25": {
+     "decimals": 2,
+     "id": "currency"
+    },
+    "D26": {
+     "decimals": 2,
+     "id": "currency"
+    },
+    "D27": {
+     "decimals": 2,
+     "id": "currency"
+    },
+    "D28": {
+     "decimals": 2,
+     "id": "currency"
+    },
+    "D29": {
+     "decimals": 2,
+     "id": "currency"
+    },
+    "D30": {
+     "decimals": 2,
+     "id": "currency"
+    },
+    "D31": {
+     "decimals": 2,
+     "id": "currency"
+    },
+    "D32": {
+     "decimals": 2,
+     "id": "currency"
+    },
+    "D33": {
+     "decimals": 2,
+     "id": "currency"
+    },
+    "D4": {
+     "decimals": 2,
+     "id": "currency"
+    },
+    "D5": {
+     "decimals": 2,
+     "id": "currency"
+    },
+    "D6": {
+     "decimals": 2,
+     "id": "currency"
+    },
+    "D7": {
+     "decimals": 2,
+     "id": "currency"
+    },
+    "D8": {
+     "decimals": 2,
+     "id": "currency"
+    },
+    "D9": {
+     "decimals": 2,
+     "id": "currency"
+    }
+   },
+   "freeze": {
+    "cols": 0,
+    "rows": 3
+   },
+   "name": "{{gastos.hoja}}",
+   "styles": {
+    "A3": {
+     "border": {
+      "b": true
+     }
+    },
+    "B3": {
+     "border": {
+      "b": true
+     }
+    },
+    "C3": {
+     "border": {
+      "b": true
+     }
+    },
+    "D3": {
+     "border": {
+      "b": true
+     }
+    },
+    "E3": {
+     "border": {
+      "b": true
+     }
+    }
+   },
+   "validations": [
+    {
+     "range": "C4:C33",
+     "values": [
+      "{{=gastos.cat_viajes}}",
+      "{{=gastos.cat_comidas}}",
+      "{{=gastos.cat_material}}",
+      "{{=gastos.cat_servicios}}",
+      "{{=gastos.cat_otros}}"
+     ]
+    }
+   ]
+  }
+ ]
+}

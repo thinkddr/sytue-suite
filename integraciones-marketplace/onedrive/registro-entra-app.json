@@ -1,0 +1,11 @@
+{
+  "producto": "Sytue — Microsoft OneDrive",
+  "app_registration": {
+    "supported_account_types": "Accounts in any organizational directory (multitenant)",
+    "redirect_uris_web": [
+      "https://integrations.sytue.eu/api/v1/oauth/callback"
+    ],
+    "delegated_permissions": ["Files.ReadWrite", "offline_access"]
+  },
+  "semilla_equivalente": "services/integrations/db/seeds/templates/onedrive.json"
+}

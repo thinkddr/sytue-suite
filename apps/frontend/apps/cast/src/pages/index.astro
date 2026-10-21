@@ -1,0 +1,36 @@
+---
+/**
+ * Sytue Cast — Inicio personal. Con sesión muestra la biblioteca, los directos y
+ * lo último de la organización; sin ella deriva a la portada pública. Así
+ * `cast.sytue.eu` es una entrada que se puede compartir y explorar sin cuenta,
+ * sin convertir en público ningún dato de la biblioteca personal.
+ */
+import AppLayout from '../layouts/AppLayout.astro';
+import { HomeApp } from '../islands/HomeApp.js';
+import { withBase } from '@sytue/ui';
+import { hubBaseUrl, sesionDe } from '../lib/pagina.js';
+import { useT } from '../i18n/index.js';
+
+export const prerender = false;
+
+const session = await sesionDe(Astro);
+// La redirección depende de la cookie: no puede quedar en una caché compartida o
+// mandaría al visitante que sí inició sesión a la portada pública. La portada SSR
+// que recibe después sí es indexable y cacheable según sus propias cabeceras.
+if (!session) {
+  const redireccion = Astro.redirect(withBase(import.meta.env.BASE_URL, '/explore'), 302);
+  redireccion.headers.set('cache-control', 'private, no-store');
+  return redireccion;
+}
+const t = useT(Astro.locals.locale);
+---
+
+<AppLayout title={t('app.title')}>
+  <HomeApp
+    slot="app"
+    client:load
+    locale={Astro.locals.locale}
+    user={session.user}
+    hubBaseUrl={hubBaseUrl()}
+  />
+</AppLayout>

@@ -1,0 +1,10 @@
+<main id="fyne-root">
+  <div id="panel"><div id="first"></div><div id="second"></div></div>
+</main>
+<style>
+  :global(html), :global(body) { margin: 0; padding: 0; background: #ffffff; }
+  #fyne-root { --color-background: #ffffff; --color-primary: #123456; --fyne-size-padding: 5px; --component-density: compact; width: 320px; height: 240px; background: var(--color-background); }
+  #panel { position: absolute; left: 12px; top: 16px; width: 280px; height: 180px; background: var(--color-primary); }
+  #first { position: absolute; left: 8px; top: 12px; width: 100px; height: 50px; background: #abcdef; }
+  #second { position: absolute; left: 128px; top: 92px; width: 80px; height: 40px; background: #fedcba; }
+</style>

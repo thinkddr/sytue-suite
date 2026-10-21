@@ -1,0 +1,18 @@
+Dvidešimt keturi moduliai ir dvejybinė apskaita, kurios duomenų bazė neleidžia išbalansuoti.
+
+• Dvidešimt keturi moduliai ir trisdešimt šeši modeliai: kontaktai, pardavimas, pirkimas, atsargos, gamyba, sąskaitų išrašymas, apskaita, projektai ir personalas.
+• Pridėti modulį reiškia parašyti JSON failą: be migracijos, be naujo maršruto ir be sąsajos darbų.
+• Pinigai saugomi sveikaisiais centais, niekada slankiuoju kableliu, o balansą užtikrina duomenų bazė.
+• Užregistruoti įrašai neliečiami: jie taisomi kitu įrašu, ir būtent tai skiria didžiąją knygą nuo skaičiuoklės.
+• Dvidešimt keturi moduliai ir trisdešimt šeši modeliai vienoje paslaugoje ir vienoje duomenų bazėje.
+• Modelių katalogas yra duomenys: kiekvienas modulis aprašo savo laukus, būsenas ir sąrašo stulpelius.
+• Naujas modulis – tai vienas JSON failas — be DDL, be migracijos ir be lentelių užrakinimo.
+• Viena API visiems trisdešimt šešiems modeliams ir viena iš katalogo sugeneruota sąsaja.
+• Dvejybinė apskaita su sumomis sveikaisiais centais; nė vieno skaičiaus slankiuoju kableliu.
+• Balansą tikrina duomenų bazė patvirtinant operaciją, o ne programos kodas.
+• Uždaryti įrašai nekeičiami: jų negalima redaguoti, šalinti ar papildyti naujomis eilutėmis.
+• Vienas dokumentas, vienas įrašas: pakartotinis bandymas ar dvi atviros kortelės negali padvigubinti pajamų.
+• Bendri pavadinimai pateikiami visomis 26 kalbomis, o neišverstas laukas neleidžia paslaugai pasileisti.
+• Indeksuoti sąrašai: pirmasis dvidešimties tūkstančių eilučių puslapis pateikiamas greičiau nei per milisekundę.
+
+Šifruojama perduodant (TLS 1.3). „Sytue“ infrastruktūra yra ES. Išorinių paslaugų vieta priklauso nuo jų teikėjo.

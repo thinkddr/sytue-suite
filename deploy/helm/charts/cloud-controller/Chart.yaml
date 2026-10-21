@@ -1,0 +1,21 @@
+apiVersion: v2
+name: sytue-cloud-controller
+description: >-
+  Sytue Cloud Controller — servicio Go propio: el reconciliador del PaaS. UNICO
+  proceso con client-go: despliega las apps de clientes en Kapsule (namespaces
+  tenant), gestiona dominios + TLS (cert-manager Certificates), previews por PR,
+  ResourceQuota/LimitRange/NetworkPolicy y aprovisiona los servicios gestionados.
+  Reconcilia en bucle (RECONCILE_INTERVAL) y reacciona a NOTIFY sobre PostgreSQL;
+  sin Redis/Valkey. Sin ingress publico. Código Apache-2.0, (c) 2026 Daniel Delgado Ramos.
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+kubeVersion: ">=1.31.0-0"
+home: https://sytue.eu
+keywords: [sytue, cloud, paas, controller, reconciler, kubernetes, go]
+maintainers:
+  - name: Sytue Platform
+    email: platform@sytue.eu
+annotations:
+  licenses: MIT
+  sytue.eu/stack: go

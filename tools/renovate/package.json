@@ -1,0 +1,14 @@
+{
+  "name": "sytue-renovate",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Renovate para .github/workflows/dependencias.yml. La versión se fija aquí y todo su árbol en bun.lock: el flujo instala con --frozen-lockfile y sin scripts de instalación.",
+  "dependencies": {
+    "renovate": "44.145.2"
+  },
+  "overrides": {
+    "handlebars": "4.7.10",
+    "http-cache-semantics": "4.3.0",
+    "markdown-it": "15.0.3"
+  }
+}

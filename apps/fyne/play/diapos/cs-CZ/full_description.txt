@@ -1,0 +1,16 @@
+Vyprávějte příběh; snímek drží krok.
+
+• Motivy prezentací s identitou vaší organizace.
+• Zobrazení přednášejícího s poznámkami a dalším snímkem.
+• Obrázky, tvary, grafy a SmartArt.
+• Export do ODP, PPTX a PDF; otevírání souborů PowerPoint.
+• Motivy a palety v souladu se značkou vaší organizace.
+• Plátno s tvary, obrázky, grafy, SmartArt a spojnicemi.
+• Prezentace na celou obrazovku se zobrazením přednášejícího a poznámkami.
+• Spolupráce v reálném čase s přítomností a komentáři.
+• Snímky s pozadími, plakáty a rozvrženími.
+• Export do ODP, PPTX a PDF.
+• Otevírání souborů PowerPoint z Drive.
+• Automatické ukládání s verzemi.
+
+Šifrování při přenosu (TLS 1.3). Infrastruktura Sytue je v EU. Umístění externích služeb závisí na jejich poskytovateli.

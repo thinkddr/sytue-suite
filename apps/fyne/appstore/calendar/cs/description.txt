@@ -1,0 +1,19 @@
+Kalendář přes CalDAV propojený se zbytkem sady.
+
+• Zobrazení dne, týdne a měsíce.
+• Opakované události a připomenutí.
+• Události přímo z e-mailu v Mail.
+• Funguje s jakýmkoli klientem CalDAV.
+• Zobrazení měsíce, týdne, dne a programu, s minikalendářem a tlačítkem „Dnes“.
+• Denní, týdenní nebo měsíční opakování s koncem; úprava jen této, této a následujících, nebo všech.
+• Připomenutí pro každou událost a oznámení v rámci sady.
+• Pozvánky s odpovědí (zúčastním se, možná, ne) a přehledem odpovědí.
+• „Najít termín“, který vyhovuje všem pozvaným osobám.
+• Rezervovatelné místnosti a prostředky s dostupností.
+• Sdílené kalendáře s oprávněními a kalendáře sdílené s vámi.
+• Odběr externích kalendářů (ICS) a několik barevně odlišených kalendářů.
+• Vytvoření události ze zprávy v Mail nebo z poznámky.
+• Funguje s jakýmkoli klientem CalDAV: Apple Calendar, Thunderbird a další.
+• Duplikování události nebo její zkopírování do vašeho kalendáře a stažení jako .ics pro kohokoli mimo Sytue.
+
+Šifrování při přenosu (TLS 1.3). Infrastruktura Sytue je v EU. Umístění externích služeb závisí na jejich poskytovateli.

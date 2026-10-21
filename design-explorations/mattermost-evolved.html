@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sytue Rooms — Mattermost Evolved</title>
+<style>
+/* ============================================================
+   Sytue Rooms · "Mattermost Evolved"
+   Evolución directa del lenguaje Sytue: blanco predominante en el
+   contenido + cabecera de marca SÓLIDA (índigo profundo) + rail y
+   panel de canales en Denim índigo. Hairlines por tinta, jerarquía
+   por peso y espacio, WCAG AA. Tokens espejo de @sytue/config.
+   ============================================================ */
+:root{
+  /* Marca Rooms (índigo) — header sólido, white 7.90:1 */
+  --indigo:#4338ca; --indigo-hover:#3a30b3; --indigo-strong:#3730a3;
+  /* Denim índigo — rail + panel de canales (sidebar-rooms #231f59) */
+  --rail:#1a1747; --denim:#231f59; --denim-2:#2b2668; --denim-active:#4338ca;
+  /* Superficies claras */
+  --surface:#ffffff; --bg:#f8fafc; --sunken:#f1f5f9; --bg-mention:#f5f4fd;
+  /* Tinta / texto */
+  --ink:#0f172a; --ink-2:#475569; --ink-3:#64748b; --msg:#1e293b;
+  --ink-rgb:30,41,59;
+  --hair:rgba(var(--ink-rgb),.08); --line:rgba(var(--ink-rgb),.12); --line-2:rgba(var(--ink-rgb),.16);
+  --indigo-tint:rgba(67,56,202,.10);
+  /* Blanco por opacidad (sobre Denim) — patrón Compass */
+  --w-92:rgba(255,255,255,.92); --w-72:rgba(255,255,255,.72); --w-58:rgba(255,255,255,.58);
+  --w-hair:rgba(255,255,255,.09); --w-fill:rgba(255,255,255,.08); --w-hover:rgba(255,255,255,.07);
+  /* Presencia / semánticos */
+  --online:#2f9e6b; --away:#d08a2c; --dnd:#e05260; --offline:#94a3b8;
+  --success:#166534; --warning:#854d0e; --danger:#b91c1c;
+  --r-sm:4px; --r-md:8px; --r-lg:12px; --pill:999px;
+  --sans:"Inter","Segoe UI",system-ui,-apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif;
+  --mono:"JetBrains Mono","SFMono-Regular",ui-monospace,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;font-family:var(--sans);background:var(--bg);color:var(--ink);
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;font-size:14px;line-height:1.5}
+button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit}
+a{color:inherit;text-decoration:none}
+svg{display:block}
+.ic{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+.ic-16{width:16px;height:16px} .ic-18{width:18px;height:18px} .ic-22{width:22px;height:22px}
+:focus-visible{outline:2px solid var(--indigo);outline-offset:2px;border-radius:var(--r-sm)}
+.channels :focus-visible,.rail :focus-visible,.chead :focus-visible{outline-color:#fff}
+.skip{position:absolute;left:-999px;top:8px;z-index:50;background:var(--surface);color:var(--indigo-strong);
+  padding:8px 14px;border-radius:var(--r-md);font-weight:600;box-shadow:0 2px 8px rgba(15,23,42,.16)}
+.skip:focus{left:8px}
+.sprite{position:absolute;width:0;height:0;overflow:hidden}
+
+/* ===================== APP SHELL ===================== */
+.app{display:grid;grid-template-columns:64px 280px minmax(0,1fr);height:100vh;min-height:660px;
+  background:var(--surface);overflow:hidden}
+
+/* ---- Rail de módulos ---- */
+.rail{background:var(--rail);display:flex;flex-direction:column;align-items:center;padding:10px 0 12px;gap:2px}
+.brand{width:38px;height:38px;border-radius:10px;background:var(--indigo);display:grid;place-items:center;margin-bottom:10px;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.14)}
+.brand svg{width:22px;height:22px;stroke:#fff;fill:none;stroke-width:1.9;stroke-linejoin:round}
+.rail-nav{display:flex;flex-direction:column;gap:2px;width:100%;align-items:center}
+.mod{position:relative;width:56px;padding:8px 0 6px;display:flex;flex-direction:column;align-items:center;gap:4px;
+  border-radius:var(--r-md);color:var(--w-58);transition:background .12s,color .12s}
+.mod span{font-size:9.5px;font-weight:600;letter-spacing:.01em}
+.mod:hover{background:var(--w-hover);color:var(--w-92)}
+.mod[aria-current]{background:var(--indigo);color:#fff}
+.mod .ndot{position:absolute;top:6px;right:11px;width:7px;height:7px;border-radius:50%;background:var(--indigo);
+  box-shadow:0 0 0 2px var(--rail)}
+.mod[aria-current] .ndot{background:#fff;box-shadow:0 0 0 2px var(--indigo)}
+.rail-foot{margin-top:auto;display:flex;flex-direction:column;align-items:center;gap:10px}
+.railbtn{width:38px;height:38px;border-radius:var(--r-md);display:grid;place-items:center;color:var(--w-58)}
+.railbtn:hover{background:var(--w-hover);color:var(--w-92)}
+.pw{position:relative}
+.pw .dot{position:absolute;right:-1px;bottom:-1px;width:11px;height:11px;border-radius:50%;box-shadow:0 0 0 2px var(--rail)}
+
+/* ---- Avatares ---- */
+.av{width:36px;height:36px;border-radius:9px;display:grid;place-items:center;color:#fff;font-weight:600;
+  font-size:13px;letter-spacing:.01em;flex:none;user-select:none}
+.av-28{width:28px;height:28px;border-radius:7px;font-size:11px}
+.av-24{width:24px;height:24px;border-radius:6px;font-size:10px}
+.av-20{width:20px;height:20px;border-radius:5px;font-size:9px}
+.a-indigo{background:#4338ca} .a-teal{background:#0f766e} .a-rose{background:#be123c}
+.a-slate{background:#334155} .a-ocre{background:#94590f} .a-green{background:#146a47}
+.dot.online{background:var(--online)} .dot.away{background:var(--away)} .dot.dnd{background:var(--dnd)} .dot.offline{background:var(--offline)}
+
+/* ---- Panel de canales (Denim) ---- */
+.channels{background:var(--denim);color:var(--w-92);display:flex;flex-direction:column;min-height:0}
+.ws{display:flex;align-items:center;gap:6px;padding:14px 12px 12px 16px;border-bottom:1px solid var(--w-hair)}
+.ws .n{font-size:15px;font-weight:700;letter-spacing:-.01em;display:flex;align-items:center;gap:5px}
+.ws .n svg{width:16px;height:16px;opacity:.7}
+.ws .sub{font-size:11px;color:var(--w-58);margin-top:2px}
+.ws .grow{flex:1}
+.ws-btn{width:30px;height:30px;border-radius:var(--r-sm);display:grid;place-items:center;color:var(--w-72)}
+.ws-btn:hover{background:var(--w-hover);color:#fff}
+.search{margin:12px 12px 6px;position:relative}
+.search svg{position:absolute;left:9px;top:50%;transform:translateY(-50%);width:15px;height:15px;color:var(--w-58)}
+.search input{width:100%;height:32px;border:1px solid transparent;border-radius:var(--r-md);background:var(--w-fill);
+  color:#fff;font-size:12.5px;padding:0 10px 0 30px;font-family:inherit}
+.search input::placeholder{color:var(--w-58)}
+.search input:focus{background:rgba(255,255,255,.13);border-color:rgba(255,255,255,.22);outline:none}
+.chan-scroll{flex:1;overflow-y:auto;padding:6px 8px 14px}
+.sec{display:flex;align-items:center;gap:6px;padding:12px 8px 4px}
+.sec .lbl{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--w-58)}
+.sec .grow{flex:1}
+.sec button{width:20px;height:20px;border-radius:var(--r-sm);display:grid;place-items:center;color:var(--w-58);opacity:0}
+.sec:hover button{opacity:1}
+.sec button:hover{background:var(--w-hover);color:#fff}
+.ch{display:flex;align-items:center;gap:8px;width:100%;padding:5px 9px;border-radius:var(--r-md);
+  color:var(--w-72);font-size:14px;text-align:left;transition:background .1s,color .1s}
+.ch:hover{background:var(--w-hover);color:var(--w-92)}
+.ch .g{width:16px;height:16px;flex:none;color:var(--w-58)}
+.ch .g svg{width:16px;height:16px}
+.ch .t{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ch.unread{color:#fff;font-weight:600}
+.ch.unread .g{color:var(--w-72)}
+.ch[aria-current]{background:var(--denim-active);color:#fff;font-weight:600}
+.ch[aria-current] .g{color:#fff}
+.badge{min-width:19px;height:19px;padding:0 6px;border-radius:var(--pill);font-size:11px;font-weight:700;
+  display:grid;place-items:center;background:var(--w-fill);color:var(--w-92)}
+.badge.men{background:#6366f1;color:#fff}
+.ch .pdot{width:9px;height:9px;border-radius:50%;flex:none;margin:0 3px}
+
+/* ===================== MAIN ===================== */
+.main{display:flex;flex-direction:column;min-width:0;background:var(--surface)}
+
+/* ---- Cabecera de canal (sólida índigo) ---- */
+.chead{height:56px;flex:none;background:var(--indigo);color:#fff;display:flex;align-items:center;gap:12px;
+  padding:0 14px 0 20px}
+.chead .title{display:flex;align-items:center;gap:8px;min-width:0}
+.chead .hsh{width:19px;height:19px;opacity:.85;flex:none}
+.chead h1{font-size:15.5px;font-weight:700;letter-spacing:-.01em;margin:0;white-space:nowrap}
+.chead .priv{font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+  padding:2px 6px;border-radius:var(--r-sm);background:rgba(255,255,255,.16);color:#fff}
+.chead .topic{font-size:12.5px;color:rgba(255,255,255,.82);border-left:1px solid rgba(255,255,255,.24);
+  padding-left:12px;margin-left:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chead .grow{flex:1;min-width:12px}
+.hstack{display:flex;align-items:center}
+.hstack .av-24{border-radius:6px;box-shadow:0 0 0 2px var(--indigo);margin-left:-6px}
+.hstack .more{margin-left:-6px;height:24px;padding:0 7px;border-radius:6px;background:rgba(255,255,255,.16);
+  color:#fff;font-size:11px;font-weight:700;display:grid;place-items:center;box-shadow:0 0 0 2px var(--indigo)}
+.hbtn{width:34px;height:34px;border-radius:var(--r-md);display:grid;place-items:center;color:rgba(255,255,255,.86);position:relative}
+.hbtn:hover{background:rgba(255,255,255,.15);color:#fff}
+.hbtn .ct{position:absolute;top:5px;right:5px;font-size:9px;font-weight:700}
+.call{height:34px;padding:0 13px;border-radius:var(--r-md);display:flex;align-items:center;gap:7px;
+  background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.3);color:#fff;font-size:12.5px;font-weight:600}
+.call:hover{background:rgba(255,255,255,.22)}
+.hsep{width:1px;height:22px;background:rgba(255,255,255,.22);margin:0 3px}
+
+/* ---- Stream ---- */
+.stream{flex:1;overflow-y:auto;padding:8px 0 14px}
+.stream::-webkit-scrollbar{width:11px}
+.stream::-webkit-scrollbar-thumb{background:rgba(var(--ink-rgb),.18);border-radius:var(--pill);border:3px solid var(--surface)}
+.stream::-webkit-scrollbar-thumb:hover{background:rgba(var(--ink-rgb),.3)}
+.divider{display:flex;align-items:center;gap:12px;padding:10px 24px}
+.divider::before,.divider::after{content:"";height:1px;flex:1;background:var(--line)}
+.divider span{font-size:11px;font-weight:700;color:var(--ink-3);letter-spacing:.04em}
+.divider.new::before,.divider.new::after{background:rgba(67,56,202,.32)}
+.divider.new span{color:var(--indigo-strong)}
+.divider.new .r{margin-left:auto;position:static}
+.divider .pill{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--indigo-strong);background:var(--indigo-tint);padding:2px 9px;border-radius:var(--pill)}
+
+.msg{display:grid;grid-template-columns:36px minmax(0,1fr);gap:11px;padding:7px 24px;position:relative}
+.msg:hover{background:var(--bg)}
+.msg.mention{background:var(--bg-mention);box-shadow:inset 3px 0 0 var(--indigo)}
+.msg.mention:hover{background:#f0eefb}
+.msg .head{display:flex;align-items:baseline;gap:8px;margin-bottom:1px;flex-wrap:wrap}
+.msg .name{font-size:14px;font-weight:600;color:var(--ink)}
+.msg .role{font-size:11.5px;color:var(--ink-3)}
+.msg .you{font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--indigo-strong);
+  background:var(--indigo-tint);padding:1px 5px;border-radius:var(--r-sm)}
+.msg .time{font-size:11.5px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.msg .edited{font-size:11px;color:var(--ink-3);font-style:italic}
+.msg .text{font-size:14px;line-height:1.52;color:var(--msg)}
+.msg .text p{margin:0}
+.mchip{color:var(--indigo-strong);background:var(--indigo-tint);font-weight:600;padding:0 4px;border-radius:var(--r-sm)}
+
+/* Hilo */
+.thread{display:inline-flex;align-items:center;gap:9px;margin-top:6px;padding:3px 11px 3px 5px;
+  border:1px solid var(--line);border-radius:var(--pill);background:var(--surface);transition:border-color .12s,background .12s}
+.thread:hover{border-color:var(--line-2);background:var(--bg)}
+.thread .avs{display:flex}
+.thread .avs .av-20{border-radius:5px;box-shadow:0 0 0 2px var(--surface);margin-left:-5px}
+.thread .avs .av-20:first-child{margin-left:0}
+.thread .n{font-size:12.5px;font-weight:600;color:var(--indigo-strong)}
+.thread .last{font-size:11.5px;color:var(--ink-3)}
+.thread .ch-r{color:var(--ink-3)}
+
+/* Adjunto / enlace */
+.att{display:flex;align-items:center;gap:12px;margin-top:8px;max-width:430px;border:1px solid var(--line);
+  border-radius:var(--r-md);padding:9px 11px;background:var(--surface)}
+.att .fic{width:42px;height:42px;border-radius:var(--r-md);display:grid;place-items:center;flex:none;
+  background:#fdeaef;color:var(--danger)}
+.att .fic svg{width:20px;height:20px}
+.att .fmeta{min-width:0;flex:1}
+.att .fn{font-size:13px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.att .fsub{font-size:11.5px;color:var(--ink-3);margin-top:2px;font-variant-numeric:tabular-nums}
+.att .dl{width:32px;height:32px;border-radius:var(--r-md);display:grid;place-items:center;color:var(--ink-3);flex:none}
+.att .dl:hover{background:var(--sunken);color:var(--ink)}
+.lnk{display:block;margin-top:8px;max-width:470px;border:1px solid var(--line);border-left:3px solid var(--indigo);
+  border-radius:var(--r-md);padding:10px 14px;background:var(--surface)}
+.lnk:hover{background:var(--bg)}
+.lnk .site{font-size:11px;color:var(--ink-3);font-weight:600;display:flex;align-items:center;gap:5px}
+.lnk .site svg{width:12px;height:12px}
+.lnk .lt{font-size:13.5px;font-weight:600;color:var(--indigo-strong);margin-top:3px}
+.lnk .ld{font-size:12.5px;color:var(--ink-2);margin-top:3px;line-height:1.45}
+
+/* Reacciones / confirmaciones (icono, nunca emoji) */
+.acks{display:flex;gap:6px;margin-top:7px;flex-wrap:wrap}
+.ack{display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 9px;border-radius:var(--pill);
+  border:1px solid var(--line);background:var(--surface);font-size:12px;font-weight:600;color:var(--ink-2)}
+.ack svg{width:13px;height:13px;color:var(--success)}
+.ack:hover{border-color:var(--line-2);background:var(--bg)}
+.ack.on{background:var(--indigo-tint);border-color:transparent;color:var(--indigo-strong)}
+.ack.on svg{color:var(--indigo-strong)}
+
+/* ---- Composer ---- */
+.composer{flex:none;padding:0 24px 18px}
+.cbox{border:1px solid var(--line-2);border-radius:var(--r-lg);background:var(--surface);
+  box-shadow:0 1px 2px rgba(15,23,42,.04);overflow:hidden}
+.cbox:focus-within{border-color:var(--indigo);box-shadow:0 0 0 3px rgba(67,56,202,.12)}
+.fmt{display:flex;align-items:center;gap:1px;padding:6px 8px;border-bottom:1px solid var(--hair)}
+.fbtn{width:29px;height:29px;border-radius:var(--r-sm);display:grid;place-items:center;color:var(--ink-3)}
+.fbtn:hover{background:var(--sunken);color:var(--ink)}
+.fsep{width:1px;height:18px;background:var(--line);margin:0 5px}
+.cin{width:100%;border:0;outline:none;resize:none;font-family:inherit;font-size:14px;line-height:1.5;
+  color:var(--ink);padding:12px 14px;background:transparent;min-height:24px}
+.cin::placeholder{color:var(--ink-3)}
+.cfoot{display:flex;align-items:center;gap:2px;padding:6px 8px 8px 6px}
+.cfoot .grow{flex:1}
+.hint{font-size:11.5px;color:var(--ink-3);margin-right:8px}
+.hint kbd{font-family:var(--mono);font-size:10.5px;background:var(--sunken);border:1px solid var(--line);
+  border-radius:var(--r-sm);padding:1px 5px;color:var(--ink-2)}
+.send{height:32px;padding:0 15px;border-radius:var(--r-md);background:var(--indigo);color:#fff;
+  font-size:13px;font-weight:600;display:flex;align-items:center;gap:7px}
+.send:hover{background:var(--indigo-hover)}
+.send svg{width:15px;height:15px}
+
+/* ===================== MINI STYLE-GUIDE ===================== */
+.sg{border-top:1px solid var(--line);background:var(--sunken);padding:26px 30px 40px}
+.sg-h{display:flex;align-items:baseline;gap:12px;margin-bottom:22px;flex-wrap:wrap}
+.sg-h .mk{width:26px;height:26px;border-radius:7px;background:var(--indigo);display:grid;place-items:center;align-self:center}
+.sg-h .mk svg{width:16px;height:16px;stroke:#fff;fill:none;stroke-width:1.9;stroke-linejoin:round}
+.sg-h h2{margin:0;font-size:17px;font-weight:700;letter-spacing:-.01em}
+.sg-h .tag{font-size:12px;color:var(--ink-3)}
+.sg-h .tag b{color:var(--ink-2);font-weight:600}
+.sg-grid{display:grid;grid-template-columns:1.5fr 1fr;gap:38px}
+@media(max-width:900px){.sg-grid{grid-template-columns:1fr}}
+.sg-lab{font-size:10.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3);
+  margin-bottom:13px;display:flex;align-items:center;gap:9px}
+.sg-lab::after{content:"";height:1px;flex:1;background:var(--line)}
+.sw-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(126px,1fr));gap:10px}
+.sw{border:1px solid var(--line);border-radius:var(--r-md);overflow:hidden;background:var(--surface)}
+.sw .c{height:44px;border-bottom:1px solid var(--line)}
+.sw .i{padding:7px 10px}
+.sw .r{font-size:11.5px;font-weight:600;color:var(--ink);line-height:1.3}
+.sw .h{font-family:var(--mono);font-size:10.5px;color:var(--ink-3);text-transform:uppercase;margin-top:2px;letter-spacing:.02em}
+.type-col{display:flex;flex-direction:column;gap:16px}
+.tl{font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3);margin-bottom:5px}
+.t-disp{font-size:29px;font-weight:700;letter-spacing:-.02em;color:var(--ink)}
+.t-disp b{color:var(--indigo-strong)}
+.t-w{font-size:16px;color:var(--ink)}
+.t-w .w4{font-weight:400;color:var(--ink-2)} .t-w .w5{font-weight:500} .t-w .w6{font-weight:600} .t-w .w7{font-weight:700}
+.t-over{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--indigo-strong)}
+.t-body{font-size:13.5px;line-height:1.55;color:var(--ink-2);max-width:52ch}
+.t-mono{font-family:var(--mono);font-size:12.5px;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.sg-note{margin-top:26px;padding-top:16px;border-top:1px solid var(--line);font-size:11.5px;color:var(--ink-3);
+  line-height:1.6;max-width:88ch}
+.sg-note b{color:var(--ink-2);font-weight:600}
+</style>
+</head>
+<body>
+<a class="skip" href="#stream">Saltar a la conversación</a>
+
+<!-- ================= SPRITE DE ICONOS (grid 24, línea) ================= -->
+<svg class="sprite" aria-hidden="true"><defs>
+<symbol id="i-brand" viewBox="0 0 24 24"><path d="M12 2.6 20.2 12 12 21.4 3.8 12Z"/><path d="M12 8.2 15 12l-3 3.8L9 12Z"/></symbol>
+<symbol id="i-rooms" viewBox="0 0 24 24"><path d="M5 5.5h14a1.5 1.5 0 0 1 1.5 1.5v7a1.5 1.5 0 0 1-1.5 1.5H10l-4 3v-3H5A1.5 1.5 0 0 1 3.5 14V7A1.5 1.5 0 0 1 5 5.5Z"/></symbol>
+<symbol id="i-docs" viewBox="0 0 24 24"><path d="M6.5 4.5h6l4 4v10a1.5 1.5 0 0 1-1.5 1.5h-8.5a1.5 1.5 0 0 1-1.5-1.5V6a1.5 1.5 0 0 1 1.5-1.5Z"/><path d="M12.5 4.5V8a.5.5 0 0 0 .5.5h3.5"/><path d="M9 12.5h6M9 15.5h4.5"/></symbol>
+<symbol id="i-sheets" viewBox="0 0 24 24"><path d="M5.5 5.5h13a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1h-13a1 1 0 0 1-1-1v-11a1 1 0 0 1 1-1Z"/><path d="M4.5 10h15M4.5 14.5h15M9.5 5.5v13"/></symbol>
+<symbol id="i-slides" viewBox="0 0 24 24"><path d="M4.5 6h15a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1Z"/><path d="M12 17.5v2.5M9 20h6"/><path d="M8.5 14v-2.3M12 14v-4.4M15.5 14v-3.2"/></symbol>
+<symbol id="i-meet" viewBox="0 0 24 24"><path d="M4.5 8.5A1.5 1.5 0 0 1 6 7h7.5A1.5 1.5 0 0 1 15 8.5v7A1.5 1.5 0 0 1 13.5 17H6a1.5 1.5 0 0 1-1.5-1.5Z"/><path d="M15 11l3.7-2.3a.6.6 0 0 1 .9.5v5.6a.6.6 0 0 1-.9.5L15 13Z"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><path d="M11 4.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13Z"/><path d="M15.8 15.8 20 20"/></symbol>
+<symbol id="i-hash" viewBox="0 0 24 24"><path d="M8.5 4 7 20M17 4l-1.5 16M4.5 9h14M3.8 15h14"/></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24"><path d="M6.5 10.5h11a1 1 0 0 1 1 1v6.5a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1v-6.5a1 1 0 0 1 1-1Z"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/></symbol>
+<symbol id="i-chev" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5"/></symbol>
+<symbol id="i-pencil" viewBox="0 0 24 24"><path d="M15.5 5.5l3 3M5 19l1-4L16 5l3 3L9 18Z"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4.5 8.5h8M16 8.5h3.5M4.5 15.5h3.5M11.5 15.5h8"/><circle cx="14.3" cy="8.5" r="1.9"/><circle cx="9.7" cy="15.5" r="1.9"/></symbol>
+<symbol id="i-pin" viewBox="0 0 24 24"><path d="M9 4.5h6M10 4.5l.7 6.5-2.7 2.5v1.5h8v-1.5l-2.7-2.5.7-6.5M12 15v4.5"/></symbol>
+<symbol id="i-files" viewBox="0 0 24 24"><path d="M8.5 3.5h5l4 4V17a1.5 1.5 0 0 1-1.5 1.5h-7.5A1.5 1.5 0 0 1 7 17V5a1.5 1.5 0 0 1 1.5-1.5Z"/><path d="M13.5 3.5V7a.5.5 0 0 0 .5.5h3.5"/><path d="M6 7.5A1.5 1.5 0 0 0 4.5 9v9.5A1.5 1.5 0 0 0 6 20h7"/></symbol>
+<symbol id="i-video" viewBox="0 0 24 24"><path d="M4.5 7.5A1.5 1.5 0 0 1 6 6h7.5A1.5 1.5 0 0 1 15 7.5v9A1.5 1.5 0 0 1 13.5 18H6a1.5 1.5 0 0 1-1.5-1.5Z"/><path d="M15 10.5l3.6-2.2a.6.6 0 0 1 .9.5v6.4a.6.6 0 0 1-.9.5L15 13.5Z"/></symbol>
+<symbol id="i-kebab" viewBox="0 0 24 24"><circle cx="12" cy="5.5" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="12" cy="18.5" r="1.4"/></symbol>
+<symbol id="i-pdf" viewBox="0 0 24 24"><path d="M7.5 3.5h6l4 4V19a1.5 1.5 0 0 1-1.5 1.5h-8.5A1.5 1.5 0 0 1 6 19V5a1.5 1.5 0 0 1 1.5-1.5Z"/><path d="M13.5 3.5V7a.5.5 0 0 0 .5.5h3.5"/><path d="M9 16.5v-4h1.3a1.1 1.1 0 0 1 0 2.2H9M14.8 12.5v4M13.9 14.5h1.7" stroke-width="1.4"/></symbol>
+<symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4.5v9.5M8.3 10.7 12 14l3.7-3.3M6 19h12"/></symbol>
+<symbol id="i-sheet2" viewBox="0 0 24 24"><path d="M5.5 5.5h13a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1h-13a1 1 0 0 1-1-1v-11a1 1 0 0 1 1-1Z"/><path d="M4.5 10h15M9.5 5.5v13"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></symbol>
+<symbol id="i-reply" viewBox="0 0 24 24"><path d="M9.5 7 5.5 11l4 4M5.5 11H14a4.5 4.5 0 0 1 4.5 4.5V17"/></symbol>
+<symbol id="i-bold" viewBox="0 0 24 24"><path d="M8.5 5.5v13M8.5 5.5h4.2a3 3 0 0 1 0 6h-4.2M8.5 11.5h5a3.2 3.2 0 0 1 0 7h-5"/></symbol>
+<symbol id="i-italic" viewBox="0 0 24 24"><path d="M11 5h6M7 19h6M14.5 5l-5 14"/></symbol>
+<symbol id="i-strike" viewBox="0 0 24 24"><path d="M5.5 12h13M8 9c0-2.1 1.8-3.4 4-3.4s3.7 1 3.9 2.8M8 15c.2 2 1.8 3 4 3.2"/></symbol>
+<symbol id="i-link" viewBox="0 0 24 24"><path d="M10.5 13.5a3.5 3.5 0 0 0 5 0l2.2-2.2a3.5 3.5 0 0 0-5-5l-1 1"/><path d="M13.5 10.5a3.5 3.5 0 0 0-5 0L6.3 12.7a3.5 3.5 0 0 0 5 5l1-1"/></symbol>
+<symbol id="i-code" viewBox="0 0 24 24"><path d="M9.5 8.5 6 12l3.5 3.5M14.5 8.5 18 12l-3.5 3.5"/></symbol>
+<symbol id="i-list" viewBox="0 0 24 24"><path d="M8.5 6.5h10M8.5 12h10M8.5 17.5h10M5 6.5h.5M5 12h.5M5 17.5h.5"/></symbol>
+<symbol id="i-quote" viewBox="0 0 24 24"><path d="M6 8h4v4a4 4 0 0 1-4 4M14 8h4v4a4 4 0 0 1-4 4"/></symbol>
+<symbol id="i-emoji" viewBox="0 0 24 24"><path d="M12 4.5a7.5 7.5 0 1 0 0 15 7.5 7.5 0 0 0 0-15Z"/><path d="M8.7 13.5a4 4 0 0 0 6.6 0M9.4 10v.6M14.6 10v.6"/></symbol>
+<symbol id="i-at" viewBox="0 0 24 24"><path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Z"/><path d="M15.5 12v1.75a2 2 0 0 0 4 0V12a7.5 7.5 0 1 0-2.9 5.9"/></symbol>
+<symbol id="i-clip" viewBox="0 0 24 24"><path d="M18 9.6l-7.6 7.6a3.3 3.3 0 0 1-4.7-4.7l7.9-7.9a2.2 2.2 0 0 1 3.1 3.1l-7.9 7.9a1.1 1.1 0 0 1-1.6-1.6l7.1-7.1"/></symbol>
+<symbol id="i-send" viewBox="0 0 24 24"><path d="M20 4 9.5 14.5M20 4l-6.4 16-3.9-7.6L2 8.6Z"/></symbol>
+</defs></svg>
+
+<div class="app">
+
+  <!-- =============== RAIL DE MÓDULOS =============== -->
+  <nav class="rail" aria-label="Módulos de Sytue">
+    <div class="brand" title="Sytue One"><svg viewBox="0 0 24 24"><use href="#i-brand"/></svg></div>
+    <div class="rail-nav">
+      <a class="mod" href="#" aria-current="page" aria-label="Rooms"><svg class="ic ic-22"><use href="#i-rooms"/></svg><span>Rooms</span></a>
+      <a class="mod" href="#" aria-label="Docs"><span class="ndot" aria-hidden="true"></span><svg class="ic ic-22"><use href="#i-docs"/></svg><span>Docs</span></a>
+      <a class="mod" href="#" aria-label="Sheets"><svg class="ic ic-22"><use href="#i-sheets"/></svg><span>Sheets</span></a>
+      <a class="mod" href="#" aria-label="Slides"><svg class="ic ic-22"><use href="#i-slides"/></svg><span>Slides</span></a>
+      <a class="mod" href="#" aria-label="Meet"><span class="ndot" aria-hidden="true"></span><svg class="ic ic-22"><use href="#i-meet"/></svg><span>Meet</span></a>
+    </div>
+    <div class="rail-foot">
+      <button class="railbtn" aria-label="Preferencias"><svg class="ic ic-22"><use href="#i-sliders"/></svg></button>
+      <div class="pw" title="Elena Vidal — En línea">
+        <div class="av av-28 a-slate">EV</div><span class="dot online" aria-hidden="true"></span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- =============== PANEL DE CANALES =============== -->
+  <aside class="channels" aria-label="Canales de Grupo Ferronor">
+    <div class="ws">
+      <div>
+        <div class="n">Grupo Ferronor <svg viewBox="0 0 24 24"><use href="#i-chev"/></svg></div>
+        <div class="sub">Infraestructuras · 12.300 empleados</div>
+      </div>
+      <div class="grow"></div>
+      <button class="ws-btn" aria-label="Redactar mensaje"><svg class="ic ic-18"><use href="#i-pencil"/></svg></button>
+    </div>
+    <div class="search">
+      <svg viewBox="0 0 24 24"><use href="#i-search"/></svg>
+      <input type="search" placeholder="Buscar en Rooms" aria-label="Buscar en Rooms">
+    </div>
+    <div class="chan-scroll">
+      <div class="sec"><span class="lbl">Favoritos</span><span class="grow"></span></div>
+      <a class="ch" aria-current="page" href="#"><span class="g"><svg viewBox="0 0 24 24"><use href="#i-hash"/></svg></span><span class="t">proyecto-atlas</span></a>
+      <a class="ch" href="#"><span class="g"><svg viewBox="0 0 24 24"><use href="#i-hash"/></svg></span><span class="t">comite-direccion</span></a>
+
+      <div class="sec"><span class="lbl">Canales</span><span class="grow"></span><button aria-label="Añadir canal"><svg class="ic ic-16"><use href="#i-plus"/></svg></button></div>
+      <a class="ch" href="#"><span class="g"><svg viewBox="0 0 24 24"><use href="#i-hash"/></svg></span><span class="t">anuncios-corporativos</span></a>
+      <a class="ch unread" href="#"><span class="g"><svg viewBox="0 0 24 24"><use href="#i-hash"/></svg></span><span class="t">operaciones-red</span><span class="badge">7</span></a>
+      <a class="ch" href="#"><span class="g"><svg viewBox="0 0 24 24"><use href="#i-hash"/></svg></span><span class="t">tesoreria</span></a>
+      <a class="ch unread" href="#"><span class="g"><svg viewBox="0 0 24 24"><use href="#i-lock"/></svg></span><span class="t">legal-contratos</span><span class="badge men">1</span></a>
+      <a class="ch unread" href="#"><span class="g"><svg viewBox="0 0 24 24"><use href="#i-hash"/></svg></span><span class="t">it-sistemas</span><span class="badge">3</span></a>
+      <a class="ch" href="#"><span class="g"><svg viewBox="0 0 24 24"><use href="#i-hash"/></svg></span><span class="t">rrhh-personas</span></a>
+
+      <div class="sec"><span class="lbl">Mensajes directos</span><span class="grow"></span><button aria-label="Nuevo mensaje directo"><svg class="ic ic-16"><use href="#i-plus"/></svg></button></div>
+      <a class="ch" href="#"><span class="pdot dot online"></span><span class="t">Nuria Sáez</span></a>
+      <a class="ch unread" href="#"><span class="pdot dot away"></span><span class="t">Marcos Ferreiro</span><span class="badge">2</span></a>
+      <a class="ch" href="#"><span class="pdot dot dnd"></span><span class="t">Javier Toledo</span></a>
+      <a class="ch" href="#"><span class="pdot dot offline"></span><span class="t">Comité M&amp;A (4)</span></a>
+    </div>
+  </aside>
+
+  <!-- =============== CONVERSACIÓN =============== -->
+  <main class="main">
+    <!-- Cabecera de canal (sólida índigo) -->
+    <header class="chead">
+      <div class="title">
+        <svg class="hsh"><use href="#i-hash"/></svg>
+        <h1>proyecto-atlas</h1>
+        <span class="priv">Privado</span>
+        <span class="topic">Integración Ferronor × Delmar — cierre del SPA y coordinación del Día 1</span>
+      </div>
+      <div class="grow"></div>
+      <div class="hstack" title="38 miembros">
+        <div class="av av-24 a-indigo">NS</div>
+        <div class="av av-24 a-rose">MF</div>
+        <div class="av av-24 a-ocre">JT</div>
+        <div class="more">+35</div>
+      </div>
+      <div class="hsep"></div>
+      <button class="call"><svg class="ic ic-16"><use href="#i-video"/></svg>Iniciar reunión</button>
+      <button class="hbtn" aria-label="Fijados"><svg class="ic ic-18"><use href="#i-pin"/></svg><span class="ct">3</span></button>
+      <button class="hbtn" aria-label="Archivos"><svg class="ic ic-18"><use href="#i-files"/></svg></button>
+      <button class="hbtn" aria-label="Buscar en el canal"><svg class="ic ic-18"><use href="#i-search"/></svg></button>
+      <button class="hbtn" aria-label="Más opciones"><svg class="ic ic-18"><use href="#i-kebab"/></svg></button>
+    </header>
+
+    <!-- Stream -->
+    <section class="stream" id="stream" aria-label="Mensajes">
+      <div class="divider"><span>Hoy · martes, 11 de julio</span></div>
+
+      <article class="msg">
+        <div class="av a-indigo">NS</div>
+        <div class="body">
+          <div class="head"><span class="name">Nuria Sáez</span><span class="role">PMO Integración</span><span class="time">09:12</span><span class="edited">· editado</span></div>
+          <div class="text"><p>Buenos días. Fijada la secuencia del Día 1: 08:00 migración de nóminas, 10:00 unificación de accesos y directorio, 12:00 corte del correo heredado de Delmar. El calendario definitivo queda en el hilo.</p></div>
+          <button class="thread">
+            <span class="avs"><span class="av-20 a-slate">EV</span><span class="av-20 a-green">AC</span><span class="av-20 a-teal">RM</span></span>
+            <span class="n">5 respuestas</span>
+            <span class="last">última hace 14 min</span>
+            <svg class="ic ic-16 ch-r"><use href="#i-chev"/></svg>
+          </button>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="av a-teal">RM</div>
+        <div class="body">
+          <div class="head"><span class="name">Rocío Mendoza</span><span class="role">Tesorería</span><span class="time">09:26</span></div>
+          <div class="text"><p>Confirmado el barrido de saldos de Delmar hacia la cuenta centralizada. Pendiente únicamente la conformidad del banco agente para los tres contratos de leasing; la espero antes de las 11:00.</p></div>
+        </div>
+      </article>
+
+      <article class="msg mention">
+        <div class="av a-rose">MF</div>
+        <div class="body">
+          <div class="head"><span class="name">Marcos Ferreiro</span><span class="role">Asesoría Jurídica · M&amp;A</span><span class="time">09:41</span></div>
+          <div class="text"><p><span class="mchip">@Elena Vidal</span> necesito tu visto bueno en la cláusula 7.3 —ajuste de precio por deuda neta— antes de las 12:00 para poder firmar. Adjunto el borrador final consolidado con los comentarios de la due diligence.</p></div>
+          <div class="att">
+            <div class="fic"><svg><use href="#i-pdf"/></svg></div>
+            <div class="fmeta">
+              <div class="fn">SPA_Ferronor-Delmar_v14_FINAL.pdf</div>
+              <div class="fsub">PDF · 2,4 MB · 48 páginas</div>
+            </div>
+            <button class="dl" aria-label="Descargar"><svg class="ic ic-18"><use href="#i-download"/></svg></button>
+          </div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="av a-slate">EV</div>
+        <div class="body">
+          <div class="head"><span class="name">Elena Vidal</span><span class="you">Tú</span><span class="role">Dirección Financiera</span><span class="time">09:48</span></div>
+          <div class="text"><p>Revisada. La 7.3 queda validada con el cap de 4,2 M€ acordado ayer en comité. Podéis proceder con la firma; mantenedme en copia del cierre y del acta.</p></div>
+          <div class="acks">
+            <button class="ack on" title="Rocío Mendoza, Marcos Ferreiro y 4 más"><svg><use href="#i-check"/></svg>6</button>
+            <button class="ack" title="Responder en hilo"><svg style="color:var(--ink-3)"><use href="#i-reply"/></svg>2</button>
+          </div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="av a-ocre">JT</div>
+        <div class="body">
+          <div class="head"><span class="name">Javier Toledo</span><span class="role">Sistemas</span><span class="time">10:03</span></div>
+          <div class="text"><p>Cuadro de mando del corte en vivo —accesos, correo y VPN por planta—. Lo iré actualizando durante toda la jornada:</p></div>
+          <a class="lnk" href="#">
+            <div class="site"><svg><use href="#i-sheet2"/></svg>docs.ferronor.eu · Sytue Sheets</div>
+            <div class="lt">Corte Atlas — Día 1 · seguimiento en vivo</div>
+            <div class="ld">14 plantas · estado de accesos, buzones migrados y VPN operativa. Actualización automática cada 5 minutos.</div>
+          </a>
+        </div>
+      </article>
+
+      <div class="divider new"><span class="pill">Nuevos mensajes</span></div>
+
+      <article class="msg">
+        <div class="av a-green">AC</div>
+        <div class="body">
+          <div class="head"><span class="name">Andrés Cobo</span><span class="role">Operaciones</span><span class="time">10:15</span></div>
+          <div class="text"><p>Operaciones lista en las 14 plantas. Turnos de noche con los nuevos procedimientos impresos y el contacto directo del PMO. Sin incidencias hasta el momento.</p></div>
+          <div class="acks">
+            <button class="ack" title="9 confirmaciones"><svg><use href="#i-check"/></svg>9</button>
+          </div>
+        </div>
+      </article>
+
+      <article class="msg">
+        <div class="av a-indigo">NS</div>
+        <div class="body">
+          <div class="head"><span class="name">Nuria Sáez</span><span class="role">PMO Integración</span><span class="time">10:22</span></div>
+          <div class="text"><p>Recordatorio: coordinación en <span class="mchip">Rooms Meet</span> a las 11:00 para revisar el estado del corte. El enlace está fijado en la cabecera del canal.</p></div>
+        </div>
+      </article>
+    </section>
+
+    <!-- Composer -->
+    <div class="composer">
+      <div class="cbox">
+        <div class="fmt" role="toolbar" aria-label="Formato">
+          <button class="fbtn" aria-label="Negrita"><svg class="ic ic-18"><use href="#i-bold"/></svg></button>
+          <button class="fbtn" aria-label="Cursiva"><svg class="ic ic-18"><use href="#i-italic"/></svg></button>
+          <button class="fbtn" aria-label="Tachado"><svg class="ic ic-18"><use href="#i-strike"/></svg></button>
+          <span class="fsep"></span>
+          <button class="fbtn" aria-label="Enlace"><svg class="ic ic-18"><use href="#i-link"/></svg></button>
+          <button class="fbtn" aria-label="Código"><svg class="ic ic-18"><use href="#i-code"/></svg></button>
+          <button class="fbtn" aria-label="Lista"><svg class="ic ic-18"><use href="#i-list"/></svg></button>
+          <button class="fbtn" aria-label="Cita"><svg class="ic ic-18"><use href="#i-quote"/></svg></button>
+        </div>
+        <textarea class="cin" rows="1" placeholder="Escribe en #proyecto-atlas" aria-label="Mensaje para proyecto-atlas">Confirmo asistencia a las 11:00. Rocío, ¿podemos revisar antes el estado del banco agente?</textarea>
+        <div class="cfoot">
+          <button class="fbtn" aria-label="Adjuntar archivo"><svg class="ic ic-18"><use href="#i-clip"/></svg></button>
+          <button class="fbtn" aria-label="Emoji"><svg class="ic ic-18"><use href="#i-emoji"/></svg></button>
+          <button class="fbtn" aria-label="Mencionar"><svg class="ic ic-18"><use href="#i-at"/></svg></button>
+          <span class="grow"></span>
+          <span class="hint"><kbd>Intro</kbd> para enviar · <kbd>Mayús+Intro</kbd> salto de línea</span>
+          <button class="send"><svg><use href="#i-send"/></svg>Enviar</button>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- =============== MINI STYLE-GUIDE =============== -->
+<section class="sg" aria-label="Guía de estilo">
+  <div class="sg-h">
+    <div class="mk"><svg viewBox="0 0 24 24"><use href="#i-brand"/></svg></div>
+    <h2>Sytue Rooms — Mattermost Evolved</h2>
+    <span class="tag">Territorio: <b>continuidad + upgrade</b> · blanco predominante, cabecera de marca sólida, hairlines por tinta, WCAG AA</span>
+  </div>
+  <div class="sg-grid">
+    <div>
+      <div class="sg-lab">Roles de color</div>
+      <div class="sw-row">
+        <div class="sw"><div class="c" style="background:#4338ca"></div><div class="i"><div class="r">Índigo · header</div><div class="h">#4338CA</div></div></div>
+        <div class="sw"><div class="c" style="background:#231f59"></div><div class="i"><div class="r">Denim · sidebar</div><div class="h">#231F59</div></div></div>
+        <div class="sw"><div class="c" style="background:#1a1747"></div><div class="i"><div class="r">Rail módulos</div><div class="h">#1A1747</div></div></div>
+        <div class="sw"><div class="c" style="background:#ffffff;box-shadow:inset 0 0 0 1px var(--line)"></div><div class="i"><div class="r">Superficie</div><div class="h">#FFFFFF</div></div></div>
+        <div class="sw"><div class="c" style="background:#f8fafc;box-shadow:inset 0 0 0 1px var(--line)"></div><div class="i"><div class="r">Fondo app</div><div class="h">#F8FAFC</div></div></div>
+        <div class="sw"><div class="c" style="background:#0f172a"></div><div class="i"><div class="r">Texto</div><div class="h">#0F172A</div></div></div>
+        <div class="sw"><div class="c" style="background:#475569"></div><div class="i"><div class="r">Texto atenuado</div><div class="h">#475569</div></div></div>
+        <div class="sw"><div class="c" style="background:#3730a3"></div><div class="i"><div class="r">Índigo · enlace</div><div class="h">#3730A3</div></div></div>
+        <div class="sw"><div class="c" style="background:#2f9e6b"></div><div class="i"><div class="r">Presencia · en línea</div><div class="h">#2F9E6B</div></div></div>
+        <div class="sw"><div class="c" style="background:#854d0e"></div><div class="i"><div class="r">Aviso</div><div class="h">#854D0E</div></div></div>
+        <div class="sw"><div class="c" style="background:#b91c1c"></div><div class="i"><div class="r">Peligro</div><div class="h">#B91C1C</div></div></div>
+        <div class="sw"><div class="c" style="background:#e2e8f0;box-shadow:inset 0 0 0 1px var(--line)"></div><div class="i"><div class="r">Hairline · tinta 12%</div><div class="h">1E293B/12</div></div></div>
+      </div>
+    </div>
+    <div>
+      <div class="sg-lab">Tipografía — Inter</div>
+      <div class="type-col">
+        <div><div class="tl">Display · 700</div><div class="t-disp">Sytue <b>Rooms</b></div></div>
+        <div><div class="tl">Pesos</div><div class="t-w"><span class="w4">Regular</span> · <span class="w5">Medium</span> · <span class="w6">Semibold</span> · <span class="w7">Bold</span></div></div>
+        <div><div class="tl">Overline</div><div class="t-over">Mensajes directos</div></div>
+        <div><div class="tl">Cuerpo · 14/1.5</div><div class="t-body">Densidad real, jerarquía por peso y espacio. Cabecera de marca sólida sobre contenido blanco; líneas finas derivadas de la tinta, no de grises sólidos.</div></div>
+        <div><div class="tl">Mono · tabular</div><div class="t-mono">09:41 · 2,4 MB · +35 · 4,2 M€</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="sg-note">
+    <b>Decisiones.</b> Evolución directa del lenguaje Sytue actual (blanco + cabeceras sólidas, estilo Mattermost/Compass) llevada a refinamiento: rail y panel de canales en Denim índigo, <b>cabecera de canal en índigo de marca sólido</b> (#4338CA, blanco 7,90:1), y stream/composer en blanco como superficie de lectura predominante. Todos los bordes derivan de una única tinta (slate&nbsp;800) por opacidad — 8% separadores, 12% borde, 16% inputs. Iconografía SVG en línea coherente (grid&nbsp;24, trazo&nbsp;1,75); cero emojis, cero degradados, cero morado genérico. Selección y menciones tiñen con el acento vigente al 10%; presencia siempre con punto + etiqueta, nunca solo color.
+  </div>
+</section>
+</body>
+</html>

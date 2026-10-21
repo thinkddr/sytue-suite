@@ -1,0 +1,236 @@
+apiVersion: v2
+name: sytue-one
+description: >-
+  Umbrella chart de la suite Sytue One para Scaleway Kapsule (solo regiones UE).
+  Despliega los servicios Go propios y Sytue-native (id, drive, docs, mail, calendar,
+  contacts, notes, rooms, hub, cloud-api, cloud-builder) + el SFU LiveKit (Apache-2.0,
+  unica app de terceros) + los frontends Astro+Preact, sobre el ingress canonico Traefik
+  y TLS automatico cert-manager. PostgreSQL es EXTERNO (Scaleway RDB) SALVO en el perfil autoalojado, que lo despliega en el propio cluster. SIN motores AGPL
+  (Keycloak/Nextcloud/OnlyOffice/Mattermost/Stalwart) y SIN Redis/Valkey.
+type: application
+# Version del chart (SemVer). Version de la suite en appVersion.
+version: 2.0.0
+appVersion: "2.0.0"
+kubeVersion: ">=1.31.0-0"
+home: https://sytue.eu
+sources:
+  - https://git.sytue.eu/sytue/one
+keywords:
+  - sytue
+  - workspace
+  - go
+  - oidc
+  - paas
+  - eu-sovereign
+maintainers:
+  - name: Sytue Platform
+    email: platform@sytue.eu
+annotations:
+  # Código Apache-2.0, (c) 2026 Daniel Delgado Ramos. Dependencias de terceros solo permisivas
+  # (Traefik MIT, cert-manager Apache-2.0, LiveKit Apache-2.0). NADA AGPL/source-available.
+  licenses: MIT
+  sytue.eu/sovereignty: "EU-only (Scaleway fr-par / nl-ams)"
+  sytue.eu/stack: go
+
+# -----------------------------------------------------------------------------
+# Dependencias
+#   Upstream (permisivas):
+#     - traefik (ingress CANONICO, MIT)
+#     - cert-manager es cluster-wide y se instala como release independiente
+#       antes de este chart (deploy/production/03-desplegar.sh).
+#   Subcharts PROPIOS (file://../charts/<svc>) — un servicio Go por producto:
+#     id, drive, docs, mail, calendar, contacts, notes, rooms, hub, integrations,
+#     cloud-api, cloud-builder, cloud-controller, analytics-ingest, analytics-api, ocr, ai
+#   Tercero permitido (Apache-2.0): livekit (SFU de medios de Meet).
+#   Frontends Astro+Preact: sytue-frontend.
+#   PostgreSQL NO se incluye: en prod es Scaleway RDB (externa, global.postgresql).
+#   SIN Redis/Valkey y SIN charts de motores AGPL.
+# Cada dependencia se activa/desactiva con su flag <name>.enabled en values.yaml.
+# -----------------------------------------------------------------------------
+dependencies:
+  # ===== Upstream permisivos =====
+  - name: traefik
+    version: "41.1.0"
+    # Vendorizado desde el chart oficial: no se consulta GitHub Pages al desplegar.
+    repository: "file://../.vendor/traefik-41.1.0"
+    condition: traefik.enabled
+    alias: traefik
+    tags:
+      - ingress
+  # ===== Servicios Go propios (./charts) =====
+  - name: sytue-id
+    version: "1.0.0"
+    repository: "file://../charts/id"
+    condition: id.enabled
+    alias: id
+  - name: sytue-drive
+    version: "1.0.0"
+    repository: "file://../charts/drive"
+    condition: drive.enabled
+    alias: drive
+  - name: sytue-docs
+    version: "1.0.0"
+    repository: "file://../charts/docs"
+    condition: docs.enabled
+    alias: docs
+  # Reconocimiento de texto para Sytue PDF (ADR-0034). Motor Tesseract 5
+  # (Apache-2.0) DENTRO de la imagen: sin SaaS, sin egress y sin que un documento
+  # escaneado salga del clúster. Solo lo llama Sytue Docs.
+  - name: sytue-ocr
+    version: "1.0.0"
+    repository: "file://../charts/ocr"
+    condition: ocr.enabled
+    alias: ocr
+  # El asistente de la suite (ADR-0034). Al reves que el OCR, este SI sale a
+  # internet: el modelo corre en Scaleway Generative APIs (fr-par), con pesos
+  # abiertos y pago por token. Sin la clave del proveedor arranca sano y
+  # responde 503, y el panel del editor se oculta solo.
+  - name: sytue-ai
+    version: "1.0.0"
+    repository: "file://../charts/ai"
+    # `global.ai.enabled` y NO el `ai.enabled` que usan los demas subcharts, a
+    # proposito: este interruptor lo miran DOS charts —este y el de frontend, que
+    # decide si pasa SYTUE_AI_URL—, y un subchart no ve los valores de otro. Con
+    # el interruptor local habria dos, y apagar el que no toca deja el servicio
+    # corriendo sin que nadie lo llame, o el BFF apuntando a un Service que no
+    # existe. Uno solo, en global, y no se pueden contradecir.
+    condition: global.ai.enabled
+    alias: ai
+  - name: sytue-mail
+    version: "1.0.0"
+    repository: "file://../charts/mail"
+    condition: mail.enabled
+    alias: mail
+  - name: sytue-calendar
+    version: "1.0.0"
+    repository: "file://../charts/calendar"
+    condition: calendar.enabled
+    alias: calendar
+  - name: sytue-contacts
+    version: "1.0.0"
+    repository: "file://../charts/contacts"
+    condition: contacts.enabled
+    alias: contacts
+  - name: sytue-notes
+    version: "1.0.0"
+    repository: "file://../charts/notes"
+    condition: notes.enabled
+    alias: notes
+  - name: sytue-syphotos
+    version: "1.0.0"
+    repository: "file://../charts/syphotos"
+    condition: syphotos.enabled
+    alias: syphotos
+  - name: sytue-syerp
+    version: "1.0.0"
+    repository: "file://../charts/syerp"
+    condition: syerp.enabled
+    alias: syerp
+  # Sytue Cast: vídeo bajo demanda y directo (ADR 0061). Dos Deployments en un
+  # chart: el servicio HTTP y el transcodificador con ffmpeg, mismo binario.
+  - name: sytue-cast
+    version: "1.0.0"
+    repository: "file://../charts/cast"
+    condition: cast.enabled
+    alias: cast
+  - name: sytue-pages
+    version: "1.0.0"
+    repository: "file://../charts/pages"
+    condition: pages.enabled
+    alias: pages
+  # Sytue Bases: tablas relacionales (ADR 0068). Por el ingress solo `/api/v1`. Encendido
+  # por defecto desde el 2026-10-04 (values-prod y values-staging lo apagan).
+  - name: sytue-bases
+    version: "1.0.0"
+    repository: "file://../charts/bases"
+    condition: bases.enabled
+    alias: bases
+  - name: sytue-rooms
+    version: "1.0.0"
+    repository: "file://../charts/rooms"
+    condition: rooms.enabled
+    alias: rooms
+  - name: sytue-hub
+    version: "1.0.0"
+    repository: "file://../charts/hub"
+    condition: hub.enabled
+    alias: hub
+  # Interoperabilidad SALIENTE (BYO-SaaS): unica puerta de egress hacia el SaaS del
+  # cliente, con SSO/SCIM/datos/gobernanza. Sin este subchart, TODO el gateway (y las
+  # 18 plantillas del catalogo) quedaba sin forma de desplegarse fuera de compose.
+  - name: sytue-integrations
+    version: "1.0.0"
+    repository: "file://../charts/integrations"
+    condition: integrations.enabled
+    alias: integrations
+  - name: sytue-cloud-api
+    version: "1.0.0"
+    repository: "file://../charts/cloud-api"
+    condition: cloud-api.enabled
+    alias: cloud-api
+  - name: sytue-cloud-builder
+    version: "1.0.0"
+    repository: "file://../charts/cloud-builder"
+    condition: cloud-builder.enabled
+    alias: cloud-builder
+  - name: sytue-cloud-controller
+    version: "1.0.0"
+    repository: "file://../charts/cloud-controller"
+    condition: cloud-controller.enabled
+    alias: cloud-controller
+
+  # ===== Sytue Analytics (ADR 0026): DOS procesos, una imagen =====
+  # El colector es el endpoint PUBLICO y de mayor volumen de la plataforma; la API de
+  # lectura guarda las credenciales del panel y los crons. Van en charts separados
+  # porque el radio de explosion es la razon de ser de la decision, no un detalle de
+  # empaquetado: escalan distinto (HPA vs singleton) y se exponen distinto (el
+  # colector NO publica hostname propio; se sirve bajo el dominio de cada cliente).
+  - name: sytue-analytics-ingest
+    version: "1.0.0"
+    repository: "file://../charts/analytics-ingest"
+    condition: analytics-ingest.enabled
+    alias: analytics-ingest
+  - name: sytue-analytics-api
+    version: "1.0.0"
+    repository: "file://../charts/analytics-api"
+    condition: analytics-api.enabled
+    alias: analytics-api
+
+  # ===== Infraestructura de datos: pooler transaccional hacia la RDB =====
+  # PgBouncer (ISC, permisiva): multiplexa los pools pgx de todas las replicas
+  # bajo max_connections de la RDB. SOLO entornos Helm; dev (deploy/compose)
+  # NO usa PgBouncer.
+  - name: sytue-pgbouncer
+    version: "1.0.0"
+    repository: "file://../charts/pgbouncer"
+    condition: pgbouncer.enabled
+    alias: pgbouncer
+
+  # ===== Infraestructura de datos: cache efimera compartida =====
+  # Dragonfly (BUSL 1.1; uso interno sin modificar, no se ofrece a terceros como
+  # servicio gestionado). Sostiene la presencia de Hub y el pub/sub entre
+  # replicas: SIN esto, escalar Hub o Rooms por encima de una replica parte el
+  # estado en vivo. Nada durable vive aqui.
+  - name: sytue-dragonfly
+    version: "1.1.0"
+    repository: "file://../charts/dragonfly"
+    condition: dragonfly.enabled
+    alias: dragonfly
+
+  # ===== Tercero permitido (Apache-2.0): SFU de medios de Meet =====
+  - name: livekit
+    version: "1.0.0"
+    repository: "file://../charts/livekit"
+    condition: livekit.enabled
+  # El grabador. Apagado salvo que se pida: no es parte del SFU y solo hace falta
+  # donde se quiera grabar reuniones.
+  - name: sytue-livekit-egress
+    version: "1.0.0"
+    repository: "file://../charts/livekit-egress"
+    condition: sytue-livekit-egress.enabled
+
+  # ===== Frontends Astro+Preact (propios) =====
+  - name: sytue-frontend
+    version: "1.0.0"
+    repository: "file://../charts/sytue-frontend"
+    condition: sytue-frontend.enabled

@@ -1,0 +1,306 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: (c) 2026 Daniel Delgado Ramos
+ *
+ * Catálogo ALEMÁN de Sytue Contacts. Terminología de Google Kontakte /
+ * Outlook: «Label», «Markiert», «Papierkorb», «Zusammenführen», «Adressbuch».
+ * El alemán es ~30 % más largo que el inglés: las etiquetas de botón y de
+ * navegación se han mantenido cortas a propósito («Zusammenführen» en vez de
+ * «Kontakte zusammenführen» donde el contexto ya lo dice).
+ * docs/CONVENTIONS.md §13.1.
+ */
+import type { AppCatalog } from '@sytue/i18n';
+import type { en } from './en.js';
+
+export const de: AppCatalog<typeof en> = {
+  // --- Barra lateral ------------------------------------------------------
+  'nav.newContact': 'Neuer Kontakt',
+  'nav.views': 'Ansichten',
+  'nav.starred': 'Markiert',
+  'nav.birthdays': 'Geburtstage',
+  'birthdays.title': 'Nächste Geburtstage',
+  'birthdays.empty': 'Bei keinem Kontakt ist ein Geburtstag hinterlegt.',
+  'birthdays.today': 'Heute',
+  'birthdays.tomorrow': 'Morgen',
+  'birthdays.inDays': { one: 'In 1 Tag', other: 'In {count} Tagen' },
+  'birthdays.turns': 'Wird {age}',
+  'nav.trash': 'Papierkorb',
+  'nav.addressBooks': 'Adressbücher',
+  'nav.labels': 'Labels',
+  'nav.newLabel': 'Neues Label',
+  'nav.newAddressBook': 'Neues Adressbuch',
+  'nav.booksError': 'Adressbücher konnten nicht geladen werden.',
+  'nav.booksEmpty': 'Keine Adressbücher verfügbar.',
+  'nav.labelsError': 'Labels konnten nicht geladen werden.',
+  'nav.labelsEmpty': 'Noch keine Labels.',
+
+  // --- Comunes ------------------------------------------------------------
+  'common.retry': 'Erneut versuchen',
+  'common.cancel': 'Abbrechen',
+  'common.close': 'Schließen',
+  'common.create': 'Erstellen',
+  'common.save': 'Speichern',
+  'common.delete': 'Löschen',
+  'common.edit': 'Bearbeiten',
+  'common.back': 'Zurück',
+  'common.add': 'Hinzufügen',
+  'common.name': 'Name',
+  'common.actionFailed': 'Aktion konnte nicht abgeschlossen werden',
+  'common.tryAgain': 'Bitte erneut versuchen.',
+  'common.tryAgainSoon': 'Bitte in einigen Sekunden erneut versuchen.',
+
+  // --- Lista de contactos -------------------------------------------------
+  'list.region': 'Kontaktliste',
+  'list.title': 'Kontakte',
+  'list.search': 'Kontakte suchen',
+  'list.selectAll': 'Alle sichtbaren Kontakte auswählen',
+  'list.select': '{name} auswählen',
+  'list.starredTitle': 'Markiert',
+  'list.reviewDuplicates': 'Duplikate prüfen ({count})',
+  'list.count': { one: '{count} Kontakt', other: '{count} Kontakte' },
+  'list.countFiltered': {
+    one: '{shown} von {count} Kontakt',
+    other: '{shown} von {count} Kontakten',
+  },
+  'list.countWithLabel': '{summary} · {label}',
+  'list.errorTitle': 'Kontakte konnten nicht geladen werden',
+  'list.errorDescription':
+    'Bei der Verbindung zum Server ist ein Problem aufgetreten. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.',
+  'list.emptyTitle': 'Keine Kontakte',
+  'list.emptySearch': 'Keine Treffer für Ihre Suche. Versuchen Sie einen anderen Begriff.',
+  'list.emptyLabel':
+    'Das Label „{label}“ enthält keine Kontakte. Weisen Sie es in einer Kontaktkarte zu.',
+  'list.emptyBook': 'Ihr Adressbuch ist leer. Erstellen Sie Ihren ersten Kontakt, um zu beginnen.',
+  'list.emptyStarred':
+    'Keine markierten Kontakte. Markieren Sie die Personen, mit denen Sie am meisten zu tun haben, dann erscheinen sie hier.',
+  'list.clearSearch': 'Suche löschen',
+  'list.clearFilter': 'Filter entfernen',
+
+  // --- Importar / exportar ------------------------------------------------
+  'io.menuLabel': 'Kontakte importieren oder exportieren',
+  'io.button': 'Import / Export',
+  'io.importVcard': 'vCard importieren (.vcf)',
+  'io.importCsv': 'CSV importieren (Google/Outlook)',
+  'io.exportVcard': 'Als vCard exportieren (.vcf)',
+  'io.exportCsv': 'Als CSV exportieren',
+  'io.exportFilename': 'kontakte.vcf',
+  'io.imported': { one: '{count} Kontakt importiert', other: '{count} Kontakte importiert' },
+  'io.skipped': {
+    one: '{count} wurde übersprungen (Duplikat oder ungültig).',
+    other: '{count} wurden übersprungen (Duplikate oder ungültig).',
+  },
+  'io.noneImported': 'Es wurde kein Kontakt importiert',
+  'io.noneImportedCsv': 'Die CSV-Datei enthielt keine gültigen neuen Zeilen.',
+  'io.noneImportedVcard': 'Die .vcf-Datei enthielt keine gültigen Karten.',
+  'io.importProgress': '{done} von {total} werden importiert',
+  'io.vcardReadFailed': 'Die .vcf-Datei konnte nicht gelesen werden',
+  'io.csvFailed': 'Die CSV-Datei konnte nicht importiert werden',
+  'io.csvFailedHint': 'Verwenden Sie einen Export aus Google Kontakte oder Outlook.',
+
+  // --- Etiquetas ----------------------------------------------------------
+  'label.newTitle': 'Neues Label',
+  'label.renameTitle': 'Label umbenennen',
+  'label.namePlaceholder': 'Familie, Arbeit, Verein…',
+  'label.nameRequired': 'Das Label braucht einen Namen.',
+  'label.created': 'Label erstellt',
+  'label.createFailed': 'Label konnte nicht erstellt werden',
+  'label.actions': 'Label-Aktionen',
+  'label.rename': 'Umbenennen',
+  'label.renamed': 'Label umbenannt',
+  'label.renameFailed': 'Label konnte nicht umbenannt werden',
+  'label.delete': 'Label löschen',
+  'label.deleteConfirm':
+    'Das Label „{label}“ löschen? Die Kontakte behalten alle ihre Daten: nur das Label verschwindet.',
+  'label.deleted': 'Label gelöscht',
+  'label.deleteFailed': 'Label konnte nicht gelöscht werden',
+  'book.newTitle': 'Neues Adressbuch',
+  'book.renameTitle': 'Adressbuch umbenennen',
+  'book.namePlaceholder': 'Familie, Lieferanten, Privat…',
+  'book.nameRequired': 'Das Adressbuch braucht einen Namen.',
+  'book.created': 'Adressbuch erstellt',
+  'book.createFailed': 'Das Adressbuch konnte nicht erstellt werden',
+  'book.actions': 'Adressbuch-Aktionen',
+  'book.rename': 'Umbenennen',
+  'book.renamed': 'Adressbuch umbenannt',
+  'book.renameFailed': 'Das Adressbuch konnte nicht umbenannt werden',
+  'book.delete': 'Adressbuch löschen',
+  'book.deleteConfirm':
+    'Adressbuch „{book}“ löschen? Die zugehörigen Kontakte werden ebenfalls gelöscht — das kann nicht rückgängig gemacht werden.',
+  'book.deleted': 'Adressbuch gelöscht',
+  'book.deleteFailed': 'Das Adressbuch konnte nicht gelöscht werden',
+
+  // --- Duplicados ---------------------------------------------------------
+  'duplicates.title': 'Mögliche Duplikate',
+  'duplicates.empty': 'Es wurden keine doppelten Kontakte gefunden.',
+  'duplicates.description':
+    'Kontakte mit gleichem Namen, gleicher E-Mail-Adresse oder gleicher Telefonnummer. Prüfen Sie jede Gruppe und führen Sie sie zusammen, damit keine Karte doppelt bleibt.',
+  'duplicates.cards': { one: '{count} Karte', other: '{count} Karten' },
+  'duplicates.merge': 'Zusammenführen',
+
+  // --- Combinar contactos -------------------------------------------------
+  'merge.selectTitle': 'Zusammenführen mit…',
+  'merge.confirmTitle': 'Zusammenführen bestätigen',
+  'merge.searchPlaceholder': 'Im Adressbuch suchen',
+  'merge.searchLabel': 'Kontakt zum Zusammenführen suchen',
+  'merge.listLabel': 'Kontakte des Adressbuchs',
+  'merge.noCandidates': 'In diesem Adressbuch gibt es keinen weiteren Kontakt zum Zusammenführen.',
+  'merge.noMatches': 'Keine Treffer für Ihre Suche.',
+  'merge.explain':
+    'Die E-Mail-Adressen und Telefonnummern von „{loser}“ werden zu „{survivor}“ hinzugefügt, die Labels gehen an den zusammengeführten Kontakt über, und „{loser}“ wird anschließend gelöscht.',
+  'merge.keepName': 'Zu behaltender Name',
+  'merge.keepOrganization': 'Zu behaltende Organisation',
+  'merge.resultEmails': { one: '{count} E-Mail-Adresse', other: '{count} E-Mail-Adressen' },
+  'merge.resultPhones': { one: '{count} Telefonnummer', other: '{count} Telefonnummern' },
+  'merge.result':
+    'Der entstehende Kontakt hat {emails} und {phones}. Diese Aktion lässt sich nicht rückgängig machen.',
+  'merge.confirm': 'Kontakte zusammenführen',
+  'merge.done': 'Kontakte zusammengeführt',
+  'merge.doneDescription': '„{loser}“ wurde mit „{survivor}“ zusammengeführt.',
+  'merge.partial': 'Unvollständiges Zusammenführen',
+  'merge.partialDescription':
+    'Die Daten wurden in „{survivor}“ gespeichert, aber „{loser}“ konnte nicht gelöscht werden und bleibt als Duplikat bestehen. Versuchen Sie es erneut.',
+  'merge.failed': 'Kontakte konnten nicht zusammengeführt werden',
+  'merge.failedHint': 'Es wurde nichts gelöscht. Bitte in einigen Sekunden erneut versuchen.',
+
+  // --- Papelera -----------------------------------------------------------
+  'trash.title': 'Papierkorb',
+  'trash.loading': 'Papierkorb wird geladen',
+  'trash.loadFailed': 'Der Papierkorb konnte nicht geladen werden. Bitte erneut versuchen.',
+  'trash.empty': 'Der Papierkorb ist leer.',
+  'trash.description':
+    'Gelöschte Kontakte. Stellen Sie sie wieder her oder löschen Sie sie endgültig.',
+  'trash.confirmPurge': 'Endgültig löschen?',
+  'trash.confirmYes': 'Ja, löschen',
+  'trash.confirmNo': 'Nein',
+  'trash.restore': 'Wiederherstellen',
+  'trash.restored': 'Kontakt wiederhergestellt',
+  'trash.restoreFailed': 'Wiederherstellen fehlgeschlagen',
+  'trash.purged': 'Kontakt endgültig gelöscht',
+  'trash.purgeFailed': 'Löschen fehlgeschlagen',
+
+  // --- Acciones en lote ---------------------------------------------------
+  'batch.region': 'Aktionen für die Auswahl',
+  'batch.selected': {
+    one: '{count} Kontakt ausgewählt',
+    other: '{count} Kontakte ausgewählt',
+  },
+  'batch.star': 'Markieren',
+  'batch.starred': { one: '{count} Kontakt markiert', other: '{count} Kontakte markiert' },
+  'batch.unstar': 'Markierung entfernen',
+  'batch.unstarred': 'Markierung entfernt',
+  'batch.addToLabel': 'Zu Label hinzufügen',
+  'batch.removeFromLabel': 'Aus Label entfernen',
+  'batch.addedTo': 'Zu „{label}“ hinzugefügt',
+  'batch.removedFrom': 'Aus „{label}“ entfernt',
+  'batch.toTrash': 'In den Papierkorb',
+  'batch.trashed': {
+    one: '{count} Kontakt in den Papierkorb verschoben',
+    other: '{count} Kontakte in den Papierkorb verschoben',
+  },
+
+  // --- Ficha del contacto -------------------------------------------------
+  'detail.emptyTitle': 'Kontakt auswählen',
+  'detail.emptyDescription':
+    'Wählen Sie einen Kontakt aus der Liste, um seine Karte zu sehen, oder erstellen Sie einen neuen.',
+  'detail.sendEmail': 'E-Mail senden',
+  'detail.meeting': 'Termin erstellen',
+  'detail.meetingTitle': 'Termin mit {name}',
+  'detail.copyEmail': 'E-Mail kopieren',
+  'detail.emailCopied': 'E-Mail kopiert',
+  'detail.copyFailed': 'Kopieren nicht möglich',
+  'detail.export': 'Exportieren',
+  'detail.merge': 'Zusammenführen mit…',
+  'detail.moreActions': 'Weitere Aktionen',
+  'detail.infoTitle': 'Kontaktdaten',
+  'detail.noLabels': 'Keine Labels',
+  'detail.removeLabel': 'Label {label} entfernen',
+  'detail.addLabel': 'Label hinzufügen',
+  'detail.noLabelsAvailable': 'Es gibt keine Labels. Erstellen Sie sie in der Seitenleiste.',
+  'detail.allLabelsAssigned': 'Dieser Kontakt hat bereits alle Labels.',
+  'detail.labelFailed': 'Label konnte nicht aktualisiert werden',
+  'detail.star': 'Kontakt markieren',
+  'detail.unstar': 'Markierung entfernen',
+  'detail.starFailed': 'Markierung konnte nicht aktualisiert werden',
+
+  // --- Foto ---------------------------------------------------------------
+  'photo.change': 'Kontaktfoto ändern',
+  'photo.add': 'Foto zum Kontakt hinzufügen',
+  'photo.remove': 'Foto entfernen',
+  'photo.presets': 'Vordefinierte Farben',
+  'photo.upload': 'Foto hochladen…',
+  'photo.updated': 'Foto aktualisiert',
+  'photo.updateFailed': 'Foto konnte nicht aktualisiert werden',
+  'photo.removed': 'Foto entfernt',
+  'photo.removeFailed': 'Foto konnte nicht entfernt werden',
+  'photo.errorFormat': 'Format nicht unterstützt. Verwenden Sie JPEG, PNG, WebP oder GIF.',
+  'photo.errorProcess': 'Das Bild konnte nicht verarbeitet werden.',
+  'photo.errorTooLarge': 'Das Bild ist auch nach der Optimierung zu groß.',
+  'photo.errorRead': 'Das Bild konnte nicht gelesen werden.',
+
+  // --- Campos -------------------------------------------------------------
+  'field.email': 'E-Mail',
+  'field.phone': 'Telefon',
+  'field.organization': 'Organisation',
+  'field.labels': 'Labels',
+  'field.address': 'Adresse',
+  'field.birthday': 'Geburtstag',
+  'field.note': 'Notiz',
+
+  // --- Formulario de contacto --------------------------------------------
+  'form.editTitle': 'Kontakt bearbeiten',
+  'form.newTitle': 'Neuer Kontakt',
+  'form.preview': 'Vorschau',
+  'form.fullName': 'Vollständiger Name',
+  'form.fullNamePlaceholder': 'Vor- und Nachname',
+  'form.ai': 'Signatur oder Visitenkarte einfügen',
+  'form.aiPlaceholder':
+    'Ana Ruiz — Vertriebsleiterin, Acme GmbH · ana.ruiz@acme.de · +49 30 1234567',
+  'form.aiFill': 'Ausfüllen',
+  'form.aiError': 'In diesem Text wurden keine Kontaktdaten gefunden.',
+  'form.nameRequired': 'Der Kontakt braucht einen Namen.',
+  'form.selectBook': 'Adressbuch auswählen',
+  'form.emailPlaceholder': 'name@domain.eu',
+  'form.emailInvalid': 'Geben Sie eine gültige E-Mail-Adresse ein (name@domain.eu).',
+  'form.addEmail': 'E-Mail-Adresse hinzufügen',
+  'form.emailTypeLabel': 'Label der E-Mail-Adresse {index}',
+  'form.emailLabel': 'E-Mail-Adresse {index}',
+  'form.removeEmail': 'E-Mail-Adresse {index} entfernen',
+  'form.phonePlaceholder': '+49 151 0000000',
+  'form.addPhone': 'Telefonnummer hinzufügen',
+  'form.phoneTypeLabel': 'Label der Telefonnummer {index}',
+  'form.phoneLabel': 'Telefonnummer {index}',
+  'form.removePhone': 'Telefonnummer {index} entfernen',
+  'form.primary': 'Hauptadresse',
+  'form.addAddress': 'Adresse hinzufügen',
+  'form.addressTypeLabel': 'Label der Adresse {index}',
+  'form.removeAddress': 'Adresse {index} entfernen',
+  'form.street': 'Straße und Hausnummer',
+  'form.streetLabel': 'Straße, Adresse {index}',
+  'form.city': 'Ort',
+  'form.cityLabel': 'Ort, Adresse {index}',
+  'form.region': 'Bundesland oder Region',
+  'form.regionLabel': 'Bundesland oder Region, Adresse {index}',
+  'form.postalCode': 'Postleitzahl',
+  'form.postalCodeLabel': 'Postleitzahl, Adresse {index}',
+  'form.country': 'Land',
+  'form.countryLabel': 'Land, Adresse {index}',
+  'form.birthdayPartial':
+    'Es ist ein Geburtstag ohne Jahr gespeichert; wählen Sie ein Datum, um ihn zu ersetzen.',
+  'form.organizationPlaceholder': 'Firma oder Team',
+  'form.notePlaceholder': 'Zusätzliche Informationen (optional)',
+  'form.confirmDelete': 'Löschen bestätigen',
+  'form.created': 'Kontakt erstellt',
+  'form.updated': 'Kontakt aktualisiert',
+  'form.saveFailed': 'Kontakt konnte nicht gespeichert werden',
+  'form.deleted': 'Kontakt in den Papierkorb verschoben',
+  'form.deletedHint': 'Sie können ihn aus dem Papierkorb wiederherstellen.',
+  'form.deleteFailed': 'Kontakt konnte nicht gelöscht werden',
+
+  // --- Tipos de correo/teléfono/dirección --------------------------------
+  'type.home': 'Privat',
+  'type.work': 'Arbeit',
+  'type.other': 'Sonstige',
+  'type.otherAddress': 'Sonstige',
+  'type.mobile': 'Mobil',
+  'type.fax': 'Fax',
+};

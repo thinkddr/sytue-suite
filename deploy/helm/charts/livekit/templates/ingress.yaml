@@ -1,0 +1,32 @@
+{{- $sfuHost := include "livekit.signalHost" . }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "livekit.fullname" . }}
+  labels:
+    {{- include "livekit.labels" . | nindent 4 }}
+  annotations:
+    cert-manager.io/cluster-issuer: {{ include "livekit.clusterIssuer" . | quote }}
+    {{- with .Values.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  tls:
+    - hosts:
+        - {{ $sfuHost | quote }}
+      secretName: {{ include "livekit.signalTlsSecret" . }}
+  rules:
+    # Sytue Rooms — señalizacion WebSocket del SFU LiveKit (<host del SFU>/rtc). El SPA
+    # Astro (sytue-frontend) sirve "/" y el servicio Go (sytue-rooms) las rutas /api; LiveKit
+    # publica su endpoint WS de señalizacion bajo el prefijo configurable signalPath.
+    - host: {{ $sfuHost | quote }}
+      http:
+        paths:
+          - path: {{ .Values.ingress.signalPath | default "/rtc" }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "livekit.fullname" . }}
+                port:
+                  name: http

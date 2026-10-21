@@ -1,0 +1,116 @@
+---
+/**
+ * Layout base de Sytue Mail. Resuelve la sesion del lado servidor (redirige a
+ * login si falta), inyecta el script de tema (claro/oscuro sin flash) y monta la
+ * isla raiz que contiene la Sytue Shell + la app. El access token NO se envia al
+ * navegador: las islas hablan con los endpoints BFF same-origin (cookie).
+ * docs/design.md §1 (toda superficie monta @sytue/shell + @sytue/ui).
+ */
+import { APP_VIEWPORT, appDomains, returnToCanonico } from '@sytue/config';
+import { serverEnv } from '@sytue/auth/server';
+import '../styles/app.css';
+import { SUFIJO_ICONOS, basePathScript, themeInitScript, withBase } from '@sytue/ui';
+import { bff, toBffContext } from '../lib/bff.js';
+import type { SytueUser } from '@sytue/auth';
+import { htmlLangAttrs } from '@sytue/i18n';
+import { useT } from '../i18n/index.js';
+
+interface Props {
+  title?: string;
+}
+
+// El idioma lo negoció el middleware (cookie > Accept-Language > inglés): aquí solo
+// se pinta, para que el <html> y el cromo del shell no puedan discrepar.
+const { lang, dir } = htmlLangAttrs(Astro.locals.locale);
+const t = useT(Astro.locals.locale);
+const { title = 'Sytue Mail' } = Astro.props;
+
+// Guard: exige sesion valida. En .astro el redirect debe RETORNARSE (Astro no
+// sigue un throw de Response fuera de middleware). Sin sesion -> login SSO.
+const session = await bff.getSession(toBffContext(Astro));
+if (!session) {
+  // ADR 0056: la entrada org-ful llega reescrita con la marca ?__org=; el returnTo
+  // sale canónico, no en la forma interna, o tras el login la barra se queda con ella.
+  const returnTo = returnToCanonico(Astro.url, bff.basePath);
+  const redireccionLogin = Astro.redirect(
+    `${bff.basePath}/auth/login?returnTo=${encodeURIComponent(returnTo)}`,
+  );
+  redireccionLogin.headers.set('cache-control', 'no-store');
+  return redireccionLogin;
+}
+const user: SytueUser = session.user;
+
+// Serializacion segura para incrustar en <script>: JSON.stringify NO escapa
+// `<`, `>`, `&` ni los separadores de linea U+2028/U+2029, de modo que un campo
+// del usuario (p. ej. `name`) que contenga `</script>` romperia el bloque y
+// ejecutaria JS arbitrario (XSS almacenado). Escapamos esos caracteres a sus
+// secuencias unicode, que JSON.parse revierte de forma transparente.
+const userJSON = JSON.stringify(user)
+  .replace(/</g, '\\u003c')
+  .replace(/>/g, '\\u003e')
+  .replace(/&/g, '\\u0026')
+  .replace(/\u2028/g, '\\u2028')
+  .replace(/\u2029/g, '\\u2029');
+
+// Prefijo REAL bajo el que se sirve esta superficie: el del host si el servidor
+// lo publica (SYTUE_BASE_PATH) y, si no, el del build. Los assets del <head> se
+// unen con `withBase` y NO con `${BASE_URL}fichero`: BASE_URL llega SIN barra
+// final (`/mail`) y esa concatenación daba `/mailfavicon.svg`, un 404 medido en
+// producción con el que ninguna app de la suite tenía icono. ID sí lo tenía
+// porque es Go y escribe `/favicon.svg` a mano; por eso el fallo parecía de ID.
+const prefijo = serverEnv(import.meta.env).SYTUE_BASE_PATH ?? import.meta.env.BASE_URL;
+---
+
+<!doctype html>
+<html lang={lang} dir={dir} class="h-full">
+  <head>
+    <meta charset="utf-8" />
+    <!-- `interactive-widget=resizes-content`: sin esto el teclado virtual NO encoge el
+         viewport de maquetación, así que el diálogo de redacción sigue midiendo la
+         pantalla entera y el navegador desplaza el viewport visual para enseñar el campo
+         donde se escribe — llevándose por delante el pie con «Enviar». El mismo síntoma
+         que ya documenta Sytue Rooms en su propio layout, y por el mismo motivo: aquí
+         también se escribe dentro de un panel que llega abajo del todo. -->
+    <meta name="viewport" content={APP_VIEWPORT} />
+    <!-- Superficie autenticada: nunca se indexa (el SEO vive solo en www). -->
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="description" content={t('page.description')} />
+    <title>{title}</title>
+    <!-- El Hub es OTRO origen y la shell le hace 3 peticiones nada mas hidratar:
+         sin esto, la primera pagaba DNS + TCP + TLS enteros (3 RTT) DESPUES de
+         ejecutar el JS. Anonimo porque los clientes no mandan cookies (fetch
+         same-origin por defecto), que es lo que exige reutilizar la conexion. -->
+    <link rel="preconnect" href={appDomains.hub} crossorigin />
+    <link rel="icon" href={withBase(prefijo, '/favicon.ico') + SUFIJO_ICONOS} sizes="32x32" />
+    <link
+      rel="icon"
+      href={withBase(prefijo, '/favicon-64.png') + SUFIJO_ICONOS}
+      type="image/png"
+      sizes="64x64"
+    />
+    <link
+      rel="icon"
+      href={withBase(prefijo, '/favicon.svg') + SUFIJO_ICONOS}
+      type="image/svg+xml"
+    />
+    <link
+      rel="apple-touch-icon"
+      href={withBase(prefijo, '/apple-touch-icon.png') + SUFIJO_ICONOS}
+    />
+    <!-- Evita el flash de tema: aplica claro/oscuro antes de pintar. -->
+    <!-- Prefija /api y /auth con el `base` de esta app: en producción cada
+         app se sirve bajo su prefijo y la raíz del host es un 404. -->
+    <script
+      is:inline
+      set:html={basePathScript(
+        serverEnv(import.meta.env).SYTUE_BASE_PATH ?? import.meta.env.BASE_URL,
+      )}
+    ></script>
+    <script is:inline set:html={themeInitScript}></script>
+  </head>
+  <body class="bg-bg text-text h-full antialiased">
+    <slot name="app" />
+    <!-- El usuario se serializa para hidratar la shell sin tokens. -->
+    <script type="application/json" id="sytue-user" set:html={userJSON} is:inline></script>
+  </body>
+</html>

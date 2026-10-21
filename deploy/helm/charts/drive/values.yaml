@@ -1,0 +1,191 @@
+# sytue-drive — defaults del subchart (servicio Go). global.* lo inyecta el umbrella.
+# Estado en PostgreSQL (RDB Scaleway, UE). Sin Redis/Valkey ni motores AGPL.
+enabled: true
+subdomain: drive
+component: drive
+replicaCount: 2
+
+image:
+  registry: ""                 # cae a global.imageRegistry (Scaleway Registry, UE)
+  repository: sytue-drive
+  tag: "1.0.0"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8082             # puerto del SPEC
+
+ingress:
+  enabled: true
+  className: traefik
+  annotations: {}
+  # drive.sytue.eu: el SPA Astro (sytue-frontend) sirve "/"; el backend Go expone API
+  # REST y WebDAV bajo prefijos para clientes nativos (sync/WebDAV) y el BFF.
+  paths:
+    # `/api/v1` y NO `/api`: el BFF de la app Astro sirve sus propias rutas
+    # bajo /api/<recurso>, y un Prefix en /api se las quedaba TODAS y se las
+    # mandaba al servicio Go, que solo expone /api/v1. El navegador recibía
+    # 404 en cada carga y la app decía «no se pudieron cargar los datos».
+    - path: /api/v1
+      pathType: Prefix
+    # El servicio monta WebDAV en /dav (services/drive/internal/http/server.go),
+    # NO en /webdav: con el prefijo antiguo el Ingress no enrutaba nada y montar
+    # Drive en Finder/Explorador daba 404.
+    - path: /dav
+      pathType: Prefix
+    # Enlaces públicos de compartición (server.go: /public/{token}). La URL la
+    # compone el propio servicio y se la damos al usuario para que la reparta
+    # (handlers.go, resp["url"]): sin esta regla el enlace lo servía el SPA y
+    # todo enlace público compartido daba 404.
+    - path: /public
+      pathType: Prefix
+    # Capa de compatibilidad: Google Drive v3 y Microsoft Graph (files), para
+    # integraciones de terceros con «base URL» configurable (handlers_compat.go).
+    - path: /compat
+      pathType: Prefix
+    # HOST WOPI (handlers_wopi.go, mountWopi: /wopi/files/{id} en la RAÍZ del
+    # router, fuera de /api/v1). Es el extremo al que VUELVE el editor externo
+    # con el WOPISrc que acuña este mismo servicio —`PublicURL + /wopi/files/<id>`,
+    # handlers_wopi.go— y el cliente WOPI de Sytue Docs exige esa URL PÚBLICA
+    # (https, validada contra SSRF y contra la allowlist `drive.<dominio>`), no
+    # una interna del clúster. Sin esta regla la app Astro se quedaba la petición
+    # y el editor recibía el 404 HTML del SPA en CheckFileInfo: «abrir en el
+    # editor externo» estaba muerto de punta a punta en producción.
+    #
+    # Prefix es seguro: la app Astro de Drive no tiene NINGUNA página bajo /wopi
+    # (su único fichero con ese nombre es pages/api/wopi.ts, que sirve /api/wopi).
+    - path: /wopi/files
+      pathType: Prefix
+  tls:
+    secretName: tls-drive-sytue-eu
+
+# Right-sized al footprint MEDIDO (Go ~6-40MiB RSS idle): requests modestos para
+# densidad/coste; limits con cabecera para picos (streaming/ZIP; burstable).
+# Requests MEDIDOS en producción (kubectl top, 2026-08-09), no estimados: en
+# Kubernetes la factura la fija lo RESERVADO, no lo usado, y estos pods pedían
+# 25-75 veces su consumo real. Esa reserva inflada obligó a un tercer nodo cuando
+# la CPU real del clúster estaba al 3 %.
+#
+# El límite NO se toca: un pico sigue pudiendo usar toda la CPU que necesite. Y
+# bajar el request hace al HPA MÁS sensible —calcula el porcentaje sobre el
+# request—, que es justo lo que hace falta para escalar por demanda real.
+resources:
+  requests:
+    cpu: 15m
+    memory: 64Mi
+  limits:
+    cpu: "2"
+    memory: 512Mi
+
+autoscaling:
+  # Etiqueta `job` de la serie de metricas, para el HPA por demanda real.
+  # Es el ServiceName del BINARIO, que no siempre coincide con el nombre del
+  # chart ni con el del directorio; por eso se escribe y no se deduce.
+  metricJob: sytue-drive
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 8
+  targetCPUUtilizationPercentage: 70
+  # Sin memoria: en Go la RSS queda alta tras el GC (mala señal de escalado) y
+  # GOMEMLIMIT (~85% de limits.memory) ya la acota -> se escala solo por CPU.
+
+networkPolicy:
+  enabled: true
+
+serviceMonitor:
+  enabled: true
+  path: /metrics
+  interval: 30s
+
+config:
+  # Correo de «X pide editar», desde la cuenta común de avisos (sytue.correoEnv):
+  # addr, from, tlsServerName, user y passwordSecret. Sin `from`, no sale ninguno.
+  smtp: {}
+  # Tamano del pool pgx por replica (DB_MAX_CONNS). Prod lo baja (3-5):
+  # PgBouncer multiplexa hacia la RDB (ver values-prod.yaml del umbrella).
+  dbMaxConns: 10
+  logLevel: info
+  s3Bucket: drive-blobs
+  # Cuota por tenant en GB. Vacio = el defecto del servicio (10 GB). Ponerlo
+  # importa cuando los blobs comparten disco con PostgreSQL: ver el comentario
+  # de DEFAULT_QUOTA_GB en el deployment.
+  defaultQuotaGb: ""
+  # URL interna de Sytue Rooms para la verja de los adjuntos de canal
+  # (vacio = http://<release>-rooms). El secreto compartido va en existingSecret,
+  # clave `rooms-internal-secret` (opcional; sin el, los adjuntos de canal no se
+  # sirven y el resto de Drive no cambia).
+  roomsUrl: ""
+  # Raíz interna de Sytue Docs (papelera compartida, mig 0027). Vacío = <release>-docs.
+  docsUrl: ""
+  # Cuota COMPARTIDA con Sytue Cast (mig 0026): Cast declara lo que ocupa en cada
+  # organizacion por PUT /internal/quota/external/cast con el secreto de existingSecret,
+  # clave `cast-internal-secret` (opcional; sin el, la puerta no deja pasar a nadie y
+  # la cuota cuenta solo lo de Drive). No hay URL: Drive nunca llama a Cast.
+  # URL interna del servicio de integraciones (token OAuth del almacenamiento
+  # conectado). Vacio = el Service del release.
+  integrationsUrl: ""
+  # Túnel de Sytue Cloud para un NAS en las instalaciones del cliente (clase
+  # `nas` del almacén de terceros): Drive habla con la API de integracion del
+  # proxy de la plataforma (Pangolin). La llave va en existingSecret, clave
+  # `tunnel-api-key`; sin ella la clase no se ofrece.
+  tunnel:
+    apiUrl: ""
+    org: "sytue-projects"
+    # Id en el proxy del dominio de contenido de clientes (`global.dominioDeClientes`).
+    # Vacío = sin NAS: el dominio de la suite (domain1) ya no se presta.
+    domainId: ""
+    endpoint: "https://pangolin.sytue.eu"
+  # `discovery.xml` del editor que abrira los ficheros. Vacio => se apunta al de
+  # SYTUE DOCS, que desde hoy es cliente WOPI: el editor de la casa abre lo que
+  # Drive custodia sin depender de que nadie despliegue un motor de terceros —y
+  # sin incorporar codigo AGPL—. Se puede sobreescribir con el de un editor
+  # externo (Collabora Online, Office for the web) si un cliente ya tiene uno.
+  #
+  # Y `external-storage-key` (32 bytes en base64) en existingSecret sella las
+  # credenciales del bucket S3 propio de cada organizacion (mig 0023); sin ella
+  # esa funcion queda apagada.
+  # Requiere ademas la clave `wopi-key` (32 bytes en base64) en existingSecret:
+  # sin ella no se acunan tokens y la capa WOPI queda apagada igualmente.
+  wopiDiscoveryUrl: ""
+# Postgres EXTERNO (Scaleway RDB). DSN por secret (nunca en git).
+postgresql:
+  existingSecret: sytue-drive-db
+  dsnKey: dsn
+  # DSN directo a la RDB (bypass PgBouncer) para LISTEN/migraciones; opcional.
+  dsnDirectKey: dsn-direct
+
+# Object Storage S3 (blobs grandes). Por defecto hereda global.objectStorage, pero
+# un entorno híbrido puede aislar Drive en otro proveedor/Secret (p. ej. Hetzner)
+# sin mover los blobs de Docs o Mail.
+objectStorage: {}
+# Secretos de la app (OIDC client secret y especificos del servicio).
+existingSecret: sytue-drive
+
+# PodDisruptionBudget: garantiza disponibilidad durante drains/upgrades del cluster.
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+  # maxUnavailable: 1   # alternativa a minAvailable (usar uno u otro)
+
+# Reparto anti-afinidad suave por zona y nodo (alta disponibilidad multi-AZ, UE).
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: ScheduleAnyway
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: ScheduleAnyway
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  fsGroup: 10001
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]

@@ -1,0 +1,16 @@
+Editing collaborativo in tempo reale
+
+• Tutto salvato nel tuo Drive europeo.
+• Modifica collaborativa in tempo reale, con presenza e senza pestarsi i piedi.
+• Una barra a schede: Home, Inserisci, Riferimenti, Lettere e Revisione.
+• Tabelle, immagini, forme, SmartArt, grafici, simboli e filigrane.
+• Riferimenti: indice, note a piè di pagina, citazioni e bibliografia.
+• Lettere: stampa unione per lettere ed etichette.
+• Commenti in thread, revisione delle modifiche e versioni.
+• Assistente IA opzionale per riscrivere, tradurre o riassumere, solo se la tua organizzazione lo attiva.
+• Esporta in ODT, DOCX e PDF; apre i file Word da Drive.
+• Intestazioni, piè di pagina, numerazione e blocchi riutilizzabili.
+• Salvataggio automatico nel tuo Drive europeo, con cronologia.
+• Scarica dalla pagina iniziale in PDF, HTML, Markdown, OpenDocument o Microsoft Office.
+
+Cifratura in transito (TLS 1.3). L’infrastruttura di Sytue si trova nell’UE. La posizione dei servizi esterni dipende dal loro fornitore.

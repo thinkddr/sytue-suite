@@ -1,0 +1,17 @@
+PDF az elejétől a végéig, a böngészőjében.
+
+• Kiemelés, aláhúzás, megjegyzés és rajzolás a dokumentumon.
+• Űrlapok: mezők kitöltése vagy saját űrlap készítése.
+• Egyesítés, kivonatolás, forgatás, számozás és vízjel.
+• Aláírási panel, végleges kitakarás és jelszóval védett dokumentumok.
+• Gyors megjelenítő vázlattal, miniatűrökkel, kereséssel és oldalhoz vagy szélességhez igazított nagyítással.
+• Megjegyzések: kiemelés, aláhúzás, áthúzás, megjegyzés, rajz, alakzatok, nyilak és bélyegzők.
+• Szövegdobozok, mérések és területi pillanatképek.
+• Űrlapok: meglévő mezők kitöltése vagy saját mezők hozzáadása.
+• Dokumentum-aláírási panel.
+• Végleges kitakarás: amit megjelöl, az a fájlból tűnik el, nem csak a nézetből.
+• Oldalak: egyesítés, kivonatolás, törlés, forgatás, számozás (Bates is), élőfejek és élőlábak.
+• Vízjel, háttér és szerkeszthető metaadatok.
+• Jelszóval védett dokumentumok és jogosultságok.
+
+Titkosítás átvitel közben (TLS 1.3). A Sytue infrastruktúrája az EU-ban található. A külső szolgáltatások helye a szolgáltatójuktól függ.

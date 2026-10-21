@@ -1,0 +1,80 @@
+# Sytue Bases (ADR 0068): API Go de tablas relacionales, 8102. Por dentro del clúster la
+# llaman el BFF de su app web (sytue-frontend, app `bases`), el Hub (búsqueda federada) y
+# los consumidores del conector de solo lectura (Docs, Drive, SyERP, Sytue Web). Desde
+# fuera, SOLO `/api/v1` (ver `ingress`): los formularios públicos y el conector
+# (`/_bases/v1/…`) no llevan sesión y siguen entrando por esos pods, nunca desde fuera.
+enabled: true
+subdomain: bases
+component: bases
+replicaCount: 2
+
+# `bases.<dominio>/api/v1`, para las apps nativas, que llaman a la API con el token de la
+# persona como en Drive (decisión del dueño, 2026-10-05; docs/security.md#bases-api-publica).
+# La ruta NO es configurable: está escrita en la plantilla, y lo que queda fuera de ella
+# (`/_bases/v1/…`, `/healthz`, `/readyz`) no tiene sesión que lo proteja.
+ingress:
+  enabled: true
+  className: traefik
+  annotations: {}
+  tls:
+    # El mismo secreto que la web (sytue-frontend, apps.bases.tlsSecret): mismo host,
+    # un solo Certificate.
+    secretName: tls-bases-sytue-eu
+
+image:
+  registry: ""
+  repository: sytue-bases
+  tag: "1.0.0"
+  pullPolicy: IfNotPresent
+
+service:
+  port: 80
+  targetPort: 8102
+
+resources:
+  requests: { cpu: 50m, memory: 96Mi }
+  limits: { cpu: "1", memory: 512Mi }
+
+postgresql:
+  existingSecret: sytue-bases-db
+  dsnKey: dsn
+secrets:
+  # Clave con la que se firman los retos ALTCHA de los formularios públicos.
+  existingSecret: sytue-bases
+  altchaKey: altcha-secret
+
+config:
+  dbMaxConns: 5
+  logLevel: info
+  # Vacíos = los Services del propio release (<release>-hub, <release>-id).
+  hubUrl: ""
+  idUrl: ""
+  # Bucket de los adjuntos. Fuera de producción lo crea el servicio al arrancar; en
+  # producción ha de existir (docs/operations.md#bases-adjuntos).
+  s3Bucket: bases-blobs
+
+# Almacén de objetos de los adjuntos. Hereda global.objectStorage (el secreto
+# `sytue-object-storage` de la suite); puede aislarse por servicio.
+objectStorage: {}
+
+networkPolicy:
+  enabled: true
+
+# Reparto anti-afinidad suave por zona y nodo (alta disponibilidad multi-AZ, UE).
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: ScheduleAnyway
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: ScheduleAnyway
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  fsGroup: 10001
+  seccompProfile: { type: RuntimeDefault }
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities: { drop: ["ALL"] }

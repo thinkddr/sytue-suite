@@ -1,0 +1,37 @@
+{
+  "key": "hubspot",
+  "tier": "tier2",
+  "manifest": {
+    "name": "HubSpot",
+    "description": "CRM, marketing y ventas de HubSpot, con inicio de sesión único.",
+    "category": "Ventas y marketing",
+    "color": "#E04E1F",
+    "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#E04E1F\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"17\" cy=\"6\" r=\"2.5\"/><circle cx=\"7\" cy=\"17\" r=\"3.5\"/><path d=\"M17 8.5V13a4 4 0 0 1-4 4h-2.5\"/></svg>",
+    "identity": {
+      "kind": "saml",
+      "entity_id": "{entity_id}",
+      "acs_url": "{acs_url}",
+      "name_id_format": "email"
+    },
+    "provisioning": "none",
+    "launch": {
+      "kind": "initiate"
+    },
+    "fields": [
+      {
+        "key": "entity_id",
+        "label": "Identificador de entidad (Entity ID)",
+        "placeholder": "https://api.hubspot.com/login-api/v1/saml/login?portalId=1234567",
+        "help": "Lo tienes en HubSpot, en Configuración → Cuenta → Seguridad → Inicio de sesión único. Ahí se llama «Audience URI».",
+        "required": true
+      },
+      {
+        "key": "acs_url",
+        "label": "URL de consumo de aserciones (ACS)",
+        "placeholder": "https://api.hubspot.com/login-api/v1/saml/acs?portalId=1234567",
+        "help": "Lo tienes en HubSpot, en Configuración → Cuenta → Seguridad → Inicio de sesión único. Ahí se llama «Sign on URL, ACS, Recipient, or Redirect».",
+        "required": true
+      }
+    ]
+  }
+}

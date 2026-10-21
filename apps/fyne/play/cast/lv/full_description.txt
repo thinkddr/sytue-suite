@@ -1,0 +1,17 @@
+Video pēc pieprasījuma un tiešraides: augšupielādējiet, raidiet un kopīgojiet, ES.
+
+• Augšupielādējiet video, un tas tiek pārkodēts vairākās kvalitātēs jebkuram ekrānam.
+• Raidiet tiešraidē no raidīšanas programmas, no pārlūka vai no lietotnes.
+• Četri redzamības līmeņi: publisks, nesarakstīts, organizācija vai konkrētas personas.
+• Tiešraides tērzēšana un komentāri, ar publicētāja pamata moderāciju.
+• Augšupielādējiet video līdz 8 GiB; oriģināls tiek saglabāts.
+• Tiešraide no raidīšanas programmas caur RTMP, ar straumes atslēgu katrai personai.
+• Tiešraidē no pārlūka vai lietotnes: kamera, ekrāns un mikrofons.
+• Tiešraižu ieraksti automātiski kļūst par video pēc pieprasījuma.
+• Publiska sākumlapa un kanāls katrai organizācijai, indeksējami.
+• Nesarakstītas saites, video tikai organizācijai vai piekļuve konkrētām personām pēc @lietotājvārda.
+• Tiešraides tērzēšana un komentāri pavedienos, ko moderē publicētājs un organizācijas administrācija.
+• Krātuve tiek ieskaitīta jūsu Sytue Drive kvotā; viss Eiropas Savienībā.
+• “Augšupielādēt pakalpojumā Cast” no Sytue Drive: video kopija nonāk Cast, bet fails paliek Drive.
+
+Šifrēts pārsūtīšanas laikā (TLS 1.3). Sytue infrastruktūra atrodas ES. Ārējo pakalpojumu atrašanās vieta ir atkarīga no to sniedzēja.

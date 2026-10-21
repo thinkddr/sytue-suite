@@ -1,0 +1,424 @@
+From 6bd31abe9042335d84a3aea314f8411487adb41c Mon Sep 17 00:00:00 2001
+From: Daniel Delgado <328510259+thinkddr@users.noreply.github.com>
+Date: Fri, 25 Sep 2026 03:24:51 +0200
+Subject: [PATCH 1/2] feat(mobile): pick several files on Android and read a
+ content URI's size
+
+- dialog.ShowFileOpenMultiple: several readers where the system picker allows it
+  (Android, EXTRA_ALLOW_MULTIPLE + ClipData); elsewhere ShowFileOpen in a slice.
+- androidURI.Size(): OpenableColumns.SIZE of a content:// URI, -1 when unknown.
+  Callers ask with a type assertion on interface{ Size() int64 }.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+---
+ dialog/file.go                                | 20 ++++++++++
+ dialog/file_mobile.go                         |  6 +++
+ internal/driver/mobile/android.c              | 37 +++++++++++++++++++
+ .../driver/mobile/app/GoNativeActivity.java   | 24 ++++++++++--
+ internal/driver/mobile/app/android.c          |  7 ++--
+ internal/driver/mobile/app/android.go         |  8 +++-
+ internal/driver/mobile/app/app.go             |  4 ++
+ internal/driver/mobile/file.go                | 36 ++++++++++++++++++
+ internal/driver/mobile/uri_android.go         | 20 ++++++++++
+ 9 files changed, 154 insertions(+), 8 deletions(-)
+
+diff --git a/dialog/file.go b/dialog/file.go
+index 9b8a1500b..692eca588 100644
+--- a/dialog/file.go
++++ b/dialog/file.go
+@@ -906,6 +906,26 @@ func ShowFileOpen(callback func(reader fyne.URIReadCloser, err error), parent fy
+ 	dialog.Show()
+ }
+ 
++// fileOpenMultipleOSOverride is set where the system picker can choose several files.
++var fileOpenMultipleOSOverride func(callback func([]fyne.URIReadCloser, error))
++
++// ShowFileOpenMultiple is ShowFileOpen allowing several files where the system picker
++// can (Android); elsewhere it is ShowFileOpen with the one reader in a slice. The slice
++// is nil when the user cancels, and each reader must be closed by the callback.
++func ShowFileOpenMultiple(callback func(readers []fyne.URIReadCloser, err error), parent fyne.Window) {
++	if fileOpenMultipleOSOverride != nil {
++		fileOpenMultipleOSOverride(callback)
++		return
++	}
++	ShowFileOpen(func(r fyne.URIReadCloser, err error) {
++		if r == nil {
++			callback(nil, err)
++			return
++		}
++		callback([]fyne.URIReadCloser{r}, err)
++	}, parent)
++}
++
+ // ShowFileSave creates and shows a file dialog allowing the user to choose a
+ // file to save to (new or overwrite). If the user chooses an existing file they
+ // will be asked if they are sure.
+diff --git a/dialog/file_mobile.go b/dialog/file_mobile.go
+index e05cf053e..4b4c73eba 100644
+--- a/dialog/file_mobile.go
++++ b/dialog/file_mobile.go
+@@ -33,6 +33,12 @@ func fileOpenOSOverride(f *FileDialog) bool {
+ 	return true
+ }
+ 
++func init() {
++	fileOpenMultipleOSOverride = func(callback func([]fyne.URIReadCloser, error)) {
++		mobile.ShowFileOpenPickerMultiple(callback, nil)
++	}
++}
++
+ func fileSaveOSOverride(f *FileDialog) bool {
+ 	mobile.ShowFileSavePicker(f.callback.(func(fyne.URIWriteCloser, error)), f.filter, f.initialFileName)
+ 	return true
+diff --git a/internal/driver/mobile/android.c b/internal/driver/mobile/android.c
+index f1084e154..9a03e2aa4 100644
+--- a/internal/driver/mobile/android.c
++++ b/internal/driver/mobile/android.c
+@@ -363,6 +363,43 @@ const char* contentURIGetFileName(uintptr_t jni_env, uintptr_t ctx, char* uriCst
+ 	return NULL;
+ }
+ 
++// contentURIGetSize is OpenableColumns.SIZE of a content URI, or -1 when the provider
++// does not know it (the column is optional and may be null).
++int64_t contentURIGetSize(uintptr_t jni_env, uintptr_t ctx, char* uriCstr) {
++	JNIEnv *env = (JNIEnv*)jni_env;
++	jobject resolver = getContentResolver(jni_env, ctx);
++	jobject uri = parseURI(jni_env, ctx, uriCstr);
++	if ((*env)->ExceptionOccurred(env) != NULL) {
++		(*env)->ExceptionClear(env);
++		return -1;
++	}
++
++	jclass stringClass = find_class(env, "java/lang/String");
++	jobjectArray project = (*env)->NewObjectArray(env, 1, stringClass, (*env)->NewStringUTF(env, "_size"));
++
++	jclass resolverClass = (*env)->GetObjectClass(env, resolver);
++	jmethodID query = find_method(env, resolverClass, "query", "(Landroid/net/Uri;[Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;Ljava/lang/String;)Landroid/database/Cursor;");
++
++	jobject cursor = (jobject)(*env)->CallObjectMethod(env, resolver, query, uri, project, NULL, NULL, NULL);
++	if ((*env)->ExceptionOccurred(env) != NULL || cursor == NULL) {
++		(*env)->ExceptionClear(env);
++		return -1;
++	}
++	jclass cursorClass = (*env)->GetObjectClass(env, cursor);
++	jmethodID first = find_method(env, cursorClass, "moveToFirst", "()Z");
++	jmethodID isNull = find_method(env, cursorClass, "isNull", "(I)Z");
++	jmethodID getLong = find_method(env, cursorClass, "getLong", "(I)J");
++	jmethodID closeCursor = find_method(env, cursorClass, "close", "()V");
++
++	int64_t size = -1;
++	if ((*env)->CallBooleanMethod(env, cursor, first) == JNI_TRUE &&
++		(*env)->CallBooleanMethod(env, cursor, isNull, 0) != JNI_TRUE) {
++		size = (int64_t)(*env)->CallLongMethod(env, cursor, getLong, 0);
++	}
++	(*env)->CallVoidMethod(env, cursor, closeCursor);
++	return size;
++}
++
+ char *filePath(char *uriCstr) {
+ 	// Get file path from URI
+ 	size_t length = strlen(uriCstr)-7;// -7 for 'file://'
+diff --git a/internal/driver/mobile/app/GoNativeActivity.java b/internal/driver/mobile/app/GoNativeActivity.java
+index 3085e5616..31742c50e 100644
+--- a/internal/driver/mobile/app/GoNativeActivity.java
++++ b/internal/driver/mobile/app/GoNativeActivity.java
+@@ -5,6 +5,7 @@ import android.app.AlarmManager;
+ import android.app.NativeActivity;
+ import android.app.NotificationManager;
+ import android.app.PendingIntent;
++import android.content.ClipData;
+ import android.content.ComponentName;
+ import android.content.Context;
+ import android.content.Intent;
+@@ -220,11 +221,11 @@ public class GoNativeActivity extends NativeActivity {
+         });
+     }
+ 
+-    static void showFileOpen(String mimes) {
+-        goNativeActivity.doShowFileOpen(mimes);
++    static void showFileOpen(String mimes, boolean multiple) {
++        goNativeActivity.doShowFileOpen(mimes, multiple);
+     }
+ 
+-    void doShowFileOpen(String mimes) {
++    void doShowFileOpen(String mimes, boolean multiple) {
+         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+         if ("application/x-directory".equals(mimes) && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+             intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE); // ask for a directory picker if OS supports it
+@@ -237,6 +238,9 @@ public class GoNativeActivity extends NativeActivity {
+             intent.setType(mimes);
+             intent.addCategory(Intent.CATEGORY_OPENABLE);
+         }
++        if (multiple && Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
++            intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
++        }
+         startActivityForResult(Intent.createChooser(intent, "Open File"), FILE_OPEN_CODE);
+     }
+ 
+@@ -453,6 +457,20 @@ public class GoNativeActivity extends NativeActivity {
+             return;
+         }
+ 
++        // Several files come in the ClipData, one only in getData. They go back as one
++        // string, one URI per line: a URI cannot hold a raw newline.
++        ClipData clip = data.getClipData();
++        if (clip != null && requestCode == FILE_OPEN_CODE) {
++            StringBuilder uris = new StringBuilder();
++            for (int i = 0; i < clip.getItemCount(); i++) {
++                if (i > 0) {
++                    uris.append('\n');
++                }
++                uris.append(clip.getItemAt(i).getUri().toString());
++            }
++            filePickerReturned(uris.toString());
++            return;
++        }
+         Uri uri = data.getData();
+         filePickerReturned(uri.toString());
+     }
+diff --git a/internal/driver/mobile/app/android.c b/internal/driver/mobile/app/android.c
+index 625198b4f..ffc7358aa 100644
+--- a/internal/driver/mobile/app/android.c
++++ b/internal/driver/mobile/app/android.c
+@@ -94,7 +94,7 @@ void ANativeActivity_onCreate(ANativeActivity *activity, void* savedState, size_
+ 		key_rune_method = find_static_method(env, current_class, "getRune", "(III)I");
+ 		show_keyboard_method = find_static_method(env, current_class, "showKeyboard", "(I)V");
+ 		hide_keyboard_method = find_static_method(env, current_class, "hideKeyboard", "()V");
+-		show_file_open_method = find_static_method(env, current_class, "showFileOpen", "(Ljava/lang/String;)V");
++		show_file_open_method = find_static_method(env, current_class, "showFileOpen", "(Ljava/lang/String;Z)V");
+ 		show_file_save_method = find_static_method(env, current_class, "showFileSave", "(Ljava/lang/String;Ljava/lang/String;)V");
+ 		finish_method = find_method(env, current_class, "finishActivity", "()V");
+ 
+@@ -259,13 +259,14 @@ void hideKeyboard(JNIEnv* env) {
+ 	);
+ }
+ 
+-void showFileOpen(JNIEnv* env, char* mimes) {
++void showFileOpen(JNIEnv* env, char* mimes, int multiple) {
+     jstring mimesJString = (*env)->NewStringUTF(env, mimes);
+     (*env)->CallStaticVoidMethod(
+ 		env,
+ 		current_class,
+ 		show_file_open_method,
+-		mimesJString
++		mimesJString,
++		(jboolean)(multiple != 0)
+ 	);
+ }
+ 
+diff --git a/internal/driver/mobile/app/android.go b/internal/driver/mobile/app/android.go
+index 4fb6c6cbe..e0a133cdd 100644
+--- a/internal/driver/mobile/app/android.go
++++ b/internal/driver/mobile/app/android.go
+@@ -45,7 +45,7 @@ int32_t getKeyRune(JNIEnv* env, AInputEvent* e);
+ 
+ void showKeyboard(JNIEnv* env, int keyboardType);
+ void hideKeyboard(JNIEnv* env);
+-void showFileOpen(JNIEnv* env, char* mimes);
++void showFileOpen(JNIEnv* env, char* mimes, int multiple);
+ void showFileSave(JNIEnv* env, char* mimes, char* filename);
+ void finish(JNIEnv* env, jobject ctx);
+ 
+@@ -410,7 +410,11 @@ func driverShowFileOpenPicker(callback func(string, func()), filter *FileFilter)
+ 	open := func(vm, jniEnv, ctx uintptr) error {
+ 		// TODO pass in filter...
+ 		env := (*C.JNIEnv)(unsafe.Pointer(jniEnv)) // not a Go heap pointer
+-		C.showFileOpen(env, mimeStr)
++		multiple := C.int(0)
++		if filter.Multiple {
++			multiple = 1
++		}
++		C.showFileOpen(env, mimeStr, multiple)
+ 		return nil
+ 	}
+ 
+diff --git a/internal/driver/mobile/app/app.go b/internal/driver/mobile/app/app.go
+index 4e4bff6f6..c4d7ec11e 100644
+--- a/internal/driver/mobile/app/app.go
++++ b/internal/driver/mobile/app/app.go
+@@ -64,6 +64,10 @@ type App interface {
+ type FileFilter struct {
+ 	Extensions []string
+ 	MimeTypes  []string
++
++	// Multiple asks the picker to allow several files; the callback then receives
++	// their URIs separated by newlines. Only Android honours it, iOS returns one.
++	Multiple bool
+ }
+ 
+ // PublishResult is the result of an App.Publish call.
+diff --git a/internal/driver/mobile/file.go b/internal/driver/mobile/file.go
+index 6f3d2a47f..564526749 100644
+--- a/internal/driver/mobile/file.go
++++ b/internal/driver/mobile/file.go
+@@ -2,6 +2,7 @@ package mobile
+ 
+ import (
+ 	"io"
++	"strings"
+ 
+ 	"fyne.io/fyne/v2"
+ 	"fyne.io/fyne/v2/internal/driver/mobile/app"
+@@ -64,6 +65,41 @@ func ShowFileOpenPicker(callback func(fyne.URIReadCloser, error), filter storage
+ 	}
+ }
+ 
++// ShowFileOpenPickerMultiple is ShowFileOpenPicker allowing several files. Where the
++// system picker cannot (iOS today) it returns one. Cancelling calls back with nil.
++func ShowFileOpenPickerMultiple(callback func([]fyne.URIReadCloser, error), filter storage.FileFilter) {
++	drv := fyne.CurrentApp().Driver().(*driver)
++	a, ok := drv.app.(hasOpenPicker)
++	if !ok {
++		return
++	}
++	mf := mobileFilter(filter)
++	mf.Multiple = true
++	a.ShowFileOpenPicker(func(uris string, closer func()) {
++		if uris == "" {
++			callback(nil, nil)
++			return
++		}
++		var files []fyne.URIReadCloser
++		for _, uri := range strings.Split(uris, "\n") {
++			f, err := fileReaderForURI(nativeURI(uri))
++			if err != nil {
++				for _, open := range files {
++					_ = open.Close()
++				}
++				if closer != nil {
++					closer()
++				}
++				callback(nil, err)
++				return
++			}
++			files = append(files, f)
++		}
++		files[len(files)-1].(*fileOpen).done = closer // one security scope for the whole pick
++		callback(files, nil)
++	}, mf)
++}
++
+ // ShowFolderOpenPicker loads the native folder open dialog and calls back the chosen directory path as a ListableURI.
+ func ShowFolderOpenPicker(callback func(fyne.ListableURI, error)) {
+ 	filter := storage.NewMimeTypeFileFilter([]string{"application/x-directory"})
+diff --git a/internal/driver/mobile/uri_android.go b/internal/driver/mobile/uri_android.go
+index 4c7ee8817..386bb4329 100644
+--- a/internal/driver/mobile/uri_android.go
++++ b/internal/driver/mobile/uri_android.go
+@@ -6,8 +6,10 @@ package mobile
+ #cgo LDFLAGS: -landroid -llog
+ 
+ #include <stdlib.h>
++#include <stdint.h>
+ 
+ char* contentURIGetFileName(uintptr_t jni_env, uintptr_t ctx, char* uriCstr);
++int64_t contentURIGetSize(uintptr_t jni_env, uintptr_t ctx, char* uriCstr);
+ */
+ import "C"
+ 
+@@ -36,6 +38,24 @@ func (a *androidURI) Name() string {
+ 	return a.URI.Name()
+ }
+ 
++// Size is what the content provider says the file measures (OpenableColumns.SIZE), or
++// -1 when it does not say or the URI is not content://. Not part of fyne.URI: callers
++// ask for it with a type assertion on interface{ Size() int64 }.
++func (a *androidURI) Size() int64 {
++	if a.Scheme() != "content" {
++		return -1
++	}
++	uriStr := C.CString(a.systemURI)
++	defer C.free(unsafe.Pointer(uriStr))
++
++	size := int64(-1)
++	app.RunOnJVM(func(_, env, ctx uintptr) error {
++		size = int64(C.contentURIGetSize(C.uintptr_t(env), C.uintptr_t(ctx), uriStr))
++		return nil
++	})
++	return size
++}
++
+ func (a *androidURI) Extension() string {
+ 	return filepath.Ext(a.Name())
+ }
+-- 
+2.54.0 (Apple Git-157)
+
+
+From cbbc17d7886ef8319b2a02a16cab081f2179f369 Mon Sep 17 00:00:00 2001
+From: Daniel Delgado <328510259+thinkddr@users.noreply.github.com>
+Date: Fri, 25 Sep 2026 03:24:51 +0200
+Subject: [PATCH 2/2] fix(driver): a clip inside a clip keeps only the overlap
+
+walkObjectTree replaced the parent's clip with the child's, so a scroller nested
+in a scrolled container painted (software painter) and took taps outside it. The
+GL ClipStack already intersects; this makes the walk agree.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+---
+ internal/driver/util.go      | 11 +++++++++--
+ internal/driver/util_test.go | 29 +++++++++++++++++++++++++++++
+ 2 files changed, 38 insertions(+), 2 deletions(-)
+
+diff --git a/internal/driver/util.go b/internal/driver/util.go
+index 786fce771..1e3f2e3c8 100644
+--- a/internal/driver/util.go
++++ b/internal/driver/util.go
+@@ -168,8 +168,15 @@ func walkObjectTree(
+ 	}
+ 
+ 	if isClipWithRenderer(obj, renderer) {
+-		clipPos = pos
+-		clipSize = obj.Size()
++		// A clip inside a clip keeps only what both show, as the GL painter's ClipStack
++		// does: replacing the parent's let a scrolled child (an Entry in a scrolling
++		// dialog) paint and take taps outside the dialog.
++		size := obj.Size()
++		x0, y0 := max(clipPos.X, pos.X), max(clipPos.Y, pos.Y)
++		x1 := min(clipPos.X+clipSize.Width, pos.X+size.Width)
++		y1 := min(clipPos.Y+clipSize.Height, pos.Y+size.Height)
++		clipPos = fyne.NewPos(x0, y0)
++		clipSize = fyne.NewSize(max(x1-x0, 0), max(y1-y0, 0))
+ 	}
+ 
+ 	if beforeChildren != nil {
+diff --git a/internal/driver/util_test.go b/internal/driver/util_test.go
+index 9b6ac719f..2b491afb0 100644
+--- a/internal/driver/util_test.go
++++ b/internal/driver/util_test.go
+@@ -550,3 +550,32 @@ func (s *scrollable) Size() fyne.Size {
+ func (s *scrollable) Visible() bool {
+ 	return true
+ }
++
++// A clip inside a clip keeps only the overlap, as the GL ClipStack does. Replacing the
++// outer one let a scroller nested in a scrolled dialog paint and take taps outside it.
++func TestWalkVisibleObjectTree_NestedClipIntersects(t *testing.T) {
++	top := canvas.NewRectangle(color.White)
++	top.SetMinSize(fyne.NewSize(100, 80))
++	innerChild := canvas.NewRectangle(color.Black)
++	innerChild.SetMinSize(fyne.NewSize(100, 100))
++	inner := internal_widget.NewScroll(innerChild)
++	inner.SetMinSize(fyne.NewSize(100, 100))
++	outer := internal_widget.NewScroll(container.NewWithoutLayout(top, inner))
++	top.Resize(fyne.NewSize(100, 80))
++	inner.Move(fyne.NewPos(0, 84))
++	inner.Resize(fyne.NewSize(100, 100))
++	outer.Content.Resize(fyne.NewSize(100, 184))
++	outer.Resize(fyne.NewSize(100, 100))
++
++	var clipPos fyne.Position
++	var clipSize fyne.Size
++	driver.WalkVisibleObjectTree(outer, func(object fyne.CanvasObject, _ fyne.Position, cp fyne.Position, cs fyne.Size) bool {
++		if object == innerChild {
++			clipPos, clipSize = cp, cs
++		}
++		return false
++	}, nil)
++
++	assert.Equal(t, fyne.NewPos(0, 84), clipPos)
++	assert.Equal(t, fyne.NewSize(100, 16), clipSize)
++}
+-- 
+2.54.0 (Apple Git-157)
+

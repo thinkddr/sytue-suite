@@ -1,0 +1,18 @@
+Kontakty přes CardDAV sdílené v celé organizaci.
+
+• Sdílený adresář pro celou organizaci.
+• Import a export ve formátu vCard.
+• Slučování duplicit bez ztráty dat.
+• Funguje s jakýmkoli klientem CardDAV.
+• Adresáře, včetně sdíleného adresáře vaší organizace.
+• Úplná karta: telefony, e-maily, adresy, organizace, narozeniny, poznámky a fotka.
+• Štítky a oblíbené pro seskupení a hledání.
+• Rozpoznání a sloučení duplicit bez ztráty dat.
+• Import a export vCard a CSV; export jednoho kontaktu.
+• Hromadné akce a koš s obnovením.
+• Okamžité vyhledávání a automatické doplňování při psaní v Mail.
+• Funguje s jakýmkoli klientem CardDAV.
+• Blížící se narozeniny z adresáře, se zvýrazněním těch v tomto měsíci.
+• Naplánování schůzky s kontaktem nebo zkopírování e-mailu kontaktu bez opuštění karty.
+
+Šifrování při přenosu (TLS 1.3). Infrastruktura Sytue je v EU. Umístění externích služeb závisí na jejich poskytovateli.

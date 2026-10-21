@@ -1,0 +1,119 @@
+{{- if .Values.enabled }}
+{{- /*
+Deployment y NO StatefulSet: aqui no vive nada durable. Un StatefulSet traeria
+identidad estable y volumen persistente, que para una cache que puede perderse
+entera sin consecuencias solo anade ceremonia al reinicio.
+
+`Recreate` y no rolling update: durante un rollout con dos pods vivos, media
+presencia estaria en el viejo y media en el nuevo. Es preferible un corte de
+segundos —durante el cual los servicios degradan a no-op— que un estado partido
+que nadie sabe interpretar.
+*/ -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "sytue-dragonfly.fullname" . }}
+  labels:
+    {{- include "sytue-dragonfly.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "sytue-dragonfly.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "sytue-dragonfly.labels" . | nindent 8 }}
+    spec:
+      # Una caché no habla con la API de Kubernetes, así que no tiene por qué
+      # llevar dentro una credencial contra ella. Los servicios Go de la suite ya
+      # lo ponen en false; Dragonfly y el grabador se habían quedado fuera, y son
+      # justo los dos que ejecutan software de terceros.
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: dragonfly
+          image: {{ include "sytue-dragonfly.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - "dragonfly"
+            - "--logtostderr"
+            - "--proactor_threads={{ .Values.settings.proactorThreads }}"
+            - "--maxmemory={{ .Values.settings.maxMemory }}"
+            - "--cache_mode={{ .Values.settings.cacheMode }}"
+            # Sin persistencia, explicitamente: por defecto Dragonfly puede
+            # volcar a disco, y aqui no hay volumen donde hacerlo.
+            - "--dbfilename="
+          {{- if ((.Values.global).cache).secretName }}
+          # CONTRASENA POR ENTORNO Y NO POR ARGUMENTO: los args salen en
+          # `kubectl describe pod` y en la linea de comandos del proceso; la
+          # variable sale del Secret y no queda escrita en el manifiesto.
+          #
+          # Dragonfly acepta cualquiera de sus flags como `DFLY_<flag>`, asi que
+          # esto equivale a `--requirepass`. VERIFICAR EN EFIMERO al encenderlo:
+          # si el nombre no fuera el correcto, Dragonfly arranca IGUAL pero SIN
+          # contrasena, y eso no falla ruidosamente. Se comprueba desde un pod
+          # con redis-cli: sin AUTH, un `PING` tiene que responder NOAUTH.
+          #
+          # `optional: true`: sin la clave en el Secret, ni Dragonfly la exige ni
+          # los servicios la mandan, y el conjunto queda como estaba.
+          env:
+            - name: DFLY_requirepass
+              valueFrom:
+                secretKeyRef:
+                  name: {{ ((.Values.global).cache).secretName }}
+                  key: {{ ((.Values.global).cache).passwordKey | default "dragonfly-password" }}
+                  optional: true
+          {{- end }}
+          ports:
+            - name: dragonfly
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          # Las sondas usan el propio protocolo (PING) por TCP en vez de un
+          # cliente externo: la imagen es distroless y no trae redis-cli.
+          livenessProbe:
+            tcpSocket:
+              port: dragonfly
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          readinessProbe:
+            tcpSocket:
+              port: dragonfly
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        # Con readOnlyRootFilesystem, Dragonfly necesita un /tmp escribible.
+        # emptyDir y no volumen: sigue siendo efimero por diseno.
+        - name: tmp
+          emptyDir: {}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

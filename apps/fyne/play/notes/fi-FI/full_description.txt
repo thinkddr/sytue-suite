@@ -1,0 +1,18 @@
+Muistikirjat, joihin mahtuu mitä tahansa: tekstiä, tiedostoja, tapahtumia, kokonaisia asiakirjoja.
+
+• Sisäkkäiset muistikirjat vapaalla pohjalla, sarakkeissa tai luettelona.
+• Kaikenlaisia muistiinpanoja: tekstiä, tehtäviä, linkkejä, tiedostoja, Calendarin tapahtumia, Docsin asiakirjoja.
+• Sinä päätät, mitä hakuun päätyy — ja mitä ei koskaan.
+• Sisäkkäiset muistikirjat kuvakkeella ja värillä; kolme asettelua: vapaa, sarakkeet ja luettelo.
+• Kaksitoista muistiinpanotyyppiä: teksti, tehtävät, linkit, väri, kuva sekä viittaukset Driveen, Docusiin, Calendariin, Roomsiin ja muihin muistiinpanoihin.
+• Muotoiluja tukeva editori (lihavointi, luettelot, linkit), joka tallentaa, kun poistut.
+• Tunnisteet, kiinnitys, monistus, siirto muistikirjojen välillä, ryhmittely ja vetäminen pohjalla.
+• Näkyvyys muistikirjoittain: yksityinen, henkilökohtainen, organisaatio tai julkinen linkki.
+• Sinä päätät, mitkä muistikirjat päätyvät kokonaisuuden hakuun.
+• Paluulinkit: näe, mitkä muistiinpanot viittaavat tähän.
+• Vie koko muistikirja HTML-, PDF-, Markdown- ja muihin muotoihin; tuo kopioita.
+• Jaa muistiinpano Roomsin kanavalle; pudota tai liitä luodaksesi muistiinpanoja.
+• Taulukot editorissa ja Markdown-pikakomennot kirjoittaessa: ”- ”, ”# ”, ”> ” ja ”```”.
+• Siirrä muistiinpano toiseen muistikirjaan, vie yksittäinen muistiinpano ja lajittele muistikirja haluamallasi tavalla.
+
+Salattu siirron aikana (TLS 1.3). Sytuen infrastruktuuri sijaitsee EU:ssa. Ulkoisten palvelujen sijainti riippuu niiden tarjoajasta.

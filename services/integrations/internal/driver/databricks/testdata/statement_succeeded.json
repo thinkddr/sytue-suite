@@ -1,0 +1,26 @@
+{
+  "statement_id": "stmt-direct",
+  "status": { "state": "SUCCEEDED" },
+  "manifest": {
+    "format": "JSON_ARRAY",
+    "schema": {
+      "column_count": 4,
+      "columns": [
+        { "name": "id", "type_name": "LONG", "position": 0 },
+        { "name": "name", "type_name": "STRING", "position": 1 },
+        { "name": "active", "type_name": "BOOLEAN", "position": 2 },
+        { "name": "amount", "type_name": "DECIMAL", "position": 3 }
+      ]
+    },
+    "total_chunk_count": 1
+  },
+  "result": {
+    "chunk_index": 0,
+    "row_offset": 0,
+    "row_count": 2,
+    "data_array": [
+      ["10", "Xavier", "false", "-5.25"],
+      ["11", "Yara", "true", "100"]
+    ]
+  }
+}

@@ -1,0 +1,19 @@
+[
+  {
+    "key": "mail",
+    "status": 200,
+    "finalUrl": "mail.sytue.localhost/",
+    "title": "Sytue Mail — Recibidos",
+    "bodyText": "AS Redactar CARPETAS Recibidos Borradores Enviados Archivo Spam Papelera Recibidos No hay correos en Recibidos Cuando",
+    "consoleErrors": [],
+    "pageErrors": [],
+    "netErrors": [
+      "FAIL ERR_ABORTED https://mail.sytue.localhost/@fs/app/node_modules/.bun/@astrojs+preact@4.1.3+2ce1873deaa5ae0d/node_modules/@astrojs/preact/dist/static-html.js?v=2d40ce2d",
+      "FAIL ERR_ABORTED https://mail.sytue.localhost/node_modules/.vite/deps/astro_n_axobject-query.js?v=2d40ce2d",
+      "FAIL ERR_ABORTED https://mail.sytue.localhost/src/components/MailApp.tsx",
+      "FAIL ERR_ABORTED https://mail.sytue.localhost/node_modules/.vite/deps/astro_runtime_client_dev-toolbar_entrypoint__js.js?v=2d40ce2d",
+      "FAIL ERR_ABORTED https://mail.sytue.localhost/node_modules/.vite/deps/astro_n_aria-query.js?v=2d40ce2d",
+      "FAIL ERR_ABORTED https://mail.sytue.localhost/node_modules/.vite/deps/icons-BHsdavyA.js?v=2d40ce2d"
+    ]
+  }
+]

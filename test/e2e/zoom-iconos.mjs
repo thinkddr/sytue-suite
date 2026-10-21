@@ -1,0 +1,11 @@
+import { chromium } from 'playwright';
+const b = await chromium.launch();
+const c = await b.newContext({ ignoreHTTPSErrors: true, viewport: { width: 1280, height: 900 }, deviceScaleFactor: 4 });
+const p = await c.newPage();
+await p.goto('https://sytue.localhost/', { waitUntil: 'domcontentloaded', timeout: 60000 });
+await p.waitForTimeout(3500);
+await p.evaluate(() => window.scrollTo(0, 1700));
+await p.waitForTimeout(500);
+await p.screenshot({ path: '/tmp/iconos.png', clip: { x: 88, y: 90, width: 830, height: 70 } });
+console.log('ok');
+await b.close();

@@ -1,0 +1,54 @@
+{
+  "id": "grafana",
+  "name": "Grafana",
+  "description": "Cuadros de mando sobre tus datos: conecta una fuente y monta gráficas y alertas sin escribir una línea de frontend.",
+  "category": "observability",
+  "license": "AGPL-3.0-only",
+  "homepage": "https://grafana.com/oss/grafana/",
+  "source": "https://github.com/grafana/grafana",
+  "upstream": "docker.io/grafana/grafana-oss:12.4.3",
+  "upstream_digest": "sha256:2e986801428cd689c2358605289c90ab37d2b39e24808874971f54c99bcdc412",
+  "version": "12.4.3",
+  "ports": [
+    {
+      "name": "http",
+      "port": 3000
+    }
+  ],
+  "web_port": 3000,
+  "exports": [
+    {
+      "key": "GRAFANA_URL",
+      "value": "http://{host}:{port}"
+    }
+  ],
+  "env": [
+    {
+      "key": "GF_SERVER_ROOT_URL",
+      "value": "{web_url}"
+    },
+    {
+      "key": "GF_SECURITY_ADMIN_PASSWORD",
+      "generate": true,
+      "export": true
+    },
+    {
+      "key": "GF_USERS_ALLOW_SIGN_UP",
+      "value": "false"
+    },
+    {
+      "key": "GF_ANALYTICS_REPORTING_ENABLED",
+      "value": "false"
+    },
+    {
+      "key": "GF_ANALYTICS_CHECK_FOR_UPDATES",
+      "value": "false"
+    }
+  ],
+  "disk_gib": 10,
+  "data_path": "/var/lib/grafana",
+  "memory_mib": 1024,
+  "cpu_milli": 1000,
+  "run_as_user": 472,
+  "health_path": "/api/health"
+}

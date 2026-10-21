@@ -1,0 +1,155 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "sytue-cast.fullname" . }}
+  labels:
+    {{- include "sytue-cast.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "sytue-cast.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "sytue-cast.labels" . | nindent 8 }}
+      annotations:
+        kubectl.kubernetes.io/default-container: cast
+    spec:
+      automountServiceAccountToken: false
+      {{- with (.Values.global).imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: cast
+          image: "{{ include "sytue-cast.imageRegistry" . }}/{{ .Values.image.repository }}:{{ ((.Values.global).image | default dict).tag | default .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.targetPort }}
+          env:
+            {{- if (.Values.global).otlp }}
+            {{- if (.Values.global).otlp.endpoint }}
+            # Telemetria: metricas OTLP directas a Cockpit, sin agente intermedio.
+            # Sale del umbrella y no de este chart para que todos escriban al
+            # MISMO sitio; si cada uno apuntara al suyo, no habria con que comparar.
+            # Vacio => no se exporta y el servicio sigue sirviendo igual.
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ (.Values.global).otlp.endpoint | quote }}
+            {{- end }}
+            {{- if (.Values.global).otlp.tokenSecret }}
+            # Por Secret y nunca por values: aunque el token solo permita escribir,
+            # con el se puede envenenar la serie que decide un escalado.
+            - name: OTEL_EXPORTER_OTLP_HEADERS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ (.Values.global).otlp.tokenSecret }}
+                  key: {{ (.Values.global).otlp.tokenKey | default "otlp-headers" }}
+                  optional: true
+            {{- end }}
+            {{- end }}
+            # Runtime Go atado a los limites del pod (helper sytue.goRuntimeEnv del umbrella):
+            # GOMAXPROCS=techo(limits.cpu) via downward API; GOMEMLIMIT=~85% de limits.memory.
+            {{- include "sytue.goRuntimeEnv" (dict "container" "cast" "memLimit" .Values.resources.limits.memory) | nindent 12 }}
+            # Lo que comparte con el transcodificador (BD, S3, Drive, Hub, secretos):
+            # _helpers.tpl, `sytue-cast.envComun`. Aqui solo lo del servicio HTTP.
+            {{- include "sytue-cast.envComun" . | nindent 12 }}
+            # ENV va AQUI, literal y no en el helper, porque el gate de variables de
+            # helm-render-test.sh la busca en deployment.yaml para decidir si comprueba
+            # este chart: en el helper, el gate saltaria Cast entero sin decirlo.
+            - name: ENV
+              value: {{ include "sytue-cast.env" . | quote }}
+            # PORT (compose) manda sobre HTTP_ADDR para fijar la escucha (config.go).
+            - name: PORT
+              value: {{ .Values.service.targetPort | quote }}
+            # ----- Sytue ID (OIDC; validacion JWT via JWKS) -----
+            - name: OIDC_ISSUER
+              value: {{ include "sytue-cast.oidcIssuer" . | quote }}
+            - name: OIDC_JWKS_URL
+              value: {{ include "sytue.oidcJwksUrl" . | quote }}
+            # La audiencia PROPIA: el token del BFF de Cast trae `aud: sytue-cast`. Los
+            # de las otras apps de la suite se aceptan por OIDC_ACCEPTED_AUDIENCES
+            # (platform/pkg/config.FirstPartyAudiences, donde sytue-cast ya esta).
+            - name: OIDC_AUDIENCE
+              value: sytue-cast
+            # `OIDC_CLIENT_ID`/`OIDC_CLIENT_SECRET` no van: este servicio valida el JWT
+            # por JWKS y no hace ningun flujo de codigo. Quien usa credenciales de
+            # cliente es el BFF, y las suyas viven en `sytue-frontend-bff`.
+            {{- include "sytue-cast.envLiveKit" . | nindent 12 }}
+            # ----- Avisos al centro de notificaciones («Ana esta en directo») -----
+            # Mismo patron que rooms/syerp/cloud-api. Va AQUI, literal, y no en el
+            # helper compartido: el guardian TestCadaServicioQueAvisaRecibeElSecretoDelHub
+            # lee deployment.yaml y busca estas cinco lineas tal cual.
+            - name: HUB_BASE_URL
+              value: {{ .Values.config.hubUrl | default (printf "http://%s-hub" .Release.Name) | quote }}
+            # El secreto de la puerta interna del Hub (/internal/notifications), el MISMO en
+            # el Hub y en cada servicio que avisa. Lo genera el chart paraguas
+            # (sytue-one/templates/secretos-internos.yaml); sin el, fuera de dev, el
+            # servicio no arranca.
+            - name: HUB_INTERNAL_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: sytue-hub-internal
+                  key: secret
+            # ----- El chat del directo: WebSocket y su limpieza -----
+            - name: ALLOWED_ORIGINS
+              value: {{ .Values.config.allowedOrigins | quote }}
+            - name: CHAT_CLEANUP_INTERVAL
+              value: {{ .Values.config.chatCleanupInterval | quote }}
+            # ----- El barrido: borrados pasada la gracia y subidas atascadas -----
+            - name: CAST_SWEEP_INTERVAL
+              value: {{ .Values.config.sweepInterval | quote }}
+            - name: CAST_SWEEP_DELETED_GRACE
+              value: {{ .Values.config.sweepDeletedGrace | quote }}
+            - name: CAST_SWEEP_STALE_UPLOAD
+              value: {{ .Values.config.sweepStaleUpload | quote }}
+            - name: CAST_SWEEP_BACKFILL_QUALITIES
+              value: {{ .Values.config.sweepBackfillQualities | quote }}
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 3
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+      {{- with .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- range . }}
+        - maxSkew: {{ .maxSkew }}
+          topologyKey: {{ .topologyKey }}
+          whenUnsatisfiable: {{ .whenUnsatisfiable }}
+          labelSelector:
+            matchLabels:
+              {{- include "sytue-cast.selectorLabels" $ | nindent 14 }}
+        {{- end }}
+      {{- end }}

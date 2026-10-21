@@ -1,0 +1,53 @@
+{
+  "_metadata": {
+    "major_version": 1,
+    "minor_version": 1
+  },
+  "display_information": {
+    "name": "Sytue Rooms",
+    "description": "Interoperabilidad y puentes bidireccionales entre canales de Sytue Rooms y Slack.",
+    "background_color": "#1f2937",
+    "long_description": "Conecta tus canales de Sytue Rooms con espacios de trabajo de Slack. Sincroniza conversaciones, hilos, archivos y reuniones WebRTC con un solo clic."
+  },
+  "features": {
+    "bot_user": {
+      "display_name": "Sytue Rooms",
+      "always_online": true
+    },
+    "slash_commands": [
+      {
+        "command": "/sytue",
+        "url": "https://rooms.sytue.eu/api/integrations/slack/command",
+        "description": "Unirse o crear una reunión Sytue, o conectar este canal",
+        "should_escape": false
+      }
+    ]
+  },
+  "oauth_config": {
+    "redirect_urls": [
+      "https://integrations.sytue.eu/api/v1/oauth/callback"
+    ],
+    "scopes": {
+      "bot": [
+        "channels:read",
+        "channels:history",
+        "chat:write",
+        "chat:write.public",
+        "incoming-webhook",
+        "commands"
+      ]
+    }
+  },
+  "settings": {
+    "event_subscriptions": {
+      "request_url": "https://rooms.sytue.eu/api/integrations/slack/events",
+      "user_events": [],
+      "bot_events": [
+        "message.channels"
+      ]
+    },
+    "org_deploy_enabled": false,
+    "socket_mode_enabled": false,
+    "token_rotation_enabled": true
+  }
+}

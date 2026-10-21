@@ -1,0 +1,13 @@
+import { chromium } from 'playwright';
+import { fileURLToPath } from 'node:url';
+const STORAGE = fileURLToPath(new URL('.auth/admin.json', import.meta.url));
+const b = await chromium.launch();
+const ctx = await b.newContext({ storageState: STORAGE, ignoreHTTPSErrors: true, viewport:{width:1440,height:900} });
+const p = await ctx.newPage();
+await p.goto('https://one.sytue.localhost/', { waitUntil:'domcontentloaded', timeout:60000 });
+await p.waitForTimeout(1500);
+await p.getByRole('button', { name: /Aplicaciones de Sytue One/i }).click();
+await p.waitForTimeout(900);
+await p.screenshot({ path: '/tmp/design-pass/app-switcher.png' });
+console.log('OK app-switcher');
+await b.close();

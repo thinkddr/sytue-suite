@@ -1,0 +1,18 @@
+Carnete care cuprind orice: text, fișiere, evenimente, documente întregi.
+
+• Carnete imbricate, pe o pânză liberă, în coloane sau ca listă.
+• Notițe de orice fel: text, sarcini, linkuri, fișiere, evenimente din Calendar, documente din Docs.
+• Dumneavoastră decideți ce intră în căutare — și ce nu intră niciodată.
+• Carnete imbricate cu pictogramă și culoare; trei aspecte: liber, coloane și listă.
+• Douăsprezece tipuri de notițe: text, sarcini, linkuri, culoare, imagine și referințe către Drive, Docus, Calendar, Rooms și alte notițe.
+• Un editor cu formatare (aldin, liste, linkuri) care salvează la ieșire.
+• Etichete, fixare, duplicare, mutare între carnete, grupare și tragere pe pânză.
+• Vizibilitate pe carnet: privat, personal, organizație sau link public.
+• Dumneavoastră decideți ce carnete intră în căutarea suitei.
+• Linkuri inverse: vedeți ce notițe trimit la aceasta.
+• Exportul unui carnet întreg în HTML, PDF, Markdown și altele; importul de copii.
+• Partajarea unei notițe într-un canal Rooms; plasare sau lipire pentru a crea notițe.
+• Tabele în editor și scurtături Markdown în timp ce scrieți: „- ”, „# ”, „> ” și „```”.
+• Mutarea unei notițe în alt carnet, exportul unei singure notițe și sortarea carnetului după preferință.
+
+Criptare în tranzit (TLS 1.3). Infrastructura Sytue se află în UE. Locația serviciilor externe depinde de furnizorul lor.

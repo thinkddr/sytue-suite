@@ -1,0 +1,91 @@
+{
+  "key": "microsoft365",
+  "tier": "tier2",
+  "manifest": {
+    "name": "Microsoft 365",
+    "description": "Traer a Sytue lo que tienes en Microsoft 365 con un solo inicio de sesión: OneDrive y tus contactos, y los equipos de Microsoft Teams —canales, miembros, ficheros de SharePoint e historial de conversación— hacia Sytue Rooms y Sytue Drive. También sirve de origen de datos (usuarios, grupos, calendario y archivos) vía Microsoft Graph. El inicio de sesión lo gobierna Entra: aquí Sytue no actúa de IdP.",
+    "category": "Productividad",
+    "color": "#0078D4",
+    "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#0078D4\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"4\" y=\"4\" width=\"7\" height=\"7\" rx=\"1\"/><rect x=\"13\" y=\"4\" width=\"7\" height=\"7\" rx=\"1\"/><rect x=\"4\" y=\"13\" width=\"7\" height=\"7\" rx=\"1\"/><rect x=\"13\" y=\"13\" width=\"7\" height=\"7\" rx=\"1\"/></svg>",
+    "identity": {
+      "kind": "none"
+    },
+    "provisioning": "none",
+    "data": "graph",
+    "launch": {
+      "kind": "url",
+      "url": "https://www.office.com/"
+    },
+    "fields": [
+      {
+        "key": "tenant",
+        "label": "Inquilino de Entra (tenant)",
+        "placeholder": "contoso.onmicrosoft.com",
+        "help": "Solo si conectas con una aplicación propia registrada en Entra. Con «Iniciar sesión con Microsoft» el inquilino se detecta solo."
+      },
+      {
+        "key": "client_id",
+        "label": "ID de aplicación (cliente)",
+        "placeholder": "00000000-0000-0000-0000-000000000000",
+        "help": "Solo si conectas con una aplicación propia registrada en Entra (modo BYO). Con la aplicación de Sytue no hace falta."
+      }
+    ],
+    "secret": {
+      "label": "Secreto de cliente (client secret)",
+      "help": "Solo para el modo BYO o para migrar a toda la organización con una aplicación propia: el secreto del registro en Entra, con el que se piden los tokens de aplicación de Microsoft Graph."
+    },
+    "substitutes": [
+      {
+        "product": "mail",
+        "open_url": "https://outlook.office.com/mail/"
+      },
+      {
+        "product": "drive",
+        "open_url": "https://www.office.com/launch/onedrive"
+      },
+      {
+        "product": "calendar",
+        "open_url": "https://outlook.office.com/calendar/"
+      },
+      {
+        "product": "contacts",
+        "open_url": "https://outlook.office.com/people/"
+      },
+      {
+        "product": "docs",
+        "open_url": "https://www.office.com/launch/word"
+      },
+      {
+        "product": "sheets",
+        "open_url": "https://www.office.com/launch/excel"
+      },
+      {
+        "product": "slides",
+        "open_url": "https://www.office.com/launch/powerpoint"
+      }
+    ],
+    "oauth": {
+      "authorize_url": "https://login.microsoftonline.com/common/oauth2/v2.0/authorize?prompt=select_account",
+      "token_url": "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+      "scopes": [
+        "offline_access",
+        "openid",
+        "email",
+        "profile",
+        "User.Read",
+        "Files.Read.All",
+        "Contacts.Read",
+        "Team.ReadBasic.All",
+        "Channel.ReadBasic.All",
+        "ChannelMember.Read.All",
+        "ChannelMessage.Read.All"
+      ],
+      "write_scopes": [
+        "Files.ReadWrite",
+        "Contacts.ReadWrite",
+        "Mail.ReadWrite",
+        "Calendars.ReadWrite"
+      ]
+    }
+  }
+}

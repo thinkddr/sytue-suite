@@ -1,0 +1,40 @@
+/**
+ * Sytue Web — entrada de estilos: importa el design system (Tailwind v4 +
+ * tokens de marca Sytue).
+ */
+@import '@sytue/ui/styles.css';
+
+@source '../**/*.{astro,ts,tsx}';
+
+/* Los tonos de recurso se comparten con el resto de la suite. */
+.pages-site-card {
+  background: var(--sytue-card-blue);
+}
+.pages-site-card:nth-child(9n + 2) {
+  background: var(--sytue-card-violet);
+}
+.pages-site-card:nth-child(9n + 3) {
+  background: var(--sytue-card-mint);
+}
+.pages-site-card:nth-child(9n + 4) {
+  background: var(--sytue-card-rose);
+}
+.pages-site-card:nth-child(9n + 5) {
+  background: var(--sytue-card-amber);
+}
+.pages-site-card:nth-child(9n + 6) {
+  background: var(--sytue-card-cyan);
+}
+.pages-site-card:nth-child(9n + 7) {
+  background: var(--sytue-card-coral);
+}
+.pages-site-card:nth-child(9n + 8) {
+  background: var(--sytue-card-lime);
+}
+.pages-site-card:nth-child(9n + 9) {
+  background: var(--sytue-card-slate);
+}
+.pages-site-preview {
+  color: var(--sytue-text);
+  background: rgba(255, 255, 255, 0.22);
+}

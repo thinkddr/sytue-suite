@@ -1,0 +1,108 @@
+---
+import DashboardLayout from '../../../layouts/DashboardLayout.astro';
+import OverviewPanel from '../../../components/OverviewPanel';
+import SizingCard from '../../../components/SizingCard';
+import MetricsCard from '../../../components/MetricsCard';
+import { requireSession } from '@sytue/auth/server';
+import { canonicaConOrg } from '@sytue/config';
+import { getBff, toBffContext } from '../../../server/bff.js';
+import {
+  firstSourceError,
+  loadProject,
+  loadDeployments,
+  loadServices,
+  loadUsage,
+  loadDomains,
+  loadProjectSizing,
+  loadInstanceSizes,
+  loadProjectMetrics,
+} from '../../../lib/cloud.js';
+
+import { useT } from '../../../i18n/index.js';
+
+export const prerender = false;
+
+// El idioma lo negocia el middleware una vez por peticion y baja a la isla por
+// props: detectarlo en el cliente desajustaria la hidratacion.
+const locale = Astro.locals.locale;
+const t = useT(locale);
+
+const guard = await requireSession(getBff(), toBffContext(Astro));
+if (guard instanceof Response) return guard;
+// Ruta en `sinOrg` (su nombre colisiona con el namespace de organizaciones):
+// con sesión, un salto local a la canónica con la org activa (ADR 0056).
+const canonica = canonicaConOrg(Astro.url, getBff().basePath, guard.session.user.tenant);
+if (canonica) return Astro.redirect(canonica);
+
+const { session } = guard;
+
+const { slug } = Astro.params;
+const projectSourced = slug ? await loadProject(session, slug) : undefined;
+if (!projectSourced) return new Response(t('common.notFound'), { status: 404 });
+const project = projectSourced.data;
+
+const [
+  deploymentsSourced,
+  servicesSourced,
+  usageSourced,
+  domainsSourced,
+  sizingSourced,
+  sizesSourced,
+  metricsSourced,
+] = await Promise.all([
+  loadDeployments(session, project.slug),
+  loadServices(session, project.slug),
+  loadUsage(session, locale, project.slug),
+  loadDomains(session, project.slug),
+  loadProjectSizing(session, project.slug),
+  loadInstanceSizes(session),
+  loadProjectMetrics(session, project.slug),
+]);
+const { data: deployments, live: depLive } = deploymentsSourced;
+const { data: services } = servicesSourced;
+const { data: usage } = usageSourced;
+const { data: domains } = domainsSourced;
+const { data: sizing, live: sizingLive } = sizingSourced;
+const { data: sizeCatalog } = sizesSourced;
+const { data: metrics } = metricsSourced;
+// Nombre legible de cada tamaño: la tarjeta no debe enseñar el slug crudo.
+const sizeLabels = Object.fromEntries(sizeCatalog.sizes.map((s) => [s.name, s.label]));
+const live = projectSourced.live && depLive;
+const current =
+  deployments.find((d) => d.current) ??
+  deployments.find((d) => d.target === 'production' && d.status === 'ready');
+const recent = deployments.slice(0, 4);
+// Checklist de setup (honesto): ¿hay ya un dominio propio verificado del usuario?
+const hasCustomDomain = domains.some((d) => d.kind === 'custom');
+---
+
+<DashboardLayout
+  title={t('page.titleWithProject', { section: t('nav.overview'), project: project.name })}
+  project={project.slug}
+  section="overview"
+  hasDb={project.services.includes('postgres')}
+>
+  <OverviewPanel
+    client:load
+    project={project}
+    current={current}
+    usage={usage}
+    services={services}
+    recent={recent}
+    hasCustomDomain={hasCustomDomain}
+    live={live}
+    locale={locale}
+    error={firstSourceError(projectSourced, deploymentsSourced, servicesSourced)}
+  />
+  <MetricsCard client:load metrics={metrics} locale={locale} />
+  {sizing && (
+    <SizingCard
+      client:load
+      projectSlug={project.slug}
+      advice={sizing}
+      sizeLabels={sizeLabels}
+      live={sizingLive}
+      locale={locale}
+    />
+  )}
+</DashboardLayout>

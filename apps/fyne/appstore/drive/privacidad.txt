@@ -1,0 +1,9 @@
+¿Recoge datos esta app? SÍ
+¿Se usan para seguimiento (tracking)? NO, ninguno
+
+Tipo de dato | Finalidad | Vinculado a la identidad | Seguimiento | Sale de (Play)
+Contact Info: Name | App Functionality | Sí | No | PSL_NAME
+Contact Info: Email Address | App Functionality | Sí | No | PSL_EMAIL
+Identifiers: User ID | App Functionality | Sí | No | PSL_USER_ACCOUNT
+User Content: Other User Content | App Functionality | Sí | No | PSL_FILES_AND_DOCS
+User Content: Photos or Videos | App Functionality | Sí | No | PSL_PHOTOS, PSL_VIDEOS

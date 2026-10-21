@@ -1,0 +1,19 @@
+Correio privado e europeu sobre JMAP — sem rastreadores nem publicidade.
+
+• Uma caixa de entrada rápida com conversas, etiquetas, filtros e pesquisa.
+• Anexar ficheiros diretamente a partir do Sytue Drive.
+• Transformar um email num evento do Calendar.
+• Cifrado em trânsito (TLS 1.3). A infraestrutura da Sytue está na UE. A localização dos serviços externos depende do respetivo fornecedor.
+• Conversas agrupadas com leitura, resposta e reencaminhamento com um clique.
+• Pastas, etiquetas coloridas e pesquisa com operadores (from:, has:attachment, is:unread…).
+• Regras automáticas que arquivam, etiquetam ou movem o correio à chegada.
+• Envio agendado e «Anular envio».
+• Assinaturas, aliases de endereço e resposta automática de ausência.
+• Caixas de correio partilhadas e delegadas com permissões de leitura e envio.
+• Editor de texto formatado com anexos do Sytue Drive sem duplicar ficheiros.
+• Conteúdo remoto bloqueado por predefinição: ninguém fica a saber quando abre um email.
+• Correio assinado (PGP e S/MIME) reconhecido e assinalado; TLS em trânsito.
+• Acesso também a partir do Thunderbird, Outlook, Apple Mail ou do telemóvel, com palavras-passe de aplicação.
+• Endereços em etiquetas com o livro de endereços do Contacts à distância de um clique, e um aviso se escrever «em anexo» sem anexar nada.
+
+Cifrado em trânsito (TLS 1.3). A infraestrutura da Sytue está na UE. A localização dos serviços externos depende do respetivo fornecedor.

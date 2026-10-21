@@ -1,0 +1,16 @@
+Samtidig redigering i realtid
+
+• Allt sparat i din europeiska Drive.
+• Samtidig redigering i realtid, med närvaro och utan att trampa varandra på tårna.
+• Ett menyfliksområde: Start, Infoga, Referenser, Utskick och Granska.
+• Tabeller, bilder, former, SmartArt, diagram, symboler och vattenstämplar.
+• Referenser: innehållsförteckning, fotnoter, citat och litteraturförteckning.
+• Utskick: dokumentkoppling för brev och etiketter.
+• Kommentarstrådar, granskning av ändringar och versioner.
+• Valfri AI-assistent för att skriva om, översätta eller sammanfatta, bara om din organisation slår på den.
+• Export till ODT, DOCX och PDF; öppna Word-filer från Drive.
+• Sidhuvuden, sidfötter, sidnumrering och återanvändbara block.
+• Automatisk sparning i din europeiska Drive, med historik.
+• Ladda ned från startsidan som PDF, HTML, Markdown, OpenDocument eller Microsoft Office.
+
+Krypterat under överföring (TLS 1.3). Sytues infrastruktur finns i EU. Var externa tjänster finns beror på deras leverantör.

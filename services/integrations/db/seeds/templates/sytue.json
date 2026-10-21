@@ -1,0 +1,24 @@
+{
+  "key": "sytue",
+  "tier": "tier1",
+  "manifest": {
+    "name": "Sytue (esta suite)",
+    "description": "La propia suite como origen de datos: el Drive de una persona llega a Sytue Sheets con los MISMOS adaptadores que leen Microsoft 365, apuntados a los endpoints /compat de Sytue Drive. Solo hay que indicar de quién.",
+    "category": "Datos",
+    "color": "#b98f4f",
+    "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#b98f4f\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"3\" y=\"3\" width=\"18\" height=\"18\" rx=\"5\"/><path d=\"M3 10h18\"/><path d=\"M10 21V10\"/></svg>",
+    "identity": { "kind": "none" },
+    "provisioning": "none",
+    "data": "graph",
+    "launch": { "kind": "none" },
+    "fields": [
+      {
+        "key": "subject",
+        "label": "Persona cuyo Drive se lee",
+        "placeholder": "ana@acme.eu",
+        "help": "Correo o identificador en Sytue. La pasarela canjea un permiso acotado a esa persona con la delegación de la organización, y cada canje queda registrado en Sytue ID. El resto de la configuración —a dónde llamar y con qué credencial— la pone el servicio.",
+        "required": true
+      }
+    ]
+  }
+}

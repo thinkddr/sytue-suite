@@ -1,0 +1,50 @@
+{
+  "children": [
+    {
+      "content": {
+        "en": [
+          {
+            "text": "© 2026 Sytue. All rights reserved."
+          }
+        ],
+        "es": [
+          {
+            "text": "© 2026 Sytue. Todos los derechos reservados."
+          }
+        ]
+      },
+      "id": "tex0000001",
+      "tag": "p",
+      "type": "text"
+    },
+    {
+      "action": {
+        "page": "pag0000001"
+      },
+      "id": "but0000001",
+      "label": {
+        "en": "Back to top",
+        "es": "Volver arriba"
+      },
+      "type": "button",
+      "variant": "secondary"
+    }
+  ],
+  "full_bleed": false,
+  "id": "sec0000001",
+  "kind": "footer",
+  "layout": {
+    "direction": "column",
+    "gap": 16,
+    "padding": [
+      32,
+      32,
+      32,
+      32
+    ],
+    "align": "center",
+    "justify": "center",
+    "wrap": false
+  },
+  "type": "section"
+}

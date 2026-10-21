@@ -1,0 +1,18 @@
+Dvadsaťštyri modulov a podvojné účtovníctvo, ktoré databáza nedovolí rozvážiť.
+
+• Dvadsaťštyri modulov a tridsaťšesť modelov: kontakty, predaj, nákup, sklad, výroba, fakturácia, účtovníctvo, projekty a personalistika.
+• Pridať modul znamená napísať súbor JSON: bez migrácie, bez novej trasy a bez práce na rozhraní.
+• Peniaze sa ukladajú v celých centoch, nikdy v pohyblivej čiarke, a vyrovnanosť stráži databáza.
+• Zaúčtované zápisy sú nedotknuteľné: opravujú sa ďalším zápisom, a to odlišuje hlavnú knihu od tabuľky.
+• Dvadsaťštyri modulov a tridsaťšesť modelov v jedinej službe a jedinej databáze.
+• Katalóg modelov sú dáta: každý modul deklaruje svoje polia, stavy a stĺpce zoznamu.
+• Nový modul je jeden súbor JSON — bez DDL, bez migrácie a bez zamykania tabuliek.
+• Jedno API pre všetkých tridsaťšesť modelov a jedno rozhranie generované z katalógu.
+• Podvojné účtovníctvo so sumami v celých centoch; ani jedno číslo v pohyblivej čiarke.
+• Vyrovnanosť kontroluje databáza pri potvrdení transakcie, nie kód aplikácie.
+• Uzavreté zápisy sú nemenné: nemožno ich upraviť, zmazať ani do nich pridať riadky.
+• Jeden doklad, jeden zápis: opakovaný pokus ani dve otvorené karty nemôžu zdvojiť výnos.
+• Spoločné popisy sú vo všetkých 26 jazykoch a nepreložené pole nedovolí službe spustiť sa.
+• Výpisy nad indexmi: prvá strana z dvadsiatich tisíc riadkov sa vráti za menej ako milisekundu.
+
+Šifrovanie pri prenose (TLS 1.3). Infraštruktúra Sytue je v EÚ. Umiestnenie externých služieb závisí od ich poskytovateľa.

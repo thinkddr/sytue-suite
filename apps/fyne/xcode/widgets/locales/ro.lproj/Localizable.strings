@@ -1,0 +1,17 @@
+"widgets.open" = "Deschide";
+"widgets.compose" = "Compune";
+"widgets.create" = "Creează eveniment";
+"widgets.notes" = "Notițe";
+"widgets.rows" = "Rânduri";
+"widgets.pending" = "În așteptare";
+"widgets.channels" = "Canale";
+"widgets.photos" = "Fotografii";
+"widgets.episodes" = "Episoade";
+"widgets.apps" = "Aplicații";
+"widgets.calendars" = "Calendare";
+"widgets.address_books" = "Agende de adrese";
+"search.label" = "Căutare globală";
+"dataflow.item.files" = "Fișiere";
+"dataflow.item.events" = "Calendar";
+"dataflow.item.documents" = "Documente";
+"dataflow.item.contacts" = "Contacte";

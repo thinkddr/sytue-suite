@@ -1,0 +1,483 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Daniel Delgado Ramos
+openapi: 3.1.0
+info:
+  title: Sytue Drive API
+  description: >-
+    API REST propia de Sytue Drive (servidor de archivos Sytue-native). Gestiona
+    carpetas, ficheros, compartición, búsqueda y cuotas por tenant. Los blobs
+    viven en Object Storage S3; los metadatos en PostgreSQL. WebDAV (RFC 4918)
+    se expone bajo /dav (no documentado aquí; usa el mismo Bearer JWT).
+    Clean-room, © 2026 Daniel Delgado Ramos (thinkddr); sin motores AGPL.
+  version: "1.0.0"
+  license:
+    name: MIT
+servers:
+  - url: https://drive.sytue.eu
+    description: Producción
+  - url: https://drive.sytue.localhost
+    description: Desarrollo (Traefik + mkcert)
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: folders
+  - name: files
+  - name: shares
+  - name: quota
+  - name: public
+
+paths:
+  /healthz:
+    get:
+      summary: Liveness
+      security: []
+      responses:
+        "200": { description: Proceso vivo }
+  /readyz:
+    get:
+      summary: Readiness (PostgreSQL + S3)
+      security: []
+      responses:
+        "200": { description: Listo }
+        "503": { description: Dependencia no disponible }
+
+  /api/v1/folders/root:
+    get:
+      tags: [folders]
+      summary: Carpeta raíz del tenant (se crea si no existe)
+      responses:
+        "200":
+          description: Carpeta raíz
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Folder" }
+
+  /api/v1/folders:
+    post:
+      tags: [folders]
+      summary: Crear subcarpeta
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [parent_id, name]
+              properties:
+                parent_id: { type: string, format: uuid }
+                name: { type: string, maxLength: 255 }
+                group_folder:
+                  type: boolean
+                  description: Carpeta compartida a nivel de organización
+      responses:
+        "201":
+          description: Carpeta creada
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Folder" }
+        "400": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+
+  /api/v1/folders/{id}:
+    parameters:
+      - $ref: "#/components/parameters/IdPath"
+    get:
+      tags: [folders]
+      summary: Obtener carpeta
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Folder" }
+        "404": { $ref: "#/components/responses/Error" }
+    patch:
+      tags: [folders]
+      summary: Renombrar o mover carpeta (exactamente uno)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                new_parent_id: { type: string, format: uuid }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Folder" }
+        "400": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+    delete:
+      tags: [folders]
+      summary: Borrar carpeta y su subárbol
+      responses:
+        "204": { description: Borrada }
+        "404": { $ref: "#/components/responses/Error" }
+
+  /api/v1/folders/{id}/children:
+    parameters:
+      - $ref: "#/components/parameters/IdPath"
+    get:
+      tags: [folders]
+      summary: Listar subcarpetas y ficheros
+      description: >-
+        Los ficheros van con paginación keyset: la respuesta incluye next_cursor
+        cuando hay más; repetir con ?cursor= para la página siguiente. Las
+        subcarpetas solo viajan en la primera página (cursor vacío).
+      parameters:
+        - in: query
+          name: cursor
+          schema: { type: string }
+          description: Token opaco de continuación (vacío = primera página).
+        - in: query
+          name: limit
+          schema: { type: integer, maximum: 500 }
+          description: Máximo de ficheros por página (por defecto 500).
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  folders:
+                    type: array
+                    items: { $ref: "#/components/schemas/Folder" }
+                  files:
+                    type: array
+                    items: { $ref: "#/components/schemas/File" }
+                  next_cursor:
+                    type: string
+                    description: Presente si hay más ficheros.
+        "404": { $ref: "#/components/responses/Error" }
+
+  /api/v1/folders/{id}/files:
+    parameters:
+      - $ref: "#/components/parameters/IdPath"
+    post:
+      tags: [files]
+      summary: Subir un fichero a la carpeta
+      description: >-
+        Cuerpo crudo (application/octet-stream u otro Content-Type). El nombre se
+        indica en la cabecera X-File-Name o el parámetro de query ?name=. Si ya
+        existe un fichero con ese nombre, se sustituye (nueva versión).
+      parameters:
+        - in: query
+          name: name
+          schema: { type: string }
+        - in: header
+          name: X-File-Name
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema: { type: string, format: binary }
+      responses:
+        "201":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/File" }
+        "400": { $ref: "#/components/responses/Error" }
+        "413": { $ref: "#/components/responses/Error" }
+        "507":
+          description: Cuota de almacenamiento superada
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+
+  /api/v1/files/{id}:
+    parameters:
+      - $ref: "#/components/parameters/IdPath"
+    get:
+      tags: [files]
+      summary: Metadatos del fichero
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/File" }
+        "404": { $ref: "#/components/responses/Error" }
+    patch:
+      tags: [files]
+      summary: Renombrar o mover fichero (exactamente uno)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                new_folder_id: { type: string, format: uuid }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/File" }
+        "400": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+    delete:
+      tags: [files]
+      summary: Borrar fichero
+      responses:
+        "204": { description: Borrado }
+        "404": { $ref: "#/components/responses/Error" }
+
+  /api/v1/files/{id}/content:
+    parameters:
+      - $ref: "#/components/parameters/IdPath"
+      - in: query
+        name: presign
+        schema: { type: string, enum: ["1"] }
+        description: Si es 1, redirige (307) a una URL S3 prefirmada
+    get:
+      tags: [files]
+      summary: Descargar contenido
+      responses:
+        "200":
+          description: Contenido del fichero
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        "307": { description: Redirección a URL prefirmada }
+        "404": { $ref: "#/components/responses/Error" }
+
+  /api/v1/search:
+    get:
+      tags: [files]
+      summary: Buscar ficheros por nombre
+      parameters:
+        - in: query
+          name: q
+          required: true
+          schema: { type: string }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 50, maximum: 200 }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  files:
+                    type: array
+                    items: { $ref: "#/components/schemas/File" }
+
+  /api/v1/shares:
+    post:
+      tags: [shares]
+      summary: Crear compartición (link, user o group)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kind]
+              properties:
+                file_id: { type: string, format: uuid }
+                folder_id: { type: string, format: uuid }
+                kind: { type: string, enum: [link, user, group] }
+                subject:
+                  type: string
+                  description: sub del usuario o slug del grupo (no para link)
+                permission: { type: string, enum: [read, write], default: read }
+                expires_at: { type: string, format: date-time }
+      responses:
+        "201":
+          description: Compartición creada (para link incluye url + token, única vez)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  share: { $ref: "#/components/schemas/Share" }
+                  url: { type: string, format: uri }
+        "400": { $ref: "#/components/responses/Error" }
+
+  /api/v1/files/{id}/shares:
+    parameters:
+      - $ref: "#/components/parameters/IdPath"
+    get:
+      tags: [shares]
+      summary: Listar comparticiones del fichero
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  shares:
+                    type: array
+                    items: { $ref: "#/components/schemas/Share" }
+
+  /api/v1/folders/{id}/shares:
+    parameters:
+      - $ref: "#/components/parameters/IdPath"
+    get:
+      tags: [shares]
+      summary: Listar comparticiones de la carpeta
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  shares:
+                    type: array
+                    items: { $ref: "#/components/schemas/Share" }
+
+  /api/v1/shares/{id}:
+    parameters:
+      - $ref: "#/components/parameters/IdPath"
+    delete:
+      tags: [shares]
+      summary: Revocar compartición
+      responses:
+        "204": { description: Revocada }
+        "404": { $ref: "#/components/responses/Error" }
+
+  /api/v1/quota:
+    get:
+      tags: [quota]
+      summary: Cuota del tenant
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Quota" }
+    put:
+      tags: [quota]
+      summary: Fijar límite de cuota (admin/owner)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [limit_bytes]
+              properties:
+                limit_bytes: { type: integer, format: int64, minimum: 0 }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Quota" }
+        "403": { $ref: "#/components/responses/Error" }
+
+  /public/{token}:
+    get:
+      tags: [public]
+      summary: Descargar fichero por enlace público
+      security: []
+      parameters:
+        - in: path
+          name: token
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Contenido del fichero compartido
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        "404": { $ref: "#/components/responses/Error" }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT de Sytue ID (validado vía JWKS)
+
+  parameters:
+    IdPath:
+      in: path
+      name: id
+      required: true
+      schema: { type: string, format: uuid }
+
+  responses:
+    Error:
+      description: Error de la API
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+
+  schemas:
+    Folder:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        parent_id: { type: string, format: uuid, nullable: true }
+        name: { type: string }
+        is_root: { type: boolean }
+        is_group: { type: boolean }
+        owner_sub: { type: string }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    File:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        folder_id: { type: string, format: uuid }
+        name: { type: string }
+        size_bytes: { type: integer, format: int64 }
+        content_type: { type: string }
+        checksum: { type: string, description: SHA-256 hex del contenido }
+        owner_sub: { type: string }
+        version: { type: integer }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    Share:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        file_id: { type: string, format: uuid, nullable: true }
+        folder_id: { type: string, format: uuid, nullable: true }
+        kind: { type: string, enum: [link, user, group] }
+        subject: { type: string }
+        permission: { type: string, enum: [read, write] }
+        token:
+          type: string
+          description: Solo presente al crear un enlace (no se vuelve a exponer)
+        created_by: { type: string }
+        expires_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time }
+    Quota:
+      type: object
+      description: >-
+        Cuota del plan, que es una para toda la suite. `used_bytes` incluye lo que
+        las otras apps han declarado (`external_usage`, por clave de app: «cast»);
+        `available_bytes` es el hueco que queda contando todo.
+      properties:
+        tenant: { type: string }
+        limit_bytes: { type: integer, format: int64 }
+        used_bytes: { type: integer, format: int64 }
+        available_bytes: { type: integer, format: int64 }
+        external_usage:
+          type: object
+          additionalProperties: { type: integer, format: int64 }
+          example: { cast: 734003200 }
+        updated_at: { type: string, format: date-time }
+    ErrorEnvelope:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code: { type: string }
+            message: { type: string }
+            details: {}
+        request_id: { type: string }

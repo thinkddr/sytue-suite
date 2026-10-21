@@ -1,0 +1,197 @@
+{
+ "pais": "EE",
+ "verificado": true,
+ "moneda": "EUR",
+ "formas": [
+  {
+   "clave": "fie",
+   "nombre": "Füüsilisest isikust ettevõtja (FIE)",
+   "tipo": "persona_fisica"
+  },
+  {
+   "clave": "ou",
+   "nombre": "Osaühing (OÜ)",
+   "tipo": "sociedad"
+  },
+  {
+   "clave": "as",
+   "nombre": "Aktsiaselts (AS)",
+   "tipo": "sociedad"
+  }
+ ],
+ "portales": {
+  "emta": {
+   "nombre": "e-MTA (Maksu- ja Tolliamet)",
+   "url": "https://www.emta.ee/"
+  },
+  "ariregister": {
+   "nombre": "e-Äriregister",
+   "url": "https://ariregister.rik.ee/"
+  }
+ },
+ "obligaciones": [
+  {
+   "clave": "ee_kmd",
+   "nombre": "Käibedeklaratsioon (KMD)",
+   "concepto": "iva_periodica",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "20"
+   },
+   "margen_dias": 7,
+   "portal": "emta",
+   "aplica": {
+    "condiciones": [
+     "iva"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_pct_mes": 1.8,
+    "recargo_max_pct": 22,
+    "nota": "Esitatakse ja käibemaks tasutakse maksustamisperioodile järgneva kuu 20. kuupäevaks. Intress 0,06 % päevas tasumata summalt; sunniraha kuni 1 300 € deklaratsiooni esitamata jätmise eest."
+   },
+   "calculo": {
+    "tipo": "saldo_neto",
+    "haber": [
+     "477"
+    ],
+    "debe": [
+     "472"
+    ]
+   }
+  },
+  {
+   "clave": "ee_vd",
+   "nombre": "Ühendusesisese käibe aruanne (VD)",
+   "concepto": "operaciones_intracomunitarias",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "20"
+   },
+   "margen_dias": 7,
+   "portal": "emta",
+   "aplica": {
+    "condiciones": [
+     "intracomunitario"
+    ]
+   },
+   "sancion": {
+    "tipo": "nota",
+    "nota": "Sunniraha kuni 1 300 €."
+   }
+  },
+  {
+   "clave": "ee_tsd",
+   "nombre": "Tulu- ja sotsiaalmaksu deklaratsioon (TSD)",
+   "concepto": "nominas",
+   "ambito": "laboral",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "10"
+   },
+   "margen_dias": 7,
+   "portal": "emta",
+   "aplica": {
+    "condiciones": [
+     "empleados"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_pct_mes": 1.8,
+    "recargo_max_pct": 22,
+    "nota": "Intress 0,06 % päevas; TSD ja maksed 10. kuupäevaks."
+   }
+  },
+  {
+   "clave": "ee_tsd_dividendid",
+   "nombre": "Tulumaks väljamakstud dividendidelt (TSD lisa 7)",
+   "concepto": "impuesto_distribucion",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "10"
+   },
+   "margen_dias": 7,
+   "portal": "emta",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_pct_mes": 1.8,
+    "recargo_max_pct": 22,
+    "nota": "Ainult kuude eest, mil dividende või muid kasumieraldisi välja maksti; ettevõtte tulumaks tasutakse jaotamisel (22/78)."
+   }
+  },
+  {
+   "clave": "ee_fie_avansiline",
+   "nombre": "FIE sotsiaalmaksu avansilised maksed",
+   "concepto": "cuota_autonomos",
+   "ambito": "laboral",
+   "periodicidad": "trimestral",
+   "plazos": {
+    "T": "15+0"
+   },
+   "margen_dias": 7,
+   "portal": "emta",
+   "aplica": {
+    "tipos": [
+     "persona_fisica"
+    ]
+   },
+   "sancion": {
+    "tipo": "nota",
+    "nota": "Intress 0,06 % päevas; iga kvartali kolmanda kuu 15. kuupäevaks."
+   }
+  },
+  {
+   "clave": "ee_e_vorm",
+   "nombre": "Tuludeklaratsioon (vorm E)",
+   "concepto": "renta_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "04-30+1"
+   },
+   "margen_dias": 30,
+   "portal": "emta",
+   "aplica": {
+    "tipos": [
+     "persona_fisica"
+    ]
+   },
+   "sancion": {
+    "tipo": "nota",
+    "nota": "Sunniraha kuni 1 300 €; deklaratsioon 15. veebruarist 30. aprillini."
+   }
+  },
+  {
+   "clave": "ee_aruanne",
+   "nombre": "Majandusaasta aruanne (äriregister)",
+   "concepto": "cuentas_anuales",
+   "ambito": "mercantil",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "06-30+1"
+   },
+   "margen_dias": 30,
+   "portal": "ariregister",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 20000,
+    "nota": "Trahv kuni 3 200 € ja registrist kustutamise oht; kuue kuu jooksul majandusaasta lõpust."
+   }
+  }
+ ]
+}

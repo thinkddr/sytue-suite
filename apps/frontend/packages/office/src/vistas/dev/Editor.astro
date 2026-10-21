@@ -1,0 +1,52 @@
+---
+/**
+ * Banco de pruebas del editor entero (editor/dev/EditorDemo.tsx), para las capturas del
+ * cromo de Playwright. SOLO en desarrollo: en producción es un 404, y no figura en la
+ * navegación ni lo enlaza nada.
+ */
+import '../../styles/global.css';
+import { EditorDemo } from '../../editor/dev/EditorDemo';
+import { EditorApp } from '../../editor/EditorApp';
+
+const q = Astro.url.searchParams;
+const kind = ['spreadsheet', 'presentation'].includes(q.get('kind') ?? '')
+  ? (q.get('kind') as 'spreadsheet' | 'presentation')
+  : 'document';
+const lang = ['en', 'de', 'fr'].includes(q.get('lang') ?? '')
+  ? (q.get('lang') as 'en' | 'de' | 'fr')
+  : 'es';
+const panel = ['buscar', 'esquema', 'comentarios', 'revision', 'ia'].includes(q.get('panel') ?? '')
+  ? (q.get('panel') as 'buscar' | 'esquema' | 'comentarios' | 'revision' | 'ia')
+  : null;
+---
+
+<!doctype html>
+<html lang={lang} class="h-full">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Editor (banco de pruebas)</title>
+  </head>
+  <body class="h-full">
+    <main class="h-dvh">
+      {q.get('demo') === '1' ? (
+        <EditorDemo
+          client:only="preact"
+          kind={kind}
+          locale={lang}
+          panel={panel}
+          settings={q.get('ajustes') === '1'}
+          soloLectura={q.get('lectura') === '1'}
+        />
+      ) : (
+        <EditorApp
+          client:only="preact"
+          documentId={q.get('id') ?? 'demo'}
+          userId="demo-user"
+          locale={lang}
+          aiEnabled={q.get('ai') === '1'}
+        />
+      )}
+    </main>
+  </body>
+</html>

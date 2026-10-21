@@ -1,0 +1,113 @@
+{{- if .Values.enabled }}
+{{- $storage := .Values.objectStorage -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "sytue-pages.fullname" . }}
+  labels: {{- include "sytue-pages.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector: { matchLabels: { app.kubernetes.io/name: sytue-pages, app.kubernetes.io/instance: {{ .Release.Name }}, app.kubernetes.io/component: pages } }
+  template:
+    metadata:
+      labels: {{- include "sytue-pages.labels" . | nindent 8 }}
+        app.kubernetes.io/component: pages
+    spec:
+      automountServiceAccountToken: false
+      securityContext: {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: pages
+          image: "{{ include "sytue-pages.registry" . }}/{{ .Values.image.repository }}:{{ ((.Values.global).image | default dict).tag | default .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext: {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          ports: [{ name: http, containerPort: {{ .Values.service.targetPort }} }]
+          env:
+            - { name: ENV, value: {{ include "sytue-pages.env" . | quote }} }
+            - { name: PORT, value: {{ .Values.service.targetPort | quote }} }
+            - { name: LOG_LEVEL, value: {{ .Values.config.logLevel | quote }} }
+            - { name: PUBLIC_URL, value: {{ printf "https://%s.%s" .Values.subdomain (include "sytue-pages.domain" .) | quote }} }
+            - name: DATABASE_URL
+              valueFrom: { secretKeyRef: { name: {{ .Values.postgresql.existingSecret }}, key: {{ .Values.postgresql.dsnKey }} } }
+            - { name: DB_MAX_CONNS, value: {{ .Values.config.dbMaxConns | quote }} }
+            - { name: OIDC_ISSUER, value: {{ printf "https://id.%s" (include "sytue-pages.domain" .) | quote }} }
+            # JWKS por el Service interno de Sytue ID, como el resto de la suite: sin
+            # depender de DNS, TLS ni ingress, y sin salir por 443 a la red privada.
+            - { name: OIDC_JWKS_URL, value: {{ include "sytue.oidcJwksUrl" . | quote }} }
+            - { name: S3_REGION, value: {{ $storage.region | quote }} }
+            - { name: S3_USE_SSL, value: {{ $storage.useSSL | quote }} }
+            - { name: S3_BUCKET, value: {{ .Values.config.s3Bucket | quote }} }
+            - { name: PAGES_SITES_DOMAIN, value: {{ .Values.config.sitesDomain | quote }} }
+            # Con él, las webs pasan a `sites.<dominio de clientes>` y la dirección de
+            # PAGES_SITES_DOMAIN solo redirige (WEB-09).
+            - { name: SYTUE_CLIENT_CONTENT_DOMAIN, value: {{ (.Values.global).dominioDeClientes | default "" | quote }} }
+            - { name: PAGES_CAST_ORIGIN, value: {{ .Values.config.castOrigin | quote }} }
+            - { name: PAGES_MAPA_REFRESCO, value: {{ .Values.config.mapaRefresco | quote }} }
+            - { name: PAGES_IP_APEX, value: {{ .Values.config.ipApex | quote }} }
+            - { name: PAGES_ABUSO_CORREO, value: {{ .Values.config.abuseEmail | quote }} }
+            - { name: ID_URL, value: {{ printf "http://%s-id.%s.svc.cluster.local" .Release.Name .Release.Namespace | quote }} }
+            - { name: HUB_BASE_URL, value: {{ printf "http://%s-hub.%s.svc.cluster.local" .Release.Name .Release.Namespace | quote }} }
+            - { name: SYTUE_AI_URL, value: {{ printf "http://%s-ai.%s.svc.cluster.local" .Release.Name .Release.Namespace | quote }} }
+            - { name: SYERP_URL, value: {{ printf "http://%s-syerp.%s.svc.cluster.local" .Release.Name .Release.Namespace | quote }} }
+            # Sytue Bases: «tabla desde una vista» lee por su conector de solo lectura.
+            - { name: BASES_URL, value: {{ printf "http://%s-bases.%s.svc.cluster.local" .Release.Name .Release.Namespace | quote }} }
+            {{- if .Values.config.analyticsEnabled }}
+            - { name: ANALYTICS_API_URL, value: {{ (.Values.config.analyticsApiURL | default (printf "http://%s-analytics-api.%s.svc.cluster.local" .Release.Name .Release.Namespace)) | quote }} }
+            {{- end }}
+            - name: S3_ENDPOINT
+              valueFrom: { secretKeyRef: { name: {{ $storage.existingSecret }}, key: endpoint } }
+            - name: S3_ACCESS_KEY
+              valueFrom: { secretKeyRef: { name: {{ $storage.existingSecret }}, key: access-key } }
+            - name: S3_SECRET_KEY
+              valueFrom: { secretKeyRef: { name: {{ $storage.existingSecret }}, key: secret-key } }
+            - name: SECRET_ENC_KEY
+              valueFrom: { secretKeyRef: { name: {{ .Values.secrets.existingSecret }}, key: {{ .Values.secrets.encKey }} } }
+            - name: PAGES_PUBLICADOR_SECRET
+              valueFrom: { secretKeyRef: { name: {{ .Values.config.publicadorSecret }}, key: secret } }
+            - name: ID_ESTADO_ORGS_SECRET
+              valueFrom: { secretKeyRef: { name: {{ .Values.config.idEstadoOrgsSecret }}, key: secret } }
+            - name: HUB_INTERNAL_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: sytue-hub-internal
+                  key: secret
+            - name: AI_PAGES_SECRET
+              valueFrom: { secretKeyRef: { name: {{ .Values.config.aiPagesSecret }}, key: secret } }
+            - name: SYERP_PEDIDOS_SECRET
+              valueFrom: { secretKeyRef: { name: {{ .Values.config.syerpPedidosSecret }}, key: secret } }
+            # ----- Avisos de la tienda por correo (confirmación del pedido, acuse del
+            # desistimiento, aviso de formulario) -----
+            # Salen del MSA de Sytue Mail con la credencial de un BUZÓN propio de Sytue Web,
+            # con el nombre de la tienda y respondiendo a ella. Sin `from` no sale ninguno.
+            {{- with .Values.config.smtp }}
+            - name: SMTP_ADDR
+              value: {{ .addr | default (printf "%s-mail-mx:587" $.Release.Name) | quote }}
+            - name: SMTP_FROM
+              value: {{ .from | quote }}
+            - name: SMTP_TLS_SERVER_NAME
+              value: {{ .tlsServerName | quote }}
+            {{- end }}
+            - name: SMTP_USER
+              valueFrom: { secretKeyRef: { name: {{ .Values.secrets.existingSecret }}, key: smtp-user, optional: true } }
+            - name: SMTP_PASSWORD
+              valueFrom: { secretKeyRef: { name: {{ .Values.secrets.existingSecret }}, key: smtp-password, optional: true } }
+            {{- if .Values.config.analyticsEnabled }}
+            - name: ANALYTICS_PAGES_SECRET
+              valueFrom: { secretKeyRef: { name: {{ .Values.config.analyticsPagesSecret }}, key: secret } }
+            {{- end }}
+          startupProbe: { httpGet: { path: /healthz, port: http }, periodSeconds: 5, failureThreshold: 30 }
+          livenessProbe: { httpGet: { path: /healthz, port: http }, periodSeconds: 20 }
+          readinessProbe: { httpGet: { path: /readyz, port: http }, periodSeconds: 10 }
+          resources: {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- range . }}
+        - maxSkew: {{ .maxSkew }}
+          topologyKey: {{ .topologyKey }}
+          whenUnsatisfiable: {{ .whenUnsatisfiable }}
+          labelSelector:
+            matchLabels:
+              {{- include "sytue-pages.selector" $ | nindent 14 }}
+              app.kubernetes.io/component: pages
+        {{- end }}
+      {{- end }}
+{{- end }}

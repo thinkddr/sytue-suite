@@ -1,0 +1,147 @@
+{{- if and .Values.enabled .Values.networkPolicy.enabled }}
+# Dos políticas, una por Deployment: la API guarda los secretos y habla con medio
+# clúster; `sitios` solo lee artefactos de S3 y NO tiene base de datos, así que su
+# política es mucho más estrecha (sin Postgres, sin intra-suite).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "sytue-pages.fullname" . }}
+  labels:
+    {{- include "sytue-pages.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "sytue-pages.selector" . | nindent 6 }}
+      app.kubernetes.io/component: pages
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Desde el ingress canónico (Traefik): /webhooks de las pasarelas, /_borde y
+    # /_pages de los sitios publicados.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              sytue.eu/role: ingress
+      ports:
+        - protocol: TCP
+          port: {{ .Values.service.targetPort }}
+    # Desde el resto de la suite (el BFF de la app Astro, el Hub, Sytue AI, SyERP).
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/part-of: sytue-one
+      ports:
+        - protocol: TCP
+          port: {{ .Values.service.targetPort }}
+  egress:
+    # DNS (también el de la verificación de dominios propios: TXT, CNAME, A)
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Intra-suite: Sytue ID (JWKS), Hub, Sytue AI, SyERP, Analytics y PgBouncer.
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/part-of: sytue-one
+    {{- with .Values.objectStorage.network }}
+    # S3 local: solo los pods del almacén, sin abrir la suite ni Postgres.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .namespace | quote }}
+          podSelector:
+            matchLabels: {{- toYaml .podLabels | nindent 14 }}
+      ports:
+        - protocol: TCP
+          port: {{ .port }}
+    {{- end }}
+    # Postgres EXTERNO (RDB), también por la red privada.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 169.254.0.0/16
+      ports:
+        - protocol: TCP
+          port: 5432
+        {{- with (.Values.config.smtp).addr }}
+        # El relé de correo de fuera del clúster (config.smtp.addr), a su puerto. Sin
+        # dirección, el aviso sale por el MSA de Sytue Mail, que es intra-suite.
+        - protocol: TCP
+          port: {{ splitList ":" . | last | int }}
+        {{- end }}
+    # HTTPS a internet: pasarelas de pago, S3 (Object Storage UE) y la prueba de TLS de
+    # un dominio propio contra PAGES_IP_APEX:443. Nunca a la red privada, como en
+    # integraciones: Pages no descarga URLs de la gente, y si un día lo hiciera esta es la
+    # segunda barrera. La suite va por el podSelector de arriba (el JWKS, también).
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+              - 169.254.0.0/16
+              - 127.0.0.0/8
+      ports:
+        - protocol: TCP
+          port: 443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "sytue-pages.sitiosFullname" . }}
+  labels:
+    {{- include "sytue-pages.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "sytue-pages.selector" . | nindent 6 }}
+      app.kubernetes.io/component: sitios
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # SOLO Traefik: el tráfico público de *.sites.<dominio> y de los dominios propios.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              sytue.eu/role: ingress
+      ports:
+        - protocol: TCP
+          port: {{ .Values.sitios.service.targetPort }}
+  egress:
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    {{- with .Values.objectStorage.network }}
+    # S3 local: solo los pods del almacén, sin abrir la suite ni Postgres.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .namespace | quote }}
+          podSelector:
+            matchLabels: {{- toYaml .podLabels | nindent 14 }}
+      ports:
+        - protocol: TCP
+          port: {{ .port }}
+    {{- end }}
+    # S3 (Object Storage UE): lo único que lee.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 169.254.0.0/16
+      ports:
+        - protocol: TCP
+          port: 443
+{{- end }}

@@ -1,0 +1,32 @@
+{
+  "name": "@sytue/diapos",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sytue Diapos — presentaciones (diapos.sytue.eu). App Astro del producto: monta las vistas y el BFF de la ofimática común (@sytue/office) contra el servicio Go de documentos.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "dev": "bun --bun astro dev --port 4340",
+    "build": "bun --bun astro build",
+    "preview": "bun --bun astro preview --port 4340",
+    "start": "bun ./dist/server/entry.mjs",
+    "typecheck": "bun --bun astro check"
+  },
+  "dependencies": {
+    "@astrojs/node": "catalog:",
+    "@astrojs/preact": "catalog:",
+    "@sytue/auth": "workspace:*",
+    "@sytue/config": "workspace:*",
+    "@sytue/office": "workspace:*",
+    "@sytue/ui": "workspace:*",
+    "astro": "catalog:",
+    "preact": "10.29.8"
+  },
+  "devDependencies": {
+    "@astrojs/check": "catalog:",
+    "@tailwindcss/vite": "4.3.3",
+    "@types/node": "catalog:",
+    "tailwindcss": "4.3.3",
+    "typescript": "6.0.3"
+  }
+}

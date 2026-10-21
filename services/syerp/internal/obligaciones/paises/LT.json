@@ -1,0 +1,254 @@
+{
+ "pais": "LT",
+ "verificado": true,
+ "moneda": "EUR",
+ "formas": [
+  {
+   "clave": "individuali",
+   "nombre": "Individuali veikla (pagal pažymą)",
+   "tipo": "persona_fisica"
+  },
+  {
+   "clave": "ii",
+   "nombre": "Individuali įmonė (IĮ)",
+   "tipo": "persona_fisica"
+  },
+  {
+   "clave": "mb",
+   "nombre": "Mažoji bendrija (MB)",
+   "tipo": "sociedad"
+  },
+  {
+   "clave": "uab",
+   "nombre": "Uždaroji akcinė bendrovė (UAB)",
+   "tipo": "sociedad"
+  },
+  {
+   "clave": "ab",
+   "nombre": "Akcinė bendrovė (AB)",
+   "tipo": "sociedad"
+  }
+ ],
+ "portales": {
+  "vmi": {
+   "nombre": "Mano VMI / EDS",
+   "url": "https://www.vmi.lt/evmi/"
+  },
+  "sodra": {
+   "nombre": "Sodra — draudėjų sistema",
+   "url": "https://draudejai.sodra.lt/"
+  },
+  "rc": {
+   "nombre": "Registrų centras — finansinės ataskaitos",
+   "url": "https://www.registrucentras.lt/"
+  }
+ },
+ "obligaciones": [
+  {
+   "clave": "lt_pvm",
+   "nombre": "PVM deklaracija (FR0600)",
+   "concepto": "iva_periodica",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "25"
+   },
+   "margen_dias": 7,
+   "portal": "vmi",
+   "aplica": {
+    "condiciones": [
+     "iva"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 15000,
+    "nota": "Bauda nuo 150 iki 300 € (ANK 187 str.) ir delspinigiai (0,027 % už dieną 2025 m.). Pusmetinė deklaracija galima, jei pajamos iki 60 000 €."
+   },
+   "calculo": {
+    "tipo": "saldo_neto",
+    "haber": [
+     "477"
+    ],
+    "debe": [
+     "472"
+    ]
+   }
+  },
+  {
+   "clave": "lt_fr0564",
+   "nombre": "Prekių tiekimo į kitas ES valstybes ataskaita (FR0564)",
+   "concepto": "operaciones_intracomunitarias",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "25"
+   },
+   "margen_dias": 7,
+   "portal": "vmi",
+   "aplica": {
+    "condiciones": [
+     "intracomunitario"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 15000,
+    "nota": "Bauda nuo 150 iki 300 €."
+   }
+  },
+  {
+   "clave": "lt_gpm313",
+   "nombre": "Mėnesinė pajamų mokesčio deklaracija (GPM313)",
+   "concepto": "retenciones_trabajo",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "15"
+   },
+   "margen_dias": 7,
+   "portal": "vmi",
+   "aplica": {
+    "condiciones": [
+     "empleados"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 15000,
+    "nota": "Bauda nuo 150 iki 300 € ir delspinigiai."
+   }
+  },
+  {
+   "clave": "lt_sam",
+   "nombre": "Sodros įmokos ir SAM pranešimas",
+   "concepto": "seguridad_social",
+   "ambito": "laboral",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "15"
+   },
+   "margen_dias": 7,
+   "portal": "sodra",
+   "aplica": {
+    "condiciones": [
+     "empleados"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_pct_mes": 0.8,
+    "recargo_max_pct": 10,
+    "nota": "Delspinigiai 0,027 % už kiekvieną pavėluotą dieną; SAM iki 15 d., įmokos iki 15 d."
+   }
+  },
+  {
+   "clave": "lt_vsd",
+   "nombre": "Savarankiškai dirbančiųjų VSD/PSD įmokos",
+   "concepto": "cuota_autonomos",
+   "ambito": "laboral",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "ultimo+0"
+   },
+   "margen_dias": 7,
+   "portal": "sodra",
+   "aplica": {
+    "tipos": [
+     "persona_fisica"
+    ]
+   },
+   "sancion": {
+    "tipo": "nota",
+    "nota": "PSD įmokos kas mėnesį; VSD įmokos gali būti mokamos metams pasibaigus iki gegužės 1 d."
+   }
+  },
+  {
+   "clave": "lt_pln204",
+   "nombre": "Metinė pelno mokesčio deklaracija (PLN204)",
+   "concepto": "sociedades_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "06-15+1"
+   },
+   "margen_dias": 30,
+   "portal": "vmi",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 15000,
+    "nota": "Iki kito mokestinio laikotarpio šešto mėnesio 15 dienos. Bauda nuo 150 iki 300 €; iki kito mokestinio laikotarpio šešto mėnesio 15 d."
+   }
+  },
+  {
+   "clave": "lt_avansinis",
+   "nombre": "Avansinis pelno mokestis (FR0430)",
+   "concepto": "pago_fraccionado_sociedades",
+   "ambito": "fiscal",
+   "periodicidad": "trimestral",
+   "plazos": {
+    "T": "15+0"
+   },
+   "margen_dias": 7,
+   "portal": "vmi",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "nota",
+    "nota": "Neprivalomas, jei praėjusių metų pajamos neviršijo 300 000 €; mokamas iki kiekvieno ketvirčio paskutinio mėnesio 15 d."
+   }
+  },
+  {
+   "clave": "lt_gpm311",
+   "nombre": "Metinė pajamų mokesčio deklaracija (GPM311)",
+   "concepto": "renta_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "05-01+1"
+   },
+   "margen_dias": 30,
+   "portal": "vmi",
+   "aplica": {
+    "tipos": [
+     "persona_fisica"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 15000,
+    "nota": "Bauda nuo 150 iki 300 €."
+   }
+  },
+  {
+   "clave": "lt_fa",
+   "nombre": "Finansinių ataskaitų rinkinys (Registrų centras)",
+   "concepto": "cuentas_anuales",
+   "ambito": "mercantil",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "06-30+1"
+   },
+   "margen_dias": 30,
+   "portal": "rc",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 20000,
+    "nota": "Bauda vadovui nuo 200 iki 3 000 € (ANK 223 str.); per 30 dienų nuo patvirtinimo (susirinkimas per 4 mėnesius)."
+   }
+  }
+ ]
+}

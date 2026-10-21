@@ -1,0 +1,16 @@
+Filer och samarbete under ditt eget varumärke.
+
+• Ladda upp, ordna och dela med kontrollerade länkar (behörighet och giltighetstid).
+• Förhandsvisning av dokument och bilder direkt på sidan.
+• Bifoga i Mail utan att kopiera filen.
+• Lagring baserad på S3 i europeiska regioner.
+• Min enhet, teamenheter, delat med mig, senaste, favoriter och papperskorg.
+• Delningslänkar med två nivåer (visa eller redigera), lösenord och giltighetstid.
+• Versionshistorik med återställning.
+• Förhandsvisa dokument, bilder och PDF:er utan att ladda ned.
+• Öppna och redigera kontorsdokument i Docus, Calcus och Diapos; PDF:er i CertiPDF.
+• Känslighetsetiketter som blockerar offentliga länkar där de inte hör hemma.
+• Dela till en kanal i Rooms eller bifoga i Mail utan att kopiera filen.
+• S3-lagring i europeiska regioner, med kvoten alltid synlig.
+
+Krypterat under överföring (TLS 1.3). Sytues infrastruktur finns i EU. Var externa tjänster finns beror på deras leverantör.

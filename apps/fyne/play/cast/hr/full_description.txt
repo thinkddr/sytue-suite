@@ -1,0 +1,17 @@
+Vaši videozapisi i vaši prijenosi uživo, na zahtjev i u stvarnom vremenu, bez napuštanja Europe.
+
+• Prenesite videozapis i transkodira se u više kvaliteta za svaki zaslon.
+• Emitirajte uživo iz programa za emitiranje, iz preglednika ili iz aplikacije.
+• Četiri razine vidljivosti: javno, neuvršteno, organizacija ili određene osobe.
+• Chat uživo i komentari, s osnovnom moderacijom od strane onoga tko objavljuje.
+• Prenesite videozapise do 8 GiB; original se čuva.
+• Prijenos uživo iz programa za emitiranje putem RTMP-a, s ključem prijenosa po osobi.
+• Uživo iz preglednika ili aplikacije: kamera, zaslon i mikrofon.
+• Snimke prijenosa uživo automatski postaju videozapisi na zahtjev.
+• Javna naslovnica i kanal za svaku organizaciju, s mogućnošću indeksiranja.
+• Neuvrštene poveznice, videozapisi samo za organizaciju ili pristup određenim osobama po @korisničkom imenu.
+• Chat uživo i komentari u nitima, koje moderiraju onaj tko objavljuje i administracija organizacije.
+• Pohrana se računa u vašu kvotu u Sytue Driveu; sve u Europskoj uniji.
+• „Prenesi u Cast” iz Sytue Drivea: kopija videozapisa ide u Cast, a datoteka ostaje u Driveu.
+
+Šifrirano u prijenosu (TLS 1.3). Infrastruktura Sytuea nalazi se u EU-u. Lokacija vanjskih usluga ovisi o njihovu pružatelju.

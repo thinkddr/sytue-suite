@@ -1,0 +1,17 @@
+Az Ön videói és élő adásai, igény szerint és valós időben, Európa elhagyása nélkül.
+
+• Töltsön fel egy videót, és több minőségben átkódoljuk bármilyen képernyőre.
+• Adjon élőben közvetítőprogramból, a böngészőből vagy az alkalmazásból.
+• Négy láthatósági szint: nyilvános, nem listázott, szervezet vagy megadott személyek.
+• Élő csevegés és hozzászólások, a közzétevő alapvető moderálásával.
+• Töltsön fel legfeljebb 8 GiB-os videókat; az eredeti megmarad.
+• Élő közvetítés közvetítőprogramból RTMP-n, személyenkénti adáskulccsal.
+• Élőben a böngészőből vagy az alkalmazásból: kamera, képernyő és mikrofon.
+• Az élő adások felvételei automatikusan igény szerinti videókká válnak.
+• Nyilvános kezdőlap és szervezetenként egy csatorna, indexelhetően.
+• Nem listázott hivatkozások, csak a szervezetnek szóló videók vagy hozzáférés megadott személyeknek @felhasználónév alapján.
+• Élő csevegés és szálakba rendezett hozzászólások, a közzétevő és a szervezet adminisztrátorai által moderálva.
+• A tárhely az Ön Sytue Drive-kvótájába számít; minden az Európai Unióban.
+• „Feltöltés a Castba” a Sytue Drive-ból: a videó másolata a Castba kerül, a fájl a Drive-ban marad.
+
+Titkosítás átvitel közben (TLS 1.3). A Sytue infrastruktúrája az EU-ban található. A külső szolgáltatások helye a szolgáltatójuktól függ.

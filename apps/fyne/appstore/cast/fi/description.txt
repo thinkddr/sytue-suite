@@ -1,0 +1,17 @@
+Sinun videosi ja suorat lähetyksesi, tilauksesta ja reaaliajassa, poistumatta Euroopasta.
+
+• Lataa video, niin se koodataan useaan laatuun mille tahansa näytölle.
+• Lähetä suorana lähetysohjelmasta, selaimesta tai sovelluksesta.
+• Neljä näkyvyystasoa: julkinen, piilotettu, organisaatio tai tietyt henkilöt.
+• Suora keskustelu ja kommentit, julkaisijan perusmoderoinnilla.
+• Lataa enintään 8 GiB:n videoita; alkuperäinen säilytetään.
+• Suora lähetys lähetysohjelmasta RTMP:llä, henkilökohtaisella lähetysavaimella.
+• Suorana selaimesta tai sovelluksesta: kamera, näyttö ja mikrofoni.
+• Suorien lähetysten tallenteet muuttuvat tilausvideoiksi automaattisesti.
+• Julkinen etusivu ja kanava jokaiselle organisaatiolle, indeksoitavissa.
+• Piilotetut linkit, videot vain organisaatiolle tai pääsy tietyille henkilöille @käyttäjänimellä.
+• Suora keskustelu ja ketjutetut kommentit, joita moderoivat julkaisija ja organisaation ylläpitäjät.
+• Tallennustila lasketaan Sytue Drive -kiintiöösi; kaikki Euroopan unionissa.
+• ”Lataa Castiin” Sytue Drivesta: kopio videosta siirtyy Castiin, ja tiedosto jää Driveen.
+
+Salattu siirron aikana (TLS 1.3). Sytuen infrastruktuuri sijaitsee EU:ssa. Ulkoisten palvelujen sijainti riippuu niiden tarjoajasta.

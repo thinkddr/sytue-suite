@@ -1,0 +1,14 @@
+La tua pagina iniziale della suite: applicazioni, accessi rapidi, attività recente e avvisi.
+
+• Un launcher con tutte le tue applicazioni e quelle che la tua organizzazione collega.
+• L’agenda di oggi e la posta non letta in prima pagina, accanto alle novità di tutta la suite e alle notifiche.
+• Collega i tuoi dispositivi e scarica le app native.
+• Un launcher con le applicazioni della suite e quelle di terzi che la tua organizzazione collega.
+• Accessi rapidi: scrivere un’e-mail, nuovo documento, caricare su Drive, creare un evento.
+• Recenti di tutta la suite: le ultime cose toccate in Drive, Docus, Mail o Rooms.
+• Centro notifiche e presenza condivisi da tutta la suite.
+• Collega i tuoi dispositivi: profilo per iPhone e Mac, Android e desktop, in due passi.
+• Download delle app native per desktop e mobile.
+• Un assistente di benvenuto che prepara l’organizzazione senza manuali.
+
+Cifratura in transito (TLS 1.3). L’infrastruttura di Sytue si trova nell’UE. La posizione dei servizi esterni dipende dal loro fornitore.

@@ -1,0 +1,18 @@
+Bildegalleri og -redigering: originalene i Drive, redigeringene som en oppskrift.
+
+• En tidslinje per måned med søk etter navn.
+• Album med forsidebilde; visning i fullskjerm.
+• Redigering av lys, farge, rotasjon, speiling og beskjæring, i sanntid.
+• Hver redigering er en oppskrift: originalen røres aldri.
+• En tidslinje gruppert etter måned, med søk etter navn og skarpe miniatyrer.
+• Album: opprett, gi nytt navn, velg forsidebilde, legg til fra visningen og fjern.
+• En redigerer med fire glidebrytere (eksponering, kontrast, metning, temperatur), rotasjon og speiling.
+• Hver redigering er en oppskrift som lagres for seg: originalen i Drive endres aldri.
+• Eksport i full oppløsning, beregnet på serveren med de samme formlene som i forhåndsvisningen.
+• Papirkurv med gjenoppretting.
+• Originalene ligger i Sytue Drive; avledede versjoner er en hurtigbuffer som kan gjenskapes.
+• EXIF-data lest fra selve filen; alt i Den europeiske union.
+• Flervalg per måned: til et nytt album, til papirkurven eller last ned alt på én gang.
+• Lysbildefremvisning, full størrelse, rotasjon fra visningen og beskjæring med fast forhold.
+
+Kryptert under overføring (TLS 1.3). Sytues infrastruktur er i EU. Plasseringen av eksterne tjenester avhenger av leverandøren deres.

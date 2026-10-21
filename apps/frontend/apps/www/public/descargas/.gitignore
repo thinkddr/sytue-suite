@@ -1,0 +1,12 @@
+# Instaladores compilados en LOCAL (los dejaba aquí el build-all.sh del escritorio de
+# Wails, retirado el 2026-09-23).
+#
+# No se versionan: pesan ~8 MB cada uno y son de un solo uso: la release oficial la fabrica
+# CI (matriz producto x plataforma de .sygit/workflows/release-desktop.yml), firmada y publicada
+# como assets del tag. Esto es solo para que «Descargar» funcione de verdad en el entorno
+# local en vez de decir «Proximamente».
+#
+# Se ignora TODO menos este fichero, que sí debe existir para que el directorio esté ahí y
+# Astro lo sirva aunque nadie haya compilado nada todavía.
+*
+!.gitignore

@@ -1,0 +1,85 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Daniel Delgado Ramos
+#
+# Publica los paquetes para los marketplaces de los vendors
+# (integraciones-marketplace/, empaquetados por scripts/empaquetar-marketplace.sh)
+# como assets de una release de git.gay — de ahí los sirve Sytue Platform.
+# SOLO a mano, como el resto de las releases: publicar es una decisión.
+name: release-marketplace
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Tag vX.Y.Z a publicar"
+        type: string
+        required: true
+
+# Lo que puede hacer GITHUB_TOKEN en este flujo, y nada más (GitHub lo
+# aplica; en Forgejo este campo se ignoraba y mandaba el token de cada paso).
+permissions:
+  contents: write
+
+# `bash` EXPLÍCITO. Dentro de un `container:` GitHub ejecuta los `run:` con
+# `sh -e` y no con bash: `set -o pipefail`, `[[`, los arrays y `<<<` mueren
+# con «Illegal option» (cancelar-al-cerrar, 2026-09-27). Con `shell: bash`
+# es `bash --noprofile --norc -eo pipefail`, que es lo que corría en la forja.
+defaults:
+  run:
+    shell: bash
+
+env:
+  # El checkout lo escribe el runner (uid 1001) y los pasos corren como root dentro
+  # del `container:`: git ve un propietario ajeno, se niega («dubious ownership»)
+  # y `go build` muere con «error obtaining VCS status». La forja montaba el
+  # workspace con el mismo usuario y no lo notaba.
+  GIT_CONFIG_COUNT: "1"
+  GIT_CONFIG_KEY_0: safe.directory
+  GIT_CONFIG_VALUE_0: "*"
+
+concurrency:
+  group: release-marketplace-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publicar:
+    name: Paquetes de marketplaces de vendors
+    runs-on: sytue-arm64
+    # Los runners propios del frontal (.github/RUNNERS.md): cada job en un
+    # contenedor del Docker del CI, con el proxy filtrado como socket de Docker
+    # y la caché de Go del host (con varios jobs, ancla `&ci` y `*ci`).
+    container:
+      image: node:24-bookworm@sha256:64af3819f9275802414d7cdc38c27e9d82bd564dec4d4da87d008255d36c63b4
+      env:
+        DOCKER_HOST: unix:///run/sytue-ci/docker.sock
+      volumes:
+        - /srv/ci/run/proxy.sock:/run/sytue-ci/docker.sock
+        - /var/cache/sytue-ci/go-build:/github/home/.cache/go-build
+        - /var/cache/sytue-ci/go-mod:/github/home/go/pkg/mod
+    timeout-minutes: 20
+    steps:
+      - name: Clonar el repositorio
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.inputs.ref }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      # El paquete de Teams lleva iconos renderizados desde la marca; sin
+      # ImageMagick el script lo avisa y el vendor rechazaría el zip.
+      - name: Empaquetar los bundles
+        run: |
+          apt-get update -qq
+          # jq, para publicar-asset.sh en el paso siguiente: la imagen no lo trae.
+          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends zip imagemagick jq
+          bash scripts/empaquetar-marketplace.sh
+
+      - name: Subir los zips a la release
+        env:
+          SYTUE_GIT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          for z in dist-marketplace/*.zip; do
+            bash deploy/sytue-git/bin/publicar-asset.sh \
+              "${{ github.event.inputs.ref }}" "$z"
+          done

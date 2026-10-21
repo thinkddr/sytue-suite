@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="160" viewBox="0 0 200 160" fill="none" role="img" aria-label="Galería vacía">
+  <title>Galería de fotos vacía</title>
+  <!-- Superficie base: rejilla de guía sutil -->
+  <line x1="46" y1="122" x2="154" y2="122" stroke="var(--sytue-border)" stroke-width="2" stroke-linecap="round"/>
+  <!-- Foto de atrás, ligeramente girada (line-art neutro) -->
+  <rect x="70" y="42" width="72" height="56" rx="7" transform="rotate(6 106 70)" stroke="var(--sytue-neutral-300)" stroke-width="2.4"/>
+  <!-- Foto de delante: marco, horizonte con montañas y sol -->
+  <rect x="56" y="54" width="80" height="60" rx="7" stroke="var(--sytue-neutral-400)" stroke-width="2.4"/>
+  <path d="M62 104l20-24 14 16 9-10 25 18" stroke="var(--sytue-neutral-400)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="114" cy="70" r="6" stroke="var(--sytue-neutral-400)" stroke-width="2.4"/>
+  <!-- Acento: el isotipo «sy:», el MISMO que el resto de la familia.
+
+       Antes era una «S» dibujada a mano aquí (`M133 55c2 1.6 8 1.6…`), así que
+       esta ilustración enseñaba una marca que no existe en ningún otro sitio.
+       El monograma sale de branding/logo/sytue-mark.svg, como en empty-mail.
+
+       POSICIÓN CANÓNICA: (borde derecho de la figura − 18, borde superior − 16).
+       La foto DE DELANTE acaba en x=136 y empieza en y=54, así que sale (118, 38).
+       Se toma la de delante y no la girada de atrás: la insignia iba anclada a
+       esa, y por eso flotaba despegada del marco que se lee como principal. -->
+  <rect x="118" y="38" width="30" height="30" rx="8" stroke="var(--sytue-primary-500)" stroke-width="2.4"/>
+  <g transform="translate(118.4 36.4) scale(0.75) translate(3.98 26)"><path fill="var(--sytue-primary-500)" d="M6.145 0.236Q4.694 0.236 3.577-0.177Q2.460-0.591 1.751-1.380Q1.042-2.170 0.838-3.287L3.835-3.803Q4.071-2.965 4.662-2.546Q5.253-2.127 6.241-2.127Q7.165-2.127 7.697-2.476Q8.229-2.825 8.229-3.362Q8.229-3.835 7.847-4.136Q7.466-4.437 6.682-4.598L4.608-5.027Q2.868-5.382 2.009-6.236Q1.149-7.090 1.149-8.433Q1.149-9.593 1.783-10.425Q2.417-11.258 3.545-11.709Q4.673-12.160 6.198-12.160Q7.616-12.160 8.658-11.768Q9.700-11.376 10.345-10.656Q10.989-9.937 11.204-8.959L8.347-8.454Q8.164-9.066 7.643-9.458Q7.122-9.851 6.241-9.851Q5.446-9.851 4.909-9.518Q4.372-9.185 4.372-8.626Q4.372-8.175 4.721-7.863Q5.070-7.552 5.919-7.380L8.078-6.950Q9.818-6.596 10.667-5.795Q11.516-4.995 11.516-3.706Q11.516-2.524 10.828-1.638Q10.141-0.752 8.932-0.258Q7.724 0.236 6.145 0.236M13.170 4.254L13.912 1.826L14.309 1.923Q14.954 2.095 15.458 2.020Q15.963 1.944 16.269 1.611Q16.576 1.278 16.640 0.677L16.726 0.032L12.214-12.010L15.641-12.010L17.661-5.779Q18.026-4.598 18.262-3.416Q18.337-3.019 18.423-2.610Q18.520-3.019 18.617-3.427Q18.907-4.608 19.293-5.779L21.399-12.010L24.783-12.010L19.680 1.418Q19.315 2.385 18.746 3.094Q18.176 3.803 17.328 4.189Q16.479 4.576 15.276 4.576Q14.631 4.576 14.073 4.485Q13.514 4.394 13.170 4.254M28.360 0.204Q27.576 0.204 27.039-0.328Q26.502-0.859 26.502-1.644Q26.502-2.428 27.039-2.959Q27.576-3.491 28.360-3.491Q29.144-3.491 29.682-2.959Q30.219-2.428 30.219-1.644Q30.219-0.859 29.682-0.328Q29.144 0.204 28.360 0.204M28.360-7.767Q27.576-7.767 27.039-8.298Q26.502-8.830 26.502-9.614Q26.502-10.398 27.039-10.930Q27.576-11.462 28.360-11.462Q29.144-11.462 29.682-10.930Q30.219-10.398 30.219-9.614Q30.219-8.830 29.682-8.298Q29.144-7.767 28.360-7.767"/></g>
+</svg>

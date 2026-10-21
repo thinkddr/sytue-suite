@@ -1,0 +1,33 @@
+{
+  "key": "slack-rooms",
+  "tier": "tier2",
+  "manifest": {
+    "name": "Slack",
+    "description": "Comparte los mensajes nuevos de un canal de Sytue Rooms en un destino que elijas, con tu autorización.",
+    "category": "Comunicación",
+    "color": "#4A154B",
+    "icon": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#4A154B\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><line x1=\"9\" y1=\"4\" x2=\"7\" y2=\"20\"/><line x1=\"17\" y1=\"4\" x2=\"15\" y2=\"20\"/><line x1=\"4\" y1=\"9\" x2=\"20\" y2=\"7\"/><line x1=\"4\" y1=\"17\" x2=\"20\" y2=\"15\"/></svg>",
+    "identity": {
+      "kind": "none"
+    },
+    "provisioning": "none",
+    "launch": {
+      "kind": "url",
+      "url": "https://app.slack.com/client"
+    },
+    "oauth": {
+      "authorize_url": "https://slack.com/oauth/v2/authorize",
+      "token_url": "https://slack.com/api/oauth.v2.access",
+      "scopes": [
+        "incoming-webhook"
+      ],
+      "revoke_url": "https://slack.com/api/auth.revoke"
+    },
+    "substitutes": [
+      {
+        "product": "rooms",
+        "open_url": "https://app.slack.com/client"
+      }
+    ]
+  }
+}

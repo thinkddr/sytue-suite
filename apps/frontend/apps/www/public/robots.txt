@@ -1,0 +1,18 @@
+# Sytue One — sitio publico (sytue.eu / www.sytue.eu).
+# Indexar solo lo publico. Las superficies de aplicacion (autenticadas) viven en
+# subdominios propios (one/id/mail/... .sytue.eu) con `noindex` y no cuelgan de
+# este host; aqui bloqueamos ademas rutas de utilidad y previews por si acaso.
+# docs/CONVENTIONS.md §0.8 — docs/operations.md#4-rendimiento-y-seo.
+
+User-agent: *
+Allow: /
+
+# Rutas de utilidad / no indexables del sitio publico.
+Disallow: /api/
+Disallow: /auth/
+Disallow: /cdn-cgi/
+Disallow: /*?*preview=
+Disallow: /404
+
+# Sitemap canonico (generado por @astrojs/sitemap).
+Sitemap: https://sytue.eu/sitemap-index.xml

@@ -1,0 +1,241 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Daniel Delgado Ramos
+from lib import *
+
+KEY = "zapateria"
+
+# Paleta propia de este sector (no existe en looks.py): cuero y crema.
+CUERO = dict(colores=dict(background="#fbf7f1", surface="#f1e8dc", text="#2a1f16", muted="#66564a",
+                          primary="#7a4416", on_primary="#ffffff", border="#e2d3c0", inverse="#2b1d12",
+                          on_inverse="#f8efe3"),
+             fuentes=("source-serif-4", "figtree"), peso=700, radio=(4, 8, 12), ancho=1120)
+
+NOTA = ("Precios de ejemplo: cámbialos por los tuyos. Incluyen IVA y mano de obra.",
+        "Example prices: replace them with your own. VAT and labour included.")
+
+
+def build():
+    nueva(KEY)
+    malos = comprobar_paleta("cuero", CUERO["colores"])
+    assert not malos, malos
+    look = CUERO
+    nav = [("inicio", ("Inicio", "Home")), ("tienda", ("Tienda y tallas", "Shop and sizes")),
+           ("taller", ("Taller y cuidados", "Repairs and care")), ("contacto", ("Contacto", "Contact"))]
+    horas = [(("Lunes a viernes", "Monday to Friday"),
+              ("9:30 a 13:30 y 16:30 a 20:00", "9:30 am to 1:30 pm and 4:30 pm to 8:00 pm")),
+             (("Sábado", "Saturday"), ("10:00 a 14:00", "10:00 am to 2:00 pm")),
+             (("Domingo", "Sunday"), ("Cerrado", "Closed"))]
+    cta_cab = marco([llamar(t=("Llamar", "Call")), whatsapp("ghost", ("WhatsApp", "WhatsApp"))],
+                    dir="row", gap=8, wrap=True)
+    a_catalogo = a_pagina("tienda", "catalogo")
+
+    def tipo(h, t):
+        return marco([tarjeta([h3(h), p(t, color="$muted")], estilo="linea", tag="div", enlace=a_catalogo)],
+                     tag="li", gap=0)
+
+    inicio = pagina("inicio", ("", ""), ("Zapatería", "Shoe shop"),
+                    ("Zapatería de barrio con tienda online: calzado por tipo, guía de tallas, cambios en 14 días, taller de reparación y botones de llamar y WhatsApp.",
+                     "Neighbourhood shoe shop with an online store: footwear by type, size guide, 14-day exchanges, a repair workshop and call and WhatsApp buttons."), [
+        hero(("Zapatos para andar todo el día, y un taller para que duren", "Shoes for walking all day, and a workshop to make them last"),
+             ("Calzado para toda la familia en la tienda y en la web. Y si unos zapatos se te desgastan, los arreglamos en el taller en lugar de tirarlos.",
+              "Footwear for the whole family in the shop and online. And if your shoes wear out, we repair them in the workshop instead of you throwing them away."),
+             [boton(("Ver la tienda", "Browse the shop"), a_catalogo), llamar("secondary"), whatsapp("ghost")],
+             eyebrow=("Zapatería", "Shoe shop"),
+             imagen_=("product", ("Par de zapatos de piel sobre el mostrador", "Pair of leather shoes on the counter"))),
+        seccion("features", [
+            titular(("Calzado por tipo", "Footwear by type"),
+                    ("Elige por lo que vas a hacer con ellos. Si dudas, pregúntanos: lo mejor es probarlos.",
+                     "Choose by what you will do in them. If you are unsure, ask us: trying them on is best."),
+                    eyebrow=("Catálogo", "Catalogue")),
+            rejilla([tipo(("Zapato de vestir", "Dress shoes"), ("Para trabajar, ceremonias y días que piden algo más arreglado.", "For work, ceremonies and days that call for something smarter.")),
+                     tipo(("Casual y diario", "Casual and everyday"), ("Mocasines, náuticos y zapatos cómodos para el día a día.", "Loafers, boat shoes and comfortable shoes for everyday.")),
+                     tipo(("Deportivo", "Trainers"), ("Zapatillas para caminar, para el gimnasio o para ir con vaqueros.", "Trainers for walking, the gym or wearing with jeans.")),
+                     tipo(("Botas y botines", "Boots and ankle boots"), ("De piel y de agua, para el invierno y para cuando llueve.", "Leather and waterproof ones, for winter and for when it rains.")),
+                     tipo(("Sandalias y verano", "Sandals and summer"), ("Sandalias, alpargatas y chanclas que se pueden llevar horas.", "Sandals, espadrilles and flip-flops you can wear for hours.")),
+                     tipo(("Infantil", "Children's"), ("Calzado de niño y niña, con la talla medida en tienda.", "Children's footwear, with the size measured in the shop."))],
+                    cols=3, gap=20)], tono="base", anchor="tipos"),
+        bloque_productos(("Novedades", "New in"),
+                         ("Lo último que ha llegado a la tienda. En Tienda y tallas está todo el catálogo.",
+                          "The latest arrivals. The full catalogue is on the Shop and sizes page."),
+                         limite=4, cols=4, anchor="novedades", tono="relleno",
+                         boton_=boton(("Ver todo el catálogo", "See the whole catalogue"), a_catalogo, "secondary")),
+        bloque_texto(("Un taller en la misma tienda", "A workshop in the same shop"),
+                     [("Cambiamos tapas de tacón, ponemos medias suelas, cosemos costuras que se abren y ensanchamos un zapato que aprieta. Muchos arreglos los tienes en el día.",
+                       "We replace heel tips, fit half-soles, stitch seams that have split and stretch a shoe that pinches. Many repairs are ready the same day."),
+                      ("En Taller y cuidados tienes los precios de ejemplo y unos consejos para que el calzado dure más.",
+                       "On the Repairs and care page there are example prices and some tips to make your footwear last longer.")],
+                     eyebrow=("Taller de reparación", "Repair workshop"),
+                     imagen_=("photo", ("Zapatero cosiendo una suela en el banco del taller", "Cobbler stitching a sole at the workshop bench")),
+                     anchor="taller-inicio", invertir=True),
+        bloque_checks(("Comprar con calma", "Shop with peace of mind"), [
+            ("14 días para cambiar, si no te quedan bien.", "14 days to exchange if they do not fit."),
+            ("Pruébalos en la tienda antes de decidir.", "Try them on in the shop before you decide."),
+            ("Guía de tallas para pedir bien desde casa.", "A size guide so you order correctly from home."),
+            ("Recogida en tienda o envío a domicilio.", "Pick up in the shop or home delivery.")],
+            eyebrow=("Tienda online", "Online store"), tono="relleno", anchor="comprar"),
+        bloque_opiniones(("Lo que dicen nuestros clientes", "What our customers say"),
+                         [("el calzado", "the footwear"), ("el arreglo", "the repair"), ("el trato", "the service")], tono="base"),
+        bloque_cta(("¿Buscas un zapato en concreto?", "Looking for a particular shoe?"),
+                   ("Dinos el modelo y la talla y te decimos si lo tenemos.", "Tell us the model and size and we will say whether we have it."),
+                   [whatsapp("primary"), llamar("ghost")], tono="relleno"),
+    ])
+
+    tienda = pagina("tienda", ("tienda", "shop"), ("Tienda y tallas", "Shop and sizes"),
+                    ("Catálogo de calzado con carrito, guía de tallas, cambios y devoluciones en 14 días y recogida en tienda o envío.",
+                     "Footwear catalogue with a cart, size guide, 14-day exchanges and returns, and in-store pickup or delivery."), [
+        hero(("Tienda y tallas", "Shop and sizes"),
+             ("Añade al carrito y paga online. Antes de elegir, mira la guía de tallas: un número de más o de menos se nota.",
+              "Add to the cart and pay online. Before choosing, check the size guide: one size too big or too small shows."),
+             [boton(("Guía de tallas", "Size guide"), a_ancla("tallas"), "secondary"), whatsapp("ghost")], variante="texto"),
+        bloque_productos(("Todo el catálogo", "Full catalogue"), None, limite=24, cols=4, anchor="catalogo"),
+        seccion("pricing", [
+            titular(("Guía de tallas", "Size guide"),
+                    ("Apoya el pie sobre un folio por la tarde, cuando está más hinchado, y marca el talón y el dedo más largo. Mide la distancia en centímetros y busca tu talla.",
+                     "Stand on a sheet of paper in the afternoon, when your feet are most swollen, and mark the heel and the longest toe. Measure the distance in centimetres and find your size.")),
+            tabla(("Talla del calzado y longitud del pie, en centímetros", "Shoe size and foot length, in centimetres"),
+                  [("Talla (UE)", "Size (EU)"), ("Longitud del pie", "Foot length"), ("Talla (Reino Unido)", "Size (UK)")],
+                  [(("36", "36"), ("22,8", "22.8"), ("3,5", "3.5")),
+                   (("37", "37"), ("23,5", "23.5"), ("4", "4")),
+                   (("38", "38"), ("24,1", "24.1"), ("5", "5")),
+                   (("39", "39"), ("24,8", "24.8"), ("6", "6")),
+                   (("40", "40"), ("25,4", "25.4"), ("6,5", "6.5")),
+                   (("41", "41"), ("26,0", "26.0"), ("7,5", "7.5")),
+                   (("42", "42"), ("26,7", "26.7"), ("8", "8")),
+                   (("43", "43"), ("27,3", "27.3"), ("9", "9")),
+                   (("44", "44"), ("28,0", "28.0"), ("9,5", "9.5"))]),
+            peq(("Medidas orientativas: cada fabricante usa su horma. Si estás entre dos tallas, elige la mayor, sobre todo en botas y en calzado cerrado. En niños, mide siempre el pie y deja un dedo de margen.",
+                 "Approximate measurements: each maker uses its own last. If you are between sizes, choose the larger, especially in boots and closed shoes. For children, always measure the foot and leave a thumb's width of room."),
+                color="$muted"),
+        ], anchor="tallas", tono="relleno", gap=28),
+        bloque_pasos(("Cambios y devoluciones", "Exchanges and returns"), [
+            (("Avísanos", "Tell us"),
+             ("Escríbenos o llámanos en los 14 días siguientes a recibir o recoger el pedido.",
+              "Message or call us within 14 days of receiving or collecting your order.")),
+            (("Prepara el par", "Get the pair ready"),
+             ("Sin usar fuera de casa, con la suela limpia, en su caja y con el ticket o el justificante del pedido.",
+              "Not worn outdoors, with a clean sole, in the box and with the receipt or order confirmation.")),
+            (("Tráelo o envíalo", "Bring it or send it"),
+             ("En la tienda no cuesta nada. Por correo, el envío de vuelta lo pagas tú, salvo que el par llegue defectuoso o sea otro.",
+              "In the shop it costs nothing. By post, you pay the return postage, unless the pair arrives faulty or is the wrong one.")),
+            (("Otra talla o reembolso", "Another size or a refund"),
+             ("Te damos otra talla u otro modelo, o te devolvemos el dinero por el mismo medio de pago.",
+              "We give you another size or model, or refund you by the same payment method.")),
+        ], anchor="devoluciones"),
+        bloque_checks(("Recogida y envío", "Pickup and delivery"), [
+            ("Recogida en tienda, sin coste: te avisamos cuando el pedido está preparado.",
+             "Pickup in the shop at no cost: we tell you when your order is ready."),
+            ("Envío a domicilio con número de seguimiento. El coste lo ves antes de pagar.",
+             "Home delivery with a tracking number. You see the cost before you pay."),
+            ("Pedidos de calzado a medida o personalizado: no tienen cambio ni devolución.",
+             "Made-to-measure or personalised footwear orders cannot be exchanged or returned.")],
+            tono="relleno", cols=1, anchor="envios"),
+        bloque_faq(("Preguntas frecuentes", "Frequently asked questions"), [
+            (("¿Cómo sé qué talla pedir?", "How do I know which size to order?"),
+             ("Mide tu pie con la guía de arriba. Si dudas, mándanos la medida por WhatsApp y te decimos qué número elegir en ese modelo.",
+              "Measure your foot with the guide above. If you are unsure, send us the measurement on WhatsApp and we will tell you which size to pick in that model.")),
+            (("¿Puedo probarlos en la tienda antes de comprar online?", "Can I try them on in the shop before buying online?"),
+             ("Sí, pasa por la tienda a probártelos. Si luego los pides desde casa, sabrás tu talla exacta.",
+              "Yes, come to the shop to try them on. If you order from home afterwards, you will know your exact size.")),
+            (("¿Cómo puedo pagar?", "How can I pay?"),
+             ("Online, con tarjeta. Si recoges en tienda, también puedes pagar al recoger.",
+              "Online, by card. If you pick up in the shop, you can also pay on collection.")),
+        ], tono="base"),
+    ])
+
+    taller = pagina("taller", ("taller", "repairs"), ("Taller y cuidados", "Repairs and care"),
+                    ("Taller de reparación de calzado con precios de ejemplo y plazos, cómo funciona un arreglo y consejos para cuidar el calzado.",
+                     "Shoe repair workshop with example prices and timescales, how a repair works and tips for looking after your footwear."), [
+        hero(("Taller de reparación de calzado", "Shoe repair workshop"),
+             ("Trae los zapatos, las botas o el bolso y te decimos qué se puede arreglar, cuánto cuesta y cuándo lo tienes. Si prefieres, mándanos una foto por WhatsApp.",
+              "Bring your shoes, boots or bag and we will tell you what can be repaired, what it costs and when it is ready. If you prefer, send us a photo on WhatsApp."),
+             [boton(("Ver precios", "See prices"), a_ancla("arreglos"), "secondary"), llamar("primary"), whatsapp("ghost")],
+             variante="texto"),
+        bloque_precios(("Arreglos y precios", "Repairs and prices"), ("Arreglos de calzado con plazo y precio", "Footwear repairs with timescale and price"),
+                       [("Arreglo", "Repair"), ("Plazo", "Time"), ("Precio", "Price")],
+                       [(("Tapas de tacón", "Heel tips"), ("Mientras esperas", "While you wait"), desde(7)),
+                        (("Medias suelas", "Half-soles"), ("24 a 48 horas", "24 to 48 hours"), desde(25)),
+                        (("Suela completa", "Full resole"), ("3 a 5 días", "3 to 5 days"), desde(45)),
+                        (("Cosido de una costura abierta", "Stitching a split seam"), ("24 a 48 horas", "24 to 48 hours"), desde(10)),
+                        (("Cambio de cremallera de bota", "Boot zip replacement"), ("2 a 3 días", "2 to 3 days"), desde(18)),
+                        (("Ensanchado de un zapato", "Stretching a shoe"), ("24 horas", "24 hours"), desde(12)),
+                        (("Limpieza y teñido de piel", "Leather cleaning and dyeing"), ("2 a 3 días", "2 to 3 days"), desde(15)),
+                        (("Pegado de suela despegada", "Re-gluing a loose sole"), ("24 horas", "24 hours"), desde(9))],
+                       intro=("El precio final depende del zapato y del estado de la suela: te lo decimos al verlo, antes de empezar.",
+                              "The final price depends on the shoe and the state of the sole: we tell you when we see it, before we start."),
+                       nota=NOTA, anchor="arreglos", tono="relleno"),
+        bloque_pasos(("Cómo funciona un arreglo", "How a repair works"), [
+            (("Tráenos el par", "Bring us the pair"),
+             ("En la tienda, o una foto por WhatsApp para que te digamos si tiene arreglo.",
+              "In the shop, or a photo on WhatsApp so we can say whether it can be repaired.")),
+            (("Lo miramos contigo", "We look at it with you"),
+             ("Te decimos qué se puede hacer, cuánto cuesta y cuándo estará.", "We tell you what can be done, what it costs and when it will be ready.")),
+            (("Lo arreglamos", "We repair it"),
+             ("En el taller de la tienda. Si surge algo más, te llamamos antes de seguir.",
+              "In the shop's workshop. If something else turns up, we call you before going on.")),
+            (("Te avisamos y lo recoges", "We call you and you collect it"),
+             ("Pagas al recogerlo. Si lo dejas más de un mes, te avisamos antes de nada.",
+              "You pay when you collect it. If you leave it more than a month, we contact you first.")),
+        ], anchor="como-funciona"),
+        bloque_valores(("Cómo cuidar el calzado", "How to look after your footwear"), [
+            (("Un día de descanso", "A day of rest"),
+             ("Alterna dos pares. La piel necesita secarse y recuperar la forma entre un uso y otro.",
+              "Alternate two pairs. Leather needs to dry and regain its shape between wears.")),
+            (("Limpia en seco primero", "Dry-clean first"),
+             ("Quita el polvo con un cepillo y, si hay barro, déjalo secar y cepíllalo. El agua, al final y con un paño apenas húmedo.",
+              "Brush off the dust and, if there is mud, let it dry and brush it off. Water comes last, with a barely damp cloth.")),
+            (("Hidrata la piel", "Condition the leather"),
+             ("Una crema o un betún a juego, de vez en cuando, evita que se agriete. Extiéndelo fino y saca brillo con un paño.",
+              "A cream or matching polish now and then stops it cracking. Spread it thin and buff with a cloth.")),
+            (("Si se mojan, que sequen despacio", "If they get wet, dry them slowly"),
+             ("Rellénalos con papel y déjalos al aire. Nada de radiadores ni secador: la piel se endurece y se agrieta.",
+              "Stuff them with paper and leave them in the open air. No radiators or hairdryers: the leather hardens and cracks.")),
+            (("Usa calzador y horma", "Use a shoehorn and shoe trees"),
+             ("El calzador cuida el talón. Una horma de madera mantiene la forma y absorbe la humedad.",
+              "A shoehorn protects the heel. A wooden shoe tree keeps the shape and absorbs moisture.")),
+            (("Arréglalos a tiempo", "Repair them in time"),
+             ("Cambiar una tapa a tiempo es barato; esperar a que el tacón se desgaste hasta el clavo, no.",
+              "Replacing a heel tip in time is cheap; waiting until the heel wears down to the nail is not.")),
+        ], eyebrow=("Consejos", "Tips"), estilo="borde", tono="relleno", anchor="cuidados"),
+        bloque_faq(("Preguntas frecuentes", "Frequently asked questions"), [
+            (("¿Se puede arreglar cualquier zapato?", "Can any shoe be repaired?"),
+             ("La mayoría sí. Algunas zapatillas deportivas y los zapatos pegados de fábrica sin costuras no compensan: te lo decimos con sinceridad al verlos.",
+              "Most can. Some trainers and factory-glued shoes without stitching are not worth it: we tell you honestly when we see them.")),
+            (("¿Necesito cita?", "Do I need an appointment?"),
+             ("No. Tapas y pegados, mientras esperas. Para lo demás, déjalo y te avisamos.",
+              "No. Heel tips and re-gluing while you wait. For the rest, leave them and we will call you.")),
+            (("¿Reparáis bolsos y cinturones?", "Do you repair bags and belts?"),
+             ("Cremalleras, asas y cosidos, sí. Pregúntanos por WhatsApp con una foto.",
+              "Zips, handles and stitching, yes. Ask us on WhatsApp with a photo.")),
+        ], tono="base"),
+        bloque_cta(("¿Tienes unos zapatos que arreglar?", "Have shoes that need repairing?"), None,
+                   [llamar(), whatsapp("ghost")], tono="relleno"),
+    ])
+
+    cont = pagina("contacto", ("contacto", "contact"), ("Contacto", "Contact"),
+                  ("Horario de la zapatería, cómo llegar, teléfono, WhatsApp y formulario para pedidos, tallas y arreglos.",
+                   "Shop hours, how to get here, phone, WhatsApp and a form for orders, sizes and repairs."), [
+        hero(("Contacto", "Contact"),
+             ("Llámanos, escríbenos por WhatsApp o pasa por la tienda. Para dudas de talla, mándanos la medida del pie; para un arreglo, una foto.",
+              "Call us, message us on WhatsApp or come by the shop. For size questions, send us your foot measurement; for a repair, a photo."),
+             [llamar(), whatsapp()], variante="texto"),
+        bloque_contacto(("Estamos en la tienda", "We are in the shop"),
+                        ("Si ya has hecho un pedido, dinos el número que te llegó por correo.",
+                         "If you have already placed an order, tell us the number that came by email."),
+                        campos_consulta(servicios=[("Un pedido", "An order"), ("Talla o medidas", "Size or measurements"),
+                                                   ("Cambio o devolución", "Exchange or return"), ("Arreglo de calzado", "Shoe repair"),
+                                                   ("Otra cosa", "Something else")]),
+                        ("Enviar consulta", "Send enquiry"), horas),
+        bloque_mapa(("Cómo llegar a la tienda", "How to get to the shop"), tono="relleno"),
+    ])
+
+    return plantilla(KEY, ("Zapatería", "Shoe shop"),
+                     ("Zapatería con tienda online: calzado por tipo y catálogo con carrito, guía de tallas, cambios en 14 días, taller de reparación con precios y consejos de cuidado.",
+                      "Shoe shop with an online store: footwear by type and a catalogue with cart, size guide, 14-day exchanges, repair workshop with prices and care tips."),
+                     "comercio", ("zapateria zapateria de barrio zapatos calzado tienda de zapatos tienda de calzado zapatero arreglo de calzado reparacion de calzado botas zapatillas sandalias tallas tienda online",
+                                  "shoe shop shoe store footwear shoes cobbler shoe repair boots trainers sandals sizes online shop local shop"),
+                     look, cabecera(nav, cta_cab, tienda=True),
+                     pie(nav, ("Zapatería de barrio y taller de reparación de calzado, en la tienda y online.",
+                               "Neighbourhood shoe shop and shoe repair workshop, in the shop and online."),
+                         ("Lunes a viernes 9:30 a 13:30 y 16:30 a 20:00. Sábado 10:00 a 14:00.",
+                          "Monday to Friday 9:30 am to 1:30 pm and 4:30 pm to 8 pm. Saturday 10 am to 2 pm.")),
+                     [inicio, tienda, taller, cont], tienda=True)

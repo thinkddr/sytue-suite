@@ -1,0 +1,314 @@
+{
+ "pais": "PT",
+ "verificado": true,
+ "moneda": "EUR",
+ "formas": [
+  {
+   "clave": "eni",
+   "nombre": "Empresário em nome individual (ENI)",
+   "tipo": "persona_fisica"
+  },
+  {
+   "clave": "profissional",
+   "nombre": "Trabalhador independente",
+   "tipo": "persona_fisica"
+  },
+  {
+   "clave": "unipessoal",
+   "nombre": "Sociedade Unipessoal por Quotas",
+   "tipo": "sociedad"
+  },
+  {
+   "clave": "lda",
+   "nombre": "Sociedade por Quotas (Lda.)",
+   "tipo": "sociedad"
+  },
+  {
+   "clave": "sa",
+   "nombre": "Sociedade Anónima (SA)",
+   "tipo": "sociedad"
+  }
+ ],
+ "portales": {
+  "financas": {
+   "nombre": "Portal das Finanças",
+   "url": "https://www.portaldasfinancas.gov.pt/"
+  },
+  "ss": {
+   "nombre": "Segurança Social Direta",
+   "url": "https://app.seg-social.pt/"
+  },
+  "ies": {
+   "nombre": "IES — Informação Empresarial Simplificada",
+   "url": "https://www.ies.gov.pt/"
+  }
+ },
+ "obligaciones": [
+  {
+   "clave": "pt_iva_t",
+   "nombre": "Declaração periódica de IVA (trimestral)",
+   "concepto": "iva_periodica",
+   "ambito": "fiscal",
+   "periodicidad": "trimestral",
+   "plazos": {
+    "T": "20+2"
+   },
+   "margen_dias": 7,
+   "portal": "financas",
+   "aplica": {
+    "condiciones": [
+     "iva",
+     "!iva_mensual"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 15000,
+    "nota": "Entrega até ao dia 20 e pagamento até ao dia 25 do 2.º mês seguinte ao período (art. 41.º CIVA). Coima de 150 € a 3.750 € por falta ou atraso na entrega (art. 116 RGIT), reduzida se regularizada voluntariamente; juros de mora de 4 % ao ano."
+   },
+   "calculo": {
+    "tipo": "saldo_neto",
+    "haber": [
+     "477"
+    ],
+    "debe": [
+     "472"
+    ]
+   }
+  },
+  {
+   "clave": "pt_iva_m",
+   "nombre": "Declaração periódica de IVA (mensal)",
+   "concepto": "iva_periodica",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "20+2"
+   },
+   "margen_dias": 7,
+   "portal": "financas",
+   "aplica": {
+    "condiciones": [
+     "iva",
+     "iva_mensual"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 15000,
+    "nota": "Entrega até ao dia 20 e pagamento até ao dia 25 do 2.º mês seguinte ao período (art. 41.º CIVA). Coima de 150 € a 3.750 € (art. 116 RGIT); juros de mora de 4 % ao ano."
+   },
+   "calculo": {
+    "tipo": "saldo_neto",
+    "haber": [
+     "477"
+    ],
+    "debe": [
+     "472"
+    ]
+   }
+  },
+  {
+   "clave": "pt_recap",
+   "nombre": "Declaração recapitulativa",
+   "concepto": "operaciones_intracomunitarias",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "20"
+   },
+   "margen_dias": 7,
+   "portal": "financas",
+   "aplica": {
+    "condiciones": [
+     "intracomunitario"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 15000,
+    "nota": "Coima de 150 € a 3.750 €."
+   }
+  },
+  {
+   "clave": "pt_dmr",
+   "nombre": "Declaração Mensal de Remunerações (DMR)",
+   "concepto": "nominas",
+   "ambito": "laboral",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "10"
+   },
+   "margen_dias": 7,
+   "portal": "financas",
+   "aplica": {
+    "condiciones": [
+     "empleados"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 15000,
+    "nota": "Coima de 150 € a 3.750 €."
+   }
+  },
+  {
+   "clave": "pt_retencoes",
+   "nombre": "Retenções na fonte (DMR / guia)",
+   "concepto": "retenciones_trabajo",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "20"
+   },
+   "margen_dias": 7,
+   "portal": "financas",
+   "aplica": {
+    "condiciones": [
+     "empleados"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_pct_mes": 0.33,
+    "recargo_max_pct": 10,
+    "nota": "Juros de mora de 4 % ao ano e coima de 30 % a 100 % do imposto em falta (art. 114 RGIT)."
+   }
+  },
+  {
+   "clave": "pt_ss",
+   "nombre": "Contribuições para a Segurança Social",
+   "concepto": "seguridad_social",
+   "ambito": "laboral",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "20"
+   },
+   "margen_dias": 7,
+   "portal": "ss",
+   "aplica": {
+    "condiciones": [
+     "empleados"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_pct_mes": 0.33,
+    "recargo_max_pct": 10,
+    "nota": "Juros de mora e contraordenação de 50 € a 1.250 € (leve)."
+   }
+  },
+  {
+   "clave": "pt_ss_ti",
+   "nombre": "Contribuições de trabalhador independente",
+   "concepto": "cuota_autonomos",
+   "ambito": "laboral",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "20"
+   },
+   "margen_dias": 7,
+   "portal": "ss",
+   "aplica": {
+    "tipos": [
+     "persona_fisica"
+    ]
+   },
+   "sancion": {
+    "tipo": "nota",
+    "nota": "Juros de mora sobre as contribuições em atraso; declaração trimestral de rendimentos até ao último dia de janeiro, abril, julho e outubro."
+   }
+  },
+  {
+   "clave": "pt_irc",
+   "nombre": "Modelo 22 (IRC)",
+   "concepto": "sociedades_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "05-31+1"
+   },
+   "margen_dias": 30,
+   "portal": "financas",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 15000,
+    "nota": "Coima de 150 € a 3.750 €; juros compensatórios."
+   }
+  },
+  {
+   "clave": "pt_pc",
+   "nombre": "Pagamentos por conta de IRC",
+   "concepto": "pago_fraccionado_sociedades",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "1P": "07-31",
+    "2P": "09-30",
+    "3P": "12-15"
+   },
+   "margen_dias": 7,
+   "portal": "financas",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_pct_mes": 0.33,
+    "recargo_max_pct": 10,
+    "nota": "Juros de mora de 4 % ao ano."
+   }
+  },
+  {
+   "clave": "pt_ies",
+   "nombre": "IES / Depósito de contas",
+   "concepto": "cuentas_anuales",
+   "ambito": "mercantil",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "07-15+1"
+   },
+   "margen_dias": 30,
+   "portal": "ies",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 15000,
+    "nota": "Coima de 150 € a 3.750 € por falta de entrega da IES."
+   }
+  },
+  {
+   "clave": "pt_irs",
+   "nombre": "Modelo 3 (IRS)",
+   "concepto": "renta_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "06-30+1"
+   },
+   "margen_dias": 30,
+   "portal": "financas",
+   "aplica": {
+    "tipos": [
+     "persona_fisica"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 2500,
+    "nota": "Coima de 25 € a 500 € se entregue até 30 dias após o prazo (art. 116 RGIT)."
+   }
+  }
+ ]
+}

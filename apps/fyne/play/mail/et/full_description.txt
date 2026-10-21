@@ -1,0 +1,19 @@
+Privaatne Euroopa e-post üle JMAP-i — ilma jälgijate ja reklaamideta.
+
+• Kiire postkast lõimede, siltide, filtrite ja otsinguga.
+• Manused otse Sytue Drive’ist.
+• E-kirjast Calendari sündmus.
+• Krüpteeritud edastamisel (TLS 1.3). Sytue taristu asub ELis. Väliste teenuste asukoht sõltub nende pakkujast.
+• Vestluslõimed lugemise, vastamise ja edasisaatmisega ühe klõpsuga.
+• Kaustad, värvilised sildid ja operaatoritega otsing (from:, has:attachment, is:unread…).
+• Automaatsed reeglid, mis saabuva posti arhiveerivad, sildistavad või teisaldavad.
+• Ajastatud saatmine ja „Võta saatmine tagasi“.
+• Allkirjad, saatja aliased ja automaatne puhkusevastus.
+• Jagatud ja delegeeritud postkastid lugemis- ja saatmisõigustega.
+• Vormindatud teksti koostaja, manused Sytue Drive’ist ilma faile dubleerimata.
+• Kaugsisu on vaikimisi blokeeritud: keegi ei saa teada, millal te e-kirja avate.
+• Allkirjastatud post (PGP ja S/MIME) tuvastatakse ja märgitakse; TLS edastamisel.
+• Juurdepääs ka Thunderbirdist, Outlookist, Apple Mailist või telefonist rakenduseparoolidega.
+• Saajad kiipidena, Contactsi aadressiraamat ühe klõpsu kaugusel ja hoiatus, kui kirjutate „manuses“, aga midagi ei lisa.
+
+Krüpteeritud edastamisel (TLS 1.3). Sytue taristu asub ELis. Väliste teenuste asukoht sõltub nende pakkujast.

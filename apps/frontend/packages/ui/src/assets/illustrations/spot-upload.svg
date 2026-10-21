@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120" fill="none" role="img" aria-label="Sube tu primer archivo">
+  <title>Subir archivo</title>
+  <!-- Zona de arrastre (borde punteado, neutro) -->
+  <rect x="26" y="30" width="68" height="60" rx="10" stroke="var(--sytue-neutral-300)" stroke-width="2.4" stroke-dasharray="6 7"/>
+  <!-- Flecha de subida: acento azul -->
+  <line x1="60" y1="76" x2="60" y2="46" stroke="var(--sytue-primary-500)" stroke-width="2.4" stroke-linecap="round"/>
+  <path d="M50 56l10-10 10 10" stroke="var(--sytue-primary-500)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

@@ -1,0 +1,16 @@
+Skupno urejanje v realnem času
+
+• Vse shranjeno v vašem evropskem Drive.
+• Skupno urejanje v realnem času, s prisotnostjo in brez medsebojnega oviranja.
+• Trak z zavihki: Osnovno, Vstavljanje, Sklici, Pošiljanje in Pregled.
+• Tabele, slike, oblike, SmartArt, grafikoni, simboli in vodni žigi.
+• Sklici: kazalo vsebine, sprotne opombe, citati in bibliografija.
+• Pošiljanje: spajanje dokumentov za pisma in nalepke.
+• Komentarji v nitih, pregled sprememb in različice.
+• Neobvezni pomočnik z umetno inteligenco za preoblikovanje, prevajanje ali povzemanje, samo če ga vaša organizacija omogoči.
+• Izvoz v ODT, DOCX in PDF; odpiranje datotek Word iz Drive.
+• Glave, noge, številčenje strani in bloki za večkratno uporabo.
+• Samodejno shranjevanje v vaš evropski Drive, z zgodovino.
+• Prenos z začetne strani kot PDF, HTML, Markdown, OpenDocument ali Microsoft Office.
+
+Šifrirano med prenosom (TLS 1.3). Infrastruktura Sytue je v EU. Lokacija zunanjih storitev je odvisna od njihovega ponudnika.

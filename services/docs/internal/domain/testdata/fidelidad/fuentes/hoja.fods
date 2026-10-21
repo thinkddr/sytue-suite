@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: Apache-2.0
+     Copyright (c) 2026 Daniel Delgado Ramos
+     Fuente del corpus de fidelidad (hoja de cálculo). Datos inventados por Sytue.
+     De aquí salen hoja.xlsx y hoja.ods con LibreOffice (ver ../generar.sh). -->
+<office:document xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+  xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"
+  xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
+  xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"
+  xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0"
+  xmlns:number="urn:oasis:names:tc:opendocument:xmlns:datastyle:1.0"
+  xmlns:of="urn:oasis:names:tc:opendocument:xmlns:of:1.2"
+  xmlns:calcext="urn:org:documentfoundation:names:experimental:calc:xmlns:calcext:1.0"
+  office:version="1.3" office:mimetype="application/vnd.oasis.opendocument.spreadsheet">
+ <office:styles>
+  <style:style style:name="Default" style:family="table-cell"/>
+  <style:style style:name="Destacado" style:family="table-cell" style:parent-style-name="Default">
+   <style:table-cell-properties fo:background-color="#fde9d9"/>
+  </style:style>
+ </office:styles>
+ <office:automatic-styles>
+  <number:currency-style style:name="N1P0" style:volatile="true">
+   <number:number number:decimal-places="2" number:min-decimal-places="2" number:min-integer-digits="1" number:grouping="true"/>
+   <number:text> </number:text>
+   <number:currency-symbol number:language="es" number:country="ES">€</number:currency-symbol>
+  </number:currency-style>
+  <number:currency-style style:name="N1">
+   <style:text-properties fo:color="#ff0000"/>
+   <number:text>-</number:text>
+   <number:number number:decimal-places="2" number:min-decimal-places="2" number:min-integer-digits="1" number:grouping="true"/>
+   <number:text> </number:text>
+   <number:currency-symbol number:language="es" number:country="ES">€</number:currency-symbol>
+   <style:map style:condition="value()&gt;=0" style:apply-style-name="N1P0"/>
+  </number:currency-style>
+  <number:percentage-style style:name="N2">
+   <number:number number:decimal-places="0" number:min-decimal-places="0" number:min-integer-digits="1"/>
+   <number:text>%</number:text>
+  </number:percentage-style>
+  <number:date-style style:name="N3">
+   <number:day number:style="long"/><number:text>/</number:text><number:month number:style="long"/><number:text>/</number:text><number:year number:style="long"/>
+  </number:date-style>
+  <number:number-style style:name="N4">
+   <number:number number:decimal-places="3" number:min-decimal-places="3" number:min-integer-digits="1"/>
+  </number:number-style>
+  <number:boolean-style style:name="N5"><number:boolean/></number:boolean-style>
+  <style:style style:name="co1" style:family="table-column"><style:table-column-properties style:column-width="4cm"/></style:style>
+  <style:style style:name="co2" style:family="table-column"><style:table-column-properties style:column-width="2.5cm"/></style:style>
+  <style:style style:name="co3" style:family="table-column"><style:table-column-properties style:column-width="2.2cm"/></style:style>
+  <style:style style:name="ro1" style:family="table-row"><style:table-row-properties style:row-height="0.8cm" style:use-optimal-row-height="false"/></style:style>
+  <style:style style:name="ro2" style:family="table-row"><style:table-row-properties style:row-height="0.452cm" style:use-optimal-row-height="true"/></style:style>
+  <style:style style:name="ta1" style:family="table" style:master-page-name="Default"><style:table-properties table:display="true"/></style:style>
+  <style:style style:name="ce1" style:family="table-cell" style:parent-style-name="Default">
+   <style:table-cell-properties fo:background-color="#ddebf7"/>
+   <style:text-properties fo:color="#1f3864" fo:font-weight="bold"/>
+  </style:style>
+  <style:style style:name="ce2" style:family="table-cell" style:parent-style-name="Default" style:data-style-name="N5"/>
+  <style:style style:name="ce3" style:family="table-cell" style:parent-style-name="Default" style:data-style-name="N3"/>
+  <style:style style:name="ce4" style:family="table-cell" style:parent-style-name="Default" style:data-style-name="N1"/>
+  <style:style style:name="ce5" style:family="table-cell" style:parent-style-name="Default" style:data-style-name="N2"/>
+  <style:style style:name="ce6" style:family="table-cell" style:parent-style-name="Default" style:data-style-name="N4"/>
+ </office:automatic-styles>
+ <office:body>
+  <office:spreadsheet>
+   <table:content-validations>
+    <table:content-validation table:name="val1" table:condition="of:cell-content-is-in-list(&quot;Norte&quot;;&quot;Sur&quot;;&quot;Este&quot;)" table:allow-empty-cell="true" table:display-list="unsorted" table:base-cell-address="Ventas.A2">
+     <table:error-message table:message-type="stop" table:display="true"><text:p>Zona no válida</text:p></table:error-message>
+    </table:content-validation>
+    <table:content-validation table:name="val2" table:condition="of:cell-content-is-whole-number() and cell-content()&gt;0" table:allow-empty-cell="true" table:base-cell-address="Ventas.B2">
+     <table:error-message table:message-type="stop" table:display="true"/>
+    </table:content-validation>
+   </table:content-validations>
+   <table:table table:name="Ventas" table:style-name="ta1">
+    <table:table-column table:style-name="co1" table:default-cell-style-name="Default"/>
+    <table:table-column table:style-name="co2" table:default-cell-style-name="Default"/>
+    <table:table-column table:style-name="co3" table:number-columns-repeated="6" table:default-cell-style-name="Default"/>
+    <table:table-row table:style-name="ro1">
+     <table:table-cell table:style-name="ce1" office:value-type="string"><text:p>Zona</text:p></table:table-cell>
+     <table:table-cell table:style-name="ce1" office:value-type="string"><text:p>Kilos</text:p></table:table-cell>
+     <table:table-cell table:style-name="ce1" office:value-type="string"><text:p>Doble</text:p></table:table-cell>
+     <table:table-cell table:style-name="ce1" office:value-type="string"><text:p>Ecológico</text:p></table:table-cell>
+     <table:table-cell table:style-name="ce1" office:value-type="string"><text:p>Fecha</text:p></table:table-cell>
+     <table:table-cell table:style-name="ce1" office:value-type="string"><text:p>Importe</text:p></table:table-cell>
+     <table:table-cell table:style-name="ce1" office:value-type="string"><text:p>Margen</text:p></table:table-cell>
+     <table:table-cell table:style-name="ce1" office:value-type="string"><text:p>Densidad</text:p></table:table-cell>
+    </table:table-row>
+    <table:table-row table:style-name="ro2">
+     <table:table-cell table:content-validation-name="val1" office:value-type="string"><text:p>Norte</text:p></table:table-cell>
+     <table:table-cell table:content-validation-name="val2" office:value-type="float" office:value="1200"><text:p>1200</text:p></table:table-cell>
+     <table:table-cell table:formula="of:=[.B2]*2" office:value-type="float" office:value="2400"><text:p>2400</text:p></table:table-cell>
+     <table:table-cell table:style-name="ce2" office:value-type="boolean" office:boolean-value="true"><text:p>VERDADERO</text:p></table:table-cell>
+     <table:table-cell table:style-name="ce3" office:value-type="date" office:date-value="2026-03-15"><text:p>15/03/2026</text:p></table:table-cell>
+     <table:table-cell table:style-name="ce4" office:value-type="currency" office:currency="EUR" office:value="1234.5"><text:p>1.234,50 €</text:p></table:table-cell>
+     <table:table-cell table:style-name="ce5" office:value-type="percentage" office:value="0.25"><text:p>25%</text:p></table:table-cell>
+     <table:table-cell table:style-name="ce6" office:value-type="float" office:value="3.14159"><text:p>3,142</text:p></table:table-cell>
+    </table:table-row>
+    <table:table-row table:style-name="ro2">
+     <table:table-cell table:content-validation-name="val1" office:value-type="string"><text:p>Sur</text:p></table:table-cell>
+     <table:table-cell table:content-validation-name="val2" office:value-type="float" office:value="800"><text:p>800</text:p></table:table-cell>
+     <table:table-cell table:formula="of:=[.B3]*2" office:value-type="float" office:value="1600"><text:p>1600</text:p></table:table-cell>
+     <table:table-cell table:style-name="ce2" office:value-type="boolean" office:boolean-value="false"><text:p>FALSO</text:p></table:table-cell>
+     <table:table-cell table:style-name="ce3" office:value-type="date" office:date-value="2026-03-20"><text:p>20/03/2026</text:p></table:table-cell>
+     <table:table-cell table:style-name="ce4" office:value-type="currency" office:currency="EUR" office:value="980"><text:p>980,00 €</text:p></table:table-cell>
+     <table:table-cell table:style-name="ce5" office:value-type="percentage" office:value="0.18"><text:p>18%</text:p></table:table-cell>
+     <table:table-cell table:style-name="ce6" office:value-type="float" office:value="2.5"><text:p>2,500</text:p></table:table-cell>
+    </table:table-row>
+    <table:table-row table:style-name="ro2">
+     <table:table-cell table:content-validation-name="val1" office:value-type="string"><text:p>Este</text:p></table:table-cell>
+     <table:table-cell table:content-validation-name="val2" office:value-type="float" office:value="1500"><text:p>1500</text:p></table:table-cell>
+     <table:table-cell table:formula="of:=[.B4]*2" office:value-type="float" office:value="3000"><text:p>3000</text:p></table:table-cell>
+     <table:table-cell table:style-name="ce2" office:value-type="boolean" office:boolean-value="true"><text:p>VERDADERO</text:p></table:table-cell>
+     <table:table-cell table:style-name="ce3" office:value-type="date" office:date-value="2026-03-28"><text:p>28/03/2026</text:p></table:table-cell>
+     <table:table-cell table:style-name="ce4" office:value-type="currency" office:currency="EUR" office:value="1520.75"><text:p>1.520,75 €</text:p></table:table-cell>
+     <table:table-cell table:style-name="ce5" office:value-type="percentage" office:value="0.31"><text:p>31%</text:p></table:table-cell>
+     <table:table-cell table:style-name="ce6" office:value-type="float" office:value="1.25"><text:p>1,250</text:p></table:table-cell>
+    </table:table-row>
+    <table:table-row table:style-name="ro2"><table:table-cell table:number-columns-repeated="8"/></table:table-row>
+    <table:table-row table:style-name="ro2">
+     <table:table-cell table:number-columns-spanned="3" table:number-rows-spanned="1" office:value-type="string"><text:p>Total del trimestre</text:p></table:table-cell>
+     <table:covered-table-cell table:number-columns-repeated="2"/>
+     <table:table-cell table:number-columns-repeated="5"/>
+    </table:table-row>
+    <calcext:conditional-formats>
+     <calcext:conditional-format calcext:target-range-address="Ventas.B2:Ventas.B4">
+      <calcext:condition calcext:apply-style-name="Destacado" calcext:value="&gt;1000" calcext:base-cell-address="Ventas.B2"/>
+     </calcext:conditional-format>
+    </calcext:conditional-formats>
+   </table:table>
+   <table:table table:name="Resumen" table:style-name="ta1">
+    <table:table-column table:style-name="co1" table:default-cell-style-name="Default"/>
+    <table:table-column table:style-name="co2" table:default-cell-style-name="Default"/>
+    <table:table-row table:style-name="ro2">
+     <table:table-cell office:value-type="string"><text:p>Total kilos</text:p></table:table-cell>
+     <table:table-cell table:formula="of:=SUM([$Ventas.B2:.B4])" office:value-type="float" office:value="3500"><text:p>3500</text:p></table:table-cell>
+    </table:table-row>
+    <table:table-row table:style-name="ro2">
+     <table:table-cell office:value-type="string"><text:p>Media</text:p></table:table-cell>
+     <table:table-cell table:formula="of:=AVERAGE([$Ventas.B2:.B4])" office:value-type="float" office:value="1166.66666666667"><text:p>1166,66666666667</text:p></table:table-cell>
+    </table:table-row>
+    <table:table-row table:style-name="ro2">
+     <table:table-cell office:value-type="string"><text:p>Objetivo</text:p></table:table-cell>
+     <table:table-cell office:value-type="float" office:value="4000"><text:p>4000</text:p></table:table-cell>
+    </table:table-row>
+    <table:table-row table:style-name="ro2">
+     <table:table-cell office:value-type="string"><text:p>Cumplimiento</text:p></table:table-cell>
+     <table:table-cell table:formula="of:=[.B1]/Objetivo" office:value-type="float" office:value="0.875"><text:p>0,875</text:p></table:table-cell>
+    </table:table-row>
+   </table:table>
+   <table:table table:name="Análisis" table:style-name="ta1">
+    <table:table-column table:style-name="co1" table:default-cell-style-name="Default"/>
+    <table:table-column-group table:display="false"><table:table-column table:style-name="co1" table:number-columns-repeated="2" table:visibility="collapse" table:default-cell-style-name="Default"/></table:table-column-group>
+    <table:table-column table:style-name="co1" table:default-cell-style-name="Default"/>
+    <table:table-row table:style-name="ro2"><table:table-cell office:value-type="string"><text:p>Concepto</text:p></table:table-cell><table:table-cell office:value-type="string"><text:p>Q1</text:p></table:table-cell><table:table-cell office:value-type="string"><text:p>Q2</text:p></table:table-cell><table:table-cell office:value-type="string"><text:p>Total</text:p></table:table-cell></table:table-row>
+    <table:table-row table:style-name="ro2"><table:table-cell office:value-type="string"><text:p>Ventas</text:p></table:table-cell><table:table-cell office:value-type="float" office:value="10"><text:p>10</text:p></table:table-cell><table:table-cell office:value-type="float" office:value="20"><text:p>20</text:p></table:table-cell><table:table-cell table:formula="of:=[.B2]+[.C2]" office:value-type="float" office:value="30"><text:p>30</text:p></table:table-cell></table:table-row>
+    <table:table-row-group table:display="false">
+    <table:table-row table:style-name="ro2" table:visibility="collapse"><table:table-cell office:value-type="string"><text:p>Norte</text:p></table:table-cell><table:table-cell office:value-type="float" office:value="6"><text:p>6</text:p></table:table-cell><table:table-cell office:value-type="float" office:value="12"><text:p>12</text:p></table:table-cell><table:table-cell table:formula="of:=[.B3]+[.C3]" office:value-type="float" office:value="18"><text:p>18</text:p></table:table-cell></table:table-row>
+    <table:table-row table:style-name="ro2" table:visibility="collapse"><table:table-cell office:value-type="string"><text:p>Sur</text:p></table:table-cell><table:table-cell office:value-type="float" office:value="4"><text:p>4</text:p></table:table-cell><table:table-cell office:value-type="float" office:value="8"><text:p>8</text:p></table:table-cell><table:table-cell table:formula="of:=[.B4]+[.C4]" office:value-type="float" office:value="12"><text:p>12</text:p></table:table-cell></table:table-row>
+    </table:table-row-group>
+    <table:table-row table:style-name="ro2"><table:table-cell office:value-type="string"><text:p>Subtotal</text:p></table:table-cell><table:table-cell office:value-type="float" office:value="10"><text:p>10</text:p></table:table-cell><table:table-cell office:value-type="float" office:value="20"><text:p>20</text:p></table:table-cell><table:table-cell table:formula="of:=[.B5]+[.C5]" office:value-type="float" office:value="30"><text:p>30</text:p></table:table-cell></table:table-row>
+   </table:table>
+   <table:table table:name="Alto" table:style-name="ta1">
+    <table:scenario table:display-border="false" table:border-color="#c0c0c0" table:copy-back="true" table:copy-styles="false" table:copy-formulas="false" table:is-active="false" table:scenario-ranges="Alto.B2" table:comment="Ana"/>
+    <table:table-column table:style-name="co1" table:number-columns-repeated="2" table:default-cell-style-name="Default"/>
+    <table:table-row table:style-name="ro2"><table:table-cell table:number-columns-repeated="2"/></table:table-row>
+    <table:table-row table:style-name="ro2"><table:table-cell office:value-type="string"><text:p>Ventas</text:p></table:table-cell><table:table-cell office:value-type="float" office:value="10"><text:p>10</text:p></table:table-cell></table:table-row>
+   </table:table>
+   <table:named-expressions>
+    <table:named-range table:name="Objetivo" table:base-cell-address="$Resumen.$B$3" table:cell-range-address="$Resumen.$B$3"/>
+   </table:named-expressions>
+   <table:database-ranges>
+    <table:database-range table:name="__Anonymous_Sheet_DB__0" table:target-range-address="Análisis.A1:Análisis.D5" table:display-filter-buttons="true"><table:filter><table:filter-and><table:filter-condition table:field-number="1" table:value="5" table:operator="&gt;"/></table:filter-and></table:filter></table:database-range>
+    <table:database-range table:name="TablaVentas" table:target-range-address="Ventas.A1:Ventas.H4" table:contains-header="true" table:display-filter-buttons="true"/>
+   </table:database-ranges>
+  </office:spreadsheet>
+ </office:body>
+</office:document>

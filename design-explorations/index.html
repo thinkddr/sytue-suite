@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sytue — Exploración de identidad</title>
+<style>
+/* ============================================================
+   SYTUE · GALERÍA DE IDENTIDAD
+   Chrome neutro derivado del sistema ganador (Graphite & Brass):
+   lienzo marfil, tinta grafito, latón como único acento y solo
+   como detalle. Sobrio, denso, WCAG AA. Sin dependencias, sin JS.
+   ============================================================ */
+:root{
+  --paper:#FAF9F6; --raised:#FFFFFF; --sunken:#F1EFE9;
+  --line:#E7E3D9; --line-2:#D9D4C7;
+  --ink:#23272C;    /* 14.3:1 */
+  --ink-2:#565B62;  /* 6.5:1  */
+  --ink-3:#6E7379;  /* 4.5:1  */
+  --brass:#B08A54; --brass-ink:#6B4E22; /* 7.3:1 sobre marfil */
+  --brass-line:rgba(176,138,84,.55);
+  --brass-wash:rgba(176,138,84,.10);
+  --brass-wash-2:rgba(176,138,84,.16);
+  --sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI","Inter",system-ui,"Helvetica Neue",Arial,sans-serif;
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,"Times New Roman",serif;
+  --mono:"SF Mono",ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background:var(--paper); color:var(--ink);
+  font-family:var(--sans); font-size:14px; line-height:1.55;
+  -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+}
+a{color:inherit;text-decoration:none}
+::selection{background:var(--brass-wash-2)}
+:focus-visible{outline:2px solid var(--brass);outline-offset:2px;border-radius:3px}
+.wrap{max-width:1200px;margin:0 auto;padding:0 32px}
+.ico{flex:none;display:inline-block;vertical-align:middle}
+
+.skip{position:absolute;left:-999px;top:8px;z-index:20;background:var(--raised);
+  color:var(--ink);padding:8px 14px;border-radius:7px;border:1px solid var(--line-2)}
+.skip:focus{left:16px}
+
+/* ---- Masthead ---- */
+.masthead{border-bottom:1px solid var(--line);background:var(--raised)}
+.masthead .wrap{padding-top:40px;padding-bottom:34px}
+.eyebrow{margin:0 0 14px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--brass-ink);font-weight:600}
+.eyebrow::before{content:"";display:inline-block;width:22px;height:1px;
+  background:var(--brass-line);vertical-align:middle;margin-right:10px}
+h1{margin:0;font-family:var(--serif);font-weight:600;font-size:34px;line-height:1.15;
+  letter-spacing:-.01em;color:var(--ink)}
+h1 .dash{color:var(--ink-3);font-weight:400;margin:0 .12em}
+.lede{margin:16px 0 0;max-width:66ch;color:var(--ink-2);font-size:15px}
+
+main.wrap{padding-top:44px;padding-bottom:8px}
+section{margin-bottom:52px}
+h2{margin:0 0 4px;font-family:var(--serif);font-size:20px;font-weight:600;
+  letter-spacing:-.005em;color:var(--ink)}
+.section-note{margin:0 0 22px;color:var(--ink-3);font-size:13px}
+
+/* ---- Ranking ---- */
+.table-shell{border:1px solid var(--line);border-radius:11px;overflow:hidden;background:var(--raised)}
+table{width:100%;border-collapse:collapse;font-size:14px}
+caption{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+thead th{background:var(--sunken);text-align:left;font-weight:600;color:var(--ink-2);
+  font-size:11px;letter-spacing:.07em;text-transform:uppercase;
+  padding:11px 18px;border-bottom:1px solid var(--line)}
+th.c-rank{width:64px}
+th.c-score{width:270px}
+th.c-judges{width:120px;text-align:right}
+tbody td{padding:13px 18px;border-bottom:1px solid var(--line);vertical-align:middle}
+tbody tr:last-child td{border-bottom:0}
+tbody tr:hover td{background:#FCFBF9}
+.r-rank{font-variant-numeric:tabular-nums;font-weight:600;color:var(--ink-3);font-size:13px}
+.r-name{font-weight:600;color:var(--ink);letter-spacing:-.002em}
+.r-name .tag{margin-left:10px}
+.score{display:flex;align-items:center;gap:12px}
+.bar{flex:1;height:6px;border-radius:999px;background:var(--sunken);
+  box-shadow:inset 0 0 0 1px var(--line);overflow:hidden}
+.bar i{display:block;height:100%;border-radius:999px;background:var(--ink-2)}
+.num{font-variant-numeric:tabular-nums;font-weight:600;color:var(--ink);
+  min-width:62px;text-align:right;font-size:13px}
+.num small{color:var(--ink-3);font-weight:500}
+.r-judges{text-align:right;color:var(--ink-2);font-variant-numeric:tabular-nums}
+
+/* fila nº1 — realce discreto */
+tr.top td{background:var(--brass-wash)}
+tr.top:hover td{background:var(--brass-wash-2)}
+tr.top td:first-child{box-shadow:inset 3px 0 0 var(--brass)}
+tr.top .bar i{background:var(--brass)}
+tr.top .r-rank{color:var(--brass-ink)}
+
+.tag{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:600;
+  letter-spacing:.05em;text-transform:uppercase;color:var(--brass-ink);
+  padding:2px 8px;border-radius:999px;background:var(--brass-wash-2);
+  border:1px solid var(--brass-line);white-space:nowrap}
+
+/* ---- Galería ---- */
+.grid{display:grid;grid-template-columns:1fr;gap:26px}
+.card{border:1px solid var(--line);border-radius:12px;background:var(--raised);
+  overflow:hidden}
+.card.top{border-color:var(--brass-line);box-shadow:0 0 0 1px var(--brass-line)}
+.card-head{display:flex;align-items:center;gap:14px;padding:14px 18px;
+  border-bottom:1px solid var(--line);background:var(--raised)}
+.card.top .card-head{background:var(--brass-wash)}
+.rank{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--ink-3);
+  font-variant-numeric:tabular-nums;min-width:24px}
+.card.top .rank{color:var(--brass-ink)}
+.card-id{flex:1;min-width:0}
+.card-id h3{margin:0;font-size:15px;font-weight:600;letter-spacing:-.003em;color:var(--ink)}
+.card-id .meta{margin:1px 0 0;font-size:12px;color:var(--ink-3);
+  font-variant-numeric:tabular-nums}
+.open{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;
+  color:var(--ink-2);padding:6px 12px;border:1px solid var(--line-2);border-radius:7px;
+  background:var(--raised);white-space:nowrap;transition:border-color .15s,color .15s}
+.open:hover{color:var(--ink);border-color:var(--ink-3)}
+.frame{display:block;width:100%;height:520px;border:0;background:var(--sunken)}
+
+/* ---- Veredictos ---- */
+footer{border-top:1px solid var(--line);background:var(--raised);margin-top:8px}
+footer .wrap{padding-top:40px;padding-bottom:52px}
+.verdicts{list-style:none;margin:18px 0 0;padding:0;
+  counter-reset:v;max-width:96ch}
+.verdicts li{display:grid;grid-template-columns:34px 1fr;gap:14px;align-items:baseline;
+  padding:14px 0;border-top:1px solid var(--line)}
+.verdicts li:first-child{border-top:0}
+.verdicts li::before{counter-increment:v;content:counter(v,decimal-leading-zero);
+  font-family:var(--mono);font-size:12px;font-weight:600;color:var(--ink-3);
+  font-variant-numeric:tabular-nums}
+.verdicts li.top::before{color:var(--brass-ink)}
+.v-name{font-weight:600;color:var(--ink);margin-right:4px}
+.v-text{color:var(--ink-2)}
+.colophon{margin:40px 0 0;padding-top:20px;border-top:1px solid var(--line);
+  font-size:12px;color:var(--ink-3);display:flex;justify-content:space-between;
+  flex-wrap:wrap;gap:10px}
+
+@media (max-width:720px){
+  .wrap{padding:0 20px}
+  h1{font-size:27px}
+  th.c-score{width:auto}
+  .card-head{flex-wrap:wrap}
+  .open{order:3;width:100%;justify-content:center}
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#ranking">Saltar al ranking</a>
+
+<header class="masthead">
+  <div class="wrap">
+    <p class="eyebrow">Panel de identidad · Sytue</p>
+    <h1>Sytue <span class="dash">—</span> Exploración de identidad</h1>
+    <p class="lede">Diez propuestas de lenguaje visual para la suite empresarial (Rooms, Docs, Sheets y Slides), evaluadas por un panel de cinco jueces sobre 10. Ordenadas por media; la propuesta seleccionada aparece destacada.</p>
+  </div>
+</header>
+
+<main class="wrap">
+  <section id="ranking">
+    <h2>Ranking del panel</h2>
+    <p class="section-note">Media agregada de cinco jueces. La barra representa la puntuación sobre 10.</p>
+    <div class="table-shell">
+      <table>
+        <caption>Ranking de las diez propuestas de identidad por media de puntuación</caption>
+        <thead>
+          <tr>
+            <th class="c-rank" scope="col">#</th>
+            <th scope="col">Concepto</th>
+            <th class="c-score" scope="col">Puntuación</th>
+            <th class="c-judges" scope="col">Jueces</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="top">
+            <td class="r-rank">01</td>
+            <td class="r-name">Graphite &amp; Brass<span class="tag">Selección</span></td>
+            <td><div class="score"><span class="bar" aria-hidden="true"><i style="width:86%"></i></span><span class="num">8.60<small>/10</small></span></div></td>
+            <td class="r-judges">5</td>
+          </tr>
+          <tr>
+            <td class="r-rank">02</td>
+            <td class="r-name">Monochrome Terminal</td>
+            <td><div class="score"><span class="bar" aria-hidden="true"><i style="width:77.4%"></i></span><span class="num">7.74<small>/10</small></span></div></td>
+            <td class="r-judges">5</td>
+          </tr>
+          <tr>
+            <td class="r-rank">03</td>
+            <td class="r-name">Nordic Calm</td>
+            <td><div class="score"><span class="bar" aria-hidden="true"><i style="width:72%"></i></span><span class="num">7.20<small>/10</small></span></div></td>
+            <td class="r-judges">5</td>
+          </tr>
+          <tr>
+            <td class="r-rank">04</td>
+            <td class="r-name">Mattermost Evolved</td>
+            <td><div class="score"><span class="bar" aria-hidden="true"><i style="width:71.6%"></i></span><span class="num">7.16<small>/10</small></span></div></td>
+            <td class="r-judges">5</td>
+          </tr>
+          <tr>
+            <td class="r-rank">05</td>
+            <td class="r-name">Swiss Grid</td>
+            <td><div class="score"><span class="bar" aria-hidden="true"><i style="width:71%"></i></span><span class="num">7.10<small>/10</small></span></div></td>
+            <td class="r-judges">5</td>
+          </tr>
+          <tr>
+            <td class="r-rank">06</td>
+            <td class="r-name">Trust Azure</td>
+            <td><div class="score"><span class="bar" aria-hidden="true"><i style="width:70%"></i></span><span class="num">7.00<small>/10</small></span></div></td>
+            <td class="r-judges">5</td>
+          </tr>
+          <tr>
+            <td class="r-rank">07</td>
+            <td class="r-name">Editorial Serif</td>
+            <td><div class="score"><span class="bar" aria-hidden="true"><i style="width:69%"></i></span><span class="num">6.90<small>/10</small></span></div></td>
+            <td class="r-judges">5</td>
+          </tr>
+          <tr>
+            <td class="r-rank">08</td>
+            <td class="r-name">Verdant</td>
+            <td><div class="score"><span class="bar" aria-hidden="true"><i style="width:66%"></i></span><span class="num">6.60<small>/10</small></span></div></td>
+            <td class="r-judges">5</td>
+          </tr>
+          <tr>
+            <td class="r-rank">09</td>
+            <td class="r-name">Deep Ink</td>
+            <td><div class="score"><span class="bar" aria-hidden="true"><i style="width:62%"></i></span><span class="num">6.20<small>/10</small></span></div></td>
+            <td class="r-judges">5</td>
+          </tr>
+          <tr>
+            <td class="r-rank">10</td>
+            <td class="r-name">Warm Slate</td>
+            <td><div class="score"><span class="bar" aria-hidden="true"><i style="width:57%"></i></span><span class="num">5.70<small>/10</small></span></div></td>
+            <td class="r-judges">5</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="galeria">
+    <h2>Mockups</h2>
+    <p class="section-note">Una tarjeta por propuesta, en orden de ranking. Cada mockup es una página autónoma; ábrela a pantalla completa para el detalle.</p>
+    <div class="grid">
+
+      <article class="card top">
+        <div class="card-head">
+          <span class="rank">01</span>
+          <div class="card-id">
+            <h3>Graphite &amp; Brass</h3>
+            <p class="meta">Media 8.60/10 · 5 jueces</p>
+          </div>
+          <span class="tag">Selección</span>
+          <a class="open" href="graphite-brass.html" target="_blank" rel="noopener">Abrir a pantalla completa<svg class="ico" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 5h5v5"/><path d="M19 5l-8 8"/><path d="M18 14v4a1.5 1.5 0 0 1-1.5 1.5H6.5A1.5 1.5 0 0 1 5 18V8a1.5 1.5 0 0 1 1.5-1.5H10"/></svg></a>
+        </div>
+        <iframe class="frame" src="graphite-brass.html" title="Mockup — Graphite &amp; Brass" loading="lazy"></iframe>
+      </article>
+
+      <article class="card">
+        <div class="card-head">
+          <span class="rank">02</span>
+          <div class="card-id">
+            <h3>Monochrome Terminal</h3>
+            <p class="meta">Media 7.74/10 · 5 jueces</p>
+          </div>
+          <a class="open" href="mono-terminal.html" target="_blank" rel="noopener">Abrir a pantalla completa<svg class="ico" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 5h5v5"/><path d="M19 5l-8 8"/><path d="M18 14v4a1.5 1.5 0 0 1-1.5 1.5H6.5A1.5 1.5 0 0 1 5 18V8a1.5 1.5 0 0 1 1.5-1.5H10"/></svg></a>
+        </div>
+        <iframe class="frame" src="mono-terminal.html" title="Mockup — Monochrome Terminal" loading="lazy"></iframe>
+      </article>
+
+      <article class="card">
+        <div class="card-head">
+          <span class="rank">03</span>
+          <div class="card-id">
+            <h3>Nordic Calm</h3>
+            <p class="meta">Media 7.20/10 · 5 jueces</p>
+          </div>
+          <a class="open" href="nordic-calm.html" target="_blank" rel="noopener">Abrir a pantalla completa<svg class="ico" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 5h5v5"/><path d="M19 5l-8 8"/><path d="M18 14v4a1.5 1.5 0 0 1-1.5 1.5H6.5A1.5 1.5 0 0 1 5 18V8a1.5 1.5 0 0 1 1.5-1.5H10"/></svg></a>
+        </div>
+        <iframe class="frame" src="nordic-calm.html" title="Mockup — Nordic Calm" loading="lazy"></iframe>
+      </article>
+
+      <article class="card">
+        <div class="card-head">
+          <span class="rank">04</span>
+          <div class="card-id">
+            <h3>Mattermost Evolved</h3>
+            <p class="meta">Media 7.16/10 · 5 jueces</p>
+          </div>
+          <a class="open" href="mattermost-evolved.html" target="_blank" rel="noopener">Abrir a pantalla completa<svg class="ico" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 5h5v5"/><path d="M19 5l-8 8"/><path d="M18 14v4a1.5 1.5 0 0 1-1.5 1.5H6.5A1.5 1.5 0 0 1 5 18V8a1.5 1.5 0 0 1 1.5-1.5H10"/></svg></a>
+        </div>
+        <iframe class="frame" src="mattermost-evolved.html" title="Mockup — Mattermost Evolved" loading="lazy"></iframe>
+      </article>
+
+      <article class="card">
+        <div class="card-head">
+          <span class="rank">05</span>
+          <div class="card-id">
+            <h3>Swiss Grid</h3>
+            <p class="meta">Media 7.10/10 · 5 jueces</p>
+          </div>
+          <a class="open" href="swiss-grid.html" target="_blank" rel="noopener">Abrir a pantalla completa<svg class="ico" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 5h5v5"/><path d="M19 5l-8 8"/><path d="M18 14v4a1.5 1.5 0 0 1-1.5 1.5H6.5A1.5 1.5 0 0 1 5 18V8a1.5 1.5 0 0 1 1.5-1.5H10"/></svg></a>
+        </div>
+        <iframe class="frame" src="swiss-grid.html" title="Mockup — Swiss Grid" loading="lazy"></iframe>
+      </article>
+
+      <article class="card">
+        <div class="card-head">
+          <span class="rank">06</span>
+          <div class="card-id">
+            <h3>Trust Azure</h3>
+            <p class="meta">Media 7.00/10 · 5 jueces</p>
+          </div>
+          <a class="open" href="trust-azure.html" target="_blank" rel="noopener">Abrir a pantalla completa<svg class="ico" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 5h5v5"/><path d="M19 5l-8 8"/><path d="M18 14v4a1.5 1.5 0 0 1-1.5 1.5H6.5A1.5 1.5 0 0 1 5 18V8a1.5 1.5 0 0 1 1.5-1.5H10"/></svg></a>
+        </div>
+        <iframe class="frame" src="trust-azure.html" title="Mockup — Trust Azure" loading="lazy"></iframe>
+      </article>
+
+      <article class="card">
+        <div class="card-head">
+          <span class="rank">07</span>
+          <div class="card-id">
+            <h3>Editorial Serif</h3>
+            <p class="meta">Media 6.90/10 · 5 jueces</p>
+          </div>
+          <a class="open" href="editorial-serif.html" target="_blank" rel="noopener">Abrir a pantalla completa<svg class="ico" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 5h5v5"/><path d="M19 5l-8 8"/><path d="M18 14v4a1.5 1.5 0 0 1-1.5 1.5H6.5A1.5 1.5 0 0 1 5 18V8a1.5 1.5 0 0 1 1.5-1.5H10"/></svg></a>
+        </div>
+        <iframe class="frame" src="editorial-serif.html" title="Mockup — Editorial Serif" loading="lazy"></iframe>
+      </article>
+
+      <article class="card">
+        <div class="card-head">
+          <span class="rank">08</span>
+          <div class="card-id">
+            <h3>Verdant</h3>
+            <p class="meta">Media 6.60/10 · 5 jueces</p>
+          </div>
+          <a class="open" href="verdant.html" target="_blank" rel="noopener">Abrir a pantalla completa<svg class="ico" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 5h5v5"/><path d="M19 5l-8 8"/><path d="M18 14v4a1.5 1.5 0 0 1-1.5 1.5H6.5A1.5 1.5 0 0 1 5 18V8a1.5 1.5 0 0 1 1.5-1.5H10"/></svg></a>
+        </div>
+        <iframe class="frame" src="verdant.html" title="Mockup — Verdant" loading="lazy"></iframe>
+      </article>
+
+      <article class="card">
+        <div class="card-head">
+          <span class="rank">09</span>
+          <div class="card-id">
+            <h3>Deep Ink</h3>
+            <p class="meta">Media 6.20/10 · 5 jueces</p>
+          </div>
+          <a class="open" href="deep-ink.html" target="_blank" rel="noopener">Abrir a pantalla completa<svg class="ico" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 5h5v5"/><path d="M19 5l-8 8"/><path d="M18 14v4a1.5 1.5 0 0 1-1.5 1.5H6.5A1.5 1.5 0 0 1 5 18V8a1.5 1.5 0 0 1 1.5-1.5H10"/></svg></a>
+        </div>
+        <iframe class="frame" src="deep-ink.html" title="Mockup — Deep Ink" loading="lazy"></iframe>
+      </article>
+
+      <article class="card">
+        <div class="card-head">
+          <span class="rank">10</span>
+          <div class="card-id">
+            <h3>Warm Slate</h3>
+            <p class="meta">Media 5.70/10 · 5 jueces</p>
+          </div>
+          <a class="open" href="warm-slate.html" target="_blank" rel="noopener">Abrir a pantalla completa<svg class="ico" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 5h5v5"/><path d="M19 5l-8 8"/><path d="M18 14v4a1.5 1.5 0 0 1-1.5 1.5H6.5A1.5 1.5 0 0 1 5 18V8a1.5 1.5 0 0 1 1.5-1.5H10"/></svg></a>
+        </div>
+        <iframe class="frame" src="warm-slate.html" title="Mockup — Warm Slate" loading="lazy"></iframe>
+      </article>
+
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <h2>Veredictos del panel</h2>
+    <p class="section-note">Una frase por concepto, en orden de ranking.</p>
+    <ol class="verdicts">
+      <li class="top"><span><span class="v-name">Graphite &amp; Brass.</span> <span class="v-text">Gana por solvencia sin estridencia: chasis grafito, lienzo marfil y latón usado solo como detalle; el único que proyecta seriedad institucional a escala sin caer en decoración.</span></span></li>
+      <li><span><span class="v-name">Monochrome Terminal.</span> <span class="v-text">Disciplina monoespaciada de gran carácter y precisión; su herencia de terminal aporta rigor y foco, pero ese acento técnico lo acerca al perfil de ingeniería más que al conjunto del comité.</span></span></li>
+      <li><span><span class="v-name">Nordic Calm.</span> <span class="v-text">Serenidad nórdica de gran densidad legible, sobria y AA, aunque su neutralidad extrema le resta el carácter memorable del líder.</span></span></li>
+      <li><span><span class="v-name">Mattermost Evolved.</span> <span class="v-text">Evoluciona el paradigma Mattermost hacia un acabado más institucional y depurado; solvente y familiar para equipos técnicos, aunque parte de un lenguaje heredado más que de una identidad propia.</span></span></li>
+      <li><span><span class="v-name">Swiss Grid.</span> <span class="v-text">Rigor tipográfico suizo impecable en retícula y jerarquía; su frialdad sistemática convence al comité pero enfría la calidez de marca.</span></span></li>
+      <li><span><span class="v-name">Trust Azure.</span> <span class="v-text">Azul corporativo de confianza, seguro y familiar para TI empresarial; esa misma familiaridad lo vuelve genérico y poco distintivo.</span></span></li>
+      <li><span><span class="v-name">Editorial Serif.</span> <span class="v-text">Gravedad editorial con serifas de autoridad, elegante en cabeceras, pero arriesga fatiga lectora en listas largas de miles de mensajes.</span></span></li>
+      <li><span><span class="v-name">Verdant.</span> <span class="v-text">Verde sereno y bien equilibrado en contraste, aunque el matiz cromático distrae del tono neutro y solvente que exige el público C-level.</span></span></li>
+      <li><span><span class="v-name">Deep Ink.</span> <span class="v-text">Tinta profunda de fuerte presencia y foco, pero su oscuridad dominante compromete la legibilidad prolongada en superficies de trabajo densas.</span></span></li>
+      <li><span><span class="v-name">Warm Slate.</span> <span class="v-text">Pizarra cálida, humana y agradable, de contraste y carácter tibios: correcta sin llegar a persuadir a un comité conservador.</span></span></li>
+    </ol>
+    <div class="colophon">
+      <span>Sytue · Exploración de identidad de la suite</span>
+      <span>10 propuestas · 5 jueces · media sobre 10</span>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

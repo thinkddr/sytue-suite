@@ -1,0 +1,526 @@
+{
+ "active": 0,
+ "sheets": [
+  {
+   "name": "{{cobros.hoja}}",
+   "cells": {
+    "A1": "<b>{{cobros.titulo}}</b>",
+    "A3": "<b>{{factura.numero}}</b>",
+    "B3": "<b>{{factura.cliente}}</b>",
+    "C3": "<b>{{cobros.emision}}</b>",
+    "D3": "<b>{{cobros.vencimiento}}</b>",
+    "E3": "<b>{{gastos.importe}}</b>",
+    "F3": "<b>{{cobros.cobrado}}</b>",
+    "G3": "<b>{{cobros.saldo}}</b>",
+    "H3": "<b>{{planificacion.estado}}</b>",
+    "G4": "=E4-F4",
+    "G5": "=E5-F5",
+    "G6": "=E6-F6",
+    "G7": "=E7-F7",
+    "G8": "=E8-F8",
+    "G9": "=E9-F9",
+    "G10": "=E10-F10",
+    "G11": "=E11-F11",
+    "G12": "=E12-F12",
+    "G13": "=E13-F13",
+    "G14": "=E14-F14",
+    "G15": "=E15-F15",
+    "G16": "=E16-F16",
+    "G17": "=E17-F17",
+    "G18": "=E18-F18",
+    "G19": "=E19-F19",
+    "G20": "=E20-F20",
+    "G21": "=E21-F21",
+    "G22": "=E22-F22",
+    "G23": "=E23-F23",
+    "A25": "<b>{{presupuesto.total}}</b>",
+    "E25": "=SUM(E4:E23)",
+    "F25": "=SUM(F4:F23)",
+    "G25": "=SUM(G4:G23)"
+   },
+   "formats": {
+    "C4": {
+     "id": "date"
+    },
+    "C5": {
+     "id": "date"
+    },
+    "C6": {
+     "id": "date"
+    },
+    "C7": {
+     "id": "date"
+    },
+    "C8": {
+     "id": "date"
+    },
+    "C9": {
+     "id": "date"
+    },
+    "C10": {
+     "id": "date"
+    },
+    "C11": {
+     "id": "date"
+    },
+    "C12": {
+     "id": "date"
+    },
+    "C13": {
+     "id": "date"
+    },
+    "C14": {
+     "id": "date"
+    },
+    "C15": {
+     "id": "date"
+    },
+    "C16": {
+     "id": "date"
+    },
+    "C17": {
+     "id": "date"
+    },
+    "C18": {
+     "id": "date"
+    },
+    "C19": {
+     "id": "date"
+    },
+    "C20": {
+     "id": "date"
+    },
+    "C21": {
+     "id": "date"
+    },
+    "C22": {
+     "id": "date"
+    },
+    "C23": {
+     "id": "date"
+    },
+    "D4": {
+     "id": "date"
+    },
+    "D5": {
+     "id": "date"
+    },
+    "D6": {
+     "id": "date"
+    },
+    "D7": {
+     "id": "date"
+    },
+    "D8": {
+     "id": "date"
+    },
+    "D9": {
+     "id": "date"
+    },
+    "D10": {
+     "id": "date"
+    },
+    "D11": {
+     "id": "date"
+    },
+    "D12": {
+     "id": "date"
+    },
+    "D13": {
+     "id": "date"
+    },
+    "D14": {
+     "id": "date"
+    },
+    "D15": {
+     "id": "date"
+    },
+    "D16": {
+     "id": "date"
+    },
+    "D17": {
+     "id": "date"
+    },
+    "D18": {
+     "id": "date"
+    },
+    "D19": {
+     "id": "date"
+    },
+    "D20": {
+     "id": "date"
+    },
+    "D21": {
+     "id": "date"
+    },
+    "D22": {
+     "id": "date"
+    },
+    "D23": {
+     "id": "date"
+    },
+    "E4": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "E5": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "E6": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "E7": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "E8": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "E9": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "E10": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "E11": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "E12": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "E13": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "E14": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "E15": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "E16": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "E17": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "E18": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "E19": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "E20": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "E21": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "E22": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "E23": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "E24": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "E25": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "F4": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "F5": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "F6": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "F7": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "F8": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "F9": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "F10": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "F11": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "F12": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "F13": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "F14": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "F15": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "F16": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "F17": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "F18": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "F19": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "F20": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "F21": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "F22": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "F23": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "F24": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "F25": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "G4": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "G5": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "G6": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "G7": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "G8": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "G9": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "G10": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "G11": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "G12": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "G13": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "G14": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "G15": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "G16": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "G17": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "G18": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "G19": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "G20": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "G21": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "G22": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "G23": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "G24": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "G25": {
+     "id": "currency",
+     "decimals": 2
+    }
+   },
+   "styles": {
+    "A3": {
+     "border": {
+      "b": true
+     }
+    },
+    "B3": {
+     "border": {
+      "b": true
+     }
+    },
+    "C3": {
+     "border": {
+      "b": true
+     }
+    },
+    "D3": {
+     "border": {
+      "b": true
+     }
+    },
+    "E3": {
+     "border": {
+      "b": true
+     }
+    },
+    "F3": {
+     "border": {
+      "b": true
+     }
+    },
+    "G3": {
+     "border": {
+      "b": true
+     }
+    },
+    "H3": {
+     "border": {
+      "b": true
+     }
+    },
+    "A25": {
+     "border": {
+      "t": true
+     }
+    },
+    "B25": {
+     "border": {
+      "t": true
+     }
+    },
+    "C25": {
+     "border": {
+      "t": true
+     }
+    },
+    "D25": {
+     "border": {
+      "t": true
+     }
+    },
+    "E25": {
+     "border": {
+      "t": true
+     }
+    },
+    "F25": {
+     "border": {
+      "t": true
+     }
+    },
+    "G25": {
+     "border": {
+      "t": true
+     }
+    },
+    "H25": {
+     "border": {
+      "t": true
+     }
+    }
+   },
+   "freeze": {
+    "cols": 0,
+    "rows": 3
+   },
+   "validations": [
+    {
+     "range": "H4:H23",
+     "values": [
+      "{{=cobros.emitida}}",
+      "{{=cobros.parcial}}",
+      "{{=cobros.cobrada}}",
+      "{{=cobros.vencida}}"
+     ]
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,21 @@
+apiVersion: v2
+name: sytue-cast
+description: >-
+  Sytue Cast — servicio Go propio de vídeo bajo demanda y directo: subida y
+  transcodificación (HLS H.264 y WebM VP9/Opus, con un segundo Deployment
+  cast-transcoder que lleva ffmpeg), emisión en directo por LiveKit Ingress
+  (OBS por RTMP) o WebRTC, grabación a S3, portada pública, canal por
+  organización, comentarios y chat. Estado en PostgreSQL, ficheros en S3.
+  Código Apache-2.0, (c) 2026 Daniel Delgado Ramos. Expuesto en cast.sytue.eu.
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+kubeVersion: ">=1.31.0-0"
+home: https://sytue.eu
+keywords: [sytue, cast, video, streaming, go]
+maintainers:
+  - name: Sytue Platform
+    email: platform@sytue.eu
+annotations:
+  licenses: MIT
+  sytue.eu/stack: go

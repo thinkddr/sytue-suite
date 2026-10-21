@@ -1,0 +1,11 @@
+-- SPDX-License-Identifier: Apache-2.0
+-- Copyright (c) 2026 Daniel Delgado Ramos
+--
+-- BLOQUES REUTILIZABLES DE LA ORGANIZACIÓN (ROADMAP-OFFICE plantillas-1).
+--
+-- Un bloque de la organización es un documento de su biblioteca (doc_org_templates,
+-- 0020) que no se ofrece para CREAR documentos sino para INSERTARSE en uno que ya
+-- existe, desde la cinta. Mismo modelo que una plantilla: las mismas versiones
+-- publicadas, el mismo registro y el mismo aislamiento por organización. Por eso es
+-- una columna y no una tabla: no hay política nueva que escribir ni que olvidar.
+ALTER TABLE doc_org_templates ADD COLUMN es_bloque boolean NOT NULL DEFAULT false;

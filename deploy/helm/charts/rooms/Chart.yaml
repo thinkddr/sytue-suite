@@ -1,0 +1,19 @@
+apiVersion: v2
+name: sytue-rooms
+description: >-
+  Sytue Rooms — servicio Go propio de mensajeria y videollamadas: WebSocket (coder/websocket, MIT)
+  + API REST. Fan-out/presencia sobre PostgreSQL (LISTEN/NOTIFY); SIN Redis/Valkey.
+  Código Apache-2.0, (c) 2026 Daniel Delgado Ramos. Reimplementacion clean-room; NO usa Mattermost.
+  Expuesto en rooms.sytue.eu (+WS). Sus hosts legados (chat, meet) se retiraron el 2026-09-11.
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+kubeVersion: ">=1.31.0-0"
+home: https://sytue.eu
+keywords: [sytue, chat, websocket, realtime, go]
+maintainers:
+  - name: Sytue Platform
+    email: platform@sytue.eu
+annotations:
+  licenses: MIT
+  sytue.eu/stack: go

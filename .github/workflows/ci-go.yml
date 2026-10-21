@@ -1,0 +1,545 @@
+# SPDX-License-Identifier: Apache-2.0
+name: ci-go-sytue-git
+
+# NO SE EJECUTA AL EMPUJAR NI AL FUSIONAR EN `main`, y es deliberado: solo en
+# pull request. Lo que llega a `main` ya pasó por su pull request, así
+# que repetir la misma comprobación sobre el commit de fusión gasta runner —el de
+# git.gay es compartido y hace cola— sin decir nada nuevo. La red de seguridad
+# local sigue siendo el hook de pre-push (.githooks/pre-push), que corre estos
+# mismos gates antes de dejar empujar.
+#
+# TAMPOCO AL PUBLICAR UNA RELEASE (2026-09-05). Lo era, con el argumento de que es
+# la última oportunidad de ver un fallo antes de que la versión salga con él, y
+# costaba 22 min de runner por release para volver a compilar y testear un commit
+# que ya nadie había tocado. Lo que este flujo comprueba —build, vet, test,
+# golangci-lint— es EXACTAMENTE lo que corre `.githooks/pre-push` antes de dejar
+# empujar, también en los empujones directos a `main`, así que en una release no
+# preguntaba nada nuevo.
+#
+# `ci-integration` y `security` SÍ siguen disparándose con la release, y a
+# propósito: son las dos cosas que el hook dice explícitamente que no cubre, y
+# la segunda es además la única que puede cambiar de veredicto sin que nadie
+# toque el repositorio —un CVE publicado esta madrugada—.
+on:
+  # SIN `pull_request`, A PROPOSITO (2026-09-12). En fase piloto se abren
+  # demasiadas y el runner es UNO y va en serie: se midio una cola de 412 jobs
+  # —unas 20 horas—, y el efecto real no fue esperar, fue que los gates NO
+  # LLEGABAN A CORRER y las PRs se fusionaban sin ellos. Asi salio a produccion
+  # una migracion que no aplicaba, y Sytue ID quedo tres releases sin arrancar.
+  #
+  # El gate vive ahora donde pasa algo irreversible: `imagenes-produccion` mira
+  # el estado COMBINADO del commit y se niega a publicar si no esta en verde.
+  # Lo que se pierde es aviso temprano; lo que se gana es un gate que de verdad
+  # corre. Antes de fusionar, el hook de pre-push ya valida en local. En una
+  # release no añade señal y solo retrasa los controles que sí dependen del
+  # runner: integración, seguridad y el empaquetado de escritorio.
+  # Lanzarlo a mano es la ÚNICA forma de conseguir un veredicto cuando la rama se
+  # mueve rápido: un push cancela la ejecución anterior, así que con varias
+  # sesiones trabajando a la vez los jobs de Go pueden encadenar cancelaciones y
+  # no validar nunca un commit concreto. Un `workflow_dispatch` entra en su
+  # PROPIO grupo de concurrencia —el evento forma parte del nombre—, así que
+  # ningún push lo cancela. `ci-frontend` y `ci-integration` ya lo tenían por lo
+  # mismo; este se quedó fuera y se notó al necesitarlo.
+  workflow_dispatch:
+    inputs:
+      medir_fidelidad:
+        description: Generar matriz OOXML/ODF como artefacto para revisar y commitear
+        type: boolean
+        required: false
+        default: false
+
+# Lo que puede hacer GITHUB_TOKEN en este flujo, y nada más (GitHub lo
+# aplica; en Forgejo este campo se ignoraba y mandaba el token de cada paso).
+permissions:
+  contents: read
+
+# `bash` EXPLÍCITO. Dentro de un `container:` GitHub ejecuta los `run:` con
+# `sh -e` y no con bash: `set -o pipefail`, `[[`, los arrays y `<<<` mueren
+# con «Illegal option» (cancelar-al-cerrar, 2026-09-27). Con `shell: bash`
+# es `bash --noprofile --norc -eo pipefail`, que es lo que corría en la forja.
+defaults:
+  run:
+    shell: bash
+
+# Un push nuevo cancela el anterior de la misma rama: igual que en GitHub, y
+# sin esto un runner propio acumula cola en vez de descartar trabajo muerto.
+# El grupo se construye con la RAMA DE ORIGEN, no con `github.ref`.
+#
+# Esto se escribió cuando el workflow disparaba TAMBIÉN en `push`, y entonces
+# `github.ref` valía distinto en cada caso —`refs/heads/sytue-native` para el
+# push y `refs/pull/38/head` para la PR—: dos grupos distintos, o sea DOS COPIAS
+# de todo corriendo a la vez sobre dos runners, sin que ninguna cancelara a la
+# otra. Ya no hay push, pero el grupo sigue construyéndose así porque el mismo
+# razonamiento vale para el único evento que queda: dispatch.
+#
+# `github.head_ref` está vacío fuera de una PR, así que en un push cae a
+# `github.ref_name` —que ya es el nombre pelado de la rama—. Push y PR de la
+# misma rama comparten grupo y el nuevo cancela al viejo.
+concurrency:
+  # `github.sha` y no `github.ref_name` fuera de una PR: con el nombre de la rama,
+  # todos los push a `main` caen en el mismo grupo y `cancel-in-progress: true`
+  # mata el gate anterior en cada fusión. Medido el 2026-08-17: ni un `success`
+  # en los ultimos 100 runs de este workflow. En dias de varias fusiones seguidas
+  # `main` no llega a validarse, y su verde significa «no dio tiempo».
+  #
+  # En una pull request `github.head_ref` SI tiene valor, asi que ahi se sigue
+  # agrupando por rama y un push nuevo cancela al anterior, que es lo correcto.
+  # Por RAMA y no por commit fuera de una pull request, al contrario que en
+  # `security.yml`, y la diferencia es deliberada.
+  #
+  # Con historia lineal, que este gate pase sobre el último commit de `main`
+  # valida también los anteriores: compila y pasa los tests. Agrupar por commit
+  # hacía que ninguna fusión cancelara a la anterior y, en una ráfaga de
+  # fusiones, se acumulaban: medido el 2026-08-17, DOCE ejecuciones de `main` a
+  # la vez con la cola a 23 y 13 plazas. Eso no valida más, solo espera más.
+  #
+  # `security` sí va por commit porque su pregunta es distinta: una dependencia
+  # vulnerable introducida y quitada en dos fusiones seguidas no aparece si solo
+  # se mira la última.
+  # UN DESPACHO A MANO NO CANCELA A OTRO (2026-09-27). El grupo lleva el `run_id`
+  # solo cuando el evento es `workflow_dispatch`: en GitHub dos despachos de la
+  # misma rama caían en el mismo grupo y el segundo cancelaba al primero, así
+  # que lanzar el CI sobre dos commits seguidos dejaba el primero sin veredicto
+  # (ci-go del 44d9b1bd, cancelado al lanzar el del 209f58f6). En push y en PR
+  # el sufijo vale vacío y todo sigue como antes.
+  group: ci-go-${{ github.workflow }}-${{ github.event_name }}-${{ github.head_ref || github.ref_name }}${{ github.event_name == 'workflow_dispatch' && format('-{0}', github.run_id) || '' }}
+  # El EVENTO va en el grupo, así que push y pull request de la misma rama NUNCA
+  # comparten cola.
+  #
+  # Compartirlo ahorraba un runner —una copia en vez de dos— y a cambio hacía
+  # `main` INFUSIONABLE: el run del PR llega después y cancelaba al del push, y un
+  # run cancelado deja sus jobs con estado `failure` pegados al commit. La
+  # protección de `main` mira el estado COMBINADO, no solo los checks del PR, así
+  # que la fusión se rechazaba con «Not all required status checks successful»
+  # teniendo todo en verde. El PR no se podía fusionar porque existía el PR.
+  #
+  # Se intentó antes con `cancel-in-progress: ${{ github.event_name == 'push' }}`
+  # y NO sirve: Forgejo no evalúa esa expresión como booleano y la cadena «false»
+  # cuenta como verdadera, así que seguía cancelando. Por eso la separación va en
+  # el nombre del grupo, que es texto y no depende de que nadie lo interprete.
+  #
+  # El coste que esto tenía —dos copias mientras hubiera un PR abierto desde esta
+  # rama— ya no se paga (2026-08-15): cada job lleva
+  #
+  #     if: github.event_name != 'pull_request' || github.head_ref != 'sytue-native'
+  #
+  # así que la PR de sincronía no repite un trabajo hecho sobre EL MISMO commit.
+  # Las PR de cualquier otra rama sí corren enteras, que es donde el push no ha
+  # validado nada.
+  #
+  # Lo que hay que vigilar: la protección de `main` exige cuatro checks de
+  # `security`, y ahora los produce el PUSH a la rama, no la PR. Con historia
+  # lineal el commit es el mismo y el estado combinado los tiene; si alguna vez la
+  # fusión se rechaza con «Not all required status checks successful» teniendo todo
+  # en verde, ES ESTO: basta con devolverle el `if` a los cuatro jobs de security.
+  cancel-in-progress: true
+
+env:
+  # El checkout lo escribe el runner (uid 1001) y los pasos corren como root dentro
+  # del `container:`: git ve un propietario ajeno, se niega («dubious ownership»)
+  # y `go build` muere con «error obtaining VCS status». La forja montaba el
+  # workspace con el mismo usuario y no lo notaba.
+  GIT_CONFIG_COUNT: "1"
+  GIT_CONFIG_KEY_0: safe.directory
+  GIT_CONFIG_VALUE_0: "*"
+  GOTOOLCHAIN: local
+  # -p=1: compilar y analizar UN paquete a la vez. El runner es un PRO2-XXS
+  # (2 vCPU, 8 GiB) que además atiende dos jobs en paralelo, y `go vet ./...`
+  # sobre este monorepo con la concurrencia por defecto agota la memoria: el job
+  # moría a los 13 minutos sin dejar ni un mensaje de error, que es de lo más
+  # caro de diagnosticar. Más lento y termina; más rápido y no termina.
+  GOFLAGS: "-mod=readonly -p=1"
+  # Tope explícito para que el recolector trabaje antes de que lo haga el OOM
+  # killer del núcleo: 3 GiB deja sitio al otro job y al propio sistema.
+  GOMEMLIMIT: "3GiB"
+  GOMAXPROCS: "2"
+
+jobs:
+  # DOS JOBS Y NO UNO (2026-09-14). `build-test` hacía vet, build, los tests con
+  # `-race` de la raíz y los de los tres módulos aparte seguidos, y tardaba 31-32
+  # minutos. Con `timeout-minutes: 25` lo cortaba en TODAS las releases —nueve
+  # seguidas, de v2.77.3 a v2.83.1, siempre a los 25 minutos exactos— y subirlo a
+  # 45 solo aplazaba lo mismo: cada test nuevo come margen de un único
+  # presupuesto compartido.
+  #
+  # El corte va donde está el peso. Medido en el piloto con estos mismos GOFLAGS
+  # y la caché caliente: `go test -race ./...` 482 s (80 %), módulos aparte 83 s
+  # (14 %), vet + build 36 s (6 %). Dos jobs y no tres porque el runner corre de
+  # uno en uno en una release —disparan todos los flujos a la vez— y cada job
+  # más es otro clon y otra restauración de 9 GB: partir lo pequeño cuesta más
+  # de lo que pesa. Si alguna vez hay plaza libre, los dos corren a la vez.
+  vet-build:
+    name: vet, build y módulos aparte
+    # La rama `sytue-native` queda fuera del CI de pull request: es la de la
+    # migración y arrastra un árbol que no compila con esta cadena.
+    if: (github.event_name != 'pull_request' || github.head_ref != 'sytue-native')
+    runs-on: sytue-arm64
+    # Los runners propios del frontal (.github/RUNNERS.md): cada job en un
+    # contenedor del Docker del CI, con el proxy filtrado como socket de Docker
+    # y la caché de Go del host (con varios jobs, ancla `&ci` y `*ci`).
+    container: &ci
+      image: node:24-bookworm@sha256:64af3819f9275802414d7cdc38c27e9d82bd564dec4d4da87d008255d36c63b4
+      env:
+        DOCKER_HOST: unix:///run/sytue-ci/docker.sock
+      volumes:
+        - /srv/ci/run/proxy.sock:/run/sytue-ci/docker.sock
+        - /var/cache/sytue-ci/go-build:/github/home/.cache/go-build
+        - /var/cache/sytue-ci/go-mod:/github/home/go/pkg/mod
+    # 20 lo cortó en la release v3.0.20 (2026-09-18): el vet de los módulos
+    # aparte ya no son los 83 s medidos al partir el job — el módulo de rooms
+    # compila el shell Fyne entero y tardó 12 min SOLO él, con la cola caliente.
+    # La carga creció con las nativas; el techo, no.
+    timeout-minutes: 40
+    steps:
+      - name: Clonar el repositorio
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Preparar toolchain
+        # `escritorio` se pedía por la app de Rooms de escritorio (Wails), que
+        # necesitaba CGO y las cabeceras de X11 y EGL, y se retiró el 2026-09-23. Se queda porque el
+        # `-race` de los módulos aparte también pide CGO, y quitarlo sin poder
+        # probar el runner es cambiar dos cosas a la vez.
+        run: $GITHUB_WORKSPACE/.github/actions/toolchain/accion.sh go escritorio
+      - name: Verificar toolchain
+        # Falla DICIENDO qué hay y qué falta. Antes era un `test` a secas: el log
+        # solo mostraba «Process completed with exit code 1» y descubrir que la
+        # imagen del runner iba una versión por detrás costaba abrir el job,
+        # reproducir el `awk` a mano y compararlo. La causa es siempre la misma
+        # —`versions.env` y `go.mod` van a una y la imagen publicada se quedó
+        # atrás—, así que el mensaje la nombra y da la orden que la arregla.
+        run: |
+          pide="$(awk '$1 == "go" {print $2}' go.mod)"
+          quiere="go$pide"
+          tiene="$(go env GOVERSION)"
+          # LA FIJADA O UNA POSTERIOR. Antes se exigía la exacta, y eso ponía en
+          # rojo una imagen de runner que va POR DELANTE: un Go más nuevo compila
+          # este código igual, y rechazarlo obliga a bajar de versión para poder
+          # construir. Lo que rompe de verdad es ir por detrás, que es cuando
+          # faltan características del lenguaje —con GOTOOLCHAIN=local no se
+          # descarga nada para tapar el hueco—.
+          #
+          # `sort -V` y no `!=`: comparando texto, go1.10 sería anterior a go1.9.
+          hay="${tiene#go}"
+          if [ "$hay" != "$pide" ] && [ "$(printf '%s\n%s\n' "$hay" "$pide" | sort -V | head -1)" != "$pide" ]; then
+            echo "✗ toolchain: la imagen del runner trae $tiene y go.mod pide $quiere o superior." >&2
+            echo "  Con GOTOOLCHAIN=local —deliberado: no se descargan toolchains—" >&2
+            echo "  ningún job de Go compila hasta republicar la imagen:" >&2
+            echo "    deploy/sytue-git/bin/build-runner-image.sh" >&2
+            exit 1
+          fi
+          echo "  toolchain: $tiene (el repo pide $quiere o superior)"
+          # Y los OTROS módulos, que este gate no miraba. Son cuatro fuera del
+          # árbol raíz —apps/nucleo, apps/fyne, el provider de Crossplane y el de
+          # Terraform— y por eso la subida a 1.26.6 los dejó atrás sin que nada
+          # se pusiera en rojo: el gate daba «ok» leyendo solo el de arriba.
+          #
+          # Pedir MENOS toolchain del que hay está permitido, así que no rompe
+          # nada el día que se desincronizan: rompe semanas después, cuando uno de
+          # ellos pide más de lo que la imagen trae y el fallo sale lejos de su
+          # causa. Compilan todos con la misma imagen, así que la versión es una.
+          mal=0
+          for f in $(git ls-files '*/go.mod' 'go.mod'); do
+            v="go$(awk '$1 == "go" {print $2; exit}' "$f")"
+            [ "$v" = "$quiere" ] || { echo "✗ $f pide $v y el resto $quiere" >&2; mal=1; }
+          done
+          [ "$mal" = 0 ] || { echo "  Iguálalos: la plataforma compila con un solo toolchain." >&2; exit 1; }
+          echo "ok - toolchain $tiene en los $(git ls-files '*/go.mod' 'go.mod' | wc -l | tr -d ' ') módulos"
+
+          # Y de paso, si la FLOTA se quedó rezagada. El caso que esto caza no lo
+          # ve el gate de arriba: publicar una imagen nueva no cambia con cuál
+          # levantan los runners —el digest viaja en /etc/sytue-git-runner/labels,
+          # y hay que re-registrar los pools con `bootstrap-runner.sh ci|build`—.
+          # Con las versiones idénticas en las dos imágenes, nada lo delataba.
+          #
+          # `bajar` es la sonda porque solo existe desde que la imagen consume el
+          # espejo de herramientas de Sytue Git (2026-08-15): si no está, esta
+          # flota es anterior y sigue bajando de github.com al construirse.
+          #
+          # AVISA, no rompe: con la imagen vieja el CI funciona igual de bien. Lo
+          # que se pierde es la propiedad que se acaba de ganar, y eso merece una
+          # anotación en el run, no dejar a nadie sin poder trabajar.
+          if ! command -v bajar >/dev/null 2>&1; then
+            echo "::warning::La imagen de este runner es anterior al espejo de herramientas:" \
+                 "publicada pero no re-registrada. Correr bootstrap-runner.sh ci y build."
+          fi
+      - name: Restaurar caché de Go
+        # En los runners propios la caché de Go es el disco del host, montado en el
+        # contenedor (.github/RUNNERS.md): restaurar encima la pisaría con otro job leyendo.
+        if: runner.environment != 'self-hosted'
+        id: cache-go
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-v2-${{ hashFiles('go.sum') }}
+          restore-keys: go-v2-
+      - name: Verificar módulos
+        run: |
+          go mod download && go mod verify
+          for m in services/cloud/terraform-provider-sytuecloud; do
+            echo "▸ mod download $m"
+            ( cd "$m" && go mod download && go mod verify )
+          done
+      - name: Vet
+        run: go vet ./...
+      - name: Build
+        run: go build ./...
+
+      # LOS OTROS MÓDULOS, que `./...` NO alcanza: `go test` no cruza fronteras
+      # de módulo, así que los `_test.go` del provider de Terraform no los
+      # ejecutaba NADIE —ni el CI ni el hook de
+      # pre-push, que también corre `./...` desde la raíz—. Pasaban, y el día que
+      # dejaran de pasar tampoco se habría enterado nadie. Es el mismo agujero
+      # que ya apareció con las versiones de Go: el gate leía solo el go.mod de
+      # arriba.
+      #
+      # El provider de Crossplane NO está en esta lista a propósito: sus tipos
+      # `zz_*.go` se generan y están en .gitignore, así que en un clon limpio ni
+      # compila. Sus tests corren en `crossplane.yml`, después de generar.
+      #
+      # apps/nucleo y apps/fyne TAMPOCO están, y no es un olvido: los valida
+      # enteros ci-desktop.yml (vet + test con las cabeceras gráficas ya
+      # instaladas por su modo `escritorio`). Duplicar aquí el módulo nativo sumó
+      # 12,5 minutos de compilación cgo con `-race` a 2 CPUs y el job murió por
+      # TIEMPO en el run 2140 —«The runner cancelled the job because it exceeds
+      # the maximum run time», con todos los tests en verde—. El peso va en su
+      # propio job con su propio presupuesto.
+      - name: Test de los módulos aparte
+        run: |
+          set -euo pipefail
+          # Los tags `nowayland,novulkan` eran para la app de Rooms de escritorio,
+          # retirada; al provider de Terraform le dan igual: un tag que ningún
+          # fichero nombra no cambia nada.
+          for m in services/cloud/terraform-provider-sytuecloud; do
+            echo "▸ $m"
+            ( cd "$m" && go vet -tags nowayland,novulkan,goolm ./... && go test -tags nowayland,novulkan,goolm -race -shuffle=on ./... )
+          done
+
+      # `always()` aquí SÍ, al contrario que en la caché de Bun de ci-frontend, y
+      # no es un descuido: la caché de build es direccionable por contenido y un job
+      # fallido no la envenena. La de MÓDULOS sí puede —Go detecta un zip truncado
+      # pero no lo repara—, y por eso tras un fallo se verifica antes de guardar.
+      # La clave es `go-v2-` desde el 2026-09-20: la `go-` quedó con un zip roto
+      # dentro. Guardar siempre es lo que hace que un test en rojo no obligue a
+      # redescargarlo todo en la siguiente vuelta. Bun no comprueba nada al
+      # restaurar: allí un guardado tras un fallo dejó el CI en rojo cuatro
+      # ejecuciones seguidas.
+      #
+      # `actions/cache` y no un guion propio: en git.gay el servidor de caché lo
+      # levantaba el runner y `actions/cache` no podía leerse (FORCE_PRIVATE), así
+      # que se hablaba con él a mano. En GitHub la caché es la del repositorio
+      # (10 GB, con expulsión por antigüedad) y las entradas siguen siendo
+      # inmutables: gana el primero que guarda, igual que antes.
+      # Tras un job FALLIDO, los módulos se verifican antes de subirlos: un disco
+      # lleno deja zips truncados, y la entrada de la caché es inmutable (el
+      # 2026-09-20 un zip roto se guardó y todo job posterior lo restauró hasta
+      # que cambió go.sum). Si no pasan, no se guarda.
+      - name: Verificar los módulos antes de guardar la caché
+        id: cache-go-sana
+        if: runner.environment != 'self-hosted' && (always() && job.status != 'success' && steps.cache-go.outputs.cache-hit != 'true')
+        continue-on-error: true
+        run: go mod verify
+      - name: Guardar caché de Go
+        if: runner.environment != 'self-hosted' && (always() && steps.cache-go.outputs.cache-hit != 'true' && (job.status == 'success' || steps.cache-go-sana.outcome == 'success'))
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-v2-${{ hashFiles('go.sum') }}
+
+  test-race:
+    name: tests con -race
+    if: (github.event_name != 'pull_request' || github.head_ref != 'sytue-native')
+    runs-on: sytue-arm64
+    container: *ci
+    timeout-minutes: 45
+    steps:
+      - name: Clonar el repositorio
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Preparar toolchain
+        run: $GITHUB_WORKSPACE/.github/actions/toolchain/accion.sh go
+      - name: Restaurar caché de Go
+        # En los runners propios la caché de Go es el disco del host, montado en el
+        # contenedor (.github/RUNNERS.md): restaurar encima la pisaría con otro job leyendo.
+        if: runner.environment != 'self-hosted'
+        id: cache-go
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-v2-${{ hashFiles('go.sum') }}
+          restore-keys: go-v2-
+      # SU PROPIA CACHÉ DE COMPILACIÓN, encima de la compartida. Las entradas del
+      # servidor son INMUTABLES y gana el primero que guarda:
+      # con la clave compartida, la guardaría `vet-build`, `lint` o `vuln`
+      # —terminan antes— y los objetos compilados con `-race`, que son los caros,
+      # no se guardarían nunca. Este job se haría más lento justo donde no hay
+      # margen. Solo `~/.cache/go-build`: los 9 GB de módulos ya vienen de la
+      # entrada compartida y duplicarlos en cada clave llenaría el disco del runner.
+      # La versión de la entrada sale de la lista de rutas, así que el prefijo
+      # `go-race-` nunca encuentra la compartida ni al revés.
+      - name: Restaurar caché de -race
+        # En los runners propios la caché de Go es el disco del host, montado en el
+        # contenedor (.github/RUNNERS.md): restaurar encima la pisaría con otro job leyendo.
+        if: runner.environment != 'self-hosted'
+        id: cache-race
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/go-build
+          key: go-race-${{ hashFiles('go.sum') }}
+          restore-keys: go-race-
+      - name: Descargar módulos
+        run: go mod download
+      - name: Medir fidelidad en el runner (no sustituye el gate)
+        if: inputs.medir_fidelidad
+        run: SYTUE_FIDELIDAD_ESCRIBIR=1 go test ./services/docs/internal/domain -run '^TestMatrizDeFidelidad$' -count=1
+      - name: Entregar matriz medida
+        if: always() && inputs.medir_fidelidad
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: office-fidelidad
+          path: docs/architecture.md
+          retention-days: 7
+          if-no-files-found: error
+      - name: Test race
+        run: go test -race -timeout=25m -shuffle=on -covermode=atomic -coverprofile=coverage.out ./...
+      # `always()` por lo mismo que en la caché compartida: la de build es
+      # direccionable por contenido y un test en rojo no la envenena.
+      - name: Guardar caché de -race
+        if: runner.environment != 'self-hosted' && (always() && steps.cache-race.outputs.cache-hit != 'true')
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/go-build
+          key: go-race-${{ hashFiles('go.sum') }}
+      # QUÉ MIDE Y QUÉ NO. Solo la mitad unitaria: los 152 ficheros
+      # `*_integration_test.go` llevan `//go:build integration` y corren en
+      # `ci-integration`, cuyo perfil no se fusiona con este. Por eso los
+      # paquetes `store` salen a 0,0% aunque estén probados, y por eso el total
+      # de abajo es un SUELO, no la cobertura real.
+      #
+      # El número se imprime en el log porque el artefacto no lo leía nadie: se
+      # subía siete días y caducaba sin abrirse. Una línea por ejecución al menos
+      # deja ver si sube o baja; poner un umbral sobre un dato que ignora la
+      # mitad de los tests sería un gate que miente.
+      - name: Cobertura
+        if: always()
+        run: go tool cover -func=coverage.out | tail -1
+
+  lint:
+    # La rama `sytue-native` queda fuera del CI de pull request: es la de la
+    # migración y arrastra un árbol que no compila con esta cadena.
+    if: (github.event_name != 'pull_request' || github.head_ref != 'sytue-native')
+    runs-on: sytue-arm64
+    container: *ci
+    timeout-minutes: 30
+    steps:
+      - name: Clonar el repositorio
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      # La imagen del runner compartido de git.gay no trae Go ni Bun.
+      # Se instalan con la MISMA versión y sha256 que la imagen propia.
+      - name: Preparar toolchain
+        run: $GITHUB_WORKSPACE/.github/actions/toolchain/accion.sh go golangci-lint
+
+      - name: Restaurar caché de Go
+        # En los runners propios la caché de Go es el disco del host, montado en el
+        # contenedor (.github/RUNNERS.md): restaurar encima la pisaría con otro job leyendo.
+        if: runner.environment != 'self-hosted'
+        id: cache-go
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-v2-${{ hashFiles('go.sum') }}
+          restore-keys: go-v2-
+      # Mismo blindaje que en security: la herramienta se asegura en el paso que
+      # la usa, porque la propagación de PATH entre pasos depende del runner y un
+      # «command not found» tres pasos después no dice qué falta.
+      - run: |
+          export PATH="/usr/local/bin:$PATH"
+          command -v golangci-lint >/dev/null 2>&1 ||
+            "$GITHUB_WORKSPACE/.github/actions/toolchain/accion.sh" golangci-lint
+          golangci-lint run --config=.golangci.yml
+      # Tras un job FALLIDO, los módulos se verifican antes de subirlos: un disco
+      # lleno deja zips truncados, y la entrada de la caché es inmutable (el
+      # 2026-09-20 un zip roto se guardó y todo job posterior lo restauró hasta
+      # que cambió go.sum). Si no pasan, no se guarda.
+      - name: Verificar los módulos antes de guardar la caché
+        id: cache-go-sana
+        if: runner.environment != 'self-hosted' && (always() && job.status != 'success' && steps.cache-go.outputs.cache-hit != 'true')
+        continue-on-error: true
+        run: go mod verify
+      - name: Guardar caché de Go
+        if: runner.environment != 'self-hosted' && (always() && steps.cache-go.outputs.cache-hit != 'true' && (job.status == 'success' || steps.cache-go-sana.outcome == 'success'))
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-v2-${{ hashFiles('go.sum') }}
+
+  vuln:
+    # La rama `sytue-native` queda fuera del CI de pull request: es la de la
+    # migración y arrastra un árbol que no compila con esta cadena.
+    if: (github.event_name != 'pull_request' || github.head_ref != 'sytue-native')
+    runs-on: sytue-arm64
+    container: *ci
+    timeout-minutes: 30
+    steps:
+      - name: Clonar el repositorio
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      # La imagen del runner compartido de git.gay no trae Go ni Bun.
+      # Se instalan con la MISMA versión y sha256 que la imagen propia.
+      - name: Preparar toolchain
+        run: $GITHUB_WORKSPACE/.github/actions/toolchain/accion.sh go govulncheck
+
+      - name: Restaurar caché de Go
+        # En los runners propios la caché de Go es el disco del host, montado en el
+        # contenedor (.github/RUNNERS.md): restaurar encima la pisaría con otro job leyendo.
+        if: runner.environment != 'self-hosted'
+        id: cache-go
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-v2-${{ hashFiles('go.sum') }}
+          restore-keys: go-v2-
+      - run: govulncheck -show verbose ./...
+      # Tras un job FALLIDO, los módulos se verifican antes de subirlos: un disco
+      # lleno deja zips truncados, y la entrada de la caché es inmutable (el
+      # 2026-09-20 un zip roto se guardó y todo job posterior lo restauró hasta
+      # que cambió go.sum). Si no pasan, no se guarda.
+      - name: Verificar los módulos antes de guardar la caché
+        id: cache-go-sana
+        if: runner.environment != 'self-hosted' && (always() && job.status != 'success' && steps.cache-go.outputs.cache-hit != 'true')
+        continue-on-error: true
+        run: go mod verify
+      - name: Guardar caché de Go
+        if: runner.environment != 'self-hosted' && (always() && steps.cache-go.outputs.cache-hit != 'true' && (job.status == 'success' || steps.cache-go-sana.outcome == 'success'))
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-v2-${{ hashFiles('go.sum') }}

@@ -1,0 +1,102 @@
+{
+  "palettes": [
+    {
+      "id": "editorial",
+      "name": "Editorial",
+      "colors": {
+        "primary": "#1e3a8a",
+        "on_primary": "#ffffff",
+        "background": "#ffffff",
+        "text": "#111827",
+        "muted": "#4b5563",
+        "border": "#e5e7eb"
+      }
+    },
+    {
+      "id": "modern",
+      "name": "Modern",
+      "colors": {
+        "primary": "#0f766e",
+        "on_primary": "#ffffff",
+        "background": "#f9fafb",
+        "text": "#111827",
+        "muted": "#4b5563",
+        "border": "#e5e7eb"
+      }
+    },
+    {
+      "id": "warm",
+      "name": "Warm",
+      "colors": {
+        "primary": "#9a3412",
+        "on_primary": "#ffffff",
+        "background": "#fdfbf7",
+        "text": "#1c1917",
+        "muted": "#57534e",
+        "border": "#e7e5e4"
+      }
+    },
+    {
+      "id": "dark_slate",
+      "name": "Dark Slate",
+      "colors": {
+        "primary": "#38bdf8",
+        "on_primary": "#0f172a",
+        "background": "#0f172a",
+        "text": "#f8fafc",
+        "muted": "#94a3b8",
+        "border": "#334155"
+      }
+    },
+    {
+      "id": "forest",
+      "name": "Forest",
+      "colors": {
+        "primary": "#1e4620",
+        "on_primary": "#ffffff",
+        "background": "#fbfcf9",
+        "text": "#142817",
+        "muted": "#4b5d4e",
+        "border": "#e2e8e3"
+      }
+    }
+  ],
+  "font_pairs": [
+    {
+      "id": "editorial",
+      "name": "Editorial",
+      "heading": "playfair-display",
+      "body": "source-serif-4"
+    },
+    {
+      "id": "modern",
+      "name": "Modern",
+      "heading": "inter",
+      "body": "inter"
+    },
+    {
+      "id": "geometric",
+      "name": "Geometric",
+      "heading": "montserrat",
+      "body": "work-sans"
+    },
+    {
+      "id": "humanist",
+      "name": "Humanist",
+      "heading": "lora",
+      "body": "manrope"
+    },
+    {
+      "id": "technical",
+      "name": "Technical",
+      "heading": "ibm-plex-sans",
+      "body": "ibm-plex-sans"
+    },
+    {
+      "id": "clean",
+      "name": "Clean",
+      "heading": "dm-sans",
+      "body": "figtree"
+    }
+  ]
+}

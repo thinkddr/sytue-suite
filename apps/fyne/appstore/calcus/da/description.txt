@@ -1,0 +1,18 @@
+Tal, der giver mening, i et regneark, der arbejder med dig.
+
+• Formler, betinget formatering og datavalidering.
+• Hent eksterne data ind, og forespørg dem uden at forlade arket.
+• Diagrammer, minidiagrammer, udsnitsværktøjer og datatabeller.
+• Eksport til ODS og XLSX; åbn Excel-filer.
+• Formler med kontekstuel hjælp og øjeblikkelig genberegning.
+• Betinget formatering, datavalidering og talformater efter landestandard.
+• Diagrammer af flere typer, minidiagrammer og udsnitsværktøjer.
+• Datatabeller med totaler og sortering; pivottabel.
+• Eksterne data: forbind en kilde, og forespørg den fra arket.
+• Problemløser til at finde den værdi, der opfylder et mål.
+• Makroer til at automatisere gentagne opgaver.
+• Samarbejde i realtid med tilstedeværelse og kommentarer.
+• Filtre, udsnitsværktøjer og søgning i arket.
+• Eksport til ODS, XLSX og PDF; åbn Excel-filer fra Drive.
+
+Krypteret under overførsel (TLS 1.3). Sytues infrastruktur er i EU. Eksterne tjenesters placering afhænger af deres udbyder.

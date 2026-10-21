@@ -1,0 +1,2165 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#14232a" media="(prefers-color-scheme: dark)" />
+    <title>No connection — Sytue One</title>
+    <!-- Pagina estatica: sin datos de usuario, autocontenida (marca en linea). -->
+    <!-- sytue-theme:start -->
+<style>
+/* Sytue — tres modos (claro, traslúcido, oscuro) por tres COLORES elegibles: petróleo
+ * (la hoja sin atributo), azul cobalto y el de cada app (`data-color`, al final de la
+ * hoja; este último es el predeterminado). El color pone acción, selección, enlace y
+ * foco, y tiñe un punto los neutros. Claro: lienzo gris frío y superficies blancas. Traslúcido: velos sobre un
+ * fondo del color. Oscuro: casi negro con un punto del color.
+ * Este archivo y colors.json se distribuyen con scripts/sync-branding.sh.
+ * No usar el color como único indicador de estado; conservar texto e iconos.
+ */
+
+:root {
+  /* ---- Primario = el COLOR, aquí PETRÓLEO (acción, selección, enlace y foco en toda la suite) ----
+   * 600 = relleno con texto blanco (AA) y anillo de foco en claro. 700 = texto/enlace
+   * sobre blanco (AA). 400 = relleno en oscuro, con rótulo OSCURO encima. 300 =
+   * texto/enlace y foco sobre oscuro. */
+  --sytue-primary-50: #e9f6f6;
+  --sytue-primary-100: #d9efef;
+  --sytue-primary-200: #aee1e4;
+  --sytue-primary-300: #7fd3d8; /* texto/enlace y foco sobre oscuro */
+  --sytue-primary-400: #3cc4cc; /* relleno en oscuro, con rótulo oscuro */
+  --sytue-primary-500: #1a9aa3; /* ≥ 3:1 sobre blanco: componente, nunca texto */
+
+  /* --- Cuña del logotipo por organización ---------------------------------
+     La marca que ve una organización que NO ha subido la suya: la nuestra, con la
+     cuña teñida. Solo cambia la cuña; el badge blanco y el monograma se quedan,
+     porque lo que se personaliza es el acento, no la marca.
+
+     Doce y no un tono libre del círculo cromático: un hue aleatorio produce
+     fucsias y verdes fluorescentes que no son de esta casa, y además no habría
+     forma de garantizar el contraste. Estos doce están medidos —todos por encima
+     de 3:1 contra el badge blanco Y contra el monograma— y recorren el círculo
+     manteniendo la saturación y la luminosidad del latón de la marca, así que
+     cualquiera de ellos se lee como una variante nuestra y no como otro logo.
+
+     El índice sale del slug de la organización: mismo slug, mismo color, siempre.
+     Con cientos de miles de organizaciones se repiten por construcción; esto es
+     ayuda de reconocimiento —distinguir dos pestañas abiertas—, no un
+     identificador. Ver packages/ui/src/components/OrgMark.tsx. */
+  --sytue-orgmark-1: #9c743a;
+  --sytue-orgmark-2: #847f40;
+  --sytue-orgmark-3: #678853;
+  --sytue-orgmark-4: #468c6f;
+  --sytue-orgmark-5: #308c8c;
+  --sytue-orgmark-6: #3b87a2;
+  --sytue-orgmark-7: #597fae;
+  --sytue-orgmark-8: #7775ad;
+  --sytue-orgmark-9: #8f6da0;
+  --sytue-orgmark-10: #a06888;
+  --sytue-orgmark-11: #a9676c;
+  --sytue-orgmark-12: #a76c51;
+
+  --sytue-primary-600: #0f7680; /* base relleno con texto blanco (AA) */
+  --sytue-primary-700: #0c636b; /* texto/enlace sobre blanco (AA) */
+  --sytue-primary-800: #0a4a50;
+  --sytue-primary-900: #083b40;
+  --sytue-primary-950: #04262a;
+  --sytue-primary: #0f7680;
+  --sytue-primary-hover: #0c636b;
+  --sytue-primary-active: var(--sytue-primary-800);
+  --sytue-on-primary: #ffffff;
+  --sytue-primary-text: var(--sytue-primary-700);
+  /* Relleno de los glifos de dos tonos (el trazo es `currentColor`): el primario del
+   * tema. Se declara una vez y sigue al primario cuando el oscuro lo reasigna. */
+  --sytue-glyph-fill: var(--sytue-primary);
+  /* La muestra de cada color elegible, para el selector: tiene que enseñar también
+   * el que NO está pintado, así que no puede salir de `--sytue-primary`. Es el
+   * primario claro de cada uno y no cambia con el modo ni con el color en vigor. */
+  --sytue-swatch-petroleo: #0f7680;
+  --sytue-swatch-cobalto: #3b5fe0;
+  /* ---- Rampa del carril ----
+   * Los pasos del primario que usan el carril y el marco. Son los del primario salvo
+   * en «el de cada app» para las apps de icono rojo, que solo tiñen el carril: ahí su
+   * bloque los reasigna y deja el primario en el de la casa (ADR 0072). */
+  --sytue-rail-50: var(--sytue-primary-50);
+  --sytue-rail-100: var(--sytue-primary-100);
+  --sytue-rail-300: var(--sytue-primary-300);
+  --sytue-rail-700: var(--sytue-primary-700);
+  --sytue-rail-800: var(--sytue-primary-800);
+  --sytue-rail-900: var(--sytue-primary-900);
+  --sytue-rail-950: var(--sytue-primary-950);
+  /* ---- fin de la rampa del carril ---- */
+
+  /* ---- Cobre: familia de datos y gráficos ----
+   * Fue la señal de «estás aquí»; hoy esa señal es `--sytue-indicator` (el primario).
+   * Nunca relleno con texto encima (para eso, el 600) ni texto sobre claro (el 700). */
+  --sytue-copper-300: #f29c77;
+  --sytue-copper-400: #ee7d52; /* señal sobre cromo oscuro — ≥ 4,7:1 */
+  --sytue-copper-500: #e06a36; /* señal sobre blanco, papel y tinta — ≥ 3:1 */
+  --sytue-copper-600: #b44a1d; /* relleno — blanco 5,3:1 */
+  --sytue-copper-700: #963d17; /* texto sobre blanco — 7:1 */
+
+  /* ---- Acento secundario = TINTA marina (cromo de la suite, texto, gráficos) ---- */
+  --sytue-accent-50: #f2f5f7;
+  --sytue-accent-100: #e3eaee;
+  --sytue-accent-200: #c6d3da;
+  --sytue-accent-300: #9fb3bd;
+  --sytue-accent-400: #6f8792;
+  --sytue-accent-500: #4d6470;
+  --sytue-accent-600: #36505c;
+  --sytue-accent-700: #224656;
+  --sytue-accent-800: #1a3541; /* tinta — 11,9:1 sobre papel */
+  --sytue-accent-900: #11232b;
+  --sytue-accent-950: #0a151a;
+  --sytue-accent: var(--sytue-accent-800);
+  --sytue-accent-hover: var(--sytue-accent-700);
+  --sytue-on-accent: #ffffff;
+  --sytue-accent-text: var(--sytue-accent-700);
+
+  /* ---- Acento terciario (violeta) — solo datos/producto, nunca acción de UI ---- */
+  --sytue-violet-300: #b8a6ff;
+  --sytue-violet-400: #9a7eff;
+  --sytue-violet-500: #7c5cff;
+  --sytue-violet-600: #6740e6;
+  --sytue-violet-700: #5430bd;
+  --sytue-violet: var(--sytue-violet-500);
+  --sytue-violet-text: var(--sytue-violet-700);
+  --sytue-violet-bg: #f0edfc;
+
+  /* ---- Neutros con un punto del COLOR: superficies y líneas (0-400) → texto (500-700)
+   * → superficies del tema oscuro (800+) ----
+   * Misma escalera de luminancia que la anterior, girada hacia el matiz del color.
+   * Los escalones que coinciden con un rol del tema llevan su nombre al lado. */
+  --sytue-neutral-0: #ffffff; /* superficie */
+  --sytue-neutral-25: #fafcfc;
+  --sytue-neutral-50: #f6f9f9;
+  --sytue-neutral-100: #f1f6f6; /* lienzo — bg de la suite */
+  --sytue-neutral-150: #e8efef; /* hundido */
+  --sytue-neutral-200: #e0e8e8; /* línea suave */
+  --sytue-neutral-300: #cad5d6; /* línea / borde */
+  --sytue-neutral-400: #919ea0; /* decorativo (no texto) */
+  --sytue-neutral-500: #586a6f; /* texto sutil */
+  --sytue-neutral-600: #43555a; /* texto atenuado */
+  --sytue-neutral-700: #34464b;
+  --sytue-neutral-800: #283639;
+  --sytue-neutral-850: #1a2628; /* oscuro: menús y superficie elevada */
+  --sytue-neutral-900: #131c1e; /* oscuro: superficie */
+  --sytue-neutral-950: #0a1011; /* oscuro: fondo */
+  --sytue-neutral-1000: #070c0d; /* oscuro: hundido */
+
+  /* Cromo nombrado: la barra superior (chrome), el menú lateral (rail), la banda de
+   * cabecera de panel (chrome-2) y su elevación (chrome-3). Claro como el contenido; el
+   * tema oscuro lo reasigna más abajo.
+   *
+   * VIVEN AQUÍ, no solo en la copia de packages/config: este fichero es la fuente
+   * de verdad y `scripts/sync-branding.sh` hace `cp -f` sobre aquella. Un `var()`
+   * sin definir es guaranteed-invalid: la declaración se descarta EN SILENCIO, sin
+   * error ni fallback, y el cromo se quedaría sin borde, sin hover y sin divisor. */
+  --sytue-rail: #ffffff;
+  --sytue-chrome: #ffffff;
+  --sytue-chrome-2: #f1f6f6;
+  --sytue-chrome-3: #f1f6f6;
+  /* Texto e iconos sobre el cromo. `warning` es el relleno del medidor de cuota cuando
+   * se acerca al límite, que vive en el menú lateral de Mail y Drive. */
+  --sytue-on-chrome: #0f1d20;
+  --sytue-on-chrome-muted: #43555a;
+  --sytue-on-chrome-warning: var(--sytue-warning-text);
+  /* Estados SOBRE el cromo. theme.css los mapea a --color-chrome-* (utilidades
+   * bg-chrome-hover, border-chrome-border…); los consume la topbar compartida por
+   * toda la suite. El velo es el hundido: se ve sobre la barra blanca (1,17:1) y
+   * también sobre la banda de cabecera (1,06:1). */
+  --sytue-chrome-hover: #e8efef;
+  --sytue-chrome-active: var(--sytue-selected);
+  --sytue-chrome-divider: var(--sytue-border);
+  --sytue-chrome-border: var(--sytue-border);
+  /* Anillo de foco de los controles que viven SOBRE el cromo (topbar, menú lateral). */
+  --sytue-chrome-focus: #0f7680;
+
+  /* «Estás aquí»: barra del ítem activo, subrayado de la pestaña activa, flecha de la
+   * columna ordenada. Nunca relleno de botón, para eso está el primario. */
+  --sytue-indicator: #0f7680;
+
+  /* ---- Semánticos (AA) ----
+   * *base = relleno con texto blanco; *-text = texto/icono sobre claro;
+   * *-bg = fondo suave. Nunca comunicar estado solo por color. */
+  --sytue-success: #1d7443;
+  --sytue-success-hover: #175c35;
+  --sytue-success-text: #1a6a3d;
+  --sytue-success-bg: #e5f3eb;
+  --sytue-warning: #8a5d0c;
+  --sytue-warning-hover: #6e4a09;
+  --sytue-warning-text: #7f5a0f;
+  --sytue-warning-bg: #fcf1d9;
+  /* El rojo de marca subió de #b53a2e a #c34134 el 2026-09-21. Como relleno con texto
+   * blanco #b53a2e iba sobrado (5,82:1), pero también es el BORDE de un campo inválido y
+   * el punto de aviso de la campana, y ahí es un componente: sobre la tinta del cromo
+   * daba 2,78:1 y sobre la superficie oscura 2,77:1, por debajo del 3:1 de WCAG 1.4.11.
+   * #c34134 es el rojo más oscuro —o sea, el más cercano al de antes— que pasa los dos
+   * a la vez sin bajar el blanco de encima de AA: 3,18:1 y 3,17:1, blanco 5,09:1. */
+  --sytue-danger: #c34134;
+  --sytue-danger-hover: #922e24;
+  --sytue-danger-text: #a3342a;
+  --sytue-danger-bg: #fbeae7;
+  /* «Info» es AZUL y lo sigue siendo. Era un alias del primario mientras el primario
+   * fue azul; con el color elegible se queda con sus valores, o un aviso informativo
+   * se leería como uno de éxito. */
+  --sytue-info: #1a6fbb;
+  --sytue-info-hover: #165c9c;
+  --sytue-info-text: #165c9c;
+  --sytue-info-bg: #eaf3fb;
+
+  /* ---- Color de producto (tile del app switcher / etiquetas) ----
+   * Orientación entre apps: el color por app vive en el tile del launcher y en la
+   * marca, no en el cromo. Escalón AA-safe (≥ 4.5:1 con blanco encima). */
+  --sytue-product-one: #c2410c;
+  --sytue-product-id: #8a6d0f;
+  --sytue-product-drive: #16734d;
+  --sytue-product-docs: #2968ec;
+  --sytue-product-sheets: #4d7c0f;
+  --sytue-product-slides: #b05321;
+  --sytue-product-pdf: #d83b35;
+  --sytue-product-mail: #dc3450;
+  --sytue-product-calendar: #953be7;
+  --sytue-product-contacts: #0e7490;
+  --sytue-product-notes: #a91fb4;
+  --sytue-product-photos: #2f8a2a;
+  --sytue-product-chat: #b21e92;
+  --sytue-product-meet: #8b34ca;
+  --sytue-product-rooms: #4338ca;
+  --sytue-product-cloud: #086ba0;
+  --sytue-product-console: #506782;
+  --sytue-product-hub: #0f766e;
+  --sytue-product-erp: #b45309;
+  --sytue-product-cast: #9f1239;
+  --sytue-product-pages: #ca1682;
+  --sytue-product-bases: #8a4b2a;
+
+  /* ---- Presencia (Sytue Hub) — siempre con icono/forma, nunca solo color ----
+   * Un punto de presencia es un INDICADOR de estado: WCAG 1.4.11 le pide 3:1 contra la
+   * superficie donde se pinta, y son cuatro puntos que hay que distinguir ENTRE SÍ.
+   * Que además lleven nombre accesible no los exime; lo que hace es que un daltónico
+   * tampoco dependa del tono. Cada valor es el más cercano al de marca que pasa el 3:1
+   * en los DOS temas a la vez, así que no hace falta reasignarlos en oscuro:
+   *   online  #1d7443 -> #2a8f57 (oscuro 2,79 -> 3,96; claro 4,07)
+   *   dnd     #b53a2e -> el rojo de peligro (oscuro 2,77 -> 3,17; claro 5,09)
+   *   offline #a39c95 -> #8c847c (claro 2,71 -> 3,68; oscuro 4,38) */
+  --sytue-presence-online: #2a8f57;
+  --sytue-presence-away: #b27a0e;
+  --sytue-presence-dnd: var(--sytue-danger);
+  --sytue-presence-offline: #8c847c;
+
+  /* ---- Avatares y colores de persona (autoría, cursores de coedición) ----
+   * Vivos pero no chillones, bien separados en el círculo para distinguir a seis
+   * personas de un vistazo. Iniciales en blanco AA (≥ 4,6:1) sobre todos. */
+  --sytue-avatar-1: #0e7c74; /* turquesa  — blanco 5,06:1 */
+  --sytue-avatar-2: #b8466a; /* frambuesa — blanco 5,09:1 */
+  --sytue-avatar-3: #1f6fb5; /* cielo     — blanco 5,25:1 */
+  --sytue-avatar-4: #b35633; /* cobre     — blanco 4,89:1 */
+  --sytue-avatar-5: #2a7d48; /* verde     — blanco 5,09:1 */
+  --sytue-avatar-6: #6a58b8; /* lavanda   — blanco 5,67:1 */
+
+  /* Tarjetas de recurso: colores de grupo, independientes del estado. */
+  --sytue-card-blue: #e8efff;
+  --sytue-card-violet: #eeebf8;
+  --sytue-card-mint: #e5f0ea;
+  --sytue-card-rose: #f6e5ed;
+  --sytue-card-amber: #f5efca;
+
+  /* ---- Tema claro (rol semántico) ----
+     El lienzo es gris verdoso y las superficies, blancas: se despegan del fondo con
+     sombra suave en vez de con una línea. */
+  --sytue-bg: #f1f6f6;
+  /* Un paso bajo la superficie Y bajo el lienzo: es el hover de una fila, y tiene que
+     verse tanto en una tarjeta blanca (1,17:1) como directamente sobre el lienzo. */
+  --sytue-bg-subtle: #e8efef;
+  --sytue-surface: #ffffff;
+  --sytue-surface-raised: #ffffff;
+  --sytue-menu-surface: #ffffff;
+  --sytue-menu-hover: #ecf4f4;
+  --sytue-menu-selected: #d9efef;
+  --sytue-surface-sunken: #e8efef;
+  --sytue-sidebar-bg: #ffffff;
+  --sytue-sidebar-fg: #0f1d20;
+  --sytue-sidebar-fg-muted: #43555a;
+  /* Ítem activo del menú: tinte del primario, con la barra de `--sytue-indicator` que
+     pinta el componente. */
+  --sytue-sidebar-active-bg: #d9efef;
+  --sytue-sidebar-active-fg: #0a4a50;
+  --sytue-sidebar-hover-bg: #ecf4f4;
+  --sytue-topbar-bg: #ffffff;
+  --sytue-topbar-fg: #0f1d20;
+  /* Banda de cabecera de panel (canal de Rooms, paneles del editor, cabecera de
+     modal y de tabla): el tono del lienzo sobre la superficie blanca, así se lee como
+     cabecera sin necesitar borde. */
+  --sytue-header-bg: #f1f6f6;
+  --sytue-header-fg: #0f1d20;
+  /* Tinta de líneas, con el punto de color del texto. TODOS los bordes derivan de aquí
+     por opacidad, y como se declaran en :root con `var()`, conmutan solos cuando el
+     tema oscuro cambia la tinta en el mismo elemento. */
+  --sytue-ink-rgb: 15, 29, 32;
+  --sytue-border-subtle: rgba(15, 29, 32, 0.07);
+  --sytue-border: rgba(15, 29, 32, 0.12);
+  /* Contorno de control: ver la nota de LÍNEAS arriba. El tema oscuro lo reasigna. */
+  --sytue-border-strong: rgba(15, 29, 32, 0.6);
+  /* Anillo de la tesela de producto: en claro el badge ya contrasta contra el papel;
+     en oscuro se enciende para devolverle contorno sin tocar la paleta. */
+  --sytue-product-tile-ring: transparent;
+  --sytue-text: #0f1d20;
+  --sytue-text-muted: #43555a;
+  --sytue-text-subtle: #586a6f;
+  /* Selección (fila/ítem elegido): tinte translúcido del primario 600. Intensidad
+     como token aparte (12 % claro, 16 % traslúcido y oscuro). */
+  --sytue-selected-strength: 12%;
+  --sytue-selected: color-mix(
+    in srgb,
+    var(--sytue-primary-600) var(--sytue-selected-strength),
+    transparent
+  );
+  /* Foco: UN anillo del primario de 2px que contrasta ≥ 3:1 por su cuenta sobre blanco,
+     lienzo y hundido (lo mide contraste-paleta.test.ts). */
+  --sytue-focus-ring: #0f7680;
+  --sytue-overlay: rgba(15, 29, 32, 0.36);
+  /* La acción principal es el primario; los fondos de tarjeta no indican estado. */
+  --sytue-primary: #0f7680;
+  --sytue-primary-hover: #0c636b;
+  --sytue-primary-active: var(--sytue-primary-800);
+  --sytue-panel-surface: #ffffff;
+  --sytue-card-emphasis: #2457e8;
+  --sytue-card-emphasis-alt: #2e7485;
+  --sytue-card-emphasis-warm: #ce6969;
+  --sytue-on-card-emphasis: #ffffff;
+  --sytue-on-card-emphasis-warm: #10141a;
+  /* Luz del fondo ambiental compartido por web y nativo. Los nombres son los de la
+     geometría (arranque, centro, final y foco cálido), no los del color: `blue` es hoy
+     otro tono. Renombrarlos toca las apps nativas y no cambia un píxel. */
+  --sytue-workspace-blue: #b6d8db;
+  --sytue-workspace-middle: #d0e4e1;
+  --sytue-workspace-mint: #ebe8d2;
+  --sytue-workspace-warm: rgba(247, 201, 72, 0.24);
+
+  --sytue-card-cyan: #dff0f3;
+  --sytue-card-coral: #f5e1dc;
+  --sytue-card-lime: #edf1d6;
+  --sytue-card-slate: #e5e9ef;
+  --sytue-card-solid-blue: #2457e8;
+  --sytue-card-solid-violet: #6546c5;
+  --sytue-card-solid-mint: #0f7680;
+  --sytue-card-solid-rose: #b64068;
+  --sytue-card-solid-amber: #f2c230;
+  --sytue-card-solid-cyan: #157a92;
+  --sytue-card-solid-coral: #ce6969;
+  --sytue-card-solid-lime: #afc94d;
+  --sytue-card-solid-slate: #202832;
+  --sytue-on-card-solid-blue: #ffffff;
+  --sytue-on-card-solid-violet: #ffffff;
+  --sytue-on-card-solid-mint: #ffffff;
+  --sytue-on-card-solid-rose: #ffffff;
+  --sytue-on-card-solid-amber: #10141a;
+  --sytue-on-card-solid-cyan: #ffffff;
+  --sytue-on-card-solid-coral: #10141a;
+  --sytue-on-card-solid-lime: #10141a;
+  --sytue-on-card-solid-slate: #ffffff;
+}
+
+/* Tema oscuro elegido por la persona. */
+[data-theme='dark'] {
+  --sytue-card-blue: rgba(36, 87, 232, 0.22);
+  --sytue-card-violet: rgba(101, 70, 197, 0.25);
+  --sytue-card-mint: rgba(37, 118, 91, 0.22);
+  --sytue-card-rose: rgba(182, 64, 104, 0.22);
+  --sytue-card-amber: rgba(234, 214, 65, 0.12);
+  --sytue-bg: #0a1011;
+  --sytue-bg-subtle: #182325;
+  --sytue-surface: #131c1e;
+  --sytue-surface-raised: #1a2628;
+  --sytue-menu-surface: #1a2628;
+  --sytue-menu-hover: #243336;
+  --sytue-menu-selected: #133f45;
+  --sytue-surface-sunken: #070c0d;
+  --sytue-rail: #0d1415;
+  --sytue-chrome: #0d1415;
+  --sytue-chrome-2: #182325;
+  --sytue-chrome-3: #182325;
+  --sytue-on-chrome: #e7efef;
+  --sytue-on-chrome-muted: #a6b8ba;
+  --sytue-on-chrome-warning: #e8b86a;
+  --sytue-chrome-hover: #243336;
+  --sytue-chrome-active: rgba(255, 255, 255, 0.14);
+  --sytue-chrome-divider: rgba(255, 255, 255, 0.14);
+  --sytue-chrome-border: rgba(255, 255, 255, 0.22);
+  --sytue-sidebar-active-bg: #133f45;
+  --sytue-sidebar-active-fg: #aee1e4;
+  --sytue-indicator: #3cc4cc;
+  --sytue-chrome-focus: #7fd3d8;
+  --sytue-header-fg: #e7efef;
+  /* Tinta clara: el contorno de control baja (60% -> 42%): la tinta clara sobre fondo
+     oscuro cunde más y al 54% gritaba. */
+  --sytue-ink-rgb: 231, 239, 239;
+  --sytue-border-strong: rgba(231, 239, 239, 0.42);
+  /* El aro de la tesela de producto es contorno DECORATIVO sobre un color que ya
+     contrasta: se queda en el 16% de siempre, no sigue al contorno de control. */
+  --sytue-product-tile-ring: rgba(var(--sytue-ink-rgb), 0.16);
+  --sytue-text: #e7efef;
+  --sytue-text-muted: #a6b8ba;
+  --sytue-text-subtle: #8a9ea1;
+  --sytue-selected-strength: 16%;
+  --sytue-focus-ring: #7fd3d8;
+  --sytue-overlay: rgba(0, 0, 0, 0.6);
+
+  /* Color como texto/enlace: escalón claro sobre oscuro (≥ 4.5:1 en superficie). */
+  --sytue-primary-text: #7fd3d8;
+  --sytue-accent-text: var(--sytue-accent-200);
+  --sytue-violet-text: var(--sytue-violet-400);
+  --sytue-violet-bg: #27203c;
+  --sytue-success-text: #5fd08f;
+  --sytue-warning-text: #e8b86a;
+  --sytue-danger-text: #f08f84;
+  --sytue-info-text: #7db8ec;
+
+  /* Semánticos como relleno mantienen su *base*; solo el *-bg cambia a variante oscura. */
+  --sytue-success-bg: #10301f;
+  --sytue-warning-bg: #33270e;
+  --sytue-danger-bg: #3a1a16;
+  --sytue-info-bg: #0f2a44;
+
+  /* En oscuro el botón principal es el primario CLARO (400) y su rótulo va en
+     OSCURO: blanco encima no llega a 3:1. Por eso `on-primary` no es
+     «blanco»: quien pinte sobre otro relleno (peligro, un color de persona) no lo usa. */
+  --sytue-primary: #3cc4cc;
+  --sytue-primary-hover: #33b0b8;
+  --sytue-primary-active: var(--sytue-primary-500);
+  --sytue-sidebar-bg: #0d1415;
+  --sytue-sidebar-fg: #e7efef;
+  --sytue-sidebar-fg-muted: #a6b8ba;
+  --sytue-sidebar-hover-bg: #161f21;
+  --sytue-topbar-bg: #0d1415;
+  --sytue-topbar-fg: #e7efef;
+  --sytue-header-bg: #182325;
+  --sytue-border: rgba(231, 239, 239, 0.11);
+  --sytue-on-primary: #04161a;
+  --sytue-panel-surface: #161f21;
+  --sytue-card-emphasis: #2457e8;
+  --sytue-card-emphasis-alt: #2e7485;
+  --sytue-card-emphasis-warm: #ce6969;
+  --sytue-on-card-emphasis: #ffffff;
+  --sytue-on-card-emphasis-warm: #10141a;
+  --sytue-border-subtle: rgba(231, 239, 239, 0.06);
+  --sytue-selected: rgba(60, 196, 204, 0.16);
+  --sytue-card-cyan: rgba(21, 122, 146, 0.22);
+  --sytue-card-coral: rgba(206, 105, 105, 0.2);
+  --sytue-card-lime: rgba(175, 201, 77, 0.14);
+  --sytue-card-slate: rgba(131, 162, 219, 0.13);
+  --sytue-card-solid-blue: #3d6cf0;
+  --sytue-card-solid-violet: #7559d6;
+  --sytue-card-solid-mint: #0f7680;
+  --sytue-card-solid-rose: #b64068;
+  --sytue-card-solid-amber: #f2c230;
+  --sytue-card-solid-cyan: #157a92;
+  --sytue-card-solid-coral: #ce6969;
+  --sytue-card-solid-lime: #afc94d;
+  --sytue-card-solid-slate: #202832;
+  --sytue-on-card-solid-blue: #ffffff;
+  --sytue-on-card-solid-violet: #ffffff;
+  --sytue-on-card-solid-mint: #ffffff;
+  --sytue-on-card-solid-rose: #ffffff;
+  --sytue-on-card-solid-amber: #10141a;
+  --sytue-on-card-solid-cyan: #ffffff;
+  --sytue-on-card-solid-coral: #10141a;
+  --sytue-on-card-solid-lime: #10141a;
+  --sytue-on-card-solid-slate: #ffffff;
+}
+
+/* Velos que dejan ver el fondo multicolor; el desenfoque vive en las superficies compartidas. */
+[data-theme='translucent'] {
+  --sytue-bg: #d0e4e1;
+  --sytue-bg-subtle: rgba(255, 255, 255, 0.26);
+  --sytue-surface: rgba(255, 255, 255, 0.66);
+  --sytue-surface-raised: #f7fbfb;
+  --sytue-menu-surface: #f7fbfb;
+  --sytue-menu-hover: #e6f1f1;
+  --sytue-menu-selected: #d4ecec;
+  --sytue-surface-sunken: rgba(15, 29, 32, 0.06);
+  --sytue-sidebar-bg: rgba(255, 255, 255, 0.5);
+  --sytue-sidebar-fg: #0f1d20;
+  --sytue-sidebar-fg-muted: #34464b;
+  --sytue-sidebar-active-bg: rgba(15, 118, 128, 0.18);
+  --sytue-sidebar-active-fg: #0a4a50;
+  --sytue-sidebar-hover-bg: rgba(255, 255, 255, 0.45);
+  --sytue-topbar-bg: rgba(255, 255, 255, 0.5);
+  --sytue-topbar-fg: #0f1d20;
+  --sytue-header-bg: rgba(255, 255, 255, 0.42);
+  --sytue-header-fg: #0f1d20;
+  --sytue-primary: #0f7680;
+  --sytue-primary-hover: #0c636b;
+  /* Sobre el velo el enlace baja un escalón (800): el 700 se queda corto donde el
+     fondo es más intenso. Y la selección sube al 16 %, que al 12 % no se ve. */
+  --sytue-primary-text: var(--sytue-primary-800);
+  --sytue-selected-strength: 16%;
+  --sytue-indicator: #0c636b;
+  --sytue-chrome-focus: #0c636b;
+  --sytue-border: rgba(15, 29, 32, 0.12);
+  --sytue-border-strong: rgba(15, 29, 32, 0.62);
+  --sytue-text: #0f1d20;
+  --sytue-text-muted: #34464b;
+  --sytue-text-subtle: #415358;
+  --sytue-on-primary: #ffffff;
+  --sytue-focus-ring: #0c636b;
+  --sytue-overlay: rgba(15, 29, 32, 0.36);
+  --sytue-card-blue: rgba(36, 87, 232, 0.16);
+  --sytue-card-violet: rgba(101, 70, 197, 0.17);
+  --sytue-card-mint: rgba(37, 118, 91, 0.17);
+  --sytue-card-rose: rgba(182, 64, 104, 0.16);
+  --sytue-card-amber: rgba(234, 214, 65, 0.26);
+  /* Opaco, como los menús: un diálogo pide atención y lo de detrás no debe
+     competir con él. Al 80 % los campos y botones se leían mal sobre el fondo. */
+  --sytue-panel-surface: var(--sytue-surface-raised);
+  --sytue-card-emphasis: #2457e8;
+  --sytue-card-emphasis-alt: #2e7485;
+  --sytue-card-emphasis-warm: #ce6969;
+  --sytue-on-card-emphasis: #ffffff;
+  --sytue-on-card-emphasis-warm: #10141a;
+  --sytue-rail: #eef6f6;
+  --sytue-chrome: #eef6f6;
+  --sytue-chrome-2: #e1efef;
+  --sytue-chrome-3: #e1efef;
+  --sytue-on-chrome: #0f1d20;
+  --sytue-on-chrome-muted: #34464b;
+  --sytue-chrome-hover: rgba(15, 29, 32, 0.06);
+  --sytue-ink-rgb: 15, 29, 32;
+  --sytue-border-subtle: rgba(15, 29, 32, 0.06);
+  --sytue-card-cyan: rgba(21, 122, 146, 0.17);
+  --sytue-card-coral: rgba(206, 105, 105, 0.2);
+  --sytue-card-lime: rgba(175, 201, 77, 0.26);
+  --sytue-card-slate: rgba(32, 40, 50, 0.12);
+  --sytue-card-solid-blue: #2457e8;
+  --sytue-card-solid-violet: #6546c5;
+  --sytue-card-solid-mint: #0f7680;
+  --sytue-card-solid-rose: #b64068;
+  --sytue-card-solid-amber: #f2c230;
+  --sytue-card-solid-cyan: #157a92;
+  --sytue-card-solid-coral: #ce6969;
+  --sytue-card-solid-lime: #afc94d;
+  --sytue-card-solid-slate: #202832;
+  --sytue-on-card-solid-blue: #ffffff;
+  --sytue-on-card-solid-violet: #ffffff;
+  --sytue-on-card-solid-mint: #ffffff;
+  --sytue-on-card-solid-rose: #ffffff;
+  --sytue-on-card-solid-amber: #10141a;
+  --sytue-on-card-solid-cyan: #ffffff;
+  --sytue-on-card-solid-coral: #10141a;
+  --sytue-on-card-solid-lime: #10141a;
+  --sytue-on-card-solid-slate: #ffffff;
+}
+
+/* Sistema: solo cuando no existe elección explícita. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --sytue-card-blue: rgba(36, 87, 232, 0.22);
+    --sytue-card-violet: rgba(101, 70, 197, 0.25);
+    --sytue-card-mint: rgba(37, 118, 91, 0.22);
+    --sytue-card-rose: rgba(182, 64, 104, 0.22);
+    --sytue-card-amber: rgba(234, 214, 65, 0.12);
+    --sytue-bg: #0a1011;
+    --sytue-bg-subtle: #182325;
+    --sytue-surface: #131c1e;
+    --sytue-surface-raised: #1a2628;
+    --sytue-menu-surface: #1a2628;
+    --sytue-menu-hover: #243336;
+    --sytue-menu-selected: #133f45;
+    --sytue-surface-sunken: #070c0d;
+    --sytue-rail: #0d1415;
+    --sytue-chrome: #0d1415;
+    --sytue-chrome-2: #182325;
+    --sytue-chrome-3: #182325;
+    --sytue-on-chrome: #e7efef;
+    --sytue-on-chrome-muted: #a6b8ba;
+    --sytue-on-chrome-warning: #e8b86a;
+    --sytue-chrome-hover: #243336;
+    --sytue-chrome-active: rgba(255, 255, 255, 0.14);
+    --sytue-chrome-divider: rgba(255, 255, 255, 0.14);
+    --sytue-chrome-border: rgba(255, 255, 255, 0.22);
+    --sytue-sidebar-active-bg: #133f45;
+    --sytue-sidebar-active-fg: #aee1e4;
+    --sytue-indicator: #3cc4cc;
+    --sytue-chrome-focus: #7fd3d8;
+    --sytue-header-fg: #e7efef;
+    /* Tinta clara: el contorno de control baja (60% -> 42%): la tinta clara sobre fondo
+     oscuro cunde más y al 54% gritaba. */
+    --sytue-ink-rgb: 231, 239, 239;
+    --sytue-border-strong: rgba(231, 239, 239, 0.42);
+    /* El aro de la tesela de producto es contorno DECORATIVO sobre un color que ya
+     contrasta: se queda en el 16% de siempre, no sigue al contorno de control. */
+    --sytue-product-tile-ring: rgba(var(--sytue-ink-rgb), 0.16);
+    --sytue-text: #e7efef;
+    --sytue-text-muted: #a6b8ba;
+    --sytue-text-subtle: #8a9ea1;
+    --sytue-selected-strength: 16%;
+    --sytue-focus-ring: #7fd3d8;
+    --sytue-overlay: rgba(0, 0, 0, 0.6);
+
+    /* Color como texto/enlace: escalón claro sobre oscuro (≥ 4.5:1 en superficie). */
+    --sytue-primary-text: #7fd3d8;
+    --sytue-accent-text: var(--sytue-accent-200);
+    --sytue-violet-text: var(--sytue-violet-400);
+    --sytue-violet-bg: #27203c;
+    --sytue-success-text: #5fd08f;
+    --sytue-warning-text: #e8b86a;
+    --sytue-danger-text: #f08f84;
+    --sytue-info-text: #7db8ec;
+
+    /* Semánticos como relleno mantienen su *base*; solo el *-bg cambia a variante oscura. */
+    --sytue-success-bg: #10301f;
+    --sytue-warning-bg: #33270e;
+    --sytue-danger-bg: #3a1a16;
+    --sytue-info-bg: #0f2a44;
+
+    /* En oscuro el botón principal es el primario CLARO (400) y su rótulo va en
+     OSCURO: blanco encima no llega a 3:1. Por eso `on-primary` no es
+     «blanco»: quien pinte sobre otro relleno (peligro, un color de persona) no lo usa. */
+    --sytue-primary: #3cc4cc;
+    --sytue-primary-hover: #33b0b8;
+    --sytue-primary-active: var(--sytue-primary-500);
+    --sytue-sidebar-bg: #0d1415;
+    --sytue-sidebar-fg: #e7efef;
+    --sytue-sidebar-fg-muted: #a6b8ba;
+    --sytue-sidebar-hover-bg: #161f21;
+    --sytue-topbar-bg: #0d1415;
+    --sytue-topbar-fg: #e7efef;
+    --sytue-header-bg: #182325;
+    --sytue-border: rgba(231, 239, 239, 0.11);
+    --sytue-on-primary: #04161a;
+    --sytue-panel-surface: #161f21;
+    --sytue-card-emphasis: #2457e8;
+    --sytue-card-emphasis-alt: #2e7485;
+    --sytue-card-emphasis-warm: #ce6969;
+    --sytue-on-card-emphasis: #ffffff;
+    --sytue-on-card-emphasis-warm: #10141a;
+    --sytue-border-subtle: rgba(231, 239, 239, 0.06);
+    --sytue-selected: rgba(60, 196, 204, 0.16);
+    --sytue-card-cyan: rgba(21, 122, 146, 0.22);
+    --sytue-card-coral: rgba(206, 105, 105, 0.2);
+    --sytue-card-lime: rgba(175, 201, 77, 0.14);
+    --sytue-card-slate: rgba(131, 162, 219, 0.13);
+    --sytue-card-solid-blue: #3d6cf0;
+    --sytue-card-solid-violet: #7559d6;
+    --sytue-card-solid-mint: #0f7680;
+    --sytue-card-solid-rose: #b64068;
+    --sytue-card-solid-amber: #f2c230;
+    --sytue-card-solid-cyan: #157a92;
+    --sytue-card-solid-coral: #ce6969;
+    --sytue-card-solid-lime: #afc94d;
+    --sytue-card-solid-slate: #202832;
+    --sytue-on-card-solid-blue: #ffffff;
+    --sytue-on-card-solid-violet: #ffffff;
+    --sytue-on-card-solid-mint: #ffffff;
+    --sytue-on-card-solid-rose: #ffffff;
+    --sytue-on-card-solid-amber: #10141a;
+    --sytue-on-card-solid-cyan: #ffffff;
+    --sytue-on-card-solid-coral: #10141a;
+    --sytue-on-card-solid-lime: #10141a;
+    --sytue-on-card-solid-slate: #ffffff;
+  }
+}
+
+/* ==== COLOR: azul cobalto ====
+   El color es un eje APARTE del modo: `data-color` en la raíz, junto a `data-theme`.
+   Petróleo es el valor sin atributo (todo lo de arriba); aquí solo va lo que cambia.
+   Cada modo repite lo que el bloque claro de cobalto declara: a igual especificidad
+   ganaría ese bloque, que va después del modo del petróleo. Lo vigila
+   contraste-paleta.test.ts. Generado con los valores de la especificación; los
+   neutros, `bg-subtle` y `chrome-hover` se derivan igual que en el petróleo. */
+[data-color='cobalto'] {
+  --sytue-primary-50: #eef2ff;
+  --sytue-primary-100: #e2e9ff;
+  --sytue-primary-200: #c5d2ff;
+  --sytue-primary-300: #a3b9ff;
+  --sytue-primary-400: #6f8ff5;
+  --sytue-primary-500: #4169e8;
+  --sytue-primary-600: #3b5fe0;
+  --sytue-primary-700: #2f4fc4;
+  --sytue-primary-800: #2843a6;
+  --sytue-primary-900: #1f3586;
+  --sytue-primary-950: #141d3d;
+  --sytue-neutral-25: #fbfcfe;
+  --sytue-neutral-50: #f7f8fc;
+  --sytue-neutral-100: #f3f5fa;
+  --sytue-neutral-150: #edf0f7;
+  --sytue-neutral-200: #e4e8f1;
+  --sytue-neutral-300: #ced4e2;
+  --sytue-neutral-400: #959db0;
+  --sytue-neutral-500: #5c667c;
+  --sytue-neutral-600: #465066;
+  --sytue-neutral-700: #3b4459;
+  --sytue-neutral-800: #282f44;
+  --sytue-neutral-850: #1e2434;
+  --sytue-neutral-900: #161b28;
+  --sytue-neutral-950: #0e111a;
+  --sytue-neutral-1000: #0a0d15;
+  --sytue-primary: #3b5fe0;
+  --sytue-primary-hover: #2f4fc4;
+  --sytue-chrome-2: #f3f5fa;
+  --sytue-chrome-3: #f3f5fa;
+  --sytue-on-chrome: #141a2b;
+  --sytue-on-chrome-muted: #465066;
+  --sytue-chrome-hover: #edf0f7;
+  --sytue-chrome-focus: #3b5fe0;
+  --sytue-indicator: #3b5fe0;
+  --sytue-bg: #f3f5fa;
+  --sytue-bg-subtle: #edf0f7;
+  --sytue-menu-hover: #eef2fb;
+  --sytue-menu-selected: #e2e9ff;
+  --sytue-surface-sunken: #edf0f7;
+  --sytue-sidebar-fg: #141a2b;
+  --sytue-sidebar-fg-muted: #465066;
+  --sytue-sidebar-active-bg: #e2e9ff;
+  --sytue-sidebar-active-fg: #2843a6;
+  --sytue-sidebar-hover-bg: #eef2fb;
+  --sytue-topbar-fg: #141a2b;
+  --sytue-header-bg: #f3f5fa;
+  --sytue-header-fg: #141a2b;
+  --sytue-ink-rgb: 20, 26, 43;
+  --sytue-border-subtle: rgba(20, 26, 43, 0.07);
+  --sytue-border: rgba(20, 26, 43, 0.12);
+  --sytue-border-strong: rgba(20, 26, 43, 0.6);
+  --sytue-text: #141a2b;
+  --sytue-text-muted: #465066;
+  --sytue-text-subtle: #5c667c;
+  --sytue-selected-strength: 11%;
+  --sytue-focus-ring: #3b5fe0;
+  --sytue-overlay: rgba(20, 26, 43, 0.36);
+  --sytue-workspace-blue: #bccdf5;
+  --sytue-workspace-middle: #d2ddf6;
+  --sytue-workspace-mint: #d3eaf0;
+  --sytue-workspace-warm: rgba(244, 164, 122, 0.22);
+  --sytue-card-solid-mint: #0a8552;
+}
+[data-color='cobalto'][data-theme='dark'] {
+  --sytue-bg: #0e111a;
+  --sytue-bg-subtle: #1b2130;
+  --sytue-surface: #161b28;
+  --sytue-surface-raised: #1e2434;
+  --sytue-menu-surface: #1e2434;
+  --sytue-menu-hover: #282f44;
+  --sytue-menu-selected: #263566;
+  --sytue-surface-sunken: #0a0d15;
+  --sytue-rail: #121622;
+  --sytue-chrome: #121622;
+  --sytue-chrome-2: #1b2130;
+  --sytue-chrome-3: #1b2130;
+  --sytue-on-chrome: #e9ecf5;
+  --sytue-on-chrome-muted: #aab3c7;
+  --sytue-chrome-hover: #282f44;
+  --sytue-sidebar-active-bg: #263566;
+  --sytue-sidebar-active-fg: #c5d2ff;
+  --sytue-indicator: #6f8ff5;
+  --sytue-chrome-focus: #a3b9ff;
+  --sytue-header-fg: #e9ecf5;
+  --sytue-ink-rgb: 233, 236, 245;
+  --sytue-border-strong: rgba(233, 236, 245, 0.42);
+  --sytue-text: #e9ecf5;
+  --sytue-text-muted: #aab3c7;
+  --sytue-text-subtle: #8e98ae;
+  --sytue-selected-strength: 20%;
+  --sytue-focus-ring: #a3b9ff;
+  --sytue-overlay: rgba(0, 0, 0, 0.6);
+  --sytue-primary-text: #a3b9ff;
+  --sytue-primary: #4169e8;
+  --sytue-primary-hover: #375cd4;
+  --sytue-primary-active: var(--sytue-primary-700);
+  --sytue-sidebar-bg: #121622;
+  --sytue-sidebar-fg: #e9ecf5;
+  --sytue-sidebar-fg-muted: #aab3c7;
+  --sytue-sidebar-hover-bg: #171c2b;
+  --sytue-topbar-bg: #121622;
+  --sytue-topbar-fg: #e9ecf5;
+  --sytue-header-bg: #1b2130;
+  --sytue-border: rgba(233, 236, 245, 0.11);
+  --sytue-on-primary: #ffffff;
+  --sytue-panel-surface: #171c2b;
+  --sytue-border-subtle: rgba(233, 236, 245, 0.06);
+  --sytue-selected: rgba(76, 114, 234, 0.2);
+  --sytue-card-solid-mint: #0c7a4c;
+}
+[data-color='cobalto'][data-theme='translucent'] {
+  --sytue-bg: #d2ddf6;
+  --sytue-bg-subtle: rgba(255, 255, 255, 0.26);
+  --sytue-surface-raised: #f8faff;
+  --sytue-menu-surface: #f8faff;
+  --sytue-menu-hover: #e9eefb;
+  --sytue-menu-selected: #dde6ff;
+  --sytue-surface-sunken: rgba(20, 26, 43, 0.06);
+  --sytue-sidebar-fg: #141a2b;
+  --sytue-sidebar-fg-muted: #3b4459;
+  --sytue-sidebar-active-bg: rgba(59, 95, 224, 0.16);
+  --sytue-sidebar-active-fg: #2843a6;
+  --sytue-sidebar-hover-bg: rgba(255, 255, 255, 0.45);
+  --sytue-topbar-fg: #141a2b;
+  --sytue-header-bg: rgba(255, 255, 255, 0.42);
+  --sytue-header-fg: #141a2b;
+  --sytue-primary: #3b5fe0;
+  --sytue-primary-hover: #2f4fc4;
+  --sytue-selected-strength: 15%;
+  --sytue-indicator: #2f4fc4;
+  --sytue-chrome-focus: #2f4fc4;
+  --sytue-border: rgba(20, 26, 43, 0.12);
+  --sytue-border-strong: rgba(20, 26, 43, 0.62);
+  --sytue-text: #141a2b;
+  --sytue-text-muted: #3b4459;
+  --sytue-text-subtle: #455068;
+  --sytue-focus-ring: #2f4fc4;
+  --sytue-overlay: rgba(20, 26, 43, 0.36);
+  --sytue-rail: #f0f3fb;
+  --sytue-chrome: #f0f3fb;
+  --sytue-chrome-2: #e3e9f8;
+  --sytue-chrome-3: #e3e9f8;
+  --sytue-on-chrome: #141a2b;
+  --sytue-on-chrome-muted: #3b4459;
+  --sytue-chrome-hover: rgba(20, 26, 43, 0.06);
+  --sytue-ink-rgb: 20, 26, 43;
+  --sytue-border-subtle: rgba(20, 26, 43, 0.06);
+  --sytue-card-solid-mint: #0a8552;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme])[data-color='cobalto'] {
+    --sytue-bg: #0e111a;
+    --sytue-bg-subtle: #1b2130;
+    --sytue-surface: #161b28;
+    --sytue-surface-raised: #1e2434;
+    --sytue-menu-surface: #1e2434;
+    --sytue-menu-hover: #282f44;
+    --sytue-menu-selected: #263566;
+    --sytue-surface-sunken: #0a0d15;
+    --sytue-rail: #121622;
+    --sytue-chrome: #121622;
+    --sytue-chrome-2: #1b2130;
+    --sytue-chrome-3: #1b2130;
+    --sytue-on-chrome: #e9ecf5;
+    --sytue-on-chrome-muted: #aab3c7;
+    --sytue-chrome-hover: #282f44;
+    --sytue-sidebar-active-bg: #263566;
+    --sytue-sidebar-active-fg: #c5d2ff;
+    --sytue-indicator: #6f8ff5;
+    --sytue-chrome-focus: #a3b9ff;
+    --sytue-header-fg: #e9ecf5;
+    --sytue-ink-rgb: 233, 236, 245;
+    --sytue-border-strong: rgba(233, 236, 245, 0.42);
+    --sytue-text: #e9ecf5;
+    --sytue-text-muted: #aab3c7;
+    --sytue-text-subtle: #8e98ae;
+    --sytue-selected-strength: 20%;
+    --sytue-focus-ring: #a3b9ff;
+    --sytue-overlay: rgba(0, 0, 0, 0.6);
+    --sytue-primary-text: #a3b9ff;
+    --sytue-primary: #4169e8;
+    --sytue-primary-hover: #375cd4;
+    --sytue-primary-active: var(--sytue-primary-700);
+    --sytue-sidebar-bg: #121622;
+    --sytue-sidebar-fg: #e9ecf5;
+    --sytue-sidebar-fg-muted: #aab3c7;
+    --sytue-sidebar-hover-bg: #171c2b;
+    --sytue-topbar-bg: #121622;
+    --sytue-topbar-fg: #e9ecf5;
+    --sytue-header-bg: #1b2130;
+    --sytue-border: rgba(233, 236, 245, 0.11);
+    --sytue-on-primary: #ffffff;
+    --sytue-panel-surface: #171c2b;
+    --sytue-border-subtle: rgba(233, 236, 245, 0.06);
+    --sytue-selected: rgba(76, 114, 234, 0.2);
+    --sytue-card-solid-mint: #0c7a4c;
+  }
+}
+
+/* ==== COLOR: el de cada app ====
+   Tercer valor del eje `data-color`: el carril y la acción toman el color de producto
+   de la app que se está usando. La app la dice `data-app` en la raíz (la web lo pone
+   con el prefijo bajo el que se sirve y, si se sirve en la raíz, con la primera etiqueta
+   del host; por eso `admin`, `platform` y `web` van como alias de `console` y
+   `pages`). Una superficie sin bloque —Hub, Mi cuenta— se queda en
+   petróleo: el reparto de abajo, sin rampa propia, da los valores de la casa.
+
+   Cada app aporta SOLO su rampa, derivada de `--sytue-product-<app>`: el 600 lleva
+   rótulo blanco (4,7:1), el 700 es el carril y el enlace (6,6:1 con blanco), el 400 la
+   acción en oscuro (rótulo oscuro a 4,7:1) y el 300 el enlace en oscuro (6:1). El
+   reparto por modo va una vez.
+
+   CINCO APPS SOLO TIÑEN EL CARRIL —Mail, PDF, Cast, Diapos y ERP—: declaran la rampa
+   `--sytue-rail-*` y dejan la del primario en la de la casa, así que botón, enlace,
+   selección y foco siguen en petróleo. Son las que el dueño decidió, de entre las que
+   caen en la franja de tono de `--sytue-danger` (a menos de 26°), porque su color se
+   confundía con el de peligro en insignias, enlaces y foco; Bases está en la franja y
+   no se confunde. No es una fórmula, es una lista decidida (ADR 0072). Generado; lo vigila contraste-paleta.test.ts. */
+[data-color='app'][data-app='drive'] {
+  --sytue-primary-50: #f1f7f4;
+  --sytue-primary-100: #e1ede8;
+  --sytue-primary-200: #b0cfc2;
+  --sytue-primary-300: #8dbaa8;
+  --sytue-primary-400: #5c9d82;
+  --sytue-primary-500: #398868;
+  --sytue-primary-600: #16734d;
+  --sytue-primary-700: #136544;
+  --sytue-primary-800: #0f5136;
+  --sytue-primary-900: #0c3f2a;
+  --sytue-primary-950: #0e2820;
+}
+[data-color='app'][data-app='docus'],
+[data-color='app'][data-app='docs'] {
+  --sytue-primary-50: #f2f6fe;
+  --sytue-primary-100: #e3ebfd;
+  --sytue-primary-200: #b6ccf9;
+  --sytue-primary-300: #96b5f6;
+  --sytue-primary-400: #6995f2;
+  --sytue-primary-500: #497fef;
+  --sytue-primary-600: #2968ec;
+  --sytue-primary-700: #2255c1;
+  --sytue-primary-800: #1b449b;
+  --sytue-primary-900: #153578;
+  --sytue-primary-950: #122546;
+}
+[data-color='app'][data-app='calcus'],
+[data-color='app'][data-app='sheets'] {
+  --sytue-primary-50: #f4f7f1;
+  --sytue-primary-100: #e8eee0;
+  --sytue-primary-200: #c2d2ad;
+  --sytue-primary-300: #a8bf89;
+  --sytue-primary-400: #82a357;
+  --sytue-primary-500: #689033;
+  --sytue-primary-600: #4d7c0f;
+  --sytue-primary-700: #3f650c;
+  --sytue-primary-800: #32510a;
+  --sytue-primary-900: #273f08;
+  --sytue-primary-950: #1b2a11;
+}
+[data-color='app'][data-app='diapos'],
+[data-color='app'][data-app='slides'] {
+  --sytue-rail-50: #faf5f2;
+  --sytue-rail-100: #f5e9e2;
+  --sytue-rail-300: #d8ab92;
+  --sytue-rail-700: #93451c;
+  --sytue-rail-800: #763816;
+  --sytue-rail-900: #5b2b11;
+  --sytue-rail-950: #332016;
+}
+[data-color='app'][data-app='certipdf'],
+[data-color='app'][data-app='pdf'] {
+  --sytue-rail-50: #fdf3f3;
+  --sytue-rail-100: #fae6e5;
+  --sytue-rail-300: #ec9f9c;
+  --sytue-rail-700: #aa2e2a;
+  --sytue-rail-800: #882521;
+  --sytue-rail-900: #691d1a;
+  --sytue-rail-950: #3c1a1a;
+}
+[data-color='app'][data-app='mail'] {
+  --sytue-rail-50: #fdf3f4;
+  --sytue-rail-100: #fae5e8;
+  --sytue-rail-300: #ee9ca9;
+  --sytue-rail-700: #ab283e;
+  --sytue-rail-800: #892032;
+  --sytue-rail-900: #6a1927;
+  --sytue-rail-950: #3d1921;
+}
+[data-color='app'][data-app='calendar'] {
+  --sytue-primary-50: #f9f3fe;
+  --sytue-primary-100: #f1e6fc;
+  --sytue-primary-200: #dbbcf7;
+  --sytue-primary-300: #cb9ff3;
+  --sytue-primary-400: #b576ee;
+  --sytue-primary-500: #a558eb;
+  --sytue-primary-600: #953be7;
+  --sytue-primary-700: #7e32c3;
+  --sytue-primary-800: #65289c;
+  --sytue-primary-900: #4e1f79;
+  --sytue-primary-950: #2c1a45;
+}
+[data-color='app'][data-app='contacts'] {
+  --sytue-primary-50: #f1f7f8;
+  --sytue-primary-100: #e0edf1;
+  --sytue-primary-200: #add0d9;
+  --sytue-primary-300: #89bbc9;
+  --sytue-primary-400: #569eb1;
+  --sytue-primary-500: #3289a1;
+  --sytue-primary-600: #0e7490;
+  --sytue-primary-700: #0c647c;
+  --sytue-primary-800: #0a5063;
+  --sytue-primary-900: #073e4d;
+  --sytue-primary-950: #0c2830;
+}
+[data-color='app'][data-app='notes'] {
+  --sytue-primary-50: #faf2fa;
+  --sytue-primary-100: #f4e2f5;
+  --sytue-primary-200: #e2b3e6;
+  --sytue-primary-300: #d695db;
+  --sytue-primary-400: #c567cc;
+  --sytue-primary-500: #b743c0;
+  --sytue-primary-600: #a91fb4;
+  --sytue-primary-700: #951b9e;
+  --sytue-primary-800: #77167f;
+  --sytue-primary-900: #5c1162;
+  --sytue-primary-950: #311439;
+}
+[data-color='app'][data-app='photos'] {
+  --sytue-primary-50: #f3f8f2;
+  --sytue-primary-100: #e4f0e3;
+  --sytue-primary-200: #b8d7b7;
+  --sytue-primary-300: #99c697;
+  --sytue-primary-400: #6dad6a;
+  --sytue-primary-500: #4d9849;
+  --sytue-primary-600: #2d8328;
+  --sytue-primary-700: #246a20;
+  --sytue-primary-800: #1d551a;
+  --sytue-primary-900: #164214;
+  --sytue-primary-950: #142d18;
+}
+[data-color='app'][data-app='chat'] {
+  --sytue-primary-50: #faf2f8;
+  --sytue-primary-100: #f5e2f1;
+  --sytue-primary-200: #e5b2da;
+  --sytue-primary-300: #db95cc;
+  --sytue-primary-400: #cb68b6;
+  --sytue-primary-500: #bf43a4;
+  --sytue-primary-600: #b21e92;
+  --sytue-primary-700: #9d1a80;
+  --sytue-primary-800: #7d1567;
+  --sytue-primary-900: #611050;
+  --sytue-primary-950: #331331;
+}
+[data-color='app'][data-app='meet'] {
+  --sytue-primary-50: #f8f3fc;
+  --sytue-primary-100: #f0e5f8;
+  --sytue-primary-200: #d8baed;
+  --sytue-primary-300: #c69ce5;
+  --sytue-primary-400: #ae71da;
+  --sytue-primary-500: #9c52d2;
+  --sytue-primary-600: #8b34ca;
+  --sytue-primary-700: #7a2eb2;
+  --sytue-primary-800: #62258e;
+  --sytue-primary-900: #4c1c6e;
+  --sytue-primary-950: #2a193e;
+}
+[data-color='app'][data-app='rooms'] {
+  --sytue-primary-50: #f4f3fc;
+  --sytue-primary-100: #e7e5f8;
+  --sytue-primary-200: #bfbbed;
+  --sytue-primary-300: #aba6e7;
+  --sytue-primary-400: #8780dd;
+  --sytue-primary-500: #655cd4;
+  --sytue-primary-600: #4338ca;
+  --sytue-primary-700: #3b31b2;
+  --sytue-primary-800: #2f278e;
+  --sytue-primary-900: #251f6e;
+  --sytue-primary-950: #181a3e;
+}
+[data-color='app'][data-app='cloud'] {
+  --sytue-primary-50: #f0f6f9;
+  --sytue-primary-100: #dfecf3;
+  --sytue-primary-200: #abcddf;
+  --sytue-primary-300: #86b6d0;
+  --sytue-primary-400: #5297bc;
+  --sytue-primary-500: #2d81ae;
+  --sytue-primary-600: #086ba0;
+  --sytue-primary-700: #075e8d;
+  --sytue-primary-800: #064b71;
+  --sytue-primary-900: #043a57;
+  --sytue-primary-950: #0a2634;
+}
+[data-color='app'][data-app='admin'],
+[data-color='app'][data-app='platform'],
+[data-color='app'][data-app='console'] {
+  --sytue-primary-50: #f4f6f8;
+  --sytue-primary-100: #e8ebef;
+  --sytue-primary-200: #c4cbd4;
+  --sytue-primary-300: #a9b5c2;
+  --sytue-primary-400: #8495a8;
+  --sytue-primary-500: #6a7e95;
+  --sytue-primary-600: #506782;
+  --sytue-primary-700: #465b72;
+  --sytue-primary-800: #38495c;
+  --sytue-primary-900: #2c3847;
+  --sytue-primary-950: #1c252d;
+}
+[data-color='app'][data-app='erp'] {
+  --sytue-rail-50: #faf5f0;
+  --sytue-rail-100: #f5e9df;
+  --sytue-rail-300: #daab86;
+  --sytue-rail-700: #964508;
+  --sytue-rail-800: #783806;
+  --sytue-rail-900: #5d2b05;
+  --sytue-rail-950: #342010;
+}
+[data-color='app'][data-app='cast'] {
+  --sytue-rail-50: #f9f1f3;
+  --sytue-rail-100: #f3e0e5;
+  --sytue-rail-300: #d79cad;
+  --sytue-rail-700: #8c1032;
+  --sytue-rail-800: #700d28;
+  --sytue-rail-900: #570a1f;
+  --sytue-rail-950: #2f101b;
+}
+[data-color='app'][data-app='web'],
+[data-color='app'][data-app='pages'] {
+  --sytue-primary-50: #fcf1f8;
+  --sytue-primary-100: #f8e1ef;
+  --sytue-primary-200: #edb0d4;
+  --sytue-primary-300: #e58ec2;
+  --sytue-primary-400: #da5ea8;
+  --sytue-primary-500: #d23a95;
+  --sytue-primary-600: #ca1682;
+  --sytue-primary-700: #ae1370;
+  --sytue-primary-800: #8b0f5a;
+  --sytue-primary-900: #6c0c46;
+  --sytue-primary-950: #39112d;
+}
+[data-color='app'][data-app='bases'] {
+  --sytue-primary-50: #f8f4f2;
+  --sytue-primary-100: #f0e8e3;
+  --sytue-primary-200: #d7c2b7;
+  --sytue-primary-300: #c6a797;
+  --sytue-primary-400: #ad816a;
+  --sytue-primary-500: #9c664a;
+  --sytue-primary-600: #8a4b2a;
+  --sytue-primary-700: #794225;
+  --sytue-primary-800: #61351e;
+  --sytue-primary-900: #4b2917;
+  --sytue-primary-950: #291e18;
+}
+[data-color='app'] {
+  --sytue-primary: var(--sytue-primary-600);
+  --sytue-primary-hover: var(--sytue-primary-700);
+  --sytue-chrome-focus: var(--sytue-primary-600);
+  --sytue-indicator: var(--sytue-primary-600);
+  --sytue-menu-selected: var(--sytue-primary-100);
+  --sytue-sidebar-active-bg: var(--sytue-primary-100);
+  --sytue-sidebar-active-fg: var(--sytue-primary-800);
+  --sytue-focus-ring: var(--sytue-primary-600);
+}
+[data-color='app'][data-theme='dark'] {
+  --sytue-sidebar-active-bg: color-mix(in srgb, var(--sytue-primary-400) 20%, transparent);
+  --sytue-sidebar-active-fg: var(--sytue-primary-200);
+  --sytue-menu-selected: color-mix(in srgb, var(--sytue-primary-400) 20%, transparent);
+  --sytue-indicator: var(--sytue-primary-400);
+  --sytue-chrome-focus: var(--sytue-primary-300);
+  --sytue-focus-ring: var(--sytue-primary-300);
+  --sytue-primary-text: var(--sytue-primary-300);
+  --sytue-primary: var(--sytue-primary-400);
+  --sytue-primary-hover: color-mix(in srgb, var(--sytue-primary-400) 88%, transparent);
+  --sytue-selected: color-mix(in srgb, var(--sytue-primary-400) 16%, transparent);
+}
+[data-color='app'][data-theme='translucent'] {
+  --sytue-sidebar-active-bg: color-mix(in srgb, var(--sytue-primary-600) 18%, transparent);
+  --sytue-sidebar-active-fg: var(--sytue-primary-800);
+  --sytue-menu-selected: var(--sytue-primary-100);
+  --sytue-primary: var(--sytue-primary-600);
+  --sytue-primary-hover: var(--sytue-primary-700);
+  --sytue-indicator: var(--sytue-primary-700);
+  --sytue-chrome-focus: var(--sytue-primary-700);
+  --sytue-focus-ring: var(--sytue-primary-700);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme])[data-color='app'] {
+    --sytue-sidebar-active-bg: color-mix(in srgb, var(--sytue-primary-400) 20%, transparent);
+    --sytue-sidebar-active-fg: var(--sytue-primary-200);
+    --sytue-menu-selected: color-mix(in srgb, var(--sytue-primary-400) 20%, transparent);
+    --sytue-indicator: var(--sytue-primary-400);
+    --sytue-chrome-focus: var(--sytue-primary-300);
+    --sytue-focus-ring: var(--sytue-primary-300);
+    --sytue-primary-text: var(--sytue-primary-300);
+    --sytue-primary: var(--sytue-primary-400);
+    --sytue-primary-hover: color-mix(in srgb, var(--sytue-primary-400) 88%, transparent);
+    --sytue-selected: color-mix(in srgb, var(--sytue-primary-400) 16%, transparent);
+  }
+}
+/* ==== fin del color de cada app ==== */
+
+/* ---- Forma «Carril»: el menú lateral es de color ----
+   El color de marca vive en el menú lateral, del color elegido de arriba abajo: texto blanco,
+   velos blancos para el hover y el ítem activo y ÁMBAR para «estás aquí».
+
+   Los valores van AQUÍ y no en colors.css: son de la FORMA, no de la paleta. Esta hoja
+   la leen la web y las apps nativas (apps/nucleo/tokens la interpreta encima de
+   colors.css, en el mismo orden de carga), así que las dos pintan el mismo carril. De
+   ella las nativas solo entienden los bloques de tokens; las reglas de clase de más
+   abajo son cascada del navegador. Quien toque un token de aquí lo toca en los
+   CUATRO bloques (claro, oscuro elegido, oscuro del sistema y traslúcido): esta hoja va
+   después de colors.css y un valor que solo estuviera en `:root` pisaría al del tema. */
+:root {
+  --sytue-rail: #0c5f68;
+  --sytue-sidebar-bg: #0c5f68;
+  --sytue-sidebar-fg: #ffffff;
+  --sytue-sidebar-fg-muted: rgba(255, 255, 255, 0.84);
+  --sytue-sidebar-active-bg: rgba(255, 255, 255, 0.14);
+  --sytue-sidebar-active-fg: #ffffff;
+  --sytue-sidebar-hover-bg: rgba(255, 255, 255, 0.08);
+  /* «Estás aquí» y relleno de los glifos de dos tonos dentro del carril. */
+  --sytue-sidebar-indicator: #ffd45e;
+  /* El botón principal sobre el carril: uno del mismo color no se vería, así que va blanco
+     con el rótulo del color del carril. En oscuro vuelve al primario del tema. */
+  --sytue-sidebar-primary: #ffffff;
+  --sytue-sidebar-on-primary: #0c5f68;
+  --sytue-sidebar-primary-hover: #e9f6f6;
+  --sytue-sidebar-primary-active: #d9efef;
+  --sytue-sidebar-focus: #ffffff;
+  /* Líneas sobre el carril: divisores y contornos. */
+  --sytue-sidebar-border: rgba(255, 255, 255, 0.16);
+  /* Un campo de texto apoyado en el carril (el buscador de la barra en móvil): velo
+     NEUTRO, sin tinte, para que valga con cualquier color de carril y en los tres temas. */
+  --sytue-sidebar-field: rgba(0, 0, 0, 0.28);
+}
+[data-theme='dark'] {
+  --sytue-rail: #0d2a2e;
+  --sytue-sidebar-bg: #0d2a2e;
+  --sytue-sidebar-fg: #e7efef;
+  --sytue-sidebar-fg-muted: rgba(231, 239, 239, 0.76);
+  --sytue-sidebar-active-bg: rgba(127, 211, 216, 0.16);
+  --sytue-sidebar-active-fg: #ffffff;
+  --sytue-sidebar-hover-bg: rgba(255, 255, 255, 0.06);
+  /* Sobre el carril oscuro el botón principal es el del tema: el primario claro ya
+     contrasta con él. */
+  --sytue-sidebar-primary: #3cc4cc;
+  --sytue-sidebar-on-primary: #04161a;
+  --sytue-sidebar-primary-hover: #33b0b8;
+  --sytue-sidebar-primary-active: #1a9aa3;
+  --sytue-sidebar-border: rgba(255, 255, 255, 0.12);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --sytue-rail: #0d2a2e;
+    --sytue-sidebar-bg: #0d2a2e;
+    --sytue-sidebar-fg: #e7efef;
+    --sytue-sidebar-fg-muted: rgba(231, 239, 239, 0.76);
+    --sytue-sidebar-active-bg: rgba(127, 211, 216, 0.16);
+    --sytue-sidebar-active-fg: #ffffff;
+    --sytue-sidebar-hover-bg: rgba(255, 255, 255, 0.06);
+    --sytue-sidebar-primary: #3cc4cc;
+    --sytue-sidebar-on-primary: #04161a;
+    --sytue-sidebar-primary-hover: #33b0b8;
+    --sytue-sidebar-primary-active: #1a9aa3;
+    --sytue-sidebar-border: rgba(255, 255, 255, 0.12);
+  }
+}
+
+/* Fondo ambiental común: campos amplios de color, sin animación ni imágenes. Y el carril
+   del traslúcido, que deja ver un punto del fondo. */
+[data-theme='translucent'] {
+  --sytue-rail: rgba(9, 84, 92, 0.92);
+  --sytue-sidebar-bg: rgba(9, 84, 92, 0.92);
+  --sytue-sidebar-fg: #ffffff;
+  --sytue-sidebar-fg-muted: rgba(255, 255, 255, 0.88);
+  --sytue-sidebar-active-bg: rgba(255, 255, 255, 0.14);
+  --sytue-sidebar-active-fg: #ffffff;
+  --sytue-sidebar-hover-bg: rgba(255, 255, 255, 0.08);
+  --workspace-canvas:
+    radial-gradient(ellipse at 88% 32% in srgb, var(--sytue-workspace-warm), transparent 38%),
+    linear-gradient(
+      112deg in srgb,
+      var(--sytue-workspace-blue) 0%,
+      var(--sytue-workspace-middle) 44%,
+      var(--sytue-workspace-mint) 100%
+    );
+}
+
+/* ==== COLOR del carril: azul cobalto ====
+   Mismo eje `data-color` que colors.css. Aquí cada modo declara el carril ENTERO: los
+   bloques de cobalto de colors.css llevan dos atributos y ganarían a los de un solo
+   atributo de esta hoja. */
+[data-color='cobalto'] {
+  --sytue-rail: #3355d6;
+  --sytue-sidebar-bg: #3355d6;
+  --sytue-sidebar-fg: #ffffff;
+  --sytue-sidebar-fg-muted: rgba(255, 255, 255, 0.86);
+  --sytue-sidebar-active-bg: rgba(255, 255, 255, 0.12);
+  --sytue-sidebar-active-fg: #ffffff;
+  --sytue-sidebar-hover-bg: rgba(255, 255, 255, 0.07);
+  --sytue-sidebar-indicator: #ffd45e;
+  --sytue-sidebar-primary: #ffffff;
+  --sytue-sidebar-on-primary: #3355d6;
+  --sytue-sidebar-primary-hover: #eef2ff;
+  --sytue-sidebar-primary-active: #e2e9ff;
+  --sytue-sidebar-focus: #ffffff;
+  --sytue-sidebar-border: rgba(255, 255, 255, 0.16);
+}
+[data-color='cobalto'][data-theme='dark'] {
+  --sytue-rail: #141d3d;
+  --sytue-sidebar-bg: #141d3d;
+  --sytue-sidebar-fg: #e9ecf5;
+  --sytue-sidebar-fg-muted: rgba(233, 236, 245, 0.78);
+  --sytue-sidebar-active-bg: rgba(143, 169, 255, 0.18);
+  --sytue-sidebar-active-fg: #ffffff;
+  --sytue-sidebar-hover-bg: rgba(255, 255, 255, 0.06);
+  --sytue-sidebar-indicator: #ffd45e;
+  --sytue-sidebar-primary: #4169e8;
+  --sytue-sidebar-on-primary: #ffffff;
+  --sytue-sidebar-primary-hover: #375cd4;
+  --sytue-sidebar-primary-active: #2f4fc4;
+  --sytue-sidebar-focus: #ffffff;
+  --sytue-sidebar-border: rgba(255, 255, 255, 0.12);
+}
+[data-color='cobalto'][data-theme='translucent'] {
+  --sytue-rail: rgba(44, 76, 204, 0.93);
+  --sytue-sidebar-bg: rgba(44, 76, 204, 0.93);
+  --sytue-sidebar-fg: #ffffff;
+  --sytue-sidebar-fg-muted: rgba(255, 255, 255, 0.86);
+  --sytue-sidebar-active-bg: rgba(255, 255, 255, 0.12);
+  --sytue-sidebar-active-fg: #ffffff;
+  --sytue-sidebar-hover-bg: rgba(255, 255, 255, 0.07);
+  --sytue-sidebar-indicator: #ffd45e;
+  --sytue-sidebar-primary: #ffffff;
+  --sytue-sidebar-on-primary: #3355d6;
+  --sytue-sidebar-primary-hover: #eef2ff;
+  --sytue-sidebar-primary-active: #e2e9ff;
+  --sytue-sidebar-focus: #ffffff;
+  --sytue-sidebar-border: rgba(255, 255, 255, 0.16);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme])[data-color='cobalto'] {
+    --sytue-rail: #141d3d;
+    --sytue-sidebar-bg: #141d3d;
+    --sytue-sidebar-fg: #e9ecf5;
+    --sytue-sidebar-fg-muted: rgba(233, 236, 245, 0.78);
+    --sytue-sidebar-active-bg: rgba(143, 169, 255, 0.18);
+    --sytue-sidebar-active-fg: #ffffff;
+    --sytue-sidebar-hover-bg: rgba(255, 255, 255, 0.06);
+    --sytue-sidebar-indicator: #ffd45e;
+    --sytue-sidebar-primary: #4169e8;
+    --sytue-sidebar-on-primary: #ffffff;
+    --sytue-sidebar-primary-hover: #375cd4;
+    --sytue-sidebar-primary-active: #2f4fc4;
+    --sytue-sidebar-focus: #ffffff;
+    --sytue-sidebar-border: rgba(255, 255, 255, 0.12);
+  }
+}
+/* ==== fin del color del carril ==== */
+
+/* ==== COLOR del carril: el de cada app ====
+   El carril toma el 700 de SU rampa (`--sytue-rail-*`: la del primario, o la propia de
+   una app de icono rojo), con blanco a 6,6:1; en traslúcido el 800, que deja ver el
+   fondo sin perder el contraste, y en oscuro el 950. El botón del carril en oscuro es
+   la acción, así que sigue al primario.
+   Como en cobalto, cada modo lo declara ENTERO. Generado con colors.css. */
+[data-color='app'] {
+  --sytue-rail: var(--sytue-rail-700);
+  --sytue-sidebar-bg: var(--sytue-rail-700);
+  --sytue-sidebar-fg: #ffffff;
+  --sytue-sidebar-fg-muted: rgba(255, 255, 255, 0.84);
+  --sytue-sidebar-active-bg: rgba(255, 255, 255, 0.14);
+  --sytue-sidebar-active-fg: #ffffff;
+  --sytue-sidebar-hover-bg: rgba(255, 255, 255, 0.08);
+  --sytue-sidebar-indicator: #ffd45e;
+  --sytue-sidebar-primary: #ffffff;
+  --sytue-sidebar-on-primary: var(--sytue-rail-700);
+  --sytue-sidebar-primary-hover: var(--sytue-rail-50);
+  --sytue-sidebar-primary-active: var(--sytue-rail-100);
+  --sytue-sidebar-focus: #ffffff;
+  --sytue-sidebar-border: rgba(255, 255, 255, 0.16);
+}
+[data-color='app'][data-theme='dark'] {
+  --sytue-rail: var(--sytue-rail-950);
+  --sytue-sidebar-bg: var(--sytue-rail-950);
+  --sytue-sidebar-fg: #e7efef;
+  --sytue-sidebar-fg-muted: rgba(231, 239, 239, 0.76);
+  --sytue-sidebar-active-bg: color-mix(in srgb, var(--sytue-rail-300) 16%, transparent);
+  --sytue-sidebar-active-fg: #ffffff;
+  --sytue-sidebar-hover-bg: rgba(255, 255, 255, 0.06);
+  --sytue-sidebar-indicator: #ffd45e;
+  --sytue-sidebar-primary: var(--sytue-primary-400);
+  --sytue-sidebar-on-primary: #04161a;
+  --sytue-sidebar-primary-hover: color-mix(in srgb, var(--sytue-primary-400) 88%, transparent);
+  --sytue-sidebar-primary-active: var(--sytue-primary-500);
+  --sytue-sidebar-focus: #ffffff;
+  --sytue-sidebar-border: rgba(255, 255, 255, 0.12);
+}
+[data-color='app'][data-theme='translucent'] {
+  --sytue-rail: color-mix(in srgb, var(--sytue-rail-800) 92%, transparent);
+  --sytue-sidebar-bg: color-mix(in srgb, var(--sytue-rail-800) 92%, transparent);
+  --sytue-sidebar-fg: #ffffff;
+  --sytue-sidebar-fg-muted: rgba(255, 255, 255, 0.88);
+  --sytue-sidebar-active-bg: rgba(255, 255, 255, 0.14);
+  --sytue-sidebar-active-fg: #ffffff;
+  --sytue-sidebar-hover-bg: rgba(255, 255, 255, 0.08);
+  --sytue-sidebar-indicator: #ffd45e;
+  --sytue-sidebar-primary: #ffffff;
+  --sytue-sidebar-on-primary: var(--sytue-rail-700);
+  --sytue-sidebar-primary-hover: var(--sytue-rail-50);
+  --sytue-sidebar-primary-active: var(--sytue-rail-100);
+  --sytue-sidebar-focus: #ffffff;
+  --sytue-sidebar-border: rgba(255, 255, 255, 0.16);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme])[data-color='app'] {
+    --sytue-rail: var(--sytue-rail-950);
+    --sytue-sidebar-bg: var(--sytue-rail-950);
+    --sytue-sidebar-fg: #e7efef;
+    --sytue-sidebar-fg-muted: rgba(231, 239, 239, 0.76);
+    --sytue-sidebar-active-bg: color-mix(in srgb, var(--sytue-rail-300) 16%, transparent);
+    --sytue-sidebar-active-fg: #ffffff;
+    --sytue-sidebar-hover-bg: rgba(255, 255, 255, 0.06);
+    --sytue-sidebar-indicator: #ffd45e;
+    --sytue-sidebar-primary: var(--sytue-primary-400);
+    --sytue-sidebar-on-primary: #04161a;
+    --sytue-sidebar-primary-hover: color-mix(in srgb, var(--sytue-primary-400) 88%, transparent);
+    --sytue-sidebar-primary-active: var(--sytue-primary-500);
+    --sytue-sidebar-focus: #ffffff;
+    --sytue-sidebar-border: rgba(255, 255, 255, 0.12);
+  }
+}
+/* ==== fin del carril de cada app ==== */
+
+[data-theme='translucent'] body {
+  background-image: var(--workspace-canvas);
+  background-attachment: fixed;
+}
+[data-theme='translucent'] .bg-bg {
+  background-color: transparent;
+}
+/* Salvo en un diálogo: vive en la capa superior, fuera del lienzo de body, y transparente
+   dejaba el texto oscuro sobre el velo negro (visor de Fotos). Opaco como los demás. */
+[data-theme='translucent'] dialog.bg-bg {
+  background-color: var(--sytue-surface-raised);
+}
+
+/* ---- El CARRIL: menú lateral de color de marca y zona de marca de la barra superior ----
+   El carril es del color elegido en los tres modos y la barra superior, clara. Las dos comparten
+   la familia del cromo (`on-chrome`, `chrome-hover`…), así que dentro del carril esa
+   familia se reasigna a los valores del menú lateral, junto con lo que sobre el color
+   dejaría de verse: el indicador de «estás aquí» y el relleno de los glifos pasan a
+   ÁMBAR; el anillo de foco, a blanco; el botón principal, a blanco con rótulo del color
+   (uno del mismo color no se distinguiría del carril), y el enlace y el velo de selección, a
+   los del menú.
+
+   Se reasignan `--sytue-*` Y `--color-*`: el puente de theme.css se resuelve UNA vez en
+   :root y no se reevalúa en los descendientes. La regla cuelga de las utilidades que
+   PINTAN el carril, no de un componente: quien pinte `bg-sidebar` es un carril.
+
+   `--sytue-surface` va sin su puente a propósito: es el hueco del aro `-inset`, que aquí
+   tiene que ser del color del carril; `bg-surface` lee `--color-surface` y sigue blanco.
+
+   En la forma «Marco» la barra superior ENTERA y la barra móvil son cromo de color (el
+   bloque de la forma, al final de esta hoja), así que entran en la misma regla; en
+   «Carril» la superior solo lo es en <768px, con la regla de más abajo. La barra móvil
+   es hermana de la hoja: estos tokens no se heredan dentro del contenido. */
+:root:not([data-forma='carril']) :is(.sytue-topbar-carril, .sytue-mobilebar),
+.bg-sidebar,
+.bg-rail {
+  --sytue-on-chrome: var(--sytue-sidebar-fg);
+  --color-on-chrome: var(--sytue-sidebar-fg);
+  --sytue-on-chrome-muted: var(--sytue-sidebar-fg-muted);
+  --color-on-chrome-muted: var(--sytue-sidebar-fg-muted);
+  --sytue-on-chrome-warning: var(--sytue-sidebar-indicator);
+  --color-on-chrome-warning: var(--sytue-sidebar-indicator);
+  --sytue-chrome-hover: var(--sytue-sidebar-hover-bg);
+  --color-chrome-hover: var(--sytue-sidebar-hover-bg);
+  --sytue-chrome-active: var(--sytue-sidebar-active-bg);
+  --color-chrome-active: var(--sytue-sidebar-active-bg);
+  --sytue-chrome-divider: var(--sytue-sidebar-border);
+  --color-chrome-divider: var(--sytue-sidebar-border);
+  --sytue-chrome-border: var(--sytue-sidebar-border);
+  --color-chrome-border: var(--sytue-sidebar-border);
+  --sytue-chrome-focus: var(--sytue-sidebar-focus);
+  --sytue-focus-ring: var(--sytue-sidebar-focus);
+  --sytue-topbar-fg: var(--sytue-sidebar-fg);
+  --color-topbar-fg: var(--sytue-sidebar-fg);
+  --sytue-header-fg: var(--sytue-sidebar-fg);
+  --color-header-fg: var(--sytue-sidebar-fg);
+  --sytue-indicator: var(--sytue-sidebar-indicator);
+  --color-indicator: var(--sytue-sidebar-indicator);
+  --sytue-glyph-fill: var(--sytue-sidebar-indicator);
+  --sytue-primary: var(--sytue-sidebar-primary);
+  --color-primary: var(--sytue-sidebar-primary);
+  --sytue-on-primary: var(--sytue-sidebar-on-primary);
+  --color-on-primary: var(--sytue-sidebar-on-primary);
+  --sytue-primary-hover: var(--sytue-sidebar-primary-hover);
+  --sytue-primary-active: var(--sytue-sidebar-primary-active);
+  --sytue-primary-text: var(--sytue-sidebar-fg);
+  --color-primary-text: var(--sytue-sidebar-fg);
+  --sytue-selected: var(--sytue-sidebar-active-bg);
+  --color-selected: var(--sytue-sidebar-active-bg);
+  --sytue-surface: var(--sytue-sidebar-bg);
+}
+
+/* En <768px el menú lateral va en un cajón y no se ve: la BARRA SUPERIOR entera es el
+   carril (`TopBar rail` le pone `.sytue-topbar-carril`). Misma lista de tokens que arriba
+   —un test las compara— más el fondo de la propia barra, y el buscador en velo oscuro:
+   es un campo de `bg-surface`, y blanco macizo en mitad de la barra de color pesaría
+   más que la marca. */
+@media (max-width: 767.98px) {
+  .sytue-topbar-carril {
+    background: var(--sytue-sidebar-bg);
+    color: var(--sytue-sidebar-fg);
+    box-shadow: none;
+    --sytue-topbar-bg: var(--sytue-sidebar-bg);
+    --sytue-on-chrome: var(--sytue-sidebar-fg);
+    --color-on-chrome: var(--sytue-sidebar-fg);
+    --sytue-on-chrome-muted: var(--sytue-sidebar-fg-muted);
+    --color-on-chrome-muted: var(--sytue-sidebar-fg-muted);
+    --sytue-on-chrome-warning: var(--sytue-sidebar-indicator);
+    --color-on-chrome-warning: var(--sytue-sidebar-indicator);
+    --sytue-chrome-hover: var(--sytue-sidebar-hover-bg);
+    --color-chrome-hover: var(--sytue-sidebar-hover-bg);
+    --sytue-chrome-active: var(--sytue-sidebar-active-bg);
+    --color-chrome-active: var(--sytue-sidebar-active-bg);
+    --sytue-chrome-divider: var(--sytue-sidebar-border);
+    --color-chrome-divider: var(--sytue-sidebar-border);
+    --sytue-chrome-border: var(--sytue-sidebar-border);
+    --color-chrome-border: var(--sytue-sidebar-border);
+    --sytue-chrome-focus: var(--sytue-sidebar-focus);
+    --sytue-focus-ring: var(--sytue-sidebar-focus);
+    --sytue-topbar-fg: var(--sytue-sidebar-fg);
+    --color-topbar-fg: var(--sytue-sidebar-fg);
+    --sytue-header-fg: var(--sytue-sidebar-fg);
+    --color-header-fg: var(--sytue-sidebar-fg);
+    --sytue-indicator: var(--sytue-sidebar-indicator);
+    --color-indicator: var(--sytue-sidebar-indicator);
+    --sytue-glyph-fill: var(--sytue-sidebar-indicator);
+    --sytue-primary: var(--sytue-sidebar-primary);
+    --color-primary: var(--sytue-sidebar-primary);
+    --sytue-on-primary: var(--sytue-sidebar-on-primary);
+    --color-on-primary: var(--sytue-sidebar-on-primary);
+    --sytue-primary-hover: var(--sytue-sidebar-primary-hover);
+    --sytue-primary-active: var(--sytue-sidebar-primary-active);
+    --sytue-primary-text: var(--sytue-sidebar-fg);
+    --color-primary-text: var(--sytue-sidebar-fg);
+    --sytue-selected: var(--sytue-sidebar-active-bg);
+    --color-selected: var(--sytue-sidebar-active-bg);
+    --sytue-surface: var(--sytue-sidebar-bg);
+  }
+  /* La zona de marca ya va sobre la barra de color: sin su propio fondo, o en el
+     traslúcido se apilarían dos velos y saldría una esquina más oscura. */
+  .sytue-topbar-carril .sytue-esquina-marca {
+    background: transparent;
+  }
+  /* El campo es `bg-surface`, así que la «vuelta al tema» de abajo le devuelve el anillo
+     de foco del tema, que sobre el carril no se vería: se le repone el del carril. */
+  .sytue-topbar-carril input {
+    --sytue-focus-ring: var(--sytue-sidebar-focus);
+    background-color: var(--sytue-sidebar-field);
+    border-color: transparent;
+    color: var(--sytue-sidebar-fg);
+  }
+  .sytue-topbar-carril input::placeholder {
+    color: var(--sytue-sidebar-fg-muted);
+  }
+  /* El avatar de la cuenta y el punto de aviso de la campana: el disco es del color de la
+     persona y el punto, rojo de peligro; cualquiera de los dos puede coincidir con el
+     del carril (con el color de Mail, rojo sobre rojo). Aro del texto del carril, como
+     las muestras de color del menú. En «Marco» la barra es de color a cualquier ancho, y
+     lo llevan también en escritorio (al final). */
+  .sytue-topbar-carril .sytue-aro-carril {
+    border-radius: 9999px;
+    box-shadow: 0 0 0 1.5px var(--sytue-sidebar-fg);
+  }
+  /* Y el menú lateral es un CAJÓN sobre el contenido. El carril del traslúcido deja ver
+     un punto de lo que tiene debajo, que en escritorio es el fondo ambiental y aquí,
+     texto: se colaba entre los rótulos del menú. Su mismo color, sobre una base opaca. */
+  [data-theme='translucent'] nav.bg-sidebar {
+    background-color: var(--sytue-neutral-50);
+    background-image: linear-gradient(var(--sytue-sidebar-bg), var(--sytue-sidebar-bg));
+  }
+}
+
+/* Lo que se abre o se apoya DENTRO del carril con su propia superficie —el conmutador de
+   aplicaciones, un menú, un popover, un diálogo, una pista, una tarjeta blanca— vuelve a
+   los valores del tema: una variable se hereda, y sin esto saldría con el indicador
+   ámbar y un botón blanco sobre blanco. Los valores «de fuera» son las copias
+   `--sytue-root-*`, que se resuelven en :root y nadie reasigna.
+
+   `:where()` deja la especificidad a cero: `.sytue-menu-surface`, más abajo, sigue
+   poniendo su hover y su selección. */
+html {
+  --sytue-root-on-chrome: var(--sytue-on-chrome);
+  --sytue-root-on-chrome-muted: var(--sytue-on-chrome-muted);
+  --sytue-root-on-chrome-warning: var(--sytue-on-chrome-warning);
+  --sytue-root-chrome-hover: var(--sytue-chrome-hover);
+  --sytue-root-chrome-active: var(--sytue-chrome-active);
+  --sytue-root-chrome-divider: var(--sytue-chrome-divider);
+  --sytue-root-chrome-border: var(--sytue-chrome-border);
+  --sytue-root-chrome-focus: var(--sytue-chrome-focus);
+  --sytue-root-focus-ring: var(--sytue-focus-ring);
+  --sytue-root-topbar-fg: var(--sytue-topbar-fg);
+  --sytue-root-header-fg: var(--sytue-header-fg);
+  --sytue-root-indicator: var(--sytue-indicator);
+  --sytue-root-glyph-fill: var(--sytue-glyph-fill);
+  --sytue-root-primary: var(--sytue-primary);
+  --sytue-root-on-primary: var(--sytue-on-primary);
+  --sytue-root-primary-hover: var(--sytue-primary-hover);
+  --sytue-root-primary-active: var(--sytue-primary-active);
+  --sytue-root-primary-text: var(--sytue-primary-text);
+  --sytue-root-selected: var(--sytue-selected);
+  --sytue-root-surface: var(--sytue-surface);
+}
+:where(.bg-sidebar, .bg-rail, .sytue-topbar-carril, .sytue-mobilebar)
+  :where(
+    .sytue-menu-surface,
+    .sytue-popover-surface,
+    .bg-surface,
+    .bg-surface-raised,
+    [role='dialog'],
+    [role='menu'],
+    [role='listbox'],
+    [role='tooltip']
+  ) {
+  --sytue-on-chrome: var(--sytue-root-on-chrome);
+  --color-on-chrome: var(--sytue-root-on-chrome);
+  --sytue-on-chrome-muted: var(--sytue-root-on-chrome-muted);
+  --color-on-chrome-muted: var(--sytue-root-on-chrome-muted);
+  --sytue-on-chrome-warning: var(--sytue-root-on-chrome-warning);
+  --color-on-chrome-warning: var(--sytue-root-on-chrome-warning);
+  --sytue-chrome-hover: var(--sytue-root-chrome-hover);
+  --color-chrome-hover: var(--sytue-root-chrome-hover);
+  --sytue-chrome-active: var(--sytue-root-chrome-active);
+  --color-chrome-active: var(--sytue-root-chrome-active);
+  --sytue-chrome-divider: var(--sytue-root-chrome-divider);
+  --color-chrome-divider: var(--sytue-root-chrome-divider);
+  --sytue-chrome-border: var(--sytue-root-chrome-border);
+  --color-chrome-border: var(--sytue-root-chrome-border);
+  --sytue-chrome-focus: var(--sytue-root-chrome-focus);
+  --sytue-focus-ring: var(--sytue-root-focus-ring);
+  --sytue-topbar-fg: var(--sytue-root-topbar-fg);
+  --color-topbar-fg: var(--sytue-root-topbar-fg);
+  --sytue-header-fg: var(--sytue-root-header-fg);
+  --color-header-fg: var(--sytue-root-header-fg);
+  --sytue-indicator: var(--sytue-root-indicator);
+  --color-indicator: var(--sytue-root-indicator);
+  --sytue-glyph-fill: var(--sytue-root-glyph-fill);
+  --sytue-primary: var(--sytue-root-primary);
+  --color-primary: var(--sytue-root-primary);
+  --sytue-on-primary: var(--sytue-root-on-primary);
+  --color-on-primary: var(--sytue-root-on-primary);
+  --sytue-primary-hover: var(--sytue-root-primary-hover);
+  --sytue-primary-active: var(--sytue-root-primary-active);
+  --sytue-primary-text: var(--sytue-root-primary-text);
+  --color-primary-text: var(--sytue-root-primary-text);
+  --sytue-selected: var(--sytue-root-selected);
+  --color-selected: var(--sytue-root-selected);
+  --sytue-surface: var(--sytue-root-surface);
+}
+
+/* Opciones opacas: el contenido que hay detrás no debe competir con un menú.
+   Los estados se resuelven aquí también para las carcasas propias del editor. */
+.sytue-menu-surface,
+.sytue-popover-surface {
+  --color-bg-subtle: var(--sytue-menu-hover);
+  --color-selected: var(--sytue-menu-selected);
+  --sytue-bg-subtle: var(--sytue-menu-hover);
+  --sytue-selected: var(--sytue-menu-selected);
+  background: var(--sytue-menu-surface);
+  color: var(--sytue-text);
+}
+
+/* Solo las placas principales y ventanas desenfocan; sus filas y teselas heredan
+   el velo, evitando apilar filtros en cada elemento de un catálogo. */
+@supports (backdrop-filter: blur(20px)) {
+  [data-theme='translucent'] .sytue-glass-surface {
+    backdrop-filter: blur(20px) saturate(1.2);
+  }
+  [data-theme='translucent'] .sytue-popover-surface {
+    background: var(--sytue-menu-surface);
+    backdrop-filter: none;
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  [data-theme='translucent'] .sytue-glass-surface,
+  [data-theme='translucent'] .sytue-menu-surface,
+  [data-theme='translucent'] .sytue-popover-surface {
+    background-color: var(--sytue-neutral-50);
+    backdrop-filter: none;
+  }
+}
+
+/* Con «reducir transparencia», el carril del traslúcido deja de ser un velo, como el
+   resto de las superficies de cristal: su mismo color, con alfa 1 (dicho a mano: el color
+   relativo hereda el alfa del de origen si se calla). Solo `background-color`,
+   para que valga en las dos formas: en «Marco» el menú y la esquina de marca que van
+   dentro del marco siguen transparentes (su regla pesa más) y dejan ver el marco, que ya
+   es opaco; un carril que pinta su propio fondo —el del ERP— sí pasa a opaco. La barra
+   superior de <768px en «Carril» es cristal Y carril: sin su regla se quedaba con el
+   fondo claro del cristal y el texto blanco del carril. Donde el navegador no entienda
+   el color relativo, la declaración se ignora y el carril se queda como estaba. */
+@media (prefers-reduced-transparency: reduce) {
+  [data-theme='translucent'] .bg-sidebar,
+  [data-theme='translucent'] .bg-rail {
+    background-color: rgb(from var(--sytue-sidebar-bg) r g b / 1);
+  }
+  @media (max-width: 767.98px) {
+    [data-forma='carril'][data-theme='translucent'] .sytue-topbar-carril.sytue-glass-surface {
+      background-color: rgb(from var(--sytue-sidebar-bg) r g b / 1);
+    }
+  }
+}
+
+/* ---- La FORMA: «Marco» (por defecto) y «Carril» (`data-forma='carril'`) ----
+   Un eje aparte del modo y del color, en <html>. SIN atributo se ve Marco; Carril es el
+   valor que se elige y deja la hoja como estaba: todo lo de abajo cuelga de
+   `:root:not([data-forma='carril'])`. Las medidas (radios, rellenos, pesos) son tokens
+   de theme.css; aquí va lo que PINTA, siempre con tokens de rol y nunca con un color.
+
+   MARCO: la barra superior y el menú lateral son un solo marco de color continuo y el
+   contenido, una hoja redondeada que flota dentro. Tres clases, que en Carril no hacen
+   nada:
+     · `.sytue-frame`      pinta el marco detrás del menú y de la hoja (la raíz de
+                           AppShell, AdminShell y de las carcasas propias);
+     · `.sytue-topbar-carril`  la barra superior de la suite (`TopBar rail`): la misma
+                           clase que en <768px la hace carril en las dos formas;
+     · `.sytue-mobilebar`  la navegación móvil, sobre el mismo marco y fuera de la hoja;
+     · `.sytue-sheet`      la hoja. Con `.sytue-sheet-bleed`, a sangre: sin separación y
+                           con solo las esquinas de arriba. Por debajo de 768 px toda
+                           hoja va a sangre (`--sytue-sheet-gap` vale 0).
+     · `.sytue-sheet-corners`  lo de dentro que toca una esquina de la hoja: la hoja no
+                           recorta, así que sus esquinas las redondea cada pieza.
+   El marco es el color del menú lateral; en el traslúcido, un degradado HORIZONTAL del
+   primario: horizontal porque la barra y el cuerpo lo pintan cada uno por su cuenta, a
+   todo el ancho, y así casan sin costura.
+
+   El ítem activo del menú es una píldora de VELO claro con el texto blanco, sin barra de
+   señal: los mismos valores que en Carril (`--sytue-sidebar-active-*`), con el radio de
+   píldora. El botón principal del menú («Redactar», «Nuevo») conserva su relleno
+   macizo —blanco; en oscuro, del primario— y las esquinas de `radius-control`.
+
+   Lo vigila contraste-paleta.test.ts («Marco: …»). */
+:root:not([data-forma='carril']) {
+  --sytue-nav-active-bg: var(--sytue-sidebar-active-bg);
+  --sytue-nav-active-fg: var(--sytue-sidebar-active-fg);
+  /* El CARRIL DE ICONOS (el del ERP): parte del marco. En reposo, el icono blanco sin
+     fondo ni relleno; el activo, un velo con el icono blanco y el relleno del indicador. */
+  --sytue-rail-item-bg: transparent;
+  --sytue-rail-item-hover: var(--sytue-sidebar-hover-bg);
+  --sytue-rail-item-fill: transparent;
+  --sytue-rail-active-bg: var(--sytue-sidebar-active-bg);
+  --sytue-rail-active-fg: var(--sytue-sidebar-active-fg);
+  --sytue-frame-from: var(--sytue-sidebar-bg);
+  --sytue-frame-to: var(--sytue-sidebar-bg);
+  --sytue-sheet-bg: var(--sytue-bg);
+}
+[data-theme='translucent']:not([data-forma='carril']) {
+  --sytue-frame-from: var(--sytue-rail-900);
+  --sytue-frame-to: var(--sytue-rail-700);
+  --sytue-sheet-bg: color-mix(in srgb, var(--sytue-surface-raised) 82%, transparent);
+}
+[data-forma='carril'] {
+  --sytue-nav-active-bg: var(--sytue-sidebar-active-bg);
+  --sytue-nav-active-fg: var(--sytue-sidebar-active-fg);
+  /* El carril de iconos de Carril: cada icono sobre su velo y el activo, un cuadro
+     macizo —el botón principal del carril— con el icono del color. */
+  --sytue-rail-item-bg: var(--sytue-sidebar-hover-bg);
+  --sytue-rail-item-hover: var(--sytue-sidebar-active-bg);
+  --sytue-rail-item-fill: var(--sytue-sidebar-indicator);
+  --sytue-rail-active-bg: var(--sytue-sidebar-primary);
+  --sytue-rail-active-fg: var(--sytue-sidebar-on-primary);
+}
+
+/* Las páginas que desplazan el DOCUMENTO (el Hub, Docs) no tienen carcasa de alto fijo:
+   el marco y la hoja son dos envoltorios que en Carril —y en papel— no existen. */
+:is(.sytue-frame-page, .sytue-sheet-page) {
+  display: contents;
+}
+/* Solo en pantalla: impreso, un documento no lleva marco ni esquinas. */
+@media screen {
+  /* El fondo del viewport también es el marco: los bordes seguros de iOS y el rebote
+     del documento no deben enseñar el lienzo blanco. Solo las superficies con barra
+     de la suite: lectores y páginas autónomas conservan su fondo. */
+  :root:not([data-forma='carril']):has(.sytue-topbar-carril),
+  :root:not([data-forma='carril']):has(.sytue-topbar-carril) body,
+  :root:not([data-forma='carril']) :is(.sytue-frame, .sytue-topbar-carril) {
+    background: linear-gradient(90deg in srgb, var(--sytue-frame-from), var(--sytue-frame-to));
+  }
+  /* Sin línea inferior: la barra y el menú son la misma pieza. */
+  :root:not([data-forma='carril']) .sytue-topbar-carril {
+    /* El hueco del punto de avisos es del color de la barra, como en la de <768px. */
+    --sytue-topbar-bg: var(--sytue-sidebar-bg);
+    box-shadow: none;
+  }
+  /* Es parte del marco, no una franja blanca dentro de la hoja. Al dejar ver el fondo
+     común, el degradado tampoco vuelve a empezar en una columna más estrecha. */
+  :root:not([data-forma='carril']) .sytue-mobilebar {
+    background: transparent;
+    color: var(--sytue-sidebar-fg);
+    border-bottom-color: transparent;
+  }
+  /* El menú lateral y la esquina de marca dejan ver el marco, que ya es de su color. En
+     <768 px el menú es un cajón sobre el contenido y conserva su fondo. */
+  :root:not([data-forma='carril']) .sytue-topbar-carril :is(.bg-sidebar, .bg-rail) {
+    background-color: transparent;
+  }
+  @media (min-width: 768px) {
+    :root:not([data-forma='carril']) .sytue-frame :is(.bg-sidebar, .bg-rail) {
+      background-color: transparent;
+    }
+  }
+  /* El buscador de la barra, como en la barra-carril de <768px (más arriba): el velo
+     neutro `--sytue-sidebar-field` con el texto del cromo. Uno claro —el del ítem activo
+     del carril— dejaba la marca de agua en 3,9:1. */
+  :root:not([data-forma='carril']) .sytue-topbar-carril input {
+    --sytue-focus-ring: var(--sytue-sidebar-focus);
+    --color-on-chrome-muted: var(--sytue-sidebar-fg-muted);
+    background-color: var(--sytue-sidebar-field);
+    border-color: transparent;
+    color: var(--sytue-sidebar-fg);
+  }
+  :root:not([data-forma='carril']) .sytue-topbar-carril input::placeholder {
+    color: var(--sytue-sidebar-fg-muted);
+  }
+
+  /* La hoja. NO RECORTA, y no debe volver a hacerlo (lo vigila contraste-paleta.test.ts).
+     Llevó `overflow: clip` para las esquinas, y una caja que recorta deja sin alcance todo
+     lo que no contiene: en la v3.11.1 la portada de Docs —una columna de alto fijo que
+     contaba con alargar la página— perdía la lista de documentos en un móvil, sin forma
+     de llegar a ella. Ahora lo que no cabe vuelve a alargar la página o a desplazar en su
+     panel.
+
+     Las esquinas las redondea LO DE DENTRO. La hoja publica sus cuatro radios en
+     `--sytue-sheet-{tl,tr,br,bl}` y cada pieza que toca una esquina lleva
+     `.sytue-sheet-corners`; la que solo toca algunas pone a `0px` las que no le tocan
+     (`[--sytue-sheet-tl:0px]`…), y así lo hereda también lo que lleve dentro. En un panel
+     que desplaza, el radio recorta además su contenido, que es lo que redondea las filas
+     al pasar por la esquina. */
+  :root:not([data-forma='carril']) .sytue-sheet {
+    --sytue-title-weight: 800;
+    --sytue-subtitle-weight: 700;
+    --sytue-title-scale: 1.1;
+    --sytue-sheet-tl: var(--radius-sheet);
+    --sytue-sheet-tr: var(--radius-sheet);
+    --sytue-sheet-br: var(--radius-sheet);
+    --sytue-sheet-bl: var(--radius-sheet);
+    margin: 0 var(--sytue-sheet-gap) var(--sytue-sheet-gap) 0;
+    border-radius: var(--sytue-sheet-tl) var(--sytue-sheet-tr) var(--sytue-sheet-br)
+      var(--sytue-sheet-bl);
+    background: var(--sytue-sheet-bg);
+    box-shadow: var(--shadow-md);
+  }
+  /* Sin menú lateral a su izquierda, la hoja se separa también de ese borde. */
+  :root:not([data-forma='carril']) .sytue-sheet:first-child,
+  :root:not([data-forma='carril']) .sytue-sheet-column:first-child > .sytue-sheet {
+    margin-left: var(--sytue-sheet-gap);
+  }
+  :root:not([data-forma='carril']) .sytue-sheet.sytue-sheet-bleed {
+    --sytue-sheet-br: 0px;
+    --sytue-sheet-bl: 0px;
+    margin: 0;
+    box-shadow: none;
+  }
+  @media (max-width: 767px) {
+    :root:not([data-forma='carril']) .sytue-sheet {
+      --sytue-sheet-br: 0px;
+      --sytue-sheet-bl: 0px;
+      box-shadow: none;
+    }
+  }
+  /* Fuera de una hoja los radios no existen y esto vale cero. */
+  :root:not([data-forma='carril']) .sytue-sheet-corners {
+    border-radius: var(--sytue-sheet-tl, 0px) var(--sytue-sheet-tr, 0px) var(--sytue-sheet-br, 0px)
+      var(--sytue-sheet-bl, 0px);
+  }
+  :root:not([data-forma='carril']) .sytue-frame-page {
+    display: block;
+    min-height: calc(100dvh - var(--spacing-topbar));
+  }
+  :root:not([data-forma='carril']) .sytue-sheet-page {
+    display: block;
+    min-height: calc(100dvh - var(--spacing-topbar) - var(--sytue-sheet-gap));
+  }
+}
+
+/* La fila de `List`, elegida o bajo el cursor: un bloque redondeado. */
+:root:not([data-forma='carril']) .sytue-row {
+  border-radius: var(--radius-row);
+}
+
+/* Tarjeta de recurso (`Card` con `tone`, o cualquier elemento con `cardTone()`): en
+   Marco, de color pleno. Lo de dentro toma la tinta del relleno —también el texto de
+   apoyo: atenuado bajaría de 4,5:1— y lo que era un panel hundido o un velo de
+   selección pasa a un velo de esa misma tinta, como el icono (`CardIcon`).
+
+   Se reasignan los `--color-*` (lo que leen las utilidades) y no los `--sytue-*`: lo que
+   se abre DENTRO con superficie propia —el menú de acciones de una carpeta— vuelve con
+   ellos a la tinta del tema, como en el carril. */
+:root:not([data-forma='carril']) .sytue-card-tone {
+  --color-text: var(--sytue-card-on-fill);
+  --color-text-muted: var(--sytue-card-on-fill);
+  --color-text-subtle: var(--sytue-card-on-fill);
+  --color-primary-text: var(--sytue-card-on-fill);
+  --sytue-glyph-fill: color-mix(in srgb, var(--sytue-card-on-fill) 30%, transparent);
+  --color-selected: color-mix(in srgb, var(--sytue-card-on-fill) 22%, transparent);
+  --color-surface-sunken: color-mix(in srgb, var(--sytue-card-on-fill) 14%, transparent);
+  /* Y el fondo de una etiqueta neutra (`Badge`), que lleva encima el texto atenuado. */
+  --color-bg-subtle: color-mix(in srgb, var(--sytue-card-on-fill) 14%, transparent);
+  --color-border: color-mix(in srgb, var(--sytue-card-on-fill) 22%, transparent);
+  border-color: transparent;
+  background: var(--sytue-card-fill);
+  color: var(--sytue-card-on-fill);
+}
+:root:not([data-forma='carril']) .sytue-card-tone .sytue-card-icon {
+  background: color-mix(in srgb, var(--sytue-card-on-fill) 22%, transparent);
+  color: inherit;
+}
+/* El dato de apoyo (`sytue-meta`) lee el token crudo: aquí, la tinta del relleno. */
+:root:not([data-forma='carril']) .sytue-card-tone .sytue-meta {
+  color: inherit;
+}
+:root:not([data-forma='carril'])
+  .sytue-card-tone
+  :where(
+    .sytue-menu-surface,
+    .sytue-popover-surface,
+    [role='dialog'],
+    [role='menu'],
+    [role='listbox'],
+    [role='tooltip']
+  ):not(.sytue-tooltip-surface) {
+  --color-text: var(--sytue-text);
+  --color-text-muted: var(--sytue-text-muted);
+  --color-text-subtle: var(--sytue-text-subtle);
+  --color-primary-text: var(--sytue-primary-text);
+  --sytue-glyph-fill: var(--sytue-root-glyph-fill);
+  --color-surface-sunken: var(--sytue-surface-sunken);
+  --color-border: var(--sytue-border);
+  color: var(--sytue-text);
+}
+/* Un menú con su clase ya pone su propio hover (`.sytue-menu-surface`, más arriba); lo
+   que solo trae el rol lo recupera aquí. */
+:root:not([data-forma='carril'])
+  .sytue-card-tone
+  :where([role='dialog'], [role='menu'], [role='listbox'], [role='tooltip']):not(
+    .sytue-menu-surface,
+    .sytue-popover-surface
+  ) {
+  --color-bg-subtle: var(--sytue-bg-subtle);
+  --color-selected: var(--sytue-selected);
+}
+:root:not([data-forma='carril'])
+  .sytue-card-tone
+  :where(.sytue-menu-surface, [role='menu'])
+  .sytue-meta {
+  color: var(--sytue-text-subtle);
+}
+/* TESELAS: un grupo de recursos (`sytue-tiles`) cuyos elementos llevan `cardTone()`. En
+   Carril son lo que su marcado diga —una lista de filas con el color en el icono—; en
+   Marco, una rejilla de teselas de color pleno con el icono arriba y el rótulo debajo. */
+:root:not([data-forma='carril']) .sytue-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
+  gap: 0.625rem;
+}
+:root:not([data-forma='carril']) .sytue-tiles > .sytue-card-tone {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+  min-width: 0;
+  padding: 0.75rem;
+  border-radius: var(--radius-card);
+  font-weight: 600;
+}
+/* El rótulo de una fila se corta con puntos suspensivos; el de una tesela, salta. */
+:root:not([data-forma='carril']) .sytue-tiles > .sytue-card-tone > * {
+  max-width: 100%;
+  white-space: normal;
+}
+
+/* El aro del avatar de la cuenta y del punto de aviso (ver la barra de <768px, más
+   arriba), en «Marco» a cualquier ancho: ahí la barra superior es siempre del color del
+   marco. */
+:root:not([data-forma='carril']) .sytue-topbar-carril .sytue-aro-carril {
+  border-radius: 9999px;
+  box-shadow: 0 0 0 1.5px var(--sytue-sidebar-fg);
+}
+
+/* «Carril», en una app SIN menú lateral (el Hub, la portada de Docus, Account, Photos): la
+   esquina de marca se ciñe a la marca y al conmutador de aplicaciones en vez de pintar el
+   ancho de un menú que no existe, que quedaba como un bloque de color suelto. Solo cambia
+   lo que se PINTA: su contenedor sigue reservando el ancho (TopBar.tsx), así que el
+   buscador no se mueve al pasar de una app a otra. En «Marco» no aplica —la barra es de
+   color entera— y por debajo de 768 px tampoco, porque lo es también. */
+@media (min-width: 768px) {
+  [data-forma='carril']:not(:has(nav:is(.bg-sidebar, .bg-rail))) .sytue-esquina-marca {
+    width: fit-content;
+  }
+}
+
+:root { --radius-control: 4px; }
+</style>
+<script>(function(read,mode,color,forma,app){mode(read('light','sytue-theme'));color(read(read('app','sytue-color-org',["petroleo","cobalto","app"]),'sytue-color',["petroleo","cobalto","app"]));forma(read(read('marco','sytue-forma-org',["marco","carril"]),'sytue-forma',["marco","carril"]));app();})(function readThemePreference(fallback, key, allowed = ["light", "dark", "translucent", "system"]) {
+  const valid = (value) => typeof value === "string" && allowed.includes(value);
+  try {
+    const shared = (typeof document > "u" ? void 0 : document.cookie?.split(";").map((value) => value.trim()).find((value) => value.startsWith(`${key}=`)))?.slice(key.length + 1);
+    if (valid(shared))
+      return shared;
+  } catch {}
+  try {
+    const stored = typeof localStorage > "u" ? null : localStorage.getItem(key);
+    if (valid(stored))
+      return stored;
+  } catch {}
+  return fallback;
+},function applyThemeMode(mode) {
+  if (typeof document > "u")
+    return;
+  if (mode === "system")
+    document.documentElement.removeAttribute("data-theme");
+  else
+    document.documentElement.setAttribute("data-theme", mode);
+},function applyThemeColor(color) {
+  if (typeof document > "u")
+    return;
+  if (color === "petroleo")
+    document.documentElement.removeAttribute("data-color");
+  else
+    document.documentElement.setAttribute("data-color", color);
+},function applyThemeForma(forma) {
+  if (typeof document > "u")
+    return;
+  if (forma === "marco")
+    document.documentElement.removeAttribute("data-forma");
+  else
+    document.documentElement.setAttribute("data-forma", forma);
+},function applyThemeApp() {
+  if (typeof document > "u" || document.documentElement.hasAttribute("data-app"))
+    return;
+  const g = globalThis;
+  if (typeof g.__sytueBase !== "string")
+    return;
+  const app = g.__sytueBase.replace(/^\/+/, "") || (g.location?.hostname ?? "").split(".")[0] || "";
+  if (/^[a-z]+$/.test(app))
+    document.documentElement.setAttribute("data-app", app);
+});</script>
+<!-- sytue-theme:end -->
+    <style>
+      :root {
+        color-scheme: light;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        /* dvh y no vh: en movil la barra del navegador se retrae y `100vh` deja el
+           contenido descentrado justo cuando aparece esta pagina. */
+        min-height: 100dvh;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        font-family:
+          'Figtree Variable',
+          'Inter Variable',
+          'Segoe UI',
+          system-ui,
+          -apple-system,
+          sans-serif;
+        background: var(--sytue-bg);
+        color: var(--sytue-text);
+      }
+      main {
+        max-width: 22rem;
+        text-align: center;
+      }
+      .mark {
+        width: 64px;
+        height: 64px;
+        border-radius: 15px;
+      }
+      h1 {
+        font-size: 1.25rem;
+        font-weight: 600;
+        margin: 1.25rem 0 0.5rem;
+      }
+      p {
+        margin: 0;
+        color: var(--sytue-text-muted);
+        line-height: 1.5;
+      }
+      button {
+        margin-top: 1.5rem;
+        font: inherit;
+        font-weight: 600;
+        color: #fff;
+        background: var(--sytue-primary);
+        border: 0;
+        border-radius: var(--radius-control);
+        padding: 0.625rem 1.25rem;
+        cursor: pointer;
+      }
+      button:hover {
+        background: var(--sytue-primary-hover);
+      }
+      button:focus-visible {
+        outline: 2px solid var(--sytue-focus-ring);
+        outline-offset: 2px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <svg
+        class="mark"
+        viewBox="0 0 40 40"
+        role="img"
+        aria-label="Sytue One"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <defs>
+          <clipPath id="rs"><rect width="40" height="40" rx="9" /></clipPath>
+        </defs>
+        <g clip-path="url(#rs)">
+          <rect width="40" height="40" fill="#0A0A0A" />
+          <polygon points="40,14 40,40 14,40" fill="#b98f4f" />
+        </g>
+        <g transform="translate(3.98 26)">
+          <path
+            fill="#FFFFFF"
+            d="M6.145 0.236Q4.694 0.236 3.577-0.177Q2.460-0.591 1.751-1.380Q1.042-2.170 0.838-3.287L3.835-3.803Q4.071-2.965 4.662-2.546Q5.253-2.127 6.241-2.127Q7.165-2.127 7.697-2.476Q8.229-2.825 8.229-3.362Q8.229-3.835 7.847-4.136Q7.466-4.437 6.682-4.598L4.608-5.027Q2.868-5.382 2.009-6.236Q1.149-7.090 1.149-8.433Q1.149-9.593 1.783-10.425Q2.417-11.258 3.545-11.709Q4.673-12.160 6.198-12.160Q7.616-12.160 8.658-11.768Q9.700-11.376 10.345-10.656Q10.989-9.937 11.204-8.959L8.347-8.454Q8.164-9.066 7.643-9.458Q7.122-9.851 6.241-9.851Q5.446-9.851 4.909-9.518Q4.372-9.185 4.372-8.626Q4.372-8.175 4.721-7.863Q5.070-7.552 5.919-7.380L8.078-6.950Q9.818-6.596 10.667-5.795Q11.516-4.995 11.516-3.706Q11.516-2.524 10.828-1.638Q10.141-0.752 8.932-0.258Q7.724 0.236 6.145 0.236M13.170 4.254L13.912 1.826L14.309 1.923Q14.954 2.095 15.458 2.020Q15.963 1.944 16.269 1.611Q16.576 1.278 16.640 0.677L16.726 0.032L12.214-12.010L15.641-12.010L17.661-5.779Q18.026-4.598 18.262-3.416Q18.337-3.019 18.423-2.610Q18.520-3.019 18.617-3.427Q18.907-4.608 19.293-5.779L21.399-12.010L24.783-12.010L19.680 1.418Q19.315 2.385 18.746 3.094Q18.176 3.803 17.328 4.189Q16.479 4.576 15.276 4.576Q14.631 4.576 14.073 4.485Q13.514 4.394 13.170 4.254M28.360 0.204Q27.576 0.204 27.039-0.328Q26.502-0.859 26.502-1.644Q26.502-2.428 27.039-2.959Q27.576-3.491 28.360-3.491Q29.144-3.491 29.682-2.959Q30.219-2.428 30.219-1.644Q30.219-0.859 29.682-0.328Q29.144 0.204 28.360 0.204M28.360-7.767Q27.576-7.767 27.039-8.298Q26.502-8.830 26.502-9.614Q26.502-10.398 27.039-10.930Q27.576-11.462 28.360-11.462Q29.144-11.462 29.682-10.930Q30.219-10.398 30.219-9.614Q30.219-8.830 29.682-8.298Q29.144-7.767 28.360-7.767"
+          />
+        </g>
+      </svg>
+      <h1>No connection</h1>
+      <p>Sytue One cannot be reached. Check your network and try again.</p>
+      <button type="button" onclick="location.reload()">Try again</button>
+    </main>
+    <!--
+      Idioma. Esta pagina la sirve el service worker desde la cache: no hay servidor
+      que negocie nada, asi que lo hace el navegador con la MISMA regla que el
+      middleware (cookie explicita > idioma del navegador). El ingles es la fuente de
+      verdad y ya esta en el HTML, de modo que si el script no llega a correr se lee
+      igual. Estaba entera en espanol, y era la unica pagina que ve quien se queda sin
+      red: el aviso mas importante de la suite hablaba un solo idioma.
+
+      Y ya no promete que «tus cambios se sincronizaran al reconectar»: el service
+      worker del portal no guarda ediciones (solo cascaron estatico, ADR-0024 fase 1).
+    -->
+    <script>
+      (function () {
+        var textos = {
+          es: [
+            'Sin conexión — Sytue One',
+            'Sin conexión',
+            'No hay conexión con Sytue One. Comprueba tu red y vuelve a intentarlo.',
+            'Volver a intentarlo',
+          ],
+          fr: [
+            'Pas de connexion — Sytue One',
+            'Pas de connexion',
+            'Sytue One est injoignable. Vérifiez votre réseau et réessayez.',
+            'Réessayer',
+          ],
+          de: [
+            'Keine Verbindung — Sytue One',
+            'Keine Verbindung',
+            'Sytue One ist nicht erreichbar. Prüfen Sie Ihr Netz und versuchen Sie es erneut.',
+            'Erneut versuchen',
+          ],
+          it: [
+            'Nessuna connessione — Sytue One',
+            'Nessuna connessione',
+            'Sytue One non è raggiungibile. Controlla la rete e riprova.',
+            'Riprova',
+          ],
+        };
+        var cookie = /(?:^|;)\s*sytue_locale=([a-z]{2})/.exec(document.cookie);
+        var idioma = cookie ? cookie[1] : (navigator.language || 'en').slice(0, 2).toLowerCase();
+        var m = textos[idioma];
+        if (!m) return;
+        document.documentElement.lang = idioma;
+        document.title = m[0];
+        document.querySelector('h1').textContent = m[1];
+        document.querySelector('p').textContent = m[2];
+        document.querySelector('button').textContent = m[3];
+      })();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,23 @@
+---
+/** Banco de pruebas de Modal/Popover para el harness remoto de accesibilidad. */
+import '../../styles/global.css';
+import { SuperposicionesDemo, type ModoSuperposicion } from '../../editor/dev/SuperposicionesDemo';
+
+const q = Astro.url.searchParams;
+const modo = ['right', 'sheet', 'popover'].includes(q.get('modo') ?? '')
+  ? (q.get('modo') as ModoSuperposicion)
+  : 'center';
+const forma = q.get('forma') === 'carril' ? 'carril' : 'marco';
+---
+
+<!doctype html>
+<html lang="de" class="h-full" data-forma={forma}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mobile overlays (development fixture)</title>
+  </head>
+  <body class="h-full">
+    <SuperposicionesDemo client:only="preact" modo={modo} />
+  </body>
+</html>

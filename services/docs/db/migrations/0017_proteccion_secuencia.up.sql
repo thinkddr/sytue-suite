@@ -1,0 +1,17 @@
+-- SPDX-License-Identifier: Apache-2.0
+-- Copyright (c) 2026 Daniel Delgado Ramos
+--
+-- SECCIONES PROTEGIDAS: COPIA DE LA SECUENCIA POR CARÁCTER (ROADMAP-OFFICE permisos-1).
+--
+-- La 0016 valida el registro doc:html contra las secciones, pero las operaciones
+-- insert/delete de la secuencia RGA (el texto por carácter que pintan los co-editores)
+-- quedaban sin comprobar. Para validarlas hace falta la secuencia, y rehacerla del
+-- historial en cada lote no es viable (el snapshot de un documento mediano vive en S3).
+-- Se guarda aquí, SOLO para los documentos de texto que tienen secciones:
+--   · NULL  = desconocida; el servicio la reconstruye cuando un no propietario escribe
+--             por carácter (store.IniciarSecuencia).
+--   · valor = los elementos de la secuencia (JSON), exactamente los del documento en su
+--             seq actual; la actualiza cada escritura con ops por carácter, en la misma
+--             transacción que bloquea el documento.
+-- Es una columna de una tabla que ya tiene RLS y política de fusión: no hay tabla nueva.
+ALTER TABLE doc_proteccion ADD COLUMN secuencia text;

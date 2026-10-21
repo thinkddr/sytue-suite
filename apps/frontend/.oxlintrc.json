@@ -1,0 +1,240 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  // Sytue One — configuración de oxlint del workspace frontend.
+  // Sustituye a ESLint en .ts/.tsx/.js/.mjs; ESLint sigue SOLO para *.astro
+  // (oxlint aún no parsea ese formato), ver eslint.config.js.
+  // Paridad con la config anterior: eslint:recommended + typescript-eslint
+  // recommendedTypeChecked + jsx-a11y recommended + react-hooks.
+  "plugins": ["typescript", "oxc", "react", "jsx-a11y", "unicorn"],
+  "categories": { "correctness": "error" },
+  "ignorePatterns": ["**/dist/**", "**/.astro/**", "**/node_modules/**", "**/*.d.ts"],
+  "settings": {
+    // Componentes de formulario propios de @sytue/ui que envuelven controles
+    // nativos (renderizan <input>/<select>/<textarea> con el `id` recibido),
+    // para que jsx-a11y asocie correctamente <label for=…>.
+    "jsx-a11y": {
+      // En Preact/Astro los labels usan `for=` (HTML), no `htmlFor` (React);
+      // hay que declararlo para que jsx-a11y detecte la asociación.
+      "attributes": { "for": ["for", "htmlFor"] },
+      "components": {
+        "Input": "input",
+        "Textarea": "textarea",
+        "Select": "select",
+        "RibbonSelect": "select",
+        "Checkbox": "input",
+        "Radio": "input",
+        "Switch": "input"
+      }
+    }
+  },
+  "rules": {
+    // --- eslint:recommended que oxlint no trae en `correctness` ---
+    "no-var": "error",
+    "prefer-const": "error",
+    "prefer-rest-params": "error",
+    "prefer-spread": "error",
+
+    // --- typescript-eslint `recommendedTypeChecked` fuera de `correctness` ---
+    "typescript/ban-ts-comment": "error",
+    "typescript/no-array-constructor": "error",
+    "typescript/no-empty-object-type": "error",
+    "typescript/no-explicit-any": "error",
+    "typescript/no-misused-promises": "error",
+    // `CSSProperties` de Preact hereda el índice iterable de `CSSStyleDeclaration`,
+    // así que la regla marca CUALQUIER `style={{ ...base, … }}`: es el idioma normal
+    // de composición de estilos, no un spread de iterable por error.
+    "typescript/no-misused-spread": [
+      "error",
+      { "allow": [{ "from": "package", "package": "preact", "name": "CSSProperties" }] }
+    ],
+    // Reglas del compilador de React (oxlint 1.8x). Llegaron con 176 avisos que se
+    // resolvieron uno a uno el 2026-09-27 y quedan en error para que no vuelvan:
+    // - Preact no está en su modelo: el `useRef` de `preact/hooks` no lo reconoce como
+    //   ref, y solo un nombre acabado en `Ref` le dice que lo es. Por eso las refs se
+    //   llaman `algoRef`.
+    // - La «ref espejo» (`fooRef.current = foo` en el render) se escribe con `useUltimo`
+    //   de @sytue/ui, que la actualiza al confirmar.
+    // - Nada de reloj ni azar en el render: inicializador perezoso de `useState` o en el
+    //   manejador que lo necesita.
+    "react/immutability": "error",
+    "react/refs": "error",
+    "react/purity": "error",
+    "react/globals": "error",
+    "react/static-components": "error",
+    "typescript/no-namespace": "error",
+    "typescript/no-require-imports": "error",
+    "typescript/no-unnecessary-type-assertion": "error",
+    "typescript/no-unnecessary-type-constraint": "error",
+    "typescript/no-unsafe-argument": "error",
+    "typescript/no-unsafe-assignment": "error",
+    "typescript/no-unsafe-call": "error",
+    "typescript/no-unsafe-enum-comparison": "error",
+    "typescript/no-unsafe-function-type": "error",
+    "typescript/no-unsafe-member-access": "error",
+    "typescript/no-unsafe-return": "error",
+    "typescript/no-unused-expressions": "error",
+    "typescript/prefer-promise-reject-errors": "error",
+    "typescript/require-await": "error",
+    "typescript/restrict-plus-operands": "error",
+
+    // --- reglas propias del repo ---
+    "typescript/no-unused-vars": [
+      "error",
+      { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }
+    ],
+    "typescript/consistent-type-imports": [
+      "error",
+      { "prefer": "type-imports", "fixStyle": "inline-type-imports" }
+    ],
+    // Firmas de método como propiedad-flecha (`foo: () => void`), NO method-shorthand
+    // (`foo(): void`). El shorthand es bivariante y hace que `unbound-method` marque
+    // como error cualquier callback de hook (useCallback, sin `this`) que se pase por
+    // referencia (p. ej. `ctx.setTitle`). Property-syntax elimina ese falso positivo
+    // en TODO el código y evita que reaparezca (incluido código de agentes futuros).
+    "typescript/method-signature-style": ["error", "property"],
+    "typescript/explicit-module-boundary-types": "off",
+    // Astro usa `throw ctx.redirect(...)` (una Response) como control de flujo
+    // de redirección en guards de página/endpoint: es idiomático, no un error.
+    "typescript/only-throw-error": ["error", { "allow": [{ "from": "lib", "name": "Response" }] }],
+    // `new Array(n)` reserva n huecos sin recorrerlos; `Array.from({length:n})` —lo que
+    // pide la regla— construye e itera. En el motor de fórmulas, el solver y la rejilla
+    // de la hoja la preasignación es intencionada y está en el camino caliente.
+    "unicorn/no-new-array": "off",
+    // `== null` / `!= null` (comprueba null y undefined a la vez) se permite;
+    // el resto de comparaciones debe usar estricta.
+    "eqeqeq": ["error", "always", { "null": "ignore" }],
+    "no-console": ["error", { "allow": ["warn", "error"] }]
+  },
+  "overrides": [
+    {
+      // Componentes Preact / accesibilidad (WCAG AA obligatorio en el design system)
+      // + reglas de hooks (exhaustive-deps / rules-of-hooks) válidas para Preact.
+      "files": ["**/*.tsx"],
+      "rules": {
+        "react/rules-of-hooks": "error",
+        "react/exhaustive-deps": "error",
+        "jsx-a11y/alt-text": "error",
+        "jsx-a11y/anchor-has-content": "error",
+        "jsx-a11y/anchor-is-valid": "error",
+        "jsx-a11y/aria-activedescendant-has-tabindex": "error",
+        "jsx-a11y/aria-props": "error",
+        "jsx-a11y/aria-role": "error",
+        "jsx-a11y/aria-unsupported-elements": "error",
+        "jsx-a11y/autocomplete-valid": "error",
+        "jsx-a11y/click-events-have-key-events": "error",
+        "jsx-a11y/heading-has-content": "error",
+        "jsx-a11y/html-has-lang": "error",
+        "jsx-a11y/iframe-has-title": "error",
+        "jsx-a11y/img-redundant-alt": "error",
+        "jsx-a11y/interactive-supports-focus": "error",
+        // Los <label for=…> apuntan por `id` a controles propios de @sytue/ui
+        // (Input/Select/…): basta la asociación por htmlFor (`assert: 'either'`),
+        // sin exigir además anidamiento del control dentro del <label>.
+        "jsx-a11y/label-has-associated-control": [
+          "error",
+          {
+            "assert": "either",
+            "controlComponents": ["Input", "Textarea", "Select", "Checkbox", "Radio", "Switch"]
+          }
+        ],
+        "jsx-a11y/lang": "error",
+        "jsx-a11y/media-has-caption": "error",
+        "jsx-a11y/mouse-events-have-key-events": "error",
+        "jsx-a11y/no-access-key": "error",
+        "jsx-a11y/no-aria-hidden-on-focusable": "error",
+        "jsx-a11y/no-autofocus": "error",
+        "jsx-a11y/no-distracting-elements": "error",
+        "jsx-a11y/no-noninteractive-element-interactions": "error",
+        "jsx-a11y/no-noninteractive-tabindex": "error",
+        "jsx-a11y/no-redundant-roles": "error",
+        "jsx-a11y/no-static-element-interactions": "error",
+        "jsx-a11y/role-has-required-aria-props": "error",
+        "jsx-a11y/role-supports-aria-props": "error",
+        "jsx-a11y/scope": "error",
+        "jsx-a11y/tabindex-no-positive": "error",
+
+        // --- Reglas donde la implementación de oxlint diverge de eslint-plugin-jsx-a11y ---
+        // Las tres estaban en verde con ESLint; oxlint las aplica sin las excepciones
+        // que jsx-a11y trae de fábrica, y marcan patrones ARIA correctos del repo.
+        // Se revisaron una a una el 2026-08-08 (desglose en PENDIENTES.md).
+        //
+        // 181 avisos, y no son de los canvas: dominan `role="group"` en los grupos de la
+        // cinta —donde <fieldset> metería semántica de formulario que no toca— y
+        // `role="status"` en regiones live, donde <output> es para resultados de cálculo.
+        // El resto son combobox/listbox de la APG, imposibles con <select> nativo.
+        "jsx-a11y/prefer-tag-over-role": "off",
+        // `<ul role="listbox">` + `<li role="option">` es el patrón combobox de la
+        // APG y jsx-a11y lo permite explícitamente; oxlint lo marca igualmente.
+        "jsx-a11y/no-noninteractive-element-to-interactive-role": "off",
+        // No está en el `recommended` de jsx-a11y y por algo: sus 50 avisos aquí son
+        // controles propios (`<RibbonSelect label=…>`) que SÍ ponen `aria-label` en el
+        // <select> de dentro (ribbon/primitives.tsx); la regla no cruza el componente.
+        "jsx-a11y/control-has-associated-label": "off"
+      }
+    },
+    {
+      // Los hooks de Preact también viven en `.ts` (useDocument, useNavDrawer…),
+      // donde ESLint no los miraba: su `react-hooks` estaba limitado a `**/*.tsx`.
+      "files": ["**/*.ts"],
+      "rules": {
+        "react/rules-of-hooks": "error",
+        "react/exhaustive-deps": "error"
+      }
+    },
+    {
+      // Scripts de servidor/tooling y service workers (PWA): corren fuera del
+      // navegador —Node/Bun o WebWorker—, sus globals no son los de `window`.
+      "files": ["**/*.mjs", "**/*.cjs", "**/public/**/sw.js", "**/service-worker.js"],
+      "env": { "node": true, "serviceworker": true, "browser": true },
+      "globals": { "Bun": "readonly" },
+      "rules": { "no-console": "off" }
+    },
+    {
+      // Ficheros fuera del programa de TypeScript, que se lintan SIN información de
+      // tipos (con ESLint las reglas type-checked solo aplicaban a *.ts/*.tsx):
+      //   · Tests (Bun test): los dobles/mocks usan `any` y stubs a propósito y viven
+      //     fuera del tsconfig de build; no tiene sentido exigir seguridad de tipos
+      //     sobre respuestas simuladas. La sintaxis sí se sigue linteando.
+      //   · JS de tooling y service workers: sin anotaciones, todo sale `any` y las
+      //     reglas `no-unsafe-*` marcarían cada línea (eran 130 avisos).
+      "files": [
+        "**/*.test.ts",
+        "**/*.test.tsx",
+        "**/*.spec.ts",
+        "**/*.spec.tsx",
+        "**/*.js",
+        "**/*.mjs",
+        "**/*.cjs"
+      ],
+      "rules": {
+        "typescript/no-explicit-any": "off",
+        "typescript/await-thenable": "off",
+        "typescript/no-array-delete": "off",
+        "typescript/no-base-to-string": "off",
+        "typescript/no-duplicate-type-constituents": "off",
+        "typescript/no-floating-promises": "off",
+        "typescript/no-for-in-array": "off",
+        "typescript/no-implied-eval": "off",
+        "typescript/no-misused-promises": "off",
+        "typescript/no-misused-spread": "off",
+        "typescript/no-redundant-type-constituents": "off",
+        "typescript/no-unnecessary-type-assertion": "off",
+        "typescript/no-unsafe-argument": "off",
+        "typescript/no-unsafe-assignment": "off",
+        "typescript/no-unsafe-call": "off",
+        "typescript/no-unsafe-enum-comparison": "off",
+        "typescript/no-unsafe-member-access": "off",
+        "typescript/no-unsafe-return": "off",
+        "typescript/no-unsafe-unary-minus": "off",
+        "typescript/only-throw-error": "off",
+        "typescript/prefer-promise-reject-errors": "off",
+        "typescript/promise-function-async": "off",
+        "typescript/require-await": "off",
+        "typescript/restrict-plus-operands": "off",
+        "typescript/restrict-template-expressions": "off",
+        "typescript/return-await": "off",
+        "typescript/unbound-method": "off"
+      }
+    }
+  ]
+}

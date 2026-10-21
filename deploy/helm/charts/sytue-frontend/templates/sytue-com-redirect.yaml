@@ -1,0 +1,220 @@
+{{/*
+  REDIRECCIÓN sytue.com → sytue.eu (301 permanente)
+
+  Cualquier petición a *.sytue.com o sytue.com/www.sytue.com se redirige a su
+  equivalente en sytue.eu conservando:
+    - el subdominio:  drive.sytue.com → drive.sytue.eu
+    - el path:        /drive/files    → /drive/files
+    - el query:       ?id=123         → ?id=123
+
+  Se necesitan DOS middlewares porque la regla del wildcard no captura el apex:
+    1. sytue-com-sub:  *.sytue.com  → reemplaza el subdominio
+    2. sytue-com-apex: sytue.com y www.sytue.com → va directamente al apex eu
+
+  El Ingress de Kubernetes no soporta wildcards en el campo `host`, así que el
+  tráfico de *.sytue.com llega a Traefik por IngressRoute (CRD) que sí los admite.
+  El apex y www van por Ingress estándar (host exacto, más simple).
+
+  TLS: cert-manager emite dos certificados vía DNS-01 (webhook Scaleway):
+    - sytue-com-apex-tls:  cubre sytue.com y www.sytue.com
+    - sytue-com-wild-tls:  cubre *.sytue.com
+  Sin TLS el navegador rechazaría la conexión antes de recibir el 301.
+*/}}
+{{- $d := .Values.global | default dict }}
+{{- $tls := ($d.tls | default dict) }}
+{{- $issuer := include "sytue-frontend.clusterIssuer" . }}
+{{- $className := ($d.ingress | default dict).className | default "traefik" }}
+{{- $domain := include "sytue-frontend.domain" . }}
+{{- $ns := .Release.Namespace }}
+
+{{/* Solo generar si global.comRedirect.enabled es true (off por defecto para
+     no romper entornos sin zona sytue.com). */}}
+{{- if ($d.comRedirect | default dict).enabled }}
+
+# ── 1. Middleware: *.sytue.com → *.sytue.eu ─────────────────────────────────
+#
+# regex captura:
+#   ${1} = subdominio (e.g. "drive")
+#   ${2} = path + query (e.g. "/drive/files?id=123")
+#
+# Ejemplo: https://drive.sytue.com/drive/files?id=123
+#          → https://drive.sytue.eu/drive/files?id=123
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: sytue-com-sub-redirect
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: sytue
+spec:
+  redirectRegex:
+    # El regex cubre path y query: (.*) al final de la URL captura todo lo que
+    # venga después del host, incluido el "?" y los parámetros.
+    regex: '^https?://([^.]+)\.sytue\.com(.*)'
+    replacement: 'https://${1}.{{ $domain }}${2}'
+    permanent: true
+
+---
+# ── 2. Middleware: sytue.com y www.sytue.com → sytue.eu ─────────────────────
+#
+# Mismo patrón pero para el apex. www es habitual en bookmarks viejos.
+#
+# Ejemplo: https://www.sytue.com/pricing?ref=ad
+#          → https://sytue.eu/pricing?ref=ad
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: sytue-com-apex-redirect
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: sytue
+spec:
+  redirectRegex:
+    regex: '^https?://(?:www\.)?sytue\.com(.*)'
+    replacement: 'https://{{ $domain }}${1}'
+    permanent: true
+
+---
+# ── 3. Certificate: sytue.com + www.sytue.com ────────────────────────────────
+#
+# DNS-01 vía ClusterIssuer (webhook Scaleway). El 301 se sirve con TLS propio:
+# sin cert el navegador bloquea la conexión antes de recibir la redirección.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: sytue-com-apex-tls
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: sytue
+spec:
+  secretName: sytue-com-apex-tls
+  issuerRef:
+    name: {{ $issuer }}
+    kind: ClusterIssuer
+  dnsNames:
+    - "sytue.com"
+    - "www.sytue.com"
+
+---
+# ── 4. Certificate: *.sytue.com ──────────────────────────────────────────────
+#
+# Wildcard: cubre todos los subdominios de superficie (drive, mail, id…).
+# Requiere DNS-01 obligatoriamente (HTTP-01 no sirve para wildcards).
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: sytue-com-wild-tls
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: sytue
+spec:
+  secretName: sytue-com-wild-tls
+  issuerRef:
+    name: {{ $issuer }}
+    kind: ClusterIssuer
+  dnsNames:
+    - "*.sytue.com"
+
+---
+# ── 5. IngressRoute: *.sytue.com → middleware sub-redirect ───────────────────
+#
+# Ingress estándar de Kubernetes no admite wildcard en el host; se usa el CRD
+# de Traefik (IngressRoute) que sí lo soporta. Priority alta para no solaparse
+# con otras reglas que pudieran coincidir.
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: sytue-com-wildcard
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: sytue
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    {{/*
+      EXPRESIÓN REGULAR DE GO, NO LA SINTAXIS DE TRAEFIK v2.
+
+      Aquí decía HostRegexp(`{subdomain:[a-z0-9-]+}.sytue.com`), que es v2. En v3
+      —y el despliegue va por v3.7.10, `deploy/helm/versions.env`—
+      los grupos con nombre `{nombre:regex}` ya no existen: el patrón se compila
+      tal cual con `regexp` de Go y `{subdomain:…}` pasa a ser TEXTO LITERAL,
+      porque no es una repetición válida. Compila sin error y no casa con nada,
+      que es la peor de las dos formas de fallar: la ruta comodín se queda muerta
+      en silencio y `drive.sytue.com` no redirige.
+
+      Comprobado con el `regexp` de Go, los dos patrones contra los mismos hosts:
+
+          "{subdomain:[a-z0-9-]+}.sytue.com"  drive.sytue.com -> false
+          "^[a-z0-9-]+\.sytue\.com$"          drive.sytue.com -> true
+          "^[a-z0-9-]+\.sytue\.com$"          sytue.com       -> false  (es del apex)
+
+      Y anclado con ^…$ porque v3 usa `MatchString`, que no ancla: sin el ancla,
+      `midrive.sytue.com.evil.tld` también casaría.
+    */}}
+    - match: "HostRegexp(`^[a-z0-9-]+\\.sytue\\.com$`)"
+      kind: Rule
+      priority: 900
+      middlewares:
+        - name: sytue-com-sub-redirect
+          namespace: {{ $ns }}
+      services:
+        # El servicio de destino no importa: el middleware emite el 301 antes
+        # de llegar al backend. Se apunta a un servicio existente para que
+        # Traefik valide el objeto; el tráfico nunca llega a él.
+        - name: {{ .Release.Name }}-www
+          port: 80
+          weight: 1
+  tls:
+    secretName: sytue-com-wild-tls
+
+---
+# ── 6. Ingress: sytue.com y www.sytue.com (hosts exactos) ───────────────────
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: sytue-com-apex
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: sytue
+  annotations:
+    cert-manager.io/cluster-issuer: {{ $issuer | quote }}
+    traefik.ingress.kubernetes.io/router.middlewares: {{ printf "%s-sytue-com-apex-redirect@kubernetescrd" $ns | quote }}
+    traefik.ingress.kubernetes.io/router.priority: "900"
+spec:
+  ingressClassName: {{ $className }}
+  tls:
+    - hosts:
+        - "sytue.com"
+        - "www.sytue.com"
+      secretName: sytue-com-apex-tls
+  rules:
+    - host: "sytue.com"
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Release.Name }}-www
+                port:
+                  name: http
+    - host: "www.sytue.com"
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Release.Name }}-www
+                port:
+                  name: http
+
+{{- end }}{{/* comRedirect.enabled */}}

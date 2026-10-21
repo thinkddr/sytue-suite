@@ -1,0 +1,22 @@
+{
+  "key": "box",
+  "tier": "tier2",
+  "manifest": {
+    "name": "Box",
+    "description": "Almacenamiento y colaboración de archivos en la nube, con inicio de sesión único.",
+    "category": "Almacenamiento",
+    "color": "#0061D5",
+    "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#0061D5\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 3 4 7v10l8 4 8-4V7z\"/><path d=\"M4 7l8 4 8-4M12 11v10\"/></svg>",
+    "identity": {
+      "kind": "saml",
+      "entity_id": "box.net",
+      "acs_url": "https://sso.services.box.net/sp/ACS.saml2",
+      "name_id_format": "email"
+    },
+    "provisioning": "none",
+    "launch": {
+      "kind": "url",
+      "url": "https://app.box.com"
+    }
+  }
+}

@@ -1,0 +1,11 @@
+Tabelle collegate per gestire clienti, ordini o scorte, con permessi e registro di ogni modifica.
+
+• Clienti, ordini o scorte in tabelle collegate, senza bisogno di conoscere i database.
+• Condividi con la tua organizzazione con il ruolo che decidi.
+• Ogni modifica viene registrata: chi l’ha fatta e quale era il valore precedente.
+• I tuoi dati restano nell’UE e li esporti quando vuoi.
+• Tabelle con campi di testo, numero, data, casella, scelta singola e scelta multipla.
+• Relazioni tra tabelle: collega un ordine al suo cliente e il database non permette di spezzare il legame.
+• Permessi per base e per tabella: proprietario, editor, commentatore e lettore.
+
+Cifratura in transito (TLS 1.3). L’infrastruttura di Sytue si trova nell’UE. La posizione dei servizi esterni dipende dal loro fornitore.

@@ -1,0 +1,212 @@
+{
+ "pais": "NL",
+ "verificado": true,
+ "moneda": "EUR",
+ "formas": [
+  {
+   "clave": "eenmanszaak",
+   "nombre": "Eenmanszaak / ZZP",
+   "tipo": "persona_fisica"
+  },
+  {
+   "clave": "vof",
+   "nombre": "Vennootschap onder firma (VOF)",
+   "tipo": "persona_fisica"
+  },
+  {
+   "clave": "bv",
+   "nombre": "Besloten vennootschap (BV)",
+   "tipo": "sociedad"
+  },
+  {
+   "clave": "nv",
+   "nombre": "Naamloze vennootschap (NV)",
+   "tipo": "sociedad"
+  }
+ ],
+ "portales": {
+  "belastingdienst": {
+   "nombre": "Mijn Belastingdienst Zakelijk",
+   "url": "https://www.belastingdienst.nl/"
+  },
+  "kvk": {
+   "nombre": "KVK — jaarrekening deponeren",
+   "url": "https://www.kvk.nl/"
+  }
+ },
+ "obligaciones": [
+  {
+   "clave": "nl_btw_q",
+   "nombre": "Btw-aangifte (kwartaal)",
+   "concepto": "iva_periodica",
+   "ambito": "fiscal",
+   "periodicidad": "trimestral",
+   "plazos": {
+    "T": "ultimo"
+   },
+   "margen_dias": 7,
+   "portal": "belastingdienst",
+   "aplica": {
+    "condiciones": [
+     "iva",
+     "!iva_mensual"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 6800,
+    "nota": "Aangifte en betaling uiterlijk de laatste dag van de maand na het tijdvak; de aangiftebrief noemt de datum. Verzuimboete voor te late aangifte 68 € (max. 1.377 €); betaalverzuimboete 3 % van het bedrag, min. 50 € en max. 5.514 €."
+   },
+   "calculo": {
+    "tipo": "saldo_neto",
+    "haber": [
+     "477"
+    ],
+    "debe": [
+     "472"
+    ]
+   }
+  },
+  {
+   "clave": "nl_btw_m",
+   "nombre": "Btw-aangifte (maand)",
+   "concepto": "iva_periodica",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "ultimo"
+   },
+   "margen_dias": 7,
+   "portal": "belastingdienst",
+   "aplica": {
+    "condiciones": [
+     "iva",
+     "iva_mensual"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 6800,
+    "nota": "Verzuimboete 68 €; betaalverzuimboete 3 % (min. 50 €, max. 5.514 €)."
+   },
+   "calculo": {
+    "tipo": "saldo_neto",
+    "haber": [
+     "477"
+    ],
+    "debe": [
+     "472"
+    ]
+   }
+  },
+  {
+   "clave": "nl_icp",
+   "nombre": "Opgaaf ICP",
+   "concepto": "operaciones_intracomunitarias",
+   "ambito": "fiscal",
+   "periodicidad": "trimestral",
+   "plazos": {
+    "T": "ultimo"
+   },
+   "margen_dias": 7,
+   "portal": "belastingdienst",
+   "aplica": {
+    "condiciones": [
+     "intracomunitario"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 6800,
+    "nota": "Verzuimboete tot 1.377 €."
+   }
+  },
+  {
+   "clave": "nl_loon",
+   "nombre": "Loonaangifte",
+   "concepto": "retenciones_trabajo",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "ultimo"
+   },
+   "margen_dias": 7,
+   "portal": "belastingdienst",
+   "aplica": {
+    "condiciones": [
+     "empleados"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 6800,
+    "nota": "Verzuimboete voor te late aangifte tot 1.377 €; betaalverzuimboete 3 % (min. 50 €, max. 5.514 €)."
+   }
+  },
+  {
+   "clave": "nl_vpb",
+   "nombre": "Aangifte vennootschapsbelasting",
+   "concepto": "sociedades_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "06-01+1"
+   },
+   "margen_dias": 30,
+   "portal": "belastingdienst",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 291500,
+    "nota": "Verzuimboete tot 2.915 € (standaard 50 % = 1.457 €) bij te late aangifte; uitstel mogelijk via belastingadviseur."
+   }
+  },
+  {
+   "clave": "nl_ib",
+   "nombre": "Aangifte inkomstenbelasting (winst uit onderneming)",
+   "concepto": "renta_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "05-01+1"
+   },
+   "margen_dias": 30,
+   "portal": "belastingdienst",
+   "aplica": {
+    "tipos": [
+     "persona_fisica"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 38500,
+    "nota": "Verzuimboete 385 € (max. 5.514 €) bij te late aangifte."
+   }
+  },
+  {
+   "clave": "nl_jaarrekening",
+   "nombre": "Jaarrekening deponeren bij KVK",
+   "concepto": "cuentas_anuales",
+   "ambito": "mercantil",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "12-31+1"
+   },
+   "margen_dias": 60,
+   "portal": "kvk",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "nota",
+    "nota": "Economisch delict (WED): boete en persoonlijke aansprakelijkheid van bestuurders bij faillissement. Uiterlijk 12 maanden na afloop van het boekjaar (8 dagen na vaststelling)."
+   }
+  }
+ ]
+}

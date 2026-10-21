@@ -1,0 +1,18 @@
+Notesbøger, der kan rumme alt: tekst, filer, begivenheder, hele dokumenter.
+
+• Indlejrede notesbøger på et frit lærred, i kolonner eller som liste.
+• Noter af enhver art: tekst, opgaver, links, filer, begivenheder fra Calendar, dokumenter fra Docs.
+• Du bestemmer, hvad der kommer med i søgningen — og hvad der aldrig gør.
+• Indlejrede notesbøger med ikon og farve; tre layout: frit, kolonner og liste.
+• Tolv typer noter: tekst, opgaver, links, farve, billede og henvisninger til Drive, Docus, Calendar, Rooms og andre noter.
+• En editor med formatering (fed, lister, links), der gemmer, når du går.
+• Tags, fastgør, dupliker, flyt mellem notesbøger, gruppér og træk rundt på lærredet.
+• Synlighed pr. notesbog: privat, personlig, organisation eller offentligt link.
+• Du bestemmer, hvilke notesbøger der kommer med i pakkens søgning.
+• Tilbagelinks: se, hvilke noter der peger på denne.
+• Eksportér en hel notesbog til HTML, PDF, Markdown og mere; importér kopier.
+• Del en note til en kanal i Rooms; slip eller indsæt for at oprette noter.
+• Tabeller i editoren og Markdown-genveje, mens du skriver: “- ”, “# ”, “> ” og “```”.
+• Flyt en note til en anden notesbog, eksportér en enkelt note, og sortér notesbogen, som du vil.
+
+Krypteret under overførsel (TLS 1.3). Sytues infrastruktur er i EU. Eksterne tjenesters placering afhænger af deres udbyder.

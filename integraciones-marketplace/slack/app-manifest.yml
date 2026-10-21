@@ -1,0 +1,19 @@
+# Slack App Manifest — importable en api.slack.com/apps → «Create App from manifest».
+# Scopes y authorize URL = semilla services/integrations/db/seeds/templates/slack.json.
+# El redirect URI es el callback del Integration Gateway.
+display_information:
+  name: Sytue
+  description: Suite de productividad soberana — integra Slack con Sytue (búsqueda, identidad y avisos).
+  background_color: "#4A154B"
+oauth_config:
+  redirect_urls:
+    - https://integrations.sytue.eu/api/v1/oauth/callback
+  bot:
+    scopes:
+      - channels:read
+      - chat:write
+      - incoming-webhook
+settings:
+  install_page: allow
+  org_deploy_enabled: false
+  socket_mode_enabled: false

@@ -1,0 +1,46 @@
+---
+/**
+ * La portada de Docus, Calcus o Diapos: sus documentos del servicio de documentos y
+ * crear uno nuevo. Montada en la Sytue Shell. La página que la monta
+ * (`src/pages/index.astro` de cada app) resuelve antes la sesión y dice el tipo.
+ */
+import type { DocKind } from '@sytue/api-clients';
+import type { SytueSession } from '@sytue/auth';
+import AppLayout from '../layouts/AppLayout.astro';
+import { DocList } from '../components/DocList';
+import { docsT } from '../i18n';
+import { NOMBRE, productoDeKind } from '../lib/producto';
+
+interface Props {
+  /** La de `entrar(Astro)`: la página ya resolvió el login. */
+  sesion: SytueSession;
+  /** El tipo de la app que la monta: Docus, Calcus o Diapos. */
+  kind: DocKind;
+}
+
+const { sesion: session, kind } = Astro.props;
+
+const locale = Astro.locals.locale;
+// Título y marca van con el tipo de la app.
+const producto = productoDeKind(kind);
+const t = docsT(locale);
+const title = `${NOMBRE[producto]} — ${t(`kind.${kind}`)}`;
+/*
+ * EL TIPO LO RESUELVE EL SERVIDOR, no el navegador.
+ *
+ * `DocList` lo leía de `window.location` y en SSR eso no existe, así que el HTML
+ * salía siempre como «documento»: color azul de Docus y el dibujo de la hoja. Al
+ * hidratar, Preact reutiliza el DOM y NO repara los atributos que difieren —el
+ * texto sí se actualiza, el `style` y la `d` del path no—, de modo que Calcus y
+ * Diapos se quedaban con el rótulo correcto y la marca de Docus. Medido el
+ * 2026-09-11 en producción: `background:var(--sytue-product-docs)` servido bajo
+ * `?kind=spreadsheet`.
+ *
+ * Pasarlo como prop lo arregla en origen: el servidor pinta ya lo correcto y la
+ * hidratación coincide, así que no hay nada que reparar.
+ */
+---
+
+<AppLayout title={title} producto={producto}>
+  <DocList client:load locale={locale} userId={session.user.id} kind={kind} />
+</AppLayout>

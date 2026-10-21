@@ -1,0 +1,56 @@
+---
+import DashboardLayout from '../../../layouts/DashboardLayout.astro';
+import FunctionsPanel from '../../../components/FunctionsPanel';
+import { requireSession } from '@sytue/auth/server';
+import { canonicaConOrg } from '@sytue/config';
+import { getBff, toBffContext } from '../../../server/bff.js';
+import { loadProject, loadServices, loadBuiltImages } from '../../../lib/cloud.js';
+
+import { useT } from '../../../i18n/index.js';
+
+export const prerender = false;
+
+// El idioma lo negocia el middleware una vez por peticion y baja a la isla por
+// props: detectarlo en el cliente desajustaria la hidratacion.
+const locale = Astro.locals.locale;
+const t = useT(locale);
+
+const guard = await requireSession(getBff(), toBffContext(Astro));
+if (guard instanceof Response) return guard;
+// Ruta en `sinOrg` (su nombre colisiona con el namespace de organizaciones):
+// con sesión, un salto local a la canónica con la org activa (ADR 0056).
+const canonica = canonicaConOrg(Astro.url, getBff().basePath, guard.session.user.tenant);
+if (canonica) return Astro.redirect(canonica);
+
+const { session } = guard;
+
+const { slug } = Astro.params;
+const projectSourced = slug ? await loadProject(session, slug) : undefined;
+if (!projectSourced) return new Response(t('common.notFound'), { status: 404 });
+const project = projectSourced.data;
+
+// Las funciones son servicios gestionados del proyecto (kind=functions), y las
+// imagenes con las que se pueden levantar salen de las builds que ya terminaron
+// bien. Las dos lecturas van a la vez: son independientes.
+const [services, images] = await Promise.all([
+  loadServices(session, project.slug),
+  loadBuiltImages(session, project.slug),
+]);
+---
+
+<DashboardLayout
+  title={t('page.titleWithProject', { section: t('nav.functions'), project: project.name })}
+  project={project.slug}
+  section="functions"
+  hasDb={project.services.includes('postgres')}
+>
+  <FunctionsPanel
+    client:load
+    project={project.slug}
+    functions={services.data.filter((s) => s.kind === 'functions')}
+    images={images.data}
+    live={projectSourced.live && services.live}
+    locale={locale}
+    error={projectSourced.error}
+  />
+</DashboardLayout>

@@ -1,0 +1,36 @@
+{
+  "name": "@sytue/photos",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sytue Photos — galería y editor de imágenes (Astro 7 + Preact 10) sobre el servicio Go propio Sytue Photos. Línea de tiempo por fecha de captura, álbumes y edición no destructiva por receta. Los ORIGINALES viven en Sytue Drive; aquí solo el índice y las derivadas. Monta la Sytue Shell y usa @sytue/ui. Producto Sytue-native, propietario. docs/CONVENTIONS.md §1.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "dev": "bun --bun astro dev --port 4332 --host",
+    "build": "bun --bun astro build",
+    "preview": "bun --bun astro preview --port 4332 --host",
+    "start": "bun ./dist/server/entry.mjs",
+    "test": "bun test",
+    "typecheck": "bun --bun astro check"
+  },
+  "dependencies": {
+    "@astrojs/node": "catalog:",
+    "@astrojs/preact": "catalog:",
+    "@sytue/api-clients": "workspace:*",
+    "@sytue/auth": "workspace:*",
+    "@sytue/config": "workspace:*",
+    "@sytue/i18n": "workspace:*",
+    "@sytue/offline": "workspace:*",
+    "@sytue/shell": "workspace:*",
+    "@sytue/ui": "workspace:*",
+    "astro": "catalog:",
+    "preact": "10.29.8"
+  },
+  "devDependencies": {
+    "@astrojs/check": "catalog:",
+    "@tailwindcss/vite": "4.3.3",
+    "@types/bun": "1.4.2",
+    "tailwindcss": "4.3.3",
+    "typescript": "6.0.3"
+  }
+}

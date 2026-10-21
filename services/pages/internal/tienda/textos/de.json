@@ -1,0 +1,10 @@
+{
+  "order_paid_buyer_subject": "Bestellbestätigung {number}",
+  "order_paid_buyer_body": "Vielen Dank für Ihren Einkauf. Bestellung {number} wurde bestätigt.",
+  "order_paid_store_subject": "Neue Bestellung erhalten: {number}",
+  "order_paid_store_body": "Sie haben eine neue Bestellung {number} über {total} erhalten.",
+  "withdrawal_ack_subject": "Widerrufsbestätigung erhalten: {number}",
+  "withdrawal_ack_body": "Ihr Widerrufsantrag für Bestellung {number} wurde erfasst.",
+  "form_received_subject": "Formularübermittlung erhalten: {form_id}",
+  "form_received_body": "Eine neue Übermittlung für Formular {form_id} ist eingegangen."
+}

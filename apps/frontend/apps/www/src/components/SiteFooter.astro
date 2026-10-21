@@ -1,0 +1,111 @@
+---
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: (c) 2026 Daniel Delgado Ramos
+ *
+ * SiteFooter — pie de página público de Sytue One. Enlaces de producto, recursos
+ * y legales (RGPD). Estático. Marca y soberanía europea. docs/CONVENTIONS.md §10.
+ */
+import type { Locale } from '@sytue/i18n';
+import { logos } from '@sytue/ui';
+import { appForKey } from '@sytue/ui';
+import { PRODUCT_KEYS, rutaDeFicha } from '../lib/product-content';
+import { localePath, useT } from '../i18n';
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const t = useT(locale);
+
+// Nombres de producto: marca, no pasan por el catálogo en ningún idioma.
+// Las QUINCE fichas, en el orden del catálogo. Antes había ocho escritas a mano
+// —faltaban Hub, Calcus, Diapos, CertiPDF, Notepads, Fotos y Admin— y cada
+// producto nuevo se olvidaba aquí: el pie es lo único que enlaza TODAS las fichas
+// desde cualquier página. El rótulo sale del catálogo de la suite, así que un
+// renombre (Docs → Docus) llega solo.
+//
+// Y enlazan a la FICHA (`/product/<clave>`), no al subdominio de la app: quien
+// lee la web pública viene a saber qué hace cada producto, no a iniciar sesión.
+const products = PRODUCT_KEYS.map((key) => ({
+  label: appForKey(key)?.name ?? key,
+  href: localePath(locale, rutaDeFicha(key)),
+}));
+
+// Solo enlaces que resuelven: docs/estado/seguridad/roadmap/subencargados aún no
+// tienen página — se añaden aquí cuando existan (un footer con 404 mina la marca).
+const resources = [
+  { label: 'GitHub (Código fuente)', href: 'https://github.com/thinkddr/sytue-suite' },
+  { label: t('footer.suite'), href: `${localePath(locale, '/')}#products` },
+  { label: t('footer.pricing'), href: `${localePath(locale, '/')}#pricing` },
+  { label: t('footer.downloads'), href: localePath(locale, '/downloads') },
+  { label: t('footer.sales'), href: 'mailto:ventas@sytue.eu' },
+  { label: t('footer.openSource'), href: localePath(locale, '/open-source') },
+];
+
+const legal = [
+  { label: t('footer.legalNotice'), href: localePath(locale, '/legal') },
+  { label: t('footer.privacy'), href: localePath(locale, '/privacy') },
+  { label: t('footer.terms'), href: localePath(locale, '/terms') },
+  { label: t('footer.accessibility'), href: localePath(locale, '/accessibility') },
+];
+
+// El año va como CADENA a propósito: `t` formatea los números con Intl, y en
+// alemán o español un 2026 numérico saldría agrupado («2.026»).
+const year = String(new Date().getFullYear());
+---
+
+<footer class="border-border bg-surface-sunken border-t">
+  <div class="mx-auto grid max-w-6xl grid-cols-2 gap-8 px-6 py-12 md:grid-cols-5">
+    <div class="col-span-2 min-w-0 md:col-span-1">
+      <img src={logos.suite} alt="Sytue One" height={26} />
+      <p class="text-text-muted mt-3 max-w-xs text-sm">{t('footer.tagline')}</p>
+    </div>
+    {/* Los quince productos en DOS columnas desde `sm`: en una sola, la lista
+        medía el triple que sus vecinas y empujaba el aviso legal fuera de la
+        primera pantalla del pie. */}
+    <nav aria-label={t('footer.products')} class="col-span-2 min-w-0">
+      <h2 class="text-text text-sm font-semibold">{t('footer.products')}</h2>
+      <ul class="mt-3 grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
+        {products.map((l) => (
+          <li>
+            <a href={l.href} class="text-text-muted hover:text-text text-sm transition-colors">
+              {l.label}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </nav>
+    <nav aria-label={t('footer.resources')}>
+      <h2 class="text-text text-sm font-semibold">{t('footer.resources')}</h2>
+      <ul class="mt-3 flex flex-col gap-2">
+        {resources.map((l) => (
+          <li>
+            <a href={l.href} class="text-text-muted hover:text-text text-sm transition-colors">
+              {l.label}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </nav>
+    <nav aria-label={t('footer.legal')}>
+      <h2 class="text-text text-sm font-semibold">{t('footer.legal')}</h2>
+      <ul class="mt-3 flex flex-col gap-2">
+        {legal.map((l) => (
+          <li>
+            <a href={l.href} class="text-text-muted hover:text-text text-sm transition-colors">
+              {l.label}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  </div>
+  <div class="border-border border-t">
+    <div class="text-text-muted mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-6 py-4 text-sm">
+      <p class="basis-full text-xs">{t('footer.privacyNotice')}</p>
+      <p>{t('footer.copyright', { year })}</p>
+    </div>
+  </div>
+</footer>

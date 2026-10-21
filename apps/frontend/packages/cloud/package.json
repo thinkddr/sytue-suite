@@ -1,0 +1,25 @@
+{
+  "name": "@sytue/cloud",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sytue One — SDK de las apps desplegadas en Sytue DevX. Sin configuración: lee las credenciales que la plataforma inyecta al desplegar. Datos sin SQL, errores que dicen qué hacer, cero dependencias.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.lib.json",
+    "typecheck": "tsc -p tsconfig.lib.json --noEmit",
+    "test": "bun test"
+  },
+  "devDependencies": {
+    "@sytue/config": "workspace:*",
+    "@types/bun": "1.4.2",
+    "@types/node": "catalog:",
+    "typescript": "6.0.3"
+  }
+}

@@ -1,0 +1,90 @@
+{
+  "$description": "Sytue — escala de espaciado, radios, sombras, bordes, z-index y motion. Base 4px (escala 4px). La consume @sytue/ui.",
+  "meta": {
+    "brand": "Sytue",
+    "version": "1.0.0"
+  },
+  "spacing": {
+    "$note": "Escala 4px. Clave = múltiplo de 0.25rem (4px). Usar para padding, gap, margin.",
+    "0": "0",
+    "0.5": "0.125rem",
+    "1": "0.25rem",
+    "2": "0.5rem",
+    "3": "0.75rem",
+    "4": "1rem",
+    "5": "1.25rem",
+    "6": "1.5rem",
+    "8": "2rem",
+    "10": "2.5rem",
+    "12": "3rem",
+    "16": "4rem",
+    "20": "5rem",
+    "24": "6rem"
+  },
+  "radii": {
+    "$note": "Formas amables, de radio medio: md (9) para controles y lg (14) para tarjetas, paneles, menús y diálogos; radios compartidos en toda la suite.",
+    "none": "0",
+    "sm": "4px",
+    "md": "9px",
+    "lg": "14px",
+    "xl": "20px",
+    "2xl": "24px",
+    "pill": "999px",
+    "full": "50%"
+  },
+  "shadows": {
+    "$note": "Teñidas con la tinta del texto (14, 26, 20), no con negro. sm y md llevan dos capas: una corta que dibuja el canto y otra ancha que despega la superficie del lienzo.",
+    "none": "none",
+    "xs": "0 1px 2px rgba(14, 26, 20, 0.04)",
+    "sm": "0 1px 2px rgba(14, 26, 20, 0.06), 0 1px 3px rgba(14, 26, 20, 0.08)",
+    "md": "0 2px 4px rgba(14, 26, 20, 0.05), 0 12px 30px rgba(14, 26, 20, 0.13)",
+    "lg": "0 16px 40px rgba(14, 26, 20, 0.16)",
+    "xl": "0 24px 48px rgba(14, 26, 20, 0.2)",
+    "focus": "0 0 0 2px #0a8552",
+    "dark": {
+      "sm": "0 1px 2px rgba(0, 0, 0, 0.4), 0 1px 3px rgba(0, 0, 0, 0.3)",
+      "md": "0 12px 30px rgba(0, 0, 0, 0.55)",
+      "lg": "0 16px 40px rgba(0, 0, 0, 0.6)",
+      "xl": "0 24px 48px rgba(0, 0, 0, 0.65)"
+    }
+  },
+  "borderWidth": {
+    "0": "0",
+    "1": "1px",
+    "2": "2px"
+  },
+  "layout": {
+    "$note": "Medidas canónicas del layout base sidebar+topbar+contenido.",
+    "topbarHeight": "56px",
+    "sidebarWidth": "260px",
+    "sidebarWidthCollapsed": "64px",
+    "appRailWidth": "64px",
+    "contentMaxWidth": "1280px",
+    "contentGutter": "1.5rem"
+  },
+  "zIndex": {
+    "base": 0,
+    "dropdown": 1000,
+    "sticky": 1020,
+    "sidebar": 1030,
+    "topbar": 1040,
+    "overlay": 1050,
+    "modal": 1060,
+    "popover": 1070,
+    "toast": 1080,
+    "tooltip": 1090
+  },
+  "motion": {
+    "$note": "Transiciones rápidas y sobrias. Respeta prefers-reduced-motion.",
+    "duration": {
+      "fast": "120ms",
+      "base": "150ms",
+      "slow": "240ms"
+    },
+    "easing": {
+      "standard": "cubic-bezier(0.2, 0, 0, 1)",
+      "emphasized": "cubic-bezier(0.2, 0, 0, 1)",
+      "exit": "cubic-bezier(0.4, 0, 1, 1)"
+    }
+  }
+}

@@ -1,0 +1,1 @@
+Cijeli ERP, s katalogom modela kao datotekom podataka.

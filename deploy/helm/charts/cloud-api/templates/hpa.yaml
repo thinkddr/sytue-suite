@@ -1,0 +1,57 @@
+{{- if .Values.autoscaling.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "sytue-cloud-api.fullname" . }}
+  labels:
+    {{- include "sytue-cloud-api.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "sytue-cloud-api.fullname" . }}
+  minReplicas: {{ .Values.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.autoscaling.maxReplicas }}
+  # Ritmo de escalado (`behavior`, lo que aporta autoscaling/v2 sobre v1).
+  #
+  # SIN esto rigen los valores por defecto de Kubernetes, y no son los que
+  # queremos: al BAJAR, tras 5 minutos de estabilización puede retirar el 100 %
+  # de las réplicas de una vez. Para un servicio con conexiones vivas —WebSocket
+  # de presencia, una subida a medias— eso es un corte visible provocado por un
+  # ahorro de céntimos.
+  #
+  # ASIMÉTRICO A PROPÓSITO: subir es urgente y bajar no.
+  #   · Al subir, sin ventana de espera: un pico de carga se atiende ahora, y
+  #     equivocarse cuesta un pod de más durante unos minutos.
+  #   · Al bajar, ventana larga y en escalones: se exige que la calma se
+  #     sostenga antes de retirar nada, y se retira POCO a POCO. Así no oscila
+  #     —subir y bajar en bucle es peor que no escalar— y las conexiones vivas
+  #     tienen tiempo de terminar.
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: {{ .Values.autoscaling.scaleUpStabilizationSeconds | default 0 }}
+      policies:
+        - type: Percent
+          value: {{ .Values.autoscaling.scaleUpPercent | default 100 }}
+          periodSeconds: 30
+        # El suelo de 2 pods/30 s importa cuando hay pocas réplicas: un 100 %
+        # sobre 1 réplica solo da 1 más, y así se sale del hueco más rápido.
+        - type: Pods
+          value: 2
+          periodSeconds: 30
+      selectPolicy: Max
+    scaleDown:
+      stabilizationWindowSeconds: {{ .Values.autoscaling.scaleDownStabilizationSeconds | default 600 }}
+      policies:
+        - type: Percent
+          value: {{ .Values.autoscaling.scaleDownPercent | default 50 }}
+          periodSeconds: 120
+      selectPolicy: Max
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.autoscaling.targetCPUUtilizationPercentage }}
+{{- end }}

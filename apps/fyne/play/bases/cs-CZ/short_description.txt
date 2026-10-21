@@ -1,0 +1,1 @@
+Společné relační tabulky pro zákazníky, objednávky nebo zásoby, v EU.

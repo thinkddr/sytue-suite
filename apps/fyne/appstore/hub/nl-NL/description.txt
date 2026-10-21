@@ -1,0 +1,14 @@
+De voorpagina van je suite: apps, snelle acties, recente activiteit en meldingen.
+
+• Een startscherm met al je apps en de apps die je organisatie koppelt.
+• De agenda van vandaag en ongelezen e-mail op de voorpagina, naast wat recent is in de suite en je meldingen.
+• Koppel je apparaten en download de native apps.
+• Een startscherm met de apps van de suite en de apps van derden die je organisatie koppelt.
+• Snelle acties: e-mail schrijven, nieuw document, uploaden naar Drive, afspraak maken.
+• Recent in de suite: de laatste items uit Drive, Docus, Mail of Rooms.
+• Meldingencentrum en aanwezigheid gedeeld in de hele suite.
+• Koppel je apparaten: een profiel voor iPhone en Mac, Android en desktop, in twee stappen.
+• Downloads van de native desktop- en mobiele apps.
+• Een welkomstassistent die de organisatie zonder handleidingen klaarzet.
+
+Versleuteld tijdens transport (TLS 1.3). De infrastructuur van Sytue staat in de EU. De locatie van externe diensten hangt af van hun aanbieder.

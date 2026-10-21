@@ -1,0 +1,49 @@
+{
+  "key": "microsoft-teams",
+  "tier": "tier1",
+  "manifest": {
+    "name": "Microsoft Teams",
+    "description": "Canales, chats y reuniones de Microsoft Teams. Conectado, puede sustituir a Sytue Rooms: el lanzador de la suite abre Teams en su lugar.",
+    "category": "Comunicación",
+    "color": "#5059C9",
+    "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#5059C9\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M3 6h9v12H3z\"/><path d=\"M5.5 9.5h4M7.5 9.5V15\"/><circle cx=\"17\" cy=\"7\" r=\"2.5\"/><path d=\"M14.5 12h5a1 1 0 0 1 1 1v3a3.5 3.5 0 0 1-7 0\"/></svg>",
+    "identity": {
+      "kind": "none"
+    },
+    "provisioning": "none",
+    "launch": {
+      "kind": "url",
+      "url": "https://teams.microsoft.com/"
+    },
+    "fields": [
+      {
+        "key": "tenant",
+        "label": "Inquilino de Entra (tenant)",
+        "placeholder": "contoso.onmicrosoft.com",
+        "help": "El dominio o el GUID del inquilino de Microsoft Entra ID. Lo encuentras en el portal de Entra, en «Información general».",
+        "required": true
+      }
+    ],
+    "oauth": {
+      "authorize_url": "https://login.microsoftonline.com/{tenant}/oauth2/v2.0/authorize",
+      "token_url": "https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token",
+      "scopes": [
+        "offline_access",
+        "User.Read",
+        "Team.ReadBasic.All",
+        "Channel.ReadBasic.All",
+        "Chat.Read"
+      ]
+    },
+    "substitutes": [
+      {
+        "product": "rooms",
+        "open_url": "https://teams.microsoft.com/"
+      },
+      {
+        "product": "meet",
+        "open_url": "https://teams.microsoft.com/"
+      }
+    ]
+  }
+}

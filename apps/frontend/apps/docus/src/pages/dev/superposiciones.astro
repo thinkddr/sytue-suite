@@ -1,0 +1,19 @@
+---
+/** Banco de DESARROLLO de Modal/Popover y compositor: en producción, 404. */
+import Banco from '@sytue/office/vistas/dev/Superposiciones.astro';
+import Compositor from '../../components/dev/RoomsComposer.astro';
+
+export const prerender = false;
+
+if (!import.meta.env.DEV) return new Response(null, { status: 404 });
+
+const q = Astro.url.searchParams;
+const compositor = q.get('modo') === 'compositor';
+const forma = q.get('forma') === 'carril' ? 'carril' : 'marco';
+---
+
+{compositor ? (
+  <Compositor forma={forma} paneles={q.get('paneles') === '1'} hilo={q.get('hilo') === '1'} />
+) : (
+  <Banco />
+)}

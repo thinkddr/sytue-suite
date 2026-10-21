@@ -1,0 +1,163 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "livekit.fullname" . }}
+  labels:
+    {{- include "livekit.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "livekit.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "livekit.labels" . | nindent 8 }}
+      annotations:
+        # Reinicia los pods cuando cambia la config (rollout en upgrade).
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    spec:
+      automountServiceAccountToken: false
+      {{- with (.Values.global).imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if (include "livekit.cacheSecret" .) }}
+      # Dragonfly EXIGE contraseña desde la respuesta al CVE-2026-62357, y LiveKit
+      # no la mandaba: `NOAUTH Authentication required` en bucle, 46 reinicios y
+      # las videollamadas caídas sin que ningún healthcheck de la suite lo viera.
+      # El umbrella cuenta «los siete servicios que hablan con Dragonfly» y este
+      # es el octavo: no es un servicio Go de la suite, así que quedó fuera.
+      #
+      # El valor NO puede ir en el ConfigMap —lo lee cualquiera con `get
+      # configmap` y es la misma contraseña de los otros ocho—, y LiveKit no
+      # admite una variable de entorno por campo: solo `--config` o LIVEKIT_CONFIG
+      # con el YAML entero. Así que se compone aquí, con la MISMA imagen del
+      # contenedor principal (nada que espejar de nuevo) y se deja en un emptyDir.
+      initContainers:
+        - name: config
+          image: "{{ include "livekit.image" . }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          command: ["/bin/sh", "-ec"]
+          args:
+            - |
+              # `sed` con la contraseña por stdin-free: va en el entorno, no en la
+              # línea de órdenes, para que no aparezca en `ps` ni en los registros.
+              sed "s|SYTUE_REDIS_PASSWORD|${REDIS_PASSWORD}|" \
+                /etc/livekit-plantilla/config.yaml > /etc/livekit/config.yaml
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "livekit.cacheSecret" . | quote }}
+                  key: {{ include "livekit.cacheSecretKey" . | quote }}
+                  optional: true
+          volumeMounts:
+            - name: plantilla
+              mountPath: /etc/livekit-plantilla
+              readOnly: true
+            - name: config
+              mountPath: /etc/livekit
+      {{- end }}
+      containers:
+        - name: livekit
+          # Mirror privado de la imagen oficial UPSTREAM (sin fork ni rebuild).
+          image: "{{ include "livekit.image" . }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          args:
+            - "--config"
+            - "/etc/livekit/config.yaml"
+            - "--key-file"
+            - "/etc/livekit-keys/{{ .Values.keys.secretKey }}"
+          ports:
+            - name: http
+              containerPort: {{ .Values.ports.http }}
+              protocol: TCP
+            - name: rtc-tcp
+              containerPort: {{ .Values.ports.rtcTcp }}
+              protocol: TCP
+            - name: rtc-udp
+              containerPort: {{ .Values.ports.rtcUdp }}
+              protocol: UDP
+            {{- if .Values.turn.enabled }}
+            - name: turn-tls
+              containerPort: {{ .Values.turn.tlsPort }}
+              protocol: TCP
+            - name: turn-udp
+              containerPort: {{ .Values.turn.udpPort }}
+              protocol: UDP
+            {{- end }}
+          # Sin variables de routing externo: el SFU opera single-node (sin Redis/Valkey).
+          startupProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 3
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/livekit
+              readOnly: true
+            - name: keys
+              mountPath: /etc/livekit-keys
+              readOnly: true
+            # rootfs de solo lectura: scratch efimero para cualquier escritura temporal.
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        {{- if (include "livekit.cacheSecret" .) }}
+        # El config FINAL lo escribe el initContainer; la plantilla viene aparte.
+        - name: config
+          emptyDir: {}
+        - name: plantilla
+          configMap:
+            name: {{ include "livekit.fullname" . }}
+        {{- else }}
+        - name: config
+          configMap:
+            name: {{ include "livekit.fullname" . }}
+        {{- end }}
+        - name: keys
+          secret:
+            secretName: {{ .Values.keys.existingSecret }}
+            # LiveKit rechaza key-files legibles por "others". El fsGroup del
+            # pod conserva lectura para el proceso no-root sin abrir 0644.
+            defaultMode: 0440
+        - name: tmp
+          emptyDir: {}

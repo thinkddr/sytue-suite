@@ -1,0 +1,13 @@
+{
+  "result": [
+    {
+      "sys_id": "cc33",
+      "number": "INC0010003",
+      "short_description": "VPN cae cada 10 minutos",
+      "state": { "value": "3", "display_value": "" },
+      "priority": { "value": "2", "display_value": "2 - Alta" },
+      "assigned_to": { "link": "https://acme.service-now.com/api/now/table/sys_user/u3", "value": "u3" },
+      "sys_created_on": "2026-07-22 08:45:00"
+    }
+  ]
+}

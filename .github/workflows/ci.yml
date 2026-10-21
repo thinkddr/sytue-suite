@@ -42,6 +42,8 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.3
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq imagemagick && sudo ln -sf /usr/bin/convert /usr/local/bin/magick
+        working-directory: .
       - run: bash scripts/sync-branding.sh
         working-directory: .
       - run: bun install --frozen-lockfile

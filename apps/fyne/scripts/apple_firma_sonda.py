@@ -29,7 +29,7 @@ def salida(resultado):
 
 def huella(pem):
     # SHA-1 es el selector de identidad de codesign, no una validación criptográfica.
-    return hashlib.sha1(ssl.PEM_cert_to_DER_cert(pem)).hexdigest().upper()
+    return hashlib.sha1(ssl.PEM_cert_to_DER_cert(pem), usedforsecurity=False).hexdigest().upper()
 
 
 def certificados_publicos(pem, carpeta, prefijo, correr):
@@ -66,7 +66,7 @@ def comprobar_firma(firma, binario, temporal, indice, esperado, correr):
     cadena = []
     for certificado in sorted(temporal.glob(f"cadena-{indice}-*")):
         der = certificado.read_bytes()
-        cadena.append({"sha1": hashlib.sha1(der).hexdigest().upper(), "metadata": salida(correr(["openssl", "x509", "-inform", "DER", "-in", str(certificado), "-noout", "-subject", "-issuer", "-fingerprint", "-sha256"]))})
+        cadena.append({"sha1": hashlib.sha1(der, usedforsecurity=False).hexdigest().upper(), "metadata": salida(correr(["openssl", "x509", "-inform", "DER", "-in", str(certificado), "-noout", "-subject", "-issuer", "-fingerprint", "-sha256"]))})
     firma["chain"] = cadena
     firma["ok"] = verificacion.returncode == 0 and extraer.returncode == 0 and bool(cadena) and cadena[0]["sha1"] in esperado
 

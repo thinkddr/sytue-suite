@@ -52,12 +52,16 @@ Opciones:
   --namespace <ns>          Namespace de Kubernetes para el modo Helm (por defecto: sytue-prod)
   --non-interactive         Usa los valores por defecto / flags sin hacer preguntas
   --only-config             Genera los ficheros de configuración y secretos sin arrancar contenedores
+  --integrations            Solo el asistente de integraciones y conectores con terceros (Google,
+                            Microsoft, Slack, Zoom…) sobre un despliegue Helm existente
+                            (equivale a: ./sytue-deploy integraciones)
   -h, --help                Muestra esta ayuda y sale
 
 Ejemplos:
   ./sytue-deploy
   ./sytue-deploy --mode compose --profile full --non-interactive --only-config
   ./sytue-deploy --mode helm --domain suite.miempresa.eu --only-config
+  ./sytue-deploy --integrations --domain suite.miempresa.eu
 EOF
 }
 
@@ -82,6 +86,7 @@ AI_MODEL="mistral-small-3.1-24b-instruct-2503"
 AI_BASE_URL=""
 NON_INTERACTIVE=0
 ONLY_CONFIG=0
+INTEGRATIONS_ONLY=0
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -93,6 +98,7 @@ while [ $# -gt 0 ]; do
     --namespace)       K8S_NAMESPACE="${2:-}"; shift 2 ;;
     --non-interactive) NON_INTERACTIVE=1; shift ;;
     --only-config)     ONLY_CONFIG=1; shift ;;
+    --integrations|integraciones) INTEGRATIONS_ONLY=1; shift ;;
     -h|--help)         usage; exit 0 ;;
     *) err "Opción desconocida: $1"; usage; exit 2 ;;
   esac
@@ -158,6 +164,305 @@ check_cmd() {
   command -v "$1" >/dev/null 2>&1
 }
 
+# ---------------------------------------------------------------------------
+# Integraciones y conectores con terceros (Sytue Integration Gateway)
+# ---------------------------------------------------------------------------
+# Tres niveles, de menos a más trabajo para quien despliega:
+#   1. Base del gateway (siempre): KEK de los secretos de cada conector, cliente
+#      `sytue-gateway` en Sytue ID y secreto interno con Drive/Rooms. Las genera
+#      apply-integrations.sh al aplicarse y NO las rota nunca: rotar la KEK
+#      dejaría ilegibles las credenciales ya selladas.
+#   2. Apps OAuth de plataforma (opcional, por proveedor): con ellas cada
+#      organización conecta con un clic, solo aprobando la pantalla de permisos.
+#      Sin ellas, el asistente de Sytue Admin pide a cada organización que
+#      registre su propia app (BYO).
+#   3. Lo demás (SAML, OIDC, IMAP/POP3, tokens de API) lo da de alta cada
+#      organización desde Sytue Admin → Aplicaciones, sin tocar el despliegue.
+#
+# Clave = plantilla del conector (services/integrations/db/seeds/templates). Una
+# app de Google, Microsoft o Slack sirve para toda su familia
+# (services/integrations/internal/http/oauth_clients.go).
+# Formato: clave|nombre|qué cubre|dónde se registra|cómo
+PROVEEDORES_OAUTH=(
+  "google-workspace|Google|Workspace, Google Drive, Gmail, Chat y Meet|https://console.cloud.google.com/apis/credentials|Configura la pantalla de consentimiento OAuth; luego «Crear credenciales» → «ID de cliente de OAuth» → tipo «Aplicación web». Habilita las API que vayas a usar (Drive, Gmail, Chat, Calendar)."
+  "microsoft365|Microsoft|Microsoft 365, Azure, OneDrive, Teams y Outlook|https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade|«Nuevo registro», cuentas de cualquier directorio (multiinquilino), URI de redirección de tipo «Web». Después «Certificados y secretos» → «Nuevo secreto de cliente». El client_id es el «Id. de aplicación (cliente)»."
+  "slack|Slack|SSO/SCIM, canales y salas de Rooms|https://api.slack.com/apps|«Create New App» → «From an app manifest» (puedes partir de integraciones-marketplace/slack/). En «OAuth & Permissions» añade la URI de redirección; Client ID y Client Secret están en «Basic Information»."
+  "zoom|Zoom|reuniones de Zoom|https://marketplace.zoom.us/develop/create|Crea una app «General App» con OAuth de usuario; añade la URI de redirección y la lista de permitidos (allow list) con el mismo dominio."
+  "github|GitHub|repositorios y migración desde GitHub|https://github.com/settings/applications/new|«New OAuth App» (o en la organización: Settings → Developer settings). «Authorization callback URL» = la URI de redirección; genera un client secret."
+  "jira-cloud|Jira Cloud (Atlassian)|Jira y SSO de Atlassian|https://developer.atlassian.com/console/myapps/|«Create» → «OAuth 2.0 integration»; en «Authorization» configura la Callback URL; añade los permisos de Jira que necesites."
+  "salesforce|Salesforce|CRM de Salesforce|https://login.salesforce.com/|Setup → App Manager → «New Connected App» (o External Client App) con OAuth habilitado y la Callback URL; Consumer Key = client_id, Consumer Secret = client_secret."
+  "servicenow|ServiceNow|incidencias y servicios de ServiceNow|https://developer.servicenow.com/|En tu instancia: System OAuth → Application Registry → «Create an OAuth API endpoint for external clients», con la Redirect URL."
+  "dropbox-storage|Dropbox|almacenamiento conectado de Dropbox en Drive|https://www.dropbox.com/developers/apps|«Create app» → Scoped access, Full Dropbox; en «Settings» añade la Redirect URI; App key = client_id, App secret = client_secret."
+  "business-central|Dynamics 365 Business Central|ERP de Business Central|https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade|Registro de app en Entra ID con permiso de API «Dynamics 365 Business Central» (delegado) y URI de redirección «Web»."
+  "databricks|Databricks|datos de Databricks|https://accounts.cloud.databricks.com/|Account console → Settings → App connections → «Add connection» con la Redirect URL; genera el client secret."
+  "yahoo-mail|Yahoo Mail|migración y buzones de Yahoo Mail|https://developer.yahoo.com/apps/|«Create an App», tipo web, con la Redirect URI y el permiso de Mail."
+  "whatsapp-business|WhatsApp Business (Meta)|conversaciones de WhatsApp Business en Rooms|https://developers.facebook.com/apps/|Crea una app de tipo «Business» con el producto WhatsApp; en «Inicio de sesión con Facebook» añade la URI de redirección. App ID = client_id, App secret = client_secret."
+)
+
+INTEG_TSV="${HELM_DIR}/integrations-oauth.tsv"
+INTEG_JSON="${HELM_DIR}/integrations-oauth-clients.json"
+INTEG_APPLY="${HELM_DIR}/apply-integrations.sh"
+INTEG_VALUES="${HELM_DIR}/values-integrations.yaml"
+INTEG_WHATSAPP=0
+INTEG_OPERADOR=0
+declare -A OAUTH_ID=() OAUTH_SECRET=()
+
+json_str() {
+  local s="$1"
+  s="${s//\\/\\\\}"
+  s="${s//\"/\\\"}"
+  printf '"%s"' "$s"
+}
+
+# Sin tabuladores, saltos de línea ni otros caracteres de control: el estado se
+# guarda en TSV y acaba en un JSON.
+valor_valido() {
+  [[ -n "$1" && "$1" != *[[:cntrl:]]* ]]
+}
+
+cargar_oauth() {
+  [ -f "$INTEG_TSV" ] || return 0
+  local clave id secreto
+  while IFS=$'\t' read -r clave id secreto; do
+    [ -n "$clave" ] || continue
+    OAUTH_ID["$clave"]="$id"
+    OAUTH_SECRET["$clave"]="$secreto"
+  done < "$INTEG_TSV"
+}
+
+guardar_oauth() {
+  local clave primero=1
+  ( umask 077
+    : > "$INTEG_TSV"
+    for clave in "${!OAUTH_ID[@]}"; do
+      printf '%s\t%s\t%s\n' "$clave" "${OAUTH_ID[$clave]}" "${OAUTH_SECRET[$clave]}" >> "$INTEG_TSV"
+    done
+    {
+      printf '{'
+      for clave in "${!OAUTH_ID[@]}"; do
+        [ "$primero" -eq 1 ] || printf ','
+        primero=0
+        printf '\n  %s: {"client_id": %s, "client_secret": %s}' \
+          "$(json_str "$clave")" "$(json_str "${OAUTH_ID[$clave]}")" "$(json_str "${OAUTH_SECRET[$clave]}")"
+      done
+      printf '\n}\n'
+    } > "$INTEG_JSON"
+  )
+  chmod 600 "$INTEG_TSV" "$INTEG_JSON"
+}
+
+leer_secreto_visible() {
+  local prompt_text="$1" var_name="$2" input=""
+  read -r -s -p "$(printf "  %b: " "$prompt_text")" input
+  echo ""
+  printf -v "$var_name" "%s" "$input"
+}
+
+configurar_proveedor() {
+  local linea="$1" redirect="$2"
+  local clave nombre cubre url como id secreto
+  IFS='|' read -r clave nombre cubre url como <<< "$linea"
+  echo ""
+  printf "  ${BOLD}%s${RESET} ${DIM}(%s)${RESET}\n" "$nombre" "$cubre"
+  if [ -n "${OAUTH_ID[$clave]:-}" ]; then
+    printf "    Configurado · client_id ${BOLD}%s${RESET}\n" "${OAUTH_ID[$clave]}"
+    prompt_yes_no "¿Cambiar la app de ${nombre}?" "n" || return 0
+  else
+    prompt_yes_no "¿Registrar una app de ${nombre}?" "n" || return 0
+  fi
+  printf "    ${BOLD}1.${RESET} Abre %s\n" "$url"
+  printf "    ${BOLD}2.${RESET} %s\n" "$como"
+  printf "    ${BOLD}3.${RESET} URI de redirección: ${BOLD}%s${RESET}\n" "$redirect"
+  printf "    ${BOLD}4.${RESET} Pega aquí el client_id y el client_secret.\n"
+  while :; do
+    prompt_default "client_id de ${nombre}" "${OAUTH_ID[$clave]:-}" id
+    valor_valido "$id" && break
+    warn "El client_id no puede estar vacío ni llevar tabuladores o saltos de línea."
+  done
+  while :; do
+    if [ -n "${OAUTH_SECRET[$clave]:-}" ]; then
+      leer_secreto_visible "client_secret de ${nombre} (Enter para conservar el actual)" secreto
+      [ -n "$secreto" ] || secreto="${OAUTH_SECRET[$clave]}"
+    else
+      leer_secreto_visible "client_secret de ${nombre}" secreto
+    fi
+    valor_valido "$secreto" && break
+    warn "El client_secret no puede estar vacío ni llevar tabuladores o saltos de línea."
+  done
+  OAUTH_ID["$clave"]="$id"
+  OAUTH_SECRET["$clave"]="$secreto"
+  ok "${nombre}: app de plataforma registrada."
+}
+
+escribir_integraciones() {
+  umask 077
+  cat > "$INTEG_VALUES" <<'EOF'
+# ===========================================================================
+# Sytue Suite — Overlay de integraciones generado por ./sytue-deploy
+# Activa la reconciliación de secretos de cliente en Sytue ID para que el
+# cliente `sytue-gateway` del Integration Gateway pueda autenticarse.
+# Uso: añade `-f deploy/helm/values-integrations.yaml` a tu `helm upgrade`.
+# ===========================================================================
+id:
+  clientSecrets:
+    enabled: true
+EOF
+  chmod 600 "$INTEG_VALUES"
+
+  cat > "$INTEG_APPLY" <<EOF
+#!/usr/bin/env bash
+# Script autogenerado por ./sytue-deploy: prepara los Secrets del Sytue
+# Integration Gateway en el namespace '${K8S_NAMESPACE}'.
+#
+# Idempotente. Las claves que ya existen en el clúster NO se rotan nunca (rotar la
+# KEK dejaría ilegibles las credenciales de conectores ya selladas): solo se
+# generan las que faltan. Las apps OAuth de plataforma salen de
+# integrations-oauth-clients.json, junto a este fichero.
+set -euo pipefail
+
+NS="${K8S_NAMESPACE}"
+WHATSAPP=${INTEG_WHATSAPP}
+OPERADOR=${INTEG_OPERADOR}
+EOF
+  cat >> "$INTEG_APPLY" <<'EOF'
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+leer() { # leer <secret> <clave> → valor en claro, o vacío
+  local v
+  v="$(kubectl -n "$NS" get secret "$1" -o go-template="{{ index .data \"$2\" }}" 2>/dev/null || true)"
+  if [ -z "$v" ] || [ "$v" = "<no value>" ]; then
+    return 0
+  fi
+  printf '%s' "$v" | base64 -d
+}
+asegurar() { kubectl -n "$NS" get secret "$1" >/dev/null 2>&1 || kubectl -n "$NS" create secret generic "$1" >/dev/null; }
+poner() { kubectl -n "$NS" patch secret "$1" --type merge -p "{\"stringData\":{\"$2\":\"$3\"}}" >/dev/null; }
+existente_o() { local v; v="$(leer "$1" "$2")"; if [ -n "$v" ]; then printf '%s' "$v"; else "${@:3}"; fi; }
+
+kubectl get namespace "$NS" >/dev/null 2>&1 || kubectl create namespace "$NS"
+
+KEK="$(existente_o sytue-integrations key-encryption-key openssl rand -base64 32)"
+GATEWAY="$(existente_o sytue-integrations gateway-client-secret openssl rand -hex 32)"
+INTERNO="$(existente_o sytue-integrations internal-secret openssl rand -hex 32)"
+
+asegurar sytue-integrations
+poner sytue-integrations key-encryption-key "$KEK"
+poner sytue-integrations gateway-client-secret "$GATEWAY"
+poner sytue-integrations internal-secret "$INTERNO"
+if [ "$OPERADOR" = 1 ]; then
+  poner sytue-integrations operator-token "$(existente_o sytue-integrations operator-token openssl rand -hex 32)"
+fi
+if [ "$WHATSAPP" = 1 ]; then
+  poner sytue-integrations whatsapp-webhook-verify-token \
+    "$(existente_o sytue-integrations whatsapp-webhook-verify-token openssl rand -hex 16)"
+fi
+echo "✓ sytue-integrations: KEK, cliente del gateway y secreto interno listos."
+
+# El mismo secreto en los dos extremos: Sytue ID fija con él el cliente
+# `sytue-gateway` (reconcile-client-secrets) y Drive pide con el interno los
+# tokens del almacenamiento conectado (Google Drive, OneDrive, Dropbox).
+asegurar sytue-id-client-secrets
+poner sytue-id-client-secrets sytue-gateway "$GATEWAY"
+asegurar sytue-drive
+poner sytue-drive integrations-internal-secret "$INTERNO"
+echo "✓ sytue-id-client-secrets y sytue-drive enlazados con el gateway."
+
+if [ -s "$DIR/integrations-oauth-clients.json" ] && [ "$(tr -d '[:space:]' < "$DIR/integrations-oauth-clients.json")" != "{}" ]; then
+  kubectl -n "$NS" create secret generic sytue-integrations-platform-oauth \
+    --from-file=clients.json="$DIR/integrations-oauth-clients.json" \
+    --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+  echo "✓ sytue-integrations-platform-oauth: apps OAuth de plataforma aplicadas."
+else
+  echo "· Sin apps OAuth de plataforma: las organizaciones usarán su propia app (BYO)."
+fi
+
+# Los Secrets montados como variables no se releen solos: se reinicia lo que los usa.
+for d in sytue-one-id sytue-one-integrations sytue-one-drive; do
+  if kubectl -n "$NS" get deployment "$d" >/dev/null 2>&1; then
+    kubectl -n "$NS" rollout restart deployment "$d" >/dev/null
+    echo "↻ $d reiniciado."
+  fi
+done
+EOF
+  chmod 700 "$INTEG_APPLY"
+}
+
+asistente_integraciones() {
+  if [ "$MODE" = "compose" ]; then
+    warn "El Sytue Integration Gateway todavía no forma parte del despliegue con Docker Compose."
+    info "Los conectores con terceros (Google, Microsoft, Slack, Zoom…) necesitan el modo Kubernetes/Helm."
+    info "Sytue AI, que es el único proveedor externo del perfil Compose, se configura en el paso anterior."
+    return 0
+  fi
+
+  local redirect="https://integrations.${DOMAIN}/api/v1/oauth/callback"
+  local admin_apps="https://admin.${DOMAIN}/admin/apps"
+  echo "  Las integraciones se activan en tres niveles:"
+  echo "    1) Base del gateway — se genera sola: KEK de cifrado, cliente 'sytue-gateway' en Sytue ID"
+  echo "       y secreto interno con Drive. Nunca se rota al volver a aplicar."
+  echo "    2) Apps OAuth de plataforma — opcional, por proveedor. Con ellas cada organización"
+  echo "       conecta con un clic; sin ellas, cada una registra su propia app (BYO)."
+  echo "    3) Conectores SAML, OIDC, IMAP/POP3 y por token — los da de alta cada organización"
+  printf "       desde ${BOLD}%s${RESET}, sin tocar el despliegue.\n" "$admin_apps"
+  printf "\n  URI de redirección para TODOS los proveedores: ${BOLD}%s${RESET}\n" "$redirect"
+
+  cargar_oauth
+  if [ "$NON_INTERACTIVE" -eq 0 ]; then
+    local linea
+    for linea in "${PROVEEDORES_OAUTH[@]}"; do
+      configurar_proveedor "$linea" "$redirect"
+    done
+    echo ""
+    if prompt_yes_no "¿Vas a recibir mensajes de WhatsApp Business (webhook de verificación)?" "n"; then
+      INTEG_WHATSAPP=1
+    fi
+    if prompt_yes_no "¿Habilitar la API de operador del gateway (gestionar apps OAuth y plantillas sin reiniciar)?" "n"; then
+      INTEG_OPERADOR=1
+    fi
+  elif [ "${#OAUTH_ID[@]}" -gt 0 ]; then
+    info "Se conservan ${#OAUTH_ID[@]} apps OAuth de ${INTEG_TSV#"${ROOT_DIR}"/}."
+  fi
+
+  guardar_oauth
+  escribir_integraciones
+  ok "Apps OAuth de plataforma: ${BOLD}${#OAUTH_ID[@]}${RESET} (guardadas en deploy/helm/integrations-oauth.tsv, permisos 0600)."
+  ok "Generados ${BOLD}deploy/helm/apply-integrations.sh${RESET} y ${BOLD}deploy/helm/values-integrations.yaml${RESET}."
+  if [ "$INTEG_WHATSAPP" -eq 1 ]; then
+    info "Webhook de WhatsApp: ${BOLD}https://integrations.${DOMAIN}/api/v1/whatsapp/webhook${RESET}; el token de verificación queda en el Secret sytue-integrations (clave whatsapp-webhook-verify-token)."
+  fi
+}
+
+# Modo `--integrations`: solo este asistente, sobre un despliegue Helm existente.
+modo_integraciones() {
+  MODE="helm"
+  step "Integraciones y conectores con terceros"
+  local dominio_previo=""
+  if [ -f "${HELM_DIR}/values-custom.yaml" ]; then
+    dominio_previo="$(sed -n 's/^  baseDomain: "\(.*\)"$/\1/p' "${HELM_DIR}/values-custom.yaml" | head -1)"
+  fi
+  [ -n "$DOMAIN" ] || prompt_default "Dominio raíz del despliegue" "${dominio_previo:-suite.ejemplo.eu}" DOMAIN
+  prompt_default "Namespace de Kubernetes" "$K8S_NAMESPACE" K8S_NAMESPACE
+  asistente_integraciones
+
+  local helm_cmd="helm upgrade --install sytue-one deploy/helm/sytue-one -n ${K8S_NAMESPACE} -f deploy/helm/sytue-one/values.yaml"
+  [ -f "${HELM_DIR}/values-custom.yaml" ] && helm_cmd="${helm_cmd} -f deploy/helm/values-custom.yaml"
+  helm_cmd="${helm_cmd} -f deploy/helm/values-integrations.yaml"
+  if [ "$ONLY_CONFIG" -eq 0 ] && check_cmd kubectl && check_cmd helm &&
+    prompt_yes_no "¿Aplicar ahora los Secrets de integraciones y actualizar el despliegue?" "n"; then
+    bash "$INTEG_APPLY"
+    # shellcheck disable=SC2086 # helm_cmd se compone arriba con rutas sin espacios.
+    (cd "$ROOT_DIR" && $helm_cmd)
+    ok "Integraciones activadas. Entra en ${BOLD}https://admin.${DOMAIN}/admin/apps${RESET} y pulsa «Conectar»."
+  else
+    echo ""
+    info "Para activarlas en tu clúster:"
+    printf "    ${BOLD}1) bash deploy/helm/apply-integrations.sh${RESET}\n"
+    printf "    ${BOLD}2) %s${RESET}\n" "$helm_cmd"
+    printf "    ${BOLD}3) https://admin.%s/admin/apps${RESET} → «Conectar» en cada aplicación\n" "$DOMAIN"
+  fi
+  exit 0
+}
+
 # Cabecera
 printf "${BOLD}${CYAN}"
 cat <<'BANNER'
@@ -176,10 +481,14 @@ if ! check_cmd openssl; then
   exit 1
 fi
 
+if [ "$INTEGRATIONS_ONLY" -eq 1 ]; then
+  modo_integraciones
+fi
+
 # ---------------------------------------------------------------------------
 # PASO 1: Modo de despliegue
 # ---------------------------------------------------------------------------
-step "Paso 1 de 5 · Modo de despliegue"
+step "Paso 1 de 6 · Modo de despliegue"
 if [ -z "$MODE" ]; then
   if [ "$NON_INTERACTIVE" -eq 1 ]; then
     MODE="compose"
@@ -201,7 +510,7 @@ ok "Modo seleccionado: ${BOLD}${MODE}${RESET}"
 # ---------------------------------------------------------------------------
 # PASO 2: Perfil de servicios / Dominio e infraestructura
 # ---------------------------------------------------------------------------
-step "Paso 2 de 5 · Topología y servicios"
+step "Paso 2 de 6 · Topología y servicios"
 if [ "$MODE" = "compose" ]; then
   if [ -z "$DOMAIN" ]; then
     prompt_default "Dominio base del entorno" "sytue.localhost" DOMAIN
@@ -261,7 +570,7 @@ fi
 # ---------------------------------------------------------------------------
 # PASO 3: Organización y cuenta administradora inicial
 # ---------------------------------------------------------------------------
-step "Paso 3 de 5 · Organización y administrador inicial"
+step "Paso 3 de 6 · Organización y administrador inicial"
 if [ -z "$ORG_SLUG" ]; then
   prompt_default "Slug de la organización inicial (minúsculas, sin espacios)" "acme" ORG_SLUG
 fi
@@ -290,9 +599,23 @@ if [ "$NON_INTERACTIVE" -eq 0 ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# PASO 4: Generación criptográfica de secretos y ficheros de configuración
+# PASO 4: Integraciones y conectores con terceros
 # ---------------------------------------------------------------------------
-step "Paso 4 de 5 · Generación de secretos criptográficos"
+step "Paso 4 de 6 · Integraciones y conectores con terceros"
+if [ "$MODE" = "helm" ] && [ "$NON_INTERACTIVE" -eq 0 ] &&
+  ! prompt_yes_no "¿Registrar ahora apps OAuth de proveedores (Google, Microsoft, Slack, Zoom…)?" "n"; then
+  # La base del gateway se genera igualmente: sin ella el pod de integraciones
+  # no arranca. Las apps OAuth se pueden añadir después con --integrations.
+  NON_INTERACTIVE=1 asistente_integraciones
+  info "Puedes registrar apps OAuth más adelante con ${BOLD}./sytue-deploy --integrations${RESET}."
+else
+  asistente_integraciones
+fi
+
+# ---------------------------------------------------------------------------
+# PASO 5: Generación criptográfica de secretos y ficheros de configuración
+# ---------------------------------------------------------------------------
+step "Paso 5 de 6 · Generación de secretos criptográficos"
 info "Generando contraseñas únicas por servicio (17 bases de datos PostgreSQL), claves AES-256-GCM y secretos OIDC/HMAC..."
 
 PG_SUPER_PASS="$(rand_hex 24)"
@@ -609,7 +932,7 @@ fi
 # ---------------------------------------------------------------------------
 # PASO 5: Verificación de prerrequisitos y arranque opcional
 # ---------------------------------------------------------------------------
-step "Paso 5 de 5 · Puesta en marcha"
+step "Paso 6 de 6 · Puesta en marcha"
 if [ "$MODE" = "compose" ]; then
   if ! check_cmd docker; then
     warn "Docker no está instalado o no se encuentra en PATH."
@@ -648,6 +971,7 @@ else
   if check_cmd kubectl && check_cmd helm; then
     if prompt_yes_no "¿Deseas aplicar los Secrets en Kubernetes y desplegar el chart de Helm ahora?" "n"; then
       bash "${HELM_DIR}/apply-secrets.sh"
+      bash "${HELM_DIR}/apply-integrations.sh"
       bash "${ROOT_DIR}/scripts/prepare-helm-vendor.sh"
       HELM_REPOSITORY_CONFIG="${HELM_DIR}/.vendor/no-repositories.yaml" \
       HELM_REPOSITORY_CACHE="${HELM_DIR}/.vendor/repository-cache" \
@@ -655,18 +979,19 @@ else
       helm upgrade --install sytue-one "${HELM_DIR}/sytue-one" \
         --namespace "${K8S_NAMESPACE}" --create-namespace \
         -f "${HELM_DIR}/sytue-one/values.yaml" \
-        -f "${HELM_DIR}/values-custom.yaml"
+        -f "${HELM_DIR}/values-custom.yaml" \
+        -f "${HELM_DIR}/values-integrations.yaml"
       ok "Release 'sytue-one' desplegada en el namespace '${K8S_NAMESPACE}'."
     else
       echo ""
       info "Cuando tengas tu clúster listo, ejecuta:"
-      printf "    ${BOLD}bash deploy/helm/apply-secrets.sh${RESET}\n"
-      printf "    ${BOLD}helm upgrade --install sytue-one deploy/helm/sytue-one -n %s --create-namespace -f deploy/helm/sytue-one/values.yaml -f deploy/helm/values-custom.yaml${RESET}\n" "$K8S_NAMESPACE"
+      printf "    ${BOLD}bash deploy/helm/apply-secrets.sh && bash deploy/helm/apply-integrations.sh${RESET}\n"
+      printf "    ${BOLD}helm upgrade --install sytue-one deploy/helm/sytue-one -n %s --create-namespace -f deploy/helm/sytue-one/values.yaml -f deploy/helm/values-custom.yaml -f deploy/helm/values-integrations.yaml${RESET}\n" "$K8S_NAMESPACE"
     fi
   else
     echo ""
     info "Para aplicar la configuración en tu clúster Kubernetes (con kubectl y helm instalados):"
-    printf "    ${BOLD}1) bash deploy/helm/apply-secrets.sh${RESET}\n"
-    printf "    ${BOLD}2) helm upgrade --install sytue-one deploy/helm/sytue-one -n %s --create-namespace -f deploy/helm/sytue-one/values.yaml -f deploy/helm/values-custom.yaml${RESET}\n" "$K8S_NAMESPACE"
+    printf "    ${BOLD}1) bash deploy/helm/apply-secrets.sh && bash deploy/helm/apply-integrations.sh${RESET}\n"
+    printf "    ${BOLD}2) helm upgrade --install sytue-one deploy/helm/sytue-one -n %s --create-namespace -f deploy/helm/sytue-one/values.yaml -f deploy/helm/values-custom.yaml -f deploy/helm/values-integrations.yaml${RESET}\n" "$K8S_NAMESPACE"
   fi
 fi

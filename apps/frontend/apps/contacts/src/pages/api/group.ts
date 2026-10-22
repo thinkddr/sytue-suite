@@ -42,8 +42,11 @@ export const POST: APIRoute = async (ctx) => {
     return json(group);
   } catch (err) {
     if (err instanceof RestError)
-      return json({ error: 'contacts_error', message: err.message }, err.status);
-    return json({ error: 'contacts_error', message: String(err) }, 502);
+      return json(
+        { error: 'contacts_error', message: 'Contacts service request failed' },
+        err.status,
+      );
+    return json({ error: 'contacts_error', message: 'Contacts service request failed' }, 502);
   }
 };
 

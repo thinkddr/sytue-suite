@@ -10,13 +10,8 @@
 
 /** Texto plano de un trozo de HTML sin ejecutar nada: sin DOM, con un recorte de etiquetas. */
 export function textoPlano(html: string): string {
-  let texto = html;
-  let anterior: string;
-  do {
-    anterior = texto;
-    texto = texto.replace(/<(script|style)\b[\s\S]*?<\/\1\s*>/gi, '');
-  } while (texto !== anterior);
-  return texto
+  let texto = removeScripts(html);
+  texto = texto
     .replace(/<\s*(br|\/p|\/div|\/h[1-6]|\/li|\/tr)\b[^>]*>/gi, '\n')
     .replace(/<[^>]*>/g, '')
     .replace(/&nbsp;/g, ' ')
@@ -24,9 +19,20 @@ export function textoPlano(html: string): string {
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
-    .replace(/&amp;/g, '&')
+    .replace(/&amp;/g, '&');
+  return removeScripts(texto)
     .replace(/\n{3,}/g, '\n\n')
     .trim();
+}
+
+function removeScripts(input: string): string {
+  let texto = input;
+  let anterior: string;
+  do {
+    anterior = texto;
+    texto = texto.replace(/<(script|style)\b[\s\S]*?<\/\1\s*>/gi, '');
+  } while (texto !== anterior);
+  return texto;
 }
 
 interface CajaMinima {

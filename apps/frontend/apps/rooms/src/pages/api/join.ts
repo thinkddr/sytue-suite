@@ -29,7 +29,7 @@ export const POST: APIRoute = async (ctx) => {
     }).joinChannel(channelId);
     return json({ channel });
   } catch (err) {
-    return json({ error: 'chat_error', message: String(err) }, 502);
+    return json({ error: 'chat_error' }, 502);
   }
 };
 

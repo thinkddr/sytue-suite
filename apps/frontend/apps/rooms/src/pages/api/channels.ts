@@ -23,7 +23,7 @@ export const GET: APIRoute = async (ctx) => {
     }).listChannels();
     return json({ channels });
   } catch (err) {
-    return json({ error: 'chat_error', message: String(err) }, 502);
+    return json({ error: 'chat_error' }, 502);
   }
 };
 
@@ -57,7 +57,7 @@ export const POST: APIRoute = async (ctx) => {
     if (err instanceof ChatHttpError && err.status >= 400 && err.status < 500) {
       return json({ error: 'chat_error' }, err.status);
     }
-    return json({ error: 'chat_error', message: String(err) }, 502);
+    return json({ error: 'chat_error' }, 502);
   }
 };
 

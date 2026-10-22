@@ -35,7 +35,7 @@ export const POST: APIRoute = async (ctx) => {
     const votes = await client.voteCard(messageId, value, payload.add !== false);
     return json({ votes });
   } catch (err) {
-    return json({ error: 'chat_error', message: String(err) }, 502);
+    return json({ error: 'chat_error' }, 502);
   }
 };
 

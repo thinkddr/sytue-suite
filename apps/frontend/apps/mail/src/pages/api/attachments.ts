@@ -30,7 +30,7 @@ export const GET: APIRoute = async (ctx) => {
   try {
     attachments = await jmapClient(session.accessToken).getAttachments(emailId);
   } catch (err) {
-    return json({ error: 'jmap_error', message: String(err) }, 502);
+    return json({ error: 'jmap_error', message: 'Mail request failed' }, 502);
   }
 
   // Sin index: metadatos para la lista del lector.

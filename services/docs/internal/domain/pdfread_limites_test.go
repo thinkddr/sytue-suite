@@ -15,6 +15,7 @@ import (
 	"compress/zlib"
 	"errors"
 	"io"
+	"math"
 	"runtime"
 	"strings"
 	"testing"
@@ -35,6 +36,57 @@ func TestLectorNoSeCaeConArraysAnidadosSinFin(t *testing.T) {
 		if d := time.Since(inicio); d > 5*time.Second {
 			t.Errorf("%q anidado: tardó %v", abre, d)
 		}
+	}
+}
+
+func TestIntDesdeInt64RespetaLimitesDeInt(t *testing.T) {
+	for _, v := range []int64{int64(math.MinInt), int64(math.MaxInt)} {
+		got, ok := intDesdeInt64(v)
+		if !ok || int64(got) != v {
+			t.Errorf("intDesdeInt64(%d) = %d, %t", v, got, ok)
+		}
+	}
+	if math.MaxInt < math.MaxInt64 {
+		maxInt, minInt := int64(math.MaxInt), int64(math.MinInt)
+		if _, ok := intDesdeInt64(maxInt + 1); ok {
+			t.Error("se aceptó un valor por encima de MaxInt")
+		}
+		if _, ok := intDesdeInt64(minInt - 1); ok {
+			t.Error("se aceptó un valor por debajo de MinInt")
+		}
+	}
+}
+
+func TestCargarSeccionXrefRechazaOffsetsFueraDelFichero(t *testing.T) {
+	d := &PDFDoc{buf: []byte("%PDF-")}
+	for _, off := range []int64{-1, math.MaxInt64} {
+		if _, err := d.cargarSeccionXref(off); !errors.Is(err, ErrPDFCorrupto) {
+			t.Errorf("offset %d: se esperaba ErrPDFCorrupto, recibido %v", off, err)
+		}
+	}
+}
+
+func TestAnchosDeXrefRechazaValoresInvalidos(t *testing.T) {
+	for _, n := range []int64{-1, 9, math.MaxInt64} {
+		_, err := anchosDeXref(pdfDict{"W": pdfArray{int64(1), n, int64(1)}})
+		if !errors.Is(err, ErrPDFCorrupto) {
+			t.Errorf("ancho %d: se esperaba ErrPDFCorrupto, recibido %v", n, err)
+		}
+	}
+	if got, err := anchosDeXref(pdfDict{"W": pdfArray{int64(1), int64(2), int64(1)}}); err != nil || got != [3]int{1, 2, 1} {
+		t.Errorf("anchosDeXref válidos = %v, %v", got, err)
+	}
+}
+
+func TestImagenDentroDelLimiteNoDesbordaElProducto(t *testing.T) {
+	if imagenDentroDelLimite(maxPixelesImagen/2+1, 2) {
+		t.Error("se aceptó una imagen que supera el límite")
+	}
+	if !imagenDentroDelLimite(maxPixelesImagen/2, 2) {
+		t.Error("se rechazó una imagen justo dentro del límite")
+	}
+	if imagenDentroDelLimite(math.MaxInt, 2) {
+		t.Error("se aceptó una dimensión cuyo producto desborda")
 	}
 }
 

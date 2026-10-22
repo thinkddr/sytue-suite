@@ -545,7 +545,7 @@ func (l *lienzo) runasDeLaTrueType(desc pdfDict) map[uint16]rune {
 // consecutivas desde el primer código.
 func (l *lienzo) anchosSimples(fd pdfDict, f *fuentePDF) {
 	primero := 0
-	if v, ok := comoEntero(l.d.resolver(fd["FirstChar"])); ok {
+	if v, ok := comoEntero(l.d.resolver(fd["FirstChar"])); ok && v >= 0 && v <= 255 {
 		primero = int(v)
 	}
 	arr, _ := l.d.resolver(fd["Widths"]).(pdfArray)
@@ -560,6 +560,9 @@ func (l *lienzo) anchosSimples(fd pdfDict, f *fuentePDF) {
 		}
 	}
 	for i, w := range arr {
+		if primero+i > 255 {
+			break
+		}
 		f.anchos[uint32(primero+i)] = comoReal(l.d.resolver(w)) * escala
 	}
 	if desc, ok := l.d.resolver(fd["FontDescriptor"]).(pdfDict); ok {
@@ -703,9 +706,17 @@ func (l *lienzo) codificacionSimple(fd pdfDict, base string, sub pdfName) map[by
 	for _, e := range difs {
 		switch x := l.d.resolver(e).(type) {
 		case int64:
-			codigo = int(x)
+			if x < 0 || x > 255 {
+				codigo = -1
+			} else {
+				codigo = int(x)
+			}
 		case float64:
-			codigo = int(x)
+			if x < 0 || x > 255 {
+				codigo = -1
+			} else {
+				codigo = int(x)
+			}
 		case pdfName:
 			if codigo >= 0 && codigo < 256 {
 				if t, ok := textoDeNombreGlifo(string(x)); ok {

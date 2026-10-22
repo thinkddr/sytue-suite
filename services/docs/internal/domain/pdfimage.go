@@ -36,12 +36,17 @@ import (
 	"image/color"
 	"image/jpeg"
 	"image/png"
+	"math"
 	"strings"
 )
 
 // maxPixelesImagen acota lo que se decodifica. Un PDF puede declarar una imagen
 // de 60000×60000 en pocos bytes; sin tope, decodificarla se come la memoria.
 const maxPixelesImagen = 40 << 20
+
+func imagenDentroDelLimite(ancho, alto int) bool {
+	return ancho > 0 && alto > 0 && ancho <= maxPixelesImagen/alto
+}
 
 // dibujarImagen pinta un XObject de imagen en el cuadrado unidad del espacio de
 // usuario, que es donde la especificación dice que va (§8.9.5.2).
@@ -252,9 +257,12 @@ func desdeCSS(css string) (byte, byte, byte) {
 }
 
 func (l *lienzo) tamanoImagen(dict pdfDict) (int, int) {
-	ancho, _ := comoEntero(l.d.resolver(primeroDe(dict, "Width", "W")))
-	alto, _ := comoEntero(l.d.resolver(primeroDe(dict, "Height", "H")))
-	return int(ancho), int(alto)
+	ancho, okAncho := comoInt(l.d.resolver(primeroDe(dict, "Width", "W")))
+	alto, okAlto := comoInt(l.d.resolver(primeroDe(dict, "Height", "H")))
+	if !okAncho || !okAlto {
+		return 0, 0
+	}
+	return ancho, alto
 }
 
 // primeroDe devuelve la primera clave presente. Las imágenes en línea usan
@@ -351,12 +359,16 @@ func (l *lienzo) streamComoBitonal(st *pdfStream) *pdfStream {
 // muestrasComoPNG interpreta las muestras crudas y las reempaqueta en PNG.
 func (l *lienzo) muestrasComoPNG(st *pdfStream, datos []byte, recursos pdfDict) (string, bool) {
 	ancho, alto := l.tamanoImagen(st.Dict)
-	if ancho <= 0 || alto <= 0 || ancho*alto > maxPixelesImagen {
+	if !imagenDentroDelLimite(ancho, alto) {
 		return "", false
 	}
 	bpc := 8
 	if v, ok := comoEntero(l.d.resolver(primeroDe(st.Dict, "BitsPerComponent", "BPC"))); ok {
-		bpc = int(v)
+		var representable bool
+		bpc, representable = intDesdeInt64(v)
+		if !representable {
+			return "", false
+		}
 	}
 	ec := l.espacioDeImagen(st.Dict, recursos)
 	nc := ec.componentes()
@@ -364,6 +376,9 @@ func (l *lienzo) muestrasComoPNG(st *pdfStream, datos []byte, recursos pdfDict) 
 		nc = 1
 	}
 	if nc <= 0 || bpc <= 0 || bpc > 16 {
+		return "", false
+	}
+	if ancho > math.MaxInt/(nc*bpc) {
 		return "", false
 	}
 	decode := l.reales(primeroDe(st.Dict, "Decode", "D"))
@@ -506,7 +521,7 @@ func (l *lienzo) canalAlfa(st *pdfStream, recursos pdfDict) *mascaraAlfa {
 
 func (l *lienzo) mascaraDeGris(sm *pdfStream) *mascaraAlfa {
 	ancho, alto := l.tamanoImagen(sm.Dict)
-	if ancho <= 0 || alto <= 0 || ancho*alto > maxPixelesImagen {
+	if !imagenDentroDelLimite(ancho, alto) {
 		return nil
 	}
 	datos, ok := l.muestrasDe(sm)
@@ -515,7 +530,14 @@ func (l *lienzo) mascaraDeGris(sm *pdfStream) *mascaraAlfa {
 	}
 	bpc := 8
 	if v, ok := comoEntero(l.d.resolver(sm.Dict["BitsPerComponent"])); ok {
-		bpc = int(v)
+		var representable bool
+		bpc, representable = intDesdeInt64(v)
+		if !representable {
+			return nil
+		}
+	}
+	if bpc <= 0 || bpc > 16 {
+		return nil
 	}
 	dec := l.reales(sm.Dict["Decode"])
 	maxVal := float64(int(1)<<uint(bpc) - 1)

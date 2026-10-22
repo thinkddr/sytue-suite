@@ -39,7 +39,7 @@ export const GET: APIRoute = async (ctx) => {
     if (!res.ok) return json({ error: 'hub_error', status: res.status }, 502);
     return json(await res.json());
   } catch (err) {
-    return json({ error: 'hub_error', message: String(err) }, 502);
+    return json({ error: 'hub_error' }, 502);
   }
 };
 
@@ -67,7 +67,7 @@ export const PUT: APIRoute = async (ctx) => {
     if (!res.ok) return json({ error: 'hub_error', status: res.status }, 502);
     return json(await res.json());
   } catch (err) {
-    return json({ error: 'hub_error', message: String(err) }, 502);
+    return json({ error: 'hub_error' }, 502);
   }
 };
 

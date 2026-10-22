@@ -25,7 +25,7 @@ export const GET: APIRoute = async (ctx) => {
     }).listThreads(opts);
     return json(data);
   } catch (err) {
-    return json({ error: 'chat_error', message: String(err) }, 502);
+    return json({ error: 'chat_error' }, 502);
   }
 };
 

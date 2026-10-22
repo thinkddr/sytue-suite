@@ -74,7 +74,10 @@ export interface BffOptions {
 function normalizeBase(base: string | undefined): string {
   const b = (base ?? '/').trim();
   if (b === '' || b === '/') return '';
-  return (b.startsWith('/') ? b : `/${b}`).replace(/\/+$/, '');
+  const prefixed = b.startsWith('/') ? b : `/${b}`;
+  let end = prefixed.length;
+  while (end > 0 && prefixed.charCodeAt(end - 1) === 47) end--;
+  return prefixed.slice(0, end);
 }
 
 interface OidcState {

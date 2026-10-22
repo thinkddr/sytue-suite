@@ -53,6 +53,11 @@ test('terminos quita la sintaxis de la búsqueda', () => {
   expect(terminos('acta "reunión" -borrador or  cafe')).toEqual(['acta', 'reunión', 'cafe']);
 });
 
+test('terminos quita comillas de consultas largas', () => {
+  const palabra = 'x'.repeat(100_000);
+  expect(terminos(`"${palabra}"`)).toEqual([palabra]);
+});
+
 test('rangosDeConsulta ordena y funde los de cada término', () => {
   // Los mismos que TestRangosDeConsultaFundeYOrdena de apps/nucleo/buscar.
   expect(rangosDeConsulta('Café y reunión del café', 'reunion cafe caf')).toEqual([

@@ -57,7 +57,9 @@ function json(body: unknown, status = 200): Response {
  * la URL completa, y romperlas al actualizar sería cambiar un fallo por otro.
  */
 export function endpointAsistencia(base: string): string {
-  const limpia = base.replace(/\/+$/, '');
+  let fin = base.length;
+  while (fin > 0 && base.charCodeAt(fin - 1) === 47) fin--;
+  const limpia = base.slice(0, fin);
   return limpia.endsWith('/api/v1/assist') ? limpia : `${limpia}/api/v1/assist`;
 }
 

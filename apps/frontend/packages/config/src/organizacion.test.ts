@@ -76,6 +76,7 @@ describe('rutaConOrg', () => {
     expect(rutaConOrg('/rooms', 'acme', '/edit?id=1')).toBe('/rooms/acme/edit?id=1');
     expect(rutaConOrg('/rooms', null, '/channels/x')).toBe('/rooms/channels/x');
     expect(rutaConOrg('/rooms', undefined, '/edit')).toBe('/rooms/edit');
+    expect(rutaConOrg('/rooms////', 'acme', '/channels/x')).toBe('/rooms/acme/channels/x');
   });
 });
 

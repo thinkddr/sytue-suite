@@ -23,8 +23,14 @@
  * El script publica además `window.__sytueBase`, que es lo que hace que `withBase`
  * acierte cuando el prefijo del HOST no es el del build: ver su comentario.
  */
+function stripTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value.charCodeAt(end - 1) === 47) end--;
+  return value.slice(0, end);
+}
+
 export function basePathScript(base: string): string {
-  const b = (base || '/').replace(/\/+$/, '');
+  const b = stripTrailingSlashes(base || '/');
   // El valor se publica SIEMPRE, también cuando está vacío: es justo el caso de
   // `platform.<dominio>` —servido en la raíz— y sin publicarlo `withBase` caería
   // al `/admin` del build. Que la cadena vacía sea significativa es la razón de
@@ -60,7 +66,7 @@ export function basePathScript(base: string): string {
  * `/one/`, que es exactamente lo que esta app debe controlar.
  */
 export function swRegisterScript(base: string): string {
-  const b = (base || '/').replace(/\/+$/, '');
+  const b = stripTrailingSlashes(base || '/');
   const url = JSON.stringify(`${b}/sw.js`);
   return (
     `if('serviceWorker' in navigator){window.addEventListener('load',function(){` +
@@ -105,7 +111,7 @@ export function withBase(base: string, path: string): string {
   // valor que el servidor conoce (`SYTUE_BASE_PATH`).
   const delHost =
     typeof window !== 'undefined' ? (window as { __sytueBase?: string }).__sytueBase : undefined;
-  const b = (delHost ?? base ?? '/').replace(/\/+$/, '');
+  const b = stripTrailingSlashes(delHost ?? base ?? '/');
   if (!b || !path.startsWith('/')) return path;
   return path === b || path.startsWith(`${b}/`) ? path : `${b}${path}`;
 }

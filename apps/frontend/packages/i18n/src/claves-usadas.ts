@@ -40,7 +40,34 @@ export function codigoDe(raiz: string): string {
 
 /** Cada `t(\`…${…}…\`)` del código, tal cual está escrito, sin repetir y ordenado. */
 export function plantillasDinamicas(codigo: string): string[] {
-  const vistas = [...codigo.matchAll(/\bt\(\s*`([^`]*\$\{[^`]*)`/g)].map((m) => m[1] ?? '');
+  const vistas: string[] = [];
+  let desde = 0;
+  while (desde < codigo.length) {
+    const llamada = codigo.indexOf('t(', desde);
+    if (llamada < 0) break;
+    desde = llamada + 2;
+    const previo = llamada > 0 ? codigo.charCodeAt(llamada - 1) : 0;
+    if (
+      (previo >= 48 && previo <= 57) ||
+      (previo >= 65 && previo <= 90) ||
+      (previo >= 97 && previo <= 122) ||
+      previo === 95
+    ) {
+      continue;
+    }
+
+    let apertura = llamada + 2;
+    while (apertura < codigo.length && /\s/.test(codigo[apertura]!)) apertura++;
+    if (codigo[apertura] !== '`') continue;
+    const cierre = codigo.indexOf('`', apertura + 1);
+    if (cierre < 0) {
+      desde = apertura + 1;
+      continue;
+    }
+    const plantilla = codigo.slice(apertura + 1, cierre);
+    if (plantilla.includes('${')) vistas.push(plantilla);
+    desde = cierre + 1;
+  }
   return [...new Set(vistas)].sort((a, b) => a.localeCompare(b));
 }
 

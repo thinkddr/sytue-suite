@@ -13,11 +13,23 @@ test('parseSearchQuery: texto libre sin operadores', () => {
   expect(parseSearchQuery('factura pendiente')).toEqual({ text: 'factura pendiente' });
 });
 
+test('parseSearchQuery: procesa valores largos sin perder el operador', () => {
+  const valor = '0'.repeat(100_000);
+  expect(parseSearchQuery(`from:${valor}`).from).toBe(valor);
+});
+
 test('parseSearchQuery: from: y subject: con valor entre comillas', () => {
   const t = parseSearchQuery('from:ada subject:"pago pendiente" urgente');
   expect(t.from).toBe('ada');
   expect(t.subject).toBe('pago pendiente');
   expect(t.text).toBe('urgente');
+});
+
+test('parseSearchQuery: una comilla sin cerrar conserva el valor no entrecomillado', () => {
+  expect(parseSearchQuery('from:"sin cerrar')).toEqual({
+    from: '"sin',
+    text: 'cerrar',
+  });
 });
 
 test('parseSearchQuery: has:attachment e is:unread', () => {

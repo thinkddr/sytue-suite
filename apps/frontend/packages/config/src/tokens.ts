@@ -6,6 +6,7 @@
  */
 import colors from './tokens/colors.json';
 import spacing from './tokens/spacing.json';
+import { stripTrailingSlashes } from './path.js';
 
 type Scale<T> = {
   readonly [
@@ -270,7 +271,7 @@ export function appUrl(key: ProductKey, path = '', org?: string | null): string 
  * ya estuvo dentro. Se pide siempre para que nadie la olvide al componer un enlace.
  */
 export function enlaceReunion(id: string, clave: string, host: string = appDomains.rooms): string {
-  const base = `${host.replace(/\/+$/, '')}/?rooms=${encodeURIComponent(id)}`;
+  const base = `${stripTrailingSlashes(host)}/?rooms=${encodeURIComponent(id)}`;
   return clave ? `${base}&clave=${encodeURIComponent(clave)}` : base;
 }
 

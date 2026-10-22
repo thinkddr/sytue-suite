@@ -79,18 +79,16 @@ function requireOnline(): void {
 }
 
 /** Recuento de palabras del blueprint (solo kind document; resto 0). */
-function countWords(html: string, kind: DocKind): number {
+export function countWords(html: string, kind: DocKind): number {
   if (kind !== 'document') return 0;
-  return (
-    html
-      // Datos embebidos (p. ej. el origen de combinación en <script type=json>) no
-      // son texto del documento: su contenido no cuenta como palabras.
-      .replace(/<script[\s\S]*?<\/script>/gi, ' ')
-      .replace(/<[^>]+>/g, ' ')
-      .trim()
-      .split(/\s+/)
-      .filter(Boolean).length
-  );
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  // Datos embebidos (p. ej. el origen de combinación en <script type=json>) no
+  // son texto del documento: su contenido no cuenta como palabras.
+  doc.querySelectorAll('script').forEach((script) => script.remove());
+  const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT);
+  const texto: string[] = [];
+  while (walker.nextNode()) texto.push(walker.currentNode.textContent ?? '');
+  return texto.join(' ').trim().split(/\s+/).filter(Boolean).length;
 }
 
 /** El registro de contenido del estado del servidor, como lo usa CoedicionModelo. */

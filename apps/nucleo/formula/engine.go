@@ -834,14 +834,43 @@ func (e *Engine) rangeToRefRange(n *nodo, defSheet string) RefRange {
 // millones de filas. Los rangos de eje entero ya se acotan a lo usado.
 const maxCeldasRango = 4_000_000
 
+func dimensionRango(inicio, fin, tope int) (int, bool) {
+	if tope <= 0 || fin < inicio {
+		return 0, false
+	}
+	delta := uint64(fin) - uint64(inicio)
+	if delta >= uint64(tope) {
+		return 0, false
+	}
+	return int(delta + 1), true
+}
+
+func dimensionesRango(rr RefRange, tope int) (filas, cols int, ok bool) {
+	filas, ok = dimensionRango(rr.R1, rr.R2, tope)
+	if !ok {
+		return 0, 0, false
+	}
+	cols, ok = dimensionRango(rr.C1, rr.C2, tope)
+	if !ok || filas > tope/cols {
+		return 0, 0, false
+	}
+	return filas, cols, true
+}
+
 func (e *Engine) resolveRange(rr RefRange) Matrix {
-	if filas, cols := int64(rr.R2)-int64(rr.R1)+1, int64(rr.C2)-int64(rr.C1)+1; filas > 0 && cols > 0 && filas*cols > maxCeldasRango {
+	if rr.R2 < rr.R1 || rr.C2 < rr.C1 {
+		return Matrix{}
+	}
+	filas, cols, ok := dimensionesRango(rr, maxCeldasRango)
+	if !ok {
 		return Matrix{{ErrRef}}
 	}
-	out := make(Matrix, 0, max(0, rr.R2-rr.R1+1))
-	for r := rr.R1; r <= rr.R2; r++ {
-		fila := make([]Value, 0, max(0, rr.C2-rr.C1+1))
-		for c := rr.C1; c <= rr.C2; c++ {
+	out := make(Matrix, 0, filas)
+	for ri := 0; ri < filas; ri++ {
+		r := rr.R1 + ri
+		fila := make([]Value, 0, cols)
+		for ci := 0; ci < cols; ci++ {
+			c := rr.C1 + ci
 			fila = append(fila, e.evalCell(rr.Sheet, c, r))
 		}
 		out = append(out, fila)
@@ -850,14 +879,20 @@ func (e *Engine) resolveRange(rr RefRange) Matrix {
 }
 
 func clavesDe(rr RefRange) []clave {
-	if (rr.C2-rr.C1+1)*(rr.R2-rr.R1+1) > topeDeps {
+	if rr.R2 < rr.R1 || rr.C2 < rr.C1 {
+		return nil
+	}
+	filas, cols, ok := dimensionesRango(rr, topeDeps)
+	if !ok {
 		// ponytail: se vigila la hoja entera, no el rectángulo; si importara, un índice de
 		// rectángulos en SetCellAt.
 		return []clave{grandeK(rr.Sheet)}
 	}
-	var out []clave
-	for r := rr.R1; r <= rr.R2; r++ {
-		for c := rr.C1; c <= rr.C2; c++ {
+	out := make([]clave, 0, filas*cols)
+	for ri := 0; ri < filas; ri++ {
+		r := rr.R1 + ri
+		for ci := 0; ci < cols; ci++ {
+			c := rr.C1 + ci
 			out = append(out, celdaK(rr.Sheet, c, r))
 		}
 	}
@@ -1157,7 +1192,7 @@ func (e *Engine) evalLet(n *nodo, env *entorno) any {
 }
 
 func clonar(m map[string]Matrix) map[string]Matrix {
-	out := make(map[string]Matrix, len(m)+2)
+	out := make(map[string]Matrix, len(m))
 	for k, v := range m {
 		out[k] = v
 	}

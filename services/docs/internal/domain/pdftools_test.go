@@ -57,6 +57,18 @@ func jpegDePrueba(t *testing.T, ancho, alto int) []byte {
 	return buf.Bytes()
 }
 
+func TestImagenDeMuestrasRechazaBitsPorComponenteFueraDeRango(t *testing.T) {
+	l := &lienzo{d: &PDFDoc{}}
+	st := &pdfStream{Dict: pdfDict{
+		"Width":  int64(1),
+		"Height": int64(1),
+		"BPC":    int64(1<<32 + 8),
+	}}
+	if _, ok := l.imagenDeMuestras(st, []byte{0}); ok {
+		t.Fatal("se aceptó un valor /BPC fuera de rango")
+	}
+}
+
 // --- Imágenes a PDF ----------------------------------------------------------
 
 func TestImagenesAPDFUnaPaginaPorImagen(t *testing.T) {

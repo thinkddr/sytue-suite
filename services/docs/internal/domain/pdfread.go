@@ -34,6 +34,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"slices"
 	"strconv"
 	"sync"
@@ -256,14 +257,18 @@ func (d *PDFDoc) cargarXref() error {
 // de referencias («/Type /XRef», PDF 1.5+). Devuelve el offset de la anterior
 // (/Prev) o 0 si es la última.
 func (d *PDFDoc) cargarSeccionXref(off int64) (int64, error) {
-	lx := &pdfLexer{buf: d.buf, pos: int(off)}
+	pos, ok := intDesdeInt64(off)
+	if !ok || pos < 0 || pos >= len(d.buf) {
+		return 0, fmt.Errorf("%w: offset xref fuera del fichero", ErrPDFCorrupto)
+	}
+	lx := &pdfLexer{buf: d.buf, pos: pos}
 	lx.saltarEspacios()
 
 	if lx.aceptaPalabra("xref") {
 		return d.cargarTablaClasica(lx)
 	}
 	// Flujo de referencias: «n g obj << ... >> stream».
-	obj, err := d.parsearObjetoIndirectoEn(int(off))
+	obj, err := d.parsearObjetoIndirectoEn(pos)
 	if err != nil {
 		return 0, err
 	}
@@ -392,7 +397,10 @@ func anchosDeXref(dict pdfDict) ([3]int, error) {
 	}
 	var anchos [3]int
 	for i := range anchos {
-		n, _ := comoEntero(arr[i])
+		n, ok := comoEntero(arr[i])
+		if !ok || n < 0 || n > 8 {
+			return [3]int{}, fmt.Errorf("%w: ancho /W inválido", ErrPDFCorrupto)
+		}
 		anchos[i] = int(n)
 	}
 	return anchos, nil
@@ -666,13 +674,13 @@ func (d *PDFDoc) datosDeFlujoHasta(st *pdfStream) (datos []byte, terminal pdfNam
 			predictor, columnas, colores, bpc := d.parametrosPredictor(st, i)
 			// /EarlyChange 0 desplaza el momento de subir de código en uno; es
 			// raro pero existe, y equivocarse desalinea TODO el resto del flujo.
-			temprano := 1
+			temprano := true
 			if parms := d.parmsDeFiltro(st, i); parms != nil {
 				if v, ok := comoEntero(d.resolver(parms["EarlyChange"])); ok {
-					temprano = int(v)
+					temprano = v != 0
 				}
 			}
-			datos = descomprimirLZW(datos, temprano != 0)
+			datos = descomprimirLZW(datos, temprano)
 			datos = aplicarPredictor(datos, predictor, columnas, colores, bpc)
 		case "ASCIIHexDecode", "AHx":
 			datos = decodificarHexASCII(datos)
@@ -733,17 +741,17 @@ func (d *PDFDoc) parametrosPredictor(st *pdfStream, i int) (predictor, columnas,
 	if parms == nil {
 		return predictor, columnas, colores, bpc
 	}
-	if v, ok := comoEntero(d.resolver(parms["Predictor"])); ok {
-		predictor = int(v)
+	if v, ok := comoInt(d.resolver(parms["Predictor"])); ok {
+		predictor = v
 	}
-	if v, ok := comoEntero(d.resolver(parms["Columns"])); ok {
-		columnas = int(v)
+	if v, ok := comoInt(d.resolver(parms["Columns"])); ok {
+		columnas = v
 	}
-	if v, ok := comoEntero(d.resolver(parms["Colors"])); ok {
-		colores = int(v)
+	if v, ok := comoInt(d.resolver(parms["Colors"])); ok {
+		colores = v
 	}
-	if v, ok := comoEntero(d.resolver(parms["BitsPerComponent"])); ok {
-		bpc = int(v)
+	if v, ok := comoInt(d.resolver(parms["BitsPerComponent"])); ok {
+		bpc = v
 	}
 	return predictor, columnas, colores, bpc
 }
@@ -1352,6 +1360,21 @@ func comoEntero(o pdfObj) (int64, bool) {
 		return int64(v), true
 	}
 	return 0, false
+}
+
+func comoInt(o pdfObj) (int, bool) {
+	v, ok := comoEntero(o)
+	if !ok {
+		return 0, false
+	}
+	return intDesdeInt64(v)
+}
+
+func intDesdeInt64(v int64) (int, bool) {
+	if v < math.MinInt || v > math.MaxInt {
+		return 0, false
+	}
+	return int(v), true
 }
 
 // comoReal convierte un número del PDF a float64. Lo que no es un número vale 0:

@@ -121,8 +121,8 @@ func componentesIntencion(d *PDFDoc) int {
 	for _, oi := range ois {
 		od, _ := d.resolver(oi).(pdfDict)
 		if st, ok := d.resolver(od["DestOutputProfile"]).(*pdfStream); ok {
-			if n, ok := comoEntero(d.resolver(st.Dict["N"])); ok {
-				return int(n)
+			if n, ok := comoInt(d.resolver(st.Dict["N"])); ok {
+				return n
 			}
 		}
 	}

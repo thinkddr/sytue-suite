@@ -105,8 +105,8 @@ type parametrosMalla struct {
 func (l *lienzo) parametrosDeMalla(dict pdfDict) (parametrosMalla, bool) {
 	var p parametrosMalla
 	ent := func(clave pdfName) int {
-		v, _ := comoEntero(l.d.resolver(dict[clave]))
-		return int(v)
+		v, _ := comoInt(l.d.resolver(dict[clave]))
+		return v
 	}
 	p.bitsCoord = ent("BitsPerCoordinate")
 	p.bitsComp = ent("BitsPerComponent")
@@ -183,8 +183,11 @@ func (l *lienzo) trianguloDeMalla(st *pdfStream, tipo int) ([]trianguloMalla, bo
 	case 4:
 		return mallaLibre(r, p)
 	case 5:
-		filas, _ := comoEntero(l.d.resolver(st.Dict["VerticesPerRow"]))
-		return mallaEnRejilla(r, p, int(filas))
+		filas, ok := comoInt(l.d.resolver(st.Dict["VerticesPerRow"]))
+		if !ok {
+			return nil, false
+		}
+		return mallaEnRejilla(r, p, filas)
 	}
 	return nil, false
 }

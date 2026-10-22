@@ -27,7 +27,7 @@ const buscar: APIRoute = async (ctx) => {
     }).searchAll(q, 30);
     return json({ messages });
   } catch (err) {
-    return json({ error: 'chat_error', message: String(err) }, 502);
+    return json({ error: 'chat_error' }, 502);
   }
 };
 

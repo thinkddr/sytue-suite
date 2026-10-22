@@ -40,7 +40,7 @@ export const POST: APIRoute = async (ctx) => {
     // El 404 del servicio se propaga TAL CUAL: es la respuesta de «no eres miembro» y
     // convertirlo en 500 haría parecer una avería lo que es una decisión de permisos.
     if (err instanceof HttpError) return json({ error: 'drive_error' }, err.status);
-    return json({ error: 'drive_error', message: String(err) }, 502);
+    return json({ error: 'drive_error' }, 502);
   }
 };
 

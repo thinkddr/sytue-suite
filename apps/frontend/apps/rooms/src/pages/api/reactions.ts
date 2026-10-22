@@ -32,7 +32,7 @@ export const POST: APIRoute = async (ctx) => {
     else await client.addReaction(messageId, emoji);
     return json({ ok: true });
   } catch (err) {
-    return json({ error: 'chat_error', message: String(err) }, 502);
+    return json({ error: 'chat_error' }, 502);
   }
 };
 

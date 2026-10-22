@@ -1470,7 +1470,7 @@ func (lx *pdfLexer) entero() (int64, bool) {
 		lx.pos = inicio
 		return 0, false
 	}
-	v, err := strconv.ParseInt(string(lx.buf[inicio:lx.pos]), 10, 64)
+	v, err := strconv.ParseInt(string(lx.buf[inicio:lx.pos]), 10, 0)
 	if err != nil {
 		return 0, false
 	}
@@ -1572,7 +1572,7 @@ func (lx *pdfLexer) numero() (pdfObj, bool, bool) {
 		}
 		return v, true, true
 	}
-	v, err := strconv.ParseInt(txt, 10, 64)
+	v, err := strconv.ParseInt(txt, 10, 0)
 	if err != nil {
 		return nil, false, false
 	}

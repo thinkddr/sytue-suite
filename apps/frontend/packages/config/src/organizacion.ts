@@ -25,6 +25,8 @@
  * con enlace de otra organización tiene que aterrizar donde está (el canje y las
  * comparticiones lo resuelven, ADR 0040/0052).
  */
+import { stripTrailingSlashes } from './path.js';
+
 /** El formato del slug lo fija platform/pkg/tenancy: `[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?`. */
 export const RE_SLUG_ORG = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
 
@@ -61,7 +63,7 @@ export function partirRuta(ruta: string): { org: string | null; resto: string } 
  * como estaba, que es lo que hacen los llamadores que aún no la conocen.
  */
 export function rutaConOrg(base: string, org: string | null | undefined, ruta: string): string {
-  const b = base.replace(/\/+$/, '');
+  const b = stripTrailingSlashes(base);
   const limpia = ruta.startsWith('/') ? ruta : `/${ruta}`;
   if (!org) return `${b}${limpia}`;
   return `${b}/${org}${limpia}`;
@@ -128,7 +130,7 @@ export function canonicaConOrg(
   if (!tenant) return null;
   const marca = url.searchParams.get(MARCA_ORG);
   if (marca && RE_SLUG_ORG.test(marca)) return null;
-  const b = base.replace(/\/+$/, '');
+  const b = stripTrailingSlashes(base);
   if (!url.pathname.startsWith(`${b}/`)) return null;
   const resto = url.pathname.slice(b.length) || '/';
   return rutaConOrg(base, tenant, resto + url.search);
@@ -155,7 +157,7 @@ export function orgActual(base: string): string | null {
   const marca = new URLSearchParams(window.location.search).get(MARCA_ORG);
   if (marca && RE_SLUG_ORG.test(marca)) return marca;
   const ruta = window.location.pathname;
-  const b = base.replace(/\/+$/, '');
+  const b = stripTrailingSlashes(base);
   if (!ruta.startsWith(`${b}/`)) return null;
   return orgDeRuta(ruta.slice(b.length).replace(/^\/+/, ''));
 }
@@ -173,7 +175,7 @@ export function orgActual(base: string): string | null {
  */
 export function returnToCanonico(url: URL, base: string): string {
   const org = url.searchParams.get(MARCA_ORG);
-  const b = base.replace(/\/+$/, '');
+  const b = stripTrailingSlashes(base);
   // La consola de plataforma se sirve en la RAÍZ (SYTUE_BASE_PATH vacío) y NUNCA
   // lleva org: con `b === ''` el `startsWith('/')` de abajo daría «de la app»
   // para cualquier URL y una marca artesanal compondría `/org/...` — un 404 tras

@@ -214,18 +214,49 @@ export interface SearchTokens {
 export function parseSearchQuery(q: string): SearchTokens {
   const out: SearchTokens = { text: '' };
   const free: string[] = [];
-  // key:"valor con espacios" | key:valor | "texto libre" | palabra.
-  const re = /(\w+):(?:"([^"]*)"|(\S+))|"([^"]*)"|(\S+)/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(q)) !== null) {
-    const key = m[1]?.toLowerCase();
-    const opVal = m[2] ?? m[3];
-    const plain = m[4] ?? m[5];
-    if (key !== undefined && opVal !== undefined) {
-      applySearchOp(out, free, key, opVal);
-    } else if (plain !== undefined) {
-      free.push(plain);
+  let i = 0;
+  while (i < q.length) {
+    while (i < q.length && /\s/.test(q[i]!)) i++;
+    if (i === q.length) break;
+
+    const inicio = i;
+    let finClave = i;
+    while (
+      (q.charCodeAt(finClave) >= 48 && q.charCodeAt(finClave) <= 57) ||
+      (q.charCodeAt(finClave) >= 65 && q.charCodeAt(finClave) <= 90) ||
+      (q.charCodeAt(finClave) >= 97 && q.charCodeAt(finClave) <= 122) ||
+      q.charCodeAt(finClave) === 95
+    ) {
+      finClave++;
     }
+    const clave =
+      finClave > inicio && q[finClave] === ':'
+        ? q.slice(inicio, finClave).toLowerCase()
+        : undefined;
+    if (clave !== undefined) i = finClave + 1;
+
+    if (q[i] === '"') {
+      const cierre = q.indexOf('"', i + 1);
+      if (cierre >= 0) {
+        const valor = q.slice(i + 1, cierre);
+        if (clave !== undefined) applySearchOp(out, free, clave, valor);
+        else free.push(valor);
+        i = cierre + 1;
+        continue;
+      }
+      if (clave === undefined) {
+        i = inicio;
+        while (i < q.length && !/\s/.test(q[i]!)) i++;
+        free.push(q.slice(inicio, i));
+        continue;
+      }
+    }
+
+    const inicioValor = i;
+    while (i < q.length && !/\s/.test(q[i]!)) i++;
+    const valor = q.slice(inicioValor, i);
+    if (clave !== undefined && valor.length > 0) applySearchOp(out, free, clave, valor);
+    else free.push(q.slice(inicio, i));
   }
   out.text = free.join(' ').trim();
   return out;

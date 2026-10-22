@@ -16,6 +16,7 @@ import (
 	"errors"
 	"io"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -51,6 +52,32 @@ func TestElLimiteDeAnidadoNoSeTrataComoTruncado(t *testing.T) {
 			_, err := d.parsearObjeto(&pdfLexer{buf: []byte(cuerpo)})
 			if !errors.Is(err, errAnidadoDemasiado) {
 				t.Fatalf("el límite de seguridad debe propagarse: %v", err)
+			}
+		})
+	}
+}
+
+func TestEnterosPDFSeAjustanAlRangoDeInt(t *testing.T) {
+	casos := []struct {
+		texto string
+		ok    bool
+	}{
+		{"2147483647", true},
+		{"-2147483648", true},
+		{"2147483648", strconv.IntSize == 64},
+		{"-2147483649", strconv.IntSize == 64},
+		{"9223372036854775807", strconv.IntSize == 64},
+		{"-9223372036854775808", strconv.IntSize == 64},
+	}
+	for _, caso := range casos {
+		t.Run(caso.texto, func(t *testing.T) {
+			entero, ok := (&pdfLexer{buf: []byte(caso.texto)}).entero()
+			if ok != caso.ok {
+				t.Errorf("entero(): valor=%d ok=%t; quería ok=%t", entero, ok, caso.ok)
+			}
+			numero, _, ok := (&pdfLexer{buf: []byte(caso.texto)}).numero()
+			if ok != caso.ok {
+				t.Errorf("numero(): valor=%v ok=%t; quería ok=%t", numero, ok, caso.ok)
 			}
 		})
 	}

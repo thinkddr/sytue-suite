@@ -19,6 +19,7 @@ const ADMIN = 'admin@sytue.localhost';
 // aparte (falla su entrega en segundo plano, inofensivo) mientras la copia de admin
 // se entrega igual con la cabecera Cc guardada — que es lo que "Responder a todos" lee.
 const CC_EXT = 'equipo-e2e@example.invalid';
+const escaparRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /** Envía por el BFF (cookie de sesión, sin tokens en el test). Devuelve el estado. */
 async function enviar(
@@ -95,9 +96,9 @@ test('Responder, Responder a todos y Reenviar prerellenan y envían por /api/sen
   //    destinatario (el Cc del original) en CC. Descartar mantiene abierto el lector.
   await page.getByRole('button', { name: 'Responder a todos', exact: true }).click();
   await expect(subject).toBeVisible({ timeout: 20_000 });
-  await expect(to).toHaveValue(new RegExp(ADMIN.replace(/[.]/g, '\\$&')));
+  await expect(to).toHaveValue(new RegExp(escaparRegExp(ADMIN)));
   await expect(subject).toHaveValue(`Re: ${asunto}`);
-  await expect(cc).toHaveValue(new RegExp(CC_EXT.replace(/[.]/g, '\\$&')));
+  await expect(cc).toHaveValue(new RegExp(escaparRegExp(CC_EXT)));
   await dialog.getByRole('button', { name: 'Descartar' }).click();
   await expect(dialog).toBeHidden();
 
@@ -105,7 +106,7 @@ test('Responder, Responder a todos y Reenviar prerellenan y envían por /api/sen
   //    cabecera de atribución. Se ENVÍA por /api/send.
   await page.getByRole('button', { name: 'Responder', exact: true }).click();
   await expect(subject).toBeVisible({ timeout: 20_000 });
-  await expect(to).toHaveValue(new RegExp(ADMIN.replace(/[.]/g, '\\$&')));
+  await expect(to).toHaveValue(new RegExp(escaparRegExp(ADMIN)));
   await expect(subject).toHaveValue(`Re: ${asunto}`);
   const cuerpoRe = await page.locator('#compose-body').inputValue();
   expect(cuerpoRe, 'la respuesta debe citar el original con "> "').toContain('> ');

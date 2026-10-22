@@ -306,9 +306,9 @@ export function extracto(html: string, max = 72): string {
     .replace(/<(br|\/p|\/div|\/li|\/h[1-6])[^>]*>/gi, ' ')
     .replace(/<[^>]+>/g, '')
     .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
     .replace(/\s+/g, ' ')
     .trim();
   return texto.length > max ? `${texto.slice(0, max - 1)}…` : texto;

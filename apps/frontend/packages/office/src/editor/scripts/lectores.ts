@@ -10,8 +10,13 @@
 
 /** Texto plano de un trozo de HTML sin ejecutar nada: sin DOM, con un recorte de etiquetas. */
 export function textoPlano(html: string): string {
-  return html
-    .replace(/<(script|style)\b[\s\S]*?<\/\1\s*>/gi, '')
+  let texto = html;
+  let anterior: string;
+  do {
+    anterior = texto;
+    texto = texto.replace(/<(script|style)\b[\s\S]*?<\/\1\s*>/gi, '');
+  } while (texto !== anterior);
+  return texto
     .replace(/<\s*(br|\/p|\/div|\/h[1-6]|\/li|\/tr)\b[^>]*>/gi, '\n')
     .replace(/<[^>]*>/g, '')
     .replace(/&nbsp;/g, ' ')

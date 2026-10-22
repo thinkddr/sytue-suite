@@ -10,6 +10,7 @@ import {
   destinoInterno,
   enlacesAAnclas,
   enlacesDeNota,
+  sinEtiquetas,
   sincronizarEnlaces,
   slugDe,
   titulosDe,
@@ -35,6 +36,10 @@ test('los títulos salen en orden, sin etiquetas internas y con slug único', ()
     [3, 'Cocina', 'cocina-2'],
     [1, 'Salón grande', 'salon-grande'],
   ]);
+});
+
+test('sinEtiquetas no desescapa dos veces entidades anidadas', () => {
+  expect(sinEtiquetas('&amp;lt;script&amp;gt;')).toBe('&lt;script&gt;');
 });
 
 test('conAnclas pone el id sin tocar lo demás', () => {

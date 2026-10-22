@@ -6,6 +6,7 @@
 package syerphttp
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"git.sytue.eu/sytue/one/platform/pkg/keycrypto"
 	"git.sytue.eu/sytue/one/platform/pkg/pgtest"
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 	"git.sytue.eu/sytue/one/services/syerp/db"
@@ -40,7 +42,11 @@ func manejadoresCompletos(t *testing.T, st *store.Store) *Handlers {
 	if err != nil {
 		t.Fatalf("cargar obligaciones: %v", err)
 	}
-	return &Handlers{store: st, cat: c, cfg: config.Config{}, obligaciones: obl}
+	cifra, err := keycrypto.New(bytes.Repeat([]byte("k"), keycrypto.KeyLen))
+	if err != nil {
+		t.Fatalf("cifra: %v", err)
+	}
+	return &Handlers{store: st, cat: c, cfg: config.Config{}, cifra: cifra, obligaciones: obl}
 }
 
 // llamar ejecuta un manejador como lo haría el router: tenant en el contexto,

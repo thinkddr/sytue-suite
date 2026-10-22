@@ -375,4 +375,9 @@ export const hu: Catalog = {
   'linkedServices.writeUnknown':
     'A szolgáltató nem erősítette meg a mentést. Frissíts és ellenőrizd, mielőtt újra próbálkozol.',
   'linkedServices.unavailable': 'A szolgáltatóhoz való csatlakozás nem érhető el a fiókodhoz.',
+  'localFile.confirmUpload.title': 'Fájl megnyitása erről az eszközről',
+  'localFile.confirmUpload.body':
+    'A(z) „{name}” megnyitásához a fájlt feltöltjük a Sytue One-fiókodba.',
+  'localFile.confirmUpload.remember': 'Választásom megjegyzése ezen az eszközön',
+  'localFile.confirmUpload.confirm': 'Feltöltés és megnyitás',
 };

@@ -159,11 +159,11 @@ func (s *Store) AplazarPendientesDocs(ctx context.Context, fallidos []PendienteD
 func (s *Store) FicheroEnCualquierEstado(ctx context.Context, id uuid.UUID) (domain.File, error) {
 	t := tenancy.MustFrom(ctx)
 	var f domain.File
-	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	err := s.inTx(ctx, func(tx pgx.Tx) error {
 		var e error
 		f, e = scanFile(tx.QueryRow(ctx,
 			`SELECT `+fileCols+` FROM files
-			 WHERE tenant=$1 AND id=$2 AND channel_id IS NULL AND team_drive_id IS NULL`,
+			 WHERE tenant=$1 AND `+ambitoSQL+` AND id=$2 AND channel_id IS NULL AND team_drive_id IS NULL`,
 			t.Slug, id), t.Slug)
 		return e
 	})

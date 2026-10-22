@@ -191,3 +191,51 @@ func TestRLSChannelScopeIsEnforcedByThePolicy(t *testing.T) {
 		t.Fatalf("una unidad de equipo ve %d carpetas de canal, quiero 0", n)
 	}
 }
+
+// TestRLSOwnerScopeIsEnforcedByThePolicy comprueba que la política de la
+// migración 0032 aísla «Mi unidad» (team_drive_id IS NULL AND channel_id IS NULL)
+// por persona (`app.owner_sub`) dentro de la misma organización.
+func TestRLSOwnerScopeIsEnforcedByThePolicy(t *testing.T) {
+	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
+	ctx := context.Background()
+
+	if err := h.Pool.InTx(ctx, func(tx pgx.Tx) error {
+		if err := pg.SetTenant(ctx, tx, "acme"); err != nil {
+			return err
+		}
+		if err := setGUC("app.owner_sub", "alice")(tx); err != nil {
+			return err
+		}
+		_, err := tx.Exec(ctx,
+			`INSERT INTO folders (tenant, name, is_root, owner_sub) VALUES ('acme', 'privada-alice', false, 'alice')`)
+		return err
+	}); err != nil {
+		t.Fatalf("insertar carpeta personal de alice: %v", err)
+	}
+
+	// Bob no puede insertar una carpeta a nombre de Alice desde su propio ámbito (WITH CHECK).
+	if err := h.Pool.InTx(ctx, func(tx pgx.Tx) error {
+		if err := pg.SetTenant(ctx, tx, "acme"); err != nil {
+			return err
+		}
+		if err := setGUC("app.owner_sub", "bob")(tx); err != nil {
+			return err
+		}
+		_, err := tx.Exec(ctx,
+			`INSERT INTO folders (tenant, name, is_root, owner_sub) VALUES ('acme', 'suplantada', false, 'alice')`)
+		return err
+	}); err == nil {
+		t.Fatal("bob pudo insertar una carpeta con owner_sub='alice': el WITH CHECK de la política no filtra por app.owner_sub")
+	}
+
+	if n := countFolders(t, h, "acme", setGUC("app.owner_sub", "alice")); n != 1 {
+		t.Fatalf("alice ve %d carpetas en su unidad, quiero 1", n)
+	}
+	if n := countFolders(t, h, "acme", setGUC("app.owner_sub", "bob")); n != 0 {
+		t.Fatalf("bob ve %d carpetas de la unidad personal de alice, quiero 0 (fuga entre personas del mismo tenant)", n)
+	}
+	if n := countFolders(t, h, "acme", nil); n != 0 {
+		t.Fatalf("sin app.owner_sub se ven %d carpetas de alice, quiero 0", n)
+	}
+}
+

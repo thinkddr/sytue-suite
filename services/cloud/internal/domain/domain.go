@@ -1082,6 +1082,7 @@ type AlertPolicy struct {
 	Event      string     `json:"event"`
 	ChannelURL string     `json:"channel_url"`
 	Enabled    bool       `json:"enabled"`
+	Confirmed  bool       `json:"confirmed"`
 	CreatedAt  time.Time  `json:"created_at"`
 }
 

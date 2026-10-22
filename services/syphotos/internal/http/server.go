@@ -101,6 +101,8 @@ func NewRouter(d Deps) http.Handler {
 
 		// «Exportar tus datos»: lo que Fotos sabe de cada foto (platform/pkg/portabilidad).
 		api.Get("/export", h.ExportarDatos)
+		api.Get("/settings", h.AjustesOrganizacion)
+		api.With(d.Verifier.RequireRole("owner", "admin")).Put("/settings", h.GuardarAjustesOrganizacion)
 
 		api.Post("/assets", h.Indexar)
 

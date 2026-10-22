@@ -262,6 +262,8 @@ export interface AlertPolicy {
   event: AlertEvent;
   channelUrl: string;
   enabled: boolean;
+  /** false = canal mailto: pendiente de confirmar por enlace en el correo. */
+  confirmed?: boolean;
   /** true = alcance organización (cualquier proyecto); false = un proyecto concreto. */
   orgScope: boolean;
 }

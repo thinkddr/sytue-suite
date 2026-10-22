@@ -612,11 +612,13 @@ function AlertsSection({ initial, t }: { initial: AlertPolicy[]; t: T }) {
         '/api/alerts',
         { event, channel_url: clean },
       );
+      const isMailto = clean.toLowerCase().startsWith('mailto:');
       const created: AlertPolicy = res.policy ?? {
         id: crypto.randomUUID(),
         event,
         channelUrl: clean,
         enabled: true,
+        confirmed: !isMailto,
         orgScope: true,
       };
       setItems((prev) => [created, ...prev]);
@@ -625,7 +627,7 @@ function AlertsSection({ initial, t }: { initial: AlertPolicy[]; t: T }) {
       toast.notify({
         tone: 'success',
         title: t('monitoring.alerts.created'),
-        ...demoDesc(t, res.live),
+        ...demoDesc(t, res.live, isMailto ? t('monitoring.alerts.created.mailtoDesc') : undefined),
       });
     } catch (err) {
       toast.notify({ tone: 'danger', ...alertErrorToast(t, err) });
@@ -752,6 +754,9 @@ function AlertsSection({ initial, t }: { initial: AlertPolicy[]; t: T }) {
                           ? t('monitoring.alerts.scope.org')
                           : t('monitoring.alerts.scope.project')}
                       </Badge>
+                      {p.confirmed === false ? (
+                        <Badge tone="warning">{t('monitoring.alerts.unconfirmed')}</Badge>
+                      ) : null}
                       {!p.enabled ? (
                         <Badge tone="warning">{t('monitoring.alerts.disabled')}</Badge>
                       ) : null}

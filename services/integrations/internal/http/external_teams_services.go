@@ -19,7 +19,7 @@ const (
 	teamsMeetScope      = "OnlineMeetings.ReadWrite"
 )
 
-var teamsChatScopes = []string{"Team.ReadBasic.All", "Channel.ReadBasic.All", "ChannelMessage.Read.All", "ChannelMessage.Send", "Chat.ReadWrite"}
+var teamsChatScopes = []string{"Team.ReadBasic.All", "Channel.ReadBasic.All", "ChannelMessage.Send", "Chat.ReadWrite"}
 
 func validExternalChatRequest(key, purpose, returnTo string) bool {
 	return key != "" && (purpose == "" || key == tmplTeamsChat && (purpose == teamsChatService || purpose == teamsMeetService)) &&

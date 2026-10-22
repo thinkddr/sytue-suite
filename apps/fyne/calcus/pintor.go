@@ -67,11 +67,12 @@ func (r *Rejilla) CreateRenderer() fyne.WidgetRenderer {
 // celdaPintada son las primitivas de UNA celda visible.
 type celdaPintada struct {
 	fondo       *canvas.Rectangle
-	barra       *canvas.Rectangle // la barra de datos del formato condicional
-	der, abajo  *canvas.Rectangle // `border-r border-b`: la cuadrícula o el borde del estilo
-	arriba, izq *canvas.Rectangle // los bordes de arriba e izquierda del estilo
-	icono       *canvas.Image     // el icono de un juego del formato condicional
-	mini        *rasterSVG        // el minigráfico, si la celda es su anfitriona
+	barra       *canvas.Rectangle   // la barra de datos del formato condicional
+	der, abajo  *canvas.Rectangle   // `border-r border-b`: la cuadrícula o el borde del estilo
+	arriba, izq *canvas.Rectangle   // los bordes de arriba e izquierda del estilo
+	trazos      []*canvas.Rectangle // los segmentos de los bordes discontinuos, de puntos o dobles
+	icono       *canvas.Image       // el icono de un juego del formato condicional
+	mini        *rasterSVG          // el minigráfico, si la celda es su anfitriona
 	texto       *canvas.Text
 	// otra es la segunda línea de un texto ajustado que, centrado en alto, enseña la
 	// mitad de dos líneas; las dos van dentro de `caja`, que recorta a la celda.
@@ -94,7 +95,12 @@ func nuevaCelda(rueda func(*fyne.ScrollEvent)) *celdaPintada {
 }
 
 func (cp *celdaPintada) objetos() []fyne.CanvasObject {
-	return []fyne.CanvasObject{cp.fondo, cp.barra, cp.der, cp.abajo, cp.arriba, cp.izq, cp.icono, cp.mini.raster, cp.caja}
+	o := make([]fyne.CanvasObject, 0, 9+len(cp.trazos))
+	o = append(o, cp.fondo, cp.barra, cp.der, cp.abajo, cp.arriba, cp.izq)
+	for _, t := range cp.trazos {
+		o = append(o, t)
+	}
+	return append(o, cp.icono, cp.mini.raster, cp.caja)
 }
 
 // recorte es `overflow-hidden`: lo que cuelga de él se ve solo dentro de su caja, y se
@@ -731,8 +737,6 @@ func (rr *rejillaRenderer) pintarCeldas(v tema.Variante, vw vista, cols, fils []
 }
 
 // pintarCelda es `cellStyle` + `cellStyleCss` + `cellHtml` de la web para UNA celda.
-//
-//nolint:gocyclo // es el puerto de tres funciones de la web; partirlo lo haría divergir
 func (rr *rejillaRenderer) pintarCelda(cp *celdaPintada, c, f int, vw vista, enRango bool, primario, fuerte color.NRGBA) {
 	r := rr.r
 	z := vw.z
@@ -748,54 +752,7 @@ func (rr *rejillaRenderer) pintarCelda(cp *celdaPintada, c, f int, vw vista, enR
 	caja(cp.fondo, fondo, x, y, w, h)
 	pintarBarra(cp.barra, d, x, y, w-tema.Borde*z, h-tema.Borde*z)
 
-	// Las líneas de la cuadrícula, que pasan a `border-strong` con un borde del estilo
-	// o en el filo de lo inmovilizado; un borde con su color y su trazo (`borderSideCss`), con
-	// ellos.
-	b := tema.Borde * z
-	lado := func(trazo, hex string) (color.NRGBA, float32) {
-		col := fuerte
-		if c, ok := tokens.ParseColor(hex); ok {
-			col = c
-		}
-		// ponytail: «dashed» y «dotted» van como línea continua y «double» como gruesa; la
-		// web los pinta con su CSS. Pintarlos aquí pide un trazo por segmento.
-		switch trazo {
-		case "medium":
-			return col, 2 * b
-		case "thick", "double":
-			return col, 3 * b
-		}
-		return col, b
-	}
-	der, anchoDer := LineaRejillaAlfa, b
-	if e.Bordes.R {
-		der, anchoDer = lado(e.Bordes.RS, e.Bordes.RC)
-	} else if c == vw.fc-1 {
-		der = fuerte
-	}
-	abajo, anchoAbajo := LineaRejillaAlfa, b
-	if e.Bordes.B {
-		abajo, anchoAbajo = lado(e.Bordes.BS, e.Bordes.BC)
-	} else if f == vw.ff-1 {
-		abajo = fuerte
-	}
-	caja(cp.der, der, x+w-anchoDer, y, anchoDer, h)
-	caja(cp.abajo, abajo, x, y+h-anchoAbajo, w, anchoAbajo)
-	var bt, bl float32
-	if e.Bordes.T {
-		col, ancho := lado(e.Bordes.TS, e.Bordes.TC)
-		bt = ancho
-		caja(cp.arriba, col, x, y, w, ancho)
-	} else {
-		cp.arriba.Hide()
-	}
-	if e.Bordes.L {
-		col, ancho := lado(e.Bordes.LS, e.Bordes.LC)
-		bl = ancho
-		caja(cp.izq, col, x, y, ancho, h)
-	} else {
-		cp.izq.Hide()
-	}
+	anchoDer, anchoAbajo, bt, bl := rr.pintarBordesCelda(cp, c, f, vw, e.Bordes, x, y, w, h, fuerte)
 
 	icono := ""
 	if d != nil {
@@ -822,6 +779,118 @@ func (rr *rejillaRenderer) pintarCelda(cp *celdaPintada, c, f int, vw vista, enR
 	}
 	cp.mini.raster.Hide()
 	rr.pintarTexto(cp, c, f, e, icono, papel, x+bl, y+bt, w-anchoDer-bl, h-anchoAbajo-bt, z)
+}
+
+// pintarBordesCelda coloca las líneas de la cuadrícula (`border-strong` en el filo de lo
+// inmovilizado) o los bordes del estilo (`borderSideCss`), por segmentos en `dashed`,
+// `dotted` y `double`.
+func (rr *rejillaRenderer) pintarBordesCelda(cp *celdaPintada, c, f int, vw vista, bo Bordes, x, y, w, h float32, fuerte color.NRGBA) (anchoDer, anchoAbajo, bt, bl float32) {
+	b := tema.Borde * vw.z
+	lado := func(trazo, hex string) (color.NRGBA, float32) {
+		col := fuerte
+		if parsed, ok := tokens.ParseColor(hex); ok {
+			col = parsed
+		}
+		switch trazo {
+		case "medium":
+			return col, 2 * b
+		case "thick", "double":
+			return col, 3 * b
+		}
+		return col, b
+	}
+	n := 0
+	crecio := false
+	poner := func(rect *canvas.Rectangle, col color.NRGBA, trazo string, bx, by, bw, bh float32, horiz bool) {
+		ts := tramosBorde(trazo, b, bx, by, bw, bh, horiz)
+		if len(ts) == 0 {
+			caja(rect, col, bx, by, bw, bh)
+			return
+		}
+		rect.Hide()
+		for _, t := range ts {
+			if n == len(cp.trazos) {
+				cp.trazos = append(cp.trazos, canvas.NewRectangle(col))
+				crecio = true
+			}
+			caja(cp.trazos[n], col, t.x, t.y, t.w, t.h)
+			n++
+		}
+	}
+	der, anchoDer := LineaRejillaAlfa, b
+	trazoDer := ""
+	if bo.R {
+		der, anchoDer = lado(bo.RS, bo.RC)
+		trazoDer = bo.RS
+	} else if c == vw.fc-1 {
+		der = fuerte
+	}
+	abajo, anchoAbajo := LineaRejillaAlfa, b
+	trazoAbajo := ""
+	if bo.B {
+		abajo, anchoAbajo = lado(bo.BS, bo.BC)
+		trazoAbajo = bo.BS
+	} else if f == vw.ff-1 {
+		abajo = fuerte
+	}
+	poner(cp.der, der, trazoDer, x+w-anchoDer, y, anchoDer, h, false)
+	poner(cp.abajo, abajo, trazoAbajo, x, y+h-anchoAbajo, w, anchoAbajo, true)
+	if bo.T {
+		col, ancho := lado(bo.TS, bo.TC)
+		bt = ancho
+		poner(cp.arriba, col, bo.TS, x, y, w, ancho, true)
+	} else {
+		cp.arriba.Hide()
+	}
+	if bo.L {
+		col, ancho := lado(bo.LS, bo.LC)
+		bl = ancho
+		poner(cp.izq, col, bo.LS, x, y, ancho, h, false)
+	} else {
+		cp.izq.Hide()
+	}
+	for ; n < len(cp.trazos); n++ {
+		cp.trazos[n].Hide()
+	}
+	if crecio {
+		rr.recomponer()
+	}
+	return anchoDer, anchoAbajo, bt, bl
+}
+
+// tramosBorde descompone un lado discontinuo (`dashed`), de puntos (`dotted`) o doble
+// (`double`) en sus rectángulos; devuelve nil cuando el trazo es una línea continua.
+func tramosBorde(trazo string, b, x, y, w, h float32, horiz bool) []tramo {
+	if trazo == "double" {
+		if horiz {
+			return []tramo{{x, y, w, b}, {x, y + 2*b, w, b}}
+		}
+		return []tramo{{x, y, b, h}, {x + 2*b, y, b, h}}
+	}
+	var t, hueco float32
+	switch trazo {
+	case "dashed":
+		t, hueco = 3*b, 2*b
+	case "dotted":
+		t, hueco = b, b
+	default:
+		return nil
+	}
+	largo := h
+	if horiz {
+		largo = w
+	}
+	paso := huecoDiscontinuo(largo, t, hueco)
+	var out []tramo
+	for d := float32(0); d < largo-0.001; d += t + paso {
+		fin := min(d+t, largo)
+		if horiz {
+			out = append(out, tramo{x + d, y, fin - d, b})
+		} else {
+			out = append(out, tramo{x, y + d, b, fin - d})
+		}
+	}
+	return out
 }
 
 // pintarBarra es `dataBarBackground`: una barra de bordes duros (sin degradado) sobre

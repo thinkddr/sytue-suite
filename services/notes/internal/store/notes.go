@@ -168,7 +168,7 @@ func (s *Store) adjuntarEnPaquete(ctx context.Context, tx pgx.Tx, slug string, n
 func (s *Store) CreateNote(ctx context.Context, notebookID uuid.UUID, sub string, in domain.NoteInput) (domain.Note, error) {
 	t := tenancy.MustFrom(ctx)
 	var n domain.Note
-	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	err := s.inWriteTx(ctx, func(tx pgx.Tx) error {
 		if err := normalizeNewNoteWrite(ctx, tx, t.Slug, notebookID, sub, &in); err != nil {
 			return err
 		}
@@ -281,7 +281,7 @@ func (s *Store) ActualizarNota(ctx context.Context, id uuid.UUID, sub string, in
 	t := tenancy.MustFrom(ctx)
 	var n domain.Note
 	var antes Antes
-	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	err := s.inWriteTx(ctx, func(tx pgx.Tx) error {
 		// POR DÓNDE ESCRIBE: por el cuaderno (dueño, organización o editora) o SOLO
 		// porque le compartieron la nota con edición (0010). Quien llega por lo
 		// segundo cambia su contenido y nada más: ni la visibilidad —abrir a todo el
@@ -374,7 +374,7 @@ func (s *Store) ActualizarNota(ctx context.Context, id uuid.UUID, sub string, in
 // la escritura del arrastrar y soltar, que ocurre muchas veces por minuto.
 func (s *Store) MoveNote(ctx context.Context, id uuid.UUID, sub string, x, y, col, position int, groupID *uuid.UUID) error {
 	t := tenancy.MustFrom(ctx)
-	return s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	return s.inWriteTx(ctx, func(tx pgx.Tx) error {
 		if err := grupoAdmisible(ctx, tx, t.Slug, id, nil, groupID); err != nil {
 			return err
 		}
@@ -404,7 +404,7 @@ func (s *Store) MoveNote(ctx context.Context, id uuid.UUID, sub string, x, y, co
 // destino y fuera de cualquier grupo, porque los grupos son por cuaderno.
 func (s *Store) MoveNoteToNotebook(ctx context.Context, id uuid.UUID, sub string, destino uuid.UUID) error {
 	t := tenancy.MustFrom(ctx)
-	return s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	return s.inWriteTx(ctx, func(tx pgx.Tx) error {
 		var origenCifrado, destinoCifrado bool
 		err := tx.QueryRow(ctx, `
 			SELECT o.encrypted, d.encrypted
@@ -461,7 +461,7 @@ func (s *Store) RestoreNote(ctx context.Context, id uuid.UUID, sub string) error
 
 func (s *Store) marcarBorrado(ctx context.Context, id uuid.UUID, sub string, borrar bool) error {
 	t := tenancy.MustFrom(ctx)
-	return s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	return s.inWriteTx(ctx, func(tx pgx.Tx) error {
 		tag, err := tx.Exec(ctx, `
 			UPDATE notes n
 			   SET deleted_at = CASE WHEN $4 THEN now() ELSE NULL END, updated_at = now()
@@ -483,7 +483,7 @@ func (s *Store) marcarBorrado(ctx context.Context, id uuid.UUID, sub string, bor
 // PurgeNote la borra de verdad (vaciar papelera). Solo su dueño.
 func (s *Store) PurgeNote(ctx context.Context, id uuid.UUID, sub string) error {
 	t := tenancy.MustFrom(ctx)
-	return s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	return s.inWriteTx(ctx, func(tx pgx.Tx) error {
 		tag, err := tx.Exec(ctx,
 			`DELETE FROM notes WHERE tenant=$1 AND id=$2 AND owner_sub=$3 AND deleted_at IS NOT NULL`,
 			t.Slug, id, sub)

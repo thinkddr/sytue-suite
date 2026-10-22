@@ -5,9 +5,9 @@
 
 package auth
 
-func cuentaCompartida(string) bool            { return false }
-func cargarCompartida(string) (Tokens, error) { return Tokens{}, nil }
-func guardarCompartida(string, Tokens) error  { return nil }
+func cuentaCompartida(string) bool                  { return false }
+func cargarCuentaCompartida(string) (Tokens, error) { return Tokens{}, nil }
+func guardarCuentaCompartida(string, Tokens) error  { return nil }
 
 func leerSecretoCompartido(string) ([]byte, error)  { return nil, nil }
 func guardarSecretoCompartido(string, []byte) error { return nil }

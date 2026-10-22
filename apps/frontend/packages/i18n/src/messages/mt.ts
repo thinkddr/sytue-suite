@@ -372,4 +372,9 @@ export const mt: Catalog = {
     'Il-fornitur ma kkonfermax jekk ġiex issejvjat. Aġġorna u ċċekkja qabel terġa’ tipprova.',
   'linkedServices.unavailable':
     'Il-konnessjoni ma’ dan il-fornitur mhijiex disponibbli għall-kont tiegħek.',
+  'localFile.confirmUpload.title': 'Iftaħ fajl minn dan l-apparat',
+  'localFile.confirmUpload.body':
+    'Biex tiftaħ “{name}”, il-fajl se jittella’ fil-kont tiegħek ta’ Sytue One.',
+  'localFile.confirmUpload.remember': 'Ftakar l-għażla tiegħi fuq dan l-apparat',
+  'localFile.confirmUpload.confirm': 'Tella’ u iftaħ',
 };

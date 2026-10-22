@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"slices"
 	"time"
 
 	pcfg "git.sytue.eu/sytue/one/platform/pkg/config"
@@ -118,6 +119,20 @@ type Config struct {
 	CloudAPIClusterRole    string
 	CloudAPIServiceAccount string
 	CloudAPINamespace      string
+
+	// CloudControllerClusterRole, CloudControllerServiceAccount y
+	// CloudControllerNamespace identifican el sujeto y el ClusterRole acotado a
+	// cargas de tenant que cloud-controller vincula por namespace `tenant-<slug>`
+	// mediante el RoleBinding `sytue-cloud-controller`.
+	CloudControllerClusterRole    string
+	CloudControllerServiceAccount string
+	CloudControllerNamespace      string
+
+	// AbiertoATerceros controla si Sytue Cloud admite organizaciones distintas de
+	// TenantsPermitidos. Permanece en false hasta que los nodos de carga tengan
+	// gVisor (runsc) activo.
+	AbiertoATerceros  bool
+	TenantsPermitidos []string
 	// RunnerMode selecciona la implementación del PaaS: "kube" (producción, sobre
 	// Kapsule vía client-go) o "stub" (dev/local sin clúster). Paridad dev/prod
 	// (CONVENTIONS §15): misma interfaz Runner/Platform, distinta implementación.
@@ -316,14 +331,19 @@ func Load(defaultPort string) (Config, error) {
 		SMTPPassword: l.Get("SMTP_PASSWORD"),
 		SMTPFrom:     l.GetDefault("SMTP_FROM", "cloud@sytue.eu"),
 
-		KubeconfigPath:         l.Get("KUBECONFIG"),
-		CloudAPIClusterRole:    l.Get("CLOUD_API_CLUSTER_ROLE"),
-		CloudAPIServiceAccount: l.Get("CLOUD_API_SERVICE_ACCOUNT"),
-		CloudAPINamespace:      l.Get("CLOUD_API_NAMESPACE"),
-		RunnerMode:             l.GetDefault("RUNNER_MODE", ""),
-		BuildkitImage:          l.GetDefault("BUILDKIT_IMAGE", "moby/buildkit:v0.32.1-rootless@sha256:66e5fe5b25509626c0e628c6e57badbcc2e8a62218ba3e1358f1427e90de6a88"),
-		HTTPTaskImage:          l.GetDefault("HTTP_TASK_IMAGE", "curlimages/curl:8.21.0@sha256:7c12af72ceb38b7432ab85e1a265cff6ae58e06f95539d539b654f2cfa64bb13"),
-		CraneImage:             l.GetDefault("CRANE_IMAGE", "gcr.io/go-containerregistry/crane:v0.21.8@sha256:e85fa14e99e5ef7351822ed887ce322bc1e22f9ef8e9eb54ebf2d7a9473bfef9"),
+		KubeconfigPath:                l.Get("KUBECONFIG"),
+		CloudAPIClusterRole:           l.Get("CLOUD_API_CLUSTER_ROLE"),
+		CloudAPIServiceAccount:        l.Get("CLOUD_API_SERVICE_ACCOUNT"),
+		CloudAPINamespace:             l.Get("CLOUD_API_NAMESPACE"),
+		CloudControllerClusterRole:    l.Get("CLOUD_CONTROLLER_CLUSTER_ROLE"),
+		CloudControllerServiceAccount: l.Get("CLOUD_CONTROLLER_SERVICE_ACCOUNT"),
+		CloudControllerNamespace:      l.Get("CLOUD_CONTROLLER_NAMESPACE"),
+		AbiertoATerceros:              l.GetBoolDefault("ABIERTO_A_TERCEROS", false),
+		TenantsPermitidos:             l.GetCSVDefault("TENANTS_PERMITIDOS", "sytue"),
+		RunnerMode:                    l.GetDefault("RUNNER_MODE", ""),
+		BuildkitImage:                 l.GetDefault("BUILDKIT_IMAGE", "moby/buildkit:v0.32.1-rootless@sha256:66e5fe5b25509626c0e628c6e57badbcc2e8a62218ba3e1358f1427e90de6a88"),
+		HTTPTaskImage:                 l.GetDefault("HTTP_TASK_IMAGE", "curlimages/curl:8.21.0@sha256:7c12af72ceb38b7432ab85e1a265cff6ae58e06f95539d539b654f2cfa64bb13"),
+		CraneImage:                    l.GetDefault("CRANE_IMAGE", "gcr.io/go-containerregistry/crane:v0.21.8@sha256:e85fa14e99e5ef7351822ed887ce322bc1e22f9ef8e9eb54ebf2d7a9473bfef9"),
 
 		// Pinneadas por tag (no :latest); en prod, re-pinnear por digest tras
 		// verificar con un build vivo (como KANIKO_IMAGE).
@@ -413,6 +433,23 @@ func (c Config) RequireWebhookSecret() error {
 		)
 	}
 	return nil
+}
+
+// TenantAllowed informa de si el tenant puede operar en Sytue Cloud según el
+// cerrojo AbiertoATerceros / TenantsPermitidos. En dev/test con Config{} en
+// memoria (sin entorno prod ni lista explícita) no bloquea los tests unitarios.
+func (c Config) TenantAllowed(tenant string) bool {
+	if c.AbiertoATerceros {
+		return true
+	}
+	if !c.Env.IsProd() && len(c.TenantsPermitidos) == 0 {
+		return true
+	}
+	allowed := c.TenantsPermitidos
+	if len(allowed) == 0 {
+		allowed = []string{"sytue"}
+	}
+	return slices.Contains(allowed, tenant)
 }
 
 func (c Config) validate() error {

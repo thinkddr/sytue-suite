@@ -61,18 +61,16 @@ public final class Biometria extends BiometricPrompt.AuthenticationCallback {
      * BiometricPrompt (-1 si no hay código o se agotó el tiempo).
      */
     public static int verificar(final Context ctx, final String motivo) throws InterruptedException {
+        if (SesionCompartida.habilitada()) {
+            return SesionCompartida.verificar(ctx, motivo);
+        }
         final Biometria b = new Biometria();
         final CancellationSignal cancelar = new CancellationSignal();
         new Handler(ctx.getMainLooper()).post(new Runnable() {
             @Override
             public void run() {
                 try {
-                    new BiometricPrompt.Builder(ctx)
-                            .setTitle(ctx.getApplicationInfo().loadLabel(ctx.getPackageManager()))
-                            .setSubtitle(motivo)
-                            .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG
-                                    | BiometricManager.Authenticators.DEVICE_CREDENTIAL)
-                            .build()
+                    prompt(ctx, ctx.getApplicationInfo().loadLabel(ctx.getPackageManager()), motivo)
                             .authenticate(cancelar, ctx.getMainExecutor(), b);
                 } catch (RuntimeException e) {
                     b.respuesta.offer(-1);
@@ -85,6 +83,16 @@ public final class Biometria extends BiometricPrompt.AuthenticationCallback {
             return -1;
         }
         return r;
+    }
+
+    /** Same OS policy for local verification and the broker's auth-per-use key. */
+    static BiometricPrompt prompt(Context ctx, CharSequence titulo, CharSequence motivo) {
+        if (Build.VERSION.SDK_INT < 30) {
+            throw new IllegalStateException("Secure owner verification requires Android 11");
+        }
+        return new BiometricPrompt.Builder(ctx).setTitle(titulo).setSubtitle(motivo)
+                .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG
+                        | BiometricManager.Authenticators.DEVICE_CREDENTIAL).build();
     }
 
     @Override

@@ -381,4 +381,9 @@ export const ro: Catalog = {
     'Furnizorul nu a confirmat salvarea. Reîmprospătează și verifică înainte de a încerca din nou.',
   'linkedServices.unavailable':
     'Conectarea la acest furnizor nu este disponibilă pentru contul tău.',
+  'localFile.confirmUpload.title': 'Deschide fișierul de pe acest dispozitiv',
+  'localFile.confirmUpload.body':
+    'Pentru a deschide „{name}”, fișierul va fi încărcat în contul tău Sytue One.',
+  'localFile.confirmUpload.remember': 'Ține minte alegerea mea pe acest dispozitiv',
+  'localFile.confirmUpload.confirm': 'Încarcă și deschide',
 };

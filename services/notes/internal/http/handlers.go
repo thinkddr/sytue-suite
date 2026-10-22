@@ -59,6 +59,8 @@ func traducir(err error) error {
 			WithMessage("This notebook is encrypted; content must be sent encrypted.").Wrap(err)
 	case errors.Is(err, domain.ErrEncryptedClientUpgrade):
 		return httpx.NewError(http.StatusConflict, "encrypted_client_upgrade_required", "Update the application before editing encrypted notes.").Wrap(err)
+	case errors.Is(err, domain.ErrBackendWriteUpgrade):
+		return httpx.NewError(http.StatusServiceUnavailable, "notes_backend_upgrade_required", "Notes needs a backend update before changes can be saved. Your existing notes are preserved.").Wrap(err)
 	case errors.Is(err, domain.ErrEncryptedMigrationRequired):
 		return httpx.NewError(http.StatusConflict, "encrypted_content_migration_required", "Unlock and migrate the encrypted note before editing it.").Wrap(err)
 	case errors.Is(err, domain.ErrNoteChanged):

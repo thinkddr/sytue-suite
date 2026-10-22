@@ -261,4 +261,7 @@ export const el: AppCatalog<typeof en> = {
   'memories.years': 'Πριν από {count} χρόνια',
   'memories.oneYear': 'Πριν από έναν χρόνο',
   'memories.hide': 'Απόκρυψη',
+  'aiBatch.excludeOrg': 'Εξαίρεση του οργανισμού από την αυτόματη παρτίδα Sytue AI',
+  'aiBatch.excludedHint':
+    'Ο οργανισμός έχει εξαιρεθεί από την αυτόματη παρτίδα Sytue AI. Οι φωτογραφίες δεν αναλύονται στο παρασκήνιο για προτάσεις ή παρόμοιες.',
 };

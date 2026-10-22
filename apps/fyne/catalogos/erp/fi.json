@@ -493,6 +493,8 @@
   "vf.confirmBody": "Tästä lähtien jokainen vahvistamasi lasku lähetetään Espanjan veroviranomaiselle, eikä sitä voi enää muokata tai poistaa: virheet korjataan korjauslaskulla. Kun otat sen käyttöön, se pysyy käytössä vuoden loppuun.",
   "vf.confirmTitle": "Otetaanko VERI*FACTU käyttöön?",
   "vf.declaration": "Vaatimustenmukaisuusvakuutus",
+  "vf.error.certificateTaxIdMismatch": "Varmenteen verotunniste (NIF) ei vastaa organisaation verotunnistetta.",
+  "vf.error.invalidCertificate": "Varmenne tai yksityinen avain ei ole kelvollinen hyväksytty varmenne, jossa on espanjalainen verotunniste (NIF).",
   "vf.export": "Lataa tietueet",
   "vf.fixHint": "Korjaa laskun tai asiakkaan tiedot ja lähetä se uudelleen.",
   "vf.intro": "Vuodesta 2027 alkaen jokainen lasku on rekisteröitävä Espanjan veroviranomaiselle sen laatimishetkellä. VERI*FACTUn avulla Sytue hoitaa sen puolestasi, kun vahvistat laskun, ja lisää QR-koodin, jolla asiakkaasi voi tarkistaa sen.",

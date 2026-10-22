@@ -80,7 +80,7 @@ const taskControls = `jsonb_strip_nulls(jsonb_build_object(
 func (s *Store) MigrateEncryptedContent(ctx context.Context, id uuid.UUID, sub string, in domain.EncryptedContentInput) (domain.Note, error) {
 	t := tenancy.MustFrom(ctx)
 	var out domain.Note
-	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	err := s.inWriteTx(ctx, func(tx pgx.Tx) error {
 		state, err := lockNoteWrite(ctx, tx, t.Slug, id, sub, in.ExpectedCrypto)
 		if err != nil {
 			return err

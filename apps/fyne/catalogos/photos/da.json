@@ -1,4 +1,6 @@
 {
+  "aiBatch.excludeOrg": "Udeluk organisationen fra den automatiske Sytue AI-kørsel",
+  "aiBatch.excludedHint": "Organisationen er udelukket fra den automatiske Sytue AI-kørsel. Billeder behandles ikke i baggrunden til forslag eller lignende.",
   "album.linkCopied": "Link kopieret",
   "album.newLink": "Nyt link",
   "album.newLinkConfirm": "Vil du oprette et nyt link? Det nuværende link holder op med at virke for dem, der allerede har det.",

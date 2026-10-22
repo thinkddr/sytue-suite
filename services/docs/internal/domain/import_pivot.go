@@ -272,6 +272,9 @@ func xlsxSharedKey(tipo, v string) string {
 
 // attachOdsPivots lee las <table:data-pilot-table> de content.xml.
 func attachOdsPivots(content []byte, model *sheetModel) {
+	if !bytes.Contains(content, []byte("data-pilot-table")) {
+		return
+	}
 	dec := xml.NewDecoder(bytes.NewReader(content))
 	for {
 		tok, err := dec.Token()

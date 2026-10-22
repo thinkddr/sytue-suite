@@ -257,4 +257,7 @@ export const fr: AppCatalog<typeof en> = {
   'memories.years': 'Il y a {count} ans',
   'memories.oneYear': 'Il y a un an',
   'memories.hide': 'Masquer',
+  'aiBatch.excludeOrg': 'Exclure l’organisation du lot automatique de Sytue AI',
+  'aiBatch.excludedHint':
+    'L’organisation est exclue du lot automatique de Sytue AI. Les nouvelles photos ne sont pas traitées en arrière-plan pour les suggestions ou les ressemblances.',
 };

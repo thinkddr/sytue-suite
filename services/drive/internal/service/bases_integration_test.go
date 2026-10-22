@@ -18,6 +18,7 @@ import (
 
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 	"git.sytue.eu/sytue/one/services/drive/internal/domain"
+	"git.sytue.eu/sytue/one/services/drive/internal/store"
 )
 
 const tokenDeBases = "sbc_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
@@ -43,6 +44,7 @@ func TestExportarVistaDeBases(t *testing.T) {
 	defer bases.Close()
 
 	svc, _, blobs, ctx := newChannelService(t)
+	ctx = store.WithOwner(ctx, "bob")
 	svc.cfg.BasesURL = bases.URL
 	root, err := svc.Root(ctx)
 	if err != nil {

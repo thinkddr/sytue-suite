@@ -639,3 +639,36 @@ func TestCadaServiceSeleccionaSusPods(t *testing.T) {
 		}
 	}
 }
+
+// CLOUD-07 / CLOUD-12 — todos los pods de tenant creados por el provisioner
+// llevan RuntimeClassName=gvisor, límites de ephemeral-storage y SizeLimit en
+// cada volumen EmptyDir.
+func TestPodsDeTenantAcotanEmptyDirEphemeralStorageYUsanGVisor(t *testing.T) {
+	cs := fake.NewSimpleClientset()
+	p := newKubeProvisionerFor(cs, testCfg(), nil, nil)
+	ctx := context.Background()
+
+	fnSvc := domain.ManagedService{
+		ID: uuid.New(), Tenant: "acme", ProjectID: uuid.New(), Kind: domain.ServiceFunctions,
+		Name: "api", Config: map[string]string{"image": "rg.fr-par.scw.cloud/sytue/web:v1"},
+	}
+	if _, err := p.Provision(ctx, fnSvc); err != nil {
+		t.Fatalf("Provision functions: %v", err)
+	}
+	dep, err := cs.AppsV1().Deployments("tenant-acme").Get(ctx, svcResourceName(fnSvc)+"-fn", metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Deployment fn: %v", err)
+	}
+	pod := dep.Spec.Template.Spec
+	if pod.RuntimeClassName == nil || *pod.RuntimeClassName != "gvisor" {
+		t.Errorf("RuntimeClassName en función = %v, quiero \"gvisor\"", pod.RuntimeClassName)
+	}
+	if _, ok := pod.Containers[0].Resources.Limits[corev1.ResourceEphemeralStorage]; !ok {
+		t.Error("el contenedor de función debe declarar límite de ephemeral-storage")
+	}
+	for _, v := range pod.Volumes {
+		if v.EmptyDir != nil && v.EmptyDir.SizeLimit == nil {
+			t.Errorf("el volumen EmptyDir %q de función no tiene SizeLimit", v.Name)
+		}
+	}
+}

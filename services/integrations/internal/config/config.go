@@ -274,6 +274,7 @@ func Load() (Config, error) {
 		}
 		cfg.OAuthClients = clients
 	}
+	cfg.OAuthClients = loadProviderOAuthEnv(l, cfg.OAuthClients)
 
 	if err := l.Err(); err != nil {
 		return Config{}, err
@@ -282,4 +283,52 @@ func Load() (Config, error) {
 		cfg.OIDCJWKSURL = cfg.OIDCIssuer + "/.well-known/jwks.json"
 	}
 	return cfg, nil
+}
+
+// loadProviderOAuthEnv permite configurar las credenciales OAuth de plataforma por
+// variables individuales de entorno (además del JSON SYTUE_INTEGRATIONS_OAUTH_CLIENTS).
+func loadProviderOAuthEnv(l *pcfg.Loader, dst map[string]OAuthClient) map[string]OAuthClient {
+	type envGroup struct {
+		id, secret string
+		keys       []string
+	}
+	groups := []envGroup{
+		{
+			id:     l.Get("GOOGLE_OAUTH_CLIENT_ID"),
+			secret: l.Get("GOOGLE_OAUTH_CLIENT_SECRET"),
+			keys:   []string{"google-drive", "google-workspace", "google-chat", "google-chat-conversations", "google-meet", "gmail-mail"},
+		},
+		{
+			id:     l.Get("MICROSOFT_OAUTH_CLIENT_ID"),
+			secret: l.Get("MICROSOFT_OAUTH_CLIENT_SECRET"),
+			keys:   []string{"onedrive", "microsoft365", "azure", "microsoft-mail", "microsoft-teams", "microsoft-teams-rooms", "microsoft-teams-chat"},
+		},
+		{
+			id:     l.Get("MICROSOFT_TEAMS_OAUTH_CLIENT_ID"),
+			secret: l.Get("MICROSOFT_TEAMS_OAUTH_CLIENT_SECRET"),
+			keys:   []string{"microsoft-teams", "microsoft-teams-rooms", "microsoft-teams-chat"},
+		},
+		{
+			id:     l.Get("SLACK_OAUTH_CLIENT_ID"),
+			secret: l.Get("SLACK_OAUTH_CLIENT_SECRET"),
+			keys:   []string{"slack", "slack-rooms", "slack-chat"},
+		},
+	}
+	for _, g := range groups {
+		id := strings.TrimSpace(g.id)
+		if id == "" {
+			continue
+		}
+		if dst == nil {
+			dst = make(map[string]OAuthClient)
+		}
+		client := OAuthClient{
+			ClientID:     id,
+			ClientSecret: strings.TrimSpace(g.secret),
+		}
+		for _, k := range g.keys {
+			dst[k] = client
+		}
+	}
+	return dst
 }

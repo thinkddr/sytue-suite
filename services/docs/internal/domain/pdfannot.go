@@ -122,8 +122,17 @@ func AnadirAnotacionesPDF(doc *PDFDoc, anots []Anotacion) ([]byte, error) {
 		}
 		pp := e.ultimaPendiente()
 		refs := make(pdfArray, 0, len(porPagina[i]))
+		hayTransp := false
 		for _, a := range porPagina[i] {
+			if an := a.normalizada(); an.Opacidad < 1 || an.Tipo == AnotResaltado {
+				hayTransp = true
+			}
 			refs = append(refs, pdfRef{Num: e.escribirAnotacion(a)})
+		}
+		if hayTransp && pp.dict["Group"] == nil {
+			if dec, ok := doc.declaraPDFA(); ok && dec.parte != "1" && componentesIntencion(doc) == 0 {
+				pp.dict["Group"] = grupoTransparenciaRGB()
+			}
 		}
 		// Se AÑADEN a las que ya había: perder las anteriores al comentar sería
 		// destruir el trabajo de otra persona sin decirlo.
@@ -158,8 +167,17 @@ func anexarAnotaciones(doc *PDFDoc, porPagina map[int][]Anotacion) ([]byte, erro
 		}
 		pagina := copiaLlana(nodo)
 		annots := arrayResuelto(doc, nodo["Annots"])
+		hayTransp := false
 		for _, a := range porPagina[i] {
+			if an := a.normalizada(); an.Opacidad < 1 || an.Tipo == AnotResaltado {
+				hayTransp = true
+			}
 			annots = append(annots, pdfRef{Num: e.escribirAnotacion(a)})
+		}
+		if hayTransp && pagina["Group"] == nil {
+			if dec, ok := doc.declaraPDFA(); ok && dec.parte != "1" && componentesIntencion(doc) == 0 {
+				pagina["Group"] = grupoTransparenciaRGB()
+			}
 		}
 		pagina["Annots"] = annots
 		cambiados[num] = objetoSalida{valor: pagina}
@@ -382,7 +400,7 @@ func (a Anotacion) cuadrosEfectivos() [][4]float64 {
 // recursos que necesita.
 func (a Anotacion) apariencia() ([]byte, pdfDict) {
 	var b strings.Builder
-	recursos := pdfDict{}
+	recursos := pdfDict{"ColorSpace": pdfDict{"DefaultRGB": calRGBDefecto()}}
 
 	// La opacidad no existe en el color de un PDF: hace falta un /ExtGState, y sin
 	// él un resaltado TAPA el texto en vez de velarlo.
@@ -658,14 +676,18 @@ func nuevaLetraAnot() *letraAnot {
 // tj es el operando de Tj para el texto: la cadena WinAnsi de la Helvetica, o
 // los glifos de la Liberation incrustada.
 func (a Anotacion) tj(texto string) string {
-	if a.letra == nil {
+	return a.letra.tj(texto)
+}
+
+func (l *letraAnot) tj(texto string) string {
+	if l == nil {
 		return "(" + escaparCadenaContenido(texto) + ")"
 	}
 	var b strings.Builder
 	b.WriteByte('<')
 	for _, r := range texto {
-		g := a.letra.f.Glifo(r)
-		a.letra.sub.Usar(g, r)
+		g := l.f.Glifo(r)
+		l.sub.Usar(g, r)
 		fmt.Fprintf(&b, "%04X", g)
 	}
 	b.WriteByte('>')

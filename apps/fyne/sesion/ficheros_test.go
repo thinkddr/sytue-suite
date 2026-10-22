@@ -17,6 +17,7 @@ import (
 	"fyne.io/fyne/v2/storage"
 	"fyne.io/fyne/v2/test"
 
+	"git.sytue.eu/sytue/one/apps/nucleo/ajustes"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 )
 
@@ -45,6 +46,7 @@ func fichero(t *testing.T, nombre, contenido string) string {
 // —una imagen soltada en Docus— no llega.
 func TestElFicheroDeLaMaquinaEntraPorElMismoSitio(t *testing.T) {
 	aparte(t)
+	_ = ajustes.Cambiar(func(a *ajustes.Ajustes) { a.SubirAlAbrir = true })
 	a := test.NewApp()
 	defer a.Quit()
 	s := Abrir(a, "sytue.eu")
@@ -80,6 +82,7 @@ func TestElFicheroDeLaMaquinaEntraPorElMismoSitio(t *testing.T) {
 // de `localesAntes` en abrirLocal.
 func TestArrancarConElFicheroLoAbre(t *testing.T) {
 	aparte(t)
+	_ = ajustes.Cambiar(func(a *ajustes.Ajustes) { a.SubirAlAbrir = true })
 	a := test.NewApp()
 	defer a.Quit()
 	s := Abrir(a, "sytue.eu")
@@ -102,6 +105,7 @@ func TestArrancarConElFicheroLoAbre(t *testing.T) {
 // llegara acabaría en un error: sin la llamada explícita, se ignora.
 func TestSinAceptarFicherosNoSeAbreNingunoSuelto(t *testing.T) {
 	aparte(t)
+	_ = ajustes.Cambiar(func(a *ajustes.Ajustes) { a.SubirAlAbrir = true })
 	a := test.NewApp()
 	defer a.Quit()
 	s := Abrir(a, "sytue.eu")
@@ -123,6 +127,7 @@ func TestSinAceptarFicherosNoSeAbreNingunoSuelto(t *testing.T) {
 // avisa a quien lo pidió y no se abre nada.
 func TestUnFicheroQueNoSeAbreSeDiceYNoVaALaWeb(t *testing.T) {
 	aparte(t)
+	_ = ajustes.Cambiar(func(a *ajustes.Ajustes) { a.SubirAlAbrir = true })
 	a := test.NewApp()
 	defer a.Quit()
 	s := Abrir(a, "sytue.eu")
@@ -171,5 +176,84 @@ func TestLosArgumentosQueSonFicheros(t *testing.T) {
 		if _, ok := ficheroLocal(u); ok {
 			t.Errorf("%q no es un fichero de la máquina", no)
 		}
+	}
+}
+
+// TestAbrirLocalPreguntaAntesDeSubirYRecuerdaEnElDispositivo (FYP-02): un fichero del
+// equipo abierto desde el sistema («Abrir con», argumento o arrastrar a la ventana) no
+// se sube al servicio sin que la persona dé su conformidad antes, y puede elegir recordar
+// esa decisión en el dispositivo.
+func TestAbrirLocalPreguntaAntesDeSubirYRecuerdaEnElDispositivo(t *testing.T) {
+	aparte(t)
+	a := test.NewApp()
+	defer a.Quit()
+	s := Abrir(a, "sytue.eu")
+	espia := nuevaEspia(a)
+	s.app = espia
+
+	w := &ventanaQueSuelta{Window: a.NewWindow("docus")}
+	s.aceptarFicheros(w, func() { t.Error("no ha fallado nada") })
+	vistas := make(chan api.Apertura, 4)
+	s.AlAbrirFichero("docs", func(_ context.Context, ap api.Apertura) error { vistas <- ap; return nil })
+
+	// 1. Sin diálogo de conformidad ni preferencia recordada, no se sube el fichero.
+	acta := fichero(t, "acta.docx", "PK\x03\x04 contenido")
+	w.soltar(fyne.NewPos(10, 10), []fyne.URI{storage.NewFileURI(acta)})
+	if ap, ok := recibir(vistas, 200*time.Millisecond); ok {
+		t.Fatalf("sin conformidad se ha subido el fichero local: %+v", ap)
+	}
+
+	// 2. Si la persona cancela la pregunta, tampoco se sube.
+	preguntas := make(chan string, 4)
+	s.AlConfirmarSubidaLocal(func(_ fyne.Window, nombre string, _ func(bool)) {
+		preguntas <- nombre
+	})
+	w.soltar(fyne.NewPos(10, 10), []fyne.URI{storage.NewFileURI(acta)})
+	if got := esperar(t, preguntas); got != "acta.docx" {
+		t.Fatalf("nombre preguntado = %q, quiero acta.docx", got)
+	}
+	if ap, ok := recibir(vistas, 200*time.Millisecond); ok {
+		t.Fatalf("tras cancelar se ha subido el fichero local: %+v", ap)
+	}
+
+	// 3. Si acepta sin recordar, se sube esta vez y la siguiente vuelve a preguntar.
+	s.AlConfirmarSubidaLocal(func(_ fyne.Window, nombre string, aceptar func(bool)) {
+		preguntas <- nombre
+		aceptar(false)
+	})
+	w.soltar(fyne.NewPos(10, 10), []fyne.URI{storage.NewFileURI(acta)})
+	esperar(t, preguntas)
+	if visto := esperar(t, vistas); !strings.HasSuffix(visto.Local, "/acta.docx") {
+		t.Fatalf("apertura tras aceptar = %+v", visto)
+	}
+	if ajustes.Leer().SubirAlAbrir {
+		t.Fatal("aceptar(false) no debía recordar la elección en el dispositivo")
+	}
+
+	// 4. Si acepta recordando en este dispositivo, queda guardado y otra app de la suite
+	// en el mismo dispositivo ya no vuelve a preguntar.
+	s.AlConfirmarSubidaLocal(func(_ fyne.Window, nombre string, aceptar func(bool)) {
+		preguntas <- nombre
+		aceptar(true)
+	})
+	w.soltar(fyne.NewPos(10, 10), []fyne.URI{storage.NewFileURI(acta)})
+	esperar(t, preguntas)
+	esperar(t, vistas)
+	if !ajustes.Leer().SubirAlAbrir {
+		t.Fatal("aceptar(true) debía recordar SubirAlAbrir en los ajustes del dispositivo")
+	}
+
+	otra := Abrir(a, "sytue.eu")
+	otra.app = espia
+	wOtra := &ventanaQueSuelta{Window: a.NewWindow("calcus")}
+	otra.aceptarFicheros(wOtra, func() { t.Error("no ha fallado nada") })
+	otra.AlConfirmarSubidaLocal(func(_ fyne.Window, nombre string, _ func(bool)) {
+		t.Errorf("con la elección recordada en el dispositivo no debía volver a preguntar (%q)", nombre)
+	})
+	otra.AlAbrirFichero("sheets", func(_ context.Context, ap api.Apertura) error { vistas <- ap; return nil })
+	hoja := fichero(t, "cuentas.xlsx", "PK")
+	wOtra.soltar(fyne.NewPos(10, 10), []fyne.URI{storage.NewFileURI(hoja)})
+	if visto := esperar(t, vistas); !strings.HasSuffix(visto.Local, "/cuentas.xlsx") {
+		t.Fatalf("apertura con elección recordada = %+v", visto)
 	}
 }

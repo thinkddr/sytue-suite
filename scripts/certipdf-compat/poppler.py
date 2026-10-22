@@ -31,8 +31,8 @@ def mensajes(ruta, clave=""):
             err = p.stderr.decode("utf-8", "replace")
         except subprocess.TimeoutExpired:
             return {"tiempo agotado"}
-    # Sin posiciones ni números sueltos: lo que identifica el problema es el texto.
-    return {re.sub(r"\(\d+\)|\b\d+\b", "#", l).strip() for l in err.splitlines()
+    # Sin posiciones («(25)») ni números sueltos: lo que identifica el problema es el texto.
+    return {re.sub(r"\b\d+\b", "#", re.sub(r"\s*\(\d+\)", "", l)).strip() for l in err.splitlines()
             if re.search(r"Syntax Error|Internal Error|Error:", l)}
 
 

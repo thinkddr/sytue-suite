@@ -557,4 +557,8 @@ export const sv: AppCatalog<typeof en> = {
   'pos.imageUpload': 'Ladda upp bild av {name}',
   'pos.images': 'Bilder',
   'pos.imageHint': 'Välj en JPEG-, PNG- eller WebP-bild på högst 10 MB.',
+  'vf.error.invalidCertificate':
+    'Certifikatet eller den privata nyckeln är inte ett giltigt kvalificerat certifikat med spanskt skatte-ID (NIF).',
+  'vf.error.certificateTaxIdMismatch':
+    'Skatte-ID:t (NIF) på certifikatet stämmer inte överens med organisationens skatte-ID.',
 };

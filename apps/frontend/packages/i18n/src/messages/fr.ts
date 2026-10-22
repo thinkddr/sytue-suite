@@ -394,4 +394,9 @@ export const fr: Catalog = {
     'Le fournisseur n’a pas confirmé l’enregistrement. Actualisez et vérifiez avant de réessayer.',
   'linkedServices.unavailable':
     'La connexion à ce fournisseur n’est pas disponible pour votre compte.',
+  'localFile.confirmUpload.title': 'Ouvrir un fichier de cet appareil',
+  'localFile.confirmUpload.body':
+    'Pour ouvrir « {name} », le fichier sera téléversé sur votre compte Sytue One.',
+  'localFile.confirmUpload.remember': 'Mémoriser mon choix sur cet appareil',
+  'localFile.confirmUpload.confirm': 'Téléverser et ouvrir',
 };

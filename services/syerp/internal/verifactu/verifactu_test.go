@@ -5,9 +5,17 @@ package verifactu
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/asn1"
+	"encoding/pem"
 	"encoding/xml"
 	"errors"
 	"io"
+	"math/big"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -329,5 +337,88 @@ func TestEnviar(t *testing.T) {
 	}
 	if _, err := c.Enviar(context.Background(), Parte{}, nil); err == nil {
 		t.Fatal("un envío vacío no se manda")
+	}
+}
+
+func emitirCertPrueba(t *testing.T, orgID, serial string, esCA bool, desde, hasta time.Time) (certPEM, keyPEM []byte) {
+	t.Helper()
+	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sujeto := pkix.Name{CommonName: "Prueba VERI*FACTU", SerialNumber: serial}
+	if orgID != "" {
+		sujeto.ExtraNames = append(sujeto.ExtraNames, pkix.AttributeTypeAndValue{
+			Type:  asn1.ObjectIdentifier{2, 5, 4, 97},
+			Value: orgID,
+		})
+	}
+	plantilla := &x509.Certificate{
+		SerialNumber:          big.NewInt(1),
+		Subject:               sujeto,
+		NotBefore:             desde,
+		NotAfter:              hasta,
+		KeyUsage:              x509.KeyUsageDigitalSignature,
+		BasicConstraintsValid: true,
+		IsCA:                  esCA,
+	}
+	der, err := x509.CreateCertificate(rand.Reader, plantilla, plantilla, &priv.PublicKey, priv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	keyDER, err := x509.MarshalECPrivateKey(priv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}),
+		pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: keyDER})
+}
+
+func TestValidarCertificadoYProduccionExigeMismoNIF(t *testing.T) {
+	// Relativo al reloj real y no a una fecha fija: NuevoCliente valida contra
+	// time.Now(), y con una fecha escrita el test caducó al día siguiente.
+	ahora := time.Now().UTC().Truncate(time.Second)
+	desde, hasta := ahora.Add(-time.Hour), ahora.Add(24*time.Hour)
+
+	// Certificado de representante: OID 2.5.4.97 (entidad) prevalece sobre 2.5.4.5 (representante).
+	certRep, keyRep := emitirCertPrueba(t, "VATES-B12345678", "IDCES-89890001K", false, desde, hasta)
+	if nif, err := ValidarCertificado(certRep, keyRep, ahora); err != nil || nif != "B12345678" {
+		t.Fatalf("representante: nif=%q err=%v", nif, err)
+	}
+
+	// Certificado de persona física: OID 2.5.4.5 (serialNumber).
+	certPF, keyPF := emitirCertPrueba(t, "", "IDCES-89890001K", false, desde, hasta)
+	if nif, err := ValidarCertificado(certPF, keyPF, ahora); err != nil || nif != "89890001K" {
+		t.Fatalf("persona física: nif=%q err=%v", nif, err)
+	}
+
+	// Sin NIF en el titular, caducado o de autoridad certificadora: rechazados.
+	certSinNIF, keySinNIF := emitirCertPrueba(t, "", "", false, desde, hasta)
+	if _, err := ValidarCertificado(certSinNIF, keySinNIF, ahora); err == nil {
+		t.Fatal("certificado sin NIF aceptado")
+	}
+	certCaducado, keyCaducado := emitirCertPrueba(t, "VATES-B12345678", "", false, ahora.Add(-48*time.Hour), ahora.Add(-time.Hour))
+	if _, err := ValidarCertificado(certCaducado, keyCaducado, ahora); err == nil {
+		t.Fatal("certificado caducado aceptado")
+	}
+	certCA, keyCA := emitirCertPrueba(t, "VATES-B12345678", "", true, desde, hasta)
+	if _, err := ValidarCertificado(certCA, keyCA, ahora); err == nil {
+		t.Fatal("certificado CA aceptado")
+	}
+
+	// En producción NuevoCliente exige certificado válido con NIF y Enviar exige que coincida con el obligado.
+	if _, err := NuevoCliente(certSinNIF, keySinNIF, true, false); err == nil {
+		t.Fatal("NuevoCliente en producción aceptó un certificado sin NIF")
+	}
+	cliProd, err := NuevoCliente(certPF, keyPF, true, false)
+	if err != nil || cliProd.NIF() != "89890001K" {
+		t.Fatalf("NuevoCliente en producción: nif=%q err=%v", cliProd.NIF(), err)
+	}
+	frag, err := alta().XML()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := cliProd.Enviar(context.Background(), Parte{Nombre: "Otra SL", NIF: "B12345678"}, []string{frag}); err == nil || !strings.Contains(err.Error(), "tiene que coincidir") {
+		t.Fatalf("Enviar en producción permitió presentar con el certificado de otro NIF: %v", err)
 	}
 }

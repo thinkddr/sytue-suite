@@ -443,11 +443,11 @@ PY
     mal "android-binario.py no da su tipo a un segundo servicio sin tocar el primero"
   python3 "$BIN" servicio-en-primer-plano "$tmp/manifiesto.bin" eu.sytue.nativo.Avisos 0x40000000 >/dev/null 2>&1 &&
     mal "android-binario.py da por bueno un manifiesto sin el servicio de avisos"
-  # La imagen dentro de imagen: supportsPictureInPicture en la <activity>, leíble, una
-  # sola vez, y sin tocar los servicios que ya estaban.
+  # La imagen dentro de imagen: supportsPictureInPicture en la GoNativeActivity, leíble, una
+  # sola vez, y sin confundirse con una segunda <activity> (SesionDesbloqueo).
   python3 - "$tmp/actividad.bin" <<'PY'
 import struct, sys
-cad = ["name", "configChanges", "activity", "org.golang.app.GoNativeActivity", "http://schemas.android.com/apk/res/android", "manifest"]
+cad = ["name", "configChanges", "activity", "org.golang.app.GoNativeActivity", "http://schemas.android.com/apk/res/android", "manifest", "eu.sytue.nativo.SesionDesbloqueo"]
 cuerpo = b"".join(bytes([len(c), len(c)]) + c.encode() + b"\0" for c in cad)
 offs, o = [], 0
 for c in cad:
@@ -460,9 +460,10 @@ def elem(nombre, atrs):
     ext = struct.pack("<IIHHHHHH", 0xFFFFFFFF, nombre, 20, 20, len(atrs), 0, 0, 0) + b"".join(atrs)
     return struct.pack("<HHIII", 0x102, 16, 16 + len(ext), 1, 0xFFFFFFFF) + ext
 nombre = struct.pack("<IIIHBBI", 4, 0, 3, 8, 0, 0x03, 3)
+nombre_sesion = struct.pack("<IIIHBBI", 4, 0, 6, 8, 0, 0x03, 6)
 cambios = struct.pack("<IIIHBBI", 4, 1, 0xFFFFFFFF, 8, 0, 0x11, 0x4a0)
 fin = struct.pack("<HHIIIII", 0x103, 16, 24, 1, 0xFFFFFFFF, 0xFFFFFFFF, 2)
-cuerpo = pool + mapa + elem(5, []) + elem(2, [nombre, cambios]) + fin
+cuerpo = pool + mapa + elem(5, []) + elem(2, [nombre, cambios]) + fin + elem(2, [nombre_sesion]) + fin
 open(sys.argv[1], "wb").write(struct.pack("<HHI", 3, 8, 8 + len(cuerpo)) + cuerpo)
 PY
   [ -z "$(python3 "$BIN" leer-imagen-en-imagen "$tmp/actividad.bin" 2>&1)" ] ||
@@ -1101,11 +1102,17 @@ fi
 
 # La CLI de Fyne solo empaqueta UNA actividad, la GoNativeActivity: cualquier otra en el
 # manifiesto tumba el AAB con «can only build an .apk for GoNativeActivity» (Rooms,
-# v3.7.10, con la del permiso de compartir pantalla). Lo que necesite una actividad va
-# en un fragmento pegado a ella (PantallaPermiso) o en otra app del sistema.
+# v3.7.10, con la del permiso de compartir pantalla; todas las apps en v3.13.12 con
+# SesionDesbloqueo inyectada por android-sesion.py). Lo que añade actividades o
+# componentes adicionales solo puede ir en $ESCENARIO/android-$app.xml (el manifiesto de
+# aapt2 link), nunca en $dir/AndroidManifest.xml (el que lee `fyne package`).
 while IFS= read -r l; do
   mal "empaquetar.sh declara una actividad que la CLI de Fyne no empaqueta: $l"
 done < <(grep -no '<activity android:name="[^"]*"' "$GUION" | grep -v '"org.golang.app.GoNativeActivity"')
+grep -qF 'manifiesto_android "" "" >"$dir/AndroidManifest.xml"' "$GUION" ||
+  mal "empaquetar.sh pasa componentes adicionales a \$dir/AndroidManifest.xml: fyne package rechaza SesionDesbloqueo"
+grep -qF 'manifiesto_android "$sesion_queries" "$sesion_components" >"$ESCENARIO/android-$app.xml"' "$GUION" ||
+  mal "empaquetar.sh no incluye sesion_queries y sesion_components en \$ESCENARIO/android-\$app.xml para el AAB final"
 
 # El manifiesto común de TODAS las apps atiende el giro y los cambios de tamaño.
 # No basta con orientation: desde API 13 también cambian screenSize/screenLayout.

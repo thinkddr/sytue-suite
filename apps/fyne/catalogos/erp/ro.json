@@ -505,6 +505,8 @@
   "vf.confirmBody": "De acum, fiecare factură confirmată se trimite Agenției Fiscale spaniole și nu mai poate fi modificată sau ștearsă: erorile se corectează cu o factură de corecție. Odată activat, rămâne activ până la sfârșitul anului.",
   "vf.confirmTitle": "Activați VERI*FACTU?",
   "vf.declaration": "Declarație de conformitate",
+  "vf.error.certificateTaxIdMismatch": "Codul fiscal (NIF) din certificat nu corespunde cu NIF-ul organizației.",
+  "vf.error.invalidCertificate": "Certificatul sau cheia sa privată nu reprezintă un certificat calificat valid cu un NIF spaniol.",
   "vf.export": "Descărcați înregistrările",
   "vf.fixHint": "Corectați datele facturii sau ale clientului și trimiteți-o din nou.",
   "vf.intro": "Din 2027, fiecare factură trebuie înregistrată la Agenția Fiscală spaniolă în momentul emiterii. Cu VERI*FACTU, Sytue face acest lucru în locul dvs. când confirmați o factură și adaugă codul QR cu care clientul o poate verifica.",

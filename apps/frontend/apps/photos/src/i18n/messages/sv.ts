@@ -250,4 +250,7 @@ export const sv: AppCatalog<typeof en> = {
   'memories.years': 'För {count} år sedan',
   'memories.oneYear': 'För ett år sedan',
   'memories.hide': 'Dölj',
+  'aiBatch.excludeOrg': 'Undanta organisationen från den automatiska Sytue AI-körningen',
+  'aiBatch.excludedHint':
+    'Organisationen är undantagen från den automatiska Sytue AI-körningen. Nya bilder bearbetas inte i bakgrunden för förslag eller likheter.',
 };

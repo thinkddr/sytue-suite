@@ -49,6 +49,9 @@ func seedOwnedFile(t *testing.T, ctx context.Context, st *store.Store, folderID 
 func backdateCreatedAt(t *testing.T, ctx context.Context, h *pgtest.Harness, id uuid.UUID, when time.Time) {
 	t.Helper()
 	if err := h.Pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, "SELECT set_config('app.maintenance', 'on', true)"); err != nil {
+			return err
+		}
 		_, err := tx.Exec(ctx, `UPDATE files SET created_at=$2 WHERE id=$1`, id, when)
 		return err
 	}); err != nil {
@@ -84,40 +87,43 @@ func TestLegalHoldPreservesFileAndVersionsThroughPurge(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool)
 	ctx := tenantCtx("acme")
+	ctxAlice := store.WithOwner(ctx, "alice")
+	ctxBob := store.WithOwner(ctx, "bob")
 	if _, err := st.EnsureQuota(ctx, 1<<30); err != nil {
 		t.Fatalf("EnsureQuota: %v", err)
 	}
-	root, _ := st.EnsureRoot(ctx)
+	rootAlice, _ := st.EnsureRoot(ctxAlice)
+	rootBob, _ := st.EnsureRoot(ctxBob)
 
 	// Fichero de alice con UNA versión archivada (dos subidas del mismo nombre).
-	seedOwnedFile(t, ctx, st, root.ID, "doc.pdf", "alice", 100)
-	held := seedOwnedFile(t, ctx, st, root.ID, "doc.pdf", "alice", 120)
-	if countArchivedVersions(t, ctx, st, held.ID) != 1 {
+	seedOwnedFile(t, ctxAlice, st, rootAlice.ID, "doc.pdf", "alice", 100)
+	held := seedOwnedFile(t, ctxAlice, st, rootAlice.ID, "doc.pdf", "alice", 120)
+	if countArchivedVersions(t, ctxAlice, st, held.ID) != 1 {
 		t.Fatalf("preparación: quiero 1 versión archivada")
 	}
-	free := seedOwnedFile(t, ctx, st, root.ID, "libre.pdf", "bob", 50)
+	free := seedOwnedFile(t, ctxBob, st, rootBob.ID, "libre.pdf", "bob", 50)
 
 	if _, err := st.CreateHold(ctx, domain.LegalHold{Subject: "alice", Case: "C1", CreatedBy: "admin-1"}); err != nil {
 		t.Fatalf("CreateHold: %v", err)
 	}
 
 	// Ambos a la papelera (soft-delete).
-	if _, err := st.DeleteFile(ctx, held.ID); err != nil {
+	if _, err := st.DeleteFile(ctxAlice, held.ID); err != nil {
 		t.Fatalf("DeleteFile held: %v", err)
 	}
-	if _, err := st.DeleteFile(ctx, free.ID); err != nil {
+	if _, err := st.DeleteFile(ctxBob, free.ID); err != nil {
 		t.Fatalf("DeleteFile free: %v", err)
 	}
 
 	// Purga manual: el de alice se NIEGA (ErrLegalHold); el de bob se purga.
-	if _, err := st.PurgeFile(ctx, held.ID); !errors.Is(err, domain.ErrLegalHold) {
+	if _, err := st.PurgeFile(ctxAlice, held.ID); !errors.Is(err, domain.ErrLegalHold) {
 		t.Fatalf("PurgeFile bajo hold = %v, quiero ErrLegalHold", err)
 	}
-	if _, err := st.PurgeFile(ctx, free.ID); err != nil {
+	if _, err := st.PurgeFile(ctxBob, free.ID); err != nil {
 		t.Fatalf("PurgeFile sin hold: %v", err)
 	}
 	// El fichero de alice y su versión sobreviven; el de bob no.
-	if countArchivedVersions(t, ctx, st, held.ID) != 1 {
+	if countArchivedVersions(t, ctxAlice, st, held.ID) != 1 {
 		t.Fatal("la versión archivada del fichero retenido debe sobrevivir")
 	}
 	if got := ediscoveryCount(t, ctx, st, "alice"); got != 1 {
@@ -135,7 +141,7 @@ func TestLegalHoldPreservesFileAndVersionsThroughPurge(t *testing.T) {
 	if err := st.ReleaseHold(ctx, holds[0].ID, "admin-1"); err != nil {
 		t.Fatalf("ReleaseHold: %v", err)
 	}
-	if _, err := st.PurgeFile(ctx, held.ID); err != nil {
+	if _, err := st.PurgeFile(ctxAlice, held.ID); err != nil {
 		t.Fatalf("PurgeFile tras liberar: %v", err)
 	}
 	if got := ediscoveryCount(t, ctx, st, "alice"); got != 0 {
@@ -150,44 +156,47 @@ func TestLegalHoldRefusesFolderCascade(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool)
 	ctx := tenantCtx("acme")
+	ctxAlice := store.WithOwner(ctx, "alice")
+	ctxBob := store.WithOwner(ctx, "bob")
 	if _, err := st.EnsureQuota(ctx, 1<<30); err != nil {
 		t.Fatalf("EnsureQuota: %v", err)
 	}
-	root, _ := st.EnsureRoot(ctx)
+	rootAlice, _ := st.EnsureRoot(ctxAlice)
+	rootBob, _ := st.EnsureRoot(ctxBob)
 
-	// Carpeta con un fichero de alice (retenido) y uno de bob (no).
-	dir, err := st.CreateFolder(ctx, root.ID, "Proyecto", "alice", false)
+	// Carpeta de alice con un fichero profundo en un subárbol y otro en la raíz de la carpeta.
+	dir, err := st.CreateFolder(ctxAlice, rootAlice.ID, "Proyecto", "alice", false)
 	if err != nil {
 		t.Fatalf("CreateFolder: %v", err)
 	}
-	sub, err := st.CreateFolder(ctx, dir.ID, "sub", "alice", false)
+	sub, err := st.CreateFolder(ctxAlice, dir.ID, "sub", "alice", false)
 	if err != nil {
 		t.Fatalf("CreateFolder sub: %v", err)
 	}
-	seedOwnedFile(t, ctx, st, sub.ID, "caso.pdf", "alice", 100) // profundo en el subárbol
-	seedOwnedFile(t, ctx, st, dir.ID, "otro.pdf", "bob", 40)
+	seedOwnedFile(t, ctxAlice, st, sub.ID, "caso.pdf", "alice", 100) // profundo en el subárbol
+	seedOwnedFile(t, ctxAlice, st, dir.ID, "otro.pdf", "alice", 40)
 
 	if _, err := st.CreateHold(ctx, domain.LegalHold{Subject: "alice", Case: "C2", CreatedBy: "admin-1"}); err != nil {
 		t.Fatalf("CreateHold: %v", err)
 	}
-	if _, err := st.DeleteFolder(ctx, dir.ID); err != nil {
+	if _, err := st.DeleteFolder(ctxAlice, dir.ID); err != nil {
 		t.Fatalf("DeleteFolder: %v", err)
 	}
 	// Purga de la carpeta: negada (el subárbol guarda un fichero retenido).
-	if _, err := st.PurgeFolder(ctx, dir.ID); !errors.Is(err, domain.ErrLegalHold) {
+	if _, err := st.PurgeFolder(ctxAlice, dir.ID); !errors.Is(err, domain.ErrLegalHold) {
 		t.Fatalf("PurgeFolder bajo hold = %v, quiero ErrLegalHold", err)
 	}
-	if got := ediscoveryCount(t, ctx, st, "alice"); got != 1 {
-		t.Fatalf("el fichero del subárbol retenido debe seguir vivo: %d", got)
+	if got := ediscoveryCount(t, ctx, st, "alice"); got != 2 {
+		t.Fatalf("los ficheros del subárbol retenido deben seguir vivos: %d", got)
 	}
 
 	// Sin hold (otra carpeta solo con fichero de bob): la purga de carpeta funciona.
-	dir2, _ := st.CreateFolder(ctx, root.ID, "Temp", "bob", false)
-	seedOwnedFile(t, ctx, st, dir2.ID, "borrable.pdf", "bob", 30)
-	if _, err := st.DeleteFolder(ctx, dir2.ID); err != nil {
+	dir2, _ := st.CreateFolder(ctxBob, rootBob.ID, "Temp", "bob", false)
+	seedOwnedFile(t, ctxBob, st, dir2.ID, "borrable.pdf", "bob", 30)
+	if _, err := st.DeleteFolder(ctxBob, dir2.ID); err != nil {
 		t.Fatalf("DeleteFolder Temp: %v", err)
 	}
-	if _, err := st.PurgeFolder(ctx, dir2.ID); err != nil {
+	if _, err := st.PurgeFolder(ctxBob, dir2.ID); err != nil {
 		t.Fatalf("PurgeFolder sin hold debe funcionar: %v", err)
 	}
 }
@@ -199,15 +208,18 @@ func TestLegalHoldAutoPurgeSkipsHeld(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool)
 	ctx := tenantCtx("acme")
+	ctxAlice := store.WithOwner(ctx, "alice")
+	ctxBob := store.WithOwner(ctx, "bob")
 	if _, err := st.EnsureQuota(ctx, 1<<30); err != nil {
 		t.Fatalf("EnsureQuota: %v", err)
 	}
-	root, _ := st.EnsureRoot(ctx)
+	rootAlice, _ := st.EnsureRoot(ctxAlice)
+	rootBob, _ := st.EnsureRoot(ctxBob)
 
-	held := seedOwnedFile(t, ctx, st, root.ID, "retenido.pdf", "alice", 100) // top-level
-	free := seedOwnedFile(t, ctx, st, root.ID, "caduco.pdf", "bob", 60)      // top-level
-	dir, _ := st.CreateFolder(ctx, root.ID, "Carpeta", "alice", false)       // subárbol con retenido
-	seedOwnedFile(t, ctx, st, dir.ID, "dentro.pdf", "alice", 70)
+	held := seedOwnedFile(t, ctxAlice, st, rootAlice.ID, "retenido.pdf", "alice", 100) // top-level
+	free := seedOwnedFile(t, ctxBob, st, rootBob.ID, "caduco.pdf", "bob", 60)          // top-level
+	dir, _ := st.CreateFolder(ctxAlice, rootAlice.ID, "Carpeta", "alice", false)       // subárbol con retenido
+	seedOwnedFile(t, ctxAlice, st, dir.ID, "dentro.pdf", "alice", 70)
 
 	hold, err := st.CreateHold(ctx, domain.LegalHold{Subject: "alice", Case: "C3", CreatedBy: "admin-1"})
 	if err != nil {
@@ -215,17 +227,19 @@ func TestLegalHoldAutoPurgeSkipsHeld(t *testing.T) {
 	}
 
 	// Todo a la papelera y envejecido 40 días.
-	for _, id := range []uuid.UUID{held.ID, free.ID} {
-		if _, err := st.DeleteFile(ctx, id); err != nil {
-			t.Fatalf("DeleteFile: %v", err)
-		}
-		backdateDeletedAt(t, ctx, h, "files", id, 40*24*time.Hour)
+	if _, err := st.DeleteFile(ctxAlice, held.ID); err != nil {
+		t.Fatalf("DeleteFile held: %v", err)
 	}
-	if _, err := st.DeleteFolder(ctx, dir.ID); err != nil {
+	backdateDeletedAt(t, ctxAlice, h, "files", held.ID, 40*24*time.Hour)
+	if _, err := st.DeleteFile(ctxBob, free.ID); err != nil {
+		t.Fatalf("DeleteFile free: %v", err)
+	}
+	backdateDeletedAt(t, ctxBob, h, "files", free.ID, 40*24*time.Hour)
+	if _, err := st.DeleteFolder(ctxAlice, dir.ID); err != nil {
 		t.Fatalf("DeleteFolder: %v", err)
 	}
-	backdateDeletedAt(t, ctx, h, "folders", dir.ID, 40*24*time.Hour)
-	backdateDeletedAt(t, ctx, h, "files", dir.ID, 40*24*time.Hour) // no-op sobre files; inocuo
+	backdateDeletedAt(t, ctxAlice, h, "folders", dir.ID, 40*24*time.Hour)
+	backdateDeletedAt(t, ctxAlice, h, "files", dir.ID, 40*24*time.Hour) // no-op sobre files; inocuo
 
 	cutoff := time.Now().Add(-30 * 24 * time.Hour)
 	claimed, _, err := st.ClaimAndPurgeExpiredTrash(context.Background(), cutoff, 100)
@@ -261,7 +275,7 @@ func TestLegalHoldAutoPurgeSkipsHeld(t *testing.T) {
 func TestPurgeNoHoldUnchanged(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool)
-	ctx := tenantCtx("acme")
+	ctx := store.WithOwner(tenantCtx("acme"), "alice")
 	if _, err := st.EnsureQuota(ctx, 1<<30); err != nil {
 		t.Fatalf("EnsureQuota: %v", err)
 	}
@@ -283,7 +297,7 @@ func TestPurgeNoHoldUnchanged(t *testing.T) {
 func TestEDiscoveryFindsPreservedAndFilters(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool)
-	ctx := tenantCtx("acme")
+	ctx := store.WithOwner(tenantCtx("acme"), "sue")
 	if _, err := st.EnsureQuota(ctx, 1<<30); err != nil {
 		t.Fatalf("EnsureQuota: %v", err)
 	}
@@ -359,7 +373,7 @@ func TestComplianceOrgIsolation(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool)
 	ctxA := tenantCtx("acme")
-	ctxB := tenantCtx("globex")
+	ctxB := store.WithOwner(tenantCtx("globex"), "spy")
 	if _, err := st.EnsureQuota(ctxB, 1<<30); err != nil {
 		t.Fatalf("EnsureQuota B: %v", err)
 	}

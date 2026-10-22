@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"net/url"
 	"regexp"
 	"slices"
 	"strings"
@@ -317,6 +318,10 @@ func (h *Handlers) PutSecrets(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, r, err)
 		return
 	}
+	if err := h.validarHostsEnSecretos(r.Context(), inst, req.Secrets); err != nil {
+		httpx.Fail(w, r, err)
+		return
+	}
 	if err := h.store.PutSecrets(r.Context(), id, req.Secrets); err != nil {
 		httpx.Fail(w, r, toAPIError(err))
 		return
@@ -348,11 +353,46 @@ func (h *Handlers) PatchSecrets(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, r, err)
 		return
 	}
+	if err := h.validarHostsEnSecretos(r.Context(), inst, req.Secrets); err != nil {
+		httpx.Fail(w, r, err)
+		return
+	}
 	if err := h.store.MergeSecrets(r.Context(), id, req.Secrets); err != nil {
 		httpx.Fail(w, r, toAPIError(err))
 		return
 	}
 	httpx.NoContent(w)
+}
+
+// validarHostsEnSecretos comprueba que un secreto estructurado (p. ej. la clave JSON de
+// cuenta de servicio de Google con `token_uri`) solo apunte a los hosts oficiales
+// declarados en el manifiesto del proveedor.
+func (h *Handlers) validarHostsEnSecretos(ctx context.Context, inst *domain.AppInstance, secrets map[string]string) error {
+	rawSA := strings.TrimSpace(secrets["service_account_key"])
+	if rawSA == "" || h.store == nil || inst == nil {
+		return nil
+	}
+	var sa struct {
+		TokenURI string `json:"token_uri"`
+	}
+	if err := json.Unmarshal([]byte(rawSA), &sa); err != nil {
+		return httpx.ErrBadRequest.WithMessage("service_account_key must be valid JSON.")
+	}
+	if strings.TrimSpace(sa.TokenURI) == "" {
+		return nil
+	}
+	u, err := url.Parse(strings.TrimSpace(sa.TokenURI))
+	if err != nil || u.Scheme != "https" || u.Hostname() == "" {
+		return httpx.ErrBadRequest.WithMessage("token_uri in service_account_key must be a valid https URL.")
+	}
+	if m, merr := h.manifestDe(ctx, inst.TemplateKey); merr == nil {
+		var cfg map[string]string
+		_ = json.Unmarshal(inst.Config, &cfg)
+		if oficiales := m.HostsOficiales(cfg); len(oficiales) > 0 && !manifest.HostPermitido(u.Hostname(), oficiales) {
+			return httpx.ErrBadRequest.WithMessage("token_uri in service_account_key does not point to an official provider host.")
+		}
+	}
+	return nil
 }
 
 // TestInstance prueba la conexión con el tercero. Una instancia puede tener VARIAS

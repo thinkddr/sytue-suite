@@ -949,6 +949,17 @@ export const fr: AppCatalog<typeof en> = {
   'monitoring.alerts.scope.org': 'organisation',
   'monitoring.alerts.scope.project': 'projet',
   'monitoring.alerts.disabled': 'désactivée',
+  'monitoring.alerts.unconfirmed': 'en attente de confirmation',
+  'monitoring.alerts.created.mailtoDesc':
+    'Nous avons envoyé un lien de confirmation à cette adresse. Les alertes arriveront dès qu’elle sera confirmée.',
+  'monitoring.alerts.confirm.title': 'Confirmer les alertes par e-mail',
+  'monitoring.alerts.confirm.desc':
+    'Confirmez que cette adresse doit recevoir les alertes d’événement de Sytue DevX.',
+  'monitoring.alerts.confirm.submit': 'Confirmer l’adresse',
+  'monitoring.alerts.confirm.done':
+    'Adresse confirmée. Vous recevrez désormais les alertes à cette adresse e-mail.',
+  'monitoring.alerts.confirm.invalid':
+    'Ce lien de confirmation n’est pas valide ou l’alerte a déjà été supprimée.',
   'monitoring.alerts.delete': 'Supprimer l’alerte {event}',
 
   'members.subtitle': 'Qui a accès à l’organisation. Chaque personne occupe un siège de la suite.',

@@ -1,4 +1,6 @@
 {
+  "aiBatch.excludeOrg": "Wyklucz organizację z automatycznej partii Sytue AI",
+  "aiBatch.excludedHint": "Organizacja jest wykluczona z automatycznej partii Sytue AI. Nowe zdjęcia nie są przetwarzane w tle pod kątem propozycji ani podobieństw.",
   "album.linkCopied": "Link skopiowany",
   "album.newLink": "Nowy link",
   "album.newLinkConfirm": "Utworzyć nowy link? Obecny link przestanie działać dla osób, które już go mają.",

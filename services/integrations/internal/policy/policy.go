@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
@@ -36,6 +37,10 @@ import (
 
 // ErrRateLimited indica que la instancia agotó su presupuesto de egress.
 var ErrRateLimited = errors.New("policy: rate limit de egress excedido")
+
+// ErrHostNotAllowed indica que el destino no pertenece a los hosts oficiales declarados
+// en el manifiesto del proveedor.
+var ErrHostNotAllowed = errors.New("policy: destino fuera de los hosts oficiales del manifiesto")
 
 // AuditSink persiste una fila de egress_audit. Lo satisface la capa store; se
 // declara aquí como interfaz para no acoplar policy a la persistencia (y poder
@@ -93,6 +98,10 @@ type RuntimeParams struct {
 	// DEL SERVICIO (ID_URL/DRIVE_URL); un valor tecleado por un administrador jamás
 	// llega aquí, así que no hay forma de convertir esto en un SSRF.
 	Internal bool
+	// AllowedHosts restringe el egreso a los hosts oficiales declarados en el manifiesto
+	// del proveedor (exactos o comodín *.dominio). Vacío = sin lista (plantillas que no
+	// declaran hosts propios).
+	AllowedHosts []string
 	// Log es el logger de la instancia (etiquetado por el llamante).
 	Log *slog.Logger
 	// Timeout total por petición (<=0 ⇒ 15s). MaxRedirects (<=0 ⇒ 5).
@@ -123,15 +132,16 @@ func BuildRuntime(p RuntimeParams) connector.Runtime {
 		base = http.DefaultTransport
 	}
 	tr := &transport{
-		base:       base,
-		internal:   p.Internal,
-		orgID:      p.OrgID,
-		instanceID: p.InstanceID,
-		bearer:     p.Bearer,
-		limiter:    p.Limiter,
-		audit:      p.Audit,
-		dlp:        dlp,
-		log:        log,
+		base:         base,
+		internal:     p.Internal,
+		orgID:        p.OrgID,
+		instanceID:   p.InstanceID,
+		bearer:       p.Bearer,
+		allowedHosts: p.AllowedHosts,
+		limiter:      p.Limiter,
+		audit:        p.Audit,
+		dlp:          dlp,
+		log:          log,
 	}
 	timeout := p.Timeout
 	if timeout <= 0 {
@@ -144,7 +154,7 @@ func BuildRuntime(p RuntimeParams) connector.Runtime {
 	client := &http.Client{
 		Timeout:       timeout,
 		Transport:     tr,
-		CheckRedirect: redirectPolicy(maxRedirects, p.Internal),
+		CheckRedirect: redirectPolicy(maxRedirects, p.Internal, p.AllowedHosts),
 	}
 	return connector.Runtime{HTTP: client, Log: log}
 }
@@ -154,7 +164,7 @@ func BuildRuntime(p RuntimeParams) connector.Runtime {
 // filtrar el Bearer inyectado). Con internal, la re-validación se omite —el destino es
 // un servicio de la suite, en IP privada— pero el tope de saltos, el same-host y el
 // no-downgrade se mantienen: son los que impiden que un redirect saque el token fuera.
-func redirectPolicy(maxRedirects int, internal bool) func(*http.Request, []*http.Request) error {
+func redirectPolicy(maxRedirects int, internal bool, allowedHosts []string) func(*http.Request, []*http.Request) error {
 	return func(req *http.Request, via []*http.Request) error {
 		if len(via) >= maxRedirects {
 			return errors.New("policy: demasiados redirects")
@@ -175,24 +185,45 @@ func redirectPolicy(maxRedirects int, internal bool) func(*http.Request, []*http
 		if internal {
 			return nil
 		}
+		if len(allowedHosts) > 0 && !hostPermitido(req.URL.Hostname(), allowedHosts) {
+			return fmt.Errorf("%w: %s", ErrHostNotAllowed, req.URL.Hostname())
+		}
 		return ssrfhttp.ValidateURL(req.Context(), req.URL.String())
 	}
 }
 
 func equalHost(a, b *http.Request) bool { return a.URL.Hostname() == b.URL.Hostname() }
 
+func hostPermitido(host string, oficiales []string) bool {
+	h := strings.ToLower(strings.TrimSpace(host))
+	if h == "" {
+		return false
+	}
+	for _, patron := range oficiales {
+		p := strings.ToLower(strings.TrimSpace(patron))
+		if p == h {
+			return true
+		}
+		if sufijo, ok := strings.CutPrefix(p, "*."); ok && sufijo != "" && strings.HasSuffix(h, "."+sufijo) {
+			return true
+		}
+	}
+	return false
+}
+
 // transport es el http.RoundTripper encadenado. Envuelve el transporte SSRF-safe
 // (base) y aplica la cadena de políticas en cada RoundTrip.
 type transport struct {
-	base       http.RoundTripper
-	internal   bool
-	orgID      string
-	instanceID string
-	bearer     string
-	limiter    httpx.RateLimiter
-	audit      AuditSink
-	dlp        Hook
-	log        *slog.Logger
+	base         http.RoundTripper
+	internal     bool
+	orgID        string
+	instanceID   string
+	bearer       string
+	allowedHosts []string
+	limiter      httpx.RateLimiter
+	audit        AuditSink
+	dlp          Hook
+	log          *slog.Logger
 }
 
 // RoundTrip aplica la cadena y delega en el transporte base. No muta la petición
@@ -205,6 +236,9 @@ func (t *transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	if !t.internal {
 		if err := ssrfhttp.ValidateURL(req.Context(), req.URL.String()); err != nil {
 			return nil, err
+		}
+		if len(t.allowedHosts) > 0 && !hostPermitido(req.URL.Hostname(), t.allowedHosts) {
+			return nil, fmt.Errorf("%w: %s", ErrHostNotAllowed, req.URL.Hostname())
 		}
 	}
 	// (2) Rate-limit por org:instance.

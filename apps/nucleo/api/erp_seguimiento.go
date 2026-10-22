@@ -309,12 +309,14 @@ func (e *ERP) RequisitosFactura(ctx context.Context) (ERPRequisitosFactura, erro
 
 // ERPEstadoVerifactu es VERI*FACTU en la organización y cómo van sus envíos.
 type ERPEstadoVerifactu struct {
-	Activo     bool       `json:"activo"`
-	Desde      *time.Time `json:"desde,omitempty"`
-	Pendientes int        `json:"pendientes"`
-	ConErrores int        `json:"con_errores"`
-	Rechazadas int        `json:"rechazadas"`
-	ErrorEnvio string     `json:"error_envio,omitempty"`
+	Activo           bool       `json:"activo"`
+	Desde            *time.Time `json:"desde,omitempty"`
+	TieneCertificado bool       `json:"tiene_certificado,omitempty"`
+	CertificadoNIF   string     `json:"certificado_nif,omitempty"`
+	Pendientes       int        `json:"pendientes"`
+	ConErrores       int        `json:"con_errores"`
+	Rechazadas       int        `json:"rechazadas"`
+	ErrorEnvio       string     `json:"error_envio,omitempty"`
 	// Motivo es por qué no se puede activar; vacío si se puede o ya está.
 	Motivo  string `json:"motivo,omitempty"`
 	Entorno string `json:"entorno"`
@@ -329,6 +331,23 @@ func (e *ERP) EstadoVerifactu(ctx context.Context) (ERPEstadoVerifactu, error) {
 func (e *ERP) ActivarVerifactu(ctx context.Context) (ERPEstadoVerifactu, error) {
 	r := e.pedir("/verifactu/activar", nil)
 	r.Method = http.MethodPost
+	return JSON[ERPEstadoVerifactu](ctx, e.c, r)
+}
+
+// GuardarCertificadoVerifactu guarda el certificado cualificado propio de la
+// organización (`PUT /api/v1/verifactu/certificado`). Solo quien la administra.
+func (e *ERP) GuardarCertificadoVerifactu(ctx context.Context, certPEM, keyPEM string, sello bool) (ERPEstadoVerifactu, error) {
+	datos, err := json.Marshal(struct {
+		CertPEM string `json:"cert_pem"`
+		KeyPEM  string `json:"key_pem"`
+		Sello   bool   `json:"sello"`
+	}{certPEM, keyPEM, sello})
+	if err != nil {
+		return ERPEstadoVerifactu{}, err
+	}
+	r := e.pedir("/verifactu/certificado", nil)
+	r.Method, r.Body = http.MethodPut, datos
+	r.Header.Set("Content-Type", "application/json")
 	return JSON[ERPEstadoVerifactu](ctx, e.c, r)
 }
 

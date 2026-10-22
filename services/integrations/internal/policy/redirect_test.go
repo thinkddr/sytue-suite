@@ -125,7 +125,7 @@ func TestRedirectPolicy(t *testing.T) {
 	for _, c := range casos {
 		t.Run(c.nombre, func(t *testing.T) {
 			req, via := salto(t, c.origen, c.destino, c.previos)
-			err := redirectPolicy(5, c.internal)(req, via)
+			err := redirectPolicy(5, c.internal, nil)(req, via)
 			if c.quiero == "" {
 				if err != nil {
 					t.Fatalf("el salto debía permitirse; err = %v", err)
@@ -148,7 +148,7 @@ func TestRedirectPolicy(t *testing.T) {
 func TestRedirectPolicy_maxRedirectsSeAplicaAlPrimerSalto(t *testing.T) {
 	soloLoopback(t)
 	req, via := salto(t, "http://127.0.0.1/a", "http://127.0.0.1/b", 1)
-	err := redirectPolicy(1, false)(req, via)
+	err := redirectPolicy(1, false, nil)(req, via)
 	if err == nil || !strings.Contains(err.Error(), "demasiados redirects") {
 		t.Fatalf("err = %v; con maxRedirects=1 el primer salto ya sobra", err)
 	}
@@ -161,7 +161,7 @@ func TestRedirectPolicy_maxRedirectsSeAplicaAlPrimerSalto(t *testing.T) {
 func TestRedirectPolicy_esquemaNoHTTPSeCorta(t *testing.T) {
 	soloLoopback(t)
 	req, via := salto(t, "http://127.0.0.1/a", "gopher://127.0.0.1/x", 1)
-	if err := redirectPolicy(5, false)(req, via); !errors.Is(err, ssrfhttp.ErrInvalidURL) {
+	if err := redirectPolicy(5, false, nil)(req, via); !errors.Is(err, ssrfhttp.ErrInvalidURL) {
 		t.Fatalf("err = %v; se esperaba ErrInvalidURL", err)
 	}
 }

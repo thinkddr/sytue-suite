@@ -555,4 +555,8 @@ export const et: AppCatalog<typeof en> = {
   'pos.imageUpload': 'Laadi üles toote {name} pilt',
   'pos.images': 'Pildid',
   'pos.imageHint': 'Valige kuni 10 MB suurune JPEG-, PNG- või WebP-pilt.',
+  'vf.error.invalidCertificate':
+    'Sertifikaat või privaatvõti ei ole kehtiv Hispaania maksukohustuslase numbriga (NIF) kvalifitseeritud sertifikaat.',
+  'vf.error.certificateTaxIdMismatch':
+    'Sertifikaadil olev maksukohustuslase number (NIF) ei ühti organisatsiooni omaga.',
 };

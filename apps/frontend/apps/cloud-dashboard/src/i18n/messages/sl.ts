@@ -927,6 +927,17 @@ export const sl: AppCatalog<typeof en> = {
   'monitoring.alerts.scope.org': 'organizacija',
   'monitoring.alerts.scope.project': 'projekt',
   'monitoring.alerts.disabled': 'onemogočeno',
+  'monitoring.alerts.unconfirmed': 'čaka na potrditev',
+  'monitoring.alerts.created.mailtoDesc':
+    'Na ta naslov smo poslali potrditveno povezavo. Opozorila bodo prispela takoj, ko bo potrjen.',
+  'monitoring.alerts.confirm.title': 'Potrdi opozorila po e-pošti',
+  'monitoring.alerts.confirm.desc':
+    'Potrdite, da naj ta naslov prejema opozorila o dogodkih iz storitve Sytue DevX.',
+  'monitoring.alerts.confirm.submit': 'Potrdi naslov',
+  'monitoring.alerts.confirm.done':
+    'Naslov je potrjen. Opozorila o dogodkih boste zdaj prejemali na ta e-poštni naslov.',
+  'monitoring.alerts.confirm.invalid':
+    'Ta potrditvena povezava ni veljavna ali pa je bilo opozorilo že odstranjeno.',
   'monitoring.alerts.delete': 'Izbriši opozorilo {event}',
   'members.subtitle': 'Kdo ima dostop do organizacije. Vsaka oseba pomeni eno mesto v zbirki.',
   'members.add': 'Povabi osebo',

@@ -14,12 +14,9 @@ const idiomas = readdirSync(DIR)
   .map((f) => f.slice(0, 2))
   .sort();
 
-// Los idiomas se publican por tandas (decisión del dueño, 18/10/2026: los cinco de la
-// web pública, y el portugués y el neerlandés, ya hechos; los otros diecinueve, la semana siguiente). Esta
-// lista es la de los publicados: un catálogo que no esté aquí, o uno de aquí que falte,
-// pone el test en rojo. Añadir un idioma es poner sus ficheros, su import en index.ts y
-// su código aquí; con los 26, la lista se sustituye por LOCALES.
-const PUBLICADOS = ['de', 'en', 'es', 'fr', 'it', 'nl', 'pt'];
+// Los 26 idiomas de la suite están publicados: un catálogo que no esté aquí, o uno de
+// aquí que falte, pone el test en rojo.
+const PUBLICADOS = [...LOCALES].sort();
 
 test('los catálogos son exactamente los idiomas publicados, todos de la suite', () => {
   expect(idiomas).toEqual(PUBLICADOS);

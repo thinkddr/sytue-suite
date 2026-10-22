@@ -39,6 +39,9 @@ var destinosDeSalida = map[string]domain.MigrationSource{
 // CreateSelfOutbound — POST /api/v1/migrations/self/out — lanza (o continúa) la
 // salida propia de los contenidos pedidos hacia una conexión autorizada.
 func (h *Handlers) CreateSelfOutbound(w http.ResponseWriter, r *http.Request) {
+	if !exigirAdminMigracion(w, r) {
+		return
+	}
 	var req salidaPropiaReq
 	if err := httpx.DecodeJSON(w, r, &req); err != nil {
 		httpx.Fail(w, r, err)

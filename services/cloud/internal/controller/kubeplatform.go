@@ -238,6 +238,13 @@ func (p *KubePlatform) ensureTenantRegistrySecret(ctx context.Context, namespace
 	return nil
 }
 
+const tenantRuntimeClass = "gvisor"
+
+func tenantRuntimeClassPtr() *string {
+	rc := tenantRuntimeClass
+	return &rc
+}
+
 func tenantImagePullSecrets() []corev1.LocalObjectReference {
 	return []corev1.LocalObjectReference{{Name: tenantRegistrySecretName}}
 }
@@ -260,6 +267,17 @@ func (p *KubePlatform) upsertNamespace(ctx context.Context, ns *corev1.Namespace
 
 // ensureResourceQuota fija los topes de cómputo/objetos del tenant según plan.
 func (p *KubePlatform) ensureResourceQuota(ctx context.Context, namespace, tenant string, quota domain.PlanQuota) error {
+	maxStorage := quota.MaxStorage
+	maxPVCs := quota.MaxPVCs
+	if maxStorage == "" || maxPVCs <= 0 {
+		def := domain.QuotasFor(domain.PlanFree)
+		if maxStorage == "" {
+			maxStorage = def.MaxStorage
+		}
+		if maxPVCs <= 0 {
+			maxPVCs = def.MaxPVCs
+		}
+	}
 	rq := &corev1.ResourceQuota{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "tenant-quota",
@@ -268,12 +286,14 @@ func (p *KubePlatform) ensureResourceQuota(ctx context.Context, namespace, tenan
 		},
 		Spec: corev1.ResourceQuotaSpec{
 			Hard: corev1.ResourceList{
-				corev1.ResourceRequestsCPU:    resource.MustParse(quota.RequestCPU),
-				corev1.ResourceRequestsMemory: resource.MustParse(quota.RequestMemory),
-				corev1.ResourceLimitsCPU:      resource.MustParse(quota.LimitCPU),
-				corev1.ResourceLimitsMemory:   resource.MustParse(quota.LimitMemory),
-				corev1.ResourcePods:           resource.MustParse(fmt.Sprintf("%d", quota.MaxPods)),
-				corev1.ResourceServices:       resource.MustParse("20"),
+				corev1.ResourceRequestsCPU:            resource.MustParse(quota.RequestCPU),
+				corev1.ResourceRequestsMemory:         resource.MustParse(quota.RequestMemory),
+				corev1.ResourceLimitsCPU:              resource.MustParse(quota.LimitCPU),
+				corev1.ResourceLimitsMemory:           resource.MustParse(quota.LimitMemory),
+				corev1.ResourcePods:                   resource.MustParse(fmt.Sprintf("%d", quota.MaxPods)),
+				corev1.ResourceServices:               resource.MustParse("20"),
+				corev1.ResourceRequestsStorage:        resource.MustParse(maxStorage),
+				corev1.ResourcePersistentVolumeClaims: resource.MustParse(fmt.Sprintf("%d", maxPVCs)),
 			},
 		},
 	}
@@ -309,16 +329,19 @@ func (p *KubePlatform) ensureLimitRange(ctx context.Context, namespace, tenant s
 			Limits: []corev1.LimitRangeItem{{
 				Type: corev1.LimitTypeContainer,
 				DefaultRequest: corev1.ResourceList{
-					corev1.ResourceCPU:    resource.MustParse("100m"),
-					corev1.ResourceMemory: resource.MustParse("128Mi"),
+					corev1.ResourceCPU:              resource.MustParse("100m"),
+					corev1.ResourceMemory:           resource.MustParse("128Mi"),
+					corev1.ResourceEphemeralStorage: resource.MustParse("128Mi"),
 				},
 				Default: corev1.ResourceList{
-					corev1.ResourceCPU:    resource.MustParse("1"),
-					corev1.ResourceMemory: resource.MustParse("512Mi"),
+					corev1.ResourceCPU:              resource.MustParse("1"),
+					corev1.ResourceMemory:           resource.MustParse("512Mi"),
+					corev1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
 				},
 				Max: corev1.ResourceList{
-					corev1.ResourceCPU:    resource.MustParse("2"),
-					corev1.ResourceMemory: resource.MustParse("2Gi"),
+					corev1.ResourceCPU:              resource.MustParse("2"),
+					corev1.ResourceMemory:           resource.MustParse("2Gi"),
+					corev1.ResourceEphemeralStorage: resource.MustParse("4Gi"),
 				},
 			}},
 		},
@@ -799,12 +822,14 @@ func (p *KubePlatform) applyDeployment(ctx context.Context, spec AppSpec, name s
 		// igual y pagaba igual. `basic` reproduce exactamente aquellos valores.
 		Resources: corev1.ResourceRequirements{
 			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse(size.CPURequest),
-				corev1.ResourceMemory: resource.MustParse(size.MemoryRequest),
+				corev1.ResourceCPU:              resource.MustParse(size.CPURequest),
+				corev1.ResourceMemory:           resource.MustParse(size.MemoryRequest),
+				corev1.ResourceEphemeralStorage: resource.MustParse("128Mi"),
 			},
 			Limits: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse(size.CPULimit),
-				corev1.ResourceMemory: resource.MustParse(size.MemoryLimit),
+				corev1.ResourceCPU:              resource.MustParse(size.CPULimit),
+				corev1.ResourceMemory:           resource.MustParse(size.MemoryLimit),
+				corev1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
 			},
 		},
 		ReadinessProbe: &corev1.Probe{
@@ -830,6 +855,7 @@ func (p *KubePlatform) applyDeployment(ctx context.Context, spec AppSpec, name s
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{Labels: podLabels},
 				Spec: corev1.PodSpec{
+					RuntimeClassName:             tenantRuntimeClassPtr(),
 					AutomountServiceAccountToken: &automountSA,
 					ImagePullSecrets:             tenantImagePullSecrets(),
 					SecurityContext: &corev1.PodSecurityContext{

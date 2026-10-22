@@ -28,7 +28,7 @@ type Procedencia struct {
 // misma versión (no debería ocurrir: cada exportación sube la versión) la reemplaza.
 func (s *Store) GuardarProcedencia(ctx context.Context, fileID uuid.UUID, version int, source string, detail json.RawMessage, sub string) error {
 	t := tenancy.MustFrom(ctx)
-	return s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	return s.inTx(ctx, func(tx pgx.Tx) error {
 		_, err := tx.Exec(ctx, `
 			INSERT INTO drive_file_provenance (tenant, file_id, version, source, detail, created_by)
 			VALUES ($1, $2, $3, $4, $5::jsonb, $6)
@@ -44,7 +44,7 @@ func (s *Store) GuardarProcedencia(ctx context.Context, fileID uuid.UUID, versio
 func (s *Store) ProcedenciaDe(ctx context.Context, fileID uuid.UUID) ([]Procedencia, error) {
 	t := tenancy.MustFrom(ctx)
 	out := []Procedencia{}
-	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	err := s.inTx(ctx, func(tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `
 			SELECT version, source, detail, created_by, created_at FROM drive_file_provenance
 			 WHERE tenant = $1 AND file_id = $2 ORDER BY version DESC LIMIT 100`, t.Slug, fileID)

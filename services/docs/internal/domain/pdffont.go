@@ -46,6 +46,7 @@ import (
 	"unicode/utf8"
 
 	"golang.org/x/image/font/sfnt"
+	"golang.org/x/text/unicode/norm"
 )
 
 // Topes de los identificadores que llegan del fichero. Un PDF manipulado puede
@@ -65,8 +66,9 @@ type glifo struct {
 	codigo uint32
 	ancho  float64 // en milésimas de em, como los guarda el PDF
 	// alto es el desplazamiento vertical (w1 de /W2 o /DW2, normalmente −1000)
-	// en una fuente de escritura vertical; 0 en las demás.
-	alto float64
+	// en una fuente de escritura vertical; vx y vy colocan el origen vertical
+	// respecto al horizontal (§9.2.4, §9.7.4.3).
+	alto, vx, vy float64
 	// esEspacioSimple marca el código 32 de UN byte, el único al que se le aplica
 	// el espaciado de palabra (§9.3.3). En una fuente de dos bytes NO se aplica,
 	// y aplicarlo separa las palabras el doble.
@@ -83,7 +85,9 @@ type fuentePDF struct {
 	// glifo baja en vez de avanzar, lo que dicen /W2 y /DW2.
 	vertical bool
 	altos    map[uint32]float64
+	vx, vy   map[uint32]float64
 	altoDef  float64
+	vyDef    float64
 	aUnicode map[uint32]string
 	dosBytes bool
 	// subconjunto marca la fuente cuyo nombre lleva el prefijo «ABCDEF+», que
@@ -182,38 +186,10 @@ func (f *fuentePDF) decodificar(s pdfString) []glifo {
 // la que no esté en su /ToUnicode; en un subconjunto, la que no tenga anchura
 // (el generador no incrustó su glifo). Mejor decirlo que escribir un hueco.
 func (f *fuentePDF) codificar(texto string) (pdfString, error) {
-	inversa := map[rune]uint32{}
-	apuntar := func(c uint32, t string) {
-		r, n := utf8.DecodeRuneInString(t)
-		if n != len(t) || r == utf8.RuneError {
-			return // ligaduras y vacíos: no son una letra
-		}
-		if _, ya := inversa[r]; !ya {
-			inversa[r] = c
-		}
-	}
-	if f.dosBytes {
-		codigos := make([]uint32, 0, len(f.aUnicode))
-		for c := range f.aUnicode {
-			codigos = append(codigos, c)
-		}
-		slices.Sort(codigos) // el menor código gana, siempre el mismo
-		for _, c := range codigos {
-			if c <= 0xFFFF {
-				apuntar(c, f.aUnicode[c])
-			}
-		}
-	} else {
-		for c := uint32(0); c < 256; c++ {
-			if f.subconjunto && c != ' ' && f.anchos[c] <= 0 {
-				continue
-			}
-			apuntar(c, f.glifoDe(c, false).texto)
-		}
-	}
+	inversa := f.tablaInversa()
 	out := make(pdfString, 0, len(texto)*2)
 	for _, r := range texto {
-		c, ok := inversa[r]
+		c, ok := f.codigoDeRuna(r, inversa)
 		if !ok && (r == '\u200b' || len(inversa) == 0) {
 			return nil, ErrLetrasDesconocidas
 		}
@@ -234,6 +210,104 @@ func (f *fuentePDF) codificar(texto string) (pdfString, error) {
 	return out, nil
 }
 
+// tablaInversa construye el mapa carácter → código para codificar con esta fuente.
+func (f *fuentePDF) tablaInversa() map[rune]uint32 {
+	inversa := map[rune]uint32{}
+	apuntar := func(c uint32, t string) {
+		r, n := utf8.DecodeRuneInString(t)
+		if n != len(t) || r == utf8.RuneError {
+			return // ligaduras y vacíos: no son una letra
+		}
+		if _, ya := inversa[r]; !ya {
+			inversa[r] = c
+		}
+	}
+	if !f.dosBytes {
+		for c := uint32(0); c < 256; c++ {
+			if f.subconjunto && c != ' ' && f.anchos[c] <= 0 {
+				continue
+			}
+			if f.type3 != nil && c != ' ' && f.type3.procs[f.type3.codificacion[byte(c)]] == nil {
+				continue
+			}
+			apuntar(c, f.glifoDe(c, false).texto)
+		}
+		return inversa
+	}
+	codigos := make([]uint32, 0, len(f.aUnicode))
+	for c := range f.aUnicode {
+		codigos = append(codigos, c)
+	}
+	slices.Sort(codigos) // el menor código gana, siempre el mismo
+	for _, c := range codigos {
+		if c <= 0xFFFF || f.cmap != nil {
+			apuntar(c, f.aUnicode[c])
+		}
+	}
+	f.apuntarInversaCID(apuntar)
+	return inversa
+}
+
+// apuntarInversaCID completa el mapa carácter → código con la `cmap` de la
+// TrueType incrustada (runaDeCID) y la CMap de /Encoding cuando no había /ToUnicode.
+func (f *fuentePDF) apuntarInversaCID(apuntar func(uint32, string)) {
+	if len(f.gidARuna) == 0 {
+		return
+	}
+	if f.cmap != nil && (len(f.cmap.cids) > 0 || len(f.cmap.rangos) > 0) {
+		cods := make([]uint32, 0, len(f.cmap.cids))
+		for c := range f.cmap.cids {
+			cods = append(cods, c)
+		}
+		slices.Sort(cods)
+		for _, c := range cods {
+			if r, ok := f.runaDeCID(f.cmap.cids[c]); ok {
+				apuntar(c, string(r))
+			}
+		}
+		for _, rg := range f.cmap.rangos {
+			for c := rg.desde; c <= rg.hasta && c-rg.desde < 70000; c++ {
+				if r, ok := f.runaDeCID(rg.base + c - rg.desde); ok {
+					apuntar(c, string(r))
+				}
+			}
+		}
+		return
+	}
+	if len(f.cidAGid) >= 2 {
+		for cid := uint32(0); int(2*cid+1) < len(f.cidAGid); cid++ {
+			if r, ok := f.runaDeCID(cid); ok {
+				apuntar(cid, string(r))
+			}
+		}
+		return
+	}
+	gids := make([]int, 0, len(f.gidARuna))
+	for g := range f.gidARuna {
+		gids = append(gids, int(g))
+	}
+	slices.Sort(gids)
+	for _, g := range gids {
+		apuntar(uint32(g), string(f.gidARuna[uint16(g)])) //nolint:gosec // G115: g proviene de uint16
+	}
+}
+
+func (f *fuentePDF) codigoDeRuna(r rune, inversa map[rune]uint32) (uint32, bool) {
+	if c, ok := inversa[r]; ok {
+		return c, true
+	}
+	if !f.dosBytes {
+		return 0, false
+	}
+	if f.cmap != nil && f.cmap.unicode != "" {
+		return f.cmap.codigoUnicode(r)
+	}
+	if f.unicodeIdentidad && r > 0 && (r <= 0xFFFF || f.cmap != nil) && (r < 0xD800 || r > 0xDFFF) {
+		return uint32(r), true
+	}
+	return 0, false
+}
+
 // glifoCompuesto resuelve un código de una fuente compuesta: la anchura va por
 // CID y el texto por código (/ToUnicode se indexa por código, no por CID).
 func (f *fuentePDF) glifoCompuesto(codigo, cid uint32, n int, espacio bool) glifo {
@@ -242,9 +316,15 @@ func (f *fuentePDF) glifoCompuesto(codigo, cid uint32, n int, espacio bool) glif
 		g.ancho = w
 	}
 	if f.vertical {
-		g.alto = f.altoDef
+		g.alto, g.vx, g.vy = f.altoDef, g.ancho/2, f.vyDef
 		if h, ok := f.altos[cid]; ok {
 			g.alto = h
+		}
+		if x, ok := f.vx[cid]; ok {
+			g.vx = x
+		}
+		if y, ok := f.vy[cid]; ok {
+			g.vy = y
 		}
 	}
 	if t, ok := f.aUnicode[codigo]; ok {
@@ -263,6 +343,12 @@ func (f *fuentePDF) glifoCompuesto(codigo, cid uint32, n int, espacio bool) glif
 	}
 	if r, ok := f.runaDeCID(cid); ok {
 		g.texto = string(r)
+		return g
+	}
+	if len(f.aUnicode) > 0 && g.ancho == 0 {
+		// Un CID de anchura 0 ausente del /ToUnicode de una fuente que sí lo trae
+		// es una marca combinante posicionada sobre la base; emitir U+200B dentro
+		// de la palabra partiría la búsqueda del texto base.
 		return g
 	}
 	// Sin /ToUnicode ni tipografía que lo diga no hay forma honesta de saber qué
@@ -305,6 +391,9 @@ func (f *fuentePDF) glifoDe(c uint32, espacio bool) glifo {
 		return g
 	}
 	codigo := byte(c & 0xFF)
+	if f.type3 != nil && f.type3.codificacion[codigo] == "" && g.ancho == 0 {
+		return g
+	}
 	if t, ok := f.simple[codigo]; ok {
 		g.texto = t
 		return g
@@ -382,8 +471,8 @@ func (l *lienzo) construir(fd pdfDict) *fuentePDF {
 			}
 		}
 	} else {
-		l.anchosSimples(fd, f)
 		f.simple = l.codificacionSimple(fd, nombreBase, sub)
+		l.anchosSimples(fd, f)
 		// Una fuente de tipo 3 no tiene contornos: sus glifos son flujos de
 		// contenido y hay que EJECUTARLOS. Se lee aquí para que `mostrar` pueda
 		// bifurcar sin volver a resolver el diccionario.
@@ -461,9 +550,11 @@ func (l *lienzo) anchosSimples(fd pdfDict, f *fuentePDF) {
 	}
 	arr, _ := l.d.resolver(fd["Widths"]).(pdfArray)
 
-	// Type3 mide sus glifos en el espacio de /FontMatrix, no en milésimas.
+	// Type3 mide sus glifos en el espacio de /FontMatrix, no en milésimas; y un
+	// código fuera de /FirstChar..LastChar sin /MissingWidth tiene anchura 0.
 	escala := 1.0
 	if s, _ := l.d.resolver(fd["Subtype"]).(pdfName); s == "Type3" {
+		f.anchoDef = 0
 		if fm, ok := l.d.resolver(fd["FontMatrix"]).(pdfArray); ok && len(fm) >= 1 {
 			escala = comoReal(l.d.resolver(fm[0])) * 1000
 		}
@@ -486,8 +577,10 @@ func (l *lienzo) anchosSimples(fd pdfDict, f *fuentePDF) {
 // altosCID lee el desplazamiento vertical w1 de /DW2 y /W2 (§9.7.4.3), con las
 // mismas dos formas que /W pero en tríos «w1 v1x v1y». Sin ellos, −1000.
 func (l *lienzo) altosCID(dd pdfDict, f *fuentePDF) {
-	f.altoDef, f.altos = -1000, map[uint32]float64{}
+	f.altoDef, f.vyDef = -1000, 880
+	f.altos, f.vx, f.vy = map[uint32]float64{}, map[uint32]float64{}, map[uint32]float64{}
 	if a, ok := l.d.resolver(dd["DW2"]).(pdfArray); ok && len(a) == 2 {
+		f.vyDef = comoReal(l.d.resolver(a[0]))
 		f.altoDef = comoReal(l.d.resolver(a[1]))
 	}
 	arr, _ := l.d.resolver(dd["W2"]).(pdfArray)
@@ -498,23 +591,46 @@ func (l *lienzo) altosCID(dd pdfDict, f *fuentePDF) {
 			continue
 		}
 		if v, ok := l.d.resolver(arr[i+1]).(pdfArray); ok {
-			for j := 0; 3*j < len(v) && c+int64(j) <= maxCID; j++ {
-				f.altos[uint32(c+int64(j))] = comoReal(l.d.resolver(v[3*j]))
-			}
+			l.altosCIDLista(f, c, v)
 			i += 2
 			continue
 		}
-		hasta, _ := comoEntero(l.d.resolver(arr[i+1]))
 		if i+2 >= len(arr) {
 			return
 		}
-		if hasta >= c && hasta-c < 70000 && hasta <= maxCID {
-			w1 := comoReal(l.d.resolver(arr[i+2]))
-			for x := c; x <= hasta; x++ {
-				f.altos[uint32(x)] = w1
-			}
-		}
+		l.altosCIDRango(f, c, arr[i+1:])
 		i += 5
+	}
+}
+
+func (l *lienzo) altosCIDLista(f *fuentePDF, c int64, v pdfArray) {
+	for j := 0; 3*j < len(v) && c+int64(j) <= maxCID; j++ {
+		cid := uint32(c + int64(j)) //nolint:gosec // G115: 0 ≤ c+j ≤ maxCID
+		f.altos[cid] = comoReal(l.d.resolver(v[3*j]))
+		if 3*j+2 < len(v) {
+			f.vx[cid] = comoReal(l.d.resolver(v[3*j+1]))
+			f.vy[cid] = comoReal(l.d.resolver(v[3*j+2]))
+		}
+	}
+}
+
+func (l *lienzo) altosCIDRango(f *fuentePDF, c int64, resto pdfArray) {
+	hasta, _ := comoEntero(l.d.resolver(resto[0]))
+	if hasta < c || hasta-c >= 70000 || hasta > maxCID {
+		return
+	}
+	w1 := comoReal(l.d.resolver(resto[1]))
+	vx, vy, tieneV := 0.0, 0.0, len(resto) >= 4
+	if tieneV {
+		vx = comoReal(l.d.resolver(resto[2]))
+		vy = comoReal(l.d.resolver(resto[3]))
+	}
+	for x := c; x <= hasta; x++ {
+		cid := uint32(x) //nolint:gosec // G115: 0 ≤ x ≤ maxCID
+		f.altos[cid] = w1
+		if tieneV {
+			f.vx[cid], f.vy[cid] = vx, vy
+		}
 	}
 }
 
@@ -593,7 +709,13 @@ func (l *lienzo) codificacionSimple(fd pdfDict, base string, sub pdfName) map[by
 		case pdfName:
 			if codigo >= 0 && codigo < 256 {
 				if t, ok := textoDeNombreGlifo(string(x)); ok {
-					tabla[byte(codigo)] = t
+					// En Type 3 sin /ToUnicode los nombres de /Differences identifican el
+					// dibujo en /CharProcs («/square», «/triangle» sobre 'a', 'b'); no se
+					// sustituye un ASCII imprimible por un símbolo geométrico (U+2000..).
+					r, _ := utf8.DecodeRuneInString(t)
+					if sub != "Type3" || codigo < 32 || codigo >= 127 || r < 0x2000 {
+						tabla[byte(codigo)] = t
+					}
 				}
 			}
 			codigo++
@@ -616,7 +738,8 @@ func (l *lienzo) aplicarBase(tabla map[byte]string, baseEnc pdfName, base string
 	case "StandardEncoding":
 		aplicarEstandar(tabla)
 	case "":
-		if sub == "Type1" || sub == "MMType1" {
+		switch sub {
+		case "Type1", "MMType1":
 			desc, _ := l.d.resolver(fd["FontDescriptor"]).(pdfDict)
 			n := strings.ToLower(base)
 			switch {
@@ -624,6 +747,11 @@ func (l *lienzo) aplicarBase(tabla map[byte]string, baseEnc pdfName, base string
 			case strings.Contains(n, "dingbats"):
 				aplicarZapfDingbats(tabla)
 			case !strings.Contains(n, "symbol"):
+				aplicarEstandar(tabla)
+			}
+		case "TrueType":
+			desc, _ := l.d.resolver(fd["FontDescriptor"]).(pdfDict)
+			if desc["FontFile2"] == nil && desc["FontFile3"] == nil {
 				aplicarEstandar(tabla)
 			}
 		}
@@ -687,15 +815,27 @@ func (l *lienzo) leerToUnicode(fd pdfDict, f *fuentePDF) {
 	if err != nil {
 		return
 	}
+	cidIdentidad := l.interpretarCMapToUnicode(datos, f)
+	if len(f.aUnicode) == 0 && !cidIdentidad && len(l.d.listaDeNombres(st.Dict["Filter"])) == 0 {
+		if inflado, err := inflar(datos); err == nil {
+			cidIdentidad = l.interpretarCMapToUnicode(inflado, f)
+		}
+	}
+	f.unicodeIdentidad = len(f.aUnicode) == 0 && cidIdentidad
+}
+
+func (l *lienzo) interpretarCMapToUnicode(flujo []byte, f *fuentePDF) bool {
 	cidIdentidad := false
-	l.d.recorrerCMap(datos, func(op string, pila []pdfObj) {
+	l.d.recorrerCMap(flujo, func(op string, pila []pdfObj) {
 		switch op {
 		case "endbfchar":
 			for i := 0; i+1 < len(pila); i += 2 {
 				o, ok1 := pila[i].(pdfString)
 				dst, ok2 := pila[i+1].(pdfString)
 				if ok1 && ok2 {
-					f.aUnicode[codigoDeHex(o)] = textoUTF16(dst)
+					if t := strings.Trim(textoUTF16(dst), "\x00"); t != "" {
+						f.aUnicode[codigoDeHex(o)] = t
+					}
 				}
 			}
 		case "endbfrange":
@@ -708,7 +848,7 @@ func (l *lienzo) leerToUnicode(fd pdfDict, f *fuentePDF) {
 			}
 		}
 	})
-	f.unicodeIdentidad = len(f.aUnicode) == 0 && cidIdentidad
+	return cidIdentidad
 }
 
 func (l *lienzo) rangoBF(pila []pdfObj, f *fuentePDF) {
@@ -1323,6 +1463,22 @@ func aplicarMetricasEstandar(l *lienzo, fd pdfDict, f *fuentePDF) {
 	}
 	for i, w := range tabla {
 		f.anchos[uint32(32+i)] = float64(w)
+	}
+	for c := 128; c < 256; c++ {
+		t := f.simple[byte(c)]
+		if t == "" {
+			t = decodificarTextoPDF(pdfString{byte(c)})
+		}
+		switch t {
+		case "…":
+			f.anchos[uint32(c)] = 1000
+		case "º", "ª":
+			f.anchos[uint32(c)] = 300
+		default:
+			if d := norm.NFD.String(t); d != "" && d[0] >= 32 && d[0] <= 126 {
+				f.anchos[uint32(c)] = float64(tabla[d[0]-32])
+			}
+		}
 	}
 }
 

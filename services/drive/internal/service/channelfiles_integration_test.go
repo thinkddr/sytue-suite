@@ -235,12 +235,13 @@ func TestChannelAttachmentByReferenceAndNameCollision(t *testing.T) {
 	canal := uuid.New()
 	gate.join(canal, alice)
 
-	root, err := svc.Root(ctx)
+	ctxAlice := store.WithOwner(ctx, alice)
+	root, err := svc.Root(ctxAlice)
 	if err != nil {
 		t.Fatalf("Root: %v", err)
 	}
 	// Fichero PERSONAL de alice (el que elegiría el selector «Archivo de Sytue Drive»).
-	personal, err := svc.UploadFile(ctx, root.ID, "informe.pdf", "application/pdf", alice,
+	personal, err := svc.UploadFile(ctxAlice, root.ID, "informe.pdf", "application/pdf", alice,
 		strings.NewReader("pdf"))
 	if err != nil {
 		t.Fatalf("UploadFile: %v", err)

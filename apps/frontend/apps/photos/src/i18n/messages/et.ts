@@ -252,4 +252,7 @@ export const et: AppCatalog<typeof en> = {
   'memories.years': '{count} aastat tagasi',
   'memories.oneYear': 'Aasta tagasi',
   'memories.hide': 'Peida',
+  'aiBatch.excludeOrg': 'Välista organisatsioon Sytue AI automaatsest pakktöötlusest',
+  'aiBatch.excludedHint':
+    'Organisatsioon on Sytue AI automaatsest pakktöötlusest välistatud. Uusi fotosid ei töödelda taustal soovituste ega sarnasuste leidmiseks.',
 };

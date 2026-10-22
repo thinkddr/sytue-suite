@@ -95,7 +95,7 @@ func entorno(t *testing.T) (*pgtest.Harness, *pg.Pool, context.Context) {
 
 // cuenta filas de una tabla con un tenant dado, saltándose la RLS (rol
 // privilegiado): la comprobación tiene que poder ver AMBAS organizaciones.
-func cuenta(t *testing.T, ctx context.Context, admin *pg.Pool, tabla, tenant string) int {
+func cuenta(ctx context.Context, t *testing.T, admin *pg.Pool, tabla, tenant string) int {
 	t.Helper()
 	var n int
 	// La tabla es una constante del propio test, no entrada de usuario.
@@ -141,14 +141,14 @@ func TestMoveServiceMueveAnalyticsIncluidaLaTablaParticionada(t *testing.T) {
 	// Nada del origen sobrevive, y lo del destino sigue intacto: el UPDATE no
 	// arrastró filas ajenas.
 	for _, tabla := range []string{"analytics_sites", "analytics_events", "analytics_daily"} {
-		if n := cuenta(t, ctx, admin, tabla, origen); n != 0 {
+		if n := cuenta(ctx, t, admin, tabla, origen); n != 0 {
 			t.Errorf("%s conserva %d filas del origen tras la fusión", tabla, n)
 		}
 	}
-	if n := cuenta(t, ctx, admin, "analytics_events", destino); n != 4 {
+	if n := cuenta(ctx, t, admin, "analytics_events", destino); n != 4 {
 		t.Errorf("eventos del destino = %d, quiero 4 (1 suyo + 3 absorbidos)", n)
 	}
-	if n := cuenta(t, ctx, admin, "analytics_sites", destino); n != 2 {
+	if n := cuenta(ctx, t, admin, "analytics_sites", destino); n != 2 {
 		t.Errorf("sitios del destino = %d, quiero 2", n)
 	}
 
@@ -200,7 +200,7 @@ func TestMoveServiceEsIdempotente(t *testing.T) {
 			segunda.Total, segunda.Rows)
 	}
 	// Y el total sigue siendo el de siempre: ni duplicados ni pérdidas.
-	if n := cuenta(t, ctx, admin, "analytics_events", destino); n != 4 {
+	if n := cuenta(ctx, t, admin, "analytics_events", destino); n != 4 {
 		t.Errorf("eventos del destino tras dos pasadas = %d, quiero 4", n)
 	}
 }
@@ -231,7 +231,7 @@ func TestMoveServiceAbortaSiFaltaLaPoliticaDeFusion(t *testing.T) {
 	}
 
 	// Y no movió NADA: la transacción entera se deshace, no medio servicio.
-	if n := cuenta(t, ctx, admin, "analytics_sites", origen); n != 1 {
+	if n := cuenta(ctx, t, admin, "analytics_sites", origen); n != 1 {
 		t.Errorf("el origen quedó a medias: %d sitios (quiero 1, intactos)", n)
 	}
 }

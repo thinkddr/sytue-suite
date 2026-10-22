@@ -211,7 +211,8 @@ func TestLabelTravelsInFlatListings(t *testing.T) {
 func TestEDiscoveryFilterByLabel(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool)
-	ctx := tenantCtx("acme")
+	const owner = "user-ada"
+	ctx := store.WithOwner(tenantCtx("acme"), owner)
 
 	if _, err := st.EnsureQuota(ctx, 1<<20); err != nil {
 		t.Fatalf("EnsureQuota: %v", err)
@@ -220,7 +221,6 @@ func TestEDiscoveryFilterByLabel(t *testing.T) {
 	if err != nil {
 		t.Fatalf("EnsureRoot: %v", err)
 	}
-	const owner = "user-ada"
 	etiquetado := seedOwnedFile(t, ctx, st, root.ID, "confidencial.pdf", owner, 10)
 	seedOwnedFile(t, ctx, st, root.ID, "normal.pdf", owner, 10)
 	if _, err := st.SetFileLabel(ctx, etiquetado.ID, etiquetaConfidencial); err != nil {

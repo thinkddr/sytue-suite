@@ -20,19 +20,122 @@ func importOds(data []byte, p *presupuesto) (Kind, string, error) {
 	if err != nil {
 		return "", "", err
 	}
-	content := files["content.xml"]
-	if len(content) == 0 {
-		return "", "", wrapFormat("ods: falta content.xml")
+	l, err := abrirLibroOds(files)
+	if err != nil {
+		return "", "", err
 	}
-	// Los estilos de celda viven en content.xml (automáticos) y en styles.xml (con nombre:
-	// el «Default» y los de formato condicional de LibreOffice).
-	model := parseODSBody(content, files["styles.xml"], p)
+	model := l.modelo(p)
 	if p.agotado() {
 		return KindSpreadsheet, "", nil // ya no cabe: importar devuelve ErrDemasiadoGrande
 	}
-	// Los objetos de cada hoja (import_ods_objetos.go), y fuera las celdas de las filas
-	// de totales, que el editor calcula al pintar.
-	objs := objetosODS(files)
+	return KindSpreadsheet, marshalSheetModel(model), nil
+}
+
+// libroOds es lo que se lee una vez de un .ods: sus estilos, sus formatos, los objetos y cada
+// hoja (<table:table>) ya separada de content.xml. modelo lo convierte, y recortarLibro lo
+// convierte varias veces con distinto tope de filas sin volver a leer estilos ni las filas
+// descartadas.
+type libroOds struct {
+	estilos  *odsEstilos
+	formatos map[string]*numFmtSpec
+	objs     []objetosHoja
+	tablas   [][]byte // cada <table:table>…</table:table> de content.xml
+	resto    []byte   // <office:body> sin las tablas: validaciones, filtros, nombres y dinámicas
+}
+
+func abrirLibroOds(files map[string][]byte) (*libroOds, error) {
+	content := files["content.xml"]
+	if len(content) == 0 {
+		return nil, wrapFormat("ods: falta content.xml")
+	}
+	styles := files["styles.xml"]
+	tablas, resto := partirCuerpoODS(content)
+	return &libroOds{
+		estilos:  parseODSEstilos(styles, content),
+		formatos: parseODSFormatos(styles, content),
+		objs:     objetosODS(files),
+		tablas:   tablas,
+		resto:    resto,
+	}, nil
+}
+
+// modelo convierte el libro con el presupuesto (y el tope de filas) de `p`; nil si se agota.
+func (l *libroOds) modelo(p *presupuesto) *sheetModel {
+	ctx := &odsCtx{estilos: l.estilos, validaciones: map[string]dataValidation{}, formatos: l.formatos, presupuesto: p}
+	model := &sheetModel{}
+	filtros, nombresLibro := leerRestoODS(l.resto, model, ctx)
+	for tablas, raw := range l.tablas {
+		sd, ok := parseODSTableSlice(raw, len(model.Sheets)+1, &model.Names, ctx)
+		if p.agotado() {
+			return nil
+		}
+		if !ok {
+			continue
+		}
+		if sd.escenarioODS != nil && len(model.Sheets) > 0 {
+			// Calc guarda un escenario como una hoja oculta tras la hoja a la que pertenece.
+			base := &model.Sheets[len(model.Sheets)-1]
+			base.Scenarios = sanearEscenarios(append(base.Scenarios, sd.escenarioODS.escenario(sd.Name, sd.Cells)))
+			continue
+		}
+		model.Sheets = append(model.Sheets, sd)
+		model.indiceTabla = append(model.indiceTabla, tablas)
+	}
+	model.Names = append(model.Names, nombresLibro...)
+	for _, f := range filtros {
+		for i := range model.Sheets {
+			if model.Sheets[i].Name == f.hoja && model.Sheets[i].AutoFilter == nil {
+				model.Sheets[i].AutoFilter = autoFilterDeODS(f, model.Sheets[i].Cells)
+			}
+		}
+	}
+	aplicarObjetosODS(model, l.objs)
+	if len(model.Sheets) == 0 {
+		model.Sheets = []sheetData{{Name: "Hoja1", Cells: map[string]string{}}}
+	}
+	resolverListas(model)
+	attachOdsPivots(l.resto, model)
+	return model
+}
+
+// leerRestoODS lee lo de `<office:body>` que no son las tablas: el candado de la hoja de
+// cálculo, las validaciones, los autofiltros y los nombres globales del libro.
+func leerRestoODS(resto []byte, model *sheetModel, ctx *odsCtx) ([]filtroODS, []definedName) {
+	if len(resto) == 0 {
+		return nil, nil
+	}
+	var filtros []filtroODS
+	var nombresLibro []definedName
+	dec := xml.NewDecoder(bytes.NewReader(resto))
+	for {
+		tok, err := dec.Token()
+		if err != nil {
+			return filtros, nombresLibro
+		}
+		se, ok := tok.(xml.StartElement)
+		if !ok {
+			continue
+		}
+		switch se.Name.Local {
+		case "spreadsheet":
+			model.Protect = lockDeODS(se)
+		case "content-validations":
+			leerValidacionesODS(dec, ctx)
+		case "database-range":
+			if f, valido := leerFiltroODS(dec, se); valido {
+				filtros = append(filtros, f)
+			}
+		default:
+			if n, esNombre := nombreDeODS(se, ""); esNombre {
+				nombresLibro = append(nombresLibro, n) // del libro: van detrás de las tablas en ODF
+			}
+		}
+	}
+}
+
+// aplicarObjetosODS adjunta los objetos de cada hoja (import_ods_objetos.go) y borra las
+// celdas de las filas de totales, que el editor calcula al pintar.
+func aplicarObjetosODS(model *sheetModel, objs []objetosHoja) {
 	for i := range model.Sheets {
 		if i >= len(model.indiceTabla) || model.indiceTabla[i] >= len(objs) {
 			break
@@ -47,12 +150,6 @@ func importOds(data []byte, p *presupuesto) (Kind, string, error) {
 			}
 		}
 	}
-	if len(model.Sheets) == 0 {
-		model.Sheets = []sheetData{{Name: "Hoja1", Cells: map[string]string{}}}
-	}
-	resolverListas(model)
-	attachOdsPivots(content, model)
-	return KindSpreadsheet, marshalSheetModel(model), nil
 }
 
 // odsCtx es lo que una tabla necesita saber del resto del documento: los estilos de celda y
@@ -64,59 +161,27 @@ type odsCtx struct {
 	presupuesto  *presupuesto           // cada celda colocada, también las repetidas
 }
 
-// parseODSBody recorre <office:spreadsheet> reconstruyendo hojas y celdas.
-//
-//nolint:gocognit,gocyclo // un caso por elemento que el libro puede traer: trocearlo reparte el recorrido sin simplificarlo
-func parseODSBody(content, estilosDoc []byte, p *presupuesto) *sheetModel {
-	ctx := &odsCtx{estilos: parseODSEstilos(estilosDoc, content), validaciones: map[string]dataValidation{}, formatos: parseODSFormatos(estilosDoc, content), presupuesto: p}
-	dec := p.decodificador(content)
-	model := &sheetModel{}
-	var filtros []filtroODS
-	tablas := 0
+// parseODSTableSlice lee el XML de una <table:table> ya aislada.
+func parseODSTableSlice(raw []byte, numHoja int, names *[]definedName, ctx *odsCtx) (sheetData, bool) {
+	dec := ctx.presupuesto.decodificador(raw)
 	for {
 		tok, err := dec.Token()
 		if err != nil {
-			break
+			return sheetData{}, false
 		}
 		se, ok := tok.(xml.StartElement)
-		if ok && se.Name.Local == "spreadsheet" {
-			model.Protect = lockDeODS(se)
-		} else if ok && se.Name.Local == "content-validations" {
-			leerValidacionesODS(dec, ctx)
-		} else if ok && se.Name.Local == "table" {
-			name := attrLocal(se, "name")
-			if name == "" {
-				name = "Hoja" + strconv.Itoa(len(model.Sheets)+1)
-			}
-			sd := parseODSTable(dec, name, &model.Names, ctx)
-			if sd.escenarioODS != nil && len(model.Sheets) > 0 {
-				// Calc guarda un escenario como una hoja oculta tras la hoja a la que pertenece.
-				base := &model.Sheets[len(model.Sheets)-1]
-				base.Scenarios = sanearEscenarios(append(base.Scenarios, sd.escenarioODS.escenario(name, sd.Cells)))
-				tablas++
-				continue
-			}
-			sd.Protect = protectDeODS(se)
-			sd.TabColor = ctx.estilos.pestanas[attrLocal(se, "style-name")]
-			model.Sheets = append(model.Sheets, sd)
-			model.indiceTabla = append(model.indiceTabla, tablas)
-			tablas++
-		} else if ok && se.Name.Local == "database-range" {
-			if f, valido := leerFiltroODS(dec, se); valido {
-				filtros = append(filtros, f)
-			}
-		} else if n, esNombre := nombreDeODS(se, ""); ok && esNombre {
-			model.Names = append(model.Names, n) // del libro: fuera de toda tabla
+		if !ok || se.Name.Local != "table" {
+			continue
 		}
-	}
-	for _, f := range filtros {
-		for i := range model.Sheets {
-			if model.Sheets[i].Name == f.hoja && model.Sheets[i].AutoFilter == nil {
-				model.Sheets[i].AutoFilter = autoFilterDeODS(f, model.Sheets[i].Cells)
-			}
+		name := attrLocal(se, "name")
+		if name == "" {
+			name = "Hoja" + strconv.Itoa(numHoja)
 		}
+		sd := parseODSTable(dec, raw, name, names, ctx)
+		sd.Protect = protectDeODS(se)
+		sd.TabColor = ctx.estilos.pestanas[attrLocal(se, "style-name")]
+		return sd, true
 	}
-	return model
 }
 
 // parseODSTable lee una <table:table> a un SheetData contando repeticiones de
@@ -124,7 +189,7 @@ func parseODSBody(content, estilosDoc []byte, p *presupuesto) *sheetModel {
 // Los nombres de la hoja (su <table:named-expressions>) se añaden a names.
 //
 //nolint:gocognit,gocyclo // recorrido de un solo paso sobre el XML de ODF: un caso por elemento, y trocearlo reparte el estado
-func parseODSTable(dec *xml.Decoder, name string, names *[]definedName, ctx *odsCtx) sheetData {
+func parseODSTable(dec *xml.Decoder, raw []byte, name string, names *[]definedName, ctx *odsCtx) sheetData {
 	sd := sheetData{Name: name, Cells: map[string]string{}}
 	row, col := 0, 0
 	var filaGrupos, colGrupos []grupoAbierto
@@ -146,13 +211,25 @@ func parseODSTable(dec *xml.Decoder, name string, names *[]definedName, ctx *ods
 			if e.Name.Local == "table-row" {
 				rep := repeticionesODS(attrLocal(e, "number-rows-repeated"))
 				if m := ctx.estilos.medida(attrLocal(e, "style-name")); m.alto > 0 && !m.optimo {
-					for k := 0; k < min(rep, maxFilasConAlto) && row+k < maxFilasHoja; k++ {
+					for k := 0; k < min(rep, maxFilasConAlto) && row+k < maxFilasHoja && !ctx.presupuesto.recorta(row+k+1); k++ {
 						sd.fijarAlto(row+k, m.alto)
 					}
 				}
 				// ponytail: una fila repetida con contenido se escribe solo en su
 				// primera posición; las filas vacías repetidas solo avanzan el índice.
-				parseODSRow(dec, &sd, row+1, ctx, validas, colDef)
+				if !parseODSRow(dec, &sd, row+1, ctx, validas, colDef) {
+					for len(filaGrupos) > 0 {
+						filaGrupos = cerrarGrupoODS(filaGrupos, row, &sd.RowGroups)
+					}
+					if f := ultimoCierreXML(raw, "table-row"); f > 0 {
+						cola := saltarCierresXML(raw[f:])
+						if bytes.Contains(cola, []byte("conditional-formats")) || bytes.Contains(cola, []byte("named-expressions")) {
+							dec = ctx.presupuesto.decodificador(cola)
+							continue
+						}
+					}
+					return fin()
+				}
 				row += rep
 			} else if e.Name.Local == "table-column" {
 				rep := repeticionesODS(attrLocal(e, "number-columns-repeated"))
@@ -241,16 +318,15 @@ var esContenedorODS = map[string]bool{
 const maxFilasConAlto = 1024
 
 // parseODSRow lee una <table:table-row> escribiendo sus celdas en la fila dada
-// (1-based). Devuelve si escribió alguna celda.
+// (1-based). Devuelve false si la fila cae fuera del recorte y tiene contenido.
 //
 //nolint:gocognit,gocyclo // traductor de un formato a otro: un caso por tipo, y trocearlo reparte la tabla sin simplificarla
 func parseODSRow(dec *xml.Decoder, sd *sheetData, rowNum int, ctx *odsCtx, validas map[string]string, colDef []tramoEstiloODS) bool {
 	col := 0
-	wrote := false
 	for {
 		tok, err := dec.Token()
 		if err != nil {
-			return wrote
+			return true
 		}
 		switch e := tok.(type) {
 		case xml.StartElement:
@@ -258,9 +334,8 @@ func parseODSRow(dec *xml.Decoder, sd *sheetData, rowNum int, ctx *odsCtx, valid
 				rep := repeticionesODS(attrLocal(e, "number-columns-repeated"))
 				nombreEstilo := attrLocal(e, "style-name")
 				validacion := attrLocal(e, "content-validation-name")
-				if cs, rs := repeticionesODS(attrLocal(e, "number-columns-spanned")), repeticionesODS(attrLocal(e, "number-rows-spanned")); (cs > 1 || rs > 1) && rep == 1 && len(sd.Merges) < maxCombinadas {
-					sd.Merges = append(sd.Merges, rango{c1: col + 1, r1: rowNum, c2: col + cs, r2: rowNum + rs - 1}.a1())
-				}
+				cs, rs := repeticionesODS(attrLocal(e, "number-columns-spanned")), repeticionesODS(attrLocal(e, "number-rows-spanned"))
+				combinada := (cs > 1 || rs > 1) && rep == 1 && len(sd.Merges) < maxCombinadas
 				text, tipo := odsCellText(dec, e)
 				if nombreEstilo == "" && text != "" {
 					// Calc escribe el formato de una columna entera una sola vez y la celda lo hereda.
@@ -271,13 +346,20 @@ func parseODSRow(dec *xml.Decoder, sd *sheetData, rowNum int, ctx *odsCtx, valid
 				if spec == nil && text != "" {
 					spec = formatoPorTipoODS(tipo)
 				}
-				if text != "" || (rep <= maxRepeticionVacia && (estilo.visible() || validacion != "")) {
+				escribe := text != "" || (rep <= maxRepeticionVacia && (estilo.visible() || validacion != ""))
+				if (combinada || escribe) && ctx.presupuesto.recorta(rowNum) {
+					sd.recortada = true
+					return false
+				}
+				if combinada {
+					sd.Merges = append(sd.Merges, rango{c1: col + 1, r1: rowNum, c2: col + cs, r2: rowNum + rs - 1}.a1())
+				}
+				if escribe {
 					for k := 0; k < min(rep, 1024) && col+k < maxColumnasHoja && rowNum <= maxFilasHoja; k++ {
 						ref := A1Ref(rowNum, col+k+1)
 						if text != "" {
 							sd.Cells[ref] = envolverCelda(html.EscapeString(text), estilo.negrita, estilo.cursiva, estilo.alinear)
 							ctx.presupuesto.gastar(len(ref) + len(sd.Cells[ref]))
-							wrote = true
 						}
 						if estilo.visible() && len(sd.Styles) < maxEstilosHoja {
 							if sd.Styles == nil {
@@ -302,9 +384,162 @@ func parseODSRow(dec *xml.Decoder, sd *sheetData, rowNum int, ctx *odsCtx, valid
 			}
 		case xml.EndElement:
 			if e.Name.Local == "table-row" {
-				return wrote
+				return true
 			}
 		}
+	}
+}
+
+// partirCuerpoODS separa cada <table:table>…</table:table> de <office:body> y devuelve
+// además el cuerpo sin ellas (validaciones, filtros, nombres del libro y tablas dinámicas).
+func partirCuerpoODS(content []byte) (tablas [][]byte, resto []byte) {
+	pos := max(inicioElementoXML(content, "body"), 0)
+	cuerpo := content[pos:]
+	var fuera [][]byte
+	for len(cuerpo) > 0 {
+		ini := inicioElementoXML(cuerpo, "table")
+		if ini < 0 {
+			fuera = append(fuera, cuerpo)
+			break
+		}
+		if ini > 0 {
+			fuera = append(fuera, cuerpo[:ini])
+		}
+		cuerpo = cuerpo[ini:]
+		finApertura := bytes.IndexByte(cuerpo, '>')
+		if finApertura < 0 {
+			tablas = append(tablas, cuerpo)
+			break
+		}
+		if finApertura > 0 && cuerpo[finApertura-1] == '/' {
+			tablas = append(tablas, cuerpo[:finApertura+1])
+			cuerpo = cuerpo[finApertura+1:]
+			continue
+		}
+		fin := primerCierreXML(cuerpo[finApertura+1:], "table")
+		if fin <= 0 {
+			tablas = append(tablas, cuerpo)
+			break
+		}
+		total := finApertura + 1 + fin
+		tablas = append(tablas, cuerpo[:total])
+		cuerpo = cuerpo[total:]
+	}
+	return tablas, bytes.Join(fuera, nil)
+}
+
+func esNombreXML(b byte) bool {
+	return b == '_' || b == '-' || b == '.' || b >= 'a' && b <= 'z' || b >= 'A' && b <= 'Z' || b >= '0' && b <= '9'
+}
+
+// inicioElementoXML devuelve el índice del `<` donde abre el primer elemento de nombre local
+// `local` (con o sin prefijo de espacio de nombres), o -1 si no está.
+func inicioElementoXML(raw []byte, local string) int {
+	aguja := []byte(local)
+	base := 0
+	for {
+		i := bytes.Index(raw[base:], aguja)
+		if i < 0 {
+			return -1
+		}
+		i += base
+		fin := i + len(aguja)
+		if fin < len(raw) {
+			switch raw[fin] {
+			case ' ', '\t', '\r', '\n', '/', '>':
+				if ini := prefijoEtiquetaXML(raw, i, false); ini >= 0 {
+					return ini
+				}
+			}
+		}
+		base = i + 1
+	}
+}
+
+// primerCierreXML devuelve el índice tras el `>` del primer cierre `</…:local>` o `</local>`, o 0.
+func primerCierreXML(raw []byte, local string) int {
+	aguja := []byte(local)
+	base := 0
+	for {
+		i := bytes.Index(raw[base:], aguja)
+		if i < 0 {
+			return 0
+		}
+		i += base
+		if fin := finDeCierreXML(raw, i, len(aguja)); fin > 0 && prefijoEtiquetaXML(raw, i, true) >= 0 {
+			return fin
+		}
+		base = i + 1
+	}
+}
+
+// ultimoCierreXML devuelve el índice tras el `>` del último cierre `</…:local>` o `</local>`, o 0.
+func ultimoCierreXML(raw []byte, local string) int {
+	aguja := []byte(local)
+	hasta := len(raw)
+	for {
+		i := bytes.LastIndex(raw[:hasta], aguja)
+		if i < 0 {
+			return 0
+		}
+		if fin := finDeCierreXML(raw, i, len(aguja)); fin > 0 && prefijoEtiquetaXML(raw, i, true) >= 0 {
+			return fin
+		}
+		hasta = i
+	}
+}
+
+func finDeCierreXML(raw []byte, i, n int) int {
+	k := i + n
+	for k < len(raw) && (raw[k] == ' ' || raw[k] == '\t' || raw[k] == '\r' || raw[k] == '\n') {
+		k++
+	}
+	if k < len(raw) && raw[k] == '>' {
+		return k + 1
+	}
+	return 0
+}
+
+func prefijoEtiquetaXML(raw []byte, i int, cierre bool) int {
+	if i < 1 {
+		return -1
+	}
+	j := i - 1
+	if raw[j] == ':' {
+		j--
+		if j < 0 || !esNombreXML(raw[j]) {
+			return -1
+		}
+		for j >= 0 && esNombreXML(raw[j]) {
+			j--
+		}
+	}
+	if cierre {
+		if j >= 1 && raw[j] == '/' && raw[j-1] == '<' {
+			return j - 1
+		}
+		return -1
+	}
+	if j >= 0 && raw[j] == '<' {
+		return j
+	}
+	return -1
+}
+
+// saltarCierresXML descarta etiquetas de cierre sueltas al comienzo de `raw` (p. ej.
+// `</table:table-row-group>` o `</table:table>`) para que un decodificador nuevo solo vea
+// elementos completos.
+func saltarCierresXML(raw []byte) []byte {
+	for {
+		s := bytes.TrimLeft(raw, " \t\r\n")
+		if !bytes.HasPrefix(s, []byte("</")) {
+			return s
+		}
+		i := bytes.IndexByte(s, '>')
+		if i < 0 {
+			return nil
+		}
+		raw = s[i+1:]
 	}
 }
 
@@ -500,7 +735,7 @@ func parseODSEstilos(docs ...[]byte) *odsEstilos {
 		var actual *odsEstiloCrudo
 		var medida *odsMedida
 		tabla := "" // el estilo de tabla abierto
-		for {
+		for fin := false; !fin; {
 			tok, err := dec.Token()
 			if err != nil {
 				break
@@ -508,6 +743,8 @@ func parseODSEstilos(docs ...[]byte) *odsEstilos {
 			switch t := tok.(type) {
 			case xml.StartElement:
 				switch t.Name.Local {
+				case "body":
+					fin = true // los estilos automáticos van siempre antes de <office:body>
 				case "style":
 					actual, medida, tabla = nil, nil, ""
 					if attrLocal(t, "family") == "table" {

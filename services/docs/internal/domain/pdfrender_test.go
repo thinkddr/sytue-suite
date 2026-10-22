@@ -789,3 +789,186 @@ func primerasLineas(s string) string {
 	}
 	return s
 }
+
+// --- Extracción de texto: casos del corpus -----------------------------------
+
+func TestExtraccionTextoType3SinAnchoPorDefecto(t *testing.T) {
+	// Type 3 donde 'a' y 'b' se llaman /square y /triangle en /Differences y el
+	// espacio (32) está fuera de /FirstChar..LastChar: sin Tw el código 32 tiene
+	// anchura 0 (no 500) y los nombres geométricos no sustituyen al ASCII.
+	charProc := "<< /Length 16 >>\nstream\n10 0 d0 0 0 m S\nendstream"
+	fuente := `<< /Type /Font /Subtype /Type3 /FontBBox [0 0 10 10] /FontMatrix [0.1 0 0 0.1 0 0] ` +
+		`/FirstChar 97 /LastChar 98 /Widths [10 10] ` +
+		`/Encoding << /Type /Encoding /Differences [97 /square /triangle] >> ` +
+		`/CharProcs << /square 6 0 R /triangle 6 0 R >> >>`
+	d, err := LeerPDF(pdfConContenido(t,
+		"BT /F1 10 Tf 12 TL 10 50 Td 10 Tw (a b) Tj T* 0 Tw ( a b) Tj ET",
+		`/Resources << /Font << /F1 5 0 R >> >>`,
+		fuente, charProc))
+	if err != nil {
+		t.Fatal(err)
+	}
+	plano, err := d.TextoPlano(0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.TrimSpace(plano) != "a b\nab" {
+		t.Errorf("Type 3 con Tw: obtuvo %q, quería %q", strings.TrimSpace(plano), "a b\nab")
+	}
+}
+
+func TestExtraccionTextoMarcasCombinantesYAvanceNegativo(t *testing.T) {
+	// 1) Marca combinante de anchura 0 emitida antes de su base (como hace FOP:
+	//    [-600 <0002> 600 <0001>]).
+	// 2) Cadena con Tc negativo (avance hacia la izquierda) y ajustes de TJ entre
+	//    letras contiguas.
+	cmap := "/CIDInit /ProcSet findresource begin 1 begincmap\n" +
+		"3 beginbfchar <0001> <0E01> <0002> <0E39> <0003> <0E19> endbfchar\nendcmap end"
+	d, err := LeerPDF(pdfConContenido(t,
+		"BT /F1 12 Tf 10 50 Td [-600 <0002> 600 <00010003>] TJ ET",
+		`/Resources << /Font << /F1 5 0 R >> >>`,
+		`<< /Type /Font /Subtype /Type0 /BaseFont /Sub+Thai /Encoding /Identity-H `+
+			`/DescendantFonts [6 0 R] /ToUnicode 7 0 R >>`,
+		`<< /Type /Font /Subtype /CIDFontType2 /BaseFont /Sub+Thai /DW 600 /W [2 [0]] >>`,
+		fmt.Sprintf("<< /Length %d >>\nstream\n%s\nendstream", len(cmap), cmap)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	plano, err := d.TextoPlano(0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.TrimSpace(plano) != "กูน" {
+		t.Errorf("marca antes de base: obtuvo %q, quería %q", strings.TrimSpace(plano), "กูน")
+	}
+}
+
+func TestExtraccionToUnicodeComprimidoSinFiltroYGlifoIdot(t *testing.T) {
+	// Un /ToUnicode comprimido con zlib cuyo diccionario olvida /Filter /FlateDecode,
+	// y una fuente simple con /Idot en /Differences.
+	cmap := "/CIDInit /ProcSet findresource begin 1 begincmap\n" +
+		"1 beginbfchar <01> <00C0> endbfchar\nendcmap end"
+	var zbuf bytes.Buffer
+	zw := zlib.NewWriter(&zbuf)
+	_, _ = zw.Write([]byte(cmap))
+	_ = zw.Close()
+
+	d, err := LeerPDF(pdfConContenido(t,
+		"BT /F1 12 Tf 10 50 Td <01> Tj /F2 12 Tf (A) Tj ET",
+		`/Resources << /Font << /F1 5 0 R /F2 7 0 R >> >>`,
+		`<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /ToUnicode 6 0 R >>`,
+		fmt.Sprintf("<< /Length %d >>\nstream\n%s\nendstream", zbuf.Len(), zbuf.String()),
+		`<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding << /Differences [65 /Idot] >> >>`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	plano, err := d.TextoPlano(0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.TrimSpace(plano) != "Àİ" {
+		t.Errorf("obtuvo %q, quería %q", strings.TrimSpace(plano), "Àİ")
+	}
+}
+
+func TestExtraccionCMapGrandeConEntradasNulas(t *testing.T) {
+	// Un bloque beginbfchar con más de 200 pares no pierde los primeros por el
+	// tope de la pila, y una entrada <0000> no machaca el respaldo de la fuente.
+	var sb strings.Builder
+	sb.WriteString("/CIDInit /ProcSet findresource begin 1 begincmap\n250 beginbfchar\n")
+	sb.WriteString("<0001> <00C0>\n<0002> <0000>\n")
+	for i := 3; i <= 250; i++ {
+		fmt.Fprintf(&sb, "<%04X> <0041>\n", i)
+	}
+	sb.WriteString("endbfchar\nendcmap end")
+	cmap := sb.String()
+	d, err := LeerPDF(pdfConContenido(t,
+		"BT /F1 12 Tf 10 50 Td <0001> Tj ET",
+		`/Resources << /Font << /F1 5 0 R >> >>`,
+		`<< /Type /Font /Subtype /Type0 /BaseFont /Sub /Encoding /Identity-H `+
+			`/DescendantFonts [6 0 R] /ToUnicode 7 0 R >>`,
+		`<< /Type /Font /Subtype /CIDFontType2 /BaseFont /Sub /DW 600 >>`,
+		fmt.Sprintf("<< /Length %d >>\nstream\n%s\nendstream", len(cmap), cmap)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	plano, err := d.TextoPlano(0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.TrimSpace(plano) != "À" {
+		t.Errorf("CMap grande: obtuvo %q, quería %q", strings.TrimSpace(plano), "À")
+	}
+}
+
+func TestRenderPNGSombreadosDeMallaYFuncion(t *testing.T) {
+	// 1) Malla de tipo 4 con dos triángulos independientes (flag=0 en ambos): el
+	//    segundo cubre (50..90, 10..90) en verde puro y antes reutilizaba los
+	//    vértices del primero.
+	// 2) Sombreado de función (ShadingType 1) con calculadora PostScript
+	//    (FunctionType 4: `{ pop }`) en rojo.
+	vert := func(flag, x, y, r, g, b byte) []byte {
+		return []byte{flag, x, y, r, g, b}
+	}
+	var malla bytes.Buffer
+	malla.Write(vert(0, 10, 10, 255, 0, 0))
+	malla.Write(vert(0, 40, 10, 255, 0, 0))
+	malla.Write(vert(0, 40, 90, 255, 0, 0))
+	malla.Write(vert(0, 50, 10, 0, 255, 0))
+	malla.Write(vert(0, 90, 10, 0, 255, 0))
+	malla.Write(vert(0, 90, 90, 0, 255, 0))
+
+	ps := "{ pop 0 1 }"
+	d, err := LeerPDF(pdfConContenido(t,
+		"/Pattern cs /P1 scn 0 0 100 100 re f q 10 10 30 30 re W n /ShF sh Q",
+		`/Resources << /Pattern << /P1 5 0 R >> /Shading << /ShF 7 0 R >> >>`,
+		`<< /Type /Pattern /PatternType 2 /Shading 6 0 R >>`,
+		fmt.Sprintf("<< /ShadingType 4 /ColorSpace /DeviceRGB /BitsPerCoordinate 8 "+
+			"/BitsPerComponent 8 /BitsPerFlag 8 /Decode [0 255 0 255 0 1 0 1 0 1] /Length %d >>\nstream\n%s\nendstream",
+			malla.Len(), malla.String()),
+		`<< /ShadingType 1 /ColorSpace /DeviceRGB /Domain [0 1 0 1] /Matrix [30 0 0 30 10 10] /Function 8 0 R >>`,
+		fmt.Sprintf("<< /FunctionType 4 /Domain [0 1 0 1] /Range [0 1 0 1 0 1] /Length %d >>\nstream\n%s\nendstream",
+			len(ps), ps)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	img, err := d.RenderizarPaginaRGBA(0, OpcionesRender{Escala: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// En (80, 100-30=70) cae el segundo triángulo (verde puro).
+	c := img.RGBAAt(80, 70)
+	if c.G < 200 || c.R > 30 {
+		t.Errorf("segundo triángulo de malla tipo 4 en (80,70): %+v, quería verde", c)
+	}
+	// En (25, 100-25=75) cae el sombreado de función con PS `{ pop 0 1 }` (azul > 200).
+	cf := img.RGBAAt(25, 75)
+	if cf.B < 200 || cf.G > 30 {
+		t.Errorf("sombreado tipo 1 con PS en (25,75): %+v, quería azul", cf)
+	}
+}
+
+func TestRenderPNGCapasOCGApagadasYTextoVertical(t *testing.T) {
+	// Una capa OCG listada en /OCProperties /D /OFF no debe tapar el fondo cuando
+	// se abre con `/OC /MC1 BDC ... EMC`.
+	raw := []byte("%PDF-1.4\n" +
+		"1 0 obj\n<< /Type /Catalog /Pages 2 0 R /OCProperties << /OCGs [6 0 R] /D << /OFF [6 0 R] >> >> >>\nendobj\n" +
+		"2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n" +
+		"3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 100 100] /Contents 4 0 R " +
+		"/Resources << /Properties << /MC1 6 0 R >> >> >>\nendobj\n" +
+		"4 0 obj\n<< /Length 62 >>\nstream\n0 1 0 rg 0 0 100 100 re f /OC /MC1 BDC 1 0 0 rg 0 0 100 100 re f EMC\nendstream\nendobj\n" +
+		"6 0 obj\n<< /Type /OCG /Name (Oculta) >>\nendobj\n" +
+		"trailer\n<< /Root 1 0 R >>\n%%EOF")
+	d, err := LeerPDF(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	img, err := d.RenderizarPaginaRGBA(0, OpcionesRender{Escala: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := img.RGBAAt(50, 50)
+	if c.G < 200 || c.R > 30 {
+		t.Errorf("la capa OCG en /OFF tapó el lienzo: %+v, quería verde", c)
+	}
+}

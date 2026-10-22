@@ -68,7 +68,7 @@
   "overrides": {
     "http-cache-semantics": "4.3.0",
     "basic-ftp": "6.2.1",
-    "ip-address": "10.7.2",
+    "ip-address": "10.7.4",
     "devalue": "5.9.4",
     "undici": "8.11.2",
     "yaml": "2.9.1",

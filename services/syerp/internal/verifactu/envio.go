@@ -7,12 +7,24 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"crypto/x509"
+	"encoding/asn1"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
 	"time"
+)
+
+var (
+	// OID 2.5.4.97 (organizationIdentifier, ETSI EN 319 412-1): NIF de la entidad en
+	// certificados cualificados de representante de persona jurídica y de sello.
+	oidOrganizationIdentifier = asn1.ObjectIdentifier{2, 5, 4, 97}
+	// OID 2.5.4.5 (serialNumber): NIF del titular en certificados de persona física
+	// (p. ej. IDCES-89890001K) o de entidad cuando no lleva 2.5.4.97.
+	oidSerialNumber = asn1.ObjectIdentifier{2, 5, 4, 5}
 )
 
 // Direcciones del servicio. «Sello» son las de quien se autentica con un
@@ -33,17 +45,113 @@ const EsperaInicial = 60 * time.Second
 
 // Cliente remite registros a la AEAT con el certificado de quien presenta.
 type Cliente struct {
-	http *http.Client
-	url  string
+	http       *http.Client
+	url        string
+	nif        string
+	produccion bool
+}
+
+// NIF devuelve el NIF español acreditado en el certificado del cliente.
+func (c *Cliente) NIF() string {
+	if c == nil {
+		return ""
+	}
+	return c.nif
+}
+
+// ValidarCertificado comprueba que el certificado y su clave privada forman un
+// par X.509 válido de entidad final (no CA), vigente en `ahora`, y extrae el
+// NIF español del titular o de la organización representada (OID 2.5.4.97 con
+// preferencia sobre OID 2.5.4.5).
+func ValidarCertificado(certPEM, keyPEM []byte, ahora time.Time) (string, error) {
+	par, err := tls.X509KeyPair(certPEM, keyPEM)
+	if err != nil || len(par.Certificate) == 0 {
+		return "", fmt.Errorf("verifactu: certificado: %w", err)
+	}
+	hoja, err := x509.ParseCertificate(par.Certificate[0])
+	if err != nil {
+		return "", fmt.Errorf("verifactu: leer certificado X.509: %w", err)
+	}
+	if hoja.IsCA {
+		return "", errors.New("verifactu: el certificado es de autoridad certificadora, no de titular")
+	}
+	if !ahora.IsZero() && (ahora.Before(hoja.NotBefore) || ahora.After(hoja.NotAfter)) {
+		return "", errors.New("verifactu: el certificado está fuera de su periodo de validez")
+	}
+	nif := nifDeCertificado(hoja)
+	if nif == "" {
+		return "", errors.New("verifactu: el certificado no declara un NIF español en su titular")
+	}
+	return nif, nil
+}
+
+func nifDeCertificado(hoja *x509.Certificate) string {
+	for _, attr := range hoja.Subject.Names {
+		if attr.Type.Equal(oidOrganizationIdentifier) {
+			if s, ok := attr.Value.(string); ok {
+				if nif := normalizarNIFCert(s); nif != "" {
+					return nif
+				}
+			}
+		}
+	}
+	for _, attr := range hoja.Subject.Names {
+		if attr.Type.Equal(oidSerialNumber) {
+			if s, ok := attr.Value.(string); ok {
+				if nif := normalizarNIFCert(s); nif != "" {
+					return nif
+				}
+			}
+		}
+	}
+	return normalizarNIFCert(hoja.Subject.SerialNumber)
+}
+
+func normalizarNIFCert(crudo string) string {
+	s := strings.ToUpper(strings.TrimSpace(crudo))
+	if len(s) > 6 && s[5] == '-' {
+		switch s[:5] {
+		case "VATES", "IDCES", "NTRES", "PNOES", "PASES", "TINES":
+			s = s[6:]
+		}
+	}
+	var b strings.Builder
+	for _, r := range s {
+		if (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') {
+			b.WriteRune(r)
+		}
+	}
+	n := b.String()
+	if len(n) == 11 && strings.HasPrefix(n, "ES") {
+		n = n[2:]
+	}
+	if !nifRe.MatchString(n) {
+		return ""
+	}
+	tieneCifra := false
+	for _, r := range n {
+		if r >= '0' && r <= '9' {
+			tieneCifra = true
+			break
+		}
+	}
+	if !tieneCifra {
+		return ""
+	}
+	return n
 }
 
 // NuevoCliente prepara el cliente con el certificado cualificado en PEM.
 // `produccion` elige el entorno real; `sello`, las direcciones de certificado de
-// sello.
+// sello. En producción exige que el certificado sea vigente y acredite un NIF.
 func NuevoCliente(certPEM, keyPEM []byte, produccion, sello bool) (*Cliente, error) {
 	cert, err := tls.X509KeyPair(certPEM, keyPEM)
 	if err != nil {
 		return nil, fmt.Errorf("verifactu: certificado: %w", err)
+	}
+	nif, errNIF := ValidarCertificado(certPEM, keyPEM, time.Now())
+	if produccion && errNIF != nil {
+		return nil, errNIF
 	}
 	url := urlPruebas
 	switch {
@@ -54,18 +162,23 @@ func NuevoCliente(certPEM, keyPEM []byte, produccion, sello bool) (*Cliente, err
 	case sello:
 		url = urlPruebasSello
 	}
-	return &Cliente{url: url, http: &http.Client{
-		Timeout: 60 * time.Second,
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				Certificates: []tls.Certificate{cert},
-				MinVersion:   tls.VersionTLS12,
-				// Los servidores de la AEAT pueden pedir el certificado de cliente
-				// renegociando en TLS 1.2, y Go por defecto corta la conexión.
-				Renegotiation: tls.RenegotiateOnceAsClient,
+	return &Cliente{
+		url:        url,
+		nif:        nif,
+		produccion: produccion,
+		http: &http.Client{
+			Timeout: 60 * time.Second,
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{
+					Certificates: []tls.Certificate{cert},
+					MinVersion:   tls.VersionTLS12,
+					// Los servidores de la AEAT pueden pedir el certificado de cliente
+					// renegociando en TLS 1.2, y Go por defecto corta la conexión.
+					Renegotiation: tls.RenegotiateOnceAsClient,
+				},
 			},
 		},
-	}}, nil
+	}, nil
 }
 
 // Linea es el resultado de un registro.
@@ -138,6 +251,9 @@ func Sobre(obligado Parte, registros []string) []byte {
 func (c *Cliente) Enviar(ctx context.Context, obligado Parte, registros []string) (Respuesta, error) {
 	if len(registros) == 0 || len(registros) > MaxRegistros {
 		return Respuesta{}, fmt.Errorf("verifactu: un envío lleva entre 1 y %d registros", MaxRegistros)
+	}
+	if c.produccion && (c.nif == "" || !strings.EqualFold(c.nif, strings.TrimSpace(obligado.NIF))) {
+		return Respuesta{}, fmt.Errorf("verifactu: en producción el NIF del certificado (%s) tiene que coincidir con el NIF del obligado (%s)", c.nif, obligado.NIF)
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.url, bytes.NewReader(Sobre(obligado, registros)))
 	if err != nil {

@@ -493,6 +493,8 @@
   "vf.confirmBody": "Désormais, chaque facture confirmée est envoyée à l’Agence fiscale espagnole et ne peut plus être modifiée ni supprimée : les erreurs se corrigent par une facture rectificative. Une fois activé, il le reste jusqu’à la fin de l’année.",
   "vf.confirmTitle": "Activer VERI*FACTU ?",
   "vf.declaration": "Déclaration de conformité",
+  "vf.error.certificateTaxIdMismatch": "Le NIF du certificat ne correspond pas au NIF de l’organisation.",
+  "vf.error.invalidCertificate": "Le certificat ou sa clé privée n’est pas un certificat qualifié valide comportant un NIF espagnol.",
   "vf.export": "Télécharger les enregistrements",
   "vf.fixHint": "Corrigez les données de la facture ou du client, puis renvoyez-la.",
   "vf.intro": "À partir de 2027, chaque facture doit être enregistrée auprès de l’Agence fiscale espagnole dès son émission. Avec VERI*FACTU, Sytue s’en charge quand vous confirmez une facture et ajoute le code QR que votre client peut utiliser pour la vérifier.",

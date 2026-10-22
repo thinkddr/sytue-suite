@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 
 	"git.sytue.eu/sytue/one/services/drive/internal/domain"
+	"git.sytue.eu/sytue/one/services/drive/internal/store"
 )
 
 // CarpetaFotos es donde van los originales de Sytue Photos: la misma que usa «Añadir
@@ -32,10 +33,10 @@ func (s *Service) CopiaParaFotos(ctx context.Context, src uuid.UUID, duenya, edi
 	}
 	// Primero que el origen existe: una organización que no existe no llega a crear ni
 	// raíz, ni cuota, ni /Fotos.
-	if _, err := s.store.GetFile(ctx, src); err != nil {
+	if _, err := s.store.GetFile(store.WithOwner(ctx, editora), src); err != nil {
 		return domain.File{}, false, err
 	}
-	carpeta, err := s.carpetaFotos(ctx, duenya)
+	carpeta, err := s.carpetaFotos(store.WithOwner(ctx, duenya), duenya)
 	if err != nil {
 		return domain.File{}, false, err
 	}

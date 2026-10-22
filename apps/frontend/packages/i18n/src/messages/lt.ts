@@ -387,4 +387,9 @@ export const lt: Catalog = {
   'linkedServices.writeUnknown':
     'Teikėjas nepatvirtino išsaugojimo. Prieš bandydami dar kartą atnaujinkite rodinį ir patikrinkite.',
   'linkedServices.unavailable': 'Prisijungimas prie šio teikėjo jūsų paskyrai neprieinamas.',
+  'localFile.confirmUpload.title': 'Atidaryti failą iš šio įrenginio',
+  'localFile.confirmUpload.body':
+    'Norint atidaryti „{name}“, failas bus įkeltas į jūsų „Sytue One“ paskyrą.',
+  'localFile.confirmUpload.remember': 'Prisiminti mano pasirinkimą šiame įrenginyje',
+  'localFile.confirmUpload.confirm': 'Įkelti ir atidaryti',
 };

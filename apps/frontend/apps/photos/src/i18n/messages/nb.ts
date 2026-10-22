@@ -247,4 +247,7 @@ export const nb: AppCatalog<typeof en> = {
   'memories.years': 'For {count} år siden',
   'memories.oneYear': 'For ett år siden',
   'memories.hide': 'Skjul',
+  'aiBatch.excludeOrg': 'Utelukk organisasjonen fra den automatiske Sytue AI-kjøringen',
+  'aiBatch.excludedHint':
+    'Organisasjonen er utelukket fra den automatiske Sytue AI-kjøringen. Nye bilder behandles ikke i bakgrunnen for forslag eller likhet.',
 };

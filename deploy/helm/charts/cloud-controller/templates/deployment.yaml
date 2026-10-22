@@ -93,6 +93,12 @@ spec:
             # Vacío => configuración in-cluster (usa el ServiceAccount del pod).
             - name: KUBECONFIG
               value: ""
+            - name: CLOUD_CONTROLLER_CLUSTER_ROLE
+              value: {{ printf "%s-tenant" (include "sytue-cloud-controller.fullname" .) | quote }}
+            - name: CLOUD_CONTROLLER_SERVICE_ACCOUNT
+              value: {{ .Values.serviceAccount.name | default (include "sytue-cloud-controller.fullname" .) | quote }}
+            - name: CLOUD_CONTROLLER_NAMESPACE
+              value: {{ .Release.Namespace | quote }}
             - name: RECONCILE_INTERVAL
               value: {{ .Values.config.reconcileInterval | quote }}
             - name: BUILD_NAMESPACE

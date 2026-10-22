@@ -25,8 +25,11 @@ func TestAvisosHistoricosDeDrive(t *testing.T) {
 	ctx := tenancy.Into(context.Background(), tenancy.Tenant{Slug: "acme"})
 	cuando := time.Date(2026, 9, 2, 8, 0, 0, 0, time.UTC)
 	err := h.Pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, "SELECT set_config('app.owner_sub', 'ana', true)"); err != nil {
+			return err
+		}
 		var raiz string
-		if err := tx.QueryRow(ctx, `INSERT INTO folders (tenant, name, is_root) VALUES ('acme', '', true) RETURNING id::text`).Scan(&raiz); err != nil {
+		if err := tx.QueryRow(ctx, `INSERT INTO folders (tenant, name, is_root, owner_sub) VALUES ('acme', '', true, 'ana') RETURNING id::text`).Scan(&raiz); err != nil {
 			return err
 		}
 		fichero := func(nombre string, papelera bool) (string, error) {

@@ -493,6 +493,8 @@
   "vf.confirmBody": "Fra nu af sendes hver faktura, du bekræfter, til den spanske skattemyndighed og kan ikke længere ændres eller slettes: fejl rettes med en korrigerende faktura. Når det er slået til, forbliver det slået til resten af året.",
   "vf.confirmTitle": "Slå VERI*FACTU til?",
   "vf.declaration": "Overensstemmelseserklæring",
+  "vf.error.certificateTaxIdMismatch": "Skatte-ID’et (NIF) på certifikatet stemmer ikke overens med organisationens skatte-ID.",
+  "vf.error.invalidCertificate": "Certifikatet eller den private nøgle er ikke et gyldigt kvalificeret certifikat med et spansk skatte-ID (NIF).",
   "vf.export": "Download registreringer",
   "vf.fixHint": "Ret oplysningerne på fakturaen eller kunden, og send den igen.",
   "vf.intro": "Fra 2027 skal hver faktura registreres hos den spanske skattemyndighed, når den udstedes. Med VERI*FACTU gør Sytue det for dig, når du bekræfter en faktura, og tilføjer den QR-kode, som din kunde kan bruge til at kontrollere den.",

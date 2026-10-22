@@ -520,6 +520,8 @@
   "vf.confirmBody": "Minn issa, kull fattura li tikkonferma tintbagħat lill-Aġenzija tat-Taxxa Spanjola u ma tistax tibqa’ tinbidel jew titħassar: l-iżbalji jiġu kkoreġuti b’fattura korrettiva. Ladarba jiġi attivat, jibqa’ attiv sal-aħħar tas-sena.",
   "vf.confirmTitle": "Tattiva VERI*FACTU?",
   "vf.declaration": "Dikjarazzjoni ta’ konformità",
+  "vf.error.certificateTaxIdMismatch": "In-NIF fuq iċ-ċertifikat ma jaqbilx man-NIF tal-organizzazzjoni.",
+  "vf.error.invalidCertificate": "Iċ-ċertifikat jew iċ-ċavetta privata mhumiex ċertifikat kwalifikat validu b’NIF Spanjol.",
   "vf.export": "Niżżel ir-reġistri",
   "vf.fixHint": "Ikkoreġi d-dettalji tal-fattura jew tal-klijent u erġa’ ibgħatha.",
   "vf.intro": "Mill-2027, kull fattura trid tiġi rreġistrata mal-Aġenzija tat-Taxxa Spanjola hekk kif tinħareġ. B’VERI*FACTU, Sytue jagħmel dan għalik meta tikkonferma fattura, u jżid il-kodiċi QR li bih il-klijent tiegħek jista’ jiċċekkjaha.",

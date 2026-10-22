@@ -493,6 +493,8 @@
   "vf.confirmBody": "Mostantól minden megerősített számla a spanyol adóhatósághoz kerül, és többé nem módosítható vagy törölhető: a hibákat helyesbítő számlával kell javítani. Bekapcsolás után az év végéig bekapcsolva marad.",
   "vf.confirmTitle": "Bekapcsolja a VERI*FACTU-t?",
   "vf.declaration": "Megfelelőségi nyilatkozat",
+  "vf.error.certificateTaxIdMismatch": "A tanúsítványban szereplő adószám (NIF) nem egyezik a szervezet adószámával.",
+  "vf.error.invalidCertificate": "A tanúsítvány vagy a privát kulcs nem érvényes, spanyol adószámmal (NIF) rendelkező minősített tanúsítvány.",
   "vf.export": "Nyilvántartások letöltése",
   "vf.fixHint": "Javítsa a számla vagy az ügyfél adatait, majd küldje el újra.",
   "vf.intro": "2027-től minden számlát a kiállításkor regisztrálni kell a spanyol adóhatóságnál. A VERI*FACTU-val ezt a Sytue elvégzi a számla megerősítésekor, és hozzáadja a QR-kódot, amellyel az ügyfele ellenőrizheti.",

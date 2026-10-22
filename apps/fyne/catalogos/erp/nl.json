@@ -493,6 +493,8 @@
   "vf.confirmBody": "Vanaf nu wordt elke factuur die je bevestigt naar de Spaanse Belastingdienst gestuurd en kan die niet meer worden gewijzigd of verwijderd: fouten corrigeer je met een correctiefactuur. Eenmaal ingeschakeld blijft het de rest van het jaar aan.",
   "vf.confirmTitle": "VERI*FACTU inschakelen?",
   "vf.declaration": "Conformiteitsverklaring",
+  "vf.error.certificateTaxIdMismatch": "Het fiscaal nummer (NIF) op het certificaat komt niet overeen met dat van de organisatie.",
+  "vf.error.invalidCertificate": "Het certificaat of de privésleutel is geen geldig gekwalificeerd certificaat met een Spaans fiscaal nummer (NIF).",
   "vf.export": "Registraties downloaden",
   "vf.fixHint": "Corrigeer de gegevens van de factuur of de klant en stuur de factuur opnieuw.",
   "vf.intro": "Vanaf 2027 moet elke factuur bij uitgifte worden geregistreerd bij de Spaanse Belastingdienst. Met VERI*FACTU doet Sytue dat voor je zodra je een factuur bevestigt, en voegt het de QR-code toe waarmee je klant de factuur kan controleren.",

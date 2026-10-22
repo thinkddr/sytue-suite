@@ -389,11 +389,15 @@ func (c *KubeJobClient) buildJob(spec JobSpec) *batchv1.Job {
 	}
 
 	volumes := []corev1.Volume{
-		{Name: "workspace", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}},
-		{Name: "cache", VolumeSource: corev1.VolumeSource{
-			EmptyDir: &corev1.EmptyDirVolumeSource{SizeLimit: ptrQuantity(c.cacheVolumeSize)},
+		{Name: "workspace", VolumeSource: corev1.VolumeSource{
+			EmptyDir: &corev1.EmptyDirVolumeSource{SizeLimit: ptrQuantity("4Gi")},
 		}},
-		{Name: "tmp", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}},
+		{Name: "cache", VolumeSource: corev1.VolumeSource{
+			EmptyDir: &corev1.EmptyDirVolumeSource{SizeLimit: ptrQuantity(firstNonEmpty(c.cacheVolumeSize, "8Gi"))},
+		}},
+		{Name: "tmp", VolumeSource: corev1.VolumeSource{
+			EmptyDir: &corev1.EmptyDirVolumeSource{SizeLimit: ptrQuantity("1Gi")},
+		}},
 	}
 	if spec.RegistrySecret != "" {
 		volumes = append(volumes, corev1.Volume{
@@ -409,8 +413,10 @@ func (c *KubeJobClient) buildJob(spec JobSpec) *batchv1.Job {
 		})
 	} else {
 		volumes = append(volumes, corev1.Volume{
-			Name:         "docker-config",
-			VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
+			Name: "docker-config",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{SizeLimit: ptrQuantity("16Mi")},
+			},
 		})
 	}
 

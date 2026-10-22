@@ -926,6 +926,17 @@ export const sk: AppCatalog<typeof en> = {
   'monitoring.alerts.scope.org': 'organizácia',
   'monitoring.alerts.scope.project': 'projekt',
   'monitoring.alerts.disabled': 'vypnuté',
+  'monitoring.alerts.unconfirmed': 'čaká na potvrdenie',
+  'monitoring.alerts.created.mailtoDesc':
+    'Na túto adresu sme poslali potvrdzovací odkaz. Upozornenia začnú chodiť po jej potvrdení.',
+  'monitoring.alerts.confirm.title': 'Potvrdiť upozornenia e-mailom',
+  'monitoring.alerts.confirm.desc':
+    'Potvrďte, že táto adresa má dostávať upozornenia na udalosti zo Sytue DevX.',
+  'monitoring.alerts.confirm.submit': 'Potvrdiť adresu',
+  'monitoring.alerts.confirm.done':
+    'Adresa potvrdená. Upozornenia na udalosti vám teraz budú chodiť na tento e-mail.',
+  'monitoring.alerts.confirm.invalid':
+    'Tento potvrdzovací odkaz nie je platný alebo už bolo upozornenie odstránené.',
   'monitoring.alerts.delete': 'Odstrániť upozornenie {event}',
   'members.subtitle':
     'Kto má prístup do organizácie. Každá osoba predstavuje jedno miesto v balíku.',

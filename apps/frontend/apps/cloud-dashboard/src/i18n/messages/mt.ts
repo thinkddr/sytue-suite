@@ -941,6 +941,17 @@ export const mt: AppCatalog<typeof en> = {
   'monitoring.alerts.scope.org': 'organizzazzjoni',
   'monitoring.alerts.scope.project': 'proġett',
   'monitoring.alerts.disabled': 'diżattivata',
+  'monitoring.alerts.unconfirmed': 'qiegħda tistenna konferma',
+  'monitoring.alerts.created.mailtoDesc':
+    "Bgħatna link ta' konferma f'dan l-indirizz. It-twissijiet jibdew jaslu hekk kif jiġi kkonfermat.",
+  'monitoring.alerts.confirm.title': 'Ikkonferma t-twissijiet bl-email',
+  'monitoring.alerts.confirm.desc':
+    'Ikkonferma li dan l-indirizz għandu jirċievi twissijiet tal-avvenimenti mingħand Sytue DevX.',
+  'monitoring.alerts.confirm.submit': 'Ikkonferma l-indirizz',
+  'monitoring.alerts.confirm.done':
+    "L-indirizz ġie kkonfermat. Issa se tirċievi twissijiet tal-avvenimenti f'dan l-indirizz tal-email.",
+  'monitoring.alerts.confirm.invalid':
+    "Din il-link ta' konferma mhijiex valida jew it-twissija diġà tneħħiet.",
   'monitoring.alerts.delete': 'Ħassar it-twissija {event}',
   'members.subtitle':
     'Min għandu aċċess għall-organizzazzjoni. Kull persuna hija post wieħed fis-suite.',

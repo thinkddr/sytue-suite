@@ -93,7 +93,7 @@ func runaDeNombreGlifo(n string) (rune, bool) {
 var nombresLatinos = func() map[string]rune {
 	acentos := map[rune][]string{
 		0x300: {"grave"}, 0x301: {"acute"}, 0x302: {"circumflex"}, 0x303: {"tilde"},
-		0x304: {"macron"}, 0x306: {"breve"}, 0x307: {"dotaccent"}, 0x308: {"dieresis"},
+		0x304: {"macron"}, 0x306: {"breve"}, 0x307: {"dotaccent", "dot"}, 0x308: {"dieresis"},
 		0x30A: {"ring"}, 0x30B: {"hungarumlaut"}, 0x30C: {"caron"},
 		0x326: {"commaaccent"}, 0x327: {"cedilla", "commaaccent"}, 0x328: {"ogonek"},
 	}

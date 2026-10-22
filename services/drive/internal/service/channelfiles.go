@@ -2,9 +2,8 @@
 // Copyright (c) 2026 Daniel Delgado Ramos
 
 // Adjuntos de canal de Sytue Rooms: la VERJA. Un fichero subido a un mensaje de un
-// canal (incluido un canal PRIVADO o un DM) pertenece al CANAL, no a «Mi unidad» —
-// que en Drive es un espacio compartido de toda la organización—, y solo lo puede
-// leer quien sea MIEMBRO del canal EN EL MOMENTO de la petición.
+// canal (incluido un canal PRIVADO o un DM) pertenece al CANAL, no a «Mi unidad»,
+// y solo lo puede leer quien sea MIEMBRO del canal EN EL MOMENTO de la petición.
 //
 // Modelo de permiso (Mattermost/Slack: se evalúa en cada petición contra el roster
 // vivo, NO se replica una ACL en Drive):
@@ -30,13 +29,9 @@
 //     confidencial del canal: invisible en el Drive de cualquiera, aunque sea admin.
 //  2. ADJUNTADO POR REFERENCIA desde el propio Drive del usuario (selector «Archivo
 //     de Sytue Drive») ⇒ NO se mueve ni se copia: sigue siendo el MISMO fichero de
-//     Drive con SUS permisos (hoy, por diseño de Drive, legibles por el tenant), de
-//     modo que la coedición, las versiones y la cuota no se bifurcan — el modelo de
-//     Teams/Slack al adjuntar un fichero de OneDrive/Google Drive. Rooms no empeora
-//     ni mejora esa exposición; lo que SÍ impone es que leerlo A TRAVÉS de Rooms
-//     exija membresía del canal. Que un fichero personal sea legible por toda la
-//     organización es un gap PROPIO de Drive («Mi unidad» es una unidad compartida:
-//     ver el ponytail de store.ListRecent), no de esta ola.
+//     Drive con SUS permisos («Mi unidad» privada por owner_sub desde la mig 0032),
+//     de modo que las versiones y la cuota no se bifurcan. Leerlo A TRAVÉS de Rooms
+//     exige además membresía del canal.
 package service
 
 import (
@@ -88,6 +83,9 @@ func (s *Service) ChannelFile(ctx context.Context, channelID, fileID uuid.UUID, 
 		return domain.File{}, err
 	}
 	// Ámbito personal: fichero adjuntado por referencia o adjunto heredado.
+	if store.OwnerFrom(ctx) == "" {
+		ctx = store.WithOwner(ctx, subject)
+	}
 	return s.store.GetFile(ctx, fileID)
 }
 
@@ -207,6 +205,9 @@ func (s *Service) putBlob(ctx context.Context, t tenancy.Tenant, key, name, cont
 // de modo que el fichero sobreviva a que el mensaje se borre o le echen del canal — que
 // es justo el sentido de guardárselo.
 func (s *Service) CopyChannelFileToMyDrive(ctx context.Context, channelID, fileID uuid.UUID, subject string) (domain.File, error) {
+	if store.OwnerFrom(ctx) == "" {
+		ctx = store.WithOwner(ctx, subject)
+	}
 	// Verja de canal: la ÚNICA que autoriza esto.
 	if _, err := s.ChannelFile(ctx, channelID, fileID, subject); err != nil {
 		return domain.File{}, err

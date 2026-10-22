@@ -1598,6 +1598,7 @@ function mapAlertPolicy(p: SdkAlertPolicy): AlertPolicy {
     event: p.event,
     channelUrl: p.channel_url,
     enabled: p.enabled,
+    confirmed: p.confirmed ?? true,
     orgScope: !p.project_id,
   };
 }

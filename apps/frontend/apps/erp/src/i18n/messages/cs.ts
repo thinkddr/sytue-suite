@@ -607,4 +607,7 @@ export const cs: AppCatalog<typeof en> = {
   'pos.imageUpload': 'Nahrát obrázek pro {name}',
   'pos.images': 'Obrázky',
   'pos.imageHint': 'Vyberte obrázek JPEG, PNG nebo WebP do 10 MB.',
+  'vf.error.invalidCertificate':
+    'Certifikát nebo jeho soukromý klíč není platný kvalifikovaný certifikát se španělským NIF.',
+  'vf.error.certificateTaxIdMismatch': 'DIČ (NIF) v certifikátu neodpovídá DIČ organizace.',
 };

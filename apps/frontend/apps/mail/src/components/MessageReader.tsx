@@ -8,6 +8,7 @@
  */
 import type { JSX } from 'preact';
 import { imagenesEnLinea, resolverCidsEnLinea } from '../lib/cid.js';
+import { neutralizarProxyEnCuerpo, reescribirImagenesRemotas } from '../lib/remoteImage.js';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import {
   Avatar,
@@ -34,6 +35,7 @@ import type {
 import {
   attachmentDownloadUrl,
   rawDownloadUrl,
+  remoteImageProxyUrl,
   resolveIntent,
   getMessageBody,
   getUnsubscribe,
@@ -1059,15 +1061,15 @@ function HtmlBody({ t, html }: { t: T; html: string }): JSX.Element {
   // bloqueado (el componente se reutiliza entre mensajes del hilo).
   useEffect(() => setRemoteAllowed(false), [html]);
 
-  // `img-src data:` deja pasar las imágenes incrustadas en el propio mensaje;
-  // al permitir, se añade `https:` (nunca `http:`: no se degrada a texto claro).
-  //
-  // `'self'` es para las imágenes EN LÍNEA, que se sirven desde nuestro propio
-  // BFF (`/api/attachments`). NO es contenido remoto y no se le pide permiso a
-  // nadie: la imagen ya llegó dentro del mensaje, pedirla a nuestro servidor no
-  // le dice nada al remitente. Lo que sigue bloqueado por defecto es `https:`,
-  // que es lo que descarga del dominio de quien envía y delata hora e IP.
-  const csp = `default-src 'none'; img-src data: 'self'${remoteAllowed ? ' https:' : ''}; style-src 'unsafe-inline'; font-src data:`;
+  // `img-src data: 'self'` deja pasar las imágenes incrustadas en el propio
+  // mensaje (`/api/attachments`) y, cuando la persona pulsa «Mostrar imágenes»,
+  // las remotas reescritas hacia nuestro proxy (`/api/remote-image`), sin abrir
+  // nunca `https:` en la CSP ni exponer la IP del navegador al remitente.
+  const csp = "default-src 'none'; img-src data: 'self'; style-src 'unsafe-inline'; font-src data:";
+  const htmlSeguro = neutralizarProxyEnCuerpo(html);
+  const htmlCuerpo = remoteAllowed
+    ? reescribirImagenesRemotas(htmlSeguro, remoteImageProxyUrl)
+    : htmlSeguro;
   // Tipografía base del sistema dentro del documento aislado + enlaces en
   // pestaña nueva (el iframe no debe navegar dentro del lector).
   //
@@ -1085,7 +1087,7 @@ function HtmlBody({ t, html }: { t: T; html: string }): JSX.Element {
 <meta http-equiv="Content-Security-Policy" content="${csp}">
 <base target="_blank">
 <style>html{color-scheme:${esquema}}html,body{background:transparent!important}body{margin:0;font:15px/1.6 system-ui,-apple-system,sans-serif;color:${tinta};overflow-wrap:anywhere}a{color:${enlace}}${invertido ? inversionNocturna() : ''}</style>
-</head><body>${html}</body></html>`;
+</head><body>${htmlCuerpo}</body></html>`;
 
   const measure = () => {
     const d = frame.current?.contentDocument;

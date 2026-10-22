@@ -932,6 +932,17 @@ export const ro: AppCatalog<typeof en> = {
   'monitoring.alerts.scope.org': 'organizație',
   'monitoring.alerts.scope.project': 'proiect',
   'monitoring.alerts.disabled': 'dezactivată',
+  'monitoring.alerts.unconfirmed': 'în așteptarea confirmării',
+  'monitoring.alerts.created.mailtoDesc':
+    'Am trimis un link de confirmare la această adresă. Alertele vor sosi imediat ce este confirmată.',
+  'monitoring.alerts.confirm.title': 'Confirmă alertele prin e-mail',
+  'monitoring.alerts.confirm.desc':
+    'Confirmați că această adresă trebuie să primească alerte de evenimente de la Sytue DevX.',
+  'monitoring.alerts.confirm.submit': 'Confirmă adresa',
+  'monitoring.alerts.confirm.done':
+    'Adresă confirmată. Veți primi acum alerte de evenimente la această adresă de e-mail.',
+  'monitoring.alerts.confirm.invalid':
+    'Acest link de confirmare nu este valid sau alerta a fost deja eliminată.',
   'monitoring.alerts.delete': 'Șterge alerta {event}',
   'members.subtitle': 'Cine are acces la organizație. Fiecare persoană ocupă un loc în suită.',
   'members.add': 'Invită o persoană',

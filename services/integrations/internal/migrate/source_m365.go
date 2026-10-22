@@ -46,6 +46,14 @@ func newM365(ctx context.Context, rt connector.Runtime, inst connector.Instance,
 	if err != nil {
 		return nil, err
 	}
+	if err := validarHostOficial(base, hostsOficialesM365); err != nil {
+		return nil, err
+	}
+	if authBase := strings.TrimSpace(inst.Config[graph.ConfigAuthorityBase]); authBase != "" {
+		if err := validarHostOficial(authBase, hostsOficialesM365); err != nil {
+			return nil, err
+		}
+	}
 	m := &m365{rt: rt, base: base}
 	if strings.TrimSpace(sourceUser) == "" {
 		if !inst.HasBearer {

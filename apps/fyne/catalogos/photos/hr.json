@@ -1,4 +1,6 @@
 {
+  "aiBatch.excludeOrg": "Isključi organizaciju iz automatske obrade Sytue AI",
+  "aiBatch.excludedHint": "Organizacija je isključena iz automatske obrade Sytue AI. Nove se fotografije ne obrađuju u pozadini za prijedloge ili sličnosti.",
   "album.linkCopied": "Poveznica kopirana",
   "album.newLink": "Nova poveznica",
   "album.newLinkConfirm": "Stvoriti novu poveznicu? Trenutačna poveznica prestat će raditi svima koji je već imaju.",

@@ -196,7 +196,7 @@ func TestGuardarEnMiDriveCruzaDeAmbitoAProposito(t *testing.T) {
 	}
 	for nombre, montar := range montajes {
 		t.Run(nombre, func(t *testing.T) {
-			st, ctx := montar(t), tenantCtx("acme")
+			st, ctx := montar(t), store.WithOwner(tenantCtx("acme"), "bea")
 			raiz, _, err := st.EnsureBase(ctx, 1<<30, false)
 			if err != nil {
 				t.Fatal(err)
@@ -235,3 +235,132 @@ func TestGuardarEnMiDriveCruzaDeAmbitoAProposito(t *testing.T) {
 		})
 	}
 }
+
+// TestSinRLSMiUnidadAisladaPorPersona verifica que dos personas de la misma
+// organización ("acme") tienen raíces personales distintas y que ni con RLS ni
+// sin RLS (superusuario) puede una persona ver, listar, buscar, mover, copiar,
+// etiquetar, borrar, compartir ni consultar versiones de los ficheros o
+// carpetas de «Mi unidad» de otra persona, salvo compartición explícita.
+func TestSinRLSMiUnidadAisladaPorPersona(t *testing.T) {
+	montajes := map[string]func(*testing.T) *store.Store{
+		"sin RLS": montarSinRLS,
+		"con RLS": func(t *testing.T) *store.Store {
+			t.Helper()
+			return store.New(pgtest.New(t, db.Migrations, db.MigrationsDir).Pool)
+		},
+	}
+	for nombre, montar := range montajes {
+		t.Run(nombre, func(t *testing.T) {
+			st := montar(t)
+			ctxAlice := store.WithOwner(tenantCtx("acme"), "alice")
+			ctxBob := store.WithOwner(tenantCtx("acme"), "bob")
+
+			raizAlice, _, err := st.EnsureBase(ctxAlice, 1<<30, false)
+			if err != nil {
+				t.Fatalf("EnsureBase alice: %v", err)
+			}
+			raizBob, _, err := st.EnsureBase(ctxBob, 1<<30, false)
+			if err != nil {
+				t.Fatalf("EnsureBase bob: %v", err)
+			}
+			if raizAlice.ID == raizBob.ID {
+				t.Fatalf("alice y bob comparten carpeta raíz (%s): «Mi unidad» sigue siendo del tenant", raizAlice.ID)
+			}
+			if raizAlice.OwnerSub != "alice" || raizBob.OwnerSub != "bob" {
+				t.Fatalf("owner_sub de raíces = (%q, %q), esperaba (alice, bob)", raizAlice.OwnerSub, raizBob.OwnerSub)
+			}
+
+			carpetaAlice, err := st.CreateFolder(ctxAlice, raizAlice.ID, "SecretoAlice", "alice", false)
+			if err != nil {
+				t.Fatalf("CreateFolder alice: %v", err)
+			}
+			ficheroAlice, err := st.CreateFile(ctxAlice, store.NewFileRecord{
+				FolderID:    carpetaAlice.ID,
+				Name:        "nomina-alice.pdf",
+				StorageKey:  "files/acme/alice-1",
+				SizeBytes:   42,
+				ContentType: "application/pdf",
+				Checksum:    "chk-alice-1",
+				OwnerSub:    "alice",
+			})
+			if err != nil {
+				t.Fatalf("CreateFile alice: %v", err)
+			}
+
+			noExiste := func(que string, err error) {
+				t.Helper()
+				if !errors.Is(err, domain.ErrNotFound) {
+					t.Errorf("%s: %v, esperaba ErrNotFound", que, err)
+				}
+			}
+
+			// Bob no ve ni la raíz, ni la subcarpeta, ni el fichero de Alice.
+			_, err = st.GetFolder(ctxBob, raizAlice.ID)
+			noExiste("GetFolder raíz de alice por bob", err)
+			_, err = st.GetFolder(ctxBob, carpetaAlice.ID)
+			noExiste("GetFolder subcarpeta de alice por bob", err)
+			_, err = st.GetFile(ctxBob, ficheroAlice.ID)
+			noExiste("GetFile de alice por bob", err)
+
+			if carpetas, err := st.ListSubfolders(ctxBob, raizAlice.ID); err != nil || len(carpetas) != 0 {
+				t.Errorf("ListSubfolders de raíz de alice por bob: %d (%v)", len(carpetas), err)
+			}
+			_, err = st.ListFilesPage(ctxBob, carpetaAlice.ID, store.FileCursor{}, 50)
+			noExiste("ListFilesPage de carpeta de alice por bob", err)
+			if res, err := st.SearchFiles(ctxBob, "nomina-alice", 50); err != nil || len(res) != 0 {
+				t.Errorf("SearchFiles por bob encontró %d ficheros de alice (%v)", len(res), err)
+			}
+			if rec, _, err := st.ListRecent(ctxBob, store.RecentCursor{}, 50); err != nil || len(rec) != 0 {
+				t.Errorf("ListRecent por bob devolvió %d ficheros de alice (%v)", len(rec), err)
+			}
+			if vers, _, err := st.ListVersions(ctxBob, ficheroAlice.ID, 50, 0); err != nil || len(vers) != 0 {
+				t.Errorf("ListVersions por bob devolvió %d versiones de alice (%v)", len(vers), err)
+			}
+			_, err = st.GetVersion(ctxBob, ficheroAlice.ID, 1)
+			noExiste("GetVersion de alice por bob", err)
+
+			// Bob tampoco puede modificar, mover, copiar, borrar ni compartir lo de Alice.
+			_, err = st.RenameFile(ctxBob, ficheroAlice.ID, "robado.pdf")
+			noExiste("RenameFile de alice por bob", err)
+			_, err = st.MoveFile(ctxBob, ficheroAlice.ID, raizBob.ID)
+			noExiste("MoveFile de alice por bob", err)
+			_, err = st.CopyFile(ctxBob, ficheroAlice.ID, raizBob.ID, "bob")
+			noExiste("CopyFile de alice por bob", err)
+			_, err = st.DeleteFile(ctxBob, ficheroAlice.ID)
+			noExiste("DeleteFile de alice por bob", err)
+			_, err = st.RenameFolder(ctxBob, carpetaAlice.ID, "Robada")
+			noExiste("RenameFolder de alice por bob", err)
+			_, err = st.DeleteFolder(ctxBob, carpetaAlice.ID)
+			noExiste("DeleteFolder de alice por bob", err)
+			_, err = st.CreateShare(ctxBob, store.NewShareRecord{
+				FileID:     &ficheroAlice.ID,
+				Kind:       domain.ShareLink,
+				Permission: domain.PermRead,
+				Token:      "tok-robo-" + nombre,
+				CreatedBy:  "bob",
+			})
+			noExiste("CreateShare sobre fichero de alice por bob", err)
+
+			// Si Alice comparte explícitamente su fichero con Bob, aparece en «Compartido conmigo» de Bob.
+			sh, err := st.CreateShare(ctxAlice, store.NewShareRecord{
+				FileID:     &ficheroAlice.ID,
+				Kind:       domain.ShareUser,
+				Permission: domain.PermRead,
+				Subject:    "bob",
+				CreatedBy:  "alice",
+			})
+			if err != nil {
+				t.Fatalf("CreateShare de alice para bob: %v", err)
+			}
+			compartidos, err := st.ListSharedWithMe(ctxBob, "bob", nil)
+			if err != nil || len(compartidos) != 1 || compartidos[0].ID != ficheroAlice.ID {
+				t.Fatalf("ListSharedWithMe de bob = %+v (%v), esperaba el fichero compartido por alice", compartidos, err)
+			}
+			// Bob no puede revocar el share creado por Alice sobre el fichero de Alice.
+			if err := st.RevokeShare(ctxBob, sh.ID); !errors.Is(err, domain.ErrNotFound) {
+				t.Errorf("RevokeShare por bob sobre share de alice: %v, esperaba ErrNotFound", err)
+			}
+		})
+	}
+}
+

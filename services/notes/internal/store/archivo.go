@@ -57,7 +57,7 @@ func (s *Store) ArchiveNotebook(ctx context.Context, id uuid.UUID, sub string, a
 		UPDATE notebooks SET archived_at = NULL, updated_at = now()
 		 WHERE tenant=$1 AND id IN (SELECT id FROM rama) AND archived_at = (SELECT archived_at FROM raiz)`
 	}
-	return s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	return s.inWriteTx(ctx, func(tx pgx.Tx) error {
 		tag, err := tx.Exec(ctx, sql, t.Slug, id, sub)
 		if err != nil {
 			return err

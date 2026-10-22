@@ -256,4 +256,7 @@ export const pt: AppCatalog<typeof en> = {
   'memories.years': 'Há {count} anos',
   'memories.oneYear': 'Há um ano',
   'memories.hide': 'Ocultar',
+  'aiBatch.excludeOrg': 'Excluir a organização do lote automático do Sytue AI',
+  'aiBatch.excludedHint':
+    'A organização está excluída do lote automático do Sytue AI. As fotos novas não são processadas em segundo plano para sugestões nem semelhanças.',
 };

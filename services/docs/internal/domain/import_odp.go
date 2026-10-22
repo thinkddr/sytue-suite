@@ -593,7 +593,14 @@ func dataURLFromZip(href string, files map[string][]byte) string {
 	if len(raw) == 0 {
 		return ""
 	}
-	mime := mediaTypeOf(strings.ToLower(href))
+	lower := strings.ToLower(href)
+	switch {
+	case strings.HasSuffix(lower, ".tif"), strings.HasSuffix(lower, ".tiff"):
+		return tiffADataURL(raw)
+	case strings.HasSuffix(lower, ".emf"):
+		return emfADataURL(raw)
+	}
+	mime := mediaTypeOf(lower)
 	if !strings.HasPrefix(mime, "image/") {
 		return ""
 	}

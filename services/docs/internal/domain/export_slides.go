@@ -116,6 +116,7 @@ func (r *relSet) xml() string {
 // lienzo y nº de diapositivas (el campo {total} del patrón).
 type pptxBuild struct {
 	media  map[string][]byte
+	imgs   map[string]string // src → nombre en ppt/media, para no duplicar entre diseños y diapositivas
 	types  map[string]string // extensión → content type de lo incrustado
 	imgN   int
 	medN   int
@@ -127,6 +128,9 @@ type pptxBuild struct {
 
 // embedImage decodifica un dataURL, lo guarda en ppt/media y devuelve su rId.
 func (pb *pptxBuild) embedImage(rels *relSet, src string) (string, bool) {
+	if name, ok := pb.imgs[src]; ok {
+		return rels.add(relImage, "../media/"+name, ""), true
+	}
 	ext, data, ok := decodeDataURL(src)
 	if !ok {
 		return "", false
@@ -134,6 +138,10 @@ func (pb *pptxBuild) embedImage(rels *relSet, src string) (string, bool) {
 	pb.imgN++
 	name := "image" + strconv.Itoa(pb.imgN) + "." + ext
 	pb.media["ppt/media/"+name] = data
+	if pb.imgs == nil {
+		pb.imgs = map[string]string{}
+	}
+	pb.imgs[src] = name
 	return rels.add(relImage, "../media/"+name, ""), true
 }
 

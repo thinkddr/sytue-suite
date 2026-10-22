@@ -613,9 +613,12 @@ func (e *ejecucion) pintarRaster(hab, relleno, trazo bool, pend int) {
 	if len(subs) == 0 {
 		return
 	}
-	if relleno && e.estado.patronRelleno != "" && e.estado.degRelleno != nil {
+	switch {
+	case relleno && e.estado.patronRelleno != "" && len(e.estado.mallaRelleno) > 0:
+		r.dibujarMalla(e.estado.mallaRelleno, e.estado.matrizMalla, e.estado.alfaRelleno, r.nuevoRecorte(subs, e.estado.recorte))
+	case relleno && e.estado.patronRelleno != "" && e.estado.degRelleno != nil:
 		r.rellenarConDegradado(subs, e.estado.degRelleno.conAlfa(e.estado.alfaRelleno), e.estado.recorte)
-	} else if relleno {
+	case relleno:
 		if c, ok := colorDePintura(e.estado.relleno, e.estado.patronRelleno,
 			e.estado.aproxRelleno, e.estado.alfaRelleno); ok {
 			r.rellenar(subs, c, e.estado.recorte)
@@ -704,12 +707,21 @@ func (e *ejecucion) dibujarTexto(f *fuentePDF, glifos []glifo) {
 	relleno := colorRaster(e.estado.relleno, e.estado.alfaRelleno)
 	desplazamiento := 0.0
 	for _, g := range glifos {
+		dx, dy := desplazamiento, 0.0
+		if f.vertical {
+			dx = -g.vx / 1000 * e.estado.tamano
+			dy = desplazamiento - g.vy/1000*e.estado.tamano
+		}
 		if gid, ok := f.indiceDeGlifo(cara, &r.buf, g); ok {
-			if subs := r.contorno(cara, gid, upem, trm, desplazamiento, e.estado.tamano); len(subs) > 0 {
+			if subs := r.contorno(cara, gid, upem, trm, dx, dy, e.estado.tamano); len(subs) > 0 {
 				e.pintarGlifo(subs, relleno)
 			}
 		}
-		a := g.ancho/1000*e.estado.tamano + e.estado.espCar
+		paso := g.ancho
+		if f.vertical {
+			paso = g.alto
+		}
+		a := paso/1000*e.estado.tamano + e.estado.espCar
 		if g.esEspacioSimple {
 			a += e.estado.espPal
 		}
@@ -722,14 +734,21 @@ func (e *ejecucion) dibujarTexto(f *fuentePDF, glifos []glifo) {
 // aplica, pero lo que dibujan sí, que es lo que se ve.
 func (e *ejecucion) pintarGlifo(subs [][]punto, relleno color.NRGBA) {
 	r := e.l.r
+	rellenar := func() {
+		if e.estado.patronRelleno != "" && e.estado.degRelleno != nil {
+			r.rellenarConDegradado(subs, e.estado.degRelleno.conAlfa(e.estado.alfaRelleno), e.estado.recorte)
+			return
+		}
+		r.rellenar(subs, relleno, e.estado.recorte)
+	}
 	switch e.estado.modoRender {
 	case 1, 5:
 		r.trazar(subs, e, colorRaster(e.estado.trazo, e.estado.alfaTrazo))
 	case 2, 6:
-		r.rellenar(subs, relleno, e.estado.recorte)
+		rellenar()
 		r.trazar(subs, e, colorRaster(e.estado.trazo, e.estado.alfaTrazo))
 	default:
-		r.rellenar(subs, relleno, e.estado.recorte)
+		rellenar()
 	}
 }
 
@@ -737,7 +756,7 @@ func (e *ejecucion) pintarGlifo(subs [][]punto, relleno color.NRGBA) {
 // devuelve con la Y hacia ABAJO y el espacio de glifo de PDF la tiene hacia
 // arriba: sin ese volteo, el texto sale reflejado.
 func (r *rasterizador) contorno(
-	cara *sfnt.Font, gid sfnt.GlyphIndex, upem float64, trm matriz, desplazamiento, tamano float64,
+	cara *sfnt.Font, gid sfnt.GlyphIndex, upem float64, trm matriz, dx, dy, tamano float64,
 ) [][]punto {
 	segs, err := cara.LoadGlyph(&r.buf, gid, fixed.Int26_6(int32(upem)<<6), nil)
 	if err != nil || len(segs) == 0 {
@@ -745,7 +764,7 @@ func (r *rasterizador) contorno(
 	}
 	k := tamano / upem / 64
 	local := func(x, y fixed.Int26_6) (float64, float64) {
-		return desplazamiento + float64(x)*k, -float64(y) * k
+		return dx + float64(x)*k, dy - float64(y)*k
 	}
 	var subs [][]punto
 	var act []punto

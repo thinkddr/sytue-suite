@@ -17,6 +17,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/storage"
 
+	"git.sytue.eu/sytue/one/apps/nucleo/ajustes"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/ficheros"
 	"git.sytue.eu/sytue/one/apps/nucleo/sistema/escritorio"
@@ -68,8 +69,19 @@ func (s *Suite) AceptarFicheros(w fyne.Window, titulo, texto string) {
 	s.aceptarFicheros(w, func() { AvisoDeRespaldo(s.app, titulo, texto) })
 }
 
+// AlConfirmarSubidaLocal registra cómo pregunta esta aplicación antes de subir al
+// servicio un fichero local abierto desde el sistema (FYP-02). Se llama en el hilo de
+// la interfaz; si la persona acepta, llama a `aceptar` indicando si quiere recordar su
+// elección en este dispositivo.
+func (s *Suite) AlConfirmarSubidaLocal(f func(w fyne.Window, nombre string, aceptar func(recordar bool))) {
+	s.mu.Lock()
+	s.confirmarLocal = f
+	s.mu.Unlock()
+}
+
 func (s *Suite) aceptarFicheros(w fyne.Window, alFallar func()) {
 	s.mu.Lock()
+	s.ventanaLocal = w
 	s.alFallarLocal = alFallar
 	antes := s.localesAntes
 	s.localesAntes = nil
@@ -118,6 +130,8 @@ func (s *Suite) predeterminarUnaVez() {
 func (s *Suite) abrirLocal(producto string, uri fyne.URI, cargar func(context.Context, api.Apertura) error) {
 	s.mu.Lock()
 	alFallar := s.alFallarLocal
+	w := s.ventanaLocal
+	confirmar := s.confirmarLocal
 	if alFallar == nil && !s.arrancada {
 		// Arrancar con el fichero (el caso de «Abrir con» con la app cerrada): llega antes
 		// de que el `main` llame a AceptarFicheros, y se guarda para entonces.
@@ -137,14 +151,37 @@ func (s *Suite) abrirLocal(producto string, uri fyne.URI, cargar func(context.Co
 			return
 		}
 	}
-	go func() {
-		ctx, parar := context.WithTimeout(context.Background(), plazoApertura)
-		defer parar()
-		if err := cargar(ctx, api.Apertura{Local: uri.String()}); err != nil {
-			slog.Info("sesion: el fichero de la máquina no se ha podido abrir", "fichero", uri.Name(), "motivo", err)
-			fyne.Do(alFallar)
-		}
-	}()
+	subir := func() {
+		go func() {
+			ctx, parar := context.WithTimeout(context.Background(), plazoApertura)
+			defer parar()
+			if err := cargar(ctx, api.Apertura{Local: uri.String()}); err != nil {
+				slog.Info("sesion: el fichero de la máquina no se ha podido abrir", "fichero", uri.Name(), "motivo", err)
+				fyne.Do(alFallar)
+			}
+		}()
+	}
+	// FYP-02: abrir un fichero del equipo lo sube al servicio; si la persona aún no ha
+	// recordado su elección en este dispositivo, se pide su conformidad antes.
+	if ajustes.Leer().SubirAlAbrir {
+		subir()
+		return
+	}
+	if confirmar == nil {
+		return
+	}
+	nombre := uri.Name()
+	if nombre == "" {
+		nombre = filepath.Base(uri.Path())
+	}
+	fyne.Do(func() {
+		confirmar(w, nombre, func(recordar bool) {
+			if recordar {
+				_ = s.Poner(func(a *ajustes.Ajustes) { a.SubirAlAbrir = true })
+			}
+			subir()
+		})
+	})
 }
 
 // ficheroLocal dice si un enlace entrante es un fichero de esta máquina, y cuál.

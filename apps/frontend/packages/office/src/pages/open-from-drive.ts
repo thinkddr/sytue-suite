@@ -142,23 +142,24 @@ export const GET: APIRoute = async (ctx) => {
       template?: boolean;
       truncated?: boolean;
     };
-    // UN LIBRO RECORTADO TAMPOCO SE ANCLA. Si no cabe entero en un documento, el servicio lo
-    // abre con las primeras filas de cada hoja y un aviso delante (`truncated`). Esa copia
-    // es un documento aparte: anclada, «Guardar en Drive» sobrescribiría el fichero entero
-    // con la copia recortada.
+    // UN ARCHIVO RECORTADO TAMPOCO SE ANCLA. Si no cabe entero en un documento (.xlsx, .ods,
+    // .docx o .pptx), el servicio lo abre con la parte inicial que cabe y un aviso delante
+    // (`truncated`). Esa copia es un documento aparte: anclada, «Guardar en Drive»
+    // sobrescribiría el fichero entero con la copia recortada.
     const nueva = esPlantilla || converted.template === true || converted.truncated === true;
     // El título de un documento nacido de una plantilla no lleva la extensión.
     const titulo = nueva ? meta.name.replace(/\.[^.]+$/, '') : meta.name;
 
     // El título es el del fichero, no el que adivine la conversión: es el nombre por
     // el que la persona lo conoce y el que verá al volver a Drive.
-    const doc = abierto
-      ? { ...abierto, created: true }
-      : await docs.create({
-          kind: converted.kind,
-          title: titulo,
-          ...(nueva ? {} : { sourceRef }),
-        });
+    const doc =
+      abierto && !nueva
+        ? { ...abierto, created: true }
+        : await docs.create({
+            kind: converted.kind,
+            title: titulo,
+            ...(nueva ? {} : { sourceRef }),
+          });
 
     // Sembrar SOLO si el documento acaba de nacer (o es el hueco de arriba). Dos
     // pestañas abriendo el mismo fichero a la vez llegan aquí las dos; la segunda

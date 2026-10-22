@@ -493,6 +493,8 @@
   "vf.confirmBody": "Nüüdsest saadetakse iga kinnitatud arve Hispaania maksuametile ja seda ei saa enam muuta ega kustutada: vead parandatakse parandusarvega. Kui see on sisse lülitatud, jääb see sisse aasta lõpuni.",
   "vf.confirmTitle": "Kas lülitada VERI*FACTU sisse?",
   "vf.declaration": "Vastavusdeklaratsioon",
+  "vf.error.certificateTaxIdMismatch": "Sertifikaadil olev maksukohustuslase number (NIF) ei ühti organisatsiooni omaga.",
+  "vf.error.invalidCertificate": "Sertifikaat või privaatvõti ei ole kehtiv Hispaania maksukohustuslase numbriga (NIF) kvalifitseeritud sertifikaat.",
   "vf.export": "Laadi kanded alla",
   "vf.fixHint": "Parandage arve või kliendi andmed ja saatke see uuesti.",
   "vf.intro": "Alates 2027. aastast tuleb iga arve selle väljastamisel registreerida Hispaania maksuametis. VERI*FACTU abil teeb Sytue seda arve kinnitamisel teie eest ja lisab QR-koodi, millega klient saab arvet kontrollida.",

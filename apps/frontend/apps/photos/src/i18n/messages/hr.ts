@@ -268,4 +268,7 @@ export const hr: AppCatalog<typeof en> = {
   'memories.years': 'Prije {count} godina',
   'memories.oneYear': 'Prije godinu dana',
   'memories.hide': 'Sakrij',
+  'aiBatch.excludeOrg': 'Isključi organizaciju iz automatske obrade Sytue AI',
+  'aiBatch.excludedHint':
+    'Organizacija je isključena iz automatske obrade Sytue AI. Nove se fotografije ne obrađuju u pozadini za prijedloge ili sličnosti.',
 };

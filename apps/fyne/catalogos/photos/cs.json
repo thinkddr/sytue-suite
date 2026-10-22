@@ -1,4 +1,6 @@
 {
+  "aiBatch.excludeOrg": "Vyloučit organizaci z automatické dávky Sytue AI",
+  "aiBatch.excludedHint": "Organizace je vyloučena z automatické dávky Sytue AI. Fotografie se na pozadí nezpracovávají pro návrhy ani podobné snímky.",
   "album.linkCopied": "Odkaz zkopírován",
   "album.newLink": "Nový odkaz",
   "album.newLinkConfirm": "Vytvořit nový odkaz? Současný odkaz přestane fungovat všem, kdo ho už mají.",

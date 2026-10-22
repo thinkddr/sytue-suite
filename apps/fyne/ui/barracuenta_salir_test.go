@@ -4,13 +4,18 @@
 package ui
 
 import (
+	"io"
+	"net/http"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/test"
 
 	"git.sytue.eu/sytue/one/apps/fyne/sesion"
+	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 	"git.sytue.eu/sytue/one/apps/nucleo/notas"
 )
@@ -63,6 +68,103 @@ func TestCerrarSesionAvisaDeLoQueNotepadsNoHaSubido(t *testing.T) {
 	}
 	if n := sesion.PendientesNotepads(); n != 0 {
 		t.Errorf("tras cerrar sesión quedan %d cosas de Notepads en el disco", n)
+	}
+}
+
+type transporteFunc func(*http.Request) (*http.Response, error)
+
+func (f transporteFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+// TestCerrarSesionSubeLoPendienteYApagaDescartarMientrasSube: elegir «Subir y cerrar
+// sesión» envía el borrador antes de salir y, mientras sube, apaga también «Descartar y
+// cerrar sesión» para que un clic a destiempo no borre el almacén a mitad de subida.
+func TestCerrarSesionSubeLoPendienteYApagaDescartarMientrasSube(t *testing.T) {
+	suite := suiteConSesion(t)
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	alm, err := sesion.Almacen()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := alm.Write("ada/", notas.EspacioBorradores, "nb-1", "borrador por subir"); err != nil {
+		t.Fatal(err)
+	}
+	llegada := make(chan struct{})
+	soltar := make(chan struct{})
+	var subidas atomic.Int32
+	prev := api.Transporte
+	t.Cleanup(func() { api.Transporte = prev })
+	api.Transporte = transporteFunc(func(r *http.Request) (*http.Response, error) {
+		if r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/notebooks/nb-1/notes") {
+			if subidas.Add(1) == 1 {
+				close(llegada)
+			}
+			<-soltar
+			return &http.Response{
+				StatusCode: http.StatusCreated,
+				Header:     http.Header{"Content-Type": []string{"application/json"}},
+				Body:       io.NopCloser(strings.NewReader(`{"id":"n-1"}`)),
+			}, nil
+		}
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"application/json"}},
+			Body:       io.NopCloser(strings.NewReader(`{}`)),
+		}, nil
+	})
+
+	c := nuevaCuentaBarra(traductorPrueba(t), suite)
+	w := test.NewTempWindow(t, c.boton)
+	w.Resize(fyne.NewSize(1280, 800))
+
+	c.salir(sesion.PendientesNotepads())
+	cp, _ := w.Canvas().Overlays().Top().(*capa)
+	if cp == nil {
+		t.Fatal("no se abrió el diálogo de aviso al salir")
+	}
+	d := cp.panel.(*Dialogo)
+	var descartar, subir *Boton
+	for _, o := range d.Pie.(*fyne.Container).Objects {
+		b, ok := o.(*Boton)
+		if !ok {
+			continue
+		}
+		switch b.Texto {
+		case c.t.T("account.signOutPending.discard", nil):
+			descartar = b
+		case c.t.T("account.signOutPending.upload", nil):
+			subir = b
+		}
+	}
+	if descartar == nil || subir == nil {
+		t.Fatal("faltan los botones de descartar o subir")
+	}
+	test.Tap(subir)
+	select {
+	case <-llegada:
+	case <-time.After(5 * time.Second):
+		t.Fatal("la subida del borrador no llegó a empezar")
+	}
+	if !descartar.Inerte {
+		t.Error("mientras sube lo pendiente, «Descartar y cerrar sesión» sigue activo")
+	}
+	test.Tap(descartar)
+	if !suite.Estado().Dentro() {
+		t.Fatal("pulsar «Descartar» mientras sube cerró la sesión a mitad de subida")
+	}
+	close(soltar)
+	limite := time.Now().Add(5 * time.Second)
+	for suite.Estado().Dentro() && time.Now().Before(limite) {
+		fyne.DoAndWait(func() {})
+		time.Sleep(10 * time.Millisecond)
+	}
+	if suite.Estado().Dentro() {
+		t.Error("tras terminar de subir, la sesión sigue abierta")
+	}
+	if subidas.Load() != 1 {
+		t.Errorf("subidas = %d; quiero 1", subidas.Load())
+	}
+	if n := sesion.PendientesNotepads(); n != 0 {
+		t.Errorf("tras subir y salir quedan %d pendientes en el disco", n)
 	}
 }
 

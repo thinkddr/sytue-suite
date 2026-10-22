@@ -377,4 +377,9 @@ export const fi: Catalog = {
   'linkedServices.writeUnknown':
     'Palveluntarjoaja ei vahvistanut tallennusta. Päivitä näkymä ja tarkista ennen kuin yrität uudelleen.',
   'linkedServices.unavailable': 'Yhteys tähän palveluntarjoajaan ei ole käytettävissä tililläsi.',
+  'localFile.confirmUpload.title': 'Avaa tiedosto tältä laitteelta',
+  'localFile.confirmUpload.body':
+    'Jotta ”{name}” voidaan avata, se lähetetään Sytue One -tilillesi.',
+  'localFile.confirmUpload.remember': 'Muista valintani tällä laitteella',
+  'localFile.confirmUpload.confirm': 'Lähetä ja avaa',
 };

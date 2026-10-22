@@ -55,18 +55,18 @@ func (e *PDFEnsamblador) incumplePDFA(origen *PDFDoc, dec declaracionPDFA, catal
 	for _, n := range e.copiados {
 		copiados[n] = true
 	}
-	var nuevos []objetoSalida
+	nuevos := map[int]objetoSalida{}
 	for i, o := range e.cuerpos {
 		if !copiados[i+1] {
-			nuevos = append(nuevos, o)
+			nuevos[i+1] = o
 		}
 	}
 	return dec, e.incumplenObjetos(nuevos, dec.parte, componentesIntencion(origen))
 }
 
-func (e *PDFEnsamblador) incumplenObjetos(objs []objetoSalida, parte string, componentes int) string {
-	for _, o := range objs {
-		if motivo := e.incumpleObjeto(o, parte, componentes); motivo != "" {
+func (e *PDFEnsamblador) incumplenObjetos(objs map[int]objetoSalida, parte string, componentes int) string {
+	for num, o := range objs {
+		if motivo := e.incumpleObjeto(num, o, parte, componentes); motivo != "" {
 			return motivo
 		}
 	}
@@ -84,11 +84,7 @@ func (e *PDFEnsamblador) marcaPDFAEnAnexo(doc *PDFDoc, nuevos map[int]objetoSali
 		return 0, objetoSalida{}, false
 	}
 	e.origenAnexo = doc
-	objs := make([]objetoSalida, 0, len(nuevos))
-	for _, o := range nuevos {
-		objs = append(objs, o)
-	}
-	if e.incumplenObjetos(objs, dec.parte, componentesIntencion(doc)) == "" {
+	if e.incumplenObjetos(nuevos, dec.parte, componentesIntencion(doc)) == "" {
 		return 0, objetoSalida{}, false
 	}
 	raiz, _ := doc.resolver(doc.trailer["Root"]).(pdfDict)
@@ -149,7 +145,7 @@ func (e *PDFEnsamblador) valorSalida(o pdfObj) pdfObj {
 	return o
 }
 
-func (e *PDFEnsamblador) incumpleObjeto(o objetoSalida, parte string, componentes int) string {
+func (e *PDFEnsamblador) incumpleObjeto(num int, o objetoSalida, parte string, componentes int) string {
 	dict, ok := o.valor.(pdfDict)
 	if !ok {
 		return ""
@@ -157,7 +153,8 @@ func (e *PDFEnsamblador) incumpleObjeto(o objetoSalida, parte string, componente
 	tipo, _ := dict["Type"].(pdfName)
 	sub, _ := dict["Subtype"].(pdfName)
 	if o.esFlujo && dict["Filter"] == nil && dict["Length1"] == nil && (sub == "Form" || (sub == "" && tipo == "")) {
-		if motivo := colorSinIntencion(o.flujo, componentes); motivo != "" {
+		cs := e.espaciosColorDeFlujo(num, dict)
+		if motivo := colorSinIntencion(o.flujo, componentes, cs); motivo != "" {
 			return motivo
 		}
 	}
@@ -169,6 +166,36 @@ func (e *PDFEnsamblador) incumpleObjeto(o objetoSalida, parte string, componente
 	// Los recursos de una apariencia suelen ir DIRECTOS dentro de ella (la
 	// fuente, el estado gráfico): se mira todo lo que cuelga del objeto.
 	return e.incumpleValor(dict, parte, 0)
+}
+
+// espaciosColorDeFlujo devuelve el diccionario /ColorSpace de los /Resources
+// propios del flujo (en un XObject de formulario) o de la página que lo usa.
+func (e *PDFEnsamblador) espaciosColorDeFlujo(num int, dict pdfDict) pdfDict {
+	rec, _ := e.valorSalida(dict["Resources"]).(pdfDict)
+	if rec == nil && num > 0 {
+		for _, pp := range e.pendientes {
+			if flujoDePagina(pp.dict["Contents"], num) {
+				rec, _ = e.valorSalida(pp.dict["Resources"]).(pdfDict)
+				break
+			}
+		}
+	}
+	cs, _ := e.valorSalida(rec["ColorSpace"]).(pdfDict)
+	return cs
+}
+
+func flujoDePagina(contents pdfObj, num int) bool {
+	switch c := contents.(type) {
+	case pdfRef:
+		return c.Num == num
+	case pdfArray:
+		for _, el := range c {
+			if r, ok := el.(pdfRef); ok && r.Num == num {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // incumpleValor recorre los diccionarios y arrays directos de un objeto.
@@ -279,20 +306,22 @@ func (e *PDFEnsamblador) fuenteIncrustada(f pdfDict) bool {
 }
 
 // colorSinIntencion busca en un flujo de contenido escrito por nosotros los
-// operadores de color de dispositivo que la intención de salida no cubre.
-func colorSinIntencion(flujo []byte, componentes int) string {
+// operadores de color de dispositivo que ni la intención de salida ni el
+// espacio por defecto (/DefaultRGB, /DefaultCMYK, /DefaultGray) de los recursos
+// cubren (§6.2.4.3 de ISO 19005).
+func colorSinIntencion(flujo []byte, componentes int, cs pdfDict) string {
 	for _, op := range operadoresDeContenido(flujo) {
 		switch op {
 		case "rg", "RG":
-			if componentes != 3 {
+			if componentes != 3 && cs["DefaultRGB"] == nil {
 				return "color RGB sin intención de salida RGB"
 			}
 		case "k", "K":
-			if componentes != 4 {
+			if componentes != 4 && cs["DefaultCMYK"] == nil {
 				return "color CMYK sin intención de salida CMYK"
 			}
 		case "g", "G":
-			if componentes == 0 {
+			if componentes == 0 && cs["DefaultGray"] == nil {
 				return "color gris sin intención de salida"
 			}
 		}
@@ -305,13 +334,69 @@ func colorSinIntencion(flujo []byte, componentes int) string {
 func imagenSinIntencion(cs pdfObj, componentes int) string {
 	switch n, _ := cs.(pdfName); n {
 	case "DeviceRGB":
-		return colorSinIntencion([]byte("rg"), componentes)
+		return colorSinIntencion([]byte("rg"), componentes, nil)
 	case "DeviceCMYK":
-		return colorSinIntencion([]byte("k"), componentes)
+		return colorSinIntencion([]byte("k"), componentes, nil)
 	case "DeviceGray":
-		return colorSinIntencion([]byte("g"), componentes)
+		return colorSinIntencion([]byte("g"), componentes, nil)
 	}
 	return ""
+}
+
+// calRGBDefecto es el /DefaultRGB calibrado (iluminante D65) con el que un
+// flujo de apariencia en RGB cumple PDF/A (§6.2.4.3) aunque el documento no
+// lleve intención de salida RGB o lleve una CMYK o gris.
+func calRGBDefecto() pdfArray {
+	return pdfArray{
+		pdfName("CalRGB"),
+		pdfDict{"WhitePoint": pdfArray{0.9505, int64(1), 1.089}},
+	}
+}
+
+// calGrayDefecto es el /DefaultGray calibrado (D65) para los recuadros negros
+// («0 g») de una página censurada cuando el PDF/A no declara OutputIntents.
+func calGrayDefecto() pdfArray {
+	return pdfArray{
+		pdfName("CalGray"),
+		pdfDict{"WhitePoint": pdfArray{0.9505, int64(1), 1.089}},
+	}
+}
+
+// grupoTransparenciaRGB declara el espacio de fusión de transparencia de la
+// página (§6.2.10 de ISO 19005-2/3/4) cuando una anotación lleva opacidad o
+// modo de fusión y el documento no tiene OutputIntents.
+func grupoTransparenciaRGB() pdfDict {
+	return pdfDict{
+		"Type": pdfName("Group"),
+		"S":    pdfName("Transparency"),
+		"CS":   calRGBDefecto(),
+	}
+}
+
+// asegurarDefaultGray añade /DefaultGray (CalGray) a los /Resources de la
+// página censurada si no lo traía ya.
+func (e *PDFEnsamblador) asegurarDefaultGray(pp *paginaPendiente) {
+	if pp == nil {
+		return
+	}
+	rec := pdfDict{}
+	if orig, ok := e.valorSalida(pp.dict["Resources"]).(pdfDict); ok {
+		for k, x := range orig {
+			rec[k] = x
+		}
+	}
+	cs := pdfDict{}
+	if orig, ok := e.valorSalida(rec["ColorSpace"]).(pdfDict); ok {
+		for k, x := range orig {
+			cs[k] = x
+		}
+	}
+	if cs["DefaultGray"] == nil {
+		cs["DefaultGray"] = calGrayDefecto()
+		rec["ColorSpace"] = cs
+		pp.dict["Resources"] = rec
+		e.reserializarPendiente(pp)
+	}
 }
 
 // operadoresDeContenido devuelve las palabras sueltas de un flujo de contenido

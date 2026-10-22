@@ -520,6 +520,8 @@
   "vf.confirmBody": "Odteraz sa každá potvrdená faktúra odošle španielskej daňovej správe a už ju nemožno upraviť ani vymazať: chyby sa opravujú opravnou faktúrou. Po zapnutí zostane aktívne do konca roka.",
   "vf.confirmTitle": "Zapnúť VERI*FACTU?",
   "vf.declaration": "Vyhlásenie o zhode",
+  "vf.error.certificateTaxIdMismatch": "Daňové číslo (NIF) v certifikáte sa nezhoduje s daňovým číslom organizácie.",
+  "vf.error.invalidCertificate": "Certifikát alebo jeho súkromný kľúč nie je platný kvalifikovaný certifikát so španielskym daňovým číslom (NIF).",
   "vf.export": "Stiahnuť záznamy",
   "vf.fixHint": "Opravte údaje faktúry alebo zákazníka a odošlite ju znova.",
   "vf.intro": "Od roku 2027 musí byť každá faktúra pri vystavení zaregistrovaná v španielskej daňovej správe. S VERI*FACTU to Sytue urobí za vás pri potvrdení faktúry a pridá QR kód, ktorým si ju zákazník môže overiť.",

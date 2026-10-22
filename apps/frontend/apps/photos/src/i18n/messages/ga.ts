@@ -291,4 +291,7 @@ export const ga: AppCatalog<typeof en> = {
   'memories.years': '{count} bliain ó shin',
   'memories.oneYear': 'Bliain ó shin',
   'memories.hide': 'Folaigh',
+  'aiBatch.excludeOrg': 'Fág an eagraíocht as baisc uathoibríoch Sytue AI',
+  'aiBatch.excludedHint':
+    'Tá an eagraíocht fágtha as baisc uathoibríoch Sytue AI. Ní phróiseáiltear grianghraif nua sa chúlra le haghaidh moltaí ná cosúlachtaí.',
 };

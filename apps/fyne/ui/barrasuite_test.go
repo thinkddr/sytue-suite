@@ -1016,3 +1016,52 @@ func TestLaBarraEstrechaEsCarrilEntera(t *testing.T) {
 		}
 	}
 }
+
+// TestBarraSuitePreguntaAntesDeSubirFicheroLocal (FYP-02): Montar registra el diálogo de
+// confirmación con casilla «Recordar mi elección en este dispositivo», y pulsar el botón
+// primario entrega el estado de la casilla.
+func TestBarraSuitePreguntaAntesDeSubirFicheroLocal(t *testing.T) {
+	w := fyne.CurrentApp().NewWindow("docus")
+	t.Cleanup(w.Close)
+	w.Resize(fyne.NewSize(anchoPrueba, 600))
+	tr := traductorPrueba(t)
+	b := NuevaBarraSuite(tr, nil, iconos.Docs)
+	t.Cleanup(b.Parar)
+	w.SetContent(b.ConSinSesionPropia().ConHojaASangre().Montar(canvas.NewRectangle(color.NRGBA{})))
+
+	var recordado *bool
+	b.confirmarSubidaLocal(w, "nomina.pdf", func(r bool) {
+		recordado = &r
+	})
+	capas := w.Canvas().Overlays().List()
+	if len(capas) != 1 {
+		t.Fatalf("capas abiertas = %d, quiero 1", len(capas))
+	}
+	cp, ok := capas[0].(*capa)
+	if !ok {
+		t.Fatalf("capa = %T, quiero *capa", capas[0])
+	}
+	d, ok := cp.panel.(*Dialogo)
+	if !ok {
+		t.Fatalf("panel = %T, quiero *Dialogo", cp.panel)
+	}
+	if d.Titulo != tr.T("localFile.confirmUpload.title", nil) {
+		t.Errorf("título = %q, quiero %q", d.Titulo, tr.T("localFile.confirmUpload.title", nil))
+	}
+	col, ok := d.Cuerpo.(*fyne.Container)
+	if !ok || len(col.Objects) != 2 {
+		t.Fatalf("cuerpo = %T (%d hijos), quiero columna de 2", d.Cuerpo, len(col.Objects))
+	}
+	casilla, ok := col.Objects[1].(*Eleccion)
+	if !ok {
+		t.Fatalf("segundo hijo = %T, quiero *Eleccion", col.Objects[1])
+	}
+	casilla.Tapped(nil)
+	if !casilla.Marcada {
+		t.Fatal("la casilla de recordar debería haberse marcado al pulsarla")
+	}
+	d.confirmar.Tapped(nil)
+	if recordado == nil || !*recordado {
+		t.Fatalf("recordado = %v, quiero true", recordado)
+	}
+}

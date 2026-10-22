@@ -8,11 +8,14 @@ metadata:
 {{- end }}
 {{- if .Values.rbac.create }}
 ---
-# ClusterRole del reconciliador de workload.
-# Crea namespaces de tenants (tenant-<slug>) y gestiona TODO el workload de los
-# proyectos (estilo Vercel) + el TLS de sus dominios (cert-manager). Acotado a los
-# recursos que reconcilia; sin acceso a nodos ni CRDs del clúster. Su única
-# delegación RBAC es el rol concreto de logs/terminal, dentro de cada tenant.
+# ClusterRole global del reconciliador de Sytue Cloud (CLOUD-11 / INF-06).
+# SOLO contiene los permisos que requieren alcance de clúster: crear/etiquetar
+# namespaces de tenants (`tenant-<slug>`), consultar métricas de pods para
+# rightsizing y delegar mediante RoleBindings namespaced los dos catálogos de
+# permisos (el de runtime de cloud-api y el de cargas de tenant del propio
+# controller). NO incluye secrets, deployments ni ningún otro recurso namespaced
+# a escala de clúster: así nunca tiene acceso a los secretos de plataforma (`sytue`)
+# ni de `kube-system`.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -22,35 +25,51 @@ metadata:
 rules:
   # Crear bindings namespaced no permite conceder otros roles: Kubernetes exige
   # poseer sus permisos o el verbo bind sobre el rol referenciado. El controller
-  # NO tiene pods/exec; solo puede bind este catálogo concreto, sin escalate ni
+  # NO tiene pods/exec ni acceso global a secrets; solo puede bind estos dos
+  # catálogos concretos dentro de cada namespace tenant-<slug>, sin escalate ni
   # escritura de ClusterRoleBindings/ClusterRoles/Roles.
   - apiGroups: ["rbac.authorization.k8s.io"]
     resources: ["rolebindings"]
     verbs: ["create"]
   - apiGroups: ["rbac.authorization.k8s.io"]
     resources: ["rolebindings"]
-    resourceNames: ["sytue-cloud-runtime"]
+    resourceNames: ["sytue-cloud-runtime", "sytue-cloud-controller"]
     verbs: ["get", "update"]
   - apiGroups: ["rbac.authorization.k8s.io"]
     resources: ["clusterroles"]
-    resourceNames: [{{ include "sytue-cloud-api.fullname" . | quote }}]
+    resourceNames:
+      - {{ include "sytue-cloud-api.fullname" . | quote }}
+      - {{ printf "%s-tenant" (include "sytue-cloud-controller.fullname" .) | quote }}
     verbs: ["bind"]
-  # Namespaces de tenants + cuotas/límites que los acotan.
+  # Namespaces de tenants (único recurso core de alcance clúster).
   - apiGroups: [""]
-    resources: ["namespaces", "resourcequotas", "limitranges"]
+    resources: ["namespaces"]
     verbs: ["get", "list", "watch", "create", "update", "patch"]
-  # Workload de las apps: servicios; secretos (credenciales inyectadas) y
-  # volúmenes de la BD gestionada.
+  # Uso REAL de los pods de app (SampleResourceUsage, rightsizing.go): solo lectura.
+  - apiGroups: ["metrics.k8s.io"]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+---
+# Catálogo de permisos de workload de tenant (SIN ClusterRoleBinding).
+# El reconciliador lo vincula únicamente mediante un RoleBinding namespaced
+# (`sytue-cloud-controller`) dentro de cada namespace `tenant-<slug>` verificado
+# (CLOUD-11 / INF-06).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ printf "%s-tenant" (include "sytue-cloud-controller.fullname" .) }}
+  labels:
+    {{- include "sytue-cloud-controller.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["resourcequotas", "limitranges"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
   - apiGroups: [""]
     resources: ["services", "secrets", "persistentvolumeclaims"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   - apiGroups: ["apps"]
     resources: ["deployments"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-  # Servicios de cómputo gestionados: CronJob (servicio cron + backup de la BD),
-  # Job (servicio job run-to-completion). El controller los materializa/lee en el
-  # namespace del tenant; sin build (los Jobs de Kaniko los crea el builder con su
-  # propio Role namespaced, no este ClusterRole).
   - apiGroups: ["batch"]
     resources: ["jobs", "cronjobs"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
@@ -60,26 +79,9 @@ rules:
   - apiGroups: ["autoscaling"]
     resources: ["horizontalpodautoscalers"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-  # TLS de los dominios de cliente (cert-manager Certificates, vía cliente dinámico).
   - apiGroups: ["cert-manager.io"]
     resources: ["certificates"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-  # Uso REAL de los pods de app (SampleResourceUsage, rightsizing.go): es lo que
-  # alimenta las recomendaciones de tamaño. Sin este permiso la lectura no falla
-  # con «no encontrado» —que el código ya trata como «este clúster no tiene
-  # metrics-server» y calla— sino con un 403 que client-go presenta como
-  # «unknown», así que en producción salía un WARN cada quince minutos y las
-  # recomendaciones se quedaban en «sin datos suficientes» para siempre. Solo
-  # lectura: el controlador mide, no toca nada aquí.
-  - apiGroups: ["metrics.k8s.io"]
-    resources: ["pods"]
-    verbs: ["get", "list"]
-  # Mínimo privilegio real = lo que kubeplatform/kubeprovisioner tocan HOY.
-  # pods/log (SSE de logs) y pods/exec (terminal WS /bin/sh) NO son del controller:
-  # los sirve cloud-api (internal/runtime vía client-go), y su RBAC vive en el chart
-  # cloud-api. El controller reconcilia INTENCIÓN (Deployments/Services/Ingress/…),
-  # nunca adjunta ni lee pods. Los Jobs de Kaniko tampoco: los crea el builder con su
-  # Role NAMESPACED en el namespace de builds.
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

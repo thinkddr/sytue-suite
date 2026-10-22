@@ -456,3 +456,33 @@ func TestGetProjectHidesSecretFromMember(t *testing.T) {
 		t.Fatalf("un miembro raso NO debe ver el secreto: %s", rr.Body.String())
 	}
 }
+
+// CLOUD-12 — mientras Sytue Cloud esté cerrado a terceros (AbiertoATerceros=false
+// y TenantsPermitidos=["sytue"]), cualquier otro tenant recibe 403 tanto con
+// sesión humana como con token de API.
+func TestCloudCerradoATercerosRechazaTenantFueraDeLista(t *testing.T) {
+	f := &fakeSvc{
+		effRole:       domain.RoleOwner,
+		effFromMember: true,
+		resolvedTok: store.ResolvedToken{
+			Tenant: "acme",
+			Scope:  domain.ScopeDeploy,
+		},
+	}
+	h := newHandlers(f)
+	h.cfg.Env = "prod"
+	h.cfg.AbiertoATerceros = false
+	h.cfg.TenantsPermitidos = []string{"sytue"}
+
+	// Humano de "acme" => 403.
+	if h.admitCloudHuman(httptest.NewRecorder(), cloudHumanReq(http.MethodGet, "/api/v1/projects", "owner")) {
+		t.Fatal("admitCloudHuman debe rechazar al tenant 'acme' cuando Cloud está cerrado a terceros")
+	}
+	// Token de API de "acme" => 403.
+	next, called := spyNext()
+	rr := httptest.NewRecorder()
+	h.authenticateToken(rr, httptest.NewRequest(http.MethodGet, "/api/v1/projects", http.NoBody), next, "scl_testtoken")
+	if rr.Code != http.StatusForbidden || *called {
+		t.Fatalf("authenticateToken debe rechazar al tenant 'acme' (code=%d called=%v)", rr.Code, *called)
+	}
+}

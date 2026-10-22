@@ -95,7 +95,9 @@ type Suite struct {
 	alVolver, alFondo []func()
 	sinDueno          []*url.URL // llegaron antes de Arrancar; los recibe cada receptor que se apunte hasta entonces
 	// alFallarLocal lo pone AceptarFicheros; nil es «esta app no abre ficheros sueltos».
-	alFallarLocal func()
+	alFallarLocal  func()
+	ventanaLocal   fyne.Window
+	confirmarLocal func(w fyne.Window, nombre string, aceptar func(recordar bool))
 	// localesAntes son los ficheros de la máquina que llegaron antes de AceptarFicheros:
 	// al arrancar con uno, AlAbrirFichero se apunta primero y los recibe cuando aún no
 	// se sabe si esta app los abre.
@@ -649,7 +651,7 @@ func (s *Suite) Entrar(ctx context.Context) error {
 //
 //nolint:contextcheck // El llavero usa callbacks sin contexto y un plazo propio para D-Bus.
 func (s *Suite) leerSesionCompartida(ctx context.Context) (auth.Tokens, string, error) {
-	soltar, err := ajustes.Cerrojo(ctx)
+	soltar, err := ajustes.CerrojoSesion(ctx)
 	if err != nil {
 		return auth.Tokens{}, "", err
 	}
@@ -840,6 +842,11 @@ func (s *Suite) aplicar(e ajustes.Estado) {
 		s.Sesion.Sincronizar(guardados)
 		s.generacionSesion = generacion
 		s.visto.Sesion = generacion
+	}
+	if cambioSesion && errors.Is(err, auth.ErrSesionNoDisponible) {
+		s.Sesion.Sincronizar(auth.Tokens{})
+		s.generacionSesion = ""
+		s.visto.Sesion = ""
 	}
 	s.mu.Unlock()
 	if err != nil {

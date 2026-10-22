@@ -901,6 +901,17 @@ export const nb: AppCatalog<typeof en> = {
   'monitoring.alerts.scope.org': 'organisasjon',
   'monitoring.alerts.scope.project': 'prosjekt',
   'monitoring.alerts.disabled': 'deaktivert',
+  'monitoring.alerts.unconfirmed': 'venter på bekreftelse',
+  'monitoring.alerts.created.mailtoDesc':
+    'Vi har sendt en bekreftelseslenke til denne adressen. Varsler kommer så snart den er bekreftet.',
+  'monitoring.alerts.confirm.title': 'Bekreft e-postvarsler',
+  'monitoring.alerts.confirm.desc':
+    'Bekreft at denne adressen skal motta hendelsesvarsler fra Sytue DevX.',
+  'monitoring.alerts.confirm.submit': 'Bekreft adresse',
+  'monitoring.alerts.confirm.done':
+    'Adressen er bekreftet. Du vil nå motta hendelsesvarsler på denne e-postadressen.',
+  'monitoring.alerts.confirm.invalid':
+    'Denne bekreftelseslenken er ikke gyldig, eller varselet er allerede fjernet.',
   'monitoring.alerts.delete': 'Slett varselet {event}',
   'members.subtitle': 'Hvem som har tilgang til organisasjonen. Hvert medlem er én plass i pakken.',
   'members.add': 'Inviter medlem',

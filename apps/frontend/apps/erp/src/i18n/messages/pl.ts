@@ -614,4 +614,8 @@ export const pl: AppCatalog<typeof en> = {
   'pos.imageUpload': 'Prześlij zdjęcie produktu {name}',
   'pos.images': 'Zdjęcia',
   'pos.imageHint': 'Wybierz obraz JPEG, PNG lub WebP o rozmiarze do 10 MB.',
+  'vf.error.invalidCertificate':
+    'Certyfikat lub klucz prywatny nie jest ważnym certyfikatem kwalifikowanym z hiszpańskim numerem NIF.',
+  'vf.error.certificateTaxIdMismatch':
+    'Numer podatkowy (NIF) w certyfikacie nie zgadza się z numerem NIF organizacji.',
 };

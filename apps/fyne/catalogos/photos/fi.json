@@ -1,4 +1,6 @@
 {
+  "aiBatch.excludeOrg": "Sulje organisaatio pois Sytue AI:n automaattierästä",
+  "aiBatch.excludedHint": "Organisaatio on suljettu pois Sytue AI:n automaattierästä. Uusia kuvia ei käsitellä taustalla ehdotuksia tai samankaltaisuuksia varten.",
   "album.linkCopied": "Linkki kopioitu",
   "album.newLink": "Uusi linkki",
   "album.newLinkConfirm": "Luodaanko uusi linkki? Nykyinen linkki lakkaa toimimasta kaikilta, joilla se jo on.",

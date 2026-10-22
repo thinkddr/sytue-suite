@@ -74,6 +74,7 @@ type odpBuild struct {
 	font          string
 	pw, ph        float64 // página, en cm
 	media         map[string][]byte
+	imgs          map[string]string // src → ruta en Pictures/, para no duplicar entre diseños y diapositivas
 	imgN, medN    int
 	idN, nG, nH   int
 	nD            int
@@ -198,13 +199,20 @@ func (b *odpBuild) boxes(boxes []slideBox, w *odtWriter, st *strings.Builder, fi
 		n := b.idN + 1
 		switch box.Kind {
 		case "image":
-			ext, data, ok := decodeDataURL(box.Src)
+			name, ok := b.imgs[box.Src]
 			if !ok {
-				continue
+				ext, data, valid := decodeDataURL(box.Src)
+				if !valid {
+					continue
+				}
+				b.imgN++
+				name = "Pictures/img" + strconv.Itoa(b.imgN) + "." + ext
+				b.media[name] = data
+				if b.imgs == nil {
+					b.imgs = map[string]string{}
+				}
+				b.imgs[box.Src] = name
 			}
-			b.imgN++
-			name := "Pictures/img" + strconv.Itoa(b.imgN) + "." + ext
-			b.media[name] = data
 			x = `<draw:frame draw:style-name="Sytue_20_marco" ` + odpIDAttrs(n) + ` ` + b.pos(box) + `>` +
 				`<draw:image xlink:href="` + name + `" xlink:type="simple" xlink:show="embed" xlink:actuate="onLoad"/></draw:frame>`
 		case "media":

@@ -21,10 +21,16 @@
  * en `/cast/studio`, que es donde se emite.
  */
 import { sequence } from 'astro:middleware';
-import { middlewareDeIdioma, middlewareDeOrganizacion } from '@sytue/config/astro-middleware';
+import { suiteApex } from '@sytue/config';
+import {
+  cabecerasCerradas,
+  middlewareDeIdioma,
+  middlewareDeOrganizacion,
+} from '@sytue/config/astro-middleware';
 import { SYTUE_PERMISSIONS_POLICY_ROOMS } from '@sytue/config/astro-security';
 import { bff, toBffContext } from './lib/bff.js';
 import { cabecerasDeRuta } from './lib/cabeceras.js';
+import { hubBaseUrl } from './lib/pagina.js';
 import { PAGINAS_SIN_ORG } from './lib/rutas.js';
 
 export const onRequest = sequence(
@@ -33,7 +39,11 @@ export const onRequest = sequence(
     sesion: async (ctx) => bff.getSession(toBffContext(ctx)),
     sinOrg: [...PAGINAS_SIN_ORG],
   }),
-  middlewareDeIdioma((context) =>
-    cabecerasDeRuta(context.url.pathname, SYTUE_PERMISSIONS_POLICY_ROOMS),
+  middlewareDeIdioma(
+    (context) => cabecerasDeRuta(context.url.pathname, SYTUE_PERMISSIONS_POLICY_ROOMS),
+    () =>
+      cabecerasCerradas(hubBaseUrl(), {
+        conectar: [`wss://rooms-sfu.${suiteApex}`],
+      }),
   ),
 );

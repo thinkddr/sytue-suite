@@ -36,6 +36,9 @@ func enPapeleraDesde(t *testing.T, h *pgtest.Harness, id string, hace time.Durat
 	// que hubiera cumplido el plazo y el test fallaba con «purgó 0», que parecía
 	// culpa de la purga.
 	err := h.Pool.InMaintenanceTx(t.Context(), func(tx pgx.Tx) error {
+		if err := db.MarkWriteTransaction(t.Context(), tx); err != nil {
+			return err
+		}
 		tag, err := tx.Exec(t.Context(),
 			`UPDATE notes SET deleted_at = now() - $2::interval WHERE id = $1`,
 			id, hace.String())

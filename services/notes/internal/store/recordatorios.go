@@ -166,7 +166,7 @@ func (s *Store) DeleteReminder(ctx context.Context, noteID uuid.UUID, sub string
 func (s *Store) RepetirAlCompletar(ctx context.Context, noteID uuid.UUID, ahora time.Time) (*domain.Note, error) {
 	t := tenancy.MustFrom(ctx)
 	var nueva *domain.Note
-	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	err := s.inWriteTx(ctx, func(tx pgx.Tx) error {
 		var ya bool
 		e := tx.QueryRow(ctx, `
 			SELECT COALESCE(data ? 'repeated_into', false) FROM notes
@@ -290,7 +290,7 @@ func crearSiguiente(ctx context.Context, tx pgx.Tx, slug string, noteID uuid.UUI
 func (s *Store) DeshacerRepeticion(ctx context.Context, noteID uuid.UUID) (*uuid.UUID, error) {
 	t := tenancy.MustFrom(ctx)
 	var retirada *uuid.UUID
-	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	err := s.inWriteTx(ctx, func(tx pgx.Tx) error {
 		var copia *uuid.UUID
 		e := tx.QueryRow(ctx, `
 			SELECT (data ->> 'repeated_into')::uuid FROM notes

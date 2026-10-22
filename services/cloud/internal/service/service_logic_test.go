@@ -853,3 +853,41 @@ func assertAudited(t *testing.T, fs *fakeStore, want ...string) {
 		}
 	}
 }
+
+// CLOUD-07 — ni ProvisionService ni UpdateService dejan pedir un pvc_size por
+// encima del tope de la instancia del plan contratado.
+func TestProvisionYUpdateServiceRechazanPVCSizePorEncimaDelPlan(t *testing.T) {
+	projID := uuid.New()
+	svcID := uuid.New()
+	fs := &fakeStore{
+		org:     domain.Organization{Plan: domain.PlanFree},
+		project: domain.Project{ID: projID, Slug: "web"},
+		svc: domain.ManagedService{
+			ID:        svcID,
+			Tenant:    "acme",
+			ProjectID: projID,
+			Kind:      domain.ServicePostgres,
+			Config:    map[string]string{"pvc_size": "2Gi"},
+		},
+	}
+	s := newTestService(fs, &capturePub{})
+	ctx := tenantCtx(t)
+
+	_, err := s.ProvisionService(ctx, ProvisionServiceInput{
+		ProjectID: projID,
+		Kind:      domain.ServicePostgres,
+		Name:      "db",
+		Config:    map[string]string{"pvc_size": "10Gi"},
+	})
+	if !errors.Is(err, domain.ErrQuotaExceeded) {
+		t.Fatalf("ProvisionService con pvc_size=10Gi en plan free = %v, quiero ErrQuotaExceeded", err)
+	}
+
+	_, err = s.UpdateService(ctx, UpdateServiceInput{
+		ServiceID: svcID,
+		Config:    map[string]string{"pvc_size": "10Gi"},
+	})
+	if !errors.Is(err, domain.ErrQuotaExceeded) {
+		t.Fatalf("UpdateService con pvc_size=10Gi en plan free = %v, quiero ErrQuotaExceeded", err)
+	}
+}

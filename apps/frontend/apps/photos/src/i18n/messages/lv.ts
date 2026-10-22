@@ -271,4 +271,7 @@ export const lv: AppCatalog<typeof en> = {
   'memories.years': 'Pirms {count} gadiem',
   'memories.oneYear': 'Pirms gada',
   'memories.hide': 'Paslēpt',
+  'aiBatch.excludeOrg': 'Izslēgt organizāciju no automātiskās Sytue AI apstrādes',
+  'aiBatch.excludedHint':
+    'Organizācija ir izslēgta no automātiskās Sytue AI apstrādes. Jauni fotoattēli fonā netiek apstrādāti ieteikumiem vai līdzībām.',
 };

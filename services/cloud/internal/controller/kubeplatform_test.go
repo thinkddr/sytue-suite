@@ -876,3 +876,52 @@ func TestHPATechoPorDebajoDelMinimo(t *testing.T) {
 			hpa.Spec.MaxReplicas, derefInt32(hpa.Spec.MinReplicas))
 	}
 }
+
+// CLOUD-07 / CLOUD-12 — ResourceQuota incluye requests.storage y
+// persistentvolumeclaims según el plan; LimitRange incluye ephemeral-storage; y
+// el Deployment de la app declara ephemeral-storage y RuntimeClassName=gvisor.
+func TestEnsureNamespaceYApplyAppAcotanDiscoYUsanGVisor(t *testing.T) {
+	p, cs := newTestPlatform()
+	ctx := context.Background()
+	if err := p.EnsureNamespace(ctx, "tenant-acme", "acme", domain.QuotasFor(domain.PlanFree)); err != nil {
+		t.Fatalf("EnsureNamespace: %v", err)
+	}
+	rq, err := cs.CoreV1().ResourceQuotas("tenant-acme").Get(ctx, "tenant-quota", metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("ResourceQuota: %v", err)
+	}
+	if _, ok := rq.Spec.Hard[corev1.ResourceRequestsStorage]; !ok {
+		t.Error("ResourceQuota debe limitar requests.storage")
+	}
+	if _, ok := rq.Spec.Hard[corev1.ResourcePersistentVolumeClaims]; !ok {
+		t.Error("ResourceQuota debe limitar persistentvolumeclaims")
+	}
+	lr, err := cs.CoreV1().LimitRanges("tenant-acme").Get(ctx, "tenant-limits", metav1.GetOptions{})
+	if err != nil || len(lr.Spec.Limits) == 0 {
+		t.Fatalf("LimitRange: %v", err)
+	}
+	if _, ok := lr.Spec.Limits[0].Max[corev1.ResourceEphemeralStorage]; !ok {
+		t.Error("LimitRange debe fijar Max para ephemeral-storage")
+	}
+
+	spec := AppSpec{
+		Tenant: "acme", Namespace: "tenant-acme", ProjectSlug: "web",
+		DeploymentID: "11112222-3333-4444-5555-666677778888",
+		Target:       domain.TargetProduction, Image: "img", Replicas: 1, Port: 8080,
+		Hostnames: []string{"web.apps.sytue.eu"},
+	}
+	if _, err := p.ApplyApp(ctx, spec); err != nil {
+		t.Fatalf("ApplyApp: %v", err)
+	}
+	dep, err := cs.AppsV1().Deployments("tenant-acme").Get(ctx, appResourceName(spec), metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Deployment app: %v", err)
+	}
+	if rc := dep.Spec.Template.Spec.RuntimeClassName; rc == nil || *rc != "gvisor" {
+		t.Errorf("RuntimeClassName del pod de app = %v, quiero \"gvisor\"", rc)
+	}
+	c := dep.Spec.Template.Spec.Containers[0]
+	if _, ok := c.Resources.Limits[corev1.ResourceEphemeralStorage]; !ok {
+		t.Error("el contenedor de app debe limitar ephemeral-storage")
+	}
+}

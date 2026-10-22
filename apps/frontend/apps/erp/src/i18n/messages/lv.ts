@@ -592,4 +592,8 @@ export const lv: AppCatalog<typeof en> = {
   'pos.imageUpload': 'Augšupielādēt attēlu produktam {name}',
   'pos.images': 'Attēli',
   'pos.imageHint': 'Izvēlieties JPEG, PNG vai WebP attēlu līdz 10 MB.',
+  'vf.error.invalidCertificate':
+    'Sertifikāts vai privātā atslēga nav derīgs kvalificēts sertifikāts ar Spānijas nodokļu maksātāja numuru (NIF).',
+  'vf.error.certificateTaxIdMismatch':
+    'Sertifikātā norādītais nodokļu maksātāja numurs (NIF) nesakrīt ar organizācijas numuru.',
 };

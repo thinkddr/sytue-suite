@@ -74,11 +74,8 @@ func backupObjectKey(svc domain.ManagedService, name string) string {
 // S3_BACKUP_* si ops las acuñó, si no las de plataforma (ver upsertPlatformS3Secret).
 func (s *Service) backupBucketClient() (*minio.Client, string, error) {
 	ak, sk := s.cfg.S3BackupAccessKey, s.cfg.S3BackupSecretKey
-	if ak == "" || sk == "" {
-		ak, sk = s.cfg.S3AccessKey, s.cfg.S3SecretKey
-	}
-	if s.cfg.S3Bucket == "" || ak == "" {
-		return nil, "", domain.ErrNotFound // sin Object Storage de plataforma: no hay backups
+	if s.cfg.S3Bucket == "" || ak == "" || sk == "" {
+		return nil, "", domain.ErrNotFound // sin credenciales S3 dedicadas de backup: no hay backups
 	}
 	mc, err := minio.New(s.cfg.S3Endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(ak, sk, ""),

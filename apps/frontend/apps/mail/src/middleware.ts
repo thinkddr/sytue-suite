@@ -32,10 +32,9 @@ export const onRequest = sequence(
     sesion: async (ctx) => bff.getSession(toBffContext(ctx)),
   }),
   // CSP cerrada (FE-03), medida en producción: su origen y el Hub.
-  // `https:` en las imágenes NO es un descuido: el cuerpo de un correo se pinta en un
-  // iframe `srcdoc`, que HEREDA esta CSP, y «Mostrar imágenes remotas» le abre `https:`.
-  // Cerrarlo aquí rompería ese botón. La conexión (`connect-src`) sí queda cerrada.
+  // Las imágenes remotas que la persona desbloquea pasan por `/api/remote-image`,
+  // sin abrir comodín de esquema en las imágenes.
   middlewareDeIdioma(undefined, () =>
-    cabecerasCerradas(serverEnv(import.meta.env).SYTUE_HUB_BASE_URL, { imagenes: ['https:'] }),
+    cabecerasCerradas(serverEnv(import.meta.env).SYTUE_HUB_BASE_URL),
   ),
 );

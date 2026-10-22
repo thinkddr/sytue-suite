@@ -117,6 +117,10 @@ spec:
               value: {{ .Values.config.previewDomain | quote }}
             - name: INGRESS_TARGET
               value: {{ .Values.config.ingressTarget | quote }}
+            - name: ABIERTO_A_TERCEROS
+              value: {{ .Values.config.abiertoATerceros | quote }}
+            - name: TENANTS_PERMITIDOS
+              value: {{ .Values.config.tenantsPermitidos | quote }}
             - name: OIDC_ISSUER
               value: {{ include "sytue-cloud-api.oidcIssuer" . | quote }}
             - name: OIDC_JWKS_URL

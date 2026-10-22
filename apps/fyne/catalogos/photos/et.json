@@ -1,4 +1,6 @@
 {
+  "aiBatch.excludeOrg": "Välista organisatsioon Sytue AI automaatsest pakktöötlusest",
+  "aiBatch.excludedHint": "Organisatsioon on Sytue AI automaatsest pakktöötlusest välistatud. Uusi fotosid ei töödelda taustal soovituste ega sarnasuste leidmiseks.",
   "album.linkCopied": "Link kopeeritud",
   "album.newLink": "Uus link",
   "album.newLinkConfirm": "Kas luua uus link? Praegune link lakkab töötamast kõigil, kellel see juba on.",

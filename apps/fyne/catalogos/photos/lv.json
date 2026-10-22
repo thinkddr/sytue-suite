@@ -1,4 +1,6 @@
 {
+  "aiBatch.excludeOrg": "Izslēgt organizāciju no automātiskās Sytue AI apstrādes",
+  "aiBatch.excludedHint": "Organizācija ir izslēgta no automātiskās Sytue AI apstrādes. Jauni fotoattēli fonā netiek apstrādāti ieteikumiem vai līdzībām.",
   "album.linkCopied": "Saite nokopēta",
   "album.newLink": "Jauna saite",
   "album.newLinkConfirm": "Vai izveidot jaunu saiti? Pašreizējā saite pārstās darboties visiem, kuriem tā jau ir.",

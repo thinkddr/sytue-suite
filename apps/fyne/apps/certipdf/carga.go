@@ -217,7 +217,7 @@ func (p *Pantalla) preguntarSiInvalidaFirmas(err error, c api.PDFCambio, mensaje
 		return false
 	}
 	p.Recomponer()
-	p.confirmar(p.t("pdf.signatures.invalidate.confirm"), p.t("pdf.signatures.invalidate.apply"), func() {
+	p.confirmarO(p.t("pdf.signatures.invalidate.confirm"), p.t("pdf.signatures.invalidate.apply"), func() {
 		otra := c
 		otra.Campos = maps.Clone(c.Campos)
 		if otra.Campos == nil {
@@ -225,6 +225,10 @@ func (p *Pantalla) preguntarSiInvalidaFirmas(err error, c api.PDFCambio, mensaje
 		}
 		otra.Campos["invalidar_firmas"] = "1"
 		p.Aplicar(otra, mensaje, hecho)
+	}, func() {
+		if hecho != nil {
+			hecho(false)
+		}
 	})
 	return true
 }

@@ -11,8 +11,10 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+	"sync"
 
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
+	"git.sytue.eu/sytue/one/services/integrations/db/seeds"
 	"git.sytue.eu/sytue/one/services/integrations/internal/connector"
 	"git.sytue.eu/sytue/one/services/integrations/internal/domain"
 	"git.sytue.eu/sytue/one/services/integrations/internal/driver/graph"
@@ -147,10 +149,38 @@ func (h *Handlers) egressRuntime(inst connector.Instance, logger *slog.Logger) c
 		// SOLO la plantilla de la propia suite: su destino sale de la configuración del
 		// servicio (ver loadInstance), nunca de un valor que teclee un administrador.
 		Internal:     inst.TemplateKey == suiteTemplateKey,
+		AllowedHosts: h.hostsOficiales(inst),
 		Log:          logger,
 		Timeout:      h.egressTimeout,
 		MaxRedirects: h.egressMaxRedirect,
 	})
+}
+
+var manifiestosDelCatalogo = sync.OnceValue(func() map[string]*manifest.Manifest {
+	lista, err := seeds.Load()
+	if err != nil {
+		return nil
+	}
+	porClave := make(map[string]*manifest.Manifest, len(lista))
+	for _, s := range lista {
+		if m, err := manifest.Parse(s.Manifest); err == nil {
+			porClave[s.Key] = m
+		}
+	}
+	return porClave
+})
+
+// hostsOficiales devuelve los hosts oficiales declarados en el manifiesto de la
+// plantilla de la instancia, o nil si no declara ninguno.
+func (h *Handlers) hostsOficiales(inst connector.Instance) []string {
+	if inst.TemplateKey == "" || inst.TemplateKey == suiteTemplateKey {
+		return nil
+	}
+	m := manifiestosDelCatalogo()[inst.TemplateKey]
+	if m == nil {
+		return nil
+	}
+	return m.HostsOficiales(inst.Config)
 }
 
 // capabilityError traduce el fallo de resolución a una respuesta que el administrador

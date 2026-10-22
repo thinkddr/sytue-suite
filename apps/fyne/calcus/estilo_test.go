@@ -365,8 +365,8 @@ func TestLaMuestraDeColorEsLaDeSwatches(t *testing.T) {
 }
 
 // TestElBordeLlevaSuColorYSuTrazo: el color y el trazo de cada lado de un libro importado se
-// leen, se pintan (el color y el grosor; los discontinuos van continuos) y se vuelven a
-// escribir; antes se perdían al sanear y, al guardar, el borde volvía a ser el de serie.
+// leen, se pintan (el color, el grosor y los segmentos en discontinuo, de puntos y doble) y se
+// vuelven a escribir; antes se perdían al sanear y, al guardar, el borde volvía a ser el de serie.
 func TestElBordeLlevaSuColorYSuTrazo(t *testing.T) {
 	var c estiloCrudo
 	if err := json.Unmarshal([]byte(`{"border":{"t":true,"tc":"#FF0000","ts":"thick","l":true,"lc":"rojo","ls":"groove","b":false,"bc":"#00FF00"}}`), &c); err != nil {
@@ -381,13 +381,47 @@ func TestElBordeLlevaSuColorYSuTrazo(t *testing.T) {
 	}
 	r := rejillaDePrueba(500, 200)
 	r.L.CambiarEstilo(func(cr *estiloCrudo) { cr.Bordes = e.Bordes.crudo() }, 3, 1, 3, 1)
+	r.L.CambiarEstilo(func(cr *estiloCrudo) {
+		cr.Bordes = (&Bordes{
+			T: true, TC: "#FF0000", TS: "dashed",
+			L: true, LC: "#00AA00", LS: "dotted",
+			B: true, BC: "#0000FF", BS: "double",
+		}).crudo()
+	}, 2, 1, 2, 1)
 	r.Seleccionar(0, 3, false)
 	img := pinta(t, 500, 200, r)
 	x := AnchoCabecera + 3*AnchoCelda
 	y := AltoCelda + AltoCelda
 	rojo := color.NRGBA{R: 0xFF, A: 0xff}
+	verde := color.NRGBA{G: 0xAA, A: 0xff}
+	azul := color.NRGBA{B: 0xFF, A: 0xff}
 	// Grueso: 3 px de rojo arriba, también en el tercero.
 	if got := px(img, x+AnchoCelda/2, y+2.5); !cerca(got, rojo) {
 		t.Errorf("el tercer px del borde grueso de D2 pinta %v y es rojo", got)
+	}
+	// C2: discontinuo arriba (trazo en x+1.5, hueco de papel en x+4), punteado a la izquierda
+	// (punto en y+0.5, hueco de papel en y+1.5) y doble abajo (dos líneas en y+h-2.5 e y+h-0.5
+	// con hueco de papel en y+h-1.5, sin la línea de la cuadrícula por el medio).
+	xc := AnchoCabecera + 2*AnchoCelda
+	if got := px(img, xc+1.5, y+0.5); !cerca(got, rojo) {
+		t.Errorf("el primer trazo discontinuo de C2 pinta %v y es rojo", got)
+	}
+	if got := px(img, xc+4.0, y+0.5); !cerca(got, Papel) {
+		t.Errorf("el primer hueco discontinuo de C2 pinta %v y debe ser papel", got)
+	}
+	if got := px(img, xc+0.5, y+0.5); !cerca(got, verde) {
+		t.Errorf("el primer punto de C2 pinta %v y es verde", got)
+	}
+	if got := px(img, xc+0.5, y+1.5); !cerca(got, Papel) {
+		t.Errorf("el primer hueco punteado de C2 pinta %v y debe ser papel", got)
+	}
+	if got := px(img, xc+AnchoCelda/2, y+AltoCelda-2.5); !cerca(got, azul) {
+		t.Errorf("la línea interior del borde doble de C2 pinta %v y es azul", got)
+	}
+	if got := px(img, xc+AnchoCelda/2, y+AltoCelda-1.5); !cerca(got, Papel) {
+		t.Errorf("el hueco del borde doble de C2 pinta %v y debe ser papel", got)
+	}
+	if got := px(img, xc+AnchoCelda/2, y+AltoCelda-0.5); !cerca(got, azul) {
+		t.Errorf("la línea exterior del borde doble de C2 pinta %v y es azul", got)
 	}
 }

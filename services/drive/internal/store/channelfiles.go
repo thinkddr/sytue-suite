@@ -51,20 +51,24 @@ const channelScopeSQL = `channel_id IS NOT DISTINCT FROM nullif(current_setting(
 // llevan A PROPÓSITO (ver blobReferenced).
 const ambitoSQL = `(current_setting('app.maintenance', true) = 'on'
 	OR (team_drive_id IS NOT DISTINCT FROM nullif(current_setting('app.team_drive', true), '')::uuid
-	AND ` + channelScopeSQL + `))`
+	AND ` + channelScopeSQL + `
+	AND (team_drive_id IS NOT NULL OR channel_id IS NOT NULL OR owner_sub = coalesce(current_setting('app.owner_sub', true), ''))))`
 
 // ambitoF, ambitoFi y ambitoFo son ambitoSQL para las consultas que nombran la
 // tabla con alias (`f`, `fi`, `fo`). Escritas a mano y no compuestas: son tres.
 const (
 	ambitoF = `(current_setting('app.maintenance', true) = 'on'
 	OR (f.team_drive_id IS NOT DISTINCT FROM nullif(current_setting('app.team_drive', true), '')::uuid
-	AND f.channel_id IS NOT DISTINCT FROM nullif(current_setting('app.channel', true), '')::uuid))`
+	AND f.channel_id IS NOT DISTINCT FROM nullif(current_setting('app.channel', true), '')::uuid
+	AND (f.team_drive_id IS NOT NULL OR f.channel_id IS NOT NULL OR f.owner_sub = coalesce(current_setting('app.owner_sub', true), ''))))`
 	ambitoFi = `(current_setting('app.maintenance', true) = 'on'
 	OR (fi.team_drive_id IS NOT DISTINCT FROM nullif(current_setting('app.team_drive', true), '')::uuid
-	AND fi.channel_id IS NOT DISTINCT FROM nullif(current_setting('app.channel', true), '')::uuid))`
+	AND fi.channel_id IS NOT DISTINCT FROM nullif(current_setting('app.channel', true), '')::uuid
+	AND (fi.team_drive_id IS NOT NULL OR fi.channel_id IS NOT NULL OR fi.owner_sub = coalesce(current_setting('app.owner_sub', true), ''))))`
 	ambitoFo = `(current_setting('app.maintenance', true) = 'on'
 	OR (fo.team_drive_id IS NOT DISTINCT FROM nullif(current_setting('app.team_drive', true), '')::uuid
-	AND fo.channel_id IS NOT DISTINCT FROM nullif(current_setting('app.channel', true), '')::uuid))`
+	AND fo.channel_id IS NOT DISTINCT FROM nullif(current_setting('app.channel', true), '')::uuid
+	AND (fo.team_drive_id IS NOT NULL OR fo.channel_id IS NOT NULL OR fo.owner_sub = coalesce(current_setting('app.owner_sub', true), ''))))`
 )
 
 // inChannelTx abre una tx con `app.tenant` (RLS por tenant) y ADEMÁS `app.channel`
@@ -200,10 +204,14 @@ func (s *Store) CopiarAdjuntoAMiUnidad(ctx context.Context, channelID, fileID, d
 			return err
 		}
 		// De aquí en adelante, «Mi unidad»: la copia nace en el ámbito personal.
-		if _, err := tx.Exec(ctx, "SELECT set_config('app.channel', '', true)"); err != nil {
+		personalOwner := OwnerFrom(ctx)
+		if personalOwner == "" {
+			personalOwner = ownerSub
+		}
+		if _, err := tx.Exec(ctx, "SELECT set_config('app.channel', '', true), set_config('app.owner_sub', $1, true)", personalOwner); err != nil {
 			return fmt.Errorf("store: volver al ámbito personal: %w", err)
 		}
-		out, err = insertarCopia(ctx, tx, t.Slug, src, destFolderID, ownerSub)
+		out, err = insertarCopia(WithOwner(ctx, personalOwner), tx, t.Slug, src, destFolderID, ownerSub)
 		return err
 	})
 	return out, err

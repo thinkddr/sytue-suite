@@ -77,7 +77,14 @@ func longitudPx(v string) float64 {
 //
 //nolint:gocyclo,gocognit // un recorrido del XML con una rama por elemento que interesa
 func objetosODS(files map[string][]byte) []objetosHoja {
-	dec := xml.NewDecoder(bytes.NewReader(files["content.xml"]))
+	raw := files["content.xml"]
+	if !bytes.Contains(raw, []byte("frame")) &&
+		!bytes.Contains(raw, []byte("sparkline-group")) &&
+		!bytes.Contains(raw, []byte("slicers")) &&
+		!bytes.Contains(raw, []byte("database-range")) {
+		return nil
+	}
+	dec := xml.NewDecoder(bytes.NewReader(raw))
 	var hojas []objetosHoja
 	var nombres []string
 	// ordenZ es el `draw:z-index` de cada gráfico: en content.xml salen en el orden de

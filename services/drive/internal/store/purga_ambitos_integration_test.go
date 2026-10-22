@@ -39,7 +39,7 @@ func conLosDosRoles(t *testing.T, caso func(t *testing.T, st *store.Store)) {
 
 func TestPurgarNoDaPorHuerfanoUnBlobQueUsaOtroAmbito(t *testing.T) {
 	conLosDosRoles(t, func(t *testing.T, st *store.Store) {
-		ctx := tenantCtx("acme")
+		ctx := store.WithOwner(tenantCtx("acme"), "bea")
 		raiz, _, err := st.EnsureBase(ctx, 1<<30, false)
 		if err != nil {
 			t.Fatal(err)

@@ -372,4 +372,9 @@ export const is: Catalog = {
     'Þjónustuveitan staðfesti ekki vistun. Endurnýjaðu og athugaðu áður en þú reynir aftur.',
   'linkedServices.unavailable':
     'Tenging við þessa þjónustuveitu er ekki í boði fyrir reikninginn þinn.',
+  'localFile.confirmUpload.title': 'Opna skrá af þessu tæki',
+  'localFile.confirmUpload.body':
+    'Til að opna „{name}“ verður skránni hlaðið upp á Sytue One-reikninginn þinn.',
+  'localFile.confirmUpload.remember': 'Muna val mitt á þessu tæki',
+  'localFile.confirmUpload.confirm': 'Hlaða upp og opna',
 };

@@ -244,6 +244,7 @@ describe('cabecerasCerradas', () => {
     'bases',
     'calcus',
     'calendar',
+    'cast',
     'certipdf',
     'cloud-dashboard',
     'console',
@@ -257,6 +258,7 @@ describe('cabecerasCerradas', () => {
     'pages',
     'photos',
     'portal',
+    'rooms',
   ];
 
   it('las apps con la CSP cerrada son estas, con el Hub que le pasan a la shell', () => {
@@ -316,6 +318,24 @@ describe('cabecerasCerradas', () => {
     );
     expect(web).toContain('cabecerasCerradas(hubBaseUrl(), { marcos: MARCOS })');
     expect(web).toContain('ORIGENES_DE_INCRUSTADOS');
+  });
+
+  it('Rooms y Cast abren el SFU de videollamada y directo, y Mail cierra img-src sin https:', () => {
+    const rooms = readFileSync(
+      fileURLToPath(new URL('../../../apps/rooms/src/middleware.ts', import.meta.url)),
+      'utf8',
+    );
+    const cast = readFileSync(
+      fileURLToPath(new URL('../../../apps/cast/src/middleware.ts', import.meta.url)),
+      'utf8',
+    );
+    const mail = readFileSync(
+      fileURLToPath(new URL('../../../apps/mail/src/middleware.ts', import.meta.url)),
+      'utf8',
+    );
+    expect(rooms).toContain('wss://rooms-sfu.${suiteApex}');
+    expect(cast).toContain('wss://rooms-sfu.${suiteApex}');
+    expect(mail).not.toContain("'https:'");
   });
 });
 

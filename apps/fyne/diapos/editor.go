@@ -117,7 +117,9 @@ type Editor struct {
 	colorTexto, resalte, interlinea string
 	// patron dice si se está editando el patrón (`editingMaster`): las cajas que se
 	// eligen, mueven, escriben, insertan y borran son las suyas (ver `objetivo`).
+	// diseno es el id del diseño activo dentro del modo patrón (`editingLayout`), o "".
 	patron bool
+	diseno string
 	// selCon es el conector elegido (`selConn`): o cajas o un conector, nunca los dos.
 	selCon string
 	// aviso es la banda de lo que este lienzo no dibuja todavía; vacía si lo pinta todo.
@@ -193,9 +195,12 @@ func NuevoEditor(ctx *editor.Contexto) *Editor {
 func (e *Editor) t(clave string) string { return e.ctx.Traducir(clave) }
 
 // objetivo es el índice de las cajas que se editan: el de la diapositiva activa o, con
-// «Editar patrón», IndicePatron.
+// «Editar patrón», IndicePatron (o IndiceDiseno si se edita un diseño).
 func (e *Editor) objetivo() int {
 	if e.patron {
+		if j := e.m.indiceDiseno(e.diseno); j >= 0 {
+			return IndiceDiseno(j)
+		}
 		return IndicePatron
 	}
 	return e.activa
@@ -204,13 +209,33 @@ func (e *Editor) objetivo() int {
 // EditarPatron es `enterMaster`: el escenario pasa a editar las cajas del patrón, sin
 // selección y con el panel de abajo cerrado (notas y animaciones no son del patrón).
 func (e *Editor) EditarPatron() {
-	if e.patron {
+	if e.patron && e.diseno == "" {
 		return
 	}
 	e.TerminarEscritura()
-	e.patron, e.abajo = true, ""
+	e.patron, e.diseno, e.abajo = true, "", ""
 	e.sel, e.extra, e.selCon = "", nil, ""
 	e.recomponer()
+}
+
+// EditarDiseno abre en el modo patrón la edición del diseño `id` (tanto sus formas
+// fijas `Decor` como sus marcadores `Cajas`); "" edita las cajas del propio patrón.
+func (e *Editor) EditarDiseno(id string) {
+	if id != "" && e.m.indiceDiseno(id) < 0 {
+		return
+	}
+	e.TerminarEscritura()
+	e.patron, e.diseno, e.abajo = true, id, ""
+	e.sel, e.extra, e.selCon = "", nil, ""
+	e.recomponer()
+}
+
+// DisenoEditado devuelve el id del diseño que se está editando en el modo patrón, o "".
+func (e *Editor) DisenoEditado() string {
+	if !e.patron {
+		return ""
+	}
+	return e.diseno
 }
 
 // CerrarPatron es `exitMaster`: vuelve a editar la diapositiva activa.
@@ -219,13 +244,21 @@ func (e *Editor) CerrarPatron() {
 		return
 	}
 	e.TerminarEscritura()
-	e.patron = false
+	e.patron, e.diseno = false, ""
 	e.sel, e.extra, e.selCon = "", nil, ""
 	e.recomponer()
 }
 
 // EditandoPatron dice si el escenario edita el patrón.
 func (e *Editor) EditandoPatron() bool { return e.patron }
+
+// PonerRelleno aplica el color de relleno a la caja primaria elegida en el objetivo actual.
+func (e *Editor) PonerRelleno(hex string) {
+	if e.sel == "" {
+		return
+	}
+	e.cambiar(func() { e.m.PonerRelleno(e.objetivo(), e.sel, hex) }, true)
+}
 
 // NuevoNumeroPagina es `addPageNumberBox`: una caja de texto con el campo {n} abajo a
 // la derecha, que es el número de página clásico del patrón.
@@ -273,7 +306,7 @@ func (e *Editor) Cargar(contenido string) bool {
 			e.aviso = Resumen(faltan, e.t)
 		}
 	}
-	e.activa, e.patron, e.selCon = 0, false, ""
+	e.activa, e.patron, e.diseno, e.selCon = 0, false, "", ""
 	e.sel, e.extra, e.escribiendo, e.escenario.Oculta = "", nil, nil, ""
 	e.escenario.M = e.m
 	e.recomponer()
@@ -494,7 +527,7 @@ func (e *Editor) recomponer() {
 		e.selCon = ""
 	}
 	e.escenario.M, e.escenario.Indice, e.escenario.Variante = e.m, e.activa, e.variante()
-	e.escenario.Patron, e.escenario.Conector = e.patron, e.selCon
+	e.escenario.Patron, e.escenario.Diseno, e.escenario.Conector = e.patron, e.diseno, e.selCon
 	e.carril.rehacer()
 	e.miniBarra.Objects = e.controlesMiniBarra()
 	e.notas.sincronizar()

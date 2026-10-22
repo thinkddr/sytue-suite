@@ -969,6 +969,17 @@ export const en = {
   'monitoring.alerts.scope.org': 'organisation',
   'monitoring.alerts.scope.project': 'project',
   'monitoring.alerts.disabled': 'disabled',
+  'monitoring.alerts.unconfirmed': 'pending confirmation',
+  'monitoring.alerts.created.mailtoDesc':
+    'We sent a confirmation link to that address. Alerts will arrive once it is confirmed.',
+  'monitoring.alerts.confirm.title': 'Confirm email alerts',
+  'monitoring.alerts.confirm.desc':
+    'Confirm that this address should receive event alerts from Sytue DevX.',
+  'monitoring.alerts.confirm.submit': 'Confirm address',
+  'monitoring.alerts.confirm.done':
+    'Address confirmed. You will now receive event alerts at this email address.',
+  'monitoring.alerts.confirm.invalid':
+    'This confirmation link is not valid or the alert has already been removed.',
   'monitoring.alerts.delete': 'Delete the {event} alert',
 
   // ---- Equipo ----

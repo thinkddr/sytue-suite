@@ -1,4 +1,6 @@
 {
+  "aiBatch.excludeOrg": "Excluir a organização do lote automático do Sytue AI",
+  "aiBatch.excludedHint": "A organização está excluída do lote automático do Sytue AI. As fotos novas não são processadas em segundo plano para sugestões nem semelhanças.",
   "album.linkCopied": "Ligação copiada",
   "album.newLink": "Nova ligação",
   "album.newLinkConfirm": "Criar uma nova ligação? A ligação atual deixará de funcionar para quem já a tem.",

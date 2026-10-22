@@ -935,6 +935,17 @@ export const lt: AppCatalog<typeof en> = {
   'monitoring.alerts.scope.org': 'organizacija',
   'monitoring.alerts.scope.project': 'projektas',
   'monitoring.alerts.disabled': 'išjungtas',
+  'monitoring.alerts.unconfirmed': 'laukia patvirtinimo',
+  'monitoring.alerts.created.mailtoDesc':
+    'Šiuo adresu išsiuntėme patvirtinimo nuorodą. Įspėjimai bus siunčiami jį patvirtinus.',
+  'monitoring.alerts.confirm.title': 'Patvirtinti įspėjimus el. paštu',
+  'monitoring.alerts.confirm.desc':
+    'Patvirtinkite, kad šiuo adresu turi būti siunčiami „Sytue DevX“ įvykių įspėjimai.',
+  'monitoring.alerts.confirm.submit': 'Patvirtinti adresą',
+  'monitoring.alerts.confirm.done':
+    'Adresas patvirtintas. Nuo šiol įvykių įspėjimus gausite šiuo el. pašto adresu.',
+  'monitoring.alerts.confirm.invalid':
+    'Ši patvirtinimo nuoroda negalioja arba įspėjimas jau pašalintas.',
   'monitoring.alerts.delete': 'Ištrinti įspėjimą {event}',
   'members.subtitle': 'Kas turi prieigą prie organizacijos. Kiekvienas asmuo – viena paketo vieta.',
   'members.add': 'Pakviesti narį',

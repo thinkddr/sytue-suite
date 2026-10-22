@@ -6,6 +6,7 @@
 package auth
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -141,6 +142,26 @@ func rutaSecreto(cuenta string) (string, error) {
 }
 
 func leerSecreto(cuenta string) ([]byte, error) {
+	if cuenta == CuentaBloqueo {
+		if habilitada, err := sistema.SesionAndroidHabilitada(); err != nil {
+			return nil, err
+		} else if habilitada {
+			texto, err := sistema.EstadoSesionAndroid()
+			if err != nil {
+				return nil, err
+			}
+			var estado struct {
+				Bloqueo bool `json:"bloqueo"`
+			}
+			if err := json.Unmarshal([]byte(texto), &estado); err != nil {
+				return nil, err
+			}
+			if estado.Bloqueo {
+				return []byte("1"), nil
+			}
+			return nil, nil
+		}
+	}
 	ruta, err := rutaSecreto(cuenta)
 	if err != nil {
 		return nil, err
@@ -160,6 +181,13 @@ func leerSecreto(cuenta string) ([]byte, error) {
 }
 
 func guardarSecreto(cuenta string, datos []byte) error {
+	if cuenta == CuentaBloqueo {
+		if habilitada, err := sistema.SesionAndroidHabilitada(); err != nil {
+			return err
+		} else if habilitada {
+			return sistema.BloquearSesionAndroid(true)
+		}
+	}
 	ruta, err := rutaSecreto(cuenta)
 	if err != nil {
 		return err
@@ -176,6 +204,13 @@ func guardarSecreto(cuenta string, datos []byte) error {
 }
 
 func borrarSecreto(cuenta string) error {
+	if cuenta == CuentaBloqueo {
+		if habilitada, err := sistema.SesionAndroidHabilitada(); err != nil {
+			return err
+		} else if habilitada {
+			return sistema.BloquearSesionAndroid(false)
+		}
+	}
 	ruta, err := rutaSecreto(cuenta)
 	if err != nil {
 		return err

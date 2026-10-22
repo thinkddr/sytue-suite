@@ -548,3 +548,59 @@ func TestLaVentanaLlevaElTituloDelDocumento(t *testing.T) {
 		t.Fatalf("títulos de la ventana %q; quiero …, «Propuesta», «» (portada)", titulos)
 	}
 }
+
+// TestCoedicionConEmojiCompuestoEnSesionReal (FYE-05): en una sesión de coedición real
+// sobre Docus, los emojis compuestos (tono de piel, secuencia ZWJ, bandera regional y
+// letra con acento combinante) viajan como una op por runa, convergen sin partir ni
+// entremezclar sus puntos de código, y un insert malicioso de varios caracteres se
+// descarta sin desincronizar el folio.
+func TestCoedicionConEmojiCompuestoEnSesionReal(t *testing.T) {
+	s := &servicioDocs{rol: "editor", html: "<p>Acta</p>", remotas: `[]`}
+	a, f := abrirParaEscribir(t, s)
+	f.escribir(" 👍🏽")
+	disparar(t) // siembra «<p>Acta 👍🏽</p>» (10 runas hasta «🏽»: puntos 1..10 de a.actor)
+	ab := a.abierto
+	a.enVivo(ab, api.DocMensaje{Type: "welcome", Seq: 4})
+
+	// Un coautor legítimo («web-1») inserta detrás de «👍🏽» (punto 10 de a.actor) la
+	// secuencia compuesta « 👩🏽‍🔬 🇪🇸 é» (runa a runa, encadenadas), mientras un actor
+	// malicioso («eva») intenta colar un insert de varios caracteres («TRAMPA»).
+	remoto := " 👩🏽‍🔬 🇪🇸 e\u0301"
+	lote := make([]api.DocOpSecuenciada, 0, len(remoto)+1)
+	prevA, prevC := a.actor, uint64(10)
+	seq := int64(10)
+	var c uint64 = 50
+	for _, r := range remoto {
+		seq++
+		c++
+		crudo, err := json.Marshal(map[string]any{
+			"kind":    "insert",
+			"dot":     map[string]any{"a": "web-1", "c": c},
+			"after":   map[string]any{"a": prevA, "c": prevC},
+			"value":   string(r),
+			"lamport": 40 + c,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		lote = append(lote, api.DocOpSecuenciada{Seq: seq, Actor: "web-1", Op: crudo})
+		prevA, prevC = "web-1", c
+	}
+	// Op inválida de varios caracteres (FYE-05): debe ser descartada por OpDeSecuencia.
+	seq++
+	lote = append(lote, api.DocOpSecuenciada{
+		Seq:   seq,
+		Actor: "eva",
+		Op:    json.RawMessage(`{"kind":"insert","dot":{"a":"eva","c":999},"after":{"a":"` + a.actor + `","c":8},"value":"TRAMPA","lamport":999}`),
+	})
+
+	a.enVivo(ab, api.DocMensaje{Type: "ops", Ops: lote})
+	esperado := "<p>Acta 👍🏽 👩🏽‍🔬 🇪🇸 e\u0301</p>"
+	if got := f.Serializar(); got != esperado {
+		t.Fatalf("fusión con emoji compuesto: %q != %q", got, esperado)
+	}
+	disparar(t) // reescribe el registro con el resultado fusionado
+	if ab.base.Value != esperado {
+		t.Fatalf("registro tras fusionar: %q != %q", ab.base.Value, esperado)
+	}
+}

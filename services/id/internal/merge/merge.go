@@ -34,6 +34,7 @@ import (
 
 	"git.sytue.eu/sytue/one/platform/pkg/callaccess"
 	"git.sytue.eu/sytue/one/platform/pkg/pg"
+	notesdb "git.sytue.eu/sytue/one/services/notes/db"
 )
 
 // Services son las bases lógicas que participan en una fusión, en el orden en
@@ -221,6 +222,11 @@ func MoveService(ctx context.Context, pool *pg.Pool, source, target string, revo
 		return res, nil
 	}
 	err := pool.InMergeTx(ctx, func(tx pgx.Tx) error {
+		// Adopt the fixed binary contract before hooks or writes. It is harmless
+		// in other service databases and never inferred from their name or data.
+		if err := notesdb.MarkWriteTransaction(ctx, tx); err != nil {
+			return fmt.Errorf("merge: notes write contract: %w", err)
+		}
 		tables, sinPolitica, err := tenantTables(ctx, tx)
 		if err != nil {
 			return err

@@ -8,11 +8,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
 
 	"git.sytue.eu/sytue/one/services/integrations/internal/connector"
+	"git.sytue.eu/sytue/one/services/integrations/internal/manifest"
 	"git.sytue.eu/sytue/one/services/integrations/internal/policy"
 )
 
@@ -116,9 +118,54 @@ func sameHostNext(current, next string) (string, error) {
 	return nu.String(), nil
 }
 
+// hostsOficialesGoogle y hostsOficialesM365 coinciden con los declarados en las
+// semillas del catálogo (google-workspace.json y microsoft365.json).
+var (
+	hostsOficialesGoogle = []string{
+		"www.googleapis.com",
+		"people.googleapis.com",
+		"gmail.googleapis.com",
+		"admin.googleapis.com",
+		"oauth2.googleapis.com",
+		"accounts.google.com",
+		"*.googleapis.com",
+	}
+	hostsOficialesM365 = []string{
+		"graph.microsoft.com",
+		"login.microsoftonline.com",
+		"*.sharepoint.com",
+		"*.1drv.com",
+	}
+	hostsOficialesGitHub = []string{
+		"api.github.com",
+		"github.com",
+		"*.githubusercontent.com",
+	}
+)
+
+func esLoopbackDePrueba(host string) bool {
+	h := strings.ToLower(strings.TrimSpace(host))
+	if h == "localhost" {
+		return true
+	}
+	ip := net.ParseIP(h)
+	return ip != nil && ip.IsLoopback()
+}
+
+func validarHostOficial(rawURL string, oficiales []string) error {
+	u, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Hostname() == "" {
+		return fmt.Errorf("%w: %q no es una URL http(s) válida", connector.ErrBadQuery, rawURL)
+	}
+	if esLoopbackDePrueba(u.Hostname()) || manifest.HostPermitido(u.Hostname(), oficiales) {
+		return nil
+	}
+	return fmt.Errorf("%w: el servidor %q no está entre los hosts oficiales declarados en el manifiesto del proveedor", connector.ErrBadQuery, u.Hostname())
+}
+
 // baseURLOr valida y normaliza (sin barra final) una raíz de API configurable —
-// existe para poder apuntar a nubes soberanas y a los servidores simulados de los
-// tests sin tocar el código.
+// existe para poder apuntar a los servidores simulados de los tests sin abrir la
+// salida hacia hosts ajenos al manifiesto del proveedor.
 func baseURLOr(raw, def string) (string, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
@@ -127,6 +174,15 @@ func baseURLOr(raw, def string) (string, error) {
 	u, err := url.Parse(raw)
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
 		return "", fmt.Errorf("%w: %q no es una URL http(s) válida", connector.ErrBadQuery, raw)
+	}
+	oficiales := hostsOficialesGoogle
+	if strings.Contains(def, "github.com") {
+		oficiales = hostsOficialesGitHub
+	} else if strings.Contains(def, "microsoft") {
+		oficiales = hostsOficialesM365
+	}
+	if err := validarHostOficial(raw, oficiales); err != nil {
+		return "", err
 	}
 	return strings.TrimRight(raw, "/"), nil
 }

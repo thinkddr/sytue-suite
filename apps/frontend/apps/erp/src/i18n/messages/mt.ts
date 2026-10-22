@@ -615,4 +615,8 @@ export const mt: AppCatalog<typeof en> = {
   'pos.imageUpload': 'Tella’ immaġni għal {name}',
   'pos.images': 'Stampi',
   'pos.imageHint': 'Agħżel immaġni JPEG, PNG jew WebP sa 10 MB.',
+  'vf.error.invalidCertificate':
+    'Iċ-ċertifikat jew iċ-ċavetta privata mhumiex ċertifikat kwalifikat validu b’NIF Spanjol.',
+  'vf.error.certificateTaxIdMismatch':
+    'In-NIF fuq iċ-ċertifikat ma jaqbilx man-NIF tal-organizzazzjoni.',
 };

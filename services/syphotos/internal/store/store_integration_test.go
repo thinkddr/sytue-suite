@@ -839,6 +839,59 @@ func TestVectores_pendientesGuardarYParecidas(t *testing.T) {
 	}
 }
 
+func TestVectores_organizacionExcluidaDelLote(t *testing.T) {
+	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
+	st := store.New(h.Pool)
+	ctxT1 := ctxDe("t1")
+	ctxT2 := ctxDe("t2")
+	const modelo = "qwen3-embedding-8b"
+
+	f1, err := st.Ingerir(ctxT1, foto("secreto.jpg", "d-t1", nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	f2, err := st.Ingerir(ctxT2, foto("normal.jpg", "d-t2", nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if ex, err := st.ExcluidaDelLoteIA(ctxT1); err != nil || ex {
+		t.Fatalf("por defecto no está excluida: ex=%v err=%v", ex, err)
+	}
+	if err := st.FijarExcluidaDelLoteIA(ctxT1, "admin-1", true); err != nil {
+		t.Fatalf("excluir t1: %v", err)
+	}
+	if ex, err := st.ExcluidaDelLoteIA(ctxT1); err != nil || !ex {
+		t.Fatalf("t1 debía quedar excluida: ex=%v err=%v", ex, err)
+	}
+	if ex, err := st.ExcluidaDelLoteIA(ctxT2); err != nil || ex {
+		t.Fatalf("t2 no debía verse afectada: ex=%v err=%v", ex, err)
+	}
+
+	pend, err := st.PendientesDeVector(context.Background(), modelo, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(pend) != 1 || pend[0].ID != f2.ID {
+		t.Fatalf("el lote no debe sacar fotos de una organización excluida: %+v", pend)
+	}
+	if err := st.GuardarVector(context.Background(), f1.ID, modelo, vectorDe(1.0, 16)); !errors.Is(err, domain.ErrNotFound) {
+		t.Fatalf("GuardarVector sobre organización excluida = %v, quiero ErrNotFound", err)
+	}
+
+	// Al volver a incluir a t1, su foto entra de nuevo en la cola y admite vector.
+	if err := st.FijarExcluidaDelLoteIA(ctxT1, "admin-1", false); err != nil {
+		t.Fatalf("volver a incluir t1: %v", err)
+	}
+	pend, err = st.PendientesDeVector(context.Background(), modelo, 100)
+	if err != nil || len(pend) != 2 {
+		t.Fatalf("al reactivar t1 deben estar pendientes las 2: %+v (%v)", pend, err)
+	}
+	if err := st.GuardarVector(context.Background(), f1.ID, modelo, vectorDe(1.0, 16)); err != nil {
+		t.Fatalf("GuardarVector tras reactivar t1: %v", err)
+	}
+}
+
 func TestDuplicadas_agrupaLasRafagasYRespetaElTiempo(t *testing.T) {
 	st, ctx := nuevoStore(t)
 	const modelo = "siglip2-so400m"

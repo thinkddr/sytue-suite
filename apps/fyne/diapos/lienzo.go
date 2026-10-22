@@ -181,8 +181,10 @@ type Lienzo struct {
 	Radio float32
 	// Patron pinta, sobre el fondo de la diapositiva, las cajas del patrón tal cual —con
 	// sus campos {n} y {total} sin sustituir— y nada más: es el escenario de «Editar
-	// patrón», donde esas cajas son las que se editan.
+	// patrón», donde esas cajas son las que se editan. Si Diseno no está vacío, pinta el
+	// patrón (salvo SinPatron) y encima las formas y marcadores de ese diseño.
 	Patron bool
+	Diseno string
 	// Conector es el conector elegido en el escenario, que lleva el halo del acento.
 	Conector string
 	// Saliendo son las cajas que hacen su salida ANIMADA en este paso: aún se pintan,
@@ -442,6 +444,13 @@ func (r *lienzoRenderer) lineasDelDiseno(o fyne.Position, sh float32, esc fyne.S
 // de las propias solo las presentes en ese paso (`boxPresentAtStep`).
 func (l *Lienzo) cajasVisibles() []Caja {
 	if l.Patron {
+		if j := l.M.indiceDiseno(l.Diseno); j >= 0 {
+			var out []Caja
+			if !l.M.Patron.Disenos[j].SinPatron {
+				out = append(out, l.M.cajas(IndicePatron)...)
+			}
+			return append(out, l.M.cajas(IndiceDiseno(j))...)
+		}
 		return l.M.cajas(IndicePatron)
 	}
 	todas := l.M.CajasResueltas(l.Indice)

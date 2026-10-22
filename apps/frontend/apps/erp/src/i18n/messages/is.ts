@@ -562,4 +562,8 @@ export const is: AppCatalog<typeof en> = {
   'pos.imageUpload': 'Hlaða upp mynd af {name}',
   'pos.images': 'Myndir',
   'pos.imageHint': 'Veldu JPEG-, PNG- eða WebP-mynd, að hámarki 10 MB.',
+  'vf.error.invalidCertificate':
+    'Skilríkið eða einkalykillinn er ekki gilt fullgilt skilríki með spænskri kennitölu (NIF).',
+  'vf.error.certificateTaxIdMismatch':
+    'Kennitalan (NIF) á skilríkinu passar ekki við kennitölu fyrirtækisins.',
 };

@@ -539,6 +539,13 @@ type Albumes struct {
 	Buscando bool
 	Error    string
 
+	// ExcluidaLoteIA y PuedeGestionarLoteIA reflejan el ajuste de organización en
+	// Sytue Photos: si la organización está excluida del lote automático de IA y si
+	// quien mira (`owner`/`admin`) puede cambiarlo.
+	ExcluidaLoteIA       bool
+	PuedeGestionarLoteIA bool
+	AlExcluirLoteIA      func(bool)
+
 	AlAbrir   func(api.Album)
 	AlIr      func(Seccion)
 	AlCrear   func(titulo string)
@@ -569,9 +576,18 @@ func PantallaAlbumes(v Vista, d Albumes) *fyne.Container {
 	// De fantasma: la acción principal de esta pantalla es crear un álbum.
 	buscar := ui.NuevoBoton(v.Traduce(claveBoton), d.AlBuscar).Con(ui.Fantasma, ui.TallaSM).ConIcono(iconos.Buscar, 0)
 	buscar.Inerte = d.Buscando
-	sugerencias := container.New(ui.FilaAuto{Hueco: tema.Espacio(2), Derecha: 2, Partir: true, SaltoFila: tema.Espacio(2)},
+	hijosSugerencias := []fyne.CanvasObject{
 		ParrafoEn(v.Traduce("albums.suggestions"), tema.TextoSM, ui.SemiNegrita, "text", v.Variante),
 		buscar,
+	}
+	if d.PuedeGestionarLoteIA {
+		casilla := ui.NuevaCasilla(v.Traduce("aiBatch.excludeOrg"), d.AlExcluirLoteIA)
+		casilla.Marcada = d.ExcluidaLoteIA
+		casilla.Escalon = tema.TextoXS
+		hijosSugerencias = append(hijosSugerencias, casilla)
+	}
+	sugerencias := container.New(ui.FilaAuto{Hueco: tema.Espacio(2), Derecha: 2, Partir: true, SaltoFila: tema.Espacio(2)},
+		hijosSugerencias...,
 	)
 
 	bloques := []ui.Bloque{
@@ -585,6 +601,12 @@ func PantallaAlbumes(v Vista, d Albumes) *fyne.Container {
 	}
 	// La sección `mb-6`: su cabecera con `mb-2`, y debajo lo que haya.
 	seccion := []ui.Bloque{{Obj: sugerencias, Margen: tema.Espacio(2)}}
+	if d.ExcluidaLoteIA {
+		seccion = append(seccion, ui.Bloque{
+			Obj:    ParrafoEn(v.Traduce("aiBatch.excludedHint"), tema.TextoXS, ui.Normal, "text-muted", v.Variante),
+			Margen: tema.Espacio(2),
+		})
+	}
 	if d.Montones != nil && len(d.Montones) == 0 {
 		seccion = append(seccion, ui.Bloque{
 			Obj: ParrafoEn(v.Traduce("albums.suggestionsNone"), tema.TextoSM, ui.Normal, "text-muted", v.Variante),
@@ -929,6 +951,11 @@ type Repetidas struct {
 	// Trabajando inertiza los «Quedarme con esta» mientras se mandan las otras a la
 	// papelera.
 	Trabajando bool
+
+	ExcluidaLoteIA       bool
+	PuedeGestionarLoteIA bool
+	AlExcluirLoteIA      func(bool)
+
 	AlIr       func(Seccion)
 	AlQuedarse func(grupo int, f api.Photo)
 }
@@ -936,14 +963,31 @@ type Repetidas struct {
 // PantallaRepetidas monta «Fotos que se repiten»: se PROPONE y no se ejecuta, así que
 // cada grupo enseña sus fotos y un botón por foto para quedarse con esa.
 func PantallaRepetidas(v Vista, d Repetidas) *fyne.Container {
+	var titulo fyne.CanvasObject = ParrafoEn(v.Traduce("dup.title"), tema.TextoLG, ui.SemiNegrita, "text", v.Variante)
+	if d.PuedeGestionarLoteIA {
+		casilla := ui.NuevaCasilla(v.Traduce("aiBatch.excludeOrg"), d.AlExcluirLoteIA)
+		casilla.Marcada = d.ExcluidaLoteIA
+		casilla.Escalon = tema.TextoXS
+		titulo = container.New(ui.FilaAuto{Hueco: tema.Espacio(2), Derecha: 1, Partir: true, SaltoFila: tema.Espacio(2)},
+			titulo, casilla)
+	}
 	bloques := []ui.Bloque{
 		{Obj: Nav(v, SecRepetidas, d.AlIr), Margen: SeparacionBloque},
-		{Obj: ParrafoEn(v.Traduce("dup.title"), tema.TextoLG, ui.SemiNegrita, "text", v.Variante)},
+		{Obj: titulo},
 		// `max-w-2xl`: el párrafo no pasa de 42rem aunque haya sitio.
 		{Obj: container.New(anchoMaximo(42*tema.Rem), ui.NuevoParrafo(v.Traduce("dup.explain"),
 			tema.TextoSM, ui.Normal, "text-muted", v.Variante)), Margen: SeparacionBloque},
-		{Obj: ParrafoEn(d.Aviso, tema.TextoSM, ui.Normal, "text-muted", v.Variante), Alto: func(float32) float32 { return max(5*0.25*tema.Rem, tema.TextoSM.Linea) }},
 	}
+	if d.ExcluidaLoteIA {
+		bloques = append(bloques, ui.Bloque{
+			Obj:    ParrafoEn(v.Traduce("aiBatch.excludedHint"), tema.TextoXS, ui.Normal, "text-muted", v.Variante),
+			Margen: SeparacionBloque,
+		})
+	}
+	bloques = append(bloques, ui.Bloque{
+		Obj:  ParrafoEn(d.Aviso, tema.TextoSM, ui.Normal, "text-muted", v.Variante),
+		Alto: func(float32) float32 { return max(5*0.25*tema.Rem, tema.TextoSM.Linea) },
+	})
 	if d.Error != "" {
 		bloques = append(bloques, ui.Bloque{Obj: ParrafoEn(d.Error, tema.TextoSM, ui.Normal, "danger-text", v.Variante), Margen: SeparacionBloque})
 	}

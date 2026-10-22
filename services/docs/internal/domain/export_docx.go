@@ -109,22 +109,7 @@ func buildDocx(title string, s *State, comments []Comment) ([]byte, error) {
 	}
 	w.body.WriteString(`<w:body>`)
 
-	if title != "" {
-		w.para(xpara{style: "Title", runs: []xrun{{text: title}}})
-	}
-	for _, blk := range doc.blocks {
-		switch {
-		case blk.para != nil:
-			w.para(*blk.para)
-		case blk.table != nil:
-			w.table(blk.table)
-		case blk.hr:
-			w.horizontalRule()
-		}
-	}
-	if w.pending != "" { // un documento sin párrafos: los comentarios de punto van en uno propio
-		w.body.WriteString(`<w:p>` + w.pending + `</w:p>`)
-	}
+	w.bloquesCuerpo(title, doc.blocks)
 	w.body.WriteString(sect + `</w:body></w:document>`)
 	document := w.body.String()
 	noteParts, overrides := w.noteParts()
@@ -185,6 +170,29 @@ func buildDocx(title string, s *State, comments []Comment) ([]byte, error) {
 		files[name] = content
 	}
 	return zipPackageBytes(files)
+}
+
+func (w *docxWriter) bloquesCuerpo(title string, blocks []xblock) {
+	if title != "" {
+		w.para(xpara{style: "Title", runs: []xrun{{text: title}}})
+	}
+	for _, blk := range blocks {
+		switch {
+		case blk.para != nil:
+			w.para(*blk.para)
+		case blk.table != nil:
+			w.table(blk.table)
+		case blk.hr:
+			w.horizontalRule()
+		}
+	}
+	if w.pending != "" { // un documento sin párrafos: los comentarios de punto van en uno propio
+		w.body.WriteString(`<w:p>` + w.pending + `</w:p>`)
+	} else if n := len(blocks); n > 0 && blocks[n-1].table != nil {
+		// Word exige un párrafo tras una tabla al final del cuerpo; entre tablas no hace falta, y
+		// uno vacío sin framePr partiría un marco con dos tablas seguidas.
+		w.body.WriteString(`<w:p/>`)
+	}
 }
 
 func (w *docxWriter) para(p xpara) {
@@ -316,6 +324,10 @@ func (w *docxWriter) run(r xrun, isLink bool) {
 		return
 	}
 	if r.brk {
+		if r.track != nil {
+			w.body.WriteString(w.revisionOpen(r.track) + `<w:r><w:br/></w:r></w:` + r.track.kind + `>`)
+			return
+		}
 		w.body.WriteString(`<w:r><w:br/></w:r>`)
 		return
 	}
@@ -424,8 +436,6 @@ func (w *docxWriter) table(t *xtable) {
 		w.body.WriteString(`</w:tr>`)
 	}
 	w.body.WriteString(`</w:tbl>`)
-	// Word exige un párrafo tras una tabla al final del cuerpo.
-	w.body.WriteString(`<w:p/>`)
 }
 
 // celda escribe un w:tc: su tcPr (con el formato de css, el de la celda que la abarca si está

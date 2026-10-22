@@ -58,26 +58,50 @@ type libroXlsx struct {
 
 func abrirLibroXlsx(files map[string][]byte, p *presupuesto) (*libroXlsx, error) {
 	principal := partePrincipal(files, "xl/workbook.xml")
-	if len(files[principal]) == 0 {
-		return nil, wrapFormat("xlsx: falta el libro (" + principal + ")")
-	}
 	// Las cadenas, los estilos y el tema, donde dicen las relaciones del libro; si no las
 	// tiene, donde los pone Excel.
 	partes := map[string]string{"sharedStrings": "xl/sharedStrings.xml", "styles": "xl/styles.xml", "theme": "xl/theme/theme1.xml"}
 	l := &libroXlsx{files: files, principal: principal, rels: map[string]string{}}
+	var relHojas []string
 	for _, r := range parseRelsTyped(files[relsPath(principal)]) {
 		l.rels[r.ID] = r.Target
-		if _, ok := partes[path.Base(r.Type)]; ok {
-			partes[path.Base(r.Type)] = destinoRel(principal, r.Target)
+		base := path.Base(r.Type)
+		if _, ok := partes[base]; ok {
+			partes[base] = destinoRel(principal, r.Target)
+		} else if base == "worksheet" {
+			relHojas = append(relHojas, r.ID)
 		}
+	}
+	if len(files[principal]) == 0 {
+		// Un paquete sin xl/workbook.xml pero con las relaciones del libro y sus hojas (como
+		// missing-bits.xlsx de exceljs) recupera la lista de hojas de esas relaciones o de
+		// xl/worksheets/sheetN.xml; si tampoco hay ninguna hoja, no es un libro.
+		for _, id := range relHojas {
+			if len(files[destinoRel(principal, l.rels[id])]) > 0 {
+				l.wb.Sheets = append(l.wb.Sheets, struct {
+					Name string `xml:"name,attr"`
+					RID  string `xml:"id,attr"`
+				}{RID: id})
+			}
+		}
+		if len(l.wb.Sheets) == 0 {
+			for i := 1; len(files["xl/worksheets/sheet"+strconv.Itoa(i)+".xml"]) > 0; i++ {
+				l.wb.Sheets = append(l.wb.Sheets, struct {
+					Name string `xml:"name,attr"`
+					RID  string `xml:"id,attr"`
+				}{})
+			}
+		}
+		if len(l.wb.Sheets) == 0 {
+			return nil, wrapFormat("xlsx: falta el libro (" + principal + ")")
+		}
+	} else if xml.Unmarshal(files[principal], &l.wb) != nil {
+		return nil, wrapFormat("xlsx: workbook.xml inválido")
 	}
 	if l.shared = parseSharedStrings(files[partes["sharedStrings"]], p); p.agotado() {
 		return l, nil
 	}
 	l.estilos = parseXlsxStyles(files[partes["styles"]], files[partes["theme"]])
-	if xml.Unmarshal(files[principal], &l.wb) != nil {
-		return nil, wrapFormat("xlsx: workbook.xml inválido")
-	}
 	return l, nil
 }
 

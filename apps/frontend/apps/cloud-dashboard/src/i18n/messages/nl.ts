@@ -905,6 +905,17 @@ export const nl: AppCatalog<typeof en> = {
   'monitoring.alerts.scope.org': 'organisatie',
   'monitoring.alerts.scope.project': 'project',
   'monitoring.alerts.disabled': 'uitgeschakeld',
+  'monitoring.alerts.unconfirmed': 'wacht op bevestiging',
+  'monitoring.alerts.created.mailtoDesc':
+    'We hebben een bevestigingslink naar dit adres gestuurd. Meldingen komen binnen zodra het adres is bevestigd.',
+  'monitoring.alerts.confirm.title': 'E-mailmeldingen bevestigen',
+  'monitoring.alerts.confirm.desc':
+    'Bevestig dat dit adres gebeurtenismeldingen van Sytue DevX moet ontvangen.',
+  'monitoring.alerts.confirm.submit': 'Adres bevestigen',
+  'monitoring.alerts.confirm.done':
+    'Adres bevestigd. Je ontvangt nu gebeurtenismeldingen op dit e-mailadres.',
+  'monitoring.alerts.confirm.invalid':
+    'Deze bevestigingslink is niet geldig of de melding is al verwijderd.',
   'monitoring.alerts.delete': 'Melding {event} verwijderen',
   'members.subtitle': 'Wie toegang heeft tot de organisatie. Elk lid is één plek in de suite.',
   'members.add': 'Lid uitnodigen',

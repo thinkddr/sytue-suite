@@ -626,7 +626,8 @@ func (s *sinParada) dar(c fyne.Canvas, yo fyne.Focusable) {
 }
 
 // Ocupado es el `busy` de ConfirmDialog: cancelar se apaga y confirmar sale con su
-// rueda (`disabled={busy}` y `loading={busy}`). Solo en una Confirmacion.
+// rueda (`disabled={busy}` y `loading={busy}`). Si el pie lleva un tercer botón —como
+// «Descartar y cerrar sesión» junto a «Subir y cerrar sesión»—, también se apaga.
 func (d *Dialogo) Ocupado(si bool) {
 	if d.confirmar == nil {
 		return
@@ -634,6 +635,14 @@ func (d *Dialogo) Ocupado(si bool) {
 	d.cancelar.Inerte, d.confirmar.Cargando = si, si
 	d.cancelar.Refresh()
 	d.confirmar.Refresh()
+	if pie, ok := d.Pie.(*fyne.Container); ok {
+		for _, o := range pie.Objects {
+			if b, ok := o.(*Boton); ok && b != d.cancelar && b != d.confirmar {
+				b.Inerte = si
+				b.Refresh()
+			}
+		}
+	}
 }
 
 // SinConfirmar es `confirmDisabled`: falta algo para poder confirmar.

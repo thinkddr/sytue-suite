@@ -11,14 +11,17 @@
  */
 import type { JSX } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
-import { Button, EmptyState, Icon, Illustration, Spinner, cx } from '@sytue/ui';
+import { Button, Checkbox, EmptyState, Icon, Illustration, Spinner, cx } from '@sytue/ui';
 import type { SytueUser } from '@sytue/auth';
 import type { Locale } from '@sytue/i18n';
 import {
   alaPapelera,
   duplicadas,
+  guardarAjustesOrganizacion,
+  obtenerAjustesOrganizacion,
   textoAlternativo,
   urlDeVariante,
+  type AjustesOrganizacion,
   type Foto,
   type GrupoRepetido,
 } from '../client/photosApi.js';
@@ -40,11 +43,28 @@ export function Duplicadas({
   const [error, setError] = useState('');
   const [aviso, setAviso] = useState('');
   const [trabajando, setTrabajando] = useState(false);
+  const [ajustes, setAjustes] = useState<AjustesOrganizacion | null>(null);
+  const [guardandoAjustes, setGuardandoAjustes] = useState(false);
+
+  const cambiarExclusionLote = async (excluir: boolean) => {
+    setGuardandoAjustes(true);
+    try {
+      const nuevos = await guardarAjustesOrganizacion(excluir);
+      setAjustes(nuevos);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setGuardandoAjustes(false);
+    }
+  };
 
   useEffect(() => {
     duplicadas()
       .then(setGrupos)
       .catch((e) => setError(String(e)));
+    obtenerAjustesOrganizacion()
+      .then(setAjustes)
+      .catch(() => {});
   }, []);
 
   const quedarse = async (indice: number, elegida: Foto) => {
@@ -72,8 +92,22 @@ export function Duplicadas({
       <div class="mx-auto flex h-full w-full max-w-7xl flex-col px-4 py-6">
         <Nav t={t} locale={locale} activa="duplicates" />
         <header class="mb-4">
-          <h1 class="text-lg font-semibold">{t('dup.title')}</h1>
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <h1 class="text-lg font-semibold">{t('dup.title')}</h1>
+            {ajustes?.canManageAiBatch ? (
+              <Checkbox
+                class="text-xs"
+                label={t('aiBatch.excludeOrg')}
+                checked={ajustes.excludeAiBatch}
+                disabled={guardandoAjustes}
+                onChange={(e) => void cambiarExclusionLote(e.currentTarget.checked)}
+              />
+            ) : null}
+          </div>
           <p class="text-text-muted max-w-2xl text-sm">{t('dup.explain')}</p>
+          {ajustes?.excludeAiBatch ? (
+            <p class="text-text-muted mt-1 text-xs">{t('aiBatch.excludedHint')}</p>
+          ) : null}
         </header>
         <p role="status" aria-live="polite" class="text-text-muted min-h-5 text-sm">
           {aviso}

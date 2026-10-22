@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 
 	"git.sytue.eu/sytue/one/services/drive/internal/domain"
+	"git.sytue.eu/sytue/one/services/drive/internal/store"
 )
 
 // Lo que Sytue Docs pide hacer con el fichero de un documento (DocsAccion) y lo
@@ -85,6 +86,7 @@ func (s *Service) DocsAccion(ctx context.Context, id uuid.UUID, ownerSub, kind, 
 		}
 		return DocsNoAplica, nil
 	}
+	ctx = store.WithOwner(ctx, ownerSub)
 	f, err := s.store.FicheroEnCualquierEstado(ctx, id)
 	if errors.Is(err, domain.ErrNotFound) {
 		return DocsNoAplica, nil

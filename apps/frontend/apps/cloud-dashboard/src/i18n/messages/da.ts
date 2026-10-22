@@ -897,6 +897,17 @@ export const da: AppCatalog<typeof en> = {
   'monitoring.alerts.scope.org': 'organisation',
   'monitoring.alerts.scope.project': 'projekt',
   'monitoring.alerts.disabled': 'deaktiveret',
+  'monitoring.alerts.unconfirmed': 'afventer bekræftelse',
+  'monitoring.alerts.created.mailtoDesc':
+    'Vi har sendt et bekræftelseslink til denne adresse. Alarmerne kommer, så snart den er bekræftet.',
+  'monitoring.alerts.confirm.title': 'Bekræft e-mailalarmer',
+  'monitoring.alerts.confirm.desc':
+    'Bekræft, at denne adresse skal modtage hændelsesalarmer fra Sytue DevX.',
+  'monitoring.alerts.confirm.submit': 'Bekræft adresse',
+  'monitoring.alerts.confirm.done':
+    'Adressen er bekræftet. Du modtager nu hændelsesalarmer på denne e-mailadresse.',
+  'monitoring.alerts.confirm.invalid':
+    'Dette bekræftelseslink er ikke gyldigt, eller alarmen er allerede blevet fjernet.',
   'monitoring.alerts.delete': 'Slet alarmen {event}',
   'members.subtitle': 'Hvem der har adgang til organisationen. Hvert medlem er én plads i pakken.',
   'members.add': 'Inviter medlem',

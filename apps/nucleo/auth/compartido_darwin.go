@@ -30,7 +30,7 @@ func cuentaCompartida(cuenta string) bool {
 	return (strings.HasPrefix(cuenta, "sesion-") || cuenta == CuentaBloqueo) && puedeCompartirApple()
 }
 
-func cargarCompartida(cuenta string) (Tokens, error) {
+func cargarCuentaCompartida(cuenta string) (Tokens, error) {
 	datos, err := leerDatosApple(cuenta, ajustes.GrupoSuite)
 	if err != nil || datos == nil {
 		return Tokens{}, err
@@ -38,7 +38,7 @@ func cargarCompartida(cuenta string) (Tokens, error) {
 	return recuperar(datos)
 }
 
-func guardarCompartida(cuenta string, t Tokens) error {
+func guardarCuentaCompartida(cuenta string, t Tokens) error {
 	if t.Refresh == "" {
 		return borrarDatosApple(cuenta, ajustes.GrupoSuite)
 	}

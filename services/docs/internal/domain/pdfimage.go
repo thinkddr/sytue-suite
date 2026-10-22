@@ -201,6 +201,10 @@ func (l *lienzo) dibujarEstarcido(e *ejecucion, st *pdfStream, m matriz) {
 
 	img := image.NewNRGBA(image.Rect(0, 0, ancho, alto))
 	r, g, b := desdeCSS(e.estado.relleno)
+	var deg *degradadoRaster
+	if e.estado.patronRelleno != "" {
+		deg = e.estado.degRelleno
+	}
 	porFila := (ancho + 7) / 8
 	for y := 0; y < alto; y++ {
 		for x := 0; x < ancho; x++ {
@@ -213,7 +217,13 @@ func (l *lienzo) dibujarEstarcido(e *ejecucion, st *pdfStream, m matriz) {
 			if invertir {
 				pinta = !pinta
 			}
-			if pinta {
+			if !pinta {
+				continue
+			}
+			if deg != nil {
+				ux, uy := (float64(x)+0.5)/float64(ancho), (float64(y)+0.5)/float64(alto)
+				img.SetNRGBA(x, y, deg.colorEn(m[0]*ux+m[2]*uy+m[4], m[1]*ux+m[3]*uy+m[5]))
+			} else {
 				img.SetNRGBA(x, y, color.NRGBA{R: r, G: g, B: b, A: 255})
 			}
 		}

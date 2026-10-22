@@ -22,6 +22,8 @@ func restoreCfg() (cfg config.Config) {
 	cfg.S3Bucket = "sytue-backups"
 	cfg.S3AccessKey = "AK"
 	cfg.S3SecretKey = "SK"
+	cfg.S3BackupAccessKey = "AK-backup"
+	cfg.S3BackupSecretKey = "SK-backup"
 	return cfg
 }
 
@@ -113,5 +115,30 @@ func TestRestorePostgresRejectsTraversalName(t *testing.T) {
 	name := svcResourceName(svc)
 	if _, err := cs.BatchV1().Jobs("tenant-acme").Get(ctx, name+"-pg-restore", metav1.GetOptions{}); err == nil {
 		t.Fatal("se creó un Job pese al nombre inválido")
+	}
+}
+
+// CLOUD-13 — sin S3_BACKUP_ACCESS_KEY / S3_BACKUP_SECRET_KEY dedicadas, ni el
+// backup ni el restore pueden caer a las credenciales S3 maestras de plataforma
+// (S3_ACCESS_KEY / S3_SECRET_KEY) ni copiarlas a un Secret en tenant-*.
+func TestBackupNoCaeACredencialesS3DePlataforma(t *testing.T) {
+	cs := fake.NewSimpleClientset()
+	cfg := testCfg()
+	cfg.S3Bucket = "sytue-backups"
+	cfg.S3AccessKey = "AK-plataforma-maestra"
+	cfg.S3SecretKey = "SK-plataforma-maestra"
+	// S3BackupAccessKey y S3BackupSecretKey quedan vacías.
+	p := newKubeProvisionerFor(cs, cfg, nil, nil)
+	ctx := context.Background()
+
+	svc := domain.ManagedService{ID: uuid.New(), Tenant: "acme", ProjectID: uuid.New(), Kind: domain.ServicePostgres}
+	if _, err := p.Provision(ctx, svc); err != nil {
+		t.Fatalf("Provision postgres: %v", err)
+	}
+	if _, err := cs.CoreV1().Secrets("tenant-acme").Get(ctx, "sytue-platform-s3", metav1.GetOptions{}); err == nil {
+		t.Fatal("se copió sytue-platform-s3 al namespace del tenant sin S3_BACKUP_* dedicadas")
+	}
+	if err := p.RestorePostgres(ctx, svc, "20260720T030000Z.sql.gz"); err == nil {
+		t.Fatal("RestorePostgres debe fallar cerrado cuando faltan S3_BACKUP_* dedicadas")
 	}
 }

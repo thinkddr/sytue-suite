@@ -283,7 +283,8 @@ func TestDocxFormatoCondicionalDeTabla(t *testing.T) {
 <w:style w:type="table" w:styleId="Rejilla4"><w:name w:val="Grid Table 4"/>
 <w:tblPr><w:tblStyleRowBandSize w:val="1"/><w:tblBorders><w:top w:val="single" w:sz="4" w:color="8EAADB"/><w:left w:val="single" w:sz="4" w:color="8EAADB"/><w:bottom w:val="single" w:sz="4" w:color="8EAADB"/><w:right w:val="single" w:sz="4" w:color="8EAADB"/><w:insideH w:val="single" w:sz="4" w:color="8EAADB"/><w:insideV w:val="single" w:sz="4" w:color="8EAADB"/></w:tblBorders></w:tblPr>
 <w:tblStylePr w:type="firstRow"><w:rPr><w:b/><w:color w:val="FFFFFF"/></w:rPr><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:color="4472C4"/><w:insideV w:val="nil"/></w:tcBorders><w:shd w:val="clear" w:color="auto" w:fill="4472C4"/></w:tcPr></w:tblStylePr>
-<w:tblStylePr w:type="lastRow"><w:rPr><w:b/></w:rPr><w:tcPr><w:tcBorders><w:top w:val="double" w:sz="4" w:color="4472C4"/></w:tcBorders></w:tcPr></w:tblStylePr>
+<w:tblStylePr w:type="lastRow"><w:pPr><w:jc w:val="right"/></w:pPr><w:rPr><w:b/></w:rPr><w:tcPr><w:tcBorders><w:top w:val="double" w:sz="4" w:color="4472C4"/></w:tcBorders></w:tcPr></w:tblStylePr>
+<w:tblStylePr w:type="swCell"><w:rPr><w:u w:val="single"/></w:rPr></w:tblStylePr>
 <w:tblStylePr w:type="firstCol"><w:rPr><w:i/></w:rPr></w:tblStylePr>
 <w:tblStylePr w:type="band1Horz"><w:tcPr><w:shd w:val="clear" w:color="auto" w:fill="D9E2F3"/></w:tcPr></w:tblStylePr>
 <w:tblStylePr w:type="band1Vert"><w:tcPr><w:shd w:val="clear" w:color="auto" w:fill="FFC0FF"/></w:tcPr></w:tblStylePr>
@@ -311,8 +312,8 @@ func TestDocxFormatoCondicionalDeTabla(t *testing.T) {
 			{"background-color:#D9E2F3"},
 			{"<em>Dos"}, // segunda banda: sin sombreado
 			{},
-			{"border-top:3px double #4472C4"}, // última fila; su negrita no se sabe al leerla
-			{"border-top:3px double #4472C4"},
+			{"border-top:3px double #4472C4", "text-align:right", "<strong>", "<em>", "<u>Tres"}, // esquina inferior izquierda (lastRow + firstCol + swCell)
+			{"border-top:3px double #4472C4", "text-align:right", "<strong>T2"},                  // última fila
 		} {
 			tieneTodo(t, celdas[i], quiero...)
 		}
@@ -423,4 +424,58 @@ func TestDocxMarcosDeTexto(t *testing.T) {
 	} {
 		mustContain(t, "marco de vuelta", vuelta.Content, q)
 	}
+}
+
+// La posición vertical de marcos (framePr) y cuadros (wp:anchor y VML) ordena los de la página de
+// arriba abajo y de izquierda a derecha, lleva al principio o al final de la página los anclados en
+// un párrafo intermedio, hace flotar en paralelo dos cuadros de la misma línea, coloca los cuadros
+// solo-VML (w:pict/v:shape) y mantiene dentro del marco las tablas al exportar y volver a importar.
+func TestDocxMarcosPosicionVerticalVMLYTabla(t *testing.T) {
+	ancla := func(x, y, cx, cy, ajuste, contenido string) string {
+		return `<w:r><w:drawing><wp:anchor distT="0" distB="0" distL="0" distR="0" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing">` +
+			`<wp:positionH relativeFrom="page"><wp:posOffset>` + x + `</wp:posOffset></wp:positionH>` +
+			`<wp:positionV relativeFrom="page"><wp:posOffset>` + y + `</wp:posOffset></wp:positionV>` +
+			`<wp:extent cx="` + cx + `" cy="` + cy + `"/><wp:` + ajuste + `/><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData>` +
+			`<wps:wsp xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"><wps:txbx><w:txbxContent>` +
+			contenido + `</w:txbxContent></wps:txbx></wps:wsp></a:graphicData></a:graphic></wp:anchor></w:drawing></w:r>`
+	}
+	vml := `<w:r><w:pict xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w10="urn:schemas-microsoft-com:office:word">` +
+		`<v:shape style="position:absolute;margin-left:36pt;margin-top:12pt;width:180pt;height:60pt;mso-wrap-distance-right:9pt">` +
+		`<v:textbox><w:txbxContent><w:p><w:r><w:t>Cuadro VML</w:t></w:r></w:p></w:txbxContent></v:textbox>` +
+		`<w10:wrap type="square" anchorx="margin" anchory="text"/></v:shape></w:pict></w:r>`
+	tabla := `<w:tbl><w:tblPr><w:tblBorders><w:top w:val="single" w:sz="4" w:color="000000"/><w:left w:val="single" w:sz="4" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:color="000000"/><w:right w:val="single" w:sz="4" w:color="000000"/></w:tblBorders></w:tblPr><w:tblGrid><w:gridCol w:w="2400"/></w:tblGrid><w:tr><w:tc><w:p><w:r><w:t>Ingrediente</w:t></w:r></w:p></w:tc></w:tr></w:tbl>`
+
+	cuerpo := `<w:p><w:r><w:t>Primero</w:t></w:r>` + vml + `</w:p>` +
+		`<w:p><w:r><w:t>Medio</w:t></w:r>` +
+		ancla("1397000", "9867900", "3238500", "241300", "wrapNone", `<w:p><w:r><w:t>Pie de página</w:t></w:r></w:p>`) +
+		ancla("1397000", "635000", "5016500", "241300", "wrapNone", `<w:p><w:r><w:t>Cabecera de página</w:t></w:r></w:p>`) +
+		ancla("5000000", "3000000", "2400000", "600000", "wrapNone", `<w:p><w:r><w:t>Columna derecha</w:t></w:r></w:p>`) +
+		ancla("1397000", "3000000", "2400000", "600000", "wrapNone", tabla) +
+		`</w:p>` +
+		`<w:p><w:pPr><w:framePr w:w="2100" w:wrap="notBeside" w:hAnchor="page" w:vAnchor="page" w:x="1440" w:y="300"/></w:pPr><w:r><w:t>Marco arriba</w:t></w:r></w:p>` +
+		`<w:p><w:r><w:t>Último</w:t></w:r></w:p>` +
+		`<w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/></w:sectPr>`
+
+	html := importarDocx(t, cuerpo, nil)
+	tieneTodo(t, html,
+		`<div data-marco="" style="width:140px"><p>Marco arriba</p></div>`+
+			`<div data-marco="" style="width:526.67px;margin-left:50.67px"><p>Cabecera de página</p></div>`+
+			`<p>Primero</p><div data-marco="" style="float:left;width:240px;margin-left:48px;margin-right:12px"><p>Cuadro VML</p></div>`+
+			`<p>Medio</p><p>Último</p>`+
+			`<div data-marco="" style="float:left;width:252px;margin-left:50.67px"><table style="width:160px"><tbody><tr><td style="border:1px solid #000000;width:160px">Ingrediente</td></tr></tbody></table></div>`+
+			`<div data-marco="" style="float:right;width:252px"><p>Columna derecha</p></div>`+
+			`<div data-marco="" style="width:340px;margin-left:50.67px"><p>Pie de página</p></div>`,
+	)
+
+	salida, _, _, err := Export(KindDocument, "", stateWithContent(t, "doc:html", html), FormatOOXML)
+	if err != nil {
+		t.Fatal(err)
+	}
+	vuelta, err := Import("vuelta.docx", salida)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mustContain(t, "tabla sigue en su marco a la vuelta", vuelta.Content,
+		`<div data-marco="" style="float:left;width:252px;margin-left:50.67px"><table style="width:160px"><tbody><tr><td style="border:1px solid #000000;width:160px">Ingrediente</td></tr></tbody></table></div>`,
+	)
 }

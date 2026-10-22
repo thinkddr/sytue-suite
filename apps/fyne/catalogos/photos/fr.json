@@ -1,4 +1,6 @@
 {
+  "aiBatch.excludeOrg": "Exclure l’organisation du lot automatique de Sytue AI",
+  "aiBatch.excludedHint": "L’organisation est exclue du lot automatique de Sytue AI. Les nouvelles photos ne sont pas traitées en arrière-plan pour les suggestions ou les ressemblances.",
   "album.linkCopied": "Lien copié",
   "album.newLink": "Nouveau lien",
   "album.newLinkConfirm": "Créer un nouveau lien ? Le lien actuel cessera de fonctionner pour les personnes qui l'ont déjà.",

@@ -302,8 +302,9 @@ func (b *rtBuilder) flush() {
 	if b.cur != nil {
 		// Un <br> al final de un bloque no abre otra línea en el navegador: es el que pone el
 		// editor en un párrafo vacío (<p><br></p>). Sin quitarlo, cada línea en blanco salía al
-		// .docx con un salto dentro y medía el doble.
-		if n := len(b.cur.runs); n > 0 && b.cur.runs[n-1].brk {
+		// .docx con un salto dentro y medía el doble. Un salto con control de cambios (<del><br></del>)
+		// sí es contenido del documento y se conserva.
+		if n := len(b.cur.runs); n > 0 && b.cur.runs[n-1].brk && b.cur.runs[n-1].track == nil {
 			b.cur.runs = b.cur.runs[:n-1]
 		}
 		b.blocks = append(b.blocks, xblock{para: b.cur})
@@ -340,9 +341,10 @@ func (b *rtBuilder) addText(s string, f xrun) {
 		return
 	}
 	collapsed := reWS.ReplaceAllString(s, " ")
-	if strings.TrimSpace(collapsed) == "" {
-		// Solo espacios: preservar UN espacio entre runs si ya hay contenido.
-		if b.cur != nil && len(b.cur.runs) > 0 {
+	if collapsed == " " {
+		// Solo espacios ASCII: preservar UN espacio si ya hay contenido o si es un tramo en
+		// línea del documento al exportar a Office (no un salto de indentación entre etiquetas).
+		if b.cur != nil && (len(b.cur.runs) > 0 || b.office && !strings.ContainsAny(s, "\r\n")) {
 			f.text = " "
 			b.cur.runs = append(b.cur.runs, f)
 		}
@@ -414,7 +416,7 @@ func (b *rtBuilder) element(n *html.Node, f xrun) {
 	case atom.Mark:
 		b.children(n, b.markOf(n, f))
 	case atom.Br:
-		b.para().runs = append(b.para().runs, xrun{brk: true})
+		b.para().runs = append(b.para().runs, xrun{brk: true, track: f.track})
 	case atom.Sup, atom.Sub:
 		b.indice(n, f)
 	case atom.Img:
@@ -693,7 +695,7 @@ func parseTableRow(tr *html.Node, depth int, p *rtBuilder) []xcell {
 // La celda hereda del cuerpo lo que cambia el mapeo (notas, exportación a OOXML/ODF, anclas de
 // comentario): una revisión o un comentario dentro de una tabla es igual de real.
 func parseTableCell(cell *html.Node, depth int, p *rtBuilder) xcell {
-	cb := &rtBuilder{depth: depth + 1, notes: p.notes, office: p.office, marks: p.marks, imagenes: p.imagenes}
+	cb := &rtBuilder{depth: depth + 1, notes: p.notes, office: p.office, marks: p.marks, imagenes: p.imagenes, marco: p.marco}
 	cb.children(cell, cb.heredado(cell, xrun{}))
 	cb.flush()
 	xc := xcell{}
@@ -703,7 +705,7 @@ func parseTableCell(cell *html.Node, depth int, p *rtBuilder) xcell {
 		}
 	}
 	if len(xc.paras) == 0 {
-		xc.paras = []xpara{{}}
+		xc.paras = []xpara{{marco: p.marco}}
 	}
 	return xc
 }

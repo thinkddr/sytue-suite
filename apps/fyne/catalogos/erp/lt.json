@@ -520,6 +520,8 @@
   "vf.confirmBody": "Nuo šiol kiekviena patvirtinta sąskaita siunčiama Ispanijos mokesčių administratoriui ir jos nebegalima keisti ar ištrinti: klaidos taisomos taisomąja sąskaita faktūra. Įjungtas lieka įjungtas iki metų pabaigos.",
   "vf.confirmTitle": "Įjungti VERI*FACTU?",
   "vf.declaration": "Atitikties deklaracija",
+  "vf.error.certificateTaxIdMismatch": "Sertifikate nurodytas mokesčių mokėtojo kodas (NIF) nesutampa su organizacijos kodu.",
+  "vf.error.invalidCertificate": "Sertifikatas arba privatusis raktas nėra galiojantis kvalifikuotas sertifikatas su Ispanijos mokesčių mokėtojo kodu (NIF).",
   "vf.export": "Atsisiųsti įrašus",
   "vf.fixHint": "Pataisykite sąskaitos arba kliento duomenis ir išsiųskite ją dar kartą.",
   "vf.intro": "Nuo 2027 m. kiekviena sąskaita faktūra ją išrašant turi būti užregistruota Ispanijos mokesčių administratoriaus sistemoje. Su VERI*FACTU Sytue tai padaro už jus patvirtinant sąskaitą ir prideda QR kodą, kuriuo klientas gali ją patikrinti.",

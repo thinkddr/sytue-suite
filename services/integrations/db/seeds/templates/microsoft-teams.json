@@ -20,13 +20,12 @@
         "key": "tenant",
         "label": "Inquilino de Entra (tenant)",
         "placeholder": "contoso.onmicrosoft.com",
-        "help": "El dominio o el GUID del inquilino de Microsoft Entra ID. Lo encuentras en el portal de Entra, en «Información general».",
-        "required": true
+        "help": "Solo si conectas con una aplicación propia registrada en Entra. Con «Iniciar sesión con Microsoft» el inquilino se detecta solo."
       }
     ],
     "oauth": {
-      "authorize_url": "https://login.microsoftonline.com/{tenant}/oauth2/v2.0/authorize",
-      "token_url": "https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token",
+      "authorize_url": "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
+      "token_url": "https://login.microsoftonline.com/common/oauth2/v2.0/token",
       "scopes": [
         "offline_access",
         "User.Read",

@@ -614,4 +614,8 @@ export const lt: AppCatalog<typeof en> = {
   'pos.imageUpload': 'Įkelti {name} nuotrauką',
   'pos.images': 'Vaizdai',
   'pos.imageHint': 'Pasirinkite JPEG, PNG arba WebP vaizdą iki 10 MB.',
+  'vf.error.invalidCertificate':
+    'Sertifikatas arba privatusis raktas nėra galiojantis kvalifikuotas sertifikatas su Ispanijos mokesčių mokėtojo kodu (NIF).',
+  'vf.error.certificateTaxIdMismatch':
+    'Sertifikate nurodytas mokesčių mokėtojo kodas (NIF) nesutampa su organizacijos kodu.',
 };

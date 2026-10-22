@@ -251,4 +251,7 @@ export const bg: AppCatalog<typeof en> = {
   'memories.years': 'Преди {count} години',
   'memories.oneYear': 'Преди една година',
   'memories.hide': 'Скриване',
+  'aiBatch.excludeOrg': 'Изключи организацията от автоматичния пакет на Sytue AI',
+  'aiBatch.excludedHint':
+    'Организацията е изключена от автоматичния пакет на Sytue AI. Снимките не се обработват във фонов режим за предложения или подобни.',
 };

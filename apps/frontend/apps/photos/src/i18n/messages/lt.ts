@@ -280,4 +280,7 @@ export const lt: AppCatalog<typeof en> = {
   'memories.years': 'Prieš {count} m.',
   'memories.oneYear': 'Prieš metus',
   'memories.hide': 'Slėpti',
+  'aiBatch.excludeOrg': 'Neįtraukti organizacijos į automatinį „Sytue AI“ paketą',
+  'aiBatch.excludedHint':
+    'Organizacija neįtraukta į automatinį „Sytue AI“ paketą. Naujos nuotraukos fone neapdorojamos pasiūlymams ar panašumams rasti.',
 };

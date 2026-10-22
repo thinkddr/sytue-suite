@@ -554,4 +554,8 @@ export const fi: AppCatalog<typeof en> = {
   'pos.imageUpload': 'Lataa kuva tuotteelle {name}',
   'pos.images': 'Kuvat',
   'pos.imageHint': 'Valitse enintään 10 Mt:n JPEG-, PNG- tai WebP-kuva.',
+  'vf.error.invalidCertificate':
+    'Varmenne tai yksityinen avain ei ole kelvollinen hyväksytty varmenne, jossa on espanjalainen verotunniste (NIF).',
+  'vf.error.certificateTaxIdMismatch':
+    'Varmenteen verotunniste (NIF) ei vastaa organisaation verotunnistetta.',
 };

@@ -232,3 +232,38 @@ func TestContratoJSONDelDashboard(t *testing.T) {
 		}
 	}
 }
+
+// CLOUD-09 — una sola celda gigante (p. ej. repeat('a', 500000000)) agotaba la
+// memoria de cloud-api dentro de rows.Values() antes de que el acumulador size
+// pudiera cortar en la siguiente iteración. decodeRowBounded inspecciona los
+// bytes crudos de la fila ANTES de llamar a decode() y trunca cualquier celda
+// que supere dbStudioMaxCellBytes sin materializarla con rows.Values().
+func TestDecodeRowBoundedTruncaCeldaGiganteSinDecodificarFila(t *testing.T) {
+	t.Parallel()
+	decodeCalled := false
+	giant := make([]byte, 1024*1024) // 1 MiB (> 64 KiB)
+	for i := range giant {
+		giant[i] = 'a'
+	}
+	raw := [][]byte{[]byte("42"), giant}
+	rec, wireSize, err := decodeRowBounded(raw, func() ([]any, error) {
+		decodeCalled = true
+		return []any{42, string(giant)}, nil
+	}, []string{"id", "payload"})
+	if err != nil {
+		t.Fatalf("decodeRowBounded: %v", err)
+	}
+	if decodeCalled {
+		t.Fatal("decode() (rows.Values) NO debe invocarse cuando una celda cruda supera el tope")
+	}
+	if got := rec["id"]; got != "42" {
+		t.Errorf("celda normal id = %v, quiero \"42\"", got)
+	}
+	wantTrunc := "[truncado: 1048576 bytes]"
+	if got := rec["payload"]; got != wantTrunc {
+		t.Errorf("celda gigante payload = %v, quiero %q", got, wantTrunc)
+	}
+	if wireSize < len(giant) {
+		t.Errorf("wireSize = %d, debe reflejar los bytes crudos (%d) para cortar la siguiente fila", wireSize, len(giant))
+	}
+}

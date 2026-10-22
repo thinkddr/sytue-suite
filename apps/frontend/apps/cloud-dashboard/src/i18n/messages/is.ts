@@ -896,6 +896,17 @@ export const is: AppCatalog<typeof en> = {
   'monitoring.alerts.scope.org': 'fyrirtæki',
   'monitoring.alerts.scope.project': 'verkefni',
   'monitoring.alerts.disabled': 'óvirk',
+  'monitoring.alerts.unconfirmed': 'bíður staðfestingar',
+  'monitoring.alerts.created.mailtoDesc':
+    'Við sendum staðfestingartengil á þetta netfang. Viðvaranir berast um leið og það er staðfest.',
+  'monitoring.alerts.confirm.title': 'Staðfesta viðvaranir í tölvupósti',
+  'monitoring.alerts.confirm.desc':
+    'Staðfestu að þetta netfang eigi að fá atburðaviðvaranir frá Sytue DevX.',
+  'monitoring.alerts.confirm.submit': 'Staðfesta netfang',
+  'monitoring.alerts.confirm.done':
+    'Netfang staðfest. Þú færð nú atburðaviðvaranir á þetta netfang.',
+  'monitoring.alerts.confirm.invalid':
+    'Þessi staðfestingartengill er ekki gildur eða viðvörunin hefur þegar verið fjarlægð.',
   'monitoring.alerts.delete': 'Eyða viðvöruninni {event}',
   'members.subtitle': 'Fólkið með aðgang að fyrirtækinu. Hver manneskja er eitt sæti í pakkanum.',
   'members.add': 'Bjóða manneskju',

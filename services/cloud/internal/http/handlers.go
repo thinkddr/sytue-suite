@@ -129,6 +129,7 @@ type cloudService interface {
 	ListAlertPolicies(ctx context.Context) ([]domain.AlertPolicy, error)
 	UpdateAlertPolicy(ctx context.Context, id uuid.UUID, upd store.UpdateAlertPolicyRecord) (domain.AlertPolicy, error)
 	DeleteAlertPolicy(ctx context.Context, id uuid.UUID) error
+	ConfirmAlertPolicy(ctx context.Context, rawToken string) (domain.AlertPolicy, error)
 }
 
 // Handlers agrupa los manejadores de la API REST de Sytue Cloud.

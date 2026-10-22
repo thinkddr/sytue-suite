@@ -316,11 +316,52 @@ func (b *BarraSuite) Montar(contenido fyne.CanvasObject) fyne.CanvasObject {
 		b.s.AlNoEncontrar(func() {
 			poner(NuevaPaginaNoEncontrada(b.t, func() { poner(contenido) }))
 		})
+		b.s.AlConfirmarSubidaLocal(b.confirmarSubidaLocal)
 		if !b.sinSesionPropia {
 			b.montarSinSesion(poner, contenido)
 		}
 	}
 	return c
+}
+
+// confirmarSubidaLocal pregunta antes de subir al servicio un fichero local abierto desde
+// el sistema, con una casilla para recordar la elección en este dispositivo (FYP-02).
+func (b *BarraSuite) confirmarSubidaLocal(w fyne.Window, nombre string, aceptar func(recordar bool)) {
+	var lienzo fyne.Canvas
+	if w != nil {
+		lienzo = w.Canvas()
+	}
+	if lienzo == nil && b.montado != nil {
+		lienzo = fyne.CurrentApp().Driver().CanvasForObject(b.montado)
+	}
+	if lienzo == nil {
+		return
+	}
+	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
+	escalon := tema.Escalon{Tam: tema.TextoSM.Tam, Linea: 1.625 * tema.TextoSM.Tam}
+	parrafo := NuevoParrafo(b.t.T("localFile.confirmUpload.body", i18n.Vars{"name": nombre}), escalon, Normal, "text", v)
+	casilla := NuevaCasilla(b.t.T("localFile.confirmUpload.remember", nil), nil)
+	casilla.Escalon = tema.TextoSM
+	cuerpo := container.New(Columna{Hueco: tema.Espacio(3)}, parrafo, casilla)
+	var d *Dialogo
+	d = Confirmacion(
+		b.t.T("localFile.confirmUpload.title", nil),
+		b.t.T("ui.cancel", nil),
+		b.t.T("localFile.confirmUpload.confirm", nil),
+		false,
+		cuerpo,
+		func() { d.Cerrar() },
+		func() {
+			recordar := casilla.Marcada
+			d.Cerrar()
+			aceptar(recordar)
+		},
+	)
+	d.RotuloCerrar = b.t.T("ui.close", nil)
+	ancho := AnchoCuerpoDialogo(d, lienzo.Size())
+	parrafo.A(ancho)
+	casilla.AnchoEtiqueta = max(ancho-LadoEleccion-HuecoEleccion, 1)
+	d.Mostrar(lienzo)
 }
 
 // ContenidoMontado es lo que hay ahora mismo bajo la barra en lo que devolvió Montar: el

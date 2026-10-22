@@ -1,3 +1,4 @@
+../../docs/architecture.md 2132ms
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 <!-- Copyright (c) 2026 Daniel Delgado Ramos -->
 
@@ -3651,12 +3652,12 @@ documentos habrían compartido `source_ref` y —por el índice único de la 000
 segundo «Nuevo documento» habría abierto el primero. Un documento que se come a
 otro es mucho peor que un paréntesis en el nombre.
 
-**Una carpeta `Sytue Docs/`, no una por persona.** En Drive, «Mi unidad» es hoy
-un espacio de toda la organización; lo documenta el propio Drive en
-`internal/service/channelfiles.go`. Una subcarpeta por `sub` daría la ilusión de
-privacidad sin darla. El fichero sí queda con su `owner_sub`. El día que Drive
-tenga raíces personales, la constante `CarpetaDocumentos` pasa a colgar de la
-raíz de cada uno y no cambia nada más.
+**Una carpeta `Sytue Docs/` en «Mi unidad» de cada persona.** En Drive, «Mi unidad»
+es privada de cada persona (migración 0032: raíz personal única por `(tenant, owner_sub)`,
+políticas RLS restrictivas `folders_scope_isolation` y `files_scope_isolation` con
+`app.owner_sub`, y predicado SQL explícito por `owner_sub`): la constante
+`CarpetaDocumentos` (`"Sytue Docs"`) cuelga de la raíz personal de su dueño y el
+fichero nace con su `owner_sub`.
 
 **El CRDT sigue siendo la fuente de verdad de la edición.** El fichero de Drive
 es la materialización del documento, no su estado vivo. _Descartado:_ mover el
@@ -3751,9 +3752,8 @@ Fyne) con restaurar y vaciar.
   por cualquier camino (uno a uno, en lote, con su carpeta, la auto-purga).
   `internal/docssync` entrega a Docs el ESTADO actual (`/internal/drive/files`);
   lo que falla se aplaza con espera creciente y a las 48 veces se registra y se
-  descarta. Desde Drive **nada se borra para siempre en Docs**: en «Mi unidad»
-  cualquiera de la organización puede purgar un fichero, y el contenido del
-  documento lo vacía su dueño.
+  descarta. Desde Drive **nada se borra para siempre en Docs**: el contenido del
+  documento lo vacía su dueño desde la papelera de Docs.
 - **Idempotente y sin carreras**: las dos mitades aplican estados, no eventos. El
   rebote (Docs tira → Drive tira → la cola avisa a Docs) no hace nada.
 - **Caduca a los 30 días**, como Drive (contados desde el 29/09/2026 como pronto): Docs
@@ -4260,8 +4260,8 @@ nueve presentaciones) sigue siendo la base.
 
 **La marca vive en Docs, no en Drive.** Una plantilla de la organización es un documento de
 Docs marcado como tal (`doc_org_templates`, migración 0020): Drive solo guarda ficheros, y
-«Mi unidad» es del _tenant_, no de la persona, así que lo que se materializara allí lo vería
-toda la organización. Marcar un documento no copia nada, y quitar la marca no borra el documento
+«Mi unidad» es privada de cada persona (migración 0032), mientras que una plantilla debe
+verse en toda la organización sin copiar ficheros a unidades de equipo. Marcar un documento no copia nada, y quitar la marca no borra el documento
 ni sus versiones.
 
 - **Quién puede qué.** Marcar y quitar la marca: quien administra la organización (rol `owner`
@@ -4580,7 +4580,8 @@ derecha que escribe PhpSpreadsheet, que se perdían enteros. En el modelo cada l
 color y su trazo (`tc`… y `ts`…, opcionales: un borde de antes se ve como siempre), y una regla
 condicional, su color de letra (`textColor`): con él llegan también las reglas que solo cambian la
 letra, que antes se descartaban. Los escriben también los exportadores (.xlsx y .ods), la web los
-pinta con su CSS y Calcus nativo, con su color y su grosor (los discontinuos, continuos).
+pinta con su CSS y Calcus nativo, con su color, su grosor y sus segmentos (discontinuo, de puntos y
+doble).
 
 El color de la pestaña va y vuelve también por .ods: el exportador escribe un estilo de tabla con
 `tableooo:tab-color`, el atributo que escribe y lee LibreOffice (comprobado con él como caja negra
@@ -4600,7 +4601,7 @@ ese espacio de nombres o con otro. De las 110 hojas con pestaña de color de los
 | Párrafos de marcadores con su tamaño heredado       | 0 / 1 742                  | 1 719 / 1 742 (98,7 %)     |
 | Párrafos de marcadores con su alineación heredada   | 0 / 685                    | 669 / 685 (97,7 %)         |
 | Párrafos de marcadores con su color heredado        | 8 / 632 (1,3 %)            | 619 / 632 (97,9 %)         |
-| Formas de los diseños que no son marcadores         | 0 / 217                    | 215 / 217 (99,1 %)         |
+| Formas de los diseños que no son marcadores         | 0 / 217                    | 217 / 217 (100 %)          |
 
 Las tres filas de los marcadores, la de las tablas y la de los diseños se midieron el 2026-10-16
 sobre el corpus de ese día (491 .pptx). La de las tablas cuenta celda a celda las que se ven rellenas: su relleno
@@ -4621,18 +4622,22 @@ pulgadas, 4:3 o la de Google, 18 pt son 24 px) y con lo que encogió el ajuste a
 «Guardar en Drive» ya no devuelve todo a 20 pt. Cada diapositiva hereda de su patrón, no del
 primero: 27 ficheros del corpus tienen varios, y 181 diapositivas usaban otro.
 
-**Las formas de los diseños** (`slides_disenos.go`). Lo que un diseño lleva además de sus
+**Las formas de los diseños** (`slides_disenos.go`, `import_imagenes.go`). Lo que un diseño lleva además de sus
 marcadores —una franja, un logo, una línea, un texto fijo— se guarda una vez en el diseño
 (`layouts[].decor`, sus líneas en `layouts[].connectors` y `hideMaster` si el diseño tapa las formas
 del patrón), no en cada diapositiva, que repetiría sus imágenes, y se pinta debajo de cada
 diapositiva que lo lleva, en la web y en Diapos nativo. Al guardar vuelven al diseño: en .pptx a su
-`p:sldLayout`, y en .odp a una página maestra por diseño. Los tres campos son opcionales: un
-documento de antes se pinta como siempre. En el editor se ven pero no se editan; al editar un
-diseño, salen atenuadas debajo de sus marcadores. Con ellas, dos arreglos que tocaban lo mismo: una
-forma oculta (`hidden`, como las que deja think-cell) ya no se pinta en ninguna parte, y había 48 en
-los diseños del corpus, 35 en los patrones y 1 en una diapositiva; y los .pptx en OOXML estricto
-traen sus diseños, que el patrón cita con el `r:id` de Strict, otro espacio de nombres. Las 2 que
-faltan son imágenes que el editor no pinta (una EMF y una TIFF).
+`p:sldLayout`, y en .odp a una página maestra por diseño, reutilizando el mismo fichero en `ppt/media/`
+y `Pictures/` cuando una imagen se repite entre diseños o diapositivas. Los tres campos son opcionales: un
+documento de antes se pinta como siempre. Al editar un diseño (en la web y en Fyne con `EditarDiseno`),
+tanto las formas de `decor` como los marcadores de `boxes` se eligen, mueven, cambian de color, insertan
+y borran sobre el mismo lienzo, repartiéndose de vuelta entre `decor` y `boxes` al guardar. Con ellas,
+tres arreglos que tocaban lo mismo: una forma oculta (`hidden`, como las que deja think-cell) ya no se
+pinta en ninguna parte, y había 48 en los diseños del corpus, 35 en los patrones y 1 en una diapositiva;
+los .pptx en OOXML estricto traen sus diseños, que el patrón cita con el `r:id` de Strict, otro espacio
+de nombres; y las imágenes TIFF y EMF (con contenido vectorial o mapa de bits dentro de su `rclBounds`)
+se convierten a PNG acotado al importar, llegando a 217 / 217 con el patrón del modelo (y 359 / 361
+contando todos los patrones, donde las 2 restantes son `a:graphicFrame` en un diseño).
 
 **Los diseños de otros patrones** (`disenoDeOtroPatron`). El modelo tiene un patrón, y una
 presentación puede tener varios. Una diapositiva de otro patrón trae su diseño a la lista de
@@ -4642,10 +4647,11 @@ lleva detrás el del patrón, que es el de su tema («Título · Oscuro»). Lo d
 2026-10-16. Con un solo patrón, el modelo no cambia: es el mismo, byte a byte, en los 464
 ficheros del corpus que no usan otro, y de 165 formas se pasa a 215.
 
-Lo que no se abre, y por qué: 42 .xlsx y 2 .pptx cifrados o binarios (CFB); 21 ZIP rotos; 3
-paquetes sin libro (dos ZIP vacíos y uno de exceljs con las hojas pero sin el libro ni
-`_rels/.rels`); y 1 .xlsx que no cabe en un documento ni sin filas (una prueba de un CVE de
-ClosedXML: lo que no cabe son sus objetos).
+Lo que no se abre, y por qué: 42 .xlsx y 2 .pptx cifrados o binarios (CFB); 21 ZIP rotos; 2
+ZIP sin libro ni hojas (`EmptyZipFile.xlsx` de ExcelDataReader, que solo llevan `test.txt` con
+`"test empty zip file"` para probar el rechazo de un archivo que no es una hoja de cálculo); y
+1 .xlsx que no cabe en un documento ni sin filas (una prueba de un CVE de ClosedXML: lo que no
+cabe son sus objetos).
 
 **La parte principal, donde diga el paquete.** El libro de un .xlsx es la parte que nombra la
 relación officeDocument de `_rels/.rels`, no siempre `xl/workbook.xml`: hay libros con ella en la
@@ -4654,12 +4660,16 @@ el Open XML SDK), y sus cadenas, sus estilos y su tema van donde dicen las relac
 (`partePrincipal` en `import.go`, la que ya usaba Docus para los .docx de Word en la web). Los
 nombres de parte de OPC no distinguen mayúsculas, y si la principal solo está con otra caja
 (`xl/WorkBook.xml` citada como `xl/workbook.xml`), el paquete se alinea con los nombres que lo
-citan (`alinearCaja`). Se abren así 6 de los 9 que no se abrían: de los 3521 .xlsx, se abren
-3454 en vez de 3448.
+citan (`alinearCaja`). Si además falta el propio `xl/workbook.xml` pero el paquete conserva las
+relaciones del libro (`xl/_rels/workbook.xml.rels`) o las hojas en `xl/worksheets/sheetN.xml`
+(como `missing-bits.xlsx` de exceljs), `abrirLibroXlsx` reconstruye la lista de hojas a partir de
+ellas y lee las celdas presentes. Se abren así 7 de los 9 que no se abrían (quedando fuera solo
+los dos `EmptyZipFile.xlsx`): de los 3521 .xlsx, se abren 3455 en vez de 3448.
 
 <a id="libros-recortados"></a>
 
-**Un libro que no cabe se abre recortado, como copia aparte.** Decisión del dueño (2026-10-16). El
+**Un libro o documento que no cabe se abre recortado, como copia aparte.** Decisión del dueño
+(2026-10-16 para .xlsx; extendido el 2026-10-21 a .ods, .docx y .pptx). El
 documento es un solo valor que se siembra y se guarda en una operación de menos de 1 MiB (900 KB
 útiles), y un libro de 10 000 filas no cabe ni con un modelo más compacto: de los 33 .xlsx del
 corpus que no cabían, 17 necesitaban entre 0,9 y 2,1 MB, 7 entre 2,3 y 4,8 y 9 entre 8 y 57. Ahora
@@ -4669,8 +4679,10 @@ y que el original no se ha tocado (`recortarLibro` en `import_presupuesto.go`). 
 marca el resultado (`truncated`), y `/open-from-drive` lo abre como documento aparte, sin anclarlo
 al fichero, como una plantilla: sin ancla no hay «Guardar en Drive», así que guardar no puede
 sobrescribir el original con la copia recortada. En el corpus se abren 32 de los 33, en menos de
-4 s el más lento y sin pasar de 290 MB. Un .ods que no cabe sigue sin abrirse: todas sus hojas van
-en `content.xml`, y saltar las filas de más obliga a leerlas en cada intento.
+4 s el más lento y sin pasar de 290 MB. En un .ods se separa cada `<table:table>` de `content.xml`
+y se salta el resto de sus filas por bytes, igual que en un .xlsx (`partirCuerpoODS` y
+`ultimoCierreXML`); y un .docx o un .pptx que supera el presupuesto se abre también recortado con
+el aviso delante (`recortarDocx` y `recortarPptx`).
 
 **Memoria de la importación.** El tope de lo sembrado se comprobaba al final, con el modelo ya
 entero en memoria: un .xlsx de 14 MB llegaba a 1,5 GB antes de fallar por tamaño, el peor del
@@ -4698,10 +4710,9 @@ de eso, y `TestPresupuestoNoCortaLoQueCabe`, si el corte rechaza algo que habrí
 Lo que el modelo no tiene y se pierde o se aproxima, por cuánto se ve: los degradados y las
 tramas llegan con su color medio; las viñetas que un marcador hereda (llegan las que dice el
 párrafo); los gráficos y los objetos incrustados de Diapos; la disposición de un
-SmartArt sin dibujo compuesto (llega su texto como lista); los bordes discontinuos y de puntos
-en Calcus nativo (se pintan continuos); y una tabla de diapositiva se guarda en .pptx/.odp como
-texto, celda a celda. De Numbers y Keynote hay muy pocas muestras con licencia libre (8 .xlsx con
-la firma de Numbers, ninguna de Keynote): están sin medir de verdad.
+SmartArt sin dibujo compuesto (llega su texto como lista); y una tabla de diapositiva se guarda en
+.pptx/.odp como texto, celda a celda. De Numbers y Keynote hay muy pocas muestras con licencia
+libre (8 .xlsx con la firma de Numbers, ninguna de Keynote): están sin medir de verdad.
 
 <a id="segmentadores-excel"></a>
 
@@ -4935,12 +4946,12 @@ La exportación devuelve cada marco como `framePr`. En rico el marco no impide e
 se editan en el flujo y su `float` no se pinta. Eran 85 ficheros con `framePr`; 52 llevaban solo
 el neutro de Pages.
 
-El formato condicional de las tablas con estilo (`tblStylePr`: fila de encabezado y bandas de
-las «Tablas de cuadrícula» de Word) se aplica según el `tblLook` de cada tabla (sin él, el 04A0
-de Word): a cada celda, el sombreado y los bordes de sus partes, y a su texto, la letra. El
-orden entre partes es el de LibreOffice usado como referencia: bandas de filas, de columnas,
-primera y última columna, primera y última fila y esquinas. La letra de la última fila no se
-aplica, porque al leerla aún no se sabe que lo es; su sombreado y sus bordes, sí.
+El formato condicional de las tablas con estilo (`tblStylePr`: fila de encabezado, fila de totales y
+bandas de las «Tablas de cuadrícula» de Word) se aplica según el `tblLook` de cada tabla (sin él,
+el 04A0 de Word): a cada celda, el sombreado y los bordes de sus partes, y a su texto, la letra y
+el párrafo (incluidas `lastRow`, `swCell` y `seCell`). El orden entre partes es el de LibreOffice
+usado como referencia: bandas de filas, de columnas, primera y última columna, primera y última fila
+y esquinas.
 
 La página (tamaño, márgenes y color del papel) es del documento y no de la vista: va en una capa
 vacía al principio del folio, `div[data-sytue-page]` con `data-width`, `data-height` y
@@ -4962,22 +4973,22 @@ escribe en el orden del esquema; además `settings.xml` (tabulador por defecto),
 (la genérica de cada fuente) y una lista por cada viñeta propia. Sus estilos reflejan el folio del
 editor (12 pt, interlineado 1,5, títulos de 24, 18 y 14 pt).
 
-| Ida y vuelta (857 ficheros)       | Antes | Después |
+| Ida y vuelta (858 ficheros)       | Antes | Después |
 | --------------------------------- | ----- | ------- |
-| Vuelven idénticos                 | 2     | 221     |
+| Vuelven idénticos                 | 2     | 263     |
 | Cambia el texto                   | 41    | 2       |
-| Pierden font-family               | 828   | 18      |
-| Pierden font-size                 | 772   | 26      |
+| Pierden font-family               | 828   | 2       |
+| Pierden font-size                 | 772   | 5       |
 | Pierden margin-bottom             | 667   | 0       |
 | Pierden line-height               | 651   | 0       |
 | Pierden margin-top                | 196   | 4       |
-| Pierden color                     | 181   | 21      |
+| Pierden color                     | 181   | 2       |
 | Pierden width                     | 146   | 0       |
 | Pierden padding                   | 142   | 0       |
 | Pierden margin-left               | 102   | 0       |
 | Pierden letter-spacing            | 95    | 0       |
 | Pierden border-bottom             | 91    | 0       |
-| Pierden background-color          | 88    | 1       |
+| Pierden background-color          | 88    | 0       |
 | Pierden tab-size y white-space    | 72    | 0       |
 | Pierden border-top                | 69    | 0       |
 | Pierden text-transform            | 66    | 1       |
@@ -4992,10 +5003,9 @@ editor (12 pt, interlineado 1,5, títulos de 24, 18 y 14 pt).
 | Pierden display                   | 11    | 0       |
 | Pierden font-variant              | 9     | 0       |
 
-De los 857, 634 no vuelven idénticos sobre todo por el orden de las declaraciones y porque el
+De los 858, 595 no vuelven idénticos sobre todo por el orden de las declaraciones y porque el
 color de un párrafo vuelve en sus tramos. Los dos en los que cambia el texto lo hacen en el valor
-guardado de un campo (un número de página), y los 21 que pierden color pierden un negro explícito
-que vuelve como la tinta del folio.
+guardado de un campo (un número de página) o en un espacio no separable dentro de una tabla.
 
 Las paradas de tabulación propias (`w:tabs`, con su herencia de estilos y sus «clear») van en el
 `style` del párrafo como `--sytue-tabs: 189.33px right, 213.33px left dot`, en px desde el borde
@@ -5156,6 +5166,32 @@ con un error explicado (nunca un documento vacío ni un fallo mudo):
 | pdf.js `poppler-937-0-fuzzed.pdf`                   | «el documento no declara ninguna página»                                     | 1 página de 0×0, en blanco, sin texto                                    |
 | pdf.js `PDFBOX-4352-0.pdf`                          | «está cifrado y no se puede leer» (/Encrypt roto: `E<` en vez de `<<`)       | 1 página en blanco, 1 byte de texto                                      |
 | Sytue `certificacion-p1*.pdf` y `-p2*.pdf` (anotar) | «una firma de certificación no admite anotaciones» y pide confirmación (409) | pyHanko: anotar rompe la certificación DocMDP P1/P2; la norma lo prohíbe |
+
+En extracción de texto quedan además ficheros del corpus donde ningún lector puede coincidir con
+Poppler porque el PDF no declara qué letras usa o porque el propio `pdftotext` trocea o desordena
+el texto:
+
+- **Sin `/ToUnicode` ni codificación en la fuente** (solo índices de glifo o códigos privados; tanto
+  Poppler como pypdf vuelcan bytes de control o PUA y CertiPDF emite `U+200B`): `TAMReview.pdf`
+  (`/F1` Cambria con `/g18…/g821` sin `/ToUnicode`), `ThuluthFeatures.pdf`, `bug1146106.pdf`,
+  `complex_ttf_font.pdf` y `issue13916.pdf`. En `XiaoBiaoSong.pdf` el texto chino está en GBK sobre
+  una fuente simple declarada WinAnsi (los tres lectores dan basura).
+- **Tabla `xref` con desplazamientos erróneos**: en `issue19802.pdf`, `7 0 R` (`/ToUnicode`) apunta
+  al byte 4696 (donde aún sigue la tabla `/W` de `6 0 obj`); Poppler y pypdf no encuentran la CMap y
+  vuelcan los códigos sumados +29 (`ÄOHFM\x01QJEJï…`), mientras que CertiPDF indexa los objetos al
+  abrir, descomprime la CMap (de 316 pares) y extrae el texto real («Àngel pidió a Änne un
+  Æbleskiver…»).
+- **Donde `pdftotext` trocea, invierte o pierde texto** (y pypdf tampoco llega al 95 % para
+  desempatar): `Type3WordSpacing.pdf` (repite sílabas `baba`/`abab` por la escala de `/FontMatrix`),
+  `test80b1.pdf` y `test80b2.pdf` (escribe `dalas`, `evif`, `atled`, `tnahpele` al revés por la CTM
+  espejada), `custom-render-demo.pdf`, `PDFBOX-6049-ExpectedResult.pdf`, `rotated.pdf` y
+  `issue9949.pdf` (parte las palabras giradas letra a letra), `issue12810.pdf` (`FM PD PD F IT ED R
+O` en vez de `PDFM PDF EDITOR`), `bug1157493.pdf` (`n e t : " h o s t "` letra a letra),
+  `issue18117.pdf` (omite los ideogramas CJK del plano 2 en UTF-8),
+  `GlyphLayoutLigaturesAndKerning*.pdf` (descoloca las vocales del tailandés y el bengalí),
+  `ControlCharacters.pdf` (descarta los caracteres de control `0x01..0x1F` que el propio test de
+  PDFBox pone entre las letras) y `veraPDF 6-3-8-t01-fail-a.pdf` (test deliberadamente inválido de
+  PDF/A con `U+FFFD` en `/ToUnicode`).
 
 <a id="calcus-filtros"></a>
 
@@ -5683,6 +5719,51 @@ puente WOPI abre el visor de Docus (`docus.<apex>/docus/wopi/editor`) para cualq
 
 **En nativo** (`apps/nucleo/api`) el host de la API y el de la web se separan: `hostDe` sigue
 mandando la API de los cuatro a `docs.`, y `webDe` da la web de cada uno. `rutaDe` es `appPaths`.
+
+<a id="android-sesion-broker"></a>
+
+## Sesión compartida Android: implementación desactivada (2026-10-20)
+
+Las quince apps publicadas por Play tienen **quince certificados finales distintos**.
+`apps/fyne/android/session-signers.json` contiene las huellas públicas por paquete; la firma
+común de los AAB de subida **no** se acepta como prueba de una APK. El generador
+`apps/fyne/scripts/android-sesion.py` valida el catálogo contra los quince `FyneApp.toml` y
+produce una única tabla Java, quince consultas de visibilidad explícitas y el proveedor de
+cada app. No se usa `QUERY_ALL_PACKAGES` ni se amplía la confianza mediante preferencias o
+variables del runner.
+
+El propietario es la app verificada con menor `firstInstallTime`, con desempate por paquete.
+Una app antigua instalada participa aunque aún no incluya el proveedor: hay que actualizarla,
+en vez de crear un segundo almacén y cambiar de propietario cuando se actualice después.
+Cada llamada verifica el UID y los paquetes que Android le asigna, los certificados finales
+del llamante y la identidad del proveedor de destino. La sesión sigue separada por
+emisor/cliente OIDC. Sólo el propietario importa su copia privada anterior una vez; un cierre
+deja una revisión persistente y no vuelve a importar tokens antiguos de otra app.
+
+El almacén usa AES-GCM con clave no exportable de Android Keystore, un registro cifrado
+atómico en `getNoBackupFilesDir()` y revisiones por cuenta. El descriptor compartido de un
+inode estable reutiliza el `flock` de `ajustes.CerrojoSesion`; no hay otro algoritmo de leases.
+Una escritura con revisión antigua se rechaza. La pérdida o el rechazo del broker impide
+renovar con la copia en memoria y borra también su access token, sin escribir en otro almacén.
+
+El bloqueo de sesión exige Android 11 o posterior y una prueba con `CryptoObject` sobre una
+clave de firma del **UID propietario**. Una actividad privada recibe un `PendingIntent`
+inmutable de un solo uso y firma un desafío ligado a UID, PID, Binder, paquete y generación.
+Un booleano del cliente no desbloquea nada. La muerte del proceso, el cierre de sesión y el
+bloqueo de pantalla invalidan las concesiones. La API Java
+`SesionCompartida.generacion(Context)` expone sólo una marca opaca; `estadoBloqueo(Context)`
+expone sólo la política efectiva. Un fallo devuelve marca vacía/bloqueado para ocultar widgets.
+Las claves de Notes, Matrix y las demás credenciales de aplicación permanecen privadas.
+
+**No está activado.** El catálogo fija `runtime_enabled: false`; así las versiones actuales
+conservan su almacén privado. La compilación contra API 36, D8 con mínimo 24, pruebas JVM de
+confianza/desafíos y pruebas Go no prueban Binder ni Android Keystore. Antes de activar faltan
+pruebas en Android real o emulado: dos apps con firmas distintas, actualización parcial,
+rotación concurrente, cierre con procesos vivos y muertos, bloqueo del dispositivo y
+autenticación biométrica/credencial del propietario. También falta una recuperación guiada
+tras desinstalar el propietario: el testigo conservado en cada cliente rechaza ese cambio,
+sin reutilizar una copia privada antigua. Las APK de distribución directa necesitan medir su
+firma final y una revisión explícita del catálogo; no se deduce del AAB.
 
 <a id="suite-blobs-cifrados-propuesta"></a>
 

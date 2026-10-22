@@ -946,6 +946,17 @@ export const de: AppCatalog<typeof en> = {
   'monitoring.alerts.scope.org': 'Organisation',
   'monitoring.alerts.scope.project': 'Projekt',
   'monitoring.alerts.disabled': 'deaktiviert',
+  'monitoring.alerts.unconfirmed': 'Bestätigung ausstehend',
+  'monitoring.alerts.created.mailtoDesc':
+    'Wir haben einen Bestätigungslink an diese Adresse geschickt. Alerts treffen ein, sobald sie bestätigt ist.',
+  'monitoring.alerts.confirm.title': 'E-Mail-Alerts bestätigen',
+  'monitoring.alerts.confirm.desc':
+    'Bestätige, dass diese Adresse Ereignis-Alerts von Sytue DevX erhalten soll.',
+  'monitoring.alerts.confirm.submit': 'Adresse bestätigen',
+  'monitoring.alerts.confirm.done':
+    'Adresse bestätigt. Du erhältst ab sofort Ereignis-Alerts an diese E-Mail-Adresse.',
+  'monitoring.alerts.confirm.invalid':
+    'Dieser Bestätigungslink ist ungültig oder der Alert wurde bereits entfernt.',
   'monitoring.alerts.delete': 'Alert „{event}“ löschen',
 
   'members.subtitle': 'Wer Zugang zur Organisation hat. Jedes Mitglied belegt einen Suite-Platz.',

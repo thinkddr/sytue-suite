@@ -6,14 +6,25 @@
 package store_test
 
 import (
+	"bytes"
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/asn1"
+	"encoding/pem"
 	"errors"
 	"fmt"
+	"math/big"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
+	"git.sytue.eu/sytue/one/platform/pkg/keycrypto"
 	"git.sytue.eu/sytue/one/platform/pkg/pgtest"
 	"git.sytue.eu/sytue/one/services/syerp/db"
 	"git.sytue.eu/sytue/one/services/syerp/internal/catalogo"
@@ -494,5 +505,99 @@ func TestLasFacturasDeLaTiendaEntranEnLaCadena(t *testing.T) {
 	lote, err := st.ReclamarLoteVerifactu(ctx)
 	if err != nil || len(lote.IDs) != 2 || lote.IDs[0] != r2[0].ID || lote.IDs[1] != r1[0].ID {
 		t.Fatalf("las dos salen en el envío: %+v %v", lote.IDs, err)
+	}
+}
+
+func emitirCertStorePrueba(t *testing.T, orgID string) (certPEM, keyPEM []byte) {
+	t.Helper()
+	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sujeto := pkix.Name{CommonName: "Certificado Organización"}
+	if orgID != "" {
+		sujeto.ExtraNames = append(sujeto.ExtraNames, pkix.AttributeTypeAndValue{
+			Type:  asn1.ObjectIdentifier{2, 5, 4, 97},
+			Value: orgID,
+		})
+	}
+	ahora := time.Now().UTC()
+	plantilla := &x509.Certificate{
+		SerialNumber:          big.NewInt(1),
+		Subject:               sujeto,
+		NotBefore:             ahora.Add(-time.Hour),
+		NotAfter:              ahora.Add(24 * time.Hour),
+		KeyUsage:              x509.KeyUsageDigitalSignature,
+		BasicConstraintsValid: true,
+	}
+	der, err := x509.CreateCertificate(rand.Reader, plantilla, plantilla, &priv.PublicKey, priv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	keyDER, err := x509.MarshalECPrivateKey(priv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}),
+		pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: keyDER})
+}
+
+// TestVerifactuProduccionExigeCertificadoPropioConMismoNIF (NEG-08): en
+// producción no vale el certificado de plataforma: cada organización necesita
+// su propio certificado cualificado cuyo NIF coincida con el NIF emisor.
+func TestVerifactuProduccionExigeCertificadoPropioConMismoNIF(t *testing.T) {
+	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
+	st := store.New(h.Pool)
+	cifra, err := keycrypto.New(bytes.Repeat([]byte("k"), keycrypto.KeyLen))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := tenantCtx("acme")
+	organizacionVerifactu(ctx, t, st, false)
+
+	respaldo := &verifactu.Cliente{}
+	// En pruebas sirve el de respaldo; en producción, sin certificado propio, se rechaza.
+	if cli, err := st.ClienteVerifactu(ctx, cifra, false, respaldo); err != nil || cli != respaldo {
+		t.Fatalf("en pruebas sin certificado propio usa el de respaldo: %v %v", cli, err)
+	}
+	if _, err := st.ClienteVerifactu(ctx, cifra, true, respaldo); !errors.Is(err, store.ErrCertificadoInvalido) {
+		t.Fatalf("en producción sin certificado propio debe fallar: %v", err)
+	}
+
+	// Un certificado con otro NIF o sin NIF no se guarda.
+	certAjeno, keyAjeno := emitirCertStorePrueba(t, "VATES-B12345674")
+	if _, err := st.GuardarCertificadoVerifactu(ctx, certAjeno, keyAjeno, false, cifra); !errors.Is(err, store.ErrCertificadoNIFNoCoincide) {
+		t.Fatalf("certificado con NIF ajeno: %v", err)
+	}
+	certSinNIF, keySinNIF := emitirCertStorePrueba(t, "")
+	if _, err := st.GuardarCertificadoVerifactu(ctx, certSinNIF, keySinNIF, false, cifra); !errors.Is(err, store.ErrCertificadoInvalido) {
+		t.Fatalf("certificado sin NIF: %v", err)
+	}
+
+	// Con el certificado del mismo NIF de la organización (B89890001), se guarda y habilita producción.
+	certPropio, keyPropio := emitirCertStorePrueba(t, "VATES-B89890001")
+	if nif, err := st.GuardarCertificadoVerifactu(ctx, certPropio, keyPropio, false, cifra); err != nil || nif != "B89890001" {
+		t.Fatalf("GuardarCertificadoVerifactu: nif=%q err=%v", nif, err)
+	}
+	if v, err := st.EstadoVerifactu(ctx); err != nil || !v.TieneCertificado || v.CertificadoNIF != "B89890001" {
+		t.Fatalf("EstadoVerifactu tras guardar certificado: %+v %v", v, err)
+	}
+	cliProd, err := st.ClienteVerifactu(ctx, cifra, true, respaldo)
+	if err != nil || cliProd == nil || cliProd == respaldo || cliProd.NIF() != "B89890001" {
+		t.Fatalf("ClienteVerifactu en producción usa el propio: cli=%v nif=%q err=%v", cliProd, cliProd.NIF(), err)
+	}
+
+	// Cambiar el NIF de la organización antes de activar VERI*FACTU invalida el certificado anterior.
+	if _, err := st.GuardarOrganizacion(ctx, store.Organizacion{
+		Nombre: "Panadería Ejemplo, S.L.", NIF: "B12345674", Direccion: "Calle Mayor, 1", CP: "28001",
+		Ciudad: "Madrid", Pais: "ES", Forma: "sl",
+	}, "ada"); err != nil {
+		t.Fatal(err)
+	}
+	if v, err := st.EstadoVerifactu(ctx); err != nil || v.TieneCertificado {
+		t.Fatalf("cambiar el NIF debe limpiar el certificado anterior: %+v %v", v, err)
+	}
+	if _, err := st.ClienteVerifactu(ctx, cifra, true, respaldo); !errors.Is(err, store.ErrCertificadoInvalido) {
+		t.Fatalf("tras cambiar el NIF no queda certificado para producción: %v", err)
 	}
 }

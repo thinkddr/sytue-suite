@@ -1,4 +1,6 @@
 {
+  "aiBatch.excludeOrg": "Organisation vom automatischen Sytue-AI-Durchlauf ausschließen",
+  "aiBatch.excludedHint": "Die Organisation ist vom automatischen Sytue-AI-Durchlauf ausgeschlossen. Fotos werden im Hintergrund nicht für Vorschläge oder Ähnlichkeiten verarbeitet.",
   "album.linkCopied": "Link kopiert",
   "album.newLink": "Neuer Link",
   "album.newLinkConfirm": "Einen neuen Link erstellen? Der aktuelle Link funktioniert dann für alle, die ihn schon haben, nicht mehr.",

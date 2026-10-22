@@ -126,6 +126,12 @@ type fakeStore struct {
 	invitation    domain.MemberInvitation
 	invitationErr error
 	accepted      bool
+
+	newAlert          *store.NewAlertPolicyRecord
+	updAlert          *store.UpdateAlertPolicyRecord
+	alertPolicy       domain.AlertPolicy
+	alertErr          error
+	confirmedAlertTok string
 }
 
 func (f *fakeStore) EnsureOrganization(_ context.Context, _ string, _ domain.Plan, _ string) (domain.Organization, error) {
@@ -413,6 +419,37 @@ func (f *fakeStore) DeleteMemberInvitationByEmail(context.Context, string) error
 
 func (f *fakeStore) AcceptMemberInvitation(context.Context, string, string) (domain.Membership, bool, error) {
 	return f.membership, f.accepted, f.invitationErr
+}
+
+func (f *fakeStore) CreateAlertPolicy(_ context.Context, rec store.NewAlertPolicyRecord) (domain.AlertPolicy, error) {
+	f.newAlert = &rec
+	if f.alertErr != nil {
+		return domain.AlertPolicy{}, f.alertErr
+	}
+	p := f.alertPolicy
+	p.Event = rec.Event
+	p.ChannelURL = rec.ChannelURL
+	p.Enabled = rec.Enabled
+	p.Confirmed = rec.Confirmed
+	return p, nil
+}
+
+func (f *fakeStore) UpdateAlertPolicy(_ context.Context, _ uuid.UUID, upd store.UpdateAlertPolicyRecord) (domain.AlertPolicy, error) {
+	f.updAlert = &upd
+	return f.alertPolicy, f.alertErr
+}
+
+func (f *fakeStore) ConfirmAlertPolicyByToken(_ context.Context, tokenHash string) (domain.AlertPolicy, error) {
+	f.confirmedAlertTok = tokenHash
+	if f.alertErr != nil {
+		return domain.AlertPolicy{}, f.alertErr
+	}
+	if f.newAlert != nil && f.newAlert.ConfirmTokenHash != nil && *f.newAlert.ConfirmTokenHash == tokenHash {
+		p := f.alertPolicy
+		p.Confirmed = true
+		return p, nil
+	}
+	return domain.AlertPolicy{}, domain.ErrNotFound
 }
 
 var _ dataStore = (*fakeStore)(nil)

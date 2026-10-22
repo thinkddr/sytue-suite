@@ -380,4 +380,9 @@ export const el: Catalog = {
     'Ο πάροχος δεν επιβεβαίωσε την αποθήκευση. Ανανεώστε και ελέγξτε πριν δοκιμάσετε ξανά.',
   'linkedServices.unavailable':
     'Η σύνδεση με αυτόν τον πάροχο δεν είναι διαθέσιμη για τον λογαριασμό σας.',
+  'localFile.confirmUpload.title': 'Άνοιγμα αρχείου από αυτή τη συσκευή',
+  'localFile.confirmUpload.body':
+    'Για να ανοίξετε το «{name}», θα μεταφορτωθεί στον λογαριασμό σας στο Sytue One.',
+  'localFile.confirmUpload.remember': 'Να θυμάσαι την επιλογή μου σε αυτή τη συσκευή',
+  'localFile.confirmUpload.confirm': 'Μεταφόρτωση και άνοιγμα',
 };

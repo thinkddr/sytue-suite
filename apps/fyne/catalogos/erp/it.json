@@ -493,6 +493,8 @@
   "vf.confirmBody": "Da ora ogni fattura che confermi viene inviata all’Agenzia delle Entrate spagnola e non si può più modificare né eliminare: gli errori si correggono con una fattura di rettifica. Una volta attivato, resta attivo per il resto dell’anno.",
   "vf.confirmTitle": "Attivare VERI*FACTU?",
   "vf.declaration": "Dichiarazione di conformità",
+  "vf.error.certificateTaxIdMismatch": "Il NIF indicato nel certificato non corrisponde al NIF dell’organizzazione.",
+  "vf.error.invalidCertificate": "Il certificato o la chiave privata non sono un certificato qualificato valido con NIF spagnolo.",
   "vf.export": "Scarica i registri",
   "vf.fixHint": "Correggi i dati della fattura o del cliente e inviala di nuovo.",
   "vf.intro": "Dal 2027 ogni fattura va registrata presso l’Agenzia delle Entrate spagnola al momento dell’emissione. Con VERI*FACTU ci pensa Sytue quando confermi una fattura, e aggiunge il codice QR con cui il tuo cliente può verificarla.",

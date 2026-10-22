@@ -247,4 +247,7 @@ export const is: AppCatalog<typeof en> = {
   'memories.years': 'Fyrir {count} árum',
   'memories.oneYear': 'Fyrir ári',
   'memories.hide': 'Fela',
+  'aiBatch.excludeOrg': 'Undanþiggja stofnunina sjálfvirkri Sytue AI-keyrslu',
+  'aiBatch.excludedHint':
+    'Stofnunin er undanþegin sjálfvirkri Sytue AI-keyrslu. Nýjar myndir eru ekki unnar í bakgrunni fyrir tillögur eða líkindi.',
 };

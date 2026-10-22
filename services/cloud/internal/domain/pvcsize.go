@@ -76,3 +76,37 @@ func ValidatePVCSize(size string) error {
 	}
 	return nil
 }
+
+// ValidatePVCSizeForPlan valida el formato de pvc_size y comprueba además que
+// no supere el tope permitido por el plan del tenant (maxPlanSize).
+func ValidatePVCSizeForPlan(size, maxPlanSize string) error {
+	if err := ValidatePVCSize(size); err != nil {
+		return err
+	}
+	if size == "" || maxPlanSize == "" {
+		return nil
+	}
+	if parsePVCSizeMiB(size) > parsePVCSizeMiB(maxPlanSize) {
+		return fmt.Errorf("%w: el disco pedido (%s) supera el máximo de tu plan (%s)",
+			ErrQuotaExceeded, size, maxPlanSize)
+	}
+	return nil
+}
+
+func parsePVCSizeMiB(size string) int {
+	m := pvcSizeRe.FindStringSubmatch(size)
+	if m == nil {
+		return 0
+	}
+	n, _ := strconv.Atoi(m[1])
+	switch m[2] {
+	case "Mi":
+		return n
+	case "Gi":
+		return n * 1024
+	case "Ti":
+		return n * 1024 * 1024
+	default:
+		return 0
+	}
+}

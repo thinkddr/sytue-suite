@@ -20,9 +20,20 @@
  * local que el middleware aplica a las rutas que no colisionan.
  */
 import { sequence } from 'astro:middleware';
-import { middlewareDeIdioma, middlewareDeOrganizacion } from '@sytue/config/astro-middleware';
+import { suiteApex } from '@sytue/config';
+import {
+  cabecerasCerradas,
+  middlewareDeIdioma,
+  middlewareDeOrganizacion,
+} from '@sytue/config/astro-middleware';
 import { SYTUE_PERMISSIONS_POLICY_ROOMS } from '@sytue/config/astro-security';
+import { serverEnv } from '@sytue/auth/server';
 import { bff, toBffContext } from './lib/bff.js';
+
+const sfuOrigen = (): string[] => {
+  const url = serverEnv(import.meta.env).SYTUE_LIVEKIT_URL ?? `wss://rooms-sfu.${suiteApex}`;
+  return URL.canParse(url) ? [new URL(url).origin] : [`wss://rooms-sfu.${suiteApex}`];
+};
 
 export const onRequest = sequence(
   middlewareDeOrganizacion({
@@ -31,9 +42,16 @@ export const onRequest = sequence(
     sinOrg: ['.well-known', 'channels', 'pip', 'share', 'matrix'],
   }),
   // Rooms es la única superficie con cámara, micrófono y captura de pantalla:
-  // su Permissions-Policy las concede a su propio origen y apaga el resto.
-  middlewareDeIdioma(() => ({
-    'permissions-policy': SYTUE_PERMISSIONS_POLICY_ROOMS,
-    'cross-origin-opener-policy': 'same-origin-allow-popups',
-  })),
+  // su Permissions-Policy las concede a su propio origen y apaga el resto, y su
+  // CSP cerrada añade la señalización del SFU (`wss://rooms-sfu.<dominio>`).
+  middlewareDeIdioma(
+    () => ({
+      'permissions-policy': SYTUE_PERMISSIONS_POLICY_ROOMS,
+      'cross-origin-opener-policy': 'same-origin-allow-popups',
+    }),
+    () =>
+      cabecerasCerradas(serverEnv(import.meta.env).SYTUE_HUB_BASE_URL, {
+        conectar: sfuOrigen(),
+      }),
+  ),
 );

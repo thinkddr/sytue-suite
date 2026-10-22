@@ -248,10 +248,11 @@ func marcaDeCasilla(rect [4]float64, marcada bool) *pdfStream {
 	b.WriteString("Q\n")
 	return &pdfStream{
 		Dict: pdfDict{
-			"Type":     pdfName("XObject"),
-			"Subtype":  pdfName("Form"),
-			"FormType": int64(1),
-			"BBox":     pdfArray{0.0, 0.0, ancho, alto},
+			"Type":      pdfName("XObject"),
+			"Subtype":   pdfName("Form"),
+			"FormType":  int64(1),
+			"BBox":      pdfArray{0.0, 0.0, ancho, alto},
+			"Resources": pdfDict{"ColorSpace": pdfDict{"DefaultRGB": calRGBDefecto()}},
 		},
 		Raw: []byte(b.String()),
 	}

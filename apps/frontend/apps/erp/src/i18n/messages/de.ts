@@ -577,4 +577,8 @@ export const de: AppCatalog<typeof en> = {
   'pos.imageUpload': 'Bild für {name} hochladen',
   'pos.images': 'Bilder',
   'pos.imageHint': 'Wählen Sie ein JPEG-, PNG- oder WebP-Bild mit höchstens 10 MB.',
+  'vf.error.invalidCertificate':
+    'Das Zertifikat oder der private Schlüssel ist kein gültiges qualifiziertes Zertifikat mit spanischer Steuernummer (NIF).',
+  'vf.error.certificateTaxIdMismatch':
+    'Die Steuernummer (NIF) im Zertifikat stimmt nicht mit der Steuernummer der Organisation überein.',
 };

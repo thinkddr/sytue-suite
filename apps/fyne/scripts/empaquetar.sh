@@ -1341,9 +1341,13 @@ verificar_aab() { # <aab> <paquete> <esquema> [«clase:tipo …» de los servici
     echo "::error::$1 no declara el esquema $3." >&2
     return 1
   }
-  if ! grep -q 'android:name="eu.sytue.nativo.Widgets"' <<<"$m" ||
-    ! grep -q 'android:name="android.appwidget.provider"' <<<"$m"; then
-    echo "::error::$1 no declara el proveedor nativo de widgets y sus recursos." >&2
+  # La demo (eu.sytue.fyne.demo) no es un producto y va sin widgets ni broker de sesión:
+  # android-widgets.py y android-sesion.py no se los ponen, y aquí tampoco se le piden.
+  if [ "$2" != eu.sytue.fyne.demo ] && { ! grep -q 'android:name="eu.sytue.nativo.Widgets"' <<<"$m" ||
+    ! grep -q 'android:name="android.appwidget.provider"' <<<"$m" ||
+    ! grep -q 'android:name="eu.sytue.nativo.SesionProveedor"' <<<"$m" ||
+    ! grep -q 'android:name="eu.sytue.nativo.SesionDesbloqueo"' <<<"$m"; }; then
+    echo "::error::$1 no declara el proveedor nativo de widgets, el broker de sesión y sus recursos." >&2
     return 1
   fi
   # El proveedor de la cámara de «Escanear» (clase Captura) va en las catorce.
@@ -1382,7 +1386,7 @@ verificar_aab() { # <aab> <paquete> <esquema> [«clase:tipo …» de los servici
     echo "::error::$1 lleva el dex de la CLI de Fyne, no el del fork: «Abrir un fichero» cerraría la app." >&2
     return 1
   fi
-  if ! grep -qa 'Leu/sytue/nativo/Widgets;' "$dex" || ! unzip -Z1 "$1" base/assets/sytue-widget.json >/dev/null 2>&1; then
+  if [ "$2" != eu.sytue.fyne.demo ] && { ! grep -qa 'Leu/sytue/nativo/Widgets;' "$dex" || ! unzip -Z1 "$1" base/assets/sytue-widget.json >/dev/null 2>&1; }; then
     rm -f "$dex"
     echo "::error::$1 no contiene la implementación del widget o sus metadatos." >&2
     return 1
@@ -1946,6 +1950,10 @@ android)
   # `while read` y no mapfile, que bash 3.2 (el de macOS) no tiene.
   java_propias=()
   while IFS= read -r fuente; do java_propias+=("$fuente"); done < <(find "$FYNE/android/java" -name '*.java')
+  # Pins finales por paquete, no la firma de subida del AAB. La activación queda en
+  # el catálogo revisado; nunca la cambia un env del runner ni una preferencia.
+  python3 "$AQUI/android-sesion.py" java "$dex_tmp/generated/eu/sytue/nativo/SesionFirmas.java"
+  java_propias+=("$dex_tmp/generated/eu/sytue/nativo/SesionFirmas.java")
   # `-encoding UTF-8`: los comentarios van en castellano, y un JDK con el locale en ASCII
   # (el contenedor del frontal) no compila ni una clase sin él.
   "$(command -v javac || echo "$JAVA_HOME/bin/javac")" --release 17 -encoding UTF-8 -nowarn -cp "$ANDROID_JAR" -d "$dex_tmp/cls" \
@@ -2163,7 +2171,19 @@ for app in "${apps[@]}"; do
     # recompone el lienzo con size.Event: TODAS las apps conservan su actividad,
     # incluida una sin imagen en imagen, en vez de recrearla al girar.
     libname="$(printf '%s' "$nombre" | sed 's/[^a-zA-Z0-9]/_/g')"
-    cat >"$dir/AndroidManifest.xml" <<XML
+    sesion_queries=""
+    sesion_components=""
+    if [ "$app" != demo ]; then
+      sesion_queries="$(python3 "$AQUI/android-sesion.py" queries - --package "$appid")"
+      sesion_components="$(python3 "$AQUI/android-sesion.py" components - --package "$appid")"
+    fi
+    # `fyne package` solo admite GoNativeActivity en el manifiesto que lee (rechaza
+    # cualquier segunda `<activity>`, como SesionDesbloqueo, y su codificador binres es
+    # anterior a `<queries>`). El manifiesto completo con `<queries>`, SesionProveedor y
+    # SesionDesbloqueo va a `$ESCENARIO/android-$app.xml`, que `apk_a_aab` enlaza después
+    # con el `aapt2 link --manifest` real (API 36).
+    manifiesto_android() { # <queries> <components>
+      cat <<XML
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
 	package="$appid"
@@ -2172,7 +2192,8 @@ for app in "${apps[@]}"; do
 
 	<uses-permission android:name="android.permission.INTERNET" />
 	<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />$(for p in ${permisos_extra[@]+"${permisos_extra[@]}"}; do printf '\n\t<uses-permission android:name="%s" />' "$p"; done)$([ "$llamadas" != si ] || printf '\n\t<uses-feature android:name="android.hardware.camera" android:required="false" />\n\t<uses-feature android:name="android.hardware.microphone" android:required="false" />')
-
+${1:+
+$1}
 	<application android:label="$nombre" android:debuggable="false">
 	<activity android:name="org.golang.app.GoNativeActivity"
 		android:label="$nombre"
@@ -2198,10 +2219,14 @@ for app in "${apps[@]}"; do
 	<provider android:name="eu.sytue.nativo.Captura"
 		android:authorities="$appid.sytue.captura"
 		android:exported="false"
-		android:grantUriPermissions="true" />$(servicio_de_avisos "$servicio_avisos")$(proveedor_documentos "$appid" "$documentos")$([ "$llamadas" != si ] || printf '\n\t<service android:name="eu.sytue.nativo.PantallaServicio" android:exported="false" />')
+		android:grantUriPermissions="true" />$(servicio_de_avisos "$servicio_avisos")$(proveedor_documentos "$appid" "$documentos")$([ "$llamadas" != si ] || printf '\n\t<service android:name="eu.sytue.nativo.PantallaServicio" android:exported="false" />')${2:+
+$2}
 	</application>
 </manifest>
 XML
+    }
+    manifiesto_android "" "" >"$dir/AndroidManifest.xml"
+    manifiesto_android "$sesion_queries" "$sesion_components" >"$ESCENARIO/android-$app.xml"
   fi
 
   case "$plataforma" in
@@ -2330,7 +2355,6 @@ XML
   }
   rm -rf "$destino"
   mv "$producido" "$destino"
-  [ "$plataforma" != android ] || cp "$dir/AndroidManifest.xml" "$ESCENARIO/android-$app.xml"
   rm -f "$dir/AndroidManifest.xml"
 
   # --- QUE LAS DEMÁS APPS PUEDAN ABRIR ESTA -------------------------------------

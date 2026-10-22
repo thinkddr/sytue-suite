@@ -12,6 +12,7 @@ import (
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"git.sytue.eu/sytue/one/platform/pkg/log"
@@ -84,20 +85,33 @@ func (c *Controller) reconcilePostgresRoles(ctx context.Context) error {
 // Secret, sin un solo Get). Los errores se acumulan por instancia: una rota no
 // impide reparar las demás.
 func (p *KubeProvisioner) RepairPostgresRoles(ctx context.Context) error {
-	list, err := p.cs.CoreV1().Secrets(metav1.NamespaceAll).List(ctx, metav1.ListOptions{LabelSelector: pgManagedSelector})
+	namespaces, err := p.cs.CoreV1().Namespaces().List(ctx, metav1.ListOptions{LabelSelector: tenantNamespaceSelector})
 	if err != nil {
-		return fmt.Errorf("controller: listar credenciales de Sytue Postgres: %w", err)
+		return fmt.Errorf("controller: listar namespaces de tenant para Sytue Postgres: %w", err)
 	}
 	var errs []error
-	for i := range list.Items {
-		sec := &list.Items[i]
-		// El sufijo descarta el Secret de plataforma (sytue-platform-s3), que lleva
-		// estas mismas etiquetas por venir del backup de un servicio postgres.
-		if sec.Annotations[pgRolesAnnotation] == pgRolesVersion || !strings.HasSuffix(sec.Name, "-creds") {
+	for i := range namespaces.Items {
+		ns := &namespaces.Items[i]
+		tenant := strings.TrimPrefix(ns.Name, "tenant-")
+		if err := ownedTenantNamespace(ns, tenant); err != nil {
+			errs = append(errs, err)
 			continue
 		}
-		if rerr := p.repairPostgresInstance(ctx, sec); rerr != nil {
-			errs = append(errs, fmt.Errorf("%s/%s: %w", sec.Namespace, sec.Name, rerr))
+		list, err := p.cs.CoreV1().Secrets(ns.Name).List(ctx, metav1.ListOptions{LabelSelector: pgManagedSelector})
+		if err != nil {
+			errs = append(errs, fmt.Errorf("controller: listar credenciales de Sytue Postgres en %s: %w", ns.Name, err))
+			continue
+		}
+		for j := range list.Items {
+			sec := &list.Items[j]
+			// El sufijo descarta el Secret de plataforma (sytue-platform-s3), que lleva
+			// estas mismas etiquetas por venir del backup de un servicio postgres.
+			if sec.Annotations[pgRolesAnnotation] == pgRolesVersion || !strings.HasSuffix(sec.Name, "-creds") {
+				continue
+			}
+			if rerr := p.repairPostgresInstance(ctx, sec); rerr != nil {
+				errs = append(errs, fmt.Errorf("%s/%s: %w", sec.Namespace, sec.Name, rerr))
+			}
 		}
 	}
 	return errors.Join(errs...)
@@ -191,6 +205,7 @@ func (p *KubeProvisioner) pgRolesJob(name, namespace string, labels map[string]s
 				ObjectMeta: metav1.ObjectMeta{Labels: labels},
 				Spec: corev1.PodSpec{
 					RestartPolicy:                corev1.RestartPolicyOnFailure,
+					RuntimeClassName:             tenantRuntimeClassPtr(),
 					AutomountServiceAccountToken: &automountSA,
 					ImagePullSecrets:             tenantImagePullSecrets(),
 					SecurityContext: &corev1.PodSecurityContext{
@@ -222,6 +237,18 @@ func (p *KubeProvisioner) pgRolesJob(name, namespace string, labels map[string]s
 							AllowPrivilegeEscalation: &allowPrivEsc,
 							Capabilities:             &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
 							SeccompProfile:           &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
+						},
+						Resources: corev1.ResourceRequirements{
+							Requests: corev1.ResourceList{
+								corev1.ResourceCPU:              resource.MustParse("50m"),
+								corev1.ResourceMemory:           resource.MustParse("64Mi"),
+								corev1.ResourceEphemeralStorage: resource.MustParse("64Mi"),
+							},
+							Limits: corev1.ResourceList{
+								corev1.ResourceCPU:              resource.MustParse("500m"),
+								corev1.ResourceMemory:           resource.MustParse("256Mi"),
+								corev1.ResourceEphemeralStorage: resource.MustParse("256Mi"),
+							},
 						},
 					}},
 				},

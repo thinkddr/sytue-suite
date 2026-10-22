@@ -432,3 +432,14 @@ export interface Recuerdo {
  */
 export const recuerdos = () =>
   pedir<{ memories: Recuerdo[] }>('/api/v1/memories').then((r) => r.memories);
+
+/** Ajustes de la organización en Sytue Fotos (exclusión del lote automático de IA). */
+export interface AjustesOrganizacion {
+  excludeAiBatch: boolean;
+  canManageAiBatch: boolean;
+}
+
+export const obtenerAjustesOrganizacion = () => pedir<AjustesOrganizacion>('/api/v1/settings');
+
+export const guardarAjustesOrganizacion = (excludeAiBatch: boolean) =>
+  mandar<AjustesOrganizacion>('PUT', '/api/v1/settings', { excludeAiBatch });

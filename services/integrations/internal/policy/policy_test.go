@@ -206,3 +206,41 @@ func TestRoundTrip_driverAuthWins(t *testing.T) {
 		t.Errorf("Authorization = %q; la cabecera del driver debe sobrevivir al bearer de la pasarela", got)
 	}
 }
+
+// TestAllowedHostsDelManifiesto comprueba que cuando la plantilla declara sus hosts
+// oficiales, el transporte rechaza cualquier destino fuera de la lista antes de mandar
+// credenciales o contenido.
+func TestAllowedHostsDelManifiesto(t *testing.T) {
+	allowLoopback(t)
+
+	tocaron := false
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		tocaron = true
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	rt := policy.BuildRuntime(policy.RuntimeParams{
+		OrgID:        "acme",
+		InstanceID:   "inst-1",
+		Bearer:       "secreto-oauth",
+		AllowedHosts: []string{"www.googleapis.com", "*.googleapis.com", "graph.microsoft.com"},
+		Log:          slog.New(slog.NewTextHandler(io.Discard, nil)),
+	})
+
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, srv.URL, http.NoBody)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := rt.HTTP.Do(req)
+	if err == nil {
+		_ = resp.Body.Close()
+		t.Fatal("el transporte permitió salir hacia un host fuera del manifiesto")
+	}
+	if !errors.Is(err, policy.ErrHostNotAllowed) {
+		t.Fatalf("error = %v, quiero ErrHostNotAllowed", err)
+	}
+	if tocaron {
+		t.Fatal("la petición llegó al servidor ajeno al manifiesto")
+	}
+}

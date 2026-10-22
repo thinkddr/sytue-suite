@@ -315,6 +315,7 @@ func contentMigrationHandler(st *store.Store, dir *directory.Client, limiter htt
 			OrgID:        inst.OrgID,
 			InstanceID:   inst.ID,
 			Bearer:       inst.Secrets[store.SecretKeyBearer],
+			AllowedHosts: hostsOficialesDeInstancia(tctx, st, inst),
 			Limiter:      limiter,
 			Audit:        st,
 			Policy:       engine,
@@ -623,6 +624,7 @@ func provisionSyncHandler(st *store.Store, reg *connector.Registry, limiter http
 			OrgID:        inst.OrgID,
 			InstanceID:   inst.ID,
 			Bearer:       inst.Secrets[store.SecretKeyBearer],
+			AllowedHosts: m.HostsOficiales(inst.Config),
 			Limiter:      limiter,
 			Audit:        st,
 			Policy:       engine,
@@ -636,6 +638,21 @@ func provisionSyncHandler(st *store.Store, reg *connector.Registry, limiter http
 		driverInst.Secrets = nil
 		return prov.Sync(tctx, driverInst, rt)
 	}
+}
+
+func hostsOficialesDeInstancia(ctx context.Context, st *store.Store, inst connector.Instance) []string {
+	if st == nil || inst.TemplateKey == "" {
+		return nil
+	}
+	tpl, err := st.GetTemplate(ctx, inst.TemplateKey)
+	if err != nil {
+		return nil
+	}
+	m, err := manifest.Parse(tpl.Manifest)
+	if err != nil {
+		return nil
+	}
+	return m.HostsOficiales(inst.Config)
 }
 
 // seedCatalog hace upsert de las plantillas Tier-1 embebidas (catálogo declarativo).

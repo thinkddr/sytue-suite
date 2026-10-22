@@ -493,6 +493,8 @@
   "vf.confirmBody": "From now on, every invoice you confirm is sent to the Spanish Tax Agency and can no longer be edited or deleted: mistakes are fixed with a corrective invoice. Once turned on, it stays on for the rest of the year.",
   "vf.confirmTitle": "Turn on VERI*FACTU?",
   "vf.declaration": "Declaration of conformity",
+  "vf.error.certificateTaxIdMismatch": "The tax ID on the certificate does not match the organisation’s tax ID.",
+  "vf.error.invalidCertificate": "The certificate or private key is not a valid qualified certificate with a Spanish tax ID.",
   "vf.export": "Download records",
   "vf.fixHint": "Fix the invoice or customer details, then send it again.",
   "vf.intro": "From 2027 every invoice must be registered with the Spanish Tax Agency as soon as it is issued. With VERI*FACTU, Sytue does it for you when you confirm an invoice, and adds the QR code your customer can use to check it.",

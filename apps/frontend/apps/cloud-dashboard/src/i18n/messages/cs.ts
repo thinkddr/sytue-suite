@@ -918,6 +918,17 @@ export const cs: AppCatalog<typeof en> = {
   'monitoring.alerts.scope.org': 'organizace',
   'monitoring.alerts.scope.project': 'projekt',
   'monitoring.alerts.disabled': 'vypnuto',
+  'monitoring.alerts.unconfirmed': 'čeká na potvrzení',
+  'monitoring.alerts.created.mailtoDesc':
+    'Na tuto adresu jsme poslali potvrzovací odkaz. Upozornění začnou chodit po jejím potvrzení.',
+  'monitoring.alerts.confirm.title': 'Potvrdit upozornění e-mailem',
+  'monitoring.alerts.confirm.desc':
+    'Potvrďte, že tato adresa má dostávat upozornění na události ze Sytue DevX.',
+  'monitoring.alerts.confirm.submit': 'Potvrdit adresu',
+  'monitoring.alerts.confirm.done':
+    'Adresa potvrzena. Upozornění na události vám nyní budou chodit na tento e-mail.',
+  'monitoring.alerts.confirm.invalid':
+    'Tento potvrzovací odkaz není platný nebo už bylo upozornění odstraněno.',
   'monitoring.alerts.delete': 'Smazat upozornění na {event}',
   'members.subtitle': 'Kdo má přístup k organizaci. Každá osoba zabírá jedno místo v sadě.',
   'members.add': 'Pozvat osobu',

@@ -53,6 +53,10 @@ const (
 	permisoFichero = 0o600
 )
 
+// ErrSesionNoDisponible distingue la pérdida del broker de un fallo ordinario de
+// preferencias. Quien tenga tokens en memoria debe olvidarlos y volver a identificar.
+var ErrSesionNoDisponible = errors.New("ajustes: el almacén de sesión compartida no está disponible")
+
 // Ajustes son las preferencias transversales de la persona.
 type Ajustes struct {
 	// Tema es "claro", "oscuro", "traslucido" o "" (el del sistema).
@@ -78,6 +82,10 @@ type Ajustes struct {
 	// abría lo adoptaba y lo volvía a publicar, con la persona desconectada para todos
 	// mientras trabajaba (visto en una ventana real el 2026-09-27).
 	Invisible bool `json:"invisible,omitempty"`
+	// SubirAlAbrir dice que la persona autorizó en este dispositivo subir al servicio los
+	// ficheros del equipo que abre con Docus, Calcus, Diapos o CertiPDF desde el sistema
+	// (FYP-02).
+	SubirAlAbrir bool `json:"subir_al_abrir,omitempty"`
 }
 
 // Estado es todo lo transversal que otra app de la suite puede haber cambiado.
@@ -108,13 +116,13 @@ func Carpeta() (string, error) {
 func Leer() Estado {
 	dir, err := Carpeta()
 	if err != nil {
-		return Estado{Ajustes: Ajustes{Tema: "claro"}}
+		return estadoPlataforma(Estado{Ajustes: Ajustes{Tema: "claro"}})
 	}
 	e := Estado{Ajustes: leerAjustes(dir)}
 	if crudo, err := os.ReadFile(filepath.Join(dir, ficheroSesion)); err == nil {
 		e.Sesion = string(crudo)
 	}
-	return e
+	return estadoPlataforma(e)
 }
 
 func leerAjustes(dir string) Ajustes {
@@ -255,6 +263,23 @@ func Cerrojo(ctx context.Context) (soltar func(), err error) {
 	if err != nil {
 		return nil, err
 	}
+	return esperarCerrojo(ctx, f)
+}
+
+// CerrojoSesion usa el mismo bloqueo del sistema que Cerrojo. En Android obtiene
+// el inode del UID propietario del broker; las preferencias ordinarias siguen locales.
+func CerrojoSesion(ctx context.Context) (soltar func(), err error) {
+	f, compartido, err := abrirCerrojoSesion()
+	if err != nil {
+		return nil, errors.Join(ErrSesionNoDisponible, err)
+	}
+	if !compartido {
+		return Cerrojo(ctx)
+	}
+	return esperarCerrojo(ctx, f)
+}
+
+func esperarCerrojo(ctx context.Context, f *os.File) (soltar func(), err error) {
 	for {
 		if err := ctx.Err(); err != nil {
 			_ = f.Close()

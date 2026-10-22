@@ -20,14 +20,9 @@ import android.util.Base64;
 import android.util.Log;
 import android.webkit.MimeTypeMap;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.security.Key;
-import java.security.KeyStore;
-import javax.crypto.Cipher;
-import javax.crypto.spec.GCMParameterSpec;
 import org.json.JSONObject;
 
 /**
@@ -79,30 +74,7 @@ public final class Documentos extends DocumentsProvider {
             return null;
         }
         try {
-            byte[] sobre = new byte[(int) f.length()];
-            try (FileInputStream in = new FileInputStream(f)) {
-                for (int n = 0; n < sobre.length; ) {
-                    int r = in.read(sobre, n, sobre.length - n);
-                    if (r < 0) {
-                        return null;
-                    }
-                    n += r;
-                }
-            }
-            // [largo del IV][IV][criptograma con su etiqueta]: `empaquetar` de apps/nucleo/auth.
-            int iv = sobre.length > 0 ? sobre[0] & 0xff : 0;
-            if (iv == 0 || 1 + iv >= sobre.length) {
-                return null;
-            }
-            KeyStore ks = KeyStore.getInstance("AndroidKeyStore");
-            ks.load(null);
-            Key k = ks.getKey("eu.sytue.one.sesion", null);
-            if (k == null) {
-                return null;
-            }
-            Cipher c = Cipher.getInstance("AES/GCM/NoPadding");
-            c.init(Cipher.DECRYPT_MODE, k, new GCMParameterSpec(128, sobre, 1, iv));
-            JSONObject j = new JSONObject(new String(c.doFinal(sobre, 1 + iv, sobre.length - 1 - iv),
+            JSONObject j = new JSONObject(new String(SesionPrivada.leer(ctx, "secreto-drive-sistema.bin"),
                     StandardCharsets.UTF_8));
             String url = j.optString("url"), usuario = j.optString("usuario"), clave = j.optString("clave");
             if (url.isEmpty() || clave.isEmpty()) {

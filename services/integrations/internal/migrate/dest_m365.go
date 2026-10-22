@@ -137,6 +137,9 @@ func (d *m365Dest) enSesion(ctx context.Context, uploadURL string, size int64, b
 	if uploadURL == "" {
 		return "", errors.New("migrate: Microsoft 365 no abrió la sesión de subida")
 	}
+	if err := validarHostOficial(uploadURL, hostsOficialesM365); err != nil {
+		return "", err
+	}
 	sctx := policy.SinCredencial(ctx)
 	trozo := make([]byte, graphTrozo)
 	var creado struct {

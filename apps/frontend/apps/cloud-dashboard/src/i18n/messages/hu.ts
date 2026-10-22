@@ -907,6 +907,17 @@ export const hu: AppCatalog<typeof en> = {
   'monitoring.alerts.scope.org': 'szervezet',
   'monitoring.alerts.scope.project': 'projekt',
   'monitoring.alerts.disabled': 'letiltva',
+  'monitoring.alerts.unconfirmed': 'megerősítésre vár',
+  'monitoring.alerts.created.mailtoDesc':
+    'Megerősítő hivatkozást küldtünk erre a címre. A riasztások a megerősítés után érkeznek.',
+  'monitoring.alerts.confirm.title': 'E-mail-riasztások megerősítése',
+  'monitoring.alerts.confirm.desc':
+    'Erősítse meg, hogy ez a cím fogadhatja a Sytue DevX eseményriasztásait.',
+  'monitoring.alerts.confirm.submit': 'Cím megerősítése',
+  'monitoring.alerts.confirm.done':
+    'Cím megerősítve. Mostantól erre az e-mail-címre kapja az eseményriasztásokat.',
+  'monitoring.alerts.confirm.invalid':
+    'Ez a megerősítő hivatkozás nem érvényes, vagy a riasztást már eltávolították.',
   'monitoring.alerts.delete': 'Riasztás törlése: {event}',
   'members.subtitle': 'Kik férnek hozzá a szervezethez. Minden tag egy hely a csomagban.',
   'members.add': 'Tag meghívása',

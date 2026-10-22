@@ -493,6 +493,8 @@
   "vf.confirmBody": "Desde ahora, cada factura que confirmes se envía a la Agencia Tributaria y ya no se puede modificar ni borrar: los errores se corrigen con una factura rectificativa. Una vez activado, se mantiene el resto del año.",
   "vf.confirmTitle": "¿Activar VERI*FACTU?",
   "vf.declaration": "Declaración responsable",
+  "vf.error.certificateTaxIdMismatch": "El NIF del certificado no coincide con el NIF de la organización.",
+  "vf.error.invalidCertificate": "El certificado o su clave privada no son un certificado cualificado válido con NIF español.",
   "vf.export": "Descargar registros",
   "vf.fixHint": "Corrige los datos de la factura o del cliente y vuelve a enviarla.",
   "vf.intro": "Desde 2027, cada factura se tiene que registrar en la Agencia Tributaria al emitirla. Con VERI*FACTU, Sytue lo hace por ti al confirmar cada factura y le añade el código QR con el que tu cliente puede comprobarla.",

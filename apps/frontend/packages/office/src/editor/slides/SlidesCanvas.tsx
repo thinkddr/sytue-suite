@@ -118,9 +118,11 @@ import {
 import {
   MAX_LAYOUTS,
   addLayout,
+  applyLayoutBoxes,
   boxesFromLayout,
   defaultNewLayoutId,
   duplicateLayout,
+  layoutEditBoxes,
   layoutsOf,
   mergeIntoLayout,
   patchLayout,
@@ -2833,7 +2835,7 @@ export function SlidesCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
   const editBoxes = useMemo<SlideBox[]>(() => {
     if (!editingMaster) return slide.boxes;
     if (editingLayout)
-      return model.master?.layouts?.find((l) => l.id === editingLayout)?.boxes ?? [];
+      return layoutEditBoxes(model.master?.layouts?.find((l) => l.id === editingLayout));
     return model.master?.boxes ?? [];
   }, [editingMaster, editingLayout, model.master, slide.boxes]);
   /** Los diseños vigentes: los del patrón o, si no los toca, los tres de serie. */
@@ -2968,10 +2970,9 @@ export function SlidesCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
     const cur = stateRef.current;
     if (!cur.editingMaster) return cur.model.slides[cur.active]?.boxes ?? [];
     const m = cur.model.master;
-    return (
-      (cur.editingLayout ? m?.layouts?.find((l) => l.id === cur.editingLayout)?.boxes : m?.boxes) ??
-      []
-    );
+    return cur.editingLayout
+      ? layoutEditBoxes(m?.layouts?.find((l) => l.id === cur.editingLayout))
+      : (m?.boxes ?? []);
   };
 
   /** Localiza una caja dentro del objetivo de edición actual. */
@@ -2987,7 +2988,7 @@ export function SlidesCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
       const m = cur.model.master;
       if (cur.editingLayout) {
         const layouts = (m?.layouts ?? []).map((l) =>
-          l.id === cur.editingLayout ? { ...l, boxes: fn(l.boxes) } : l,
+          l.id === cur.editingLayout ? applyLayoutBoxes(l, fn(layoutEditBoxes(l))) : l,
         );
         apply({ master: { boxes: m?.boxes ?? [], layouts } }, persist);
       } else {
@@ -3803,9 +3804,9 @@ export function SlidesCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
     setEditBox(null);
   };
 
-  /** Un diseño solo lleva marcadores de texto: mientras se edita uno, lo demás no se inserta. */
+  /** Un diseño admite marcadores de texto, formas e imágenes (`decor`); gráficos, diagramas, medios y conectores son de las diapositivas. */
   const bloqueadoPorDiseno = (cmd: SlidesCommand): boolean => {
-    const solo: SlidesCommand[] = ['imagen', 'forma', 'grafico', 'smartart', 'media', 'conector'];
+    const solo: SlidesCommand[] = ['grafico', 'smartart', 'media', 'conector'];
     if (!stateRef.current.editingLayout || !solo.includes(cmd)) return false;
     notify({ tone: 'warning', title: t('slides.layout.onlyText') });
     return true;
@@ -3878,7 +3879,7 @@ export function SlidesCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
         master: {
           boxes: m?.boxes ?? [],
           layouts: (m?.layouts ?? []).map((l) =>
-            l.id === cur.editingLayout ? { ...l, boxes } : l,
+            l.id === cur.editingLayout ? applyLayoutBoxes(l, boxes) : l,
           ),
         },
       };
@@ -4984,9 +4985,10 @@ export function SlidesCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
                   sh={sh}
                 />
               )}
-              {/* Editando un diseño: el patrón, atenuado y sin tocar, de contexto. */}
+              {/* Editando un diseño: el patrón (si el diseño no lo oculta) y sus líneas, de contexto; las formas del diseño (`decor`) están en `editBoxes` y se editan. */}
               {editingMaster &&
                 editingLayout &&
+                !model.master?.layouts?.find((l) => l.id === editingLayout)?.hideMaster &&
                 (model.master?.boxes ?? []).map((b) => (
                   <div
                     key={`m-${b.id}`}
@@ -4996,20 +4998,15 @@ export function SlidesCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
                     {renderBox(t, b, sh)}
                   </div>
                 ))}
-              {/* Y las formas del diseño (de un .pptx importado), igual: aquí no se editan. */}
-              {editingMaster &&
-                editingLayout &&
-                (model.master?.layouts?.find((l) => l.id === editingLayout)?.decor ?? []).map(
-                  (b) => (
-                    <div
-                      key={`d-${b.id}`}
-                      class="pointer-events-none absolute opacity-40"
-                      style={boxPos(b)}
-                    >
-                      {renderBox(t, b, sh)}
-                    </div>
-                  ),
-                )}
+              {editingMaster && editingLayout && (
+                <ConnectorLayer
+                  connectors={
+                    model.master?.layouts?.find((l) => l.id === editingLayout)?.connectors ?? []
+                  }
+                  boxes={editBoxes}
+                  sh={sh}
+                />
+              )}
               {editBoxes.map((b) => {
                 const isPrimary = selBox === b.id; // ancla: lleva los tiradores
                 const inSel = selectedIds.has(b.id); // en la selección efectiva: lleva el marco

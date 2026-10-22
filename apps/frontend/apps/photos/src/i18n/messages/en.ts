@@ -246,4 +246,7 @@ export const en = {
   'memories.years': '{count} years ago',
   'memories.oneYear': 'A year ago',
   'memories.hide': 'Hide',
+  'aiBatch.excludeOrg': 'Exclude organization from the automatic Sytue AI batch',
+  'aiBatch.excludedHint':
+    'This organization is excluded from the automatic Sytue AI batch. New photos are not processed in the background for suggestions or similarity.',
 } as const;

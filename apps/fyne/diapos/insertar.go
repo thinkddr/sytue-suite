@@ -133,8 +133,8 @@ var conectoresUI = []struct {
 // o el patrón— y elegida.
 func (e *Editor) empujarCaja(c Caja) {
 	e.cambiar(func() {
-		if l := e.m.listaCajas(e.objetivo(), true); l != nil {
-			*l = append(*l, c)
+		if e.m.disenoEn(e.objetivo()) != nil || e.m.listaCajas(e.objetivo(), true) != nil {
+			e.m.cambiarCajas(e.objetivo(), true, func(cs []Caja) []Caja { return append(cs, c) })
 			e.sel, e.extra = c.ID, nil
 		}
 	}, true)
@@ -331,10 +331,9 @@ func (e *Editor) cabeCaja(c Caja) bool {
 	prueba.Diapos = append([]Diapo(nil), e.m.Diapos...)
 	if e.m.Patron != nil {
 		copia := *e.m.Patron
+		copia.Disenos = slices.Clone(e.m.Patron.Disenos)
 		prueba.Patron = &copia
 	}
-	if l := prueba.listaCajas(e.objetivo(), true); l != nil {
-		*l = append(slices.Clone(*l), c)
-	}
+	prueba.cambiarCajas(e.objetivo(), true, func(cs []Caja) []Caja { return append(slices.Clone(cs), c) })
 	return prueba.cabe()
 }

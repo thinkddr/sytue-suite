@@ -65,6 +65,8 @@ func leerDatosODS(doc []byte, out map[string]*datoODS) {
 		case xml.StartElement:
 			l := t.Name.Local
 			switch l {
+			case "body":
+				return // los estilos automáticos van siempre antes de <office:body>
 			case "number-style", "percentage-style", "currency-style", "date-style", "time-style":
 				if len(out) >= maxEstilosHoja {
 					return

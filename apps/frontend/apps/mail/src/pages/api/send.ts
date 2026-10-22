@@ -143,8 +143,8 @@ export const POST: APIRoute = async (ctx) => {
     };
     await jmapClient(session.accessToken).send(email);
     return json({ ok: true });
-  } catch (err) {
-    return json({ error: 'jmap_error', message: String(err) }, 502);
+  } catch {
+    return json({ error: 'jmap_error' }, 502);
   }
 };
 

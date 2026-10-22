@@ -241,7 +241,7 @@ func seed(ctx context.Context, dsn, password string, logger *slog.Logger) error 
 		return err
 	}
 
-	// Credenciales de dev bien visibles para el desarrollador.
+	// El inicio de sesión usa la contraseña de SYTUE_ID_DEV_SEED_PASSWORD.
 	logger.Info("seed de desarrollo completado",
 		"org_slug", seedOrgSlug, "org_name", seedOrgName,
 		"email", seedUserEmail, "role", string(seedUserRole), "mfa", true,
@@ -251,13 +251,13 @@ func seed(ctx context.Context, dsn, password string, logger *slog.Logger) error 
 		" Sytue ID — usuario admin de DESARROLLO listo para LOGIN\n"+
 		"   Organización : %s (%s)\n"+
 		"   Email        : %s\n"+
-		"   Contraseña   : %s\n"+
+		"   Contraseña   : configurada mediante %s\n"+
 		"   Rol          : %s\n"+
 		"   MFA / TOTP   : habilitado — secreto dev (base32): %s\n"+
 		"   ── member    : %s (rol %s, sin MFA, misma contraseña)\n"+
 		" (Solo dev. Cambia la contraseña con %s.)\n"+
 		"────────────────────────────────────────────────────────────\n\n",
-		seedOrgName, seedOrgSlug, seedUserEmail, password,
+		seedOrgName, seedOrgSlug, seedUserEmail, seedPasswordEnvVar,
 		seedUserRole, seedTOTPSecretB32, seedMemberEmail, seedMemberRole, seedPasswordEnvVar)
 	return nil
 }

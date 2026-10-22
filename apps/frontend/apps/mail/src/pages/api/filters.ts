@@ -20,8 +20,8 @@ export const GET: APIRoute = async (ctx) => {
   try {
     const filters = await jmapClient(session.accessToken).listFilters();
     return json({ filters });
-  } catch (err) {
-    return json({ error: 'jmap_error', message: String(err) }, 502);
+  } catch {
+    return json({ error: 'jmap_error' }, 502);
   }
 };
 
@@ -58,8 +58,8 @@ export const POST: APIRoute = async (ctx) => {
     }
     const filter = await client.createFilter(input);
     return json({ filter }, 201);
-  } catch (err) {
-    return json({ error: 'jmap_error', message: String(err) }, 502);
+  } catch {
+    return json({ error: 'jmap_error' }, 502);
   }
 };
 

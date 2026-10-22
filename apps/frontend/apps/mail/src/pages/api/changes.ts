@@ -41,8 +41,8 @@ export const GET: APIRoute = async (ctx) => {
       state: body.state ?? '',
       hasMore: body.has_more ?? false,
     });
-  } catch (err) {
-    return json({ error: 'mail_error', message: String(err) }, 502);
+  } catch {
+    return json({ error: 'mail_error' }, 502);
   }
 };
 

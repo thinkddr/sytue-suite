@@ -44,8 +44,8 @@ export const GET: APIRoute = async (ctx) => {
     if (!res.ok) return json({ error: 'mail_error', status: res.status }, 502);
     const body = (await res.json()) as { labels?: RawLabel[] };
     return json({ labels: (body.labels ?? []).map(mapLabel) });
-  } catch (err) {
-    return json({ error: 'mail_error', message: String(err) }, 502);
+  } catch {
+    return json({ error: 'mail_error' }, 502);
   }
 };
 
@@ -102,8 +102,8 @@ export const POST: APIRoute = async (ctx) => {
       return json({ label: mapLabel((await res.json()) as RawLabel) }, 201);
     }
     return json({ error: 'invalid_payload' }, 400);
-  } catch (err) {
-    return json({ error: 'mail_error', message: String(err) }, 502);
+  } catch {
+    return json({ error: 'mail_error' }, 502);
   }
 };
 

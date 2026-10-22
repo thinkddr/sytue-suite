@@ -30,8 +30,8 @@ export const GET: APIRoute = async (ctx) => {
         permission: g.permission ?? 'read',
       })),
     });
-  } catch (err) {
-    return json({ error: 'mail_error', message: String(err) }, 502);
+  } catch {
+    return json({ error: 'mail_error' }, 502);
   }
 };
 
@@ -56,8 +56,8 @@ export const POST: APIRoute = async (ctx) => {
     if (!res.ok)
       return json({ error: 'mail_error', status: res.status }, res.status === 400 ? 400 : 502);
     return json({ ok: true });
-  } catch (err) {
-    return json({ error: 'mail_error', message: String(err) }, 502);
+  } catch {
+    return json({ error: 'mail_error' }, 502);
   }
 };
 

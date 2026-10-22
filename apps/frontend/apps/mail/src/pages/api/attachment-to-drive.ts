@@ -83,8 +83,8 @@ export const POST: APIRoute = async (ctx) => {
   try {
     const all = await jmapClient(session.accessToken).getAttachments(emailId);
     attachment = all[index];
-  } catch (err) {
-    return json({ error: 'jmap_error', message: String(err) }, 502);
+  } catch {
+    return json({ error: 'jmap_error' }, 502);
   }
   if (!attachment) return json({ error: 'not_found' }, 404);
 
@@ -99,7 +99,7 @@ export const POST: APIRoute = async (ctx) => {
     let existing: Awaited<ReturnType<typeof drive.list>> = [];
     try {
       existing = await drive.list(FOLDER);
-    } catch (err) {
+    } catch {
       if (err instanceof HttpError && err.status === 404) {
         await drive.createFolder(FOLDER);
       } else {
@@ -124,7 +124,7 @@ export const POST: APIRoute = async (ctx) => {
     });
   } catch (err) {
     if (err instanceof HttpError && err.status === 507) return json({ error: 'quota' }, 507);
-    return json({ error: 'drive_error', message: String(err) }, 502);
+    return json({ error: 'drive_error' }, 502);
   }
 };
 

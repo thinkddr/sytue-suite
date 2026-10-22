@@ -39,8 +39,8 @@ export const GET: APIRoute = async (ctx) => {
     const body = (await res.json()) as ListResponse;
     const emails = (body.messages ?? []).map((m) => toEmailSummary(m as never));
     return json({ emails, nextCursor: body.next_cursor ?? '' });
-  } catch (err) {
-    return json({ error: 'mail_error', message: String(err) }, 502);
+  } catch {
+    return json({ error: 'mail_error' }, 502);
   }
 };
 

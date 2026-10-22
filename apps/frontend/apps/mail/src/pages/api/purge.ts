@@ -54,8 +54,8 @@ export const POST: APIRoute = async (ctx) => {
       if (res.ok || res.status === 404) deleted += 1;
       else if (res.status === 401 || res.status === 403) return json({ error: 'forbidden' }, 403);
     }
-  } catch (err) {
-    return json({ error: 'mail_error', message: String(err) }, 502);
+  } catch {
+    return json({ error: 'mail_error' }, 502);
   }
   // Un borrado parcial es un fallo para quien lo pidió: si no cayeron todos, se
   // dice, porque la lista de la pantalla ya los quitó todos de la vista.

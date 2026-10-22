@@ -1,0 +1,203 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Daniel Delgado Ramos (thinkddr)
+name: Codex security fix
+run-name: Codex · ${{ inputs.finding_type }} · alerta ${{ inputs.alert_number }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      finding_type:
+        description: Tipo de alerta de GitHub Security
+        type: choice
+        options: [code-scanning, dependabot]
+        required: true
+      alert_number:
+        description: Número de la alerta (último segmento de su URL)
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codex-security-${{ inputs.finding_type }}-${{ inputs.alert_number }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    # Nunca cargar código ni secretos desde una rama elegida en Run workflow.
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      security-events: read
+    outputs:
+      base_sha: ${{ steps.base.outputs.sha }}
+      finding_url: ${{ steps.alert.outputs.finding_url }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Check configuration and fix base
+        id: base
+        env:
+          OPENAI_CONFIGURED: ${{ secrets.OPENAI_API_KEY != '' }}
+          PR_TOKEN_CONFIGURED: ${{ secrets.CODEX_PR_TOKEN != '' }}
+          ALERT_TOKEN_CONFIGURED: ${{ secrets.SECURITY_ALERTS_TOKEN != '' }}
+          FINDING_TYPE: ${{ inputs.finding_type }}
+        run: |
+          test "$OPENAI_CONFIGURED" = true || { echo 'Configure OPENAI_API_KEY.' >&2; exit 1; }
+          test "$PR_TOKEN_CONFIGURED" = true || { echo 'Configure CODEX_PR_TOKEN (Contents y Pull requests: write).' >&2; exit 1; }
+          if [ "$FINDING_TYPE" = dependabot ] && [ "$ALERT_TOKEN_CONFIGURED" != true ]; then
+            echo 'Configure SECURITY_ALERTS_TOKEN con Dependabot alerts: read.' >&2
+            exit 1
+          fi
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Read the selected open alert
+        id: alert
+        env:
+          FINDING_TYPE: ${{ inputs.finding_type }}
+          ALERT_NUMBER: ${{ inputs.alert_number }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          SECURITY_ALERTS_TOKEN: ${{ inputs.finding_type == 'dependabot' && secrets.SECURITY_ALERTS_TOKEN || github.token }}
+          ALERT_CONTEXT_PATH: ${{ runner.temp }}/alert-context/alert.json
+        run: |
+          mkdir -p "$RUNNER_TEMP/alert-context"
+          node .github/scripts/security-alert.mjs
+
+      - name: Pass selected metadata to the isolated job
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: security-alert-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/alert-context/alert.json
+          if-no-files-found: error
+          retention-days: 1
+
+  fix:
+    needs: prepare
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    outputs:
+      has_changes: ${{ steps.patch.outputs.has_changes }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.prepare.outputs.base_sha }}
+          persist-credentials: false
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: security-alert-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/alert-context
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: apps/frontend/package.json
+
+      - name: Prepare trusted packaging and Codex configuration
+        run: |
+          mkdir -p "$RUNNER_TEMP/security-result" "$RUNNER_TEMP/codex-security-home"
+          cp .github/scripts/security-patch.mjs "$RUNNER_TEMP/security-patch.mjs"
+          # Red necesaria para resolver versiones corregidas y ejecutar pruebas.
+          # Los tokens de alertas y publicación solo existen en otros jobs.
+          cat > "$RUNNER_TEMP/codex-security-home/config.toml" <<'TOML'
+          [sandbox_workspace_write]
+          network_access = true
+          TOML
+
+      - name: Ask Codex to investigate, fix and test this alert
+        uses: openai/codex-action@c05cfd74ad95c626cdf05c6685e62becc3bf7813 # reviewed 2026-10-20
+        env:
+          SECURITY_ALERT_CONTEXT: ${{ runner.temp }}/alert-context/alert.json
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          prompt-file: .github/codex/prompts/security-fix.md
+          output-file: ${{ runner.temp }}/security-result/report.md
+          codex-home: ${{ runner.temp }}/codex-security-home
+          sandbox: workspace-write
+          safety-strategy: drop-sudo
+
+      # Tras Codex solo se empaquetan datos con una copia previa del helper.
+      # Nunca se ejecuta código modificado con credenciales de publicación.
+      - name: Export and validate the patch
+        id: patch
+        env:
+          SECURITY_PATCH_DIR: ${{ runner.temp }}/security-result
+          SECURITY_BASE_SHA: ${{ needs.prepare.outputs.base_sha }}
+        run: node "$RUNNER_TEMP/security-patch.mjs" export
+
+      - name: Save patch and validation report
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: security-fix-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/security-result/security.patch
+            ${{ runner.temp }}/security-result/manifest.json
+            ${{ runner.temp }}/security-result/report.md
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Report a run without a patch
+        if: steps.patch.outputs.has_changes != 'true'
+        run: echo 'Codex no ha generado cambios. Consulta report.md en el artifact de esta ejecución.' >> "$GITHUB_STEP_SUMMARY"
+
+  pull-request:
+    needs: [prepare, fix]
+    if: needs.fix.outputs.has_changes == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    # La escritura usa CODEX_PR_TOKEN únicamente en el último paso.
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.prepare.outputs.base_sha }}
+          persist-credentials: false
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: security-fix-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/security-result
+
+      - name: Apply the patch on the original clean base
+        id: patch
+        env:
+          SECURITY_PATCH_DIR: ${{ runner.temp }}/security-result
+          SECURITY_BASE_SHA: ${{ needs.prepare.outputs.base_sha }}
+        run: node .github/scripts/security-patch.mjs apply
+
+      - name: Open a draft pull request
+        if: steps.patch.outputs.has_changes == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.CODEX_PR_TOKEN }}
+          FINDING_TYPE: ${{ inputs.finding_type }}
+          ALERT_NUMBER: ${{ inputs.alert_number }}
+          FINDING_URL: ${{ needs.prepare.outputs.finding_url }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          fix_branch="codex/security/${FINDING_TYPE}-${ALERT_NUMBER}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          pr_title="fix(security): ${FINDING_TYPE} alert #${ALERT_NUMBER}"
+          pr_body="$RUNNER_TEMP/security-pr.md"
+          {
+            printf 'Propuesta de Codex para [la alerta de GitHub Security](%s).\n\n' "$FINDING_URL"
+            printf 'Revisa el diff y las comprobaciones de CI antes de aprobar.\n\n'
+            printf 'Ejecución: %s/%s/actions/runs/%s\n\n' "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID"
+            if [ -f "$RUNNER_TEMP/security-result/report.md" ]; then
+              head -c 40000 "$RUNNER_TEMP/security-result/report.md"
+            fi
+          } > "$pr_body"
+          git -c core.hooksPath=/dev/null -c user.name='codex-security[bot]' -c user.email='codex-security[bot]@users.noreply.github.com' commit -m "$pr_title"
+          gh auth setup-git
+          git -c core.hooksPath=/dev/null push origin "HEAD:refs/heads/$fix_branch"
+          pr_url="$(gh pr create --draft --base "$DEFAULT_BRANCH" --head "$fix_branch" --title "$pr_title" --body-file "$pr_body")"
+          printf 'PR borrador creado: %s\n' "$pr_url" >> "$GITHUB_STEP_SUMMARY"

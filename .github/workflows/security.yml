@@ -47,5 +47,5 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Validate alert handling and patch transfer
-        run: node --test .github/scripts/security-alert.test.mjs .github/scripts/security-patch.test.mjs
+      - name: Validate alert handling and native Codex task preparation
+        run: node --test .github/scripts/security-alert.test.mjs .github/scripts/security-request.test.mjs

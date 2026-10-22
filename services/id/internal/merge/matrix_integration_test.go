@@ -7,9 +7,10 @@ import (
 	"context"
 	"testing"
 
+	"github.com/jackc/pgx/v5"
+
 	"git.sytue.eu/sytue/one/platform/pkg/pgtest"
 	roomsdb "git.sytue.eu/sytue/one/services/rooms/db"
-	"github.com/jackc/pgx/v5"
 )
 
 func TestRoomsMergeKeepsNewestMatrixLifecycleTombstone(t *testing.T) {

@@ -474,3 +474,29 @@ func (p *Photos) Duplicates(ctx context.Context, limite int) ([][]Photo, error) 
 	}
 	return grupos, err
 }
+
+// PhotosSettings son los ajustes de organización en Sytue Photos: si la organización
+// está excluida del lote automático de IA y si quien pregunta puede cambiarlo.
+type PhotosSettings struct {
+	ExcludeAIBatch   bool `json:"excludeAiBatch"`
+	CanManageAIBatch bool `json:"canManageAiBatch"`
+}
+
+// Settings consulta los ajustes de la organización en Sytue Photos.
+func (p *Photos) Settings(ctx context.Context) (PhotosSettings, error) {
+	return JSON[PhotosSettings](ctx, p.c, Request{Path: "/settings"})
+}
+
+// SetExcludeAIBatch activa o desactiva la exclusión de la organización en el lote de IA.
+func (p *Photos) SetExcludeAIBatch(ctx context.Context, exclude bool) (PhotosSettings, error) {
+	cuerpo, err := json.Marshal(map[string]bool{"excludeAiBatch": exclude})
+	if err != nil {
+		return PhotosSettings{}, err
+	}
+	return JSON[PhotosSettings](ctx, p.c, Request{
+		Method: http.MethodPut,
+		Path:   "/settings",
+		Body:   cuerpo,
+		Header: http.Header{"Content-Type": {"application/json"}},
+	})
+}

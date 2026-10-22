@@ -104,6 +104,11 @@ def icons(original, res):
 
 
 def prepare(args):
+    # La demo de los cimientos no es un producto (eu.sytue.fyne.demo, sin tienda): no
+    # lleva widgets, y su identificador no pasa la validación de los de la suite.
+    # Sin esto, release-mobile se caía al empaquetarla y no salía ningún AAB.
+    if args.appdir.resolve().name == "demo":
+        return
     config = metadata(args.appdir)
     source = ET.parse(args.manifest)
     root = source.getroot()

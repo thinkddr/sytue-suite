@@ -844,6 +844,9 @@ func (p *pptxDec) readSp() (slideBox, string, bool) {
 		}
 	}
 	p.tintaForma, p.propia, p.cadena = "", nivelesTexto{}, nil
+	if boxHTML != "" {
+		return p.pintarSp(nv, sp, rellenoEstilo, trazoEstilo, boxHTML)
+	}
 	return slideBox{}, "", false
 }
 
@@ -1081,16 +1084,7 @@ func (p *pptxDec) dataURLFor(rID string) string {
 	if target == "" {
 		return ""
 	}
-	name := path.Clean(p.dir + "/" + target)
-	raw := p.files[name]
-	if len(raw) == 0 {
-		return ""
-	}
-	mime := mediaTypeOf(strings.ToLower(name))
-	if !strings.HasPrefix(mime, "image/") {
-		return ""
-	}
-	return "data:" + mime + ";base64," + base64.StdEncoding.EncodeToString(raw)
+	return dataURLFromZip(path.Clean(p.dir+"/"+target), p.files)
 }
 
 // nvProps es lo que importa de las propiedades no visuales de una forma: su id, si es

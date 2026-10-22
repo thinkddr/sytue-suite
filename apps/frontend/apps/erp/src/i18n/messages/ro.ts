@@ -600,4 +600,8 @@ export const ro: AppCatalog<typeof en> = {
   'pos.imageUpload': 'Încarcă imagine pentru {name}',
   'pos.images': 'Imagini',
   'pos.imageHint': 'Alegeți o imagine JPEG, PNG sau WebP de maximum 10 MB.',
+  'vf.error.invalidCertificate':
+    'Certificatul sau cheia sa privată nu reprezintă un certificat calificat valid cu un NIF spaniol.',
+  'vf.error.certificateTaxIdMismatch':
+    'Codul fiscal (NIF) din certificat nu corespunde cu NIF-ul organizației.',
 };

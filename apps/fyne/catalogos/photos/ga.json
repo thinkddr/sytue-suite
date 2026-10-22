@@ -1,4 +1,6 @@
 {
+  "aiBatch.excludeOrg": "Fág an eagraíocht as baisc uathoibríoch Sytue AI",
+  "aiBatch.excludedHint": "Tá an eagraíocht fágtha as baisc uathoibríoch Sytue AI. Ní phróiseáiltear grianghraif nua sa chúlra le haghaidh moltaí ná cosúlachtaí.",
   "album.linkCopied": "Nasc cóipeáilte",
   "album.newLink": "Nasc nua",
   "album.newLinkConfirm": "Nasc nua a chruthú? Stopfaidh an nasc reatha ag obair do gach duine a bhfuil sé acu cheana.",

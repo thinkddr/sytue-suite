@@ -5,10 +5,14 @@ package service
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -262,6 +266,10 @@ type CreateAlertPolicyInput struct {
 }
 
 // CreateAlertPolicy valida el evento y la URL de canal (anti-SSRF) y crea la policy.
+// Si el canal es `mailto:`, la alerta nace sin confirmar (`Confirmed=false`),
+// guarda el hash SHA-256 de un token aleatorio y envía un correo de confirmación
+// al destinatario para evitar usar Sytue Cloud como amplificador de correo hacia
+// direcciones de terceros sin consentimiento (CLOUD-19).
 func (s *Service) CreateAlertPolicy(ctx context.Context, in CreateAlertPolicyInput) (domain.AlertPolicy, error) {
 	if !domain.ValidAlertEvent(in.Event) {
 		return domain.AlertPolicy{}, fmt.Errorf("%w: event no soportado", domain.ErrInvalidInput)
@@ -274,12 +282,32 @@ func (s *Service) CreateAlertPolicy(ctx context.Context, in CreateAlertPolicyInp
 	if in.Enabled != nil {
 		enabled = *in.Enabled
 	}
-	return s.pstore.CreateAlertPolicy(ctx, store.NewAlertPolicyRecord{
+	rec := store.NewAlertPolicyRecord{
 		ProjectID:  in.ProjectID,
 		Event:      in.Event,
 		ChannelURL: channel,
 		Enabled:    enabled,
-	})
+		Confirmed:  true,
+	}
+	addr, isMail := domain.MailChannelAddress(channel)
+	var rawTok string
+	if isMail {
+		tok, hash, err := newAlertConfirmToken()
+		if err != nil {
+			return domain.AlertPolicy{}, err
+		}
+		rawTok = tok
+		rec.Confirmed = false
+		rec.ConfirmTokenHash = &hash
+	}
+	pol, err := s.store.CreateAlertPolicy(ctx, rec)
+	if err != nil {
+		return domain.AlertPolicy{}, err
+	}
+	if isMail {
+		s.sendAlertConfirmEmail(ctx, addr, in.Event, rawTok)
+	}
+	return pol, nil
 }
 
 // ListAlertPolicies lista las policies del tenant.
@@ -288,21 +316,81 @@ func (s *Service) ListAlertPolicies(ctx context.Context) ([]domain.AlertPolicy, 
 }
 
 // UpdateAlertPolicy valida (evento/URL si vienen) y aplica una actualización parcial.
+// Si se cambia channel_url a un canal `mailto:`, reinicia el estado de confirmación
+// y envía un nuevo enlace al destinatario (CLOUD-19).
 func (s *Service) UpdateAlertPolicy(ctx context.Context, id uuid.UUID, upd store.UpdateAlertPolicyRecord) (domain.AlertPolicy, error) {
 	if upd.Event != nil && !domain.ValidAlertEvent(*upd.Event) {
 		return domain.AlertPolicy{}, fmt.Errorf("%w: event no soportado", domain.ErrInvalidInput)
 	}
+	var mailAddr, rawTok string
 	if upd.ChannelURL != nil {
 		c := strings.TrimSpace(*upd.ChannelURL)
 		if err := domain.ValidateAlertChannel(c); err != nil {
 			return domain.AlertPolicy{}, err
 		}
 		upd.ChannelURL = &c
+		if addr, ok := domain.MailChannelAddress(c); ok {
+			tok, hash, err := newAlertConfirmToken()
+			if err != nil {
+				return domain.AlertPolicy{}, err
+			}
+			mailAddr = addr
+			rawTok = tok
+			upd.ResetConfirm = true
+			upd.ConfirmTokenHash = &hash
+		}
 	}
-	return s.pstore.UpdateAlertPolicy(ctx, id, upd)
+	pol, err := s.store.UpdateAlertPolicy(ctx, id, upd)
+	if err != nil {
+		return domain.AlertPolicy{}, err
+	}
+	if mailAddr != "" {
+		s.sendAlertConfirmEmail(ctx, mailAddr, pol.Event, rawTok)
+	}
+	return pol, nil
 }
 
 // DeleteAlertPolicy elimina una policy.
 func (s *Service) DeleteAlertPolicy(ctx context.Context, id uuid.UUID) error {
 	return s.pstore.DeleteAlertPolicy(ctx, id)
+}
+
+// ConfirmAlertPolicy confirma una alerta de correo a partir del token en claro
+// recibido en el enlace de confirmación (CLOUD-19).
+func (s *Service) ConfirmAlertPolicy(ctx context.Context, rawToken string) (domain.AlertPolicy, error) {
+	tok := strings.TrimSpace(rawToken)
+	if tok == "" {
+		return domain.AlertPolicy{}, fmt.Errorf("%w: token de confirmación requerido", domain.ErrInvalidInput)
+	}
+	sum := sha256.Sum256([]byte(tok))
+	hash := hex.EncodeToString(sum[:])
+	return s.store.ConfirmAlertPolicyByToken(ctx, hash)
+}
+
+func newAlertConfirmToken() (rawToken, tokenHash string, err error) {
+	var b [32]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return "", "", fmt.Errorf("generar token de confirmación de alerta: %w", err)
+	}
+	rawToken = hex.EncodeToString(b[:])
+	sum := sha256.Sum256([]byte(rawToken))
+	return rawToken, hex.EncodeToString(sum[:]), nil
+}
+
+func (s *Service) sendAlertConfirmEmail(ctx context.Context, to, event, rawToken string) {
+	base := strings.TrimRight(strings.TrimSpace(s.cfg.PublicURL), "/")
+	if base == "" {
+		base = "https://cloud.sytue.eu/cloud"
+	} else if !strings.HasSuffix(base, "/cloud") {
+		base += "/cloud"
+	}
+	link := base + "/confirm-alert?token=" + url.QueryEscape(rawToken)
+	subject := "[Sytue Cloud] Confirma la recepción de alertas (" + event + ")"
+	body := "Alguien ha configurado esta dirección (" + to + ") como destinataria de alertas de Sytue Cloud para el evento «" + event + "».\n\n" +
+		"Para activar el envío de alertas a este buzón, confirma la suscripción visitando el siguiente enlace:\n\n" +
+		"  " + link + "\n\n" +
+		"Si no has solicitado estas alertas, ignora este mensaje: no se enviará ningún aviso mientras no confirmes el enlace."
+	if err := sendAlertMail(ctx, s.cfg, to, subject, body); err != nil {
+		log.From(ctx).Warn("enviar correo de confirmación de alerta falló", "to", to, "error", err)
+	}
 }

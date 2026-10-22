@@ -905,6 +905,17 @@ export const bg: AppCatalog<typeof en> = {
   'monitoring.alerts.scope.org': 'организация',
   'monitoring.alerts.scope.project': 'проект',
   'monitoring.alerts.disabled': 'деактивирано',
+  'monitoring.alerts.unconfirmed': 'чака потвърждение',
+  'monitoring.alerts.created.mailtoDesc':
+    'Изпратихме връзка за потвърждение на този адрес. Известията ще пристигат след потвърждаването му.',
+  'monitoring.alerts.confirm.title': 'Потвърждаване на известия по имейл',
+  'monitoring.alerts.confirm.desc':
+    'Потвърдете, че този адрес трябва да получава известия за събития от Sytue DevX.',
+  'monitoring.alerts.confirm.submit': 'Потвърди адреса',
+  'monitoring.alerts.confirm.done':
+    'Адресът е потвърден. Вече ще получавате известия за събития на този имейл.',
+  'monitoring.alerts.confirm.invalid':
+    'Тази връзка за потвърждение е невалидна или известието вече е премахнато.',
   'monitoring.alerts.delete': 'Изтриване на известието за {event}',
   'members.subtitle': 'Кой има достъп до организацията. Всяко лице заема едно място в пакета.',
   'members.add': 'Покана на лице',

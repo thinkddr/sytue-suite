@@ -400,4 +400,9 @@ export const en = {
   'linkedServices.writeUnknown':
     'The provider did not confirm whether this was saved. Refresh and check before trying again.',
   'linkedServices.unavailable': 'Connection to this provider is not available for your account.',
+  'localFile.confirmUpload.title': 'Open file from this device',
+  'localFile.confirmUpload.body':
+    'To open “{name}”, it will be uploaded to your Sytue One account.',
+  'localFile.confirmUpload.remember': 'Remember my choice on this device',
+  'localFile.confirmUpload.confirm': 'Upload and open',
 };

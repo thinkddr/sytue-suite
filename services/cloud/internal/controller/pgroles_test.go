@@ -29,8 +29,10 @@ const (
 func seedLegacyPostgres(t *testing.T, p *KubeProvisioner, cs *fake.Clientset, ns, name string) map[string]string {
 	t.Helper()
 	ctx := context.Background()
+	tenant := strings.TrimPrefix(ns, "tenant-")
+	_, _ = cs.CoreV1().Namespaces().Create(ctx, managedTenantNamespace(tenant), metav1.CreateOptions{})
 	labels := managedLabels(domain.ManagedService{
-		Tenant: strings.TrimPrefix(ns, "tenant-"), ProjectID: uuid.New(), Kind: domain.ServicePostgres,
+		Tenant: tenant, ProjectID: uuid.New(), Kind: domain.ServicePostgres,
 	})
 	sec := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{Name: name + "-creds", Namespace: ns, Labels: labels},
@@ -205,8 +207,11 @@ func TestRepairPostgresRolesEsIdempotente(t *testing.T) {
 // reparación no la toca (ni un Get). Y el Secret de plataforma, que arrastra las
 // mismas etiquetas gestionadas, tampoco se confunde con una instancia heredada.
 func TestRepairPostgresRolesIgnoraInstanciasNuevasYSecretosAjenos(t *testing.T) {
-	cs := fake.NewSimpleClientset()
-	p := newKubeProvisionerFor(cs, testCfg(), nil, nil)
+	cs := fake.NewSimpleClientset(managedTenantNamespace("acme"))
+	cfg := testCfg()
+	cfg.S3BackupAccessKey = "AK-backup"
+	cfg.S3BackupSecretKey = "SK-backup"
+	p := newKubeProvisionerFor(cs, cfg, nil, nil)
 	ctx := context.Background()
 	svc := domain.ManagedService{ID: uuid.New(), Tenant: "acme", ProjectID: uuid.New(), Kind: domain.ServicePostgres}
 	if _, err := p.Provision(ctx, svc); err != nil {
@@ -236,6 +241,21 @@ func TestReconcilePostgresRolesOpcional(t *testing.T) {
 	c := newTestController(&fakeCtrlStore{}, &recPlatform{}, &StubProvisioner{})
 	if err := c.reconcilePostgresRoles(context.Background()); err != nil {
 		t.Fatalf("el paso debe ser no-op sin capacidad de reparación: %v", err)
+	}
+}
+
+// CLOUD-11 / INF-06 — RepairPostgresRoles no lista Secrets en NamespaceAll (""):
+// recorre únicamente los namespaces tenant-* verificados como propiedad de Sytue.
+func TestRepairPostgresRolesNoListaSecretsEnNamespaceAll(t *testing.T) {
+	cs := fake.NewSimpleClientset(managedTenantNamespace("acme"))
+	p := newKubeProvisionerFor(cs, testCfg(), nil, nil)
+	if err := p.RepairPostgresRoles(context.Background()); err != nil {
+		t.Fatalf("RepairPostgresRoles: %v", err)
+	}
+	for _, a := range cs.Actions() {
+		if a.GetResource().Resource == "secrets" && a.GetNamespace() == "" {
+			t.Fatal("RepairPostgresRoles listó Secrets en NamespaceAll (\"\") en vez de por namespace tenant-*")
+		}
 	}
 }
 

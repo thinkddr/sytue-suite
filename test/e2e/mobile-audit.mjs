@@ -947,7 +947,7 @@ const DIR_A_APP = {
 /** Página que hoy no se puede visitar, y por qué. Sin motivo escrito no entra. */
 const NO_VISITABLES = [
   [
-    /^(docus\/dev\/(cinta|superficies|editor|inicio|pdf|superposiciones)|bases\/dev\/(app|vistas|rejilla)|calendar\/dev\/servicios-vinculados|drive\/dev\/almacenamiento|rooms\/dev\/conexiones|console\/dev\/conectar-app)$/,
+    /^(docus\/dev\/(cinta|superficies|editor|inicio|pdf|superposiciones)|bases\/dev\/(app|vistas|rejilla)|calendar\/dev\/servicios-vinculados|drive\/dev\/almacenamiento|mail\/dev\/correo-externo|rooms\/dev\/conexiones|console\/dev\/conectar-app)$/,
     'bancos de prueba exclusivos de desarrollo: import.meta.env.DEV exige 404 en producción',
   ],
   [/\[/, 'ruta dinámica: depende de un dato, se alcanza con { desde, enlace } o { resolver }'],
@@ -970,6 +970,11 @@ const NO_VISITABLES = [
     /^rooms\/pip$/,
     'ventana emergente de 420x320 de una llamada en curso (la abre window.open desde ' +
       'VideoRoom): sin canal redirige a la app y con canal ENTRARÍA en la sala',
+  ],
+  [
+    /^cloud-dashboard\/confirm-alert$/,
+    'confirmación de un destino mailto de las alertas: se llega por el enlace de un solo ' +
+      'uso que recibe esa dirección (equivalente a auth/*); sin token solo pinta «no válido»',
   ],
   [
     /^rooms\/matrix\/(callback|external\/callback|native\/(callback|start))$/,

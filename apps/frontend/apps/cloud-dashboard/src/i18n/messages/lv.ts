@@ -923,6 +923,17 @@ export const lv: AppCatalog<typeof en> = {
   'monitoring.alerts.scope.org': 'organizācija',
   'monitoring.alerts.scope.project': 'projekts',
   'monitoring.alerts.disabled': 'atspējots',
+  'monitoring.alerts.unconfirmed': 'gaida apstiprinājumu',
+  'monitoring.alerts.created.mailtoDesc':
+    'Nosūtījām apstiprinājuma saiti uz šo adresi. Brīdinājumi pienāks, tiklīdz tā būs apstiprināta.',
+  'monitoring.alerts.confirm.title': 'Apstiprināt e-pasta brīdinājumus',
+  'monitoring.alerts.confirm.desc':
+    'Apstipriniet, ka uz šo adresi jāsūta Sytue DevX notikumu brīdinājumi.',
+  'monitoring.alerts.confirm.submit': 'Apstiprināt adresi',
+  'monitoring.alerts.confirm.done':
+    'Adrese apstiprināta. Turpmāk saņemsiet notikumu brīdinājumus uz šo e-pasta adresi.',
+  'monitoring.alerts.confirm.invalid':
+    'Šī apstiprinājuma saite nav derīga vai brīdinājums jau ir noņemts.',
   'monitoring.alerts.delete': 'Dzēst brīdinājumu {event}',
   'members.subtitle': 'Kam ir piekļuve organizācijai. Katra persona ir viena vieta komplektā.',
   'members.add': 'Uzaicināt personu',

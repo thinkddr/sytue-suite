@@ -892,6 +892,16 @@ export const et: AppCatalog<typeof en> = {
   'monitoring.alerts.scope.org': 'organisatsioon',
   'monitoring.alerts.scope.project': 'projekt',
   'monitoring.alerts.disabled': 'keelatud',
+  'monitoring.alerts.unconfirmed': 'ootab kinnitamist',
+  'monitoring.alerts.created.mailtoDesc':
+    'Saatsime sellele aadressile kinnituslingi. Hoiatused hakkavad saabuma pärast selle kinnitamist.',
+  'monitoring.alerts.confirm.title': 'Kinnita e-posti hoiatused',
+  'monitoring.alerts.confirm.desc':
+    'Kinnitage, et see aadress peaks saama Sytue DevX-i sündmuste hoiatusi.',
+  'monitoring.alerts.confirm.submit': 'Kinnita aadress',
+  'monitoring.alerts.confirm.done':
+    'Aadress on kinnitatud. Saate nüüd sündmuste hoiatusi sellele e-posti aadressile.',
+  'monitoring.alerts.confirm.invalid': 'See kinnituslink ei kehti või on hoiatus juba eemaldatud.',
   'monitoring.alerts.delete': 'Kustuta hoiatus: {event}',
   'members.subtitle': 'Kellel on organisatsioonile ligipääs. Iga liige on üks komplekti koht.',
   'members.add': 'Kutsu liige',

@@ -72,7 +72,7 @@ type Modelo struct {
 // Patron es `SlideMaster`.
 type Patron struct {
 	Cajas []Caja `json:"boxes"`
-	// Diseños de la presentación (`SlideLayout`): aquí solo se conservan, no se editan.
+	// Diseños de la presentación (`SlideLayout`): marcadores (`Cajas`) y formas propias (`Decor`).
 	Disenos []Diseno `json:"layouts,omitempty"`
 }
 

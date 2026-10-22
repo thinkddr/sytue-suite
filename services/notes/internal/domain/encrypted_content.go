@@ -17,6 +17,7 @@ const (
 )
 
 var (
+	ErrBackendWriteUpgrade        = errors.New("notes: the backend does not support the database write contract")
 	ErrEncryptedClientUpgrade     = errors.New("notes: encrypted writes require a client that seals note data")
 	ErrEncryptedMigrationRequired = errors.New("notes: legacy content must be sealed with a checked migration")
 	ErrNoteChanged                = errors.New("notes: the note changed before encrypted migration")

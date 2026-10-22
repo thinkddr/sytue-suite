@@ -509,10 +509,12 @@ func appDeployment(name, namespace, registry string, labels map[string]string, a
 	// /tmp siempre: con la raíz de solo lectura, media imagen no arranca sin un
 	// sitio donde escribir temporales, y montar un emptyDir es más barato —y más
 	// acotado— que renunciar a readOnlyRootFilesystem.
+	tmpSize := resource.MustParse("256Mi")
+	rwSize := resource.MustParse("512Mi")
 	mounts := []corev1.VolumeMount{{Name: "tmp", MountPath: "/tmp"}}
 	volumes := []corev1.Volume{{
 		Name:         "tmp",
-		VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
+		VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{SizeLimit: &tmpSize}},
 	}}
 	if app.DiskGiB > 0 {
 		mounts = append(mounts, corev1.VolumeMount{Name: "data", MountPath: app.DataPath})
@@ -531,7 +533,7 @@ func appDeployment(name, namespace, registry string, labels map[string]string, a
 		mounts = append(mounts, corev1.VolumeMount{Name: vol, MountPath: w})
 		volumes = append(volumes, corev1.Volume{
 			Name:         vol,
-			VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
+			VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{SizeLimit: &rwSize}},
 		})
 	}
 
@@ -578,12 +580,14 @@ func appDeployment(name, namespace, registry string, labels map[string]string, a
 			// TECHO, y reservar el techo entero multiplicaría por cuatro lo que un
 			// proyecto le quita a la cuota sin usarlo.
 			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    *resource.NewMilliQuantity(int64(app.CPUMilli)/4+1, resource.DecimalSI),
-				corev1.ResourceMemory: *resource.NewQuantity(int64(app.MemoryMiB)/4*1024*1024+1, resource.BinarySI),
+				corev1.ResourceCPU:              *resource.NewMilliQuantity(int64(app.CPUMilli)/4+1, resource.DecimalSI),
+				corev1.ResourceMemory:           *resource.NewQuantity(int64(app.MemoryMiB)/4*1024*1024+1, resource.BinarySI),
+				corev1.ResourceEphemeralStorage: resource.MustParse("128Mi"),
 			},
 			Limits: corev1.ResourceList{
-				corev1.ResourceCPU:    *resource.NewMilliQuantity(int64(app.CPUMilli), resource.DecimalSI),
-				corev1.ResourceMemory: *resource.NewQuantity(int64(app.MemoryMiB)*1024*1024, resource.BinarySI),
+				corev1.ResourceCPU:              *resource.NewMilliQuantity(int64(app.CPUMilli), resource.DecimalSI),
+				corev1.ResourceMemory:           *resource.NewQuantity(int64(app.MemoryMiB)*1024*1024, resource.BinarySI),
+				corev1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
 			},
 		},
 		VolumeMounts:   mounts,
@@ -601,6 +605,7 @@ func appDeployment(name, namespace, registry string, labels map[string]string, a
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{Labels: mergeLabels(labels, selector)},
 				Spec: corev1.PodSpec{
+					RuntimeClassName:             tenantRuntimeClassPtr(),
 					AutomountServiceAccountToken: &automountSA,
 					ImagePullSecrets:             tenantImagePullSecrets(),
 					SecurityContext: &corev1.PodSecurityContext{

@@ -45,8 +45,10 @@ type Handlers struct {
 	ia *asistente.Cliente
 	// web comprueba en internet lo que propone Sytue AI; nulo = sin comprobar.
 	web *web.Comprobador
-	// verifactu remite los registros a la AEAT; nulo = sin certificado.
+	// verifactu remite los registros a la AEAT; nulo = sin certificado de respaldo.
 	verifactu *verifactu.Cliente
+	// declaracionFecha sobreescribe verifactu.DeclaracionFecha en tests de producción.
+	declaracionFecha string
 	// hub deja en la campana de quien la tiene una tarea que no se ha puesto él.
 	hub *hubnotify.Client
 }
@@ -852,6 +854,10 @@ func errorDeEscritura(err error) error {
 		return errNadaQueSubsanar
 	case errors.Is(err, store.ErrNIFConVerifactu):
 		return errNIFConVerifactu
+	case errors.Is(err, store.ErrCertificadoInvalido):
+		return errCertificadoInvalido
+	case errors.Is(err, store.ErrCertificadoNIFNoCoincide):
+		return errCertificadoNIFNoCoincide
 	case errors.Is(err, store.ErrPeriodoCerrado):
 		return errPeriodoCerrado
 	case errors.Is(err, store.ErrRequiereAprobacion):

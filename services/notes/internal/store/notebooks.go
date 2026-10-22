@@ -222,7 +222,7 @@ func (s *Store) CreateNotebook(ctx context.Context, sub string, in domain.Notebo
 		token = tk
 	}
 	var nb domain.Notebook
-	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	err := s.inWriteTx(ctx, func(tx pgx.Tx) error {
 		// El padre tiene que existir y ser escribible por quien crea; sin esta
 		// comprobación se podría colgar un cuaderno del árbol de otra persona.
 		if in.ParentID != nil {
@@ -293,7 +293,7 @@ func (s *Store) ActualizarCuaderno(ctx context.Context, id uuid.UUID, sub string
 		nuevo = tk
 	}
 	var nb domain.Notebook
-	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	err := s.inWriteTx(ctx, func(tx pgx.Tx) error {
 		visAntes, err := ajustesAdmisibles(ctx, tx, t.Slug, id, sub, administra, in)
 		if err != nil {
 			return err
@@ -426,7 +426,7 @@ func padreAdmisible(ctx context.Context, tx pgx.Tx, tenant string, id, padre uui
 // DeleteNotebook lo manda a la papelera (borrado suave), con sus descendientes.
 func (s *Store) DeleteNotebook(ctx context.Context, id uuid.UUID, sub string) error {
 	t := tenancy.MustFrom(ctx)
-	return s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	return s.inWriteTx(ctx, func(tx pgx.Tx) error {
 		// Solo el DUEÑO borra un cuaderno entero. Que un cuaderno de organización se
 		// escriba entre varios no significa que cualquiera pueda hacerlo desaparecer.
 		//

@@ -38,6 +38,10 @@ func MensajeDeError(err error, tr *i18n.Translator) string {
 	switch {
 	case errors.As(err, &e) && e.Code() == "sin_permiso":
 		return tr.T("error.sinPermiso", nil)
+	case errors.As(err, &e) && e.Code() == "certificado_invalido":
+		return tr.T("vf.error.invalidCertificate", nil)
+	case errors.As(err, &e) && e.Code() == "certificado_nif_no_coincide":
+		return tr.T("vf.error.certificateTaxIdMismatch", nil)
 	case errors.As(err, &e) && e.Message() != "":
 		return e.Message()
 	}

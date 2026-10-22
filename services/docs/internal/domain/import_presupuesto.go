@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"errors"
+	"html"
 	"image"
 	"image/jpeg"
 	"image/png"
@@ -19,6 +20,7 @@ import (
 	"strings"
 
 	_ "golang.org/x/image/webp" // las imágenes que el navegador sabe leer de un data: URL
+	xhtml "golang.org/x/net/html"
 
 	"git.sytue.eu/sytue/one/platform/pkg/miniatura"
 )
@@ -162,7 +164,7 @@ func caberEnElDocumento(content string) (string, error) {
 		return content, nil
 	}
 	if !strings.Contains(content, prefijoDataURLs) {
-		return "", ErrDemasiadoGrande
+		return content, ErrDemasiadoGrande
 	}
 	var imgs []imagenIncrustada
 	for _, m := range reDataURL.FindAllStringSubmatchIndex(content, -1) {
@@ -181,19 +183,23 @@ func caberEnElDocumento(content string) (string, error) {
 		})
 	}
 	if len(imgs) == 0 {
-		return "", ErrDemasiadoGrande
+		return content, ErrDemasiadoGrande
 	}
 	calidad := calidadInicial
 	escala := 1.0
+	ultimo := content
 	for paso := 0; paso < maxPasosImagen; paso++ {
 		candidato, ok := reescribirImagenes(content, imgs, escala, calidad)
-		if ok && tamanoSembrado(candidato) <= MaxContenidoSembrado {
-			return candidato, nil
+		if ok {
+			ultimo = candidato
+			if tamanoSembrado(candidato) <= MaxContenidoSembrado {
+				return candidato, nil
+			}
 		}
 		escala *= factorPasoLado
 		calidad = max(calidadMinima, calidad-pasoCalidad)
 	}
-	return "", ErrDemasiadoGrande
+	return ultimo, ErrDemasiadoGrande
 }
 
 // reescribirImagenes vuelve a escribir `content` con cada imagen reducida a `escala` de
@@ -255,22 +261,29 @@ func tieneAlfa(img image.Image) bool {
 // anclarlo al fichero, de modo que «Guardar en Drive» no existe para él y guardar no puede
 // sobrescribir el original con la copia recortada.
 
-// recortarLibro abre recortado un libro que no cabe entero: lo convertido y sus claves, y si
-// de verdad se ha recortado alguna hoja (un libro que solo no cabía por el presupuesto, que
-// carga por arriba, puede caber entero al contar solo sus celdas). ErrDemasiadoGrande si no
-// cabe ni sin filas (lo que ocupan sus objetos, por ejemplo).
+// libroHoja es lo que recortarLibro necesita de un .xlsx o de un .ods ya abierto.
+type libroHoja interface {
+	modelo(p *presupuesto) *sheetModel
+}
+
+// recortarLibro abre recortado un libro (.xlsx o .ods) que no cabe entero: lo convertido y sus
+// claves, y si de verdad se ha recortado alguna hoja (un libro que solo no cabía por el
+// presupuesto, que carga por arriba, puede caber entero al contar solo sus celdas).
+// ErrDemasiadoGrande si no cabe ni sin filas (lo que ocupan sus objetos, por ejemplo).
 func recortarLibro(f srcFormat, data []byte, idioma string) (string, map[string]ClaveWire, bool, error) {
 	files, err := readZip(data)
 	if err != nil {
 		return "", nil, false, err
 	}
-	// ponytail: solo .xlsx. En un .ods todas las hojas van en content.xml, y saltar las filas
-	// de más obliga a leerlas en cada intento (en un .xlsx se salta al cierre de sheetData);
-	// un .ods que no cabe sigue sin abrirse hasta que se parta content.xml por hojas.
-	if f != fmtXlsx {
+	var l libroHoja
+	switch f {
+	case fmtXlsx:
+		l, err = abrirLibroXlsx(files, &presupuesto{recortando: true})
+	case fmtOds:
+		l, err = abrirLibroOds(files)
+	default:
 		return "", nil, false, ErrDemasiadoGrande
 	}
-	l, err := abrirLibroXlsx(files, &presupuesto{recortando: true})
 	if err != nil {
 		return "", nil, false, err
 	}
@@ -382,4 +395,230 @@ func filasHasta[V any](m map[string]V, n int, recortada *bool) map[string]V {
 		out[ref] = v
 	}
 	return out
+}
+
+// avisoRecortadoHTML es el bloque de aviso que va delante cuando un .docx o un .pptx se abre
+// recortado como copia aparte.
+func avisoRecortadoHTML(idioma string) string {
+	return "<blockquote><p><strong>" + html.EscapeString(avisoImportar(idioma, "titulo.parcial")) +
+		"</strong></p><p>" + html.EscapeString(avisoImportar(idioma, "texto.recortado_archivo")) + "</p></blockquote>"
+}
+
+// recortarDocx abre recortado un .docx cuyo contenido supera el límite del documento:
+// antepone el aviso y conserva todos los bloques iniciales que caben enteros.
+func recortarDocx(content, idioma string) (string, bool, error) {
+	if strings.Contains(content, prefijoDataURLs) {
+		if reducido, err := caberEnElDocumento(content); err == nil {
+			content = reducido
+		} else if reducido != "" {
+			content = reducido
+		}
+	}
+	aviso := avisoRecortadoHTML(idioma)
+	cuerpo, ok := recortarHTMLCon(content, MaxContenidoSembrado, func(h string) bool {
+		return tamanoSembrado(aviso+h) <= MaxContenidoSembrado
+	})
+	if !ok {
+		return "", false, ErrDemasiadoGrande
+	}
+	out, err := caberEnElDocumento(aviso + cuerpo)
+	if err != nil {
+		return "", false, err
+	}
+	return out, true, nil
+}
+
+// recortarPptx abre recortada una presentación .pptx que supera el límite del documento:
+// añade delante una diapositiva con el aviso y conserva las primeras diapositivas (o las
+// primeras cajas y párrafos de la primera, si una sola ya desborda) que caben.
+func recortarPptx(content, idioma string) (string, bool, error) {
+	if strings.Contains(content, prefijoDataURLs) {
+		if reducido, err := caberEnElDocumento(content); err == nil {
+			content = reducido
+		} else if reducido != "" {
+			content = reducido
+		}
+	}
+	var m slidesModel
+	if json.Unmarshal([]byte(content), &m) != nil || len(m.Slides) == 0 {
+		return "", false, ErrDemasiadoGrande
+	}
+	aviso := slideT{
+		ID: "s0",
+		Boxes: []slideBox{{
+			ID: "s0b1", Kind: "text", X: 5, Y: 4, W: 90, H: 40,
+			HTML: avisoRecortadoHTML(idioma),
+		}},
+	}
+	base := m
+	base.Slides = []slideT{aviso}
+	if tamanoSembrado(marshalSlidesModel(&base)) > MaxContenidoSembrado {
+		return "", false, ErrDemasiadoGrande
+	}
+	lo, hi := 0, len(m.Slides)
+	mejor := ""
+	for lo < hi {
+		mitad := lo + (hi-lo+1)/2
+		cand := m
+		cand.Slides = append([]slideT{aviso}, m.Slides[:mitad]...)
+		if s := marshalSlidesModel(&cand); tamanoSembrado(s) <= MaxContenidoSembrado {
+			lo, mejor = mitad, s
+		} else {
+			hi = mitad - 1
+		}
+	}
+	if lo > 0 {
+		return mejor, true, nil
+	}
+	// Ni la primera diapositiva cabe entera: se recortan sus cajas o el texto de la que desborda.
+	sl := m.Slides[0]
+	sl.Connectors = nil
+	sl.Notes = ""
+	var cajas []slideBox
+	for _, b := range sl.Boxes {
+		cand := m
+		s := sl
+		s.Boxes = append(append([]slideBox(nil), cajas...), b)
+		cand.Slides = []slideT{aviso, s}
+		if tamanoSembrado(marshalSlidesModel(&cand)) <= MaxContenidoSembrado {
+			cajas = append(cajas, b)
+			continue
+		}
+		if b.HTML != "" {
+			if h, ok := recortarHTMLCon(b.HTML, MaxContenidoSembrado, func(h string) bool {
+				copia := b
+				copia.HTML = h
+				s.Boxes = append(append([]slideBox(nil), cajas...), copia)
+				cand.Slides = []slideT{aviso, s}
+				return tamanoSembrado(marshalSlidesModel(&cand)) <= MaxContenidoSembrado
+			}); ok {
+				b.HTML = h
+				cajas = append(cajas, b)
+			}
+		}
+		break
+	}
+	if len(cajas) == 0 {
+		return "", false, ErrDemasiadoGrande
+	}
+	sl.Boxes = cajas
+	cand := m
+	cand.Slides = []slideT{aviso, sl}
+	out := marshalSlidesModel(&cand)
+	if tamanoSembrado(out) > MaxContenidoSembrado {
+		return "", false, ErrDemasiadoGrande
+	}
+	return out, true, nil
+}
+
+var elementosVaciosHTML = map[string]bool{
+	"area": true, "base": true, "br": true, "col": true, "embed": true,
+	"hr": true, "img": true, "input": true, "link": true, "meta": true,
+	"param": true, "source": true, "track": true, "wbr": true,
+}
+
+type corteHTML struct {
+	pos     int
+	cierres string
+}
+
+// recortarHTMLCon busca el prefijo más largo de `htmlStr` cortado en un límite limpio de
+// bloque (párrafo, título, cita, elemento de lista o fila de tabla) para el que `cabe` es true.
+func recortarHTMLCon(htmlStr string, tope int, cabe func(string) bool) (string, bool) {
+	sub := htmlStr[:min(len(htmlStr), tope)]
+	cortes := cortesDeHTML(sub)
+	lo, hi := -1, len(cortes)-1
+	for lo < hi {
+		mitad := lo + (hi-lo+1)/2
+		c := cortes[mitad]
+		if cabe(sub[:c.pos] + c.cierres) {
+			lo = mitad
+		} else {
+			hi = mitad - 1
+		}
+	}
+	if lo < 0 {
+		return "", false
+	}
+	c := cortes[lo]
+	return sub[:c.pos] + c.cierres, true
+}
+
+func cortesDeHTML(sub string) []corteHTML {
+	z := xhtml.NewTokenizer(strings.NewReader(sub))
+	var abiertos []string
+	var cortes []corteHTML
+	pos := 0
+	enCuerpo := false
+	for {
+		tt := z.Next()
+		if tt == xhtml.ErrorToken {
+			return cortes
+		}
+		raw := z.Raw()
+		pos += len(raw)
+		tn, _ := z.TagName()
+		tag := string(tn)
+		switch tt { //nolint:exhaustive // solo abren o cierran bloque las etiquetas de inicio y fin
+		case xhtml.StartTagToken:
+			if len(abiertos) == 0 && !esMetadatoDePaginaHTML(tag, raw) {
+				enCuerpo = true
+			}
+			if !elementosVaciosHTML[tag] {
+				abiertos = append(abiertos, tag)
+			} else if tag == "hr" && len(abiertos) == 0 && enCuerpo {
+				cortes = append(cortes, corteHTML{pos: pos})
+			}
+		case xhtml.EndTagToken:
+			abiertos = cerrarEtiquetaHTML(abiertos, tag)
+			if enCuerpo && admiteCorteHTML(tag, abiertos) {
+				cortes = append(cortes, corteHTML{pos: pos, cierres: cierresHTML(abiertos)})
+			}
+		}
+	}
+}
+
+func esMetadatoDePaginaHTML(tag string, raw []byte) bool {
+	return tag == "div" && (bytes.Contains(raw, []byte("data-sytue-page")) || bytes.Contains(raw, []byte("data-doc-header")))
+}
+
+func cerrarEtiquetaHTML(abiertos []string, tag string) []string {
+	for i := len(abiertos) - 1; i >= 0; i-- {
+		if abiertos[i] == tag {
+			return abiertos[:i]
+		}
+	}
+	return abiertos
+}
+
+func admiteCorteHTML(tag string, abiertos []string) bool {
+	return len(abiertos) == 0 ||
+		(tag == "li" && soloContenedoresLista(abiertos)) ||
+		(tag == "tr" && soloContenedoresTabla(abiertos))
+}
+
+func cierresHTML(abiertos []string) string {
+	var b strings.Builder
+	for i := len(abiertos) - 1; i >= 0; i-- {
+		b.WriteString("</" + abiertos[i] + ">")
+	}
+	return b.String()
+}
+
+func soloContenedoresLista(abiertos []string) bool {
+	for _, a := range abiertos {
+		if a != "ul" && a != "ol" && a != "li" {
+			return false
+		}
+	}
+	return true
+}
+
+func soloContenedoresTabla(abiertos []string) bool {
+	for _, a := range abiertos {
+		if a != "table" && a != "tbody" && a != "thead" && a != "tfoot" {
+			return false
+		}
+	}
+	return true
 }

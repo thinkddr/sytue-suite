@@ -365,4 +365,9 @@ export const et: Catalog = {
   'linkedServices.writeUnknown':
     'Teenusepakkuja ei kinnitanud salvestamist. Enne uuesti proovimist värskenda vaadet ja kontrolli tulemust.',
   'linkedServices.unavailable': 'Selle teenusepakkujaga ühendamine pole sinu kontole saadaval.',
+  'localFile.confirmUpload.title': 'Ava fail sellest seadmest',
+  'localFile.confirmUpload.body':
+    'Faili „{name}” avamiseks laaditakse see üles sinu Sytue One’i kontole.',
+  'localFile.confirmUpload.remember': 'Jäta minu valik selles seadmes meelde',
+  'localFile.confirmUpload.confirm': 'Laadi üles ja ava',
 };

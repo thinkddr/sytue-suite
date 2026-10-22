@@ -124,6 +124,10 @@ class ResourceTests(unittest.TestCase):
             WIDGETS.prepare(self.args)
         self.assertEqual((folder / "important.txt").read_text(), "must survive")
 
+    def test_demo_is_packaged_without_widgets(self):
+        args = type("Args", (), {"appdir": WIDGETS.FYNE / "cmd" / "demo"})()
+        self.assertIsNone(WIDGETS.prepare(args))
+
     def test_catalog_uses_each_native_app_metadata(self):
         seen = set()
         for path in (WIDGETS.FYNE / "cmd").glob("*/FyneApp.toml"):

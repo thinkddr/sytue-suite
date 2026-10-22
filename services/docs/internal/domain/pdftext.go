@@ -223,15 +223,20 @@ type recolectorTexto struct {
 	// Donde acabó la última cadena (espacio de usuario), la dirección de su
 	// línea base y el tamaño de su letra.
 	finX, finY, dirX, dirY, tam float64
+	// Posición y longitud en bytes de la última marca de avance cero (para los
+	// generadores como FOP que emiten el diacrítico antes de su consonante base).
+	marcaX, marcaY float64
+	marcaLen       int
 }
 
 // Umbrales en ems del tamaño de la letra. Un hueco de más de 0,15 em entre dos
 // cadenas es un espacio entre palabras (el kerning no llega a 0,1); a partir de
 // 3 em es otra columna, y a medio em de la línea base, otra línea.
 const (
-	emEspacio     = 0.15
-	emOtraColumna = 3.0
-	emOtraLinea   = 0.5
+	emEspacio          = 0.15
+	emEspacioFragmento = 0.10
+	emOtraColumna      = 3.0
+	emOtraLinea        = 0.5
 )
 
 // avX y avY son el desplazamiento de la cadena en el espacio de texto: avY solo
@@ -245,10 +250,17 @@ func (r *recolectorTexto) anadir(e *ejecucion, glifos []glifo, avX, avY float64)
 	ini := escala.por(e.tm).por(e.estado.ctm)
 	fin := escala.por(matriz{1, 0, 0, 1, avX, avY}.por(e.tm)).por(e.estado.ctm)
 	tam := math.Abs(e.estado.tamano) * math.Hypot(ini[2], ini[3])
+	if len(glifos) > 0 {
+		if avMedio := math.Abs(avX) * math.Hypot(ini[0], ini[1]) / float64(len(glifos)); avMedio > tam {
+			tam = avMedio
+		}
+	}
 	dx, dy := ini[0], ini[1]
 	vertical := avY != 0 || (e.estado.fuente != nil && e.estado.fuente.vertical)
 	if vertical {
 		dx, dy = -ini[2], -ini[3] // la línea baja por el eje y del texto
+	} else if avX < 0 {
+		dx, dy = -dx, -dy
 	}
 	if n := math.Hypot(dx, dy); n > 0 {
 		dx, dy = dx/n, dy/n
@@ -256,23 +268,53 @@ func (r *recolectorTexto) anadir(e *ejecucion, glifos []glifo, avX, avY float64)
 		dx, dy = 1, 0
 	}
 
-	if k := len(r.frags); k > 0 && r.tam > 0 {
-		hx, hy := ini[4]-r.finX, ini[5]-r.finY
-		a := hx*r.dirX + hy*r.dirY  // a lo largo de la línea
-		p := -hx*r.dirY + hy*r.dirX // de una línea a otra
-		em := math.Max(r.tam, tam)
-		if math.Abs(p) < emOtraLinea*em && a > -emOtraLinea*em && a < emOtraColumna*em {
-			ult := &r.frags[k-1]
-			if a > emEspacio*em && !strings.HasSuffix(ult.Texto, " ") && !strings.HasPrefix(texto, " ") {
-				ult.Texto += " "
-			}
-			ult.Texto += texto
-			r.finX, r.finY = fin[4], fin[5]
-			return
-		}
+	if len(r.frags) > 0 && r.tam > 0 && r.unirAlUltimo(texto, ini, fin, avX, avY, math.Max(r.tam, tam)) {
+		return
 	}
-	r.frags = append(r.frags, PDFFragmento{Texto: texto, X: ini[4], Y: ini[5], Tamano: tam, izquierda: !vertical && (dx < 0) != (avX < 0)})
+	r.frags = append(r.frags, PDFFragmento{Texto: texto, X: ini[4], Y: ini[5], Tamano: tam, izquierda: !vertical && dx < 0})
 	r.finX, r.finY, r.dirX, r.dirY, r.tam = fin[4], fin[5], dx, dy, tam
+	if avX == 0 && avY == 0 {
+		r.marcaX, r.marcaY, r.marcaLen = ini[4], ini[5], len(texto)
+	} else {
+		r.marcaLen = 0
+	}
+}
+
+func (r *recolectorTexto) unirAlUltimo(texto string, ini, fin matriz, avX, avY, em float64) bool {
+	hx, hy := ini[4]-r.finX, ini[5]-r.finY
+	a := hx*r.dirX + hy*r.dirY  // a lo largo de la línea
+	p := -hx*r.dirY + hy*r.dirX // de una línea a otra
+	if math.Abs(p) >= emOtraLinea*em || a <= -em || a >= emOtraColumna*em {
+		return false
+	}
+	ult := &r.frags[len(r.frags)-1]
+	if avX == 0 && avY == 0 {
+		ult.Texto += texto
+		if r.marcaLen > 0 && math.Hypot(ini[4]-r.marcaX, ini[5]-r.marcaY) < 0.2*em {
+			r.marcaLen += len(texto)
+		} else {
+			r.marcaX, r.marcaY, r.marcaLen = ini[4], ini[5], len(texto)
+		}
+		return true
+	}
+	if r.marcaLen > 0 && r.marcaLen <= len(ult.Texto) &&
+		(ini[4]-r.marcaX)*r.dirX+(ini[5]-r.marcaY)*r.dirY < -0.1*em {
+		_, nRuna := utf8.DecodeRuneInString(texto)
+		corte := len(ult.Texto) - r.marcaLen
+		ult.Texto = ult.Texto[:corte] + texto[:nRuna] + ult.Texto[corte:] + texto[nRuna:]
+	} else {
+		umbralEsp := emEspacioFragmento
+		if avX < 0 {
+			umbralEsp = emOtraLinea
+		}
+		if a > umbralEsp*em && !strings.HasSuffix(ult.Texto, " ") && !strings.HasPrefix(texto, " ") {
+			ult.Texto += " "
+		}
+		ult.Texto += texto
+	}
+	r.marcaLen = 0
+	r.finX, r.finY = fin[4], fin[5]
+	return true
 }
 
 // textoConHuecos junta los glifos de una cadena y pone un espacio donde el

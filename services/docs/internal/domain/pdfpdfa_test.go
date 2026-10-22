@@ -68,17 +68,37 @@ func TestPDFANivelABajaABAlCensurar(t *testing.T) {
 	}
 }
 
-// Una anotación nuestra dibuja en RGB: con una intención de salida CMYK ya no
-// cumple (6.2.4.3), y la marca se quita; con una RGB, se conserva.
+// Una anotación lleva /DefaultRGB (CalRGB) en sus recursos, así que cumple con
+// intención RGB, CMYK o sin intención de salida (con /Group en la página si hay
+// transparencia en PDF/A-2+). Si un flujo nuevo usa RGB sin /DefaultRGB bajo una
+// intención CMYK, la comprobación sí quita la marca.
 func TestPDFASeQuitaSiLaEdicionNoCumple(t *testing.T) {
-	anots := []Anotacion{{Tipo: AnotRectangulo, Rect: [4]float64{10, 10, 50, 50}, Color: [3]float64{1, 0, 0}, Grosor: 1}}
-	salida, err := AnadirAnotacionesPDF(pdfADePrueba(t, "2", "B", 4, false), anots)
-	if got := releerPDFA(t, salida, err); got != "" {
-		t.Errorf("con intención CMYK la salida sigue declarando %q", got)
+	anots := []Anotacion{
+		{Tipo: AnotRectangulo, Rect: [4]float64{10, 10, 50, 50}, Color: [3]float64{1, 0, 0}, Grosor: 1},
+		{Tipo: AnotResaltado, Cuadros: [][4]float64{{10, 60, 80, 72}}, Color: [3]float64{1, 1, 0}, Opacidad: 0.5},
 	}
-	salida, err = AnadirAnotacionesPDF(pdfADePrueba(t, "2", "B", 3, false), anots)
-	if got := releerPDFA(t, salida, err); got != "2b" {
-		t.Errorf("con intención RGB la salida declara %q, quería 2b", got)
+	for _, comp := range []int{0, 3, 4} {
+		salida, err := AnadirAnotacionesPDF(pdfADePrueba(t, "2", "B", comp, false), anots)
+		if got := releerPDFA(t, salida, err); got != "2b" {
+			t.Errorf("comp=%d: la salida anotada declara %q, quería 2b", comp, got)
+		}
+	}
+	// En PDF/A-1 el resaltado transparente sigue incumpliendo (6.4) y quita la marca.
+	salida1, err := AnadirAnotacionesPDF(pdfADePrueba(t, "1", "B", 3, false), anots)
+	if got := releerPDFA(t, salida1, err); got != "" {
+		t.Errorf("en PDF/A-1 con resaltado transparente sigue declarando %q", got)
+	}
+	// Y un flujo en RGB sin /DefaultRGB sobre intención CMYK se sigue rechazando.
+	origen := pdfADePrueba(t, "2", "B", 4, false)
+	dec, _ := origen.declaraPDFA()
+	e := NuevoEnsambladorPDF()
+	e.cuerpos = []objetoSalida{{
+		valor:   pdfDict{"Type": pdfName("XObject"), "Subtype": pdfName("Form")},
+		flujo:   []byte("1 0 0 rg 0 0 10 10 re f"),
+		esFlujo: true,
+	}}
+	if _, motivo := e.incumplePDFA(origen, dec, pdfDict{}); motivo == "" {
+		t.Error("un flujo RGB sin /DefaultRGB en CMYK debía incumplir")
 	}
 }
 
@@ -224,5 +244,30 @@ func TestPDFACensurarConIntencionCMYKConservaLaMarca(t *testing.T) {
 	salida, err := RedactarPDF(pdfADePrueba(t, "2", "B", 4, false), []AreaRedaccion{{Pagina: 0, X1: 0, Y1: 40, X2: 200, Y2: 70}})
 	if got := releerPDFA(t, salida, err); got != "2b" {
 		t.Errorf("censurar con intención CMYK: la salida declara %q, quería 2b", got)
+	}
+	// Y sin OutputIntents (componentes = 0): la página censurada lleva /DefaultGray
+	// (CalGray) para cubrir el «0 g» de los recuadros.
+	salida0, err := RedactarPDF(pdfADePrueba(t, "2", "B", 0, false), []AreaRedaccion{{Pagina: 0, X1: 0, Y1: 40, X2: 200, Y2: 70}})
+	if got := releerPDFA(t, salida0, err); got != "2b" {
+		t.Errorf("censurar sin OutputIntents: la salida declara %q, quería 2b", got)
+	}
+}
+
+// Rellenar un campo de texto en un PDF/A incrusta Liberation Sans y declara
+// /DefaultRGB en la apariencia del widget, conservando la marca PDF/A.
+func TestPDFARellenarFormularioConservaLaMarca(t *testing.T) {
+	base, err := AnadirCamposPDF(pdfADePrueba(t, "2", "B", 0, false), []CampoNuevo{{
+		Pagina: 0, Nombre: "nombre", Tipo: CampoTexto, Rect: [4]float64{10, 10, 150, 35},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	d, err := LeerPDF(base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	salida, err := RellenarFormularioPDF(d, map[string]string{"nombre": "Ana Pérez"})
+	if got := releerPDFA(t, salida, err); got != "2b" {
+		t.Errorf("rellenar formulario PDF/A: declara %q, quería 2b", got)
 	}
 }

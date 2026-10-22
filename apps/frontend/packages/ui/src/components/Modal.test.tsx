@@ -163,14 +163,23 @@ test('bajar la hoja por el asa la cierra; un tirón corto, no', () => {
       <p>Texto</p>
     </Modal>
   );
-  const tirar = (zona: Element, hasta: number) => {
-    const ev = (tipo: string, y: number) =>
-      zona.dispatchEvent(
-        new PointerEvent(tipo, { bubbles: true, clientY: y, pointerType: 'touch', pointerId: 1 }),
-      );
-    ev('pointerdown', 100);
-    ev('pointermove', hasta);
-    ev('pointerup', hasta);
+  // El tiempo del gesto se fija a mano: con el reloj real, tres eventos seguidos
+  // tardan 0 ms o unas décimas según la máquina, y un tirón corto pasaba a ser un
+  // golpe rápido (que sí cierra) solo en el runner.
+  const tirar = (zona: Element, hasta: number, ms = 1000) => {
+    const ev = (tipo: string, y: number, t: number) => {
+      const e = new PointerEvent(tipo, {
+        bubbles: true,
+        clientY: y,
+        pointerType: 'touch',
+        pointerId: 1,
+      });
+      Object.defineProperty(e, 'timeStamp', { value: t });
+      zona.dispatchEvent(e);
+    };
+    ev('pointerdown', 100, 0);
+    ev('pointermove', hasta, ms);
+    ev('pointerup', hasta, ms);
   };
   enHost((host) => {
     conMedios(['(width < 48rem)'], () => {
@@ -180,12 +189,15 @@ test('bajar la hoja por el asa la cierra; un tirón corto, no', () => {
       expect(cierres).toBe(0);
       tirar(asa, 300);
       expect(cierres).toBe(1);
+      // El mismo tirón corto, pero rápido, sí cierra: es el golpe de las hojas del sistema.
+      tirar(asa, 140, 20);
+      expect(cierres).toBe(2);
       // Sin cierre por clic fuera, ni asa ni arrastre: la cabecera no la baja.
       render(ui(false), host);
       const cabecera = document.querySelector('[role="dialog"] h2')!.parentElement!;
       expect(cabecera.previousElementSibling).toBeNull();
       tirar(cabecera, 400);
-      expect(cierres).toBe(1);
+      expect(cierres).toBe(2);
     });
   });
 });

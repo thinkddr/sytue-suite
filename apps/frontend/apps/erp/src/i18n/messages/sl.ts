@@ -610,4 +610,8 @@ export const sl: AppCatalog<typeof en> = {
   'pos.imageUpload': 'Naloži sliko za {name}',
   'pos.images': 'Slike',
   'pos.imageHint': 'Izberite sliko JPEG, PNG ali WebP do 10 MB.',
+  'vf.error.invalidCertificate':
+    'Potrdilo ali zasebni ključ ni veljavno kvalificirano potrdilo s špansko davčno številko (NIF).',
+  'vf.error.certificateTaxIdMismatch':
+    'Davčna številka (NIF) na potrdilu se ne ujema z davčno številko organizacije.',
 };

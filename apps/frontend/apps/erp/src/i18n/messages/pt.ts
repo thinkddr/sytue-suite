@@ -556,4 +556,8 @@ export const pt: AppCatalog<typeof en> = {
   'pos.imageUpload': 'Carregar imagem de {name}',
   'pos.images': 'Imagens',
   'pos.imageHint': 'Escolha uma imagem JPEG, PNG ou WebP até 10 MB.',
+  'vf.error.invalidCertificate':
+    'O certificado ou a respetiva chave privada não são um certificado qualificado válido com NIF espanhol.',
+  'vf.error.certificateTaxIdMismatch':
+    'O NIF constante do certificado não coincide com o NIF da organização.',
 };

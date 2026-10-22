@@ -84,6 +84,17 @@ func (h *Handlers) CreateSelfMigration(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	if h.store != nil {
+		inst, err := h.store.GetInstance(r.Context(), req.InstanceID)
+		if err != nil {
+			httpx.Fail(w, r, toAPIError(err))
+			return
+		}
+		if tplSrc, ok := sourceForTemplate(inst.TemplateKey); !ok || tplSrc != src {
+			httpx.Fail(w, r, httpx.ErrBadRequest.WithMessage("The instance template does not match the requested migration source."))
+			return
+		}
+	}
 
 	jobs := make([]domain.MigrationJob, 0, len(doms))
 	for _, dom := range doms {

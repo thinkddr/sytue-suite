@@ -906,6 +906,17 @@ export const sv: AppCatalog<typeof en> = {
   'monitoring.alerts.scope.org': 'organisation',
   'monitoring.alerts.scope.project': 'projekt',
   'monitoring.alerts.disabled': 'inaktiverad',
+  'monitoring.alerts.unconfirmed': 'inväntar bekräftelse',
+  'monitoring.alerts.created.mailtoDesc':
+    'Vi har skickat en bekräftelselänk till den här adressen. Aviseringar kommer så snart den har bekräftats.',
+  'monitoring.alerts.confirm.title': 'Bekräfta e-postaviseringar',
+  'monitoring.alerts.confirm.desc':
+    'Bekräfta att den här adressen ska ta emot händelseaviseringar från Sytue DevX.',
+  'monitoring.alerts.confirm.submit': 'Bekräfta adress',
+  'monitoring.alerts.confirm.done':
+    'Adressen är bekräftad. Du får nu händelseaviseringar till den här e-postadressen.',
+  'monitoring.alerts.confirm.invalid':
+    'Den här bekräftelselänken är inte giltig eller så har aviseringen redan tagits bort.',
   'monitoring.alerts.delete': 'Ta bort aviseringen {event}',
   'members.subtitle': 'Vem som har åtkomst till organisationen. Varje medlem är en plats i sviten.',
   'members.add': 'Bjud in medlem',

@@ -37,13 +37,15 @@ func (s *Store) PedirEdicion(ctx context.Context, recurso uuid.UUID, p peticione
 // verjas de Drive). ErrNotFound si no, sin decir si existe.
 func puedeConceder(ctx context.Context, tx pgx.Tx, tenant string, recurso uuid.UUID, sub string) error {
 	var puede bool
-	err := tx.QueryRow(ctx, `
-		SELECT EXISTS (SELECT 1 FROM files   WHERE tenant = $1 AND id = $2 AND owner_sub = $3)
-		    OR EXISTS (SELECT 1 FROM folders WHERE tenant = $1 AND id = $2 AND owner_sub = $3)
-		    OR EXISTS (SELECT 1 FROM shares  WHERE tenant = $1 AND (file_id = $2 OR folder_id = $2)
-		                                       AND created_by = $3 AND revoked_at IS NULL
-		                                       AND (expires_at IS NULL OR expires_at > now()))`,
-		tenant, recurso, sub).Scan(&puede)
+	err := conTodaLaOrganizacion(ctx, tx, func() error {
+		return tx.QueryRow(ctx, `
+			SELECT EXISTS (SELECT 1 FROM files   WHERE tenant = $1 AND id = $2 AND owner_sub = $3)
+			    OR EXISTS (SELECT 1 FROM folders WHERE tenant = $1 AND id = $2 AND owner_sub = $3)
+			    OR EXISTS (SELECT 1 FROM shares  WHERE tenant = $1 AND (file_id = $2 OR folder_id = $2)
+			                                       AND created_by = $3 AND revoked_at IS NULL
+			                                       AND (expires_at IS NULL OR expires_at > now()))`,
+			tenant, recurso, sub).Scan(&puede)
+	})
 	if err != nil {
 		return err
 	}
@@ -56,8 +58,11 @@ func puedeConceder(ctx context.Context, tx pgx.Tx, tenant string, recurso uuid.U
 // PeticionesEdicion son las pendientes de `recurso`. Solo quien puede conceder.
 func (s *Store) PeticionesEdicion(ctx context.Context, recurso uuid.UUID, sub string) ([]peticiones.Peticion, error) {
 	t := tenancy.MustFrom(ctx)
+	if OwnerFrom(ctx) == "" {
+		ctx = WithOwner(ctx, sub)
+	}
 	var out []peticiones.Peticion
-	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	err := s.inTx(ctx, func(tx pgx.Tx) error {
 		if err := puedeConceder(ctx, tx, t.Slug, recurso, sub); err != nil {
 			return err
 		}
@@ -74,7 +79,10 @@ func (s *Store) PeticionesEdicion(ctx context.Context, recurso uuid.UUID, sub st
 // tiene compartición propia, se le da una de escritura.
 func (s *Store) ResolverPeticionEdicion(ctx context.Context, recurso uuid.UUID, sub, sujeto string, concede bool) error {
 	t := tenancy.MustFrom(ctx)
-	return s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	if OwnerFrom(ctx) == "" {
+		ctx = WithOwner(ctx, sub)
+	}
+	return s.inTx(ctx, func(tx pgx.Tx) error {
 		if err := puedeConceder(ctx, tx, t.Slug, recurso, sub); err != nil {
 			return err
 		}
@@ -96,14 +104,16 @@ func (s *Store) ResolverPeticionEdicion(ctx context.Context, recurso uuid.UUID, 
 		if err != nil || tag.RowsAffected() > 0 {
 			return err
 		}
-		_, err = tx.Exec(ctx, `
-			INSERT INTO shares (tenant, file_id, folder_id, kind, subject, permission, created_by)
-			SELECT $1, (SELECT id FROM files WHERE tenant = $1 AND id = $2),
-			           (SELECT id FROM folders WHERE tenant = $1 AND id = $2), 'user', $3, 'write', $4
-			 WHERE EXISTS (SELECT 1 FROM files WHERE tenant = $1 AND id = $2)
-			    OR EXISTS (SELECT 1 FROM folders WHERE tenant = $1 AND id = $2)`,
-			t.Slug, recurso, sujeto, sub)
-		return err
+		return conTodaLaOrganizacion(ctx, tx, func() error {
+			_, err := tx.Exec(ctx, `
+				INSERT INTO shares (tenant, file_id, folder_id, kind, subject, permission, created_by)
+				SELECT $1, (SELECT id FROM files WHERE tenant = $1 AND id = $2),
+				           (SELECT id FROM folders WHERE tenant = $1 AND id = $2), 'user', $3, 'write', $4
+				 WHERE EXISTS (SELECT 1 FROM files WHERE tenant = $1 AND id = $2)
+				    OR EXISTS (SELECT 1 FROM folders WHERE tenant = $1 AND id = $2)`,
+				t.Slug, recurso, sujeto, sub)
+			return err
+		})
 	})
 }
 

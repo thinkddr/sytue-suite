@@ -328,6 +328,7 @@ func (e *ejecucion) color(ops []pdfObj, trazo bool) {
 		e.estado.trazo, e.estado.patronTrazo = css, ""
 	} else {
 		e.estado.relleno, e.estado.patronRelleno = css, ""
+		e.estado.degRelleno, e.estado.mallaRelleno = nil, nil
 	}
 }
 
@@ -347,6 +348,7 @@ type funcionPDF struct {
 	bps      int
 	decodif  []float64
 	nSalida  int
+	psTokens []tokenPS
 }
 
 // funcion interpreta un diccionario o flujo de función. Un array de funciones
@@ -360,11 +362,14 @@ func (l *lienzo) funcion(o pdfObj, prof int) *funcionPDF {
 	}
 	res := l.d.resolver(o)
 	if arr, ok := res.(pdfArray); ok {
-		// Array de N funciones de 1 salida cada una: se representa como tipo 3
-		// degenerado con `limites` vacío, que `evaluar` trata como concatenación.
+		// Array de N funciones de 1 salida cada una: se representa como tipo -1,
+		// que `evaluar` y `evaluarVarias` tratan como concatenación.
 		f := &funcionPDF{tipo: -1, dominio: []float64{0, 1}}
 		for _, e := range arr {
 			if sub := l.funcion(e, prof+1); sub != nil {
+				if len(f.trozos) == 0 && len(sub.dominio) >= 2 {
+					f.dominio = sub.dominio
+				}
 				f.trozos = append(f.trozos, sub)
 			}
 		}
@@ -438,9 +443,11 @@ func (l *lienzo) funcion(o pdfObj, prof int) *funcionPDF {
 		f.decodif = l.reales(dict["Decode"])
 		f.nSalida = len(f.rango) / 2
 	case 4:
-		// Calculadora PostScript. No se interpreta: se aproxima por el rango
-		// declarado, que da un degradado con la dirección y los extremos
-		// correctos aunque el centro no coincida.
+		if st != nil {
+			if datos, err := l.d.datosDeFlujo(st); err == nil {
+				f.psTokens = tokenizarPS(datos)
+			}
+		}
 		f.nSalida = len(f.rango) / 2
 	}
 	if f.nSalida == 0 {
@@ -503,8 +510,9 @@ func (f *funcionPDF) evaluar(x float64) []float64 {
 	case 0:
 		return f.evaluarMuestreada(x, d0, d1)
 	case 4:
-		// Interpolación lineal entre los extremos del rango: no es la función,
-		// pero es monótona y va del color inicial al final.
+		if len(f.psTokens) > 0 {
+			return f.evaluarPS([]float64{x})
+		}
 		out := make([]float64, f.nSalida)
 		t := normalizar(x, d0, d1)
 		for i := 0; i < f.nSalida && 2*i+1 < len(f.rango); i++ {
@@ -515,13 +523,46 @@ func (f *funcionPDF) evaluar(x float64) []float64 {
 	return []float64{0}
 }
 
-// evaluarVarias aplica la función a una entrada de varios componentes. Solo la
-// necesitan DeviceN; con una sola entrada delega en `evaluar`.
+// evaluarVarias aplica la función a una entrada de varios componentes (DeviceN,
+// sombreados de función de dos variables y calculadoras PostScript).
 func (f *funcionPDF) evaluarVarias(c []float64) []float64 {
-	if len(c) == 0 {
+	if f == nil || len(c) == 0 {
 		return []float64{0}
 	}
-	return f.evaluar(c[0])
+	if len(c) == 1 && f.tipo != 4 {
+		return f.evaluar(c[0])
+	}
+	entradas := make([]float64, len(c))
+	for i, x := range c {
+		if 2*i+1 < len(f.dominio) {
+			d0, d1 := f.dominio[2*i], f.dominio[2*i+1]
+			x = math.Max(math.Min(d0, d1), math.Min(math.Max(d0, d1), x))
+		}
+		entradas[i] = x
+	}
+	switch f.tipo {
+	case -1:
+		out := make([]float64, 0, len(f.trozos))
+		for _, sub := range f.trozos {
+			v := sub.evaluarVarias(entradas)
+			if len(v) > 0 {
+				out = append(out, v[0])
+			} else {
+				out = append(out, 0)
+			}
+		}
+		return out
+	case 0:
+		if len(f.tamano) >= 2 && len(entradas) >= 2 {
+			return f.evaluarMuestreada2D(entradas[0], entradas[1])
+		}
+		return f.evaluar(entradas[0])
+	case 4:
+		if len(f.psTokens) > 0 {
+			return f.evaluarPS(entradas)
+		}
+	}
+	return f.evaluar(entradas[0])
 }
 
 func (f *funcionPDF) evaluarCosida(x, d0, d1 float64) []float64 {
@@ -595,6 +636,374 @@ func (f *funcionPDF) evaluarMuestreada(x, d0, d1 float64) []float64 {
 	return out
 }
 
+func (f *funcionPDF) evaluarMuestreada2D(x0, x1 float64) []float64 {
+	if len(f.tamano) < 2 || f.tamano[0] < 1 || f.tamano[1] < 1 || f.nSalida == 0 {
+		return []float64{0}
+	}
+	indice := func(k int, x float64) (int, int, float64) {
+		tam := f.tamano[k]
+		d0, d1 := 0.0, 1.0
+		if 2*k+1 < len(f.dominio) {
+			d0, d1 = f.dominio[2*k], f.dominio[2*k+1]
+		}
+		e0, e1 := 0.0, float64(tam-1)
+		if 2*k+1 < len(f.codifica) {
+			e0, e1 = f.codifica[2*k], f.codifica[2*k+1]
+		}
+		pos := e0 + normalizar(x, d0, d1)*(e1-e0)
+		pos = math.Max(0, math.Min(float64(tam-1), pos))
+		i0 := int(math.Floor(pos))
+		i1 := min(i0+1, tam-1)
+		return i0, i1, pos - float64(i0)
+	}
+	i0, i1, tx := indice(0, x0)
+	j0, j1, ty := indice(1, x1)
+	tam0 := f.tamano[0]
+	maxVal := float64(uint64(1)<<uint(f.bps) - 1)
+	out := make([]float64, f.nSalida)
+	for c := 0; c < f.nSalida; c++ {
+		m00 := float64(f.muestra((j0*tam0+i0)*f.nSalida+c)) / maxVal
+		m10 := float64(f.muestra((j0*tam0+i1)*f.nSalida+c)) / maxVal
+		m01 := float64(f.muestra((j1*tam0+i0)*f.nSalida+c)) / maxVal
+		m11 := float64(f.muestra((j1*tam0+i1)*f.nSalida+c)) / maxVal
+		v0 := m00 + tx*(m10-m00)
+		v1 := m01 + tx*(m11-m01)
+		v := v0 + ty*(v1-v0)
+		lo, hi := 0.0, 1.0
+		switch {
+		case 2*c+1 < len(f.decodif):
+			lo, hi = f.decodif[2*c], f.decodif[2*c+1]
+		case 2*c+1 < len(f.rango):
+			lo, hi = f.rango[2*c], f.rango[2*c+1]
+		}
+		out[c] = lo + v*(hi-lo)
+	}
+	return out
+}
+
+// --- Calculadora PostScript (FunctionType 4, §7.10.5) ------------------------
+
+type tokenPS struct {
+	op     string
+	num    float64
+	esNum  bool
+	esInt  bool
+	bloque []tokenPS
+}
+
+type valorPS struct {
+	num    float64
+	esInt  bool
+	esBool bool
+	bloque []tokenPS
+}
+
+func tokenizarPS(src []byte) []tokenPS {
+	tokens, _ := leerBloquePS(src, 0)
+	if len(tokens) == 1 && tokens[0].bloque != nil {
+		return tokens[0].bloque
+	}
+	return tokens
+}
+
+func leerBloquePS(src []byte, pos int) ([]tokenPS, int) {
+	var out []tokenPS
+	for pos < len(src) {
+		pos = saltarEspaciosYComentariosPS(src, pos)
+		if pos >= len(src) {
+			break
+		}
+		if src[pos] == '{' {
+			var sub []tokenPS
+			sub, pos = leerBloquePS(src, pos+1)
+			out = append(out, tokenPS{bloque: sub})
+			continue
+		}
+		if src[pos] == '}' {
+			return out, pos + 1
+		}
+		ini := pos
+		for pos < len(src) && !esDelimitadorPS(src[pos]) {
+			pos++
+		}
+		pal := string(src[ini:pos])
+		if v, err := strconv.ParseInt(pal, 10, 64); err == nil {
+			out = append(out, tokenPS{num: float64(v), esNum: true, esInt: true})
+		} else if v, err := strconv.ParseFloat(pal, 64); err == nil {
+			out = append(out, tokenPS{num: v, esNum: true})
+		} else {
+			out = append(out, tokenPS{op: pal})
+		}
+	}
+	return out, pos
+}
+
+func saltarEspaciosYComentariosPS(src []byte, pos int) int {
+	for pos < len(src) {
+		if esEspacioPDF(src[pos]) {
+			pos++
+			continue
+		}
+		if src[pos] == '%' {
+			for pos < len(src) && src[pos] != '\n' && src[pos] != '\r' {
+				pos++
+			}
+			continue
+		}
+		break
+	}
+	return pos
+}
+
+func esDelimitadorPS(b byte) bool {
+	return esEspacioPDF(b) || b == '{' || b == '}' || b == '%'
+}
+
+func (f *funcionPDF) evaluarPS(entradas []float64) []float64 {
+	pila := make([]valorPS, 0, len(entradas)+8)
+	for _, x := range entradas {
+		pila = append(pila, valorPS{num: x})
+	}
+	pasos := 0
+	pila = ejecutarPS(f.psTokens, pila, &pasos)
+	out := make([]float64, f.nSalida)
+	base := max(len(pila)-f.nSalida, 0)
+	for i := 0; i < f.nSalida; i++ {
+		var v float64
+		if base+i < len(pila) {
+			v = pila[base+i].num
+		}
+		if 2*i+1 < len(f.rango) {
+			d0, d1 := f.rango[2*i], f.rango[2*i+1]
+			v = math.Max(math.Min(d0, d1), math.Min(math.Max(d0, d1), v))
+		}
+		out[i] = v
+	}
+	return out
+}
+
+//nolint:gocognit,gocyclo // Conjunto fijo de operadores de la tabla 42 de PDF (§7.10.5).
+func ejecutarPS(tokens []tokenPS, pila []valorPS, pasos *int) []valorPS {
+	pop := func() valorPS {
+		if len(pila) == 0 {
+			return valorPS{}
+		}
+		v := pila[len(pila)-1]
+		pila = pila[:len(pila)-1]
+		return v
+	}
+	push := func(v float64) {
+		if len(pila) < 1024 {
+			pila = append(pila, valorPS{num: v})
+		}
+	}
+	pushNum := func(v float64, esInt bool) {
+		if len(pila) < 1024 {
+			pila = append(pila, valorPS{num: v, esInt: esInt})
+		}
+	}
+	pushBool := func(b bool) {
+		v := 0.0
+		if b {
+			v = 1
+		}
+		if len(pila) < 1024 {
+			pila = append(pila, valorPS{num: v, esBool: true})
+		}
+	}
+	for _, tk := range tokens {
+		*pasos++
+		if *pasos > 4096 {
+			return pila
+		}
+		if tk.esNum {
+			pushNum(tk.num, tk.esInt)
+			continue
+		}
+		if tk.bloque != nil {
+			if len(pila) < 1024 {
+				pila = append(pila, valorPS{bloque: tk.bloque})
+			}
+			continue
+		}
+		switch tk.op {
+		case "true":
+			pushBool(true)
+		case "false":
+			pushBool(false)
+		case "add":
+			b, a := pop(), pop()
+			pushNum(a.num+b.num, a.esInt && b.esInt)
+		case "sub":
+			b, a := pop(), pop()
+			pushNum(a.num-b.num, a.esInt && b.esInt)
+		case "mul":
+			b, a := pop(), pop()
+			pushNum(a.num*b.num, a.esInt && b.esInt)
+		case "div":
+			b, a := pop().num, pop().num
+			if b != 0 {
+				push(a / b)
+			} else {
+				push(0)
+			}
+		case "idiv":
+			b, a := pop(), pop()
+			if !a.esInt || !b.esInt || int64(b.num) == 0 {
+				return nil
+			}
+			pushNum(float64(int64(a.num)/int64(b.num)), true)
+		case "mod":
+			b, a := pop(), pop()
+			if !a.esInt || !b.esInt || int64(b.num) == 0 {
+				return nil
+			}
+			pushNum(float64(int64(a.num)%int64(b.num)), true)
+		case "neg":
+			a := pop()
+			pushNum(-a.num, a.esInt)
+		case "abs":
+			a := pop()
+			pushNum(math.Abs(a.num), a.esInt)
+		case "ceiling":
+			a := pop()
+			pushNum(math.Ceil(a.num), a.esInt)
+		case "floor":
+			a := pop()
+			pushNum(math.Floor(a.num), a.esInt)
+		case "round":
+			a := pop()
+			pushNum(math.Floor(a.num+0.5), a.esInt)
+		case "truncate":
+			a := pop()
+			pushNum(math.Trunc(a.num), a.esInt)
+		case "cvi":
+			pushNum(math.Trunc(pop().num), true)
+		case "cvr":
+			push(pop().num)
+		case "sqrt":
+			push(math.Sqrt(math.Max(pop().num, 0)))
+		case "sin":
+			push(math.Sin(pop().num * math.Pi / 180))
+		case "cos":
+			push(math.Cos(pop().num * math.Pi / 180))
+		case "atan":
+			den, num := pop().num, pop().num
+			ang := math.Atan2(num, den) * 180 / math.Pi
+			if ang < 0 {
+				ang += 360
+			}
+			push(ang)
+		case "exp":
+			b, a := pop().num, pop().num
+			push(math.Pow(a, b))
+		case "ln":
+			push(math.Log(math.Max(pop().num, 1e-30)))
+		case "log":
+			push(math.Log10(math.Max(pop().num, 1e-30)))
+		case "eq":
+			b, a := pop(), pop()
+			pushBool(math.Abs(a.num-b.num) < 1e-9)
+		case "ne":
+			b, a := pop(), pop()
+			pushBool(math.Abs(a.num-b.num) >= 1e-9)
+		case "gt":
+			b, a := pop().num, pop().num
+			pushBool(a > b)
+		case "ge":
+			b, a := pop().num, pop().num
+			pushBool(a >= b)
+		case "lt":
+			b, a := pop().num, pop().num
+			pushBool(a < b)
+		case "le":
+			b, a := pop().num, pop().num
+			pushBool(a <= b)
+		case "and":
+			b, a := pop(), pop()
+			if a.esBool || b.esBool {
+				pushBool(a.num != 0 && b.num != 0)
+			} else {
+				push(float64(int64(a.num) & int64(b.num)))
+			}
+		case "or":
+			b, a := pop(), pop()
+			if a.esBool || b.esBool {
+				pushBool(a.num != 0 || b.num != 0)
+			} else {
+				push(float64(int64(a.num) | int64(b.num)))
+			}
+		case "xor":
+			b, a := pop(), pop()
+			if a.esBool || b.esBool {
+				pushBool((a.num != 0) != (b.num != 0))
+			} else {
+				push(float64(int64(a.num) ^ int64(b.num)))
+			}
+		case "not":
+			a := pop()
+			if a.esBool {
+				pushBool(a.num == 0)
+			} else {
+				push(float64(^int64(a.num)))
+			}
+		case "bitshift":
+			sh, v := int(pop().num), int64(pop().num)
+			switch {
+			case sh >= 0 && sh < 64:
+				push(float64(v << uint(sh)))
+			case sh < 0 && -sh < 64:
+				push(float64(uint64(v) >> uint(-sh))) //nolint:gosec // G115: desplazamiento lógico de PostScript
+			default:
+				push(0)
+			}
+		case "if":
+			proc, cond := pop(), pop()
+			if cond.num != 0 && proc.bloque != nil {
+				pila = ejecutarPS(proc.bloque, pila, pasos)
+			}
+		case "ifelse":
+			falso, cierto, cond := pop(), pop(), pop()
+			if cond.num != 0 && cierto.bloque != nil {
+				pila = ejecutarPS(cierto.bloque, pila, pasos)
+			} else if cond.num == 0 && falso.bloque != nil {
+				pila = ejecutarPS(falso.bloque, pila, pasos)
+			}
+		case "pop":
+			_ = pop()
+		case "exch":
+			if len(pila) >= 2 {
+				n := len(pila)
+				pila[n-1], pila[n-2] = pila[n-2], pila[n-1]
+			}
+		case "dup":
+			if len(pila) >= 1 && len(pila) < 1024 {
+				pila = append(pila, pila[len(pila)-1])
+			}
+		case "copy":
+			n := int(pop().num)
+			if n > 0 && n <= len(pila) && len(pila)+n <= 1024 {
+				pila = append(pila, pila[len(pila)-n:]...)
+			}
+		case "index":
+			n := int(pop().num)
+			if n >= 0 && n < len(pila) && len(pila) < 1024 {
+				pila = append(pila, pila[len(pila)-1-n])
+			}
+		case "roll":
+			j, n := int(pop().num), int(pop().num)
+			if n > 0 && n <= len(pila) {
+				ini := len(pila) - n
+				viejo := append([]valorPS(nil), pila[ini:]...)
+				for k := 0; k < n; k++ {
+					pila[ini+k] = viejo[((k-j)%n+n)%n]
+				}
+			}
+		}
+	}
+	return pila
+}
+
 // muestra lee la muestra número i respetando /BitsPerSample, que puede no ser
 // múltiplo de 8 (1, 2, 4, 12 y 24 son legales).
 func (f *funcionPDF) muestra(i int) uint64 {
@@ -624,26 +1033,29 @@ func normalizar(x, a, b float64) float64 {
 // vigente. Como el recorte ya es un <g clip-path>, basta con un rectángulo
 // enorme dentro de él.
 func (e *ejecucion) sombrear(nombre pdfName) {
-	sh := e.l.d.resolver(e.recursoDe("Shading", nombre))
-
-	if e.l.r != nil {
-		// En PNG el degradado se resuelve con su color medio sobre el área de
-		// recorte. Se ve el bloque de color donde va el sombreado, que es lo que
-		// permite leer lo que tiene encima; el degradado fino es del SVG.
-		if g := e.l.degradadoDe(sh, e.estado.ctm); g != nil {
-			e.l.r.rellenarAreaCon(e.estado.recorte, g.conAlfa(e.estado.alfaRelleno))
-		} else if medio := e.l.colorMedioDeSombreado(sh); medio != "" {
-			e.l.r.rellenarArea(e.estado.recorte, colorRaster(medio, e.estado.alfaRelleno))
-		}
+	if e.ocgOculto > 0 {
+		return
 	}
+	sh := e.l.d.resolver(e.recursoDe("Shading", nombre))
 
 	// Una MALLA no es un servidor de pintura: son triángulos. Se dibujan aquí
 	// mismo y el recorte vigente —que ya es un <g clip-path>— los acota, que es
 	// exactamente lo que `sh` quiere decir.
 	if tris, ok := e.l.mallaDeSombreado(sh); ok {
+		if e.l.r != nil {
+			e.l.r.dibujarMalla(tris, e.estado.ctm, e.estado.alfaRelleno, e.estado.recorte)
+		}
 		e.cerrarTexto()
 		e.l.dibujarMalla(tris, e.estado.ctm, &e.l.sb)
 		return
+	}
+
+	if e.l.r != nil {
+		if g := e.l.degradadoDe(sh, e.estado.ctm, false); g != nil {
+			e.l.r.rellenarAreaCon(e.estado.recorte, g.conAlfa(e.estado.alfaRelleno))
+		} else if medio := e.l.colorMedioDeSombreado(sh); medio != "" {
+			e.l.r.rellenarArea(e.estado.recorte, colorRaster(medio, e.estado.alfaRelleno))
+		}
 	}
 
 	id, ok := e.l.gradiente(sh, e.estado.ctm)
@@ -684,41 +1096,43 @@ func (e *ejecucion) aplicarPatron(nombre pdfName, trazo bool) {
 	// del momento: un patrón no se mueve con lo que se pinta. Por eso se compone
 	// con la matriz base de la página, que es la que hay en el fondo de la pila.
 	base := e.pila[0].ctm
+	mp := m.por(base)
 	tipo, _ := comoEntero(e.l.d.resolver(dict["PatternType"]))
 
 	var id string
 	var ok bool
+	var malla []trianguloMalla
 	switch tipo {
 	case 2:
 		sh := e.l.d.resolver(dict["Shading"])
 		// Con una malla dentro hace falta envolverla: un relleno necesita un
 		// servidor de pintura y las figuras no lo son.
 		if tris, hay := e.l.mallaDeSombreado(sh); hay {
-			id, ok = e.l.mallaComoPatron(tris, m.por(base))
+			malla = tris
+			id, ok = e.l.mallaComoPatron(tris, mp)
 			break
 		}
-		id, ok = e.l.gradiente(sh, m.por(base))
+		id, ok = e.l.gradiente(sh, mp)
 	case 1:
 		if st != nil {
-			id, ok = e.l.mosaico(st, m.por(base))
+			id, ok = e.l.mosaico(st, mp)
 		}
 	}
 	if !ok {
 		return
 	}
-	// La salida PNG no tiene servidores de pintura: se queda con el color medio
-	// del sombreado, que es visible y del tono correcto. De un mosaico no se
-	// deduce color, así que se deja vacío y no se pinta.
 	aprox := ""
 	var deg *degradadoRaster
-	if tipo == 2 && e.l.r != nil {
-		aprox = e.l.colorMedioDeSombreado(e.l.d.resolver(dict["Shading"]))
-		deg = e.l.degradadoDe(e.l.d.resolver(dict["Shading"]), m.por(base))
+	if tipo == 2 && len(malla) == 0 {
+		sh := e.l.d.resolver(dict["Shading"])
+		aprox = e.l.colorMedioDeSombreado(sh)
+		deg = e.l.degradadoDe(sh, mp, true)
 	}
 	if trazo {
 		e.estado.patronTrazo, e.estado.aproxTrazo = id, aprox
 	} else {
 		e.estado.patronRelleno, e.estado.aproxRelleno, e.estado.degRelleno = id, aprox, deg
+		e.estado.mallaRelleno, e.estado.matrizMalla = malla, mp
 	}
 }
 
@@ -735,8 +1149,12 @@ func (l *lienzo) colorMedioDeSombreado(sh pdfObj) string {
 	default:
 		return ""
 	}
+	tipo, _ := comoEntero(l.d.resolver(dict["ShadingType"]))
 	fn := l.funcion(dict["Function"], 0)
 	if fn == nil {
+		return ""
+	}
+	if (tipo == 2 || tipo == 3) && len(fn.dominio) > 2 {
 		return ""
 	}
 	dom := l.reales(dict["Domain"])

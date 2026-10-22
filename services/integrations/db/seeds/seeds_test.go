@@ -314,6 +314,7 @@ func TestRoomsPideSoloLosPermisosQueConsume(t *testing.T) {
 	want := map[string]string{
 		"slack-rooms":           "incoming-webhook",
 		"microsoft-teams-rooms": "offline_access User.Read Team.ReadBasic.All Channel.ReadBasic.All ChannelMessage.Send",
+		"microsoft-teams-chat":  "offline_access User.Read Team.ReadBasic.All Channel.ReadBasic.All ChannelMessage.Send Chat.ReadWrite",
 		"google-chat":           "https://www.googleapis.com/auth/chat.spaces.readonly https://www.googleapis.com/auth/chat.messages.create",
 		"google-meet":           "https://www.googleapis.com/auth/meetings.space.created",
 	}

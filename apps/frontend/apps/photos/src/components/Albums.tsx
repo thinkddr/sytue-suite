@@ -4,15 +4,27 @@
  */
 import type { JSX } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
-import { Button, EmptyState, Icon, Illustration, Input, Spinner, usePrompt } from '@sytue/ui';
+import {
+  Button,
+  Checkbox,
+  EmptyState,
+  Icon,
+  Illustration,
+  Input,
+  Spinner,
+  usePrompt,
+} from '@sytue/ui';
 import type { Locale } from '@sytue/i18n';
 import {
   albumes,
   anyadirAlAlbum,
   crearAlbum,
+  guardarAjustesOrganizacion,
+  obtenerAjustesOrganizacion,
   temas as pedirTemas,
   textoAlternativo,
   urlDeVariante,
+  type AjustesOrganizacion,
   type Album,
   type Foto,
 } from '../client/photosApi.js';
@@ -42,7 +54,21 @@ export function Albums({
   // dejar la sección en blanco como si estuviera cargando para siempre.
   const [montones, setMontones] = useState<Foto[][] | null>(null);
   const [buscando, setBuscando] = useState(false);
+  const [ajustes, setAjustes] = useState<AjustesOrganizacion | null>(null);
+  const [guardandoAjustes, setGuardandoAjustes] = useState(false);
   const { preguntar, dialogo: dialogoPreguntar } = usePrompt();
+
+  const cambiarExclusionLote = async (excluir: boolean) => {
+    setGuardandoAjustes(true);
+    try {
+      const nuevos = await guardarAjustesOrganizacion(excluir);
+      setAjustes(nuevos);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setGuardandoAjustes(false);
+    }
+  };
 
   const buscarTemas = async () => {
     if (buscando) return;
@@ -85,6 +111,9 @@ export function Albums({
     albumes()
       .then(setLista)
       .catch((e) => setError(String(e)));
+    obtenerAjustesOrganizacion()
+      .then(setAjustes)
+      .catch(() => {});
   }, []);
 
   const crear = async (e: Event) => {
@@ -146,7 +175,19 @@ export function Albums({
             >
               {buscando ? t('albums.suggestionsLoading') : t('albums.suggestionsFind')}
             </Button>
+            {ajustes?.canManageAiBatch ? (
+              <Checkbox
+                class="ml-auto text-xs"
+                label={t('aiBatch.excludeOrg')}
+                checked={ajustes.excludeAiBatch}
+                disabled={guardandoAjustes}
+                onChange={(e) => void cambiarExclusionLote(e.currentTarget.checked)}
+              />
+            ) : null}
           </div>
+          {ajustes?.excludeAiBatch ? (
+            <p class="text-text-muted mb-2 text-xs">{t('aiBatch.excludedHint')}</p>
+          ) : null}
           {montones !== null && montones.length === 0 ? (
             <p class="text-text-muted text-sm">{t('albums.suggestionsNone')}</p>
           ) : null}

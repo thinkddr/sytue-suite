@@ -505,6 +505,8 @@
   "vf.confirmBody": "No šī brīža katrs apstiprinātais rēķins tiek nosūtīts Spānijas nodokļu administrācijai, un to vairs nevar mainīt vai dzēst: kļūdas labo ar labojuma rēķinu. Kad ieslēgts, tas paliek ieslēgts līdz gada beigām.",
   "vf.confirmTitle": "Ieslēgt VERI*FACTU?",
   "vf.declaration": "Atbilstības deklarācija",
+  "vf.error.certificateTaxIdMismatch": "Sertifikātā norādītais nodokļu maksātāja numurs (NIF) nesakrīt ar organizācijas numuru.",
+  "vf.error.invalidCertificate": "Sertifikāts vai privātā atslēga nav derīgs kvalificēts sertifikāts ar Spānijas nodokļu maksātāja numuru (NIF).",
   "vf.export": "Lejupielādēt ierakstus",
   "vf.fixHint": "Izlabojiet rēķina vai klienta datus un nosūtiet to vēlreiz.",
   "vf.intro": "No 2027. gada katrs rēķins tā izrakstīšanas brīdī jāreģistrē Spānijas nodokļu administrācijā. Ar VERI*FACTU Sytue to izdara jūsu vietā, kad apstiprināt rēķinu, un pievieno QR kodu, ar kuru klients var to pārbaudīt.",

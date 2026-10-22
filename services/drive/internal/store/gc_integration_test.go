@@ -36,6 +36,9 @@ func backdateDeletedAt(t *testing.T, ctx context.Context, h *pgtest.Harness, tab
 	// table es un literal de test controlado ("files"/"folders"), no entrada externa.
 	sql := "UPDATE " + table + " SET deleted_at = now() - make_interval(secs => $2) WHERE id = $1"
 	if err := h.Pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, "SELECT set_config('app.maintenance', 'on', true)"); err != nil {
+			return err
+		}
 		_, err := tx.Exec(ctx, sql, id, age.Seconds())
 		return err
 	}); err != nil {

@@ -35,3 +35,40 @@ func TestAlertEventForBusType(t *testing.T) {
 		}
 	}
 }
+
+// CLOUD-19 — una alerta con canal mailto: nace sin confirmar (Confirmed=false),
+// guarda el hash SHA-256 de un token aleatorio y solo queda confirmada tras
+// presentar el token en ConfirmAlertPolicy. Los webhooks HTTP(S) nacen ya
+// confirmados.
+func TestCreateAlertPolicyMailtoRequiereConfirmacionPorEnlace(t *testing.T) {
+	fs := &fakeStore{}
+	s := newTestService(fs, nil)
+	ctx := tenantCtx(t)
+
+	// Webhook HTTP(S): confirmado desde el alta.
+	wh, err := s.CreateAlertPolicy(ctx, CreateAlertPolicyInput{
+		Event:      domain.AlertEventDeployFailed,
+		ChannelURL: "https://hooks.slack.com/services/T00/B00/X00",
+	})
+	if err != nil {
+		t.Fatalf("CreateAlertPolicy webhook: %v", err)
+	}
+	if !wh.Confirmed || fs.newAlert == nil || !fs.newAlert.Confirmed || fs.newAlert.ConfirmTokenHash != nil {
+		t.Fatalf("un webhook debe nacer confirmado y sin token: policy=%+v rec=%+v", wh, fs.newAlert)
+	}
+
+	// Canal mailto: nace sin confirmar y con hash de token.
+	mailPol, err := s.CreateAlertPolicy(ctx, CreateAlertPolicyInput{
+		Event:      domain.AlertEventUptimeDown,
+		ChannelURL: "mailto:ops@sytue.eu",
+	})
+	if err != nil {
+		t.Fatalf("CreateAlertPolicy mailto: %v", err)
+	}
+	if mailPol.Confirmed {
+		t.Fatal("una alerta mailto: debe nacer sin confirmar (Confirmed=false)")
+	}
+	if fs.newAlert == nil || fs.newAlert.Confirmed || fs.newAlert.ConfirmTokenHash == nil || len(*fs.newAlert.ConfirmTokenHash) != 64 {
+		t.Fatalf("debe persistirse el hash SHA-256 del token de confirmación: %+v", fs.newAlert)
+	}
+}

@@ -24,11 +24,14 @@ func AvisosHistoricos(ctx context.Context, pool *pg.Pool, publicURL string) ([]h
 	t := tenancy.MustFrom(ctx)
 	var out []hubnotify.Historico
 	err := pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+		if err := pg.SetMaintenance(ctx, tx); err != nil {
+			return err
+		}
 		rows, err := tx.Query(ctx, `
 			SELECT sh.created_at, sh.id::text, sh.subject, coalesce(f.id, d.id)::text, coalesce(f.name, d.name)
 			FROM shares sh
-			LEFT JOIN files f ON f.id = sh.file_id AND f.deleted_at IS NULL
-			LEFT JOIN folders d ON d.id = sh.folder_id AND d.deleted_at IS NULL
+			LEFT JOIN files f ON f.tenant = sh.tenant AND f.id = sh.file_id AND f.deleted_at IS NULL
+			LEFT JOIN folders d ON d.tenant = sh.tenant AND d.id = sh.folder_id AND d.deleted_at IS NULL
 			WHERE sh.tenant = $1 AND sh.kind = 'user' AND sh.revoked_at IS NULL
 			  AND (sh.expires_at IS NULL OR sh.expires_at > now())
 			  AND sh.subject <> sh.created_by

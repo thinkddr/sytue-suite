@@ -76,6 +76,10 @@ func (s *Store) GuardarOrganizacion(ctx context.Context, o Organizacion, sub str
 			   SET nombre = EXCLUDED.nombre, nif = EXCLUDED.nif, direccion = EXCLUDED.direccion,
 			       cp = EXCLUDED.cp, ciudad = EXCLUDED.ciudad, pais = EXCLUDED.pais,
 			       forma = EXCLUDED.forma, condiciones = EXCLUDED.condiciones,
+			       verifactu_cert_pem = CASE WHEN upper(regexp_replace(organizacion.nif, '[^A-Za-z0-9]', '', 'g')) = upper(regexp_replace(EXCLUDED.nif, '[^A-Za-z0-9]', '', 'g')) THEN organizacion.verifactu_cert_pem ELSE '' END,
+			       verifactu_key_enc = CASE WHEN upper(regexp_replace(organizacion.nif, '[^A-Za-z0-9]', '', 'g')) = upper(regexp_replace(EXCLUDED.nif, '[^A-Za-z0-9]', '', 'g')) THEN organizacion.verifactu_key_enc ELSE '' END,
+			       verifactu_cert_nif = CASE WHEN upper(regexp_replace(organizacion.nif, '[^A-Za-z0-9]', '', 'g')) = upper(regexp_replace(EXCLUDED.nif, '[^A-Za-z0-9]', '', 'g')) THEN organizacion.verifactu_cert_nif ELSE '' END,
+			       verifactu_sello = CASE WHEN upper(regexp_replace(organizacion.nif, '[^A-Za-z0-9]', '', 'g')) = upper(regexp_replace(EXCLUDED.nif, '[^A-Za-z0-9]', '', 'g')) THEN organizacion.verifactu_sello ELSE false END,
 			       actualizado_por = EXCLUDED.actualizado_por, updated_at = now()
 			 WHERE organizacion.verifactu_desde IS NULL
 			    OR upper(regexp_replace(organizacion.nif, '[^A-Za-z0-9]', '', 'g'))

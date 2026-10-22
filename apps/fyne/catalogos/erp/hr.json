@@ -505,6 +505,8 @@
   "vf.confirmBody": "Od sada se svaki potvrđeni račun šalje španjolskoj Poreznoj upravi i više se ne može mijenjati ni brisati: pogreške se ispravljaju ispravkom računa. Kad se uključi, ostaje uključen do kraja godine.",
   "vf.confirmTitle": "Uključiti VERI*FACTU?",
   "vf.declaration": "Izjava o sukladnosti",
+  "vf.error.certificateTaxIdMismatch": "Porezni broj (NIF) u certifikatu ne odgovara poreznom broju organizacije.",
+  "vf.error.invalidCertificate": "Certifikat ili privatni ključ nije valjani kvalificirani certifikat sa španjolskim poreznim brojem (NIF).",
   "vf.export": "Preuzmi zapise",
   "vf.fixHint": "Ispravite podatke računa ili kupca i ponovno ga pošaljite.",
   "vf.intro": "Od 2027. svaki se račun mora registrirati u španjolskoj Poreznoj upravi u trenutku izdavanja. S VERI*FACTU Sytue to čini umjesto vas kad potvrdite račun i dodaje QR kod kojim ga kupac može provjeriti.",

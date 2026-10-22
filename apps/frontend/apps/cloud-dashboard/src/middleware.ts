@@ -32,7 +32,17 @@ export const onRequest = sequence(
   middlewareDeOrganizacion({
     base: '/cloud',
     sesion: async (context) => getBff().getSession(toBffContext(context)),
-    sinOrg: ['audit', 'billing', 'projects', 'settings', 'team', 'templates', 'tokens', 'usage'],
+    sinOrg: [
+      'audit',
+      'billing',
+      'confirm-alert',
+      'projects',
+      'settings',
+      'team',
+      'templates',
+      'tokens',
+      'usage',
+    ],
   }),
   // CSP cerrada (FE-03), medida en producción: su origen y el Hub.
   middlewareDeIdioma(undefined, () =>

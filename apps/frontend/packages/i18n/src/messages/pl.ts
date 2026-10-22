@@ -384,4 +384,9 @@ export const pl: Catalog = {
   'linkedServices.writeUnknown':
     'Dostawca nie potwierdził zapisu. Odśwież i sprawdź stan przed ponowną próbą.',
   'linkedServices.unavailable': 'Połączenie z tym dostawcą nie jest dostępne dla Twojego konta.',
+  'localFile.confirmUpload.title': 'Otwórz plik z tego urządzenia',
+  'localFile.confirmUpload.body':
+    'Aby otworzyć „{name}”, plik zostanie przesłany na Twoje konto Sytue One.',
+  'localFile.confirmUpload.remember': 'Zapamiętaj mój wybór na tym urządzeniu',
+  'localFile.confirmUpload.confirm': 'Prześlij i otwórz',
 };

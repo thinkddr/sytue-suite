@@ -243,3 +243,28 @@ func hasVolume(job *batchv1.Job, name string) bool {
 	}
 	return false
 }
+
+// CLOUD-07 — todos los volúmenes EmptyDir del Job de build llevan SizeLimit y
+// todos sus contenedores declaran límites de ephemeral-storage.
+func TestBuildJobAcotaEmptyDirYEphemeralStorage(t *testing.T) {
+	c := newKubeJobClientFor(fake.NewSimpleClientset(), KubeJobConfig{BuildkitImage: "kaniko:test", CraneImage: "crane:test"})
+	job := c.buildJob(JobSpec{
+		Name: "b-disk", Namespace: "sytue-builds", GitImage: "git:test",
+		RepoURL: "https://github.com/a/b", GitRef: "main", Destination: "rg/x:tag",
+	})
+	for _, v := range job.Spec.Template.Spec.Volumes {
+		if v.EmptyDir != nil && v.EmptyDir.SizeLimit == nil {
+			t.Errorf("el volumen EmptyDir %q de buildJob no tiene SizeLimit", v.Name)
+		}
+	}
+	for _, ic := range job.Spec.Template.Spec.InitContainers {
+		if _, ok := ic.Resources.Limits[corev1.ResourceEphemeralStorage]; !ok {
+			t.Errorf("el initContainer %q de buildJob no limita ephemeral-storage", ic.Name)
+		}
+	}
+	for _, mc := range job.Spec.Template.Spec.Containers {
+		if _, ok := mc.Resources.Limits[corev1.ResourceEphemeralStorage]; !ok {
+			t.Errorf("el container %q de buildJob no limita ephemeral-storage", mc.Name)
+		}
+	}
+}

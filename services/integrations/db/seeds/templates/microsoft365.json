@@ -76,9 +76,7 @@
         "Files.Read.All",
         "Contacts.Read",
         "Team.ReadBasic.All",
-        "Channel.ReadBasic.All",
-        "ChannelMember.Read.All",
-        "ChannelMessage.Read.All"
+        "Channel.ReadBasic.All"
       ],
       "write_scopes": [
         "Files.ReadWrite",
@@ -86,6 +84,12 @@
         "Mail.ReadWrite",
         "Calendars.ReadWrite"
       ]
-    }
+    },
+    "hosts": [
+      "graph.microsoft.com",
+      "login.microsoftonline.com",
+      "*.sharepoint.com",
+      "*.1drv.com"
+    ]
   }
 }

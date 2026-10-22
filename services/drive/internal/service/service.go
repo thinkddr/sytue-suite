@@ -1228,7 +1228,7 @@ func (s *Service) PublicBrowse(ctx context.Context, share domain.Share, tenantSl
 	if err != nil {
 		return PublicNode{}, err
 	}
-	tctx := tenancy.Into(ctx, t)
+	tctx := store.WithOwner(tenancy.Into(ctx, t), share.CreatedBy)
 	segs := splitPath(subpath)
 
 	// Enlace a un único fichero: no admite subruta; devuelve el fichero.
@@ -1382,11 +1382,12 @@ func (s *Service) SharedUpload(ctx context.Context, subject string, groups []str
 	if sh.FolderID == nil {
 		return domain.File{}, domain.ErrPermission // solo se sube dentro de una carpeta compartida
 	}
-	destID, err := s.resolveSharedFolder(ctx, *sh.FolderID, subpath)
+	ownerCtx := store.WithOwner(ctx, sh.CreatedBy)
+	destID, err := s.resolveSharedFolder(ownerCtx, *sh.FolderID, subpath)
 	if err != nil {
 		return domain.File{}, err
 	}
-	return s.UploadFile(ctx, destID, name, contentType, ownerSub, body)
+	return s.UploadFile(ownerCtx, destID, name, contentType, ownerSub, body)
 }
 
 // resolveSharedFolder camina subpath (solo carpetas) por nombre desde rootID y

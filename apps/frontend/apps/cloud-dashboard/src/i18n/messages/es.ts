@@ -932,6 +932,17 @@ export const es: AppCatalog<typeof en> = {
   'monitoring.alerts.scope.org': 'organización',
   'monitoring.alerts.scope.project': 'proyecto',
   'monitoring.alerts.disabled': 'desactivada',
+  'monitoring.alerts.unconfirmed': 'pendiente de confirmar',
+  'monitoring.alerts.created.mailtoDesc':
+    'Hemos enviado un enlace de confirmación a esa dirección. Los avisos llegarán en cuanto se confirme.',
+  'monitoring.alerts.confirm.title': 'Confirmar avisos por correo',
+  'monitoring.alerts.confirm.desc':
+    'Confirma que esta dirección quiere recibir los avisos de Sytue DevX.',
+  'monitoring.alerts.confirm.submit': 'Confirmar dirección',
+  'monitoring.alerts.confirm.done':
+    'Dirección confirmada. A partir de ahora recibirás aquí los avisos.',
+  'monitoring.alerts.confirm.invalid':
+    'Este enlace de confirmación no es válido o la alerta ya se ha eliminado.',
   'monitoring.alerts.delete': 'Eliminar la alerta de {event}',
 
   'members.subtitle':

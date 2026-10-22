@@ -14,7 +14,7 @@ import (
 // `Truncated`, que es lo que hace que no se ancle al fichero (open-from-drive.ts). Antes
 // daba «no se pudo abrir» con «Formatos admitidos… máx. 25 MB», aunque el fichero pesara 3.
 func TestLibroQueNoCabeSeAbreRecortado(t *testing.T) {
-	for _, nombre := range []string{"grande.xlsx"} {
+	for _, nombre := range []string{"grande.xlsx", "grande.ods"} {
 		res, err := ImportLocalized(nombre, ficheroDeTexto(t, nombre, 40_000), false, "es")
 		if err != nil {
 			t.Fatalf("%s: %v", nombre, err)
@@ -78,5 +78,46 @@ func TestRecorteSoloEnLasHojasQueNoCaben(t *testing.T) {
 	res, err = Import("pequeno.xlsx", ficheroDeTexto(t, "grande.xlsx", 100))
 	if err != nil || res.Truncated || strings.Contains(res.Content, `"Aviso"`) {
 		t.Errorf("un libro que cabe: truncated=%v err=%v", res != nil && res.Truncated, err)
+	}
+}
+
+// Un .docx o un .pptx que no cabe entero también se abre recortado como copia aparte
+// (`Truncated`), con el aviso delante en el idioma de quien lo abre y dentro del tope.
+func TestDocxYPptxQueNoCabenSeAbrenRecortados(t *testing.T) {
+	// .docx grande: aviso delante en el idioma pedido, primeros párrafos presentes y sin los últimos.
+	docRes, err := ImportLocalized("grande.docx", ficheroDeTexto(t, "grande.docx", 40_000), false, "es")
+	if err != nil {
+		t.Fatalf("grande.docx: %v", err)
+	}
+	if !docRes.Truncated || docRes.Kind != KindDocument {
+		t.Fatalf("grande.docx: quiero documento recortado, tengo truncated=%v kind=%s", docRes.Truncated, docRes.Kind)
+	}
+	if tam := tamanoSembrado(docRes.Content); tam > MaxContenidoSembrado || tam < MaxContenidoSembrado*95/100 {
+		t.Errorf("grande.docx: lo sembrado ocupa %d: tiene que caber y quedarse junto al tope", tam)
+	}
+	if !strings.HasPrefix(docRes.Content, "<blockquote><p><strong>Conversión parcial</strong></p>") ||
+		!strings.Contains(docRes.Content, "Es una copia aparte") ||
+		!strings.Contains(docRes.Content, "0 Lorem ipsum") ||
+		strings.Contains(docRes.Content, "39999 Lorem ipsum") {
+		t.Errorf("grande.docx: falta el aviso o no recorta por el final")
+	}
+
+	// .pptx grande (una diapositiva con texto que desborda): diapositiva de aviso delante y la primera recortada.
+	pptRes, err := ImportLocalized("grande.pptx", ficheroDeTexto(t, "grande.pptx", 40_000), false, "fr")
+	if err != nil {
+		t.Fatalf("grande.pptx: %v", err)
+	}
+	if !pptRes.Truncated || pptRes.Kind != KindPresentation {
+		t.Fatalf("grande.pptx: quiero presentación recortada, tengo truncated=%v kind=%s", pptRes.Truncated, pptRes.Kind)
+	}
+	if tam := tamanoSembrado(pptRes.Content); tam > MaxContenidoSembrado || tam < MaxContenidoSembrado*90/100 {
+		t.Errorf("grande.pptx: lo sembrado ocupa %d: tiene que caber y aprovechar el tope", tam)
+	}
+	sm := parseSlidesModelJSON(t, pptRes.Content)
+	if len(sm.Slides) != 2 || len(sm.Slides[0].Boxes) == 0 ||
+		!strings.Contains(sm.Slides[0].Boxes[0].HTML, "Conversion partielle") ||
+		!strings.Contains(sm.Slides[1].Boxes[0].HTML, "0 Lorem ipsum") ||
+		strings.Contains(sm.Slides[1].Boxes[0].HTML, "39999 Lorem ipsum") {
+		t.Errorf("grande.pptx: quiero diapositiva de aviso delante y la primera recortada: %d diapositivas", len(sm.Slides))
 	}
 }

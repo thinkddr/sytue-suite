@@ -269,4 +269,7 @@ export const ro: AppCatalog<typeof en> = {
   'memories.years': 'Acum {count} ani',
   'memories.oneYear': 'Acum un an',
   'memories.hide': 'Ascunde',
+  'aiBatch.excludeOrg': 'Exclude organizația din lotul automat Sytue AI',
+  'aiBatch.excludedHint':
+    'Organizația este exclusă din lotul automat Sytue AI. Fotografiile noi nu sunt procesate în fundal pentru sugestii sau asemănări.',
 };

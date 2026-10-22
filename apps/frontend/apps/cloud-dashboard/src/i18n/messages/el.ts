@@ -919,6 +919,17 @@ export const el: AppCatalog<typeof en> = {
   'monitoring.alerts.scope.org': 'οργανισμός',
   'monitoring.alerts.scope.project': 'έργο',
   'monitoring.alerts.disabled': 'απενεργοποιημένη',
+  'monitoring.alerts.unconfirmed': 'εκκρεμεί επιβεβαίωση',
+  'monitoring.alerts.created.mailtoDesc':
+    'Στείλαμε σύνδεσμο επιβεβαίωσης σε αυτή τη διεύθυνση. Οι ειδοποιήσεις θα φτάνουν μόλις επιβεβαιωθεί.',
+  'monitoring.alerts.confirm.title': 'Επιβεβαίωση ειδοποιήσεων μέσω email',
+  'monitoring.alerts.confirm.desc':
+    'Επιβεβαιώστε ότι αυτή η διεύθυνση πρέπει να λαμβάνει ειδοποιήσεις συμβάντων από το Sytue DevX.',
+  'monitoring.alerts.confirm.submit': 'Επιβεβαίωση διεύθυνσης',
+  'monitoring.alerts.confirm.done':
+    'Η διεύθυνση επιβεβαιώθηκε. Θα λαμβάνετε πλέον ειδοποιήσεις συμβάντων σε αυτό το email.',
+  'monitoring.alerts.confirm.invalid':
+    'Αυτός ο σύνδεσμος επιβεβαίωσης δεν είναι έγκυρος ή η ειδοποίηση έχει ήδη αφαιρεθεί.',
   'monitoring.alerts.delete': 'Διαγραφή της ειδοποίησης {event}',
   'members.subtitle': 'Τα άτομα με πρόσβαση στον οργανισμό. Κάθε μέλος είναι μία θέση της σουίτας.',
   'members.add': 'Πρόσκληση μέλους',

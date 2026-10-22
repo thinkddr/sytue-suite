@@ -4,8 +4,10 @@
 package ui
 
 import (
+	"fmt"
 	"image"
 	"image/color"
+	"os"
 	"testing"
 
 	"fyne.io/fyne/v2"
@@ -17,6 +19,9 @@ import (
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 )
 
+// enVentanaReal lo pone `ventanareal_test.go` (`-tags ventanareal`).
+var enVentanaReal func(string) error
+
 // TestMain arranca la aplicación de pruebas de Fyne con NUESTRO tema. Sin él,
 // `canvas.Text` resolvería la letra de serie y todas las medidas de aquí serían las de
 // otra fuente.
@@ -25,6 +30,14 @@ import (
 // es lo que hace que estos guardianes puedan correr en el hook de pre-push y en el CI,
 // que es donde tienen que correr.
 func TestMain(m *testing.M) {
+	if dir := os.Getenv("SYTUE_VENTANA_REAL"); dir != "" && enVentanaReal != nil {
+		if err := enVentanaReal(dir); err != nil {
+			fmt.Println("VENTANA REAL: FALLO:", err)
+			os.Exit(1)
+		}
+		fmt.Println("VENTANA REAL: bien")
+		os.Exit(0)
+	}
 	test.NewApp().Settings().SetTheme(tema.Sytue{})
 	tema.FormaDeLosGuardianes()
 	// Las pruebas pulsan el velo en el mismo instante en que se pone: sin esto las

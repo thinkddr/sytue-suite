@@ -379,4 +379,9 @@ export const nl: Catalog = {
     'De aanbieder heeft het opslaan niet bevestigd. Vernieuw en controleer voordat je het opnieuw probeert.',
   'linkedServices.unavailable':
     'Verbinding met deze aanbieder is niet beschikbaar voor je account.',
+  'localFile.confirmUpload.title': 'Bestand van dit apparaat openen',
+  'localFile.confirmUpload.body':
+    'Om ‘{name}’ te openen, wordt het bestand geüpload naar je Sytue One-account.',
+  'localFile.confirmUpload.remember': 'Mijn keuze op dit apparaat onthouden',
+  'localFile.confirmUpload.confirm': 'Uploaden en openen',
 };

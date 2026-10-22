@@ -39,6 +39,12 @@ func conTinta(c color.Color) bool {
 // empieza en x = 383 y mide 514 × 34,25; el glifo va en 393,5, el nombre en 418,25, la
 // meta termina en 886,5 con 112 de ancho como mucho, y el pelo es `border-subtle`.
 func TestLaFilaDelSelectorEsLaDeLaWeb(t *testing.T) {
+	// Los colores medidos son los de la casa: otra prueba del proceso pudo dejar puesto
+	// el producto de su barra (ElegirApp) o un color, y con -test.shuffle primary-text
+	// salía del acento ajeno según el orden en que corrieran.
+	tema.ElegirColor("")
+	tema.ElegirApp("")
+	t.Cleanup(func() { tema.ElegirColor(""); tema.ElegirApp("") })
 	// Los colores medidos, contra los tokens: si la hoja cambia, esto lo dice.
 	for token, web := range map[string]color.NRGBA{
 		"text": {15, 29, 32, 255}, "text-muted": {67, 85, 90, 255},

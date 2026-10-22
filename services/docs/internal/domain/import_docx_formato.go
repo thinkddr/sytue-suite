@@ -97,6 +97,8 @@ type docxPPr struct {
 	tieneMarca, tieneBordeAb bool
 	tabs                     []docxTab // paradas propias (w:tabs, §17.3.1.38), por posición
 	marco                    *string   // CSS del marco de texto (framePr); "" es que no lo es
+	marcoAncla               docxAncla // posición del marco cuando va respecto a la página/margen
+	antesPag, finPag         bool      // pageBreakBefore y sectPr en pPr
 }
 
 // docxTab es una parada de tabulación: posición en twips desde el margen, alineación y relleno.
@@ -166,7 +168,13 @@ func (p *docxPPr) sobre(o docxPPr) {
 		p.tabs = mezclarTabs(p.tabs, o.tabs)
 	}
 	if o.marco != nil {
-		p.marco = o.marco
+		p.marco, p.marcoAncla = o.marco, o.marcoAncla
+	}
+	if o.antesPag {
+		p.antesPag = true
+	}
+	if o.finPag {
+		p.finPag = true
 	}
 }
 
@@ -245,15 +253,17 @@ type docxEstilo struct {
 }
 
 type docxHoja struct {
-	rDef       docxRPr
-	pDef       docxPPr
-	estilos    map[string]*docxEstilo
-	defecto    map[string]string // tipo -> styleId con w:default="1"
-	tema       docxTema
-	familias   map[string]string // nombre de fuente -> familia genérica de CSS (fontTable)
-	tabulador  float64           // w:defaultTabStop de settings.xml, en twips
-	margenIzq  float64           // margen izquierdo de la última sección, en twips (seccionDe)
-	anchoTexto float64           // ancho de página menos sus márgenes laterales, en twips; 0 si no se sabe
+	rDef         docxRPr
+	pDef         docxPPr
+	estilos      map[string]*docxEstilo
+	defecto      map[string]string // tipo -> styleId con w:default="1"
+	tema         docxTema
+	familias     map[string]string // nombre de fuente -> familia genérica de CSS (fontTable)
+	tabulador    float64           // w:defaultTabStop de settings.xml, en twips
+	margenIzq    float64           // margen izquierdo de la última sección, en twips (seccionDe)
+	margenArriba float64           // margen superior de la última sección, en twips
+	anchoTexto   float64           // ancho de página menos sus márgenes laterales, en twips; 0 si no se sabe
+	altoPag      float64           // alto de página de la última sección, en twips; 0 si no se sabe
 	// descartes cuenta lo que se lee y no se traduce (ver corpus_docx_test.go); nil no cuenta.
 	descartes map[string]int
 }
@@ -661,8 +671,8 @@ func (h *docxHoja) propiedadP(dec *xml.Decoder, t xml.StartElement, p *docxPPr) 
 		h.leerTabs(dec, p)
 		return
 	case "framePr":
-		v := h.marcoCSS(t)
-		p.marco = &v
+		v, a := h.marcoCSS(t)
+		p.marco, p.marcoAncla = &v, a
 	case "pBdr":
 		h.leerBordes(dec, "pBdr", p.bordes[:])
 		p.tieneBordeAb = p.bordes[2] != nil && *p.bordes[2] != "none"
@@ -719,15 +729,18 @@ func (h *docxHoja) propiedadP(dec *xml.Decoder, t xml.StartElement, p *docxPPr) 
 	case "keepNext", "keepLines", "widowControl", "suppressAutoHyphens", "suppressLineNumbers",
 		"snapToGrid", "adjustRightInd", "autoSpaceDE", "autoSpaceDN", "kinsoku", "wordWrap",
 		"overflowPunct", "topLinePunct", "textAlignment", "bidi", "mirrorIndents", "suppressOverlap",
-		"pPrChange", "sectPr", "rPrChange", "cnfStyle", "divId":
+		"pPrChange", "rPrChange", "cnfStyle", "divId":
 		// Paginación, partición de palabras y tipografía de Asia oriental: el editor no pagina
 		// así; cnfStyle es la caché del formato condicional de una tabla y divId, el div de un
 		// HTML pegado. bidi=0 es el valor por defecto; activado sí se pierde y se cuenta.
 		if t.Name.Local == "bidi" && boolAttr(t) {
 			h.descarta("pPr", "bidi")
 		}
+	case "sectPr":
+		p.finPag = true
 	case "pageBreakBefore":
 		if boolAttr(t) {
+			p.antesPag = true
 			h.descarta("pPr", "pageBreakBefore")
 		}
 	default:

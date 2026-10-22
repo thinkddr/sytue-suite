@@ -4,8 +4,15 @@
 package domain
 
 import (
+	"archive/zip"
+	"bytes"
+	"encoding/binary"
+	"image"
+	"image/color"
 	"strings"
 	"testing"
+
+	"golang.org/x/image/tiff"
 )
 
 // pptxConDiseno es una presentación con un diseño (`atributos` de su p:sldLayout y lo que va
@@ -174,4 +181,135 @@ func TestDisenosDeOtroPatron(t *testing.T) {
 	}
 	v := reimportar(t, "x.pptx", data)
 	comprobar("pptx a la vuelta", &v)
+}
+
+func tiffBytes(t *testing.T) []byte {
+	t.Helper()
+	img := image.NewRGBA(image.Rect(0, 0, 4, 4))
+	for y := 0; y < 4; y++ {
+		for x := 0; x < 4; x++ {
+			img.SetRGBA(x, y, color.RGBA{R: 0x1F, G: 0x38, B: 0x64, A: 0xFF})
+		}
+	}
+	var buf bytes.Buffer
+	if err := tiff.Encode(&buf, img, nil); err != nil {
+		t.Fatal(err)
+	}
+	return buf.Bytes()
+}
+
+// emfRojo construye un EMF mínimo con EMR_HEADER (bounds 0,0..100,50), pincel sólido
+// #C00000, un camino cerrado de 100x50 relleno con EMR_FILLPATH y EMR_EOF.
+func emfRojo() []byte {
+	var out bytes.Buffer
+	rec := func(tipo uint32, cuerpo ...uint32) {
+		_ = binary.Write(&out, binary.LittleEndian, tipo)
+		_ = binary.Write(&out, binary.LittleEndian, uint32(8+4*len(cuerpo))) //nolint:gosec // G115: registro de prueba acotado
+		for _, v := range cuerpo {
+			_ = binary.Write(&out, binary.LittleEndian, v)
+		}
+	}
+	hdr := make([]uint32, 25) // 8 + 100 = 108 bytes (>= 88)
+	hdr[2], hdr[3] = 100, 50  // Bounds: (0,0)-(100,50)
+	hdr[6], hdr[7] = 2000, 1000
+	hdr[8] = 0x464D4520 // " EMF"
+	hdr[9] = 0x00010000
+	hdr[11] = 8 // nRecords
+	hdr[12] = 2 // nHandles
+	hdr[17], hdr[18] = 1024, 768
+	hdr[19], hdr[20] = 320, 240
+	rec(1, hdr...)                                    // EMR_HEADER
+	rec(39, 1, 0, 0x000000C0, 0)                      // EMR_CREATEBRUSHINDIRECT #1: BS_SOLID, RGB(0xC0,0,0)
+	rec(37, 1)                                        // EMR_SELECTOBJECT #1
+	rec(59)                                           // EMR_BEGINPATH
+	rec(27, 0, 0)                                     // EMR_MOVETOEX (0,0)
+	rec(89, 0, 0, 100, 50, 3, 100, 0, 100, 50, 0, 50) // EMR_POLYLINETO16: 3 puntos (100,0),(100,50),(0,50)
+	rec(61)                                           // EMR_CLOSEFIGURE
+	rec(60)                                           // EMR_ENDPATH
+	rec(62, 0, 0, 100, 50)                            // EMR_FILLPATH
+	rec(14, 0, 0, 20)                                 // EMR_EOF
+	return out.Bytes()
+}
+
+// Las imágenes TIFF y EMF de un diseño (o de una diapositiva) se convierten a PNG al
+// importar, un EMF vacío (bounds 0,0..-1,-1) se descarta, y al exportar a .pptx y .odp
+// una misma imagen repetida entre diseños y diapositivas se escribe una sola vez en el ZIP.
+func TestImagenesEMFyTIFFEnDisenoYSinDuplicarAlExportar(t *testing.T) {
+	pic := func(id, nombre, relID string) string {
+		return `<p:pic><p:nvPicPr><p:cNvPr id="` + id + `" name="` + nombre + `"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr>` +
+			`<p:blipFill><a:blip r:embed="` + relID + `"/><a:stretch><a:fillRect/></a:stretch></p:blipFill>` +
+			`<p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="609600" cy="609600"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>`
+	}
+	vacio := make([]byte, 108)
+	binary.LittleEndian.PutUint32(vacio[0:4], 1)
+	binary.LittleEndian.PutUint32(vacio[4:8], 108)
+	binary.LittleEndian.PutUint32(vacio[16:20], ^uint32(0)) // br = -1
+	binary.LittleEndian.PutUint32(vacio[20:24], ^uint32(0)) // bb = -1
+	binary.LittleEndian.PutUint32(vacio[40:44], 0x464D4520)
+
+	m := pptxConDiseno(t, "", pic("6", "FondoTIFF", "rTiff")+pic("7", "VectorEMF", "rEmf")+pic("8", "VacioEMF", "rVacio"),
+		func(s string) string {
+			return strings.Replace(s,
+				`Target="../media/logo.png"/>`,
+				`Target="../media/logo.png"/>`+
+					`<Relationship Id="rTiff" Type="`+tipoR+`image" Target="../media/fondo.tiff"/>`+
+					`<Relationship Id="rEmf" Type="`+tipoR+`image" Target="../media/vector.emf"/>`+
+					`<Relationship Id="rVacio" Type="`+tipoR+`image" Target="../media/vacio.emf"/>`, 1)
+		})
+	// Ahora inyectamos los ficheros binarios en un zip directo:
+	files := map[string]string{
+		"ppt/theme/theme1.xml": temaSin,
+		"ppt/slideMasters/slideMaster1.xml": `<p:sldMaster ` + nsPres + `><p:cSld><p:spTree/></p:cSld>` +
+			`<p:clrMap bg1="lt1" tx1="dk1" bg2="lt2" tx2="dk2" accent1="accent1" accent2="accent2" accent3="accent3" accent4="accent4" accent5="accent5" accent6="accent6" hlink="hlink" folHlink="folHlink"/>` +
+			`<p:sldLayoutIdLst><p:sldLayoutId id="2147483649" r:id="rL"/></p:sldLayoutIdLst></p:sldMaster>`,
+		"ppt/slideMasters/_rels/slideMaster1.xml.rels": `<Relationships ` + nsRels + `><Relationship Id="rT" Type="` + tipoR + `theme" Target="../theme/theme1.xml"/>` +
+			`<Relationship Id="rL" Type="` + tipoR + `slideLayout" Target="../slideLayouts/slideLayout1.xml"/></Relationships>`,
+		"ppt/slideLayouts/slideLayout1.xml": `<p:sldLayout ` + nsPres + `><p:cSld name="Portada"><p:spTree>` +
+			pic("6", "FondoTIFF", "rTiff") + pic("7", "VectorEMF", "rEmf") + pic("8", "VacioEMF", "rVacio") +
+			`</p:spTree></p:cSld></p:sldLayout>`,
+		"ppt/slideLayouts/_rels/slideLayout1.xml.rels": `<Relationships ` + nsRels + `>` +
+			`<Relationship Id="rM" Type="` + tipoR + `slideMaster" Target="../slideMasters/slideMaster1.xml"/>` +
+			`<Relationship Id="rTiff" Type="` + tipoR + `image" Target="../media/fondo.tiff"/>` +
+			`<Relationship Id="rEmf" Type="` + tipoR + `image" Target="../media/vector.emf"/>` +
+			`<Relationship Id="rVacio" Type="` + tipoR + `image" Target="../media/vacio.emf"/></Relationships>`,
+		"ppt/media/fondo.tiff":             string(tiffBytes(t)),
+		"ppt/media/vector.emf":             string(emfRojo()),
+		"ppt/media/vacio.emf":              string(vacio),
+		"ppt/slides/slide1.xml":            `<p:sld ` + nsPres + `><p:cSld><p:spTree>` + pic("9", "Rep", "rTiff") + `</p:spTree></p:cSld></p:sld>`,
+		"ppt/slides/_rels/slide1.xml.rels": `<Relationships ` + nsRels + `><Relationship Id="rL" Type="` + tipoR + `slideLayout" Target="../slideLayouts/slideLayout1.xml"/><Relationship Id="rTiff" Type="` + tipoR + `image" Target="../media/fondo.tiff"/></Relationships>`,
+		"ppt/presentation.xml": `<p:presentation ` + nsPres + `><p:sldMasterIdLst><p:sldMasterId id="2147483648" r:id="rM"/></p:sldMasterIdLst>` +
+			`<p:sldIdLst><p:sldId id="256" r:id="rS1"/></p:sldIdLst><p:sldSz cx="12192000" cy="6858000"/></p:presentation>`,
+		"ppt/_rels/presentation.xml.rels": `<Relationships ` + nsRels + `><Relationship Id="rM" Type="` + tipoR + `slideMaster" Target="slideMasters/slideMaster1.xml"/><Relationship Id="rS1" Type="` + tipoR + `slide" Target="slides/slide1.xml"/></Relationships>`,
+	}
+	_ = m
+	m = parseSlidesModelJSON(t, importar1(t, "emf-tiff.pptx", files))
+	if m.Master == nil || len(m.Master.Layouts) != 1 || len(m.Master.Layouts[0].Decor) != 2 {
+		t.Fatalf("decor = %+v (esperaba 2 imágenes: TIFF y EMF con contenido, descartando el EMF vacío)", m.Master)
+	}
+	for i, d := range m.Master.Layouts[0].Decor {
+		if d.Kind != "image" || !strings.HasPrefix(d.Src, "data:image/png;base64,") {
+			t.Errorf("decor[%d] = %+v", i, d)
+		}
+	}
+	// La imagen TIFF está tanto en el diseño como en la diapositiva 1: al exportar a .pptx
+	// y a .odp se escribe 2 ficheros de imagen en total (1 por el TIFF y 1 por el EMF), no 3.
+	for _, formato := range []BlobFormat{FormatOOXML, FormatODF} {
+		data, _, ext, err := Export(KindPresentation, "x", stateWithContent(t, "doc:slides", jsonDe(t, *m)), formato)
+		if err != nil {
+			t.Fatal(err)
+		}
+		zr, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		nMedia := 0
+		for _, f := range zr.File {
+			if strings.HasPrefix(f.Name, "ppt/media/") || strings.HasPrefix(f.Name, "Pictures/") {
+				nMedia++
+			}
+		}
+		if nMedia != 2 {
+			t.Errorf("%s: se escribieron %d ficheros de imagen en el paquete (esperaba 2 sin duplicar)", ext, nMedia)
+		}
+	}
 }

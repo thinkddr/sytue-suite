@@ -132,6 +132,9 @@ type dataStore interface {
 	DeleteMemberInvitation(ctx context.Context, id uuid.UUID) (domain.MemberInvitation, error)
 	DeleteMemberInvitationByEmail(ctx context.Context, email string) error
 	AcceptMemberInvitation(ctx context.Context, sub, email string) (domain.Membership, bool, error)
+	CreateAlertPolicy(ctx context.Context, rec store.NewAlertPolicyRecord) (domain.AlertPolicy, error)
+	UpdateAlertPolicy(ctx context.Context, id uuid.UUID, upd store.UpdateAlertPolicyRecord) (domain.AlertPolicy, error)
+	ConfirmAlertPolicyByToken(ctx context.Context, tokenHash string) (domain.AlertPolicy, error)
 }
 
 // Service es la fachada de aplicación de Sytue Cloud.
@@ -1451,7 +1454,7 @@ func (s *Service) ProvisionService(ctx context.Context, in ProvisionServiceInput
 		// es la red y no el suelo — sin esto el servicio se queda en 'provisioning'
 		// para siempre y el cliente no se entera de por qué. El error sale AQUÍ,
 		// donde hay alguien mirando.
-		if err := domain.ValidatePVCSize(in.Config["pvc_size"]); err != nil {
+		if err := domain.ValidatePVCSizeForPlan(in.Config["pvc_size"], quota.PostgresPVCSize); err != nil {
 			return domain.ManagedService{}, err
 		}
 		if in.Config["pvc_size"] == "" {
@@ -1807,6 +1810,14 @@ func (s *Service) validateServiceConfig(
 			ProjectID: cur.ProjectID, Kind: cur.Kind, Name: name, Config: cfg,
 		})
 	case domain.ServicePostgres:
+		org, err := s.store.GetOrganization(ctx)
+		if err != nil {
+			return err
+		}
+		quota := domain.QuotasFor(org.Plan)
+		if err := domain.ValidatePVCSizeForPlan(cfg["pvc_size"], quota.PostgresPVCSize); err != nil {
+			return err
+		}
 		if sch := strings.TrimSpace(cfg["backup_schedule"]); sch != "" && !domain.ValidCronSchedule(sch) {
 			return fmt.Errorf("%w: la programación de la copia debe ser una expresión cron válida",
 				domain.ErrInvalidInput)

@@ -520,6 +520,8 @@
   "vf.confirmBody": "Od zdaj se vsak potrjen račun pošlje španski davčni upravi in ga ni več mogoče spremeniti ali izbrisati: napake se popravijo s popravkom računa. Ko ga vklopite, ostane vklopljen do konca leta.",
   "vf.confirmTitle": "Vklopiti VERI*FACTU?",
   "vf.declaration": "Izjava o skladnosti",
+  "vf.error.certificateTaxIdMismatch": "Davčna številka (NIF) na potrdilu se ne ujema z davčno številko organizacije.",
+  "vf.error.invalidCertificate": "Potrdilo ali zasebni ključ ni veljavno kvalificirano potrdilo s špansko davčno številko (NIF).",
   "vf.export": "Prenesi zapise",
   "vf.fixHint": "Popravite podatke računa ali stranke in ga pošljite znova.",
   "vf.intro": "Od leta 2027 mora biti vsak račun ob izdaji registriran pri španski davčni upravi. Z VERI*FACTU to Sytue naredi namesto vas, ko potrdite račun, in doda kodo QR, s katero ga lahko stranka preveri.",

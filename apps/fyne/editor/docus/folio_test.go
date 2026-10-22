@@ -21,9 +21,21 @@ import (
 	"git.sytue.eu/sytue/one/apps/nucleo/webref"
 )
 
+// enVentanaReal lo asigna ventanareal_test.go (bajo -tags ventanareal) para correr el
+// recorrido de ventana real en el hilo principal antes de m.Run().
+var enVentanaReal func(dir string) error
+
 // TestMain arranca la aplicación de pruebas con NUESTRO tema: sin ella, medir texto
 // resolvería la letra de serie y el folio no podría ni maquetarse.
 func TestMain(m *testing.M) {
+	if dir := os.Getenv("SYTUE_VENTANA_REAL"); dir != "" && enVentanaReal != nil {
+		if err := enVentanaReal(dir); err != nil {
+			os.Stderr.WriteString("VENTANA REAL: FALLO: " + err.Error() + "\n")
+			os.Exit(1)
+		}
+		os.Stdout.WriteString("VENTANA REAL: bien\n")
+		os.Exit(0)
+	}
 	a := test.NewApp()
 	a.Settings().SetTheme(tema.Sytue{})
 	tema.FormaDeLosGuardianes()

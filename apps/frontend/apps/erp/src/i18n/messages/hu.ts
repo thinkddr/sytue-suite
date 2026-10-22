@@ -553,4 +553,8 @@ export const hu: AppCatalog<typeof en> = {
   'pos.imageUpload': 'Kép feltöltése ehhez: {name}',
   'pos.images': 'Képek',
   'pos.imageHint': 'Válasszon legfeljebb 10 MB-os JPEG-, PNG- vagy WebP-képet.',
+  'vf.error.invalidCertificate':
+    'A tanúsítvány vagy a privát kulcs nem érvényes, spanyol adószámmal (NIF) rendelkező minősített tanúsítvány.',
+  'vf.error.certificateTaxIdMismatch':
+    'A tanúsítványban szereplő adószám (NIF) nem egyezik a szervezet adószámával.',
 };

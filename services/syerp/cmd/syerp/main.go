@@ -188,28 +188,30 @@ func run() error {
 	st := store.New(pool)
 	st.Version = cfg.Version
 
-	// VERI*FACTU: sin certificado no se envía nada y nadie lo puede activar, que es
-	// mejor que emitir facturas con QR que nunca llegan a la AEAT.
-	var remitente *verifactu.Cliente
-	if len(cfg.VerifactuCertPEM) > 0 {
-		if remitente, err = verifactu.NuevoCliente(cfg.VerifactuCertPEM, cfg.VerifactuKeyPEM, cfg.VerifactuProduccion, cfg.VerifactuSello); err != nil {
-			return fmt.Errorf("VERI*FACTU: %w", err)
-		}
-		go remitirVerifactu(ctx, st, remitente, logger)
-	} else {
-		logger.Info("VERI*FACTU desactivado: falta el certificado (VERIFACTU_CERT_PEM, VERIFACTU_KEY_PEM)")
-	}
-
-	// Sellado de los secretos de firma de webhooks. Sin clave queda deshabilitado
-	// (nil) y configurar un webhook se rechaza: guardar en claro un secreto con el
-	// que se pueden falsificar cobros no es una alternativa.
+	// Sellado de los secretos de firma de webhooks y de la clave privada del
+	// certificado propio de VERI*FACTU. Sin clave queda deshabilitado (nil) y
+	// configurarlos se rechaza: guardar en claro un secreto o una clave privada
+	// no es una alternativa.
 	cifra, err := keycrypto.New(cfg.SecretEncKey)
 	if err != nil {
 		return fmt.Errorf("clave de sellado: %w", err)
 	}
 	if !cifra.Enabled() {
-		logger.Warn("SECRET_ENC_KEY ausente: no se podrán configurar webhooks de Stripe")
+		logger.Warn("SECRET_ENC_KEY ausente: no se podrán configurar webhooks de Stripe ni certificados propios de VERI*FACTU")
 	}
+
+	// VERI*FACTU: en producción cada organización presenta con su propio
+	// certificado cualificado guardado en la base; en pruebas puede usar el
+	// propio o el de respaldo del despliegue (VERIFACTU_CERT_PEM).
+	var remitente *verifactu.Cliente
+	if len(cfg.VerifactuCertPEM) > 0 {
+		if remitente, err = verifactu.NuevoCliente(cfg.VerifactuCertPEM, cfg.VerifactuKeyPEM, cfg.VerifactuProduccion, cfg.VerifactuSello); err != nil {
+			return fmt.Errorf("VERI*FACTU: %w", err)
+		}
+	} else if !cfg.VerifactuProduccion {
+		logger.Info("VERI*FACTU sin certificado de pruebas de respaldo (VERIFACTU_CERT_PEM): solo organizaciones con certificado propio")
+	}
+	go remitirVerifactu(ctx, st, cifra, cfg.VerifactuProduccion, remitente, logger)
 
 	// Avisos por correo de las obligaciones: cada media hora, sin la sesión de nadie.
 	go avisos.Ejecutar(ctx, avisos.Deps{
@@ -262,7 +264,7 @@ func run() error {
 // remitirVerifactu envía lo pendiente de cada organización. Mira cada 30 s, pero
 // quien decide si toca es la base: guarda el tiempo de espera que marca la AEAT
 // para todas las réplicas.
-func remitirVerifactu(ctx context.Context, st *store.Store, c *verifactu.Cliente, logger *slog.Logger) {
+func remitirVerifactu(ctx context.Context, st *store.Store, cifra *keycrypto.Cipher, produccion bool, c *verifactu.Cliente, logger *slog.Logger) {
 	tic := time.NewTicker(30 * time.Second)
 	defer tic.Stop()
 	for {
@@ -279,7 +281,11 @@ func remitirVerifactu(ctx context.Context, st *store.Store, c *verifactu.Cliente
 				}
 				continue
 			}
-			resp, errEnvio := c.Enviar(tctx, lote.Obligado, lote.XML)
+			cli, errEnvio := st.ClienteVerifactu(tctx, cifra, produccion, c)
+			var resp verifactu.Respuesta
+			if errEnvio == nil {
+				resp, errEnvio = cli.Enviar(tctx, lote.Obligado, lote.XML)
+			}
 			if errEnvio != nil {
 				logger.Warn("VERI*FACTU: envío fallido", "tenant", t, "registros", len(lote.IDs), "error", errEnvio)
 			} else {

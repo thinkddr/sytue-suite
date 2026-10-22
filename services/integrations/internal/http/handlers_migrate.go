@@ -8,10 +8,20 @@ import (
 	"strconv"
 	"strings"
 
+	"git.sytue.eu/sytue/one/platform/pkg/authn"
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/services/integrations/internal/domain"
 	"git.sytue.eu/sytue/one/services/integrations/internal/store"
 )
+
+func exigirAdminMigracion(w http.ResponseWriter, r *http.Request) bool {
+	c, _ := authn.FromContext(r.Context())
+	if !esAdmin(c) {
+		httpx.Fail(w, r, httpx.ErrForbidden.WithMessage("Only an organisation owner or administrator can run or manage organisation migrations."))
+		return false
+	}
+	return true
+}
 
 // maxSourceUserLen acota el identificador del usuario de origen (UPN/email).
 const maxSourceUserLen = 320
@@ -49,6 +59,9 @@ type createMigrationReq struct {
 // Un trabajo por (persona × tipo de contenido): así cada uno tiene su cursor, su
 // mapa de idempotencia y su informe, y el fallo de uno no arrastra a los demás.
 func (h *Handlers) CreateMigration(w http.ResponseWriter, r *http.Request) {
+	if !exigirAdminMigracion(w, r) {
+		return
+	}
 	var req createMigrationReq
 	if err := httpx.DecodeJSON(w, r, &req); err != nil {
 		httpx.Fail(w, r, err)
@@ -83,6 +96,17 @@ func (h *Handlers) CreateMigration(w http.ResponseWriter, r *http.Request) {
 	if apiErr != nil {
 		httpx.Fail(w, r, apiErr)
 		return
+	}
+	if h.store != nil {
+		inst, err := h.store.GetInstance(r.Context(), req.InstanceID)
+		if err != nil {
+			httpx.Fail(w, r, toAPIError(err))
+			return
+		}
+		if tplSrc, ok := sourceForTemplate(inst.TemplateKey); !ok || tplSrc != src {
+			httpx.Fail(w, r, httpx.ErrBadRequest.WithMessage("The instance template does not match the requested migration source."))
+			return
+		}
 	}
 
 	// Alta trabajo a trabajo: cada uno es independiente por diseño. Si uno falla, se
@@ -202,6 +226,9 @@ func parseTargets(raw []migrationTarget) ([]migrationTarget, error) {
 // ListMigrations — GET /api/v1/migrations — trabajos de la org, más reciente
 // primero. limit opcional (1..200, 50 por defecto).
 func (h *Handlers) ListMigrations(w http.ResponseWriter, r *http.Request) {
+	if !exigirAdminMigracion(w, r) {
+		return
+	}
 	limit, ok := limitParam(w, r, 50, 200)
 	if !ok {
 		return
@@ -219,6 +246,9 @@ func (h *Handlers) ListMigrations(w http.ResponseWriter, r *http.Request) {
 // omitido es tan parte del resultado como lo migrado: nada se cuenta como copiado
 // sin haberse copiado.
 func (h *Handlers) GetMigration(w http.ResponseWriter, r *http.Request) {
+	if !exigirAdminMigracion(w, r) {
+		return
+	}
 	id, ok := pathID(w, r)
 	if !ok {
 		return
@@ -247,6 +277,9 @@ func (h *Handlers) GetMigration(w http.ResponseWriter, r *http.Request) {
 // CancelMigration — POST /api/v1/migrations/{id}/cancel — detiene un trabajo vivo.
 // Lo ya migrado se queda; el cursor también, así que puede reanudarse después.
 func (h *Handlers) CancelMigration(w http.ResponseWriter, r *http.Request) {
+	if !exigirAdminMigracion(w, r) {
+		return
+	}
 	id, ok := pathID(w, r)
 	if !ok {
 		return
@@ -263,6 +296,9 @@ func (h *Handlers) CancelMigration(w http.ResponseWriter, r *http.Request) {
 // permiso de escritura se vuelve a canjear al arrancar, así que reanudar tras
 // arreglar el problema (una persona reactivada, la delegación aprovisionada) basta.
 func (h *Handlers) ResumeMigration(w http.ResponseWriter, r *http.Request) {
+	if !exigirAdminMigracion(w, r) {
+		return
+	}
 	id, ok := pathID(w, r)
 	if !ok {
 		return

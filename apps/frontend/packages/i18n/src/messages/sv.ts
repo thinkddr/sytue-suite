@@ -367,4 +367,9 @@ export const sv: Catalog = {
     'Leverantören bekräftade inte om det sparades. Uppdatera och kontrollera innan du försöker igen.',
   'linkedServices.unavailable':
     'Anslutning till den här leverantören är inte tillgänglig för ditt konto.',
+  'localFile.confirmUpload.title': 'Öppna fil från den här enheten',
+  'localFile.confirmUpload.body':
+    'För att öppna ”{name}” laddas filen upp till ditt Sytue One-konto.',
+  'localFile.confirmUpload.remember': 'Kom ihåg mitt val på den här enheten',
+  'localFile.confirmUpload.confirm': 'Ladda upp och öppna',
 };

@@ -365,4 +365,8 @@ export const da: Catalog = {
   'linkedServices.writeUnknown':
     'Udbyderen bekræftede ikke, om det blev gemt. Opdater og kontrollér, før du prøver igen.',
   'linkedServices.unavailable': 'Forbindelse til denne udbyder er ikke tilgængelig for din konto.',
+  'localFile.confirmUpload.title': 'Åbn fil fra denne enhed',
+  'localFile.confirmUpload.body': 'For at åbne »{name}« uploades filen til din Sytue One-konto.',
+  'localFile.confirmUpload.remember': 'Husk mit valg på denne enhed',
+  'localFile.confirmUpload.confirm': 'Upload og åbn',
 };

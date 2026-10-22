@@ -18,6 +18,10 @@ import (
 // ErrSesionAjena impide presentar un refresh token a otro emisor o cliente OIDC.
 var ErrSesionAjena = errors.New("auth: la sesión pertenece a otro emisor o cliente OIDC")
 
+// ErrSesionNoDisponible exige olvidar también la sesión en memoria. Un broker
+// perdido, bloqueado o rechazado nunca autoriza renovar con una copia antigua.
+var ErrSesionNoDisponible = ajustes.ErrSesionNoDisponible
+
 // AlmacenSesion es la entrada estable de una sesión nativa. El nombre depende sólo
 // del emisor y cliente OIDC; nunca de la app, su versión ni su ruta de instalación.
 // Los productos comparten el refresh cuando usan el mismo cliente público, sin
@@ -40,6 +44,12 @@ func (a *AlmacenSesion) pertenece(t Tokens) bool {
 // Cargar no renueva ni abre un navegador. Los tokens sólo salen del almacén seguro
 // de la plataforma, y nunca se aceptan si pertenecen a otro emisor o cliente.
 func (a *AlmacenSesion) Cargar() (Tokens, error) {
+	if t, compartida, err := cargarCompartida(a); compartida {
+		if err == nil && t.Refresh != "" && (t.Issuer != a.emisor || t.Cliente != a.cliente) {
+			return Tokens{}, errors.Join(ErrSesionNoDisponible, ErrSesionAjena)
+		}
+		return t, err
+	}
 	ruta, err := a.marcaCierre()
 	if err != nil {
 		return Tokens{}, err
@@ -82,6 +92,9 @@ func (a *AlmacenSesion) Guardar(t Tokens) error {
 	if !a.pertenece(t) {
 		return ErrSesionAjena
 	}
+	if compartida, err := guardarCompartida(a, t); compartida {
+		return err
+	}
 	var errMarca error
 	rutaCierre, errCierre := a.marcaCierre()
 	if errCierre != nil {
@@ -113,11 +126,14 @@ func (a *AlmacenSesion) Guardar(t Tokens) error {
 //
 //nolint:contextcheck // Los callbacks del llavero no reciben contexto; su consulta D-Bus tiene plazo propio.
 func (a *AlmacenSesion) Migrar(ctx context.Context, permitirSinEmisor bool) error {
-	soltar, err := ajustes.Cerrojo(ctx)
+	soltar, err := ajustes.CerrojoSesion(ctx)
 	if err != nil {
 		return err
 	}
 	defer soltar()
+	if compartida, err := migrarCompartida(a, permitirSinEmisor); compartida {
+		return err
+	}
 	t, err := a.Cargar()
 	if err != nil {
 		return err

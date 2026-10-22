@@ -209,6 +209,9 @@ func RedactarPDF(doc *PDFDoc, areas []AreaRedaccion) ([]byte, error) {
 		}); err != nil {
 			return nil, err
 		}
+		if componentesIntencion(doc) == 0 {
+			e.asegurarDefaultGray(e.ultimaPendiente())
+		}
 	}
 	if forma := e.formularioCensurado(doc, formulario); forma != nil {
 		if e.extrasCatalogo == nil {

@@ -11,9 +11,11 @@ import {
   MAX_LAYOUTS,
   MAX_PLACEHOLDERS,
   addLayout,
+  applyLayoutBoxes,
   boxesFromLayout,
   defaultNewLayoutId,
   duplicateLayout,
+  layoutEditBoxes,
   layoutsOf,
   mergeIntoLayout,
   nextLayoutId,
@@ -142,4 +144,46 @@ test('sanitizeLayouts: las formas, las líneas y hideMaster del diseño', () => 
   const r = duplicateLayout([l!], 'portada', 'Copia', () => 'n1');
   expect(r!.layouts[1]!.decor?.map((b) => b.id)).toEqual(['logo']);
   expect(r!.layouts[1]!.hideMaster).toBe(true);
+});
+
+// En el editor de diseños se seleccionan, mueven, recolorean, insertan y borran tanto
+// las formas del diseño (`decor`, debajo) como sus marcadores (`boxes`, encima), y al
+// guardar cada una vuelve a su lista sin perder las no-texto ni convertir un texto de
+// `decor` en marcador.
+test('layoutEditBoxes y applyLayoutBoxes: editar decor y boxes de un diseño', () => {
+  const inicial: SlideLayout = {
+    id: 'portada',
+    name: 'Portada',
+    decor: [
+      caja('franja', { kind: 'shape', shape: 'rect', fill: '#1F3864', html: '' }),
+      caja('pie', { y: 92, h: 6, html: '<p>Confidencial</p>' }),
+    ],
+    boxes: [caja('titulo', { y: 30 })],
+  };
+  const editables = layoutEditBoxes(inicial);
+  expect(editables.map((b) => b.id)).toEqual(['franja', 'pie', 'titulo']);
+
+  // Mover y cambiar el color de la franja, mover el pie (texto de decor), añadir una
+  // imagen y un nuevo marcador de texto, y borrar nada aún:
+  const editadas: SlideBox[] = [
+    { ...editables[0]!, x: 2, fill: '#C00000' },
+    { ...editables[1]!, x: 4 },
+    editables[2]!,
+    caja('logo', { kind: 'image', src: 'data:image/png;base64,AA', html: '' }),
+    caja('subtitulo', { y: 50, html: '<p>Subtítulo</p>' }),
+  ];
+  const actualizado = applyLayoutBoxes(inicial, editadas);
+  expect(actualizado.decor?.map((b) => b.id)).toEqual(['franja', 'pie', 'logo']);
+  expect(actualizado.decor?.[0]?.x).toBe(2);
+  expect(actualizado.decor?.[0]?.fill).toBe('#C00000');
+  expect(actualizado.decor?.[1]?.x).toBe(4);
+  expect(actualizado.boxes.map((b) => b.id)).toEqual(['titulo', 'subtitulo']);
+
+  // Borrar la franja de decor:
+  const sinFranja = applyLayoutBoxes(
+    actualizado,
+    layoutEditBoxes(actualizado).filter((b) => b.id !== 'franja'),
+  );
+  expect(sinFranja.decor?.map((b) => b.id)).toEqual(['pie', 'logo']);
+  expect(sinFranja.boxes.map((b) => b.id)).toEqual(['titulo', 'subtitulo']);
 });

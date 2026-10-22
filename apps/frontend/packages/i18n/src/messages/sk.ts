@@ -381,4 +381,8 @@ export const sk: Catalog = {
   'linkedServices.writeUnknown':
     'Poskytovateľ nepotvrdil uloženie. Pred ďalším pokusom obnovte zobrazenie a overte stav.',
   'linkedServices.unavailable': 'Pripojenie k tomuto poskytovateľovi nie je pre váš účet dostupné.',
+  'localFile.confirmUpload.title': 'Otvoriť súbor z tohto zariadenia',
+  'localFile.confirmUpload.body': 'Na otvorenie súboru „{name}“ sa nahrá do vášho účtu Sytue One.',
+  'localFile.confirmUpload.remember': 'Zapamätať si moju voľbu na tomto zariadení',
+  'localFile.confirmUpload.confirm': 'Nahrať a otvoriť',
 };

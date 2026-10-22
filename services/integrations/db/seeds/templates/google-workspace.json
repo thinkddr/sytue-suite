@@ -90,6 +90,15 @@
         "open_url": "https://docs.google.com/presentation/",
         "document_url": "https://docs.google.com/presentation/d/{document_id}/edit"
       }
+    ],
+    "hosts": [
+      "www.googleapis.com",
+      "people.googleapis.com",
+      "gmail.googleapis.com",
+      "admin.googleapis.com",
+      "oauth2.googleapis.com",
+      "accounts.google.com",
+      "*.googleapis.com"
     ]
   }
 }

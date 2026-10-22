@@ -31,6 +31,9 @@ func cuadernoEnPapeleraDesde(t *testing.T, h *pgtest.Harness, id string, hace ti
 	// `app.maintenance` la RLS de `notebooks` deja el UPDATE en cero filas y sin
 	// error, y el test acaba culpando a la purga de algo que no hizo.
 	err := h.Pool.InMaintenanceTx(t.Context(), func(tx pgx.Tx) error {
+		if err := db.MarkWriteTransaction(t.Context(), tx); err != nil {
+			return err
+		}
 		tag, err := tx.Exec(t.Context(),
 			`UPDATE notebooks SET deleted_at = now() - $2::interval WHERE id = $1`,
 			id, hace.String())

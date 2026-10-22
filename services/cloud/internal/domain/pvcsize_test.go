@@ -69,3 +69,23 @@ func TestPVCSizeAceptadoLoParseaKubernetes(t *testing.T) {
 		}
 	}
 }
+
+// CLOUD-07 — un cliente en PlanFree no puede pedir pvc_size=10Gi ni al crear ni al
+// actualizar el servicio: el límite por instancia lo fija el plan (PostgresPVCSize).
+func TestValidatePVCSizeForPlan(t *testing.T) {
+	free := domain.QuotasFor(domain.PlanFree)
+	if err := domain.ValidatePVCSizeForPlan("", free.PostgresPVCSize); err != nil {
+		t.Errorf("vacío debe valer en cualquier plan: %v", err)
+	}
+	if err := domain.ValidatePVCSizeForPlan("2Gi", free.PostgresPVCSize); err != nil {
+		t.Errorf("2Gi cabe en el plan free (%s): %v", free.PostgresPVCSize, err)
+	}
+	err := domain.ValidatePVCSizeForPlan("5Gi", free.PostgresPVCSize)
+	if !errors.Is(err, domain.ErrQuotaExceeded) {
+		t.Errorf("5Gi sobre el plan free (%s) debe dar ErrQuotaExceeded, dio %v", free.PostgresPVCSize, err)
+	}
+	err = domain.ValidatePVCSizeForPlan("3072Mi", free.PostgresPVCSize)
+	if !errors.Is(err, domain.ErrQuotaExceeded) {
+		t.Errorf("3072Mi (3 GiB) sobre el plan free (%s) debe dar ErrQuotaExceeded, dio %v", free.PostgresPVCSize, err)
+	}
+}

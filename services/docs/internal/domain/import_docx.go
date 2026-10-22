@@ -36,10 +36,10 @@ func importDocxComments(data []byte, comments bool, p *presupuesto) (Kind, strin
 		return "", "", nil, wrapFormat("docx: falta " + principal)
 	}
 	d := newDocxDec(files, doc, principal, nil, p)
-	if ancho, izq, der := seccionDe(doc); ancho > 0 {
-		d.hoja.margenIzq, d.hoja.anchoTexto = izq, ancho-izq-der
-	} else {
-		d.hoja.margenIzq = izq
+	ancho, alto, izq, der, arriba := seccionDe(doc)
+	d.hoja.margenIzq, d.hoja.margenArriba, d.hoja.altoPag = izq, arriba, alto
+	if ancho > 0 {
+		d.hoja.anchoTexto = ancho - izq - der
 	}
 	if comments {
 		d.cm = parseDocxComments(files)
@@ -84,7 +84,8 @@ type docxDec struct {
 	cm      *docxComments     // comentarios del fichero, si se piden
 	paraN   int               // párrafos leídos del cuerpo
 	par     docxParrafo       // el párrafo que se está leyendo
-	cajas   []xblock          // párrafos de los cuadros de texto del párrafo en curso, para después de él
+	cajas   []docxCaja        // cuadros de texto del párrafo en curso, para después de él
+	finPag  bool              // el párrafo en curso tiene un salto de página (<w:br w:type="page"/>)
 	ultimo  docxUltimo        // estilo y contextualSpacing del último párrafo leído
 	tabla   docxTablaCtx      // el estilo de la tabla en la que se está, si se está en una
 	// presupuesto corta la lectura de esta parte y de las que cuelgan de ella (notas,
@@ -129,6 +130,7 @@ type docxTablaCtx struct {
 	bandaF int
 	bandaC int
 	ncols  int
+	nfilas int
 	fila   int // filas leídas
 }
 
@@ -195,12 +197,11 @@ func (t docxTablaCtx) banda(eje string, k, tam, encabezado int) string {
 }
 
 // condicionar da a lo que se lee de la celda (col, span) de la fila en curso la letra y el
-// párrafo de su parte de la tabla. ponytail: la última fila aún no se sabe cuál es, así que su
-// letra (la negrita de una fila de totales) no se aplica; su sombreado y sus bordes, sí.
+// párrafo de su parte de la tabla.
 func (d *docxDec) condicionar(col, span int) {
 	t := &d.tabla
 	t.p, t.r = t.tp, t.tr
-	for _, reg := range t.regiones(t.fila, -1, col, span) {
+	for _, reg := range t.regiones(t.fila, t.nfilas, col, span) {
 		c := t.cond[reg]
 		t.p.sobre(c.p)
 		t.r.sobre(c.r)
@@ -307,27 +308,34 @@ func (d *docxDec) parseBody() ([]xblock, error) {
 // readBlocks lee párrafos y tablas hasta el cierre de `until`.
 func (d *docxDec) readBlocks(until string) ([]xblock, error) {
 	var blocks []xblock
-	var previo *xpara // el párrafo de justo antes, para contextualSpacing
-	abierto := ""     // el marco de texto en el que van los últimos párrafos
+	var previo *xpara    // el párrafo de justo antes, para contextualSpacing
+	var enPag []docxCaja // marcos y cuadros colocados respecto a la página en curso
+	inicioPag := 0
+	abierto := "" // el marco de texto en el que van los últimos párrafos
+	enCuerpo := until == "body"
+	fin := func() ([]xblock, error) {
+		blocks = cerrarMarcoAbierto(blocks, abierto)
+		if enCuerpo {
+			blocks, _ = d.cerrarPagina(blocks, enPag, inicioPag)
+		}
+		return juntarMarcos(blocks), nil
+	}
 	for {
 		tok, err := d.dec.Token()
 		if err != nil {
 			//nolint:nilerr // fin de stream/EOF: importación best-effort, devuelve los bloques ya leídos
-			return juntarMarcos(cerrarMarcoAbierto(blocks, abierto)), nil
+			return fin()
 		}
 		switch t := tok.(type) {
 		case xml.StartElement:
 			switch t.Name.Local {
 			case "p":
-				blocks, previo, abierto = d.anadirParrafo(blocks, previo, abierto)
+				blocks, previo, abierto, enPag, inicioPag = d.anadirParrafo(blocks, previo, abierto, enCuerpo, enPag, inicioPag)
 			case "tbl":
 				previo = nil
-				blocks, abierto = cerrarMarcoAbierto(blocks, abierto), ""
-				if tbl := d.readTable(); tbl != nil {
-					blocks = append(blocks, xblock{table: tbl})
-				}
+				blocks, abierto = d.anadirTabla(blocks, abierto)
 			case "sectPr":
-				if until == "body" {
+				if enCuerpo {
 					d.readSect()
 				} else {
 					_ = d.dec.Skip()
@@ -341,10 +349,25 @@ func (d *docxDec) readBlocks(until string) ([]xblock, error) {
 			}
 		case xml.EndElement:
 			if t.Name.Local == until {
-				return juntarMarcos(cerrarMarcoAbierto(blocks, abierto)), nil
+				return fin()
 			}
 		}
 	}
+}
+
+func (d *docxDec) anadirTabla(blocks []xblock, abierto string) ([]xblock, string) {
+	tbl := d.readTable()
+	if tbl == nil {
+		return blocks, abierto
+	}
+	if marco := marcoDeTabla(tbl); marco != abierto {
+		blocks = cerrarMarcoAbierto(blocks, abierto)
+		abierto = ""
+		if marco != "" {
+			blocks, abierto = append(blocks, abrirMarco(marco)), marco
+		}
+	}
+	return append(blocks, xblock{table: tbl}), abierto
 }
 
 // cerrarMarcoAbierto cierra el marco de texto abierto, si lo hay.
@@ -355,11 +378,50 @@ func cerrarMarcoAbierto(blocks []xblock, abierto string) []xblock {
 	return blocks
 }
 
-// anadirParrafo lee un <w:p> y lo pone tras blocks, con los cuadros de texto que ancla detrás.
-// previo es el párrafo de justo antes (nil si no lo hay), para contextualSpacing.
-func (d *docxDec) anadirParrafo(blocks []xblock, previo *xpara, abierto string) ([]xblock, *xpara, string) {
+// marcoDeTabla es el marco que comparten todos los párrafos de una tabla (§17.3.1.11): el que
+// escribe la exportación en las celdas de una tabla que iba dentro de un <div data-marco>.
+func marcoDeTabla(t *xtable) string {
+	paras := parrafosDeTabla(t)
+	if len(paras) == 0 || paras[0].marco == "" {
+		return ""
+	}
+	m := paras[0].marco
+	for _, p := range paras[1:] {
+		if p.marco != m {
+			return ""
+		}
+	}
+	return m
+}
+
+// anadirParrafo lee un <w:p> y lo pone tras blocks, con los cuadros de texto que ancla detrás (o
+// en enPag si van colocados respecto a la página). previo es el párrafo de justo antes (nil si no
+// lo hay), para contextualSpacing.
+func (d *docxDec) anadirParrafo(blocks []xblock, previo *xpara, abierto string, enCuerpo bool, enPag []docxCaja, inicioPag int) ([]xblock, *xpara, string, []docxCaja, int) {
 	antes := d.ultimo
+	d.finPag = false
 	p, hr := d.readParagraph()
+	if enCuerpo && d.par.p.antesPag {
+		blocks, abierto, previo = cerrarMarcoAbierto(blocks, abierto), "", nil
+		blocks, inicioPag = d.cerrarPagina(blocks, enPag, inicioPag)
+		enPag = nil
+	}
+	if enCuerpo && !hr && p.marco != "" && d.par.p.marcoAncla.enPagina() {
+		blocks, abierto, previo = cerrarMarcoAbierto(blocks, abierto), "", nil
+		enPag = append(enPag, docxCaja{ancla: d.par.p.marcoAncla, marco: p.marco, bloques: []xblock{{para: &p}}})
+	} else {
+		blocks, previo, abierto = d.ponerParrafo(blocks, previo, abierto, p, hr, antes)
+	}
+	blocks, previo, abierto, enPag = d.repartirCajas(blocks, previo, abierto, enCuerpo, enPag)
+	if enCuerpo && (d.finPag || d.par.p.finPag) {
+		blocks, abierto, previo = cerrarMarcoAbierto(blocks, abierto), "", nil
+		blocks, inicioPag = d.cerrarPagina(blocks, enPag, inicioPag)
+		enPag = nil
+	}
+	return blocks, previo, abierto, enPag, inicioPag
+}
+
+func (d *docxDec) ponerParrafo(blocks []xblock, previo *xpara, abierto string, p xpara, hr bool, antes docxUltimo) ([]xblock, *xpara, string) {
 	// Los párrafos seguidos con el mismo marco van en el mismo (§17.3.1.11).
 	if marco := p.marco; hr || marco != abierto {
 		blocks = cerrarMarcoAbierto(blocks, abierto)
@@ -369,22 +431,32 @@ func (d *docxDec) anadirParrafo(blocks []xblock, previo *xpara, abierto string) 
 		}
 	}
 	if hr {
-		blocks = append(blocks, xblock{hr: true})
-		previo = nil
-	} else {
-		if previo != nil && antes.estilo == d.ultimo.estilo {
-			contextual(previo, &p, antes.contextual, d.ultimo.contextual)
-		}
-		previo = &p
-		blocks = append(blocks, xblock{para: previo})
+		return append(blocks, xblock{hr: true}), nil, abierto
 	}
-	if len(d.cajas) > 0 {
-		blocks = cerrarMarcoAbierto(blocks, abierto)
-		blocks, abierto = append(blocks, d.cajas...), ""
-		previo = nil
+	if previo != nil && antes.estilo == d.ultimo.estilo {
+		contextual(previo, &p, antes.contextual, d.ultimo.contextual)
+	}
+	return append(blocks, xblock{para: &p}), &p, abierto
+}
+
+func (d *docxDec) repartirCajas(blocks []xblock, previo *xpara, abierto string, enCuerpo bool, enPag []docxCaja) ([]xblock, *xpara, string, []docxCaja) {
+	if len(d.cajas) == 0 {
+		return blocks, previo, abierto, enPag
+	}
+	var locales []docxCaja
+	for _, c := range d.cajas {
+		if enCuerpo && c.anclado && c.ancla.enPagina() {
+			enPag = append(enPag, c)
+		} else {
+			locales = append(locales, c)
+		}
 	}
 	d.cajas = nil
-	return blocks, previo, abierto
+	if len(locales) > 0 {
+		blocks = cerrarMarcoAbierto(blocks, abierto)
+		blocks, abierto, previo = append(blocks, d.bloquesDeCajas(locales)...), "", nil
+	}
+	return blocks, previo, abierto, enPag
 }
 
 // readParagraph lee un <w:p>: sus propiedades (pPr) y sus runs/enlaces en orden.
@@ -538,7 +610,7 @@ func (d *docxDec) cerrarParrafo(p xpara, directo docxPPr) (xpara, bool) {
 		// la altura de la línea.
 		base = d.h().resolverR(d.tabla.r, d.par.rEst, d.h().estiloR(""), pp.marca)
 	}
-	p.css = d.cssParrafo(pp, base, p.list != "", headingLevel(p.style) > 0, tieneTab(p.runs))
+	p.css = d.cssParrafo(pp, base, baseUsada(base, p.runs), p.list != "", headingLevel(p.style) > 0, tieneTab(p.runs))
 	subirComun(&p)
 	if l := headingLevel(p.style); l >= 1 && l <= 3 {
 		// El editor ya pinta en negrita h1, h2 y h3 (de h4 a h6 el reset los deja como el
@@ -551,9 +623,9 @@ func (d *docxDec) cerrarParrafo(p xpara, directo docxPPr) (xpara, bool) {
 
 // cssParrafo es el style de un bloque: lo que da a su texto, su espaciado, sus sangrías, su
 // sombreado y sus bordes. Solo lo que algún nivel de la herencia dice.
-func (d *docxDec) cssParrafo(pp docxPPr, base docxRPr, lista, titulo, tab bool) string {
+func (d *docxDec) cssParrafo(pp docxPPr, base, baseTexto docxRPr, lista, titulo, tab bool) string {
 	var css docxCSS
-	d.h().cssBase(&css, base, titulo)
+	d.h().cssBase(&css, baseTexto, titulo)
 	if pp.antes != nil && (*pp.antes != 0 || titulo) {
 		// Un <p> del editor no tiene margen de arriba; un título, sí.
 		css.add("margin-top", docxPx(*pp.antes))
@@ -669,6 +741,49 @@ func tramosConLetra(runs []xrun) bool {
 	return false
 }
 
+// baseUsada deja en base solo las propiedades de carácter que algún tramo de texto del párrafo
+// hereda del bloque: si todos los tramos de texto traen la suya propia (distinta entre sí), la
+// del bloque no pinta ninguna letra y se perdería al exportar y reimportar.
+func baseUsada(base docxRPr, runs []xrun) docxRPr {
+	if !tramosConLetra(runs) {
+		return base
+	}
+	var usaFont, usaSz, usaColor bool
+	for _, r := range runs {
+		if r.text == "" || r.raw != "" || r.field != "" || r.image != nil {
+			continue
+		}
+		if !tienePropCSS(r.css, "font-family") {
+			usaFont = true
+		}
+		if !tienePropCSS(r.css, "font-size") {
+			usaSz = true
+		}
+		if r.color == "" {
+			usaColor = true
+		}
+	}
+	if !usaFont {
+		base.font = ""
+	}
+	if !usaSz {
+		base.sz = 0
+	}
+	if !usaColor {
+		base.color = nil
+	}
+	return base
+}
+
+func tienePropCSS(css, prop string) bool {
+	for _, d := range strings.Split(css, ";") {
+		if k, _, ok := strings.Cut(d, ":"); ok && k == prop {
+			return true
+		}
+	}
+	return false
+}
+
 func tieneTab(runs []xrun) bool {
 	for _, r := range runs {
 		if strings.Contains(r.text, "\t") {
@@ -737,6 +852,9 @@ func (d *docxDec) readRun(link string) []xrun {
 				out = append(out, r)
 				_ = d.dec.Skip()
 			case "br", "cr":
+				if t.Name.Local == "br" && attrLocal(t, "type") == "page" {
+					d.finPag = true
+				}
 				out = append(out, xrun{brk: true})
 				_ = d.dec.Skip()
 			case "footnoteReference", "endnoteReference":
@@ -862,7 +980,9 @@ func (d *docxDec) readDrawing(until string) string {
 	var rID, rSVG, alt string
 	var cxEMU, cyEMU int
 	var ancla docxAncla // la de un cuadro de texto anclado (wp:anchor), para colocarlo
-	anclado, enH := false, false
+	var grupo, forma docxVML
+	var leidas []docxCaja
+	anclado, enH, enV, enVML := false, false, false, false
 	// El primero de cada cosa manda (un dibujo de Word repite extensiones y blips).
 	primero := func(dst *string, v string) {
 		if *dst == "" {
@@ -872,6 +992,7 @@ func (d *docxDec) readDrawing(until string) string {
 	for {
 		tok, err := d.dec.Token()
 		if err != nil {
+			d.cajas = append(d.cajas, leidas...)
 			return ""
 		}
 		switch t := tok.(type) {
@@ -890,25 +1011,43 @@ func (d *docxDec) readDrawing(until string) string {
 					cxEMU = atoiDefault(attrLocal(t, "cx"), 0)
 					cyEMU = atoiDefault(attrLocal(t, "cy"), 0)
 				}
+			case "group", "shape", "rect", "roundrect", "oval", "wrap":
+				elementoVML(t, &forma, &grupo, &enVML, leidas)
 			case "txbxContent":
-				css := ""
-				if anclado && cxEMU > 0 { // sin ancho no hay caja que colocar
-					css = d.cuadroCSS(ancla, float64(cxEMU)/9525)
+				if c, ok := d.cajaLeida(anclado, ancla, cxEMU, cyEMU, enVML, forma); ok {
+					leidas = append(leidas, c)
 				}
-				d.leerCuadro(css)
 			case "anchor", "positionH", "positionV", "posOffset", "align", "wrapNone", "wrapSquare", "wrapTight", "wrapThrough", "wrapTopAndBottom":
-				anclado = anclado || t.Name.Local == "anchor"
-				enH = enH || t.Name.Local == "positionH"
-				d.leerAncla(t, &ancla, enH)
+				d.leerAncla(t, &ancla, &anclado, &enH, &enV)
 			}
 		case xml.EndElement:
-			if t.Name.Local == "positionH" {
+			switch t.Name.Local {
+			case "positionH":
 				enH = false
-			}
-			if t.Name.Local == until {
+			case "positionV":
+				enV = false
+			case "group":
+				grupo = docxVML{}
+			case until:
+				d.cajas = append(d.cajas, leidas...)
 				return d.imagenLeida(rID, rSVG, alt, emuToPx(cxEMU), emuToPx(cyEMU))
 			}
 		}
+	}
+}
+
+func (d *docxDec) cajaLeida(anclado bool, ancla docxAncla, cxEMU, cyEMU int, enVML bool, forma docxVML) (docxCaja, bool) {
+	bloques := d.leerCuadro()
+	if len(bloques) == 0 {
+		return docxCaja{}, false
+	}
+	switch {
+	case anclado:
+		return docxCaja{ancla: ancla, ancho: float64(cxEMU) / 9525, alto: float64(cyEMU) / 9525, anclado: cxEMU > 0, bloques: bloques}, true
+	case enVML:
+		return docxCaja{ancla: forma.ancla, ancho: forma.ancho, alto: forma.alto, anclado: forma.anclado && forma.ancho > 0, bloques: bloques}, true
+	default:
+		return docxCaja{bloques: bloques}, true
 	}
 }
 
@@ -1026,20 +1165,45 @@ type docxTabla struct {
 	filas  [][]docxCell
 }
 
-// readRows lee las filas de un <w:tbl> hasta su cierre.
+// readRows lee las filas de un <w:tbl> hasta su cierre. Con lookUltimaFila activo retiene la
+// última <w:tr> leída hasta ver si hay otra detrás: así condicionar sabe cuál es la fila final y
+// aplica el rPr y el pPr de lastRow, swCell y seCell sin guardar la tabla entera en memoria.
 func (d *docxDec) readRows(t *docxTabla) {
+	var pendiente []xml.Token
+	vaciar := func(ultima bool) {
+		if len(pendiente) == 0 {
+			return
+		}
+		d.tabla.nfilas = -1
+		if ultima {
+			d.tabla.nfilas = d.tabla.fila + 1
+		}
+		dec := d.dec
+		d.dec = xml.NewTokenDecoder(&lectorTokens{toks: pendiente})
+		pendiente = nil
+		if row := d.readRow(); len(row) > 0 {
+			t.filas = append(t.filas, row)
+			d.tabla.fila++
+		}
+		d.dec = dec
+	}
 	for {
 		tok, err := d.dec.Token()
 		if err != nil {
-			return
+			break
 		}
 		switch e := tok.(type) {
 		case xml.StartElement:
 			switch e.Name.Local {
 			case "tr":
-				if row := d.readRow(); len(row) > 0 {
-					t.filas = append(t.filas, row)
-					d.tabla.fila++
+				if d.tabla.look&lookUltimaFila == 0 || len(d.tabla.cond) == 0 {
+					if row := d.readRow(); len(row) > 0 {
+						t.filas = append(t.filas, row)
+						d.tabla.fila++
+					}
+				} else if toks := d.leerTokensTr(); len(toks) > 0 {
+					vaciar(false)
+					pendiente = toks
 				}
 			case "tblPr":
 				d.h().leerCeldaPr(d.dec, "tblPr", &t.pr)
@@ -1056,10 +1220,61 @@ func (d *docxDec) readRows(t *docxTabla) {
 			}
 		case xml.EndElement:
 			if e.Name.Local == "tbl" {
+				vaciar(true)
 				return
 			}
 		}
 	}
+	vaciar(true)
+}
+
+func (d *docxDec) leerTokensTr() []xml.Token {
+	var toks []xml.Token
+	prof, profTbl, tieneTc := 1, 0, false
+	for prof > 0 {
+		tok, err := d.dec.Token()
+		if err != nil {
+			break
+		}
+		toks = append(toks, xml.CopyToken(tok))
+		switch e := tok.(type) {
+		case xml.StartElement:
+			switch e.Name.Local {
+			case "tr":
+				prof++
+			case "tbl":
+				profTbl++
+			case "tc":
+				if profTbl == 0 {
+					tieneTc = true
+				}
+			}
+		case xml.EndElement:
+			switch e.Name.Local {
+			case "tr":
+				prof--
+			case "tbl":
+				profTbl--
+			}
+		}
+	}
+	if !tieneTc {
+		return nil
+	}
+	return toks
+}
+
+type lectorTokens struct {
+	toks []xml.Token
+}
+
+func (l *lectorTokens) Token() (xml.Token, error) {
+	if len(l.toks) == 0 {
+		return nil, io.EOF
+	}
+	t := l.toks[0]
+	l.toks = l.toks[1:]
+	return t, nil
 }
 
 func (d *docxDec) readGrid() []float64 {
@@ -1351,11 +1566,13 @@ func (d *docxDec) readCell(col int) docxCell {
 			case "p":
 				p, _ := d.readParagraph()
 				c.paras = append(c.paras, p)
-				for _, b := range d.cajas {
-					if b.para != nil {
-						c.paras = append(c.paras, *b.para)
+				for _, caja := range d.cajas {
+					for _, b := range caja.bloques {
+						if b.para != nil {
+							c.paras = append(c.paras, *b.para)
+						}
+						c.paras = append(c.paras, parrafosDeTabla(b.table)...)
 					}
-					c.paras = append(c.paras, parrafosDeTabla(b.table)...)
 				}
 				d.cajas = nil
 			case "tcPr":
@@ -1906,17 +2123,13 @@ func subirComun(p *xpara) {
 	}
 }
 
-// leerCuadro lee el contenido de un cuadro de texto (w:txbxContent, de DrawingML o de VML) y lo
-// deja para después del párrafo en el que está anclado: su texto es del documento, y Pages pone en
-// cuadros de texto la portada, el pie de una carta y, en sus plantillas de maquetación, el
-// documento entero. Con css (un cuadro anclado, de DrawingML), va en su marco (import_docx_marcos.go).
-func (d *docxDec) leerCuadro(css string) {
-	par, ultimo, cajas := d.par, d.ultimo, d.cajas
+// leerCuadro lee el contenido de un cuadro de texto (w:txbxContent, de DrawingML o de VML): su
+// texto es del documento, y Pages pone en cuadros de texto la portada, el pie de una carta y, en
+// sus plantillas de maquetación, el documento entero.
+func (d *docxDec) leerCuadro() []xblock {
+	par, ultimo, cajas, finPag := d.par, d.ultimo, d.cajas, d.finPag
 	d.cajas = nil
 	bloques, _ := d.readBlocks("txbxContent")
-	if css != "" && len(bloques) > 0 {
-		bloques = append(append([]xblock{abrirMarco(css)}, bloques...), cerrarMarco)
-	}
-	cajas = append(cajas, bloques...)
-	d.par, d.ultimo, d.cajas = par, ultimo, cajas
+	d.par, d.ultimo, d.cajas, d.finPag = par, ultimo, cajas, finPag
+	return bloques
 }

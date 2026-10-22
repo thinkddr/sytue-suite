@@ -635,4 +635,7 @@ export const ga: AppCatalog<typeof en> = {
   'pos.imageUpload': 'Uaslódáil íomhá do {name}',
   'pos.images': 'Íomhánna',
   'pos.imageHint': 'Roghnaigh íomhá JPEG, PNG nó WebP suas le 10 MB.',
+  'vf.error.invalidCertificate':
+    'Ní deimhniú cáilithe bailí le NIF Spáinneach é an deimhniú nó an eochair phríobháideach.',
+  'vf.error.certificateTaxIdMismatch': 'Ní hionann an NIF ar an deimhniú agus NIF na heagraíochta.',
 };

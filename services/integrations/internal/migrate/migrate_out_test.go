@@ -20,6 +20,7 @@ import (
 	"strings"
 	"testing"
 
+	"git.sytue.eu/sytue/one/services/integrations/internal/connector"
 	"git.sytue.eu/sytue/one/services/integrations/internal/domain"
 	"git.sytue.eu/sytue/one/services/integrations/internal/migrate"
 )
@@ -265,5 +266,55 @@ func TestSalidaSegundaPasadaNoDuplica(t *testing.T) {
 	run(*segunda)
 	if google.next != subidas {
 		t.Errorf("la segunda pasada volvió a escribir en Google: %d → %d", subidas, google.next)
+	}
+}
+
+// TestSalidaDelegadaSoloPermiteHostsOficialesDelManifiesto fija la decisión sobre la
+// salida delegada de las migraciones: ni las raíces de Google/Microsoft ni el token_uri
+// de una cuenta de servicio pueden apuntar a un servidor ajeno al manifiesto oficial.
+func TestSalidaDelegadaSoloPermiteHostsOficialesDelManifiesto(t *testing.T) {
+	ctx := context.Background()
+	rt := gmailRuntime()
+
+	// (1) Google: raíz de Drive o People fuera de *.googleapis.com.
+	for _, clave := range []string{migrate.ConfigGoogleDriveBase, migrate.ConfigGooglePeopleBase} {
+		inst := connector.Instance{
+			ID: "i-g", OrgID: "org-1", HasBearer: true,
+			Config: map[string]string{clave: "https://evil.example/drive"},
+		}
+		j := job("job-g", domain.SourceGoogle, domain.DomainDrive)
+		j.Direction = domain.DirectionOut
+		j.SourceUser = ""
+		if _, err := migrate.NewOutboundDestination(ctx, rt, inst, j); err == nil {
+			t.Errorf("Google (%s) aceptó un host fuera del manifiesto oficial", clave)
+		}
+	}
+
+	// (2) Google con delegación de dominio: token_uri fuera de Google en service_account_key.
+	instDelegada := connector.Instance{
+		ID: "i-gd", OrgID: "org-1",
+		Secrets: map[string]string{
+			"service_account_key": `{"client_email":"sa@acme.iam.gserviceaccount.com","private_key":"-----BEGIN PRIVATE KEY-----\n-----END PRIVATE KEY-----","token_uri":"https://evil.example/token"}`,
+		},
+	}
+	jDel := job("job-gd", domain.SourceGoogle, domain.DomainDrive)
+	jDel.Direction = domain.DirectionOut
+	jDel.SourceUser = "ana@acme.com"
+	if _, err := migrate.NewOutboundDestination(ctx, rt, instDelegada, jDel); err == nil {
+		t.Error("Google delegado aceptó un token_uri fuera de los hosts oficiales")
+	}
+
+	// (3) Microsoft 365: graph_base o authority_base fuera de los hosts oficiales.
+	for _, clave := range []string{"graph_base", "authority_base"} {
+		inst := connector.Instance{
+			ID: "i-m", OrgID: "org-1", HasBearer: true,
+			Config: map[string]string{clave: "https://evil.example/v1.0"},
+		}
+		j := job("job-m", domain.SourceM365, domain.DomainDrive)
+		j.Direction = domain.DirectionOut
+		j.SourceUser = "ana@acme.com"
+		if _, err := migrate.NewOutboundDestination(ctx, rt, inst, j); err == nil {
+			t.Errorf("Microsoft 365 (%s) aceptó un host fuera del manifiesto oficial", clave)
+		}
 	}
 }

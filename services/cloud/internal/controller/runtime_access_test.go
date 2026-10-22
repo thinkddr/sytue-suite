@@ -443,3 +443,30 @@ func TestReconcileRepairsRuntimeAccessWithoutPendingDeployments(t *testing.T) {
 		}
 	}
 }
+
+// CLOUD-11 / INF-06 — cuando se configura la identidad del controlador
+// (CLOUD_CONTROLLER_CLUSTER_ROLE / SERVICE_ACCOUNT / NAMESPACE), EnsureNamespace
+// y ReconcileTenantRuntimeAccess vinculan también el RoleBinding
+// sytue-cloud-controller en cada namespace tenant-*.
+func TestEnsureNamespaceVinculaRoleBindingDelControlador(t *testing.T) {
+	p, cs := newTestPlatform()
+	cfg := runtimeAccessConfig()
+	cfg.CloudControllerClusterRole = "sytue-one-cloud-controller-tenant"
+	cfg.CloudControllerServiceAccount = "sytue-one-cloud-controller"
+	cfg.CloudControllerNamespace = "sytue-platform"
+	p.cfg = cfg
+	ctx := context.Background()
+
+	if err := p.EnsureNamespace(ctx, "tenant-acme", "acme", domain.QuotasFor(domain.PlanFree)); err != nil {
+		t.Fatalf("EnsureNamespace: %v", err)
+	}
+	rb, err := cs.RbacV1().RoleBindings("tenant-acme").Get(ctx, "sytue-cloud-controller", metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("RoleBinding sytue-cloud-controller no creado en tenant-acme: %v", err)
+	}
+	wantRole := rbacv1.RoleRef{APIGroup: rbacv1.GroupName, Kind: "ClusterRole", Name: cfg.CloudControllerClusterRole}
+	wantSubjects := []rbacv1.Subject{{Kind: "ServiceAccount", Name: cfg.CloudControllerServiceAccount, Namespace: cfg.CloudControllerNamespace}}
+	if rb.RoleRef != wantRole || !slices.Equal(rb.Subjects, wantSubjects) {
+		t.Fatalf("RoleBinding sytue-cloud-controller inesperado: %+v", rb)
+	}
+}

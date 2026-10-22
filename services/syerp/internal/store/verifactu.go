@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"git.sytue.eu/sytue/one/platform/pkg/keycrypto"
 	"git.sytue.eu/sytue/one/services/syerp/internal/domain"
 	"git.sytue.eu/sytue/one/services/syerp/internal/verifactu"
 )
@@ -38,12 +39,18 @@ var (
 	ErrNadaQueSubsanar = errors.New("esta factura no tiene nada que corregir en la Agencia Tributaria")
 	// ErrNIFConVerifactu: con VERI*FACTU activado el NIF ya no cambia.
 	ErrNIFConVerifactu = errors.New("con VERI*FACTU activado el NIF de la organización no se puede cambiar")
+	// ErrCertificadoInvalido: el certificado o su clave privada no son un certificado cualificado vigente con NIF.
+	ErrCertificadoInvalido = errors.New("el certificado o su clave privada no son válidos")
+	// ErrCertificadoNIFNoCoincide: el NIF del certificado no coincide con el NIF emisor de la organización.
+	ErrCertificadoNIFNoCoincide = errors.New("el NIF del certificado no coincide con el NIF de la organización")
 )
 
 // Verifactu es el estado de VERI*FACTU en la organización.
 type Verifactu struct {
-	Activo bool       `json:"activo"`
-	Desde  *time.Time `json:"desde,omitempty"`
+	Activo           bool       `json:"activo"`
+	Desde            *time.Time `json:"desde,omitempty"`
+	TieneCertificado bool       `json:"tiene_certificado,omitempty"`
+	CertificadoNIF   string     `json:"certificado_nif,omitempty"`
 	// Cuántas facturas están en cada situación, por su último registro.
 	Pendientes int `json:"pendientes"`
 	ConErrores int `json:"con_errores"`
@@ -76,7 +83,12 @@ func (s *Store) EstadoVerifactu(ctx context.Context) (Verifactu, error) {
 	}
 	var v Verifactu
 	err = s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
-		err := tx.QueryRow(ctx, `SELECT verifactu_desde FROM organizacion WHERE tenant = $1`, tenant).Scan(&v.Desde)
+		var nifOrg, certNIF string
+		var tieneCert bool
+		err := tx.QueryRow(ctx, `
+			SELECT verifactu_desde, nif, verifactu_cert_pem <> '' AND verifactu_key_enc <> '', verifactu_cert_nif
+			  FROM organizacion WHERE tenant = $1`, tenant).
+			Scan(&v.Desde, &nifOrg, &tieneCert, &certNIF)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil
 		}
@@ -84,6 +96,10 @@ func (s *Store) EstadoVerifactu(ctx context.Context) (Verifactu, error) {
 			return err
 		}
 		v.Activo = v.Desde != nil
+		if tieneCert && certNIF != "" && domain.MismoNIF(nifOrg, certNIF) {
+			v.TieneCertificado = true
+			v.CertificadoNIF = certNIF
+		}
 		return tx.QueryRow(ctx, `
 			SELECT count(*) FILTER (WHERE estado = 'pendiente'),
 			       count(*) FILTER (WHERE estado = 'aceptado_con_errores'),
@@ -96,6 +112,90 @@ func (s *Store) EstadoVerifactu(ctx context.Context) (Verifactu, error) {
 			Scan(&v.Pendientes, &v.ConErrores, &v.Rechazadas, &v.ErrorEnvio)
 	})
 	return v, err
+}
+
+// GuardarCertificadoVerifactu valida el certificado cualificado y su clave
+// privada, comprueba que el NIF acreditado en el certificado coincide con el NIF
+// emisor de la organización y guarda la clave privada cifrada en reposo.
+func (s *Store) GuardarCertificadoVerifactu(ctx context.Context, certPEM, keyPEM []byte, sello bool, cifra *keycrypto.Cipher) (string, error) {
+	if !cifra.Enabled() {
+		return "", fmt.Errorf("no hay clave de sellado configurada: %w", domain.ErrDatos)
+	}
+	nifCert, err := verifactu.ValidarCertificado(certPEM, keyPEM, time.Now())
+	if err != nil {
+		return "", fmt.Errorf("%w: %w", ErrCertificadoInvalido, err)
+	}
+	sellada, err := cifra.Encrypt(string(keyPEM))
+	if err != nil {
+		return "", fmt.Errorf("sellar clave privada: %w", err)
+	}
+	err = s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+		var nifOrg string
+		err := tx.QueryRow(ctx, `
+			SELECT nif FROM organizacion WHERE tenant = current_setting('app.tenant', true) FOR UPDATE`).
+			Scan(&nifOrg)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrNoEncontrado
+		}
+		if err != nil {
+			return err
+		}
+		if v := domain.VariantesNIF(nifOrg); len(v) == 0 || len(v[len(v)-1]) != 9 || !domain.MismoNIF(nifOrg, nifCert) {
+			return ErrCertificadoNIFNoCoincide
+		}
+		_, err = tx.Exec(ctx, `
+			UPDATE organizacion
+			   SET verifactu_cert_pem = $1,
+			       verifactu_key_enc  = $2,
+			       verifactu_cert_nif = $3,
+			       verifactu_sello    = $4,
+			       updated_at         = now()
+			 WHERE tenant = current_setting('app.tenant', true)`,
+			string(certPEM), sellada, nifCert, sello)
+		return err
+	})
+	if err != nil {
+		return "", err
+	}
+	return nifCert, nil
+}
+
+// ClienteVerifactu construye el cliente de envío de la organización. En
+// producción exige el certificado propio de la organización cuyo NIF coincida
+// con el NIF emisor (nunca usa el certificado de plataforma); en pruebas usa el
+// propio si está configurado o el de pruebas de respaldo.
+func (s *Store) ClienteVerifactu(ctx context.Context, cifra *keycrypto.Cipher, produccion bool, respaldo *verifactu.Cliente) (*verifactu.Cliente, error) {
+	var nifOrg, certPEM, keyEnc, certNIF string
+	var sello bool
+	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+		return tx.QueryRow(ctx, `
+			SELECT nif, verifactu_cert_pem, verifactu_key_enc, verifactu_cert_nif, verifactu_sello
+			  FROM organizacion WHERE tenant = current_setting('app.tenant', true)`).
+			Scan(&nifOrg, &certPEM, &keyEnc, &certNIF, &sello)
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		if produccion || respaldo == nil {
+			return nil, ErrCertificadoInvalido
+		}
+		return respaldo, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if certPEM != "" && keyEnc != "" {
+		if certNIF == "" || !domain.MismoNIF(nifOrg, certNIF) {
+			return nil, ErrCertificadoNIFNoCoincide
+		}
+		keyPEM, err := cifra.Decrypt(keyEnc)
+		if err != nil {
+			return nil, fmt.Errorf("abrir clave privada de VERI*FACTU: %w", err)
+		}
+		return verifactu.NuevoCliente([]byte(certPEM), []byte(keyPEM), produccion, sello)
+	}
+	if produccion || respaldo == nil {
+		return nil, ErrCertificadoInvalido
+	}
+	return respaldo, nil
 }
 
 // ActivarVerifactu enciende VERI*FACTU desde ahora. Repetirlo no cambia nada: la

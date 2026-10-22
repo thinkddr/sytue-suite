@@ -40,7 +40,7 @@ func cargar() (Tokens, error) { return cargarCuenta(llaveroCuenta) }
 
 func cargarCuenta(cuenta string) (Tokens, error) {
 	if cuentaCompartida(cuenta) {
-		return cargarCompartida(cuenta)
+		return cargarCuentaCompartida(cuenta)
 	}
 	crudo, errLlavero := keyring.Get(llaveroServicio, cuenta)
 	llaveroVivo := errLlavero == nil || errors.Is(errLlavero, keyring.ErrNotFound)
@@ -100,7 +100,7 @@ func guardar(t Tokens) error { return guardarCuenta(llaveroCuenta, t) }
 
 func guardarCuenta(cuenta string, t Tokens) error {
 	if cuentaCompartida(cuenta) {
-		return guardarCompartida(cuenta, t)
+		return guardarCuentaCompartida(cuenta, t)
 	}
 	if t.Refresh == "" {
 		errFichero := borrarFichero(cuenta)

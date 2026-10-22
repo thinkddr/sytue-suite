@@ -372,6 +372,11 @@ func NewRouter(d Deps) http.Handler {
 	r.With(middleware.Timeout(requestTimeout), httpx.RateLimit(httpx.RateLimitConfig{Limiter: webhookLimiter, KeyFunc: webhookRateKey})).
 		Post("/hooks/deploy/{token}", h.DeployHook)
 
+	// Confirmación de alertas por correo (CLOUD-19): el destinatario abre el
+	// enlace sin sesión de Sytue ID; la credencial es el token de 256 bits.
+	r.With(middleware.Timeout(requestTimeout), httpx.RateLimit(httpx.RateLimitConfig{Limiter: webhookLimiter, KeyFunc: webhookRateKey})).
+		Post("/alerts/confirm", h.ConfirmAlertPolicy)
+
 	return r
 }
 

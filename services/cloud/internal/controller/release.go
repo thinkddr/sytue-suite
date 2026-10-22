@@ -138,6 +138,7 @@ func (p *KubePlatform) releaseJob(spec AppSpec, name string) *batchv1.Job {
 				ObjectMeta: metav1.ObjectMeta{Labels: labels},
 				Spec: corev1.PodSpec{
 					RestartPolicy:                corev1.RestartPolicyNever,
+					RuntimeClassName:             tenantRuntimeClassPtr(),
 					AutomountServiceAccountToken: &automountSA,
 					ImagePullSecrets:             tenantImagePullSecrets(),
 					Containers: []corev1.Container{{
@@ -169,12 +170,14 @@ func (p *KubePlatform) releaseJob(spec AppSpec, name string) *batchv1.Job {
 						// menos de lo que necesita la aplicación.
 						Resources: corev1.ResourceRequirements{
 							Requests: corev1.ResourceList{
-								corev1.ResourceCPU:    resource.MustParse(size.CPURequest),
-								corev1.ResourceMemory: resource.MustParse(size.MemoryRequest),
+								corev1.ResourceCPU:              resource.MustParse(size.CPURequest),
+								corev1.ResourceMemory:           resource.MustParse(size.MemoryRequest),
+								corev1.ResourceEphemeralStorage: resource.MustParse("128Mi"),
 							},
 							Limits: corev1.ResourceList{
-								corev1.ResourceCPU:    resource.MustParse(size.CPULimit),
-								corev1.ResourceMemory: resource.MustParse(size.MemoryLimit),
+								corev1.ResourceCPU:              resource.MustParse(size.CPULimit),
+								corev1.ResourceMemory:           resource.MustParse(size.MemoryLimit),
+								corev1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
 							},
 						},
 						VolumeMounts: []corev1.VolumeMount{{Name: "tmp", MountPath: "/tmp"}},

@@ -1,4 +1,6 @@
 {
+  "aiBatch.excludeOrg": "Organisatie uitsluiten van de automatische Sytue AI-batch",
+  "aiBatch.excludedHint": "De organisatie is uitgesloten van de automatische Sytue AI-batch. Nieuwe foto’s worden niet op de achtergrond verwerkt voor suggesties of gelijkenissen.",
   "album.linkCopied": "Link gekopieerd",
   "album.newLink": "Nieuwe link",
   "album.newLinkConfirm": "Een nieuwe link maken? De huidige link werkt dan niet meer voor wie hem al heeft.",

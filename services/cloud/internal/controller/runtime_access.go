@@ -22,8 +22,11 @@ import (
 	"git.sytue.eu/sytue/one/services/cloud/internal/config"
 )
 
-// Nombre fijo: el RBAC del controller limita get/update a este RoleBinding.
-const cloudRuntimeBinding = "sytue-cloud-runtime"
+// Nombre fijo: el RBAC del controller limita get/update a estos RoleBindings.
+const (
+	cloudRuntimeBinding    = "sytue-cloud-runtime"
+	cloudControllerBinding = "sytue-cloud-controller"
+)
 
 const tenantNamespaceSelector = "app.kubernetes.io/part-of=sytue-one,sytue.eu/namespace-kind=tenant"
 
@@ -61,6 +64,28 @@ func cloudRuntimeAccessEnabled(cfg config.Config) (bool, error) {
 	}
 	if problemas := validation.IsDNS1123Label(cfg.CloudAPINamespace); len(problemas) > 0 {
 		return false, fmt.Errorf("controller: CLOUD_API_NAMESPACE inválido: %v", problemas)
+	}
+	if _, err := cloudControllerAccessEnabled(cfg); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+func cloudControllerAccessEnabled(cfg config.Config) (bool, error) {
+	if cfg.CloudControllerClusterRole == "" && cfg.CloudControllerServiceAccount == "" && cfg.CloudControllerNamespace == "" {
+		return false, nil
+	}
+	if cfg.CloudControllerClusterRole == "" || cfg.CloudControllerServiceAccount == "" || cfg.CloudControllerNamespace == "" {
+		return false, fmt.Errorf("controller: CLOUD_CONTROLLER_CLUSTER_ROLE, CLOUD_CONTROLLER_SERVICE_ACCOUNT y CLOUD_CONTROLLER_NAMESPACE deben estar completos")
+	}
+	if problemas := content.IsPathSegmentName(cfg.CloudControllerClusterRole); len(problemas) > 0 {
+		return false, fmt.Errorf("controller: CLOUD_CONTROLLER_CLUSTER_ROLE inválido: %v", problemas)
+	}
+	if problemas := validation.IsDNS1123Subdomain(cfg.CloudControllerServiceAccount); len(problemas) > 0 {
+		return false, fmt.Errorf("controller: CLOUD_CONTROLLER_SERVICE_ACCOUNT inválido: %v", problemas)
+	}
+	if problemas := validation.IsDNS1123Label(cfg.CloudControllerNamespace); len(problemas) > 0 {
+		return false, fmt.Errorf("controller: CLOUD_CONTROLLER_NAMESPACE inválido: %v", problemas)
 	}
 	return true, nil
 }
@@ -128,18 +153,37 @@ func (p *KubePlatform) ensureCloudRuntimeBinding(ctx context.Context, namespace,
 	if err != nil || !enabled {
 		return err
 	}
+	if err := p.ensureTenantRoleBinding(
+		ctx, namespace, tenant,
+		cloudRuntimeBinding, p.cfg.CloudAPIClusterRole, p.cfg.CloudAPIServiceAccount, p.cfg.CloudAPINamespace,
+	); err != nil {
+		return err
+	}
+	ctrlEnabled, err := cloudControllerAccessEnabled(p.cfg)
+	if err != nil || !ctrlEnabled {
+		return err
+	}
+	return p.ensureTenantRoleBinding(
+		ctx, namespace, tenant,
+		cloudControllerBinding, p.cfg.CloudControllerClusterRole, p.cfg.CloudControllerServiceAccount, p.cfg.CloudControllerNamespace,
+	)
+}
+
+func (p *KubePlatform) ensureTenantRoleBinding(
+	ctx context.Context, namespace, tenant, bindingName, clusterRole, saName, saNamespace string,
+) error {
 	desired := &rbacv1.RoleBinding{
-		ObjectMeta: metav1.ObjectMeta{Name: cloudRuntimeBinding, Namespace: namespace, Labels: map[string]string{
+		ObjectMeta: metav1.ObjectMeta{Name: bindingName, Namespace: namespace, Labels: map[string]string{
 			"app.kubernetes.io/managed-by": "sytue-cloud", "sytue.eu/tenant": tenant,
 		}},
-		RoleRef: rbacv1.RoleRef{APIGroup: rbacv1.GroupName, Kind: "ClusterRole", Name: p.cfg.CloudAPIClusterRole},
+		RoleRef: rbacv1.RoleRef{APIGroup: rbacv1.GroupName, Kind: "ClusterRole", Name: clusterRole},
 		Subjects: []rbacv1.Subject{{
-			Kind: "ServiceAccount", Name: p.cfg.CloudAPIServiceAccount,
-			Namespace: p.cfg.CloudAPINamespace,
+			Kind: "ServiceAccount", Name: saName,
+			Namespace: saNamespace,
 		}},
 	}
 	api := p.cs.RbacV1().RoleBindings(namespace)
-	existing, err := api.Get(ctx, cloudRuntimeBinding, metav1.GetOptions{})
+	existing, err := api.Get(ctx, bindingName, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		_, err = api.Create(ctx, desired, metav1.CreateOptions{})
 		if !apierrors.IsAlreadyExists(err) {
@@ -149,7 +193,7 @@ func (p *KubePlatform) ensureCloudRuntimeBinding(ctx context.Context, namespace,
 			return nil
 		}
 		// Una creación concurrente no autoriza a dar por bueno un binding ajeno.
-		existing, err = api.Get(ctx, cloudRuntimeBinding, metav1.GetOptions{})
+		existing, err = api.Get(ctx, bindingName, metav1.GetOptions{})
 	}
 	if err != nil {
 		return fmt.Errorf("controller: consultar acceso runtime de %s: %w", namespace, err)

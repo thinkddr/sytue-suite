@@ -223,3 +223,23 @@ func (h *Handlers) DeleteAlertPolicy(w http.ResponseWriter, r *http.Request) {
 	}
 	httpx.NoContent(w)
 }
+
+type confirmAlertPolicyRequest struct {
+	Token string `json:"token"`
+}
+
+// ConfirmAlertPolicy confirma una alerta de correo electrónico mediante el
+// token de un solo uso recibido por enlace (CLOUD-19).
+func (h *Handlers) ConfirmAlertPolicy(w http.ResponseWriter, r *http.Request) {
+	var req confirmAlertPolicyRequest
+	if err := httpx.DecodeJSON(w, r, &req); err != nil {
+		httpx.Fail(w, r, err)
+		return
+	}
+	p, err := h.svc.ConfirmAlertPolicy(r.Context(), req.Token)
+	if err != nil {
+		httpx.Fail(w, r, toAPIError(err))
+		return
+	}
+	httpx.JSON(w, r, http.StatusOK, p)
+}

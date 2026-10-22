@@ -18,6 +18,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"git.sytue.eu/sytue/one/platform/pkg/authn"
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 	"git.sytue.eu/sytue/one/services/drive/internal/domain"
 	"git.sytue.eu/sytue/one/services/drive/internal/service"
@@ -229,6 +230,29 @@ func TestUnBloqueoNoCruzaOrganizaciones(t *testing.T) {
 	rec = pedirComo(h, "otra", "LOCK", "/dav/corto.txt", strings.NewReader(lockinfo), "Timeout", "Second-60")
 	if !strings.Contains(rec.Body.String(), "Second-60") {
 		t.Errorf("un LOCK de 60 s: %s", rec.Body.String())
+	}
+
+	// Tampoco cruza entre dos personas de la MISMA organización («Mi unidad» es privada).
+	pedirPersona := func(sub, metodo, ruta string, cuerpo io.Reader, cabeceras ...string) *httptest.ResponseRecorder {
+		r := httptest.NewRequest(metodo, ruta, cuerpo)
+		ctx := tenancy.Into(r.Context(), tenancy.Tenant{Slug: "compartida"})
+		ctx = authn.Into(ctx, authn.Claims{Subject: sub, Tenant: "compartida"})
+		r = r.WithContext(ctx)
+		for i := 0; i+1 < len(cabeceras); i += 2 {
+			r.Header.Set(cabeceras[i], cabeceras[i+1])
+		}
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		return w
+	}
+	if rec := pedirPersona("alice", "LOCK", "/dav/", strings.NewReader(lockinfo), "Depth", "infinity"); rec.Code != http.StatusOK {
+		t.Fatalf("LOCK de alice = %d: %s", rec.Code, rec.Body.String())
+	}
+	if rec := pedirPersona("bob", http.MethodPut, "/dav/de-bob.txt", strings.NewReader("x")); rec.Code != http.StatusCreated {
+		t.Errorf("el bloqueo de alice dejó a bob (misma org) con %d al escribir", rec.Code)
+	}
+	if rec := pedirPersona("alice", http.MethodPut, "/dav/de-alice.txt", strings.NewReader("x")); rec.Code != http.StatusLocked {
+		t.Errorf("dentro de la unidad de alice, escribir sin el token del bloqueo = %d, quiero 423", rec.Code)
 	}
 }
 

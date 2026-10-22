@@ -494,6 +494,7 @@ export interface AlertPolicy {
   event: AlertEvent;
   channel_url: string;
   enabled: boolean;
+  confirmed?: boolean;
   created_at: string;
 }
 

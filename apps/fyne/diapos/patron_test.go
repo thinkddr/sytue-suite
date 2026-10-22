@@ -96,6 +96,74 @@ func TestElPatronSeEditaComoEnLaWeb(t *testing.T) {
 	}
 }
 
+// TestLasFormasDelDisenoSeEditanComoElPatron: al editar un diseño con EditarDiseno(id),
+// se editan tanto las formas del diseño (`decor`, debajo) como sus marcadores (`boxes`,
+// encima): mover, recolorear, insertar forma o cuadro de texto y borrar reparten cada
+// caja de vuelta entre `decor` y `boxes`, y se conservan en el JSON del modelo (`Fiel`).
+func TestLasFormasDelDisenoSeEditanComoElPatron(t *testing.T) {
+	src := `{"slides":[{"id":"a","layout":"portada","boxes":[{"id":"t","x":10,"y":10,"w":40,"h":20,"html":"<p>t</p>"}]}],` +
+		`"master":{"boxes":[{"id":"m","x":0,"y":0,"w":20,"h":10,"html":"<p>Patrón</p>"}],` +
+		`"layouts":[{"id":"portada","name":"Portada",` +
+		`"decor":[{"id":"franja","kind":"shape","shape":"rect","x":0,"y":0,"w":80,"h":10,"fill":"#1F3864","html":""},` +
+		`{"id":"pie","x":8,"y":90,"w":40,"h":6,"html":"<p>Pie fijo</p>"}],` +
+		`"boxes":[{"id":"marc","x":8,"y":30,"w":84,"h":20,"html":"<h1>Título</h1>"}]}]}}`
+	e, _, _ := montar(t, src)
+	e.EditarDiseno("portada")
+	if !e.escenario.Patron || e.DisenoEditado() != "portada" || e.escenario.Diseno != "portada" {
+		t.Fatalf("EditarDiseno(portada): Patron=%v DisenoEditado=%q Diseno=%q", e.escenario.Patron, e.DisenoEditado(), e.escenario.Diseno)
+	}
+	if ids := idsDe(e.cajasEdit()); ids != "franja,pie,marc" {
+		t.Fatalf("se editan %q (esperaba decor + boxes del diseño: franja,pie,marc)", ids)
+	}
+	if ids := idsDe(e.escenario.cajasVisibles()); ids != "m,franja,pie,marc" {
+		t.Fatalf("el escenario pinta %q (esperaba el patrón detrás y decor + boxes del diseño)", ids)
+	}
+	// Mover y recolorear la franja (forma en decor):
+	e.sel = "franja"
+	e.Empujar(2, 3, false)
+	e.PonerRelleno("#C00000")
+	// Mover el pie (texto que ya estaba en decor, sigue en decor):
+	e.sel = "pie"
+	e.Empujar(1, 0, false)
+	// Insertar una forma nueva (va a decor) y un cuadro de texto nuevo (va a boxes):
+	e.NuevaForma("ellipse")
+	idForma := e.sel
+	e.NuevaCajaTexto()
+	idTexto := e.sel
+
+	d := e.m.Patron.Disenos[0]
+	if ids := idsDe(d.Decor); ids != "franja,pie,"+idForma {
+		t.Fatalf("decor = %q (esperaba franja,pie,%s)", ids, idForma)
+	}
+	if d.Decor[0].X != 2 || d.Decor[0].Y != 3 || d.Decor[0].Relleno != "#C00000" {
+		t.Errorf("franja editada = %+v", d.Decor[0])
+	}
+	if d.Decor[1].X != 9 {
+		t.Errorf("pie editado x = %v (esperaba 9)", d.Decor[1].X)
+	}
+	if ids := idsDe(d.Cajas); ids != "marc,"+idTexto {
+		t.Fatalf("boxes = %q (esperaba marc,%s)", ids, idTexto)
+	}
+	// Borrar la forma insertada de decor:
+	e.sel = idForma
+	e.BorrarSeleccion()
+	if ids := idsDe(e.m.Patron.Disenos[0].Decor); ids != "franja,pie" {
+		t.Errorf("tras borrar forma, decor = %q", ids)
+	}
+	// Verificar que el viaje por JSON (Serializar -> Leer) preserva decor y boxes:
+	raw := e.Serializar()
+	m2, err := Leer([]byte(raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ids := idsDe(m2.Patron.Disenos[0].Decor); ids != "franja,pie" {
+		t.Errorf("reimportado decor = %q", ids)
+	}
+	if ids := idsDe(m2.Patron.Disenos[0].Cajas); ids != "marc,"+idTexto {
+		t.Errorf("reimportado boxes = %q", ids)
+	}
+}
+
 func idsDe(cs []Caja) string {
 	ids := make([]string, 0, len(cs))
 	for _, c := range cs {

@@ -154,22 +154,26 @@ def _codificar(texto, utf8):
     return struct.pack("<H", len(texto)) + texto.encode("utf-16-le") + b"\0\0"
 
 
-def servicio_en_primer_plano(ruta, clase, banderas):
-    """android:foregroundServiceType del <service> de `clase`."""
+def _es_clase(clase):
     def es_el(cadenas, datos, ext, a_ini, a_num, resid):
         for k in range(a_num):
             _, a_nombre, a_crudo = struct.unpack_from("<III", datos, ext + a_ini + k * 20)
             if resid(a_nombre) == NOMBRE and a_crudo < len(cadenas) and cadenas[a_crudo] == clase:
                 return True
         return False
-    _anadir_atributo(ruta, "service", es_el, "<service android:name=\"%s\">" % clase,
+    return es_el
+
+
+def servicio_en_primer_plano(ruta, clase, banderas):
+    """android:foregroundServiceType del <service> de `clase`."""
+    _anadir_atributo(ruta, "service", _es_clase(clase), "<service android:name=\"%s\">" % clase,
                      "foregroundServiceType", TIPO_SERVICIO, TIPO_HEX, banderas)
     print("%s: foregroundServiceType 0x%x" % (clase, banderas))
 
 
 def imagen_en_imagen(ruta):
-    """android:supportsPictureInPicture="true" en la <activity> (solo hay una)."""
-    _anadir_atributo(ruta, "activity", lambda *_: True, "<activity>",
+    """android:supportsPictureInPicture="true" en la GoNativeActivity."""
+    _anadir_atributo(ruta, "activity", _es_clase("org.golang.app.GoNativeActivity"), "<activity>",
                      "supportsPictureInPicture", PICTURE_IN_PICTURE, TIPO_BOOL, 0xFFFFFFFF)
     print("activity: supportsPictureInPicture")
 

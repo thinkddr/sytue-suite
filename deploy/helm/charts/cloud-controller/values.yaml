@@ -126,6 +126,13 @@ serviceAccount:
   create: true
   name: ""
 
+# RuntimeClass para aislar los contenedores de tenant con un kernel en espacio
+# de usuario (gVisor / runsc, CLOUD-12).
+runtimeClass:
+  create: true
+  name: gvisor
+  handler: runsc
+
 # PodDisruptionBudget. El controller corre como singleton (1 réplica); el PDB usa
 # maxUnavailable para no bloquear drains/upgrades del nodo.
 podDisruptionBudget:

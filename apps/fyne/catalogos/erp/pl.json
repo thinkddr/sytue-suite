@@ -520,6 +520,8 @@
   "vf.confirmBody": "Od teraz każda zatwierdzona faktura trafia do hiszpańskiej administracji skarbowej i nie można jej już zmienić ani usunąć: błędy poprawia się fakturą korygującą. Po włączeniu pozostaje aktywne do końca roku.",
   "vf.confirmTitle": "Włączyć VERI*FACTU?",
   "vf.declaration": "Deklaracja zgodności",
+  "vf.error.certificateTaxIdMismatch": "Numer podatkowy (NIF) w certyfikacie nie zgadza się z numerem NIF organizacji.",
+  "vf.error.invalidCertificate": "Certyfikat lub klucz prywatny nie jest ważnym certyfikatem kwalifikowanym z hiszpańskim numerem NIF.",
   "vf.export": "Pobierz rejestry",
   "vf.fixHint": "Popraw dane faktury lub klienta i wyślij ją ponownie.",
   "vf.intro": "Od 2027 roku każdą fakturę trzeba zarejestrować w hiszpańskiej administracji skarbowej w chwili jej wystawienia. Dzięki VERI*FACTU Sytue robi to za ciebie przy zatwierdzaniu faktury i dodaje kod QR, którym klient może ją sprawdzić.",

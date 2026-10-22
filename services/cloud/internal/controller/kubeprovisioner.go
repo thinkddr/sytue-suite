@@ -604,6 +604,7 @@ func (p *KubeProvisioner) functionDeployment(name, namespace, image, secretName,
 	allowPrivEsc := false
 	automountSA := false
 	runAsUser := int64(1000)
+	tmpSize := resource.MustParse("256Mi")
 	selector := map[string]string{"sytue.eu/managed": name + "-fn"}
 	podLabels := mergeLabels(labels, selector)
 
@@ -611,6 +612,7 @@ func (p *KubeProvisioner) functionDeployment(name, namespace, image, secretName,
 		Name:  "function",
 		Image: image,
 		Ports: []corev1.ContainerPort{{ContainerPort: appContainerPort, Name: "http"}},
+		Env:   []corev1.EnvVar{{Name: "TMPDIR", Value: "/tmp"}},
 		SecurityContext: &corev1.SecurityContext{
 			RunAsNonRoot:             &runAsNonRoot,
 			RunAsUser:                &runAsUser,
@@ -621,14 +623,17 @@ func (p *KubeProvisioner) functionDeployment(name, namespace, image, secretName,
 		},
 		Resources: corev1.ResourceRequirements{
 			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("50m"),
-				corev1.ResourceMemory: resource.MustParse("64Mi"),
+				corev1.ResourceCPU:              resource.MustParse("50m"),
+				corev1.ResourceMemory:           resource.MustParse("64Mi"),
+				corev1.ResourceEphemeralStorage: resource.MustParse("64Mi"),
 			},
 			Limits: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("500m"),
-				corev1.ResourceMemory: resource.MustParse("256Mi"),
+				corev1.ResourceCPU:              resource.MustParse("500m"),
+				corev1.ResourceMemory:           resource.MustParse("256Mi"),
+				corev1.ResourceEphemeralStorage: resource.MustParse("512Mi"),
 			},
 		},
+		VolumeMounts: []corev1.VolumeMount{{Name: "tmp", MountPath: "/tmp"}},
 		// TCP-socket (no HTTP GET /): una función HTTP genérica puede servir solo un
 		// sub-path o devolver no-2xx en «/»; con GET / nunca quedaría Ready (Service sin
 		// endpoints, 503). TCP comprueba que el puerto escucha = la función arrancó.
@@ -655,6 +660,7 @@ func (p *KubeProvisioner) functionDeployment(name, namespace, image, secretName,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{Labels: podLabels},
 				Spec: corev1.PodSpec{
+					RuntimeClassName:             tenantRuntimeClassPtr(),
 					AutomountServiceAccountToken: &automountSA,
 					ImagePullSecrets:             tenantImagePullSecrets(),
 					SecurityContext: &corev1.PodSecurityContext{
@@ -663,6 +669,10 @@ func (p *KubeProvisioner) functionDeployment(name, namespace, image, secretName,
 						SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
 					},
 					Containers: []corev1.Container{c},
+					Volumes: []corev1.Volume{{
+						Name:         "tmp",
+						VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{SizeLimit: &tmpSize}},
+					}},
 				},
 			},
 		},
@@ -750,9 +760,11 @@ func managedTaskPodSpec(image string, command []string) corev1.PodSpec {
 	allowPrivEsc := false
 	automountSA := false
 	uid := int64(1000)
+	tmpSize := resource.MustParse("256Mi")
 	c := corev1.Container{
 		Name:  "task",
 		Image: image,
+		Env:   []corev1.EnvVar{{Name: "TMPDIR", Value: "/tmp"}},
 		SecurityContext: &corev1.SecurityContext{
 			RunAsNonRoot:             &runAsNonRoot,
 			AllowPrivilegeEscalation: &allowPrivEsc,
@@ -761,20 +773,24 @@ func managedTaskPodSpec(image string, command []string) corev1.PodSpec {
 		},
 		Resources: corev1.ResourceRequirements{
 			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("50m"),
-				corev1.ResourceMemory: resource.MustParse("64Mi"),
+				corev1.ResourceCPU:              resource.MustParse("50m"),
+				corev1.ResourceMemory:           resource.MustParse("64Mi"),
+				corev1.ResourceEphemeralStorage: resource.MustParse("64Mi"),
 			},
 			Limits: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("1"),
-				corev1.ResourceMemory: resource.MustParse("512Mi"),
+				corev1.ResourceCPU:              resource.MustParse("1"),
+				corev1.ResourceMemory:           resource.MustParse("512Mi"),
+				corev1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
 			},
 		},
+		VolumeMounts: []corev1.VolumeMount{{Name: "tmp", MountPath: "/tmp"}},
 	}
 	if len(command) > 0 {
 		c.Command = command
 	}
 	return corev1.PodSpec{
 		RestartPolicy:                corev1.RestartPolicyOnFailure,
+		RuntimeClassName:             tenantRuntimeClassPtr(),
 		AutomountServiceAccountToken: &automountSA,
 		ImagePullSecrets:             tenantImagePullSecrets(),
 		SecurityContext: &corev1.PodSecurityContext{
@@ -784,6 +800,10 @@ func managedTaskPodSpec(image string, command []string) corev1.PodSpec {
 			SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
 		},
 		Containers: []corev1.Container{c},
+		Volumes: []corev1.Volume{{
+			Name:         "tmp",
+			VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{SizeLimit: &tmpSize}},
+		}},
 	}
 }
 
@@ -1052,6 +1072,7 @@ func (p *KubeProvisioner) postgresDeployment(name, namespace string, labels map[
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{Labels: podLabels},
 				Spec: corev1.PodSpec{
+					RuntimeClassName:             tenantRuntimeClassPtr(),
 					AutomountServiceAccountToken: &automountSA,
 					ImagePullSecrets:             tenantImagePullSecrets(),
 					SecurityContext: &corev1.PodSecurityContext{
@@ -1078,12 +1099,14 @@ func (p *KubeProvisioner) postgresDeployment(name, namespace string, labels map[
 						},
 						Resources: corev1.ResourceRequirements{
 							Requests: corev1.ResourceList{
-								corev1.ResourceCPU:    resource.MustParse("100m"),
-								corev1.ResourceMemory: resource.MustParse("256Mi"),
+								corev1.ResourceCPU:              resource.MustParse("100m"),
+								corev1.ResourceMemory:           resource.MustParse("256Mi"),
+								corev1.ResourceEphemeralStorage: resource.MustParse("128Mi"),
 							},
 							Limits: corev1.ResourceList{
-								corev1.ResourceCPU:    resource.MustParse("1"),
-								corev1.ResourceMemory: resource.MustParse("1Gi"),
+								corev1.ResourceCPU:              resource.MustParse("1"),
+								corev1.ResourceMemory:           resource.MustParse("1Gi"),
+								corev1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
 							},
 						},
 						VolumeMounts: []corev1.VolumeMount{
@@ -1149,6 +1172,7 @@ func (p *KubeProvisioner) postgrestDeployment(name, namespace string, labels map
 					Annotations: map[string]string{pgRolesAnnotation: pgRolesVersion},
 				},
 				Spec: corev1.PodSpec{
+					RuntimeClassName:             tenantRuntimeClassPtr(),
 					AutomountServiceAccountToken: &automountSA,
 					ImagePullSecrets:             tenantImagePullSecrets(),
 					SecurityContext: &corev1.PodSecurityContext{
@@ -1182,12 +1206,14 @@ func (p *KubeProvisioner) postgrestDeployment(name, namespace string, labels map
 						},
 						Resources: corev1.ResourceRequirements{
 							Requests: corev1.ResourceList{
-								corev1.ResourceCPU:    resource.MustParse("50m"),
-								corev1.ResourceMemory: resource.MustParse("64Mi"),
+								corev1.ResourceCPU:              resource.MustParse("50m"),
+								corev1.ResourceMemory:           resource.MustParse("64Mi"),
+								corev1.ResourceEphemeralStorage: resource.MustParse("64Mi"),
 							},
 							Limits: corev1.ResourceList{
-								corev1.ResourceCPU:    resource.MustParse("500m"),
-								corev1.ResourceMemory: resource.MustParse("256Mi"),
+								corev1.ResourceCPU:              resource.MustParse("500m"),
+								corev1.ResourceMemory:           resource.MustParse("256Mi"),
+								corev1.ResourceEphemeralStorage: resource.MustParse("512Mi"),
 							},
 						},
 						ReadinessProbe: &corev1.Probe{
@@ -1400,8 +1426,8 @@ func s3EndpointURL(cfg config.Config) string {
 
 // ensurePostgresBackup programa un CronJob diario pg_dump→Object Storage.
 func (p *KubeProvisioner) ensurePostgresBackup(ctx context.Context, namespace, name string, labels map[string]string, svc domain.ManagedService, retentionDays int) error {
-	if p.cfg.S3Bucket == "" || p.cfg.S3AccessKey == "" {
-		return nil // sin Object Storage de plataforma: omitir backups
+	if p.cfg.S3Bucket == "" || p.cfg.S3BackupAccessKey == "" || p.cfg.S3BackupSecretKey == "" {
+		return nil // sin credenciales S3 dedicadas de backup: no copiar claves de plataforma al namespace
 	}
 	if err := p.upsertPlatformS3Secret(ctx, namespace, labels); err != nil {
 		return err
@@ -1458,6 +1484,20 @@ rclone delete --min-age %dd "scw:$S3_BUCKET/%s/" 2>/dev/null || true
 		schedule = domain.DefaultBackupSchedule
 	}
 
+	workSize := resource.MustParse("5Gi")
+	jobResources := corev1.ResourceRequirements{
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU:              resource.MustParse("50m"),
+			corev1.ResourceMemory:           resource.MustParse("128Mi"),
+			corev1.ResourceEphemeralStorage: resource.MustParse("128Mi"),
+		},
+		Limits: corev1.ResourceList{
+			corev1.ResourceCPU:              resource.MustParse("1"),
+			corev1.ResourceMemory:           resource.MustParse("512Mi"),
+			corev1.ResourceEphemeralStorage: resource.MustParse("5Gi"),
+		},
+	}
+
 	cron := &batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{Name: name + "-pg-backup", Namespace: namespace, Labels: labels},
 		Spec: batchv1.CronJobSpec{
@@ -1468,6 +1508,7 @@ rclone delete --min-age %dd "scw:$S3_BUCKET/%s/" 2>/dev/null || true
 						ObjectMeta: metav1.ObjectMeta{Labels: labels},
 						Spec: corev1.PodSpec{
 							RestartPolicy:                corev1.RestartPolicyOnFailure,
+							RuntimeClassName:             tenantRuntimeClassPtr(),
 							AutomountServiceAccountToken: &automountSA,
 							ImagePullSecrets:             tenantImagePullSecrets(),
 							SecurityContext:              podSC,
@@ -1489,6 +1530,7 @@ rclone delete --min-age %dd "scw:$S3_BUCKET/%s/" 2>/dev/null || true
 									},
 								}},
 								SecurityContext: containerSC,
+								Resources:       jobResources,
 								VolumeMounts:    []corev1.VolumeMount{{Name: "work", MountPath: "/work"}},
 							}},
 							Containers: []corev1.Container{{
@@ -1501,12 +1543,13 @@ rclone delete --min-age %dd "scw:$S3_BUCKET/%s/" 2>/dev/null || true
 									},
 								}},
 								SecurityContext: containerSC,
+								Resources:       jobResources,
 								VolumeMounts:    []corev1.VolumeMount{{Name: "work", MountPath: "/work"}},
 							}},
 							Volumes: []corev1.Volume{{
 								Name: "work",
 								VolumeSource: corev1.VolumeSource{
-									EmptyDir: &corev1.EmptyDirVolumeSource{},
+									EmptyDir: &corev1.EmptyDirVolumeSource{SizeLimit: &workSize},
 								},
 							}},
 						},
@@ -1655,8 +1698,8 @@ func (p *KubeProvisioner) RunServiceNow(ctx context.Context, svc domain.ManagedS
 // (cmd/cloud-controller/main.go) resuelve el servicio bajo el tenant del evento con
 // controller.DispatchServiceRestore y llama aquí.
 func (p *KubeProvisioner) RestorePostgres(ctx context.Context, svc domain.ManagedService, backupName string) error {
-	if p.cfg.S3Bucket == "" || p.cfg.S3AccessKey == "" {
-		return fmt.Errorf("controller: restore sin Object Storage de plataforma")
+	if p.cfg.S3Bucket == "" || p.cfg.S3BackupAccessKey == "" || p.cfg.S3BackupSecretKey == "" {
+		return fmt.Errorf("controller: restore sin credenciales S3 dedicadas de backup (S3_BACKUP_*)")
 	}
 	if strings.ContainsAny(backupName, `/\`) || strings.Contains(backupName, "..") {
 		return fmt.Errorf("controller: nombre de backup inválido")
@@ -1706,6 +1749,20 @@ rclone copyto "scw:$S3_BUCKET/$BACKUP_OBJECT" /work/backup.sql.gz
 		SeccompProfile:           &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
 	}
 
+	workSize := resource.MustParse("5Gi")
+	jobResources := corev1.ResourceRequirements{
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU:              resource.MustParse("50m"),
+			corev1.ResourceMemory:           resource.MustParse("128Mi"),
+			corev1.ResourceEphemeralStorage: resource.MustParse("128Mi"),
+		},
+		Limits: corev1.ResourceList{
+			corev1.ResourceCPU:              resource.MustParse("1"),
+			corev1.ResourceMemory:           resource.MustParse("512Mi"),
+			corev1.ResourceEphemeralStorage: resource.MustParse("5Gi"),
+		},
+	}
+
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{Name: name + "-pg-restore", Namespace: namespace, Labels: labels},
 		Spec: batchv1.JobSpec{
@@ -1715,6 +1772,7 @@ rclone copyto "scw:$S3_BUCKET/$BACKUP_OBJECT" /work/backup.sql.gz
 				ObjectMeta: metav1.ObjectMeta{Labels: labels},
 				Spec: corev1.PodSpec{
 					RestartPolicy:                corev1.RestartPolicyNever,
+					RuntimeClassName:             tenantRuntimeClassPtr(),
 					AutomountServiceAccountToken: &automountSA,
 					ImagePullSecrets:             tenantImagePullSecrets(),
 					SecurityContext:              podSC,
@@ -1733,6 +1791,7 @@ rclone copyto "scw:$S3_BUCKET/$BACKUP_OBJECT" /work/backup.sql.gz
 							},
 						}},
 						SecurityContext: containerSC,
+						Resources:       jobResources,
 						VolumeMounts:    []corev1.VolumeMount{{Name: "work", MountPath: "/work"}},
 					}},
 					Containers: []corev1.Container{{
@@ -1745,11 +1804,12 @@ rclone copyto "scw:$S3_BUCKET/$BACKUP_OBJECT" /work/backup.sql.gz
 							},
 						}},
 						SecurityContext: containerSC,
+						Resources:       jobResources,
 						VolumeMounts:    []corev1.VolumeMount{{Name: "work", MountPath: "/work"}},
 					}},
 					Volumes: []corev1.Volume{{
 						Name:         "work",
-						VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
+						VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{SizeLimit: &workSize}},
 					}},
 				},
 			},
@@ -1790,7 +1850,7 @@ rclone copyto "scw:$S3_BUCKET/$BACKUP_OBJECT" /work/backup.sql.gz
 func (p *KubeProvisioner) upsertPlatformS3Secret(ctx context.Context, namespace string, labels map[string]string) error {
 	accessKey, secretKey := p.cfg.S3BackupAccessKey, p.cfg.S3BackupSecretKey
 	if accessKey == "" || secretKey == "" {
-		accessKey, secretKey = p.cfg.S3AccessKey, p.cfg.S3SecretKey
+		return fmt.Errorf("controller: S3_BACKUP_ACCESS_KEY y S3_BACKUP_SECRET_KEY son obligatorias para copias de seguridad")
 	}
 	sec := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{Name: "sytue-platform-s3", Namespace: namespace, Labels: labels},

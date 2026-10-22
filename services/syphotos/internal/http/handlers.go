@@ -574,3 +574,62 @@ func (h *Handlers) Recuerdos(w http.ResponseWriter, r *http.Request) {
 	}
 	httpx.JSON(w, r, http.StatusOK, map[string]any{"memories": salida})
 }
+
+func esAdminOrganizacion(r *http.Request) bool {
+	c, ok := authn.FromContext(r.Context())
+	if !ok {
+		return false
+	}
+	for _, rol := range c.Roles {
+		if rol == "owner" || rol == "admin" {
+			return true
+		}
+	}
+	return false
+}
+
+// GET /api/v1/settings
+//
+// Ajustes de la organización en Fotos: si está excluida del lote automático de
+// IA y si quien pregunta puede cambiarlo (`owner` o `admin`).
+func (h *Handlers) AjustesOrganizacion(w http.ResponseWriter, r *http.Request) {
+	excluida, err := h.store.ExcluidaDelLoteIA(r.Context())
+	if err != nil {
+		httpx.Fail(w, r, traducir(err))
+		return
+	}
+	httpx.JSON(w, r, http.StatusOK, map[string]any{
+		"excludeAiBatch":   excluida,
+		"canManageAiBatch": esAdminOrganizacion(r),
+	})
+}
+
+// PUT /api/v1/settings
+//
+// Solo `owner` o `admin` de la organización pueden excluirla o volver a
+// incluirla en el lote automático de IA.
+func (h *Handlers) GuardarAjustesOrganizacion(w http.ResponseWriter, r *http.Request) {
+	if !esAdminOrganizacion(r) {
+		httpx.Fail(w, r, httpx.ErrForbidden.WithMessage("insufficient role"))
+		return
+	}
+	var body struct {
+		ExcludeAIBatch *bool `json:"excludeAiBatch"`
+	}
+	if err := httpx.DecodeJSON(w, r, &body); err != nil {
+		httpx.Fail(w, r, err)
+		return
+	}
+	if body.ExcludeAIBatch == nil {
+		httpx.Fail(w, r, httpx.ErrBadRequest.WithMessage("excludeAiBatch is required"))
+		return
+	}
+	if err := h.store.FijarExcluidaDelLoteIA(r.Context(), sub(r), *body.ExcludeAIBatch); err != nil {
+		httpx.Fail(w, r, traducir(err))
+		return
+	}
+	httpx.JSON(w, r, http.StatusOK, map[string]any{
+		"excludeAiBatch":   *body.ExcludeAIBatch,
+		"canManageAiBatch": true,
+	})
+}

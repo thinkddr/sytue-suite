@@ -230,6 +230,35 @@ func (c *cmapCodigos) textoUnicode(codigo uint32, n int) string {
 	return ""
 }
 
+// codigoUnicode es el inverso de textoUnicode: qué código escribe la runa `r`.
+func (c *cmapCodigos) codigoUnicode(r rune) (uint32, bool) {
+	switch c.unicode {
+	case "ucs2":
+		if r > 0 && r <= 0xFFFF {
+			return uint32(r), true
+		}
+	case "utf16":
+		if r > 0 && r <= 0xFFFF {
+			return uint32(r), true
+		}
+		if r > 0xFFFF && r <= maxRuna {
+			r1, r2 := utf16.EncodeRune(r)
+			return uint32(r1&0xFFFF)<<16 | uint32(r2&0xFFFF), true
+		}
+	case "utf8":
+		var b [4]byte
+		n := utf8.EncodeRune(b[:], r)
+		if n > 0 {
+			return codigoDeHex(b[:n]), true
+		}
+	case "utf32":
+		if r > 0 && r <= maxRuna {
+			return uint32(r), true
+		}
+	}
+	return 0, false
+}
+
 // recorrerCMap pasa por los operadores de una CMap con la pila de operandos que
 // los precede. Sirve para /ToUnicode y para las CMaps de /Encoding.
 func (d *PDFDoc) recorrerCMap(datos []byte, op func(string, []pdfObj)) {
@@ -250,8 +279,8 @@ func (d *PDFDoc) recorrerCMap(datos []byte, op func(string, []pdfObj)) {
 				continue
 			}
 			pila = append(pila, o)
-			if len(pila) > 400 {
-				pila = pila[len(pila)-400:]
+			if len(pila) > 4096 {
+				pila = pila[len(pila)-4096:]
 			}
 			continue
 		}

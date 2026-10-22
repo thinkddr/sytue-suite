@@ -15,12 +15,12 @@ import (
 	"git.sytue.eu/sytue/one/services/cloud/internal/domain"
 )
 
-const alertCols = `id, tenant, project_id, event, channel_url, enabled, created_at`
+const alertCols = `id, tenant, project_id, event, channel_url, enabled, (confirmed_at IS NOT NULL) AS confirmed, created_at`
 
 func scanAlertPolicy(row pgx.Row, t string) (domain.AlertPolicy, error) {
 	var p domain.AlertPolicy
 	if err := row.Scan(&p.ID, &p.Tenant, &p.ProjectID, &p.Event, &p.ChannelURL,
-		&p.Enabled, &p.CreatedAt); err != nil {
+		&p.Enabled, &p.Confirmed, &p.CreatedAt); err != nil {
 		return domain.AlertPolicy{}, err
 	}
 	if t != "" {
@@ -32,10 +32,12 @@ func scanAlertPolicy(row pgx.Row, t string) (domain.AlertPolicy, error) {
 // NewAlertPolicyRecord son los datos de creación de una policy. channel_url se
 // valida anti-SSRF en la capa service ANTES de llegar aquí. ProjectID nil = org.
 type NewAlertPolicyRecord struct {
-	ProjectID  *uuid.UUID
-	Event      string
-	ChannelURL string
-	Enabled    bool
+	ProjectID        *uuid.UUID
+	Event            string
+	ChannelURL       string
+	Enabled          bool
+	Confirmed        bool
+	ConfirmTokenHash *string
 }
 
 // CreateAlertPolicy inserta una policy. Si lleva project_id, verifica que el
@@ -52,11 +54,12 @@ func (s *Store) CreateAlertPolicy(ctx context.Context, rec NewAlertPolicyRecord)
 				return normalizeNoRows(err, domain.ErrNotFound)
 			}
 		}
+		confirmed := rec.Confirmed || rec.ConfirmTokenHash == nil
 		row := tx.QueryRow(ctx, `
-			INSERT INTO alert_policies (tenant, project_id, event, channel_url, enabled)
-			VALUES ($1, $2, $3, $4, $5)
+			INSERT INTO alert_policies (tenant, project_id, event, channel_url, enabled, confirmed_at, confirm_token_hash)
+			VALUES ($1, $2, $3, $4, $5, CASE WHEN $6 THEN now() ELSE NULL END, $7)
 			RETURNING `+alertCols,
-			t.Slug, rec.ProjectID, rec.Event, rec.ChannelURL, rec.Enabled)
+			t.Slug, rec.ProjectID, rec.Event, rec.ChannelURL, rec.Enabled, confirmed, rec.ConfirmTokenHash)
 		var e error
 		p, e = scanAlertPolicy(row, t.Slug)
 		if checkViolation(e) {
@@ -92,9 +95,11 @@ func (s *Store) ListAlertPolicies(ctx context.Context) ([]domain.AlertPolicy, er
 
 // UpdateAlertPolicyRecord son los campos mutables (punteros = opcional).
 type UpdateAlertPolicyRecord struct {
-	Event      *string
-	ChannelURL *string
-	Enabled    *bool
+	Event            *string
+	ChannelURL       *string
+	Enabled          *bool
+	ResetConfirm     bool
+	ConfirmTokenHash *string
 }
 
 // UpdateAlertPolicy aplica una actualización parcial.
@@ -104,12 +109,22 @@ func (s *Store) UpdateAlertPolicy(ctx context.Context, id uuid.UUID, upd UpdateA
 	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
 		row := tx.QueryRow(ctx, `
 			UPDATE alert_policies SET
-				event       = COALESCE($3, event),
-				channel_url = COALESCE($4, channel_url),
-				enabled     = COALESCE($5, enabled)
+				event              = COALESCE($3, event),
+				channel_url        = COALESCE($4, channel_url),
+				enabled            = COALESCE($5, enabled),
+				confirmed_at       = CASE
+					WHEN $6 THEN NULL
+					WHEN $4 IS NOT NULL THEN COALESCE(confirmed_at, now())
+					ELSE confirmed_at
+				END,
+				confirm_token_hash = CASE
+					WHEN $6 THEN $7
+					WHEN $4 IS NOT NULL THEN NULL
+					ELSE confirm_token_hash
+				END
 			WHERE tenant=$1 AND id=$2
 			RETURNING `+alertCols,
-			t.Slug, id, upd.Event, upd.ChannelURL, upd.Enabled)
+			t.Slug, id, upd.Event, upd.ChannelURL, upd.Enabled, upd.ResetConfirm, upd.ConfirmTokenHash)
 		var e error
 		p, e = scanAlertPolicy(row, t.Slug)
 		if checkViolation(e) {
@@ -138,7 +153,7 @@ func (s *Store) DeleteAlertPolicy(ctx context.Context, id uuid.UUID) error {
 	})
 }
 
-// MatchAlertPolicies resuelve las policies habilitadas del tenant que casan un
+// MatchAlertPolicies resuelve las policies habilitadas y confirmadas del tenant que casan un
 // evento: el mismo `event` y alcance de proyecto (project_id = projectID) O de
 // organización (project_id IS NULL). Cross-tenant: el consumer pasa el tenant
 // del evento y se fija app.tenant bajo RLS. Sirve el índice alert_policies_route_idx.
@@ -150,7 +165,7 @@ func (s *Store) MatchAlertPolicies(ctx context.Context, tenant, event string, pr
 		}
 		rows, err := tx.Query(ctx, `
 			SELECT `+alertCols+` FROM alert_policies
-			WHERE tenant=$1 AND event=$2 AND enabled AND (project_id = $3 OR project_id IS NULL)`,
+			WHERE tenant=$1 AND event=$2 AND enabled AND confirmed_at IS NOT NULL AND (project_id = $3 OR project_id IS NULL)`,
 			tenant, event, projectID)
 		if err != nil {
 			return fmtErr("resolver alert policies", err)
@@ -205,4 +220,28 @@ func (s *Store) ReleaseAlertDelivery(ctx context.Context, tenant string, policyI
 		}
 		return nil
 	})
+}
+
+// ConfirmAlertPolicyByToken confirma una alerta de correo electrónico buscando
+// su confirm_token_hash bajo mantenimiento (el enlace llega sin sesión OIDC).
+func (s *Store) ConfirmAlertPolicyByToken(ctx context.Context, tokenHash string) (domain.AlertPolicy, error) {
+	if tokenHash == "" {
+		return domain.AlertPolicy{}, domain.ErrNotFound
+	}
+	var p domain.AlertPolicy
+	err := s.pool.InMaintenanceTx(ctx, func(tx pgx.Tx) error {
+		row := tx.QueryRow(ctx, `
+			UPDATE alert_policies
+			SET confirmed_at = COALESCE(confirmed_at, now()),
+			    confirm_token_hash = NULL
+			WHERE confirm_token_hash = $1
+			RETURNING `+alertCols, tokenHash)
+		var e error
+		p, e = scanAlertPolicy(row, "")
+		return e
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.AlertPolicy{}, domain.ErrNotFound
+	}
+	return p, err
 }

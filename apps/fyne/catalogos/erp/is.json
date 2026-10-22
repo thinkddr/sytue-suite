@@ -493,6 +493,8 @@
   "vf.confirmBody": "Héðan í frá er hver reikningur sem þú staðfestir sendur spænsku skattstofunni og ekki er lengur hægt að breyta honum eða eyða: villur eru leiðréttar með leiðréttingarreikningi. Þegar kveikt hefur verið á því helst það á til ársloka.",
   "vf.confirmTitle": "Kveikja á VERI*FACTU?",
   "vf.declaration": "Samræmisyfirlýsing",
+  "vf.error.certificateTaxIdMismatch": "Kennitalan (NIF) á skilríkinu passar ekki við kennitölu fyrirtækisins.",
+  "vf.error.invalidCertificate": "Skilríkið eða einkalykillinn er ekki gilt fullgilt skilríki með spænskri kennitölu (NIF).",
   "vf.export": "Sækja færslur",
   "vf.fixHint": "Leiðréttu upplýsingar reikningsins eða viðskiptavinarins og sendu hann aftur.",
   "vf.intro": "Frá 2027 þarf að skrá hvern reikning hjá spænsku skattstofunni um leið og hann er gefinn út. Með VERI*FACTU sér Sytue um það fyrir þig þegar þú staðfestir reikning og bætir við QR-kóðanum sem viðskiptavinurinn getur notað til að sannreyna hann.",

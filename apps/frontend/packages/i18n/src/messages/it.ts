@@ -381,4 +381,9 @@ export const it: Catalog = {
     'Il fornitore non ha confermato il salvataggio. Aggiorna e verifica prima di riprovare.',
   'linkedServices.unavailable':
     'Il collegamento a questo fornitore non è disponibile per il tuo account.',
+  'localFile.confirmUpload.title': 'Apri file da questo dispositivo',
+  'localFile.confirmUpload.body':
+    'Per aprire «{name}», il file verrà caricato sul tuo account Sytue One.',
+  'localFile.confirmUpload.remember': 'Ricorda la mia scelta su questo dispositivo',
+  'localFile.confirmUpload.confirm': 'Carica e apri',
 };

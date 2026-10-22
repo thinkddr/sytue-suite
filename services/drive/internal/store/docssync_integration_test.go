@@ -25,7 +25,7 @@ import (
 func TestColaHaciaDocs(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool)
-	ctx := tenantCtx("acme")
+	ctx := store.WithOwner(tenantCtx("acme"), "ana")
 	if _, err := st.EnsureQuota(ctx, 1<<30); err != nil {
 		t.Fatal(err)
 	}

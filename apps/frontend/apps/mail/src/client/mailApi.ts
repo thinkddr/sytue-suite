@@ -421,6 +421,13 @@ export function attachmentDownloadUrl(emailId: string, index: number, enLinea = 
 }
 
 /**
+ * URL del proxy del BFF para pintar una imagen remota tras pulsar «Mostrar imágenes».
+ */
+export function remoteImageProxyUrl(url: string): string {
+  return withBase(import.meta.env.BASE_URL, `/api/remote-image?url=${encodeURIComponent(url)}`);
+}
+
+/**
  * URL de descarga del mensaje ORIGINAL (.eml). `subject` solo bautiza el fichero
  * —el BFF lo desinfecta— para que no acabe en Descargas con nombre de UUID.
  */

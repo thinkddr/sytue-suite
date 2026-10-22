@@ -37,12 +37,40 @@ func pedir[T any](a *App, llamada func(context.Context, *api.Photos) (T, error),
 
 // ---- Álbumes ----
 
+func (a *App) pedirAjustes() {
+	pedir(a, func(x context.Context, c *api.Photos) (api.PhotosSettings, error) {
+		return c.Settings(x)
+	}, func(aj api.PhotosSettings, err error) {
+		if err == nil {
+			a.aj = aj
+		}
+	})
+}
+
+func (a *App) cambiarExclusionLote(excluir bool) {
+	pedir(a, func(x context.Context, c *api.Photos) (api.PhotosSettings, error) {
+		return c.SetExcludeAIBatch(x, excluir)
+	}, func(aj api.PhotosSettings, err error) {
+		if err != nil {
+			if a.ruta == RutaRepetidas {
+				a.rep.error = a.textoDeFallo(err)
+			} else {
+				a.alb.error = a.textoDeFallo(err)
+			}
+			return
+		}
+		a.aj = aj
+	})
+}
+
 func (a *App) datosAlbumes() Albumes {
 	return Albumes{
 		Lista: a.alb.lista, Titulo: a.campoAlbum, Montones: a.alb.montones,
 		Buscando: a.alb.buscando, Error: a.alb.error,
-		AlAbrir: func(al api.Album) { a.AbrirAlbum(al.ID) },
-		AlIr:    a.irSeccion, AlCrear: a.crearAlbum, AlBuscar: a.buscarMontones,
+		ExcluidaLoteIA: a.aj.ExcludeAIBatch, PuedeGestionarLoteIA: a.aj.CanManageAIBatch,
+		AlExcluirLoteIA: a.cambiarExclusionLote,
+		AlAbrir:         func(al api.Album) { a.AbrirAlbum(al.ID) },
+		AlIr:            a.irSeccion, AlCrear: a.crearAlbum, AlBuscar: a.buscarMontones,
 		AlGuardar: a.guardarMonton,
 		AlVer:     func(fotos []api.Photo) { a.AbrirParecidas(idsDe(fotos)) },
 	}
@@ -335,7 +363,9 @@ func (a *App) pedirRepetidas() {
 func (a *App) datosRepetidas() Repetidas {
 	return Repetidas{
 		Grupos: a.rep.grupos, Aviso: a.rep.aviso, Error: a.rep.error, Trabajando: a.rep.trabajando,
-		AlIr: a.irSeccion, AlQuedarse: a.quedarse,
+		ExcluidaLoteIA: a.aj.ExcludeAIBatch, PuedeGestionarLoteIA: a.aj.CanManageAIBatch,
+		AlExcluirLoteIA: a.cambiarExclusionLote,
+		AlIr:            a.irSeccion, AlQuedarse: a.quedarse,
 	}
 }
 

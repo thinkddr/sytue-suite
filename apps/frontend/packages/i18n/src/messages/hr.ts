@@ -379,4 +379,9 @@ export const hr: Catalog = {
   'linkedServices.writeUnknown':
     'Pružatelj nije potvrdio spremanje. Osvježite prikaz i provjerite prije ponovnog pokušaja.',
   'linkedServices.unavailable': 'Povezivanje s ovim pružateljem nije dostupno za vaš račun.',
+  'localFile.confirmUpload.title': 'Otvori datoteku s ovog uređaja',
+  'localFile.confirmUpload.body':
+    'Za otvaranje datoteke „{name}” ona će se prenijeti na vaš račun Sytue One.',
+  'localFile.confirmUpload.remember': 'Zapamti moj odabir na ovom uređaju',
+  'localFile.confirmUpload.confirm': 'Prenesi i otvori',
 };

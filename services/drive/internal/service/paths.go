@@ -15,6 +15,7 @@ import (
 	"git.sytue.eu/sytue/one/platform/pkg/objectstore"
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 	"git.sytue.eu/sytue/one/services/drive/internal/domain"
+	"git.sytue.eu/sytue/one/services/drive/internal/store"
 )
 
 // Node identifica un recurso resuelto por ruta dentro del árbol del tenant.
@@ -100,7 +101,7 @@ func (s *Service) MkdirPath(ctx context.Context, p string) error {
 	if err != nil {
 		return err
 	}
-	owner := ""
+	owner := store.OwnerFrom(ctx)
 	_, err = s.CreateFolder(ctx, parentID, name, owner, false)
 	return err
 }
@@ -111,7 +112,7 @@ func (s *Service) WritePath(ctx context.Context, p, contentType string, body io.
 	if err != nil {
 		return domain.File{}, err
 	}
-	return s.UploadFile(ctx, parentID, name, contentType, "", body)
+	return s.UploadFile(ctx, parentID, name, contentType, store.OwnerFrom(ctx), body)
 }
 
 // RemovePath borra el recurso (fichero o carpeta) de la ruta dada.

@@ -248,4 +248,7 @@ export const fi: AppCatalog<typeof en> = {
   'memories.years': '{count} vuotta sitten',
   'memories.oneYear': 'Vuosi sitten',
   'memories.hide': 'Piilota',
+  'aiBatch.excludeOrg': 'Sulje organisaatio pois Sytue AI:n automaattierästä',
+  'aiBatch.excludedHint':
+    'Organisaatio on suljettu pois Sytue AI:n automaattierästä. Uusia kuvia ei käsitellä taustalla ehdotuksia tai samankaltaisuuksia varten.',
 };

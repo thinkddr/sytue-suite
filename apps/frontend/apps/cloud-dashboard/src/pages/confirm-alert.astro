@@ -1,0 +1,104 @@
+---
+/**
+ * Confirmación de una dirección de correo (`mailto:`) en las alertas de Sytue DevX.
+ *
+ * No exige sesión: quien recibe el correo es la dirección de destino, que puede
+ * ser una cuenta de guardia o una lista ajena a quien creó la política. El GET
+ * solo muestra el botón; la confirmación ocurre en el POST para que los
+ * escáneres de enlaces de los proveedores de correo no la activen solos.
+ */
+import '../styles/app.css';
+import { serverEnv } from '@sytue/auth/server';
+import { Button, Card, CardBody, SUFIJO_ICONOS, themeInitScript, withBase } from '@sytue/ui';
+import { htmlLangAttrs } from '@sytue/i18n';
+import { APP_VIEWPORT, brand } from '@sytue/config';
+import { cloudBaseUrl } from '../lib/auth.js';
+import { useT } from '../i18n/index.js';
+
+export const prerender = false;
+
+const locale = Astro.locals.locale;
+const { lang, dir } = htmlLangAttrs(locale);
+const t = useT(locale);
+const prefijo = serverEnv(import.meta.env).SYTUE_BASE_PATH ?? import.meta.env.BASE_URL;
+
+let token = Astro.url.searchParams.get('token')?.trim() ?? '';
+let state: 'prompt' | 'done' | 'invalid' = token ? 'prompt' : 'invalid';
+
+if (Astro.request.method === 'POST') {
+  try {
+    const form = await Astro.request.formData();
+    const raw = form.get('token');
+    token = typeof raw === 'string' ? raw.trim() : '';
+  } catch {
+    token = '';
+  }
+  if (!token) {
+    state = 'invalid';
+  } else {
+    try {
+      const res = await fetch(`${cloudBaseUrl().replace(/\/$/, '')}/alerts/confirm`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ token }),
+      });
+      state = res.ok ? 'done' : 'invalid';
+    } catch {
+      state = 'invalid';
+    }
+  }
+}
+---
+
+<!doctype html>
+<html lang={lang} dir={dir} class="h-full">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="color-scheme" content="light" />
+    <meta name="viewport" content={APP_VIEWPORT} />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>{t('monitoring.alerts.confirm.title')} · Sytue DevX</title>
+    <link rel="icon" href={withBase(prefijo, '/favicon.ico') + SUFIJO_ICONOS} sizes="32x32" />
+    <link
+      rel="icon"
+      href={withBase(prefijo, '/favicon-64.png') + SUFIJO_ICONOS}
+      type="image/png"
+      sizes="64x64"
+    />
+    <link
+      rel="icon"
+      href={withBase(prefijo, '/favicon.svg') + SUFIJO_ICONOS}
+      type="image/svg+xml"
+    />
+    <meta name="theme-color" content={brand.neutral[0]} />
+    <link
+      rel="apple-touch-icon"
+      href={withBase(prefijo, '/apple-touch-icon.png') + SUFIJO_ICONOS}
+    />
+    <script is:inline set:html={themeInitScript}></script>
+  </head>
+  <body class="bg-bg text-text grid min-h-full place-items-center p-6 antialiased">
+    <main class="w-full max-w-md">
+      <Card>
+        <CardBody>
+          <h1 class="sytue-h3 text-text mb-2">{t('monitoring.alerts.confirm.title')}</h1>
+          {state === 'prompt' ? (
+            <>
+              <p class="text-text-muted mb-5 text-sm">{t('monitoring.alerts.confirm.desc')}</p>
+              <form method="post">
+                <input type="hidden" name="token" value={token} />
+                <Button type="submit" variant="primary">
+                  {t('monitoring.alerts.confirm.submit')}
+                </Button>
+              </form>
+            </>
+          ) : state === 'done' ? (
+            <p class="text-text-muted text-sm">{t('monitoring.alerts.confirm.done')}</p>
+          ) : (
+            <p class="text-danger-text text-sm">{t('monitoring.alerts.confirm.invalid')}</p>
+          )}
+        </CardBody>
+      </Card>
+    </main>
+  </body>
+</html>

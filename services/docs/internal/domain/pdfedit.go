@@ -379,6 +379,7 @@ func reescribirTexto(doc *PDFDoc, contenido []byte, p PDFPagina, nuevos map[int]
 	var out []byte
 	lx := &pdfLexer{buf: contenido}
 	var operandos []pdfObj
+	var inicios []int
 	indice, tocados := 0, 0
 	copiadoHasta := 0
 
@@ -387,7 +388,6 @@ func reescribirTexto(doc *PDFDoc, contenido []byte, p PDFPagina, nuevos map[int]
 		if lx.pos >= len(lx.buf) {
 			break
 		}
-		inicioToken := lx.pos
 		c := lx.buf[lx.pos]
 		if c == '/' || c == '(' || c == '<' || c == '[' || c == '+' || c == '-' || c == '.' ||
 			(c >= '0' && c <= '9') {
@@ -398,8 +398,10 @@ func reescribirTexto(doc *PDFDoc, contenido []byte, p PDFPagina, nuevos map[int]
 				continue
 			}
 			operandos = append(operandos, o)
+			inicios = append(inicios, antes)
 			continue
 		}
+		inicioOp := lx.pos
 		op := lx.operador()
 		if op == "" {
 			lx.pos++
@@ -410,6 +412,7 @@ func reescribirTexto(doc *PDFDoc, contenido []byte, p PDFPagina, nuevos map[int]
 		if !esTexto {
 			e.aplicar(op, operandos)
 			operandos = operandos[:0]
+			inicios = inicios[:0]
 			continue
 		}
 
@@ -418,13 +421,7 @@ func reescribirTexto(doc *PDFDoc, contenido []byte, p PDFPagina, nuevos map[int]
 		f, ok := e.fragmentoDe(operandos, op, antesDeMostrar, indice, 0)
 		if ok {
 			if nuevo, hay := nuevos[indice]; hay {
-				// Se copia todo lo anterior al PRIMER operando de este operador y se
-				// escribe la sustitución entera en su lugar.
-				inicioOperandos := inicioOperandosDe(contenido, copiadoHasta, inicioToken)
-				if op == `"` {
-					// `aw ac (cadena) "`: los dos números también son suyos.
-					inicioOperandos = retrocederNumeros(contenido, copiadoHasta, inicioOperandos, 2)
-				}
+				inicioOperandos := inicioOperandosTexto(inicios, copiadoHasta, inicioOp, op)
 				sust, err := sustitucionDeTexto(nuevo, f, e.estado, op)
 				if err != nil {
 					return nil, 0, err
@@ -440,76 +437,26 @@ func reescribirTexto(doc *PDFDoc, contenido []byte, p PDFPagina, nuevos map[int]
 		// números y se cambiaba otro texto, o ninguno («no se encontró el texto»).
 		indice++
 		operandos = operandos[:0]
+		inicios = inicios[:0]
 	}
 	out = append(out, contenido[copiadoHasta:]...)
 	return out, tocados, nil
 }
 
-// retrocederNumeros mueve `i` hacia atrás sobre `n` números (y sus espacios).
-func retrocederNumeros(contenido []byte, desde, i, n int) int {
-	for ; n > 0; n-- {
-		j := i - 1
-		for j >= desde && esEspacioPDF(contenido[j]) {
-			j--
-		}
-		k := j
-		for k >= desde && (contenido[k] >= '0' && contenido[k] <= '9' || contenido[k] == '.' || contenido[k] == '-' || contenido[k] == '+') {
-			k--
-		}
-		if k == j {
-			return i // no era un número: se deja como estaba
-		}
-		i = k + 1
+// inicioOperandosTexto devuelve la posición donde empieza el primer operando de
+// un operador de texto, tomada del propio lexer al leer cada operando.
+// Retroceder byte a byte desde el operador tropezaba con paréntesis escapados
+// «\(» dentro de la cadena y dejaba un prefijo sin cerrar (BOE y issue14497).
+func inicioOperandosTexto(inicios []int, copiadoHasta, inicioOp int, op string) int {
+	inicio := inicioOp
+	n := 1
+	if op == `"` {
+		n = 3 // `aw ac (cadena) "`: los dos números también son suyos.
 	}
-	return i
-}
-
-// inicioOperandosDe retrocede desde el operador hasta donde empiezan sus
-// operandos, que es lo que hay que sustituir. Se busca hacia atrás el final del
-// token anterior saltando los espacios; con `[` se retrocede hasta su pareja.
-func inicioOperandosDe(contenido []byte, desde, opInicio int) int {
-	i := opInicio - 1
-	for i > desde && esEspacioPDF(contenido[i]) {
-		i--
+	if len(inicios) > 0 {
+		inicio = inicios[max(0, len(inicios)-n)]
 	}
-	if i <= desde {
-		return opInicio
-	}
-	if contenido[i] == ']' {
-		nivel := 0
-		for ; i > desde; i-- {
-			switch contenido[i] {
-			case ']':
-				nivel++
-			case '[':
-				nivel--
-				if nivel == 0 {
-					return i
-				}
-			}
-		}
-		return opInicio
-	}
-	if contenido[i] == ')' || contenido[i] == '>' {
-		abre := byte('(')
-		cierra := byte(')')
-		if contenido[i] == '>' {
-			abre, cierra = '<', '>'
-		}
-		nivel := 0
-		for ; i > desde; i-- {
-			switch contenido[i] {
-			case cierra:
-				nivel++
-			case abre:
-				nivel--
-				if nivel == 0 {
-					return i
-				}
-			}
-		}
-	}
-	return opInicio
+	return max(copiadoHasta, inicio)
 }
 
 // sustitucionDeTexto escribe el operador nuevo. El texto se ajusta al ANCHO del

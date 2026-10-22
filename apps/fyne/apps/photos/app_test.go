@@ -38,7 +38,9 @@ type servicioFalso struct {
 	papelera  []api.Photo
 	porPagina int
 	// sinIA contesta a `/assist` como un servicio sin modelo (503 ai_not_configured).
-	sinIA bool
+	sinIA            bool
+	excluidaLoteIA   bool
+	puedeGestionarIA bool
 }
 
 func (s *servicioFalso) vistas() []string {
@@ -147,6 +149,13 @@ func (s *servicioFalso) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		escribir(map[string]any{"memories": []any{}})
 	case r.URL.Path == "/api/v1/albums":
 		escribir(map[string]any{"items": []any{}})
+	case r.Method == http.MethodGet && r.URL.Path == "/api/v1/settings":
+		escribir(map[string]bool{"excludeAiBatch": s.excluidaLoteIA, "canManageAiBatch": s.puedeGestionarIA})
+	case r.Method == http.MethodPut && r.URL.Path == "/api/v1/settings":
+		var body map[string]bool
+		_ = json.Unmarshal(cuerpo, &body)
+		s.excluidaLoteIA = body["excludeAiBatch"]
+		escribir(map[string]bool{"excludeAiBatch": s.excluidaLoteIA, "canManageAiBatch": s.puedeGestionarIA})
 	default:
 		w.WriteHeader(http.StatusNotFound)
 	}
@@ -983,5 +992,19 @@ func TestElEditorComparaConElOriginal(t *testing.T) {
 	a.deshacerEditor()
 	if a.ed.comparar {
 		t.Fatal("deshacer el último ajuste de color debe apagar comparar")
+	}
+}
+
+func TestExcluirOrganizacionDelLoteIA(t *testing.T) {
+	s := &servicioFalso{fotos: fotosDelServicio(2), porPagina: 100, puedeGestionarIA: true}
+	a, _ := appDePrueba(t, s)
+	a.Arrancar()
+	a.Ir(RutaAlbumes)
+	if !a.aj.CanManageAIBatch || a.aj.ExcludeAIBatch {
+		t.Fatalf("ajustes iniciales inesperados: %+v", a.aj)
+	}
+	a.cambiarExclusionLote(true)
+	if !a.aj.ExcludeAIBatch || !contieneTextoApp(a.scroll.Content, a.v.Traduce("aiBatch.excludedHint")) {
+		t.Fatalf("tras excluir debe quedar activo y mostrar el aviso: %+v", a.aj)
 	}
 }

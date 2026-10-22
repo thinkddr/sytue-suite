@@ -204,6 +204,11 @@ func runVectoresServerless(args []string) error {
 // vectorizarUna lleva UNA foto de pendiente a vector: miniatura del almacén,
 // descripción por la visión serverless y vector por el embebedor.
 func vectorizarUna(ctx context.Context, st *store.Store, objetos *objectstore.Client, ia *clienteIA, p store.Pendiente, modelo string) error {
+	if excluida, err := st.TenantExcluidoDelLoteIA(ctx, p.Tenant); err != nil {
+		return err
+	} else if excluida {
+		return nil
+	}
 	huella := p.Huella
 	if huella == "" {
 		huella = service.HuellaDelOriginal()

@@ -570,4 +570,8 @@ export const en = {
   'pos.imageUpload': 'Upload image for {name}',
   'pos.images': 'Images',
   'pos.imageHint': 'Choose a JPEG, PNG or WebP image, up to 10 MB.',
+  'vf.error.invalidCertificate':
+    'The certificate or private key is not a valid qualified certificate with a Spanish tax ID.',
+  'vf.error.certificateTaxIdMismatch':
+    'The tax ID on the certificate does not match the organisation’s tax ID.',
 } as const;

@@ -364,4 +364,9 @@ export const pt: Catalog = {
   'linkedServices.writeUnknown':
     'O fornecedor não confirmou se foi guardado. Atualiza e verifica antes de tentares novamente.',
   'linkedServices.unavailable': 'A ligação a este fornecedor não está disponível para a tua conta.',
+  'localFile.confirmUpload.title': 'Abrir ficheiro deste dispositivo',
+  'localFile.confirmUpload.body':
+    'Para abrir «{name}», o ficheiro será carregado na tua conta Sytue One.',
+  'localFile.confirmUpload.remember': 'Memorizar a minha escolha neste dispositivo',
+  'localFile.confirmUpload.confirm': 'Carregar e abrir',
 };

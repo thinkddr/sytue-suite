@@ -1,4 +1,6 @@
 {
+  "aiBatch.excludeOrg": "Neįtraukti organizacijos į automatinį „Sytue AI“ paketą",
+  "aiBatch.excludedHint": "Organizacija neįtraukta į automatinį „Sytue AI“ paketą. Naujos nuotraukos fone neapdorojamos pasiūlymams ar panašumams rasti.",
   "album.linkCopied": "Nuoroda nukopijuota",
   "album.newLink": "Nauja nuoroda",
   "album.newLinkConfirm": "Sukurti naują nuorodą? Dabartinė nuoroda nustos veikti visiems, kurie ją jau turi.",

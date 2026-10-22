@@ -379,8 +379,22 @@ func parseServiceAccount(raw string) (serviceAccount, error) {
 	}
 	if sa.TokenURI == "" {
 		sa.TokenURI = defaultTokenURL
+	} else if err := validarTokenURIGoogle(sa.TokenURI); err != nil {
+		return serviceAccount{}, err
 	}
 	return sa, nil
+}
+
+func validarTokenURIGoogle(raw string) error {
+	u, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Hostname() == "" {
+		return fmt.Errorf("%w: token_uri %q inválido en la cuenta de servicio", connector.ErrBadQuery, raw)
+	}
+	h := strings.ToLower(u.Hostname())
+	if h == "oauth2.googleapis.com" || h == "accounts.google.com" || strings.HasSuffix(h, ".googleapis.com") || h == "localhost" || h == "127.0.0.1" || h == "::1" {
+		return nil
+	}
+	return fmt.Errorf("%w: token_uri %q no apunta a un host oficial de Google", connector.ErrBadQuery, u.Hostname())
 }
 
 // UserToken mintea un access_token impersonando a subject (delegación a nivel de

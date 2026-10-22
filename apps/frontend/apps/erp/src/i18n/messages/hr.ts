@@ -586,4 +586,8 @@ export const hr: AppCatalog<typeof en> = {
   'pos.imageUpload': 'Prenesi sliku za {name}',
   'pos.images': 'Slike',
   'pos.imageHint': 'Odaberite JPEG, PNG ili WebP sliku do 10 MB.',
+  'vf.error.invalidCertificate':
+    'Certifikat ili privatni ključ nije valjani kvalificirani certifikat sa španjolskim poreznim brojem (NIF).',
+  'vf.error.certificateTaxIdMismatch':
+    'Porezni broj (NIF) u certifikatu ne odgovara poreznom broju organizacije.',
 };

@@ -529,6 +529,8 @@
   "vf.confirmBody": "As seo amach, seoltar gach sonrasc a dheimhníonn tú chuig Gníomhaireacht Cánach na Spáinne agus ní féidir é a athrú ná a scriosadh a thuilleadh: ceartaítear botúin le sonrasc ceartaitheach. Nuair a chastar air é, fanann sé air go deireadh na bliana.",
   "vf.confirmTitle": "An gcasfar air VERI*FACTU?",
   "vf.declaration": "Dearbhú comhréireachta",
+  "vf.error.certificateTaxIdMismatch": "Ní hionann an NIF ar an deimhniú agus NIF na heagraíochta.",
+  "vf.error.invalidCertificate": "Ní deimhniú cáilithe bailí le NIF Spáinneach é an deimhniú nó an eochair phríobháideach.",
   "vf.export": "Íoslódáil na taifid",
   "vf.fixHint": "Ceartaigh sonraí an tsonraisc nó an chustaiméara agus seol arís é.",
   "vf.intro": "Ó 2027 ar aghaidh, caithfear gach sonrasc a chlárú le Gníomhaireacht Cánach na Spáinne nuair a eisítear é. Le VERI*FACTU, déanann Sytue é sin duit nuair a dheimhníonn tú sonrasc, agus cuireann sé an cód QR leis ar féidir le do chustaiméir é a sheiceáil leis.",

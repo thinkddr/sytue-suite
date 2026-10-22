@@ -393,4 +393,9 @@ export const de: Catalog = {
     'Der Anbieter hat das Speichern nicht bestätigt. Aktualisiere die Ansicht und prüfe den Stand, bevor du es erneut versuchst.',
   'linkedServices.unavailable':
     'Die Verbindung mit diesem Anbieter ist für dein Konto nicht verfügbar.',
+  'localFile.confirmUpload.title': 'Datei von diesem Gerät öffnen',
+  'localFile.confirmUpload.body':
+    'Um „{name}“ zu öffnen, wird die Datei in dein Sytue-One-Konto hochgeladen.',
+  'localFile.confirmUpload.remember': 'Meine Auswahl auf diesem Gerät merken',
+  'localFile.confirmUpload.confirm': 'Hochladen und öffnen',
 };

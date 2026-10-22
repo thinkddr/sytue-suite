@@ -382,4 +382,9 @@ export const cs: Catalog = {
   'linkedServices.writeUnknown':
     'Poskytovatel nepotvrdil uložení. Před dalším pokusem obnovte zobrazení a ověřte stav.',
   'linkedServices.unavailable': 'Připojení k tomuto poskytovateli není pro váš účet dostupné.',
+  'localFile.confirmUpload.title': 'Otevřít soubor z tohoto zařízení',
+  'localFile.confirmUpload.body':
+    'Pro otevření souboru „{name}“ bude nahrán do vašeho účtu Sytue One.',
+  'localFile.confirmUpload.remember': 'Zapamatovat si mou volbu na tomto zařízení',
+  'localFile.confirmUpload.confirm': 'Nahrát a otevřít',
 };

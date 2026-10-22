@@ -367,4 +367,8 @@ export const nb: Catalog = {
     'Leverandøren bekreftet ikke lagringen. Oppdater og kontroller før du prøver igjen.',
   'linkedServices.unavailable':
     'Tilkobling til denne leverandøren er ikke tilgjengelig for kontoen din.',
+  'localFile.confirmUpload.title': 'Åpne fil fra denne enheten',
+  'localFile.confirmUpload.body': 'For å åpne «{name}» lastes filen opp til Sytue One-kontoen din.',
+  'localFile.confirmUpload.remember': 'Husk valget mitt på denne enheten',
+  'localFile.confirmUpload.confirm': 'Last opp og åpne',
 };

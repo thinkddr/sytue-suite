@@ -140,6 +140,21 @@ func TestMatchAlertPoliciesRouting(t *testing.T) {
 	mustPolicy(t, ctx, st, &other.ID, domain.AlertEventDeployFailed, true)     // otro proyecto: NO
 	mustPolicy(t, ctx, st, &p.ID, domain.AlertEventUptimeDown, true)           // otro evento: NO
 	_ = mustPolicy(t, ctx, st, &p.ID, domain.AlertEventDeployFailed, false)    // deshabilitada: NO
+	tokenHash := "hash-confirmacion-mailto"
+	mailtoUnconfirmed, err := st.CreateAlertPolicy(ctx, store.NewAlertPolicyRecord{
+		ProjectID:        &p.ID,
+		Event:            domain.AlertEventDeployFailed,
+		ChannelURL:       "mailto:ops@acme.eu",
+		Enabled:          true,
+		Confirmed:        false,
+		ConfirmTokenHash: &tokenHash,
+	})
+	if err != nil {
+		t.Fatalf("CreateAlertPolicy mailto: %v", err)
+	}
+	if mailtoUnconfirmed.Confirmed {
+		t.Fatalf("mailto sin confirmar salió Confirmed=true")
+	}
 
 	// Policy de OTRO tenant para el mismo evento: aislamiento (NO debe casar).
 	// Slug distinto: projects_unique_global_slug hace el slug único global (subdominio).
@@ -157,6 +172,22 @@ func TestMatchAlertPoliciesRouting(t *testing.T) {
 	}
 	if len(matched) != 2 || !got[proj.ID] || !got[org.ID] {
 		t.Fatalf("casaron %d policies (%v), quiero exactamente {proyecto, org}", len(matched), got)
+	}
+
+	// Al confirmar el token del mailto, empieza a casar.
+	confirmedPolicy, err := st.ConfirmAlertPolicyByToken(context.Background(), tokenHash)
+	if err != nil {
+		t.Fatalf("ConfirmAlertPolicyByToken: %v", err)
+	}
+	if !confirmedPolicy.Confirmed || confirmedPolicy.ID != mailtoUnconfirmed.ID {
+		t.Fatalf("ConfirmAlertPolicyByToken = %+v", confirmedPolicy)
+	}
+	matchedAfter, err := st.MatchAlertPolicies(context.Background(), "acme", domain.AlertEventDeployFailed, p.ID)
+	if err != nil {
+		t.Fatalf("MatchAlertPolicies tras confirmar: %v", err)
+	}
+	if len(matchedAfter) != 3 {
+		t.Fatalf("casaron %d policies tras confirmar mailto, quiero 3", len(matchedAfter))
 	}
 }
 

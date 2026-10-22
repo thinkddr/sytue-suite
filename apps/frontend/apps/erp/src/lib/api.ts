@@ -46,9 +46,19 @@ export function esSinPermiso(err: unknown): boolean {
  */
 export function mensajeDeError(
   err: unknown,
-  t: (clave: 'error.generic' | 'error.sinPermiso') => string,
+  t: (
+    clave:
+      | 'error.generic'
+      | 'error.sinPermiso'
+      | 'vf.error.invalidCertificate'
+      | 'vf.error.certificateTaxIdMismatch',
+  ) => string,
 ): string {
   if (esSinPermiso(err)) return t('error.sinPermiso');
+  if (err instanceof ErrorApi) {
+    if (err.codigo === 'certificado_invalido') return t('vf.error.invalidCertificate');
+    if (err.codigo === 'certificado_nif_no_coincide') return t('vf.error.certificateTaxIdMismatch');
+  }
   return err instanceof Error ? err.message : t('error.generic');
 }
 

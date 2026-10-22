@@ -382,4 +382,9 @@ export const ga: Catalog = {
   'linkedServices.writeUnknown':
     'Níor dheimhnigh an soláthraí gur sábháladh é. Athnuaigh agus seiceáil sula ndéanann tú iarracht eile.',
   'linkedServices.unavailable': 'Níl nascadh leis an soláthraí seo ar fáil do do chuntas.',
+  'localFile.confirmUpload.title': 'Oscail comhad ón ngléas seo',
+  'localFile.confirmUpload.body':
+    'Chun “{name}” a oscailt, uaslódálfar chuig do chuntas Sytue One é.',
+  'localFile.confirmUpload.remember': 'Cuimhnigh ar mo rogha ar an ngléas seo',
+  'localFile.confirmUpload.confirm': 'Uaslódáil agus oscail',
 };

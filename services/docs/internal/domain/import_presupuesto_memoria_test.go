@@ -184,10 +184,11 @@ func TestImportarGrandeCortaAlConvertir(t *testing.T) {
 		var res *ImportResult
 		pico := picoDeMemoria(func() { res, errImp = Import(nombre, data) })
 		t.Logf("%s: %d MB descomprimidos, pico de %d MB", nombre, descomprimido>>20, pico>>20)
-		// Un libro que no cabe se abre recortado (recortarLibro); lo demás no se abre.
-		if hoja := nombre == "grande.xlsx"; hoja && (errImp != nil || !res.Truncated) {
-			t.Errorf("%s: quiero el libro recortado, tengo %v", nombre, errImp)
-		} else if !hoja && !errors.Is(errImp, ErrDemasiadoGrande) {
+		// .xlsx, .ods, .docx y .pptx que no caben se abren recortados; .odt y .odp devuelven ErrDemasiadoGrande.
+		recortable := nombre == "grande.xlsx" || nombre == "grande.ods" || nombre == "grande.docx" || nombre == "grande.pptx"
+		if recortable && (errImp != nil || !res.Truncated) {
+			t.Errorf("%s: quiero el documento recortado, tengo truncated=%v err=%v", nombre, res != nil && res.Truncated, errImp)
+		} else if !recortable && !errors.Is(errImp, ErrDemasiadoGrande) {
 			t.Errorf("%s: quiero ErrDemasiadoGrande, tengo %v", nombre, errImp)
 		}
 		// Lo descomprimido se tiene entero en memoria (readZip), y el modelo puede crecer hasta

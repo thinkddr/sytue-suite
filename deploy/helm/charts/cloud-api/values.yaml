@@ -30,6 +30,9 @@ ingress:
     # la quedaba el dashboard Astro: 404 HTML medido en cloud.sytue.eu.
     - path: /openapi.yaml
       pathType: Exact
+    # Confirmación sin sesión de alertas por correo (CLOUD-19).
+    - path: /alerts/confirm
+      pathType: Exact
   annotations: {}
   tls:
     secretName: tls-cloud-sytue-eu
@@ -106,6 +109,9 @@ config:
   appsDomain: apps.sytue.eu
   previewDomain: preview.sytue.eu
   ingressTarget: ingress.sytue.eu
+  # Cierre a terceros hasta que gVisor esté operativo en los nodos de carga (CLOUD-12).
+  abiertoATerceros: false
+  tenantsPermitidos: sytue
   # Forja donde Cloud le crea el repositorio a quien no tiene ninguno (tercera vía
   # del alta): la URL raíz de una forja Forgejo/Gitea; el client id/secret de la
   # aplicación OAuth2 van en el Secret, no aquí. Vacía, la vía está apagada: ya no

@@ -118,6 +118,9 @@ func TestUnCuadernoNoSeCuelgaDeSuPropiaRama(t *testing.T) {
 
 	// Un ciclo guardado antes de esta guardia: se escribe a mano.
 	if err := h.Pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+		if err := db.MarkWriteTransaction(ctx, tx); err != nil {
+			return err
+		}
 		_, err := tx.Exec(ctx, `UPDATE notebooks SET parent_id = $2 WHERE id = $1`, a.ID, b.ID)
 		return err
 	}); err != nil {

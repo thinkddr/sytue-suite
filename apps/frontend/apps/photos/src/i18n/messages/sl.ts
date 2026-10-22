@@ -277,4 +277,7 @@ export const sl: AppCatalog<typeof en> = {
   'memories.years': 'Pred {count} leti',
   'memories.oneYear': 'Pred enim letom',
   'memories.hide': 'Skrij',
+  'aiBatch.excludeOrg': 'Izključi organizacijo iz samodejnega sklopa Sytue AI',
+  'aiBatch.excludedHint':
+    'Organizacija je izključena iz samodejnega sklopa Sytue AI. Nove fotografije se v ozadju ne obdelujejo za predloge ali podobnosti.',
 };

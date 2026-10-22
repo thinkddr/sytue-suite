@@ -23,6 +23,7 @@ import (
 	"git.sytue.eu/sytue/one/platform/pkg/log"
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 	"git.sytue.eu/sytue/one/services/drive/internal/service"
+	"git.sytue.eu/sytue/one/services/drive/internal/store"
 )
 
 // Handler construye el http.Handler de WebDAV sobre el FileSystem de Drive.
@@ -89,6 +90,9 @@ func (b *bloqueosPorOrganizacion) organizacion(ctx context.Context) webdav.LockS
 	org := ""
 	if t, err := tenancy.From(ctx); err == nil {
 		org = t.Slug
+	}
+	if sub := store.OwnerFrom(ctx); sub != "" {
+		org += "\x00" + sub
 	}
 	b.mu.Lock()
 	defer b.mu.Unlock()

@@ -23,7 +23,6 @@
         "User.Read",
         "Team.ReadBasic.All",
         "Channel.ReadBasic.All",
-        "ChannelMessage.Read.All",
         "ChannelMessage.Send",
         "Chat.ReadWrite"
       ]

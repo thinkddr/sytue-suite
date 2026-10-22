@@ -1,4 +1,6 @@
 {
+  "aiBatch.excludeOrg": "Undanta organisationen från den automatiska Sytue AI-körningen",
+  "aiBatch.excludedHint": "Organisationen är undantagen från den automatiska Sytue AI-körningen. Nya bilder bearbetas inte i bakgrunden för förslag eller likheter.",
   "album.linkCopied": "Länk kopierad",
   "album.newLink": "Ny länk",
   "album.newLinkConfirm": "Skapa en ny länk? Den nuvarande länken slutar fungera för alla som redan har den.",

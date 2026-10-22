@@ -384,4 +384,9 @@ export const sl: Catalog = {
   'linkedServices.writeUnknown':
     'Ponudnik ni potrdil shranjevanja. Pred ponovnim poskusom osvežite prikaz in preverite stanje.',
   'linkedServices.unavailable': 'Povezava s tem ponudnikom ni na voljo za vaš račun.',
+  'localFile.confirmUpload.title': 'Odpri datoteko iz te naprave',
+  'localFile.confirmUpload.body':
+    'Za odpiranje »{name}« bo datoteka naložena v vaš račun Sytue One.',
+  'localFile.confirmUpload.remember': 'Zapomni si mojo izbiro v tej napravi',
+  'localFile.confirmUpload.confirm': 'Naloži in odpri',
 };

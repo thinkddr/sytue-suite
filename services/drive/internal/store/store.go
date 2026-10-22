@@ -21,10 +21,34 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
+	"git.sytue.eu/sytue/one/platform/pkg/authn"
 	"git.sytue.eu/sytue/one/platform/pkg/pg"
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 	"git.sytue.eu/sytue/one/services/drive/internal/domain"
 )
+
+type ownerCtxKey struct{}
+
+// WithOwner fija el propietario (`owner_sub`) del ámbito personal («Mi unidad»)
+// en el contexto cuando el llamador no entra por el middleware HTTP de authn
+// o cuando resuelve deliberadamente el ámbito de otra persona (compartición,
+// enlace público, sincronización interna de Docs o copia hacia la dueña).
+func WithOwner(ctx context.Context, ownerSub string) context.Context {
+	return context.WithValue(ctx, ownerCtxKey{}, ownerSub)
+}
+
+// OwnerFrom devuelve el identificador de la persona cuyo ámbito personal («Mi
+// unidad») se consulta: primero el fijado con WithOwner y, si no lo hay, el
+// Subject de authn.FromContext.
+func OwnerFrom(ctx context.Context) string {
+	if v, ok := ctx.Value(ownerCtxKey{}).(string); ok {
+		return v
+	}
+	if c, ok := authn.FromContext(ctx); ok {
+		return c.Subject
+	}
+	return ""
+}
 
 // Store agrupa el acceso a datos de Drive.
 type Store struct {
@@ -36,6 +60,21 @@ func New(pool *pg.Pool) *Store { return &Store{pool: pool} }
 
 // Healthz delega en el pool (para sondas /readyz).
 func (s *Store) Healthz(ctx context.Context) error { return s.pool.Healthz(ctx) }
+
+// inTx abre una transacción aislada por tenant (`app.tenant`) y, en el ámbito
+// personal («Mi unidad»), fija también `app.owner_sub` con el propietario del
+// contexto (`OwnerFrom(ctx)`).
+func (s *Store) inTx(ctx context.Context, fn func(tx pgx.Tx) error) error {
+	owner := OwnerFrom(ctx)
+	return s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+		if owner != "" {
+			if _, err := tx.Exec(ctx, "SELECT set_config('app.owner_sub', $1, true)", owner); err != nil {
+				return fmt.Errorf("store: fijar app.owner_sub: %w", err)
+			}
+		}
+		return fn(tx)
+	})
+}
 
 // uniqueViolation indica si el error es una violación de unicidad (23505).
 func uniqueViolation(err error) bool {
@@ -62,7 +101,7 @@ func scanFolder(row pgx.Row, t string) (domain.Folder, error) {
 func (s *Store) EnsureRoot(ctx context.Context) (domain.Folder, error) {
 	t := tenancy.MustFrom(ctx)
 	var f domain.Folder
-	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	err := s.inTx(ctx, func(tx pgx.Tx) error {
 		var e error
 		f, e = ensureRootTx(ctx, tx, t.Slug)
 		return e
@@ -80,9 +119,11 @@ func ensureRootTx(ctx context.Context, tx pgx.Tx, slug string) (domain.Folder, e
 	if !errors.Is(err, pgx.ErrNoRows) {
 		return domain.Folder{}, fmt.Errorf("store: leer raíz: %w", err)
 	}
+	owner := OwnerFrom(ctx)
 	insert := tx.QueryRow(ctx,
-		`INSERT INTO folders (tenant, parent_id, name, is_root) VALUES ($1, NULL, '', true)
-			 RETURNING `+folderCols, slug)
+		`INSERT INTO folders (tenant, parent_id, name, is_root, owner_sub) VALUES ($1, NULL, '', true, $2)
+		 ON CONFLICT (tenant, owner_sub) WHERE is_root DO UPDATE SET updated_at = folders.updated_at
+		 RETURNING `+folderCols, slug, owner)
 	f, err = scanFolder(insert, slug)
 	if err != nil {
 		return domain.Folder{}, fmt.Errorf("store: crear raíz: %w", err)
@@ -105,7 +146,7 @@ func (s *Store) EnsureBase(ctx context.Context, limit int64, fijar bool) (domain
 		f domain.Folder
 		q domain.Quota
 	)
-	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	err := s.inTx(ctx, func(tx pgx.Tx) error {
 		var e error
 		if q, e = ensureQuotaTx(ctx, tx, t.Slug, limit, fijar); e != nil {
 			return e
@@ -122,7 +163,7 @@ func (s *Store) EnsureBase(ctx context.Context, limit int64, fijar bool) (domain
 func (s *Store) GetFolder(ctx context.Context, id uuid.UUID) (domain.Folder, error) {
 	t := tenancy.MustFrom(ctx)
 	var f domain.Folder
-	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	err := s.inTx(ctx, func(tx pgx.Tx) error {
 		row := tx.QueryRow(ctx,
 			`SELECT `+folderCols+` FROM folders
 			 WHERE tenant=$1 AND `+ambitoSQL+` AND id=$2 AND deleted_at IS NULL AND channel_id IS NULL`,
@@ -165,7 +206,7 @@ func listSubfoldersTx(ctx context.Context, tx pgx.Tx, tenant string, folderID uu
 func (s *Store) ListSubfolders(ctx context.Context, folderID uuid.UUID) ([]domain.Folder, error) {
 	t := tenancy.MustFrom(ctx)
 	var folders []domain.Folder
-	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	err := s.inTx(ctx, func(tx pgx.Tx) error {
 		var e error
 		folders, e = listSubfoldersTx(ctx, tx, t.Slug, folderID)
 		return e
@@ -178,7 +219,7 @@ func (s *Store) ListChildren(ctx context.Context, folderID uuid.UUID) ([]domain.
 	t := tenancy.MustFrom(ctx)
 	var folders []domain.Folder
 	var files []domain.File
-	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	err := s.inTx(ctx, func(tx pgx.Tx) error {
 		var err error
 		folders, err = listSubfoldersTx(ctx, tx, t.Slug, folderID)
 		if err != nil {
@@ -234,7 +275,7 @@ func (s *Store) ResolveUnder(ctx context.Context, root uuid.UUID, segs []string)
 		carpeta *domain.Folder
 		fichero *domain.File
 	)
-	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	err := s.inTx(ctx, func(tx pgx.Tx) error {
 		// El padre del último tramo. Los intermedios son carpetas por definición,
 		// así que el descenso no mira la tabla de ficheros ni una vez.
 		var padre uuid.UUID
@@ -305,13 +346,14 @@ func (s *Store) ResolveUnder(ctx context.Context, root uuid.UUID, segs []string)
 }
 
 // CreateFolder crea una subcarpeta. parentID debe existir y estar viva.
-func (s *Store) CreateFolder(ctx context.Context, parentID uuid.UUID, name, ownerSub string, isGroup bool) (domain.Folder, error) {
+func (s *Store) CreateFolder(ctx context.Context, parentID uuid.UUID, name, _ string, isGroup bool) (domain.Folder, error) {
 	t := tenancy.MustFrom(ctx)
 	if !domain.ValidName(name) {
 		return domain.Folder{}, domain.ErrInvalidName
 	}
+	folderOwner := OwnerFrom(ctx)
 	var f domain.Folder
-	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	err := s.inTx(ctx, func(tx pgx.Tx) error {
 		var exists bool
 		if err := tx.QueryRow(ctx,
 			`SELECT true FROM folders WHERE tenant=$1 AND `+ambitoSQL+` AND id=$2 AND deleted_at IS NULL`,
@@ -324,7 +366,7 @@ func (s *Store) CreateFolder(ctx context.Context, parentID uuid.UUID, name, owne
 		row := tx.QueryRow(ctx,
 			`INSERT INTO folders (tenant, parent_id, name, is_group, owner_sub)
 			 VALUES ($1, $2, $3, $4, $5) RETURNING `+folderCols,
-			t.Slug, parentID, strings.TrimSpace(name), isGroup, ownerSub)
+			t.Slug, parentID, strings.TrimSpace(name), isGroup, folderOwner)
 		var e error
 		f, e = scanFolder(row, t.Slug)
 		if uniqueViolation(e) {
@@ -342,7 +384,7 @@ func (s *Store) RenameFolder(ctx context.Context, id uuid.UUID, name string) (do
 		return domain.Folder{}, domain.ErrInvalidName
 	}
 	var f domain.Folder
-	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	err := s.inTx(ctx, func(tx pgx.Tx) error {
 		row := tx.QueryRow(ctx,
 			`UPDATE folders SET name=$3, updated_at=now()
 			 WHERE tenant=$1 AND `+ambitoSQL+` AND id=$2 AND deleted_at IS NULL AND NOT is_root
@@ -368,7 +410,7 @@ func (s *Store) MoveFolder(ctx context.Context, id, newParentID uuid.UUID) (doma
 		return domain.Folder{}, domain.ErrCycle
 	}
 	var f domain.Folder
-	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	err := s.inTx(ctx, func(tx pgx.Tx) error {
 		// Detección de ciclo: newParent no puede ser descendiente de id.
 		descendant, err := isDescendant(ctx, tx, t.Slug, newParentID, id)
 		if err != nil {
@@ -436,7 +478,7 @@ type DeletedFile struct {
 func (s *Store) DeleteFolder(ctx context.Context, id uuid.UUID) ([]DeletedFile, error) {
 	t := tenancy.MustFrom(ctx)
 	var deleted []DeletedFile
-	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	err := s.inTx(ctx, func(tx pgx.Tx) error {
 		var e error
 		deleted, e = softDeleteFolderTx(ctx, tx, t.Slug, id)
 		return e
@@ -558,7 +600,7 @@ func (s *Store) SetFileLabel(ctx context.Context, id uuid.UUID, label domain.Lab
 		label = domain.Label{}
 	}
 	var f domain.File
-	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	err := s.inTx(ctx, func(tx pgx.Tx) error {
 		row := tx.QueryRow(ctx,
 			`UPDATE files SET label_id=$3, label_name=$4, label_rank=$5, label_block_external_share=$6
 			 WHERE tenant=$1 AND `+ambitoSQL+` AND id=$2 AND deleted_at IS NULL RETURNING `+fileCols,
@@ -584,7 +626,7 @@ func (s *Store) SetFileLabel(ctx context.Context, id uuid.UUID, label domain.Lab
 func (s *Store) GetFile(ctx context.Context, id uuid.UUID) (domain.File, error) {
 	t := tenancy.MustFrom(ctx)
 	var f domain.File
-	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	err := s.inTx(ctx, func(tx pgx.Tx) error {
 		row := tx.QueryRow(ctx,
 			`SELECT `+fileCols+` FROM files
 			 WHERE tenant=$1 AND `+ambitoSQL+` AND id=$2 AND deleted_at IS NULL AND channel_id IS NULL`,
@@ -606,9 +648,9 @@ func (s *Store) GetFile(ctx context.Context, id uuid.UUID) (domain.File, error) 
 func (s *Store) GetFileByStorageKey(ctx context.Context, key string) (domain.File, error) {
 	t := tenancy.MustFrom(ctx)
 	var f domain.File
-	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	err := s.inTx(ctx, func(tx pgx.Tx) error {
 		row := tx.QueryRow(ctx,
-			`SELECT `+fileCols+` FROM files WHERE tenant=$1 AND storage_key=$2 AND deleted_at IS NULL`,
+			`SELECT `+fileCols+` FROM files WHERE tenant=$1 AND `+ambitoSQL+` AND storage_key=$2 AND deleted_at IS NULL`,
 			t.Slug, key)
 		var e error
 		f, e = scanFile(row, t.Slug)
@@ -643,7 +685,7 @@ func (s *Store) CreateFile(ctx context.Context, rec NewFileRecord) (domain.File,
 		rec.ContentType = "application/octet-stream"
 	}
 	var f domain.File
-	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	err := s.inTx(ctx, func(tx pgx.Tx) error {
 		var e error
 		f, e = createFileTx(ctx, tx, t.Slug, nil, rec)
 		return e
@@ -700,6 +742,14 @@ func createFileTx(ctx context.Context, tx pgx.Tx, tenant string, teamDriveID *uu
 		return domain.File{}, err
 	}
 
+	fileOwner := rec.OwnerSub
+	modifiedBy := rec.OwnerSub
+	if teamDriveID == nil {
+		fileOwner = OwnerFrom(ctx)
+		if modifiedBy == "" {
+			modifiedBy = fileOwner
+		}
+	}
 	if exists {
 		// Conserva la versión ANTERIOR (referencia su blob previo, que si no
 		// quedaría huérfano) antes de sobrescribir el contenido.
@@ -710,14 +760,14 @@ func createFileTx(ctx context.Context, tx pgx.Tx, tenant string, teamDriveID *uu
 			`UPDATE files SET storage_key=$3, size_bytes=$4, content_type=$5, checksum=$6, modified_by=$7,
 			 version=version+1, updated_at=now()
 			 WHERE tenant=$1 AND `+ambitoSQL+` AND id=$2 RETURNING `+fileCols,
-			tenant, existingID, rec.StorageKey, rec.SizeBytes, rec.ContentType, rec.Checksum, rec.OwnerSub)
+			tenant, existingID, rec.StorageKey, rec.SizeBytes, rec.ContentType, rec.Checksum, modifiedBy)
 		return scanFile(row, tenant)
 	}
 	row := tx.QueryRow(ctx,
 		`INSERT INTO files (tenant, folder_id, name, storage_key, size_bytes, content_type, checksum, owner_sub, modified_by, team_drive_id)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8, $9) RETURNING `+fileCols,
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING `+fileCols,
 		tenant, rec.FolderID, strings.TrimSpace(rec.Name), rec.StorageKey,
-		rec.SizeBytes, rec.ContentType, rec.Checksum, rec.OwnerSub, teamDriveID)
+		rec.SizeBytes, rec.ContentType, rec.Checksum, fileOwner, modifiedBy, teamDriveID)
 	f, e := scanFile(row, tenant)
 	if uniqueViolation(e) {
 		return domain.File{}, domain.ErrConflict
@@ -732,7 +782,7 @@ func (s *Store) RenameFile(ctx context.Context, id uuid.UUID, name string) (doma
 		return domain.File{}, domain.ErrInvalidName
 	}
 	var f domain.File
-	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	err := s.inTx(ctx, func(tx pgx.Tx) error {
 		row := tx.QueryRow(ctx,
 			`UPDATE files SET name=$3, updated_at=now()
 			 WHERE tenant=$1 AND `+ambitoSQL+` AND id=$2 AND deleted_at IS NULL RETURNING `+fileCols,
@@ -754,7 +804,7 @@ func (s *Store) RenameFile(ctx context.Context, id uuid.UUID, name string) (doma
 func (s *Store) MoveFile(ctx context.Context, id, newFolderID uuid.UUID) (domain.File, error) {
 	t := tenancy.MustFrom(ctx)
 	var f domain.File
-	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	err := s.inTx(ctx, func(tx pgx.Tx) error {
 		var ok bool
 		if err := tx.QueryRow(ctx,
 			`SELECT true FROM folders WHERE tenant=$1 AND `+ambitoSQL+` AND id=$2 AND deleted_at IS NULL`,
@@ -787,7 +837,7 @@ func (s *Store) MoveFile(ctx context.Context, id, newFolderID uuid.UUID) (domain
 func (s *Store) DeleteFile(ctx context.Context, id uuid.UUID) (DeletedFile, error) {
 	t := tenancy.MustFrom(ctx)
 	var df DeletedFile
-	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	err := s.inTx(ctx, func(tx pgx.Tx) error {
 		row := tx.QueryRow(ctx,
 			`UPDATE files SET deleted_at=now(), updated_at=now()
 			 WHERE tenant=$1 AND `+ambitoSQL+` AND id=$2 AND deleted_at IS NULL
@@ -851,7 +901,7 @@ func copyBase(name string) string { return "Copia de " + name }
 func (s *Store) CopyFile(ctx context.Context, srcID, destFolderID uuid.UUID, ownerSub string) (domain.File, error) {
 	t := tenancy.MustFrom(ctx)
 	var out domain.File
-	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	err := s.inTx(ctx, func(tx pgx.Tx) error {
 		var e error
 		out, e = copiarFichero(ctx, tx, t.Slug, srcID, destFolderID, ownerSub)
 		return e
@@ -867,24 +917,30 @@ func (s *Store) CopyFile(ctx context.Context, srcID, destFolderID uuid.UUID, own
 // de `editora` —quien lo añade—: uno de otra persona es ErrNotFound.
 func (s *Store) CopiaParaDuenya(ctx context.Context, srcID, destFolderID uuid.UUID, duenya, editora string) (out domain.File, reusada bool, err error) {
 	t := tenancy.MustFrom(ctx)
-	err = s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
-		var huella string
-		if editora == "" {
+	if editora == "" {
+		return domain.File{}, false, domain.ErrNotFound
+	}
+	err = s.inTx(WithOwner(ctx, editora), func(tx pgx.Tx) error {
+		src, e := scanFile(tx.QueryRow(ctx,
+			`SELECT `+fileCols+` FROM files WHERE tenant=$1 AND `+ambitoSQL+` AND id=$2 AND owner_sub=$3 AND deleted_at IS NULL`,
+			t.Slug, srcID, editora), t.Slug)
+		if errors.Is(e, pgx.ErrNoRows) {
 			return domain.ErrNotFound
 		}
-		if e := tx.QueryRow(ctx, `SELECT checksum FROM files WHERE tenant=$1 AND `+ambitoSQL+` AND id=$2 AND owner_sub=$3 AND deleted_at IS NULL`,
-			t.Slug, srcID, editora).Scan(&huella); e != nil {
-			if errors.Is(e, pgx.ErrNoRows) {
-				return domain.ErrNotFound
-			}
+		if e != nil {
 			return e
 		}
+		if _, e := tx.Exec(ctx, "SELECT set_config('app.owner_sub', $1, true)", duenya); e != nil {
+			return fmt.Errorf("store: fijar app.owner_sub de la dueña: %w", e)
+		}
+		ctxDuenya := WithOwner(ctx, duenya)
+		huella := src.Checksum
 		if huella != "" {
-			if _, e := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1 || '|' || $2 || '|' || $3, 0))`,
+			if _, e := tx.Exec(ctxDuenya, `SELECT pg_advisory_xact_lock(hashtextextended($1 || '|' || $2 || '|' || $3, 0))`,
 				t.Slug, duenya, huella); e != nil {
 				return e
 			}
-			ya, e := scanFile(tx.QueryRow(ctx,
+			ya, e := scanFile(tx.QueryRow(ctxDuenya,
 				`SELECT `+fileCols+` FROM files
 				  WHERE tenant=$1 AND `+ambitoSQL+` AND owner_sub=$2 AND checksum=$3 AND deleted_at IS NULL
 				  ORDER BY created_at LIMIT 1`, t.Slug, duenya, huella), t.Slug)
@@ -896,8 +952,7 @@ func (s *Store) CopiaParaDuenya(ctx context.Context, srcID, destFolderID uuid.UU
 				return e
 			}
 		}
-		var e error
-		out, e = copiarFichero(ctx, tx, t.Slug, srcID, destFolderID, duenya)
+		out, e = insertarCopia(ctxDuenya, tx, t.Slug, src, destFolderID, duenya)
 		return e
 	})
 	return out, reusada, err
@@ -953,10 +1008,15 @@ func insertarCopia(ctx context.Context, tx pgx.Tx, slug string, src domain.File,
 	if src.Label != nil {
 		lb = *src.Label
 	}
+	fileOwner := OwnerFrom(ctx)
+	modifiedBy := ownerSub
+	if modifiedBy == "" {
+		modifiedBy = fileOwner
+	}
 	out, err := scanFile(tx.QueryRow(ctx,
 		`INSERT INTO files (tenant, folder_id, name, storage_key, size_bytes, content_type, checksum, owner_sub, modified_by, `+labelSnapshotCols+`)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8, $9, $10, $11, $12) RETURNING `+fileCols,
-		slug, destFolderID, name, src.StorageKey, src.SizeBytes, src.ContentType, src.Checksum, ownerSub,
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING `+fileCols,
+		slug, destFolderID, name, src.StorageKey, src.SizeBytes, src.ContentType, src.Checksum, fileOwner, modifiedBy,
 		lb.ID, lb.Name, lb.Rank, lb.BlockExternalShare), slug)
 	if uniqueViolation(err) {
 		return domain.File{}, domain.ErrConflict
@@ -988,7 +1048,7 @@ func insertarCopia(ctx context.Context, tx pgx.Tx, slug string, src domain.File,
 func (s *Store) CopyFolder(ctx context.Context, srcID uuid.UUID, destParentID *uuid.UUID, ownerSub string) (domain.Folder, error) {
 	t := tenancy.MustFrom(ctx)
 	var out domain.Folder
-	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	err := s.inTx(ctx, func(tx pgx.Tx) error {
 		// Origen VIVO y no raíz (RLS).
 		src, err := scanFolder(tx.QueryRow(ctx,
 			`SELECT `+folderCols+` FROM folders WHERE tenant=$1 AND `+ambitoSQL+` AND id=$2 AND deleted_at IS NULL AND NOT is_root`,
@@ -1118,9 +1178,14 @@ func (s *Store) CopyFolder(ctx context.Context, srcID uuid.UUID, destParentID *u
 		if err != nil {
 			return err
 		}
+		folderOwner := OwnerFrom(ctx)
+		modifiedBy := ownerSub
+		if modifiedBy == "" {
+			modifiedBy = folderOwner
+		}
 		out, err = scanFolder(tx.QueryRow(ctx,
 			`INSERT INTO folders (tenant, parent_id, name, owner_sub) VALUES ($1, $2, $3, $4)
-			 RETURNING `+folderCols, t.Slug, *destParent, rootName, ownerSub), t.Slug)
+			 RETURNING `+folderCols, t.Slug, *destParent, rootName, folderOwner), t.Slug)
 		if uniqueViolation(err) {
 			return domain.ErrConflict
 		}
@@ -1146,7 +1211,7 @@ func (s *Store) CopyFolder(ctx context.Context, srcID uuid.UUID, destParentID *u
 				INSERT INTO folders (tenant, id, parent_id, name, owner_sub)
 				SELECT $1, u.id, u.parent_id, u.name, $2
 				FROM unnest($3::uuid[], $4::uuid[], $5::text[]) AS u(id, parent_id, name)`,
-				t.Slug, ownerSub, subIDs, subParents, subNames); err != nil {
+				t.Slug, folderOwner, subIDs, subParents, subNames); err != nil {
 				return fmt.Errorf("store: copiar carpeta (insertar subcarpetas): %w", err)
 			}
 		}
@@ -1179,14 +1244,14 @@ func (s *Store) CopyFolder(ctx context.Context, srcID uuid.UUID, destParentID *u
 				                   checksum, owner_sub, modified_by,
 				                   label_id, label_name, label_rank, label_block_external_share)
 				SELECT $1, u.folder_id, u.name, u.storage_key, u.size_bytes, u.content_type,
-				       u.checksum, $2, $2,
+				       u.checksum, $2, $13,
 				       u.label_id, u.label_name, u.label_rank, u.label_block
 				FROM unnest($3::uuid[], $4::text[], $5::text[], $6::bigint[], $7::text[], $8::text[],
 				            $9::text[], $10::text[], $11::smallint[], $12::boolean[])
 				     AS u(folder_id, name, storage_key, size_bytes, content_type, checksum,
 				          label_id, label_name, label_rank, label_block)`,
-				t.Slug, ownerSub, fFolders, fNames, fKeys, fSizes, fTypes, fSums,
-				fLabelIDs, fLabelNames, fLabelRanks, fLabelBlocks); err != nil {
+				t.Slug, folderOwner, fFolders, fNames, fKeys, fSizes, fTypes, fSums,
+				fLabelIDs, fLabelNames, fLabelRanks, fLabelBlocks, modifiedBy); err != nil {
 				return fmt.Errorf("store: copiar carpeta (insertar ficheros): %w", err)
 			}
 		}
@@ -1248,13 +1313,14 @@ func (s *Store) ListVersions(ctx context.Context, fileID uuid.UUID, before, limi
 	}
 	var out []domain.FileVersion
 	var next *int
-	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	err := s.inTx(ctx, func(tx pgx.Tx) error {
 		// $3::bigint: la cota (versionCeil) desborda int4; el cast la pasa como int8
 		// y el operador cruzado int4<int8 sigue usando el índice (sin castear la
 		// columna, que sí lo impediría).
 		rows, err := tx.Query(ctx,
 			`SELECT `+fileVersionCols+` FROM file_versions
 			 WHERE tenant=$1 AND file_id=$2 AND version < $3::bigint
+			   AND EXISTS (SELECT 1 FROM files f WHERE f.tenant=$1 AND `+ambitoF+` AND f.id=file_versions.file_id)
 			 ORDER BY version DESC LIMIT $4`,
 			t.Slug, fileID, bound, limit+1)
 		if err != nil {
@@ -1289,10 +1355,12 @@ func (s *Store) ListVersions(ctx context.Context, fileID uuid.UUID, before, limi
 func (s *Store) GetVersion(ctx context.Context, fileID uuid.UUID, version int) (domain.FileVersion, error) {
 	t := tenancy.MustFrom(ctx)
 	var v domain.FileVersion
-	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	err := s.inTx(ctx, func(tx pgx.Tx) error {
 		row := tx.QueryRow(ctx,
 			`SELECT `+fileVersionCols+` FROM file_versions
-			 WHERE tenant=$1 AND file_id=$2 AND version=$3`, t.Slug, fileID, version)
+			 WHERE tenant=$1 AND file_id=$2 AND version=$3
+			   AND EXISTS (SELECT 1 FROM files f WHERE f.tenant=$1 AND `+ambitoF+` AND f.id=file_versions.file_id)`,
+			t.Slug, fileID, version)
 		var e error
 		v, e = scanFileVersion(row, t.Slug)
 		return e
@@ -1311,7 +1379,7 @@ func (s *Store) GetVersion(ctx context.Context, fileID uuid.UUID, version int) (
 func (s *Store) RestoreVersion(ctx context.Context, fileID uuid.UUID, version int, actorSub string) (domain.File, error) {
 	t := tenancy.MustFrom(ctx)
 	var f domain.File
-	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	err := s.inTx(ctx, func(tx pgx.Tx) error {
 		// Contenido de la versión objetivo (referencia a su blob existente).
 		var vKey, vCT, vChk string
 		var vSize int64
@@ -1376,7 +1444,7 @@ func (s *Store) ListTrash(ctx context.Context) ([]domain.Folder, []domain.File, 
 	t := tenancy.MustFrom(ctx)
 	var folders []domain.Folder
 	var files []domain.File
-	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	err := s.inTx(ctx, func(tx pgx.Tx) error {
 		var e error
 		folders, files, e = listTrashTx(ctx, tx, t.Slug)
 		return e
@@ -1443,7 +1511,7 @@ func listTrashTx(ctx context.Context, tx pgx.Tx, tenant string) ([]domain.Folder
 func (s *Store) RestoreFile(ctx context.Context, id uuid.UUID) (domain.File, error) {
 	t := tenancy.MustFrom(ctx)
 	var f domain.File
-	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	err := s.inTx(ctx, func(tx pgx.Tx) error {
 		row := tx.QueryRow(ctx,
 			`UPDATE files SET deleted_at=NULL, updated_at=now()
 			 WHERE tenant=$1 AND `+ambitoSQL+` AND id=$2 AND deleted_at IS NOT NULL
@@ -1469,7 +1537,7 @@ func (s *Store) RestoreFile(ctx context.Context, id uuid.UUID) (domain.File, err
 func (s *Store) RestoreFolder(ctx context.Context, id uuid.UUID) (domain.Folder, error) {
 	t := tenancy.MustFrom(ctx)
 	var f domain.Folder
-	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	err := s.inTx(ctx, func(tx pgx.Tx) error {
 		var e error
 		f, e = restoreFolderTx(ctx, tx, t.Slug, id)
 		return e
@@ -1586,7 +1654,7 @@ func conTodaLaOrganizacion(ctx context.Context, tx pgx.Tx, fn func() error) erro
 func (s *Store) PurgeFile(ctx context.Context, id uuid.UUID) (DeletedFile, error) {
 	t := tenancy.MustFrom(ctx)
 	var df DeletedFile
-	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	err := s.inTx(ctx, func(tx pgx.Tx) error {
 		var e error
 		df, e = purgeFileTx(ctx, tx, t.Slug, id)
 		return e
@@ -1644,7 +1712,7 @@ func purgeFileTx(ctx context.Context, tx pgx.Tx, tenant string, id uuid.UUID) (D
 func (s *Store) PurgeFolder(ctx context.Context, id uuid.UUID) ([]DeletedFile, error) {
 	t := tenancy.MustFrom(ctx)
 	var deleted []DeletedFile
-	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	err := s.inTx(ctx, func(tx pgx.Tx) error {
 		var e error
 		deleted, e = purgeFolderTx(ctx, tx, t.Slug, id)
 		return e
@@ -1796,7 +1864,7 @@ func (s *Store) ListFilesPage(ctx context.Context, folderID uuid.UUID, after Fil
 		limit = 100
 	}
 	var page FilePage
-	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	err := s.inTx(ctx, func(tx pgx.Tx) error {
 		var e error
 		page, e = listFilesPageTx(ctx, tx, t.Slug, folderID, after, limit)
 		return e
@@ -1872,7 +1940,7 @@ func listFilesPageTx(ctx context.Context, tx pgx.Tx, tenant string, folderID uui
 func (s *Store) FolderPath(ctx context.Context, id uuid.UUID) (string, error) {
 	t := tenancy.MustFrom(ctx)
 	var path string
-	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	err := s.inTx(ctx, func(tx pgx.Tx) error {
 		paths, err := folderPaths(ctx, tx, t.Slug, []uuid.UUID{id})
 		if err != nil {
 			return err
@@ -1902,7 +1970,7 @@ func (s *Store) SearchFiles(ctx context.Context, query string, limit int) ([]Ent
 	}
 	pattern := "%" + strings.TrimSpace(query) + "%"
 	var entries []Entry
-	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	err := s.inTx(ctx, func(tx pgx.Tx) error {
 		rows, err := tx.Query(ctx,
 			// channel_id IS NULL: los adjuntos de canal no se buscan desde «Mi unidad»
 			// (ver GetFile). Sin esto, el buscador filtraría el NOMBRE de un fichero de
@@ -1970,7 +2038,7 @@ func (s *Store) SearchFiles(ctx context.Context, query string, limit int) ([]Ent
 func (s *Store) EnsureQuota(ctx context.Context, defaultLimit int64) (domain.Quota, error) {
 	t := tenancy.MustFrom(ctx)
 	var q domain.Quota
-	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	err := s.inTx(ctx, func(tx pgx.Tx) error {
 		var e error
 		q, e = ensureQuotaTx(ctx, tx, t.Slug, defaultLimit, false)
 		return e
@@ -2034,7 +2102,7 @@ func scanQuota(row pgx.Row) (domain.Quota, error) {
 func (s *Store) GetQuota(ctx context.Context) (domain.Quota, error) {
 	t := tenancy.MustFrom(ctx)
 	var q domain.Quota
-	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	err := s.inTx(ctx, func(tx pgx.Tx) error {
 		var e error
 		q, e = scanQuota(tx.QueryRow(ctx, `SELECT `+quotaCols+` FROM quotas q WHERE q.tenant=$1`, t.Slug))
 		return e
@@ -2049,7 +2117,7 @@ func (s *Store) GetQuota(ctx context.Context) (domain.Quota, error) {
 func (s *Store) SetQuotaLimit(ctx context.Context, limit int64) (domain.Quota, error) {
 	t := tenancy.MustFrom(ctx)
 	var q domain.Quota
-	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	err := s.inTx(ctx, func(tx pgx.Tx) error {
 		var e error
 		q, e = scanQuota(tx.QueryRow(ctx, `
 			INSERT INTO quotas AS q (tenant, limit_bytes) VALUES ($1, $2)
@@ -2182,7 +2250,29 @@ func (s *Store) CreateShare(ctx context.Context, rec NewShareRecord) (domain.Sha
 		return domain.Share{}, domain.ErrInvalidName
 	}
 	var sh domain.Share
-	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	err := s.inTx(ctx, func(tx pgx.Tx) error {
+		if rec.FileID != nil {
+			var ok bool
+			if err := tx.QueryRow(ctx,
+				`SELECT true FROM files WHERE tenant=$1 AND `+ambitoSQL+` AND id=$2 AND deleted_at IS NULL AND channel_id IS NULL`,
+				t.Slug, *rec.FileID).Scan(&ok); err != nil {
+				if errors.Is(err, pgx.ErrNoRows) {
+					return domain.ErrNotFound
+				}
+				return err
+			}
+		}
+		if rec.FolderID != nil {
+			var ok bool
+			if err := tx.QueryRow(ctx,
+				`SELECT true FROM folders WHERE tenant=$1 AND `+ambitoSQL+` AND id=$2 AND deleted_at IS NULL AND channel_id IS NULL`,
+				t.Slug, *rec.FolderID).Scan(&ok); err != nil {
+				if errors.Is(err, pgx.ErrNoRows) {
+					return domain.ErrNotFound
+				}
+				return err
+			}
+		}
 		var tokenHash *string
 		if rec.Kind == domain.ShareLink {
 			h := hashShareToken(rec.Token)
@@ -2213,18 +2303,18 @@ func (s *Store) CreateShare(ctx context.Context, rec NewShareRecord) (domain.Sha
 
 // ListSharesForFile lista las comparticiones vivas de un fichero.
 func (s *Store) ListSharesForFile(ctx context.Context, fileID uuid.UUID) ([]domain.Share, error) {
-	return s.listShares(ctx, `file_id=$2`, fileID)
+	return s.listShares(ctx, `file_id=$2 AND EXISTS (SELECT 1 FROM files f WHERE f.tenant=$1 AND `+ambitoF+` AND f.id=shares.file_id)`, fileID)
 }
 
 // ListSharesForFolder lista las comparticiones vivas de una carpeta.
 func (s *Store) ListSharesForFolder(ctx context.Context, folderID uuid.UUID) ([]domain.Share, error) {
-	return s.listShares(ctx, `folder_id=$2`, folderID)
+	return s.listShares(ctx, `folder_id=$2 AND EXISTS (SELECT 1 FROM folders f WHERE f.tenant=$1 AND `+ambitoF+` AND f.id=shares.folder_id)`, folderID)
 }
 
 func (s *Store) listShares(ctx context.Context, cond string, id uuid.UUID) ([]domain.Share, error) {
 	t := tenancy.MustFrom(ctx)
 	var out []domain.Share
-	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	err := s.inTx(ctx, func(tx pgx.Tx) error {
 		rows, err := tx.Query(ctx,
 			`SELECT `+shareCols+` FROM shares
 			 WHERE tenant=$1 AND `+cond+` AND revoked_at IS NULL
@@ -2248,10 +2338,14 @@ func (s *Store) listShares(ctx context.Context, cond string, id uuid.UUID) ([]do
 // RevokeShare revoca (soft) una compartición.
 func (s *Store) RevokeShare(ctx context.Context, id uuid.UUID) error {
 	t := tenancy.MustFrom(ctx)
-	return s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	return s.inTx(ctx, func(tx pgx.Tx) error {
 		tag, err := tx.Exec(ctx,
-			`UPDATE shares SET revoked_at=now()
-			 WHERE tenant=$1 AND id=$2 AND revoked_at IS NULL`, t.Slug, id)
+			`UPDATE shares s SET revoked_at=now()
+			 WHERE s.tenant=$1 AND s.id=$2 AND s.revoked_at IS NULL
+			   AND (
+			     (s.file_id IS NOT NULL AND EXISTS (SELECT 1 FROM files f WHERE f.tenant=$1 AND `+ambitoF+` AND f.id=s.file_id))
+			     OR (s.folder_id IS NOT NULL AND EXISTS (SELECT 1 FROM folders f WHERE f.tenant=$1 AND `+ambitoF+` AND f.id=s.folder_id))
+			   )`, t.Slug, id)
 		if err != nil {
 			return fmt.Errorf("store: revocar share: %w", err)
 		}
@@ -2320,7 +2414,7 @@ func (s *Store) ResolveLink(ctx context.Context, token string) (domain.Share, st
 func (s *Store) GetFileByName(ctx context.Context, folderID uuid.UUID, name string) (domain.File, error) {
 	t := tenancy.MustFrom(ctx)
 	var f domain.File
-	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	err := s.inTx(ctx, func(tx pgx.Tx) error {
 		row := tx.QueryRow(ctx,
 			`SELECT `+fileCols+` FROM files
 			 WHERE tenant=$1 AND `+ambitoSQL+` AND folder_id=$2 AND lower(name)=lower($3) AND deleted_at IS NULL`,
@@ -2395,7 +2489,7 @@ func (s *Store) ListRecent(ctx context.Context, after RecentCursor, limit int) (
 	}
 	var entries []Entry
 	var next *RecentCursor
-	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	err := s.inTx(ctx, func(tx pgx.Tx) error {
 		rows, err := tx.Query(ctx,
 			// channel_id IS NULL: un adjunto de canal no aparece en «Recientes» del
 			// tenant (ver GetFile).
@@ -2459,7 +2553,7 @@ func (s *Store) ListRecent(ctx context.Context, after RecentCursor, limit int) (
 func (s *Store) ListFavorites(ctx context.Context, subject string) ([]Entry, error) {
 	t := tenancy.MustFrom(ctx)
 	var entries []Entry
-	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	err := s.inTx(ctx, func(tx pgx.Tx) error {
 		type folderRow struct {
 			id  uuid.UUID
 			nm  string
@@ -2570,7 +2664,7 @@ func (s *Store) ListFavorites(ctx context.Context, subject string) ([]Entry, err
 // el objetivo exista y esté vivo; desmarcar es idempotente (DELETE sin fila = no-op).
 func (s *Store) SetFavorite(ctx context.Context, subject string, fileID, folderID *uuid.UUID, on bool) error {
 	t := tenancy.MustFrom(ctx)
-	return s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	return s.inTx(ctx, func(tx pgx.Tx) error {
 		if !on {
 			if fileID != nil {
 				_, err := tx.Exec(ctx,
@@ -2699,7 +2793,7 @@ func sharesForSubjectTx(ctx context.Context, tx pgx.Tx, tenant, subject string, 
 func (s *Store) ListSharesForSubject(ctx context.Context, subject string, groups []string) ([]domain.Share, error) {
 	t := tenancy.MustFrom(ctx)
 	var out []domain.Share
-	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	err := s.inTx(ctx, func(tx pgx.Tx) error {
 		var e error
 		out, e = sharesForSubjectTx(ctx, tx, t.Slug, subject, groups)
 		return e
@@ -2719,7 +2813,7 @@ func (s *Store) ShareForResource(ctx context.Context, subject string, groups []s
 	}
 	t := tenancy.MustFrom(ctx)
 	var sh domain.Share
-	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	err := s.inTx(ctx, func(tx pgx.Tx) error {
 		row := tx.QueryRow(ctx,
 			`SELECT `+shareCols+` FROM shares
 			 WHERE tenant = $1 AND `+recipientPred+`
@@ -2748,7 +2842,7 @@ func (s *Store) ShareForResource(ctx context.Context, subject string, groups []s
 func (s *Store) ListSharedWithMe(ctx context.Context, subject string, groups []string) ([]SharedEntry, error) {
 	t := tenancy.MustFrom(ctx)
 	var out []SharedEntry
-	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	err := s.inTx(ctx, func(tx pgx.Tx) error {
 		shares, err := sharesForSubjectTx(ctx, tx, t.Slug, subject, groups)
 		if err != nil {
 			return err
@@ -2807,60 +2901,64 @@ func (s *Store) ListSharedWithMe(ctx context.Context, subject string, groups []s
 		fileMetas := make(map[uuid.UUID]fileMeta, len(fileIDs))
 		pathIDs := make([]uuid.UUID, 0, len(order))
 
-		// Carpetas destino VIVAS (una tanda: leer y cerrar antes del siguiente Query).
-		if len(folderIDs) > 0 {
-			rows, err := tx.Query(ctx,
-				`SELECT id, name, updated_at FROM folders
-				 WHERE tenant=$1 AND `+ambitoSQL+` AND id = ANY($2) AND deleted_at IS NULL AND NOT is_root`,
-				t.Slug, folderIDs)
-			if err != nil {
-				return fmt.Errorf("store: compartido conmigo (carpetas): %w", err)
-			}
-			for rows.Next() {
-				var id uuid.UUID
-				var m folderMeta
-				if err := rows.Scan(&id, &m.name, &m.upd); err != nil {
-					rows.Close()
+		var paths map[uuid.UUID]string
+		if err := conTodaLaOrganizacion(ctx, tx, func() error {
+			// Carpetas destino VIVAS (una tanda: leer y cerrar antes del siguiente Query).
+			if len(folderIDs) > 0 {
+				rows, err := tx.Query(ctx,
+					`SELECT id, name, updated_at FROM folders
+					 WHERE tenant=$1 AND team_drive_id IS NULL AND channel_id IS NULL AND id = ANY($2) AND deleted_at IS NULL AND NOT is_root`,
+					t.Slug, folderIDs)
+				if err != nil {
+					return fmt.Errorf("store: compartido conmigo (carpetas): %w", err)
+				}
+				for rows.Next() {
+					var id uuid.UUID
+					var m folderMeta
+					if err := rows.Scan(&id, &m.name, &m.upd); err != nil {
+						rows.Close()
+						return err
+					}
+					folderMetas[id] = m
+					pathIDs = append(pathIDs, id) // la ruta de la propia carpeta
+				}
+				rows.Close()
+				if err := rows.Err(); err != nil {
 					return err
 				}
-				folderMetas[id] = m
-				pathIDs = append(pathIDs, id) // la ruta de la propia carpeta
 			}
-			rows.Close()
-			if err := rows.Err(); err != nil {
-				return err
-			}
-		}
-		// Ficheros destino VIVOS.
-		if len(fileIDs) > 0 {
-			rows, err := tx.Query(ctx,
-				`SELECT id, folder_id, name, size_bytes, content_type, updated_at, `+labelReadCols+` FROM files
-				 WHERE tenant=$1 AND `+ambitoSQL+` AND id = ANY($2) AND deleted_at IS NULL`,
-				t.Slug, fileIDs)
-			if err != nil {
-				return fmt.Errorf("store: compartido conmigo (ficheros): %w", err)
-			}
-			for rows.Next() {
-				var id uuid.UUID
-				var m fileMeta
-				var lb domain.Label
-				if err := rows.Scan(&id, &m.folderID, &m.name, &m.size, &m.ct, &m.upd,
-					&lb.ID, &lb.Name, &lb.Rank, &lb.BlockExternalShare); err != nil {
-					rows.Close()
+			// Ficheros destino VIVOS.
+			if len(fileIDs) > 0 {
+				rows, err := tx.Query(ctx,
+					`SELECT id, folder_id, name, size_bytes, content_type, updated_at, `+labelReadCols+` FROM files
+					 WHERE tenant=$1 AND team_drive_id IS NULL AND channel_id IS NULL AND id = ANY($2) AND deleted_at IS NULL`,
+					t.Slug, fileIDs)
+				if err != nil {
+					return fmt.Errorf("store: compartido conmigo (ficheros): %w", err)
+				}
+				for rows.Next() {
+					var id uuid.UUID
+					var m fileMeta
+					var lb domain.Label
+					if err := rows.Scan(&id, &m.folderID, &m.name, &m.size, &m.ct, &m.upd,
+						&lb.ID, &lb.Name, &lb.Rank, &lb.BlockExternalShare); err != nil {
+						rows.Close()
+						return err
+					}
+					m.label = labelPtr(lb)
+					fileMetas[id] = m
+					pathIDs = append(pathIDs, m.folderID) // la ruta de la carpeta contenedora
+				}
+				rows.Close()
+				if err := rows.Err(); err != nil {
 					return err
 				}
-				m.label = labelPtr(lb)
-				fileMetas[id] = m
-				pathIDs = append(pathIDs, m.folderID) // la ruta de la carpeta contenedora
 			}
-			rows.Close()
-			if err := rows.Err(); err != nil {
-				return err
-			}
-		}
 
-		paths, err := folderPaths(ctx, tx, t.Slug, pathIDs)
-		if err != nil {
+			var err error
+			paths, err = folderPaths(ctx, tx, t.Slug, pathIDs)
+			return err
+		}); err != nil {
 			return err
 		}
 		out = make([]SharedEntry, 0, len(order))
@@ -2966,7 +3064,7 @@ func (s *Store) BatchMove(ctx context.Context, fileIDs, folderIDs []uuid.UUID, t
 	t := tenancy.MustFrom(ctx)
 	fileIDs, folderIDs = idsOrEmpty(fileIDs), idsOrEmpty(folderIDs)
 	var res BatchResult
-	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	err := s.inTx(ctx, func(tx pgx.Tx) error {
 		var ok bool
 		if err := tx.QueryRow(ctx,
 			`SELECT true FROM folders WHERE tenant=$1 AND `+ambitoSQL+` AND id=$2 AND deleted_at IS NULL`,
@@ -3048,7 +3146,7 @@ func (s *Store) BatchTrash(ctx context.Context, fileIDs, folderIDs []uuid.UUID) 
 	fileIDs, folderIDs = idsOrEmpty(fileIDs), idsOrEmpty(folderIDs)
 	var deleted []DeletedFile
 	var folderCount int
-	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	err := s.inTx(ctx, func(tx pgx.Tx) error {
 		if len(fileIDs) > 0 {
 			rows, err := tx.Query(ctx,
 				`UPDATE files SET deleted_at=now(), updated_at=now()
@@ -3127,7 +3225,7 @@ func (s *Store) CollectZip(ctx context.Context, fileIDs, folderIDs []uuid.UUID, 
 	t := tenancy.MustFrom(ctx)
 	fileIDs, folderIDs = idsOrEmpty(fileIDs), idsOrEmpty(folderIDs)
 	var out []ZipEntry
-	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	err := s.inTx(ctx, func(tx pgx.Tx) error {
 		if len(folderIDs) > 0 {
 			rows, err := tx.Query(ctx, `
 				WITH RECURSIVE tree AS (

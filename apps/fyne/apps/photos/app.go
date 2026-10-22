@@ -155,6 +155,7 @@ type App struct {
 	rec estadoRecuerdos
 	pub estadoPublico
 	cmp estadoCompartidos
+	aj  api.PhotosSettings
 }
 
 // estadoCarga es lo común a las pantallas que piden UNA cosa al entrar.
@@ -322,10 +323,12 @@ func (a *App) Ir(r Ruta) {
 		a.alb = estadoAlbumes{estadoCarga: estadoCarga{cargando: true}}
 		a.pintar()
 		a.pedirAlbumes()
+		a.pedirAjustes()
 	case RutaRepetidas:
 		a.rep = estadoRepetidas{estadoCarga: estadoCarga{cargando: true}}
 		a.pintar()
 		a.pedirRepetidas()
+		a.pedirAjustes()
 	case RutaPapelera:
 		a.pap = estadoPapelera{estadoCarga: estadoCarga{cargando: true}}
 		a.pintar()

@@ -1,4 +1,6 @@
 {
+  "aiBatch.excludeOrg": "Exclude organizația din lotul automat Sytue AI",
+  "aiBatch.excludedHint": "Organizația este exclusă din lotul automat Sytue AI. Fotografiile noi nu sunt procesate în fundal pentru sugestii sau asemănări.",
   "album.linkCopied": "Link copiat",
   "album.newLink": "Link nou",
   "album.newLinkConfirm": "Creezi un link nou? Linkul actual nu va mai funcționa pentru cei care îl au deja.",

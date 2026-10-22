@@ -549,6 +549,9 @@ func (f *fakeSvc) UpdateAlertPolicy(context.Context, uuid.UUID, store.UpdateAler
 	return f.alertPolicy, f.alertErr
 }
 func (f *fakeSvc) DeleteAlertPolicy(context.Context, uuid.UUID) error { return f.alertErr }
+func (f *fakeSvc) ConfirmAlertPolicy(context.Context, string) (domain.AlertPolicy, error) {
+	return f.alertPolicy, f.alertErr
+}
 
 var _ cloudService = (*fakeSvc)(nil)
 

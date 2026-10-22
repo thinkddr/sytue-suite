@@ -125,6 +125,11 @@ type Manifest struct {
 	// de verdad las edite. Sin esta lista, el catálogo dejaría elegir a Slack como
 	// sustituto de Sytue Mail.
 	Substitutes []Substitution `json:"substitutes,omitempty"`
+	// Hosts declara los hosts oficiales de API del proveedor (p. ej. *.googleapis.com,
+	// graph.microsoft.com). Cuando una plantilla los declara, el runtime de egreso y la
+	// salida delegada de migraciones solo permiten hablar con ellos y con las URLs del
+	// propio manifiesto.
+	Hosts []string `json:"hosts,omitempty"`
 }
 
 // Substitution es la capacidad de reemplazar UN producto de la suite.
@@ -266,6 +271,9 @@ func (m *Manifest) validate() error {
 		return err
 	}
 	if err := m.validateSubstitutes(keys); err != nil {
+		return err
+	}
+	if err := m.validateHosts(); err != nil {
 		return err
 	}
 	if err := m.validateIdentity(); err != nil {
@@ -607,6 +615,85 @@ func (m *Manifest) Destinos(values map[string]string) []string {
 func (m *Manifest) Declara(clave string) bool {
 	for _, f := range m.Fields {
 		if f.Key == clave {
+			return true
+		}
+	}
+	return false
+}
+
+// reHostOficial valida un host declarado en el manifiesto (exacto o comodín *.dominio.tld).
+var reHostOficial = regexp.MustCompile(`^(\*\.)?[a-z0-9][a-z0-9.-]*\.[a-z0-9-]+$`)
+
+func (m *Manifest) validateHosts() error {
+	for i, raw := range m.Hosts {
+		h := strings.ToLower(strings.TrimSpace(raw))
+		if !reHostOficial.MatchString(h) {
+			return fmt.Errorf("%w: hosts[%d] (%q) debe ser un nombre de servidor oficial (o *.dominio)", ErrInvalid, i, raw)
+		}
+	}
+	return nil
+}
+
+// HostsOficiales devuelve los hosts oficiales autorizados por el manifiesto para una
+// instancia: los declarados en `hosts` más los de las URLs del propio manifiesto y de
+// sus campos declarados. Devuelve nil si la plantilla no declara `hosts`.
+func (m *Manifest) HostsOficiales(values map[string]string) []string {
+	if len(m.Hosts) == 0 {
+		return nil
+	}
+	vistos := map[string]struct{}{}
+	apuntarHost := func(h string) {
+		if h = strings.ToLower(strings.TrimSpace(h)); h != "" {
+			vistos[h] = struct{}{}
+		}
+	}
+	apuntarURL := func(raw string) {
+		if u, err := url.Parse(strings.TrimSpace(raw)); err == nil && u.Hostname() != "" {
+			apuntarHost(u.Hostname())
+		}
+	}
+	for _, h := range m.Hosts {
+		apuntarHost(h)
+	}
+	for _, t := range m.plantillasDeURL() {
+		if out, err := render(t, values); err == nil {
+			apuntarURL(out)
+		}
+	}
+	for _, sub := range m.Substitutes {
+		if out, err := render(sub.OpenURL, values); err == nil {
+			apuntarURL(out)
+		}
+		if out, err := RenderURLKeeping(sub.DocumentURL, values, "document_id"); err == nil {
+			apuntarURL(out)
+		}
+	}
+	for k, v := range values {
+		if m.Declara(k) && strings.Contains(v, "://") {
+			apuntarURL(v)
+		}
+	}
+	out := make([]string, 0, len(vistos))
+	for h := range vistos {
+		out = append(out, h)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// HostPermitido comprueba si `host` (sin puerto) pertenece a la lista de hosts
+// oficiales del manifiesto (coincidencia exacta o comodín `*.sufijo`).
+func HostPermitido(host string, oficiales []string) bool {
+	h := strings.ToLower(strings.TrimSpace(host))
+	if h == "" {
+		return false
+	}
+	for _, patron := range oficiales {
+		p := strings.ToLower(strings.TrimSpace(patron))
+		if p == h {
+			return true
+		}
+		if sufijo, ok := strings.CutPrefix(p, "*."); ok && sufijo != "" && strings.HasSuffix(h, "."+sufijo) {
 			return true
 		}
 	}

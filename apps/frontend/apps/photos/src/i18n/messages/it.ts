@@ -253,4 +253,7 @@ export const it: AppCatalog<typeof en> = {
   'memories.years': '{count} anni fa',
   'memories.oneYear': 'Un anno fa',
   'memories.hide': 'Nascondi',
+  'aiBatch.excludeOrg': 'Escludi l’organizzazione dal lotto automatico di Sytue AI',
+  'aiBatch.excludedHint':
+    'L’organizzazione è esclusa dal lotto automatico di Sytue AI. Le nuove foto non vengono elaborate in secondo piano per suggerimenti o somiglianze.',
 };

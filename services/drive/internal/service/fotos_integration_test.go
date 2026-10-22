@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"git.sytue.eu/sytue/one/services/drive/internal/domain"
+	"git.sytue.eu/sytue/one/services/drive/internal/store"
 )
 
 // La foto que Bob añade al álbum de Ada se COPIA al Drive de Ada: el fichero nuevo es
@@ -18,11 +19,13 @@ import (
 // si no cabe, es ErrQuotaExceeded, no una copia a medias.
 func TestCopiaParaFotos(t *testing.T) {
 	svc, _, _, ctx := newChannelService(t)
-	root, err := svc.Root(ctx)
+	ctxBob := store.WithOwner(ctx, "bob")
+	ctxAda := store.WithOwner(ctx, "ada")
+	root, err := svc.Root(ctxBob)
 	if err != nil {
 		t.Fatal(err)
 	}
-	src, err := svc.UploadFile(ctx, root.ID, "cala.jpg", "image/jpeg", "bob", strings.NewReader("JPEG de Bob"))
+	src, err := svc.UploadFile(ctxBob, root.ID, "cala.jpg", "image/jpeg", "bob", strings.NewReader("JPEG de Bob"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -40,7 +43,7 @@ func TestCopiaParaFotos(t *testing.T) {
 	if copia.ID == src.ID || copia.OwnerSub != "ada" || copia.SizeBytes != src.SizeBytes {
 		t.Fatalf("la copia no es de Ada o no es una copia: %+v", copia)
 	}
-	carpeta, err := svc.ResolvePath(ctx, CarpetaFotos)
+	carpeta, err := svc.ResolvePath(ctxAda, CarpetaFotos)
 	if err != nil || !carpeta.IsDir() || copia.FolderID != carpeta.Folder.ID {
 		t.Fatalf("la copia no va a /Fotos: %+v %v", copia, err)
 	}
@@ -57,7 +60,7 @@ func TestCopiaParaFotos(t *testing.T) {
 		t.Errorf("reutilizar cobra cuota: %d → %d", despues.UsedBytes, q.UsedBytes)
 	}
 
-	grande, err := svc.UploadFile(ctx, root.ID, "grande.jpg", "image/jpeg", "bob", strings.NewReader(strings.Repeat("x", 4096)))
+	grande, err := svc.UploadFile(ctxBob, root.ID, "grande.jpg", "image/jpeg", "bob", strings.NewReader(strings.Repeat("x", 4096)))
 	if err != nil {
 		t.Fatal(err)
 	}

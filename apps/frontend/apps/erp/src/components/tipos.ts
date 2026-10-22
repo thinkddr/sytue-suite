@@ -351,6 +351,8 @@ export type MotivoVerifactu =
 export interface EstadoVerifactu {
   activo: boolean;
   desde?: string;
+  tiene_certificado?: boolean;
+  certificado_nif?: string;
   pendientes: number;
   con_errores: number;
   rechazadas: number;

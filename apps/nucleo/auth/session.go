@@ -190,10 +190,17 @@ func (s *Session) AccessToken(ctx context.Context) (string, error) {
 	}
 	nuevos, err := s.renovar(ctx, s.tokens)
 	switch {
+	case errors.Is(err, ErrSesionNoDisponible):
+		// Un fallo del broker o del dueño no es un fallo transitorio de red: no
+		// se reutiliza el access vigente ni se escribe en un almacén perdido.
+		s.tokens = Tokens{}
+		return "", err
 	case errors.Is(err, ErrLoginRequired):
 		// Descartar todos los datos parciales del renovador, conservando solo que
 		// Compartida ya ha limpiado el almacén antes de soltar su cerrojo.
-		s.poner(Tokens{persistenciaAtendida: nuevos.persistenciaAtendida})
+		if errGuardar := s.poner(Tokens{persistenciaAtendida: nuevos.persistenciaAtendida}); errGuardar != nil {
+			return "", errors.Join(err, errGuardar)
+		}
 		return "", err
 	case err != nil:
 		// Un fallo de red no cierra la sesión: si el token aún no ha caducado del
@@ -203,7 +210,9 @@ func (s *Session) AccessToken(ctx context.Context) (string, error) {
 		}
 		return "", err
 	}
-	s.poner(conservar(nuevos, s.tokens))
+	if err := s.poner(conservar(nuevos, s.tokens)); err != nil {
+		return "", err
+	}
 	return nuevos.Access, nil
 }
 
@@ -235,15 +244,14 @@ func (s *Session) Adoptar(t Tokens) {
 func (s *Session) AdoptarCon(ctx context.Context, t Tokens) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	soltar, err := ajustes.Cerrojo(ctx)
+	soltar, err := ajustes.CerrojoSesion(ctx)
 	if err != nil {
 		return err
 	}
 	defer soltar()
 	// Adoptar siempre guarda, incluso si le reenvían un resultado de Compartida.
 	t.persistenciaAtendida = false
-	s.poner(t)
-	return nil
+	return s.poner(t)
 }
 
 // PonerApariencia apunta la apariencia de la organización que OTRA app de la suite ha
@@ -355,33 +363,39 @@ func (s *Session) Sincronizar(t Tokens) {
 func (s *Session) Logout() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if soltar, err := ajustes.Cerrojo(context.Background()); err == nil {
+	if soltar, err := ajustes.CerrojoSesion(context.Background()); err == nil {
 		defer soltar()
 	} else {
 		slog.Warn("auth: no se pudo bloquear el cierre de sesión", "error", err)
 	}
-	s.poner(Tokens{})
+	_ = s.poner(Tokens{}) // La memoria queda vacía incluso si el broker no está disponible.
 }
 
-func (s *Session) poner(t Tokens) {
+func (s *Session) poner(t Tokens) error {
 	atendida := t.persistenciaAtendida
 	t.persistenciaAtendida = false
 	s.tokens = t
 	if atendida {
-		return
+		return nil
 	}
-	guardarTokens(t, s.guardar)
+	if err := guardarTokens(t, s.guardar); errors.Is(err, ErrSesionNoDisponible) {
+		s.tokens = Tokens{}
+		return err
+	}
+	return nil
 }
 
-func guardarTokens(t Tokens, guardar func(Tokens) error) {
+func guardarTokens(t Tokens, guardar func(Tokens) error) error {
 	if guardar == nil {
-		return
+		return nil
 	}
-	// No poder guardar no invalida el token: la sesión vale para esta ejecución y en
-	// la siguiente se pedirá login. Se deja dicho, no se esconde.
+	// Un fallo ordinario al guardar permite esta ejecución. ErrSesionNoDisponible
+	// exige además olvidar lo recibido: el broker puede haber cerrado otra sesión.
 	if err := guardar(t); err != nil {
 		slog.Warn("auth: no se pudo guardar la sesión", "error", err)
+		return err
 	}
+	return nil
 }
 
 // Compartida envuelve una renovación para cuando VARIOS procesos comparten la sesión
@@ -406,25 +420,29 @@ func guardarTokens(t Tokens, guardar func(Tokens) error) {
 // Renovar sin él podría reutilizar un refresh token rotado y revocar toda la familia.
 // Con guardar=nil no se marca persistencia atendida: Session conserva su guardado normal.
 func Compartida(renovar Renewer, cargar func() (Tokens, error), guardar func(Tokens) error) Renewer {
-	persistir := func(t Tokens) Tokens {
+	persistir := func(t Tokens) (Tokens, error) {
 		t.persistenciaAtendida = false
 		if guardar != nil {
-			guardarTokens(t, guardar)
-			// También tras un fallo: reintentar fuera del cerrojo podría pisar una
+			if err := guardarTokens(t, guardar); errors.Is(err, ErrSesionNoDisponible) {
+				return Tokens{}, err
+			}
+			// También tras un fallo ordinario: reintentar fuera del cerrojo podría pisar una
 			// sesión posterior. El error ya se ha avisado y el token sigue en memoria.
 			t.persistenciaAtendida = true
 		}
-		return t
+		return t, nil
 	}
 	return func(ctx context.Context, actuales Tokens) (Tokens, error) {
 		actuales.persistenciaAtendida = false
-		soltar, err := ajustes.Cerrojo(ctx)
+		soltar, err := ajustes.CerrojoSesion(ctx)
 		if err != nil {
 			return Tokens{}, err
 		}
 		defer soltar()
 		guardados, err := cargar()
 		switch {
+		case errors.Is(err, ErrSesionNoDisponible):
+			return Tokens{}, err
 		case err != nil:
 			// Lo guardado no se deja leer: se sigue con lo que hay en memoria.
 		case guardados.Refresh == "":
@@ -444,12 +462,13 @@ func Compartida(renovar Renewer, cargar func() (Tokens, error), guardar func(Tok
 		nuevos, err := renovar(ctx, actuales)
 		nuevos.persistenciaAtendida = false
 		if errors.Is(err, ErrLoginRequired) {
-			return persistir(Tokens{}), err
+			vacios, errGuardar := persistir(Tokens{})
+			return vacios, errors.Join(err, errGuardar)
 		}
 		if err != nil {
 			return nuevos, err
 		}
-		return persistir(conservar(nuevos, actuales)), nil
+		return persistir(conservar(nuevos, actuales))
 	}
 }
 

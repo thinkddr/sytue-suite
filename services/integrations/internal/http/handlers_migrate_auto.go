@@ -69,6 +69,9 @@ type planPerson struct {
 // MigrationPlan — GET /api/v1/instances/{id}/migration-plan — descubre qué se
 // puede migrar con la conexión ya autorizada. No escribe nada.
 func (h *Handlers) MigrationPlan(w http.ResponseWriter, r *http.Request) {
+	if !exigirAdminMigracion(w, r) {
+		return
+	}
 	id, ok := pathID(w, r)
 	if !ok {
 		return
@@ -91,6 +94,9 @@ type autoMigrationReq struct {
 // Se vuelve a construir el plan aquí en vez de fiarse de lo que mande el cliente:
 // lo que se migra lo decide el origen y el directorio, no el navegador.
 func (h *Handlers) AutoMigrate(w http.ResponseWriter, r *http.Request) {
+	if !exigirAdminMigracion(w, r) {
+		return
+	}
 	var req autoMigrationReq
 	if err := httpx.DecodeJSON(w, r, &req); err != nil {
 		httpx.Fail(w, r, err)

@@ -6,6 +6,7 @@ package calcus
 import (
 	"fmt"
 	"image/color"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -18,12 +19,23 @@ import (
 	"git.sytue.eu/sytue/one/apps/nucleo/webref"
 )
 
+// enVentanaReal lo pone `ventanareal_test.go` (`-tags ventanareal`).
+var enVentanaReal func(string) error
+
 // TestMain arranca la aplicación de pruebas con NUESTRO tema. Sin él, `canvas.Text`
 // resolvería la letra de serie y todas las medidas serían las de otra fuente.
 //
 // `test.NewApp()` y no `test.NewTempApp(t)`: el temporal se desmonta al acabar el test
 // y deja sin tema a los que vengan después en otro fichero.
 func TestMain(m *testing.M) {
+	if dir := os.Getenv("SYTUE_VENTANA_REAL"); dir != "" && enVentanaReal != nil {
+		if err := enVentanaReal(dir); err != nil {
+			fmt.Println("VENTANA REAL: FALLO:", err)
+			os.Exit(1)
+		}
+		fmt.Println("VENTANA REAL: bien")
+		os.Exit(0)
+	}
 	test.NewApp().Settings().SetTheme(tema.Sytue{})
 	tema.FormaDeLosGuardianes()
 	m.Run()

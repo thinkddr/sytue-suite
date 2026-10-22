@@ -18,6 +18,7 @@ import (
 	"git.sytue.eu/sytue/one/platform/pkg/objectstore"
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 	"git.sytue.eu/sytue/one/services/drive/internal/domain"
+	"git.sytue.eu/sytue/one/services/drive/internal/store"
 )
 
 // presignSvc arma un servicio con raíz + cuota holgada y un blob store fake con una
@@ -224,6 +225,22 @@ func TestFinalizeUploadTenantIsolation(t *testing.T) {
 	otherCtx := tenancy.Into(context.Background(), other)
 	if _, err := s.FinalizeUpload(otherCtx, res.Handle); !errors.Is(err, domain.ErrPermission) {
 		t.Fatalf("esperaba ErrPermission (cross-tenant), got %v", err)
+	}
+}
+
+func TestFinalizeUploadOwnerIsolation(t *testing.T) {
+	s, fs, fb := presignSvc(t)
+	fs.byKeyErr = domain.ErrNotFound
+	fb.statSize = 50
+	ctxUser1 := store.WithOwner(tenantCtx(t), "user-1")
+	res, err := s.PresignUpload(ctxUser1, "/big.bin", 50, "", "user-1")
+	if err != nil {
+		t.Fatalf("PresignUpload: %v", err)
+	}
+	// Otra persona de la misma organización no puede finalizar el handle de user-1.
+	ctxUser2 := store.WithOwner(tenantCtx(t), "user-2")
+	if _, err := s.FinalizeUpload(ctxUser2, res.Handle); !errors.Is(err, domain.ErrPermission) {
+		t.Fatalf("esperaba ErrPermission (otra persona de la misma org), got %v", err)
 	}
 }
 

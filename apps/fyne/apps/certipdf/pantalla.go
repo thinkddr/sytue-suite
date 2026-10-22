@@ -684,17 +684,33 @@ func (p *Pantalla) confirmar(mensaje, confirmar string, si func()) {
 	p.confirmarCon(confirmar, mensaje, confirmar, si)
 }
 
+func (p *Pantalla) confirmarO(mensaje, confirmar string, si, no func()) {
+	p.confirmarConO(confirmar, mensaje, confirmar, si, no)
+}
+
 // confirmarCon es confirmar con un título propio (el `titulo` de la web): «Quitar» a
 // secas no decía qué se quitaba.
 func (p *Pantalla) confirmarCon(titulo, mensaje, confirmar string, si func()) {
+	p.confirmarConO(titulo, mensaje, confirmar, si, nil)
+}
+
+func (p *Pantalla) confirmarConO(titulo, mensaje, confirmar string, si, no func()) {
 	c := fyne.CurrentApp().Driver().CanvasForObject(p.raiz)
 	if c == nil {
+		if no != nil {
+			no()
+		}
 		return
 	}
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	cuerpo := ui.NuevoParrafo(mensaje, tema.Escalon{Tam: tema.TextoSM.Tam, Linea: tema.TextoSM.Tam * 1.625}, ui.Normal, "text", v)
 	var d *ui.Dialogo
 	d = ui.Confirmacion(titulo, p.t("ui.cancel"), confirmar, true, cuerpo,
-		func() { d.Cerrar() }, func() { d.Cerrar(); si() })
+		func() {
+			d.Cerrar()
+			if no != nil {
+				no()
+			}
+		}, func() { d.Cerrar(); si() })
 	d.Mostrar(c)
 }

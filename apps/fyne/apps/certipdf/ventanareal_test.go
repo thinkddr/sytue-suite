@@ -128,7 +128,65 @@ func ventanaReal(dir string) error {
 			fallo <- fmt.Errorf("el clic real hizo %d verificaciones; tenía que hacer una", m.llamadas.Load())
 			return
 		}
-		fallo <- captura("2-informe")
+		if err := captura("2-informe"); err != nil {
+			fallo <- err
+			return
+		}
+		// Cambio destructivo sobre un PDF firmado: el motor responde 409
+		// pdf_invalidates_signatures y la pantalla abre el diálogo de confirmación.
+		aplicado := make(chan bool, 1)
+		fyne.Do(func() {
+			p.Aplicar(api.PDFCambio{
+				Op:    "metadatos",
+				Datos: map[string]string{"title": "Revisado"},
+			}, p.t("pdf.protect.cleaned"), func(ok bool) {
+				aplicado <- ok
+			})
+		})
+		pausa()
+		if err := captura("3-confirmar-invalidar"); err != nil {
+			fallo <- err
+			return
+		}
+		var ax, ay, aancho, aalto float32
+		fyne.DoAndWait(func() {
+			top := w.Canvas().Overlays().Top()
+			if top == nil {
+				return
+			}
+			rotulo := p.t("pdf.signatures.invalidate.apply")
+			todos(top, func(o fyne.CanvasObject) {
+				if k, ok := o.(*ui.Boton); ok && k.Texto == rotulo {
+					pos := fyne.CurrentApp().Driver().AbsolutePositionForObject(k)
+					ax, ay, aancho, aalto = pos.X, pos.Y, k.Size().Width, k.Size().Height
+				}
+			})
+		})
+		if aancho == 0 {
+			fallo <- fmt.Errorf("no apareció el botón «Aplicar de todos modos» en el diálogo 409")
+			return
+		}
+		acx, acy := fmt.Sprint(int(ax+aancho/2)), fmt.Sprint(int(ay+aalto/2))
+		if out, err := exec.Command("xdotool", "mousemove", acx, acy, "click", "1").CombinedOutput(); err != nil {
+			fallo <- fmt.Errorf("xdotool confirmar 409: %w %s", err, out)
+			return
+		}
+		pausa()
+		select {
+		case ok := <-aplicado:
+			if !ok {
+				fallo <- fmt.Errorf("Aplicar devolvió false tras confirmar invalidar firmas")
+				return
+			}
+		default:
+			fallo <- fmt.Errorf("Aplicar no notificó el resultado tras confirmar")
+			return
+		}
+		if m.cambios.Load() != 2 || !m.invalidaVista.Load() {
+			fallo <- fmt.Errorf("cambios=%d invalidaVista=%v; quería 2 y true", m.cambios.Load(), m.invalidaVista.Load())
+			return
+		}
+		fallo <- captura("4-invalidada-aplicada")
 	}()
 	a.Run()
 	select {

@@ -39,6 +39,9 @@ func TestNoteReadRoutesBatchSmallNotesAndNeverTruncateLegacySilently(t *testing.
 	insert := func(count int) {
 		t.Helper()
 		if err := pg.Pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+			if err := db.MarkWriteTransaction(ctx, tx); err != nil {
+				return err
+			}
 			_, err := tx.Exec(ctx, `INSERT INTO notes (tenant,notebook_id,owner_sub,title,data) SELECT 'acme',$1,'ada','small','{"n":9007199254740993,"x":"<>&"}'::jsonb FROM generate_series(1,$2)`, book.ID, count)
 			return err
 		}); err != nil {

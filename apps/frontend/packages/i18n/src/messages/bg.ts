@@ -367,4 +367,9 @@ export const bg: Catalog = {
   'linkedServices.writeUnknown':
     'Доставчикът не потвърди дали промените са запазени. Опреснете и проверете, преди да опитате отново.',
   'linkedServices.unavailable': 'Свързването с този доставчик не е достъпно за вашия профил.',
+  'localFile.confirmUpload.title': 'Отваряне на файл от това устройство',
+  'localFile.confirmUpload.body':
+    'За да отворите „{name}“, файлът ще бъде качен във вашия акаунт в Sytue One.',
+  'localFile.confirmUpload.remember': 'Запомни избора ми на това устройство',
+  'localFile.confirmUpload.confirm': 'Качи и отвори',
 };

@@ -42,7 +42,7 @@ func (s *Store) PurgeExpiredTrash(ctx context.Context, retention time.Duration) 
 	}
 	corte := time.Now().Add(-retention)
 	var total int64
-	err := s.pool.InMaintenanceTx(ctx, func(tx pgx.Tx) error {
+	err := s.inMaintenanceWriteTx(ctx, func(tx pgx.Tx) error {
 		// Las notas de cuadernos que también caducan entran igual por su propio
 		// `deleted_at`: `DeleteNotebook` marca la rama entera, no solo la raíz.
 		// EL `NOT EXISTS` ES LA RETENCIÓN LEGAL (migración 0006), y se evalúa aquí

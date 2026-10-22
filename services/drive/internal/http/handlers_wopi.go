@@ -126,8 +126,9 @@ func (h *wopiHandlers) authorize(w http.ResponseWriter, r *http.Request) (*http.
 		wopiFail(w, r, http.StatusUnauthorized, "token")
 		return nil, wopi.Claims{}, domain.File{}, false
 	}
-	// El tenant sale del TOKEN. Es lo que impide pedir el id de otra organización.
-	ctx := tenancy.Into(r.Context(), tenancy.Tenant{Slug: claims.Tenant})
+	// El tenant y el sujeto salen del TOKEN: impiden pedir el id de otra organización
+	// o de otra persona dentro de la misma organización.
+	ctx := store.WithOwner(tenancy.Into(r.Context(), tenancy.Tenant{Slug: claims.Tenant}), claims.Subject)
 	r = r.WithContext(ctx)
 
 	f, err := h.svc.GetFile(ctx, id)

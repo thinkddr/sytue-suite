@@ -15,6 +15,7 @@ import (
 	"git.sytue.eu/sytue/one/platform/pkg/peticiones"
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 	"git.sytue.eu/sytue/one/services/drive/internal/domain"
+	"git.sytue.eu/sytue/one/services/drive/internal/store"
 )
 
 // «Pedir acceso de edición» de algo compartido en lectura (platform/pkg/peticiones):
@@ -51,7 +52,7 @@ func (s *Service) PedirEdicion(ctx context.Context, recurso uuid.UUID, groups []
 	if err != nil || !nueva {
 		return false, err
 	}
-	quien, nombre := p.Quien(), s.nombreDe(ctx, recurso)
+	quien, nombre := p.Quien(), s.nombreDe(store.WithOwner(ctx, sh.CreatedBy), recurso)
 	s.avisador().Avisar(ctx, peticiones.Aviso{
 		Tenant: tenancy.MustFrom(ctx).Slug, Para: sh.CreatedBy, Source: "drive", Type: "drive.access.requested",
 		Titulo: quien + " asks to edit “" + nombre + "”", URL: hubnotify.EnlacePeticionDrive(s.cfg.PublicURL, tenancy.MustFrom(ctx).Slug, recurso.String()),
@@ -79,7 +80,7 @@ func (s *Service) ResolverPeticion(ctx context.Context, recurso uuid.UUID, sub, 
 	if c, ok := authn.FromContext(ctx); ok {
 		actor = cmp.Or(strings.TrimSpace(c.Name), c.Email)
 	}
-	nombre := s.nombreDe(ctx, recurso)
+	nombre := s.nombreDe(store.WithOwner(ctx, sub), recurso)
 	s.avisador().Avisar(ctx, peticiones.Aviso{
 		Tenant: tenancy.MustFrom(ctx).Slug, Para: sujeto, Source: "drive", Type: "drive.access.granted",
 		Titulo: "You can now edit “" + nombre + "”", URL: hubnotify.EnlaceCompartido(s.cfg.PublicURL, tenancy.MustFrom(ctx).Slug, recurso.String()),

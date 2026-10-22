@@ -252,4 +252,7 @@ export const nl: AppCatalog<typeof en> = {
   'memories.years': '{count} jaar geleden',
   'memories.oneYear': 'Een jaar geleden',
   'memories.hide': 'Verbergen',
+  'aiBatch.excludeOrg': 'Organisatie uitsluiten van de automatische Sytue AI-batch',
+  'aiBatch.excludedHint':
+    'De organisatie is uitgesloten van de automatische Sytue AI-batch. Nieuwe foto’s worden niet op de achtergrond verwerkt voor suggesties of gelijkenissen.',
 };

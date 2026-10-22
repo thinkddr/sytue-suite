@@ -279,4 +279,7 @@ export const mt: AppCatalog<typeof en> = {
   'memories.years': '{count} snin ilu',
   'memories.oneYear': 'Sena ilu',
   'memories.hide': 'Aħbi',
+  'aiBatch.excludeOrg': "Eskludi l-organizzazzjoni mill-lott awtomatiku ta' Sytue AI",
+  'aiBatch.excludedHint':
+    "L-organizzazzjoni hija eskluża mill-lott awtomatiku ta' Sytue AI. Ritratti ġodda ma jiġux ipproċessati fl-isfond għal suġġerimenti jew xebh.",
 };

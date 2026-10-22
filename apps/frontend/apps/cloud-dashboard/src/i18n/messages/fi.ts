@@ -904,6 +904,17 @@ export const fi: AppCatalog<typeof en> = {
   'monitoring.alerts.scope.org': 'organisaatio',
   'monitoring.alerts.scope.project': 'projekti',
   'monitoring.alerts.disabled': 'poistettu käytöstä',
+  'monitoring.alerts.unconfirmed': 'odottaa vahvistusta',
+  'monitoring.alerts.created.mailtoDesc':
+    'Lähetimme vahvistuslinkin tähän osoitteeseen. Hälytykset saapuvat, kun osoite on vahvistettu.',
+  'monitoring.alerts.confirm.title': 'Vahvista sähköpostihälytykset',
+  'monitoring.alerts.confirm.desc':
+    'Vahvista, että tähän osoitteeseen lähetetään Sytue DevX:n tapahtumahälytyksiä.',
+  'monitoring.alerts.confirm.submit': 'Vahvista osoite',
+  'monitoring.alerts.confirm.done':
+    'Osoite vahvistettu. Saat nyt tapahtumahälytykset tähän sähköpostiosoitteeseen.',
+  'monitoring.alerts.confirm.invalid':
+    'Tämä vahvistuslinkki ei kelpaa tai hälytys on jo poistettu.',
   'monitoring.alerts.delete': 'Poista hälytys: {event}',
   'members.subtitle':
     'Kenellä on pääsy organisaatioon. Jokainen jäsen on yksi paketin käyttäjäpaikka.',

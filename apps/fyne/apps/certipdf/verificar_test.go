@@ -29,20 +29,22 @@ import (
 // `/pdf/verify`, que contesta lo que se le ponga: el informe, o un 500 las veces que se
 // diga. Cuenta las verificaciones y apunta si llegó el fichero.
 type motorDeFirmas struct {
-	informe    string
-	fallar     atomic.Int32
-	llamadas   atomic.Int32
-	hayFichero atomic.Bool
+	informe       string
+	fallar        atomic.Int32
+	llamadas      atomic.Int32
+	hayFichero    atomic.Bool
+	cambios       atomic.Int32
+	invalidaVista atomic.Bool
 }
 
 func (m *motorDeFirmas) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	_ = r.ParseMultipartForm(1 << 20)
-	switch r.URL.Path {
-	case "/api/v1/pdf/content":
+	switch {
+	case r.URL.Path == "/api/v1/pdf/content":
 		_, _ = io.WriteString(w, `{"paginas":[{"numero":1,"ancho":100,"alto":140,"caja":[0,0,100,140]}],"total":1,
 			"firmas":[{"nombre":"Ana Pérez","motivo":"Conforme","fecha":"2026-09-10","cubre_todo":true},
 			{"fecha":"2026-09-12","cubre_todo":false}]}`)
-	case "/api/v1/pdf/verify":
+	case r.URL.Path == "/api/v1/pdf/verify":
 		m.llamadas.Add(1)
 		_, f, err := r.FormFile("file")
 		m.hayFichero.Store(err == nil && f != nil)
@@ -51,6 +53,19 @@ func (m *motorDeFirmas) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		_, _ = io.WriteString(w, m.informe)
+	case r.URL.Path == "/api/v1/pdf/protect":
+		m.cambios.Add(1)
+		if r.FormValue("invalidar_firmas") != "1" {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusConflict)
+			_, _ = io.WriteString(w, `{"code":"pdf_invalidates_signatures","message":"Signed PDF"}`)
+			return
+		}
+		m.invalidaVista.Store(true)
+		_, _ = io.WriteString(w, "%PDF-modificado")
+	case strings.HasPrefix(r.URL.Path, "/api/v1/folders/"):
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"id":"f-1","name":"a.pdf"}`)
 	default:
 		w.WriteHeader(http.StatusNotFound)
 	}
@@ -420,5 +435,91 @@ func TestLasClavesDeLaVerificacionExistenEnTodosLosIdiomas(t *testing.T) {
 			t.Errorf("los motivos %s y %s comparten clave", m, otro)
 		}
 		vistas[claveDeMotivo(m)] = m
+	}
+}
+
+// botonesDeConfirmacion devuelve el diálogo abierto encima del lienzo y sus botones de
+// cancelar y confirmar.
+func botonesDeConfirmacion(t *testing.T, p *Pantalla) (*ui.Dialogo, *ui.Boton, *ui.Boton) {
+	t.Helper()
+	var dlg *ui.Dialogo
+	var cancelar, confirmar *ui.Boton
+	fyne.DoAndWait(func() {
+		c := fyne.CurrentApp().Driver().CanvasForObject(p.raiz)
+		if c == nil || c.Overlays().Top() == nil {
+			return
+		}
+		todos(c.Overlays().Top(), func(o fyne.CanvasObject) {
+			switch x := o.(type) {
+			case *ui.Dialogo:
+				dlg = x
+			case *ui.Boton:
+				switch x.Texto {
+				case p.t("ui.cancel"):
+					cancelar = x
+				case p.t("pdf.signatures.invalidate.apply"):
+					confirmar = x
+				}
+			}
+		})
+	})
+	if dlg == nil || cancelar == nil || confirmar == nil {
+		t.Fatalf("no está abierto el diálogo de confirmación de invalidar firmas (dlg=%v cancelar=%v confirmar=%v)", dlg, cancelar, confirmar)
+	}
+	return dlg, cancelar, confirmar
+}
+
+// TestEl409DeInvalidarFirmasPreguntaAntesDeRepetir: cuando el motor contesta 409
+// `pdf_invalidates_signatures`, la pantalla abre la confirmación nativa. Si se cancela,
+// avisa con `hecho(false)` y no repite la petición; si se confirma, repite con
+// `invalidar_firmas=1` y avisa con `hecho(true)`.
+func TestEl409DeInvalidarFirmasPreguntaAntesDeRepetir(t *testing.T) {
+	m := &motorDeFirmas{informe: informeDePrueba}
+	p, listo, cerrar := abrirConFirmas(t, m)
+	defer cerrar()
+
+	cambio := api.PDFCambio{Op: "metadatos", Datos: map[string]string{"title": "Revisado"}}
+	cancelado := make(chan bool, 1)
+	fyne.DoAndWait(func() {
+		p.Aplicar(cambio, "Metadatos guardados", func(ok bool) { cancelado <- ok })
+	})
+	esperarRed(t, listo)
+	dlg, cancelar, _ := botonesDeConfirmacion(t, p)
+	if dlg.Titulo != p.t("pdf.signatures.invalidate.apply") {
+		t.Errorf("título del diálogo = %q; quiero %q", dlg.Titulo, p.t("pdf.signatures.invalidate.apply"))
+	}
+	fyne.DoAndWait(func() { cancelar.Tapped(nil) })
+	select {
+	case ok := <-cancelado:
+		if ok {
+			t.Error("cancelar la confirmación devolvió hecho(true)")
+		}
+	default:
+		t.Fatal("cancelar la confirmación de invalidar firmas no llamó a hecho(false)")
+	}
+	if m.cambios.Load() != 1 || m.invalidaVista.Load() {
+		t.Fatalf("tras cancelar: cambios=%d invalidaVista=%v", m.cambios.Load(), m.invalidaVista.Load())
+	}
+
+	confirmado := make(chan bool, 1)
+	fyne.DoAndWait(func() {
+		p.Aplicar(cambio, "Metadatos guardados", func(ok bool) { confirmado <- ok })
+	})
+	esperarRed(t, listo)
+	_, _, confirmar := botonesDeConfirmacion(t, p)
+	fyne.DoAndWait(func() { confirmar.Tapped(nil) })
+	esperarRed(t, listo) // segunda llamada a /pdf/protect con invalidar_firmas=1
+	esperarRed(t, listo) // recarga de contenido
+	esperarRed(t, listo) // recarga de lote
+	select {
+	case ok := <-confirmado:
+		if !ok {
+			t.Error("confirmar la invalidación devolvió hecho(false)")
+		}
+	default:
+		t.Fatal("confirmar la invalidación no llamó a hecho(true)")
+	}
+	if m.cambios.Load() != 3 || !m.invalidaVista.Load() {
+		t.Errorf("tras confirmar: cambios=%d (quiero 3) invalidaVista=%v", m.cambios.Load(), m.invalidaVista.Load())
 	}
 }

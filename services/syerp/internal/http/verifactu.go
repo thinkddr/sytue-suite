@@ -34,6 +34,10 @@ var (
 		"There is nothing to correct for this invoice at the Spanish Tax Agency.")
 	errNIFConVerifactu = httpx.NewError(http.StatusConflict, "nif_con_verifactu",
 		"The organisation's tax ID cannot change while VERI*FACTU is enabled.")
+	errCertificadoInvalido = httpx.NewError(http.StatusUnprocessableEntity, "certificado_invalido",
+		"The certificate or private key is not a valid qualified certificate with a Spanish tax ID.")
+	errCertificadoNIFNoCoincide = httpx.NewError(http.StatusUnprocessableEntity, "certificado_nif_no_coincide",
+		"The tax ID on the certificate does not match the organisation's tax ID.")
 )
 
 // Motivos por los que una organización no puede activar VERI*FACTU.
@@ -77,13 +81,31 @@ func (h *Handlers) motivoVerifactu(ctx context.Context) (string, error) {
 	if v := domain.VariantesNIF(org.NIF); len(v) == 0 || len(v[len(v)-1]) != 9 {
 		return motivoNIF, nil
 	}
-	if h.verifactu == nil {
+	v, err := h.store.EstadoVerifactu(ctx)
+	if err != nil {
+		return "", err
+	}
+	// En producción cada organización tiene que presentar con su propio
+	// certificado cualificado (cuyo NIF coincide con el del emisor); en pruebas
+	// sirve el propio o el certificado de pruebas del despliegue.
+	if h.cfg.VerifactuProduccion {
+		if !v.TieneCertificado {
+			return motivoSinCertificado, nil
+		}
+	} else if !v.TieneCertificado && h.verifactu == nil {
 		return motivoSinCertificado, nil
 	}
-	if h.cfg.VerifactuProduccion && verifactu.DeclaracionFecha == "" {
+	if h.cfg.VerifactuProduccion && h.fechaDeclaracionVerifactu() == "" {
 		return motivoDeclaracion, nil
 	}
 	return "", nil
+}
+
+func (h *Handlers) fechaDeclaracionVerifactu() string {
+	if h.declaracionFecha != "" {
+		return h.declaracionFecha
+	}
+	return verifactu.DeclaracionFecha
 }
 
 func (h *Handlers) entornoVerifactu() string {
@@ -127,6 +149,28 @@ func (h *Handlers) ActivarVerifactu(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.JSON(w, r, http.StatusOK, estadoVerifactu{Verifactu: v, Entorno: h.entornoVerifactu()})
+}
+
+type cuerpoCertificadoVerifactu struct {
+	CertPEM string `json:"cert_pem"`
+	KeyPEM  string `json:"key_pem"`
+	Sello   bool   `json:"sello"`
+}
+
+// GuardarCertificadoVerifactu — PUT /api/v1/verifactu/certificado. Owner y admin.
+// Guarda el certificado cualificado propio de la organización tras comprobar que
+// su NIF coincide con el NIF del emisor.
+func (h *Handlers) GuardarCertificadoVerifactu(w http.ResponseWriter, r *http.Request) {
+	var cuerpo cuerpoCertificadoVerifactu
+	if err := httpx.DecodeJSON(w, r, &cuerpo); err != nil {
+		httpx.Fail(w, r, err)
+		return
+	}
+	if _, err := h.store.GuardarCertificadoVerifactu(r.Context(), []byte(cuerpo.CertPEM), []byte(cuerpo.KeyPEM), cuerpo.Sello, h.cifra); err != nil {
+		httpx.Fail(w, r, errorDeEscritura(err))
+		return
+	}
+	h.Verifactu(w, r)
 }
 
 // registrosDeFactura devuelve los registros de una factura de venta y la URL de su

@@ -142,13 +142,48 @@ export function duplicateLayout(
     : null;
 }
 
-/** Cambia el nombre o los marcadores de un diseño. */
+/** Cambia el nombre, los marcadores o las formas de un diseño. */
 export function patchLayout(
   layouts: readonly SlideLayout[],
   id: string,
-  patch: Partial<Pick<SlideLayout, 'name' | 'boxes'>>,
+  patch: Partial<Pick<SlideLayout, 'name' | 'boxes' | 'decor'>>,
 ): SlideLayout[] {
   return sanitizeLayouts(layouts.map((l) => (l.id === id ? { ...l, ...patch } : l)));
+}
+
+/** Cajas editables de un diseño: primero sus formas fijas (`decor`, debajo) y encima sus
+ *  marcadores (`boxes`), para que todas se puedan seleccionar, mover, cambiar o borrar. */
+export function layoutEditBoxes(layout: SlideLayout | undefined): SlideBox[] {
+  if (!layout) return [];
+  return [...(layout.decor ?? []), ...layout.boxes];
+}
+
+/** Reparte las cajas editadas de un diseño de vuelta entre `decor` (formas, imágenes y los
+ *  textos fijos que ya venían de `decor`) y `boxes` (marcadores de texto). */
+export function applyLayoutBoxes(layout: SlideLayout, next: readonly SlideBox[]): SlideLayout {
+  const prevDecorIds = new Set((layout.decor ?? []).map((b) => b.id));
+  const prevBoxIds = new Set(layout.boxes.map((b) => b.id));
+  const decor: SlideBox[] = [];
+  const boxes: SlideBox[] = [];
+  for (const b of next) {
+    const isText = b.kind === undefined || b.kind === 'text';
+    if (!isText) {
+      decor.push(b);
+    } else if (prevDecorIds.has(b.id) && !prevBoxIds.has(b.id)) {
+      decor.push(b);
+    } else if (prevBoxIds.has(b.id) || boxes.length < MAX_PLACEHOLDERS) {
+      boxes.push(b);
+    } else {
+      decor.push(b);
+    }
+  }
+  const updated: SlideLayout = { ...layout, boxes };
+  if (decor.length > 0) {
+    updated.decor = decor;
+  } else {
+    delete updated.decor;
+  }
+  return sanitizeLayouts([updated])[0] ?? updated;
 }
 
 /** Quita un diseño. */

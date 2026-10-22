@@ -558,4 +558,8 @@ export const bg: AppCatalog<typeof en> = {
   'pos.imageUpload': 'Качване на изображение за {name}',
   'pos.images': 'Изображения',
   'pos.imageHint': 'Изберете JPEG, PNG или WebP изображение до 10 MB.',
+  'vf.error.invalidCertificate':
+    'Сертификатът или частният му ключ не са валиден квалифициран сертификат с испански NIF.',
+  'vf.error.certificateTaxIdMismatch':
+    'Испанският NIF в сертификата не съвпада с NIF на организацията.',
 };

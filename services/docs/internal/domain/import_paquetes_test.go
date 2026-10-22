@@ -68,7 +68,19 @@ func TestLibroConLaParteEnOtroSitio(t *testing.T) {
 			t.Errorf("%s: hoja %q, A1 %q, B1 %q con relleno %q", nombre, h.Name, h.Cells["A1"], h.Cells["B1"], h.Styles["B1"].Fill)
 		}
 	}
-	// Sin parte principal no hay libro (un ZIP vacío, o uno con las hojas y sin el libro).
+	// Sin xl/workbook.xml ni _rels/.rels pero con hojas en xl/_rels/workbook.xml.rels y
+	// xl/worksheets/sheet1.xml, como missing-bits.xlsx de exceljs: se abre con sus hojas.
+	sinLibroConHoja := map[string]string{
+		"xl/_rels/workbook.xml.rels": rels(rel("rId4", "worksheet", "worksheets/sheet1.xml")),
+		"xl/worksheets/sheet1.xml":   `<worksheet ` + nsHoja + `><sheetData><row r="2"><c r="N2"><v>42</v></c></row></sheetData></worksheet>`,
+	}
+	if res, err := Import("missing-bits.xlsx", zipStore(t, sinLibroConHoja)); err != nil {
+		t.Errorf("sin workbook.xml pero con hoja (missing-bits): %v", err)
+	} else if m := parseSheetModelJSON(t, res.Content); len(m.Sheets) != 1 || m.Sheets[0].Name != "Hoja1" || m.Sheets[0].Cells["N2"] != "42" {
+		t.Errorf("missing-bits: hojas = %+v", m.Sheets)
+	}
+	// Sin parte principal ni hojas no hay libro (como EmptyZipFile.xlsx de ExcelDataReader,
+	// que solo lleva test.txt).
 	vacio := map[string]string{"test.txt": "no es un libro"}
 	if _, err := Import("vacio.xlsx", zipStore(t, vacio)); !errors.Is(err, ErrInvalidFormat) {
 		t.Errorf("un ZIP sin libro: err = %v, quiero formato inválido", err)

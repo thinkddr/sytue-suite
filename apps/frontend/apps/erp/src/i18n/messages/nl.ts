@@ -561,4 +561,8 @@ export const nl: AppCatalog<typeof en> = {
   'pos.imageUpload': 'Afbeelding voor {name} uploaden',
   'pos.images': 'Afbeeldingen',
   'pos.imageHint': 'Kies een JPEG-, PNG- of WebP-afbeelding van maximaal 10 MB.',
+  'vf.error.invalidCertificate':
+    'Het certificaat of de privésleutel is geen geldig gekwalificeerd certificaat met een Spaans fiscaal nummer (NIF).',
+  'vf.error.certificateTaxIdMismatch':
+    'Het fiscaal nummer (NIF) op het certificaat komt niet overeen met dat van de organisatie.',
 };

@@ -424,6 +424,14 @@ func (l *lienzo) aparienciaRegenerada(ad pdfDict) *pdfStream {
 	case CampoTexto, CampoDesplegable:
 	case CampoLista:
 		valor, campo.VariasLineas = strings.Join(l.d.opcionesDeCampo(at["Opt"]), "\n"), true
+	case CampoBoton:
+		if l.aparienciaNormal(ad) != nil {
+			return nil
+		}
+		mk, _ := l.d.resolver(ad["MK"]).(pdfDict)
+		if ca, ok := l.d.resolver(mk["CA"]).(pdfString); ok {
+			valor = decodificarTextoPDF(ca)
+		}
 	default:
 		return nil
 	}
@@ -689,9 +697,20 @@ func aplicarValor(e *PDFEnsamblador, dst pdfDict, campo CampoFormulario, valor, 
 
 // aplicarApariencia dibuja el valor dentro del widget y lo cuelga del /AP.
 func aplicarApariencia(e *PDFEnsamblador, dst pdfDict, campo CampoFormulario, valor, da string) {
-	obj, ok := aparienciaDeCampo(dst, campo, valor, da, marcoDeMK(dst))
+	marco := marcoDeMK(dst)
+	letra := nuevaLetraAnot()
+	obj, ok := aparienciaDeCampoConLetra(dst, campo, valor, da, marco, letra)
 	if !ok {
 		return
+	}
+	if letra != nil && !letra.sub.Vacio() {
+		if num, err := letra.sub.Escribir(escritorDeFuente{e}); err == nil {
+			dict, _ := obj.valor.(pdfDict)
+			rec, _ := dict["Resources"].(pdfDict)
+			rec["Font"] = pdfDict{"SytueCampoF": pdfRef{Num: num}}
+		} else {
+			obj, _ = aparienciaDeCampoConLetra(dst, campo, valor, da, marco, nil)
+		}
 	}
 	numAP := e.reservar()
 	e.cuerpos[numAP-1] = obj
@@ -710,6 +729,10 @@ func aplicarApariencia(e *PDFEnsamblador, dst pdfDict, campo CampoFormulario, va
 // escribía en él. Un widget ajeno que no declara /MK sigue sin recuadro, que es
 // la elección de su diseñador.
 func aparienciaDeCampo(dst pdfDict, campo CampoFormulario, valor, da string, marco *marcoCampo) (objetoSalida, bool) {
+	return aparienciaDeCampoConLetra(dst, campo, valor, da, marco, nil)
+}
+
+func aparienciaDeCampoConLetra(dst pdfDict, campo CampoFormulario, valor, da string, marco *marcoCampo, letra *letraAnot) (objetoSalida, bool) {
 	if campo.Tipo == CampoCasilla || campo.Tipo == CampoOpcion {
 		// Las casillas ya traen dibujado su estado marcado; basta con /AS, que se
 		// fijó arriba. Redibujarlas perdería la marca que eligió el diseñador.
@@ -748,54 +771,67 @@ func aparienciaDeCampo(dst pdfDict, campo CampoFormulario, valor, da string, mar
 	}
 
 	var b strings.Builder
-	if marco != nil {
-		b.WriteString("q\n")
-		if marco.fondo != "" {
-			fmt.Fprintf(&b, "%s rg 0 0 %s %s re f\n", marco.fondo, numPDF(ancho), numPDF(alto))
-		}
-		if marco.borde != "" && marco.grosor > 0 {
-			// El trazo se centra en el camino, así que el recuadro se mete media
-			// anchura hacia dentro: si no, la mitad de fuera cae fuera del /BBox y
-			// el borde sale a la mitad de grueso.
-			g := marco.grosor
-			fmt.Fprintf(&b, "%s RG %s w %s %s %s %s re S\n", marco.borde, numPDF(g),
-				numPDF(g/2), numPDF(g/2), numPDF(ancho-g), numPDF(alto-g))
-		}
-		b.WriteString("Q\n")
-	}
+	dibujarMarcoCampo(&b, marco, ancho, alto)
 	// /Tx BMC … EMC marca el bloque como «texto variable de un campo»: es lo que
 	// permite a un lector volver a generarlo si el usuario lo edita.
 	b.WriteString("/Tx BMC\nq\n")
 	fmt.Fprintf(&b, "1 1 %s %s re W n\n", numPDF(ancho-2), numPDF(alto-2))
-	fmt.Fprintf(&b, "BT %s %s %s rg /SytueCampoF %s Tf %s TL\n",
-		numPDF(color[0]), numPDF(color[1]), numPDF(color[2]), numPDF(tam), numPDF(tam*1.2))
-
-	if campo.VariasLineas {
-		fmt.Fprintf(&b, "2 %s Td\n", numPDF(alto-2-tam))
-		for i, linea := range partirEnLineas(texto, ancho-4, tam) {
-			if i > 0 {
-				b.WriteString("T*\n")
+	if texto != "" {
+		fmt.Fprintf(&b, "BT %s %s %s rg /SytueCampoF %s Tf %s TL\n",
+			numPDF(color[0]), numPDF(color[1]), numPDF(color[2]), numPDF(tam), numPDF(tam*1.2))
+		if campo.VariasLineas {
+			fmt.Fprintf(&b, "2 %s Td\n", numPDF(alto-2-tam))
+			for i, linea := range partirEnLineas(texto, ancho-4, tam) {
+				if i > 0 {
+					b.WriteString("T*\n")
+				}
+				fmt.Fprintf(&b, "%s Tj\n", letra.tj(linea))
 			}
-			fmt.Fprintf(&b, "(%s) Tj\n", escaparCadenaContenido(linea))
+		} else {
+			// Centrado vertical: la línea base va a un tercio del alto, que es donde
+			// cae el texto de un campo de una línea en cualquier formulario.
+			fmt.Fprintf(&b, "2 %s Td %s Tj\n", numPDF((alto-tam*0.72)/2), letra.tj(texto))
 		}
-	} else {
-		// Centrado vertical: la línea base va a un tercio del alto, que es donde
-		// cae el texto de un campo de una línea en cualquier formulario.
-		fmt.Fprintf(&b, "2 %s Td (%s) Tj\n", numPDF((alto-tam*0.72)/2), escaparCadenaContenido(texto))
+		b.WriteString("ET\n")
 	}
-	b.WriteString("ET\nQ\nEMC\n")
+	b.WriteString("Q\nEMC\n")
 
+	recursos := pdfDict{
+		"ColorSpace": pdfDict{"DefaultRGB": calRGBDefecto(), "DefaultGray": calGrayDefecto()},
+	}
+	if texto != "" {
+		recursos["Font"] = pdfDict{"SytueCampoF": fuenteDeCampo()}
+	}
 	return objetoSalida{
 		valor: pdfDict{
 			"Type":      pdfName("XObject"),
 			"Subtype":   pdfName("Form"),
 			"FormType":  int64(1),
 			"BBox":      pdfArray{0.0, 0.0, ancho, alto},
-			"Resources": pdfDict{"Font": pdfDict{"SytueCampoF": fuenteDeCampo()}},
+			"Resources": recursos,
 		},
 		flujo:   []byte(b.String()),
 		esFlujo: true,
 	}, true
+}
+
+func dibujarMarcoCampo(b *strings.Builder, marco *marcoCampo, ancho, alto float64) {
+	if marco == nil {
+		return
+	}
+	b.WriteString("q\n")
+	if marco.fondo != "" {
+		fmt.Fprintf(b, "%s rg 0 0 %s %s re f\n", marco.fondo, numPDF(ancho), numPDF(alto))
+	}
+	if marco.borde != "" && marco.grosor > 0 {
+		// El trazo se centra en el camino, así que el recuadro se mete media
+		// anchura hacia dentro: si no, la mitad de fuera cae fuera del /BBox y
+		// el borde sale a la mitad de grueso.
+		g := marco.grosor
+		fmt.Fprintf(b, "%s RG %s w %s %s %s %s re S\n", marco.borde, numPDF(g),
+			numPDF(g/2), numPDF(g/2), numPDF(ancho-g), numPDF(alto-g))
+	}
+	b.WriteString("Q\n")
 }
 
 // marcoCampo son los operandos ya listos del recuadro de un widget: el color de

@@ -1,0 +1,201 @@
+/**
+ * Poruke na hrvatskom za umjetnu inteligenciju (ia).
+ * Prefiks: ai.*
+ */
+export const ia = {
+  // Postavke
+  'ai.settings.provider': 'Pružatelj UI-ja',
+  'ai.settings.model': 'Model',
+  'ai.settings.key': 'Vlastiti API ključ (BYOK)',
+  'ai.settings.key_placeholder': 'Unesite svoj tajni API ključ…',
+  'ai.settings.key_help':
+    'Vaš se ključ pohranjuje šifriran algoritmom AES-256-GCM. Nikada se ne vraća pregledniku.',
+  'ai.settings.check_key': 'Isprobaj ključ',
+  'ai.settings.delete_key': 'Izbriši ključ',
+  'ai.settings.status_configured': 'Ključ je postavljen',
+  'ai.settings.tested_at': 'Provjereno',
+  'ai.settings.quota_title': 'Mjesečna kvota za UI',
+  'ai.settings.quota_reset': 'Ponovno se postavlja {date}',
+  'ai.settings.notice_eu_title': 'Obavijest o prijenosu podataka izvan EGP-a',
+  'ai.settings.notice_eu_desc':
+    'Odabrani pružatelj ({provider}) obrađuje podatke izvan Europskog gospodarskog prostora. U skladu s člankom 49. stavkom 1. točkom (a) GDPR-a morate izričito pristati na taj prijenos kako biste nastavili.',
+  'ai.settings.notice_eu_accept':
+    'Pristajem na međunarodni prijenos podataka izvan EGP-a za zahtjeve prema UI-ju kod ovog pružatelja.',
+  'ai.settings.success_save': 'Ključ je uspješno spremljen i provjeren.',
+  'ai.settings.error_check': 'Pogreška pri provjeri ključa kod pružatelja.',
+  'ai.settings.form_title': 'Postavite vlastiti ključ (BYOK)',
+  'ai.settings.form_help':
+    'Koristite vlastite vjerodajnice za Mistral AI, OpenAI, Anthropic ili Zhipu AI kako ne biste ovisili o mjesečnoj kvoti.',
+  'ai.settings.provider_mistral': 'Mistral AI (EU, GDPR)',
+  'ai.settings.provider_openai': 'OpenAI (SAD)',
+  'ai.settings.provider_anthropic': 'Anthropic (SAD)',
+  'ai.settings.provider_zai': 'Zhipu AI (GLM)',
+  'ai.region.eu_fr': 'EU, Francuska',
+  'ai.region.us': 'SAD',
+  'ai.region.intl': 'Međunarodno',
+  'ai.settings.show_key': 'Prikaži ključ',
+  'ai.settings.hide_key': 'Sakrij ključ',
+  'ai.settings.key_required': 'Unesite ključ.',
+  'ai.settings.notice_required': 'Morate prihvatiti obavijest o prijenosu izvan EGP-a.',
+  'ai.settings.check_ok': 'Ključ je uspješno provjeren kod pružatelja.',
+  'ai.settings.error_save': 'Ključ nije bilo moguće spremiti.',
+  'ai.settings.error_delete': 'Ključ nije bilo moguće izbrisati.',
+  'ai.settings.checking': 'Provjera…',
+  'ai.settings.save_activate': 'Spremi i aktiviraj',
+  'ai.settings.key_deleted': 'Ključ je izbrisan. Primjenjivat će se zadana mjesečna kvota.',
+  'ai.settings.active_provider': 'Aktivni pružatelj: {provider} ({model})',
+  'ai.settings.no_key_default':
+    'Vlastiti ključ nije postavljen. Primjenjuje se mjesečno ograničenje plana.',
+  'ai.settings.status_plan': 'Kvota plana',
+  'ai.settings.quota_unlimited': 'Neograničeno',
+  'ai.settings.quota_unlimited_help': 'Zahtjevi koji se obrađuju vašim vlastitim API ključem.',
+  'ai.settings.quota_jobs': 'Zadaci dizajniranja, prevođenja i izvoza.',
+  'ai.settings.loading': 'Učitavanje postavki UI-ja',
+  'ai.settings.load_error': 'Postavke UI-ja nije bilo moguće učitati.',
+  'ai.settings.load_error_help': 'Usluga nije dostupna. Vaše se postavke nisu promijenile.',
+  'ai.settings.key_invalid': 'Pružatelj je odbio ključ. Provjerite je li točan i aktivan.',
+  'ai.settings.encryption_unavailable':
+    'Usluga još nije spremna za sigurno spremanje ključeva. Obratite se podršci.',
+  'ai.settings.invalid_model': 'Odaberite valjani model za ovog pružatelja.',
+  'ai.settings.key_state': 'Stanje ključa',
+
+  'ai.common.cancel': 'Odustani',
+
+  // Zajednički kontekst: kvota, GDPR obavijest, pogreške i stanje zadatka
+  'ai.context.quota_label': 'Mjesečna kvota za UI',
+  'ai.context.quota_used': '{used} od {limit} zadataka ovog mjeseca',
+  'ai.context.quota_reset': 'Obnavlja se {date}.',
+  'ai.context.quota_exhausted_title': 'Mjesečna kvota za UI je iskorištena',
+  'ai.context.quota_exhausted_desc':
+    'Više zadataka moći ćete pokrenuti {date}. Uprava organizacije može ukloniti ograničenje dodavanjem vlastitog API ključa u postavkama UI-ja.',
+  'ai.context.byok': 'Vaša organizacija koristi vlastiti API ključ: ovaj zadatak ne troši kvotu.',
+  'ai.context.loading': 'Provjera kvote za UI',
+  'ai.context.load_error': 'Kvotu za UI nije bilo moguće provjeriti. Svejedno možete pokušati.',
+  'ai.context.retry': 'Pokušaj ponovno',
+  'ai.notice.eu': 'Tekstovi se obrađuju unutar EU-a, u skladu s GDPR-om.',
+  'ai.notice.non_eu_title': 'Ovaj zadatak izlazi izvan Europskog gospodarskog prostora',
+  'ai.notice.non_eu_desc':
+    'Vlastiti ključ vaše organizacije pripada pružatelju {provider}, koji obrađuje podatke izvan EGP-a. Vaša je organizacija prihvatila taj prijenos (čl. 49. st. 1. t. (a) GDPR-a) pri spremanju ključa.',
+  'ai.error.quota': 'Mjesečna kvota za UI je iskorištena. Obnavlja se {date}.',
+  'ai.error.quota_nodate': 'Mjesečna kvota za UI je iskorištena.',
+  'ai.error.busy': 'Zadaci UI-ja već su u tijeku. Pričekajte da završe pa pokušajte ponovno.',
+  'ai.error.admin': 'Samo uprava organizacije može to učiniti.',
+  'ai.error.prompt': 'Opišite svoje web-mjesto prije generiranja prijedloga.',
+  'ai.error.languages': 'Odaberite najmanje jedan ciljni jezik.',
+  'ai.error.session': 'Vaša je sesija istekla. Ponovno učitajte stranicu i prijavite se.',
+  'ai.error.generic': 'Zadatak nije bilo moguće pokrenuti. Pokušajte ponovno za nekoliko minuta.',
+  'ai.error.draft_not_saved':
+    'Skicu nije bilo moguće spremiti. Riješite problem sa spremanjem i ponovno pokrenite UI.',
+  'ai.job.state_queued': 'U redu čekanja',
+  'ai.job.state_running': 'U tijeku',
+  'ai.job.state_done': 'Gotovo',
+  'ai.job.state_failed': 'Neuspjelo',
+  'ai.job.queued_text': 'Čeka se da poslužitelj prihvati zadatak…',
+  'ai.job.running_text': 'UI radi. To može potrajati nekoliko minuta.',
+  'ai.job.done_text': 'Zadatak je dovršen.',
+  'ai.job.failed_text': 'Zadatak nije bilo moguće dovršiti.',
+  'ai.job.lost_text': 'Veza s poslužiteljem je prekinuta.',
+  'ai.job.elapsed': 'Proteklo vrijeme: {time}',
+  'ai.job.detail': 'Tehnički detalj: {detail}',
+  'ai.job.model': 'Model: {model}',
+  'ai.job.badge_eu': 'Unutar EU-a',
+  'ai.job.badge_non_eu': 'Izvan EGP-a',
+  'ai.job.badge_byok': 'Vlastiti ključ',
+  'ai.job.back': 'Natrag',
+  'ai.job.retry': 'Pokušaj ponovno',
+  'ai.job.stop': 'Prekini čekanje',
+  'ai.job.stop_help': 'Zadatak će se nastaviti na poslužitelju i ubrojit će se u vašu kvotu.',
+
+  // Dizajn
+  'ai.design.title': 'Dizajniraj uz UI',
+  'ai.design.desc':
+    'Opišite svoje poslovanje i UI će predložiti odjeljke stranice s tekstovima spremnima za uređivanje.',
+  'ai.design.prompt_label': 'Opišite svoje web-mjesto ili poslovanje',
+  'ai.design.prompt_placeholder':
+    'Npr. Trgovina prirodnom veganskom kozmetikom s katalogom i rezervacijama…',
+  'ai.design.prompt_help':
+    'Što konkretnije opišete (što nudite, kome i što želite da posjetitelji učine), to će prijedlog biti bolji.',
+  'ai.design.ideas_label': 'Ideje za početak',
+  'ai.design.idea_1': 'Delikatesna trgovina domaćim sirevima i vinima s online narudžbama',
+  'ai.design.idea_2': 'Studio za arhitekturu i adaptacije s galerijom projekata',
+  'ai.design.idea_3': 'Stomatološka ordinacija s naručivanjem, timom i čestim pitanjima',
+  'ai.design.idea_4': 'Talijanski restoran s degustacijskim jelovnikom i rezervacijom stola',
+  'ai.design.style_label': 'Vizualni stil',
+  'ai.design.style_modern': 'Moderan i čist',
+  'ai.design.style_elegant': 'Elegantan i profinjen',
+  'ai.design.style_bold': 'Odvažan i upečatljiv',
+  'ai.design.style_minimal': 'Minimalistički',
+  'ai.design.lang_label': 'Jezik sadržaja',
+  'ai.design.button_generate': 'Generiraj prijedlog',
+  'ai.design.job_title': 'Dizajniranje prijedloga',
+  'ai.design.result_title': 'Prijedlog je spreman',
+  'ai.design.result_sections': {
+    one: '{count} odjeljak spreman za dodavanje na platno.',
+    few: '{count} odjeljka spremna za dodavanje na platno.',
+    other: '{count} odjeljaka spremno za dodavanje na platno.',
+  },
+  'ai.design.result_help':
+    'Dodat će se na stranicu koju uređujete i moći ćete ih naknadno prilagoditi.',
+  'ai.design.result_empty': 'UI nije vratio nijedan upotrebljiv odjeljak.',
+  'ai.design.button_apply': 'Dodaj na platno',
+  'ai.design.button_again': 'Isprobaj drugu ideju',
+
+  // Prijevod
+  'ai.translate.title': 'Prevedi uz UI',
+  'ai.translate.desc': 'Prevedite tekstove web-mjesta na druge jezike bez mijenjanja dizajna.',
+  'ai.translate.from_label': 'Izvorni jezik',
+  'ai.translate.to_label': 'Ciljni jezici',
+  'ai.translate.to_help':
+    'Odaberite najmanje jedan. Izvorni jezik ne može biti ciljni. Primjenom rezultata novi se jezici dodaju web-mjestu.',
+  'ai.translate.scope_label': 'Opseg prijevoda',
+  'ai.translate.scope_site': 'Cijelo web-mjesto',
+  'ai.translate.scope_page': 'Trenutačna stranica',
+  'ai.translate.scope_store': 'Samo katalog trgovine',
+  'ai.translate.store_unavailable': 'Prijevod kataloga trgovine još nije dostupan.',
+  'ai.translate.scope_invalid': 'Odaberite postojeću stranicu ili cijelo web-mjesto za prijevod.',
+  'ai.translate.overwrite_label': 'Prebriši prijevode koji već postoje',
+  'ai.translate.button_translate': 'Prevedi',
+  'ai.translate.job_title': 'Prevođenje tekstova',
+  'ai.translate.result_title': 'Prijevodi su spremni',
+  'ai.translate.result_texts': {
+    one: '{count} prevedeni tekst.',
+    few: '{count} prevedena teksta.',
+    other: '{count} prevedenih tekstova.',
+  },
+  'ai.translate.result_help': 'Dodat će se u skicu; dizajn se ne mijenja.',
+  'ai.translate.result_empty': 'UI nije vratio nijedan prijevod.',
+  'ai.translate.button_apply': 'Primijeni prijevode',
+  'ai.translate.button_again': 'Prevedi na druge jezike',
+
+  // Izvoz
+  'ai.export.title': 'Izvezi uz UI',
+  'ai.export.desc':
+    'Generirajte paket sa svojim web-mjestom spreman za prijenos na drugu platformu, bez ovisnosti o Sytueu.',
+  'ai.export.destination_label': 'Odredišna platforma',
+  'ai.export.dest_shopify': 'Shopify Online Store 2.0',
+  'ai.export.dest_shopify_desc':
+    'Cjelovita tema s JSON predlošcima i Liquid odjeljcima te katalog u CSV-u za uvoz iz upravljačke ploče Shopifya.',
+  'ai.export.dest_react': 'React + Tailwind CSS',
+  'ai.export.dest_react_desc':
+    'Jednostranični projekt povezan s javnim API-jem Sytuea, s naplatom i obrascima.',
+  'ai.export.dest_nextjs': 'Next.js App Router',
+  'ai.export.dest_nextjs_desc':
+    'Poslužiteljski iscrtana ili statička aplikacija s ugrađenim platnim sustavom.',
+  'ai.export.dest_woocommerce': 'WooCommerce / WordPress',
+  'ai.export.dest_woocommerce_desc':
+    'Izvorna blok-tema za WordPress s izvozom proizvoda i atributa.',
+  'ai.export.badge_available': 'Dostupno',
+  'ai.export.badge_soon': 'Uskoro',
+  'ai.export.button_export': 'Generiraj paket',
+  'ai.export.job_title': 'Generiranje paketa za {destination}',
+  'ai.export.result_title': 'Paket je spreman',
+  'ai.export.result_help': 'Tema i CSV kataloga nalaze se zajedno u jednoj ZIP datoteci.',
+  'ai.export.steps_title': 'Kako instalirati u Shopify',
+  'ai.export.step_1': 'Preuzmite ZIP datoteku.',
+  'ai.export.step_2':
+    'U upravljačkoj ploči Shopifya idite na Online Store > Themes i odaberite „Upload zip file”.',
+  'ai.export.step_3':
+    'Za proizvode idite na Products > Import i prenesite datoteku products_export_shopify.csv iz ZIP-a.',
+  'ai.export.button_download': 'Preuzmi ZIP',
+  'ai.export.button_again': 'Generiraj drugi izvoz',
+};

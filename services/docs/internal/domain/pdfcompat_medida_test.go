@@ -304,9 +304,9 @@ func TestMedirCompatibilidad(t *testing.T) {
 		o.Datos["fragmentos"] = len(an.Fragmentos)
 		for _, f := range an.Fragmentos {
 			r := []rune(strings.TrimSpace(f.Texto))
-			// Un trozo sin letras identificables (la fuente no dice qué carácter es
-			// cada código y sale U+200B o U+FFFD) no se puede reescribir con sentido.
-			if len(r) < 4 || strings.Trim(string(r), "\u200b\ufffd ") == "" {
+			// Un trozo con letras sin identificar (la fuente no dice qué carácter es
+			// un código y sale U+200B o U+FFFD) no se puede reescribir con sentido.
+			if f.LetrasDesconocidas || len(r) < 4 || strings.ContainsAny(string(r), "\u200b\ufffd") {
 				continue
 			}
 			// El mismo texto al revés: mismas letras, así que el subconjunto de la

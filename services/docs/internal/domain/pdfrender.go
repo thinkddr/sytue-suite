@@ -155,11 +155,13 @@ type estadoG struct {
 	aproxRelleno string
 	aproxTrazo   string
 	// degRelleno es el degradado de verdad para la salida PNG cuando el patrón de
-	// relleno es un sombreado axial o radial; solo vale mientras patronRelleno
-	// siga puesto.
-	degRelleno  *degradadoRaster
-	alfaRelleno float64
-	alfaTrazo   float64
+	// relleno es un sombreado axial, radial o de función; mallaRelleno son los
+	// triángulos cuando el patrón es una malla (tipos 4 a 7).
+	degRelleno   *degradadoRaster
+	mallaRelleno []trianguloMalla
+	matrizMalla  matriz
+	alfaRelleno  float64
+	alfaTrazo    float64
 
 	grosor  float64
 	tapa    int
@@ -201,12 +203,13 @@ type lienzo struct {
 	sb   strings.Builder
 	defs strings.Builder
 
-	seq        int
-	prefijoIDs string // documento+página: los recursos SVG inline tienen ámbito global
-	fuentes    map[string]*fuentePDF
-	caraCSS    map[string]bool // @font-face ya emitido, por id
-	prof       int
-	truncado   bool
+	seq         int
+	prefijoIDs  string // documento+página: los recursos SVG inline tienen ámbito global
+	fuentes     map[string]*fuentePDF
+	caraCSS     map[string]bool // @font-face ya emitido, por id
+	ocgApagados map[int]bool    // objetos OCG en /OCProperties /D /OFF
+	prof        int
+	truncado    bool
 
 	// r, si no es nil, es el mapa de bits de la salida `formato=png`. El SVG y el
 	// PNG salen del MISMO recorrido del flujo de contenido: aquí no hay un segundo
@@ -326,7 +329,7 @@ func (d *PDFDoc) recorrerPagina(i int, opts OpcionesRender, r *rasterizador) (*l
 
 	l := &lienzo{
 		d: d, opts: opts, fuentes: map[string]*fuentePDF{}, caraCSS: map[string]bool{},
-		r: r, soloRaster: r != nil,
+		ocgApagados: d.ocgApagados(), r: r, soloRaster: r != nil,
 	}
 	if !l.soloRaster {
 		// clipPath, patrones y gradientes se resuelven por ID en TODO el DOM,
@@ -467,8 +470,8 @@ func (l *lienzo) ejecutar(contenido []byte, recursos pdfDict, inicial estadoG) {
 const maxTextoMarcadoBytes = 64 << 10
 
 type marcaTexto struct {
-	actual            string
-	presente, emitida bool
+	actual                    string
+	presente, emitida, oculta bool
 }
 
 // ejecucion es el intérprete de UN flujo de contenido: su pila de estados, el
@@ -480,6 +483,7 @@ type ejecucion struct {
 	pila           []estadoG
 	marcas         []marcaTexto
 	marcasOmitidas int
+	ocgOculto      int
 
 	// abiertosN[i] cuenta los <g> abiertos en el nivel i de la pila `q`. El
 	// recorte de PDF es parte del estado gráfico y se deshace con `Q`, mientras
@@ -615,6 +619,7 @@ func (e *ejecucion) aplicar(op string, ops []pdfObj) {
 	case "cs":
 		e.estado.csRelleno = e.l.espacioPorNombre(nombre(1), e.recursos)
 		e.estado.relleno, e.estado.patronRelleno = e.estado.csRelleno.inicial(), ""
+		e.estado.degRelleno, e.estado.mallaRelleno = nil, nil
 	case "SC", "SCN":
 		e.color(ops, true)
 	case "sc", "scn":
@@ -624,18 +629,21 @@ func (e *ejecucion) aplicar(op string, ops []pdfObj) {
 		e.estado.trazo = cssGris(n(1))
 	case "g":
 		e.estado.csRelleno, e.estado.patronRelleno = espacioGris, ""
+		e.estado.degRelleno, e.estado.mallaRelleno = nil, nil
 		e.estado.relleno = cssGris(n(1))
 	case "RG":
 		e.estado.csTrazo, e.estado.patronTrazo = espacioRGB, ""
 		e.estado.trazo = cssRGB(n(3), n(2), n(1))
 	case "rg":
 		e.estado.csRelleno, e.estado.patronRelleno = espacioRGB, ""
+		e.estado.degRelleno, e.estado.mallaRelleno = nil, nil
 		e.estado.relleno = cssRGB(n(3), n(2), n(1))
 	case "K":
 		e.estado.csTrazo, e.estado.patronTrazo = espacioCMYK, ""
 		e.estado.trazo = cssCMYK(n(4), n(3), n(2), n(1))
 	case "k":
 		e.estado.csRelleno, e.estado.patronRelleno = espacioCMYK, ""
+		e.estado.degRelleno, e.estado.mallaRelleno = nil, nil
 		e.estado.relleno = cssCMYK(n(4), n(3), n(2), n(1))
 
 	// --- Sombreado ---
@@ -708,14 +716,17 @@ func (e *ejecucion) aplicar(op string, ops []pdfObj) {
 		if e.marcasOmitidas > 0 {
 			e.marcasOmitidas--
 		} else if len(e.marcas) > 0 {
+			if e.marcas[len(e.marcas)-1].oculta {
+				e.ocgOculto--
+			}
 			e.marcas = e.marcas[:len(e.marcas)-1]
 		}
 	case "MP", "DP", "BX", "EX", "d0", "d1":
 	}
 }
 
-// abrirMarcaTexto recoge el texto lógico de las ligaduras y acota la pila de
-// contenido marcado. El dibujo sigue usando los códigos originales del PDF.
+// abrirMarcaTexto recoge el texto lógico de las ligaduras, detecta capas
+// opcionales apagadas (/OC) y acota la pila de contenido marcado.
 func (e *ejecucion) abrirMarcaTexto(op string, ops []pdfObj) {
 	if e.marcasOmitidas > 0 || len(e.marcas) >= 256 {
 		e.marcasOmitidas++
@@ -723,18 +734,79 @@ func (e *ejecucion) abrirMarcaTexto(op string, ops []pdfObj) {
 	}
 	m := marcaTexto{}
 	if op == "BDC" && len(ops) >= 2 {
-		prop := e.l.d.resolver(ops[len(ops)-1])
+		raw := ops[len(ops)-1]
+		prop := e.l.d.resolver(raw)
 		if nombre, ok := prop.(pdfName); ok {
 			catalogo, _ := e.l.d.resolver(e.recursos["Properties"]).(pdfDict)
-			prop = e.l.d.resolver(catalogo[nombre])
+			raw = catalogo[nombre]
+			prop = e.l.d.resolver(raw)
+		}
+		if ref, ok := raw.(pdfRef); ok && e.l.ocgApagados[ref.Num] {
+			m.oculta = true
+			e.ocgOculto++
 		}
 		if dict, ok := prop.(pdfDict); ok {
+			if !m.oculta && e.l.ocmdApagado(dict) {
+				m.oculta = true
+				e.ocgOculto++
+			}
 			if texto, ok := e.l.d.resolver(dict["ActualText"]).(pdfString); ok && len(texto) <= maxTextoMarcadoBytes {
 				m.actual, m.presente = decodificarTextoPDF(texto), true
 			}
 		}
 	}
 	e.marcas = append(e.marcas, m)
+}
+
+func (d *PDFDoc) ocgApagados() map[int]bool {
+	cat, _ := d.resolver(d.trailer["Root"]).(pdfDict)
+	ocp, _ := d.resolver(cat["OCProperties"]).(pdfDict)
+	def, _ := d.resolver(ocp["D"]).(pdfDict)
+	if def == nil {
+		return nil
+	}
+	apagados := map[int]bool{}
+	if base, _ := d.resolver(def["BaseState"]).(pdfName); base == "OFF" {
+		if todos, ok := d.resolver(ocp["OCGs"]).(pdfArray); ok {
+			for _, o := range todos {
+				if ref, ok := o.(pdfRef); ok {
+					apagados[ref.Num] = true
+				}
+			}
+		}
+		if encendidos, ok := d.resolver(def["ON"]).(pdfArray); ok {
+			for _, o := range encendidos {
+				if ref, ok := o.(pdfRef); ok {
+					delete(apagados, ref.Num)
+				}
+			}
+		}
+	}
+	if off, ok := d.resolver(def["OFF"]).(pdfArray); ok {
+		for _, o := range off {
+			if ref, ok := o.(pdfRef); ok {
+				apagados[ref.Num] = true
+			}
+		}
+	}
+	return apagados
+}
+
+func (l *lienzo) ocmdApagado(dict pdfDict) bool {
+	if len(l.ocgApagados) == 0 {
+		return false
+	}
+	switch v := dict["OCGs"].(type) {
+	case pdfRef:
+		return l.ocgApagados[v.Num]
+	case pdfArray:
+		for _, e := range v {
+			if ref, ok := e.(pdfRef); ok && l.ocgApagados[ref.Num] {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (e *ejecucion) textoDeLaMarca(texto string) string {
@@ -858,6 +930,9 @@ func (l *lienzo) apuntarRect(e *ejecucion, x, y, w, h float64) {
 // pintar cierra el camino en curso: lo dibuja si toca y lo convierte en recorte
 // si venía marcado con W/W*.
 func (e *ejecucion) pintar(relleno, trazo, parImpar bool) {
+	if e.ocgOculto > 0 {
+		relleno, trazo = false, false
+	}
 	dAttr := e.camino.String()
 	e.camino.Reset()
 	hab := e.hayCamino
@@ -1142,7 +1217,7 @@ func (e *ejecucion) mostrarArray(arr pdfArray) {
 		case pdfString:
 			e.mostrar(v)
 		case int64, float64:
-			if f := e.estado.fuente; f != nil && f.vertical && e.l.texto != nil {
+			if f := e.estado.fuente; f != nil && f.vertical {
 				// En vertical el ajuste baja la línea y no lleva la escala
 				// horizontal (§9.4.4).
 				e.tm = matriz{1, 0, 0, 1, 0, -comoReal(v) / 1000 * e.estado.tamano}.por(e.tm)
@@ -1156,7 +1231,7 @@ func (e *ejecucion) mostrarArray(arr pdfArray) {
 
 // mostrar pinta una cadena y adelanta la matriz de texto.
 func (e *ejecucion) mostrar(s pdfString) {
-	if len(s) == 0 || e.l.opts.SinTexto {
+	if len(s) == 0 || e.l.opts.SinTexto || e.ocgOculto > 0 {
 		return
 	}
 	f := e.estado.fuente
@@ -1168,27 +1243,24 @@ func (e *ejecucion) mostrar(s pdfString) {
 	// El avance total se calcula ANTES de emitir para poder fijar `textLength`:
 	// es lo que hace que el texto caiga donde el PDF dice aunque el navegador
 	// use otra fuente. Sin él, una línea justificada se desmonta.
-	var avance float64
+	var avance, bajada float64
 	for _, g := range glifos {
 		a := g.ancho/1000*e.estado.tamano + e.estado.espCar
 		if g.esEspacioSimple {
 			a += e.estado.espPal
 		}
 		avance += a * e.estado.escalaH
+		if f.vertical {
+			b := g.alto/1000*e.estado.tamano + e.estado.espCar
+			if g.esEspacioSimple {
+				b += e.estado.espPal
+			}
+			bajada += b
+		}
 	}
 
 	if e.l.texto != nil {
-		// ponytail: la escritura vertical solo se entiende al EXTRAER texto; al
-		// pintar los glifos siguen en horizontal hasta que el pintado la soporte.
 		if f.vertical {
-			var bajada float64
-			for _, g := range glifos {
-				b := g.alto/1000*e.estado.tamano + e.estado.espCar
-				if g.esEspacioSimple {
-					b += e.estado.espPal
-				}
-				bajada += b
-			}
 			e.l.texto.anadir(e, glifos, 0, bajada)
 			e.tm = matriz{1, 0, 0, 1, 0, bajada}.por(e.tm)
 			return
@@ -1212,6 +1284,10 @@ func (e *ejecucion) mostrar(s pdfString) {
 		// El PNG dibuja los CONTORNOS de los mismos glifos: es lo que un motor de
 		// SVG sin `<text>` no puede hacer y por lo que existe esta salida.
 		e.dibujarTexto(f, glifos)
+	}
+	if f.vertical {
+		e.tm = matriz{1, 0, 0, 1, 0, bajada}.por(e.tm)
+		return
 	}
 	e.tm = matriz{1, 0, 0, 1, avance, 0}.por(e.tm)
 }
@@ -1304,6 +1380,9 @@ func (e *ejecucion) cerrarTexto() {
 // --- XObjects ----------------------------------------------------------------
 
 func (e *ejecucion) hacer(nombre pdfName) {
+	if e.ocgOculto > 0 {
+		return
+	}
 	obj := e.recursoDe("XObject", nombre)
 	st, ok := e.l.d.resolver(obj).(*pdfStream)
 	if !ok {
@@ -1390,7 +1469,7 @@ func (l *lienzo) anotacionesDePagina(p PDFPagina, base matriz) {
 			continue
 		}
 		ap := l.aparienciaNormal(ad)
-		if redibujar {
+		if redibujar || ap == nil {
 			if nueva := l.aparienciaRegenerada(ad); nueva != nil {
 				ap = nueva
 			}

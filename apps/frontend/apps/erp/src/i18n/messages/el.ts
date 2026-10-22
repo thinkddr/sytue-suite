@@ -568,4 +568,8 @@ export const el: AppCatalog<typeof en> = {
   'pos.imageUpload': 'Μεταφόρτωση εικόνας για {name}',
   'pos.images': 'Εικόνες',
   'pos.imageHint': 'Επιλέξτε εικόνα JPEG, PNG ή WebP έως 10 MB.',
+  'vf.error.invalidCertificate':
+    'Το πιστοποιητικό ή το ιδιωτικό του κλειδί δεν είναι έγκυρο εγκεκριμένο πιστοποιητικό με ισπανικό NIF.',
+  'vf.error.certificateTaxIdMismatch':
+    'Το ΑΦΜ (NIF) του πιστοποιητικού δεν αντιστοιχεί στο ΑΦΜ του οργανισμού.',
 };

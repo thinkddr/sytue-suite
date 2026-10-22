@@ -148,3 +148,40 @@ func TestCompartirUnAlbumConUnaPersona(t *testing.T) {
 	case <-time.After(300 * time.Millisecond):
 	}
 }
+
+func TestAjustesOrganizacion_soloAdminExcluyeDelLote(t *testing.T) {
+	harness := pgtest.New(t, db.Migrations, db.MigrationsDir)
+	st := store.New(harness.Pool)
+	ctx := tenancy.Into(context.Background(), tenancy.Tenant{Slug: "acme"})
+	h := &Handlers{store: st}
+
+	pedir := func(fn http.HandlerFunc, quien string, roles []string, metodo, cuerpo string) *httptest.ResponseRecorder {
+		t.Helper()
+		req := httptest.NewRequest(metodo, "/api/v1/settings", strings.NewReader(cuerpo))
+		req.Header.Set("Content-Type", "application/json")
+		c := authn.Into(ctx, authn.Claims{Subject: quien, Roles: roles})
+		req = req.WithContext(c)
+		w := httptest.NewRecorder()
+		fn(w, req)
+		return w
+	}
+
+	if w := pedir(h.AjustesOrganizacion, "bob", []string{"member"}, http.MethodGet, ""); w.Code != http.StatusOK ||
+		!strings.Contains(w.Body.String(), `"excludeAiBatch":false`) ||
+		!strings.Contains(w.Body.String(), `"canManageAiBatch":false`) {
+		t.Fatalf("GET inicial miembro: %d %s", w.Code, w.Body)
+	}
+	if w := pedir(h.GuardarAjustesOrganizacion, "bob", []string{"member"}, http.MethodPut, `{"excludeAiBatch":true}`); w.Code != http.StatusForbidden {
+		t.Fatalf("miembro no debe poder excluir la organización: %d %s", w.Code, w.Body)
+	}
+	if w := pedir(h.GuardarAjustesOrganizacion, "ada", []string{"admin"}, http.MethodPut, `{"excludeAiBatch":true}`); w.Code != http.StatusOK ||
+		!strings.Contains(w.Body.String(), `"excludeAiBatch":true`) ||
+		!strings.Contains(w.Body.String(), `"canManageAiBatch":true`) {
+		t.Fatalf("admin excluye la organización: %d %s", w.Code, w.Body)
+	}
+	if w := pedir(h.AjustesOrganizacion, "bob", []string{"member"}, http.MethodGet, ""); w.Code != http.StatusOK ||
+		!strings.Contains(w.Body.String(), `"excludeAiBatch":true`) ||
+		!strings.Contains(w.Body.String(), `"canManageAiBatch":false`) {
+		t.Fatalf("GET miembro tras excluir: %d %s", w.Code, w.Body)
+	}
+}

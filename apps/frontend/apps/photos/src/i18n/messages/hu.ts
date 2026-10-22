@@ -248,4 +248,7 @@ export const hu: AppCatalog<typeof en> = {
   'memories.years': '{count} évvel ezelőtt',
   'memories.oneYear': 'Egy évvel ezelőtt',
   'memories.hide': 'Elrejtés',
+  'aiBatch.excludeOrg': 'Szervezet kizárása az automatikus Sytue AI-feldolgozásból',
+  'aiBatch.excludedHint':
+    'A szervezet ki van zárva az automatikus Sytue AI-feldolgozásból. Az új fényképeket nem dolgozzuk fel a háttérben javaslatokhoz vagy hasonlóságokhoz.',
 };

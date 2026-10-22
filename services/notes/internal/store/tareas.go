@@ -106,7 +106,7 @@ func (s *Store) ListTasks(ctx context.Context, sub, estado string, desde, hasta 
 func (s *Store) PostponeTask(ctx context.Context, id uuid.UUID, sub, date, title string) (domain.Notebook, error) {
 	t := tenancy.MustFrom(ctx)
 	var nb domain.Notebook
-	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+	err := s.inWriteTx(ctx, func(tx pgx.Tx) error {
 		var err error
 		if nb, err = abrirDiario(ctx, tx, t.Slug, sub, date, title); err != nil {
 			return err

@@ -44,6 +44,7 @@ var excepcionesNFD = map[string]string{
 	"apps/fyne/apps/notes/escritura.go":                "slugDe: el ancla `h=` de un título, igual que la de la web",
 	"apps/fyne/apps/hub/bienvenida.go":                 "Slugify: el identificador ASCII de la organización, igual que el de la web",
 	"services/docs/internal/domain/pdfcodificacion.go": "nombres de glifos Adobe: conserva mayúsculas y diacríticos al descomponer; no es un buscador",
+	"services/docs/internal/domain/pdffont.go":         "métricas AFM de las 14 fuentes estándar PDF: aproxima el ancho de caracteres acentuados por su base ASCII; no es un buscador",
 }
 
 var (

@@ -216,6 +216,9 @@ func mallaLibre(r *lectorDeBits, p parametrosMalla) ([]trianguloMalla, bool) {
 
 		switch {
 		case bandera == 0 || tengo < 3:
+			if bandera == 0 && tengo == 3 {
+				tengo = 0
+			}
 			// Un triángulo nuevo son TRES vértices con su propia bandera cada uno.
 			if tengo < 2 {
 				if tengo == 0 {
@@ -483,20 +486,22 @@ func (l *lienzo) parchesDeMalla(st *pdfStream, tipo int) ([]trianguloMalla, bool
 			break
 		}
 		cols := make([]string, 0, colores)
+		ts := make([]float64, 0, colores)
 		for i := 0; i < colores; i++ {
-			css, ok := p.leerColor(r)
+			css, t, ok := p.leerColor(r)
 			if !ok {
 				fallo = true
 				break
 			}
 			cols = append(cols, css)
+			ts = append(ts, t)
 		}
 		if fallo {
 			break
 		}
 		r.alinearAByte()
 
-		parche, ok := ensamblarParche(bandera, pts, cols, previo)
+		parche, ok := ensamblarParche(bandera, pts, cols, ts, p.fn, p.ec, previo)
 		if !ok {
 			break
 		}
@@ -509,21 +514,23 @@ func (l *lienzo) parchesDeMalla(st *pdfStream, tipo int) ([]trianguloMalla, bool
 
 // leerColor saca solo el color de un vértice, sin coordenadas. Los parches los
 // traen aparte de los puntos, al contrario que las mallas de triángulos.
-func (p parametrosMalla) leerColor(r *lectorDeBits) (string, bool) {
+func (p parametrosMalla) leerColor(r *lectorDeBits) (string, float64, bool) {
 	maxComp := math.Pow(2, float64(p.bitsComp)) - 1
 	comps := make([]float64, 0, p.comps)
 	for i := 0; i < p.comps; i++ {
 		b, ok := r.leer(p.bitsComp)
 		if !ok {
-			return "", false
+			return "", 0, false
 		}
 		lo, hi := p.decode[4+2*i], p.decode[5+2*i]
 		comps = append(comps, lo+float64(b)/maxComp*(hi-lo))
 	}
+	var t float64
 	if p.fn != nil {
-		comps = p.fn.evaluar(comps[0])
+		t = comps[0]
+		comps = p.fn.evaluar(t)
 	}
-	return p.ec.css(comps), true
+	return p.ec.css(comps), t, true
 }
 
 // parcheCoons es un parche listo para triangular: los doce puntos del borde en
@@ -534,6 +541,9 @@ type parcheCoons struct {
 	borde [12][2]float64
 	// colores son las esquinas 1 a 4, en el mismo sentido que el borde.
 	colores [4]string
+	t       [4]float64
+	fn      *funcionPDF
+	ec      *espacioColor
 }
 
 // ensamblarParche coloca los puntos y colores nuevos en su sitio, heredando del
@@ -543,14 +553,18 @@ type parcheCoons struct {
 // BORDE del parche previo se reutiliza como primer borde del nuevo, y por tanto
 // qué dos colores se heredan. Equivocarse no da error: encaja los parches por el
 // lado equivocado y el degradado sale retorcido.
-func ensamblarParche(bandera uint64, pts [][2]float64, cols []string, previo *parcheCoons) (*parcheCoons, bool) {
-	p := &parcheCoons{}
+func ensamblarParche(
+	bandera uint64, pts [][2]float64, cols []string, ts []float64,
+	fn *funcionPDF, ec *espacioColor, previo *parcheCoons,
+) (*parcheCoons, bool) {
+	p := &parcheCoons{fn: fn, ec: ec}
 	if bandera == 0 || previo == nil {
 		if len(pts) < 12 || len(cols) < 4 {
 			return nil, false
 		}
 		copy(p.borde[:], pts[:12])
 		copy(p.colores[:], cols[:4])
+		copy(p.t[:], ts[:4])
 		return p, true
 	}
 	if len(pts) < 8 || len(cols) < 2 {
@@ -561,21 +575,27 @@ func ensamblarParche(bandera uint64, pts [][2]float64, cols []string, previo *pa
 	// de la tabla 85 de la especificación.
 	var heredado [4][2]float64
 	var c1, c2 string
+	var t1, t2 float64
 	switch bandera {
 	case 1:
 		heredado = [4][2]float64{previo.borde[3], previo.borde[4], previo.borde[5], previo.borde[6]}
 		c1, c2 = previo.colores[1], previo.colores[2]
+		t1, t2 = previo.t[1], previo.t[2]
 	case 2:
 		heredado = [4][2]float64{previo.borde[6], previo.borde[7], previo.borde[8], previo.borde[9]}
 		c1, c2 = previo.colores[2], previo.colores[3]
+		t1, t2 = previo.t[2], previo.t[3]
 	default: // 3
 		heredado = [4][2]float64{previo.borde[9], previo.borde[10], previo.borde[11], previo.borde[0]}
 		c1, c2 = previo.colores[3], previo.colores[0]
+		t1, t2 = previo.t[3], previo.t[0]
 	}
 	p.borde[0], p.borde[1], p.borde[2], p.borde[3] = heredado[0], heredado[1], heredado[2], heredado[3]
 	copy(p.borde[4:], pts[:8])
 	p.colores[0], p.colores[1] = c1, c2
 	p.colores[2], p.colores[3] = cols[0], cols[1]
+	p.t[0], p.t[1] = t1, t2
+	p.t[2], p.t[3] = ts[0], ts[1]
 	return p, true
 }
 
@@ -627,8 +647,15 @@ func (p *parcheCoons) superficie(u, v float64) (float64, float64) {
 	return coord(0), coord(1)
 }
 
-// colorEn interpola bilinealmente los cuatro colores de las esquinas.
+// colorEn interpola bilinealmente los cuatro colores de las esquinas, o el
+// parámetro escalar t cuando el sombreado lleva /Function (§8.7.4.5.7).
 func (p *parcheCoons) colorEn(u, v float64) string {
+	if p.fn != nil && p.ec != nil {
+		arriba := p.t[0]*(1-v) + p.t[1]*v
+		abajo := p.t[3]*(1-v) + p.t[2]*v
+		t := arriba*(1-u) + abajo*u
+		return p.ec.css(p.fn.evaluar(t))
+	}
 	arriba := mezclarPeso(p.colores[0], p.colores[1], v)
 	abajo := mezclarPeso(p.colores[3], p.colores[2], v)
 	return mezclarPeso(arriba, abajo, u)

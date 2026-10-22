@@ -246,6 +246,14 @@ func (s *Service) FinalizeUpload(ctx context.Context, handle string) (domain.Fil
 	if h.Tenant != t.Slug {
 		return domain.File{}, domain.ErrPermission
 	}
+	// Aislamiento por propietaria dentro de la organización: el handle pertenece a
+	// quien lo solicitó y no puede finalizarlo otra persona.
+	if caller := store.OwnerFrom(ctx); caller != "" && h.Owner != "" && caller != h.Owner {
+		return domain.File{}, domain.ErrPermission
+	}
+	if store.OwnerFrom(ctx) == "" && h.Owner != "" {
+		ctx = store.WithOwner(ctx, h.Owner)
+	}
 	if time.Now().Unix() > h.Expires {
 		return domain.File{}, ErrPresignHandleInvalid
 	}

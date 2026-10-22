@@ -112,10 +112,19 @@ func importar(filename string, data []byte, comments bool, locale string) (*Impo
 		content, err = caberEnElDocumento(content)
 	}
 	recortado := false
-	if errors.Is(err, ErrDemasiadoGrande) && f == fmtXlsx {
-		// Un libro que no cabe se abre recortado, como copia aparte (recortarLibro).
-		kind, imported = KindSpreadsheet, nil
-		content, hashes, recortado, err = recortarLibro(f, data, locale)
+	if errors.Is(err, ErrDemasiadoGrande) {
+		switch f { //nolint:exhaustive // solo los formatos de paquete que se recortan como copia aparte
+		case fmtXlsx, fmtOds:
+			// Un libro que no cabe se abre recortado, como copia aparte (recortarLibro).
+			kind, imported = KindSpreadsheet, nil
+			content, hashes, recortado, err = recortarLibro(f, data, locale)
+		case fmtDocx:
+			kind, imported = KindDocument, nil
+			content, recortado, err = recortarDocx(content, locale)
+		case fmtPptx:
+			kind, imported = KindPresentation, nil
+			content, recortado, err = recortarPptx(content, locale)
+		}
 	}
 	if err != nil {
 		return nil, err

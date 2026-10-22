@@ -34,6 +34,61 @@ type Pendiente struct {
 	Huella string
 }
 
+// ExcluidaDelLoteIA dice si la organización de la transacción ha pedido quedar
+// fuera del lote automático de IA. Sin fila en `org_settings` es false.
+func (s *Store) ExcluidaDelLoteIA(ctx context.Context) (bool, error) {
+	var excluida bool
+	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+		tenant, err := tenantDe(ctx)
+		if err != nil {
+			return err
+		}
+		err = tx.QueryRow(ctx, `
+			SELECT exclude_ai_batch FROM org_settings WHERE tenant = $1`, tenant).Scan(&excluida)
+		if errors.Is(err, pgx.ErrNoRows) {
+			excluida = false
+			return nil
+		}
+		return err
+	})
+	return excluida, err
+}
+
+// FijarExcluidaDelLoteIA activa o desactiva la exclusión de la organización en
+// el lote automático de IA.
+func (s *Store) FijarExcluidaDelLoteIA(ctx context.Context, quien string, excluida bool) error {
+	return s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+		tenant, err := tenantDe(ctx)
+		if err != nil {
+			return err
+		}
+		_, err = tx.Exec(ctx, `
+			INSERT INTO org_settings (tenant, exclude_ai_batch, updated_by, updated_at)
+			VALUES ($1, $2, $3, now())
+			ON CONFLICT (tenant) DO UPDATE SET
+			    exclude_ai_batch = EXCLUDED.exclude_ai_batch,
+			    updated_by       = EXCLUDED.updated_by,
+			    updated_at       = now()`, tenant, excluida, quien)
+		return err
+	})
+}
+
+// TenantExcluidoDelLoteIA comprueba en una transacción de mantenimiento si una
+// organización se ha excluido del lote mientras el lote está en marcha.
+func (s *Store) TenantExcluidoDelLoteIA(ctx context.Context, tenant string) (bool, error) {
+	var excluida bool
+	err := s.pool.InMaintenanceTx(ctx, func(tx pgx.Tx) error {
+		err := tx.QueryRow(ctx, `
+			SELECT exclude_ai_batch FROM org_settings WHERE tenant = $1`, tenant).Scan(&excluida)
+		if errors.Is(err, pgx.ErrNoRows) {
+			excluida = false
+			return nil
+		}
+		return err
+	})
+	return excluida, err
+}
+
 // PendientesDeVector lista lo que falta por vectorizar, de TODAS las
 // organizaciones.
 //
@@ -58,6 +113,10 @@ func (s *Store) PendientesDeVector(ctx context.Context, modelo string, limite in
 			    ON e.tenant = a.tenant AND e.asset_id = a.id AND e.owner_sub = a.owner_sub
 			 WHERE a.deleted_at IS NULL
 			   AND (a.embedding IS NULL OR a.embedding_model <> $1)
+			   AND NOT EXISTS (
+			       SELECT 1 FROM org_settings os
+			        WHERE os.tenant = a.tenant AND os.exclude_ai_batch
+			   )
 			 ORDER BY a.uploaded_at DESC
 			 LIMIT $2`, modelo, limite)
 		if err != nil {
@@ -97,8 +156,12 @@ func (s *Store) GuardarVector(ctx context.Context, id uuid.UUID, modelo string, 
 	}
 	return s.pool.InMaintenanceTx(ctx, func(tx pgx.Tx) error {
 		tag, err := tx.Exec(ctx, `
-			UPDATE assets SET embedding = $2, embedding_model = $3, updated_at = now()
-			WHERE id = $1 AND deleted_at IS NULL`, id, unitario, modelo)
+			UPDATE assets a SET embedding = $2, embedding_model = $3, updated_at = now()
+			WHERE a.id = $1 AND a.deleted_at IS NULL
+			  AND NOT EXISTS (
+			      SELECT 1 FROM org_settings os
+			       WHERE os.tenant = a.tenant AND os.exclude_ai_batch
+			  )`, id, unitario, modelo)
 		if err != nil {
 			return err
 		}

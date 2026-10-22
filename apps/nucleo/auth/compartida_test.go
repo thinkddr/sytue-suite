@@ -42,6 +42,7 @@ func TestCompartidaRenuevaConLoGuardado(t *testing.T) {
 		{"nadie lo ha tocado", Tokens{Refresh: "r1"}, nil, "r1", nil},
 		{"otra app cerró la sesión: no se resucita", Tokens{}, nil, "", ErrLoginRequired},
 		{"el llavero no se deja leer: lo de memoria", Tokens{}, errors.New("sin llavero"), "r1", nil},
+		{"broker bloqueado o perdido: nunca lo de memoria", Tokens{}, errors.Join(ErrSesionNoDisponible, errors.New("broker unavailable")), "", ErrSesionNoDisponible},
 	}
 	for _, c := range casos {
 		presentado = ""
@@ -50,6 +51,46 @@ func TestCompartidaRenuevaConLoGuardado(t *testing.T) {
 		if !errors.Is(err, c.err) || presentado != c.presentado {
 			t.Errorf("%s: presentó %q, %v; quiero %q, %v", c.nombre, presentado, err, c.presentado, c.err)
 		}
+	}
+}
+
+func TestBrokerRechazadoNoEntregaAccessAunVigenteNiReescribeSuVault(t *testing.T) {
+	aparte(t)
+	guardados, llamadasIDP := 0, 0
+	s := NewSession(Tokens{
+		Access: "synthetic-stale-access", Refresh: "synthetic-stale-refresh", Subject: "actor",
+		Expiry: time.Now().Add(Margen / 2),
+	}, Compartida(func(context.Context, Tokens) (Tokens, error) {
+		llamadasIDP++
+		return Tokens{}, nil
+	}, func() (Tokens, error) { return Tokens{}, ErrSesionNoDisponible }, nil), func(Tokens) error {
+		guardados++
+		return nil
+	})
+	if token, err := s.AccessToken(context.Background()); token != "" || !errors.Is(err, ErrSesionNoDisponible) {
+		t.Fatal("un broker perdido ha permitido reutilizar el access vigente", err)
+	}
+	if s.Subject() != "" || guardados != 0 || llamadasIDP != 0 {
+		t.Fatal("el fallo seguro conservó identidad, reescribió el vault o renovó un refresh antiguo")
+	}
+}
+
+func TestBrokerRechazaGuardadoTardioSinAdoptarAccessNuevo(t *testing.T) {
+	aparte(t)
+	veces := 0
+	guardar := func(Tokens) error { veces++; return ErrSesionNoDisponible }
+	renovar := Compartida(func(context.Context, Tokens) (Tokens, error) {
+		return Tokens{Access: "synthetic-new-access", Refresh: "synthetic-new-refresh", Expiry: time.Now().Add(time.Hour)}, nil
+	}, func() (Tokens, error) { return Tokens{Refresh: "synthetic-old-refresh", Subject: "actor"}, nil }, guardar)
+	s := NewSession(Tokens{Refresh: "synthetic-old-refresh", Subject: "actor"}, renovar, guardar)
+	if token, err := s.AccessToken(context.Background()); token != "" || !errors.Is(err, ErrSesionNoDisponible) {
+		t.Fatal("un guardado rechazado ha permitido adoptar el resultado tardío", err)
+	}
+	if s.Subject() != "" || veces != 1 {
+		t.Fatal("el rechazo conservó identidad o se reintentó fuera del cerrojo")
+	}
+	if err := s.AdoptarCon(context.Background(), Tokens{Refresh: "synthetic-interactive-refresh", Subject: "other"}); !errors.Is(err, ErrSesionNoDisponible) || s.Subject() != "" {
+		t.Fatal("login informó éxito después del rechazo seguro del broker", err)
 	}
 }
 

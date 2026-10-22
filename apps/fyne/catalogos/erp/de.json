@@ -493,6 +493,8 @@
   "vf.confirmBody": "Ab jetzt wird jede bestätigte Rechnung an die spanische Steuerbehörde übermittelt und kann nicht mehr geändert oder gelöscht werden: Fehler werden mit einer Rechnungskorrektur behoben. Einmal aktiviert, bleibt es für den Rest des Jahres aktiv.",
   "vf.confirmTitle": "VERI*FACTU aktivieren?",
   "vf.declaration": "Konformitätserklärung",
+  "vf.error.certificateTaxIdMismatch": "Die Steuernummer (NIF) im Zertifikat stimmt nicht mit der Steuernummer der Organisation überein.",
+  "vf.error.invalidCertificate": "Das Zertifikat oder der private Schlüssel ist kein gültiges qualifiziertes Zertifikat mit spanischer Steuernummer (NIF).",
   "vf.export": "Datensätze herunterladen",
   "vf.fixHint": "Korrigieren Sie die Rechnungs- oder Kundendaten und senden Sie sie erneut.",
   "vf.intro": "Ab 2027 muss jede Rechnung bei der Ausstellung bei der spanischen Steuerbehörde registriert werden. Mit VERI*FACTU erledigt Sytue das beim Bestätigen jeder Rechnung und fügt den QR-Code hinzu, mit dem Ihr Kunde sie prüfen kann.",

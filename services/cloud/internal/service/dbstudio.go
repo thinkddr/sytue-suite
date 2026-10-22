@@ -516,6 +516,12 @@ func parseQualifiedTable(table string) (string, string, error) {
 // que cubre también la transmisión, así que un `SELECT *` de una tabla enorme se
 // corta en 8 s server-side. Si algún día hiciera falta cortar antes: enviar un
 // CancelRequest a la conexión en vez de cerrar.
+// dbStudioMaxCellBytes acota el tamaño en bytes crudos de una celda individual
+// en DB Studio (64 KiB) antes de llamar a rows.Values(), evitando que una sola
+// fila con un valor enorme (p. ej. repeat('a', 500000000)) agote la memoria del
+// proceso de cloud-api antes de que el acumulador por fila entre en juego.
+const dbStudioMaxCellBytes = 64 * 1024
+
 func collectRows(rows pgx.Rows, maxRows int) ([]string, []map[string]any, error) {
 	defer rows.Close()
 	fds := rows.FieldDescriptions()
@@ -526,24 +532,61 @@ func collectRows(rows pgx.Rows, maxRows int) ([]string, []map[string]any, error)
 	out := make([]map[string]any, 0, 32)
 	size := 0
 	for len(out) < maxRows && size < dbStudioMaxBytes && rows.Next() {
-		vals, err := rows.Values()
+		rec, rowBytes, err := decodeRowBounded(rows.RawValues(), rows.Values, cols)
 		if err != nil {
 			return nil, nil, err
 		}
-		rec := make(map[string]any, len(cols))
-		for i, v := range vals {
-			if i >= len(cols) {
-				break
-			}
-			rec[cols[i]] = jsonSafeValue(v)
-			size += approxValueSize(v)
-		}
+		size += rowBytes
 		out = append(out, rec)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, nil, err
 	}
 	return cols, out, nil
+}
+
+// decodeRowBounded inspecciona los bytes crudos de la fila antes de llamar a
+// decode() (rows.Values()) para acotar el tamaño de cada celda y de la fila.
+func decodeRowBounded(raw [][]byte, decode func() ([]any, error), cols []string) (map[string]any, int, error) {
+	hasOversized := false
+	wireBytes := 0
+	for _, b := range raw {
+		wireBytes += len(b)
+		if len(b) > dbStudioMaxCellBytes {
+			hasOversized = true
+		}
+	}
+	rec := make(map[string]any, len(cols))
+	if hasOversized {
+		for i, col := range cols {
+			if i >= len(raw) || raw[i] == nil {
+				rec[col] = nil
+				continue
+			}
+			if len(raw[i]) > dbStudioMaxCellBytes {
+				rec[col] = fmt.Sprintf("[truncado: %d bytes]", len(raw[i]))
+				continue
+			}
+			rec[col] = jsonSafeValue(raw[i])
+		}
+		return rec, wireBytes, nil
+	}
+	vals, err := decode()
+	if err != nil {
+		return nil, 0, err
+	}
+	size := 0
+	for i, v := range vals {
+		if i >= len(cols) {
+			break
+		}
+		rec[cols[i]] = jsonSafeValue(v)
+		size += approxValueSize(v)
+	}
+	if wireBytes > size {
+		size = wireBytes
+	}
+	return rec, size, nil
 }
 
 // jsonSafeValue normaliza los valores que pgx decodifica a formas que el

@@ -98,8 +98,13 @@ func (h *Handlers) admitCloudHuman(w http.ResponseWriter, r *http.Request) bool 
 		httpx.Fail(w, r, httpx.ErrUnauthorized)
 		return false
 	}
-	if _, ok := claims.TenantOrEmpty(); !ok {
+	tenantSlug, ok := claims.TenantOrEmpty()
+	if !ok {
 		httpx.Fail(w, r, httpx.ErrForbidden.WithMessage("An active organisation is required."))
+		return false
+	}
+	if !h.cfg.TenantAllowed(tenantSlug.Slug) {
+		httpx.Fail(w, r, httpx.ErrForbidden.WithMessage("Sytue Cloud is currently restricted to internal workloads."))
 		return false
 	}
 	role, fromMembership, err := h.svc.EffectiveRole(r.Context(), claims.Subject)
@@ -159,6 +164,10 @@ func (h *Handlers) authenticateToken(w http.ResponseWriter, r *http.Request, nex
 	if err != nil || rt.Scope == domain.ScopeHook {
 		// Un token hook solo vale en /hooks/deploy/{token} (CLOUD-17).
 		httpx.Fail(w, r, httpx.ErrUnauthorized.WithMessage("Invalid or expired API token."))
+		return
+	}
+	if !h.cfg.TenantAllowed(rt.Tenant) {
+		httpx.Fail(w, r, httpx.ErrForbidden.WithMessage("Sytue Cloud is currently restricted to internal workloads."))
 		return
 	}
 	// Suelo global: un token read no muta nada (métodos no seguros → 403).

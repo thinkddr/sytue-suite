@@ -277,4 +277,7 @@ export const pl: AppCatalog<typeof en> = {
   'memories.years': '{count} lat temu',
   'memories.oneYear': 'Rok temu',
   'memories.hide': 'Ukryj',
+  'aiBatch.excludeOrg': 'Wyklucz organizację z automatycznej partii Sytue AI',
+  'aiBatch.excludedHint':
+    'Organizacja jest wykluczona z automatycznej partii Sytue AI. Nowe zdjęcia nie są przetwarzane w tle pod kątem propozycji ani podobieństw.',
 };

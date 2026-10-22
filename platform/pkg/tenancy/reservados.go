@@ -58,8 +58,8 @@ var reservados = map[string]struct{}{
 	// y falla si una app estrena una página que aquí no esté.
 	"abrir": {}, "access": {}, "account": {}, "actividad": {}, "album": {}, "albums": {},
 	"audit": {}, "bienvenida": {}, "buscar": {}, "channels": {}, "compliance": {},
-	"conexiones": {}, "datos": {}, "descargas": {}, "devices": {}, "dispositivos": {},
-	"duplicates": {}, "edit": {}, "editor-de-documentos": {}, "erp": {}, "events": {},
+	"conexiones": {}, "confirm-alert": {}, "datos": {}, "descargas": {}, "devices": {},
+	"dispositivos": {}, "duplicates": {}, "edit": {}, "editor-de-documentos": {}, "erp": {}, "events": {},
 	"favorites": {}, "files": {}, "governance": {}, "groups": {}, "messages": {},
 	"migrations": {}, "nearby": {}, "notebooks": {}, "notificaciones": {},
 	"open-from-drive": {}, "p": {}, "pdf": {}, "pip": {}, "platform": {},

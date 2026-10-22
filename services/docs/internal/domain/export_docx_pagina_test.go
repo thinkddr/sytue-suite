@@ -131,3 +131,35 @@ func declaracionesDe(h string) map[string]int {
 	}
 	return out
 }
+
+// La base de carácter de un párrafo que todos sus tramos pisan no se escribe muerta en <p>,
+// los espacios duros (\u00a0), ideográficos (\u3000) o de sangría con formato no se tiran al
+// exportar, y un salto de línea borrado con control de cambios (<del data-track><br></del>)
+// vuelve íntegro tras exportar y reimportar.
+func TestDocxIdaYVueltaSinPerdidasDeBaseNiEspacios(t *testing.T) {
+	styles := `<w:styles ` + wNS + `><w:docDefaults><w:rPrDefault><w:rPr>` +
+		`<w:rFonts w:ascii="Times New Roman"/><w:color w:val="5F5F5F"/><w:sz w:val="20"/>` +
+		`</w:rPr></w:rPrDefault></w:docDefaults></w:styles>`
+	cuerpo := `<w:p>` +
+		`<w:r><w:rPr><w:rFonts w:ascii="Georgia"/><w:color w:val="112233"/><w:sz w:val="24"/></w:rPr><w:t>Uno </w:t></w:r>` +
+		`<w:r><w:rPr><w:rFonts w:ascii="Arial"/><w:color w:val="445566"/><w:sz w:val="22"/></w:rPr><w:t>Dos</w:t></w:r>` +
+		`</w:p>` +
+		`<w:p><w:r><w:rPr><w:color w:val="0000FF"/></w:rPr><w:t xml:space="preserve"> </w:t></w:r><w:r><w:rPr><w:color w:val="112233"/></w:rPr><w:t>código</w:t></w:r></w:p>` +
+		`<w:p><w:r><w:rPr><w:color w:val="333333"/></w:rPr><w:t>` + "\u00a0" + `</w:t></w:r></w:p>` +
+		`<w:p><w:r><w:rPr><w:color w:val="000000"/></w:rPr><w:t>` + "\u3000\u3000" + `</w:t></w:r><w:r><w:rPr><w:color w:val="000000"/><w:b/></w:rPr><w:t>默示</w:t></w:r></w:p>` +
+		`<w:p><w:del w:id="1" w:author="Ana" w:date="2026-05-01T10:00:00Z"><w:r><w:br/></w:r></w:del></w:p>` +
+		`<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/></w:sectPr>`
+	ida := importarDocx(t, cuerpo, map[string]string{"word/styles.xml": styles})
+	noTiene(t, strings.Split(ida, "</p>")[0], "Times New Roman", "#5F5F5F", "10pt")
+	raw, _, _, err := Export(KindDocument, "", stateWithContent(t, "doc:html", ida), FormatOOXML)
+	if err != nil {
+		t.Fatalf("exportar: %v", err)
+	}
+	res, err := Import("vuelta.docx", raw)
+	if err != nil {
+		t.Fatalf("reimportar: %v", err)
+	}
+	if res.Content != ida {
+		t.Errorf("ida y vuelta difieren:\nida:    %s\nvuelta: %s", ida, res.Content)
+	}
+}

@@ -463,3 +463,44 @@ func TestEditarConUnTjVacioDelante(t *testing.T) {
 		t.Fatalf("fragmentos = %+v, quería «hola todos»", frags)
 	}
 }
+
+// Un paréntesis escapado «\(» dentro del operando hacía que el retroceso byte a
+// byte parara en él en vez de llegar al «(» de apertura, dejando un prefijo sin
+// cerrar delante de la sustitución (24 BOE y issue14497 de pdf.js).
+func TestEditarCadenaConParentesisEscapado(t *testing.T) {
+	d, err := LeerPDF(pdfConContenido(t, `BT /F1 12 Tf 10 50 Td (BOE \(2026) Tj ET`, helvetica, objHelvetica))
+	if err != nil {
+		t.Fatal(err)
+	}
+	salida, err := EditarTextoPDF(d, []CambioDeTexto{{Pagina: 0, ID: 0, Nuevo: "BOE (2025"}})
+	if err != nil {
+		t.Fatalf("EditarTextoPDF: %v", err)
+	}
+	if bytes.Contains(salida, []byte("(BOE \\")) {
+		t.Fatalf("quedó el prefijo sin cerrar del operando antiguo en el flujo")
+	}
+	if frags := fragmentosDeSalida(t, salida); len(frags) != 1 || frags[0].Texto != "BOE (2025" {
+		t.Fatalf("fragmentos = %+v, quería «BOE (2025»", frags)
+	}
+}
+
+// Una fuente compuesta con CMap Unicode predefinida (/UniJIS-UCS2-H) o con
+// /ToUnicode /Identity-H se decodificaba al leer pero codificar la rechazaba con
+// ErrLetrasDesconocidas porque solo miraba el mapa explícito de /ToUnicode.
+func TestEditarEnFuenteCIDConCMapUnicode(t *testing.T) {
+	fuente := []string{
+		`<< /Type /Font /Subtype /Type0 /BaseFont /P /Encoding /UniJIS-UCS2-H /DescendantFonts [6 0 R] >>`,
+		`<< /Type /Font /Subtype /CIDFontType2 /BaseFont /P /CIDSystemInfo << /Registry (Adobe) /Ordering (Japan1) /Supplement 0 >> /DW 500 >>`,
+	}
+	d, err := LeerPDF(pdfConContenido(t, `BT /F1 12 Tf 10 50 Td <0048006F006C0061> Tj ET`, helvetica, fuente...))
+	if err != nil {
+		t.Fatal(err)
+	}
+	salida, err := EditarTextoPDF(d, []CambioDeTexto{{Pagina: 0, ID: 0, Nuevo: "aloH"}})
+	if err != nil {
+		t.Fatalf("EditarTextoPDF: %v", err)
+	}
+	if frags := fragmentosDeSalida(t, salida); len(frags) != 1 || frags[0].Texto != "aloH" {
+		t.Fatalf("fragmentos = %+v, quería «aloH»", frags)
+	}
+}

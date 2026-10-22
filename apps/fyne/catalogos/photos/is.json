@@ -1,4 +1,6 @@
 {
+  "aiBatch.excludeOrg": "Undanþiggja stofnunina sjálfvirkri Sytue AI-keyrslu",
+  "aiBatch.excludedHint": "Stofnunin er undanþegin sjálfvirkri Sytue AI-keyrslu. Nýjar myndir eru ekki unnar í bakgrunni fyrir tillögur eða líkindi.",
   "album.linkCopied": "Tengill afritaður",
   "album.newLink": "Nýr tengill",
   "album.newLinkConfirm": "Búa til nýjan tengil? Núverandi tengill hættir að virka fyrir þá sem þegar hafa hann.",

@@ -1,0 +1,116 @@
+{
+  "protocol_version": 1,
+  "runtime_enabled": false,
+  "verified_play_tag": "v3.13.4",
+  "source_runs": [
+    39448132952,
+    39449212641
+  ],
+  "apps": [
+    {
+      "package_name": "eu.sytue.bases",
+      "version_code": 3013004,
+      "certificate_sha256": [
+        "7150c62ac3ec5f3d24f7a9585aa620bfae68c3c89f1485154951a33834042de8"
+      ]
+    },
+    {
+      "package_name": "eu.sytue.calcus",
+      "version_code": 3013004,
+      "certificate_sha256": [
+        "e7557d97b642ac939f26d63115db25b8e3c92af56d16791131c453ba451fdbc4"
+      ]
+    },
+    {
+      "package_name": "eu.sytue.calendar",
+      "version_code": 3013004,
+      "certificate_sha256": [
+        "e099beba6c5067fef9280b4cf24a06078fcbec4f58e2a2b9393b9437bd33d023"
+      ]
+    },
+    {
+      "package_name": "eu.sytue.cast",
+      "version_code": 3013004,
+      "certificate_sha256": [
+        "35c27dc7964cf8e249fb3063a8a073ee62274b26047e12c0c52cee40f0613f03"
+      ]
+    },
+    {
+      "package_name": "eu.sytue.certipdf",
+      "version_code": 3013004,
+      "certificate_sha256": [
+        "d6c2cda660d632fa2f3fa940deecda3e67872f2f5f38f3e7fa379f8c3a309121"
+      ]
+    },
+    {
+      "package_name": "eu.sytue.contacts",
+      "version_code": 3013004,
+      "certificate_sha256": [
+        "f61ca5adaf932644da1531dd45bf634ec851baf6a4ad267d6a2a2a84dab7a0cd"
+      ]
+    },
+    {
+      "package_name": "eu.sytue.diapos",
+      "version_code": 3013004,
+      "certificate_sha256": [
+        "18552089cbd676cdc7bda9974b525e4226f4b3b0073c4d4894583ecbe32ac409"
+      ]
+    },
+    {
+      "package_name": "eu.sytue.drive",
+      "version_code": 3013004,
+      "certificate_sha256": [
+        "975aed7b7a11560198e9ba275f65f8ff1b43e11bf29034b3fe223ffeca3c7b67"
+      ]
+    },
+    {
+      "package_name": "eu.sytue.erp",
+      "version_code": 3013004,
+      "certificate_sha256": [
+        "ef599caa9bf84f235d19151e05c8963fc38f8b5fa62803fc64da08a011a46ec7"
+      ]
+    },
+    {
+      "package_name": "eu.sytue.one",
+      "version_code": 3013004,
+      "certificate_sha256": [
+        "efbdc492ef688ad2e8a36e5707f7ace41dcd86fa514172cd5fbf25be28c2cf02"
+      ]
+    },
+    {
+      "package_name": "eu.sytue.mail",
+      "version_code": 3013004,
+      "certificate_sha256": [
+        "d97c2fb803bd142e7819e9d0d9fd0c6ca47f14bfe392f37717cae57d3c03a5dd"
+      ]
+    },
+    {
+      "package_name": "eu.sytue.notes",
+      "version_code": 3013004,
+      "certificate_sha256": [
+        "ce2f82e5754c7e2feb89a5379dbed9cde9d9daf804817621055fdbbf458873bd"
+      ]
+    },
+    {
+      "package_name": "eu.sytue.photos",
+      "version_code": 3013004,
+      "certificate_sha256": [
+        "a998f201a7ca4aac0342afcf996ca164c9ea6eb90ff16a50b17ae69c37d36fbc"
+      ]
+    },
+    {
+      "package_name": "eu.sytue.rooms",
+      "version_code": 3013004,
+      "certificate_sha256": [
+        "dd8f370c324f7de9c4790e9d0e05cc108a9a83cfe14e35a427ce72b2b26523f8"
+      ]
+    },
+    {
+      "package_name": "eu.sytue.docus",
+      "version_code": 3013004,
+      "certificate_sha256": [
+        "2d4ebe12a0587db1505ab4fa66404dd33e0117024bdbca32d0cfc69b1601ea7c"
+      ]
+    }
+  ]
+}

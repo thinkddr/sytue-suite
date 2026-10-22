@@ -1,4 +1,6 @@
 {
+  "aiBatch.excludeOrg": "Eskludi l-organizzazzjoni mill-lott awtomatiku ta' Sytue AI",
+  "aiBatch.excludedHint": "L-organizzazzjoni hija eskluża mill-lott awtomatiku ta' Sytue AI. Ritratti ġodda ma jiġux ipproċessati fl-isfond għal suġġerimenti jew xebh.",
   "album.linkCopied": "Link ikkupjat",
   "album.newLink": "Link ġdida",
   "album.newLinkConfirm": "Toħloq link ġdida? Il-link attwali tieqaf taħdem għal min diġà għandu.",

@@ -383,4 +383,9 @@ export const lv: Catalog = {
   'linkedServices.writeUnknown':
     'Pakalpojumu sniedzējs neapstiprināja saglabāšanu. Pirms mēģināt vēlreiz, atsvaidziniet un pārbaudiet.',
   'linkedServices.unavailable': 'Savienojums ar šo pakalpojumu sniedzēju nav pieejams jūsu kontam.',
+  'localFile.confirmUpload.title': 'Atvērt failu no šīs ierīces',
+  'localFile.confirmUpload.body':
+    'Lai atvērtu “{name}”, fails tiks augšupielādēts jūsu Sytue One kontā.',
+  'localFile.confirmUpload.remember': 'Atcerēties manu izvēli šajā ierīcē',
+  'localFile.confirmUpload.confirm': 'Augšupielādēt un atvērt',
 };

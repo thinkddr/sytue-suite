@@ -950,6 +950,17 @@ export const ga: AppCatalog<typeof en> = {
   'monitoring.alerts.scope.org': 'eagraíocht',
   'monitoring.alerts.scope.project': 'tionscadal',
   'monitoring.alerts.disabled': 'díchumasaithe',
+  'monitoring.alerts.unconfirmed': 'ag fanacht le deimhniú',
+  'monitoring.alerts.created.mailtoDesc':
+    'Chuireamar nasc deimhnithe chuig an seoladh sin. Tiocfaidh na foláirimh chomh luath agus a dheimhnítear é.',
+  'monitoring.alerts.confirm.title': 'Deimhnigh foláirimh ríomhphoist',
+  'monitoring.alerts.confirm.desc':
+    'Deimhnigh gur cheart don seoladh seo foláirimh teagmhas a fháil ó Sytue DevX.',
+  'monitoring.alerts.confirm.submit': 'Deimhnigh an seoladh',
+  'monitoring.alerts.confirm.done':
+    'Seoladh deimhnithe. Gheobhaidh tú foláirimh teagmhas ag an seoladh ríomhphoist seo anois.',
+  'monitoring.alerts.confirm.invalid':
+    'Níl an nasc deimhnithe seo bailí nó baineadh an foláireamh cheana féin.',
   'monitoring.alerts.delete': 'Scrios an foláireamh {event}',
   'members.subtitle':
     'Na daoine a bhfuil rochtain acu ar an eagraíocht. Is suíochán amháin den tsraith gach ball.',

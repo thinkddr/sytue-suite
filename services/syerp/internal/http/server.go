@@ -159,6 +159,7 @@ func NewRouter(d Deps) http.Handler {
 		// VERI*FACTU: el estado, activarlo (configuración, solo administración), la
 		// declaración responsable y la exportación de todos los registros.
 		api.With(h.exigir("facturacion", permisos.Lectura)).Get("/verifactu", h.Verifactu)
+		api.With(d.Verifier.RequireRole("owner", "admin")).Put("/verifactu/certificado", h.GuardarCertificadoVerifactu)
 		api.With(d.Verifier.RequireRole("owner", "admin")).Post("/verifactu/activar", h.ActivarVerifactu)
 		api.Get("/verifactu/declaracion", h.DeclaracionVerifactu)
 		api.With(h.exigir("facturacion", permisos.Lectura)).Get("/verifactu/exportar", h.ExportarVerifactu)

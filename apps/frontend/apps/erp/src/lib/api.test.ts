@@ -5,13 +5,28 @@
 import { describe, expect, it } from 'bun:test';
 import { ErrorApi, esSinPermiso, mensajeDeError } from './api.js';
 
-const t = (clave: 'error.generic' | 'error.sinPermiso'): string => `«${clave}»`;
+const t = (
+  clave:
+    | 'error.generic'
+    | 'error.sinPermiso'
+    | 'vf.error.invalidCertificate'
+    | 'vf.error.certificateTaxIdMismatch',
+): string => `«${clave}»`;
 
 describe('mensajeDeError', () => {
   it('traduce el 403 sin_permiso en vez de pintar el respaldo en inglés', () => {
     const err = new ErrorApi('You do not have access to this module.', 403, {}, 'sin_permiso');
     expect(esSinPermiso(err)).toBe(true);
     expect(mensajeDeError(err, t)).toBe('«error.sinPermiso»');
+  });
+
+  it('traduce los errores de certificado de VERI*FACTU', () => {
+    expect(mensajeDeError(new ErrorApi('invalid', 422, {}, 'certificado_invalido'), t)).toBe(
+      '«vf.error.invalidCertificate»',
+    );
+    expect(
+      mensajeDeError(new ErrorApi('mismatch', 422, {}, 'certificado_nif_no_coincide'), t),
+    ).toBe('«vf.error.certificateTaxIdMismatch»');
   });
 
   it('deja el resto como estaba', () => {

@@ -51,6 +51,10 @@ deploy: ## Ejecuta el asistente interactivo paso a paso de despliegue (./sytue-d
 
 deploy-wizard: deploy ## Alias de `make deploy`
 
+.PHONY: deploy-integrations
+deploy-integrations: ## Asistente de integraciones y conectores con terceros (./sytue-deploy --integrations)
+	@$(ROOT_DIR)/sytue-deploy --integrations
+
 # =============================================================================
 # Desarrollo LOCAL (Docker Compose en deploy/compose)
 # =============================================================================

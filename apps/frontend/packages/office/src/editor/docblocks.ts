@@ -303,7 +303,7 @@ const CHART_H = 300;
 const parseChartCell = (raw: string): number | string => {
   const t = raw.trim();
   if (t === '' || /[a-zA-Z]/.test(t)) return t;
-  const s = (t.includes(',') ? t.replace(/\./g, '').replace(',', '.') : t).replace('%', '');
+  const s = (t.includes(',') ? t.replace(/\./g, '').replace(',', '.') : t).replace(/%/g, '');
   const n = Number(s);
   return Number.isFinite(n) ? n : t;
 };

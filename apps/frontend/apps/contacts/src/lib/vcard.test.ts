@@ -1,6 +1,6 @@
 /** Chequeo de buildVcard: usa la proyección nueva pero conserva los campos no proyectados de la base. */
 import { expect, test } from 'bun:test';
-import { buildVcard, preservedLines, parseVcardDetails } from './vcard.js';
+import { buildVcard, newUid, preservedLines, parseVcardDetails } from './vcard.js';
 
 const BASE =
   [
@@ -20,6 +20,10 @@ const BASE =
     'REV:20200101T000000Z',
     'END:VCARD',
   ].join('\r\n') + '\r\n';
+
+test('newUid genera un identificador aleatorio UUID', () => {
+  expect(newUid()).toMatch(/^[0-9a-f-]{36}@sytue\.eu$/i);
+});
 
 test('preservedLines: conserva no proyectadas (BDAY/NICKNAME/ADR/X-*), descarta las gestionadas', () => {
   expect(preservedLines(BASE)).toEqual([

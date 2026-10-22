@@ -54,7 +54,9 @@ test('redactar con adjunto → enviar → leer y descargar el adjunto', async ({
   await fila.click();
 
   // --- El adjunto aparece en el lector ---
-  const enlaceAdjunto = page.getByRole('link', { name: new RegExp(nombreAdjunto.replace(/[.\-]/g, '\\$&')) });
+  const enlaceAdjunto = page.getByRole('link', {
+    name: new RegExp(nombreAdjunto.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
+  });
   await expect(enlaceAdjunto).toBeVisible({ timeout: 20_000 });
 
   // --- Descargar y verificar el contenido ---

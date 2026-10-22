@@ -186,7 +186,7 @@ test('los botones RELLENOS llevan la tinta que pone el relleno del glifo en curr
   // de peligro (en oscuro `on-primary` es casi negro y sobre el rojo no contrasta).
   const tintas = ['text-[var(--sytue-on-primary)]', 'text-white'];
   for (const tinta of tintas) {
-    expect(selector).toContain('.' + tinta.replace(/[[\]()]/g, '\\$&'));
+    expect(selector).toContain('.' + tinta.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
   }
 
   const clases = (variant: 'primary' | 'secondary' | 'ghost' | 'danger'): string[] =>

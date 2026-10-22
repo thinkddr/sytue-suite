@@ -320,6 +320,6 @@ export function parseVcardDetails(vcard: string): ContactDetails {
 
 /** Genera un UID estable para un contacto nuevo. */
 export function newUid(): string {
-  const rand = globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2);
+  const rand = globalThis.crypto.randomUUID();
   return `${rand}@sytue.eu`;
 }

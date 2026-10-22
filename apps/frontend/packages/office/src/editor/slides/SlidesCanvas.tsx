@@ -999,7 +999,7 @@ export function parseChartCell(raw: string): number | string {
   const t = raw.trim();
   if (t === '' || /[a-zA-Z]/.test(t)) return t; // vacío o con letras: texto tal cual
   // Con coma es formato es-ES (coma decimal, punto de millar); si no, punto decimal.
-  const s = (t.includes(',') ? t.replace(/\./g, '').replace(',', '.') : t).replace('%', '');
+  const s = (t.includes(',') ? t.replace(/\./g, '').replace(',', '.') : t).replace(/%/g, '');
   const n = Number(s);
   return Number.isFinite(n) ? n : t;
 }

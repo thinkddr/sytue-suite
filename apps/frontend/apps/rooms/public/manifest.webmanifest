@@ -1,0 +1,19 @@
+{
+  "name": "Sytue Rooms",
+  "short_name": "Rooms",
+  "description": "Canales, mensajes y videollamadas soberanos de la suite Sytue One.",
+  "id": "/",
+  "start_url": ".",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "lang": "es",
+  "dir": "ltr",
+  "categories": ["business", "productivity", "social"],
+  "theme_color": "#ffffff",
+  "background_color": "#f8f5f3",
+  "icons": [
+    { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icon-maskable.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}

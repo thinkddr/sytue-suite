@@ -1,0 +1,561 @@
+/**
+ * Sytue One — capa de tema Tailwind v4.
+ *
+ * Punto de entrada CSS unico de la suite. Importa los tokens de marca
+ * (branding/tokens/colors.css, fuente de verdad) y los expone a Tailwind v4
+ * via @theme, de modo que las utilidades (bg-*, text-*, rounded-*, etc.) usen
+ * SIEMPRE variables de rol Sytue — nunca HEX crudos. Color elegible.
+ *
+ * Uso en una app/paquete:
+ *   @import "tailwindcss";
+ *   @import "@sytue/config/theme.css";
+ *
+ * Modo oscuro: branding/tokens/colors.css reasigna los roles con
+ * [data-theme="dark"] o prefers-color-scheme; aqui solo mapeamos los roles
+ * a Tailwind, asi que el modo oscuro es automatico.
+ */
+
+/* Tokens de color de marca (single source of truth en branding/). */
+@import './tokens/colors.css';
+@import './tokens/appearance.css';
+
+@theme {
+  /* ---- Tipografia (branding/tokens/typography.json) ----
+     Figtree (SIL OFL): geométrica y amable, con el espacio entre palabras de una
+     fuente de interfaz (0,25 em), cifras tabulares y todo el latín extendido de los
+     24 idiomas de alfabeto latino de la suite. No trae griego ni cirílico: esos
+     caracteres los pinta Inter, que va detrás en la pila, y en las páginas en griego
+     y búlgaro Inter pasa delante (ver abajo). Las dos las importa @sytue/ui/styles.css,
+     autoalojadas: mismo origen (CSP `font-src 'self'`) y sin terceros.
+
+     Se midieron diez candidatas con textos reales de la suite a 13-14px. Manrope, la
+     primera elegida, se descartó por el espacio entre palabras (0,20 em: «Tu fecha»
+     se leía «Tufecha»). */
+  --font-sans:
+    'Figtree Variable', 'Inter Variable', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont,
+    'Helvetica Neue', Arial, sans-serif;
+  --font-mono:
+    'JetBrains Mono', 'SFMono-Regular', ui-monospace, 'Cascadia Code', 'Roboto Mono', Menlo,
+    Consolas, monospace;
+
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1rem;
+  --text-sm: 0.8125rem;
+  --text-sm--line-height: 1.125rem;
+  --text-base: 0.875rem;
+  --text-base--line-height: 1.375rem;
+  --text-md: 1rem;
+  --text-md--line-height: 1.5rem;
+  --text-lg: 1.125rem;
+  --text-lg--line-height: 1.625rem;
+  --text-xl: 1.375rem;
+  --text-xl--line-height: 1.875rem;
+  --text-2xl: 1.75rem;
+  --text-2xl--line-height: 2.25rem;
+  --text-3xl: 2.25rem;
+  --text-3xl--line-height: 2.625rem;
+  --text-4xl: 3rem;
+  --text-4xl--line-height: 3.25rem;
+
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  /* ---- Colores de marca (escalas) ---- */
+  --color-primary-50: var(--sytue-primary-50);
+  --color-primary-100: var(--sytue-primary-100);
+  --color-primary-200: var(--sytue-primary-200);
+  --color-primary-300: var(--sytue-primary-300);
+  --color-primary-400: var(--sytue-primary-400);
+  --color-primary-500: var(--sytue-primary-500);
+  --color-primary-600: var(--sytue-primary-600);
+  --color-primary-700: var(--sytue-primary-700);
+  --color-primary-800: var(--sytue-primary-800);
+  --color-primary-900: var(--sytue-primary-900);
+  --color-primary-950: var(--sytue-primary-950);
+  --color-primary: var(--sytue-primary);
+  /* Lo que se escribe SOBRE el relleno primario (`bg-primary text-on-primary`). No es
+     «blanco»: en oscuro el primario puede ser un tono claro y su rótulo, casi negro. Sobre
+     cualquier otro relleno —peligro, un color de persona o de producto— va `text-white`. */
+  --color-on-primary: var(--sytue-on-primary);
+  --color-primary-text: var(--sytue-primary-text);
+
+  --color-accent-50: var(--sytue-accent-50);
+  --color-accent-100: var(--sytue-accent-100);
+  --color-accent-200: var(--sytue-accent-200);
+  --color-accent-300: var(--sytue-accent-300);
+  --color-accent-400: var(--sytue-accent-400);
+  --color-accent-500: var(--sytue-accent-500);
+  --color-accent-600: var(--sytue-accent-600);
+  --color-accent-700: var(--sytue-accent-700);
+  --color-accent: var(--sytue-accent);
+  --color-accent-text: var(--sytue-accent-text);
+
+  --color-violet-300: var(--sytue-violet-300);
+  --color-violet-400: var(--sytue-violet-400);
+  --color-violet-500: var(--sytue-violet-500);
+  --color-violet-600: var(--sytue-violet-600);
+  --color-violet: var(--sytue-violet);
+  --color-violet-text: var(--sytue-violet-text);
+  --color-violet-bg: var(--sytue-violet-bg);
+
+  --color-neutral-0: var(--sytue-neutral-0);
+  --color-neutral-50: var(--sytue-neutral-50);
+  --color-neutral-100: var(--sytue-neutral-100);
+  --color-neutral-150: var(--sytue-neutral-150);
+  --color-neutral-200: var(--sytue-neutral-200);
+  --color-neutral-300: var(--sytue-neutral-300);
+  --color-neutral-400: var(--sytue-neutral-400);
+  --color-neutral-500: var(--sytue-neutral-500);
+  --color-neutral-600: var(--sytue-neutral-600);
+  --color-neutral-700: var(--sytue-neutral-700);
+  --color-neutral-800: var(--sytue-neutral-800);
+  --color-neutral-900: var(--sytue-neutral-900);
+  --color-neutral-1000: var(--sytue-neutral-1000);
+
+  /* ---- Roles semanticos (mapeados a los roles de tema, modo oscuro automatico) ---- */
+  --color-bg: var(--sytue-bg);
+  --color-bg-subtle: var(--sytue-bg-subtle);
+  --color-surface: var(--sytue-surface);
+  --color-surface-raised: var(--sytue-surface-raised);
+  --color-surface-sunken: var(--sytue-surface-sunken);
+  --color-sidebar: var(--sytue-sidebar-bg);
+  --color-sidebar-fg: var(--sytue-sidebar-fg);
+  --color-sidebar-fg-muted: var(--sytue-sidebar-fg-muted);
+  /* El ítem ACTIVO del menú depende de la forma: píldora en Marco, velo en Carril
+     (`--sytue-nav-active-*`, en tokens/appearance.css). */
+  --color-sidebar-active: var(--sytue-nav-active-bg);
+  --color-sidebar-active-fg: var(--sytue-nav-active-fg);
+  --color-sidebar-hover: var(--sytue-sidebar-hover-bg);
+  --color-topbar: var(--sytue-topbar-bg);
+  --color-topbar-fg: var(--sytue-topbar-fg);
+  /* Banda de cabecera de panel: tinta. Siempre en pareja: bg-header + text-header-fg. */
+  --color-header: var(--sytue-header-bg);
+  --color-chrome-hover: var(--sytue-chrome-hover);
+  --color-chrome-active: var(--sytue-chrome-active);
+  --color-chrome-divider: var(--sytue-chrome-divider);
+  --color-chrome-border: var(--sytue-chrome-border);
+  --color-header-fg: var(--sytue-header-fg);
+  /* «Estás aquí». bg-indicator para barras y subrayados, text-indicator para iconos. */
+  --color-indicator: var(--sytue-indicator);
+  /* Cromo nombrado: bg-chrome para la barra y bg-rail para el carril de color; on-chrome
+     para lo de encima (dentro del carril se reasigna, ver tokens/appearance.css). */
+  --color-chrome: var(--sytue-chrome);
+  --color-chrome-2: var(--sytue-chrome-2);
+  --color-rail: var(--sytue-rail);
+  --color-on-chrome: var(--sytue-on-chrome);
+  --color-on-chrome-muted: var(--sytue-on-chrome-muted);
+  --color-on-chrome-warning: var(--sytue-on-chrome-warning);
+  /* Líneas por opacidad de tinta (Compass): subtle 8% separadores internos,
+     border 12% por defecto, strong 16% inputs/énfasis. */
+  --color-border-subtle: var(--sytue-border-subtle);
+  --color-border: var(--sytue-border);
+  --color-border-strong: var(--sytue-border-strong);
+  --color-text: var(--sytue-text);
+  --color-text-muted: var(--sytue-text-muted);
+  --color-text-subtle: var(--sytue-text-subtle);
+
+  --color-success: var(--sytue-success);
+  --color-success-text: var(--sytue-success-text);
+  --color-success-bg: var(--sytue-success-bg);
+  --color-warning: var(--sytue-warning);
+  --color-warning-text: var(--sytue-warning-text);
+  --color-warning-bg: var(--sytue-warning-bg);
+  --color-danger: var(--sytue-danger);
+  --color-danger-text: var(--sytue-danger-text);
+  --color-danger-bg: var(--sytue-danger-bg);
+  --color-info: var(--sytue-info);
+  --color-info-text: var(--sytue-info-text);
+  --color-info-bg: var(--sytue-info-bg);
+
+  /* Color de producto (tile del app switcher / etiquetas). Hoy el tile se
+     tematiza vía el propio SVG; se exponen por si alguna app tinta por CSS. */
+  --color-product-one: var(--sytue-product-one);
+  --color-product-id: var(--sytue-product-id);
+  --color-product-drive: var(--sytue-product-drive);
+  --color-product-docs: var(--sytue-product-docs);
+  --color-product-sheets: var(--sytue-product-sheets);
+  --color-product-slides: var(--sytue-product-slides);
+  --color-product-mail: var(--sytue-product-mail);
+  --color-product-calendar: var(--sytue-product-calendar);
+  --color-product-contacts: var(--sytue-product-contacts);
+  --color-product-chat: var(--sytue-product-chat);
+  --color-product-meet: var(--sytue-product-meet);
+  --color-product-cloud: var(--sytue-product-cloud);
+  --color-product-console: var(--sytue-product-console);
+  --color-product-hub: var(--sytue-product-hub);
+
+  /* Seleccion (fila/ítem seleccionado): tinte translúcido del primario. */
+  --color-selected: var(--sytue-selected);
+
+  --color-presence-online: var(--sytue-presence-online);
+  --color-presence-away: var(--sytue-presence-away);
+  --color-presence-dnd: var(--sytue-presence-dnd);
+  --color-presence-offline: var(--sytue-presence-offline);
+
+  --color-card-blue: var(--sytue-card-blue);
+  --color-card-violet: var(--sytue-card-violet);
+  --color-card-mint: var(--sytue-card-mint);
+  --color-card-rose: var(--sytue-card-rose);
+  --color-card-amber: var(--sytue-card-amber);
+
+  --color-card-solid-blue: var(--sytue-card-solid-blue);
+  --color-on-card-solid-blue: var(--sytue-on-card-solid-blue);
+  --color-card-solid-violet: var(--sytue-card-solid-violet);
+  --color-on-card-solid-violet: var(--sytue-on-card-solid-violet);
+  --color-card-solid-mint: var(--sytue-card-solid-mint);
+  --color-on-card-solid-mint: var(--sytue-on-card-solid-mint);
+  --color-card-solid-rose: var(--sytue-card-solid-rose);
+  --color-on-card-solid-rose: var(--sytue-on-card-solid-rose);
+  --color-card-solid-amber: var(--sytue-card-solid-amber);
+  --color-on-card-solid-amber: var(--sytue-on-card-solid-amber);
+  --color-card-cyan: var(--sytue-card-cyan);
+  --color-card-solid-cyan: var(--sytue-card-solid-cyan);
+  --color-on-card-solid-cyan: var(--sytue-on-card-solid-cyan);
+  --color-card-coral: var(--sytue-card-coral);
+  --color-card-solid-coral: var(--sytue-card-solid-coral);
+  --color-on-card-solid-coral: var(--sytue-on-card-solid-coral);
+  --color-card-lime: var(--sytue-card-lime);
+  --color-card-solid-lime: var(--sytue-card-solid-lime);
+  --color-on-card-solid-lime: var(--sytue-on-card-solid-lime);
+  --color-card-slate: var(--sytue-card-slate);
+  --color-card-solid-slate: var(--sytue-card-solid-slate);
+  --color-on-card-solid-slate: var(--sytue-on-card-solid-slate);
+
+  /* ---- Radios ----
+     Botones con esquinas de 4 px; 9 para campos e ítems de menú
+     y 14 para tarjetas, paneles, menús y diálogos. Comunes a toda la suite y a las
+     apps nativas (branding/tokens/spacing.json). */
+  --radius-sm: 4px;
+  --radius-md: 9px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-2xl: 24px;
+  --radius-pill: 999px;
+  /* Radios de FORMA (`rounded-control`, `rounded-nav`, `rounded-card`; los de la fila y
+     la hoja los aplica appearance.css): los de Marco, que es la forma por defecto. Carril los reasigna más
+     abajo, en «Tokens de forma». */
+  --radius-control: var(--radius-sm);
+  --radius-nav: 999px;
+  --radius-card: 16px;
+  --radius-row: 10px;
+  --radius-sheet: 16px;
+
+  /* ---- Sombras suaves sobre superficies claras ----
+     xs contacto · sm tarjetas · md menús/popovers · lg overlays · xl modales.
+     Teñidas con la tinta del texto (14, 26, 20), no con negro. `sm` y `md` llevan dos
+     capas: una corta que dibuja el canto y otra ancha que despega la superficie. */
+  --shadow-xs: 0 1px 2px rgba(14, 26, 20, 0.04);
+  --shadow-sm: 0 1px 2px rgba(14, 26, 20, 0.06), 0 1px 3px rgba(14, 26, 20, 0.08);
+  --shadow-md: 0 2px 4px rgba(14, 26, 20, 0.05), 0 12px 30px rgba(14, 26, 20, 0.13);
+  --shadow-lg: 0 16px 40px rgba(14, 26, 20, 0.16);
+  --shadow-xl: 0 24px 48px rgba(14, 26, 20, 0.2);
+
+  /* ---- Layout canonico (sidebar + topbar + contenido) ---- */
+  --spacing-topbar: calc(56px + var(--sytue-safe-top, 0px));
+  --spacing-sidebar: 260px;
+  --spacing-sidebar-collapsed: 64px;
+  --spacing-app-rail: 64px;
+  --container-content: 1280px;
+
+  /* ---- Z-index ---- */
+  /* Chrome persistente primero (sticky/sidebar/topbar), y SOLO DESPUÉS los
+     overlays transitorios (dropdown/popover/overlay/modal/toast/tooltip).
+     `--z-dropdown` vivía en 1000 — por DEBAJO de sidebar (1030) y topbar
+     (1040) — y un Dropdown anclado a un control DENTRO de un carril de altura
+     completa (el «⋮» de un calendario, en la barra lateral de Sytue Calendar)
+     se pintaba detrás de su propio carril: `aria-expanded` pasaba a `true`,
+     el panel llegaba a existir en el DOM con la posición y los items
+     correctos, pero `elementFromPoint` en su centro devolvía el carril, no el
+     menú. Se abría y no se veía. Medido el 2026-09-15. */
+  --z-sticky: 1020;
+  --z-sidebar: 1030;
+  --z-topbar: 1040;
+  --z-dropdown: 1050;
+  --z-popover: 1060;
+  --z-overlay: 1070;
+  --z-modal: 1080;
+  --z-toast: 1090;
+  --z-tooltip: 1100;
+
+  /* ---- Motion ---- */
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+}
+
+/* Sombras intensificadas en modo oscuro (misma geometría, más alpha para que la
+   elevación se lea sobre superficies oscuras). */
+[data-theme='dark'] {
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4), 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 12px 30px rgba(0, 0, 0, 0.55);
+  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.6);
+  --shadow-xl: 0 24px 48px rgba(0, 0, 0, 0.65);
+}
+/* Y lo mismo con el oscuro del SISTEMA, como hace colors.css con los colores: sin esto,
+   quien deja el tema en «Sistema» veía la sombra teñida del claro sobre fondo casi negro
+   (el tema la aplica quitando `data-theme`). Lo vigila `tema.TestLasSombrasSonLasDeLaWeb`
+   en apps/fyne: si se toca un bloque, los dos. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4), 0 1px 3px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 12px 30px rgba(0, 0, 0, 0.55);
+    --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.6);
+    --shadow-xl: 0 24px 48px rgba(0, 0, 0, 0.65);
+  }
+}
+
+/* Zonas físicas del dispositivo, también al girar. El marco pinta hasta el borde;
+   solo quien contiene CONTROLES reserva estos insets. Un panel dentro del marco no
+   vuelve a sumarlos. Los overlays de body sí son una superficie independiente. */
+:root {
+  --sytue-safe-top: env(safe-area-inset-top, 0px);
+  --sytue-safe-right: env(safe-area-inset-right, 0px);
+  --sytue-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --sytue-safe-left: env(safe-area-inset-left, 0px);
+}
+@media screen {
+  .sytue-topbar {
+    --sytue-topbar-pad: 1rem;
+    padding-top: var(--sytue-safe-top);
+    padding-left: calc(var(--sytue-topbar-pad) + var(--sytue-safe-left));
+    padding-right: calc(var(--sytue-topbar-pad) + var(--sytue-safe-right));
+    box-sizing: border-box;
+  }
+  @media (min-width: 1024px) {
+    .sytue-topbar {
+      --sytue-topbar-pad: 1.5rem;
+    }
+  }
+  .sytue-safe-workspace {
+    padding-left: var(--sytue-safe-left);
+    padding-right: var(--sytue-safe-right);
+    padding-bottom: var(--sytue-safe-bottom);
+    box-sizing: border-box;
+  }
+  /* En Carril estos envoltorios son contents: para reservar las zonas seguras
+     también necesitan caja en pantalla. En papel siguen sin generarla. */
+  .sytue-safe-workspace.sytue-frame-page {
+    display: block;
+  }
+  /* Las ventanas que ocultan la barra de la suite conservan su zona superior. */
+  .sytue-native-safe-top {
+    height: var(--sytue-safe-top);
+  }
+  .sytue-safe-fullscreen {
+    padding: var(--sytue-safe-top) var(--sytue-safe-right) var(--sytue-safe-bottom)
+      var(--sytue-safe-left);
+    box-sizing: border-box;
+  }
+  /* El Modal ya reserva arriba y abajo en su cabecera y su última banda. */
+  .sytue-safe-overlay {
+    padding-left: var(--sytue-safe-left);
+    padding-right: var(--sytue-safe-right);
+  }
+  @media (min-width: 768px) {
+    .sytue-safe-overlay {
+      padding-left: max(1rem, var(--sytue-safe-left));
+      padding-right: max(1rem, var(--sytue-safe-right));
+    }
+  }
+  /* Los cajones fijos no participan en el padding del marco que tienen debajo. */
+  .sytue-nav-drawer,
+  .sytue-side-panel {
+    left: var(--sytue-safe-left);
+    bottom: var(--sytue-safe-bottom);
+  }
+  .sytue-side-panel {
+    right: var(--sytue-safe-right);
+  }
+}
+
+/* ---- Variantes de FORMA ----
+   `marco:` y `carril:` aplican una utilidad solo en esa forma. Son para lo que NO es una
+   medida —una disposición distinta, algo que una forma enseña y la otra no— y dejan un
+   solo marcado para las dos: nada de ramas por forma en los componentes, que además
+   parpadearían al hidratar (la forma no se conoce en el servidor). */
+@custom-variant marco (:root:not([data-forma='carril']) &);
+@custom-variant carril ([data-forma='carril'] &);
+
+/* ---- Tokens de FORMA ----
+   La forma de la suite es un eje aparte del modo y del color: `data-forma` en <html>.
+   SIN atributo se ve «Marco» (la forma por defecto) y `data-forma='carril'` es la que se
+   elige. No hay dos juegos de componentes: `Button`, `Card`, `Sidebar`, `Table`, `List` y
+   las carcasas leen estos tokens, y lo que pinta el marco y la hoja está en
+   tokens/appearance.css. Aquí van las MEDIDAS; allí, los colores de rol.
+
+   | token                    | Marco        | Carril |
+   | `--radius-control`       | 4px          | 4px    |  botones
+   | `--radius-nav`           | 999px        | 9px    |  ítems del menú lateral
+   | `--radius-card`          | 16px         | 14px   |  tarjetas
+   | `--radius-row`           | 10px         | 0      |  fila seleccionada
+   | `--radius-sheet`         | 16px         | 0      |  la hoja del contenido
+   | `--sytue-sheet-gap`      | 10px         | 0      |  lo que la hoja se separa del borde
+   | `--sytue-nav-pad`        | 14px         | 10px   |  relleno horizontal del ítem
+   | `--sytue-nav-indicator`  | 0            | 3px    |  barra de «estás aquí»
+   | `--sytue-nav-active-weight` | 650       | 500    |  peso del ítem activo: sin barra, negrita
+   | `--sytue-rail-indicator` | 3px          | 0      |  barra de «estás aquí» del carril de iconos
+   | `--sytue-row-grow`       | 1px          | 0      |  relleno extra de fila, arriba y abajo
+   | `--sytue-row-inset`      | 6px          | 0      |  sangría de la fila seleccionada
+   | `--sytue-row-bar`        | 0            | 2px    |  barra de la fila seleccionada
+   | `--sytue-title-weight`   | 800          | 700    |  h1 y h2 (dentro de la hoja)
+   | `--sytue-subtitle-weight`| 700          | 600    |  h3 y h4 (dentro de la hoja)
+   | `--sytue-title-scale`    | 1.1          | 1      |  cuerpo de los títulos (dentro de la hoja)
+
+   Por debajo de 768 px la hoja va A SANGRE: flotando quitaba 16 px de los 390 de ancho y
+   8 de alto. Conserva las esquinas de arriba, que es lo que la sigue leyendo como hoja. */
+:root {
+  --sytue-sheet-gap: 10px;
+  --sytue-nav-pad: 0.875rem;
+  --sytue-nav-indicator: 0px;
+  --sytue-nav-active-weight: 650;
+  --sytue-rail-indicator: 3px;
+  --sytue-row-grow: 1px;
+  --sytue-row-inset: 6px;
+  --sytue-row-bar: 0px;
+  /* Los títulos solo cambian DENTRO de la hoja (ver `.sytue-sheet` en appearance.css): el
+     sitio público y las páginas sin sesión comparten estas clases y no llevan marco. */
+  --sytue-title-weight: 700;
+  --sytue-subtitle-weight: 600;
+  --sytue-title-scale: 1;
+}
+@media (max-width: 767px) {
+  :root {
+    --sytue-sheet-gap: 0px;
+  }
+}
+[data-forma='carril'] {
+  --radius-nav: var(--radius-md);
+  --radius-card: var(--radius-lg);
+  --radius-row: 0px;
+  --radius-sheet: 0px;
+  --sytue-sheet-gap: 0px;
+  --sytue-nav-pad: 0.625rem;
+  --sytue-nav-indicator: 3px;
+  --sytue-nav-active-weight: 500;
+  --sytue-rail-indicator: 0px;
+  --sytue-row-grow: 0px;
+  --sytue-row-inset: 0px;
+  --sytue-row-bar: 2px;
+}
+
+/* Griego y búlgaro: la página entera en Inter. Con Figtree delante, las letras
+   saldrían en Inter y las cifras y la puntuación en Figtree, y la altura de x no es la
+   misma (0,55 frente a 0,50 em): una línea de dos tipos. Un texto en griego dentro de
+   una página en español sigue cayendo a Inter carácter a carácter, que es lo correcto
+   para un nombre suelto. */
+html:lang(el),
+html:lang(bg) {
+  --font-sans:
+    'Inter Variable', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, 'Helvetica Neue',
+    Arial, sans-serif;
+}
+
+/* Base de superficie de la suite. */
+:where(html) {
+  font-family: var(--font-sans);
+  /* Una raíz de 16px mantiene text-base en 14px y text-sm en 13px, sin una
+     segunda reducción. Comparada con tema.Rem por el guardián nativo.
+     :where() permite a los documentos y lienzos usar su propia escala. */
+  font-size: 16px;
+  line-height: var(--text-base--line-height);
+  color: var(--sytue-text);
+  background-color: var(--sytue-bg);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  /* Sin inflación de texto del navegador móvil. Al girar el teléfono, Safari y
+     Chrome Android suben el tamaño del texto «para ayudar» y una app de marco
+     fijo —100dvh con paneles que scrollean por dentro— responde deformándose:
+     las filas de las barras bajan a la línea siguiente y el área de trabajo se
+     encoge sin que nadie la haya tocado. El zoom lo pone quien mira, con el
+     pellizco, y ese queda intacto (WCAG 1.4.4): esto solo apaga la que el
+     navegador pone solo. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  /* El destello del toque, en el color de la casa y no en el NEGRO del navegador. Al tocar
+     cualquier control, Chrome de Android y Safari de iOS pintan encima un
+     rectángulo oscuro (≈rgba(0,0,0,.18)) que nadie había desactivado: en la vista
+     móvil eso es una mancha negra sobre el campo, hermana de la que dejaba el
+     contorno del aro en escritorio.
+
+     Tintado y no `transparent`: quitarlo del todo deja sin respuesta al dedo en
+     los controles que no declaran `:active` propio, y perder la confirmación de
+     que el toque llegó es peor que un destello feo. Así hay respuesta y es de la
+     casa. Solo lo lee WebKit/Blink; en el resto no existe y no molesta. */
+  -webkit-tap-highlight-color: color-mix(in srgb, var(--sytue-focus-ring) 18%, transparent);
+}
+
+/* Foco visible siempre (WCAG AA) — nunca outline:none sin reemplazo. UN anillo del primario
+   de 2px: los 2px son el área que exige WCAG 2.4.13 y el 3:1 de WCAG 1.4.11 lo
+   cumple el propio color (ver `--sytue-focus-ring` en tokens/colors.css).
+
+   Aquí había un segundo anillo de contorno casi negro para alcanzar ese 3:1. Es lo
+   que se veía —una línea negra rodeando el campo— y con él se iba el aspecto de
+   toda la suite, porque esta regla la hereda cualquier control sin clase propia.
+   El mismo grosor está en `.sytue-focus-ring*` de @sytue/ui: si se toca uno, los
+   dos. */
+:where(:focus-visible) {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--sytue-focus-ring);
+}
+
+/* La esquina del aro es la del PROPIO control: `box-shadow` sigue el `border-radius` del
+   elemento. Estaba en la regla de arriba, sin capa, y así ganaba a cualquier `rounded-*`
+   —las utilidades viven en `@layer utilities`—: un botón `rounded-md` (6px), una
+   pastilla (999px) o un campo pasaban a 4px en cuanto se enfocaban con el teclado.
+   Medido en producción el 2026-09-25.
+
+   En `@layer base` la gana cualquier utilidad o componente, y `:focus-visible` a secas
+   (0,1,0) le gana al `button, input, … { border-radius: 0 }` de la base de Tailwind: lo
+   que NO declara esquina —un enlace, un botón sin clase, una fila con tabindex— sigue
+   con su aro de 4px, como antes. */
+@layer base {
+  :focus-visible {
+    border-radius: var(--radius-sm);
+  }
+
+  /* Un `<fieldset>` nace con `min-inline-size: min-content`: no deja encoger lo de
+     dentro y un `truncate` no trunca. En «Restaurar una copia» (Cloud) y «Organizar
+     PDF» (Drive) las filas medían 611 px en un diálogo de 558 y el tamaño y
+     «Descargar» quedaban fuera del panel. Es el `min-w-0` que nadie se acordaba de
+     poner. */
+  fieldset {
+    min-inline-size: 0;
+  }
+}
+
+/* Alto contraste (Windows HC / forced-colors): el navegador DESCARTA box-shadow, así
+   que el anillo de arriba —y las variantes `.sytue-focus-ring*` de @sytue/ui— dejarían
+   al usuario de teclado sin foco visible. Se restituye con un outline real, que sí
+   sobrevive, usando el color de sistema Highlight. */
+@media (forced-colors: active) {
+  /* `:focus-visible` a secas y con !important, NO `:where(:focus-visible)`.
+   *
+   * `:where()` fuerza especificidad 0,0,0, así que esta regla perdía contra
+   * CUALQUIER utilidad de Tailwind — y hay 1376 `focus-visible:outline-none` en la
+   * suite, precisamente porque el anillo normal se pinta con box-shadow. Resultado:
+   * en alto contraste el outline se restituía y acto seguido lo anulaba la utilidad,
+   * dejando al usuario de teclado SIN foco visible en los 1376 sitios (WCAG 2.4.11).
+   *
+   * Con la misma especificidad que la utilidad (0,1,0) seguiría ganando la que vaya
+   * después en la hoja, que no controlamos: por eso `!important`, que aquí es la
+   * herramienta correcta y no un parche. */
+  :focus-visible {
+    outline: 2px solid Highlight !important;
+    outline-offset: 2px;
+  }
+}
+
+/* Respeto a prefers-reduced-motion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

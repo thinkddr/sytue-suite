@@ -1,0 +1,58 @@
+[
+  {
+    "clave": "contacto", "modulo": "contactos", "titulo": "nombre",
+    "etiqueta": {"en":"Contacts","es":"Contactos","fr":"Contacts","de":"Kontakte","it":"Contatti","bg":"Контакти","cs":"Kontakty","da":"Kontakter","el":"Επαφές","et":"Kontaktid","fi":"Yhteystiedot","ga":"Teagmhálaithe","hr":"Kontakti","hu":"Névjegyek","is":"Tengiliðir","lt":"Kontaktai","lv":"Kontakti","mt":"Kuntatti","nb":"Kontakter","nl":"Contacten","pl":"Kontakty","pt":"Contactos","ro":"Contacte","sk":"Kontakty","sl":"Stiki","sv":"Kontakter"},
+    "estados": ["activa", "pausada"],
+    "campos": [
+      {"clave":"nombre","tipo":"texto","requerido":true},
+      {"clave":"tipo","tipo":"seleccion","opciones":["organizacion","persona"],"requerido":true},
+      {"clave":"nif","tipo":"texto"},
+      {"clave":"correo","tipo":"correo"},
+      {"clave":"telefono","tipo":"telefono"},
+      {"clave":"web","tipo":"url"},
+      {"clave":"direccion","tipo":"texto"},
+      {"clave":"ciudad","tipo":"texto"},
+      {"clave":"cp","tipo":"texto"},
+      {"clave":"pais","tipo":"texto"},
+      {"clave":"dir3_contable","tipo":"texto"},
+      {"clave":"dir3_gestor","tipo":"texto"},
+      {"clave":"dir3_tramitadora","tipo":"texto"},
+      {"clave":"empresa","tipo":"relacion","modelo":"contacto"},
+      {"clave":"responsable","tipo":"texto"},
+      {"clave":"notas","tipo":"texto_largo"},
+      {"clave":"externo_id","tipo":"texto"}
+    ],
+    "lista": ["nombre","tipo","correo","telefono","ciudad","estado"]
+  },
+  {
+    "clave": "producto", "modulo": "productos", "titulo": "nombre",
+    "etiqueta": {"en":"Products","es":"Productos","fr":"Produits","de":"Produkte","it":"Prodotti","bg":"Продукти","cs":"Produkty","da":"Produkter","el":"Προϊόντα","et":"Tooted","fi":"Tuotteet","ga":"Táirgí","hr":"Proizvodi","hu":"Termékek","is":"Vörur","lt":"Produktai","lv":"Produkti","mt":"Prodotti","nb":"Produkter","nl":"Producten","pl":"Produkty","pt":"Produtos","ro":"Produse","sk":"Produkty","sl":"Izdelki","sv":"Produkter"},
+    "estados": ["activa", "pausada"],
+    "campos": [
+      {"clave":"nombre","tipo":"texto","requerido":true},
+      {"clave":"codigo","tipo":"texto"},
+      {"clave":"tipo","tipo":"seleccion","opciones":["bien","servicio"],"requerido":true},
+      {"clave":"categoria","tipo":"texto"},
+      {"clave":"precio","tipo":"dinero","requerido":true},
+      {"clave":"precio_con_iva","tipo":"dinero"},
+      {"clave":"tipo_iva","tipo":"seleccion","opciones":["21","10","5","4","0"]},
+      {"clave":"coste","tipo":"dinero"},
+      {"clave":"unidad","tipo":"texto"},
+      {"clave":"stock_minimo","tipo":"decimal"},
+      {"clave":"descripcion","tipo":"texto_largo"},
+      {"clave":"externo_id","tipo":"texto"}
+    ],
+    "lista": ["codigo","nombre","tipo","precio","coste","estado"]
+  },
+  {
+    "clave": "cuenta_contable", "modulo": "contabilidad", "titulo": "nombre",
+    "etiqueta": {"en":"Chart of accounts","es":"Plan contable","fr":"Plan comptable","de":"Kontenplan","it":"Piano dei conti","bg":"Сметкоплан","cs":"Účtová osnova","da":"Kontoplan","el":"Λογιστικό σχέδιο","et":"Kontoplaan","fi":"Tilikartta","ga":"Cairt na gcuntas","hr":"Kontni plan","hu":"Számlatükör","is":"Bókhaldslykill","lt":"Sąskaitų planas","lv":"Kontu plāns","mt":"Pjan tal-kontijiet","nb":"Kontoplan","nl":"Rekeningschema","pl":"Plan kont","pt":"Plano de contas","ro":"Plan de conturi","sk":"Účtová osnova","sl":"Kontni načrt","sv":"Kontoplan"},
+    "campos": [
+      {"clave":"codigo","tipo":"texto","requerido":true},
+      {"clave":"nombre","tipo":"texto","requerido":true},
+      {"clave":"tipo","tipo":"texto"},
+      {"clave":"saldo","tipo":"dinero"}
+    ],
+    "lista": ["codigo","nombre","tipo","saldo"]
+  }
+]

@@ -1,0 +1,43 @@
+---
+import ConsoleLayout from '../layouts/ConsoleLayout.astro';
+import { useT } from '../i18n/index.js';
+import UnifiedAuditPanel from '../components/UnifiedAuditPanel';
+import AuditSinkCard from '../components/AuditSinkCard';
+import { requireSession } from '@sytue/auth/server';
+import { canonicaConOrg } from '@sytue/config';
+import { getBff, toBffContext } from '../server/bff.js';
+import { loadUnifiedAudit } from '../lib/audit-siem.js';
+import { loadAuditSink } from '../lib/admin.js';
+
+export const prerender = false;
+
+const guard = await requireSession(getBff(), toBffContext(Astro), {
+  roles: ['admin', 'owner'],
+  perms: ['audit.view'],
+});
+if (guard instanceof Response) return guard;
+// Ruta en `sinOrg` (su nombre colisiona con el namespace de organizaciones):
+// con sesión, un salto local a la canónica con la org activa (ADR 0056).
+const canonica = canonicaConOrg(Astro.url, getBff().basePath, guard.session.user.tenant);
+if (canonica) return Astro.redirect(canonica);
+
+// Auditoría unificada: fan-out best-effort a todos los servicios (Identidad, Correo,
+// Archivos, Integraciones). La primera ventana se carga en SSR; los filtros y el
+// export (CSV/JSON, esquema SIEM) van por el BFF /api/admin/siem-audit.
+const { records, sources } = await loadUnifiedAudit(guard.session, { limit: 200 });
+// A dónde se ENVÍA esta auditoría. Va en la misma página y no en Configuración
+// porque es la misma pregunta: qué se registra y a dónde va.
+const sink = await loadAuditSink(guard.session);
+const live = sources.some((s) => s.ok);
+
+// El idioma lo negoció el middleware; la isla lo recibe por props (nunca lo detecta).
+const locale = Astro.locals.locale;
+const t = useT(locale);
+---
+
+<ConsoleLayout title={t('page.audit')} section="audit">
+  <UnifiedAuditPanel client:load locale={locale} records={records} sources={sources} live={live} />
+  <div class="px-4 pb-4">
+    <AuditSinkCard client:load locale={locale} sink={sink} />
+  </div>
+</ConsoleLayout>

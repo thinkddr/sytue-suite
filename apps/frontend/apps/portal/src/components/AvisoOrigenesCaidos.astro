@@ -1,0 +1,45 @@
+---
+/**
+ * «Sytue Mail no ha respondido»: los orígenes que se cayeron en una búsqueda
+ * federada.
+ *
+ * POR QUÉ HACE FALTA. La búsqueda pregunta a la vez a todos los productos y
+ * devuelve lo que conteste cada uno; que Mail no responda no rompe el resto, y
+ * eso está bien pensado. Pero si el aviso no se pinta, la degradación elegante
+ * se vuelve una MENTIRA: la pantalla enseña unos pocos resultados —o ninguno— y
+ * quien busca da por perdido un documento que sí existe y deja de buscarlo.
+ *
+ * NO es un error rojo. No ha fallado nada de lo que la persona hizo: falta una
+ * parte de la respuesta, y lo que tiene que saber es cuál y que puede volver a
+ * intentarlo. Un error rojo aquí enseñaría a ignorar los errores rojos.
+ *
+ * Tampoco se enseña el motivo técnico que manda el Hub (`timeout`, `502`…): a
+ * quien busca no le sirve, y es exactamente la clase de detalle que no debe
+ * salir a una pantalla.
+ */
+import { appForKey, Icon } from '@sytue/ui';
+import type { T } from '../i18n/index.js';
+
+interface Props {
+  fallidos: { source: string; error: string }[];
+  /** El traductor ya atado, con sus claves tipadas: una clave inventada no compila. */
+  t: T;
+}
+
+const { fallidos, t } = Astro.props;
+
+// El nombre del producto, no su clave interna: «Sytue Mail», no `mail`.
+const nombres = fallidos
+  .map((f) => appForKey(f.source)?.name ?? f.source)
+  .join(t('search.partialJoin'));
+---
+
+<p
+  role="status"
+  class="border-border bg-bg-subtle text-text-muted flex items-start gap-2 rounded-md border px-3 py-2 text-sm"
+>
+  <span aria-hidden="true" class="text-text-subtle mt-px shrink-0">
+    <Icon name="danger" size={15} />
+  </span>
+  <span>{t('search.partial', { sources: nombres })}</span>
+</p>

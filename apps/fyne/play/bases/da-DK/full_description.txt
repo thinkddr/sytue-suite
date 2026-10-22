@@ -1,0 +1,11 @@
+Sammenkædede tabeller til kunder, ordrer eller lager, med rettigheder og log over hver ændring.
+
+• Kunder, ordrer eller lager i sammenkædede tabeller, uden at kunne noget om databaser.
+• Del med din organisation med den rolle, du vælger.
+• Hver ændring logges: hvem der gjorde det, og hvad der stod før.
+• Dine data bliver i EU, og du eksporterer dem, når du vil.
+• Tabeller med felter til tekst, tal, dato, afkrydsning, enkelt valg og flere valg.
+• Relationer mellem tabeller: kobl en ordre til sin kunde, og databasen lader ikke koblingen brydes.
+• Rettigheder pr. database og pr. tabel: ejer, redaktør, kommentator og læser.
+
+Krypteret under overførsel (TLS 1.3). Sytues infrastruktur er i EU. Eksterne tjenesters placering afhænger af deres udbyder.

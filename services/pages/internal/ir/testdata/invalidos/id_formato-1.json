@@ -1,0 +1,778 @@
+{
+  "modo": "borrador",
+  "ir": {
+    "version": 1,
+    "languages": {
+      "default": "es",
+      "others": [
+        "en"
+      ]
+    },
+    "theme": {
+      "colors": {
+        "background": "#ffffff",
+        "text": "#1f2328",
+        "primary": "#ca1682",
+        "on_primary": "#ffffff",
+        "muted": "#f5f2ee",
+        "border": "#e2ddd6"
+      },
+      "fonts": {
+        "heading": "source-serif-4",
+        "body": "inter"
+      },
+      "text_styles": {
+        "h1": {
+          "font": "heading",
+          "size": [
+            56,
+            44,
+            34
+          ],
+          "line_height": 1.1,
+          "weight": 700,
+          "letter_spacing": -0.01
+        },
+        "h2": {
+          "font": "heading",
+          "size": [
+            40,
+            32,
+            28
+          ],
+          "line_height": 1.15,
+          "weight": 700,
+          "letter_spacing": 0
+        },
+        "h3": {
+          "font": "heading",
+          "size": [
+            28,
+            24,
+            22
+          ],
+          "line_height": 1.2,
+          "weight": 600,
+          "letter_spacing": 0
+        },
+        "h4": {
+          "font": "heading",
+          "size": [
+            22,
+            20,
+            19
+          ],
+          "line_height": 1.3,
+          "weight": 600,
+          "letter_spacing": 0
+        },
+        "h5": {
+          "font": "body",
+          "size": [
+            18,
+            18,
+            17
+          ],
+          "line_height": 1.4,
+          "weight": 600,
+          "letter_spacing": 0
+        },
+        "h6": {
+          "font": "body",
+          "size": [
+            16,
+            16,
+            16
+          ],
+          "line_height": 1.4,
+          "weight": 600,
+          "letter_spacing": 0.02
+        },
+        "body": {
+          "font": "body",
+          "size": [
+            18,
+            17,
+            16
+          ],
+          "line_height": 1.6,
+          "weight": 400,
+          "letter_spacing": 0
+        },
+        "small": {
+          "font": "body",
+          "size": [
+            14,
+            14,
+            14
+          ],
+          "line_height": 1.5,
+          "weight": 400,
+          "letter_spacing": 0
+        },
+        "label": {
+          "font": "body",
+          "size": [
+            13,
+            13,
+            13
+          ],
+          "line_height": 1.4,
+          "weight": 600,
+          "letter_spacing": 0.04,
+          "transform": "uppercase"
+        },
+        "button": {
+          "font": "body",
+          "size": [
+            16,
+            16,
+            16
+          ],
+          "line_height": 1.2,
+          "weight": 600,
+          "letter_spacing": 0
+        }
+      },
+      "radius": {
+        "sm": 4,
+        "md": 8,
+        "lg": 16
+      },
+      "container": 1200
+    },
+    "header": {
+      "id": "hdr0000001",
+      "type": "section",
+      "kind": "header",
+      "full_bleed": false,
+      "layout": {
+        "direction": "row",
+        "gap": 24,
+        "padding": [
+          16,
+          24,
+          16,
+          24
+        ],
+        "align": "center",
+        "justify": "space-between",
+        "wrap": false
+      },
+      "style": {
+        "background": "$background",
+        "border": {
+          "width": 1,
+          "color": "$border",
+          "style": "solid"
+        }
+      },
+      "breakpoints": {
+        "mobile": {
+          "layout": {
+            "gap": 12,
+            "padding": [
+              12,
+              16,
+              12,
+              16
+            ]
+          }
+        }
+      },
+      "children": [
+        {
+          "id": "logo000001",
+          "type": "image",
+          "src": {
+            "placeholder": "logo"
+          },
+          "fit": "contain",
+          "alt": {
+            "es": "Panadería Aurora",
+            "en": "Aurora Bakery"
+          },
+          "size": {
+            "width": 140,
+            "height": 40
+          },
+          "link": {
+            "page": "pag0000001"
+          }
+        },
+        {
+          "id": "menu000001",
+          "type": "menu",
+          "orientation": "horizontal",
+          "collapse_below": "tablet",
+          "label": {
+            "es": "Principal",
+            "en": "Main"
+          },
+          "items": [
+            {
+              "id": "mit0000001",
+              "label": {
+                "es": "Inicio",
+                "en": "Home"
+              },
+              "link": {
+                "page": "pag0000001"
+              }
+            },
+            {
+              "id": "mit0000002",
+              "label": {
+                "es": "Tienda",
+                "en": "Shop"
+              },
+              "link": {
+                "page": "pag0000001",
+                "anchor": "tienda"
+              }
+            },
+            {
+              "id": "mit0000003",
+              "label": {
+                "es": "Contacto",
+                "en": "Contact"
+              },
+              "link": {
+                "page": "pag0000001",
+                "anchor": "contacto"
+              }
+            }
+          ]
+        },
+        {
+          "id": "frm0000001",
+          "type": "frame",
+          "tag": "div",
+          "size": {
+            "width": "hug",
+            "height": "hug"
+          },
+          "layout": {
+            "direction": "row",
+            "gap": 12,
+            "padding": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "align": "center",
+            "justify": "end",
+            "wrap": false
+          },
+          "children": [
+            {
+              "id": "lng0000001",
+              "type": "language_switcher",
+              "display": "code"
+            },
+            {
+              "id": "crt0000001",
+              "type": "cart_button",
+              "label": {
+                "es": "Carrito",
+                "en": "Cart"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "footer": {
+      "id": "ftr0000001",
+      "type": "section",
+      "kind": "footer",
+      "full_bleed": false,
+      "layout": {
+        "direction": "column",
+        "gap": 16,
+        "padding": [
+          48,
+          24,
+          48,
+          24
+        ],
+        "align": "start",
+        "justify": "start",
+        "wrap": false
+      },
+      "style": {
+        "background": "$muted"
+      },
+      "children": [
+        {
+          "id": "ins0000001",
+          "type": "instance",
+          "component": "cmp0000001",
+          "overrides": {
+            "ctx0000001": {
+              "text": {
+                "es": [
+                  {
+                    "text": "De lunes a sábado, de 7:00 a 14:00"
+                  }
+                ],
+                "en": [
+                  {
+                    "text": "Monday to Saturday, 7:00 to 14:00"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "pages": [
+      {
+        "id": "bad-id",
+        "slug": {
+          "es": "",
+          "en": ""
+        },
+        "title": {
+          "es": "Panadería Aurora — Pan de masa madre en Valladolid",
+          "en": "Aurora Bakery — Sourdough bread in Valladolid"
+        },
+        "description": {
+          "es": "Pan de masa madre con harinas ecológicas. Pedidos para recoger en el obrador.",
+          "en": "Sourdough bread with organic flour. Orders for pick-up at the bakery."
+        },
+        "show_header": true,
+        "show_footer": true,
+        "sections": [
+          {
+            "id": "sec0000001",
+            "type": "section",
+            "kind": "hero",
+            "full_bleed": false,
+            "layout": {
+              "direction": "row",
+              "gap": 48,
+              "padding": [
+                96,
+                24,
+                96,
+                24
+              ],
+              "align": "center",
+              "justify": "space-between",
+              "wrap": false
+            },
+            "style": {
+              "background": "$muted"
+            },
+            "breakpoints": {
+              "tablet": {
+                "layout": {
+                  "direction": "column",
+                  "gap": 32,
+                  "padding": [
+                    64,
+                    24,
+                    64,
+                    24
+                  ]
+                }
+              },
+              "mobile": {
+                "layout": {
+                  "padding": [
+                    48,
+                    16,
+                    48,
+                    16
+                  ]
+                }
+              }
+            },
+            "children": [
+              {
+                "id": "frm0000002",
+                "type": "frame",
+                "tag": "div",
+                "size": {
+                  "width": "fill",
+                  "height": "hug",
+                  "max_width": 560
+                },
+                "layout": {
+                  "direction": "column",
+                  "gap": 20,
+                  "padding": [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  "align": "start",
+                  "justify": "start",
+                  "wrap": false
+                },
+                "breakpoints": {
+                  "tablet": {
+                    "size": {
+                      "max_width": 720
+                    }
+                  }
+                },
+                "children": [
+                  {
+                    "id": "txt0000001",
+                    "type": "text",
+                    "tag": "h1",
+                    "style": {
+                      "text": {
+                        "preset": "h1"
+                      }
+                    },
+                    "content": {
+                      "es": [
+                        {
+                          "text": "Pan de masa madre, "
+                        },
+                        {
+                          "text": "cada mañana",
+                          "italic": true
+                        }
+                      ],
+                      "en": [
+                        {
+                          "text": "Sourdough bread, "
+                        },
+                        {
+                          "text": "every morning",
+                          "italic": true
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "id": "txt0000002",
+                    "type": "text",
+                    "tag": "p",
+                    "style": {
+                      "color": "#4a4f57",
+                      "text": {
+                        "preset": "body"
+                      }
+                    },
+                    "content": {
+                      "es": [
+                        {
+                          "text": "Harinas ecológicas de Castilla y 24 horas de fermentación lenta."
+                        }
+                      ],
+                      "en": [
+                        {
+                          "text": "Organic Castilian flour and a slow 24-hour fermentation."
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "id": "btn0000001",
+                    "type": "button",
+                    "variant": "primary",
+                    "label": {
+                      "es": "Ver la tienda",
+                      "en": "Visit the shop"
+                    },
+                    "action": {
+                      "anchor": "tienda"
+                    },
+                    "icon": "arrow-right",
+                    "icon_position": "end"
+                  }
+                ]
+              },
+              {
+                "id": "img0000001",
+                "type": "image",
+                "src": {
+                  "placeholder": "photo"
+                },
+                "fit": "cover",
+                "priority": true,
+                "alt": {
+                  "es": "Hogazas recién horneadas sobre una mesa de madera",
+                  "en": "Freshly baked loaves on a wooden table"
+                },
+                "size": {
+                  "width": "fill",
+                  "height": "hug",
+                  "aspect_ratio": 1.25
+                },
+                "style": {
+                  "radius": "$lg",
+                  "overflow": "hidden"
+                }
+              }
+            ]
+          },
+          {
+            "id": "sec0000002",
+            "type": "section",
+            "kind": "products",
+            "anchor": "tienda",
+            "full_bleed": false,
+            "layout": {
+              "direction": "column",
+              "gap": 32,
+              "padding": [
+                80,
+                24,
+                80,
+                24
+              ],
+              "align": "start",
+              "justify": "start",
+              "wrap": false
+            },
+            "children": [
+              {
+                "id": "txt0000003",
+                "type": "text",
+                "tag": "h2",
+                "style": {
+                  "text": {
+                    "preset": "h2"
+                  }
+                },
+                "content": {
+                  "es": [
+                    {
+                      "text": "Nuestros panes"
+                    }
+                  ],
+                  "en": [
+                    {
+                      "text": "Our breads"
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "grd0000001",
+                "type": "product_grid",
+                "source": {
+                  "all": true
+                },
+                "limit": 8,
+                "columns": 4,
+                "show_price": true,
+                "show_add_to_cart": true,
+                "breakpoints": {
+                  "tablet": {
+                    "columns": 2
+                  },
+                  "mobile": {
+                    "columns": 1
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "id": "sec0000003",
+            "type": "section",
+            "kind": "contact",
+            "anchor": "contacto",
+            "full_bleed": false,
+            "layout": {
+              "direction": "row",
+              "gap": 40,
+              "padding": [
+                80,
+                24,
+                80,
+                24
+              ],
+              "align": "start",
+              "justify": "start",
+              "wrap": true
+            },
+            "children": [
+              {
+                "id": "frm0000003",
+                "type": "form",
+                "form": "fom0000001",
+                "size": {
+                  "width": "fill",
+                  "height": "hug",
+                  "min_width": 280
+                },
+                "layout": {
+                  "direction": "column",
+                  "gap": 16,
+                  "padding": [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  "align": "start",
+                  "justify": "start",
+                  "wrap": false
+                },
+                "fields": [
+                  {
+                    "id": "fld0000001",
+                    "kind": "text",
+                    "label": {
+                      "es": "Nombre",
+                      "en": "Name"
+                    },
+                    "required": true,
+                    "max_length": 120,
+                    "autocomplete": "name"
+                  },
+                  {
+                    "id": "fld0000002",
+                    "kind": "email",
+                    "label": {
+                      "es": "Correo",
+                      "en": "Email"
+                    },
+                    "required": true,
+                    "autocomplete": "email"
+                  },
+                  {
+                    "id": "fld0000003",
+                    "kind": "textarea",
+                    "label": {
+                      "es": "Mensaje",
+                      "en": "Message"
+                    },
+                    "required": true,
+                    "max_length": 2000
+                  }
+                ],
+                "submit": {
+                  "es": "Enviar",
+                  "en": "Send"
+                },
+                "success": {
+                  "es": "Gracias. Te respondemos en un día laborable.",
+                  "en": "Thank you. We reply within one working day."
+                },
+                "consent": {
+                  "es": "Acepto que se usen estos datos para responder a mi mensaje.",
+                  "en": "I agree to these details being used to reply to my message."
+                }
+              },
+              {
+                "id": "emb0000001",
+                "type": "embed",
+                "provider": "osm",
+                "ref": "41.6523,-4.7245,16",
+                "title": {
+                  "es": "Mapa: Panadería Aurora en Valladolid",
+                  "en": "Map: Aurora Bakery in Valladolid"
+                },
+                "size": {
+                  "width": "fill",
+                  "height": "hug",
+                  "min_width": 280,
+                  "aspect_ratio": 1.33
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "components": [
+      {
+        "id": "cmp0000001",
+        "name": "Horario",
+        "root": {
+          "id": "cro0000001",
+          "type": "frame",
+          "tag": "div",
+          "layout": {
+            "direction": "row",
+            "gap": 8,
+            "padding": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "align": "center",
+            "justify": "start",
+            "wrap": true
+          },
+          "children": [
+            {
+              "id": "cic0000001",
+              "type": "icon",
+              "name": "clock"
+            },
+            {
+              "id": "ctx0000001",
+              "type": "text",
+              "tag": "p",
+              "content": {
+                "es": [
+                  {
+                    "text": "Horario"
+                  }
+                ],
+                "en": [
+                  {
+                    "text": "Opening hours"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "seo": {
+      "site_name": {
+        "es": "Panadería Aurora",
+        "en": "Aurora Bakery"
+      },
+      "business": {
+        "type": "LocalBusiness",
+        "phone": "+34 983 000 000",
+        "email": "hola@panaderia-aurora.example",
+        "address": {
+          "street": "Calle Mayor 1",
+          "city": "Valladolid",
+          "postal_code": "47001",
+          "region": "Valladolid",
+          "country": "ES"
+        },
+        "opening_hours": [
+          {
+            "days": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr",
+              "Sa"
+            ],
+            "opens": "07:00",
+            "closes": "14:00"
+          }
+        ]
+      }
+    }
+  },
+  "espera": [
+    {
+      "path": "/pages/0/id",
+      "code": "id_formato",
+      "severity": "error"
+    }
+  ]
+}

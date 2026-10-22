@@ -1,0 +1,22 @@
+apiVersion: v2
+name: sytue-ocr
+description: >-
+  Sytue OCR — servicio Go propio de reconocimiento optico de caracteres para Sytue PDF.
+  Motor Tesseract 5 (Apache-2.0) AUTOALOJADO dentro de la imagen: sin ninguna llamada
+  saliente, sin SaaS de terceros y sin que un documento escaneado salga del clúster.
+  Recibe la imagen de una pagina y devuelve palabras con su posicion; la capa de texto
+  del PDF la escribe Sytue Docs. STATELESS: sin base de datos, sin disco y sin secretos.
+  ClusterIP, SIN ingress — solo lo llama Sytue Docs. Ver docs/decisions.md#0034.
+  Código Apache-2.0, (c) 2026 Daniel Delgado Ramos. Motor de terceros permisivo (Apache-2.0).
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+kubeVersion: ">=1.31.0-0"
+home: https://sytue.eu
+keywords: [sytue, ocr, tesseract, pdf, go, eu-sovereign]
+maintainers:
+  - name: Sytue Platform
+    email: platform@sytue.eu
+annotations:
+  licenses: MIT
+  sytue.eu/stack: go

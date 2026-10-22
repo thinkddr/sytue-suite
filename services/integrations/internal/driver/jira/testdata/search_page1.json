@@ -1,0 +1,37 @@
+{
+  "startAt": 0,
+  "maxResults": 2,
+  "total": 3,
+  "issues": [
+    {
+      "id": "10001",
+      "key": "SUITE-101",
+      "fields": {
+        "summary": "El editor de Docs pierde el foco al pegar",
+        "status": { "name": "En curso", "statusCategory": { "key": "indeterminate" } },
+        "assignee": { "displayName": "Ada Lovelace", "emailAddress": "ada@acme.example.com" },
+        "priority": { "name": "Alta" },
+        "issuetype": { "name": "Error" },
+        "project": { "key": "SUITE", "name": "Sytue Suite" },
+        "created": "2026-07-18T09:12:00.000+0200",
+        "updated": "2026-07-24T17:40:11.000+0200",
+        "labels": ["docs", "regresión"]
+      }
+    },
+    {
+      "id": "10002",
+      "key": "SUITE-102",
+      "fields": {
+        "summary": "Añadir exportación a CSV en Sheets",
+        "status": { "name": "Pendiente" },
+        "assignee": null,
+        "priority": { "name": "Media" },
+        "issuetype": { "name": "Tarea" },
+        "project": { "key": "SUITE", "name": "Sytue Suite" },
+        "created": "2026-07-19T11:00:00.000+0200",
+        "updated": "2026-07-23T08:05:00.000+0200",
+        "labels": []
+      }
+    }
+  ]
+}

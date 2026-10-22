@@ -1,0 +1,18 @@
+Notitieboeken waar alles in past: tekst, bestanden, afspraken, hele documenten.
+
+• Geneste notitieboeken, op een vrij canvas, in kolommen of als lijst.
+• Notities van elke soort: tekst, taken, links, bestanden, afspraken uit Calendar, documenten uit Docs.
+• Jij bepaalt wat in de zoekresultaten komt — en wat nooit.
+• Geneste notitieboeken met pictogram en kleur; drie indelingen: vrij, kolommen en lijst.
+• Twaalf soorten notities: tekst, taken, links, kleur, afbeelding en verwijzingen naar Drive, Docus, Calendar, Rooms en andere notities.
+• Een editor met opmaak (vet, lijsten, links) die opslaat als je weggaat.
+• Tags, vastpinnen, dupliceren, verplaatsen tussen notitieboeken, groeperen en slepen op het canvas.
+• Zichtbaarheid per notitieboek: privé, persoonlijk, organisatie of openbare link.
+• Jij bepaalt welke notitieboeken in de zoekfunctie van de suite komen.
+• Terugverwijzingen: zie welke notities naar deze verwijzen.
+• Een heel notitieboek exporteren naar HTML, PDF, Markdown en meer; kopieën importeren.
+• Een notitie delen in een Rooms-kanaal; slepen of plakken om notities te maken.
+• Tabellen in de editor en Markdown-snelkoppelingen tijdens het typen: “- ”, “# ”, “> ” en “```”.
+• Een notitie naar een ander notitieboek verplaatsen, één notitie exporteren en het notitieboek naar wens sorteren.
+
+Versleuteld tijdens transport (TLS 1.3). De infrastructuur van Sytue staat in de EU. De locatie van externe diensten hangt af van hun aanbieder.

@@ -1,0 +1,12 @@
+---
+/** /s/{token} — un documento compartido por enlace, sin sesión (`@sytue/office`, vista `Compartido`). */
+import Compartido from '@sytue/office/vistas/Compartido.astro';
+import { vistaCompartida } from '@sytue/office/vistas';
+
+export const prerender = false;
+
+const vista = await vistaCompartida(Astro);
+if (vista instanceof Response) return vista;
+---
+
+<Compartido vista={vista} />

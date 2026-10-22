@@ -1,0 +1,250 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Daniel Delgado Ramos
+from lib import *
+
+KEY = "servicios-it"
+
+
+def _c(background, surface, text, muted, primary, on_primary, border, inverse, on_inverse):
+    return dict(background=background, surface=surface, text=text, muted=muted, primary=primary,
+                on_primary=on_primary, border=border, inverse=inverse, on_inverse=on_inverse)
+
+
+# Paleta propia, oscura: violeta claro sobre negro azulado. Con fondo $inverse, primary/inverse >= 3.
+CONSOLA = dict(colores=_c("#10151a", "#1a2128", "#eef1f5", "#a9b4c0", "#b79cff", "#10151a", "#2b343d", "#080b0e", "#eef1f5"),
+               fuentes=("inter", "ibm-plex-sans"), radio=(4, 8, 12), ancho=1120, peso=700)
+
+
+def build():
+    nueva(KEY)
+    look = CONSOLA
+    malos = comprobar_paleta("consola", look["colores"])
+    assert not malos, malos
+    nav = [("inicio", ("Inicio", "Home")), ("servicios", ("Servicios", "Services")),
+           ("planes", ("Planes y soporte", "Plans and support")), ("contacto", ("Contacto", "Contact"))]
+    horas = [(("Lunes a viernes", "Monday to Friday"),
+              ("8:30 a 14:00 y 15:30 a 18:30", "8:30 am to 2:00 pm and 3:30 pm to 6:30 pm")),
+             (("Sábado y domingo", "Saturday and Sunday"), ("Cerrado", "Closed")),
+             (("Urgencias de clientes con plan", "Urgent calls from plan customers"),
+              ("Según el plan contratado", "Depending on the plan taken out"))]
+    revision = lambda v="primary": boton(("Pedir primera revisión", "Ask for a first review"),
+                                         a_pagina("contacto", "contacto"), v)
+    nota_precios = ("Precios de ejemplo: cámbialos por los tuyos. IVA no incluido.",
+                    "Example prices: replace them with your own. VAT not included.")
+
+    inicio = pagina("inicio", ("", ""), ("Servicios informáticos", "IT services"),
+                    ("Mantenimiento informático y soporte para pequeñas empresas: soporte remoto y presencial, copias de seguridad, ciberseguridad básica, redes y correo.",
+                     "IT maintenance and support for small businesses: remote and on-site support, backups, basic cybersecurity, networks and email."), [
+        hero(("Que los ordenadores de tu empresa funcionen, y alguien a quien llamar cuando no", "Keep your company's computers working, and someone to call when they do not"),
+             ("Mantenemos los equipos, el correo, la red y las copias de seguridad de pequeñas empresas. Hablamos en llano y solucionamos primero lo que te impide trabajar.",
+              "We look after small businesses' computers, email, network and backups. We speak plainly and fix first whatever stops you working."),
+             [revision(), llamar("secondary"), whatsapp("ghost")],
+             eyebrow=("Informática para pequeñas empresas", "IT for small businesses"),
+             variante="centro"),
+        bloque_valores(("Qué hacemos por tu empresa", "What we do for your company"), [
+            (("Soporte remoto y presencial", "Remote and on-site support"),
+             ("Resolvemos la mayoría de incidencias conectándonos a tu equipo. Si hace falta, vamos a tu oficina.",
+              "We solve most issues by connecting to your computer. If needed, we come to your office.")),
+            (("Copias de seguridad", "Backups"),
+             ("Copias automáticas de tus archivos importantes y pruebas periódicas de que se pueden recuperar.",
+              "Automatic copies of your important files and regular checks that they can be restored.")),
+            (("Ciberseguridad básica", "Basic cybersecurity"),
+             ("Contraseñas, actualizaciones, antivirus y formación para no caer en correos falsos.",
+              "Passwords, updates, antivirus and training so nobody falls for fake emails.")),
+            (("Redes y wifi", "Networks and wifi"),
+             ("Una red que llegue a todas las mesas, con una wifi para el equipo y otra aparte para las visitas.",
+              "A network that reaches every desk, with one wifi for the team and another for visitors.")),
+            (("Correo y nube", "Email and cloud"),
+             ("Cuentas de correo, calendarios y archivos compartidos, y migración desde lo que uses ahora.",
+              "Email accounts, calendars and shared files, and migration from whatever you use now.")),
+            (("Equipos y software", "Computers and software"),
+             ("Compra y puesta en marcha de equipos, impresoras y programas, con las licencias en regla.",
+              "Buying and setting up computers, printers and software, with licences in order.")),
+        ], eyebrow=("Servicios", "Services"), estilo="relleno", tono="base", anchor="que-hacemos"),
+        bloque_checks(("Cómo trabajamos", "How we work"), [
+            ("Te explicamos lo que pasa con palabras normales, no con siglas", "We explain what is going on in plain words, not acronyms"),
+            ("Presupuesto por escrito antes de hacer cualquier compra", "A written quote before any purchase"),
+            ("Las contraseñas y accesos son de tu empresa, no nuestros", "Passwords and access belong to your company, not to us"),
+            ("Dejamos apuntado qué hemos hecho en cada aviso", "We write down what we did on every call-out"),
+            ("Si accedemos a datos personales, firmamos el contrato de encargo de tratamiento que pide la normativa de protección de datos", "If we access personal data, we sign the data processing agreement that data protection rules require"),
+        ], eyebrow=("Forma de trabajar", "Our approach"), tono="relleno", cols=1),
+        bloque_pasos(("Primera revisión sin compromiso", "First review with no obligation"), [
+            (("Nos cuentas", "You tell us"),
+             ("Cuántas personas sois, qué equipos y programas usáis y qué os da problemas.",
+              "How many of you there are, what computers and programs you use and what causes you trouble.")),
+            (("Revisamos", "We review"),
+             ("Miramos equipos, red, correo y copias, en tu oficina o a distancia.",
+              "We look at computers, network, email and backups, at your office or remotely.")),
+            (("Te contamos lo que vemos", "We tell you what we see"),
+             ("Un resumen claro con lo urgente, lo recomendable y lo que puede esperar. Tú decides.",
+              "A clear summary of what is urgent, what is advisable and what can wait. You decide.")),
+        ], intro=("Es una primera visita para conocernos. No te comprometes a contratar nada.",
+                  "It is a first visit to get to know each other. You are not committing to hire anything."),
+            tono="base", anchor="revision"),
+        bloque_opiniones(("Lo que dicen las empresas a las que damos soporte", "What the companies we support say"),
+                         [("la rapidez al avisar", "how quickly they respond"), ("las copias de seguridad", "the backups"), ("la claridad al explicar", "how clearly they explain")],
+                         tono="relleno"),
+        bloque_cta(("¿Algo no funciona o quieres evitar que pase?", "Is something not working, or do you want to stop it happening?"),
+                   ("Llámanos o escríbenos por WhatsApp. Si es una primera revisión, no te cuesta nada.",
+                    "Call us or message us on WhatsApp. If it is a first review, it costs you nothing."),
+                   [revision(), llamar("ghost")], tono="base"),
+    ])
+
+    servicios = pagina("servicios", ("servicios", "services"), ("Servicios", "Services"),
+                       ("Soporte, copias de seguridad, ciberseguridad básica, redes y wifi, y correo y nube, explicados en llano.",
+                        "Support, backups, basic cybersecurity, networks and wifi, and email and cloud, explained in plain words."), [
+        hero(("Lo que hacemos, explicado en llano", "What we do, explained in plain words"),
+             ("Seis cosas que hacen que una oficina funcione sin sobresaltos. Si no sabes cuáles necesitas, empezamos por la revisión.",
+              "Six things that keep an office running without surprises. If you do not know which ones you need, we start with the review."),
+             [revision()], variante="texto"),
+        bloque_texto(("Soporte remoto y presencial", "Remote and on-site support"), [
+            ("Cuando algo falla, nos avisas por teléfono, WhatsApp o correo. Si se puede arreglar a distancia, nos conectamos a tu equipo con tu permiso y lo vemos contigo.",
+             "When something breaks, you contact us by phone, WhatsApp or email. If it can be fixed remotely, we connect to your computer with your permission and look at it with you."),
+            ("Si hace falta, vamos a tu oficina. Los equipos que no se pueden arreglar allí nos los llevamos al taller y te los devolvemos configurados.",
+             "If needed, we come to your office. Computers that cannot be fixed there come to our workshop and we return them configured."),
+        ], eyebrow=("Soporte", "Support"), tono="base", anchor="soporte",
+            imagen_=("photo", ("Técnico informático atendiendo un ordenador en una oficina pequeña", "IT technician working on a computer in a small office"))),
+        bloque_valores(("Copias de seguridad", "Backups"), [
+            (("Qué copiamos", "What we copy"),
+             ("Documentos, correo, facturación y lo demás que nos indiques. Elegimos contigo lo que no puede perderse.",
+              "Documents, email, invoicing and whatever else you tell us. We choose with you what cannot be lost.")),
+            (("Dónde se guarda", "Where it is kept"),
+             ("En más de un sitio: una copia en tu oficina y otra fuera, para que un robo, un incendio o un virus no se lleven todo.",
+              "In more than one place: one copy at your office and another off-site, so a theft, fire or virus does not take everything.")),
+            (("Que se pueda recuperar", "That it can be restored"),
+             ("De poco sirve una copia que no funciona. Hacemos pruebas de recuperación y te contamos cómo han ido.",
+              "A copy that does not work is little use. We run restore tests and tell you how they went.")),
+        ], eyebrow=("Copias", "Backups"), estilo="borde", tono="relleno", anchor="copias"),
+        bloque_checks(("Ciberseguridad básica, en llano", "Basic cybersecurity, in plain words"), [
+            ("Contraseñas distintas para cada servicio y un gestor para no tener que recordarlas", "Different passwords for each service and a manager so nobody has to remember them"),
+            ("Verificación en dos pasos en el correo y en lo importante", "Two-step verification on email and on anything important"),
+            ("Actualizaciones al día en equipos y programas", "Updates kept current on computers and programs"),
+            ("Antivirus y protección del correo contra mensajes falsos", "Antivirus and email protection against fake messages"),
+            ("Una charla corta con el equipo para reconocer un correo sospechoso", "A short talk with the team on spotting a suspicious email"),
+            ("Un plan sencillo de qué hacer si alguien cae en un engaño", "A simple plan for what to do if someone falls for a scam"),
+        ], eyebrow=("Seguridad", "Security"),
+            intro=("Ningún sistema es invulnerable. Lo que hacemos es reducir el riesgo y dejarte preparado para recuperarte rápido.",
+                   "No system is invulnerable. What we do is reduce the risk and leave you ready to recover quickly."),
+            tono="base", cols=2, anchor="seguridad"),
+        bloque_valores(("Redes, wifi, correo y nube", "Networks, wifi, email and cloud"), [
+            (("Redes y wifi", "Networks and wifi"),
+             ("Revisamos el router, la cobertura y los cables. Separamos la wifi del equipo de la de las visitas.",
+              "We check the router, coverage and cables. We separate the team's wifi from the visitors' one.")),
+            (("Correo con tu dominio", "Email with your domain"),
+             ("Cuentas con el nombre de tu empresa, en el móvil y en el ordenador, y migración de los correos que ya tienes.",
+              "Accounts with your company's name, on the phone and the computer, and migration of the emails you already have.")),
+            (("Archivos en la nube", "Files in the cloud"),
+             ("Carpetas compartidas con permisos por persona, para trabajar en equipo sin enviar adjuntos de un lado a otro.",
+              "Shared folders with permissions per person, so the team can work together without sending attachments back and forth.")),
+        ], eyebrow=("Conexión", "Connectivity"), estilo="relleno", tono="relleno", anchor="redes"),
+        bloque_faq(("Preguntas frecuentes", "Frequently asked questions"), [
+            (("¿Vais a mi oficina o lo hacéis todo a distancia?", "Do you come to my office or do everything remotely?"),
+             ("Las dos cosas. Lo que se puede arreglar a distancia se hace así, y lo que no, lo hacemos en persona.",
+              "Both. What can be fixed remotely is done that way, and what cannot is done in person.")),
+            (("¿Tengo que cambiar de programas o de equipos?", "Do I have to change programs or computers?"),
+             ("Solo si es necesario. Primero miramos qué tienes y qué se puede aprovechar; no vendemos equipos que no hagan falta.",
+              "Only if necessary. First we look at what you have and what can be reused; we do not sell computers you do not need.")),
+            (("¿Puedo contrataros solo para un arreglo?", "Can I hire you for just one repair?"),
+             ("Sí. Los planes mensuales son para quien quiere tener todo cubierto, pero también atendemos avisos sueltos.",
+              "Yes. Monthly plans are for those who want everything covered, but we also take one-off call-outs.")),
+        ], tono="base"),
+        bloque_cta(("¿Quieres que lo revisemos?", "Would you like us to take a look?"), None,
+                   [revision(), whatsapp("ghost")], tono="relleno"),
+    ])
+
+    planes = pagina("planes", ("planes", "plans"), ("Planes y soporte", "Plans and support"),
+                    ("Planes mensuales de ejemplo, tiempos de respuesta y qué pasa paso a paso cuando algo falla.",
+                     "Example monthly plans, response times and what happens step by step when something fails."), [
+        hero(("Planes mensuales y qué hacemos si algo falla", "Monthly plans and what we do if something fails"),
+             ("Una cuota fija al mes por tener tus equipos cuidados y a quien llamar. También hacemos arreglos sueltos.",
+              "A fixed monthly fee for having your computers looked after and someone to call. We also do one-off repairs."),
+             [revision()], variante="texto"),
+        bloque_precios(("Planes mensuales", "Monthly plans"),
+                       ("Planes mensuales de ejemplo", "Example monthly plans"),
+                       [("Plan", "Plan"), ("Para", "For"), ("Qué incluye", "What it includes"), ("Precio al mes", "Price per month")],
+                       [(("Básico", "Basic"), ("Hasta 5 equipos", "Up to 5 computers"),
+                         ("Soporte remoto, actualizaciones y copia de seguridad de lo importante", "Remote support, updates and a backup of what matters"), desde(59)),
+                        (("Oficina", "Office"), ("Hasta 10 equipos", "Up to 10 computers"),
+                         ("Todo lo del Básico, visitas a la oficina, antivirus y protección del correo", "Everything in Basic, office visits, antivirus and email protection"), desde(129)),
+                        (("Completo", "Complete"), ("Hasta 25 equipos", "Up to 25 computers"),
+                         ("Todo lo de Oficina, gestión de red y wifi, formación al equipo y revisión trimestral", "Everything in Office, network and wifi management, team training and a quarterly review"), desde(249))],
+                       intro=("Una cuota fija, sin sorpresas. Los equipos nuevos o las obras de red se presupuestan aparte.",
+                              "A fixed fee, with no surprises. New computers and network work are quoted separately."),
+                       eyebrow=("Precios", "Prices"), nota=nota_precios, boton_=revision(), tono="base", anchor="planes"),
+        bloque_valores(("Tiempos de respuesta", "Response times"), [
+            (("Plan Básico", "Basic plan"),
+             ("Respondemos el mismo día laborable o el siguiente.", "We reply the same or the next working day.")),
+            (("Plan Oficina", "Office plan"),
+             ("Respondemos en pocas horas dentro del horario de atención.", "We reply within a few hours during opening hours.")),
+            (("Plan Completo", "Complete plan"),
+             ("Respuesta prioritaria dentro del horario de atención y aviso por teléfono si es urgente.", "Priority reply during opening hours and a phone call if it is urgent.")),
+        ], intro=("Tiempos de ejemplo: ajústalos a lo que de verdad puedes cumplir en cada plan.",
+                  "Example times: adjust them to what you can really deliver on each plan."),
+            eyebrow=("Respuesta", "Response"), estilo="relleno", tono="relleno", cols=3, anchor="tiempos"),
+        bloque_pasos(("Si algo falla, esto es lo que pasa", "If something fails, this is what happens"), [
+            (("1. Nos avisas", "1. You let us know"),
+             ("Por teléfono o WhatsApp. Dinos qué equipo es, qué ha pasado y si puedes seguir trabajando.",
+              "By phone or WhatsApp. Tell us which computer it is, what happened and whether you can carry on working.")),
+            (("2. Lo apuntamos y lo clasificamos", "2. We log and prioritise it"),
+             ("Primero lo que para el trabajo de varias personas, después lo que molesta a una.",
+              "First what stops several people working, then what bothers one.")),
+            (("3. Lo resolvemos", "3. We fix it"),
+             ("A distancia si se puede, en tu oficina si no. Si hay que cambiar una pieza, te lo decimos antes.",
+              "Remotely if possible, at your office if not. If a part has to be replaced, we tell you first.")),
+            (("4. Te lo contamos", "4. We report back"),
+             ("Te decimos qué ha ocurrido, qué hemos hecho y qué hacer para que no se repita.",
+              "We tell you what happened, what we did and what to do to stop it happening again.")),
+        ], tono="base", anchor="si-falla"),
+        bloque_faq(("Preguntas sobre los planes", "Questions about plans"), [
+            (("¿Hay permanencia?", "Is there a minimum term?"),
+             ("Los planes se pagan mes a mes y se pueden cancelar avisando con un mes de antelación. Texto de ejemplo: ajústalo a tu política.",
+              "Plans are paid month by month and can be cancelled with a month's notice. Example text: adjust it to your policy.")),
+            (("¿Qué pasa si tengo más equipos de los que incluye el plan?", "What if I have more computers than the plan includes?"),
+             ("Te proponemos el plan siguiente o un precio por equipo adicional, siempre por escrito.",
+              "We suggest the next plan or a price per extra computer, always in writing.")),
+            (("¿Y si se pierde información?", "What if information is lost?"),
+             ("Intentamos recuperarla desde las copias de seguridad. Por eso las probamos de forma periódica y te contamos el resultado.",
+              "We try to restore it from the backups. That is why we test them regularly and tell you the result.")),
+        ], tono="relleno"),
+        bloque_cta(("Empezamos por una primera revisión", "We start with a first review"), None,
+                   [revision(), llamar("ghost")], tono="base"),
+    ])
+
+    cont = pagina("contacto", ("contacto", "contact"), ("Contacto y primera revisión", "Contact and first review"),
+                  ("Pide una primera revisión sin compromiso con el formulario, por teléfono o por WhatsApp. Horario y cómo llegar.",
+                   "Ask for a no-obligation first review using the form, by phone or on WhatsApp. Opening hours and directions."), [
+        hero(("Primera revisión sin compromiso", "First review with no obligation"),
+             ("Cuéntanos qué equipos tienes y qué te da problemas. Si prefieres hablar, llámanos o escríbenos por WhatsApp.",
+              "Tell us what computers you have and what is giving you trouble. If you prefer to talk, call us or message us on WhatsApp."),
+             [llamar(), whatsapp()], variante="texto"),
+        bloque_contacto(("Cuéntanos tu caso", "Tell us about your case"),
+                        ("Con el número de equipos y lo que falla nos basta para decirte por dónde empezar.",
+                         "The number of computers and what is going wrong is enough for us to tell you where to begin."),
+                        campos_consulta(("¿Qué te pasa o qué necesitas?", "What is wrong or what do you need?"),
+                                        servicios=[("Primera revisión", "First review"), ("Algo no funciona", "Something is not working"),
+                                                   ("Copias de seguridad", "Backups"), ("Seguridad informática", "IT security"),
+                                                   ("Red o wifi", "Network or wifi"), ("Correo o nube", "Email or cloud"),
+                                                   ("Plan mensual", "Monthly plan")],
+                                        extra=[campo("equipos", "select", ("Número de equipos", "Number of computers"), False,
+                                                     opciones=[("De 1 a 5", "1 to 5"), ("De 6 a 10", "6 to 10"),
+                                                               ("De 11 a 25", "11 to 25"), ("Más de 25", "More than 25")])]),
+                        ("Pedir revisión", "Ask for a review"), horas,
+                        notas=("Lo que nos cuentes es confidencial y solo lo usamos para responderte. Nunca te pedimos contraseñas por el formulario.",
+                               "What you tell us is confidential and we use it only to reply to you. We never ask for passwords through the form."),
+                        exito=("Gracias. Te llamamos para concretar cuándo podemos hacer la revisión.",
+                               "Thank you. We will call you to agree when we can do the review.")),
+        bloque_mapa(texto_=("Atendemos en el taller con cita previa. El soporte a tu oficina lo hacemos nosotros.",
+                            "We see customers at the workshop by appointment. We provide support at your office ourselves."), tono="relleno"),
+    ])
+
+    return plantilla(KEY, ("Servicios informáticos", "IT services"),
+                     ("Mantenimiento informático para pequeñas empresas con servicios, planes mensuales de ejemplo, qué pasa si algo falla y primera revisión sin compromiso con formulario, llamada y WhatsApp.",
+                      "IT maintenance for small businesses with services, example monthly plans, what happens if something fails and a no-obligation first review with form, call and WhatsApp."),
+                     "profesionales", ("servicios informaticos mantenimiento informatico soporte informatico informatico informatica para empresas it tecnico informatico copias de seguridad backup ciberseguridad redes wifi correo nube pymes sistemas",
+                                       "it services it support managed it computer support small business backup cybersecurity network wifi email cloud technician helpdesk"),
+                     look, cabecera(nav, marco([llamar(), whatsapp("ghost")], dir="row", gap=12, wrap=True)),
+                     pie(nav, ("Mantenimiento informático y soporte para pequeñas empresas: equipos, red, correo y copias de seguridad.",
+                               "IT maintenance and support for small businesses: computers, network, email and backups."),
+                         ("Lunes a viernes 8:30 a 14:00 y 15:30 a 18:30.",
+                          "Monday to Friday 8:30 am to 2 pm and 3:30 pm to 6:30 pm.")),
+                     [inicio, servicios, planes, cont])

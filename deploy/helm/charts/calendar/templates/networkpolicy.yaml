@@ -1,0 +1,64 @@
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "sytue-calendar.fullname" . }}
+  labels:
+    {{- include "sytue-calendar.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "sytue-calendar.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Desde el ingress canonico (Traefik) — trafico publico calendar.sytue.eu.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              sytue.eu/role: ingress
+      ports:
+        - protocol: TCP
+          port: {{ .Values.service.targetPort }}
+    # Desde el resto de la suite (shell, Hub, intents cross-app).
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/part-of: sytue-one
+      ports:
+        - protocol: TCP
+          port: {{ .Values.service.targetPort }}
+  egress:
+    # DNS
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Intra-suite (validacion JWT contra Sytue ID via JWKS, Hub, etc.).
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/part-of: sytue-one
+    # Postgres EXTERNO (RDB), S3 (Object Storage UE), Secret Manager / HTTPS.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 169.254.0.0/16
+      ports:
+        - protocol: TCP
+          port: 5432
+        - protocol: TCP
+          port: 443
+        {{- with (.Values.config.smtp).addr }}
+        # El relé de correo de fuera del clúster (config.smtp.addr), a su puerto: por
+        # ahí salen las invitaciones iMIP. Sin dirección, por el MSA de Sytue Mail,
+        # que es intra-suite.
+        - protocol: TCP
+          port: {{ splitList ":" . | last | int }}
+        {{- end }}
+{{- end }}

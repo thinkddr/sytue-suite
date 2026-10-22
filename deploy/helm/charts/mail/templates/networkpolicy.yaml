@@ -1,0 +1,80 @@
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "sytue-mail.fullname" . }}
+  labels:
+    {{- include "sytue-mail.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "sytue-mail.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Desde el ingress canonico (Traefik) — trafico publico mail.sytue.eu.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              sytue.eu/role: ingress
+      ports:
+        - protocol: TCP
+          port: {{ .Values.service.targetPort }}
+    # Desde el resto de la suite (shell, Hub, intents cross-app).
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/part-of: sytue-one
+      ports:
+        - protocol: TCP
+          port: {{ .Values.service.targetPort }}
+    {{- if .Values.mailService.enabled }}
+    # SMTP entrante (MX) + submission + IMAPS desde Internet via el LB (mx.sytue.eu).
+    - ports:
+        - protocol: TCP
+          port: {{ .Values.mailService.ports.smtp }}
+        - protocol: TCP
+          port: {{ .Values.mailService.ports.submissions }}
+        - protocol: TCP
+          port: {{ .Values.mailService.ports.submission }}
+        - protocol: TCP
+          port: {{ .Values.mailService.ports.imaps }}
+    {{- end }}
+  egress:
+    # DNS
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Intra-suite (validacion JWT contra Sytue ID via JWKS, Hub, etc.).
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/part-of: sytue-one
+    # Postgres EXTERNO (RDB), S3 (Object Storage UE), Secret Manager / HTTPS.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 169.254.0.0/16
+      ports:
+        - protocol: TCP
+          port: 5432
+        - protocol: TCP
+          port: 443
+        # El relé de fuera del clúster por el que salen los avisos por correo.
+        {{- include "sytue.correoEgress" . | nindent 8 }}
+        {{- if .Values.mailService.enabled }}
+        # Entrega SMTP saliente a otros MX (25) + submission relay (465/587).
+        - protocol: TCP
+          port: 25
+        - protocol: TCP
+          port: 465
+        - protocol: TCP
+          port: 587
+        {{- end }}
+{{- end }}

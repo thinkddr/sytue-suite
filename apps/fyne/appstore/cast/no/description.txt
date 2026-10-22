@@ -1,0 +1,17 @@
+Videoene dine og direktesendingene dine, på forespørsel og i sanntid, uten å forlate Europa.
+
+• Last opp en video, så omkodes den i flere kvaliteter for alle skjermer.
+• Gå direkte fra et sendeprogram, fra nettleseren eller fra appen.
+• Fire synlighetsnivåer: offentlig, ikke oppført, organisasjon eller bestemte personer.
+• Direktechat og kommentarer, med enkel moderering av den som publiserer.
+• Last opp videoer på opptil 8 GiB; originalen beholdes.
+• Direktesending fra et sendeprogram over RTMP, med en strømnøkkel per person.
+• Direkte fra nettleseren eller appen: kamera, skjerm og mikrofon.
+• Opptak av direktesendinger blir automatisk til videoer på forespørsel.
+• En offentlig forside og en kanal per organisasjon, indekserbare.
+• Ikke-oppførte lenker, videoer bare for organisasjonen eller tilgang for bestemte personer via @brukernavn.
+• Direktechat og trådede kommentarer, moderert av den som publiserer og organisasjonens administratorer.
+• Lagringen telles mot kvoten din i Sytue Drive; alt i Den europeiske union.
+• «Last opp til Cast» fra Sytue Drive: en kopi av videoen går til Cast, og filen blir liggende i Drive.
+
+Kryptert under overføring (TLS 1.3). Sytues infrastruktur er i EU. Plasseringen av eksterne tjenester avhenger av leverandøren deres.

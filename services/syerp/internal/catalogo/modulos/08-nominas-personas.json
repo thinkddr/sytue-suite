@@ -1,0 +1,96 @@
+[
+  {
+    "clave": "nomina", "modulo": "nominas", "secuencia": "NOM",
+    "etiqueta": {"en":"Payslips","es":"Nóminas","fr":"Bulletins de paie","de":"Gehaltsabrechnungen","it":"Buste paga","bg":"Фишове за заплати","cs":"Výplatní pásky","da":"Lønsedler","el":"Αποδείξεις μισθοδοσίας","et":"Palgalehed","fi":"Palkkalaskelmat","ga":"Duillíní pá","hr":"Platne liste","hu":"Bérjegyzékek","is":"Launaseðlar","lt":"Atlyginimo lapeliai","lv":"Algas lapas","mt":"Payslips","nb":"Lønnsslipper","nl":"Loonstroken","pl":"Listy płac","pt":"Recibos de vencimento","ro":"Fluturași de salariu","sk":"Výplatné pásky","sl":"Plačilne liste","sv":"Lönespecifikationer"},
+    "estados": ["borrador","confirmado","pagado","cancelado"],
+    "campos": [
+      {"clave":"empleado","tipo":"relacion","modelo":"empleado","requerido":true},
+      {"clave":"fecha","tipo":"fecha","requerido":true},
+      {"clave":"fecha_inicio","tipo":"fecha","requerido":true},
+      {"clave":"fecha_fin","tipo":"fecha","requerido":true},
+      {"clave":"bruto","tipo":"dinero","requerido":true},
+      {"clave":"deducciones","tipo":"dinero"},
+      {"clave":"neto","tipo":"dinero"},
+      {"clave":"notas","tipo":"texto_largo"}
+    ],
+    "lista": ["ref","empleado","fecha","bruto","neto","estado"],
+    "contable": {
+      "diario": "nominas",
+      "campo_base": "bruto", "campo_tercero": "empleado",
+      "cuenta_contrapartida": "465000",
+      "cuenta_ingreso_gasto": "640000",
+      "cobro": false
+    }
+  },
+  {
+    "clave": "concepto_nomina", "modulo": "nominas", "titulo": "nombre",
+    "etiqueta": {"en":"Salary items","es":"Conceptos retributivos","fr":"Rubriques de paie","de":"Lohnarten","it":"Voci di paga","bg":"Елементи на заплатата","cs":"Mzdové složky","da":"Lønarter","el":"Στοιχεία μισθοδοσίας","et":"Palgakomponendid","fi":"Palkkalajit","ga":"Míreanna tuarastail","hr":"Stavke plaće","hu":"Bérelemek","is":"Launaliðir","lt":"Atlyginimo elementai","lv":"Algas elementi","mt":"Elementi tas-salarju","nb":"Lønnsarter","nl":"Looncomponenten","pl":"Składniki wynagrodzenia","pt":"Rubricas salariais","ro":"Elemente salariale","sk":"Mzdové zložky","sl":"Postavke plače","sv":"Lönearter"},
+    "campos": [
+      {"clave":"nomina","tipo":"relacion","modelo":"nomina","requerido":true},
+      {"clave":"codigo","tipo":"texto"},
+      {"clave":"nombre","tipo":"texto","requerido":true},
+      {"clave":"tipo","tipo":"seleccion","opciones":["devengo","deduccion"],"requerido":true},
+      {"clave":"cantidad","tipo":"decimal"},
+      {"clave":"importe","tipo":"dinero","requerido":true}
+    ],
+    "lista": ["nomina","codigo","nombre","tipo","importe"]
+  },
+  {
+    "clave": "solicitud_aprobacion", "modulo": "aprobaciones", "secuencia": "APR",
+    "etiqueta": {"en":"Approval requests","es":"Solicitudes de aprobación","fr":"Demandes d'approbation","de":"Genehmigungsanträge","it":"Richieste di approvazione","bg":"Заявки за одобрение","cs":"Žádosti o schválení","da":"Godkendelsesanmodninger","el":"Αιτήματα έγκρισης","et":"Kinnitustaotlused","fi":"Hyväksyntäpyynnöt","ga":"Iarratais cheadaithe","hr":"Zahtjevi za odobrenje","hu":"Jóváhagyási kérelmek","is":"Samþykktarbeiðnir","lt":"Patvirtinimo prašymai","lv":"Apstiprināšanas pieprasījumi","mt":"Talbiet għal approvazzjoni","nb":"Godkjenningsforespørsler","nl":"Goedkeuringsverzoeken","pl":"Wnioski o zatwierdzenie","pt":"Pedidos de aprovação","ro":"Cereri de aprobare","sk":"Žiadosti o schválenie","sl":"Zahteve za odobritev","sv":"Godkännandeärenden"},
+    "estados": ["pendiente","aprobado","rechazado","cancelado"],
+    "campos": [
+      {"clave":"asunto","tipo":"texto","requerido":true},
+      {"clave":"tipo","tipo":"seleccion","opciones":["gasto","compra","ausencia","otro"],"requerido":true},
+      {"clave":"solicitante","tipo":"relacion","modelo":"empleado","requerido":true},
+      {"clave":"aprobador","tipo":"relacion","modelo":"empleado"},
+      {"clave":"fecha","tipo":"fecha","requerido":true},
+      {"clave":"importe","tipo":"dinero"},
+      {"clave":"motivo","tipo":"texto_largo"}
+    ],
+    "lista": ["ref","asunto","tipo","solicitante","fecha","estado"]
+  },
+  {
+    "clave": "turno", "modulo": "planificacion", "titulo": "nombre",
+    "etiqueta": {"en":"Shifts","es":"Turnos","fr":"Créneaux","de":"Schichten","it":"Turni","bg":"Смени","cs":"Směny","da":"Vagter","el":"Βάρδιες","et":"Vahetused","fi":"Työvuorot","ga":"Sealanna","hr":"Smjene","hu":"Műszakok","is":"Vaktir","lt":"Pamainos","lv":"Maiņas","mt":"Xiftijiet","nb":"Skift","nl":"Diensten","pl":"Zmiany","pt":"Turnos","ro":"Ture","sk":"Zmeny","sl":"Izmene","sv":"Skift"},
+    "estados": ["borrador","publicado","cancelado"],
+    "campos": [
+      {"clave":"nombre","tipo":"texto","requerido":true},
+      {"clave":"empleado","tipo":"relacion","modelo":"empleado"},
+      {"clave":"fecha_inicio","tipo":"fechahora","requerido":true},
+      {"clave":"fecha_fin","tipo":"fechahora","requerido":true},
+      {"clave":"horas","tipo":"decimal"},
+      {"clave":"proyecto","tipo":"relacion","modelo":"proyecto"}
+    ],
+    "lista": ["nombre","empleado","fecha_inicio","fecha_fin","horas","estado"]
+  },
+  {
+    "clave": "evaluacion", "modulo": "evaluaciones", "secuencia": "EVA",
+    "etiqueta": {"en":"Appraisals","es":"Evaluaciones","fr":"Évaluations","de":"Mitarbeitergespräche","it":"Valutazioni","bg":"Оценки","cs":"Hodnocení","da":"Medarbejdersamtaler","el":"Αξιολογήσεις","et":"Hindamised","fi":"Arvioinnit","ga":"Measúnuithe","hr":"Ocjenjivanja","hu":"Értékelések","is":"Frammistöðumat","lt":"Vertinimai","lv":"Novērtējumi","mt":"Evalwazzjonijiet","nb":"Medarbeidersamtaler","nl":"Beoordelingen","pl":"Oceny","pt":"Avaliações","ro":"Evaluări","sk":"Hodnotenia","sl":"Ocenjevanja","sv":"Utvärderingar"},
+    "estados": ["borrador","pendiente","hecho","cancelado"],
+    "campos": [
+      {"clave":"empleado","tipo":"relacion","modelo":"empleado","requerido":true},
+      {"clave":"responsable","tipo":"texto"},
+      {"clave":"fecha","tipo":"fecha","requerido":true},
+      {"clave":"puntuacion","tipo":"entero"},
+      {"clave":"objetivos","tipo":"texto_largo"},
+      {"clave":"resultado","tipo":"texto_largo"}
+    ],
+    "lista": ["ref","empleado","responsable","fecha","puntuacion","estado"]
+  },
+  {
+    "clave": "referido", "modulo": "referidos", "titulo": "nombre",
+    "etiqueta": {"en":"Referrals","es":"Recomendaciones","fr":"Cooptations","de":"Empfehlungen","it":"Segnalazioni","bg":"Препоръки","cs":"Doporučení","da":"Anbefalinger","el":"Συστάσεις","et":"Soovitused","fi":"Suositukset","ga":"Moltaí","hr":"Preporuke","hu":"Ajánlások","is":"Meðmæli","lt":"Rekomendacijos","lv":"Ieteikumi","mt":"Referenzi","nb":"Anbefalinger","nl":"Aanbevelingen","pl":"Polecenia","pt":"Referências","ro":"Recomandări","sk":"Odporúčania","sl":"Priporočila","sv":"Rekommendationer"},
+    "estados": ["nuevo","entrevista","contratado","rechazado"],
+    "campos": [
+      {"clave":"nombre","tipo":"texto","requerido":true},
+      {"clave":"empleado","tipo":"relacion","modelo":"empleado","requerido":true},
+      {"clave":"vacante","tipo":"relacion","modelo":"vacante"},
+      {"clave":"candidato","tipo":"relacion","modelo":"candidato"},
+      {"clave":"correo","tipo":"correo"},
+      {"clave":"fecha","tipo":"fecha"},
+      {"clave":"importe","tipo":"dinero"}
+    ],
+    "lista": ["nombre","empleado","vacante","fecha","estado"]
+  }
+]

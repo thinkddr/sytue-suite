@@ -1,0 +1,11 @@
+Verknüpfte Tabellen für Kunden, Bestellungen oder Bestände, mit Berechtigungen und Protokoll jeder Änderung.
+
+• Kunden, Bestellungen oder Bestände in verknüpften Tabellen, ganz ohne Datenbankkenntnisse.
+• Teilen Sie mit Ihrer Organisation in der Rolle, die Sie festlegen.
+• Jede Änderung wird protokolliert: wer sie vorgenommen hat und was vorher galt.
+• Ihre Daten bleiben in der EU, und Sie exportieren sie, wann Sie wollen.
+• Tabellen mit Feldern für Text, Zahl, Datum, Kontrollkästchen sowie Einzel- und Mehrfachauswahl.
+• Beziehungen zwischen Tabellen: Verknüpfen Sie eine Bestellung mit ihrem Kunden, und die Datenbank verhindert, dass die Verknüpfung bricht.
+• Berechtigungen pro Datenbank und pro Tabelle: Eigentümer, Bearbeiter, Kommentator und Leser.
+
+Verschlüsselt bei der Übertragung (TLS 1.3). Die Infrastruktur von Sytue befindet sich in der EU. Der Standort externer Dienste hängt von ihrem Anbieter ab.

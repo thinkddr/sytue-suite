@@ -1,0 +1,16 @@
+Archivos y colaboración, con la marca de tu organización.
+
+• Sube, organiza y comparte con enlaces controlados (permiso y caducidad).
+• Vista previa en línea de documentos e imágenes.
+• Adjunta a Mail sin duplicar el archivo.
+• Almacenamiento respaldado por S3 en regiones europeas.
+• Mi unidad, unidades de equipo, compartido conmigo, recientes, favoritos y papelera.
+• Enlaces de compartición con dos niveles (mirar o editar), contraseña y caducidad.
+• Historial de versiones con restauración.
+• Vista previa de documentos, imágenes y PDF sin descargar.
+• Abre y edita documentos de oficina en Docus, Calcus y Diapos; los PDF, en CertiPDF.
+• Etiquetas de confidencialidad que impiden enlaces públicos donde no toca.
+• Comparte a un canal de Rooms o adjunta a Mail sin duplicar el archivo.
+• Almacenamiento S3 en regiones europeas, con la cuota siempre visible.
+
+Cifrado en tránsito (TLS 1.3). La infraestructura de Sytue está en la UE. Los servicios externos siguen la ubicación de su proveedor.

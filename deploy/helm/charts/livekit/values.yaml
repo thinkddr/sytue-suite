@@ -1,0 +1,179 @@
+# Sytue Rooms — LiveKit server (SFU WebRTC, Apache-2.0) SIN modificar (imagen
+# UPSTREAM oficial). global.* desde el umbrella. Ver CONVENTIONS §1, §3, §8.
+enabled: true
+
+rooms:
+  subdomain: rooms-sfu
+
+# SFU sin routing externo (sin Redis/Valkey, por contrato): se ejecuta en modo single
+# node. La capacidad se escala verticalmente; para mas sesiones, usar instancias mas
+# grandes. La escala horizontal multinodo (que requeriria un store de routing) NO se usa.
+replicaCount: 1
+
+image:
+  # Upstream para desarrollo del subchart. values-prod lo sustituye por el
+  # mirror byte-a-byte firmado en Scaleway Registry.
+  repository: livekit/livekit-server
+  tag: "v1.13.7@sha256:6fd3b7088874c4d119160dd688798dfec852bc014786d392caad15f6f63912a3"
+  pullPolicy: IfNotPresent
+  useGlobalRegistry: false
+
+# Señalización WebSocket (cliente <-> SFU) y fallback TCP/ICE para media.
+ports:
+  http: 7880        # WS/HTTP de señalización (detrás del ingress, rooms.sytue.eu)
+  rtcTcp: 7881      # ICE/TCP fallback de media
+  # Mux UDP: un solo frontend del LB en vez de 101 listeners. Es suficiente
+  # para el arranque y evita superar los límites del LB gestionado.
+  rtcUdp: 7882
+
+rtc:
+  # IP flexible del LB de medios. 03-desplegar.sh la obtiene de OpenTofu y la
+  # inyecta; con ella LiveKit no consulta STUN de Google/Twilio para descubrirse.
+  nodeIP: ""
+
+# Claves de API (api_key -> api_secret). El minteo de JWT lo hace el BFF `sytue-rooms`,
+# no LiveKit; aquí solo se monta el par de claves que el BFF usa para firmar.
+keys:
+  # Secret con las claves de LiveKit. Esperado: clave = api_key, valor = api_secret.
+  # Formato del fichero proyectado: "<API_KEY>: <API_SECRET>".
+  existingSecret: sytue-livekit-keys
+  secretKey: keys.yaml          # nombre de la entrada dentro del secret
+
+# Store de routing. APAGADO por defecto: el SFU opera single-node y no lo necesita,
+# y PostgreSQL sigue siendo el único datastore de la suite (LiveKit no persiste
+# estado; las salas son efímeras).
+#
+# Se enciende SOLO para grabar. El egress de LiveKit no recibe las peticiones por
+# HTTP: se registra en este store y el SFU le habla por ahí, así que sin él la
+# grabación no existe —no es una optimización, es su único canal—.
+#
+# Cuando se enciende apunta a Dragonfly, que ya corre para la caché efímera de la
+# suite y habla el protocolo de Redis. El uso encaja con «solo efímero»: lo que
+# viaja son peticiones de trabajo que caducan en segundos, no estado. Redis a
+# secas queda descartado por licencia (CONVENTIONS.md §0.1); Valkey sería la
+# alternativa si algún día conviene aislar este bus de la caché de las apps.
+redis:
+  enabled: false
+  # Host:puerto. Vacío = lo rellena el umbrella con la URL global de Dragonfly.
+  address: ""
+  db: 0
+  # Contraseña de Dragonfly, que la EXIGE desde la respuesta al CVE-2026-62357.
+  # Es el mismo Secret compartido que leen Dragonfly y los siete servicios de la
+  # suite: repartirlo sería tener que rotarlo en nueve sitios. Nombre vacío ⇒ sin
+  # contraseña y sin initContainer, que es como estaba antes del CVE.
+  passwordSecret:
+    name: ""
+    key: dragonfly-password
+
+# Webhooks del SFU hacia Rooms y Cast. Rooms cierra las salas y Cast finaliza las
+# grabaciones al recibir egress_ended: sin ese aviso el HLS no se convierte en VOD.
+#
+# Sin esta sección el SFU no notifica a nadie: `services/rooms` monta y verifica
+# /webhooks/livekit, pero nunca recibe un solo evento, así que las salas quedan abiertas
+# para siempre y el canal no se entera de nada. Estuvo así desde el principio.
+webhook:
+  enabled: true
+  # api_key con la que LiveKit FIRMA el webhook. Debe ser una de las del key-file
+  # (`keys.existingSecret`), y su api_secret es el que verifica Rooms. La api_key
+  # identifica la clave, no autoriza por sí sola: el secreto no sale de su Secret.
+  apiKey: ""
+  # Destino único heredado. Si se configura, conserva ese único destino; vacío
+  # junto con `urls` => Services internos de Rooms Y Cast de este release.
+  url: ""
+  # Lista explícita de destinos; tiene prioridad sobre `url`. Permite instalaciones
+  # con servicios en otros hosts sin perder los avisos de uno de los dos productos.
+  urls: []
+
+# TURN embebido de LiveKit para clientes tras NAT estricto. Traefik termina TLS
+# en el ingress principal y reenvía TURN plano por un Service interno; UDP se
+# enruta por otra entrypoint del mismo ingress. Así cert-manager puede resolver
+# HTTP-01 para el dominio TURN y los clientes conservan cobertura corporativa.
+turn:
+  enabled: true
+  domain: ""                    # vacío => turn.<host del SFU>
+  tlsPort: 5349
+  udpPort: 3478
+  tlsSecret: tls-turn-rooms-sfu-sytue-eu
+  tlsEntryPoint: turntls
+  udpEntryPoint: turnudp
+
+# Servicio de media (UDP mux 7882 + TCP 7881) vía LoadBalancer Scaleway (UE).
+mediaService:
+  # `LoadBalancer` por defecto para no cambiar el comportamiento de quien use
+  # este chart fuera de Sytue. En producción se pone `ClusterIP` y el 7881 entra
+  # por el Traefik de la suite (templates/media-route.yaml), que ahorra un LB-S
+  # entero —unos 20 EUR/mes con su IP— y ya hacía lo mismo con el TURN/TLS.
+  type: LoadBalancer
+  # EntryPoint de Traefik por el que entra el ICE/TCP cuando `type: ClusterIP`.
+  # Tiene que existir en el chart de Traefik y NO llevar TLS: ICE/TCP no manda
+  # SNI, así que la ruta casa con `HostSNI("*")`, que TLS no admite.
+  tcpEntryPoint: rtctcp
+  externalTrafficPolicy: Local
+  # Solo debe activarse cuando el proveedor del LoadBalancer soporte UDP.
+  # Scaleway no lo soporta; values-prod usa ICE/TCP + TURN/TLS.
+  exposeUdp: true
+  # IP flexible reservada por OpenTofu e inyectada por 03-desplegar.sh.
+  loadBalancerIP: ""
+  annotations:
+    service.beta.kubernetes.io/scw-loadbalancer-type: "lb-s"
+
+ingress:
+  className: traefik
+  tlsSecret: tls-rooms-sfu-sytue-eu
+  # HOST Y SECRETO DE LA SEÑALIZACIÓN. Vacíos = los mismos que el SFU, que es el
+  # comportamiento de siempre y lo correcto con IP pública propia. Se rellenan
+  # cuando el servidor está tras un router y la señalización tiene que entrar por
+  # un túnel HTTP mientras los medios siguen yendo por la IP real. El porqué
+  # completo está en el comentario de `livekit.signalHost`.
+  signalHost: ""
+  signalTlsSecret: ""
+  # Prefijo del endpoint WS de señalizacion del SFU (default /rtc). El "/" de
+  # rooms.sytue.eu lo sirve el SPA Astro; las rutas /api las sirve el servicio Go (sytue-rooms).
+  signalPath: /rtc
+  # WebSocket: Traefik no bufferea ni limita el cuerpo por defecto (streaming OK).
+  annotations: {}
+
+networkPolicy:
+  enabled: true
+
+serviceMonitor:
+  enabled: true
+  interval: 30s
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 512Mi
+  limits:
+    cpu: "4"
+    memory: 2Gi
+
+# Permite reservar el SFU en nodos con red/CPU apropiadas. Vacío conserva el
+# comportamiento de los entornos gestionados existentes.
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+# securityContext de contenedor restrictivo (defensa en profundidad). LiveKit
+# (unica app de terceros, Apache-2.0) no escribe en el rootfs en runtime: config y
+# claves se montan read-only; el resto es efimero.
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  capabilities:
+    drop: ["ALL"]
+
+# PodDisruptionBudget. El SFU opera single-node (sin routing store; sin Redis/Valkey),
+# por lo que un PDB con minAvailable bloquearia drains. Se usa maxUnavailable para no
+# impedir el mantenimiento del nodo; en HA multinodo (con routing) se elevaria.
+podDisruptionBudget:
+  enabled: true
+  maxUnavailable: 1

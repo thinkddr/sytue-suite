@@ -1,0 +1,19 @@
+apiVersion: v2
+name: sytue-cloud-builder
+description: >-
+  Sytue Cloud Builder — servicio Go propio de build del PaaS. Recibe ordenes del
+  control-plane (cloud-api), detecta el framework del repo y lanza Jobs Kaniko (rootless)
+  que construyen y publican imagenes en el Scaleway Registry (UE). Sin ingress publico.
+  Código Apache-2.0, (c) 2026 Daniel Delgado Ramos.
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+kubeVersion: ">=1.31.0-0"
+home: https://sytue.eu
+keywords: [sytue, cloud, paas, builder, buildkit, go]
+maintainers:
+  - name: Sytue Platform
+    email: platform@sytue.eu
+annotations:
+  licenses: MIT
+  sytue.eu/stack: go

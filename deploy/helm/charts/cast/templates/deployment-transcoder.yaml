@@ -1,0 +1,132 @@
+{{- if .Values.transcoder.enabled }}
+{{- /*
+El transcodificador (CAST-ENCARGO §7): el MISMO binario que el servicio, con el
+subcomando `transcoder`, empaquetado en OTRA imagen (services/cast/Dockerfile.transcoder,
+debian-slim + ffmpeg; ENTRYPOINT ["/app/cast", "transcoder"]). Saca trabajos de
+`transcode_jobs` con FOR UPDATE SKIP LOCKED, descarga el original al emptyDir, corre
+ffmpeg con -threads acotado, sube HLS/WebM/poster a S3 y deja el video `ready`.
+
+Sin Service ni Ingress: nadie le habla; el habla con Postgres, S3 y Drive (la
+cuota). Su unica sonda es el fichero de latido que toca en cada vuelta del bucle.
+*/ -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "sytue-cast.transcoderFullname" . }}
+  labels:
+    {{- include "sytue-cast.transcoderLabels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.transcoder.replicaCount }}
+  # Un trabajo a medias se reintenta (tres veces, domain.MaxIntentos): matar el pod
+  # viejo antes de que arranque el nuevo es mas barato que dos ffmpeg a la vez en
+  # un nodo que solo reservo CPU para uno.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "sytue-cast.transcoderSelectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "sytue-cast.transcoderLabels" . | nindent 8 }}
+      annotations:
+        kubectl.kubernetes.io/default-container: transcoder
+    spec:
+      automountServiceAccountToken: false
+      {{- with (.Values.global).imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      # ffmpeg puede tardar: un 1080p de dos horas al limite de TRANSCODER_MAX_MINUTES.
+      # Se le da margen para terminar el trabajo en curso antes del SIGKILL; si no
+      # llega, la cola lo reintenta en otro pod.
+      terminationGracePeriodSeconds: 120
+      containers:
+        - name: transcoder
+          image: "{{ include "sytue-cast.imageRegistry" . }}/{{ .Values.transcoder.image.repository }}:{{ .Values.transcoder.image.tag | default ((.Values.global).image | default dict).tag | default .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          # `command` Y `args`, los dos: Kubernetes CONCATENA el ENTRYPOINT de la imagen
+          # con `args`, y Dockerfile.transcoder ya trae el subcomando en el suyo
+          # (`["/app/cast", "transcoder"]`). Con solo `args` saldria `cast transcoder
+          # transcoder`; con `command` fijado aqui, el ENTRYPOINT no cuenta y el
+          # proceso es exactamente `/app/cast transcoder`, lo traiga la imagen o no.
+          command: ["/app/cast"]
+          args: ["transcoder"]
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          env:
+            {{- if (.Values.global).otlp }}
+            {{- if (.Values.global).otlp.endpoint }}
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ (.Values.global).otlp.endpoint | quote }}
+            {{- end }}
+            {{- if (.Values.global).otlp.tokenSecret }}
+            - name: OTEL_EXPORTER_OTLP_HEADERS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ (.Values.global).otlp.tokenSecret }}
+                  key: {{ (.Values.global).otlp.tokenKey | default "otlp-headers" }}
+                  optional: true
+            {{- end }}
+            {{- end }}
+            # Runtime Go atado a los limites del pod. GOMAXPROCS=2 aqui es ademas lo
+            # que acota a ffmpeg: TRANSCODER_THREADS va a la par (values.transcoder.threads).
+            {{- include "sytue.goRuntimeEnv" (dict "container" "transcoder" "memLimit" .Values.transcoder.resources.limits.memory) | nindent 12 }}
+            # Lo que comparte con el servicio HTTP (BD, S3, Drive, ID, secretos):
+            # _helpers.tpl, `sytue-cast.envComun`. Sin OIDC: no atiende peticiones.
+            {{- include "sytue-cast.envComun" . | nindent 12 }}
+            - name: ENV
+              value: {{ include "sytue-cast.env" . | quote }}
+            {{- include "sytue-cast.envLiveKit" . | nindent 12 }}
+            # El Hub: el binario carga UNA configuracion y el secreto es obligatorio
+            # fuera de dev; sin el, el trabajador no arrancaria aunque no avise.
+            - name: HUB_BASE_URL
+              value: {{ .Values.config.hubUrl | default (printf "http://%s-hub" .Release.Name) | quote }}
+            - name: HUB_INTERNAL_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: sytue-hub-internal
+                  key: secret
+            # ----- ffmpeg: hilos, techo por trabajo y donde trabaja -----
+            - name: TRANSCODER_THREADS
+              value: {{ .Values.transcoder.threads | quote }}
+            - name: TRANSCODER_MAX_MINUTES
+              value: {{ .Values.transcoder.maxMinutes | quote }}
+            - name: TRANSCODER_TMPDIR
+              value: {{ .Values.transcoder.tmpDir | quote }}
+          # Sin puerto: la sonda es el fichero de latido que el bucle toca en cada
+          # vuelta (o al terminar un trabajo largo). Un ffmpeg colgado deja de
+          # tocarlo y el pod se reinicia; el trabajo vuelve a la cola.
+          startupProbe:
+            exec:
+              command:
+                {{- toYaml .Values.transcoder.probe.command | nindent 16 }}
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 30
+          livenessProbe:
+            exec:
+              command:
+                {{- toYaml .Values.transcoder.probe.command | nindent 16 }}
+            initialDelaySeconds: 30
+            periodSeconds: 60
+            timeoutSeconds: 5
+            # Tres minutos sin latido: mas que el ciclo mas largo de una vuelta
+            # (descargar el original), menos que el techo del trabajo, que lo mata
+            # el propio proceso con el contexto.
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.transcoder.resources | nindent 12 }}
+          volumeMounts:
+            - name: trabajo
+              mountPath: {{ .Values.transcoder.tmpDir }}
+      volumes:
+        # Originales y derivadas mientras se transcodifican. Con TOPE: sin el, un
+        # original de 8 GiB mas sus derivadas se comerian el disco del nodo.
+        - name: trabajo
+          emptyDir:
+            sizeLimit: {{ .Values.transcoder.tmpSizeLimit }}
+{{- end }}

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Sytue Drive">
+  <!-- GENERADO por scripts/gen-marks.sh: cambia la paleta o el script, no este fichero. -->
+  <rect width="512" height="512" fill="#16734d"/>
+  <path d="M512 179V512H179Z" fill="#000000" fill-opacity="0.22"/>
+  <g transform="translate(256 256) scale(10.9) translate(-20 -20)"><g transform="translate(20 20) scale(0.9422) translate(-20.025 -21.000)"><path fill="#fff" d="M10.4 12.4h5.9a2 2 0 0 1 1.56.75l1.42 1.75h10.32a2 2 0 0 1 2 2v10.7a2 2 0 0 1-2 2h-19.2a2 2 0 0 1-2-2V14.4a2 2 0 0 1 2-2Z"/></g></g>
+</svg>

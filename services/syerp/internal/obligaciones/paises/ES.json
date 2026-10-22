@@ -1,0 +1,1397 @@
+{
+ "pais": "ES",
+ "verificado": true,
+ "moneda": "EUR",
+ "formas": [
+  {
+   "clave": "autonomo",
+   "nombre": "Autónomo (empresario individual)",
+   "tipo": "persona_fisica"
+  },
+  {
+   "clave": "profesional",
+   "nombre": "Profesional autónomo",
+   "tipo": "persona_fisica"
+  },
+  {
+   "clave": "comunidad_bienes",
+   "nombre": "Comunidad de bienes",
+   "tipo": "persona_fisica"
+  },
+  {
+   "clave": "sl",
+   "nombre": "Sociedad Limitada (SL)",
+   "tipo": "sociedad"
+  },
+  {
+   "clave": "sa",
+   "nombre": "Sociedad Anónima (SA)",
+   "tipo": "sociedad"
+  },
+  {
+   "clave": "cooperativa",
+   "nombre": "Sociedad Cooperativa",
+   "tipo": "sociedad"
+  }
+ ],
+ "portales": {
+  "aeat": {
+   "nombre": "Agencia Tributaria — Sede electrónica",
+   "url": "https://sede.agenciatributaria.gob.es/"
+  },
+  "tgss": {
+   "nombre": "Seguridad Social — Sede electrónica",
+   "url": "https://sede.seg-social.gob.es/"
+  },
+  "registro_mercantil": {
+   "nombre": "Registro Mercantil (Registradores)",
+   "url": "https://www.registradores.org/"
+  }
+ },
+ "obligaciones": [
+  {
+   "clave": "es_303",
+   "nombre": "Modelo 303",
+   "concepto": "iva_periodica",
+   "ambito": "fiscal",
+   "periodicidad": "trimestral",
+   "plazos": {
+    "T1": "04-20",
+    "T2": "07-20",
+    "T3": "10-20",
+    "T4": "01-30+1"
+   },
+   "margen_dias": 7,
+   "portal": "aeat",
+   "aplica": {
+    "condiciones": [
+     "iva",
+     "!iva_mensual"
+    ],
+    "excepto_regiones": [
+     "PV",
+     "NC",
+     "CN",
+     "CE",
+     "ML"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_pct_mes": 1,
+    "recargo_max_pct": 15,
+    "tras_meses": 12,
+    "con_requerimiento_pct": [
+     50,
+     150
+    ],
+    "nota": "Recargo por presentación extemporánea sin requerimiento (art. 27 LGT): 1 % + 1 % por cada mes completo de retraso; a partir de 12 meses, 15 % más intereses de demora. Con requerimiento previo: sanción del 50 % al 150 % de la cuota."
+   },
+   "calculo": {
+    "tipo": "saldo_neto",
+    "haber": [
+     "477"
+    ],
+    "debe": [
+     "472"
+    ]
+   },
+   "domiciliable": true,
+   "preparacion": [
+    "banco",
+    "facturas"
+   ],
+   "guia": {
+    "que": "Cada trimestre le cuentas a Hacienda el IVA que has cobrado en tus facturas y el que has pagado en tus gastos, y pagas la diferencia. Se presenta aunque no hayas facturado nada.",
+    "necesitas": [
+     "Las facturas que has emitido en el trimestre, confirmadas.",
+     "Las facturas de tus gastos del trimestre, añadidas y confirmadas.",
+     "Cada movimiento del banco del trimestre con su factura o su explicación."
+    ],
+    "pasos": [
+     "Antes de tu fecha, deja a cero lo que falta: aquí mismo ves cuántos movimientos y facturas quedan.",
+     "Pulsa «Preparar cifras»: Sytue suma el IVA de tus facturas y te dice cuánto sale.",
+     "Entra en la sede de la Agencia Tributaria (botón «Abrir el portal») con tu certificado digital o Cl@ve y abre el modelo 303 de este trimestre.",
+     "Comprueba las cifras con las de Sytue. Si tenías IVA a compensar de otro trimestre, Hacienda ya lo pone y el resultado baja.",
+     "Si sale a pagar, domicilia el pago: te lo cargan en el banco el último día del plazo. Si sale negativo, no pagas y se descuenta en el siguiente trimestre (en el cuarto puedes pedir que te lo devuelvan).",
+     "Descarga el justificante en PDF y guárdalo en Sytue Drive."
+    ],
+    "si_no": "Si lo presentas tarde por tu cuenta, pagas un recargo: un 1 % más otro 1 % por cada mes de retraso. Si Hacienda te lo reclama antes, la multa va del 50 % al 150 % de lo que tenías que pagar."
+   },
+   "documentos": [
+    {
+     "clave": "justificante",
+     "nombre": "Justificante de presentación",
+     "requisitos": [
+      "El PDF que da la sede de la Agencia Tributaria al presentar, no una captura de pantalla.",
+      "Lleva el número de justificante y el código seguro de verificación (CSV).",
+      "Si salió a pagar, que se vea el pago: la domiciliación o el NRC del banco."
+     ]
+    }
+   ]
+  },
+  {
+   "clave": "es_303m",
+   "nombre": "Modelo 303 (mensual)",
+   "concepto": "iva_periodica",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "30"
+   },
+   "margen_dias": 7,
+   "portal": "aeat",
+   "aplica": {
+    "condiciones": [
+     "iva",
+     "iva_mensual"
+    ],
+    "excepto_regiones": [
+     "PV",
+     "NC",
+     "CN",
+     "CE",
+     "ML"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_pct_mes": 1,
+    "recargo_max_pct": 15,
+    "tras_meses": 12,
+    "con_requerimiento_pct": [
+     50,
+     150
+    ],
+    "nota": "Recargo por presentación extemporánea sin requerimiento (art. 27 LGT): 1 % + 1 % por cada mes completo de retraso; a partir de 12 meses, 15 % más intereses de demora. Con requerimiento previo: sanción del 50 % al 150 % de la cuota."
+   },
+   "calculo": {
+    "tipo": "saldo_neto",
+    "haber": [
+     "477"
+    ],
+    "debe": [
+     "472"
+    ]
+   },
+   "domiciliable": true,
+   "preparacion": [
+    "banco",
+    "facturas"
+   ],
+   "guia": {
+    "que": "Es la declaración del IVA, pero cada mes. Solo la presentan las empresas que facturan más de 6 millones de euros al año o las que se han apuntado a la devolución mensual.",
+    "necesitas": [
+     "Las facturas que has emitido en el mes, confirmadas.",
+     "Las facturas de tus gastos del mes, añadidas y confirmadas.",
+     "Cada movimiento del banco del mes con su factura o su explicación."
+    ],
+    "pasos": [
+     "Antes de tu fecha, deja a cero lo que falta: aquí mismo ves cuántos movimientos y facturas quedan.",
+     "Pulsa «Preparar cifras»: Sytue suma el IVA de tus facturas y te dice cuánto sale.",
+     "Entra en la sede de la Agencia Tributaria (botón «Abrir el portal») con tu certificado digital o Cl@ve y abre el modelo 303 de este mes.",
+     "Comprueba las cifras, preséntalo y domicilia el pago si sale a pagar.",
+     "Recuerda que con el IVA mensual cada factura se comunica además al SII en los cuatro días hábiles siguientes."
+    ],
+    "si_no": "Si lo presentas tarde por tu cuenta, pagas un recargo: un 1 % más otro 1 % por cada mes de retraso. Si Hacienda te lo reclama antes, la multa va del 50 % al 150 % de lo que tenías que pagar."
+   },
+   "documentos": [
+    {
+     "clave": "justificante",
+     "nombre": "Justificante de presentación",
+     "requisitos": [
+      "El PDF que da la sede de la Agencia Tributaria al presentar, no una captura de pantalla.",
+      "Lleva el número de justificante y el código seguro de verificación (CSV).",
+      "Si salió a pagar, que se vea el pago: la domiciliación o el NRC del banco."
+     ]
+    }
+   ]
+  },
+  {
+   "clave": "es_390",
+   "nombre": "Modelo 390",
+   "concepto": "iva_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "01-30+1"
+   },
+   "margen_dias": 14,
+   "portal": "aeat",
+   "aplica": {
+    "condiciones": [
+     "iva"
+    ],
+    "excepto_regiones": [
+     "PV",
+     "NC",
+     "CN",
+     "CE",
+     "ML"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 30000,
+    "nota": "Declaración informativa fuera de plazo: 20 € por dato, mínimo 300 € y máximo 20.000 € (art. 198 LGT); la mitad si se presenta sin requerimiento."
+   },
+   "preparacion": [
+    "banco",
+    "facturas"
+   ],
+   "guia": {
+    "que": "Es el resumen de todo el IVA del año. Se presenta en enero, junto al IVA del cuarto trimestre, y no se paga nada: solo informa.",
+    "necesitas": [
+     "Las declaraciones del IVA del año presentadas.",
+     "Todas las facturas del año confirmadas."
+    ],
+    "pasos": [
+     "Presenta antes el IVA del cuarto trimestre.",
+     "Entra en la sede de la Agencia Tributaria (botón «Abrir el portal») con tu certificado digital o Cl@ve y abre el modelo 390 del año.",
+     "Comprueba que los totales coinciden con la suma de tus declaraciones del año y preséntalo."
+    ],
+    "si_no": "No hay nada que pagar, pero llegar tarde tiene multa, aunque es menor si la presentas antes de que Hacienda te la pida."
+   },
+   "documentos": [
+    {
+     "clave": "justificante",
+     "nombre": "Justificante de presentación",
+     "requisitos": [
+      "El PDF que da la sede de la Agencia Tributaria al presentar, no una captura de pantalla.",
+      "Lleva el número de justificante y el código seguro de verificación (CSV).",
+      "Si salió a pagar, que se vea el pago: la domiciliación o el NRC del banco."
+     ]
+    }
+   ]
+  },
+  {
+   "clave": "es_349",
+   "nombre": "Modelo 349",
+   "concepto": "operaciones_intracomunitarias",
+   "ambito": "fiscal",
+   "periodicidad": "trimestral",
+   "plazos": {
+    "T1": "04-20",
+    "T2": "07-20",
+    "T3": "10-20",
+    "T4": "01-30+1"
+   },
+   "margen_dias": 7,
+   "portal": "aeat",
+   "aplica": {
+    "condiciones": [
+     "intracomunitario"
+    ],
+    "excepto_regiones": [
+     "PV",
+     "NC",
+     "CN",
+     "CE",
+     "ML"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 30000,
+    "nota": "Declaración informativa fuera de plazo: 20 € por dato, mínimo 300 € y máximo 20.000 € (art. 198 LGT); la mitad si se presenta sin requerimiento."
+   },
+   "preparacion": [
+    "facturas"
+   ],
+   "guia": {
+    "que": "Si compras o vendes a empresas de otros países de la Unión Europea, le dices a Hacienda con quién y por cuánto. No se paga nada: solo informa. Si en un trimestre pasas de 50.000 €, pasa a ser mensual.",
+    "necesitas": [
+     "Estar dado de alta en el Registro de Operadores Intracomunitarios (se pide con el modelo 036): sin él no puedes facturar sin IVA a otra empresa europea.",
+     "Las facturas con clientes y proveedores de la UE, confirmadas.",
+     "El NIF-IVA europeo de cada uno (empieza por las letras de su país), comprobado en el VIES."
+    ],
+    "pasos": [
+     "Revisa que cada factura con la UE lleva el NIF-IVA del cliente o del proveedor.",
+     "Entra en la sede de la Agencia Tributaria (botón «Abrir el portal») con tu certificado digital o Cl@ve y abre el modelo 349 del periodo.",
+     "Añade cada empresa con su NIF-IVA y el total del periodo, y preséntalo."
+    ],
+    "si_no": "No hay nada que pagar, pero llegar tarde tiene multa: 20 € por cada persona o empresa que faltaba, con un mínimo de 300 €. Es la mitad si la presentas antes de que Hacienda te la pida."
+   },
+   "documentos": [
+    {
+     "clave": "justificante",
+     "nombre": "Justificante de presentación",
+     "requisitos": [
+      "El PDF que da la sede de la Agencia Tributaria al presentar, no una captura de pantalla.",
+      "Lleva el número de justificante y el código seguro de verificación (CSV).",
+      "Si salió a pagar, que se vea el pago: la domiciliación o el NRC del banco."
+     ]
+    }
+   ]
+  },
+  {
+   "clave": "es_347",
+   "nombre": "Modelo 347",
+   "concepto": "operaciones_terceros",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "02-ultimo+1"
+   },
+   "margen_dias": 14,
+   "portal": "aeat",
+   "aplica": {
+    "condiciones": [
+     "iva"
+    ],
+    "excepto_regiones": [
+     "PV",
+     "NC"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 30000,
+    "nota": "Declaración informativa fuera de plazo: 20 € por dato, mínimo 300 € y máximo 20.000 € (art. 198 LGT); la mitad si se presenta sin requerimiento."
+   },
+   "preparacion": [
+    "facturas"
+   ],
+   "guia": {
+    "que": "Una vez al año le dices a Hacienda con qué clientes y proveedores has hecho operaciones por más de 3.005,06 € en total, IVA incluido. No se paga nada: solo informa.",
+    "necesitas": [
+     "Todas las facturas del año confirmadas.",
+     "El NIF de cada cliente y proveedor en su ficha."
+    ],
+    "pasos": [
+     "Pide a Sytue AI: «clientes y proveedores con más de 3.005,06 € este año, por trimestres y con su NIF».",
+     "Entra en la sede de la Agencia Tributaria (botón «Abrir el portal») con tu certificado digital o Cl@ve y abre el modelo 347.",
+     "Añade cada uno con su NIF y su importe por trimestres, y preséntalo."
+    ],
+    "si_no": "No hay nada que pagar, pero llegar tarde tiene multa: 20 € por cada persona o empresa que faltaba, con un mínimo de 300 €. Es la mitad si la presentas antes de que Hacienda te la pida."
+   },
+   "documentos": [
+    {
+     "clave": "justificante",
+     "nombre": "Justificante de presentación",
+     "requisitos": [
+      "El PDF que da la sede de la Agencia Tributaria al presentar, no una captura de pantalla.",
+      "Lleva el número de justificante y el código seguro de verificación (CSV).",
+      "Si salió a pagar, que se vea el pago: la domiciliación o el NRC del banco."
+     ]
+    }
+   ]
+  },
+  {
+   "clave": "es_111",
+   "nombre": "Modelo 111",
+   "concepto": "retenciones_trabajo",
+   "ambito": "fiscal",
+   "periodicidad": "trimestral",
+   "plazos": {
+    "T1": "04-20",
+    "T2": "07-20",
+    "T3": "10-20",
+    "T4": "01-20+1"
+   },
+   "margen_dias": 7,
+   "portal": "aeat",
+   "aplica": {
+    "condiciones": [
+     "empleados"
+    ],
+    "excepto_regiones": [
+     "PV",
+     "NC"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_pct_mes": 1,
+    "recargo_max_pct": 15,
+    "tras_meses": 12,
+    "con_requerimiento_pct": [
+     50,
+     150
+    ],
+    "nota": "Recargo por presentación extemporánea sin requerimiento (art. 27 LGT): 1 % + 1 % por cada mes completo de retraso; a partir de 12 meses, 15 % más intereses de demora. Con requerimiento previo: sanción del 50 % al 150 % de la cuota."
+   },
+   "domiciliable": true,
+   "preparacion": [
+    "nominas"
+   ],
+   "guia": {
+    "que": "Si pagas nóminas, o facturas de profesionales con retención (un abogado, un asesor o un diseñador autónomo), te quedas una parte de ese dinero para Hacienda. Cada trimestre la ingresas con este modelo.",
+    "necesitas": [
+     "Las nóminas del trimestre confirmadas.",
+     "Las facturas de profesionales del trimestre, con su retención."
+    ],
+    "pasos": [
+     "Suma las retenciones del trimestre: las de las nóminas y las de las facturas de profesionales.",
+     "Entra en la sede de la Agencia Tributaria (botón «Abrir el portal») con tu certificado digital o Cl@ve y abre el modelo 111 del trimestre.",
+     "Pon cuántas personas son, cuánto les has pagado y cuánto les has retenido, y preséntalo con el pago domiciliado."
+    ],
+    "si_no": "Si lo presentas tarde por tu cuenta, pagas un recargo: un 1 % más otro 1 % por cada mes de retraso. Si Hacienda te lo reclama antes, la multa va del 50 % al 150 % de lo que tenías que pagar."
+   },
+   "documentos": [
+    {
+     "clave": "justificante",
+     "nombre": "Justificante de presentación",
+     "requisitos": [
+      "El PDF que da la sede de la Agencia Tributaria al presentar, no una captura de pantalla.",
+      "Lleva el número de justificante y el código seguro de verificación (CSV).",
+      "Si salió a pagar, que se vea el pago: la domiciliación o el NRC del banco."
+     ]
+    }
+   ]
+  },
+  {
+   "clave": "es_190",
+   "nombre": "Modelo 190",
+   "concepto": "retenciones_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "01-31+1"
+   },
+   "margen_dias": 14,
+   "portal": "aeat",
+   "aplica": {
+    "condiciones": [
+     "empleados"
+    ],
+    "excepto_regiones": [
+     "PV",
+     "NC"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 30000,
+    "nota": "Declaración informativa fuera de plazo: 20 € por dato, mínimo 300 € y máximo 20.000 € (art. 198 LGT); la mitad si se presenta sin requerimiento."
+   },
+   "preparacion": [
+    "nominas"
+   ],
+   "guia": {
+    "que": "Es el resumen del año de lo que has retenido en nóminas y facturas de profesionales, persona a persona. Se presenta en enero y no se paga nada.",
+    "necesitas": [
+     "Los modelos 111 del año presentados.",
+     "El NIF de cada trabajador y de cada profesional."
+    ],
+    "pasos": [
+     "Comprueba que lo de cada persona suma lo mismo que tus modelos 111 del año.",
+     "Entra en la sede de la Agencia Tributaria (botón «Abrir el portal») con tu certificado digital o Cl@ve y presenta el modelo 190 con cada persona, lo que cobró y lo que se le retuvo.",
+     "Da a cada trabajador su certificado de retenciones: lo necesita para su declaración de la renta."
+    ],
+    "si_no": "No hay nada que pagar, pero llegar tarde tiene multa: 20 € por cada persona o empresa que faltaba, con un mínimo de 300 €. Es la mitad si la presentas antes de que Hacienda te la pida."
+   },
+   "documentos": [
+    {
+     "clave": "justificante",
+     "nombre": "Justificante de presentación",
+     "requisitos": [
+      "El PDF que da la sede de la Agencia Tributaria al presentar, no una captura de pantalla.",
+      "Lleva el número de justificante y el código seguro de verificación (CSV).",
+      "Si salió a pagar, que se vea el pago: la domiciliación o el NRC del banco."
+     ]
+    }
+   ]
+  },
+  {
+   "clave": "es_115",
+   "nombre": "Modelo 115",
+   "concepto": "retenciones_alquiler",
+   "ambito": "fiscal",
+   "periodicidad": "trimestral",
+   "plazos": {
+    "T1": "04-20",
+    "T2": "07-20",
+    "T3": "10-20",
+    "T4": "01-20+1"
+   },
+   "margen_dias": 7,
+   "portal": "aeat",
+   "aplica": {
+    "condiciones": [
+     "alquiler"
+    ],
+    "excepto_regiones": [
+     "PV",
+     "NC"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_pct_mes": 1,
+    "recargo_max_pct": 15,
+    "tras_meses": 12,
+    "con_requerimiento_pct": [
+     50,
+     150
+    ],
+    "nota": "Recargo por presentación extemporánea sin requerimiento (art. 27 LGT): 1 % + 1 % por cada mes completo de retraso; a partir de 12 meses, 15 % más intereses de demora. Con requerimiento previo: sanción del 50 % al 150 % de la cuota."
+   },
+   "domiciliable": true,
+   "preparacion": [
+    "banco"
+   ],
+   "guia": {
+    "que": "Si alquilas un local, una oficina o una nave para tu negocio, te quedas el 19 % del alquiler (sin contar el IVA) y lo ingresas tú a Hacienda en nombre del dueño. Cada trimestre, con este modelo.",
+    "necesitas": [
+     "Las facturas del alquiler del trimestre, con la retención del 19 %.",
+     "Los pagos del alquiler en el banco, justificados."
+    ],
+    "pasos": [
+     "Suma la retención de las facturas de alquiler del trimestre.",
+     "Entra en la sede de la Agencia Tributaria (botón «Abrir el portal») con tu certificado digital o Cl@ve y abre el modelo 115 del trimestre.",
+     "Pon el total retenido y preséntalo con el pago domiciliado."
+    ],
+    "si_no": "Si lo presentas tarde por tu cuenta, pagas un recargo: un 1 % más otro 1 % por cada mes de retraso. Si Hacienda te lo reclama antes, la multa va del 50 % al 150 % de lo que tenías que pagar."
+   },
+   "documentos": [
+    {
+     "clave": "justificante",
+     "nombre": "Justificante de presentación",
+     "requisitos": [
+      "El PDF que da la sede de la Agencia Tributaria al presentar, no una captura de pantalla.",
+      "Lleva el número de justificante y el código seguro de verificación (CSV).",
+      "Si salió a pagar, que se vea el pago: la domiciliación o el NRC del banco."
+     ]
+    },
+    {
+     "clave": "contrato_alquiler",
+     "nombre": "Contrato de alquiler",
+     "requisitos": [
+      "Firmado por el dueño y por ti.",
+      "Con la dirección y la referencia catastral del local.",
+      "Con la renta y desde cuándo se paga."
+     ]
+    }
+   ]
+  },
+  {
+   "clave": "es_180",
+   "nombre": "Modelo 180",
+   "concepto": "retenciones_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "01-31+1"
+   },
+   "margen_dias": 14,
+   "portal": "aeat",
+   "aplica": {
+    "condiciones": [
+     "alquiler"
+    ],
+    "excepto_regiones": [
+     "PV",
+     "NC"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 30000,
+    "nota": "Declaración informativa fuera de plazo: 20 € por dato, mínimo 300 € y máximo 20.000 € (art. 198 LGT); la mitad si se presenta sin requerimiento."
+   },
+   "preparacion": [
+    "banco"
+   ],
+   "guia": {
+    "que": "Es el resumen del año de las retenciones de tus alquileres, dueño por dueño. Se presenta en enero y no se paga nada.",
+    "necesitas": [
+     "Los modelos 115 del año presentados.",
+     "El NIF de cada dueño y la referencia catastral del local (está en el contrato o en el recibo del IBI)."
+    ],
+    "pasos": [
+     "Comprueba que lo de cada dueño suma lo mismo que tus modelos 115 del año.",
+     "Entra en la sede de la Agencia Tributaria (botón «Abrir el portal») con tu certificado digital o Cl@ve y presenta el modelo 180 con cada dueño, lo pagado y lo retenido.",
+     "Da al dueño su certificado de retenciones."
+    ],
+    "si_no": "No hay nada que pagar, pero llegar tarde tiene multa: 20 € por cada persona o empresa que faltaba, con un mínimo de 300 €. Es la mitad si la presentas antes de que Hacienda te la pida."
+   },
+   "documentos": [
+    {
+     "clave": "justificante",
+     "nombre": "Justificante de presentación",
+     "requisitos": [
+      "El PDF que da la sede de la Agencia Tributaria al presentar, no una captura de pantalla.",
+      "Lleva el número de justificante y el código seguro de verificación (CSV).",
+      "Si salió a pagar, que se vea el pago: la domiciliación o el NRC del banco."
+     ]
+    },
+    {
+     "clave": "contrato_alquiler",
+     "nombre": "Contrato de alquiler",
+     "requisitos": [
+      "Firmado por el dueño y por ti.",
+      "Con la dirección y la referencia catastral del local.",
+      "Con la renta y desde cuándo se paga."
+     ]
+    }
+   ]
+  },
+  {
+   "clave": "es_130",
+   "nombre": "Modelo 130",
+   "concepto": "pago_fraccionado_renta",
+   "ambito": "fiscal",
+   "periodicidad": "trimestral",
+   "plazos": {
+    "T1": "04-20",
+    "T2": "07-20",
+    "T3": "10-20",
+    "T4": "01-30+1"
+   },
+   "margen_dias": 7,
+   "portal": "aeat",
+   "aplica": {
+    "tipos": [
+     "persona_fisica"
+    ],
+    "excepto_regiones": [
+     "PV",
+     "NC"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_pct_mes": 1,
+    "recargo_max_pct": 15,
+    "tras_meses": 12,
+    "con_requerimiento_pct": [
+     50,
+     150
+    ],
+    "nota": "Recargo por presentación extemporánea sin requerimiento (art. 27 LGT): 1 % + 1 % por cada mes completo de retraso; a partir de 12 meses, 15 % más intereses de demora. Con requerimiento previo: sanción del 50 % al 150 % de la cuota."
+   },
+   "calculo": {
+    "tipo": "porcentaje_resultado",
+    "haber": [
+     "7"
+    ],
+    "debe": [
+     "6"
+    ],
+    "porcentaje": 20,
+    "acumulado": true
+   },
+   "domiciliable": true,
+   "preparacion": [
+    "banco",
+    "facturas"
+   ],
+   "guia": {
+    "que": "Si eres autónomo, cada trimestre adelantas a Hacienda el 20 % de lo que vas ganando en el año (ingresos menos gastos). Después se descuenta en tu declaración de la renta.",
+    "necesitas": [
+     "Las facturas que has emitido y las de tus gastos, desde enero, confirmadas.",
+     "Cada movimiento del banco con su factura o su explicación."
+    ],
+    "pasos": [
+     "Si eres profesional y al menos 7 de cada 10 euros que facturas llevan retención, no tienes que presentarlo.",
+     "Pulsa «Preparar cifras»: Sytue calcula tus ingresos y gastos desde enero y lo que te toca adelantar este trimestre.",
+     "Entra en la sede de la Agencia Tributaria (botón «Abrir el portal») con tu certificado digital o Cl@ve y abre el modelo 130 del trimestre.",
+     "Pon los ingresos y los gastos desde el 1 de enero y lo que ya pagaste en los trimestres anteriores. Preséntalo con el pago domiciliado; si sale negativo, se presenta igual, a cero."
+    ],
+    "si_no": "Si lo presentas tarde por tu cuenta, pagas un recargo: un 1 % más otro 1 % por cada mes de retraso. Si Hacienda te lo reclama antes, la multa va del 50 % al 150 % de lo que tenías que pagar."
+   },
+   "documentos": [
+    {
+     "clave": "justificante",
+     "nombre": "Justificante de presentación",
+     "requisitos": [
+      "El PDF que da la sede de la Agencia Tributaria al presentar, no una captura de pantalla.",
+      "Lleva el número de justificante y el código seguro de verificación (CSV).",
+      "Si salió a pagar, que se vea el pago: la domiciliación o el NRC del banco."
+     ]
+    }
+   ]
+  },
+  {
+   "clave": "es_100",
+   "nombre": "Modelo 100 (Renta)",
+   "concepto": "renta_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "06-30+1"
+   },
+   "margen_dias": 30,
+   "portal": "aeat",
+   "aplica": {
+    "tipos": [
+     "persona_fisica"
+    ],
+    "excepto_regiones": [
+     "PV",
+     "NC"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_pct_mes": 1,
+    "recargo_max_pct": 15,
+    "tras_meses": 12,
+    "con_requerimiento_pct": [
+     50,
+     150
+    ],
+    "nota": "Recargo por presentación extemporánea sin requerimiento (art. 27 LGT): 1 % + 1 % por cada mes completo de retraso; a partir de 12 meses, 15 % más intereses de demora. Con requerimiento previo: sanción del 50 % al 150 % de la cuota."
+   },
+   "domiciliable": true,
+   "preparacion": [
+    "banco",
+    "facturas"
+   ],
+   "guia": {
+    "que": "Es tu declaración de la renta del año. Como autónomo, incluye lo que ha ganado tu negocio. Se presenta entre abril y el 30 de junio del año siguiente.",
+    "necesitas": [
+     "Todas las facturas del año confirmadas y el banco justificado.",
+     "Los justificantes de tus modelos 130 del año.",
+     "Tu certificado digital, Cl@ve o número de referencia de la Agencia Tributaria."
+    ],
+    "pasos": [
+     "Pide a Sytue AI: «ingresos y gastos de mi actividad de este año».",
+     "Entra en Renta WEB, en la sede de la Agencia Tributaria (abre a primeros de abril).",
+     "Revisa los datos que ya tiene Hacienda y añade tu actividad con esos ingresos y gastos.",
+     "Presenta la declaración. Si sale a pagar, puedes domiciliarlo entero o en dos plazos: el 60 % ahora y el 40 % en noviembre."
+    ],
+    "si_no": "Si lo presentas tarde por tu cuenta, pagas un recargo: un 1 % más otro 1 % por cada mes de retraso. Si Hacienda te lo reclama antes, la multa va del 50 % al 150 % de lo que tenías que pagar."
+   },
+   "documentos": [
+    {
+     "clave": "justificante",
+     "nombre": "Justificante de presentación",
+     "requisitos": [
+      "El PDF que da la sede de la Agencia Tributaria al presentar, no una captura de pantalla.",
+      "Lleva el número de justificante y el código seguro de verificación (CSV).",
+      "Si salió a pagar, que se vea el pago: la domiciliación o el NRC del banco."
+     ]
+    }
+   ]
+  },
+  {
+   "clave": "es_184",
+   "nombre": "Modelo 184",
+   "concepto": "atribucion_rentas",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "01-31+1"
+   },
+   "margen_dias": 14,
+   "portal": "aeat",
+   "aplica": {
+    "formas": [
+     "comunidad_bienes"
+    ],
+    "excepto_regiones": [
+     "PV",
+     "NC"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 30000,
+    "nota": "Declaración informativa fuera de plazo: 20 € por dato, mínimo 300 € y máximo 20.000 € (art. 198 LGT); la mitad si se presenta sin requerimiento."
+   },
+   "preparacion": [
+    "banco",
+    "facturas"
+   ],
+   "guia": {
+    "que": "Si tu negocio es una comunidad de bienes, cada enero se informa a Hacienda de lo que ganó el año anterior y de la parte de cada comunero. No se paga nada: cada comunero lo declara en su renta.",
+    "necesitas": [
+     "Todas las facturas del año confirmadas y el banco justificado.",
+     "El NIF y el porcentaje de cada comunero."
+    ],
+    "pasos": [
+     "Pide a Sytue AI: «ingresos y gastos de este año».",
+     "Entra en la sede de la Agencia Tributaria (botón «Abrir el portal») con tu certificado digital o Cl@ve y presenta el modelo 184 con el resultado y el reparto entre comuneros.",
+     "Da a cada comunero su parte: la necesita para su modelo 130 y su renta."
+    ],
+    "si_no": "No hay nada que pagar, pero llegar tarde tiene multa: 20 € por cada persona o empresa que faltaba, con un mínimo de 300 €. Es la mitad si la presentas antes de que Hacienda te la pida."
+   },
+   "documentos": [
+    {
+     "clave": "justificante",
+     "nombre": "Justificante de presentación",
+     "requisitos": [
+      "El PDF que da la sede de la Agencia Tributaria al presentar, no una captura de pantalla.",
+      "Lleva el número de justificante y el código seguro de verificación (CSV).",
+      "Si salió a pagar, que se vea el pago: la domiciliación o el NRC del banco."
+     ]
+    }
+   ]
+  },
+  {
+   "clave": "es_202",
+   "nombre": "Modelo 202",
+   "concepto": "pago_fraccionado_sociedades",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "1P": "04-20",
+    "2P": "10-20",
+    "3P": "12-20"
+   },
+   "margen_dias": 7,
+   "portal": "aeat",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ],
+    "excepto_regiones": [
+     "PV",
+     "NC"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_pct_mes": 1,
+    "recargo_max_pct": 15,
+    "tras_meses": 12,
+    "con_requerimiento_pct": [
+     50,
+     150
+    ],
+    "nota": "Recargo por presentación extemporánea sin requerimiento (art. 27 LGT): 1 % + 1 % por cada mes completo de retraso; a partir de 12 meses, 15 % más intereses de demora. Con requerimiento previo: sanción del 50 % al 150 % de la cuota."
+   },
+   "domiciliable": true,
+   "preparacion": [
+    "banco",
+    "facturas"
+   ],
+   "guia": {
+    "que": "Si en el último Impuesto sobre Sociedades a tu sociedad le salió a pagar, adelanta una parte tres veces al año: en abril, octubre y diciembre. Si no le salió a pagar, no tiene que presentarlo.",
+    "necesitas": [
+     "El último Impuesto sobre Sociedades presentado (modelo 200).",
+     "La contabilidad del año al día."
+    ],
+    "pasos": [
+     "Mira tu último modelo 200: si la cuota salió positiva, toca presentarlo.",
+     "Entra en la sede de la Agencia Tributaria (botón «Abrir el portal») con tu certificado digital o Cl@ve y abre el modelo 202 del periodo.",
+     "Por lo general es el 18 % de esa cuota. Ponlo y preséntalo con el pago domiciliado."
+    ],
+    "si_no": "Si lo presentas tarde por tu cuenta, pagas un recargo: un 1 % más otro 1 % por cada mes de retraso. Si Hacienda te lo reclama antes, la multa va del 50 % al 150 % de lo que tenías que pagar."
+   },
+   "documentos": [
+    {
+     "clave": "justificante",
+     "nombre": "Justificante de presentación",
+     "requisitos": [
+      "El PDF que da la sede de la Agencia Tributaria al presentar, no una captura de pantalla.",
+      "Lleva el número de justificante y el código seguro de verificación (CSV).",
+      "Si salió a pagar, que se vea el pago: la domiciliación o el NRC del banco."
+     ]
+    }
+   ]
+  },
+  {
+   "clave": "es_200",
+   "nombre": "Modelo 200",
+   "concepto": "sociedades_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "07-25+1"
+   },
+   "margen_dias": 30,
+   "portal": "aeat",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ],
+    "excepto_regiones": [
+     "PV",
+     "NC"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_pct_mes": 1,
+    "recargo_max_pct": 15,
+    "tras_meses": 12,
+    "con_requerimiento_pct": [
+     50,
+     150
+    ],
+    "nota": "Recargo por presentación extemporánea sin requerimiento (art. 27 LGT): 1 % + 1 % por cada mes completo de retraso; a partir de 12 meses, 15 % más intereses de demora. Con requerimiento previo: sanción del 50 % al 150 % de la cuota."
+   },
+   "domiciliable": true,
+   "preparacion": [
+    "banco",
+    "facturas",
+    "nominas"
+   ],
+   "guia": {
+    "que": "Es el impuesto anual de tu sociedad sobre lo que ha ganado. Se presenta en julio del año siguiente y siempre, aunque la sociedad no haya tenido actividad o haya perdido dinero.",
+    "necesitas": [
+     "La contabilidad del año cerrada: facturas, banco y nóminas al día.",
+     "Las cuentas del año formuladas y aprobadas."
+    ],
+    "pasos": [
+     "Cierra el año en Sytue: que no quede nada pendiente en el banco ni en las facturas.",
+     "Entra en la sede de la Agencia Tributaria (botón «Abrir el portal») con tu certificado digital o Cl@ve y abre Sociedades WEB (modelo 200).",
+     "Parte del resultado de la contabilidad. Si tienes dudas con los ajustes (gastos que no se pueden deducir, amortizaciones), consúltalo antes de presentar.",
+     "Resta los pagos fraccionados del año (modelo 202), preséntalo y domicilia el pago si sale a pagar."
+    ],
+    "si_no": "Si lo presentas tarde por tu cuenta, pagas un recargo: un 1 % más otro 1 % por cada mes de retraso. Si Hacienda te lo reclama antes, la multa va del 50 % al 150 % de lo que tenías que pagar."
+   },
+   "documentos": [
+    {
+     "clave": "justificante",
+     "nombre": "Justificante de presentación",
+     "requisitos": [
+      "El PDF que da la sede de la Agencia Tributaria al presentar, no una captura de pantalla.",
+      "Lleva el número de justificante y el código seguro de verificación (CSV).",
+      "Si salió a pagar, que se vea el pago: la domiciliación o el NRC del banco."
+     ]
+    }
+   ]
+  },
+  {
+   "clave": "es_cuentas",
+   "nombre": "Depósito de cuentas anuales",
+   "concepto": "cuentas_anuales",
+   "ambito": "mercantil",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "07-30+1"
+   },
+   "margen_dias": 30,
+   "portal": "registro_mercantil",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 120000,
+    "nota": "Multa de 1.200 € a 60.000 € (art. 283 LSC) y cierre de la hoja registral tras un año sin depositar."
+   },
+   "preparacion": [
+    "banco",
+    "facturas",
+    "nominas"
+   ],
+   "guia": {
+    "que": "Cada año tu sociedad prepara sus cuentas (balance, pérdidas y ganancias y memoria), los socios las aprueban y se depositan en el Registro Mercantil, donde son públicas.",
+    "necesitas": [
+     "La contabilidad del año cerrada.",
+     "Las cuentas firmadas por los administradores antes del 31 de marzo.",
+     "El acta de la junta de socios que las aprueba, antes del 30 de junio."
+    ],
+    "pasos": [
+     "Antes del 31 de marzo, los administradores preparan y firman las cuentas del año.",
+     "Antes del 30 de junio, la junta de socios las aprueba y se levanta acta.",
+     "En el mes siguiente a la junta, deposítalas por internet en registradores.org."
+    ],
+    "si_no": "Si no se depositan, el Registro Mercantil cierra la hoja de la sociedad (no podrá inscribir cambios, como un nuevo administrador) y puede haber multas de 1.200 € a 60.000 €."
+   },
+   "documentos": [
+    {
+     "clave": "cuentas_formuladas",
+     "nombre": "Cuentas anuales formuladas",
+     "requisitos": [
+      "El balance, la cuenta de pérdidas y ganancias y la memoria del año.",
+      "Firmadas por todos los administradores, con la fecha, antes del 31 de marzo."
+     ]
+    },
+    {
+     "clave": "acta_junta",
+     "nombre": "Acta de la junta que aprueba las cuentas",
+     "requisitos": [
+      "Con fecha antes del 30 de junio.",
+      "Con lo que se hace con el resultado (reservas, dividendos o pérdidas a compensar).",
+      "Firmada por quien hace de secretario, con el visto bueno del presidente."
+     ]
+    },
+    {
+     "clave": "justificante_deposito",
+     "nombre": "Justificante del depósito",
+     "requisitos": [
+      "El que da el Registro Mercantil al presentar las cuentas."
+     ]
+    }
+   ]
+  },
+  {
+   "clave": "es_libros",
+   "nombre": "Legalización de libros contables",
+   "concepto": "libros_contables",
+   "ambito": "contable",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "04-30+1"
+   },
+   "margen_dias": 30,
+   "portal": "registro_mercantil",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 0,
+    "nota": "Sin multa directa: los libros no legalizados pierden valor probatorio y bloquean el depósito de cuentas."
+   },
+   "preparacion": [
+    "banco",
+    "facturas",
+    "nominas"
+   ],
+   "guia": {
+    "que": "Los libros de tu sociedad (el diario, el de inventarios y cuentas anuales, el de actas y el de socios) se envían cada año al Registro Mercantil para que tengan valor legal.",
+    "necesitas": [
+     "La contabilidad del año cerrada en Sytue.",
+     "Las actas de las juntas del año."
+    ],
+    "pasos": [
+     "Pide a Sytue AI el libro diario del año en Excel.",
+     "Entra en registradores.org y envía los libros con su servicio de legalización de libros.",
+     "Guarda el justificante que te devuelve el Registro."
+    ],
+    "si_no": "No hay multa directa, pero unos libros sin legalizar pierden valor como prueba ante Hacienda o ante un juez."
+   },
+   "documentos": [
+    {
+     "clave": "justificante_legalizacion",
+     "nombre": "Justificante de legalización de libros",
+     "requisitos": [
+      "El acuse que da el Registro Mercantil al enviar los libros.",
+      "Con los libros y el año que se legalizan."
+     ]
+    }
+   ]
+  },
+  {
+   "clave": "es_rlc",
+   "nombre": "Liquidación de cuotas (RLC/RNT)",
+   "concepto": "seguridad_social",
+   "ambito": "laboral",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "ultimo"
+   },
+   "margen_dias": 7,
+   "portal": "tgss",
+   "aplica": {
+    "condiciones": [
+     "empleados"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_pct_mes": 10,
+    "recargo_max_pct": 20,
+    "tras_meses": 1,
+    "nota": "Recargo del 10 % si se ingresa dentro del mes siguiente al vencimiento y del 20 % después (art. 30 LGSS), más intereses."
+   },
+   "preparacion": [
+    "nominas"
+   ],
+   "guia": {
+    "que": "Si tienes empleados, cada mes se pagan sus cotizaciones a la Seguridad Social: la parte que pone la empresa y la que se descuenta en su nómina.",
+    "necesitas": [
+     "Las nóminas del mes confirmadas.",
+     "Autorización en el Sistema RED de la Seguridad Social, tuya o de quien te lleve las nóminas.",
+     "Saldo en el banco al final del mes siguiente."
+    ],
+    "pasos": [
+     "Confirma las nóminas del mes en Sytue.",
+     "La Tesorería de la Seguridad Social calcula la liquidación con los datos de tus trabajadores: revísala y confírmala en el Sistema RED antes de que acabe el mes siguiente.",
+     "Si la tienes domiciliada, se cobra sola: ten saldo el último día hábil del mes."
+    ],
+    "si_no": "Si se paga tarde, hay un recargo del 10 % el primer mes y del 20 % después, y mientras debas no puedes recibir ayudas públicas."
+   },
+   "documentos": [
+    {
+     "clave": "recibo_liquidacion",
+     "nombre": "Recibo de liquidación de cotizaciones",
+     "requisitos": [
+      "El que da la Tesorería o el Sistema RED, con el mes y el importe.",
+      "Si se pagó por el banco, el cargo de ese día."
+     ]
+    }
+   ]
+  },
+  {
+   "clave": "es_cuota_autonomos",
+   "nombre": "Cuota de autónomos (RETA)",
+   "concepto": "cuota_autonomos",
+   "ambito": "laboral",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "ultimo+0"
+   },
+   "margen_dias": 3,
+   "portal": "tgss",
+   "aplica": {
+    "tipos": [
+     "persona_fisica"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_pct_mes": 10,
+    "recargo_max_pct": 20,
+    "tras_meses": 1,
+    "nota": "Recargo del 10 % el primer mes y del 20 % después (art. 30 LGSS)."
+   },
+   "guia": {
+    "que": "Es tu cuota mensual de autónomo a la Seguridad Social. Se cobra sola en tu cuenta el último día hábil de cada mes.",
+    "necesitas": [
+     "Saldo en la cuenta domiciliada el último día hábil del mes.",
+     "Tus ingresos previstos del año al día en Import@ss: la cuota depende de lo que ganes."
+    ],
+    "pasos": [
+     "No tienes que presentar nada: solo ten saldo.",
+     "Si tus ingresos cambian mucho, cambia tu base de cotización en Import@ss (puedes hacerlo hasta seis veces al año) para no pagar de más ni de menos.",
+     "El cargo sale en tu banco como «TGSS» o «Seguridad Social»: Sytue lo reconoce y lo justifica solo."
+    ],
+    "si_no": "Si no se paga a tiempo, hay un recargo del 10 % el primer mes y del 20 % después, y pierdes la tarifa plana y las bonificaciones."
+   },
+   "documentos": [
+    {
+     "clave": "recibo_autonomo",
+     "nombre": "Recibo de la cuota de autónomo",
+     "requisitos": [
+      "El recibo de Import@ss o el cargo del banco, con el mes que paga."
+     ]
+    }
+   ]
+  }
+ ],
+ "calendario": {
+  "fuente": "BOE-A-2025-23702 (días inhábiles de 2026 a efectos de cómputo de plazos)",
+  "margen_habiles": 4,
+  "regiones_por_cp": {
+   "01": "PV",
+   "02": "CM",
+   "03": "VC",
+   "04": "AN",
+   "05": "CL",
+   "06": "EX",
+   "07": "IB",
+   "08": "CT",
+   "09": "CL",
+   "10": "EX",
+   "11": "AN",
+   "12": "VC",
+   "13": "CM",
+   "14": "AN",
+   "15": "GA",
+   "16": "CM",
+   "17": "CT",
+   "18": "AN",
+   "19": "CM",
+   "20": "PV",
+   "21": "AN",
+   "22": "AR",
+   "23": "AN",
+   "24": "CL",
+   "25": "CT",
+   "26": "RI",
+   "27": "GA",
+   "28": "MD",
+   "29": "AN",
+   "30": "MC",
+   "31": "NC",
+   "32": "GA",
+   "33": "AS",
+   "34": "CL",
+   "35": "CN",
+   "36": "GA",
+   "37": "CL",
+   "38": "CN",
+   "39": "CB",
+   "40": "CL",
+   "41": "AN",
+   "42": "CL",
+   "43": "CT",
+   "44": "AR",
+   "45": "CM",
+   "46": "VC",
+   "47": "CL",
+   "48": "PV",
+   "49": "CL",
+   "50": "AR",
+   "51": "CE",
+   "52": "ML"
+  },
+  "inhabiles": {
+   "2026": {
+    "nacional": [
+     "2026-01-01",
+     "2026-01-06",
+     "2026-04-03",
+     "2026-05-01",
+     "2026-10-12",
+     "2026-12-08",
+     "2026-12-25"
+    ],
+    "AN": [
+     "2026-04-02",
+     "2026-11-02",
+     "2026-12-07"
+    ],
+    "AR": [
+     "2026-04-02",
+     "2026-04-23",
+     "2026-11-02",
+     "2026-12-07"
+    ],
+    "AS": [
+     "2026-04-02",
+     "2026-09-08",
+     "2026-11-02",
+     "2026-12-07"
+    ],
+    "IB": [
+     "2026-03-02",
+     "2026-04-02",
+     "2026-04-06"
+    ],
+    "CN": [
+     "2026-04-02",
+     "2026-11-02"
+    ],
+    "CB": [
+     "2026-04-02",
+     "2026-07-28",
+     "2026-09-15",
+     "2026-12-07"
+    ],
+    "CM": [
+     "2026-04-02",
+     "2026-04-06",
+     "2026-06-04",
+     "2026-11-02"
+    ],
+    "CL": [
+     "2026-04-02",
+     "2026-04-23",
+     "2026-11-02",
+     "2026-12-07"
+    ],
+    "CT": [
+     "2026-04-06",
+     "2026-06-24",
+     "2026-09-11"
+    ],
+    "MD": [
+     "2026-04-02",
+     "2026-11-02",
+     "2026-12-07"
+    ],
+    "VC": [
+     "2026-03-19",
+     "2026-04-06",
+     "2026-06-24",
+     "2026-10-09"
+    ],
+    "EX": [
+     "2026-04-02",
+     "2026-09-08",
+     "2026-11-02",
+     "2026-12-07"
+    ],
+    "GA": [
+     "2026-03-19",
+     "2026-04-02",
+     "2026-06-24"
+    ],
+    "RI": [
+     "2026-04-02",
+     "2026-04-06",
+     "2026-06-09",
+     "2026-12-07"
+    ],
+    "MC": [
+     "2026-03-19",
+     "2026-04-02",
+     "2026-06-09",
+     "2026-12-07"
+    ],
+    "NC": [
+     "2026-03-19",
+     "2026-04-02",
+     "2026-04-06",
+     "2026-11-02"
+    ],
+    "PV": [
+     "2026-03-19",
+     "2026-04-02",
+     "2026-04-06"
+    ],
+    "CE": [
+     "2026-04-02",
+     "2026-05-27",
+     "2026-08-05",
+     "2026-09-02"
+    ],
+    "ML": [
+     "2026-03-20",
+     "2026-04-02",
+     "2026-05-27",
+     "2026-12-07"
+    ]
+   }
+  },
+  "fiestas_fijas": [
+   "01-01",
+   "01-06",
+   "05-01",
+   "08-15",
+   "10-12",
+   "11-01",
+   "12-06",
+   "12-08",
+   "12-25"
+  ],
+  "viernes_santo": true
+ },
+ "territorios": {
+  "PV": {
+   "nombre": "País Vasco",
+   "nota": "En el País Vasco, el IVA, el IRPF y el Impuesto sobre Sociedades se presentan en la hacienda foral de tu provincia (Álava, Bizkaia o Gipuzkoa), no en la Agencia Tributaria. Por eso no están en esta lista: consúltalos en tu hacienda foral. La Seguridad Social y el Registro Mercantil son iguales que en el resto de España."
+  },
+  "NC": {
+   "nombre": "Navarra",
+   "nota": "En Navarra, el IVA, el IRPF y el Impuesto sobre Sociedades se presentan en la Hacienda Foral de Navarra, no en la Agencia Tributaria. Por eso no están en esta lista: consúltalos allí. La Seguridad Social y el Registro Mercantil son iguales que en el resto de España."
+  },
+  "CN": {
+   "nombre": "Canarias",
+   "nota": "En Canarias no hay IVA: hay IGIC, que se presenta en la Agencia Tributaria Canaria y no está en esta lista. El IRPF, Sociedades, las retenciones y la Seguridad Social van como en el resto de España."
+  },
+  "CE": {
+   "nombre": "Ceuta",
+   "nota": "En Ceuta no hay IVA: hay IPSI, que gestiona la Ciudad Autónoma y no está en esta lista. El IRPF, Sociedades, las retenciones y la Seguridad Social van como en el resto de España."
+  },
+  "ML": {
+   "nombre": "Melilla",
+   "nota": "En Melilla no hay IVA: hay IPSI, que gestiona la Ciudad Autónoma y no está en esta lista. El IRPF, Sociedades, las retenciones y la Seguridad Social van como en el resto de España."
+  }
+ },
+ "requisitos_factura": {
+  "fuente": "Real Decreto 1619/2012, Reglamento de facturación (arts. 6 y 7)",
+  "completa": [
+   "Pone «Factura» y lleva un número (y su serie, si la tiene).",
+   "La fecha de la factura y, si la compra o el servicio fue otro día, también esa fecha.",
+   "El nombre o la razón social, el NIF y la dirección de quien la emite.",
+   "Tu nombre o la razón social de tu empresa, tu NIF y tu dirección: a tu nombre, no al de otra persona.",
+   "Qué se ha comprado o qué servicio es, con cantidades y precios.",
+   "La base (el importe sin IVA), el tipo de IVA (21 %, 10 % o 4 %) y el IVA en euros, por separado, y el total.",
+   "Si no lleva IVA, la frase que explica por qué: «exenta de IVA» con su artículo o «inversión del sujeto pasivo»."
+  ],
+  "simplificada": [
+   "Un ticket vale como factura simplificada si el total no pasa de 400 € con IVA incluido (3.000 € en comercio y hostelería).",
+   "Lleva número, fecha, el NIF y el nombre del negocio, qué se compró, el tipo de IVA y el total.",
+   "Para poder desgravar su IVA, pide que añadan tu NIF y tu dirección y el IVA separado del precio."
+  ],
+  "extranjera": [
+   "De una empresa de otro país vale igual, en su idioma: tiene que llevar su nombre, su NIF-IVA y la fecha.",
+   "Si tu empresa está en el Registro de Operadores Intracomunitarios, a tu nombre con tu NIF-IVA (ES y tu NIF).",
+   "Sin IVA y con la mención «reverse charge» o «inversión del sujeto pasivo»: ese IVA lo declaras tú en el 303."
+  ]
+ }
+}

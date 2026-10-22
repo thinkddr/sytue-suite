@@ -1,0 +1,68 @@
+{
+  "id": "gitea",
+  "name": "Gitea",
+  "description": "Tu propia forja de código: repositorios, pull requests, incidencias y acciones de CI. Ligera de verdad — arranca en un contenedor y no pide base de datos aparte.",
+  "category": "devtools",
+  "license": "Apache-2.0",
+  "homepage": "https://about.gitea.com/",
+  "source": "https://github.com/go-gitea/gitea",
+  "upstream": "docker.io/gitea/gitea:1.24.6-rootless",
+  "upstream_digest": "sha256:91f2b27e080739f0d19dba716c3214f17257c632cf762e545b44ca577e37052c",
+  "version": "1.24.6",
+  "ports": [
+    {
+      "name": "http",
+      "port": 3000
+    },
+    {
+      "name": "ssh",
+      "port": 2222
+    }
+  ],
+  "web_port": 3000,
+  "exports": [
+    {
+      "key": "GITEA_URL",
+      "value": "http://{host}:{port}"
+    }
+  ],
+  "env": [
+    {
+      "key": "GITEA__DATABASE__DB_TYPE",
+      "value": "sqlite3"
+    },
+    {
+      "key": "GITEA__DATABASE__PATH",
+      "value": "/var/lib/gitea/data/gitea.db"
+    },
+    {
+      "key": "GITEA__SERVER__ROOT_URL",
+      "value": "{web_url}"
+    },
+    {
+      "key": "GITEA__SERVER__SSH_PORT",
+      "value": "2222"
+    },
+    {
+      "key": "GITEA__SECURITY__SECRET_KEY",
+      "generate": true
+    },
+    {
+      "key": "GITEA__SECURITY__INTERNAL_TOKEN",
+      "generate": true
+    },
+    {
+      "key": "GITEA__SERVICE__DISABLE_REGISTRATION",
+      "value": "true"
+    }
+  ],
+  "disk_gib": 20,
+  "data_path": "/var/lib/gitea",
+  "writable_paths": [
+    "/etc/gitea"
+  ],
+  "memory_mib": 2048,
+  "cpu_milli": 1000,
+  "run_as_user": 1000,
+  "health_path": "/api/healthz"
+}

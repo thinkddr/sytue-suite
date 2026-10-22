@@ -1,0 +1,45 @@
+{
+  "key": "salesforce",
+  "tier": "tier1",
+  "manifest": {
+    "name": "Salesforce",
+    "description": "CRM y automatización de ventas, con inicio de sesión único.",
+    "category": "CRM",
+    "color": "#00A1E0",
+    "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#00A1E0\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M7.4 18.5a3.5 3.5 0 0 1-.6-6.95 5 5 0 0 1 9.55-1.35A3.75 3.75 0 0 1 16.6 18.5Z\"/></svg>",
+    "identity": {
+      "kind": "saml",
+      "entity_id": "https://{subdomain}.my.salesforce.com",
+      "acs_url": "https://{subdomain}.my.salesforce.com",
+      "name_id_format": "email"
+    },
+    "provisioning": "none",
+    "data": "salesforce",
+    "launch": {
+      "kind": "initiate"
+    },
+    "fields": [
+      {
+        "key": "subdomain",
+        "label": "Subdominio de Salesforce",
+        "placeholder": "acme",
+        "help": "El subdominio de tu «My Domain»: https://SUBDOMINIO.my.salesforce.com",
+        "required": true
+      }
+    ],
+    "secret": {
+      "label": "Token de API de Salesforce",
+      "help": "Con permiso de gestión de usuarios: lo usan el aprovisionamiento SCIM y la lectura de datos (SOQL)."
+    },
+    "oauth": {
+      "authorize_url": "https://{subdomain}.my.salesforce.com/services/oauth2/authorize",
+      "token_url": "https://{subdomain}.my.salesforce.com/services/oauth2/token",
+      "scopes": [
+        "api",
+        "refresh_token",
+        "offline_access"
+      ],
+      "revoke_url": "https://{subdomain}.my.salesforce.com/services/oauth2/revoke"
+    }
+  }
+}

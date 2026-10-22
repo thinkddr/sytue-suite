@@ -1,0 +1,98 @@
+{{- if .Values.global.edgeSecurity.enabled }}
+# Baseline transversal que no interpreta ni reescribe contenido publicado por
+# usuarios. CSP/X-Frame-Options/CORP se dejan a cada aplicación: imponerlos aquí
+# rompería sitios legítimos de Cloud. Sí son seguros globalmente HSTS, nosniff,
+# límites por IP y un techo de concurrencia.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: sytue-edge-security
+  labels:
+    app.kubernetes.io/part-of: sytue-one
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+spec:
+  chain:
+    middlewares:
+      # El PRIMERO de la cadena. Los middlewares se ejecutan en orden en la ida y
+      # al revés en la vuelta, así que comprimir solo funciona desde aquí: es el
+      # que tiene que envolver la respuesta de todos los demás.
+      - name: sytue-compress
+      - name: sytue-security-headers
+      - name: sytue-rate-limit
+      - name: sytue-inflight-limit
+---
+# Compresión en el borde, una vez para toda la plataforma: www, las nueve apps
+# Astro, los servicios Go y Sytue Git. Ninguno comprimía por su cuenta (la home
+# viajaba a 158 kB y la consola a 999 kB), y ponerlo en cada servidor serían diez
+# implementaciones de lo mismo detrás del único sitio por el que pasa todo.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: sytue-compress
+  labels:
+    app.kubernetes.io/part-of: sytue-one
+spec:
+  compress:
+    # Por preferencia del cliente: zstd y brotli ganan a gzip en texto, y gzip
+    # queda de suelo para lo que no anuncie los otros dos.
+    encodings:
+      - zstd
+      - br
+      - gzip
+    excludedContentTypes:
+      # SSE en vivo (services/hub/internal/http/stream.go, services/cloud/internal/http/streams.go):
+      # comprimir un flujo lo bufferiza y convierte el tiempo real en a ratos.
+      - text/event-stream
+      # Git smart HTTP: el packfile ya viene comprimido —envolverlo no ahorra
+      # nada— y el cliente lo consume conforme llega, así que el buffer solo
+      # añadiría latencia a cada clone y a cada fetch.
+      - application/x-git-upload-pack-result
+      - application/x-git-receive-pack-result
+      # Binarios opacos: instaladores, ficheros de Drive, adjuntos. Casi siempre vienen ya
+      # comprimidos —un .dmg, un .exe de NSIS, un .tar.xz— y envolverlos solo gasta CPU
+      # del servidor. Y además QUITA el Content-Length: medido el 2026-09-25, un
+      # instalador cortado a los 30 MB de 660 llegaba al navegador como una descarga
+      # terminada «bien», porque sin longitud no hay forma de saber que faltaba el resto.
+      - application/octet-stream
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: sytue-security-headers
+  labels:
+    app.kubernetes.io/part-of: sytue-one
+spec:
+  headers:
+    contentTypeNosniff: true
+    stsSeconds: {{ .Values.global.edgeSecurity.hstsSeconds }}
+    stsIncludeSubdomains: true
+    stsPreload: true
+    # No se fijan Permissions-Policy ni Referrer-Policy globales: Rooms necesita
+    # cámara/micrófono y una publicación de Cloud puede depender legítimamente
+    # de esos permisos o del referrer. Cada producto aplica su propia política.
+    customResponseHeaders:
+      Server: ""
+      X-Powered-By: ""
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: sytue-rate-limit
+  labels:
+    app.kubernetes.io/part-of: sytue-one
+spec:
+  rateLimit:
+    average: {{ .Values.global.edgeSecurity.rateLimit.average }}
+    period: {{ .Values.global.edgeSecurity.rateLimit.period }}
+    burst: {{ .Values.global.edgeSecurity.rateLimit.burst }}
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: sytue-inflight-limit
+  labels:
+    app.kubernetes.io/part-of: sytue-one
+spec:
+  inFlightReq:
+    amount: {{ .Values.global.edgeSecurity.maxInFlight }}
+{{- end }}

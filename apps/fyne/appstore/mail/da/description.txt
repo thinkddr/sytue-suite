@@ -1,0 +1,19 @@
+Privat, europæisk mail over JMAP — uden sporing og uden reklamer.
+
+• En hurtig indbakke med tråde, etiketter, filtre og søgning.
+• Vedhæft filer direkte fra Sytue Drive.
+• Gør en mail til en begivenhed i Calendar.
+• Krypteret under overførsel (TLS 1.3). Sytues infrastruktur er i EU. Eksterne tjenesters placering afhænger af deres udbyder.
+• Samtaletråde med læsning, svar og videresendelse med ét klik.
+• Mapper, farvede etiketter og søgning med operatorer (from:, has:attachment, is:unread…).
+• Automatiske regler, der arkiverer, mærker eller flytter mail, når den ankommer.
+• Planlagt afsendelse og “Fortryd afsendelse”.
+• Signaturer, afsenderaliasser og automatisk fraværssvar.
+• Delte og delegerede postkasser med rettigheder til at læse og sende.
+• Editor med formateret tekst og vedhæftede filer fra Sytue Drive uden kopier.
+• Fjernindhold blokeret som standard: ingen får at vide, hvornår du åbner en mail.
+• Signeret mail (PGP og S/MIME) genkendes og markeres; TLS under overførsel.
+• Adgang også fra Thunderbird, Outlook, Apple Mail eller din telefon, med app-adgangskoder.
+• Modtagere som chips med adressebogen i Contacts ét klik væk og en advarsel, hvis du skriver “vedhæftet” uden at vedhæfte noget.
+
+Krypteret under overførsel (TLS 1.3). Sytues infrastruktur er i EU. Eksterne tjenesters placering afhænger af deres udbyder.

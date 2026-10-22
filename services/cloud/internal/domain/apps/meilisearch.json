@@ -1,0 +1,41 @@
+{
+  "id": "meilisearch",
+  "name": "Meilisearch",
+  "description": "Buscador para tu app: escribe mal el nombre y lo encuentra igual. Responde en milisegundos sin configurar nada.",
+  "category": "search",
+  "license": "Apache-2.0",
+  "homepage": "https://www.meilisearch.com/",
+  "upstream": "docker.io/getmeili/meilisearch:v1.52.0",
+  "upstream_digest": "sha256:d36e713e8f89483af1ab0d72011bbd503f5ab100b68ccbfad51c39e3f0a0567d",
+  "version": "1.52.0",
+  "ports": [
+    {
+      "name": "http",
+      "port": 7700
+    }
+  ],
+  "exports": [
+    {
+      "key": "MEILI_URL",
+      "value": "http://{host}:{port}"
+    }
+  ],
+  "env": [
+    {
+      "key": "MEILI_MASTER_KEY",
+      "generate": true,
+      "export": true
+    },
+    {
+      "key": "MEILI_ENV",
+      "value": "production"
+    }
+  ],
+  "disk_gib": 10,
+  "data_path": "/meili_data",
+  "memory_mib": 1024,
+  "cpu_milli": 1000,
+  "run_as_user": 1000,
+  "health_path": "/health",
+  "mirrored_digest": "sha256:d36e713e8f89483af1ab0d72011bbd503f5ab100b68ccbfad51c39e3f0a0567d"
+}

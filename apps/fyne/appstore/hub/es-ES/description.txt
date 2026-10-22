@@ -1,0 +1,14 @@
+Tu portada de la suite: aplicaciones, accesos rápidos, actividad reciente y avisos.
+
+• Lanzador con todas tus aplicaciones y las que tu organización conecta.
+• Tu agenda de hoy y el correo sin leer en la portada, junto a lo reciente en toda la suite y las notificaciones.
+• Conecta tus dispositivos y descarga las aplicaciones nativas.
+• Lanzador con las aplicaciones de la suite y las de terceros que tu organización conecta.
+• Accesos rápidos: escribir un correo, nuevo documento, subir a Drive, crear un evento.
+• Reciente en toda la suite: lo último que tocaste en Drive, Docus, Mail o Rooms.
+• Centro de notificaciones y presencia compartidos por toda la suite.
+• Conecta tus dispositivos: perfil para iPhone y Mac, Android y escritorio, en dos pasos.
+• Descargas de las aplicaciones nativas de escritorio y móvil.
+• Asistente de bienvenida que deja la organización lista sin manuales.
+
+Cifrado en tránsito (TLS 1.3). La infraestructura de Sytue está en la UE. Los servicios externos siguen la ubicación de su proveedor.

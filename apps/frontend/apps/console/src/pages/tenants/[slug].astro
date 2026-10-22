@@ -1,0 +1,43 @@
+---
+import ConsoleLayout from '../../layouts/ConsoleLayout.astro';
+import { useT } from '../../i18n/index.js';
+import TenantDetailPanel from '../../components/TenantDetailPanel';
+import { requireSession } from '@sytue/auth/server';
+import { canonicaConOrg } from '@sytue/config';
+import { getBff, toBffContext } from '../../server/bff.js';
+import { loadTenant, loadUsers, loadGroups } from '../../lib/admin.js';
+
+export const prerender = false;
+
+const guard = await requireSession(getBff(), toBffContext(Astro), { roles: ['admin', 'owner'] });
+if (guard instanceof Response) return guard;
+// Ruta en `sinOrg` (su nombre colisiona con el namespace de organizaciones):
+// con sesión, un salto local a la canónica con la org activa (ADR 0056).
+const canonica = canonicaConOrg(Astro.url, getBff().basePath, guard.session.user.tenant);
+if (canonica) return Astro.redirect(canonica);
+
+const { session } = guard;
+
+// El idioma lo negoció el middleware; la isla lo recibe por props (nunca lo detecta).
+const locale = Astro.locals.locale;
+const t = useT(locale);
+
+const { slug } = Astro.params;
+const tenantSourced = slug ? await loadTenant(session, slug) : undefined;
+if (!tenantSourced)
+  return new Response(t('page.tenantNotFound'), {
+    status: 404,
+    headers: { 'content-type': 'text/plain; charset=utf-8' },
+  });
+const tenant = tenantSourced.data;
+
+const [{ data: usersPage }, { data: groups }] = await Promise.all([
+  loadUsers(session, tenant.slug),
+  loadGroups(session, tenant.slug),
+]);
+const users = usersPage.items;
+---
+
+<ConsoleLayout title={`${tenant.name} · ${t('page.tenants')}`} section="tenants">
+  <TenantDetailPanel client:load locale={locale} tenant={tenant} users={users} groups={groups} />
+</ConsoleLayout>

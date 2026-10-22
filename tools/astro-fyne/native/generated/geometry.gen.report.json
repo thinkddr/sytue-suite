@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "generator": "astro-fyne",
+  "name": "Geometry",
+  "sourceHash": "f109f672ade93b7f677e6373bf9e8498c58ad4c1cae5a3317f201ec729baa6b0",
+  "sources": [
+    {
+      "path": "example/src/pages/geometry.astro",
+      "hash": "975d75b34e72d25fd9d0bc65dfe77b3088c65ef24fb8b38b8e9660b5e284090c"
+    }
+  ],
+  "resources": [],
+  "actions": [],
+  "components": [
+    "geometry_871e0d70"
+  ],
+  "compatibility": "declarative-stage-1",
+  "visual": {
+    "measured": true,
+    "pixelPerfectVerified": false,
+    "state": "default",
+    "viewport": {
+      "width": 320,
+      "height": 240,
+      "scale": 1
+    }
+  }
+}

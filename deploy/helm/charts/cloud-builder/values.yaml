@@ -1,0 +1,120 @@
+# Sytue Cloud Builder — servicio de build (orquesta Jobs Kaniko). Sin ingress público.
+enabled: true
+replicaCount: 1
+
+image:
+  registry: ""
+  repository: sytue-cloud-builder
+  tag: "1.0.0"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8091           # puerto del SPEC (Sytue Cloud builder)
+
+# Requests MEDIDOS en producción (kubectl top, 2026-08-09), no estimados: en
+# Kubernetes la factura la fija lo RESERVADO, no lo usado, y estos pods pedían
+# 25-75 veces su consumo real. Esa reserva inflada obligó a un tercer nodo cuando
+# la CPU real del clúster estaba al 3 %.
+#
+# El límite NO se toca: un pico sigue pudiendo usar toda la CPU que necesite. Y
+# bajar el request hace al HPA MÁS sensible —calcula el porcentaje sobre el
+# request—, que es justo lo que hace falta para escalar por demanda real.
+resources:
+  requests:
+    cpu: 25m
+    memory: 96Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+networkPolicy:
+  enabled: true
+  # CIDR de pods/servicios del clúster que el egress de los Jobs de build nunca
+  # alcanza (espejo de CLUSTER_CIDRS / config.DefaultClusterCIDRs — Kapsule).
+  clusterCidrs:
+    - 100.64.0.0/14
+    - 10.32.0.0/12
+
+serviceMonitor:
+  enabled: true
+  path: /metrics
+  interval: 30s
+
+# Imagen de BuildKit rootless (builds de Dockerfile). BUILDKIT_IMAGE en
+# config.go. Sustituye a Kaniko, que Google archivó en junio de 2025: sin
+# versiones nuevas ni parches, y esto compila código de terceros.
+buildkit:
+  image: moby/buildkit:v0.32.1-rootless@sha256:66e5fe5b25509626c0e628c6e57badbcc2e8a62218ba3e1358f1427e90de6a88
+
+crane:
+  image: gcr.io/go-containerregistry/crane:v0.21.9@sha256:1adc5402d3545c76c559d095faaedec779f55b8457bb032b0905d4287fcd3597
+
+# Cloud Native Buildpacks (deploy sin Dockerfile). CNB_* en config.go; pinneadas por tag.
+cnb:
+  builderImage: paketobuildpacks/builder-jammy-base:0.4.615@sha256:ff504f33d9ce9f3ed9f109e61bffbf145f80e98d90abfeb2172b96dbb4eceb92
+  gitImage: alpine/git:2.54.0@sha256:ae0f6f4bce38d2b8c40becc0d6241a08d9f57186ea03029de2189a2b5e722d94
+  runImage: ""    # CNB_RUN_IMAGE opcional: vacío ⇒ derivada del builder (como `pack`)
+
+# Nombres de env: services/cloud/internal/config/config.go. No-secretos por value.
+config:
+  logLevel: info
+  # Puerto del POD de Sytue ID, para el recolector de logs (NetworkPolicy).
+  idApiPort: 8081
+  dbMaxConns: 10
+  # kube => client-go sobre Kapsule (Jobs de build). stub sería dev sin clúster.
+  runnerMode: kube
+  # Namespace donde corren los Jobs de build (aislado del control-plane).
+  buildNamespace: sytue-paas-builds
+  # Registry destino de las imágenes de proyectos del PaaS (REGISTRY_URL).
+  # Mismo namespace del PaaS que cloud-api y cloud-controller: lo crea Terraform
+  # como `sytue-<env>-paas`. Aquí importa el doble, porque es ESTE el que
+  # publica la imagen de cada build de cliente.
+  registry: rg.fr-par.scw.cloud/sytue-prod-paas
+  # Object Storage (S3 UE): cache de capas de build + logs. S3_ENDPOINT/REGION/BUCKET/USE_SSL.
+  s3:
+    endpoint: https://s3.fr-par.scw.cloud
+    region: fr-par
+    bucket: sytue-paas-build-cache
+    useSSL: true
+
+# Secret (existingSecret) sytue-cloud-builder. OBLIGATORIAS (config.Load l.Require):
+# database-url, secret-enc-key, s3-access-key, s3-secret-key. OPCIONALES (secretKeyRef
+# optional:true): registry-username, registry-password, github-app-id, github-app-private-key.
+existingSecret: sytue-cloud-builder
+
+rbac:
+  create: true
+serviceAccount:
+  create: true
+  name: ""
+
+# PodDisruptionBudget. El builder es un controlador; por defecto corre 1 replica
+# (singleton) y el PDB usa maxUnavailable para no bloquear drains. En prod se sube a
+# 2+ replicas (values-prod) y el PDB garantiza continuidad de los builds.
+podDisruptionBudget:
+  enabled: true
+  maxUnavailable: 1
+
+# Reparto anti-afinidad suave por zona y nodo (cuando hay >1 replica).
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: ScheduleAnyway
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: ScheduleAnyway
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10003
+  fsGroup: 10003
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]

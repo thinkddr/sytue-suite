@@ -1,0 +1,164 @@
+{
+ "pais": "CH",
+ "verificado": false,
+ "moneda": "CHF",
+ "formas": [
+  {
+   "clave": "einzelunternehmen",
+   "nombre": "Einzelunternehmen",
+   "tipo": "persona_fisica"
+  },
+  {
+   "clave": "kollektivgesellschaft",
+   "nombre": "Kollektivgesellschaft",
+   "tipo": "persona_fisica"
+  },
+  {
+   "clave": "gmbh",
+   "nombre": "GmbH / Sàrl",
+   "tipo": "sociedad"
+  },
+  {
+   "clave": "ag",
+   "nombre": "AG / SA",
+   "tipo": "sociedad"
+  }
+ ],
+ "portales": {
+  "estv": {
+   "nombre": "ESTV — ePortal (MWST)",
+   "url": "https://eportal.admin.ch/"
+  },
+  "ahv": {
+   "nombre": "AHV/IV — Ausgleichskasse",
+   "url": "https://www.ahv-iv.ch/"
+  },
+  "kanton": {
+   "nombre": "Kantonale Steuerverwaltung",
+   "url": "https://www.estv.admin.ch/estv/de/home/allgemein/steuerinformationen/kantonale-steuerverwaltungen.html"
+  },
+  "zefix": {
+   "nombre": "Handelsregister — Zefix",
+   "url": "https://www.zefix.ch/"
+  }
+ },
+ "obligaciones": [
+  {
+   "clave": "ch_mwst",
+   "nombre": "MWST-Abrechnung (vierteljährlich, effektive Methode)",
+   "concepto": "iva_periodica",
+   "ambito": "fiscal",
+   "periodicidad": "trimestral",
+   "plazos": {
+    "T1": "05-30",
+    "T2": "08-29",
+    "T3": "11-29",
+    "T4": "02-28+1"
+   },
+   "margen_dias": 14,
+   "portal": "estv",
+   "aplica": {
+    "condiciones": [
+     "iva"
+    ]
+   },
+   "sancion": {
+    "tipo": "nota",
+    "nota": "Einreichung und Zahlung innert 60 Tagen nach Ablauf der Abrechnungsperiode (Art. 71 und 86 MWSTG; hier der 60. Tag). Saldosteuersatz: halbjährlich; jährliche Abrechnung mit Raten bis CHF 5 Mio. Umsatz. Verzugszins gemäss Verordnung des EFD."
+   },
+   "calculo": {
+    "tipo": "saldo_neto",
+    "haber": [
+     "477"
+    ],
+    "debe": [
+     "472"
+    ]
+   }
+  },
+  {
+   "clave": "ch_ahv",
+   "nombre": "AHV/IV/EO/ALV-Beiträge (Ausgleichskasse)",
+   "concepto": "seguridad_social",
+   "ambito": "laboral",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "10"
+   },
+   "margen_dias": 5,
+   "portal": "ahv",
+   "aplica": {
+    "condiciones": [
+     "empleados"
+    ]
+   },
+   "sancion": {
+    "tipo": "nota",
+    "nota": "Akontobeiträge monatlich (Lohnsumme über CHF 200 000) oder vierteljährlich, zahlbar bis zum 10. Tag nach Ablauf der Periode; Lohndeklaration bis 30. Januar. Verzugszins 5 % pro Jahr (Merkblatt 2.01)."
+   }
+  },
+  {
+   "clave": "ch_lohnausweis",
+   "nombre": "Lohnausweise ausstellen",
+   "concepto": "certificados_retenciones",
+   "ambito": "laboral",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "01-31+1"
+   },
+   "margen_dias": 14,
+   "portal": "kanton",
+   "aplica": {
+    "condiciones": [
+     "empleados"
+    ]
+   },
+   "sancion": {
+    "tipo": "nota",
+    "nota": "Lohnausweis für alle Mitarbeitenden bis Ende Januar; in mehreren Kantonen (z. B. BE, BS, VD) direkt an die Steuerverwaltung."
+   }
+  },
+  {
+   "clave": "ch_steuer_np",
+   "nombre": "Steuererklärung natürliche Personen (Selbständigerwerbende)",
+   "concepto": "renta_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "03-31+1"
+   },
+   "margen_dias": 30,
+   "portal": "kanton",
+   "aplica": {
+    "tipos": [
+     "persona_fisica"
+    ]
+   },
+   "sancion": {
+    "tipo": "nota",
+    "nota": "Frist je nach Kanton, meist 31. März; Fristerstreckung online beim Kanton. Nach Mahnung Busse und Ermessensveranlagung."
+   }
+  },
+  {
+   "clave": "ch_steuer_jp",
+   "nombre": "Steuererklärung juristische Personen",
+   "concepto": "sociedades_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "06-30+1"
+   },
+   "margen_dias": 30,
+   "portal": "kanton",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "nota",
+    "nota": "Frist je nach Kanton (Genf 30. April, Bern 31. Juli, Zürich 30. September …) — hier der 30. Juni als Richtwert, massgebend ist der Kanton. Fristerstreckung online; nach Mahnung Busse und Ermessensveranlagung."
+   }
+  }
+ ]
+}

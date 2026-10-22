@@ -1,0 +1,719 @@
+{
+  "version": 1,
+  "origenes": {
+    "propio": "https://docs.sytue.eu",
+    "drive": ["https://drive.sytue.eu"]
+  },
+  "casos": [
+    {
+      "nombre": "negrita en el folio",
+      "kind": "document",
+      "editor": "document",
+      "cmd": "bold",
+      "soloLectura": false,
+      "esperado": null
+    },
+    {
+      "nombre": "color hex largo",
+      "kind": "document",
+      "editor": "document",
+      "cmd": "color",
+      "soloLectura": false,
+      "esperado": null,
+      "valor": "#DC2626"
+    },
+    {
+      "nombre": "color hex corto",
+      "kind": "document",
+      "editor": "document",
+      "cmd": "color",
+      "soloLectura": false,
+      "esperado": null,
+      "valor": "#abc"
+    },
+    {
+      "nombre": "color con nombre",
+      "kind": "document",
+      "editor": "document",
+      "cmd": "color",
+      "soloLectura": false,
+      "esperado": "valor",
+      "valor": "red"
+    },
+    {
+      "nombre": "color con url()",
+      "kind": "document",
+      "editor": "document",
+      "cmd": "color",
+      "soloLectura": false,
+      "esperado": "valor",
+      "valor": "url(javascript:alert(1))"
+    },
+    {
+      "nombre": "color transparente no vale como texto",
+      "kind": "document",
+      "editor": "document",
+      "cmd": "color",
+      "soloLectura": false,
+      "esperado": "valor",
+      "valor": "transparent"
+    },
+    {
+      "nombre": "resaltado transparente",
+      "kind": "document",
+      "editor": "document",
+      "cmd": "highlight",
+      "soloLectura": false,
+      "esperado": null,
+      "valor": "transparent"
+    },
+    {
+      "nombre": "resaltado con expresión",
+      "kind": "document",
+      "editor": "document",
+      "cmd": "highlight",
+      "soloLectura": false,
+      "esperado": "valor",
+      "valor": "expression(1)"
+    },
+    {
+      "nombre": "fuente de la lista",
+      "kind": "document",
+      "editor": "document",
+      "cmd": "font",
+      "soloLectura": false,
+      "esperado": null,
+      "valor": "Georgia"
+    },
+    {
+      "nombre": "fuente fuera de la lista",
+      "kind": "document",
+      "editor": "document",
+      "cmd": "font",
+      "soloLectura": false,
+      "esperado": "valor",
+      "valor": "Comic Sans MS"
+    },
+    {
+      "nombre": "fuente con inyección",
+      "kind": "document",
+      "editor": "document",
+      "cmd": "font",
+      "soloLectura": false,
+      "esperado": "valor",
+      "valor": "Arial; background:url(//x)"
+    },
+    {
+      "nombre": "fuente sin valor",
+      "kind": "document",
+      "editor": "document",
+      "cmd": "font",
+      "soloLectura": false,
+      "esperado": "valor"
+    },
+    {
+      "nombre": "talla de la escala",
+      "kind": "document",
+      "editor": "document",
+      "cmd": "size",
+      "soloLectura": false,
+      "esperado": null,
+      "valor": "5"
+    },
+    {
+      "nombre": "talla fuera de la escala",
+      "kind": "document",
+      "editor": "document",
+      "cmd": "size",
+      "soloLectura": false,
+      "esperado": "valor",
+      "valor": "99"
+    },
+    {
+      "nombre": "interlineado válido",
+      "kind": "document",
+      "editor": "document",
+      "cmd": "lineHeight",
+      "soloLectura": false,
+      "esperado": null,
+      "valor": "1.15"
+    },
+    {
+      "nombre": "interlineado inválido",
+      "kind": "document",
+      "editor": "document",
+      "cmd": "lineHeight",
+      "soloLectura": false,
+      "esperado": "valor",
+      "valor": "3"
+    },
+    {
+      "nombre": "bloque válido",
+      "kind": "document",
+      "editor": "document",
+      "cmd": "heading",
+      "soloLectura": false,
+      "esperado": null,
+      "valor": "blockquote"
+    },
+    {
+      "nombre": "bloque inválido",
+      "kind": "document",
+      "editor": "document",
+      "cmd": "heading",
+      "soloLectura": false,
+      "esperado": "valor",
+      "valor": "script"
+    },
+    {
+      "nombre": "tabla 3x4",
+      "kind": "document",
+      "editor": "document",
+      "cmd": "insertTable",
+      "soloLectura": false,
+      "esperado": null,
+      "valor": "3x4"
+    },
+    {
+      "nombre": "tabla con marcado",
+      "kind": "document",
+      "editor": "document",
+      "cmd": "insertTable",
+      "soloLectura": false,
+      "esperado": "valor",
+      "valor": "3x4<script>"
+    },
+    {
+      "nombre": "tabla desmesurada",
+      "kind": "document",
+      "editor": "document",
+      "cmd": "insertTable",
+      "soloLectura": false,
+      "esperado": "valor",
+      "valor": "999x999"
+    },
+    {
+      "nombre": "alineación vertical inválida",
+      "kind": "document",
+      "editor": "document",
+      "cmd": "tableCellValign",
+      "soloLectura": false,
+      "esperado": "valor",
+      "valor": "bottom;position:fixed"
+    },
+    {
+      "nombre": "enlace https",
+      "kind": "document",
+      "editor": "document",
+      "cmd": "insertLink",
+      "soloLectura": false,
+      "esperado": null,
+      "valor": "https://sytue.eu"
+    },
+    {
+      "nombre": "enlace mailto",
+      "kind": "document",
+      "editor": "document",
+      "cmd": "insertLink",
+      "soloLectura": false,
+      "esperado": null,
+      "valor": "mailto:a@b.eu"
+    },
+    {
+      "nombre": "enlace sin esquema",
+      "kind": "document",
+      "editor": "document",
+      "cmd": "insertLink",
+      "soloLectura": false,
+      "esperado": null,
+      "valor": "sytue.eu"
+    },
+    {
+      "nombre": "enlace javascript",
+      "kind": "document",
+      "editor": "document",
+      "cmd": "insertLink",
+      "soloLectura": false,
+      "esperado": "valor",
+      "valor": "javascript:alert(1)"
+    },
+    {
+      "nombre": "enlace javascript en mayúsculas",
+      "kind": "document",
+      "editor": "document",
+      "cmd": "insertLink",
+      "soloLectura": false,
+      "esperado": "valor",
+      "valor": "JaVaScRiPt:alert(1)"
+    },
+    {
+      "nombre": "enlace data",
+      "kind": "document",
+      "editor": "document",
+      "cmd": "insertLink",
+      "soloLectura": false,
+      "esperado": "valor",
+      "valor": "data:text/html,<b>x</b>"
+    },
+    {
+      "nombre": "enlace con espacios",
+      "kind": "document",
+      "editor": "document",
+      "cmd": "insertLink",
+      "soloLectura": false,
+      "esperado": "valor",
+      "valor": "https://a b"
+    },
+    {
+      "nombre": "imagen data png",
+      "kind": "document",
+      "editor": "document",
+      "cmd": "insertImage",
+      "soloLectura": false,
+      "esperado": null,
+      "valor": "data:image/png;base64,iVBORw0KGgo="
+    },
+    {
+      "nombre": "imagen blob propio",
+      "kind": "document",
+      "editor": "document",
+      "cmd": "insertImage",
+      "soloLectura": false,
+      "esperado": null,
+      "valor": "blob:https://docs.sytue.eu/abc-123"
+    },
+    {
+      "nombre": "imagen blob ajeno",
+      "kind": "document",
+      "editor": "document",
+      "cmd": "insertImage",
+      "soloLectura": false,
+      "esperado": "valor",
+      "valor": "blob:https://otro.example/abc"
+    },
+    {
+      "nombre": "imagen ruta propia",
+      "kind": "document",
+      "editor": "document",
+      "cmd": "insertImage",
+      "soloLectura": false,
+      "esperado": null,
+      "valor": "/api/images/1"
+    },
+    {
+      "nombre": "imagen mismo origen",
+      "kind": "document",
+      "editor": "document",
+      "cmd": "insertImage",
+      "soloLectura": false,
+      "esperado": null,
+      "valor": "https://docs.sytue.eu/x.png"
+    },
+    {
+      "nombre": "imagen de Drive",
+      "kind": "document",
+      "editor": "document",
+      "cmd": "insertImage",
+      "soloLectura": false,
+      "esperado": null,
+      "valor": "https://drive.sytue.eu/files/1"
+    },
+    {
+      "nombre": "imagen de un tercero",
+      "kind": "document",
+      "editor": "document",
+      "cmd": "insertImage",
+      "soloLectura": false,
+      "esperado": "valor",
+      "valor": "https://tracker.example/pixel.gif"
+    },
+    {
+      "nombre": "imagen con esquema heredado",
+      "kind": "document",
+      "editor": "document",
+      "cmd": "insertImage",
+      "soloLectura": false,
+      "esperado": "valor",
+      "valor": "//tracker.example/pixel.gif"
+    },
+    {
+      "nombre": "imagen svg",
+      "kind": "document",
+      "editor": "document",
+      "cmd": "insertImage",
+      "soloLectura": false,
+      "esperado": "valor",
+      "valor": "data:image/svg+xml;base64,PHN2Zz48L3N2Zz4="
+    },
+    {
+      "nombre": "imagen data html",
+      "kind": "document",
+      "editor": "document",
+      "cmd": "insertImage",
+      "soloLectura": false,
+      "esperado": "valor",
+      "valor": "data:text/html;base64,PGI+"
+    },
+    {
+      "nombre": "imagen javascript",
+      "kind": "document",
+      "editor": "document",
+      "cmd": "insertImage",
+      "soloLectura": false,
+      "esperado": "valor",
+      "valor": "javascript:alert(1)"
+    },
+    {
+      "nombre": "imagen en un dominio parecido",
+      "kind": "document",
+      "editor": "document",
+      "cmd": "insertImage",
+      "soloLectura": false,
+      "esperado": "valor",
+      "valor": "https://docs.sytue.eu.evil.example/x.png"
+    },
+    {
+      "nombre": "imagen vacía",
+      "kind": "document",
+      "editor": "document",
+      "cmd": "insertImage",
+      "soloLectura": false,
+      "esperado": "valor",
+      "valor": ""
+    },
+    {
+      "nombre": "comando inventado",
+      "kind": "document",
+      "editor": "document",
+      "cmd": "formatC:",
+      "soloLectura": false,
+      "esperado": "comando"
+    },
+    {
+      "nombre": "comando heredado de Object",
+      "kind": "document",
+      "editor": "document",
+      "cmd": "toString",
+      "soloLectura": false,
+      "esperado": "comando"
+    },
+    {
+      "nombre": "comando de hoja en un folio",
+      "kind": "document",
+      "editor": "spreadsheet",
+      "cmd": "sort",
+      "soloLectura": false,
+      "esperado": "tipo",
+      "valor": "asc"
+    },
+    {
+      "nombre": "negrita de hoja en presentación",
+      "kind": "presentation",
+      "editor": "spreadsheet",
+      "cmd": "bold",
+      "soloLectura": false,
+      "esperado": "tipo"
+    },
+    {
+      "nombre": "negrita de hoja en hoja",
+      "kind": "spreadsheet",
+      "editor": "spreadsheet",
+      "cmd": "bold",
+      "soloLectura": false,
+      "esperado": null
+    },
+    {
+      "nombre": "deshacer nunca",
+      "kind": "document",
+      "editor": "document",
+      "cmd": "undo",
+      "soloLectura": false,
+      "esperado": "excluido"
+    },
+    {
+      "nombre": "presentar nunca",
+      "kind": "presentation",
+      "editor": "presentation",
+      "cmd": "presentar",
+      "soloLectura": false,
+      "esperado": "excluido"
+    },
+    {
+      "nombre": "proteger nunca",
+      "kind": "spreadsheet",
+      "editor": "spreadsheet",
+      "cmd": "protect",
+      "soloLectura": false,
+      "esperado": "excluido",
+      "valor": "{\"password\":\"x\"}"
+    },
+    {
+      "nombre": "desproteger nunca",
+      "kind": "spreadsheet",
+      "editor": "spreadsheet",
+      "cmd": "unprotect",
+      "soloLectura": false,
+      "esperado": "excluido",
+      "valor": "clave"
+    },
+    {
+      "nombre": "proteger libro nunca",
+      "kind": "spreadsheet",
+      "editor": "spreadsheet",
+      "cmd": "protectbook",
+      "soloLectura": false,
+      "esperado": "excluido",
+      "valor": "{}"
+    },
+    {
+      "nombre": "datos externos nunca",
+      "kind": "spreadsheet",
+      "editor": "spreadsheet",
+      "cmd": "extdata",
+      "soloLectura": false,
+      "esperado": "excluido",
+      "valor": "{}"
+    },
+    {
+      "nombre": "negrita en solo lectura",
+      "kind": "document",
+      "editor": "document",
+      "cmd": "bold",
+      "soloLectura": true,
+      "esperado": "soloLectura"
+    },
+    {
+      "nombre": "estilo de bloque en solo lectura",
+      "kind": "document",
+      "editor": "document",
+      "cmd": "heading",
+      "soloLectura": true,
+      "esperado": "soloLectura",
+      "valor": "h1"
+    },
+    {
+      "nombre": "cortar en solo lectura",
+      "kind": "spreadsheet",
+      "editor": "spreadsheet",
+      "cmd": "copy",
+      "soloLectura": true,
+      "esperado": "soloLectura",
+      "valor": "cut"
+    },
+    {
+      "nombre": "copiar en solo lectura",
+      "kind": "spreadsheet",
+      "editor": "spreadsheet",
+      "cmd": "copy",
+      "soloLectura": true,
+      "esperado": null
+    },
+    {
+      "nombre": "estilo de celda",
+      "kind": "spreadsheet",
+      "editor": "spreadsheet",
+      "cmd": "style",
+      "soloLectura": false,
+      "esperado": null,
+      "valor": "{\"color\":\"#112233\",\"fill\":\"#fff\"}"
+    },
+    {
+      "nombre": "estilo con color falso",
+      "kind": "spreadsheet",
+      "editor": "spreadsheet",
+      "cmd": "style",
+      "soloLectura": false,
+      "esperado": "valor",
+      "valor": "{\"color\":\"url(javascript:1)\"}"
+    },
+    {
+      "nombre": "regla con color falso anidado",
+      "kind": "spreadsheet",
+      "editor": "spreadsheet",
+      "cmd": "style",
+      "soloLectura": false,
+      "esperado": "valor",
+      "valor": "{\"cond\":{\"bgColor\":\"red\"}}"
+    },
+    {
+      "nombre": "estilo no JSON",
+      "kind": "spreadsheet",
+      "editor": "spreadsheet",
+      "cmd": "style",
+      "soloLectura": false,
+      "esperado": "valor",
+      "valor": "{no json"
+    },
+    {
+      "nombre": "estilo cadena JSON",
+      "kind": "spreadsheet",
+      "editor": "spreadsheet",
+      "cmd": "style",
+      "soloLectura": false,
+      "esperado": "valor",
+      "valor": "\"cadena\""
+    },
+    {
+      "nombre": "orden ascendente",
+      "kind": "spreadsheet",
+      "editor": "spreadsheet",
+      "cmd": "sort",
+      "soloLectura": false,
+      "esperado": null,
+      "valor": "asc"
+    },
+    {
+      "nombre": "orden raro",
+      "kind": "spreadsheet",
+      "editor": "spreadsheet",
+      "cmd": "sort",
+      "soloLectura": false,
+      "esperado": "valor",
+      "valor": "sideways"
+    },
+    {
+      "nombre": "congelar",
+      "kind": "spreadsheet",
+      "editor": "spreadsheet",
+      "cmd": "freeze",
+      "soloLectura": false,
+      "esperado": null,
+      "valor": "2,1"
+    },
+    {
+      "nombre": "congelar raro",
+      "kind": "spreadsheet",
+      "editor": "spreadsheet",
+      "cmd": "freeze",
+      "soloLectura": false,
+      "esperado": "valor",
+      "valor": "2;1"
+    },
+    {
+      "nombre": "borde exterior",
+      "kind": "spreadsheet",
+      "editor": "spreadsheet",
+      "cmd": "border",
+      "soloLectura": false,
+      "esperado": null,
+      "valor": "outer"
+    },
+    {
+      "nombre": "borde raro",
+      "kind": "spreadsheet",
+      "editor": "spreadsheet",
+      "cmd": "border",
+      "soloLectura": false,
+      "esperado": "valor",
+      "valor": "dashed"
+    },
+    {
+      "nombre": "decimales",
+      "kind": "spreadsheet",
+      "editor": "spreadsheet",
+      "cmd": "decimals",
+      "soloLectura": false,
+      "esperado": null,
+      "valor": "+1"
+    },
+    {
+      "nombre": "formato general",
+      "kind": "spreadsheet",
+      "editor": "spreadsheet",
+      "cmd": "numfmt",
+      "soloLectura": false,
+      "esperado": null,
+      "valor": "percent"
+    },
+    {
+      "nombre": "formato propio",
+      "kind": "spreadsheet",
+      "editor": "spreadsheet",
+      "cmd": "numfmt",
+      "soloLectura": false,
+      "esperado": null,
+      "valor": "custom:0.00 \"€\""
+    },
+    {
+      "nombre": "mover regla",
+      "kind": "spreadsheet",
+      "editor": "spreadsheet",
+      "cmd": "condmove",
+      "soloLectura": false,
+      "esperado": null,
+      "valor": "3,-1"
+    },
+    {
+      "nombre": "mover regla raro",
+      "kind": "spreadsheet",
+      "editor": "spreadsheet",
+      "cmd": "condmove",
+      "soloLectura": false,
+      "esperado": "valor",
+      "valor": "3,7"
+    },
+    {
+      "nombre": "pegar valores",
+      "kind": "spreadsheet",
+      "editor": "spreadsheet",
+      "cmd": "paste",
+      "soloLectura": false,
+      "esperado": null,
+      "valor": "values"
+    },
+    {
+      "nombre": "pegar raro",
+      "kind": "spreadsheet",
+      "editor": "spreadsheet",
+      "cmd": "paste",
+      "soloLectura": false,
+      "esperado": "valor",
+      "valor": "formulas"
+    },
+    {
+      "nombre": "medio de diapositiva en data",
+      "kind": "presentation",
+      "editor": "presentation",
+      "cmd": "media",
+      "soloLectura": false,
+      "esperado": null,
+      "valor": "{\"src\":\"data:video/mp4;base64,AAAA\",\"mediaType\":\"video\"}"
+    },
+    {
+      "nombre": "medio de un tercero",
+      "kind": "presentation",
+      "editor": "presentation",
+      "cmd": "media",
+      "soloLectura": false,
+      "esperado": "valor",
+      "valor": "{\"src\":\"https://cdn.example/v.mp4\",\"mediaType\":\"video\"}"
+    },
+    {
+      "nombre": "medio no JSON",
+      "kind": "presentation",
+      "editor": "presentation",
+      "cmd": "media",
+      "soloLectura": false,
+      "esperado": "valor",
+      "valor": "no json"
+    },
+    {
+      "nombre": "conector curvo",
+      "kind": "presentation",
+      "editor": "presentation",
+      "cmd": "conector",
+      "soloLectura": false,
+      "esperado": null,
+      "valor": "curved"
+    },
+    {
+      "nombre": "conector raro",
+      "kind": "presentation",
+      "editor": "presentation",
+      "cmd": "conector",
+      "soloLectura": false,
+      "esperado": "valor",
+      "valor": "zigzag"
+    }
+  ]
+}

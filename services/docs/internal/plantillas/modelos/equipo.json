@@ -1,0 +1,117 @@
+{
+ "slides": [
+  {
+   "id": "s1",
+   "boxes": [
+    {
+     "id": "s1-titulo",
+     "x": 10,
+     "y": 35,
+     "w": 80,
+     "h": 20,
+     "html": "<h1>{{equipo.titulo}}</h1>"
+    },
+    {
+     "id": "s1-subtitulo",
+     "x": 10,
+     "y": 58,
+     "w": 80,
+     "h": 10,
+     "html": "<p>{{equipo.subtitulo}}</p>"
+    }
+   ]
+  },
+  {
+   "id": "s2",
+   "boxes": [
+    {
+     "id": "s2-titulo",
+     "x": 8,
+     "y": 8,
+     "w": 84,
+     "h": 16,
+     "html": "<h1>{{equipo.quienes}}</h1>"
+    },
+    {
+     "id": "s2-cuerpo",
+     "x": 8,
+     "y": 30,
+     "w": 84,
+     "h": 60,
+     "html": "<ul><li>{{equipo.quienes1}}</li><li>{{equipo.quienes2}}</li><li>{{equipo.quienes3}}</li></ul>"
+    }
+   ]
+  },
+  {
+   "id": "s3",
+   "boxes": [
+    {
+     "id": "s3-titulo",
+     "x": 8,
+     "y": 8,
+     "w": 84,
+     "h": 16,
+     "html": "<h1>{{equipo.personas}}</h1>"
+    },
+    {
+     "id": "s3-izquierda",
+     "x": 8,
+     "y": 30,
+     "w": 40,
+     "h": 60,
+     "html": "<h2>{{equipo.lideres}}</h2><ul><li>{{equipo.persona}}</li><li>{{equipo.persona}}</li></ul>"
+    },
+    {
+     "id": "s3-derecha",
+     "x": 52,
+     "y": 30,
+     "w": 40,
+     "h": 60,
+     "html": "<h2>{{equipo.especialistas}}</h2><ul><li>{{equipo.persona}}</li><li>{{equipo.persona}}</li><li>{{equipo.persona}}</li></ul>"
+    }
+   ]
+  },
+  {
+   "id": "s4",
+   "boxes": [
+    {
+     "id": "s4-titulo",
+     "x": 8,
+     "y": 8,
+     "w": 84,
+     "h": 16,
+     "html": "<h1>{{equipo.trabajo}}</h1>"
+    },
+    {
+     "id": "s4-cuerpo",
+     "x": 8,
+     "y": 30,
+     "w": 84,
+     "h": 60,
+     "html": "<ul><li>{{equipo.trabajo1}}</li><li>{{equipo.trabajo2}}</li><li>{{equipo.trabajo3}}</li></ul>"
+    }
+   ]
+  },
+  {
+   "id": "s5",
+   "boxes": [
+    {
+     "id": "s5-titulo",
+     "x": 8,
+     "y": 8,
+     "w": 84,
+     "h": 16,
+     "html": "<h1>{{equipo.contacto}}</h1>"
+    },
+    {
+     "id": "s5-cuerpo",
+     "x": 8,
+     "y": 30,
+     "w": 84,
+     "h": 60,
+     "html": "<ul><li>{{equipo.contacto1}}</li><li>{{equipo.contacto2}}</li></ul>"
+    }
+   ]
+  }
+ ]
+}

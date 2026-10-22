@@ -1,0 +1,74 @@
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "sytue-drive.fullname" . }}
+  labels:
+    {{- include "sytue-drive.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "sytue-drive.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Desde el ingress canonico (Traefik) — trafico publico drive.sytue.eu.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              sytue.eu/role: ingress
+      ports:
+        - protocol: TCP
+          port: {{ .Values.service.targetPort }}
+    # Desde el resto de la suite (shell, Hub, intents cross-app).
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/part-of: sytue-one
+      ports:
+        - protocol: TCP
+          port: {{ .Values.service.targetPort }}
+  egress:
+    # DNS
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Intra-suite (validacion JWT contra Sytue ID via JWKS, Hub, etc.).
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/part-of: sytue-one
+    # Postgres EXTERNO (RDB) y el relé de fuera del clúster por el que salen los
+    # avisos por correo.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 169.254.0.0/16
+      ports:
+        - protocol: TCP
+          port: 5432
+        {{- include "sytue.correoEgress" . | nindent 8 }}
+    # HTTPS a terceros: S3 (Object Storage UE) y los almacenes que conecta cada
+    # organización (su bucket, su WebDAV, su editor WOPI), cuya dirección escribe un
+    # administrador. Hacia Internet sí; hacia la red privada no. El filtro SSRF vive
+    # en la aplicación (platform/pkg/ssrfhttp valida el destino y cada redirección) y
+    # esto es la segunda barrera, en la red, igual que en `integrations`.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+              - 169.254.0.0/16
+              - 127.0.0.0/8
+      ports:
+        - protocol: TCP
+          port: 443
+{{- end }}

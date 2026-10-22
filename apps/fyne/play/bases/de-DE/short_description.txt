@@ -1,0 +1,1 @@
+Jede Änderung wird protokolliert: wer sie vorgenommen hat und was vorher galt.

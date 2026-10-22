@@ -1,0 +1,244 @@
+# Sytue One — overlay DEV-ONLY: frontends Astro COMPILADOS (SSR "runtime") ======
+# ---------------------------------------------------------------------------
+# **SOLO desarrollo local.** En PROD no aplica: prod se despliega por Helm
+# (deploy/helm) con sus imágenes/límites por chart. Este overlay NO se usa nunca
+# en staging/prod.
+#
+# PARA QUÉ: la suite en dev arranca 10 dev-servers Astro (`astro dev`), ~450 MiB
+# c/u (≈4.4 GiB). Este overlay los sustituye por el servidor SSR **compilado**
+# (target `runtime` del Dockerfile: `bun ./dist/server/entry.mjs`), ~60-130 MiB
+# c/u con mem_limit 256m. Es la palanca grande para caber en un local de 8 GB.
+#
+# USO:
+#   # todas las apps compilables, servidas compiladas (núcleo + Go van aparte):
+#   docker compose -f docker-compose.yml -f frontlite.yml up -d --build
+#   # combinable con perfiles (p.ej. solo docs compilada + su backend):
+#   COMPOSE_PROFILES=docs docker compose -f docker-compose.yml -f frontlite.yml up -d --build
+#   # ¿editar UNA app en caliente mientras el resto sigue compilado? no la incluyas
+#   #   en este overlay: levántala con su perfil desde el base (astro dev, bind mount).
+#
+# OJO — `docker compose up` (sin `-f`) auto-carga docker-compose.override.yml pero
+# NO este overlay: hay que nombrarlo con `-f ... -f frontlite.yml` (opt-in). Al
+# pasar `-f` explícitos, el override deja de auto-cargarse (añádelo con otro `-f`
+# si lo necesitas).
+#
+# Cubre los 11 frontends Astro de la suite: portal, mail, drive, calendar, contacts,
+# docs, notes, rooms, console, cloud-dashboard y www.
+# backend Go de services/meet — no hay app en apps/frontend/apps/meet.)
+#   - console / cloud-dashboard / www: su NOMBRE de paquete (@sytue/app-*) ≠ su
+#     DIRECTORIO. El Dockerfile filtra por RUTA (`--filter ./apps/${APP}`), que casa
+#     por directorio SIEMPRE, así que un único APP = nombre de directorio sirve.
+#   - www es `output: 'static'` (astro.config): no genera servidor SSR
+#     (`dist/server/entry.mjs`); se sirve con el file-server estático clean-room
+#     apps/frontend/static-serve.mjs (ver su servicio abajo).
+#
+# CAVEAT PUBLIC_* (baked en build): las PUBLIC_* se HORNEAN en el bundle (cliente +
+# SSR) en tiempo de BUILD (Vite/Astro), no en runtime. Van como `build.args`
+# (x-runtime-args) y el Dockerfile las DECLARA con `ARG PUBLIC_*` en su stage build,
+# así que el bundle compilado emite enlaces *.sytue.localhost coherentes en dev. Sin
+# esos args (build por defecto Helm/CI) el código cae a sus defaults de PROD
+# (*.sytue.eu): prod-neutral. Las SYTUE_* server-side se siguen leyendo en runtime
+# desde `environment` (el BFF de Bun), así que la sesión OIDC no cambia.
+# ---------------------------------------------------------------------------
+name: sytue-one-dev
+
+# PUBLIC_* que Astro hornea en el cliente (ver CAVEAT arriba). Mismos valores que
+# x-frontend-env del base, ahora como build-args para el bundle compilado.
+x-runtime-build: &runtime-build
+  context: ../../apps/frontend
+  dockerfile: Dockerfile
+  target: runtime
+  args: &runtime-args
+    PUBLIC_OIDC_ISSUER: https://id.sytue.localhost
+    PUBLIC_HUB_URL: https://hub.sytue.localhost
+    PUBLIC_SYTUE_HUB_BASE_URL: https://hub.sytue.localhost
+    PUBLIC_SYTUE_DRIVE_BASE_URL: https://drive-dav.sytue.localhost
+    PUBLIC_SYTUE_DOCS_BASE_URL: https://docs-api.sytue.localhost
+    PUBLIC_SYTUE_CLOUD_API_URL: https://cloud.sytue.localhost
+
+# Común a todo frontend compilado: sirve el server SSR y acota memoria. NO lleva
+# los bind mounts de dev (se limpian por servicio con `volumes: !reset []`).
+x-runtime-svc: &runtime-svc
+  command: ["bun", "./dist/server/entry.mjs"]
+  mem_limit: 256m
+
+services:
+  # NOTA: @astrojs/node standalone toma el puerto de `PORT` (env), NO del
+  # server.port de astro.config (eso es solo `astro dev`/`preview`). Sin PORT
+  # escucharía 4321 y Traefik (label por app) daría 502. Por eso se fija PORT al
+  # puerto canónico de cada app (docs/CONVENTIONS.md §6). `volumes: !reset []`
+  # descarta los bind mounts de dev del base (el runtime trae dist/ + node_modules).
+  portal:
+    <<: *runtime-svc
+    build:
+      <<: *runtime-build
+      args:
+        <<: *runtime-args
+        APP: portal
+    volumes: !reset []
+    environment:
+      PORT: "4321"
+
+  mail-web:
+    <<: *runtime-svc
+    build:
+      <<: *runtime-build
+      args:
+        <<: *runtime-args
+        APP: mail
+    volumes: !reset []
+    environment:
+      PORT: "4325"
+
+  drive-web:
+    <<: *runtime-svc
+    build:
+      <<: *runtime-build
+      args:
+        <<: *runtime-args
+        APP: drive
+    volumes: !reset []
+    environment:
+      PORT: "4326"
+
+  calendar-web:
+    <<: *runtime-svc
+    build:
+      <<: *runtime-build
+      args:
+        <<: *runtime-args
+        APP: calendar
+    volumes: !reset []
+    environment:
+      PORT: "4327"
+
+  contacts-web:
+    <<: *runtime-svc
+    build:
+      <<: *runtime-build
+      args:
+        <<: *runtime-args
+        APP: contacts
+    volumes: !reset []
+    environment:
+      PORT: "4328"
+
+  docus-web:
+    <<: *runtime-svc
+    build:
+      <<: *runtime-build
+      args:
+        <<: *runtime-args
+        APP: docus
+    volumes: !reset []
+    environment:
+      PORT: "4338"
+
+  calcus-web:
+    <<: *runtime-svc
+    build:
+      <<: *runtime-build
+      args:
+        <<: *runtime-args
+        APP: calcus
+    volumes: !reset []
+    environment:
+      PORT: "4339"
+
+  diapos-web:
+    <<: *runtime-svc
+    build:
+      <<: *runtime-build
+      args:
+        <<: *runtime-args
+        APP: diapos
+    volumes: !reset []
+    environment:
+      PORT: "4340"
+
+  certipdf-web:
+    <<: *runtime-svc
+    build:
+      <<: *runtime-build
+      args:
+        <<: *runtime-args
+        APP: certipdf
+    volumes: !reset []
+    environment:
+      PORT: "4341"
+
+  notes-web:
+    <<: *runtime-svc
+    build:
+      <<: *runtime-build
+      args:
+        <<: *runtime-args
+        APP: notes
+    volumes: !reset []
+    environment:
+      PORT: "4331"
+
+  photos-web:
+    <<: *runtime-svc
+    build:
+      <<: *runtime-build
+      args:
+        <<: *runtime-args
+        APP: photos
+    volumes: !reset []
+    environment:
+      PORT: "4332"
+
+  rooms-web:
+    <<: *runtime-svc
+    build:
+      <<: *runtime-build
+      args:
+        <<: *runtime-args
+        APP: rooms
+    volumes: !reset []
+    environment:
+      PORT: "4330"
+
+  # console y cloud-dashboard: su NOMBRE de paquete (@sytue/app-console,
+  # @sytue/app-cloud-dashboard) ≠ su DIRECTORIO. El Dockerfile ya filtra por RUTA
+  # (`--filter ./apps/${APP}`), así que APP = nombre de directorio para AMBOS.
+  console:
+    <<: *runtime-svc
+    build:
+      <<: *runtime-build
+      args:
+        <<: *runtime-args
+        APP: console
+    volumes: !reset []
+    environment:
+      PORT: "4322"
+
+  cloud-dashboard:
+    <<: *runtime-svc
+    build:
+      <<: *runtime-build
+      args:
+        <<: *runtime-args
+        APP: cloud-dashboard
+    volumes: !reset []
+    environment:
+      PORT: "4323"
+
+  # www es Astro `output: 'static'` (astro.config): NO genera dist/server/entry.mjs,
+  # luego el CMD SSR del runtime no le sirve. Se compila igual (el target runtime trae
+  # apps/www/dist) y se sirve con el file-server estático clean-room static-serve.mjs
+  # (montado; lee PORT/HOST del env, dist por routing de directorio de Astro).
+  # `!override` descarta los bind mounts de dev del base y deja SOLO el helper.
+  www:
+    <<: *runtime-svc
+    build:
+      <<: *runtime-build
+      args:
+        <<: *runtime-args
+        APP: www
+    command: ["bun", "./static-serve.mjs"]
+    volumes: !override
+      - ../../apps/frontend/static-serve.mjs:/app/apps/www/static-serve.mjs:ro
+    environment:
+      PORT: "4324"

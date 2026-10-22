@@ -1,0 +1,25 @@
+{
+  "name": "@sytue/scripts",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sytue One — runtime aislado de los scripts de usuario (ADR 0069): iframe de origen opaco con CSP propia, Worker que se mata por tiempo, protocolo de mensajes validado y el bucle del anfitrión que hace cumplir los límites. Cada producto aporta su superficie `sytue.v1` y su traductor. TypeScript puro, cero dependencias.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.lib.json",
+    "typecheck": "tsc -p tsconfig.lib.json --noEmit",
+    "test": "bun test"
+  },
+  "devDependencies": {
+    "@sytue/config": "workspace:*",
+    "@types/bun": "1.4.2",
+    "@types/node": "catalog:",
+    "typescript": "6.0.3"
+  }
+}

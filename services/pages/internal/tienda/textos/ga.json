@@ -1,0 +1,10 @@
+{
+  "order_paid_buyer_subject": "Deimhniú ordaithe {number}",
+  "order_paid_buyer_body": "Go raibh maith agat as do cheannachán. Tá ordú {number} deimhnithe.",
+  "order_paid_store_subject": "Ordú nua faighte: {number}",
+  "order_paid_store_body": "Fuair tú ordú nua {number} ar luach {total}.",
+  "withdrawal_ack_subject": "Deimhniú tarraingt siar faighte: {number}",
+  "withdrawal_ack_body": "Tá d'iarratas ar tharraingt siar d'ordú {number} taifeadta.",
+  "form_received_subject": "Aighneacht foirme faighte: {form_id}",
+  "form_received_body": "Fuarthas aighneacht nua don fhoirm {form_id}."
+}

@@ -1,0 +1,18 @@
+Numeri che si capiscono, in un foglio che lavora con te.
+
+• Formule, formattazione condizionale e convalida dei dati.
+• Porta dati dall’esterno e interrogali senza uscire dal foglio.
+• Grafici, sparkline, filtri dati e tabelle di dati.
+• Esporta in ODS e XLSX; apre i file Excel.
+• Formule con aiuto contestuale e ricalcolo istantaneo.
+• Formattazione condizionale, convalida dei dati e formati numerici regionali.
+• Grafici di vari tipi, sparkline e filtri dati.
+• Tabelle di dati con totali e ordinamento; tabella pivot.
+• Dati esterni: collega una fonte e interrogala dal foglio.
+• Risolutore per trovare il valore che raggiunge un obiettivo.
+• Macro per automatizzare le attività ripetitive.
+• Collaborazione in tempo reale con presenza e commenti.
+• Filtri, filtri dati e ricerca nel foglio.
+• Esporta in ODS, XLSX e PDF; apre i file Excel da Drive.
+
+Cifratura in transito (TLS 1.3). L’infrastruttura di Sytue si trova nell’UE. La posizione dei servizi esterni dipende dal loro fornitore.

@@ -1,0 +1,30 @@
+---
+/**
+ * Banco de pruebas del tablero y del formulario público (dev/VistasDemo.tsx) para la
+ * auditoría de accesibilidad. SOLO en desarrollo: en producción es un 404.
+ */
+import '../../styles/app.css';
+import { VistasDemo } from '../../dev/VistasDemo.js';
+
+export const prerender = false;
+
+if (!import.meta.env.DEV) return new Response(null, { status: 404 });
+
+const q = Astro.url.searchParams;
+const lang = ['en', 'de', 'fr'].includes(q.get('lang') ?? '')
+  ? (q.get('lang') as 'en' | 'de' | 'fr')
+  : 'es';
+const que = q.get('que') === 'formulario' ? 'formulario' : 'tablero';
+---
+
+<!doctype html>
+<html lang={lang} class="h-full">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Vistas (banco de pruebas)</title>
+  </head>
+  <body class="bg-bg h-full">
+    <VistasDemo client:only="preact" locale={lang} que={que} />
+  </body>
+</html>

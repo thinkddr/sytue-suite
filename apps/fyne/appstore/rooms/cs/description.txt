@@ -1,0 +1,20 @@
+
+
+• Kanály podle týmu nebo projektu.
+• Videohovor zabudovaný v každém kanálu.
+• Zmínky a oznámení sjednocené v celé sadě.
+• Prohledávatelná historie odkudkoli v Sytue One.
+• Veřejné a soukromé kanály v kategoriích; přímé zprávy a skupiny.
+• Vlákna, reakce, zmínky, připnuté a uložené zprávy a koncepty.
+• Formátování s lištou „Aa“ a zkratkami: tučné písmo, kurzíva, kód, citace, seznamy a odkazy.
+• Přílohy, obrázky, GIFy a vlastní emoji; soubory z Drive.
+• Plánované odeslání, priorita, potvrzení přečtení a „zobrazeno“.
+• Příkazy s lomítkem a karty: ankety a přiřaditelné úkoly.
+• Videohovory v kanálu: kamera, obrazovka, zvednutá ruka, chat a nahrávání.
+• Plánované schůzky a odkazy s pozvánkou.
+• Boti, webhooky a integrace s dalšími nástroji.
+• Přítomnost a vlastní stav; nastavení oznámení pro každý kanál.
+• Vyhledávání v historii, i z celé sady.
+• Reálný čas přes WebSocket, s opětovným připojením a bez ztracených zpráv.
+
+Šifrování při přenosu (TLS 1.3). Infrastruktura Sytue je v EU. Umístění externích služeb závisí na jejich poskytovateli.

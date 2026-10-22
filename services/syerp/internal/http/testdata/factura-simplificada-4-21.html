@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><title>Factura simplificada FV-2026-00001</title>
+<style>
+@page{size:A4;margin:16mm}
+*{box-sizing:border-box}
+body{font:13px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;color:#111;max-width:190mm;margin:1.5rem auto;padding:0 1rem}
+header{display:flex;justify-content:space-between;align-items:flex-start;gap:1.5rem}
+.emisor strong{font-size:1.25rem;display:block}
+.qr{text-align:center;font-size:11px;font-weight:600}
+.qr img{width:35mm;height:35mm;display:block;margin:1mm auto;image-rendering:pixelated}
+.qr .url{font-weight:400;font-size:9px;max-width:40mm;word-break:break-all}
+h1{font-size:1.5rem;margin:1.6rem 0 .2rem}
+.aviso{display:inline-block;border:2px solid #b91c1c;color:#b91c1c;padding:.1rem .6rem;font-weight:700;text-transform:uppercase;margin-left:.6rem;font-size:.9rem;vertical-align:middle}
+.bloques{display:flex;justify-content:space-between;gap:2rem;margin:1rem 0 1.4rem}
+dl{display:grid;grid-template-columns:auto auto;gap:.15rem 1rem;margin:0}
+dt{color:#555}dd{margin:0;text-align:right}
+table{width:100%;border-collapse:collapse;margin-top:.6rem}
+th,td{padding:.45rem .3rem;border-bottom:1px solid #ddd;text-align:left;vertical-align:top}
+td.n,th.n{text-align:right;white-space:nowrap}
+tfoot td{border:0}tfoot tr:last-child td{font-weight:700;font-size:1.05rem;border-top:2px solid #111}
+.leyenda{margin-top:1.2rem;font-size:12px}
+@media print{body{margin:0;padding:0;max-width:none}}
+</style></head><body>
+<header>
+  <div class="emisor"><strong>Acme Ibérica SL</strong>B12345678<br>Gran Vía 1<br>28013 Madrid</div>
+  <div class="qr">QR tributario:<img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAagAAAGoAQMAAAApfOODAAAABlBMVEX///8KCgpCb1c8AAACJElEQVR42uzXwW6zOhSF0e/9X3rdUWlDU91ZzC/tbeID6CwxQCbQsizLsvyrAVSV66dSqLx2TZ1UP&#43;aoUoG&#43;xmvX1FGFpJREUpFICVNPUlCQKIXE1PNUJVWBgsrUo1SVCEWpEPeuqeMK6H/GH&#43;82U59WX1FVVCpKUP7&#43;Gpj6sBJuLaCqSt3OTB1UpaQKCZWquKa6XW3qhJKQokryMoGkqeMqlSKEqkiUqt//eVOHFF9bKAgkCVAydV4lklRQKRVVqDD1BJUQfO8mkVC9fUeZ&#43;rwKVCEqhUooVcjUcYUiiQhKqVR&#43;3eOpYyqVUBJVqSoIVTJ1XqWoCnmZU5SbmTqoJCmEqhKhrjL1BFUgShJQlQD6fbWpzytJBVUplQoSFWrqCYqu4eUYP4&#43;mHqCUyrVJBRKlYuoZ6kpIAqkUAWXquCpRAgGiSioqph6gVAggSpWSeLcqpw6pUiqIUkRJ/PHtMHVECaGKpKSoVEmvbOqUilQU5RoVKlJi6riipKKqUolS/LrDU8dVRK6kED/L1HEVSYJUqup7H3mzlqc&#43;rygq&#43;a4ooCqaeoSqbidEokrem6lDCiqVSKmQpLjK1GmlSERRgei7IE0dV18RUkWlQEWFps4rQAUkEkQgiakHqKqkSCoV0Z93eeqYcu8OqErl3bN36gFKBYoqKQkx9RwFiaqCpLxZllPn1M9ZRAIkpXr77J36uAJ66RGqSHFnU6fUsizLsvxj&#43;W8AmcFxUQOFk48AAAAASUVORK5CYII=" alt="QR tributario">VERI*FACTU</div>
+</header>
+<h1>Factura simplificada FV-2026-00001</h1>
+<div class="bloques">
+  <div></div>
+  <dl><dt>Fecha</dt><dd>20/09/2026</dd></dl>
+</div>
+<p>Pedido P-000123</p>
+<table>
+  <thead><tr><th>Descripción</th><th class="n">Cantidad</th><th class="n">Precio unitario con IVA</th><th class="n">Tipo de IVA (%)</th><th class="n">Importe con IVA</th></tr></thead>
+  <tbody>
+    <tr><td>Hogaza de masa madre</td><td class="n">3</td><td class="n">2,50 €</td><td class="n">4 %</td><td class="n">7,50 €</td></tr>
+    <tr><td>Vino tinto</td><td class="n">1,5</td><td class="n">12,10 €</td><td class="n">21 %</td><td class="n">18,15 €</td></tr>
+  </tbody>
+</table>
+<table>
+  <thead><tr><th>Tipo de IVA (%)</th><th class="n">Base imponible</th><th class="n">IVA</th></tr></thead>
+  <tbody>
+    <tr><td>21 %</td><td class="n">15,00 €</td><td class="n">3,15 €</td></tr>
+    <tr><td>4 %</td><td class="n">7,21 €</td><td class="n">0,29 €</td></tr>
+  </tbody>
+  <tfoot>
+    <tr><td></td><td class="n">22,21 €</td><td class="n">3,44 €</td></tr>
+    <tr><td class="n" colspan="2">Total</td><td class="n">25,65 €</td></tr>
+  </tfoot>
+</table>
+
+</body></html>

@@ -1,0 +1,11 @@
+Linkitetyt taulukot asiakkaiden, tilausten tai varaston hallintaan, käyttöoikeuksin ja jokaisen muutoksen lokilla.
+
+• Asiakkaat, tilaukset tai varasto linkitetyissä taulukoissa, ilman tietokantaosaamista.
+• Jaa organisaatiosi kanssa valitsemallasi roolilla.
+• Jokainen muutos kirjataan: kuka sen teki ja mikä arvo oli ennen.
+• Tietosi pysyvät EU:ssa ja viet ne milloin haluat.
+• Taulukot, joissa on teksti-, luku-, päivämäärä-, valintaruutu-, yksittäis- ja monivalintakentät.
+• Taulukoiden väliset suhteet: linkitä tilaus asiakkaaseensa, eikä tietokanta anna katkaista linkkiä.
+• Käyttöoikeudet tietokannoittain ja taulukoittain: omistaja, muokkaaja, kommentoija ja lukija.
+
+Salattu siirron aikana (TLS 1.3). Sytuen infrastruktuuri sijaitsee EU:ssa. Ulkoisten palvelujen sijainti riippuu niiden tarjoajasta.

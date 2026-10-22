@@ -1,0 +1,11 @@
+Linked tables to keep customers, orders or stock, with permissions and a record of every change.
+
+• Customers, orders or stock in linked tables, with no database knowledge needed.
+• Share with your organization at the role you choose.
+• Every change is recorded: who made it and what it was before.
+• Your data stays in the EU, and you can export it whenever you like.
+• Tables with text, number, date, checkbox, single-choice and multiple-choice fields.
+• Relations between tables: link an order to its customer, and the database refuses to break the link.
+• Permissions per base and per table: owner, editor, commenter and reader.
+
+Encrypted in transit (TLS 1.3). Sytue’s infrastructure is in the EU. The location of external services depends on their provider.

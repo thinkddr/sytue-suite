@@ -1,0 +1,18 @@
+Veinticuatro módulos y un libro por partida doble que la base de datos no deja descuadrar.
+
+• Veinticuatro módulos y treinta y seis modelos: contactos, ventas, compras, inventario, fabricación, facturación, contabilidad, proyectos y RRHH.
+• Añadir un módulo es escribir un JSON: sin migración, sin ruta nueva y sin tocar la interfaz.
+• El dinero va en céntimos enteros, nunca en coma flotante, y el cuadre lo impone la base de datos.
+• Lo asentado no se toca: se corrige con otro asiento, que es lo que separa un libro de una hoja de cálculo.
+• Veinticuatro módulos y treinta y seis modelos en un solo servicio y una sola base de datos.
+• El catálogo de modelos es dato: cada módulo declara sus campos, sus estados y sus columnas de lista.
+• Un módulo nuevo es un fichero JSON — sin DDL, sin migración y sin bloquear una tabla.
+• Una sola API para los treinta y seis modelos, y una sola interfaz generada del catálogo.
+• Contabilidad por partida doble con importes en céntimos enteros; ni un decimal en coma flotante.
+• El cuadre lo comprueba la base de datos al confirmar la transacción, no el código de la aplicación.
+• Los asientos cerrados son inmutables: no se modifican, no se borran y no admiten apuntes nuevos.
+• Un documento, un asiento: un reintento o dos pestañas no pueden duplicar un ingreso.
+• Los rótulos comunes están en los 26 idiomas, y un campo sin traducir impide el arranque.
+• Listados sobre índice: la primera página de veinte mil filas se sirve en menos de un milisegundo.
+
+Cifrado en tránsito (TLS 1.3). La infraestructura de Sytue está en la UE. Los servicios externos siguen la ubicación de su proveedor.

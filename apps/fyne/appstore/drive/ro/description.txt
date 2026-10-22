@@ -1,0 +1,16 @@
+Fișiere și colaborare, sub propria marcă.
+
+• Încărcați, organizați și partajați cu linkuri controlate (permisiuni și expirare).
+• Previzualizare de documente și imagini direct în pagină.
+• Atașare în Mail fără duplicarea fișierului.
+• Stocare S3 în regiuni europene.
+• Unitatea mea, unități de echipă, partajate cu mine, recente, favorite și coș.
+• Linkuri de partajare cu două niveluri (vizualizare sau editare), parolă și expirare.
+• Istoric al versiunilor cu restaurare.
+• Previzualizarea documentelor, imaginilor și PDF-urilor fără descărcare.
+• Deschiderea și editarea documentelor de birou în Docus, Calcus și Diapos; PDF-uri în CertiPDF.
+• Etichete de sensibilitate care blochează linkurile publice acolo unde nu își au locul.
+• Partajare într-un canal Rooms sau atașare în Mail fără duplicarea fișierului.
+• Stocare S3 în regiuni europene, cu cota mereu vizibilă.
+
+Criptare în tranzit (TLS 1.3). Infrastructura Sytue se află în UE. Locația serviciilor externe depinde de furnizorul lor.

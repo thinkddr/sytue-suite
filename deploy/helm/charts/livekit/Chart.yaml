@@ -1,0 +1,19 @@
+apiVersion: v2
+name: livekit
+description: >-
+  Sytue Rooms (rooms.sytue.eu): LiveKit server (SFU WebRTC, Apache-2.0) autohospedado
+  en Scaleway Kapsule (UE), en su imagen oficial UPSTREAM `livekit/livekit-server`,
+  ejecutada SIN modificar. Las API key/secret se montan por existingSecret; el BFF de la
+  app Rooms (client `sytue-rooms`, servicio Go) mintea los JWT de acceso TRAS validar la
+  sesion OIDC del usuario en Sytue ID. El SFU opera single-node (sin store de routing
+  externo: por contrato, SIN Redis/Valkey). Unica app de terceros de la suite.
+type: application
+version: 1.0.0
+appVersion: "1.8.0"
+keywords: [sytue, livekit, rooms, webrtc, sfu, apache-2.0]
+maintainers:
+  - name: Sytue Platform
+    email: platform@sytue.eu
+annotations:
+  # Motor LiveKit server: Apache-2.0 (se ejecuta sin modificar, imagen upstream).
+  licenses: Apache-2.0

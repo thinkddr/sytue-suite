@@ -1,0 +1,60 @@
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "sytue-ai.fullname" . }}
+  labels:
+    {{- include "sytue-ai.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "sytue-ai.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # SOLO desde la suite. NO hay regla para el ingress controller, y es
+    # deliberado: por aqui pasa el texto de los documentos del usuario y lo llama
+    # el BFF de cada app desde dentro del cluster.
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/part-of: sytue-one
+      ports:
+        - protocol: TCP
+          port: {{ .Values.service.targetPort }}
+  egress:
+    # DNS
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Sytue ID, para el JWKS con el que se valida el token del usuario.
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/part-of: sytue-one
+      ports:
+        - protocol: TCP
+          port: 8081
+    # ESTE POD SI SALE A INTERNET, al reves que sytue-ocr, y esa es la diferencia
+    # que justifica no copiar su politica: el modelo corre en Scaleway Generative
+    # APIs (api.scaleway.ai, fr-par) y sin esta regla toda peticion moriria en el
+    # timeout, no con un error de red claro.
+    #
+    # POR CIDR Y NO POR NOMBRE porque NetworkPolicy no resuelve DNS: no existe una
+    # regla "solo api.scaleway.ai". El filtro fino de destino, si algun dia hace
+    # falta, es un proxy de salida; aqui se acota lo que si se puede acotar —el
+    # puerto, y el enlace-local, que es la ruta a los metadatos del nodo—.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 169.254.0.0/16
+      ports:
+        - protocol: TCP
+          port: 443
+{{- end }}

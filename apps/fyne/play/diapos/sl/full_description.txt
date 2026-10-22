@@ -1,0 +1,16 @@
+Povejte zgodbo; diapozitiv drži korak.
+
+• Teme predstavitev z identiteto vaše organizacije.
+• Pogled predavatelja z opombami in naslednjim diapozitivom.
+• Slike, oblike, grafikoni in SmartArt.
+• Izvoz v ODP, PPTX in PDF; odpiranje datotek PowerPoint.
+• Teme in palete v skladu z blagovno znamko vaše organizacije.
+• Platno z oblikami, slikami, grafikoni, SmartArt in povezovalniki.
+• Predstavitev na celotnem zaslonu s pogledom predavatelja in opombami.
+• Sodelovanje v realnem času s prisotnostjo in komentarji.
+• Diapozitivi z ozadji, plakati in postavitvami.
+• Izvoz v ODP, PPTX in PDF.
+• Odpiranje datotek PowerPoint iz Drive.
+• Samodejno shranjevanje z različicami.
+
+Šifrirano med prenosom (TLS 1.3). Infrastruktura Sytue je v EU. Lokacija zunanjih storitev je odvisna od njihovega ponudnika.

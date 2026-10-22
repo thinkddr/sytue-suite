@@ -1,0 +1,115 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Daniel Delgado Ramos
+#
+# Excepciones del escaneo de Trivy, con su porqué y su caducidad.
+#
+# Una excepción sin fecha se convierte en permanente por olvido, así que todas
+# llevan `expired_at`: cuando pasa, el hallazgo vuelve a salir y hay que
+# revisarlo de nuevo en vez de heredarlo sin mirar.
+misconfigurations:
+  # La terminal necesita create pods/exec, pero este ClusterRole es SOLO un
+  # catálogo: NO tiene ClusterRoleBinding ni RoleBinding de plataforma. El
+  # controller lo concede mediante RoleBindings únicamente en namespaces tenant
+  # verificados (etiquetas y nombre canónico), incluidos los ya existentes.
+  # Cloud API no puede ejecutar en la plataforma ni en kube-system.
+  #
+  # Trivy avisa por el permiso exec del catálogo sin evaluar sus enlaces. La
+  # excepción conserva una sola plantilla; helm-render-test.sh impide CUALQUIER
+  # binding global/de plataforma hacia la API, exige sus tres reglas exactas y
+  # la delegación bind del controller acotada a este rol, sin escalate ni RBAC
+  # global escribible. Los tests Go cubren namespaces ajenos, backfill y drift.
+  # La autorización humana y el aislamiento de datos se mantienen además en
+  # TestRequireRoleRejectsTokens, TestRequireRoleEffectiveMembership,
+  # TestWSOriginPatternsCerrada y store/rls_forzada_integration_test.go.
+  - id: KSV-0053
+    paths:
+      - "deploy/helm/charts/cloud-api/templates/rbac.yaml"
+      - "**/sytue-one/charts/cloud-api/templates/rbac.yaml"
+    statement: "Catálogo de terminal sin binding global ni de plataforma: el controller delega logs/exec solo mediante RoleBindings en namespaces tenant verificados; guardias Helm y Go impiden ampliar el alcance"
+    expired_at: 2026-11-01
+
+  # El identificador lleva GUION: `KSV-0041` es lo que emite Trivy 0.73 (el campo AVDID
+  # viene vacío). Escrito como `KSV0041` la excepción se acepta sin protestar y no filtra
+  # nada — que es como este fichero llevaba desde ayer sin surtir efecto.
+  #
+  # Y el path de un hallazgo dentro de un .tgz es COMPUESTO
+  # (`…/traefik-41.1.0.tgz:templates/rbac/clusterrole.yaml`): un glob de un solo nivel
+  # como `upstream/*` NO casa con él. Verificado probando las variantes una por una;
+  # `**` sí casa y además no fija la versión del chart, que cambia al actualizarlo.
+  - id: KSV-0041
+    paths:
+      - "deploy/helm/upstream/**"
+    # FALSO POSITIVO, comprobado renderizando el chart.
+    #
+    # Trivy analiza la PLANTILLA sin evaluar sus condicionales. En el clusterrole
+    # de Traefik, los verbos de escritura sobre `secrets` (update, create, delete,
+    # deletecollection) están dentro de un `{{- if .Values.hub.token }}`, y no
+    # usamos Traefik Hub. Renderizado con nuestros valores, el ClusterRole real
+    # concede únicamente get, list y watch — que es lo que necesita para leer los
+    # certificados TLS y no se puede quitar sin romper el TLS.
+    #
+    # Comprobación: helm template deploy/helm/upstream/traefik-*.tgz | grep -A8 secrets
+    statement: "Traefik solo obtiene get/list/watch sobre secrets al renderizar; la escritura vive tras un if de Traefik Hub que no usamos"
+    expired_at: 2026-11-01
+
+  # El reconciliador de Sytue Cloud. Este NO es un falso positivo: gestiona `secrets` de
+  # verdad, y es su función — materializa las credenciales que inyecta en las apps de
+  # cada tenant (modelo Vercel). Quitarle el permiso no endurece nada, rompe el producto.
+  #
+  # Lo que acota el riesgo: su ClusterRole no toca nodos, CRDs ni pods/log o
+  # pods/exec. Su delegación RBAC solo crea bindings namespaced al catálogo
+  # concreto de cloud-api, sin escalate ni escritura de Roles/ClusterRoles o
+  # ClusterRoleBindings. El alcance de clúster tampoco es holgura: hace falta
+  # para crear el namespace de un tenant nuevo,
+  # que por definición no existe todavía.
+  #
+  # La alternativa real —un Role NAMESPACED por tenant en vez de un ClusterRole— es un
+  # rediseño del reconciliador, no un ajuste de permisos. Esa es la conversación que
+  # debe provocar la caducidad de abajo.
+  # El segundo path es la MISMA plantilla bajo helm --output-dir, por perfil.
+  # No se exime el YAML agregado ni los Roles de ningún otro chart.
+  - id: KSV-0041
+    paths:
+      - "deploy/helm/charts/cloud-controller/templates/rbac.yaml"
+      - "**/sytue-one/charts/cloud-controller/templates/rbac.yaml"
+    statement: "El reconciliador crea los secretos de las apps tenant; sin nodos, CRDs ni pods/exec; la delegación RBAC solo enlaza el catálogo concreto de runtime por namespace, sin escalate ni escritura de roles o bindings globales"
+    expired_at: 2026-11-01
+
+  - id: KSV-0056
+    paths:
+      - "deploy/helm/charts/cloud-controller/templates/rbac.yaml"
+      - "**/sytue-one/charts/cloud-controller/templates/rbac.yaml"
+    statement: "Mismo caso: el alcance de clúster es lo que permite crear el namespace de un tenant que aún no existe"
+    expired_at: 2026-11-01
+
+  # La plantilla pública contiene el literal SYTUE_REDIS_PASSWORD, nunca el
+  # valor. El initContainer lo sustituye desde secretKeyRef y escribe el YAML
+  # final en un emptyDir que solo monta el SFU. El guardián helm-render-test
+  # rechaza contraseñas reales y otros campos secretos en este ConfigMap.
+  - id: KSV-0109
+    paths:
+      - "deploy/helm/charts/livekit/templates/configmap.yaml"
+      - "**/sytue-one/charts/livekit/templates/configmap.yaml"
+    statement: "Falso positivo sobre el marcador SYTUE_REDIS_PASSWORD; la credencial solo llega desde un Secret al emptyDir privado del pod, con guardián que impide publicarla en el ConfigMap"
+    expired_at: 2026-11-01
+
+vulnerabilities:
+  # OpenSSL en la base de las imágenes de frontal: `oven/bun:1.4.2-alpine` trae
+  # libcrypto3/libssl3 3.5.7-r0 y Alpine ya publica 3.5.8-r0.
+  #
+  # NO HAY A QUÉ SUBIR TODAVÍA, comprobado el 2026-09-05: el digest que fija el
+  # Dockerfile es el MISMO que sirve hoy `1.4.2-alpine` —o sea que upstream aún no
+  # ha reconstruido la imagen— y no existe ningún tag alpine posterior (el último
+  # publicado es 1.4.2). Meter un `apk upgrade` en el Dockerfile lo taparía a
+  # costa de romper la reproducibilidad que el pinning por digest existe para
+  # dar, y hay un gate que la vigila.
+  #
+  # Y NO NOS ALCANZA: el fallo es un consumo de memoria sin límite en el
+  # SERVIDOR QUIC de OpenSSL. Estas imágenes sirven HTTP con bun por detrás de
+  # Traefik y no abren ningún puerto QUIC.
+  #
+  # Fecha corta a propósito: en cuanto oven/bun reconstruya, esto vuelve a salir
+  # y lo que toca es repinchar el digest, no renovar la excepción.
+  - id: CVE-2026-14456
+    statement: "openssl 3.5.7-r0 en oven/bun:1.4.2-alpine; upstream no ha reconstruido la imagen y el fallo es del servidor QUIC, que estas imágenes no levantan"
+    expired_at: 2026-10-15

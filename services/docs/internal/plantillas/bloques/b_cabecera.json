@@ -1,0 +1,27 @@
+{
+ "cells": {
+  "A1": "<b>{{b_cabecera.titulo}}</b>",
+  "A2": "<b>{{horas.periodo}}</b>",
+  "A3": "<b>{{b_cabecera.preparado}}</b>",
+  "A4": "<b>{{gastos.fecha}}</b>"
+ },
+ "formats": {
+  "B4": {
+   "id": "date"
+  }
+ },
+ "styles": {
+  "A1": {
+   "tema": "papel"
+  },
+  "B1": {
+   "tema": "papel"
+  },
+  "C1": {
+   "tema": "papel"
+  },
+  "D1": {
+   "tema": "papel"
+  }
+ }
+}

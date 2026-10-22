@@ -1,0 +1,17 @@
+Vaši videoposnetki in vaši prenosi v živo, na zahtevo in v realnem času, ne da bi zapustili Evropo.
+
+• Naložite videoposnetek in prekodira se v več kakovosti za vsak zaslon.
+• Oddajajte v živo iz programa za oddajanje, iz brskalnika ali iz aplikacije.
+• Štiri ravni vidnosti: javno, skrito, organizacija ali določene osebe.
+• Klepet v živo in komentarji, z osnovnim moderiranjem s strani tistega, ki objavlja.
+• Naložite videoposnetke do 8 GiB; izvirnik se ohrani.
+• Prenos v živo iz programa za oddajanje prek RTMP, s ključem prenosa za vsako osebo.
+• V živo iz brskalnika ali aplikacije: kamera, zaslon in mikrofon.
+• Posnetki prenosov v živo samodejno postanejo videoposnetki na zahtevo.
+• Javna naslovnica in kanal za vsako organizacijo, z možnostjo indeksiranja.
+• Skrite povezave, videoposnetki samo za organizacijo ali dostop za določene osebe po @uporabniškem imenu.
+• Klepet v živo in komentarji v nitih, ki jih moderirata oseba, ki objavlja, in uprava organizacije.
+• Prostor se šteje v vašo kvoto v Sytue Drive; vse v Evropski uniji.
+• »Naložite v Cast« iz Sytue Drive: kopija videoposnetka gre v Cast, datoteka pa ostane v Drive.
+
+Šifrirano med prenosom (TLS 1.3). Infrastruktura Sytue je v EU. Lokacija zunanjih storitev je odvisna od njihovega ponudnika.

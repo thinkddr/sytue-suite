@@ -1,0 +1,32 @@
+{{- if .Values.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "livekit-egress.fullname" . }}
+  labels:
+    {{- include "livekit-egress.labels" . | nindent 4 }}
+data:
+  # Config del egress. Las claves de LiveKit NO están aquí: llegan por
+  # EGRESS_CONFIG_BODY/ficheros del secret, igual que en el SFU.
+  #
+  # `redis` es obligatorio y no es una opción de rendimiento: el egress no
+  # escucha en ningún puerto, se registra en ese store y espera a que el SFU le
+  # mande trabajo. Sin él, el pod arranca, pasa sus sondas y no graba jamás.
+  config.yaml: |
+    redis:
+      address: {{ .Values.redis.address | quote }}
+      db: {{ .Values.redis.db }}
+      {{- if include "livekit-egress.cacheSecret" . }}
+      # Marcador: lo sustituye el initContainer con el valor del Secret. Aquí no
+      # va la contraseña porque un ConfigMap lo lee cualquiera del namespace.
+      password: "SYTUE_REDIS_PASSWORD"
+      {{- end }}
+    ws_url: {{ include "livekit-egress.wsUrl" . | quote }}
+    log_level: info
+    # Solo grabación compuesta de sala. No se habilita el egress de pista suelta
+    # ni el de streaming: cada uno abre su propia superficie —y su propio coste—
+    # y hoy nada del producto los pide.
+    template_port: 7980
+    health_port: 7981
+    insecure: false
+{{- end }}

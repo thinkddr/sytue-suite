@@ -1,0 +1,18 @@
+Galéria a editor fotiek: originály v Drive, úpravy ako recept.
+
+• Časová os po mesiacoch s hľadaním podľa názvu.
+• Albumy s obalom; prehliadač na celú obrazovku.
+• Editor svetla, farieb, otočenia, zrkadlenia a orezania v reálnom čase.
+• Každá úprava je recept: originál zostáva nedotknutý.
+• Časová os zoskupená po mesiacoch, s hľadaním podľa názvu a ostrými miniatúrami.
+• Albumy: vytvorenie, premenovanie, výber obalu, pridanie z prehliadača a odstránenie.
+• Editor so štyrmi posúvačmi (expozícia, kontrast, sýtosť, teplota), otočením a zrkadlením.
+• Každá úprava je recept uložený samostatne: originál v Drive sa nikdy nemení.
+• Export v plnom rozlíšení, vykreslený na serveri rovnakými vzorcami ako náhľad.
+• Kôš s obnovením.
+• Originály sú vo vašom Sytue Drive; odvodené verzie sú obnoviteľná vyrovnávacia pamäť.
+• Údaje EXIF čítané priamo zo súboru; všetko v Európskej únii.
+• Viacnásobný výber po mesiacoch: do nového albumu, do koša alebo stiahnutie naraz.
+• Prezentácia, plná veľkosť, otočenie z prehliadača a orezanie s pevným pomerom strán.
+
+Šifrovanie pri prenose (TLS 1.3). Infraštruktúra Sytue je v EÚ. Umiestnenie externých služieb závisí od ich poskytovateľa.

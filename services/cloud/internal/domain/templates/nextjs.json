@@ -1,0 +1,16 @@
+{
+  "id": "nextjs",
+  "name": "Next.js",
+  "description": "Empieza con estos ajustes para una app Next.js con render en servidor.",
+  "version": "1.0.0",
+  "license": "Apache-2.0",
+  "maintainer": "Sytue",
+  "framework": "node",
+  "build": {
+    "strategy": "buildpacks",
+    "install": "bun install --frozen-lockfile",
+    "build": "bun run build"
+  },
+  "docs_url": "https://nextjs.org/docs",
+  "tags": ["ssr", "react"]
+}

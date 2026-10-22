@@ -1,0 +1,23 @@
+{{- if .Values.enabled }}
+{{- /*
+Service con nombre ESTABLE (`dragonfly`), no derivado de la release: los
+servicios lo reciben como `redis://dragonfly:6379`, la misma URL que usan en el
+compose de desarrollo. Que dev y produccion no difieran en esto es lo que hace
+que un fallo de conexion se pueda reproducir donde toca.
+*/ -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "sytue-dragonfly.serviceName" . }}
+  labels:
+    {{- include "sytue-dragonfly.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: dragonfly
+      port: {{ .Values.service.port }}
+      targetPort: dragonfly
+      protocol: TCP
+  selector:
+    {{- include "sytue-dragonfly.selectorLabels" . | nindent 4 }}
+{{- end }}

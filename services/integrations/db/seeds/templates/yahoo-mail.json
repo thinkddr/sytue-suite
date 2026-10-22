@@ -1,0 +1,27 @@
+{
+  "key": "yahoo-mail",
+  "tier": "tier2",
+  "manifest": {
+    "name": "Yahoo Mail",
+    "description": "Conecta tu cuenta personal de correo para leer y enviar mensajes desde Sytue Mail.",
+    "category": "Correo",
+    "color": "#6001D2",
+    "icon": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><rect x=\"3\" y=\"5\" width=\"18\" height=\"14\" rx=\"2\"/><path d=\"m3 6 9 7 9-7\"/></svg>",
+    "identity": {
+      "kind": "none"
+    },
+    "provisioning": "none",
+    "launch": {
+      "kind": "none"
+    },
+    "oauth": {
+      "authorize_url": "https://api.login.yahoo.com/oauth2/request_auth",
+      "token_url": "https://api.login.yahoo.com/oauth2/get_token",
+      "scopes": ["openid", "email", "mail-r", "mail-w"],
+      "authorize_params": {
+        "prompt": "consent"
+      },
+      "revoke_url": "https://api.login.yahoo.com/oauth2/revoke"
+    }
+  }
+}

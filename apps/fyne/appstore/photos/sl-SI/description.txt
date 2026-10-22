@@ -1,0 +1,18 @@
+Galerija in urejevalnik fotografij: izvirniki v Drive, urejanja kot recept.
+
+• Časovnica po mesecih z iskanjem po imenu.
+• Albumi z naslovnico; pregledovalnik na celotnem zaslonu.
+• Urejevalnik svetlobe, barv, sukanja, zrcaljenja in obrezovanja v realnem času.
+• Vsako urejanje je recept: izvirnik ostane nedotaknjen.
+• Časovnica, združena po mesecih, z iskanjem po imenu in ostrimi sličicami.
+• Albumi: ustvarjanje, preimenovanje, izbira naslovnice, dodajanje iz pregledovalnika in odstranjevanje.
+• Urejevalnik s štirimi drsniki (osvetlitev, kontrast, nasičenost, temperatura), sukanjem in zrcaljenjem.
+• Vsako urejanje je recept, shranjen posebej: izvirnik v Drive se nikoli ne spremeni.
+• Izvoz v polni ločljivosti, upodobljen na strežniku z enakimi formulami kot v predogledu.
+• Koš z obnovitvijo.
+• Izvirniki so v vašem Sytue Drive; izpeljanke so predpomnilnik, ki ga je mogoče znova ustvariti.
+• Podatki EXIF, prebrani iz same datoteke; vse v Evropski uniji.
+• Večkratna izbira po mesecih: v nov album, v koš ali prenos naenkrat.
+• Diaprojekcija, polna velikost, sukanje iz pregledovalnika in obrezovanje s fiksnim razmerjem.
+
+Šifrirano med prenosom (TLS 1.3). Infrastruktura Sytue je v EU. Lokacija zunanjih storitev je odvisna od njihovega ponudnika.

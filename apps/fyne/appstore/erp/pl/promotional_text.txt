@@ -1,0 +1,1 @@
+Cały ERP, z katalogiem modeli jako plikiem danych.

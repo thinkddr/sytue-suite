@@ -1,0 +1,16 @@
+Ühine redigeerimine reaalajas
+
+• Kõik salvestatud teie Euroopa Drive’i.
+• Ühine redigeerimine reaalajas, kohalolekuga ja üksteist segamata.
+• Vahekaartidega lint: Avaleht, Lisa, Viited, Postitused ja Läbivaatus.
+• Tabelid, pildid, kujundid, SmartArt, diagrammid, sümbolid ja vesimärgid.
+• Viited: sisukord, allmärkused, tsitaadid ja bibliograafia.
+• Postitused: kirjakooste kirjade ja siltide jaoks.
+• Lõimitud kommentaarid, muudatuste läbivaatus ja versioonid.
+• Valikuline tehisintellekti abiline ümbersõnastamiseks, tõlkimiseks või kokkuvõtmiseks, ainult kui teie organisatsioon selle lubab.
+• Eksport ODT-, DOCX- ja PDF-vormingusse; Wordi failide avamine Drive’ist.
+• Päised, jalused, lehekülgede nummerdamine ja korduvkasutatavad plokid.
+• Automaatne salvestamine teie Euroopa Drive’i koos ajalooga.
+• Allalaadimine avalehelt PDF-, HTML-, Markdown-, OpenDocument- või Microsoft Office’i vormingus.
+
+Krüpteeritud edastamisel (TLS 1.3). Sytue taristu asub ELis. Väliste teenuste asukoht sõltub nende pakkujast.

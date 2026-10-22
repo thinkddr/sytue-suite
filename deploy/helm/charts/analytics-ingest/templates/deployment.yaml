@@ -1,0 +1,133 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "sytue-analytics-ingest.fullname" . }}
+  labels:
+    {{- include "sytue-analytics-ingest.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "sytue-analytics-ingest.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "sytue-analytics-ingest.labels" . | nindent 8 }}
+      annotations:
+        kubectl.kubernetes.io/default-container: analytics-ingest
+    spec:
+      automountServiceAccountToken: false
+      {{- with (.Values.global).imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: analytics-ingest
+          image: "{{ include "sytue-analytics-ingest.imageRegistry" . }}/{{ .Values.image.repository }}:{{ ((.Values.global).image | default dict).tag | default .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          # Sin `command`: el ENTRYPOINT de la imagen YA es /app/analytics-ingest.
+          # El que cambia el proceso es analytics-api, que comparte esta imagen.
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.targetPort }}
+          env:
+            {{- if (.Values.global).otlp }}
+            {{- if (.Values.global).otlp.endpoint }}
+            # Telemetria: metricas OTLP directas a Cockpit, sin agente intermedio.
+            # Sale del umbrella y no de este chart para que los catorce escriban al
+            # MISMO sitio; si cada uno apuntara al suyo, no habria con que comparar.
+            # Vacio => no se exporta y el servicio sigue sirviendo igual.
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ (.Values.global).otlp.endpoint | quote }}
+            {{- end }}
+            {{- if (.Values.global).otlp.tokenSecret }}
+            # Por Secret y nunca por values: aunque el token solo permita escribir,
+            # con el se puede envenenar la serie que decide un escalado.
+            - name: OTEL_EXPORTER_OTLP_HEADERS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ (.Values.global).otlp.tokenSecret }}
+                  key: {{ (.Values.global).otlp.tokenKey | default "otlp-headers" }}
+                  optional: true
+            {{- end }}
+            {{- end }}
+            # Runtime Go atado a los limites del pod (helper sytue.goRuntimeEnv del umbrella):
+            # GOMAXPROCS=techo(limits.cpu) via downward API; GOMEMLIMIT=~85% de limits.memory.
+            {{- include "sytue.goRuntimeEnv" (dict "container" "analytics-ingest" "memLimit" .Values.resources.limits.memory) | nindent 12 }}
+            {{- include "sytue.logCollectorEnv" . | nindent 12 }}
+            {{- if ne (include "sytue-analytics-ingest.env" .) "base" }}
+            # config.Load valida ENV ∈ {dev,staging,prod}; "base" (default del helper
+            # para labels) haria ABORTAR el binario -> solo se inyecta si es real.
+            - name: ENV
+              value: {{ include "sytue-analytics-ingest.env" . | quote }}
+            {{- end }}
+            # config.Load da prioridad a PORT sobre HTTP_ADDR (paridad con compose).
+            - name: PORT
+              value: "{{ .Values.service.targetPort }}"
+            - name: LOG_LEVEL
+              value: {{ .Values.config.logLevel | quote }}
+            # ----- Postgres EXTERNO (RDB; sitios, sal del dia y cola de escritura) -----
+            # El colector NO migra ni hace mantenimiento (eso es de analytics-api), asi
+            # que no recibe DATABASE_DIRECT_URL: aqui no hay DDL ni advisory locks.
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgresql.existingSecret }}
+                  key: {{ .Values.postgresql.dsnKey }}
+            # Pool pgx POR replica (bajo en prod: PgBouncer multiplexa hacia la RDB).
+            - name: DB_MAX_CONNS
+              value: {{ .Values.config.dbMaxConns | quote }}
+            # KEK AES-256 de la SAL DIARIA. Sin ella la sal se guardaria en claro y el
+            # anonimato del ADR dejaria de ser estructural: por eso NO es opcional.
+            - name: SYTUE_ANALYTICS_KEY_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret }}
+                  key: key-encryption-key
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 3
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+      {{- with .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- range . }}
+        - maxSkew: {{ .maxSkew }}
+          topologyKey: {{ .topologyKey }}
+          whenUnsatisfiable: {{ .whenUnsatisfiable }}
+          labelSelector:
+            matchLabels:
+              {{- include "sytue-analytics-ingest.selectorLabels" $ | nindent 14 }}
+        {{- end }}
+      {{- end }}

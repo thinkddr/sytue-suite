@@ -1,0 +1,43 @@
+{
+  "key": "servicenow",
+  "tier": "tier2",
+  "manifest": {
+    "name": "ServiceNow",
+    "description": "Gestión de servicios de TI (ITSM) y flujos de trabajo, con inicio de sesión único.",
+    "category": "Gestión de servicios",
+    "color": "#4B9E6B",
+    "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#4B9E6B\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"6\" cy=\"8\" r=\"2.5\"/><circle cx=\"18\" cy=\"8\" r=\"2.5\"/><circle cx=\"12\" cy=\"18\" r=\"2.5\"/><line x1=\"8\" y1=\"9\" x2=\"11\" y2=\"16\"/><line x1=\"16\" y1=\"9\" x2=\"13\" y2=\"16\"/><line x1=\"8.5\" y1=\"8\" x2=\"15.5\" y2=\"8\"/></svg>",
+    "identity": {
+      "kind": "saml",
+      "entity_id": "https://{instance}.service-now.com",
+      "acs_url": "https://{instance}.service-now.com/consumer.do",
+      "name_id_format": "email"
+    },
+    "provisioning": "none",
+    "data": "servicenow",
+    "launch": {
+      "kind": "initiate"
+    },
+    "fields": [
+      {
+        "key": "instance",
+        "label": "Instancia de ServiceNow",
+        "placeholder": "acme",
+        "help": "El nombre de tu instancia: https://INSTANCIA.service-now.com",
+        "required": true
+      }
+    ],
+    "secret": {
+      "label": "Token de ServiceNow",
+      "help": "Alternativa al consentimiento: credencial de la cuenta de integración. Conectando con ServiceNow no hace falta pegar nada."
+    },
+    "oauth": {
+      "authorize_url": "https://{instance}.service-now.com/oauth_auth.do",
+      "token_url": "https://{instance}.service-now.com/oauth_token.do",
+      "scopes": [
+        "useraccount"
+      ],
+      "revoke_url": "https://{instance}.service-now.com/oauth_revoke_token.do"
+    }
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "package": "generated",
+  "entries": [
+    {
+      "name": "ImageGeometry",
+      "source": "example/src/pages/geometry-image.astro",
+      "output": "native/generated/image_geometry.gen.go",
+      "profile": {
+        "state": "default",
+        "width": 320,
+        "height": 240,
+        "scale": 1
+      }
+    }
+  ]
+}

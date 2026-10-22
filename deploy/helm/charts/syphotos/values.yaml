@@ -1,0 +1,151 @@
+# sytue-syphotos — defaults del subchart (servicio Go). global.* lo inyecta el umbrella.
+# Estado en PostgreSQL (RDB Scaleway, UE). Sin Redis/Valkey ni motores AGPL.
+enabled: true
+subdomain: syphotos
+component: syphotos
+replicaCount: 2
+
+image:
+  registry: ""                 # cae a global.imageRegistry (Scaleway Registry, UE)
+  repository: sytue-syphotos
+  tag: "1.0.0"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8097             # puerto del SPEC (hueco que dejó la señalización de Meet)
+
+ingress:
+  enabled: true
+  className: traefik
+  annotations: {}
+  # photos.sytue.eu: la app Astro (sytue-frontend) sirve "/"; el backend Go expone
+  # solo su API.
+  paths:
+    # `/api/v1` y NO `/api`: el BFF de la app Astro sirve sus propias rutas bajo
+    # /api/<recurso>, y un Prefix en /api se las quedaría TODAS mandándolas al
+    # servicio Go, que solo expone /api/v1 (el mismo fallo que ya se corrigió en
+    # contacts: 404 en cada carga y la app diciendo «no se pudieron cargar»).
+    - path: /api/v1
+      pathType: Prefix
+  tls:
+    secretName: tls-photos-sytue-eu
+
+# Right-sized al footprint MEDIDO (Go ~6-40MiB RSS idle): requests modestos para
+# densidad/coste; limits con cabecera para picos (CRUD ligero; burstable).
+# Requests MEDIDOS en producción (kubectl top, 2026-08-09), no estimados: en
+# Kubernetes la factura la fija lo RESERVADO, no lo usado, y estos pods pedían
+# 25-75 veces su consumo real. Esa reserva inflada obligó a un tercer nodo cuando
+# la CPU real del clúster estaba al 3 %.
+#
+# El límite NO se toca: un pico sigue pudiendo usar toda la CPU que necesite. Y
+# bajar el request hace al HPA MÁS sensible —calcula el porcentaje sobre el
+# request—, que es justo lo que hace falta para escalar por demanda real.
+# MEMORIA: 512Mi como Drive y Docs, y por una razón que ellos no tienen.
+#
+# Este servicio DECODIFICA imágenes, que es lo más caro en memoria de toda la
+# suite: una foto de 24 megapíxeles reserva del orden de 100 MB al abrirla, y la
+# cascada de derivadas mantiene además todos los tamaños a la vez. Con 192Mi el
+# proceso moría por OOM en cuanto una galería pedía varias miniaturas de golpe
+# —medido en el piloto: 4 reinicios seguidos y todas las miniaturas en HTTP 500,
+# que en pantalla es una cuadrícula de imágenes rotas—.
+#
+# El techo va atado a `MaxDerivadasSimultaneas` (services/syphotos/internal/http):
+# dos decodificaciones a la vez en el peor caso son ~200 MB, y el GOMEMLIMIT que
+# pone el chart (85 % del límite, 435 MB) deja margen para el resto del proceso.
+# Si alguien sube ese semáforo, este número sube con él o vuelve el OOM.
+resources:
+  requests:
+    cpu: 15m
+    memory: 128Mi
+  limits:
+    cpu: "1"
+    memory: 512Mi
+
+autoscaling:
+  # Etiqueta `job` de la serie de metricas, para el HPA por demanda real.
+  # Es el ServiceName del BINARIO, que no siempre coincide con el nombre del
+  # chart ni con el del directorio; por eso se escribe y no se deduce.
+  metricJob: sytue-syphotos
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 8
+  targetCPUUtilizationPercentage: 70
+  # Sin memoria: en Go la RSS queda alta tras el GC (mala señal de escalado) y
+  # GOMEMLIMIT (~85% de limits.memory) ya la acota -> se escala solo por CPU.
+
+networkPolicy:
+  enabled: true
+
+serviceMonitor:
+  enabled: true
+  path: /metrics
+  interval: 30s
+
+config:
+  # Cuanto se queda en la papelera lo borrado antes de que el worker lo destruya
+  # de verdad, con sus derivadas. Treinta dias, como el resto de la suite.
+  #
+  # A CERO SE APAGA la purga y nada caduca, que es la salida para una
+  # instalacion con obligacion de conservar (un litigio, un plazo sectorial).
+  trashRetention: 720h
+  # Cada cuanto despierta el worker. La retencion se mide en dias, asi que esto
+  # solo decide cuanto tarda en notarse.
+  trashGcInterval: 1h
+  # Bucket PROPIO de derivadas (miniaturas, previas): caché regenerable, con
+  # ciclo de vida distinto del de un fichero de alguien. No es el de Drive.
+  s3Bucket: sytue-prod-syphotos-derivadas
+  # Dónde vive Sytue Drive dentro del clúster: es donde están los originales.
+  #
+  # Vacío = se deriva del Release, que es como lo hacen todos los demás
+  # (`sytue-frontend/_helpers.tpl`). Antes iba escrito a mano y con el puerto del
+  # POD, `http://sytue-one-drive:8082`: el Service expone el 80, así que el 8097
+  # no tenía regla en kube-proxy y toda subida moría con «connection refused» al
+  # pedir los metadatos del fichero recién subido. Sin puerto no hay nada que
+  # pueda desalinearse.
+  driveUrl: ""
+  # Tamano del pool pgx por replica (DB_MAX_CONNS). Prod lo baja (3-5):
+  # PgBouncer multiplexa hacia la RDB (ver values-prod.yaml del umbrella).
+  dbMaxConns: 10
+  logLevel: info
+
+# Postgres EXTERNO (Scaleway RDB). DSN por secret (nunca en git).
+postgresql:
+  existingSecret: sytue-syphotos-db
+  dsnKey: dsn
+  # DSN directo a la RDB (bypass PgBouncer) para LISTEN/migraciones; opcional.
+  dsnDirectKey: dsn-direct
+
+# Sin `existingSecret` propio: este servicio valida el JWT de Sytue ID por JWKS y
+# no ejecuta ningún flujo de código OIDC, así que no hay client secret que montar.
+# Quien sí tiene credenciales de cliente es el BFF de la app Astro, y las suyas
+# viven en `sytue-frontend-bff` (mismo caso que Rooms e Integrations).
+
+# PodDisruptionBudget: garantiza disponibilidad durante drains/upgrades del cluster.
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+  # maxUnavailable: 1   # alternativa a minAvailable (usar uno u otro)
+
+# Reparto anti-afinidad suave por zona y nodo (alta disponibilidad multi-AZ, UE).
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: ScheduleAnyway
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: ScheduleAnyway
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  fsGroup: 10001
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]

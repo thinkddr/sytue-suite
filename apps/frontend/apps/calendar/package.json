@@ -1,0 +1,38 @@
+{
+  "name": "@sytue/calendar",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sytue Calendar — calendario propio (Astro 7 + Preact 10) sobre el servicio Go propio Sytue Calendar (CalDAV RFC 4791 + REST). Vistas mes/semana/dia, crear/editar eventos. Monta la Sytue Shell y usa @sytue/ui. Producto Sytue-native, propietario. docs/CONVENTIONS.md §1.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "dev": "bun --bun astro dev --port 4327 --host",
+    "build": "bun --bun astro build",
+    "preview": "bun --bun astro preview --port 4327 --host",
+    "start": "bun ./dist/server/entry.mjs",
+    "test": "bun test",
+    "typecheck": "bun --bun astro check"
+  },
+  "dependencies": {
+    "@astrojs/node": "catalog:",
+    "@astrojs/preact": "catalog:",
+    "@sytue/ai": "workspace:*",
+    "@sytue/api-clients": "workspace:*",
+    "@sytue/auth": "workspace:*",
+    "@sytue/config": "workspace:*",
+    "@sytue/i18n": "workspace:*",
+    "@sytue/offline": "workspace:*",
+    "@sytue/shell": "workspace:*",
+    "@sytue/ui": "workspace:*",
+    "@xmldom/xmldom": "0.9.12",
+    "astro": "catalog:",
+    "preact": "10.29.8"
+  },
+  "devDependencies": {
+    "@astrojs/check": "catalog:",
+    "@tailwindcss/vite": "4.3.3",
+    "@types/bun": "1.4.2",
+    "tailwindcss": "4.3.3",
+    "typescript": "6.0.3"
+  }
+}

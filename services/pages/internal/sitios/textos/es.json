@@ -1,0 +1,8 @@
+{
+  "not_found_mensaje": "El recurso solicitado no existe.",
+  "not_found_titulo": "Página no encontrada",
+  "suspended_mensaje": "Esta web ha sido suspendida temporalmente.",
+  "suspended_titulo": "Esta web no está disponible",
+  "unpublished_mensaje": "Esta web aún no está publicada.",
+  "unpublished_titulo": "Esta web aún no está publicada"
+}

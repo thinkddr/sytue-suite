@@ -1,0 +1,55 @@
+{
+  "children": [
+    {
+      "content": {
+        "en": [
+          {
+            "text": "Companies that trust us"
+          }
+        ],
+        "es": [
+          {
+            "text": "Empresas que confían en nosotros"
+          }
+        ]
+      },
+      "id": "tex0000001",
+      "tag": "h2",
+      "type": "text"
+    },
+    {
+      "content": {
+        "en": [
+          {
+            "text": "Partner Company 1 · Partner Company 2"
+          }
+        ],
+        "es": [
+          {
+            "text": "Empresa Colaboradora 1 · Empresa Colaboradora 2"
+          }
+        ]
+      },
+      "id": "tex0000002",
+      "tag": "p",
+      "type": "text"
+    }
+  ],
+  "full_bleed": false,
+  "id": "sec0000001",
+  "kind": "logos",
+  "layout": {
+    "direction": "column",
+    "gap": 24,
+    "padding": [
+      32,
+      32,
+      32,
+      32
+    ],
+    "align": "center",
+    "justify": "center",
+    "wrap": false
+  },
+  "type": "section"
+}

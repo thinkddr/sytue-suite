@@ -1,0 +1,95 @@
+---
+import DashboardLayout from '../../../layouts/DashboardLayout.astro';
+import RuntimePanel from '../../../components/RuntimePanel';
+import SourcePanel from '../../../components/SourcePanel';
+import HttpRulesPanel from '../../../components/HttpRulesPanel';
+import PauseCard from '../../../components/PauseCard';
+import CloneCard from '../../../components/CloneCard';
+import DangerZone from '../../../components/DangerZone';
+import { requireSession } from '@sytue/auth/server';
+import { canonicaConOrg } from '@sytue/config';
+import { getBff, toBffContext } from '../../../server/bff.js';
+import { loadProject, loadInstanceSizes, loadPushDeploy } from '../../../lib/cloud.js';
+
+import { useT } from '../../../i18n/index.js';
+
+export const prerender = false;
+
+// El idioma lo negocia el middleware una vez por peticion y baja a la isla por
+// props: detectarlo en el cliente desajustaria la hidratacion.
+const locale = Astro.locals.locale;
+const t = useT(locale);
+
+const guard = await requireSession(getBff(), toBffContext(Astro));
+if (guard instanceof Response) return guard;
+// Ruta en `sinOrg` (su nombre colisiona con el namespace de organizaciones):
+// con sesión, un salto local a la canónica con la org activa (ADR 0056).
+const canonica = canonicaConOrg(Astro.url, getBff().basePath, guard.session.user.tenant);
+if (canonica) return Astro.redirect(canonica);
+
+const { session } = guard;
+
+const { slug } = Astro.params;
+const projectSourced = slug ? await loadProject(session, slug) : undefined;
+if (!projectSourced) return new Response(t('common.notFound'), { status: 404 });
+const project = projectSourced.data;
+
+// El catálogo de tamaños marca si hay control-plane: es una lectura que no exige
+// ningún rol, así que si degrada es que no hay backend, no que falte permiso.
+const sizes = await loadInstanceSizes(session);
+// Los datos del webhook solo los devuelve el control-plane a un admin/owner: si
+// llegan vacios, el panel lo dice en vez de leerse como averia.
+const push = await loadPushDeploy(session, project.slug);
+---
+
+<DashboardLayout
+  title={t('page.titleWithProject', { section: t('nav.settings'), project: project.name })}
+  project={project.slug}
+  section="settings"
+  hasDb={project.services.includes('postgres')}
+>
+  <h1 class="sytue-h2 text-text mb-4">{t('nav.settings')}</h1>
+  <RuntimePanel
+    client:load
+    project={project.slug}
+    runtime={project.runtime}
+    sizes={sizes.data.sizes}
+    maxCount={sizes.data.maxCount}
+    framework={project.framework}
+    live={sizes.live && projectSourced.live}
+    locale={locale}
+  />
+  <SourcePanel
+    client:load
+    project={project.slug}
+    repo={project.repo}
+    productionRef={project.productionRef}
+    releaseCommand={project.runtime.releaseCommand}
+    previewProtected={project.previewProtected ?? false}
+    push={push.data}
+    live={push.live}
+    locale={locale}
+  />
+  <HttpRulesPanel
+    client:load
+    project={project.slug}
+    rules={project.httpRules ?? {}}
+    live={projectSourced.live}
+    locale={locale}
+  />
+  <PauseCard
+    client:load
+    project={project.slug}
+    paused={project.paused ?? false}
+    live={projectSourced.live}
+    locale={locale}
+  />
+  <CloneCard client:load project={project.slug} live={projectSourced.live} locale={locale} />
+  <DangerZone
+    client:load
+    project={project.slug}
+    name={project.name}
+    live={projectSourced.live}
+    locale={locale}
+  />
+</DashboardLayout>

@@ -1,0 +1,214 @@
+{
+ "pais": "IS",
+ "verificado": true,
+ "moneda": "ISK",
+ "formas": [
+  {
+   "clave": "einstaklingur",
+   "nombre": "Einstaklingur með rekstur",
+   "tipo": "persona_fisica"
+  },
+  {
+   "clave": "sf",
+   "nombre": "Sameignarfélag (sf.)",
+   "tipo": "persona_fisica"
+  },
+  {
+   "clave": "ehf",
+   "nombre": "Einkahlutafélag (ehf.)",
+   "tipo": "sociedad"
+  },
+  {
+   "clave": "hf",
+   "nombre": "Hlutafélag (hf.)",
+   "tipo": "sociedad"
+  }
+ ],
+ "portales": {
+  "skatturinn": {
+   "nombre": "Skatturinn — þjónustusíða",
+   "url": "https://thjonustusida.skatturinn.is/"
+  },
+  "arsreikningaskra": {
+   "nombre": "Ársreikningaskrá (fyrirtækjaskrá)",
+   "url": "https://www.skatturinn.is/fyrirtaekjaskra/"
+  }
+ },
+ "obligaciones": [
+  {
+   "clave": "is_vsk",
+   "nombre": "Virðisaukaskattsskil (tveggja mánaða uppgjör)",
+   "concepto": "iva_periodica",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "1P": "04-05",
+    "2P": "06-05",
+    "3P": "08-05",
+    "4P": "10-05",
+    "5P": "12-05",
+    "6P": "02-05+1"
+   },
+   "margen_dias": 7,
+   "portal": "skatturinn",
+   "aplica": {
+    "condiciones": [
+     "iva"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_pct_mes": 30,
+    "recargo_max_pct": 10,
+    "nota": "Gjalddagi og eindagi einn mánuður og fimm dagar eftir lok tveggja mánaða uppgjörstímabils (janúar–febrúar: 5. apríl); beri hann upp á helgi færist hann á næsta virka dag. Stærri aðilar skila mánaðarlega (5. næsta mánaðar). Álag 1 % á dag af vangreiddum skatti, að hámarki 10 %, auk dráttarvaxta."
+   },
+   "calculo": {
+    "tipo": "saldo_neto",
+    "haber": [
+     "477"
+    ],
+    "debe": [
+     "472"
+    ]
+   }
+  },
+  {
+   "clave": "is_stadgreidsla",
+   "nombre": "Staðgreiðsla opinberra gjalda af launum",
+   "concepto": "retenciones_trabajo",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "15"
+   },
+   "margen_dias": 5,
+   "portal": "skatturinn",
+   "aplica": {
+    "condiciones": [
+     "empleados"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_pct_mes": 30,
+    "recargo_max_pct": 10,
+    "nota": "Gjalddagi 1. dags næsta mánaðar, eindagi 15.; skilagrein og greiðsla rafrænt. Álag 1 % á dag, að hámarki 10 %, og dráttarvextir."
+   }
+  },
+  {
+   "clave": "is_tryggingagjald",
+   "nombre": "Tryggingagjald",
+   "concepto": "seguridad_social",
+   "ambito": "laboral",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "15"
+   },
+   "margen_dias": 5,
+   "portal": "skatturinn",
+   "aplica": {
+    "condiciones": [
+     "empleados"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_pct_mes": 30,
+    "recargo_max_pct": 10,
+    "nota": "Greitt með staðgreiðslu, eindagi 15. næsta mánaðar. Álag 1 % á dag, að hámarki 10 %."
+   }
+  },
+  {
+   "clave": "is_framtal_einstaklinga",
+   "nombre": "Skattframtal einstaklinga með rekstur (RSK 1.01 / 1.04)",
+   "concepto": "renta_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "03-10+1"
+   },
+   "margen_dias": 21,
+   "portal": "skatturinn",
+   "aplica": {
+    "tipos": [
+     "persona_fisica"
+    ]
+   },
+   "sancion": {
+    "tipo": "nota",
+    "nota": "Lokaskiladagur um miðjan mars, auglýstur árlega (2026: 13. mars) — hér 10. mars. Rekstur yfir 30 milljónum kr. skilar RSK 1.04. Álag allt að 15 % á skattstofna sé framtali skilað of seint."
+   }
+  },
+  {
+   "clave": "is_framtal_logadila",
+   "nombre": "Skattframtal lögaðila (RSK 1.04)",
+   "concepto": "sociedades_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "05-31+1"
+   },
+   "margen_dias": 30,
+   "portal": "skatturinn",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "nota",
+    "nota": "Skilafrestur 31. maí; endurskoðendur og bókarar fá frest til 21. september samkvæmt skilalista. Álag allt að 15 % á skattstofna og áætlun sé ekki skilað."
+   }
+  },
+  {
+   "clave": "is_fyrirframgreidsla",
+   "nombre": "Fyrirframgreiðsla þinggjalda",
+   "concepto": "pago_fraccionado_sociedades",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "1P": "02-ultimo",
+    "2P": "03-ultimo",
+    "3P": "04-ultimo",
+    "4P": "05-ultimo",
+    "5P": "06-ultimo",
+    "6P": "07-ultimo",
+    "7P": "09-ultimo",
+    "8P": "12-01"
+   },
+   "margen_dias": 5,
+   "portal": "skatturinn",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "nota",
+    "nota": "Átta greiðslur (febrúar–júlí, september og 1. desember), hlutfall af álagningu fyrra árs; dráttarvextir af vangreiddri fyrirframgreiðslu."
+   }
+  },
+  {
+   "clave": "is_arsreikningur",
+   "nombre": "Skil ársreiknings til ársreikningaskrár",
+   "concepto": "cuentas_anuales",
+   "ambito": "mercantil",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "08-31+1"
+   },
+   "margen_dias": 30,
+   "portal": "arsreikningaskra",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 60000000,
+    "nota": "Lokaskiladagur 31. ágúst. Stjórnvaldssekt 600.000 kr. fyrir vanskil, lækkuð í 250.000 kr. sé skilað innan 30 daga frá tilkynningu; að lokum krafa um félagsslit."
+   }
+  }
+ ]
+}

@@ -1,0 +1,18 @@
+# Configuración de Bun. Endurecida a propósito: el gestor de paquetes es la vía
+# de entrada más cómoda a la cadena de suministro, y sus valores por defecto
+# priorizan la comodidad sobre la prudencia.
+[install]
+# Versiones exactas: un rango deja que una publicación nueva entre sola en el
+# próximo install sin que nadie la haya revisado.
+exact = true
+
+# Registro explícito. Sin esta línea, una variable de entorno o un fichero de
+# configuración del sistema pueden redirigir las descargas a otro origen sin que
+# el repositorio lo refleje.
+registry = "https://registry.npmjs.org"
+
+# Ninguna versión publicada hace menos de cinco días. Es la defensa concreta
+# contra el ataque más frecuente: comprometer la cuenta de un mantenedor y
+# publicar una versión maliciosa, que suele detectarse y retirarse en horas.
+# Congela esa ventana sin renunciar a actualizar.
+minimumReleaseAge = 432000

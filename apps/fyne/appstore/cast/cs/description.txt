@@ -1,0 +1,17 @@
+Vaše videa a vaše živé přenosy, na vyžádání i v reálném čase, aniž byste opustili Evropu.
+
+• Nahrajte video a překóduje se do několika kvalit pro jakoukoli obrazovku.
+• Vysílejte živě z vysílacího programu, z prohlížeče nebo z aplikace.
+• Čtyři úrovně viditelnosti: veřejné, nezařazené, organizace nebo konkrétní osoby.
+• Živý chat a komentáře se základní moderací od osoby, která vysílá.
+• Nahrávejte videa do 8 GiB; originál se zachová.
+• Živé vysílání z vysílacího programu přes RTMP, s vysílacím klíčem pro každou osobu.
+• Živě z prohlížeče nebo z aplikace: kamera, obrazovka a mikrofon.
+• Záznamy živých přenosů se automaticky stávají videi na vyžádání.
+• Veřejná úvodní stránka a kanál pro každou organizaci, indexovatelné.
+• Nezařazené odkazy, videa jen pro organizaci nebo přístup pro konkrétní osoby podle @uživatelského jména.
+• Živý chat a komentáře ve vláknech, moderované osobou, která zveřejňuje, a správou organizace.
+• Úložiště se počítá do vaší kvóty v Sytue Drive; vše v Evropské unii.
+• „Nahrát do Cast“ ze Sytue Drive: kopie videa se přenese do Cast a soubor zůstane v Drive.
+
+Šifrování při přenosu (TLS 1.3). Infrastruktura Sytue je v EU. Umístění externích služeb závisí na jejich poskytovateli.

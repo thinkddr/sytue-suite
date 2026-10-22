@@ -1,0 +1,10 @@
+{
+  "order_paid_buyer_subject": "Confirmation de commande {number}",
+  "order_paid_buyer_body": "Merci pour votre achat. La commande {number} a été confirmée.",
+  "order_paid_store_subject": "Nouvelle commande reçue : {number}",
+  "order_paid_store_body": "Vous avez reçu une nouvelle commande {number} d'un montant de {total}.",
+  "withdrawal_ack_subject": "Confirmation de rétractation reçue : {number}",
+  "withdrawal_ack_body": "Votre demande de rétractation pour la commande {number} a bien été enregistrée.",
+  "form_received_subject": "Envoi de formulaire reçu : {form_id}",
+  "form_received_body": "Un nouvel envoi a été reçu pour le formulaire {form_id}."
+}

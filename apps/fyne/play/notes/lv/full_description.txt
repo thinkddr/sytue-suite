@@ -1,0 +1,18 @@
+Piezīmju grāmatiņas, kurās ietilpst viss: teksts, faili, notikumi, veseli dokumenti.
+
+• Ligzdotas piezīmju grāmatiņas uz brīva audekla, kolonnās vai sarakstā.
+• Jebkādas piezīmes: teksts, uzdevumi, saites, faili, Calendar notikumi, Docs dokumenti.
+• Jūs izlemjat, kas nonāk meklēšanā — un kas nekad.
+• Ligzdotas piezīmju grāmatiņas ar ikonu un krāsu; trīs izkārtojumi: brīvs, kolonnas un saraksts.
+• Divpadsmit piezīmju veidi: teksts, uzdevumi, saites, krāsa, attēls un atsauces uz Drive, Docus, Calendar, Rooms un citām piezīmēm.
+• Redaktors ar formatēšanu (treknraksts, saraksti, saites), kas saglabā, aizejot.
+• Birkas, piespraušana, dublēšana, pārvietošana starp grāmatiņām, grupēšana un vilkšana uz audekla.
+• Redzamība katrai grāmatiņai: privāta, personiska, organizācijas vai publiska saite.
+• Jūs izlemjat, kuras grāmatiņas nonāk komplekta meklēšanā.
+• Atpakaļsaites: kuras piezīmes norāda uz šo.
+• Visas grāmatiņas eksports uz HTML, PDF, Markdown un citiem formātiem; kopiju importēšana.
+• Piezīmes kopīgošana Rooms kanālā; piezīmju izveide, nometot vai ielīmējot.
+• Tabulas redaktorā un Markdown saīsnes rakstīšanas laikā: “- ”, “# ”, “> ” un “```”.
+• Piezīmes pārvietošana uz citu grāmatiņu, vienas piezīmes eksports un grāmatiņas kārtošana pēc izvēles.
+
+Šifrēts pārsūtīšanas laikā (TLS 1.3). Sytue infrastruktūra atrodas ES. Ārējo pakalpojumu atrašanās vieta ir atkarīga no to sniedzēja.

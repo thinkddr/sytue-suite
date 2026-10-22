@@ -1,0 +1,4 @@
+-- SPDX-License-Identifier: Apache-2.0
+-- Copyright (c) 2026 Daniel Delgado Ramos
+DROP TABLE IF EXISTS base_altcha_used;
+DROP TABLE IF EXISTS base_form_links;

@@ -1,0 +1,18 @@
+Blocos de notas que guardam tudo: texto, ficheiros, eventos, documentos inteiros.
+
+• Blocos de notas encaixados, numa tela livre, em colunas ou em lista.
+• Notas de todo o tipo: texto, tarefas, ligações, ficheiros, eventos do Calendar, documentos do Docs.
+• Decide o que entra na pesquisa — e o que nunca entra.
+• Blocos de notas encaixados com ícone e cor; três esquemas: livre, colunas e lista.
+• Doze tipos de nota: texto, tarefas, ligações, cor, imagem e referências ao Drive, Docus, Calendar, Rooms e outras notas.
+• Editor com formatação (negrito, listas, ligações) que guarda ao sair.
+• Etiquetas, fixar, duplicar, mover entre blocos, agrupar e arrastar na tela.
+• Visibilidade por bloco de notas: privado, pessoal, organização ou ligação pública.
+• Decide que blocos de notas entram na pesquisa da suite.
+• Retroligações: veja que notas apontam para esta.
+• Exportar um bloco de notas inteiro para HTML, PDF, Markdown e mais; importar cópias.
+• Partilhar uma nota num canal do Rooms; largar ou colar para criar notas.
+• Tabelas no editor e atalhos Markdown ao escrever: «- », «# », «> » e «```».
+• Mover uma nota para outro bloco de notas, exportar uma única nota e ordenar o bloco como quiser.
+
+Cifrado em trânsito (TLS 1.3). A infraestrutura da Sytue está na UE. A localização dos serviços externos depende do respetivo fornecedor.

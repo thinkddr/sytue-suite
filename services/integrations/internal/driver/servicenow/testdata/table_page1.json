@@ -1,0 +1,22 @@
+{
+  "result": [
+    {
+      "sys_id": "aa11",
+      "number": "INC0010001",
+      "short_description": "El portal de clientes no carga",
+      "state": { "value": "2", "display_value": "En curso" },
+      "priority": { "value": "1", "display_value": "1 - Crítica" },
+      "assigned_to": { "link": "https://acme.service-now.com/api/now/table/sys_user/u1", "value": "u1" },
+      "sys_created_on": "2026-07-20 09:14:33"
+    },
+    {
+      "sys_id": "bb22",
+      "number": "INC0010002",
+      "short_description": "Impresora de planta 3 sin tóner",
+      "state": { "value": "1", "display_value": "Nueva" },
+      "priority": { "value": "4", "display_value": "4 - Baja" },
+      "assigned_to": { "link": "https://acme.service-now.com/api/now/table/sys_user/u2", "value": "" },
+      "sys_created_on": "2026-07-21 11:02:10"
+    }
+  ]
+}

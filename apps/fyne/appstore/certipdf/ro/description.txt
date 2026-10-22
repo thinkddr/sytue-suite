@@ -1,0 +1,17 @@
+PDF de la început până la sfârșit, în browser.
+
+• Evidențiere, subliniere, comentarii și desen pe document.
+• Formulare: completarea câmpurilor sau crearea propriilor formulare.
+• Îmbinare, extragere, rotire, numerotare și filigran.
+• Panou de semnături, înnegrire permanentă și documente protejate prin parolă.
+• Vizualizator rapid cu cuprins, miniaturi, căutare și zoom pe pagină sau lățime.
+• Adnotări: evidențiere, subliniere, tăiere, comentarii, desen, forme, săgeți și ștampile.
+• Casete de text, măsurători și capturi de zone.
+• Formulare: completarea câmpurilor existente sau adăugarea unor câmpuri proprii.
+• Panou de semnare a documentelor.
+• Înnegrire permanentă: ce marcați dispare din fișier, nu doar din vizualizare.
+• Pagini: îmbinare, extragere, ștergere, rotire, numerotare (inclusiv Bates), anteturi și subsoluri.
+• Filigran, fundal și metadate editabile.
+• Documente și permisiuni protejate prin parolă.
+
+Criptare în tranzit (TLS 1.3). Infrastructura Sytue se află în UE. Locația serviciilor externe depinde de furnizorul lor.

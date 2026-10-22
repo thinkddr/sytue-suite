@@ -1,0 +1,128 @@
+{
+  "equipo": "VHC5QW7BZ3",
+  "idioma_principal": "es-ES",
+  "soporte": "https://sytue.eu",
+  "marketing": "https://sytue.eu",
+  "privacidad": "https://sytue.eu/privacidad",
+  "copyright": "2026 Sytue Projects, S.L.",
+  "derechos_de_contenido": "DOES_NOT_USE_THIRD_PARTY_CONTENT",
+  "edades": {
+    "advertising": false,
+    "alcoholTobaccoOrDrugUseOrReferences": "NONE",
+    "contests": "NONE",
+    "gambling": false,
+    "gamblingSimulated": "NONE",
+    "gunsOrOtherWeapons": "NONE",
+    "healthOrWellnessTopics": false,
+    "horrorOrFearThemes": "NONE",
+    "lootBox": false,
+    "matureOrSuggestiveThemes": "NONE",
+    "medicalOrTreatmentInformation": "NONE",
+    "messagingAndChat": false,
+    "parentalControls": false,
+    "ageAssurance": false,
+    "profanityOrCrudeHumor": "NONE",
+    "sexualContentGraphicAndNudity": "NONE",
+    "sexualContentOrNudity": "NONE",
+    "socialMedia": false,
+    "socialMediaAgeRestricted": false,
+    "unrestrictedWebAccess": false,
+    "userGeneratedContent": true,
+    "violenceCartoonOrFantasy": "NONE",
+    "violenceRealistic": "NONE",
+    "violenceRealisticProlongedGraphicOrSadistic": "NONE"
+  },
+  "revision": {
+    "cuenta_de_prueba": true,
+    "notas": "Sytue is a European productivity suite for organisations; each product is its own app and all of them share one account (Sytue ID).\n\nSIGN IN: tap \"Sign in\". The system browser opens id.sytue.eu; use the demo account given above. It belongs to a demo organisation with sample mail, files, calendar and channels, and it does not ask for a second factor. The same account works in all fifteen Sytue apps.\n\nThe app is free, has no in-app purchases, no ads and no third-party SDKs or analytics. Accounts are created by an organisation's administrator or at sytue.eu; an account can be deleted at https://id.sytue.eu/account/delete."
+  },
+  "apps": {
+    "bases": {
+      "id": "6819660194",
+      "categoria": "PRODUCTIVITY",
+      "secundaria": "BUSINESS"
+    },
+    "calcus": {
+      "id": "6819659049",
+      "categoria": "PRODUCTIVITY",
+      "secundaria": "BUSINESS"
+    },
+    "calendar": {
+      "id": "6819660334",
+      "categoria": "PRODUCTIVITY",
+      "secundaria": "BUSINESS"
+    },
+    "cast": {
+      "id": "6819660618",
+      "categoria": "BUSINESS",
+      "secundaria": "PHOTO_AND_VIDEO",
+      "edades": {
+        "messagingAndChat": true,
+        "ageRatingOverrideV2": "EIGHTEEN_PLUS"
+      },
+      "notas": "CAMERA AND MICROPHONE are requested only when the user starts a live broadcast. REPORT AND BLOCK (guideline 1.2): \"Report\" next to a video (to report the video or the person, or \"Block {name}\"); \"Report\" and \"Block {name}\" under each comment; the \"…\" menu of each live chat message; and the header of a channel. Reports go to the administrators of the organisation that owns the content, who can dismiss them, delete the comment or message, take the video off the public front page, unpublish it or block the person. Blocks are listed and undone in \"Reports and blocks\"."
+    },
+    "certipdf": {
+      "id": "6819660930",
+      "categoria": "PRODUCTIVITY",
+      "secundaria": "BUSINESS"
+    },
+    "contacts": {
+      "id": "6819661406",
+      "categoria": "PRODUCTIVITY",
+      "secundaria": "BUSINESS"
+    },
+    "diapos": {
+      "id": "6819661711",
+      "categoria": "PRODUCTIVITY",
+      "secundaria": "BUSINESS"
+    },
+    "docus": {
+      "id": "6819661966",
+      "categoria": "PRODUCTIVITY",
+      "secundaria": "BUSINESS"
+    },
+    "drive": {
+      "id": "6819662326",
+      "categoria": "PRODUCTIVITY",
+      "secundaria": "BUSINESS"
+    },
+    "erp": {
+      "id": "6819662679",
+      "categoria": "BUSINESS",
+      "secundaria": "FINANCE"
+    },
+    "hub": {
+      "id": "6819662979",
+      "categoria": "PRODUCTIVITY",
+      "secundaria": "BUSINESS"
+    },
+    "mail": {
+      "id": "6819663133",
+      "categoria": "PRODUCTIVITY",
+      "secundaria": "BUSINESS",
+      "edades": {
+        "messagingAndChat": true
+      }
+    },
+    "notes": {
+      "id": "6819663636",
+      "categoria": "PRODUCTIVITY",
+      "secundaria": "BUSINESS"
+    },
+    "photos": {
+      "id": "6819663851",
+      "categoria": "PRODUCTIVITY",
+      "secundaria": "PHOTO_AND_VIDEO"
+    },
+    "rooms": {
+      "id": "6819664143",
+      "categoria": "BUSINESS",
+      "secundaria": "PRODUCTIVITY",
+      "edades": {
+        "messagingAndChat": true
+      },
+      "notas": "CAMERA AND MICROPHONE are requested only when the user joins a call. BLOCK AND REPORT (guideline 1.2): \"…\" on a message → \"Report message\" or \"Block…\"; \"People\" panel → \"…\" on a person → \"Report…\" or \"Block…\". Reports go to the team and organisation administrators, who can dismiss them, delete the message or remove the person from the channel."
+    }
+  }
+}

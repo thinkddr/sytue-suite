@@ -1,0 +1,19 @@
+CalDAV kalendārs, kas saistīts ar pārējo komplektu.
+
+• Dienas, nedēļas un mēneša skati.
+• Atkārtoti notikumi un atgādinājumi.
+• Notikumu izveide tieši no e-pasta ziņojuma Mail.
+• Darbojas ar jebkuru CalDAV klientu.
+• Mēneša, nedēļas, dienas un darba kārtības skati ar mazo kalendāru un pogu “Šodien”.
+• Ikdienas, iknedēļas vai ikmēneša atkārtojums ar beigām; rediģēt tikai šo, šo un nākamos vai visus.
+• Atgādinājumi katram notikumam un paziņojumi komplektā.
+• Ielūgumi ar atbildi (piedalīšos, varbūt, nē) un izsekošanu.
+• “Atrast laiku”, kas brīvs visām uzaicinātajām personām.
+• Rezervējamas telpas un resursi ar pieejamību.
+• Kopīgoti kalendāri ar atļaujām un ar jums kopīgotie kalendāri.
+• Ārēju kalendāru (ICS) abonēšana un vairāki krāsās iezīmēti kalendāri.
+• Notikuma izveide no Mail ziņojuma vai piezīmes.
+• Darbojas ar jebkuru CalDAV klientu: Apple Calendar, Thunderbird un citiem.
+• Notikuma dublēšana vai kopēšana uz jūsu kalendāru un lejupielāde kā .ics personām ārpus Sytue.
+
+Šifrēts pārsūtīšanas laikā (TLS 1.3). Sytue infrastruktūra atrodas ES. Ārējo pakalpojumu atrašanās vieta ir atkarīga no to sniedzēja.

@@ -1,0 +1,13 @@
+{
+  "extends": "@sytue/config/tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "outDir": "dist",
+    "rootDir": "src",
+    "noEmit": false,
+    "tsBuildInfoFile": "dist/.tsbuildinfo"
+  },
+  "references": [],
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"]
+}

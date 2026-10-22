@@ -1,0 +1,17 @@
+I tuoi video e le tue dirette, on demand e in tempo reale, senza uscire dall’Europa.
+
+• Carica un video e viene transcodificato in più qualità per qualsiasi schermo.
+• Vai in diretta da un programma di trasmissione, dal browser o dall’app.
+• Quattro livelli di visibilità: pubblico, non in elenco, organizzazione o persone specifiche.
+• Chat in diretta e commenti, con moderazione di base da parte di chi pubblica.
+• Carica video fino a 8 GiB; l’originale viene conservato.
+• Diretta da un programma di trasmissione via RTMP, con una chiave di streaming per persona.
+• Diretta dal browser o dall’app: fotocamera, schermo e microfono.
+• Le registrazioni delle dirette diventano video on demand da sole.
+• Una pagina iniziale pubblica e un canale per organizzazione, indicizzabili.
+• Link non in elenco, video solo per l’organizzazione o accesso a persone specifiche per @utente.
+• Chat in diretta e commenti in thread, moderati da chi pubblica e dall’amministrazione dell’organizzazione.
+• Lo spazio conta nella tua quota di Sytue Drive; tutto nell’Unione europea.
+• «Carica su Cast» da Sytue Drive: una copia del video va su Cast e il file resta in Drive.
+
+Cifratura in transito (TLS 1.3). L’infrastruttura di Sytue si trova nell’UE. La posizione dei servizi esterni dipende dal loro fornitore.

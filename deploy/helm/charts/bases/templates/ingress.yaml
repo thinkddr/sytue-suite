@@ -1,0 +1,45 @@
+{{- if and .Values.enabled .Values.ingress.enabled }}
+{{- $host := include "sytue-bases.host" . }}
+{{/*
+  LA API CON SESIÓN, Y NADA MÁS. Las apps nativas llaman a `bases.<dominio>/api/v1` con
+  el token de la persona (decisión del dueño, 2026-10-05, que revierte el «sin Ingress»
+  del ADR 0068).
+
+  La ruta va ESCRITA aquí y no en los values, a propósito: todo `/api/v1` exige un token
+  de Sytue ID (RequireAuth + organización + límite por persona), y lo demás que sirve el
+  mismo puerto NO lleva sesión —los formularios públicos y el conector de solo lectura
+  (`/_bases/v1/…`), las sondas—. Añadir aquí otra ruta es publicar algo cuya única
+  defensa era no ser alcanzable. Lo vigila helm-render-test.sh.
+
+  Comparte host y certificado con la web (`<release>-fe-bases`, que sirve `/bases`, y
+  su `-bff`, que sirve `/api` con la prioridad más baja): `/api/v1` es más específica
+  y el BFF no tiene ninguna ruta propia bajo `/api/v1`.
+*/}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "sytue-bases.fullname" . }}
+  labels: {{- include "sytue-bases.labels" . | nindent 4 }}
+  annotations:
+    cert-manager.io/cluster-issuer: {{ include "sytue-bases.clusterIssuer" . | quote }}
+    {{- with .Values.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  tls:
+    - hosts:
+        - {{ $host | quote }}
+      secretName: {{ .Values.ingress.tls.secretName }}
+  rules:
+    - host: {{ $host | quote }}
+      http:
+        paths:
+          - path: /api/v1
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "sytue-bases.fullname" . }}
+                port:
+                  name: http
+{{- end }}

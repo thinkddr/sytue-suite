@@ -1,0 +1,43 @@
+/**
+ * POST /api/follow — sigue o deja de seguir un hilo (proxy BFF hacia el servicio Go
+ * Sytue Chat). Cuerpo: { messageId } para seguir, o { messageId, delete:true } para
+ * dejar de seguir. messageId es el mensaje RAÍZ del hilo. JSON (no form) y el borrado
+ * vía POST {delete:true} para no disparar la protección CSRF de Astro dev (que rechaza
+ * DELETE del navegador). Mismo patrón que /api/pin y /api/save.
+ */
+import type { APIRoute } from 'astro';
+import { getApiSession } from '../../lib/session.js';
+import { chatClient } from '../../lib/chat.js';
+
+export const prerender = false;
+
+export const POST: APIRoute = async (ctx) => {
+  const session = await getApiSession(ctx);
+  if (!session) return json({ error: 'unauthenticated' }, 401);
+
+  let payload: { messageId?: string; delete?: boolean };
+  try {
+    payload = (await ctx.request.json()) as typeof payload;
+  } catch {
+    return json({ error: 'invalid_json' }, 400);
+  }
+
+  const messageId = payload.messageId?.trim();
+  if (!messageId) return json({ error: 'missing_messageId' }, 400);
+
+  const client = chatClient({ accessToken: session.accessToken, userId: session.user.id });
+  try {
+    if (payload.delete === true) await client.unfollowThread(messageId);
+    else await client.followThread(messageId);
+    return json({ ok: true });
+  } catch (err) {
+    return json({ error: 'chat_error', message: String(err) }, 502);
+  }
+};
+
+function json(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
+  });
+}

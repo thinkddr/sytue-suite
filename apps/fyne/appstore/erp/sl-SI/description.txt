@@ -1,0 +1,18 @@
+Štiriindvajset modulov in dvostavno knjigovodstvo, ki ga zbirka podatkov ne pusti spraviti iz ravnovesja.
+
+• Štiriindvajset modulov in šestintrideset modelov: stiki, prodaja, nabava, zaloge, proizvodnja, izdajanje računov, računovodstvo, projekti in kadri.
+• Dodajanje modula pomeni pisanje datoteke JSON: brez selitve, brez nove poti in brez dela na vmesniku.
+• Denar se shranjuje v celih centih, nikoli s plavajočo vejico, ravnovesje pa zagotavlja zbirka podatkov.
+• Knjižene postavke so nedotakljive: popravijo se z novo postavko, in to loči glavno knjigo od preglednice.
+• Štiriindvajset modulov in šestintrideset modelov v eni storitvi in eni zbirki podatkov.
+• Katalog modelov so podatki: vsak modul navede svoja polja, stanja in stolpce seznama.
+• Nov modul je ena datoteka JSON — brez DDL, brez selitve in brez zaklepanja tabel.
+• En API za vseh šestintrideset modelov in en vmesnik, ustvarjen iz kataloga.
+• Dvostavno knjigovodstvo z zneski v celih centih; niti ena številka s plavajočo vejico.
+• Ravnovesje preveri zbirka podatkov ob potrditvi transakcije, ne koda aplikacije.
+• Zaključene postavke so nespremenljive: ni jih mogoče urejati, brisati ali jim dodajati vrstic.
+• En dokument, ena postavka: ponovni poskus ali dva odprta zavihka ne moreta podvojiti prihodkov.
+• Skupni nazivi obstajajo v vseh 26 jezikih, neprevedeno polje pa prepreči zagon storitve.
+• Seznami z indeksi: prva stran od dvajset tisoč vrstic je vrnjena v manj kot milisekundi.
+
+Šifrirano med prenosom (TLS 1.3). Infrastruktura Sytue je v EU. Lokacija zunanjih storitev je odvisna od njihovega ponudnika.

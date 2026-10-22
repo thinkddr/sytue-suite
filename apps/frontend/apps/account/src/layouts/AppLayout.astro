@@ -1,0 +1,100 @@
+---
+/**
+ * Layout base de Mi cuenta. Guarda de sesión del lado servidor, script de tema
+ * (sin flash) y slot para la isla raíz que monta la Sytue Shell + la app. El
+ * access token NO se envía al navegador. docs/design.md §1.
+ *
+ * Es idéntico al del resto de aplicaciones a propósito: lo que esta pantalla no
+ * tenía cuando se servía desde Go era precisamente esto — la Shell, y con ella
+ * el selector de aplicaciones y la salida hacia el resto de la suite.
+ */
+import { APP_VIEWPORT, appDomains, returnToCanonico } from '@sytue/config';
+import '../styles/app.css';
+import { serverEnv } from '@sytue/auth/server';
+import { SUFIJO_ICONOS, withBase } from '@sytue/ui';
+import { bff, toBffContext } from '../lib/bff.js';
+import { htmlLangAttrs } from '@sytue/i18n';
+
+interface Props {
+  title?: string;
+}
+
+const { title = 'Mi cuenta' } = Astro.props;
+// El idioma lo negoció el middleware (cookie > Accept-Language > inglés): aquí
+// solo se pinta, para que el <html> y el cromo del shell no puedan discrepar.
+const { lang, dir } = htmlLangAttrs(Astro.locals.locale);
+// Guard: en .astro el redirect debe RETORNARSE (throw de Response solo se sigue
+// en middleware). Sin sesión -> login SSO.
+if (!(await bff.getSession(toBffContext(Astro)))) {
+  // ADR 0056: la entrada org-ful llega reescrita con la marca ?__org=; el returnTo
+  // sale canónico, no en la forma interna, o tras el login la barra se queda con ella.
+  const returnTo = returnToCanonico(Astro.url, bff.basePath);
+  const redireccionLogin = Astro.redirect(
+    `${bff.basePath}/auth/login?returnTo=${encodeURIComponent(returnTo)}`,
+  );
+  // Una redirección que transporta la ruta autenticada nunca debe quedar en
+  // la caché compartida del navegador o de un proxy.
+  redireccionLogin.headers.set('cache-control', 'no-store');
+  return redireccionLogin;
+}
+
+// Prefijo REAL bajo el que se sirve esta superficie: el del host si el servidor
+// lo publica (SYTUE_BASE_PATH) y, si no, el del build. Los assets del <head> se
+// unen con `withBase` y NO con `${BASE_URL}fichero`: BASE_URL llega SIN barra
+// final (`/mail`) y esa concatenación daba `/mailfavicon.svg`, un 404 medido en
+// producción con el que ninguna app de la suite tenía icono. ID sí lo tenía
+// porque es Go y escribe `/favicon.svg` a mano; por eso el fallo parecía de ID.
+const prefijo = serverEnv(import.meta.env).SYTUE_BASE_PATH ?? import.meta.env.BASE_URL;
+---
+
+<!doctype html>
+<html lang={lang} dir={dir} class="h-full">
+  <head>
+    <meta charset="utf-8" />
+    <!-- `interactive-widget=resizes-content`: sin esto el teclado virtual NO encoge el
+         viewport de maquetación, así que el `100dvh` del armazón sigue midiendo la
+         pantalla entera y lo que se está escribiendo queda DEBAJO del teclado — el
+         navegador desplaza el viewport visual para enseñar el campo y se lleva por
+         delante los botones que van con él. Se vio en el redactor de Sytue Mail. Lo
+         declaraba solo Sytue Rooms, que fue donde se descubrió.
+         La carcasa común reserva las zonas seguras en las cuatro orientaciones. -->
+    <meta name="viewport" content={APP_VIEWPORT} />
+    <!-- Superficie autenticada: nunca se indexa (el SEO vive solo en www). -->
+    <meta name="robots" content="noindex, nofollow" />
+    <meta
+      name="description"
+      content="Mi cuenta — perfil, seguridad y accesos de tu cuenta de Sytue."
+    />
+    <title>{title}</title>
+    <!-- El Hub es OTRO origen y la shell le hace 3 peticiones nada más hidratar:
+         sin esto, la primera pagaría DNS + TCP + TLS enteros (3 RTT) DESPUÉS de
+         ejecutar el JS. -->
+    <link rel="preconnect" href={appDomains.hub} crossorigin />
+    <link rel="icon" href={withBase(prefijo, '/favicon.ico') + SUFIJO_ICONOS} sizes="32x32" />
+    <link
+      rel="icon"
+      href={withBase(prefijo, '/favicon-64.png') + SUFIJO_ICONOS}
+      type="image/png"
+      sizes="64x64"
+    />
+    <link
+      rel="icon"
+      href={withBase(prefijo, '/favicon.svg') + SUFIJO_ICONOS}
+      type="image/svg+xml"
+    />
+    <link
+      rel="apple-touch-icon"
+      href={withBase(prefijo, '/apple-touch-icon.png') + SUFIJO_ICONOS}
+    />
+    <!-- Prefija /api y /auth con el `base` de esta app: en producción cada app
+         se sirve bajo su prefijo y la raíz del host es un 404. -->
+    <!-- El prefijo de /api y /auth, y el tema: un fichero de este origen y no dos
+         scripts en línea, porque la CSP de esta app no deja correr nada en línea
+         que Astro no haya firmado (ver src/pages/arranque.js.ts). Síncrono a
+         propósito: tiene que ir antes que las islas. -->
+    <script is:inline src={withBase(prefijo, '/arranque.js')}></script>
+  </head>
+  <body class="bg-bg text-text h-full antialiased">
+    <slot name="app" />
+  </body>
+</html>

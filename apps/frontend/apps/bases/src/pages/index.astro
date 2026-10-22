@@ -1,0 +1,24 @@
+---
+import AppLayout from '../layouts/AppLayout.astro';
+import { BasesApp } from '../islands/BasesApp.js';
+import { protegerPagina, hubBaseUrl } from '../lib/pagina.js';
+import { useT } from '../i18n/index.js';
+
+export const prerender = false;
+
+const guard = await protegerPagina(Astro);
+if (guard instanceof Response) return guard;
+
+const locale = Astro.locals.locale;
+const t = useT(locale);
+---
+
+<AppLayout title={`${t('bases.title')} · Bases`}>
+  <BasesApp
+    slot="app"
+    client:load
+    locale={locale}
+    user={guard.session.user}
+    hubBaseUrl={hubBaseUrl()}
+  />
+</AppLayout>

@@ -1,0 +1,24 @@
+apiVersion: v2
+name: sytue-ai
+description: >-
+  Sytue AI — el asistente de la suite. Microservicio Go STATELESS que atiende
+  POST /api/v1/assist y delega en Scaleway Generative APIs (Paris, fr-par): pesos
+  abiertos servidos en la UE, pago por token y sin que un documento salga del
+  continente. DOS MODELOS por eleccion medida: mistral-small-3.2-24b para lo
+  interactivo (0,6 s de mediana) y gemma-4-26b para el modo calidad, asincrono
+  (14 s, pero acierta donde el rapido falla). Sin base de datos y sin disco; el
+  unico secreto es la clave del proveedor. ClusterIP, SIN ingress — solo lo llama
+  el BFF de cada app. Ver docs/decisions.md#0034.
+  Código Apache-2.0, (c) 2026 Daniel Delgado Ramos. Modelos de terceros de pesos abiertos.
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+kubeVersion: ">=1.31.0-0"
+home: https://sytue.eu
+keywords: [sytue, ai, llm, scaleway, go, eu-sovereign]
+maintainers:
+  - name: Sytue Platform
+    email: platform@sytue.eu
+annotations:
+  licenses: MIT
+  sytue.eu/stack: go

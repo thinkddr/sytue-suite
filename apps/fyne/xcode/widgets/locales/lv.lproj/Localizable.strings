@@ -1,0 +1,17 @@
+"widgets.open" = "Atvērt";
+"widgets.compose" = "Rakstīt";
+"widgets.create" = "Izveidot notikumu";
+"widgets.notes" = "Piezīmes";
+"widgets.rows" = "Rindas";
+"widgets.pending" = "Gaida";
+"widgets.channels" = "Kanāli";
+"widgets.photos" = "Fotoattēli";
+"widgets.episodes" = "Epizodes";
+"widgets.apps" = "Lietotnes";
+"widgets.calendars" = "Kalendāri";
+"widgets.address_books" = "Adrešu grāmatas";
+"search.label" = "Globālā meklēšana";
+"dataflow.item.files" = "Faili";
+"dataflow.item.events" = "Kalendārs";
+"dataflow.item.documents" = "Dokumenti";
+"dataflow.item.contacts" = "Kontakti";

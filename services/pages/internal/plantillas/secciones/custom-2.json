@@ -1,0 +1,55 @@
+{
+  "children": [
+    {
+      "content": {
+        "en": [
+          {
+            "text": "Custom Section"
+          }
+        ],
+        "es": [
+          {
+            "text": "Sección personalizada"
+          }
+        ]
+      },
+      "id": "tex0000001",
+      "tag": "h2",
+      "type": "text"
+    },
+    {
+      "content": {
+        "en": [
+          {
+            "text": "Customized layout block."
+          }
+        ],
+        "es": [
+          {
+            "text": "Bloque de maquetación personalizado."
+          }
+        ]
+      },
+      "id": "tex0000002",
+      "tag": "p",
+      "type": "text"
+    }
+  ],
+  "full_bleed": false,
+  "id": "sec0000001",
+  "kind": "custom",
+  "layout": {
+    "direction": "column",
+    "gap": 24,
+    "padding": [
+      32,
+      32,
+      32,
+      32
+    ],
+    "align": "center",
+    "justify": "center",
+    "wrap": false
+  },
+  "type": "section"
+}

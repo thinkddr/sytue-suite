@@ -1,0 +1,24 @@
+---
+/** Documento completo del fixture DEV: el harness mide en modo estándar. */
+import { RoomsComposerDemo } from './RoomsComposerDemo';
+import '../../../../rooms/src/styles/app.css';
+
+interface Props {
+  forma: 'marco' | 'carril';
+  paneles: boolean;
+  hilo: boolean;
+}
+const { forma, paneles, hilo } = Astro.props;
+---
+
+<!doctype html>
+<html lang="en" class="h-full" data-forma={forma}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Rooms composer (development fixture)</title>
+  </head>
+  <body class="h-full">
+    <RoomsComposerDemo client:only="preact" paneles={paneles} hilo={hilo} />
+  </body>
+</html>

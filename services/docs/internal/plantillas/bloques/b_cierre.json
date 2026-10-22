@@ -1,0 +1,29 @@
+{
+ "id": "b",
+ "boxes": [
+  {
+   "id": "b-titulo",
+   "x": 10,
+   "y": 30,
+   "w": 80,
+   "h": 20,
+   "html": "<h1>{{b_cierre.titulo}}</h1>"
+  },
+  {
+   "id": "b-mensaje",
+   "x": 10,
+   "y": 52,
+   "w": 80,
+   "h": 12,
+   "html": "<p>{{b_cierre.mensaje}}</p>"
+  },
+  {
+   "id": "b-contacto",
+   "x": 10,
+   "y": 68,
+   "w": 80,
+   "h": 10,
+   "html": "<p>{{b_cierre.contacto}}</p>"
+  }
+ ]
+}

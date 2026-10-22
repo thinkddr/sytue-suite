@@ -1,0 +1,377 @@
+/**
+ * Mensajes en español para el área núcleo de Sytue Web (web).
+ * Prefijos: nav.*, sites.*, new.*, publish.*, versions.*, domains.*, analytics.*, export.*, legal.*, errors.*, settings.*
+ */
+export const nucleo = {
+  'ficha.address_unavailable': 'No se pudo consultar la dirección pública del sitio.',
+  'nav.title': 'Web',
+  'nav.sites': 'Mis sitios',
+  'nav.new': 'Nuevo sitio',
+  'nav.settings': 'Ajustes',
+
+  'sites.title': 'Mis sitios',
+  'sites.empty': 'No tienes sitios creados todavía.',
+  'sites.create': 'Crear sitio',
+  'sites.status.published': 'Publicado',
+  'sites.status.draft': 'Borrador',
+  'sites.restore': 'Restaurar',
+  'sites.trash': 'Sitios en la papelera',
+  'sites.trash_help':
+    'Los sitios eliminados se conservan durante 30 días antes de su borrado definitivo.',
+  'sites.open_editor': 'Abrir editor',
+  'sites.manage': 'Gestionar',
+  'sites.last_updated': 'Actualizado el {fecha}',
+  'sites.filter_all': 'Todos',
+  'sites.filter_published': 'Publicados',
+  'sites.filter_draft': 'Borradores',
+  'sites.count': { one: '{count} sitio', other: '{count} sitios' },
+  'sites.empty_help':
+    'Elige una plantilla o empieza con una página en blanco. Podrás publicarla cuando quieras.',
+  'sites.filter_label': 'Filtrar por estado',
+  'sites.filter_empty': 'Ningún sitio coincide con este filtro.',
+  'sites.loading': 'Cargando sitios',
+  'sites.load_error': 'No se pudieron cargar los sitios',
+  'sites.load_error_help': 'Comprueba tu conexión e inténtalo de nuevo.',
+  'sites.retry': 'Reintentar',
+  'sites.restore_error': 'No se pudo restaurar el sitio. Inténtalo de nuevo.',
+  'sites.days_left': { one: 'queda {count} día', other: 'quedan {count} días' },
+
+  'new.title': 'Crear nuevo sitio',
+  'new.template_step': 'Elige una plantilla',
+  'new.details_step': 'Detalles del sitio',
+  'new.name_label': 'Nombre del sitio',
+  'new.slug_label': 'Identificador (slug)',
+  'new.languages_label': 'Idiomas del sitio',
+  'new.submit': 'Crear y abrir editor',
+  'new.step_template': 'Plantilla',
+  'new.step_info': 'Información básica',
+  'new.step_languages': 'Idiomas',
+  'new.primary_language': 'Idioma principal',
+  'new.step_review': 'Revisar',
+  'new.details_help':
+    'Ponle nombre a tu sitio. Prepararemos su dirección automáticamente y podrás conectar tu dominio después.',
+  'new.review_heading': 'Todo listo para empezar',
+  'new.review_help': 'Revisa estas opciones antes de crear tu sitio.',
+  'new.draft_notice':
+    'Se creará un borrador privado. En el editor podrás cambiar los textos, las fotos y el diseño. Después te guiaremos para revisar, conectar tu dominio y publicar.',
+  'new.template_blank': 'En blanco',
+  'new.template_blank_desc': 'Comienza con una página vacía y diseña libremente.',
+  'new.languages_notice': 'Más idiomas en breve',
+  'new.slug_available': 'Identificador disponible',
+  'new.slug_unavailable': 'Este identificador no está disponible',
+  'new.slug_checking': 'Comprobando identificador...',
+  'new.next': 'Siguiente',
+  'new.back': 'Atrás',
+  'new.templates_error':
+    'No se pudieron cargar las plantillas. Puedes empezar con una página en blanco.',
+  'new.name_placeholder': 'Mi tienda online',
+  'new.slug_placeholder': 'mi-tienda',
+  'new.slug_help': 'Solo minúsculas, números y guiones. Forma la dirección del sitio.',
+  'new.slug_unverified':
+    'No se pudo comprobar el identificador ahora; se validará al crear el sitio.',
+  'new.main_language': 'Idioma principal',
+  'new.lang_es': 'Español',
+  'new.lang_en': 'English',
+  'new.bilingual': 'Activar versión bilingüe ({idioma})',
+  'new.create_error': 'No se pudo crear el sitio. Inténtalo de nuevo.',
+  'new.err_site_limit':
+    'Tu organización ya tiene 20 sitios, o ya ha creado 5 hoy. Borra uno o vuelve mañana.',
+  'new.cancel': 'Cancelar',
+  'new.progress': 'Pasos para crear el sitio',
+  'new.go_to_step': 'Ir al paso {n}',
+  'new.step_of': 'Paso {n} de {total}',
+  'app_settings.title': 'Ajustes de Sytue Web',
+  'new.search_title': 'Empieza por tu tipo de negocio',
+  'new.search_help':
+    'Escribe a qué te dedicas o elige un grupo. Cada plantilla ya trae los textos de tu oficio: solo cambias el nombre, el teléfono, los precios y las fotos.',
+  'new.search_label': 'Tu tipo de negocio',
+  'new.search_placeholder': 'Peluquería, bar, fontanero, tienda de ropa...',
+  'new.all_groups': 'Todos',
+  'new.results': { one: '{count} plantilla', other: '{count} plantillas' },
+  'new.no_results': 'No hay ninguna plantilla para «{q}».',
+  'new.no_results_help':
+    'Prueba con otra palabra (por ejemplo «tienda» o «clínica») o empieza con una página en blanco.',
+  'new.clear_search': 'Quitar la búsqueda',
+  'new.select': 'Elegir esta plantilla',
+  'new.selected': 'Elegida',
+  'new.preview': 'Vista previa',
+  'new.preview_close': 'Cerrar',
+  'new.preview_loading': 'Cargando la plantilla...',
+  'new.preview_error': 'No se pudo cargar la vista previa.',
+  'new.preview_desktop': 'Ordenador',
+  'new.preview_mobile': 'Móvil',
+  'new.preview_pages': 'Páginas de la plantilla',
+  'new.preview_note':
+    'Vista aproximada: las fotos son marcadores que sustituirás por las tuyas y los datos de ejemplo se cambian en el editor.',
+  'new.badge_store': 'Con tienda',
+  'new.badge_custom': 'Personalizado',
+  'new.cat.belleza': 'Belleza y bienestar',
+  'new.cat.comida': 'Comida y bebida',
+  'new.cat.comercio': 'Tiendas y comercio',
+  'new.cat.oficios': 'Oficios y hogar',
+  'new.cat.motor': 'Coche y motor',
+  'new.cat.profesionales': 'Empresas y profesionales',
+  'new.cat.salud': 'Salud',
+  'new.cat.deporte': 'Deporte',
+  'new.cat.educacion': 'Educación y formación',
+  'new.cat.creativos': 'Creativos y eventos',
+  'new.cat.turismo': 'Turismo y alojamiento',
+  'new.cat.local': 'Producto local',
+  'new.cat.comunidad': 'Asociaciones y comunidad',
+  'new.cat.web': 'Páginas sencillas',
+  'new.cat.otras': 'Otras',
+
+  'publish.title': 'Publicar sitio',
+  'publish.action': 'Publicar',
+  'publish.checklist': 'Lista previa de publicación',
+  'publish.preview': 'Vista previa',
+
+  'versions.title': 'Versiones',
+  'versions.create': 'Crear versión',
+  'versions.restore': 'Restaurar esta versión',
+  'versions.empty': 'No hay versiones guardadas todavía.',
+  'versions.name': 'Nombre de la versión',
+  'versions.rev': 'Revisión',
+  'versions.restored': 'Versión restaurada con éxito',
+
+  'domains.title': 'Dominios',
+  'domains.add': 'Añadir dominio',
+
+  'analytics.title': 'Analítica',
+  'analytics.visits': 'Visitas',
+
+  'export.title': 'Exportar',
+  'export.origins_label': 'Dónde vas a alojar este código (orígenes permitidos)',
+  'export.origins_help':
+    'Introduce una URL https:// por línea desde donde se llamará a la API pública.',
+  'export.schemes_label': 'Esquemas de la app (para aplicaciones nativas)',
+  'export.schemes_help': 'Esquemas personalizados (uno por línea), por ejemplo: miapp, sytue.',
+  'export.save': 'Guardar ajustes de exportación',
+  'export.saved': 'Ajustes de exportación guardados',
+
+  'legal.title': 'Datos legales',
+  'legal.holder_name': 'Titular o razón social',
+  'legal.tax_id': 'NIF / CIF / VAT',
+  'legal.country': 'País',
+  'legal.street': 'Dirección (calle y número)',
+  'legal.postal_code': 'Código postal',
+  'legal.city': 'Ciudad',
+  'legal.region': 'Provincia o región',
+  'legal.email': 'Correo de contacto legal',
+  'legal.phone': 'Teléfono',
+  'legal.registry': 'Datos registrales (Tomo, Libro, Folio, Hoja)',
+  'legal.privacy_contact': 'Contacto de privacidad (DPO)',
+  'legal.save': 'Guardar datos legales',
+  'legal.saved': 'Datos legales guardados',
+
+  'settings.title': 'Ajustes del sitio',
+  'settings.name': 'Nombre del sitio',
+  'settings.slug': 'Identificador (slug)',
+  'settings.analytics': 'Activar analítica integrada',
+  'settings.analytics_help':
+    'Registra métricas y visitas respetando la privacidad sin cookies de terceros.',
+  'settings.save': 'Guardar ajustes',
+  'settings.saved': 'Ajustes guardados',
+  'settings.danger_zone': 'Zona de peligro',
+  'settings.delete_title': 'Eliminar este sitio',
+  'settings.delete_desc':
+    'El sitio se moverá a la papelera durante 30 días, tiempo durante el cual podrás restaurarlo.',
+  'settings.delete_confirm_prompt': 'Escribe el nombre del sitio ({name}) para confirmar:',
+  'settings.delete_button': 'Eliminar sitio',
+
+  'errors.not_found': 'Sitio no encontrado',
+  'errors.unauthorized': 'No tienes permisos para ver este sitio',
+
+  // Ficha del sitio (islands/SitioDetalleApp.tsx, formularios/Bandeja.tsx, tienda/Pedidos.tsx)
+  'ficha.page_title': 'Ficha del sitio',
+  'ficha.back': 'Volver a mis sitios',
+  'ficha.sections': 'Secciones del sitio',
+  'ficha.loading': 'Cargando el sitio',
+  'ficha.load_error': 'No se pudo cargar el sitio',
+  'ficha.open_site': 'Abrir el sitio',
+  'ficha.not_found_help': 'Puede que se haya eliminado o que no tengas acceso a él.',
+
+  'publish.tab': 'Publicar',
+  'publish.intro':
+    'Revisa la lista y publica cuando todo esté listo. Una vista previa no cambia lo que ve el público.',
+  'publish.status': 'Estado actual',
+  'publish.check_ok': 'Listo',
+  'publish.check_missing': 'Falta',
+  'publish.check_legal': 'Datos legales completos',
+  'publish.check_legal_missing': 'Faltan: {campos}',
+  'publish.check_legal_fix': 'Completar',
+  'publish.check_demo': 'Sin textos de relleno de la plantilla',
+  'publish.check_ir': 'Páginas bien formadas',
+  'publish.check_server':
+    'Al publicar también se revisa que no queden textos de relleno de la plantilla y que las páginas estén bien formadas.',
+  'publish.done_preview': 'Vista previa creada.',
+  'publish.done_live': 'Sitio publicado.',
+  'publish.open_preview': 'Abrir la vista previa',
+  'publish.err_legal':
+    'Faltan datos legales para publicar. Complétalos en la pestaña «Datos legales».',
+  'publish.err_demo':
+    'El sitio aún contiene textos de relleno de la plantilla. Sustitúyelos en el editor y vuelve a publicar.',
+  'publish.err_ir':
+    'Alguna página no está bien formada. Ábrela en el editor para ver qué hay que corregir.',
+  'publish.err_previews':
+    'Ya hay 5 vistas previas activas. Espera a que caduque alguna para crear otra.',
+  'publish.err_too_large':
+    'El sitio supera el tamaño máximo que se puede publicar (64 MiB o 5000 ficheros). Reduce las imágenes o los ficheros.',
+  'publish.err_forbidden': 'Solo quienes administran la organización pueden publicar el sitio.',
+  'publish.err_conflict':
+    'No se pudo publicar porque el sitio cambió o está suspendido. Recarga la página e inténtalo de nuevo.',
+  'publish.err_invalid': 'La publicación no es válida. Revisa el contenido del sitio en el editor.',
+  'publish.err_generic': 'No se pudo publicar el sitio. Inténtalo de nuevo.',
+
+  'versions.intro':
+    'Una versión es una copia del borrador a la que puedes volver. Crea una antes de un cambio grande.',
+  'versions.name_placeholder': 'Antes de cambiar la portada',
+  'versions.manual_name': 'Versión manual',
+  'versions.unnamed': 'Sin nombre',
+  'versions.loading': 'Cargando versiones',
+  'versions.load_error': 'No se pudieron cargar las versiones',
+  'versions.empty_help': 'Cuando crees una versión o publiques el sitio, aparecerá aquí.',
+  'versions.created': 'Versión creada',
+  'versions.create_error': 'No se pudo crear la versión. Inténtalo de nuevo.',
+  'versions.restore_error': 'No se pudo restaurar la versión. Inténtalo de nuevo.',
+  'versions.restore_confirm':
+    'El borrador volverá al estado de «{nombre}». Antes se guarda el estado actual como «Antes de restaurar», así que podrás volver a él.',
+  'versions.kind.manual': 'Manual',
+  'versions.kind.publish': 'Publicación',
+  'versions.kind.preview': 'Vista previa',
+  'versions.kind.export': 'Exportación',
+  'versions.kind.before_restore': 'Antes de restaurar',
+
+  'domains.intro':
+    'Conecta un dominio propio. Al añadirlo, crea en tu proveedor de DNS los registros que se indican y comprueba la configuración.',
+  'domains.host_label': 'Dominio',
+  'domains.host_placeholder': 'www.ejemplo.es',
+  'domains.host_help': 'Solo el nombre del dominio, sin https:// ni barras.',
+  'domains.empty': 'Aún no hay dominios propios configurados.',
+  'domains.loading': 'Cargando dominios',
+  'domains.load_error': 'No se pudieron cargar los dominios',
+  'domains.primary': 'Principal',
+  'domains.status.pending': 'Pendiente de verificar',
+  'domains.status.verified': 'Verificado',
+  'domains.status.active': 'Activo',
+  'domains.status.failed': 'Con error',
+  'domains.dns_title': 'Registros DNS',
+  'domains.dns_txt': 'TXT (verificación)',
+  'domains.dns_cname': 'CNAME (subdominios como www)',
+  'domains.dns_a': 'A (dominio raíz)',
+  'domains.check': 'Comprobar DNS y HTTPS',
+  'domains.make_primary': 'Hacer principal',
+  'domains.remove': 'Eliminar',
+  'domains.remove_title': 'Eliminar dominio',
+  'domains.remove_confirm':
+    '«{host}» dejará de apuntar a este sitio. Tendrás que añadirlo de nuevo para volver a usarlo.',
+  'domains.added':
+    'Dominio añadido. Crea en tu proveedor de DNS los registros que aparecen debajo.',
+  'domains.updated': 'Dominios actualizados.',
+  'domains.action_error': 'No se pudo completar la acción. Inténtalo de nuevo.',
+  'domains.err_invalid': 'El nombre del dominio no es válido.',
+  'domains.err_reserved': 'Ese dominio está reservado y no se puede usar.',
+  'domains.err_taken': 'Ese dominio ya está en uso en otro sitio.',
+  'domains.err_limit': 'Has alcanzado el número máximo de dominios de este sitio.',
+  'domains.err_suspended': 'El sitio está suspendido y no admite cambios de dominio.',
+  'domains.err_forbidden': 'Solo quienes administran la organización pueden gestionar dominios.',
+  'domains.err_generic': 'No se pudo completar la operación con el dominio. Inténtalo de nuevo.',
+  'domains.start_title': 'Conecta tu dominio, paso a paso',
+  'domains.start_help':
+    'Introduce el dominio que quieres usar. Necesitarás acceso al panel DNS del proveedor donde lo compraste.',
+  'domains.progress': 'Progreso de conexión del dominio',
+  'domains.step.registered': 'Añadido a Sytue Web',
+  'domains.step.dns': 'DNS verificado',
+  'domains.step.https': 'HTTPS listo',
+  'domains.step.primary': 'Dirección principal',
+  'domains.step.done': 'Completado',
+  'domains.step.pending': 'Pendiente',
+  'domains.status.review': 'Necesita revisión',
+  'domains.record_name': 'Nombre del registro',
+  'domains.record_value': 'Valor del registro',
+  'domains.routing_title': 'Dirección del sitio',
+  'domains.dns_help':
+    'Abre la configuración DNS de tu proveedor y añade estos dos registros. Copia cada nombre y valor exactamente como aparece.',
+  'domains.dns_names_help':
+    'Algunos proveedores usan @ para el dominio raíz o solo www para ese subdominio. El nombre completo del registro se muestra arriba.',
+  'domains.routing_legacy_help':
+    'Usa A para el dominio raíz o CNAME para un subdominio como www, con el destino correspondiente indicado por el servicio.',
+  'domains.dns_propagation':
+    'Después de guardar los registros, pulsa «Comprobar DNS y HTTPS». Si aún no aparecen, espera a que tu proveedor propague el cambio y vuelve a comprobar. Conserva los registros de correo y otros servicios.',
+  'domains.records_unavailable':
+    'El servicio aún no ha proporcionado todos los datos de este registro. No cambies el DNS hasta que estén disponibles.',
+  'domains.copy': 'Copiar',
+  'domains.copied': 'Copiado',
+  'domains.copy_field': 'Copiar {campo}',
+  'domains.copy_error':
+    'No se pudo copiar al portapapeles. Selecciona el valor del campo y cópialo manualmente.',
+  'domains.last_check': 'Última comprobación: {fecha}',
+  'domains.publish_help':
+    'Cuando la dirección principal esté lista, publica el sitio de nuevo para que los enlaces y redirecciones usen tu dominio.',
+  'domains.publish_action': 'Ir a publicar',
+  'domains.detail.pending':
+    'Ya está añadido. Configura los registros DNS y comprueba la conexión para continuar.',
+  'domains.detail.txt_missing':
+    'Aún no se encuentra el registro TXT. Añádelo en tu proveedor DNS y vuelve a comprobar después de que se propague.',
+  'domains.detail.txt_mismatch':
+    'El valor del TXT no coincide. Sustitúyelo por el valor exacto que aparece en esta pantalla.',
+  'domains.detail.dns_unreachable':
+    'No se ha podido consultar el DNS de este dominio. Revisa el dominio y sus servidores DNS y vuelve a comprobar.',
+  'domains.detail.routing':
+    'El dominio aún no apunta al sitio. Revisa el registro A o CNAME que se indica y vuelve a comprobar.',
+  'domains.detail.certificate':
+    'Los registros DNS están verificados. El certificado HTTPS todavía no está listo; vuelve a comprobar en unos minutos.',
+  'domains.detail.active': 'El DNS y la conexión HTTPS están verificados. El dominio está listo.',
+  'domains.detail.unknown':
+    'La última comprobación requiere revisión. Comprueba los registros y vuelve a verificar la conexión.',
+
+  'analytics.intro':
+    'Los visitantes son una estimación diaria durante el piloto; no representan usuarios únicos del periodo.',
+  'analytics.visitors': 'Visitantes estimados',
+  'analytics.loading': 'Cargando analítica',
+  'analytics.load_error': 'No se pudo cargar la analítica',
+  'analytics.unavailable':
+    'El servicio de analítica no está disponible ahora mismo. Inténtalo en unos minutos.',
+  'analytics.disabled': 'La analítica está desactivada',
+  'analytics.disabled_help': 'Actívala en los ajustes del sitio para empezar a contar visitas.',
+  'analytics.go_settings': 'Ir a los ajustes',
+  'analytics.refresh': 'Actualizar',
+
+  'export.intro':
+    'Si vas a alojar el código del sitio fuera de Sytue, indica desde dónde se llamará a la API pública.',
+  'export.origins_placeholder': 'https://mitienda.ejemplo.es',
+  'export.schemes_placeholder': 'miapp',
+  'export.origins_invalid':
+    'Cada línea debe ser una dirección https:// válida (la línea {n} no lo es).',
+  'export.schemes_invalid':
+    'Cada línea debe ser un esquema válido: empieza por una letra y solo lleva letras, números, «+», «-» o «.» (la línea {n} no lo es).',
+  'export.err_generic': 'No se pudieron guardar los ajustes. Inténtalo de nuevo.',
+
+  'legal.intro': 'Son obligatorios para publicar el sitio.',
+  'legal.required_note': 'Los campos marcados con * son obligatorios.',
+  'legal.saved_incomplete': 'Datos guardados. Aún faltan para publicar: {campos}.',
+  'legal.country_help': 'Código de dos letras, por ejemplo ES.',
+  'legal.registry_help':
+    'Obligatorio para sociedades españolas (NIF que empieza por A, B, C, D o F).',
+  'legal.ph_holder': 'Empresa S.L.',
+  'legal.ph_street': 'Calle Mayor, 12, 1º',
+  'legal.ph_city': 'Madrid',
+  'legal.ph_email': 'legal@ejemplo.es',
+  'legal.ph_privacy': 'dpo@ejemplo.es',
+  'legal.ph_registry': 'Reg. Mercantil Madrid, Tomo 1234, Folio 56, Hoja M-789',
+  'legal.err_generic': 'No se pudieron guardar los datos legales. Inténtalo de nuevo.',
+
+  'settings.tab': 'Ajustes',
+  'settings.intro': 'Nombre, dirección y opciones generales del sitio.',
+  'settings.slug_help':
+    'Solo minúsculas, números y guiones. Si lo cambias, cambia la dirección del sitio.',
+  'settings.admin_only': 'Solo quienes administran la organización pueden cambiar esto.',
+  'settings.name_required': 'El nombre del sitio no puede estar vacío.',
+  'settings.err_slug_taken': 'Ese identificador ya lo usa otro sitio.',
+  'settings.err_invalid': 'Revisa el nombre, el identificador y la dirección: alguno no es válido.',
+  'settings.err_generic': 'No se pudieron guardar los ajustes. Inténtalo de nuevo.',
+  'settings.delete_error': 'No se pudo eliminar el sitio. Inténtalo de nuevo.',
+
+  'forms.empty': 'Todavía no hay respuestas',
+  'forms.empty_help': 'Cuando alguien envíe un formulario de tu web, lo verás aquí.',
+};

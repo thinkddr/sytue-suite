@@ -1,0 +1,11 @@
+Tabele legate pentru a ține clienți, comenzi sau stocuri, cu permisiuni și jurnal al fiecărei modificări.
+
+• Clienți, comenzi sau stocuri în tabele legate, fără să știi nimic despre baze de date.
+• Partajezi cu organizația ta, cu rolul pe care îl alegi.
+• Fiecare modificare este înregistrată: cine a făcut-o și cum era înainte.
+• Datele tale rămân în UE și le exporți oricând vrei.
+• Tabele cu câmpuri de text, număr, dată, casetă de selectare, alegere unică și alegere multiplă.
+• Relații între tabele: legi o comandă de clientul ei, iar baza de date nu lasă legătura să se rupă.
+• Permisiuni pe bază și pe tabel: proprietar, editor, comentator și cititor.
+
+Criptare în tranzit (TLS 1.3). Infrastructura Sytue se află în UE. Locația serviciilor externe depinde de furnizorul lor.

@@ -1,0 +1,89 @@
+---
+import ConsoleLayout from '../layouts/ConsoleLayout.astro';
+import { useT } from '../i18n/index.js';
+import MigrationsPanel from '../components/MigrationsPanel';
+import { requireSession } from '@sytue/auth/server';
+import { canonicaConOrg } from '@sytue/config';
+import { getBff, toBffContext } from '../server/bff.js';
+import { loadCatalog, loadConnected, loadMigrations } from '../lib/gateway.js';
+
+export const prerender = false;
+
+const guard = await requireSession(getBff(), toBffContext(Astro), {
+  roles: ['admin', 'owner'],
+  perms: ['apps.manage'],
+});
+if (guard instanceof Response) return guard;
+// Ruta en `sinOrg` (su nombre colisiona con el namespace de organizaciones):
+// con sesión, un salto local a la canónica con la org activa (ADR 0056).
+const canonica = canonicaConOrg(Astro.url, getBff().basePath, guard.session.user.tenant);
+if (canonica) return Astro.redirect(canonica);
+
+const [connected, migrations, catalog] = await Promise.all([
+  loadConnected(guard.session),
+  loadMigrations(guard.session),
+  loadCatalog(guard.session),
+]);
+
+// Solo están disponibles las plantillas activadas en Platform
+const enabledCatalogKeys = new Set(catalog.data.map((c) => c.key));
+
+// Solo sirven de origen las conexiones VIVAS de Microsoft 365 y Google Workspace:
+// son las únicas plantillas cuyo driver sabe leer Drive y Contactos.
+const SOURCE_OF: Record<string, 'm365' | 'google'> = {
+  microsoft365: 'm365',
+  'google-workspace': 'google',
+};
+const sources = connected.data
+  .filter(
+    (i) =>
+      i.status === 'active' && SOURCE_OF[i.templateKey] && enabledCatalogKeys.has(i.templateKey),
+  )
+  .map((i) => ({
+    instanceId: i.id,
+    name: i.name,
+    source: SOURCE_OF[i.templateKey] as 'm365' | 'google',
+  }));
+
+// Orígenes del asistente AUTOMÁTICO: solo los habilitados en Platform.
+const AUTO_TEMPLATES = [
+  { key: 'microsoft' as const, templateKey: 'microsoft365' },
+  { key: 'google' as const, templateKey: 'google-workspace' },
+  { key: 'github' as const, templateKey: 'github' },
+].filter((tpl) => enabledCatalogKeys.has(tpl.templateKey));
+const autoSources = AUTO_TEMPLATES.map((tpl) => {
+  const inst = connected.data.find((i) => i.templateKey === tpl.templateKey);
+  return {
+    ...tpl,
+    ...(inst ? { instanceId: inst.id } : {}),
+    // «Conectada» es tener credencial, no estar activada: el consentimiento guarda
+    // los tokens y deja la instancia en borrador, y para migrar eso ya basta.
+    connected: Boolean(inst?.hasSecrets),
+  };
+});
+
+// Vuelta del consentimiento: el gateway devuelve aquí con ?instance=…&oauth=connected.
+const oauthOk = Astro.url.searchParams.get('oauth') === 'connected';
+const justConnected = oauthOk ? (Astro.url.searchParams.get('instance') ?? '') : '';
+// Con purpose=out se volvía de autorizar la ESCRITURA: se sigue en la salida.
+const justAuthorizedOut = oauthOk && Astro.url.searchParams.get('purpose') === 'out';
+
+const live = connected.live && migrations.live;
+
+// El idioma lo negoció el middleware; la isla lo recibe por props (nunca lo detecta).
+const locale = Astro.locals.locale;
+const t = useT(locale);
+---
+
+<ConsoleLayout title={t('page.migrations')} section="migrations">
+  <MigrationsPanel
+    client:load
+    locale={locale}
+    sources={sources}
+    autoSources={autoSources}
+    justConnected={justConnected}
+    justAuthorizedOut={justAuthorizedOut}
+    jobs={migrations.data}
+    live={live}
+  />
+</ConsoleLayout>

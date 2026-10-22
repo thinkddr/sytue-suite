@@ -1,0 +1,150 @@
+# Sytue Hub — defaults del subchart (servicio Go). global.* lo inyecta el umbrella.
+# Fan-out/presencia sobre PostgreSQL (LISTEN/NOTIFY). Sin Redis/Valkey ni motores AGPL.
+enabled: true
+subdomain: hub
+component: hub
+replicaCount: 2
+
+image:
+  registry: ""                 # cae a global.imageRegistry (Scaleway Registry, UE)
+  repository: sytue-hub
+  tag: "1.0.0"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8092             # puerto del SPEC (Sytue Hub API)
+
+ingress:
+  enabled: true
+  className: traefik
+  path: /
+  pathType: Prefix
+  # SSE/WebSocket: por defecto Traefik no bufferea ni limita el cuerpo (streaming OK).
+  annotations: {}
+  tls:
+    secretName: tls-hub-sytue-eu
+
+# Right-sized al footprint MEDIDO (Go ~6-40MiB RSS idle): requests modestos para
+# densidad/coste; limits con cabecera para picos (fan-out SSE/WS; burstable).
+# Requests MEDIDOS en producción (kubectl top, 2026-08-09), no estimados: en
+# Kubernetes la factura la fija lo RESERVADO, no lo usado, y estos pods pedían
+# 25-75 veces su consumo real. Esa reserva inflada obligó a un tercer nodo cuando
+# la CPU real del clúster estaba al 3 %.
+#
+# El límite NO se toca: un pico sigue pudiendo usar toda la CPU que necesite. Y
+# bajar el request hace al HPA MÁS sensible —calcula el porcentaje sobre el
+# request—, que es justo lo que hace falta para escalar por demanda real.
+resources:
+  requests:
+    cpu: 15m
+    memory: 64Mi
+  limits:
+    cpu: "1"
+    memory: 192Mi
+
+autoscaling:
+  # Etiqueta `job` de la serie de metricas, para el HPA por demanda real.
+  # Es el ServiceName del BINARIO, que no siempre coincide con el nombre del
+  # chart ni con el del directorio; por eso se escribe y no se deduce.
+  metricJob: sytue-hub
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 8
+  targetCPUUtilizationPercentage: 70
+  # Sin memoria: en Go la RSS queda alta tras el GC (mala señal de escalado) y
+  # GOMEMLIMIT (~85% de limits.memory) ya la acota -> se escala solo por CPU.
+
+networkPolicy:
+  enabled: true
+
+serviceMonitor:
+  enabled: true
+  path: /metrics
+  interval: 30s
+
+# Configuracion de la app (no secretos). Los backends federados son servicios Go
+# internos del cluster; sus URLs se derivan del release salvo override explicito
+# (ver deployment: http://<release>-<svc>). Sin Nextcloud/Mattermost/Stalwart/Valkey.
+config:
+  # Qué productos levanta ESTA instalación. El conmutador de aplicaciones y el
+  # lanzador del portal lo consultan (GET /api/v1/apps) para no ofrecer teselas
+  # que llevan a un dominio inexistente: el perfil piloto no despliega Sytue
+  # Cloud, y su acceso seguía ahí.
+  #
+  # VACÍA = «no se sabe» y se presenta la suite entera, que es el comportamiento
+  # de siempre. La lista real la fija el umbrella, y `helm-render-test.sh`
+  # comprueba que coincide con los subcharts realmente habilitados: si se apaga
+  # un producto y se olvida esta lista, el gate lo dice.
+  apps: []
+  # Tamano del pool pgx por replica (DB_MAX_CONNS). Prod lo baja (3-5):
+  # PgBouncer multiplexa hacia la RDB (ver values-prod.yaml del umbrella).
+  dbMaxConns: 10
+  logLevel: info
+  driveUrl: ""
+  mailUrl: ""
+  calendarUrl: ""
+  contactsUrl: ""
+  notesUrl: ""
+  roomsUrl: ""
+  erpUrl: ""
+  castUrl: ""
+  pagesUrl: ""
+  basesUrl: ""
+  docsUrl: ""
+  photosUrl: ""
+  idUrl: ""
+  integrationsUrl: ""
+
+# Postgres EXTERNO (Scaleway RDB). DSN por secret (nunca en git).
+postgresql:
+  existingSecret: sytue-hub-db
+  dsnKey: dsn
+  # DSN directo a la RDB (bypass PgBouncer) para LISTEN/migraciones; opcional.
+  dsnDirectKey: dsn-direct
+
+# Secretos: oidc-client-secret (y los que requiera el servicio).
+existingSecret: sytue-hub
+
+# Bucket de los instaladores nativos, el MISMO que sirve la página de descargas del
+# portal (`sytue-frontend`: downloadsBucket, downloadsEndpoint, downloadsSecret…) y con
+# la misma credencial de solo lectura. Lo lee el actualizador de las apps de escritorio
+# por `/api/v1/instaladores`. Los valores por defecto son los del portal; sin el Secret,
+# o con `bucket` vacío, esas rutas dan 503 y las apps siguen como están.
+# El endpoint admite esquema (`http://` es un almacén en claro, sin TLS).
+descargas:
+  bucket: sytue-prod-downloads
+  endpoint: https://s3.fr-par.scw.cloud
+  # Con el que se firma la URL cuando el de arriba solo existe dentro del clúster.
+  publicEndpoint: ""
+  region: fr-par
+  secret: sytue-downloads
+
+# PodDisruptionBudget: garantiza disponibilidad durante drains/upgrades del cluster.
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+  # maxUnavailable: 1   # alternativa a minAvailable (usar uno u otro)
+
+# Reparto anti-afinidad suave por zona y nodo (alta disponibilidad multi-AZ, UE).
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: ScheduleAnyway
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: ScheduleAnyway
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  fsGroup: 10001
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]

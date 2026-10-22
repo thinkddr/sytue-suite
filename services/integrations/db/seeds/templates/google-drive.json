@@ -1,0 +1,31 @@
+{
+  "key": "google-drive",
+  "tier": "tier2",
+  "manifest": {
+    "name": "Google Drive",
+    "description": "Guarda los archivos nuevos de Sytue Drive en tu Google Drive. Las copias de seguridad y la recuperación de lo que vive allí son responsabilidad del cliente.",
+    "category": "Almacenamiento",
+    "color": "#1FA463",
+    "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#1FA463\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M8 3h8l6 10-4 7H6l-4-7z\"/><path d=\"M8 3 2 13h20\"/></svg>",
+    "identity": {
+      "kind": "none"
+    },
+    "provisioning": "none",
+    "launch": {
+      "kind": "url",
+      "url": "https://drive.google.com"
+    },
+    "oauth": {
+      "authorize_url": "https://accounts.google.com/o/oauth2/v2/auth",
+      "token_url": "https://oauth2.googleapis.com/token",
+      "revoke_url": "https://oauth2.googleapis.com/revoke",
+      "scopes": [
+        "https://www.googleapis.com/auth/drive.file"
+      ],
+      "authorize_params": {
+        "access_type": "offline",
+        "prompt": "consent"
+      }
+    }
+  }
+}

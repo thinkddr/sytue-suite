@@ -1,0 +1,10 @@
+{
+  "order_paid_buyer_subject": "Потвърждение на поръчка {number}",
+  "order_paid_buyer_body": "Благодарим ви за покупката. Поръчка {number} е потвърдена.",
+  "order_paid_store_subject": "Получена е нова поръчка: {number}",
+  "order_paid_store_body": "Получихте нова поръчка {number} за {total}.",
+  "withdrawal_ack_subject": "Получено потвърждение за отказ: {number}",
+  "withdrawal_ack_body": "Вашата заявка за отказ от поръчка {number} е регистрирана.",
+  "form_received_subject": "Получено изпращане на формуляр: {form_id}",
+  "form_received_body": "Получено е ново изпращане за формуляр {form_id}."
+}

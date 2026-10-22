@@ -1,0 +1,1 @@
+Tabelas relacionais colaborativas para clientes, encomendas ou stocks, na UE.

@@ -1,0 +1,146 @@
+---
+/**
+ * Descargas de las aplicaciones nativas — DETRÁS DE LA SESIÓN.
+ *
+ * Los instaladores son producto, no folleto: se bajan con una cuenta de Sytue y
+ * una suscripción viva. Por eso viven aquí y no en el sitio público, que es
+ * estático y anónimo por diseño. El sitio público sigue contando qué son las
+ * apps y manda aquí a iniciar sesión.
+ *
+ * No hay comprobación de suscripción en esta página, y es deliberado: Sytue ID no
+ * emite ni refresca token sin derecho a la suite —lo cruza con la suscripción, los
+ * miembros activos y los asientos concedidos, que son los que cubren el regalo y
+ * al empleado—, así que llegar hasta aquí con sesión YA es tener derecho. Un
+ * segundo criterio distinto solo podría discrepar del que manda.
+ *
+ * La lista sale de la release de verdad. Si no hay instaladores publicados se dice
+ * por qué, en vez de enseñar botones que dan 404.
+ */
+import AppLayout from '../layouts/AppLayout.astro';
+import { useT } from '../i18n/index.js';
+import { formatBytes } from '@sytue/ui';
+import { bff, toBffContext } from '../lib/auth';
+import { canonicaConOrg, returnToCanonico } from '@sytue/config';
+import {
+  cargarCatalogo,
+  equipoDelUA,
+  sirveEn,
+  type Arquitectura,
+  type Plataforma,
+} from '../lib/descargas.js';
+
+export const prerender = false;
+
+const session = await bff.getSession(toBffContext(Astro));
+if (!session) {
+  // ADR 0056: la entrada org-ful llega reescrita con la marca ?__org=; el returnTo
+  // sale canónico, no en la forma interna, o tras el login la barra se queda con ella.
+  const returnTo = returnToCanonico(Astro.url, bff.basePath);
+  const redireccionLogin = Astro.redirect(
+    `${bff.basePath}/auth/login?returnTo=${encodeURIComponent(returnTo)}`,
+  );
+  redireccionLogin.headers.set('cache-control', 'no-store');
+  return redireccionLogin;
+}
+// Ruta en `sinOrg` (su nombre colisiona con el namespace de organizaciones):
+// con sesión, un salto local a la canónica con la org activa.
+const canonica = canonicaConOrg(Astro.url, bff.basePath, session.user.tenant);
+if (canonica) return Astro.redirect(canonica);
+
+const locale = Astro.locals.locale;
+const t = useT(locale);
+const catalogo = await cargarCatalogo();
+
+// La plataforma de quien mira, para poner SU descarga primero. Es una pista del
+// user agent, no una decisión: las demás siguen visibles debajo, porque mucha
+// gente baja el instalador de otra máquina desde la que tiene delante.
+const equipo = equipoDelUA(Astro.request.headers.get('user-agent') ?? '');
+const suya: Plataforma | null = equipo.plataforma;
+
+const NOMBRE: Record<Plataforma, string> = {
+  macos: 'macOS',
+  windows: 'Windows',
+  linux: 'Linux',
+  android: 'Android',
+};
+
+/** Tamaño legible, con el `formatBytes` de la suite; sin tamaño conocido, nada. */
+const tamano = (bytes: number): string => (bytes > 0 ? formatBytes(locale, bytes) : '');
+
+// El procesador, en la ficha: un «Linux» a secas no dice que no arranca en un ARM.
+// Es nomenclatura técnica, igual en todos los idiomas.
+const ARQUITECTURA: Record<Arquitectura, string> = {
+  amd64: 'x86_64',
+  arm64: 'ARM64',
+  universal: 'Universal',
+};
+const ficha = (i: (typeof catalogo.instaladores)[number]) =>
+  [NOMBRE[i.plataforma], i.arquitectura && ARQUITECTURA[i.arquitectura], tamano(i.bytes)]
+    .filter(Boolean)
+    .join(' · ');
+
+// Solo se destaca lo que ARRANCA en ese equipo: plataforma y procesador.
+const destacados = catalogo.instaladores.filter((i) => sirveEn(i, suya, equipo.arquitectura));
+const resto = catalogo.instaladores.filter((i) => !destacados.includes(i));
+---
+
+<AppLayout title={t('page.downloads')}>
+  <section class="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8">
+    <header class="flex flex-col gap-1">
+      <h1 class="sytue-h1">{t('downloads.title')}</h1>
+      <p class="text-text-muted">{t('downloads.lead')}</p>
+      {catalogo.version ? (
+        <p class="sytue-meta">{t('downloads.version', { version: catalogo.version })}</p>
+      ) : null}
+    </header>
+
+    {catalogo.instaladores.length === 0 ? (
+      <div class="border-border bg-bg-subtle rounded-lg border p-6">
+        <p class="text-text font-medium">{t('downloads.empty')}</p>
+        <p class="text-text-muted mt-1 text-sm">
+          {catalogo.motivo === 'sin-configurar'
+            ? t('downloads.emptyUnconfigured')
+            : t('downloads.emptyNoRelease')}
+        </p>
+      </div>
+    ) : null}
+
+    {destacados.length > 0 ? (
+      <div class="flex flex-col gap-3">
+        <h2 class="sytue-h3">{t('downloads.forYou', { platform: NOMBRE[suya!] })}</h2>
+        <ul class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {destacados.map((i) => (
+            <li class="border-border bg-bg rounded-lg border p-4">
+              <p class="text-text font-medium">{i.producto}</p>
+              <p class="sytue-meta">{ficha(i)}</p>
+              <a class="sy-btn sy-btn--primary mt-3 inline-flex" href={i.href} download>
+                {t('downloads.get')}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </div>
+    ) : null}
+
+    {resto.length > 0 ? (
+      <div class="flex flex-col gap-3">
+        <h2 class="sytue-h3">
+          {destacados.length > 0 ? t('downloads.others') : t('downloads.all')}
+        </h2>
+        <ul class="border-border divide-border divide-y rounded-lg border">
+          {resto.map((i) => (
+            <li class="flex items-center justify-between gap-4 px-4 py-3">
+              <span class="min-w-0">
+                <span class="text-text block truncate font-medium">{i.producto}</span>
+                <span class="sytue-meta">{ficha(i)}</span>
+              </span>
+              <a class="sy-btn sy-btn--ghost shrink-0" href={i.href} download>
+                {t('downloads.get')}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </div>
+    ) : null}
+  </section>
+</AppLayout>

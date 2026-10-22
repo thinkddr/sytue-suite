@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "generator": "astro-fyne",
+  "name": "UpdaterConformance",
+  "sourceHash": "4e7466c294c4552b90655349d0f84ea8ab41d193746593b4cd67b4f5b067fe1c",
+  "sources": [
+    {
+      "path": "example/src/components/UpdaterConformance.tsx",
+      "hash": "022559694c355e92a2ae5d4fb1a39796ed557615179a151c4842c56530865243"
+    }
+  ],
+  "resources": [],
+  "actions": [],
+  "components": [
+    "CrossHookUnit_cc5f4c8c",
+    "EventArgumentUnit_cc5f4c8c",
+    "MappedUnit_cc5f4c8c",
+    "NormalMappedUnit_cc5f4c8c",
+    "SelfClosureUnit_cc5f4c8c",
+    "SequentialUnit_cc5f4c8c",
+    "ShadowedParameterUnit_cc5f4c8c",
+    "UpdaterConformance_cc5f4c8c"
+  ],
+  "compatibility": "declarative-stage-1",
+  "visual": {
+    "measured": false,
+    "pixelPerfectVerified": false
+  }
+}

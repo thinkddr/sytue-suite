@@ -1,0 +1,18 @@
+Bilježnice u koje stane sve: tekst, datoteke, događaji, cijeli dokumenti.
+
+• Ugniježđene bilježnice na slobodnom platnu, u stupcima ili kao popis.
+• Bilješke svih vrsta: tekst, zadaci, poveznice, datoteke, događaji iz Calendara, dokumenti iz Docsa.
+• Vi odlučujete što ulazi u pretraživanje — i što nikad.
+• Ugniježđene bilježnice s ikonom i bojom; tri rasporeda: slobodni, stupci i popis.
+• Dvanaest vrsta bilješki: tekst, zadaci, poveznice, boja, slika i reference na Drive, Docus, Calendar, Rooms i druge bilješke.
+• Uređivač s oblikovanjem (podebljano, popisi, poveznice) koji sprema pri izlasku.
+• Oznake, prikvačivanje, dupliciranje, premještanje među bilježnicama, grupiranje i povlačenje po platnu.
+• Vidljivost po bilježnici: privatna, osobna, organizacijska ili javna poveznica.
+• Vi odlučujete koje bilježnice ulaze u pretraživanje paketa.
+• Povratne poveznice: koje bilješke upućuju na ovu.
+• Izvoz cijele bilježnice u HTML, PDF, Markdown i druge formate; uvoz kopija.
+• Dijeljenje bilješke u kanal Roomsa; ispuštanje ili lijepljenje za stvaranje bilješki.
+• Tablice u uređivaču i prečaci Markdowna pri pisanju: „- ”, „# ”, „> ” i „```”.
+• Premještanje bilješke u drugu bilježnicu, izvoz jedne bilješke i sortiranje bilježnice po želji.
+
+Šifrirano u prijenosu (TLS 1.3). Infrastruktura Sytuea nalazi se u EU-u. Lokacija vanjskih usluga ovisi o njihovu pružatelju.

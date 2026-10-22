@@ -1,0 +1,19 @@
+Calendario CalDAV integrado con el resto de la suite.
+
+• Vistas de día, semana y mes.
+• Eventos recurrentes y recordatorios.
+• Crea eventos desde un correo de Mail.
+• Compatible con cualquier cliente CalDAV.
+• Vistas de mes, semana, día y agenda, con minicalendario y «Hoy».
+• Repetición diaria, semanal o mensual con fin; edita solo este, este y los siguientes, o todos.
+• Recordatorios por evento y notificaciones dentro de la suite.
+• Invitaciones con respuesta (asistiré, quizá, no) y seguimiento.
+• «Buscar un hueco» libre para todas las personas invitadas.
+• Salas y recursos reservables con disponibilidad.
+• Calendarios compartidos con permisos, y los que otros comparten contigo.
+• Suscripción a calendarios externos (ICS) y varios calendarios con color.
+• Crea un evento desde un correo de Mail o desde una nota.
+• Compatible con cualquier cliente CalDAV: Apple Calendar, Thunderbird y más.
+• Duplica un evento o cópialo a tu calendario, y descárgalo como .ics para quien no esté en Sytue.
+
+Cifrado en tránsito (TLS 1.3). La infraestructura de Sytue está en la UE. Los servicios externos siguen la ubicación de su proveedor.

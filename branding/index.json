@@ -1,0 +1,88 @@
+{
+  "$description": "Sytue — manifiesto de branding. Punto de entrada para que @sytue/ui descubra tokens, logos e iconos. Diseño 100% Sytue-native (sin motores de terceros que tematizar; retirados en v4). Todas las rutas son relativas a la raíz del repo. Marca padre: Sytue. Suite: Sytue One. Soberanía 100% UE.",
+  "version": "1.0.0",
+  "tokens": {
+    "colors": "branding/tokens/colors.json",
+    "colorsCss": "branding/tokens/colors.css",
+    "typography": "branding/tokens/typography.json",
+    "spacing": "branding/tokens/spacing.json"
+  },
+  "logo": {
+    "wordmark": "branding/logo/sytue.svg",
+    "suite": "branding/logo/sytue-one.svg",
+    "suiteWhite": "branding/logo/sytue-one-white.svg",
+    "mark": "branding/logo/sytue-mark.svg",
+    "favicon": "branding/logo/favicon.svg"
+  },
+  "icons": {
+    "one": "branding/icons/one.svg",
+    "id": "branding/icons/id.svg",
+    "drive": "branding/icons/drive.svg",
+    "docs": "branding/icons/docs.svg",
+    "sheets": "branding/icons/sheets.svg",
+    "slides": "branding/icons/slides.svg",
+    "mail": "branding/icons/mail.svg",
+    "calendar": "branding/icons/calendar.svg",
+    "contacts": "branding/icons/contacts.svg",
+    "notes": "branding/icons/notes.svg",
+    "photos": "branding/icons/photos.svg",
+    "rooms": "branding/icons/rooms.svg",
+    "cloud": "branding/icons/cloud.svg",
+    "console": "branding/icons/console.svg",
+    "hub": "branding/icons/hub.svg",
+    "erp": "branding/icons/erp.svg",
+    "cast": "branding/icons/cast.svg",
+    "pages": "branding/icons/pages.svg",
+    "bases": "branding/icons/bases.svg"
+  },
+  "marks": {
+    "$note": "Marca de APLICACION por producto: el logotipo «sy:» con el color del producto. Identifica la app en la pestaña, el dock y el móvil, donde un pictograma a 16 px no se lee. Distinto de icons/, que son las teselas del conmutador. Las genera scripts/gen-marks.sh desde tokens/colors.json: no se editan a mano.",
+    "$dir": "branding/marks/"
+  },
+  "illustrations": {
+    "$note": "Ilustración SVG de servicio (empty states, hero, spots). Line-art con roles var(--sytue-*): respeta claro/oscuro. Un solo toque de acento por pieza. Uso en brand-guidelines.md §9.",
+    "emptyMail": "branding/illustrations/empty-mail.svg",
+    "emptyDrive": "branding/illustrations/empty-drive.svg",
+    "emptyCalendar": "branding/illustrations/empty-calendar.svg",
+    "emptyChat": "branding/illustrations/empty-chat.svg",
+    "emptyContacts": "branding/illustrations/empty-contacts.svg",
+    "emptyNotes": "branding/illustrations/empty-notes.svg",
+    "emptySearch": "branding/illustrations/empty-search.svg",
+    "errorRetry": "branding/illustrations/error-retry.svg",
+    "allDone": "branding/illustrations/all-done.svg",
+    "heroSuite": "branding/illustrations/hero-suite.svg",
+    "spotSovereignty": "branding/illustrations/spot-sovereignty.svg",
+    "spotUpload": "branding/illustrations/spot-upload.svg"
+  },
+  "og": {
+    "$note": "Superficie de marca fija (no depende de tema): hexes de marca embebidos a propósito.",
+    "ogImage": "branding/og/og-image.svg",
+    "faviconMaskable": "branding/og/favicon-maskable.svg"
+  },
+  "docs": {
+    "designSystem": "docs/design.md",
+    "brandGuidelines": "branding/brand-guidelines.md"
+  },
+  "appSwitcher": {
+    "$note": "Orden canónico del grid de 9+ puntos del app switcher (@sytue/shell).",
+    "order": [
+      "one",
+      "mail",
+      "drive",
+      "calendar",
+      "contacts",
+      "docs",
+      "notes",
+      "photos",
+      "rooms",
+      "cast",
+      "erp",
+      "pages",
+      "bases",
+      "cloud",
+      "console",
+      "hub",
+      "id"
+    ]
+  }
+}

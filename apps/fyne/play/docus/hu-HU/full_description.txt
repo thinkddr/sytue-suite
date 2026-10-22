@@ -1,0 +1,16 @@
+Valós idejű közös szerkesztés
+
+• Minden az Ön európai Drive-jában mentve.
+• Valós idejű közös szerkesztés jelenléttel, egymás munkájának zavarása nélkül.
+• Lapfüles menüszalag: Kezdőlap, Beszúrás, Hivatkozások, Levelezés és Korrektúra.
+• Táblázatok, képek, alakzatok, SmartArt, diagramok, szimbólumok és vízjelek.
+• Hivatkozások: tartalomjegyzék, lábjegyzetek, idézetek és irodalomjegyzék.
+• Levelezés: körlevél leveleken és címkéken.
+• Szálakba rendezett megjegyzések, változások áttekintése és verziók.
+• Opcionális MI-asszisztens átfogalmazáshoz, fordításhoz vagy összefoglaláshoz, csak ha szervezete engedélyezi.
+• Exportálás ODT, DOCX és PDF formátumba; Word-fájlok megnyitása a Drive-ból.
+• Élőfejek, élőlábak, oldalszámozás és újrahasznosítható blokkok.
+• Automatikus mentés az Ön európai Drive-jába, előzményekkel.
+• Letöltés a kezdőlapról PDF, HTML, Markdown, OpenDocument vagy Microsoft Office formátumban.
+
+Titkosítás átvitel közben (TLS 1.3). A Sytue infrastruktúrája az EU-ban található. A külső szolgáltatások helye a szolgáltatójuktól függ.

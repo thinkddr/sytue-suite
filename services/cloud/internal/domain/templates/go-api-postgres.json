@@ -1,0 +1,32 @@
+{
+  "id": "go-api-postgres",
+  "name": "API en Go + Postgres",
+  "description": "API en Go (imagen distroless) con una base Sytue Postgres aprovisionada.",
+  "version": "1.0.0",
+  "license": "BSD-3-Clause",
+  "maintainer": "Sytue",
+  "framework": "go",
+  "build": {},
+  "app_port": 8080,
+  "health_path": "/healthz",
+  "instance_size": "standard",
+  "services": ["postgres"],
+  "env": [
+    {
+      "key": "DATABASE_URL",
+      "origin": "from_service",
+      "service": "postgres"
+    },
+    {
+      "key": "POSTGREST_URL",
+      "origin": "from_service",
+      "service": "postgres"
+    },
+    {
+      "key": "SESSION_SECRET",
+      "origin": "generate"
+    }
+  ],
+  "docs_url": "https://go.dev/doc/",
+  "tags": ["api", "backend", "fullstack"]
+}

@@ -1,0 +1,18 @@
+Jegyzetfüzetek, amelyekbe bármi belefér: szöveg, fájlok, események, teljes dokumentumok.
+
+• Egymásba ágyazott jegyzetfüzetek szabad vásznon, oszlopokban vagy listaként.
+• Bármilyen jegyzet: szöveg, teendők, hivatkozások, fájlok, Calendar-események, Docs-dokumentumok.
+• Ön dönti el, mi kerül a keresésbe — és mi soha.
+• Egymásba ágyazott jegyzetfüzetek ikonnal és színnel; három elrendezés: szabad, oszlopok és lista.
+• Tizenkét jegyzettípus: szöveg, teendők, hivatkozások, szín, kép, valamint hivatkozások a Drive, Docus, Calendar, Rooms elemeire és más jegyzetekre.
+• Formázást támogató szerkesztő (félkövér, listák, hivatkozások), amely kilépéskor ment.
+• Címkék, rögzítés, duplikálás, áthelyezés jegyzetfüzetek között, csoportosítás és húzás a vásznon.
+• Láthatóság jegyzetfüzetenként: privát, személyes, szervezeti vagy nyilvános hivatkozás.
+• Ön dönti el, mely jegyzetfüzetek kerüljenek a programcsomag keresésébe.
+• Visszahivatkozások: mely jegyzetek mutatnak erre.
+• Teljes jegyzetfüzet exportálása HTML, PDF, Markdown és más formátumba; másolatok importálása.
+• Jegyzet megosztása Rooms-csatornán; jegyzetek létrehozása ráejtéssel vagy beillesztéssel.
+• Táblázatok a szerkesztőben és Markdown-rövidítések gépelés közben: „- ”, „# ”, „> ” és „```”.
+• Jegyzet áthelyezése másik jegyzetfüzetbe, egyetlen jegyzet exportálása és a jegyzetfüzet tetszés szerinti rendezése.
+
+Titkosítás átvitel közben (TLS 1.3). A Sytue infrastruktúrája az EU-ban található. A külső szolgáltatások helye a szolgáltatójuktól függ.

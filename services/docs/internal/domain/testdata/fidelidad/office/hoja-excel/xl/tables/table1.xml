@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!-- SPDX-License-Identifier: Apache-2.0. Copyright (c) 2026 Daniel Delgado Ramos -->
+<table xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" id="1" name="TablaVentas" displayName="TablaVentas" ref="A1:H4" totalsRowShown="0"><autoFilter ref="A1:H4"/><tableColumns count="8"><tableColumn id="1" name="Zona"/><tableColumn id="2" name="Kilos"/><tableColumn id="3" name="Doble"/><tableColumn id="4" name="Ecológico"/><tableColumn id="5" name="Fecha"/><tableColumn id="6" name="Importe"/><tableColumn id="7" name="Margen"/><tableColumn id="8" name="Densidad"/></tableColumns><tableStyleInfo name="TableStyleMedium2" showFirstColumn="0" showLastColumn="0" showRowStripes="1" showColumnStripes="0"/></table>

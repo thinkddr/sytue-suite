@@ -1,0 +1,54 @@
+---
+/**
+ * «Conectar tus dispositivos» — asistente guiado que lleva la cuenta de Sytue al
+ * correo, calendario y contactos del móvil o del ordenador del usuario.
+ *
+ * Las coordenadas (servidor IMAP/SMTP, URLs DAV, perfil de Apple) NO están
+ * escritas aquí: se leen del servidor, de /.well-known/sytue-clients.json de
+ * Sytue ID, que las deriva de la configuración del despliegue. La dirección de
+ * correo sale de la sesión del BFF. Si el servicio no responde, la página lo dice
+ * en vez de inventarse valores.
+ */
+import AppLayout from '../layouts/AppLayout.astro';
+import { useT } from '../i18n/index.js';
+import { ConnectDevices } from '../components/ConnectDevices';
+import type { ClientEndpoints } from '../components/ConnectDevices';
+import { bff, toBffContext, idBaseUrl } from '../lib/auth';
+import { canonicaConOrg, returnToCanonico } from '@sytue/config';
+
+export const prerender = false;
+
+const session = await bff.getSession(toBffContext(Astro));
+if (!session) {
+  // ADR 0056: la entrada org-ful llega reescrita con la marca ?__org=; el returnTo
+  // sale canónico, no en la forma interna, o tras el login la barra se queda con ella.
+  const returnTo = returnToCanonico(Astro.url, bff.basePath);
+  const redireccionLogin = Astro.redirect(
+    `${bff.basePath}/auth/login?returnTo=${encodeURIComponent(returnTo)}`,
+  );
+  redireccionLogin.headers.set('cache-control', 'no-store');
+  return redireccionLogin;
+}
+// Ruta en `sinOrg` (su nombre colisiona con el namespace de organizaciones):
+// con sesión, un salto local a la canónica con la org activa.
+const canonica = canonicaConOrg(Astro.url, bff.basePath, session.user.tenant);
+if (canonica) return Astro.redirect(canonica);
+
+let endpoints: ClientEndpoints | null = null;
+try {
+  const res = await fetch(`${idBaseUrl()}/.well-known/sytue-clients.json`);
+  if (res.ok) endpoints = (await res.json()) as ClientEndpoints;
+} catch {
+  endpoints = null;
+}
+const t = useT(Astro.locals.locale);
+---
+
+<AppLayout title={t('page.devices')}>
+  <ConnectDevices
+    client:load
+    locale={Astro.locals.locale}
+    email={session.user.email ?? ''}
+    endpoints={endpoints}
+  />
+</AppLayout>

@@ -1,0 +1,33 @@
+{{- if .Values.ingress.enabled }}
+{{- $host := include "sytue-drive.host" . }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "sytue-drive.fullname" . }}
+  labels:
+    {{- include "sytue-drive.labels" . | nindent 4 }}
+  annotations:
+    cert-manager.io/cluster-issuer: {{ include "sytue-drive.clusterIssuer" . | quote }}
+    {{- with .Values.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  tls:
+    - hosts:
+        - {{ $host | quote }}
+      secretName: {{ .Values.ingress.tls.secretName }}
+  rules:
+    - host: {{ $host | quote }}
+      http:
+        paths:
+          {{- range .Values.ingress.paths }}
+          - path: {{ .path }}
+            pathType: {{ .pathType | default "Prefix" }}
+            backend:
+              service:
+                name: {{ include "sytue-drive.fullname" $ }}
+                port:
+                  name: http
+          {{- end }}
+{{- end }}

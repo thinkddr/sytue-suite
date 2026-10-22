@@ -1,0 +1,78 @@
+---
+/**
+ * Plantillas de arranque — asistente de alta de proyecto en unos pocos pasos.
+ *
+ * Antes esta página solo pre-rellenaba el formulario de nuevo proyecto con unos
+ * parámetros en la URL: había que crear el proyecto, luego la base de datos, luego
+ * cada variable, y encima averiguar por cuenta propia que faltaba desplegar. El
+ * control-plane ya hace las cuatro cosas en UNA transacción
+ * (POST /projects:from-template), así que aquí vive el asistente que la usa.
+ *
+ * El catálogo se carga en el servidor. Sin control-plane conectado llega VACÍO
+ * (loadTemplates no inventa plantillas), y entonces no hay asistente que enseñar:
+ * se muestra el estado vacío honesto y el camino de crear un proyecto a mano.
+ */
+import DashboardLayout from '../layouts/DashboardLayout.astro';
+import DemoBanner from '../components/DemoBanner';
+import TemplateWizard from '../components/TemplateWizard';
+import { Card, Icon, SectionHeader, EmptyState } from '@sytue/ui';
+import { requireSession } from '@sytue/auth/server';
+import { canonicaConOrg } from '@sytue/config';
+import { getBff, toBffContext } from '../server/bff.js';
+import { loadTemplates } from '../lib/cloud.js';
+import { useT } from '../i18n/index.js';
+
+export const prerender = false;
+
+// El idioma lo negocia el middleware una vez por petición; aquí solo se usa y
+// baja a las islas por props (detectarlo en el cliente rompería la hidratación).
+const locale = Astro.locals.locale;
+const t = useT(locale);
+
+const guard = await requireSession(getBff(), toBffContext(Astro));
+if (guard instanceof Response) return guard;
+// Ruta en `sinOrg` (su nombre colisiona con el namespace de organizaciones):
+// con sesión, un salto local a la canónica con la org activa (ADR 0056).
+const canonica = canonicaConOrg(Astro.url, getBff().basePath, guard.session.user.tenant);
+if (canonica) return Astro.redirect(canonica);
+
+const { live, data: templates, error } = await loadTemplates(guard.session);
+
+// Anchor con apariencia de botón primario (design-system): el CTA navega, así que
+// no puede ser el <button> de @sytue/ui. Tokens Graphite & Brass, foco doble anillo.
+const ctaClass =
+  'inline-flex h-9 items-center justify-center gap-2 rounded-md px-4 text-base font-semibold ' +
+  'bg-primary text-[var(--sytue-on-primary)] shadow-[var(--shadow-xs)] transition-colors duration-150 ' +
+  'hover:bg-[var(--sytue-primary-hover)] active:bg-[var(--sytue-primary-active)] focus-visible:outline-none ' +
+  'sytue-focus-ring-inset';
+import { r } from '../lib/rutas.js';
+---
+
+<DashboardLayout title={t('nav.templates')} section="templates" error={error}>
+  <DemoBanner live={live} locale={locale} error={error} />
+  <SectionHeader
+    level={1}
+    icon={<Icon name="grid" size={20} />}
+    title={t('templates.title')}
+    subtitle={t('templates.subtitle')}
+  />
+  <div class="cloud-content">
+    {templates.length === 0 ? (
+      <Card class="mt-2">
+        <EmptyState
+          illustration={<Icon name="grid" size={24} />}
+          title={t('templates.empty.title')}
+          description={t('templates.empty.desc')}
+          action={
+            <a href={r('/?new=1')} class={ctaClass}>
+              <Icon name="plus" size={16} />
+              {t('projects.new')}
+            </a>
+          }
+        />
+      </Card>
+    ) : (
+      <TemplateWizard client:load templates={templates} locale={locale} />
+    )}
+  </div>
+</DashboardLayout>

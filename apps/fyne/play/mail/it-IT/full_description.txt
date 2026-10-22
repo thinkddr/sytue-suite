@@ -1,0 +1,19 @@
+Posta privata ed europea su JMAP, senza tracker né pubblicità.
+
+• Casella veloce con conversazioni, etichette, filtri e ricerca.
+• Allega file direttamente da Sytue Drive.
+• Trasforma un’email in un evento di Calendar.
+• Cifratura in transito (TLS 1.3). L’infrastruttura di Sytue si trova nell’UE. La posizione dei servizi esterni dipende dal loro fornitore.
+• Conversazioni in thread con lettura, risposta e inoltro in un clic.
+• Cartelle, etichette colorate e ricerca con operatori (from:, has:attachment, is:unread…).
+• Regole automatiche che archiviano, etichettano o spostano la posta in arrivo.
+• Invio programmato e «Annulla invio».
+• Firme, alias dell’indirizzo e risposta automatica di assenza.
+• Caselle condivise e delegate con permessi di lettura e invio.
+• Editor con formattazione e allegati da Sytue Drive senza duplicare i file.
+• Contenuti remoti bloccati per impostazione predefinita: nessuno sa quando apri un’e-mail.
+• Posta firmata (PGP e S/MIME) riconosciuta e segnalata; TLS in transito.
+• Accesso anche da Thunderbird, Outlook, Apple Mail o dal telefono, con password per app.
+• Indirizzi a pastiglie con la rubrica di Contacts a un clic, e avviso se dici «allegato» senza allegare.
+
+Cifratura in transito (TLS 1.3). L’infrastruttura di Sytue si trova nell’UE. La posizione dei servizi esterni dipende dal loro fornitore.

@@ -1,0 +1,222 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "sytue-calendar.fullname" . }}
+  labels:
+    {{- include "sytue-calendar.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "sytue-calendar.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "sytue-calendar.labels" . | nindent 8 }}
+      annotations:
+        kubectl.kubernetes.io/default-container: calendar
+    spec:
+      automountServiceAccountToken: false
+      {{- with (.Values.global).imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: calendar
+          image: "{{ include "sytue-calendar.imageRegistry" . }}/{{ .Values.image.repository }}:{{ ((.Values.global).image | default dict).tag | default .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.targetPort }}
+          env:
+            {{- if (.Values.global).otlp }}
+            {{- if (.Values.global).otlp.endpoint }}
+            # Telemetria: metricas OTLP directas a Cockpit, sin agente intermedio.
+            # Sale del umbrella y no de este chart para que los catorce escriban al
+            # MISMO sitio; si cada uno apuntara al suyo, no habria con que comparar.
+            # Vacio => no se exporta y el servicio sigue sirviendo igual.
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ (.Values.global).otlp.endpoint | quote }}
+            {{- end }}
+            {{- if (.Values.global).otlp.tokenSecret }}
+            # Por Secret y nunca por values: aunque el token solo permita escribir,
+            # con el se puede envenenar la serie que decide un escalado.
+            - name: OTEL_EXPORTER_OTLP_HEADERS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ (.Values.global).otlp.tokenSecret }}
+                  key: {{ (.Values.global).otlp.tokenKey | default "otlp-headers" }}
+                  optional: true
+            {{- end }}
+            {{- end }}
+            # Runtime Go atado a los limites del pod (helper sytue.goRuntimeEnv del umbrella):
+            # GOMAXPROCS=techo(limits.cpu) via downward API; GOMEMLIMIT=~85% de limits.memory.
+            {{- include "sytue.goRuntimeEnv" (dict "container" "calendar" "memLimit" .Values.resources.limits.memory) | nindent 12 }}
+            {{- include "sytue.logCollectorEnv" . | nindent 12 }}
+            {{- if (.Values.global).dragonflyUrl }}
+            # Cache efimera compartida. Calendar la usa para la LISTA DE COLECCIONES de
+            # cada usuario, que es lo primero que pide cada sincronizacion CalDAV: los
+            # clientes de escritorio y movil sincronizan cada pocos minutos y empiezan
+            # siempre listando. Ahorra la consulta y, sobre todo, el UPSERT de
+            # auto-aprovisionamiento que corria en CADA PROPFIND.
+            #
+            # Sale del umbrella para apuntar al MISMO sitio que el resto. Ausente => se
+            # consulta PostgreSQL, que es el comportamiento previo.
+            - name: DRAGONFLY_URL
+              value: {{ (.Values.global).dragonflyUrl | quote }}
+            {{- if ((.Values.global).cache).secretName }}
+            # La contraseña va por Secret y APARTE de la URL. La URL no es un secreto
+            # —es la misma en dev y en prod— y se deja como `value:` a la vista para
+            # que se pueda comprobar que los siete servicios apuntan a la MISMA cache;
+            # meterla dentro de la URL obligaría a mandar la URL entera por Secret y
+            # ese gate se quedaría ciego.
+            #
+            # `optional: true` a propósito: sin la clave en el Secret, Dragonfly
+            # tampoco la exige (misma referencia opcional en su chart) y el conjunto
+            # sigue funcionando sin autenticación, que es el comportamiento previo.
+            - name: DRAGONFLY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ ((.Values.global).cache).secretName }}
+                  key: {{ ((.Values.global).cache).passwordKey | default "dragonfly-password" }}
+                  optional: true
+            {{- end }}
+            {{- end }}
+            - name: ENV
+              value: {{ include "sytue-calendar.env" . | quote }}
+            - name: HTTP_ADDR
+              value: ":{{ .Values.service.targetPort }}"
+            - name: LOG_LEVEL
+              value: {{ .Values.config.logLevel | quote }}
+            # Avisos al centro de notificaciones de la suite (topBar y apps
+            # nativas): mismo patrón que syerp/cloud-api.
+            # «Pedir acceso de edición»: el correo del dueño sale de Sytue ID con la
+            # sesión de quien pide (platform/pkg/peticiones).
+            - name: ID_BASE_URL
+              value: {{ .Values.config.idUrl | default (printf "http://%s-id" .Release.Name) | quote }}
+            # El nombre visible de la organizacion de fuera en las invitaciones (Sytue ID,
+            # /internal/orgs/names). Sin el, solo su identificador.
+            - name: ID_NOMBRES_ORGS_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: sytue-id-nombres-orgs
+                  key: secret
+                  optional: true
+            - name: HUB_BASE_URL
+              value: {{ .Values.config.hubUrl | default (printf "http://%s-hub" .Release.Name) | quote }}
+            # El secreto de la puerta interna del Hub (/internal/notifications), el MISMO en
+            # el Hub y en cada servicio que avisa. Lo genera el chart paraguas
+            # (sytue-one/templates/secretos-internos.yaml); sin él, fuera de dev, el
+            # servicio no arranca.
+            - name: HUB_INTERNAL_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: sytue-hub-internal
+                  key: secret
+            - name: PUBLIC_URL
+              value: "https://{{ include "sytue-calendar.host" . }}"
+
+            # ----- Invitaciones por correo (iMIP) a quien no es de la suite -----
+            # Salen del MSA de Sytue Mail con la credencial de un BUZÓN propio de
+            # Calendar. Sin `from` no sale ninguna: dentro de la suite la invitación ya
+            # llega a la bandeja y a la campana.
+            {{- with .Values.config.smtp }}
+            - name: SMTP_ADDR
+              value: {{ .addr | default (printf "%s-mail-mx:587" $.Release.Name) | quote }}
+            - name: SMTP_FROM
+              value: {{ .from | quote }}
+            - name: SMTP_TLS_SERVER_NAME
+              value: {{ .tlsServerName | quote }}
+            {{- end }}
+            # Sytue Mail da los dominios de correo de la suite: a quien tiene una
+            # dirección en ellos no se le manda la invitación por correo.
+            - name: MAIL_INTERNAL_URL
+              value: {{ .Values.config.mailInternalUrl | default (printf "http://%s-mail" .Release.Name) | quote }}
+            - name: SMTP_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret }}
+                  key: smtp-user
+                  optional: true
+            - name: SMTP_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret }}
+                  key: smtp-password
+                  optional: true
+            # ----- Sytue ID (OIDC; validacion JWT via JWKS) -----
+            - name: OIDC_ISSUER
+              value: {{ include "sytue-calendar.oidcIssuer" . | quote }}
+            - name: OIDC_JWKS_URL
+              value: {{ include "sytue.oidcJwksUrl" . | quote }}
+            # `OIDC_CLIENT_ID`/`OIDC_CLIENT_SECRET` vivieron aqui sin que ningun
+            # binario Go los leyera: este servicio valida el JWT por JWKS y no hace
+            # ningun flujo de codigo. Quien usa credenciales de cliente es el BFF, y
+            # las suyas se llaman SYTUE_OIDC_CLIENT_SECRET. Montaban un secreto real
+            # en un pod que no lo usa, y ademas tapaban el gate de prefijos.
+            # ----- Postgres EXTERNO (Scaleway RDB; unica fuente de verdad) -----
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgresql.existingSecret }}
+                  key: {{ .Values.postgresql.dsnKey }}
+            # Pool pgx POR replica (bajo en prod: PgBouncer multiplexa hacia la RDB).
+            - name: DB_MAX_CONNS
+              value: {{ .Values.config.dbMaxConns | quote }}
+            # DSN DIRECTO a la RDB (bypass del pooler) para estado de sesion:
+            # LISTEN/NOTIFY y advisory locks de migraciones (platform/pkg/pg).
+            # Opcional: sin PgBouncer (staging/dev) no existe y se usa DATABASE_URL.
+            - name: DATABASE_DIRECT_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgresql.existingSecret }}
+                  key: {{ .Values.postgresql.dsnDirectKey }}
+                  optional: true
+
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 3
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+      {{- with .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- range . }}
+        - maxSkew: {{ .maxSkew }}
+          topologyKey: {{ .topologyKey }}
+          whenUnsatisfiable: {{ .whenUnsatisfiable }}
+          labelSelector:
+            matchLabels:
+              {{- include "sytue-calendar.selectorLabels" $ | nindent 14 }}
+        {{- end }}
+      {{- end }}

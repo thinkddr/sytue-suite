@@ -1,0 +1,16 @@
+Ispričajte priču; slajd prati tempo.
+
+• Teme prezentacija s identitetom vaše organizacije.
+• Prikaz za izlagača s bilješkama i sljedećim slajdom.
+• Slike, oblici, grafikoni i SmartArt.
+• Izvoz u ODP, PPTX i PDF; otvaranje datoteka programa PowerPoint.
+• Teme i palete usklađene s brendom vaše organizacije.
+• Platno s oblicima, slikama, grafikonima, SmartArtom i poveznim crtama.
+• Izlaganje preko cijelog zaslona s prikazom za izlagača i bilješkama.
+• Suradnja u stvarnom vremenu s prisutnošću i komentarima.
+• Slajdovi s pozadinama, plakatima i rasporedima.
+• Izvoz u ODP, PPTX i PDF.
+• Otvaranje datoteka programa PowerPoint iz Drivea.
+• Automatsko spremanje s verzijama.
+
+Šifrirano u prijenosu (TLS 1.3). Infrastruktura Sytuea nalazi se u EU-u. Lokacija vanjskih usluga ovisi o njihovu pružatelju.

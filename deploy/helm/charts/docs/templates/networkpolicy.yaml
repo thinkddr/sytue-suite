@@ -1,0 +1,70 @@
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "sytue-docs.fullname" . }}
+  labels:
+    {{- include "sytue-docs.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "sytue-docs.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Desde el ingress canonico (Traefik) — trafico publico docs.sytue.eu.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              sytue.eu/role: ingress
+      ports:
+        - protocol: TCP
+          port: {{ .Values.service.targetPort }}
+    # Desde el resto de la suite (shell, Hub, intents cross-app).
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/part-of: sytue-one
+      ports:
+        - protocol: TCP
+          port: {{ .Values.service.targetPort }}
+  egress:
+    # DNS
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Intra-suite (validacion JWT contra Sytue ID via JWKS, Hub, etc.).
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/part-of: sytue-one
+    # Postgres EXTERNO (RDB), S3 (Object Storage UE), Secret Manager / HTTPS.
+    #
+    # El 80 es para la autoridad de SELLADO DE TIEMPO de las firmas. No es una
+    # rebaja: las TSA de RFC 3161 hablan HTTP plano —todas—, y es defendible,
+    # porque de ida viaja un hash y de vuelta algo firmado por la autoridad. Lo
+    # que sí puede hacer un intermediario es sustituir el token por otro auténtico
+    # de OTRA huella o fabricar uno falso, y contra eso están `comprobarToken` y la
+    # verificación de su firma con `selloAnclas` en pdftimestamp.go: sin ellas el
+    # PDF se guardaría con un sello que no vale y nadie se enteraría hasta
+    # necesitarlo.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 169.254.0.0/16
+      ports:
+        - protocol: TCP
+          port: 5432
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 80
+        # El relé de correo de fuera del clúster: por ahí sale «te piden editar».
+        {{- include "sytue.correoEgress" . | nindent 8 }}
+{{- end }}

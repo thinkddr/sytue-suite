@@ -1,0 +1,18 @@
+Contactos CardDAV, partilhados em toda a organização.
+
+• Um livro de endereços partilhado em toda a organização.
+• Importação e exportação em vCard.
+• Juntar duplicados sem perder dados.
+• Funciona com qualquer cliente CardDAV.
+• Livros de endereços, incluindo o partilhado da sua organização.
+• Ficha completa: telefones, emails, moradas, organização, aniversário, notas e fotografia.
+• Etiquetas e favoritos para agrupar e encontrar.
+• Deteção e junção de duplicados sem perder dados.
+• Importação e exportação de vCard e CSV; exportação de um contacto individual.
+• Ações em lote e lixo com recuperação.
+• Pesquisa instantânea e preenchimento automático ao escrever no Mail.
+• Funciona com qualquer cliente CardDAV.
+• Aniversários próximos do seu livro de endereços, com os deste mês assinalados.
+• Criar uma reunião com um contacto ou copiar o email do contacto sem sair da ficha.
+
+Cifrado em trânsito (TLS 1.3). A infraestrutura da Sytue está na UE. A localização dos serviços externos depende do respetivo fornecedor.

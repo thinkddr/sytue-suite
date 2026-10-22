@@ -1,0 +1,129 @@
+{
+  "slides": [
+    {
+      "id": "s1",
+      "layout": "portada",
+      "boxes": [
+        { "id": "b1", "x": 8, "y": 14, "w": 84, "h": 22, "html": "<h1>Haz clic para añadir título</h1>" },
+        { "id": "b2", "x": 8, "y": 42, "w": 84, "h": 40, "html": "<p>Haz clic para añadir texto</p>" }
+      ],
+      "transition": "fade",
+      "notes": "Presentar el trimestre en dos minutos."
+    },
+    {
+      "id": "s2",
+      "boxes": [
+        { "id": "b3", "x": 6, "y": 8, "w": 40, "h": 30, "html": "", "kind": "shape", "shape": "ellipse", "fill": "#E2E8F0", "stroke": "#1A2541" },
+        { "id": "b4", "x": 52, "y": 8, "w": 40, "h": 30, "html": "", "kind": "shape", "shape": "star" },
+        {
+          "id": "b5",
+          "x": 6,
+          "y": 44,
+          "w": 40,
+          "h": 40,
+          "html": "",
+          "kind": "chart",
+          "chart": { "type": "bar", "grid": [["", "2025", "2026"], ["UE", "12", "18"], ["Resto", "3", "4"]] }
+        },
+        {
+          "id": "b6",
+          "x": 52,
+          "y": 44,
+          "w": 40,
+          "h": 40,
+          "html": "",
+          "kind": "smartart",
+          "smartart": { "layout": "hierarchy", "items": [{ "text": "Raíz" }, { "text": "Hija", "level": 1 }] }
+        }
+      ],
+      "connectors": [
+        {
+          "id": "c1",
+          "kind": "elbow",
+          "from": { "boxId": "b3", "anchor": "right" },
+          "to": { "x": 60, "y": 20 },
+          "endArrow": true,
+          "stroke": "#1A2541"
+        }
+      ],
+      "bg": "#FFFFFF",
+      "hideMaster": true
+    },
+    {
+      "id": "s3",
+      "boxes": [
+        {
+          "id": "b7",
+          "x": 10,
+          "y": 10,
+          "w": 50,
+          "h": 50,
+          "html": "",
+          "kind": "media",
+          "mediaType": "video",
+          "src": "https://drive.sytue.eu/v/1",
+          "poster": "https://drive.sytue.eu/v/1.jpg",
+          "autoplay": false,
+          "loop": true,
+          "controls": false,
+          "tracks": [
+            { "lang": "es", "vtt": "WEBVTT\n\n00:00.000 --> 00:02.000\nHola\n", "default": true },
+            { "lang": "en-GB", "label": "English (UK)", "vtt": "WEBVTT\n\n00:00.000 --> 00:02.000\nHello\n", "default": false }
+          ]
+        },
+        {
+          "id": "b8",
+          "x": 62,
+          "y": 10,
+          "w": 30,
+          "h": 30,
+          "html": "",
+          "kind": "image",
+          "src": "https://drive.sytue.eu/i/1.png",
+          "action": "next",
+          "groupId": "g1",
+          "anims": [
+            { "type": "fly", "order": 1 },
+            { "type": "motion-custom", "order": 2, "trigger": "after", "points": [{ "dx": 0, "dy": 0 }, { "dx": 12.5, "dy": -4 }] }
+          ]
+        },
+        {
+          "id": "b9",
+          "x": 62,
+          "y": 48,
+          "w": 30,
+          "h": 30,
+          "html": "<p>Vieja</p>",
+          "action": 1,
+          "anim": { "type": "fade", "order": 1 }
+        }
+      ],
+      "transition": "morph"
+    }
+  ],
+  "theme": "arena",
+  "themes": [
+    { "id": "custom-1", "name": "Cooperativa", "bg": "#F4F1EA", "ink": "#1B2A41", "font": "Georgia" },
+    { "id": "custom-2", "name": "Noche", "bg": "#0F1B2D", "ink": "#FFFFFF" }
+  ],
+  "master": {
+    "boxes": [{ "id": "m1", "x": 80, "y": 90, "w": 16, "h": 6, "html": "<p>{n} / {total}</p>" }],
+    "layouts": [
+      {
+        "id": "portada",
+        "name": "Portada",
+        "boxes": [{ "id": "p1", "x": 10, "y": 35, "w": 80, "h": 20, "html": "<h1>Título de la portada</h1>" }]
+      },
+      {
+        "id": "dos",
+        "name": "Dos columnas",
+        "boxes": [
+          { "id": "d1", "x": 8, "y": 8, "w": 84, "h": 16, "html": "<h1>Título</h1>" },
+          { "id": "d2", "x": 8, "y": 30, "w": 40, "h": 60, "html": "<p>Izquierda</p>" },
+          { "id": "d3", "x": 52, "y": 30, "w": 40, "h": 60, "html": "<p>Derecha</p>" }
+        ]
+      }
+    ]
+  },
+  "size": { "preset": "custom", "w": 33.87, "h": 19.05, "unit": "cm" }
+}

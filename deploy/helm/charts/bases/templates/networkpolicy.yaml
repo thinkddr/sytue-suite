@@ -1,0 +1,63 @@
+{{- if and .Values.enabled .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "sytue-bases.fullname" . }}
+  labels:
+    {{- include "sytue-bases.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "sytue-bases.selector" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Desde el ingress canónico (Traefik): `bases.<dominio>/api/v1`, para las apps
+    # nativas. Qué rutas salen lo decide el Ingress (solo `/api/v1`), no esta regla: una
+    # NetworkPolicy no sabe de rutas, y además la política base del umbrella ya admite a
+    # ese namespace en todos los pods.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              sytue.eu/role: ingress
+      ports:
+        - protocol: TCP
+          port: {{ .Values.service.targetPort }}
+    # Desde la suite: el BFF de la app web, el Hub y los consumidores del conector. Los
+    # formularios públicos (`/_bases/v1/forms`) y el conector de solo lectura
+    # (`/_bases/v1/connector`) no llevan sesión: entran por aquí y NO están en el Ingress.
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/part-of: sytue-one
+      ports:
+        - protocol: TCP
+          port: {{ .Values.service.targetPort }}
+  egress:
+    # DNS
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Intra-suite: Sytue ID (JWKS y directorio), el Hub (avisos) y PgBouncer.
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/part-of: sytue-one
+    # Postgres EXTERNO (RDB), Cockpit (OTLP) y el almacén de objetos de los adjuntos
+    # (S3 por 443). Nada más: Bases no llama a terceros.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 169.254.0.0/16
+      ports:
+        - protocol: TCP
+          port: 5432
+        - protocol: TCP
+          port: 443
+{{- end }}

@@ -1,0 +1,75 @@
+---
+/**
+ * Layout de Sytue Cast. Script de tema (sin flash), prefijo de la app para /api y
+ * /auth, iconos con su sufijo de caché, y el hueco para la isla raíz.
+ *
+ * `publica`: la portada, un canal y la página de un vídeo se abren SIN sesión, así
+ * que el guard no vive aquí sino en cada página que la exige (como en Photos, el
+ * redirect se RETORNA desde la página). `indexable` solo para lo que es público de
+ * verdad: la portada, un canal y un vídeo público; lo demás lleva `noindex`.
+ */
+import { APP_VIEWPORT, appDomains } from '@sytue/config';
+import { serverEnv } from '@sytue/auth/server';
+import '../styles/app.css';
+import { SUFIJO_ICONOS, basePathScript, themeInitScript, withBase } from '@sytue/ui';
+import { htmlLangAttrs } from '@sytue/i18n';
+
+interface Props {
+  title: string;
+  description?: string;
+  indexable?: boolean;
+  /** Imagen para las tarjetas al compartir (absoluta). */
+  imagen?: string | null;
+  /** URL canónica (absoluta) para las tarjetas al compartir. */
+  canonica?: string | null;
+}
+
+const { title, description, indexable = false, imagen = null, canonica = null } = Astro.props;
+const prefijo = serverEnv(import.meta.env).SYTUE_BASE_PATH ?? import.meta.env.BASE_URL;
+const { lang, dir } = htmlLangAttrs(Astro.locals.locale);
+---
+
+<!doctype html>
+<html lang={lang} dir={dir} class="h-full">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content={APP_VIEWPORT} />
+    <meta name="robots" content={indexable ? 'index, follow' : 'noindex, nofollow'} />
+    {description ? <meta name="description" content={description} /> : null}
+    <title>{title}</title>
+    {canonica ? <link rel="canonical" href={canonica} /> : null}
+    {indexable ? (
+      <>
+        <meta property="og:site_name" content="Sytue Cast" />
+        <meta property="og:title" content={title} />
+        {description ? <meta property="og:description" content={description} /> : null}
+        {canonica ? <meta property="og:url" content={canonica} /> : null}
+        {imagen ? <meta property="og:image" content={imagen} /> : null}
+        <meta name="twitter:card" content={imagen ? 'summary_large_image' : 'summary'} />
+      </>
+    ) : null}
+    <link rel="preconnect" href={appDomains.hub} crossorigin />
+    <link rel="icon" href={withBase(prefijo, '/favicon.ico') + SUFIJO_ICONOS} sizes="32x32" />
+    <link
+      rel="icon"
+      href={withBase(prefijo, '/favicon-64.png') + SUFIJO_ICONOS}
+      type="image/png"
+      sizes="64x64"
+    />
+    <link
+      rel="icon"
+      href={withBase(prefijo, '/favicon.svg') + SUFIJO_ICONOS}
+      type="image/svg+xml"
+    />
+    <link
+      rel="apple-touch-icon"
+      href={withBase(prefijo, '/apple-touch-icon.png') + SUFIJO_ICONOS}
+    />
+    <slot name="head" />
+    <script is:inline set:html={basePathScript(prefijo)}></script>
+    <script is:inline set:html={themeInitScript}></script>
+  </head>
+  <body class="bg-bg text-text h-full antialiased">
+    <slot name="app" />
+  </body>
+</html>

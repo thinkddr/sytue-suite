@@ -1,0 +1,4754 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+		044B2BBF3C893A843660D6A0 = {
+			fileRef = B899E16011D404AC806CAC42;
+			isa = PBXBuildFile;
+		};
+		05D90B62044B3EC4C3210038 = {
+			fileRef = 7D88E6F89B1AA92641A2357A;
+			isa = PBXBuildFile;
+		};
+		090439908A834FED2F4D6C6E = {
+			fileRef = 99BCFFFD4C49393862661B4C;
+			isa = PBXBuildFile;
+		};
+		0C4B3796702FCC6CA94C7716 = {
+			fileRef = 39DD8A0CB33503AE9CA4B825;
+			isa = PBXBuildFile;
+		};
+		0D9A6E84817EC9DB9DE9F209 = {
+			fileRef = 0329DE900086071AF357FB72;
+			isa = PBXBuildFile;
+		};
+		1639FB8BAEAEA8D1D84A4863 = {
+			fileRef = C5C45E2AD7B62CDBAEEB36B2;
+			isa = PBXBuildFile;
+		};
+		16E35E7151AE876450810611 = {
+			fileRef = 99BCFFFD4C49393862661B4C;
+			isa = PBXBuildFile;
+		};
+		1A9D2D4BD9ACA5E17ABBDCC3 = {
+			fileRef = 0C9C4195AE9C25B255FD18C5;
+			isa = PBXBuildFile;
+		};
+		2246F892302014F4C91E36BB = {
+			fileRef = C5C45E2AD7B62CDBAEEB36B2;
+			isa = PBXBuildFile;
+		};
+		273301F9D2238C9888F3BCFA = {
+			fileRef = 3BC364DC32D051EAB7B35DDA;
+			isa = PBXBuildFile;
+		};
+		276DA61F22C039064F01E7D2 = {
+			fileRef = 99BCFFFD4C49393862661B4C;
+			isa = PBXBuildFile;
+		};
+		283EE4E179507D8731AE711D = {
+			fileRef = B7AB8BF9FAF3106CA75C66E3;
+			isa = PBXBuildFile;
+		};
+		2910827A886FE410FF14750D = {
+			fileRef = 537260548F1E03C736D62990;
+			isa = PBXBuildFile;
+		};
+		2D0F1246E3ED952E221E2644 = {
+			fileRef = C5C45E2AD7B62CDBAEEB36B2;
+			isa = PBXBuildFile;
+		};
+		2EBB114E036F5F99A932ED4D = {
+			fileRef = 0134CD68D29C4085CE1DB6CA;
+			isa = PBXBuildFile;
+		};
+		2F85D1757B5B74F9AED3D447 = {
+			fileRef = DB08B1DA239CCA88CD945D84;
+			isa = PBXBuildFile;
+		};
+		3048D0803BEFFFBBEC346EDB = {
+			fileRef = 537260548F1E03C736D62990;
+			isa = PBXBuildFile;
+		};
+		346793275850D66A032CCA74 = {
+			fileRef = B7AB8BF9FAF3106CA75C66E3;
+			isa = PBXBuildFile;
+		};
+		384845A0313441A749187CE5 = {
+			fileRef = 5B6C2AB23F838FBF01510F06;
+			isa = PBXBuildFile;
+		};
+		38B70E39B8511A2FCAAEDE7D = {
+			fileRef = 0C9C4195AE9C25B255FD18C5;
+			isa = PBXBuildFile;
+		};
+		38DCE0EF50303FC94AD904DB = {
+			fileRef = 99BCFFFD4C49393862661B4C;
+			isa = PBXBuildFile;
+		};
+		3B55B4FA89E31F5EC15E3D1A = {
+			fileRef = 8380A44D092F260A3C780F53;
+			isa = PBXBuildFile;
+		};
+		3C179607F6596509CC3DC618 = {
+			fileRef = 99BCFFFD4C49393862661B4C;
+			isa = PBXBuildFile;
+		};
+		3EBDB7D1F142F356BB20A1CD = {
+			fileRef = B7AB8BF9FAF3106CA75C66E3;
+			isa = PBXBuildFile;
+		};
+		3FA252AC60C2559B50B87EDC = {
+			fileRef = C5C45E2AD7B62CDBAEEB36B2;
+			isa = PBXBuildFile;
+		};
+		417ECF5A97C2C214112DC790 = {
+			fileRef = B7AB8BF9FAF3106CA75C66E3;
+			isa = PBXBuildFile;
+		};
+		42228B12DB7C14E6DFCB560D = {
+			fileRef = 99BCFFFD4C49393862661B4C;
+			isa = PBXBuildFile;
+		};
+		42873FF78BD96FA660154C56 = {
+			fileRef = 32BBC57727F14AC7641A3DD3;
+			isa = PBXBuildFile;
+		};
+		4325B3E60F8E5D9C8858CF48 = {
+			fileRef = 1ADE6C21131CFD2496E90E32;
+			isa = PBXBuildFile;
+		};
+		4456EF280BCB5A481E672DA1 = {
+			fileRef = C5C45E2AD7B62CDBAEEB36B2;
+			isa = PBXBuildFile;
+		};
+		47934F5FA0D9CF80F7203333 = {
+			fileRef = DC103898193FCAA55EA569E2;
+			isa = PBXBuildFile;
+		};
+		4950A5A137901E34816220F6 = {
+			fileRef = FE0C6FFB9D4EB49061F392E0;
+			isa = PBXBuildFile;
+		};
+		4AC2068ED829BF4A2DF05357 = {
+			fileRef = 99BCFFFD4C49393862661B4C;
+			isa = PBXBuildFile;
+		};
+		4DA1E732AFCFBB7C5837529D = {
+			fileRef = 537260548F1E03C736D62990;
+			isa = PBXBuildFile;
+		};
+		4FE17D061F1C8ACE422AA4CD = {
+			fileRef = 75EE105A0174EEB73689345D;
+			isa = PBXBuildFile;
+		};
+		51D2C0FBA93091F0055D5A64 = {
+			fileRef = 7FC124E73CB477C8E0FA3CDB;
+			isa = PBXBuildFile;
+		};
+		54C58155D5124ED0A7213494 = {
+			fileRef = 537260548F1E03C736D62990;
+			isa = PBXBuildFile;
+		};
+		5BA6FB7DA3B8EE8F40F4A968 = {
+			fileRef = 99BCFFFD4C49393862661B4C;
+			isa = PBXBuildFile;
+		};
+		5D6E451B87E9B3E171BEC024 = {
+			fileRef = 0C9C4195AE9C25B255FD18C5;
+			isa = PBXBuildFile;
+		};
+		61D965FC6567ECA424F66943 = {
+			fileRef = 537260548F1E03C736D62990;
+			isa = PBXBuildFile;
+		};
+		62730A18A60D0A0DF95BA2DF = {
+			fileRef = B7AB8BF9FAF3106CA75C66E3;
+			isa = PBXBuildFile;
+		};
+		635D4C570F9DE15320C59FF5 = {
+			fileRef = 0C9C4195AE9C25B255FD18C5;
+			isa = PBXBuildFile;
+		};
+		68AB0366C60925BABEADDAF4 = {
+			fileRef = 494D58533E41B017D519249A;
+			isa = PBXBuildFile;
+		};
+		6A0FF5DDF9F75F5216D2F979 = {
+			fileRef = B7AB8BF9FAF3106CA75C66E3;
+			isa = PBXBuildFile;
+		};
+		6CABB314190BEEED6DCA9056 = {
+			fileRef = 537260548F1E03C736D62990;
+			isa = PBXBuildFile;
+		};
+		6D085D6C2FAA4A35F983E368 = {
+			fileRef = C5C45E2AD7B62CDBAEEB36B2;
+			isa = PBXBuildFile;
+		};
+		6DFD3A7F1B2A92A08E770AC7 = {
+			fileRef = B7AB8BF9FAF3106CA75C66E3;
+			isa = PBXBuildFile;
+		};
+		706DDA517CF4D0839C45AF7D = {
+			fileRef = 0C9C4195AE9C25B255FD18C5;
+			isa = PBXBuildFile;
+		};
+		70A9C476E0D6BB30C95198CB = {
+			fileRef = 99BCFFFD4C49393862661B4C;
+			isa = PBXBuildFile;
+		};
+		7108B58A6725E3FA3E335358 = {
+			fileRef = 0C9C4195AE9C25B255FD18C5;
+			isa = PBXBuildFile;
+		};
+		726EDAF7EDFFAEB37027A5FD = {
+			fileRef = 0C9C4195AE9C25B255FD18C5;
+			isa = PBXBuildFile;
+		};
+		74C08AA6CA2DDB589742EC6C = {
+			fileRef = 0C9C4195AE9C25B255FD18C5;
+			isa = PBXBuildFile;
+		};
+		7819338305A89922D21EC128 = {
+			fileRef = F3F4665779662816DDE5F676;
+			isa = PBXBuildFile;
+		};
+		78986F894EE8ED4F73B7031B = {
+			fileRef = 0C9C4195AE9C25B255FD18C5;
+			isa = PBXBuildFile;
+		};
+		79C29928707B8C485CD0190C = {
+			fileRef = 537260548F1E03C736D62990;
+			isa = PBXBuildFile;
+		};
+		85DE1B3B9A0F8DF2AAC04643 = {
+			fileRef = 6D343627CDA7A2C504FDE333;
+			isa = PBXBuildFile;
+		};
+		89C232429B05CC76D6822F14 = {
+			fileRef = 0C9C4195AE9C25B255FD18C5;
+			isa = PBXBuildFile;
+		};
+		89F3A532E0FEA929FB7E7757 = {
+			fileRef = 10697E5552CBC790C9EAF43C;
+			isa = PBXBuildFile;
+		};
+		8AAC904511866BEC107AFE10 = {
+			fileRef = 99BCFFFD4C49393862661B4C;
+			isa = PBXBuildFile;
+		};
+		8E5DF73CB4D77800284B6049 = {
+			fileRef = 1015BB1CE3A1E75A8B5270C6;
+			isa = PBXBuildFile;
+		};
+		8EE3ADCDF7E98CCA5B06E67D = {
+			fileRef = 33363A2F782AC752DA011D03;
+			isa = PBXBuildFile;
+		};
+		942FAD2BCBE37A395880AE43 = {
+			fileRef = 99BCFFFD4C49393862661B4C;
+			isa = PBXBuildFile;
+		};
+		967559358608448B582C58AD = {
+			fileRef = 6D3020E1BC6FA6B844C00A23;
+			isa = PBXBuildFile;
+		};
+		96EE5C004E1F4DA8B8899E28 = {
+			fileRef = B7AB8BF9FAF3106CA75C66E3;
+			isa = PBXBuildFile;
+		};
+		9A144A23C03089DC59945D95 = {
+			fileRef = 537260548F1E03C736D62990;
+			isa = PBXBuildFile;
+		};
+		9D6DBEEAC5CD0C0B79EE9912 = {
+			fileRef = 0C9C4195AE9C25B255FD18C5;
+			isa = PBXBuildFile;
+		};
+		A2A8D8B38CDB20A2E7D92471 = {
+			fileRef = C5C45E2AD7B62CDBAEEB36B2;
+			isa = PBXBuildFile;
+		};
+		A4EB05453AAAC1C8063EB5A3 = {
+			fileRef = 7D2E1CFC7710D2111DBA1FD3;
+			isa = PBXBuildFile;
+		};
+		A62B7D023A63EECE70A97A8A = {
+			fileRef = 0C9C4195AE9C25B255FD18C5;
+			isa = PBXBuildFile;
+		};
+		AA5A19F6CF28B8BD6313DFF5 = {
+			fileRef = 934CFD06DDABE331232325C3;
+			isa = PBXBuildFile;
+		};
+		AAC5E1210CFF5C491704FD75 = {
+			fileRef = B7AB8BF9FAF3106CA75C66E3;
+			isa = PBXBuildFile;
+		};
+		AC307F255573C19E1287AA02 = {
+			fileRef = 99BCFFFD4C49393862661B4C;
+			isa = PBXBuildFile;
+		};
+		AE8A1A55F6E48913B604E47C = {
+			fileRef = B7AB8BF9FAF3106CA75C66E3;
+			isa = PBXBuildFile;
+		};
+		AEBEA251AABA070683AF2620 = {
+			fileRef = C5F346890E8660EE77B4194F;
+			isa = PBXBuildFile;
+			settings = {
+				ATTRIBUTES = (
+					RemoveHeadersOnCopy,
+				);
+			};
+		};
+		B1A4719F61E63904F98603A7 = {
+			fileRef = C5C45E2AD7B62CDBAEEB36B2;
+			isa = PBXBuildFile;
+		};
+		B2C50D07A64E7619D1FCB570 = {
+			fileRef = C5C45E2AD7B62CDBAEEB36B2;
+			isa = PBXBuildFile;
+		};
+		B31940FBAC7AF83089CD65EB = {
+			fileRef = B7AB8BF9FAF3106CA75C66E3;
+			isa = PBXBuildFile;
+		};
+		B43FE5B516780DE367917BBC = {
+			fileRef = C5C45E2AD7B62CDBAEEB36B2;
+			isa = PBXBuildFile;
+		};
+		B6CB1A062D057760F1B1A761 = {
+			fileRef = C5C45E2AD7B62CDBAEEB36B2;
+			isa = PBXBuildFile;
+		};
+		B8ED74C394F6237723EFAF1B = {
+			fileRef = 537260548F1E03C736D62990;
+			isa = PBXBuildFile;
+		};
+		B9DBCFD31B5EA5CAAAC50D5F = {
+			fileRef = C5C45E2AD7B62CDBAEEB36B2;
+			isa = PBXBuildFile;
+		};
+		C323B772F8CC7B4A50FEE0BB = {
+			fileRef = C5C45E2AD7B62CDBAEEB36B2;
+			isa = PBXBuildFile;
+		};
+		C74C7E98436E173D4D4E2DD6 = {
+			fileRef = 0C9C4195AE9C25B255FD18C5;
+			isa = PBXBuildFile;
+		};
+		C7DB7D0EA7FA86654B6134A0 = {
+			fileRef = 6590C48B333D98558B31F777;
+			isa = PBXBuildFile;
+		};
+		CACE6499D150266DE2650120 = {
+			fileRef = 537260548F1E03C736D62990;
+			isa = PBXBuildFile;
+		};
+		CB4CF6ED7801FF8DACC01318 = {
+			fileRef = 537260548F1E03C736D62990;
+			isa = PBXBuildFile;
+		};
+		CBF7FE14E4C9CCFDA6BCC9D3 = {
+			fileRef = 5E66CE67F6A018FEA336F379;
+			isa = PBXBuildFile;
+		};
+		CD9D24EC3F230D184A98BDAC = {
+			fileRef = 537260548F1E03C736D62990;
+			isa = PBXBuildFile;
+		};
+		CDDB4124F5638B00FBCD8CD0 = {
+			fileRef = 5AD11396492DC2713A925C5D;
+			isa = PBXBuildFile;
+		};
+		CEFCB5757C9F405ABBD83408 = {
+			fileRef = 298C2F47E9E1A6F528F6DC75;
+			isa = PBXBuildFile;
+		};
+		D013CA3553437D1C2D6B3726 = {
+			fileRef = B7AB8BF9FAF3106CA75C66E3;
+			isa = PBXBuildFile;
+		};
+		D36E1F5ABCBE00318E52B9FB = {
+			fileRef = 21EF2BBA9464FB203F2E4EE1;
+			isa = PBXBuildFile;
+		};
+		D942158D2A1187C28E0CC351 = {
+			fileRef = 99BCFFFD4C49393862661B4C;
+			isa = PBXBuildFile;
+		};
+		DBB054198E9A1FF77939D579 = {
+			fileRef = C5C45E2AD7B62CDBAEEB36B2;
+			isa = PBXBuildFile;
+		};
+		DC9004D31C76468C5B0DDCF5 = {
+			fileRef = B7AB8BF9FAF3106CA75C66E3;
+			isa = PBXBuildFile;
+		};
+		DD40DDE6526474C414C7D202 = {
+			fileRef = 0C9C4195AE9C25B255FD18C5;
+			isa = PBXBuildFile;
+		};
+		DFB0A00AB33F8891BD77B5E0 = {
+			fileRef = 06D440E1FCA6EDC85C85909A;
+			isa = PBXBuildFile;
+		};
+		E7EF426E3F72102F5DA9B0C3 = {
+			fileRef = 99BCFFFD4C49393862661B4C;
+			isa = PBXBuildFile;
+		};
+		EA1D3EE5FEF45EB0AC9CB6FB = {
+			fileRef = B7AB8BF9FAF3106CA75C66E3;
+			isa = PBXBuildFile;
+		};
+		ECF8BB8C798D1935CBDC5432 = {
+			fileRef = C5C45E2AD7B62CDBAEEB36B2;
+			isa = PBXBuildFile;
+		};
+		F1EFD4BE5FA294BFC119B61F = {
+			fileRef = C91B5759BECBE23E89501059;
+			isa = PBXBuildFile;
+		};
+		F67BD8EE77EE430707E807FA = {
+			fileRef = 537260548F1E03C736D62990;
+			isa = PBXBuildFile;
+		};
+		F88583C3E2627A67BF11A2F3 = {
+			fileRef = 96CA1EACAA25AE4C70F80889;
+			isa = PBXBuildFile;
+		};
+		F89FACB57204BE80C8863C53 = {
+			fileRef = 99BCFFFD4C49393862661B4C;
+			isa = PBXBuildFile;
+		};
+		FADD1AB216007DC30496631C = {
+			fileRef = B7AB8BF9FAF3106CA75C66E3;
+			isa = PBXBuildFile;
+		};
+		FC86DC96BCB7B7F0E7814879 = {
+			fileRef = 537260548F1E03C736D62990;
+			isa = PBXBuildFile;
+		};
+		FF7CFC50AF892F4AAD8B7DFD = {
+			fileRef = 0C9C4195AE9C25B255FD18C5;
+			isa = PBXBuildFile;
+		};
+		FFE208335C65466B5E12AF8F = {
+			fileRef = 537260548F1E03C736D62990;
+			isa = PBXBuildFile;
+		};
+		DB841A544DC75D3966AE1710 = {
+			containerPortal = 7B6581EE30595C57D6133265;
+			isa = PBXContainerItemProxy;
+			proxyType = 1;
+			remoteGlobalIDString = 26FA2B47A8C639F4FA71C9B5;
+			remoteInfo = "drive-archivos";
+		};
+		03BDC5E738827D3588B7B9C2 = {
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				AEBEA251AABA070683AF2620,
+			);
+			isa = PBXCopyFilesBuildPhase;
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		0134CD68D29C4085CE1DB6CA = {
+			isa = PBXFileReference;
+			lastKnownFileType = image.png;
+			path = ../../cmd/erp/Icon.png;
+			sourceTree = "<group>";
+		};
+		02F6BE639529171C5FF425D2 = {
+			explicitFileType = "wrapper.app-extension";
+			includeInIndex = 0;
+			isa = PBXFileReference;
+			path = "Sytue-erp-Widgets.appex";
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		0329DE900086071AF357FB72 = {
+			isa = PBXFileReference;
+			lastKnownFileType = image.png;
+			path = ../../cmd/notes/Icon.png;
+			sourceTree = "<group>";
+		};
+		035A29B550F37EB41788B4D0 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.xml;
+			path = widgets/Info.plist;
+			sourceTree = "<group>";
+		};
+		0367CE6A6274292999DC6798 = {
+			explicitFileType = wrapper.application;
+			includeInIndex = 0;
+			isa = PBXFileReference;
+			path = "Sytue Rooms.app";
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		053F5F89B2DA1F37CE885701 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = widgets/ios.entitlements;
+			sourceTree = "<group>";
+		};
+		0554D14727D930DA1F946A43 = {
+			explicitFileType = "wrapper.app-extension";
+			includeInIndex = 0;
+			isa = PBXFileReference;
+			path = "Sytue-drive-Widgets.appex";
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		0692519CEF693D7A58CA2037 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.xml;
+			name = ro;
+			path = locales/ro.lproj/Localizable.stringsdict;
+			sourceTree = "<group>";
+		};
+		06D440E1FCA6EDC85C85909A = {
+			isa = PBXFileReference;
+			lastKnownFileType = folder.iconcomposer.icon;
+			path = AppIcon.icon;
+			sourceTree = "<group>";
+		};
+		0913603E5C3409122C99931B = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = widgets/ios.entitlements;
+			sourceTree = "<group>";
+		};
+		096CA058F72ABC97C1E1928D = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.xml;
+			path = widgets/Info.plist;
+			sourceTree = "<group>";
+		};
+		0A2D13B12F39B39988860864 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = widgets/macos.entitlements;
+			sourceTree = "<group>";
+		};
+		0C48C2DD8379EE82EFFA365A = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.strings;
+			name = fr;
+			path = locales/fr.lproj/Localizable.strings;
+			sourceTree = "<group>";
+		};
+		0C9C4195AE9C25B255FD18C5 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.xml;
+			path = PrivacyInfo.xcprivacy;
+			sourceTree = "<group>";
+		};
+		0E7D8DC057B95BBFF9E1810B = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.xml;
+			path = "Info-ios.plist";
+			sourceTree = "<group>";
+		};
+		1015BB1CE3A1E75A8B5270C6 = {
+			isa = PBXFileReference;
+			lastKnownFileType = folder.iconcomposer.icon;
+			path = AppIcon.icon;
+			sourceTree = "<group>";
+		};
+		10697E5552CBC790C9EAF43C = {
+			isa = PBXFileReference;
+			lastKnownFileType = folder.iconcomposer.icon;
+			path = AppIcon.icon;
+			sourceTree = "<group>";
+		};
+		128B13569F6253A33E134500 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = widgets/macos.entitlements;
+			sourceTree = "<group>";
+		};
+		130CB88F7262AD4A6CD44C90 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.strings;
+			name = hr;
+			path = locales/hr.lproj/Localizable.strings;
+			sourceTree = "<group>";
+		};
+		135DCE7E76750246B4A2E5E4 = {
+			explicitFileType = wrapper.application;
+			includeInIndex = 0;
+			isa = PBXFileReference;
+			path = "Sytue ERP.app";
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		15DB5D7876615A98FAD15E46 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = widgets/ios.entitlements;
+			sourceTree = "<group>";
+		};
+		16EE107058259F5C026CA863 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.strings;
+			name = de;
+			path = locales/de.lproj/Localizable.strings;
+			sourceTree = "<group>";
+		};
+		1ADE6C21131CFD2496E90E32 = {
+			isa = PBXFileReference;
+			lastKnownFileType = image.png;
+			path = ../../cmd/mail/Icon.png;
+			sourceTree = "<group>";
+		};
+		1BD786C9A44A1C59A383BC56 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = tienda.entitlements;
+			sourceTree = "<group>";
+		};
+		1CA7CA234171B3C3ED15D39D = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = ios.entitlements;
+			sourceTree = "<group>";
+		};
+		1CC6328102BCF8AFB68B220B = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.xml;
+			name = fr;
+			path = locales/fr.lproj/Localizable.stringsdict;
+			sourceTree = "<group>";
+		};
+		1D38518CDD4F019E3BCAF315 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = tienda.entitlements;
+			sourceTree = "<group>";
+		};
+		1FE936E0401B694B1EF9F88A = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = ios.entitlements;
+			sourceTree = "<group>";
+		};
+		2063DE4CBA4D6CE860B88AFE = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = tienda.entitlements;
+			sourceTree = "<group>";
+		};
+		21389B72E1E1FE6A29B1D834 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.xml;
+			name = hu;
+			path = locales/hu.lproj/Localizable.stringsdict;
+			sourceTree = "<group>";
+		};
+		21EF2BBA9464FB203F2E4EE1 = {
+			isa = PBXFileReference;
+			lastKnownFileType = image.png;
+			path = ../../cmd/certipdf/Icon.png;
+			sourceTree = "<group>";
+		};
+		2331385AA56F5B5F644FE25C = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.strings;
+			name = sv;
+			path = locales/sv.lproj/Localizable.strings;
+			sourceTree = "<group>";
+		};
+		298C2F47E9E1A6F528F6DC75 = {
+			isa = PBXFileReference;
+			lastKnownFileType = folder.iconcomposer.icon;
+			path = AppIcon.icon;
+			sourceTree = "<group>";
+		};
+		2AF58A8A5348BCF9C2DA747B = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = tienda.entitlements;
+			sourceTree = "<group>";
+		};
+		2E2E4AF59D12F9DCE79B8C5F = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.xml;
+			path = "Info-macos.plist";
+			sourceTree = "<group>";
+		};
+		32BBC57727F14AC7641A3DD3 = {
+			isa = PBXFileReference;
+			lastKnownFileType = image.png;
+			path = ../../cmd/rooms/Icon.png;
+			sourceTree = "<group>";
+		};
+		33363A2F782AC752DA011D03 = {
+			isa = PBXFileReference;
+			lastKnownFileType = folder.iconcomposer.icon;
+			path = AppIcon.icon;
+			sourceTree = "<group>";
+		};
+		33828DAFCA36F745AC73AA09 = {
+			explicitFileType = "wrapper.app-extension";
+			includeInIndex = 0;
+			isa = PBXFileReference;
+			path = "Sytue-cast-Widgets.appex";
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		33E9A64412996F717A19E03C = {
+			explicitFileType = "wrapper.app-extension";
+			includeInIndex = 0;
+			isa = PBXFileReference;
+			path = "Sytue-calcus-Widgets.appex";
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		375065B9BBC60111ADD2CAD3 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = tienda.entitlements;
+			sourceTree = "<group>";
+		};
+		390A2CFB2175622FC17DB059 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = widgets/ios.entitlements;
+			sourceTree = "<group>";
+		};
+		398BD606E0CFA13D05323ECD = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = ios.entitlements;
+			sourceTree = "<group>";
+		};
+		39DD8A0CB33503AE9CA4B825 = {
+			isa = PBXFileReference;
+			lastKnownFileType = folder.iconcomposer.icon;
+			path = AppIcon.icon;
+			sourceTree = "<group>";
+		};
+		3BC364DC32D051EAB7B35DDA = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = Puente.swift;
+			sourceTree = "<group>";
+		};
+		3C5829931C3C1A881B36055F = {
+			explicitFileType = "wrapper.app-extension";
+			includeInIndex = 0;
+			isa = PBXFileReference;
+			path = "Sytue-calendar-Widgets.appex";
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		3D3FD866C0DA57718D2F58B8 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = widgets/ios.entitlements;
+			sourceTree = "<group>";
+		};
+		3DBC73E219D7E9352FAF2B9F = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.strings;
+			name = el;
+			path = locales/el.lproj/Localizable.strings;
+			sourceTree = "<group>";
+		};
+		3E205BB21FCADEED54CDD505 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = tienda.entitlements;
+			sourceTree = "<group>";
+		};
+		4098CAE3E6A020A70A6DE36C = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = ios.entitlements;
+			sourceTree = "<group>";
+		};
+		4251EC1E99C65CF8B820E427 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = ios.entitlements;
+			sourceTree = "<group>";
+		};
+		4582BF030622666F41AF0C74 = {
+			explicitFileType = "wrapper.app-extension";
+			includeInIndex = 0;
+			isa = PBXFileReference;
+			path = "Sytue-notes-Widgets.appex";
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		45D245D78E7AEB7008097A8B = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = tienda.entitlements;
+			sourceTree = "<group>";
+		};
+		465C7B8A68229364142A9C98 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = tienda.entitlements;
+			sourceTree = "<group>";
+		};
+		476325AF68535334A1536FBB = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.xml;
+			name = fi;
+			path = locales/fi.lproj/Localizable.stringsdict;
+			sourceTree = "<group>";
+		};
+		4774E3E026C40878E65C71DC = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.xml;
+			name = sl;
+			path = locales/sl.lproj/Localizable.stringsdict;
+			sourceTree = "<group>";
+		};
+		48EDACDA7B5547C6DB325919 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = widgets/macos.entitlements;
+			sourceTree = "<group>";
+		};
+		491BFAD79361AC0511AF264A = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.xml;
+			name = mt;
+			path = locales/mt.lproj/Localizable.stringsdict;
+			sourceTree = "<group>";
+		};
+		494D58533E41B017D519249A = {
+			isa = PBXFileReference;
+			lastKnownFileType = folder.iconcomposer.icon;
+			path = AppIcon.icon;
+			sourceTree = "<group>";
+		};
+		4A91F842B128F0DBD49C94C4 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.strings;
+			name = pl;
+			path = locales/pl.lproj/Localizable.strings;
+			sourceTree = "<group>";
+		};
+		4B2C9153C4E13A235F892FE8 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.xml;
+			name = lt;
+			path = locales/lt.lproj/Localizable.stringsdict;
+			sourceTree = "<group>";
+		};
+		4B8C47AAA9AB7AEE65FFE3FF = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.strings;
+			name = sl;
+			path = locales/sl.lproj/Localizable.strings;
+			sourceTree = "<group>";
+		};
+		4E33C91F80929A9A02CC6ABE = {
+			explicitFileType = "wrapper.app-extension";
+			includeInIndex = 0;
+			isa = PBXFileReference;
+			path = "Sytue-certipdf-Widgets.appex";
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		4EC9F3A93259763A8F9B315F = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.strings;
+			name = lv;
+			path = locales/lv.lproj/Localizable.strings;
+			sourceTree = "<group>";
+		};
+		5214480F84EDEAE34F35DC87 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.strings;
+			name = fi;
+			path = locales/fi.lproj/Localizable.strings;
+			sourceTree = "<group>";
+		};
+		537260548F1E03C736D62990 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = Snapshot.swift;
+			sourceTree = "<group>";
+		};
+		542EBB6CAAE5FF2E8E106C02 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.strings;
+			name = nb;
+			path = locales/nb.lproj/Localizable.strings;
+			sourceTree = "<group>";
+		};
+		57F8CAD851A322590A62272E = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.xml;
+			path = widgets/Info.plist;
+			sourceTree = "<group>";
+		};
+		5AD11396492DC2713A925C5D = {
+			isa = PBXFileReference;
+			lastKnownFileType = image.png;
+			path = ../../cmd/bases/Icon.png;
+			sourceTree = "<group>";
+		};
+		5B6C2AB23F838FBF01510F06 = {
+			isa = PBXFileReference;
+			lastKnownFileType = folder.iconcomposer.icon;
+			path = AppIcon.icon;
+			sourceTree = "<group>";
+		};
+		5BBB15C4DAD97EA026F40308 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.strings;
+			name = es;
+			path = locales/es.lproj/Localizable.strings;
+			sourceTree = "<group>";
+		};
+		5BF8565CDE2A10879AD9D2E3 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.strings;
+			name = ro;
+			path = locales/ro.lproj/Localizable.strings;
+			sourceTree = "<group>";
+		};
+		5E3349ABAA41FE41CA8D9D10 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = archivos/macos.entitlements;
+			sourceTree = "<group>";
+		};
+		5E66CE67F6A018FEA336F379 = {
+			isa = PBXFileReference;
+			lastKnownFileType = image.png;
+			path = ../../cmd/docus/Icon.png;
+			sourceTree = "<group>";
+		};
+		642AEF1FAA438DC47C405AC6 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.strings;
+			name = nl;
+			path = locales/nl.lproj/Localizable.strings;
+			sourceTree = "<group>";
+		};
+		64B018ED028FF6E0616849C7 = {
+			explicitFileType = wrapper.application;
+			includeInIndex = 0;
+			isa = PBXFileReference;
+			path = "Sytue Photos.app";
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		64F6B4AA4BED47A7FFC7D503 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = widgets/ios.entitlements;
+			sourceTree = "<group>";
+		};
+		6590C48B333D98558B31F777 = {
+			isa = PBXFileReference;
+			lastKnownFileType = image.png;
+			path = ../../cmd/cast/Icon.png;
+			sourceTree = "<group>";
+		};
+		666C2D3582D26D52363B705E = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = ios.entitlements;
+			sourceTree = "<group>";
+		};
+		671D748E14D16122B8877227 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = ios.entitlements;
+			sourceTree = "<group>";
+		};
+		6A55FC72D717F9B425527348 = {
+			explicitFileType = wrapper.application;
+			includeInIndex = 0;
+			isa = PBXFileReference;
+			path = "Sytue CertiPDF.app";
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		6A9B844FE9AEE3F0FFC62167 = {
+			explicitFileType = wrapper.application;
+			includeInIndex = 0;
+			isa = PBXFileReference;
+			path = "Sytue Contacts.app";
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		6AF628445FE652D0A5FAE1C0 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = widgets/macos.entitlements;
+			sourceTree = "<group>";
+		};
+		6C4DDEBC0D806ADAC4DF0EEA = {
+			explicitFileType = "wrapper.app-extension";
+			includeInIndex = 0;
+			isa = PBXFileReference;
+			path = "Sytue-rooms-Widgets.appex";
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		6C73A6326D8BE9222AA072C8 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = tienda.entitlements;
+			sourceTree = "<group>";
+		};
+		6D3020E1BC6FA6B844C00A23 = {
+			isa = PBXFileReference;
+			lastKnownFileType = folder.iconcomposer.icon;
+			path = AppIcon.icon;
+			sourceTree = "<group>";
+		};
+		6D343627CDA7A2C504FDE333 = {
+			isa = PBXFileReference;
+			lastKnownFileType = folder.iconcomposer.icon;
+			path = AppIcon.icon;
+			sourceTree = "<group>";
+		};
+		6E29171EBECA223C8ABE815A = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = ios.entitlements;
+			sourceTree = "<group>";
+		};
+		6EF72787472F3872090724B6 = {
+			explicitFileType = wrapper.application;
+			includeInIndex = 0;
+			isa = PBXFileReference;
+			path = "Sytue Hub.app";
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		6FBFEBE79F4AF6F9D28A1AD5 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = widgets/ios.entitlements;
+			sourceTree = "<group>";
+		};
+		71BCA059B5C5390A9A8A2E09 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = widgets/ios.entitlements;
+			sourceTree = "<group>";
+		};
+		729F22B4965821E558C40177 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.xml;
+			name = hr;
+			path = locales/hr.lproj/Localizable.stringsdict;
+			sourceTree = "<group>";
+		};
+		74CDE4CFE28F715C1EB95497 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.xcconfig;
+			path = Sytue.xcconfig;
+			sourceTree = "<group>";
+		};
+		75AED28DDCCB870658C241EA = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = ios.entitlements;
+			sourceTree = "<group>";
+		};
+		75EE105A0174EEB73689345D = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = Proveedor.swift;
+			sourceTree = "<group>";
+		};
+		7843A6CFB0C39758711E3423 = {
+			explicitFileType = "wrapper.app-extension";
+			includeInIndex = 0;
+			isa = PBXFileReference;
+			path = "Sytue-mail-Widgets.appex";
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		7A7402F59BB0A891EF9AF3A7 = {
+			explicitFileType = "wrapper.app-extension";
+			includeInIndex = 0;
+			isa = PBXFileReference;
+			path = "Sytue-diapos-Widgets.appex";
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		7C1F8D3E3A4BC53D36362924 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.xml;
+			name = bg;
+			path = locales/bg.lproj/Localizable.stringsdict;
+			sourceTree = "<group>";
+		};
+		7C88A446A443F4CE83E252A4 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = ios.entitlements;
+			sourceTree = "<group>";
+		};
+		7D2E1CFC7710D2111DBA1FD3 = {
+			isa = PBXFileReference;
+			lastKnownFileType = image.png;
+			path = ../../cmd/photos/Icon.png;
+			sourceTree = "<group>";
+		};
+		7D88E6F89B1AA92641A2357A = {
+			isa = PBXFileReference;
+			lastKnownFileType = folder.iconcomposer.icon;
+			path = AppIcon.icon;
+			sourceTree = "<group>";
+		};
+		7FC124E73CB477C8E0FA3CDB = {
+			isa = PBXFileReference;
+			lastKnownFileType = image.png;
+			path = ../../cmd/calendar/Icon.png;
+			sourceTree = "<group>";
+		};
+		80175A5ECC9022D7FD2DD4DE = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.xml;
+			name = nb;
+			path = locales/nb.lproj/Localizable.stringsdict;
+			sourceTree = "<group>";
+		};
+		8073591D9BEE3307F22A6EAC = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.strings;
+			name = en;
+			path = locales/en.lproj/Localizable.strings;
+			sourceTree = "<group>";
+		};
+		812F6BE29BC45FC8AA07874E = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.xml;
+			name = de;
+			path = locales/de.lproj/Localizable.stringsdict;
+			sourceTree = "<group>";
+		};
+		82862B1E25474CF1E3FC196E = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.strings;
+			name = mt;
+			path = locales/mt.lproj/Localizable.strings;
+			sourceTree = "<group>";
+		};
+		8380A44D092F260A3C780F53 = {
+			isa = PBXFileReference;
+			lastKnownFileType = folder.iconcomposer.icon;
+			path = AppIcon.icon;
+			sourceTree = "<group>";
+		};
+		8676E0B97EBD3E5887D4EA81 = {
+			explicitFileType = wrapper.application;
+			includeInIndex = 0;
+			isa = PBXFileReference;
+			path = "Sytue Calcus.app";
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		89BDF058D83A0FC7638466BD = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.xml;
+			name = pl;
+			path = locales/pl.lproj/Localizable.stringsdict;
+			sourceTree = "<group>";
+		};
+		8AE25D6A80AB83F66D265590 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.xml;
+			name = da;
+			path = locales/da.lproj/Localizable.stringsdict;
+			sourceTree = "<group>";
+		};
+		934CFD06DDABE331232325C3 = {
+			isa = PBXFileReference;
+			lastKnownFileType = image.png;
+			path = ../../cmd/calcus/Icon.png;
+			sourceTree = "<group>";
+		};
+		93D9A4FB1917D41D8B8A420F = {
+			explicitFileType = "wrapper.app-extension";
+			includeInIndex = 0;
+			isa = PBXFileReference;
+			path = "Sytue-contacts-Widgets.appex";
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		9576D0B3B3E85D4750802290 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = tienda.entitlements;
+			sourceTree = "<group>";
+		};
+		96CA1EACAA25AE4C70F80889 = {
+			isa = PBXFileReference;
+			lastKnownFileType = image.png;
+			path = ../../cmd/hub/Icon.png;
+			sourceTree = "<group>";
+		};
+		97BE80E7D4CA86BAB355872B = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.xml;
+			name = el;
+			path = locales/el.lproj/Localizable.stringsdict;
+			sourceTree = "<group>";
+		};
+		97EDF7BCE7EBD7373C00F5D7 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = tienda.entitlements;
+			sourceTree = "<group>";
+		};
+		98EAC928D85492A5C9F0479B = {
+			explicitFileType = wrapper.application;
+			includeInIndex = 0;
+			isa = PBXFileReference;
+			path = "Sytue Diapos.app";
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		998F2D180E5B7A3EB2AC6D42 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.xml;
+			name = et;
+			path = locales/et.lproj/Localizable.stringsdict;
+			sourceTree = "<group>";
+		};
+		99BCFFFD4C49393862661B4C = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = Widgets.swift;
+			sourceTree = "<group>";
+		};
+		9A7B27000655867FCCDFD9CA = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = archivos/ios.entitlements;
+			sourceTree = "<group>";
+		};
+		9B2EAD408EA2237709459FF3 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.strings;
+			name = cs;
+			path = locales/cs.lproj/Localizable.strings;
+			sourceTree = "<group>";
+		};
+		9CA6931ED3272A5F680372DA = {
+			explicitFileType = wrapper.application;
+			includeInIndex = 0;
+			isa = PBXFileReference;
+			path = "Sytue Mail.app";
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		9CC656AA7BA44481A576B6AD = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.xml;
+			path = widgets/Info.plist;
+			sourceTree = "<group>";
+		};
+		9DEC49C30DE397EFECAC517E = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.strings;
+			name = da;
+			path = locales/da.lproj/Localizable.strings;
+			sourceTree = "<group>";
+		};
+		9E32DB0A9259439871872319 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.strings;
+			name = et;
+			path = locales/et.lproj/Localizable.strings;
+			sourceTree = "<group>";
+		};
+		9ED6A08CA5186DF237D33B09 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.xml;
+			name = it;
+			path = locales/it.lproj/Localizable.stringsdict;
+			sourceTree = "<group>";
+		};
+		A00653032AD13938F7A97254 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.xml;
+			name = cs;
+			path = locales/cs.lproj/Localizable.stringsdict;
+			sourceTree = "<group>";
+		};
+		A00C1E65F1B0FAE79BB8E25E = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.xml;
+			name = lv;
+			path = locales/lv.lproj/Localizable.stringsdict;
+			sourceTree = "<group>";
+		};
+		A3874F94EB40F7F1B8E0FAAE = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.strings;
+			name = ga;
+			path = locales/ga.lproj/Localizable.strings;
+			sourceTree = "<group>";
+		};
+		A39569FC9C7340612E758960 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = widgets/macos.entitlements;
+			sourceTree = "<group>";
+		};
+		A3CFD0C9259877EA388591B9 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = widgets/macos.entitlements;
+			sourceTree = "<group>";
+		};
+		A5895ECB5A3675A109478A2A = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.strings;
+			name = bg;
+			path = locales/bg.lproj/Localizable.strings;
+			sourceTree = "<group>";
+		};
+		A873764A21CC15F2E644F221 = {
+			explicitFileType = "wrapper.app-extension";
+			includeInIndex = 0;
+			isa = PBXFileReference;
+			path = "Sytue-bases-Widgets.appex";
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		AAF4219D5E1CA3F0E4BEEA7F = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.xml;
+			name = en;
+			path = locales/en.lproj/Localizable.stringsdict;
+			sourceTree = "<group>";
+		};
+		ACFDF13B1C397098C92B3F83 = {
+			explicitFileType = wrapper.application;
+			includeInIndex = 0;
+			isa = PBXFileReference;
+			path = "Sytue Bases.app";
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		AE861445B1E3E3F28F4BE529 = {
+			explicitFileType = wrapper.application;
+			includeInIndex = 0;
+			isa = PBXFileReference;
+			path = "Sytue Cast.app";
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		AF37333825D9088295EB9C8B = {
+			explicitFileType = "wrapper.app-extension";
+			includeInIndex = 0;
+			isa = PBXFileReference;
+			path = "Sytue-docus-Widgets.appex";
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		AFA4CDFA9226081B8636A12D = {
+			explicitFileType = wrapper.application;
+			includeInIndex = 0;
+			isa = PBXFileReference;
+			path = "Sytue Calendar.app";
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		B0661EA557F4802E55048624 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.strings;
+			name = hu;
+			path = locales/hu.lproj/Localizable.strings;
+			sourceTree = "<group>";
+		};
+		B7A1A1026D6329CC11C5CF06 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = tienda.entitlements;
+			sourceTree = "<group>";
+		};
+		B899E16011D404AC806CAC42 = {
+			isa = PBXFileReference;
+			lastKnownFileType = folder.iconcomposer.icon;
+			path = AppIcon.icon;
+			sourceTree = "<group>";
+		};
+		B9106839592669D273280B83 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.xml;
+			path = widgets/Info.plist;
+			sourceTree = "<group>";
+		};
+		BADBD76EBBD19FC992FD910C = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.xml;
+			path = widgets/Info.plist;
+			sourceTree = "<group>";
+		};
+		BBBD34C73DFAA5B36EC4C16C = {
+			explicitFileType = "wrapper.app-extension";
+			includeInIndex = 0;
+			isa = PBXFileReference;
+			path = "Sytue-photos-Widgets.appex";
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		BC4B1494E3FA7B2CFF2943D2 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.xml;
+			path = archivos/Info.plist;
+			sourceTree = "<group>";
+		};
+		BED0EEEE763680CA54B76388 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = ios.entitlements;
+			sourceTree = "<group>";
+		};
+		C0364B853A49157D661D0C69 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = widgets/ios.entitlements;
+			sourceTree = "<group>";
+		};
+		C06280201005586BC9D22862 = {
+			explicitFileType = wrapper.application;
+			includeInIndex = 0;
+			isa = PBXFileReference;
+			path = "Sytue Drive.app";
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		C0B81F3448E5CFB7DE90D4D2 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.xml;
+			name = ga;
+			path = locales/ga.lproj/Localizable.stringsdict;
+			sourceTree = "<group>";
+		};
+		C1F41500CF6E05E475A2E126 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = tienda.entitlements;
+			sourceTree = "<group>";
+		};
+		C297B013F7F196276A9F77BE = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = widgets/ios.entitlements;
+			sourceTree = "<group>";
+		};
+		C2EB9A020A83B228BF3FAB04 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.strings;
+			name = sk;
+			path = locales/sk.lproj/Localizable.strings;
+			sourceTree = "<group>";
+		};
+		C41E75BC6AE24DD66FBABCC6 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = ios.entitlements;
+			sourceTree = "<group>";
+		};
+		C44F45E202A652F4271F91DF = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.xml;
+			path = "Puente-Info.plist";
+			sourceTree = "<group>";
+		};
+		C5F346890E8660EE77B4194F = {
+			explicitFileType = "wrapper.app-extension";
+			includeInIndex = 0;
+			isa = PBXFileReference;
+			path = Archivos.appex;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		C91B5759BECBE23E89501059 = {
+			isa = PBXFileReference;
+			lastKnownFileType = image.png;
+			path = ../../cmd/contacts/Icon.png;
+			sourceTree = "<group>";
+		};
+		C97EB7ECD90B0B9509A0556E = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.xml;
+			name = nl;
+			path = locales/nl.lproj/Localizable.stringsdict;
+			sourceTree = "<group>";
+		};
+		C9B2EBA2C5A8DD2E982CF376 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = widgets/ios.entitlements;
+			sourceTree = "<group>";
+		};
+		CBA91E9FB64052BC52343259 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = ios.entitlements;
+			sourceTree = "<group>";
+		};
+		CD1F622C72746AED0AD7EEED = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = widgets/macos.entitlements;
+			sourceTree = "<group>";
+		};
+		CE4E9414FB5605A7DDD98AD8 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = ios.entitlements;
+			sourceTree = "<group>";
+		};
+		CE7CD50ED5F40198AF4B55ED = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.xml;
+			path = widgets/Info.plist;
+			sourceTree = "<group>";
+		};
+		CE7D3F642542BE4970DB6067 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = tienda.entitlements;
+			sourceTree = "<group>";
+		};
+		CEFC0B574BBBC1B5C73C83DD = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = widgets/macos.entitlements;
+			sourceTree = "<group>";
+		};
+		CFB20C1A6627680DA6246B00 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = widgets/ios.entitlements;
+			sourceTree = "<group>";
+		};
+		D1D3856BF97A9E370D239995 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.xml;
+			path = widgets/Info.plist;
+			sourceTree = "<group>";
+		};
+		D508F1AD7B591D7DDE7BBD3A = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = widgets/macos.entitlements;
+			sourceTree = "<group>";
+		};
+		D591B5A98B2F57FFB27EABFF = {
+			explicitFileType = wrapper.application;
+			includeInIndex = 0;
+			isa = PBXFileReference;
+			path = "Sytue Docus.app";
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		D7014C2B343D9ED08C32753E = {
+			explicitFileType = "wrapper.app-extension";
+			includeInIndex = 0;
+			isa = PBXFileReference;
+			path = "Sytue-hub-Widgets.appex";
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		DA45B58E042CAB72DD432D43 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.xml;
+			path = widgets/Info.plist;
+			sourceTree = "<group>";
+		};
+		DAD3A2608E45322167371C14 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.xml;
+			name = sk;
+			path = locales/sk.lproj/Localizable.stringsdict;
+			sourceTree = "<group>";
+		};
+		DB08B1DA239CCA88CD945D84 = {
+			isa = PBXFileReference;
+			lastKnownFileType = image.png;
+			path = ../../cmd/diapos/Icon.png;
+			sourceTree = "<group>";
+		};
+		DC103898193FCAA55EA569E2 = {
+			isa = PBXFileReference;
+			lastKnownFileType = image.png;
+			path = ../../cmd/drive/Icon.png;
+			sourceTree = "<group>";
+		};
+		DDB9C76D0AED3214DEBC1AB3 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = widgets/macos.entitlements;
+			sourceTree = "<group>";
+		};
+		DE44BA8126A12179BF31B1E2 = {
+			explicitFileType = wrapper.framework;
+			includeInIndex = 0;
+			isa = PBXFileReference;
+			path = SytueWidgetBridge.framework;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		DE769B25D898EE1FCF8AD093 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.xml;
+			name = sv;
+			path = locales/sv.lproj/Localizable.stringsdict;
+			sourceTree = "<group>";
+		};
+		DEDBFCD406BAB83A6915483C = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.xml;
+			path = widgets/Info.plist;
+			sourceTree = "<group>";
+		};
+		DF84CEE534C7E2F5DE860104 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = widgets/macos.entitlements;
+			sourceTree = "<group>";
+		};
+		DFF0B27541E0A40D2B19E2BE = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.xml;
+			path = widgets/Info.plist;
+			sourceTree = "<group>";
+		};
+		E1D1510A5E5D534B37731B7D = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = widgets/macos.entitlements;
+			sourceTree = "<group>";
+		};
+		E1D57173773E995188BA0B62 = {
+			explicitFileType = wrapper.application;
+			includeInIndex = 0;
+			isa = PBXFileReference;
+			path = "Sytue Notepads.app";
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		E1DC8C9B7BD311879A8074B4 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.xml;
+			path = widgets/Info.plist;
+			sourceTree = "<group>";
+		};
+		E294FFF67C35AFF0A537E07B = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.xml;
+			path = widgets/Info.plist;
+			sourceTree = "<group>";
+		};
+		E2C70895C045063E938AFD8E = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.xml;
+			name = es;
+			path = locales/es.lproj/Localizable.stringsdict;
+			sourceTree = "<group>";
+		};
+		E557850512AAEA4334F54FE8 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.strings;
+			name = is;
+			path = locales/is.lproj/Localizable.strings;
+			sourceTree = "<group>";
+		};
+		E610064699BEA5E7829A0BC6 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.strings;
+			name = pt;
+			path = locales/pt.lproj/Localizable.strings;
+			sourceTree = "<group>";
+		};
+		E66FFAD4DDDC484C94A726DD = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = widgets/ios.entitlements;
+			sourceTree = "<group>";
+		};
+		EBEEA53DFE275B93498A98E8 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = widgets/ios.entitlements;
+			sourceTree = "<group>";
+		};
+		ED0C506C4EF0440C331CD17B = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.strings;
+			name = lt;
+			path = locales/lt.lproj/Localizable.strings;
+			sourceTree = "<group>";
+		};
+		ED9F9FCA5B7A80A3C0C0C17C = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = ios.entitlements;
+			sourceTree = "<group>";
+		};
+		F22292538468FA43F95716BE = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = widgets/macos.entitlements;
+			sourceTree = "<group>";
+		};
+		F3F4665779662816DDE5F676 = {
+			isa = PBXFileReference;
+			lastKnownFileType = folder.iconcomposer.icon;
+			path = AppIcon.icon;
+			sourceTree = "<group>";
+		};
+		F541B3C403588D77938C41E8 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = tienda.entitlements;
+			sourceTree = "<group>";
+		};
+		F57A2D84B16FF15A50FCEA76 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.strings;
+			name = it;
+			path = locales/it.lproj/Localizable.strings;
+			sourceTree = "<group>";
+		};
+		F75D765D45BFABF813DEFBF1 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.xml;
+			name = pt;
+			path = locales/pt.lproj/Localizable.stringsdict;
+			sourceTree = "<group>";
+		};
+		F90472E49C8C360E7C3252CD = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.xml;
+			name = is;
+			path = locales/is.lproj/Localizable.stringsdict;
+			sourceTree = "<group>";
+		};
+		FB5F9E7CF8DEE931347F5D9A = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.xml;
+			path = widgets/Info.plist;
+			sourceTree = "<group>";
+		};
+		FBE7663F998273D8B6062C4E = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.xml;
+			path = widgets/Info.plist;
+			sourceTree = "<group>";
+		};
+		FC1F257A352A32368D9A9DEF = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = widgets/macos.entitlements;
+			sourceTree = "<group>";
+		};
+		FC87AAF6E0E23D1512F315D8 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = widgets/ios.entitlements;
+			sourceTree = "<group>";
+		};
+		FD56297C75AC88BD98EF7DA2 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = widgets/macos.entitlements;
+			sourceTree = "<group>";
+		};
+		FE0C6FFB9D4EB49061F392E0 = {
+			isa = PBXFileReference;
+			lastKnownFileType = folder.iconcomposer.icon;
+			path = AppIcon.icon;
+			sourceTree = "<group>";
+		};
+		136C5885A38A987140307CA9 = {
+			children = (
+				537260548F1E03C736D62990,
+				99BCFFFD4C49393862661B4C,
+				3BC364DC32D051EAB7B35DDA,
+				C44F45E202A652F4271F91DF,
+				0C9C4195AE9C25B255FD18C5,
+				B7AB8BF9FAF3106CA75C66E3,
+				C5C45E2AD7B62CDBAEEB36B2,
+			);
+			isa = PBXGroup;
+			path = widgets;
+			sourceTree = "<group>";
+		};
+		1393FD55875442DCECE7FA15 = {
+			children = (
+				8380A44D092F260A3C780F53,
+				B7A1A1026D6329CC11C5CF06,
+				CE4E9414FB5605A7DDD98AD8,
+				57F8CAD851A322590A62272E,
+				FC1F257A352A32368D9A9DEF,
+				EBEEA53DFE275B93498A98E8,
+				0329DE900086071AF357FB72,
+			);
+			isa = PBXGroup;
+			path = notes;
+			sourceTree = "<group>";
+		};
+		19354EF87D4F8C393E3A8CE3 = {
+			children = (
+				5B6C2AB23F838FBF01510F06,
+				45D245D78E7AEB7008097A8B,
+				666C2D3582D26D52363B705E,
+				DFF0B27541E0A40D2B19E2BE,
+				A39569FC9C7340612E758960,
+				C0364B853A49157D661D0C69,
+				32BBC57727F14AC7641A3DD3,
+			);
+			isa = PBXGroup;
+			path = rooms;
+			sourceTree = "<group>";
+		};
+		1E822F5A5DA2D07C1A4402D3 = {
+			children = (
+				06D440E1FCA6EDC85C85909A,
+				6C73A6326D8BE9222AA072C8,
+				ED9F9FCA5B7A80A3C0C0C17C,
+				B9106839592669D273280B83,
+				6AF628445FE652D0A5FAE1C0,
+				FC87AAF6E0E23D1512F315D8,
+				6590C48B333D98558B31F777,
+			);
+			isa = PBXGroup;
+			path = cast;
+			sourceTree = "<group>";
+		};
+		23F732510E00DBC068CF3BD1 = {
+			children = (
+				74CDE4CFE28F715C1EB95497,
+				0E7D8DC057B95BBFF9E1810B,
+				2E2E4AF59D12F9DCE79B8C5F,
+				9C748BB4617F1608C0D52FF2,
+				136C5885A38A987140307CA9,
+				8DBB20D66642DB51B3555F95,
+				4B243F573991DD13943DFB10,
+				D584642182AED4D47BFAC97D,
+				1E822F5A5DA2D07C1A4402D3,
+				A48676C33649907358A4ED23,
+				4C987F0E05857E4B8D7CC9A3,
+				E1B628BF541346967F7D66E3,
+				B5FBB8400344EB6A9043FE23,
+				70893ACC14263BB1D3B303A5,
+				E8788318AECC56217D8376AB,
+				928DDA4F0A7766989050448C,
+				C6C42A7E53F78AF542930AD0,
+				1393FD55875442DCECE7FA15,
+				790426A285C8F1977CE440A1,
+				19354EF87D4F8C393E3A8CE3,
+				8997A309528A42030E402C04,
+			);
+			isa = PBXGroup;
+			sourceTree = "<group>";
+		};
+		4B243F573991DD13943DFB10 = {
+			children = (
+				F3F4665779662816DDE5F676,
+				2063DE4CBA4D6CE860B88AFE,
+				1FE936E0401B694B1EF9F88A,
+				D1D3856BF97A9E370D239995,
+				128B13569F6253A33E134500,
+				0913603E5C3409122C99931B,
+				934CFD06DDABE331232325C3,
+			);
+			isa = PBXGroup;
+			path = calcus;
+			sourceTree = "<group>";
+		};
+		4C987F0E05857E4B8D7CC9A3 = {
+			children = (
+				298C2F47E9E1A6F528F6DC75,
+				F541B3C403588D77938C41E8,
+				4251EC1E99C65CF8B820E427,
+				CE7CD50ED5F40198AF4B55ED,
+				F22292538468FA43F95716BE,
+				71BCA059B5C5390A9A8A2E09,
+				C91B5759BECBE23E89501059,
+			);
+			isa = PBXGroup;
+			path = contacts;
+			sourceTree = "<group>";
+		};
+		70893ACC14263BB1D3B303A5 = {
+			children = (
+				33363A2F782AC752DA011D03,
+				CE7D3F642542BE4970DB6067,
+				1CA7CA234171B3C3ED15D39D,
+				BC4B1494E3FA7B2CFF2943D2,
+				5E3349ABAA41FE41CA8D9D10,
+				9A7B27000655867FCCDFD9CA,
+				E1DC8C9B7BD311879A8074B4,
+				A3CFD0C9259877EA388591B9,
+				15DB5D7876615A98FAD15E46,
+				DC103898193FCAA55EA569E2,
+			);
+			isa = PBXGroup;
+			path = drive;
+			sourceTree = "<group>";
+		};
+		790426A285C8F1977CE440A1 = {
+			children = (
+				39DD8A0CB33503AE9CA4B825,
+				3E205BB21FCADEED54CDD505,
+				CBA91E9FB64052BC52343259,
+				E294FFF67C35AFF0A537E07B,
+				CD1F622C72746AED0AD7EEED,
+				C297B013F7F196276A9F77BE,
+				7D2E1CFC7710D2111DBA1FD3,
+			);
+			isa = PBXGroup;
+			path = photos;
+			sourceTree = "<group>";
+		};
+		8997A309528A42030E402C04 = {
+			children = (
+				DE44BA8126A12179BF31B1E2,
+				A873764A21CC15F2E644F221,
+				ACFDF13B1C397098C92B3F83,
+				33E9A64412996F717A19E03C,
+				8676E0B97EBD3E5887D4EA81,
+				3C5829931C3C1A881B36055F,
+				AFA4CDFA9226081B8636A12D,
+				33828DAFCA36F745AC73AA09,
+				AE861445B1E3E3F28F4BE529,
+				4E33C91F80929A9A02CC6ABE,
+				6A55FC72D717F9B425527348,
+				93D9A4FB1917D41D8B8A420F,
+				6A9B844FE9AEE3F0FFC62167,
+				7A7402F59BB0A891EF9AF3A7,
+				98EAC928D85492A5C9F0479B,
+				AF37333825D9088295EB9C8B,
+				D591B5A98B2F57FFB27EABFF,
+				C5F346890E8660EE77B4194F,
+				0554D14727D930DA1F946A43,
+				C06280201005586BC9D22862,
+				02F6BE639529171C5FF425D2,
+				135DCE7E76750246B4A2E5E4,
+				D7014C2B343D9ED08C32753E,
+				6EF72787472F3872090724B6,
+				7843A6CFB0C39758711E3423,
+				9CA6931ED3272A5F680372DA,
+				4582BF030622666F41AF0C74,
+				E1D57173773E995188BA0B62,
+				BBBD34C73DFAA5B36EC4C16C,
+				64B018ED028FF6E0616849C7,
+				6C4DDEBC0D806ADAC4DF0EEA,
+				0367CE6A6274292999DC6798,
+			);
+			isa = PBXGroup;
+			name = Products;
+			sourceTree = "<group>";
+		};
+		8DBB20D66642DB51B3555F95 = {
+			children = (
+				6D3020E1BC6FA6B844C00A23,
+				2AF58A8A5348BCF9C2DA747B,
+				C41E75BC6AE24DD66FBABCC6,
+				035A29B550F37EB41788B4D0,
+				CEFC0B574BBBC1B5C73C83DD,
+				E66FFAD4DDDC484C94A726DD,
+				5AD11396492DC2713A925C5D,
+			);
+			isa = PBXGroup;
+			path = bases;
+			sourceTree = "<group>";
+		};
+		928DDA4F0A7766989050448C = {
+			children = (
+				1015BB1CE3A1E75A8B5270C6,
+				1D38518CDD4F019E3BCAF315,
+				BED0EEEE763680CA54B76388,
+				DEDBFCD406BAB83A6915483C,
+				48EDACDA7B5547C6DB325919,
+				C9B2EBA2C5A8DD2E982CF376,
+				96CA1EACAA25AE4C70F80889,
+			);
+			isa = PBXGroup;
+			path = hub;
+			sourceTree = "<group>";
+		};
+		9C748BB4617F1608C0D52FF2 = {
+			children = (
+				75EE105A0174EEB73689345D,
+			);
+			isa = PBXGroup;
+			path = "proveedor-archivos";
+			sourceTree = "<group>";
+		};
+		A48676C33649907358A4ED23 = {
+			children = (
+				FE0C6FFB9D4EB49061F392E0,
+				9576D0B3B3E85D4750802290,
+				7C88A446A443F4CE83E252A4,
+				9CC656AA7BA44481A576B6AD,
+				FD56297C75AC88BD98EF7DA2,
+				390A2CFB2175622FC17DB059,
+				21EF2BBA9464FB203F2E4EE1,
+			);
+			isa = PBXGroup;
+			path = certipdf;
+			sourceTree = "<group>";
+		};
+		B5FBB8400344EB6A9043FE23 = {
+			children = (
+				6D343627CDA7A2C504FDE333,
+				C1F41500CF6E05E475A2E126,
+				6E29171EBECA223C8ABE815A,
+				096CA058F72ABC97C1E1928D,
+				DDB9C76D0AED3214DEBC1AB3,
+				64F6B4AA4BED47A7FFC7D503,
+				5E66CE67F6A018FEA336F379,
+			);
+			isa = PBXGroup;
+			path = docus;
+			sourceTree = "<group>";
+		};
+		C6C42A7E53F78AF542930AD0 = {
+			children = (
+				494D58533E41B017D519249A,
+				1BD786C9A44A1C59A383BC56,
+				398BD606E0CFA13D05323ECD,
+				FB5F9E7CF8DEE931347F5D9A,
+				0A2D13B12F39B39988860864,
+				6FBFEBE79F4AF6F9D28A1AD5,
+				1ADE6C21131CFD2496E90E32,
+			);
+			isa = PBXGroup;
+			path = mail;
+			sourceTree = "<group>";
+		};
+		D584642182AED4D47BFAC97D = {
+			children = (
+				10697E5552CBC790C9EAF43C,
+				465C7B8A68229364142A9C98,
+				75AED28DDCCB870658C241EA,
+				FBE7663F998273D8B6062C4E,
+				E1D1510A5E5D534B37731B7D,
+				3D3FD866C0DA57718D2F58B8,
+				7FC124E73CB477C8E0FA3CDB,
+			);
+			isa = PBXGroup;
+			path = calendar;
+			sourceTree = "<group>";
+		};
+		E1B628BF541346967F7D66E3 = {
+			children = (
+				7D88E6F89B1AA92641A2357A,
+				375065B9BBC60111ADD2CAD3,
+				4098CAE3E6A020A70A6DE36C,
+				DA45B58E042CAB72DD432D43,
+				D508F1AD7B591D7DDE7BBD3A,
+				CFB20C1A6627680DA6246B00,
+				DB08B1DA239CCA88CD945D84,
+			);
+			isa = PBXGroup;
+			path = diapos;
+			sourceTree = "<group>";
+		};
+		E8788318AECC56217D8376AB = {
+			children = (
+				B899E16011D404AC806CAC42,
+				97EDF7BCE7EBD7373C00F5D7,
+				671D748E14D16122B8877227,
+				BADBD76EBBD19FC992FD910C,
+				DF84CEE534C7E2F5DE860104,
+				053F5F89B2DA1F37CE885701,
+				0134CD68D29C4085CE1DB6CA,
+			);
+			isa = PBXGroup;
+			path = erp;
+			sourceTree = "<group>";
+		};
+		0BEE626670F8D45BFB140A9E = {
+			buildConfigurationList = BFC3517E16C3AA8A99D5CAD9;
+			buildPhases = (
+				901F5B206A8C0FF49288E7C6,
+				9A4CFC7FF89AB8810CBB9998,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			isa = PBXNativeTarget;
+			name = mail;
+			productName = mail;
+			productReference = 9CA6931ED3272A5F680372DA;
+			productType = "com.apple.product-type.application";
+		};
+		194FABC42E3073C4235CAF12 = {
+			buildConfigurationList = 722CCCD35E86A9B122EAA116;
+			buildPhases = (
+				C7B7C49FB4BB8282DF8CB795,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			isa = PBXNativeTarget;
+			name = SytueWidgetBridge;
+			productName = SytueWidgetBridge;
+			productReference = DE44BA8126A12179BF31B1E2;
+			productType = "com.apple.product-type.framework";
+		};
+		26FA2B47A8C639F4FA71C9B5 = {
+			buildConfigurationList = 4197DA0CF2081EF14D905FBA;
+			buildPhases = (
+				E4C6C0BD245B464A6373829E,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			isa = PBXNativeTarget;
+			name = "drive-archivos";
+			productName = "drive-archivos";
+			productReference = C5F346890E8660EE77B4194F;
+			productType = "com.apple.product-type.app-extension";
+		};
+		295D6F447ED49E6D3E0611C6 = {
+			buildConfigurationList = 818769A4F4B7CB10757236A2;
+			buildPhases = (
+				338ACF6A7A3312952AF18F47,
+				199888C968A797370702D79A,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			isa = PBXNativeTarget;
+			name = docus;
+			productName = docus;
+			productReference = D591B5A98B2F57FFB27EABFF;
+			productType = "com.apple.product-type.application";
+		};
+		2FD8068A1966674483EA9E0C = {
+			buildConfigurationList = B1DB9FA6EF96BD19E069F0B5;
+			buildPhases = (
+				F682336B6EB8CB3B12523473,
+				B758C0901416CB03780A88C2,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			isa = PBXNativeTarget;
+			name = "mail-widgets";
+			productName = "Sytue-mail-Widgets";
+			productReference = 7843A6CFB0C39758711E3423;
+			productType = "com.apple.product-type.app-extension";
+		};
+		42B3B6338F0ACEAD1C97DBA1 = {
+			buildConfigurationList = E37FCE34EC1CF95CF1216DE7;
+			buildPhases = (
+				0A6B59B65124CF71D0AC1BA4,
+				B6C3D3159A300595DD8B62F5,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			isa = PBXNativeTarget;
+			name = "calcus-widgets";
+			productName = "Sytue-calcus-Widgets";
+			productReference = 33E9A64412996F717A19E03C;
+			productType = "com.apple.product-type.app-extension";
+		};
+		4771506CF7ED207168121EEE = {
+			buildConfigurationList = A88768C1C174EDBD165CBB81;
+			buildPhases = (
+				0CF82A6F49971A47C04AA8C7,
+				3CD30CCE24DF835106A4AB2F,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			isa = PBXNativeTarget;
+			name = "bases-widgets";
+			productName = "Sytue-bases-Widgets";
+			productReference = A873764A21CC15F2E644F221;
+			productType = "com.apple.product-type.app-extension";
+		};
+		4AD004CEB7B3BBF1123C1A2E = {
+			buildConfigurationList = A5B12CA1B6C4B730DCD74320;
+			buildPhases = (
+				59EB5CFAD45C17D8D465C5D0,
+				35D95616CA23CA47ED6596B5,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			isa = PBXNativeTarget;
+			name = erp;
+			productName = erp;
+			productReference = 135DCE7E76750246B4A2E5E4;
+			productType = "com.apple.product-type.application";
+		};
+		5023BB233ACF9D561845E566 = {
+			buildConfigurationList = 71A25576582E5EB9A3E9AA23;
+			buildPhases = (
+				60AF4A7364E790DC22AF4F4C,
+				CF80D76D9AFA7F909B42D304,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			isa = PBXNativeTarget;
+			name = "notes-widgets";
+			productName = "Sytue-notes-Widgets";
+			productReference = 4582BF030622666F41AF0C74;
+			productType = "com.apple.product-type.app-extension";
+		};
+		56C70729E7485334DDA432CA = {
+			buildConfigurationList = 9CF91AD315BBCBBF1473B0F8;
+			buildPhases = (
+				8748B183CF3B00E4603790B7,
+				CE30D9A44F74E837EC27E599,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			isa = PBXNativeTarget;
+			name = certipdf;
+			productName = certipdf;
+			productReference = 6A55FC72D717F9B425527348;
+			productType = "com.apple.product-type.application";
+		};
+		5A8247F5E48398E776A04CC0 = {
+			buildConfigurationList = 33EA5B8BC5163FB6588DF42E;
+			buildPhases = (
+				A63C59ABC7E970A5C6A7DBAF,
+				67C3B55D8E64379A0C877BCD,
+				03BDC5E738827D3588B7B9C2,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				36FF1361793A4861B44AE0E5,
+			);
+			isa = PBXNativeTarget;
+			name = drive;
+			productName = drive;
+			productReference = C06280201005586BC9D22862;
+			productType = "com.apple.product-type.application";
+		};
+		64763D4B386E6390ACF67E42 = {
+			buildConfigurationList = 00B96F77A909C4C449A798B3;
+			buildPhases = (
+				2DA03321C0069AC81F0508E3,
+				DFAADB5182BCFE92C9958C99,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			isa = PBXNativeTarget;
+			name = photos;
+			productName = photos;
+			productReference = 64B018ED028FF6E0616849C7;
+			productType = "com.apple.product-type.application";
+		};
+		6C3C618A2C4F872614A934C1 = {
+			buildConfigurationList = 61D47CF10DE4EEFADA99F5C4;
+			buildPhases = (
+				C1831B12EDF28C293CCE4B38,
+				7181874AF3BA41383A2059C4,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			isa = PBXNativeTarget;
+			name = "cast-widgets";
+			productName = "Sytue-cast-Widgets";
+			productReference = 33828DAFCA36F745AC73AA09;
+			productType = "com.apple.product-type.app-extension";
+		};
+		6E68C3BDC31C78623E6BA080 = {
+			buildConfigurationList = 62062608C167096D2AA2D940;
+			buildPhases = (
+				3709E23C81C2D98888195FBD,
+				BD2F78031A085D1A7BFDFA20,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			isa = PBXNativeTarget;
+			name = "rooms-widgets";
+			productName = "Sytue-rooms-Widgets";
+			productReference = 6C4DDEBC0D806ADAC4DF0EEA;
+			productType = "com.apple.product-type.app-extension";
+		};
+		70ED7EBB1E2FB088EF662800 = {
+			buildConfigurationList = 16E07C692445C6E897F2E1E0;
+			buildPhases = (
+				A1FDB5828413BA108F6EB8C4,
+				D14443CD5BCA25D781862F15,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			isa = PBXNativeTarget;
+			name = "calendar-widgets";
+			productName = "Sytue-calendar-Widgets";
+			productReference = 3C5829931C3C1A881B36055F;
+			productType = "com.apple.product-type.app-extension";
+		};
+		781BAF139D02B448B51AC782 = {
+			buildConfigurationList = 316F064688417E0A159B6FD9;
+			buildPhases = (
+				F045AC62B1B10D7FAB85DDBA,
+				94530EAB1089FE850D2D432E,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			isa = PBXNativeTarget;
+			name = "drive-widgets";
+			productName = "Sytue-drive-Widgets";
+			productReference = 0554D14727D930DA1F946A43;
+			productType = "com.apple.product-type.app-extension";
+		};
+		7CCA2E8C34B34F3DC9C0FFCA = {
+			buildConfigurationList = 868CEFAC090F825139AB25B0;
+			buildPhases = (
+				3774E1E177D68046713D75B9,
+				E1F395F7365B46B783F3AB81,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			isa = PBXNativeTarget;
+			name = bases;
+			productName = bases;
+			productReference = ACFDF13B1C397098C92B3F83;
+			productType = "com.apple.product-type.application";
+		};
+		8FA4D4F6E1F27FD94CEAEA6A = {
+			buildConfigurationList = ABC0CFDF18F73239A082477D;
+			buildPhases = (
+				B497B47DD568A111CD899AE7,
+				7BA1092FEC72B0A860B78835,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			isa = PBXNativeTarget;
+			name = "photos-widgets";
+			productName = "Sytue-photos-Widgets";
+			productReference = BBBD34C73DFAA5B36EC4C16C;
+			productType = "com.apple.product-type.app-extension";
+		};
+		A101EF58F1E1A22452633DAF = {
+			buildConfigurationList = 2B6B5EC6603780A089744B30;
+			buildPhases = (
+				F8032A5E306F39DD01DDC652,
+				BAEF8322870C058D1825AC6B,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			isa = PBXNativeTarget;
+			name = diapos;
+			productName = diapos;
+			productReference = 98EAC928D85492A5C9F0479B;
+			productType = "com.apple.product-type.application";
+		};
+		A1770318C346C6FE80CF9D1D = {
+			buildConfigurationList = 84E86FF6184886C9527190C6;
+			buildPhases = (
+				9E52ABDCE66211FDB182F47F,
+				BDBF1D7A5A17FCAD493BBB19,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			isa = PBXNativeTarget;
+			name = calcus;
+			productName = calcus;
+			productReference = 8676E0B97EBD3E5887D4EA81;
+			productType = "com.apple.product-type.application";
+		};
+		A27770FD4A2413408A89580C = {
+			buildConfigurationList = E0B897DD29ADFDB78100B560;
+			buildPhases = (
+				60FC340B740F905E5F6C6CED,
+				B3B337497CF4C504AB11DCB2,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			isa = PBXNativeTarget;
+			name = calendar;
+			productName = calendar;
+			productReference = AFA4CDFA9226081B8636A12D;
+			productType = "com.apple.product-type.application";
+		};
+		B1CADAC5096E32508486437D = {
+			buildConfigurationList = 6B375AB7898DC909495761B9;
+			buildPhases = (
+				7E4AF7B180649792BF6BA306,
+				101C0DF6A6A723DA5A8A9055,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			isa = PBXNativeTarget;
+			name = notes;
+			productName = notes;
+			productReference = E1D57173773E995188BA0B62;
+			productType = "com.apple.product-type.application";
+		};
+		B24755742182C86AB7824962 = {
+			buildConfigurationList = 7C305009BFA925E01278FA6E;
+			buildPhases = (
+				3417054A02821EAD8014014B,
+				BECF58A5F3F7BF931F122500,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			isa = PBXNativeTarget;
+			name = rooms;
+			productName = rooms;
+			productReference = 0367CE6A6274292999DC6798;
+			productType = "com.apple.product-type.application";
+		};
+		BA74C91E95366EEBF0315EB6 = {
+			buildConfigurationList = 00E614CB8FC399E7FF3259BC;
+			buildPhases = (
+				AE16C529B4AD47AF10B61728,
+				DC6F87F7AEB38ABC978259B7,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			isa = PBXNativeTarget;
+			name = "certipdf-widgets";
+			productName = "Sytue-certipdf-Widgets";
+			productReference = 4E33C91F80929A9A02CC6ABE;
+			productType = "com.apple.product-type.app-extension";
+		};
+		BF01097A37B388FFFAD8C7BB = {
+			buildConfigurationList = 66C81A11F14FACB3976B0BAC;
+			buildPhases = (
+				847DA413C6FEF6667A20376C,
+				BBB19ACD8A7395FB567C9303,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			isa = PBXNativeTarget;
+			name = "docus-widgets";
+			productName = "Sytue-docus-Widgets";
+			productReference = AF37333825D9088295EB9C8B;
+			productType = "com.apple.product-type.app-extension";
+		};
+		C51AAAC07A58441CF2AB0617 = {
+			buildConfigurationList = 8E4E510D5BCAB629CFF094D7;
+			buildPhases = (
+				1EAC114D5CE62EBC25AC4D62,
+				5BED49F0B86AA83445F9E7B6,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			isa = PBXNativeTarget;
+			name = cast;
+			productName = cast;
+			productReference = AE861445B1E3E3F28F4BE529;
+			productType = "com.apple.product-type.application";
+		};
+		CB3879BC27B337D96B96E90E = {
+			buildConfigurationList = 280A5DE6D86629DBEA2F8C83;
+			buildPhases = (
+				D555994A341463883FBC64C7,
+				66509CEAA8856F59291AA3FD,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			isa = PBXNativeTarget;
+			name = "diapos-widgets";
+			productName = "Sytue-diapos-Widgets";
+			productReference = 7A7402F59BB0A891EF9AF3A7;
+			productType = "com.apple.product-type.app-extension";
+		};
+		CBCC48BD7DE7AAD51536A6B4 = {
+			buildConfigurationList = C1317A6997B7FF88841F9988;
+			buildPhases = (
+				F66D7342E0A22D5EB61C046B,
+				0D0426DA0111BBB6D4F18D27,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			isa = PBXNativeTarget;
+			name = "erp-widgets";
+			productName = "Sytue-erp-Widgets";
+			productReference = 02F6BE639529171C5FF425D2;
+			productType = "com.apple.product-type.app-extension";
+		};
+		E9D3FD74FD589738B0619DDD = {
+			buildConfigurationList = 0FC7AA4EDB77FA8F7D69A400;
+			buildPhases = (
+				D2178F38A767BA4E9E448A07,
+				0182365434B24F7C2561566B,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			isa = PBXNativeTarget;
+			name = "contacts-widgets";
+			productName = "Sytue-contacts-Widgets";
+			productReference = 93D9A4FB1917D41D8B8A420F;
+			productType = "com.apple.product-type.app-extension";
+		};
+		EA36099F724208588755C7A5 = {
+			buildConfigurationList = 4F604E6B070207A396EEEA3B;
+			buildPhases = (
+				BF80335050422CAB2AB8112A,
+				C101F9321C449A7BBBE69B46,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			isa = PBXNativeTarget;
+			name = hub;
+			productName = hub;
+			productReference = 6EF72787472F3872090724B6;
+			productType = "com.apple.product-type.application";
+		};
+		ED1C9F95410B13D3B70B4A02 = {
+			buildConfigurationList = 283BEA14DAE065CA446083E1;
+			buildPhases = (
+				0C5D006D1AD84E9F4F6AE2BA,
+				726C3FA21EDA74923844A569,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			isa = PBXNativeTarget;
+			name = contacts;
+			productName = contacts;
+			productReference = 6A9B844FE9AEE3F0FFC62167;
+			productType = "com.apple.product-type.application";
+		};
+		ED2A2375524E3E93BD249B5A = {
+			buildConfigurationList = AD569DCDA840590D1F53AB39;
+			buildPhases = (
+				2CFFDFEC3A0C05BCCD45A126,
+				B01FB6084AB1066808A11270,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			isa = PBXNativeTarget;
+			name = "hub-widgets";
+			productName = "Sytue-hub-Widgets";
+			productReference = D7014C2B343D9ED08C32753E;
+			productType = "com.apple.product-type.app-extension";
+		};
+		7B6581EE30595C57D6133265 = {
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastUpgradeCheck = 2700;
+			};
+			buildConfigurationList = 6715C315515097E95BBF5384;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			isa = PBXProject;
+			knownRegions = (
+				Base,
+				bg,
+				cs,
+				da,
+				de,
+				el,
+				en,
+				es,
+				et,
+				fi,
+				fr,
+				ga,
+				hr,
+				hu,
+				is,
+				it,
+				lt,
+				lv,
+				mt,
+				nb,
+				nl,
+				pl,
+				pt,
+				ro,
+				sk,
+				sl,
+				sv,
+			);
+			mainGroup = 23F732510E00DBC068CF3BD1;
+			productRefGroup = 8997A309528A42030E402C04;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				194FABC42E3073C4235CAF12,
+				4771506CF7ED207168121EEE,
+				7CCA2E8C34B34F3DC9C0FFCA,
+				42B3B6338F0ACEAD1C97DBA1,
+				A1770318C346C6FE80CF9D1D,
+				70ED7EBB1E2FB088EF662800,
+				A27770FD4A2413408A89580C,
+				6C3C618A2C4F872614A934C1,
+				C51AAAC07A58441CF2AB0617,
+				BA74C91E95366EEBF0315EB6,
+				56C70729E7485334DDA432CA,
+				E9D3FD74FD589738B0619DDD,
+				ED1C9F95410B13D3B70B4A02,
+				CB3879BC27B337D96B96E90E,
+				A101EF58F1E1A22452633DAF,
+				BF01097A37B388FFFAD8C7BB,
+				295D6F447ED49E6D3E0611C6,
+				26FA2B47A8C639F4FA71C9B5,
+				781BAF139D02B448B51AC782,
+				5A8247F5E48398E776A04CC0,
+				CBCC48BD7DE7AAD51536A6B4,
+				4AD004CEB7B3BBF1123C1A2E,
+				ED2A2375524E3E93BD249B5A,
+				EA36099F724208588755C7A5,
+				2FD8068A1966674483EA9E0C,
+				0BEE626670F8D45BFB140A9E,
+				5023BB233ACF9D561845E566,
+				B1CADAC5096E32508486437D,
+				8FA4D4F6E1F27FD94CEAEA6A,
+				64763D4B386E6390ACF67E42,
+				6E68C3BDC31C78623E6BA080,
+				B24755742182C86AB7824962,
+			);
+		};
+		0182365434B24F7C2561566B = {
+			buildActionMask = 2147483647;
+			files = (
+				F1EFD4BE5FA294BFC119B61F,
+				A62B7D023A63EECE70A97A8A,
+				6DFD3A7F1B2A92A08E770AC7,
+				6D085D6C2FAA4A35F983E368,
+			);
+			isa = PBXResourcesBuildPhase;
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		0C5D006D1AD84E9F4F6AE2BA = {
+			buildActionMask = 2147483647;
+			files = (
+				CEFCB5757C9F405ABBD83408,
+			);
+			isa = PBXResourcesBuildPhase;
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		0D0426DA0111BBB6D4F18D27 = {
+			buildActionMask = 2147483647;
+			files = (
+				2EBB114E036F5F99A932ED4D,
+				FF7CFC50AF892F4AAD8B7DFD,
+				283EE4E179507D8731AE711D,
+				2D0F1246E3ED952E221E2644,
+			);
+			isa = PBXResourcesBuildPhase;
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		1EAC114D5CE62EBC25AC4D62 = {
+			buildActionMask = 2147483647;
+			files = (
+				DFB0A00AB33F8891BD77B5E0,
+			);
+			isa = PBXResourcesBuildPhase;
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		2DA03321C0069AC81F0508E3 = {
+			buildActionMask = 2147483647;
+			files = (
+				0C4B3796702FCC6CA94C7716,
+			);
+			isa = PBXResourcesBuildPhase;
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		338ACF6A7A3312952AF18F47 = {
+			buildActionMask = 2147483647;
+			files = (
+				85DE1B3B9A0F8DF2AAC04643,
+			);
+			isa = PBXResourcesBuildPhase;
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		3417054A02821EAD8014014B = {
+			buildActionMask = 2147483647;
+			files = (
+				384845A0313441A749187CE5,
+			);
+			isa = PBXResourcesBuildPhase;
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		3774E1E177D68046713D75B9 = {
+			buildActionMask = 2147483647;
+			files = (
+				967559358608448B582C58AD,
+			);
+			isa = PBXResourcesBuildPhase;
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		3CD30CCE24DF835106A4AB2F = {
+			buildActionMask = 2147483647;
+			files = (
+				CDDB4124F5638B00FBCD8CD0,
+				78986F894EE8ED4F73B7031B,
+				B31940FBAC7AF83089CD65EB,
+				3FA252AC60C2559B50B87EDC,
+			);
+			isa = PBXResourcesBuildPhase;
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		59EB5CFAD45C17D8D465C5D0 = {
+			buildActionMask = 2147483647;
+			files = (
+				044B2BBF3C893A843660D6A0,
+			);
+			isa = PBXResourcesBuildPhase;
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		60FC340B740F905E5F6C6CED = {
+			buildActionMask = 2147483647;
+			files = (
+				89F3A532E0FEA929FB7E7757,
+			);
+			isa = PBXResourcesBuildPhase;
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		66509CEAA8856F59291AA3FD = {
+			buildActionMask = 2147483647;
+			files = (
+				2F85D1757B5B74F9AED3D447,
+				DD40DDE6526474C414C7D202,
+				EA1D3EE5FEF45EB0AC9CB6FB,
+				B6CB1A062D057760F1B1A761,
+			);
+			isa = PBXResourcesBuildPhase;
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		7181874AF3BA41383A2059C4 = {
+			buildActionMask = 2147483647;
+			files = (
+				C7DB7D0EA7FA86654B6134A0,
+				89C232429B05CC76D6822F14,
+				6A0FF5DDF9F75F5216D2F979,
+				4456EF280BCB5A481E672DA1,
+			);
+			isa = PBXResourcesBuildPhase;
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		7BA1092FEC72B0A860B78835 = {
+			buildActionMask = 2147483647;
+			files = (
+				A4EB05453AAAC1C8063EB5A3,
+				726EDAF7EDFFAEB37027A5FD,
+				AAC5E1210CFF5C491704FD75,
+				A2A8D8B38CDB20A2E7D92471,
+			);
+			isa = PBXResourcesBuildPhase;
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		7E4AF7B180649792BF6BA306 = {
+			buildActionMask = 2147483647;
+			files = (
+				3B55B4FA89E31F5EC15E3D1A,
+			);
+			isa = PBXResourcesBuildPhase;
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8748B183CF3B00E4603790B7 = {
+			buildActionMask = 2147483647;
+			files = (
+				4950A5A137901E34816220F6,
+			);
+			isa = PBXResourcesBuildPhase;
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		901F5B206A8C0FF49288E7C6 = {
+			buildActionMask = 2147483647;
+			files = (
+				68AB0366C60925BABEADDAF4,
+			);
+			isa = PBXResourcesBuildPhase;
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		94530EAB1089FE850D2D432E = {
+			buildActionMask = 2147483647;
+			files = (
+				47934F5FA0D9CF80F7203333,
+				38B70E39B8511A2FCAAEDE7D,
+				346793275850D66A032CCA74,
+				B9DBCFD31B5EA5CAAAC50D5F,
+			);
+			isa = PBXResourcesBuildPhase;
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9E52ABDCE66211FDB182F47F = {
+			buildActionMask = 2147483647;
+			files = (
+				7819338305A89922D21EC128,
+			);
+			isa = PBXResourcesBuildPhase;
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A63C59ABC7E970A5C6A7DBAF = {
+			buildActionMask = 2147483647;
+			files = (
+				8EE3ADCDF7E98CCA5B06E67D,
+			);
+			isa = PBXResourcesBuildPhase;
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B01FB6084AB1066808A11270 = {
+			buildActionMask = 2147483647;
+			files = (
+				F88583C3E2627A67BF11A2F3,
+				74C08AA6CA2DDB589742EC6C,
+				417ECF5A97C2C214112DC790,
+				1639FB8BAEAEA8D1D84A4863,
+			);
+			isa = PBXResourcesBuildPhase;
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B6C3D3159A300595DD8B62F5 = {
+			buildActionMask = 2147483647;
+			files = (
+				AA5A19F6CF28B8BD6313DFF5,
+				7108B58A6725E3FA3E335358,
+				96EE5C004E1F4DA8B8899E28,
+				B43FE5B516780DE367917BBC,
+			);
+			isa = PBXResourcesBuildPhase;
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B758C0901416CB03780A88C2 = {
+			buildActionMask = 2147483647;
+			files = (
+				4325B3E60F8E5D9C8858CF48,
+				5D6E451B87E9B3E171BEC024,
+				D013CA3553437D1C2D6B3726,
+				DBB054198E9A1FF77939D579,
+			);
+			isa = PBXResourcesBuildPhase;
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BBB19ACD8A7395FB567C9303 = {
+			buildActionMask = 2147483647;
+			files = (
+				CBF7FE14E4C9CCFDA6BCC9D3,
+				C74C7E98436E173D4D4E2DD6,
+				DC9004D31C76468C5B0DDCF5,
+				ECF8BB8C798D1935CBDC5432,
+			);
+			isa = PBXResourcesBuildPhase;
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BD2F78031A085D1A7BFDFA20 = {
+			buildActionMask = 2147483647;
+			files = (
+				42873FF78BD96FA660154C56,
+				9D6DBEEAC5CD0C0B79EE9912,
+				3EBDB7D1F142F356BB20A1CD,
+				B1A4719F61E63904F98603A7,
+			);
+			isa = PBXResourcesBuildPhase;
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BF80335050422CAB2AB8112A = {
+			buildActionMask = 2147483647;
+			files = (
+				8E5DF73CB4D77800284B6049,
+			);
+			isa = PBXResourcesBuildPhase;
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CF80D76D9AFA7F909B42D304 = {
+			buildActionMask = 2147483647;
+			files = (
+				0D9A6E84817EC9DB9DE9F209,
+				635D4C570F9DE15320C59FF5,
+				FADD1AB216007DC30496631C,
+				B2C50D07A64E7619D1FCB570,
+			);
+			isa = PBXResourcesBuildPhase;
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D14443CD5BCA25D781862F15 = {
+			buildActionMask = 2147483647;
+			files = (
+				51D2C0FBA93091F0055D5A64,
+				1A9D2D4BD9ACA5E17ABBDCC3,
+				AE8A1A55F6E48913B604E47C,
+				2246F892302014F4C91E36BB,
+			);
+			isa = PBXResourcesBuildPhase;
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DC6F87F7AEB38ABC978259B7 = {
+			buildActionMask = 2147483647;
+			files = (
+				D36E1F5ABCBE00318E52B9FB,
+				706DDA517CF4D0839C45AF7D,
+				62730A18A60D0A0DF95BA2DF,
+				C323B772F8CC7B4A50FEE0BB,
+			);
+			isa = PBXResourcesBuildPhase;
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F8032A5E306F39DD01DDC652 = {
+			buildActionMask = 2147483647;
+			files = (
+				05D90B62044B3EC4C3210038,
+			);
+			isa = PBXResourcesBuildPhase;
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		101C0DF6A6A723DA5A8A9055 = {
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(TARGET_BUILD_DIR)/$(INFOPLIST_PATH)",
+			);
+			isa = PBXShellScriptBuildPhase;
+			name = "Compilar el Go";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(EXECUTABLE_PATH)",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/bash;
+			shellScript = "# La fase de apps/fyne/scripts/empaquetar.sh: el Go de la app (SYTUE_APP) y su Info.plist.\n# Xcode arranca las fases con un PATH mínimo: Go y la CLI de Fyne donde los deja\n# ci_scripts/ci_post_clone.sh en Xcode Cloud, o donde estén en un Mac de desarrollo.\nexport PATH=\"$HOME/.sytue-toolchain/go/bin:/usr/local/go/bin:$HOME/go/bin:/opt/homebrew/bin:/usr/local/bin:$PATH\"\nexport GOPRIVATE='github.com/thinkddr/*'\nexec bash \"$SRCROOT/../scripts/empaquetar.sh\" xcode\n";
+		};
+		199888C968A797370702D79A = {
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(TARGET_BUILD_DIR)/$(INFOPLIST_PATH)",
+			);
+			isa = PBXShellScriptBuildPhase;
+			name = "Compilar el Go";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(EXECUTABLE_PATH)",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/bash;
+			shellScript = "# La fase de apps/fyne/scripts/empaquetar.sh: el Go de la app (SYTUE_APP) y su Info.plist.\n# Xcode arranca las fases con un PATH mínimo: Go y la CLI de Fyne donde los deja\n# ci_scripts/ci_post_clone.sh en Xcode Cloud, o donde estén en un Mac de desarrollo.\nexport PATH=\"$HOME/.sytue-toolchain/go/bin:/usr/local/go/bin:$HOME/go/bin:/opt/homebrew/bin:/usr/local/bin:$PATH\"\nexport GOPRIVATE='github.com/thinkddr/*'\nexec bash \"$SRCROOT/../scripts/empaquetar.sh\" xcode\n";
+		};
+		35D95616CA23CA47ED6596B5 = {
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(TARGET_BUILD_DIR)/$(INFOPLIST_PATH)",
+			);
+			isa = PBXShellScriptBuildPhase;
+			name = "Compilar el Go";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(EXECUTABLE_PATH)",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/bash;
+			shellScript = "# La fase de apps/fyne/scripts/empaquetar.sh: el Go de la app (SYTUE_APP) y su Info.plist.\n# Xcode arranca las fases con un PATH mínimo: Go y la CLI de Fyne donde los deja\n# ci_scripts/ci_post_clone.sh en Xcode Cloud, o donde estén en un Mac de desarrollo.\nexport PATH=\"$HOME/.sytue-toolchain/go/bin:/usr/local/go/bin:$HOME/go/bin:/opt/homebrew/bin:/usr/local/bin:$PATH\"\nexport GOPRIVATE='github.com/thinkddr/*'\nexec bash \"$SRCROOT/../scripts/empaquetar.sh\" xcode\n";
+		};
+		5BED49F0B86AA83445F9E7B6 = {
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(TARGET_BUILD_DIR)/$(INFOPLIST_PATH)",
+			);
+			isa = PBXShellScriptBuildPhase;
+			name = "Compilar el Go";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(EXECUTABLE_PATH)",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/bash;
+			shellScript = "# La fase de apps/fyne/scripts/empaquetar.sh: el Go de la app (SYTUE_APP) y su Info.plist.\n# Xcode arranca las fases con un PATH mínimo: Go y la CLI de Fyne donde los deja\n# ci_scripts/ci_post_clone.sh en Xcode Cloud, o donde estén en un Mac de desarrollo.\nexport PATH=\"$HOME/.sytue-toolchain/go/bin:/usr/local/go/bin:$HOME/go/bin:/opt/homebrew/bin:/usr/local/bin:$PATH\"\nexport GOPRIVATE='github.com/thinkddr/*'\nexec bash \"$SRCROOT/../scripts/empaquetar.sh\" xcode\n";
+		};
+		67C3B55D8E64379A0C877BCD = {
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(TARGET_BUILD_DIR)/$(INFOPLIST_PATH)",
+			);
+			isa = PBXShellScriptBuildPhase;
+			name = "Compilar el Go";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(EXECUTABLE_PATH)",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/bash;
+			shellScript = "# La fase de apps/fyne/scripts/empaquetar.sh: el Go de la app (SYTUE_APP) y su Info.plist.\n# Xcode arranca las fases con un PATH mínimo: Go y la CLI de Fyne donde los deja\n# ci_scripts/ci_post_clone.sh en Xcode Cloud, o donde estén en un Mac de desarrollo.\nexport PATH=\"$HOME/.sytue-toolchain/go/bin:/usr/local/go/bin:$HOME/go/bin:/opt/homebrew/bin:/usr/local/bin:$PATH\"\nexport GOPRIVATE='github.com/thinkddr/*'\nexec bash \"$SRCROOT/../scripts/empaquetar.sh\" xcode\n";
+		};
+		726C3FA21EDA74923844A569 = {
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(TARGET_BUILD_DIR)/$(INFOPLIST_PATH)",
+			);
+			isa = PBXShellScriptBuildPhase;
+			name = "Compilar el Go";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(EXECUTABLE_PATH)",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/bash;
+			shellScript = "# La fase de apps/fyne/scripts/empaquetar.sh: el Go de la app (SYTUE_APP) y su Info.plist.\n# Xcode arranca las fases con un PATH mínimo: Go y la CLI de Fyne donde los deja\n# ci_scripts/ci_post_clone.sh en Xcode Cloud, o donde estén en un Mac de desarrollo.\nexport PATH=\"$HOME/.sytue-toolchain/go/bin:/usr/local/go/bin:$HOME/go/bin:/opt/homebrew/bin:/usr/local/bin:$PATH\"\nexport GOPRIVATE='github.com/thinkddr/*'\nexec bash \"$SRCROOT/../scripts/empaquetar.sh\" xcode\n";
+		};
+		9A4CFC7FF89AB8810CBB9998 = {
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(TARGET_BUILD_DIR)/$(INFOPLIST_PATH)",
+			);
+			isa = PBXShellScriptBuildPhase;
+			name = "Compilar el Go";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(EXECUTABLE_PATH)",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/bash;
+			shellScript = "# La fase de apps/fyne/scripts/empaquetar.sh: el Go de la app (SYTUE_APP) y su Info.plist.\n# Xcode arranca las fases con un PATH mínimo: Go y la CLI de Fyne donde los deja\n# ci_scripts/ci_post_clone.sh en Xcode Cloud, o donde estén en un Mac de desarrollo.\nexport PATH=\"$HOME/.sytue-toolchain/go/bin:/usr/local/go/bin:$HOME/go/bin:/opt/homebrew/bin:/usr/local/bin:$PATH\"\nexport GOPRIVATE='github.com/thinkddr/*'\nexec bash \"$SRCROOT/../scripts/empaquetar.sh\" xcode\n";
+		};
+		B3B337497CF4C504AB11DCB2 = {
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(TARGET_BUILD_DIR)/$(INFOPLIST_PATH)",
+			);
+			isa = PBXShellScriptBuildPhase;
+			name = "Compilar el Go";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(EXECUTABLE_PATH)",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/bash;
+			shellScript = "# La fase de apps/fyne/scripts/empaquetar.sh: el Go de la app (SYTUE_APP) y su Info.plist.\n# Xcode arranca las fases con un PATH mínimo: Go y la CLI de Fyne donde los deja\n# ci_scripts/ci_post_clone.sh en Xcode Cloud, o donde estén en un Mac de desarrollo.\nexport PATH=\"$HOME/.sytue-toolchain/go/bin:/usr/local/go/bin:$HOME/go/bin:/opt/homebrew/bin:/usr/local/bin:$PATH\"\nexport GOPRIVATE='github.com/thinkddr/*'\nexec bash \"$SRCROOT/../scripts/empaquetar.sh\" xcode\n";
+		};
+		BAEF8322870C058D1825AC6B = {
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(TARGET_BUILD_DIR)/$(INFOPLIST_PATH)",
+			);
+			isa = PBXShellScriptBuildPhase;
+			name = "Compilar el Go";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(EXECUTABLE_PATH)",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/bash;
+			shellScript = "# La fase de apps/fyne/scripts/empaquetar.sh: el Go de la app (SYTUE_APP) y su Info.plist.\n# Xcode arranca las fases con un PATH mínimo: Go y la CLI de Fyne donde los deja\n# ci_scripts/ci_post_clone.sh en Xcode Cloud, o donde estén en un Mac de desarrollo.\nexport PATH=\"$HOME/.sytue-toolchain/go/bin:/usr/local/go/bin:$HOME/go/bin:/opt/homebrew/bin:/usr/local/bin:$PATH\"\nexport GOPRIVATE='github.com/thinkddr/*'\nexec bash \"$SRCROOT/../scripts/empaquetar.sh\" xcode\n";
+		};
+		BDBF1D7A5A17FCAD493BBB19 = {
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(TARGET_BUILD_DIR)/$(INFOPLIST_PATH)",
+			);
+			isa = PBXShellScriptBuildPhase;
+			name = "Compilar el Go";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(EXECUTABLE_PATH)",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/bash;
+			shellScript = "# La fase de apps/fyne/scripts/empaquetar.sh: el Go de la app (SYTUE_APP) y su Info.plist.\n# Xcode arranca las fases con un PATH mínimo: Go y la CLI de Fyne donde los deja\n# ci_scripts/ci_post_clone.sh en Xcode Cloud, o donde estén en un Mac de desarrollo.\nexport PATH=\"$HOME/.sytue-toolchain/go/bin:/usr/local/go/bin:$HOME/go/bin:/opt/homebrew/bin:/usr/local/bin:$PATH\"\nexport GOPRIVATE='github.com/thinkddr/*'\nexec bash \"$SRCROOT/../scripts/empaquetar.sh\" xcode\n";
+		};
+		BECF58A5F3F7BF931F122500 = {
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(TARGET_BUILD_DIR)/$(INFOPLIST_PATH)",
+			);
+			isa = PBXShellScriptBuildPhase;
+			name = "Compilar el Go";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(EXECUTABLE_PATH)",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/bash;
+			shellScript = "# La fase de apps/fyne/scripts/empaquetar.sh: el Go de la app (SYTUE_APP) y su Info.plist.\n# Xcode arranca las fases con un PATH mínimo: Go y la CLI de Fyne donde los deja\n# ci_scripts/ci_post_clone.sh en Xcode Cloud, o donde estén en un Mac de desarrollo.\nexport PATH=\"$HOME/.sytue-toolchain/go/bin:/usr/local/go/bin:$HOME/go/bin:/opt/homebrew/bin:/usr/local/bin:$PATH\"\nexport GOPRIVATE='github.com/thinkddr/*'\nexec bash \"$SRCROOT/../scripts/empaquetar.sh\" xcode\n";
+		};
+		C101F9321C449A7BBBE69B46 = {
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(TARGET_BUILD_DIR)/$(INFOPLIST_PATH)",
+			);
+			isa = PBXShellScriptBuildPhase;
+			name = "Compilar el Go";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(EXECUTABLE_PATH)",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/bash;
+			shellScript = "# La fase de apps/fyne/scripts/empaquetar.sh: el Go de la app (SYTUE_APP) y su Info.plist.\n# Xcode arranca las fases con un PATH mínimo: Go y la CLI de Fyne donde los deja\n# ci_scripts/ci_post_clone.sh en Xcode Cloud, o donde estén en un Mac de desarrollo.\nexport PATH=\"$HOME/.sytue-toolchain/go/bin:/usr/local/go/bin:$HOME/go/bin:/opt/homebrew/bin:/usr/local/bin:$PATH\"\nexport GOPRIVATE='github.com/thinkddr/*'\nexec bash \"$SRCROOT/../scripts/empaquetar.sh\" xcode\n";
+		};
+		CE30D9A44F74E837EC27E599 = {
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(TARGET_BUILD_DIR)/$(INFOPLIST_PATH)",
+			);
+			isa = PBXShellScriptBuildPhase;
+			name = "Compilar el Go";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(EXECUTABLE_PATH)",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/bash;
+			shellScript = "# La fase de apps/fyne/scripts/empaquetar.sh: el Go de la app (SYTUE_APP) y su Info.plist.\n# Xcode arranca las fases con un PATH mínimo: Go y la CLI de Fyne donde los deja\n# ci_scripts/ci_post_clone.sh en Xcode Cloud, o donde estén en un Mac de desarrollo.\nexport PATH=\"$HOME/.sytue-toolchain/go/bin:/usr/local/go/bin:$HOME/go/bin:/opt/homebrew/bin:/usr/local/bin:$PATH\"\nexport GOPRIVATE='github.com/thinkddr/*'\nexec bash \"$SRCROOT/../scripts/empaquetar.sh\" xcode\n";
+		};
+		DFAADB5182BCFE92C9958C99 = {
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(TARGET_BUILD_DIR)/$(INFOPLIST_PATH)",
+			);
+			isa = PBXShellScriptBuildPhase;
+			name = "Compilar el Go";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(EXECUTABLE_PATH)",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/bash;
+			shellScript = "# La fase de apps/fyne/scripts/empaquetar.sh: el Go de la app (SYTUE_APP) y su Info.plist.\n# Xcode arranca las fases con un PATH mínimo: Go y la CLI de Fyne donde los deja\n# ci_scripts/ci_post_clone.sh en Xcode Cloud, o donde estén en un Mac de desarrollo.\nexport PATH=\"$HOME/.sytue-toolchain/go/bin:/usr/local/go/bin:$HOME/go/bin:/opt/homebrew/bin:/usr/local/bin:$PATH\"\nexport GOPRIVATE='github.com/thinkddr/*'\nexec bash \"$SRCROOT/../scripts/empaquetar.sh\" xcode\n";
+		};
+		E1F395F7365B46B783F3AB81 = {
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(TARGET_BUILD_DIR)/$(INFOPLIST_PATH)",
+			);
+			isa = PBXShellScriptBuildPhase;
+			name = "Compilar el Go";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(EXECUTABLE_PATH)",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/bash;
+			shellScript = "# La fase de apps/fyne/scripts/empaquetar.sh: el Go de la app (SYTUE_APP) y su Info.plist.\n# Xcode arranca las fases con un PATH mínimo: Go y la CLI de Fyne donde los deja\n# ci_scripts/ci_post_clone.sh en Xcode Cloud, o donde estén en un Mac de desarrollo.\nexport PATH=\"$HOME/.sytue-toolchain/go/bin:/usr/local/go/bin:$HOME/go/bin:/opt/homebrew/bin:/usr/local/bin:$PATH\"\nexport GOPRIVATE='github.com/thinkddr/*'\nexec bash \"$SRCROOT/../scripts/empaquetar.sh\" xcode\n";
+		};
+		0A6B59B65124CF71D0AC1BA4 = {
+			buildActionMask = 2147483647;
+			files = (
+				CB4CF6ED7801FF8DACC01318,
+				5BA6FB7DA3B8EE8F40F4A968,
+			);
+			isa = PBXSourcesBuildPhase;
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		0CF82A6F49971A47C04AA8C7 = {
+			buildActionMask = 2147483647;
+			files = (
+				FFE208335C65466B5E12AF8F,
+				AC307F255573C19E1287AA02,
+			);
+			isa = PBXSourcesBuildPhase;
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		2CFFDFEC3A0C05BCCD45A126 = {
+			buildActionMask = 2147483647;
+			files = (
+				3048D0803BEFFFBBEC346EDB,
+				E7EF426E3F72102F5DA9B0C3,
+			);
+			isa = PBXSourcesBuildPhase;
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		3709E23C81C2D98888195FBD = {
+			buildActionMask = 2147483647;
+			files = (
+				6CABB314190BEEED6DCA9056,
+				F89FACB57204BE80C8863C53,
+			);
+			isa = PBXSourcesBuildPhase;
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		60AF4A7364E790DC22AF4F4C = {
+			buildActionMask = 2147483647;
+			files = (
+				F67BD8EE77EE430707E807FA,
+				38DCE0EF50303FC94AD904DB,
+			);
+			isa = PBXSourcesBuildPhase;
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		847DA413C6FEF6667A20376C = {
+			buildActionMask = 2147483647;
+			files = (
+				54C58155D5124ED0A7213494,
+				16E35E7151AE876450810611,
+			);
+			isa = PBXSourcesBuildPhase;
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A1FDB5828413BA108F6EB8C4 = {
+			buildActionMask = 2147483647;
+			files = (
+				4DA1E732AFCFBB7C5837529D,
+				3C179607F6596509CC3DC618,
+			);
+			isa = PBXSourcesBuildPhase;
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AE16C529B4AD47AF10B61728 = {
+			buildActionMask = 2147483647;
+			files = (
+				CD9D24EC3F230D184A98BDAC,
+				D942158D2A1187C28E0CC351,
+			);
+			isa = PBXSourcesBuildPhase;
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B497B47DD568A111CD899AE7 = {
+			buildActionMask = 2147483647;
+			files = (
+				FC86DC96BCB7B7F0E7814879,
+				70A9C476E0D6BB30C95198CB,
+			);
+			isa = PBXSourcesBuildPhase;
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C1831B12EDF28C293CCE4B38 = {
+			buildActionMask = 2147483647;
+			files = (
+				B8ED74C394F6237723EFAF1B,
+				942FAD2BCBE37A395880AE43,
+			);
+			isa = PBXSourcesBuildPhase;
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C7B7C49FB4BB8282DF8CB795 = {
+			buildActionMask = 2147483647;
+			files = (
+				273301F9D2238C9888F3BCFA,
+			);
+			isa = PBXSourcesBuildPhase;
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D2178F38A767BA4E9E448A07 = {
+			buildActionMask = 2147483647;
+			files = (
+				79C29928707B8C485CD0190C,
+				4AC2068ED829BF4A2DF05357,
+			);
+			isa = PBXSourcesBuildPhase;
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D555994A341463883FBC64C7 = {
+			buildActionMask = 2147483647;
+			files = (
+				9A144A23C03089DC59945D95,
+				090439908A834FED2F4D6C6E,
+			);
+			isa = PBXSourcesBuildPhase;
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E4C6C0BD245B464A6373829E = {
+			buildActionMask = 2147483647;
+			files = (
+				4FE17D061F1C8ACE422AA4CD,
+			);
+			isa = PBXSourcesBuildPhase;
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F045AC62B1B10D7FAB85DDBA = {
+			buildActionMask = 2147483647;
+			files = (
+				61D965FC6567ECA424F66943,
+				8AAC904511866BEC107AFE10,
+			);
+			isa = PBXSourcesBuildPhase;
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F66D7342E0A22D5EB61C046B = {
+			buildActionMask = 2147483647;
+			files = (
+				CACE6499D150266DE2650120,
+				42228B12DB7C14E6DFCB560D,
+			);
+			isa = PBXSourcesBuildPhase;
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F682336B6EB8CB3B12523473 = {
+			buildActionMask = 2147483647;
+			files = (
+				2910827A886FE410FF14750D,
+				276DA61F22C039064F01E7D2,
+			);
+			isa = PBXSourcesBuildPhase;
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		36FF1361793A4861B44AE0E5 = {
+			isa = PBXTargetDependency;
+			target = 26FA2B47A8C639F4FA71C9B5;
+			targetProxy = DB841A544DC75D3966AE1710;
+		};
+		B7AB8BF9FAF3106CA75C66E3 = {
+			children = (
+				A5895ECB5A3675A109478A2A,
+				9B2EAD408EA2237709459FF3,
+				9DEC49C30DE397EFECAC517E,
+				16EE107058259F5C026CA863,
+				3DBC73E219D7E9352FAF2B9F,
+				8073591D9BEE3307F22A6EAC,
+				5BBB15C4DAD97EA026F40308,
+				9E32DB0A9259439871872319,
+				5214480F84EDEAE34F35DC87,
+				0C48C2DD8379EE82EFFA365A,
+				A3874F94EB40F7F1B8E0FAAE,
+				130CB88F7262AD4A6CD44C90,
+				B0661EA557F4802E55048624,
+				E557850512AAEA4334F54FE8,
+				F57A2D84B16FF15A50FCEA76,
+				ED0C506C4EF0440C331CD17B,
+				4EC9F3A93259763A8F9B315F,
+				82862B1E25474CF1E3FC196E,
+				542EBB6CAAE5FF2E8E106C02,
+				642AEF1FAA438DC47C405AC6,
+				4A91F842B128F0DBD49C94C4,
+				E610064699BEA5E7829A0BC6,
+				5BF8565CDE2A10879AD9D2E3,
+				C2EB9A020A83B228BF3FAB04,
+				4B8C47AAA9AB7AEE65FFE3FF,
+				2331385AA56F5B5F644FE25C,
+			);
+			isa = PBXVariantGroup;
+			name = Localizable.strings;
+			sourceTree = "<group>";
+		};
+		C5C45E2AD7B62CDBAEEB36B2 = {
+			children = (
+				7C1F8D3E3A4BC53D36362924,
+				A00653032AD13938F7A97254,
+				8AE25D6A80AB83F66D265590,
+				812F6BE29BC45FC8AA07874E,
+				97BE80E7D4CA86BAB355872B,
+				AAF4219D5E1CA3F0E4BEEA7F,
+				E2C70895C045063E938AFD8E,
+				998F2D180E5B7A3EB2AC6D42,
+				476325AF68535334A1536FBB,
+				1CC6328102BCF8AFB68B220B,
+				C0B81F3448E5CFB7DE90D4D2,
+				729F22B4965821E558C40177,
+				21389B72E1E1FE6A29B1D834,
+				F90472E49C8C360E7C3252CD,
+				9ED6A08CA5186DF237D33B09,
+				4B2C9153C4E13A235F892FE8,
+				A00C1E65F1B0FAE79BB8E25E,
+				491BFAD79361AC0511AF264A,
+				80175A5ECC9022D7FD2DD4DE,
+				C97EB7ECD90B0B9509A0556E,
+				89BDF058D83A0FC7638466BD,
+				F75D765D45BFABF813DEFBF1,
+				0692519CEF693D7A58CA2037,
+				DAD3A2608E45322167371C14,
+				4774E3E026C40878E65C71DC,
+				DE769B25D898EE1FCF8AD093,
+			);
+			isa = PBXVariantGroup;
+			name = Localizable.stringsdict;
+			sourceTree = "<group>";
+		};
+		02F154C2513F88DDCA5510FF = {
+			buildSettings = {
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = photos/ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = photos/tienda.entitlements;
+				EXECUTABLE_NAME = "sytue-photos";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.photos;
+				PRODUCT_NAME = "Sytue Photos";
+				SYTUE_APP = photos;
+			};
+			isa = XCBuildConfiguration;
+			name = Debug;
+		};
+		0316095A4D756F5A4F948560 = {
+			buildSettings = {
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = cast/ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = cast/tienda.entitlements;
+				EXECUTABLE_NAME = "sytue-cast";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.cast;
+				PRODUCT_NAME = "Sytue Cast";
+				SYTUE_APP = cast;
+			};
+			isa = XCBuildConfiguration;
+			name = Release;
+		};
+		098515EA4C06E4A1B24A4159 = {
+			buildSettings = {
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = bases/ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = bases/tienda.entitlements;
+				EXECUTABLE_NAME = "sytue-bases";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.bases;
+				PRODUCT_NAME = "Sytue Bases";
+				SYTUE_APP = bases;
+			};
+			isa = XCBuildConfiguration;
+			name = Debug;
+		};
+		09CC2915C2E51AA2A9D1BF1E = {
+			buildSettings = {
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = rooms/ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = rooms/tienda.entitlements;
+				EXECUTABLE_NAME = "sytue-rooms";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.rooms;
+				PRODUCT_NAME = "Sytue Rooms";
+				SYTUE_APP = rooms;
+			};
+			isa = XCBuildConfiguration;
+			name = Release;
+		};
+		0A3A2273A432579BD01A16AC = {
+			buildSettings = {
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = hub/ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = hub/tienda.entitlements;
+				EXECUTABLE_NAME = "sytue-hub";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.one;
+				PRODUCT_NAME = "Sytue Hub";
+				SYTUE_APP = hub;
+			};
+			isa = XCBuildConfiguration;
+			name = Debug;
+		};
+		0BF8B0809E33FDF170EB44E4 = {
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = erp/widgets/ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = erp/widgets/macos.entitlements;
+				INFOPLIST_FILE = erp/widgets/Info.plist;
+				"INFOPLIST_FILE[sdk=macosx*]" = erp/widgets/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../../Frameworks /usr/lib/swift";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "$(inherited) @executable_path/../../../../Frameworks /usr/lib/swift";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.erp.widgets;
+				PRODUCT_NAME = "Sytue-erp-Widgets";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			isa = XCBuildConfiguration;
+			name = Debug;
+		};
+		1BD5044FDF286715CD116C4B = {
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = drive/archivos/ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = drive/archivos/macos.entitlements;
+				INFOPLIST_FILE = drive/archivos/Info.plist;
+				"INFOPLIST_FILE[sdk=macosx*]" = drive/archivos/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks @executable_path/../../Frameworks";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "$(inherited) @executable_path/../Frameworks @executable_path/../../../../Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.drive.archivos;
+				PRODUCT_NAME = Archivos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				SYTUE_GRUPO_ARCHIVOS = group.eu.sytue.drive;
+				"SYTUE_GRUPO_ARCHIVOS[sdk=macosx*]" = VHC5QW7BZ3.eu.sytue.drive;
+			};
+			isa = XCBuildConfiguration;
+			name = Release;
+		};
+		208A3B3DDCC3BA628975B403 = {
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = notes/widgets/ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = notes/widgets/macos.entitlements;
+				INFOPLIST_FILE = notes/widgets/Info.plist;
+				"INFOPLIST_FILE[sdk=macosx*]" = notes/widgets/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../../Frameworks /usr/lib/swift";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "$(inherited) @executable_path/../../../../Frameworks /usr/lib/swift";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.notes.widgets;
+				PRODUCT_NAME = "Sytue-notes-Widgets";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			isa = XCBuildConfiguration;
+			name = Release;
+		};
+		232C1D0FAF176D8594FC46F9 = {
+			buildSettings = {
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = diapos/ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = diapos/tienda.entitlements;
+				EXECUTABLE_NAME = "sytue-diapos";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.diapos;
+				PRODUCT_NAME = "Sytue Diapos";
+				SYTUE_APP = diapos;
+			};
+			isa = XCBuildConfiguration;
+			name = Debug;
+		};
+		234185362D3355E34F5B291C = {
+			buildSettings = {
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = certipdf/ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = certipdf/tienda.entitlements;
+				EXECUTABLE_NAME = "sytue-certipdf";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.certipdf;
+				PRODUCT_NAME = "Sytue CertiPDF";
+				SYTUE_APP = certipdf;
+			};
+			isa = XCBuildConfiguration;
+			name = Debug;
+		};
+		2602971AC117A668FEA5F135 = {
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = calcus/widgets/ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = calcus/widgets/macos.entitlements;
+				INFOPLIST_FILE = calcus/widgets/Info.plist;
+				"INFOPLIST_FILE[sdk=macosx*]" = calcus/widgets/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../../Frameworks /usr/lib/swift";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "$(inherited) @executable_path/../../../../Frameworks /usr/lib/swift";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.calcus.widgets;
+				PRODUCT_NAME = "Sytue-calcus-Widgets";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			isa = XCBuildConfiguration;
+			name = Debug;
+		};
+		2E66F7C31A122467E8448179 = {
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = contacts/widgets/ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = contacts/widgets/macos.entitlements;
+				INFOPLIST_FILE = contacts/widgets/Info.plist;
+				"INFOPLIST_FILE[sdk=macosx*]" = contacts/widgets/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../../Frameworks /usr/lib/swift";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "$(inherited) @executable_path/../../../../Frameworks /usr/lib/swift";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.contacts.widgets;
+				PRODUCT_NAME = "Sytue-contacts-Widgets";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			isa = XCBuildConfiguration;
+			name = Debug;
+		};
+		392B784C0566141965108771 = {
+			buildSettings = {
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = contacts/ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = contacts/tienda.entitlements;
+				EXECUTABLE_NAME = "sytue-contacts";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.contacts;
+				PRODUCT_NAME = "Sytue Contacts";
+				SYTUE_APP = contacts;
+			};
+			isa = XCBuildConfiguration;
+			name = Debug;
+		};
+		3B37A38440095E2C37C8E67F = {
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = certipdf/widgets/ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = certipdf/widgets/macos.entitlements;
+				INFOPLIST_FILE = certipdf/widgets/Info.plist;
+				"INFOPLIST_FILE[sdk=macosx*]" = certipdf/widgets/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../../Frameworks /usr/lib/swift";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "$(inherited) @executable_path/../../../../Frameworks /usr/lib/swift";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.certipdf.widgets;
+				PRODUCT_NAME = "Sytue-certipdf-Widgets";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			isa = XCBuildConfiguration;
+			name = Release;
+		};
+		3C50FFD862FED9EDA317BDAD = {
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = certipdf/widgets/ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = certipdf/widgets/macos.entitlements;
+				INFOPLIST_FILE = certipdf/widgets/Info.plist;
+				"INFOPLIST_FILE[sdk=macosx*]" = certipdf/widgets/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../../Frameworks /usr/lib/swift";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "$(inherited) @executable_path/../../../../Frameworks /usr/lib/swift";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.certipdf.widgets;
+				PRODUCT_NAME = "Sytue-certipdf-Widgets";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			isa = XCBuildConfiguration;
+			name = Debug;
+		};
+		4402AE03477BAA70CCB79B70 = {
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				DEFINES_MODULE = YES;
+				INFOPLIST_FILE = "widgets/Puente-Info.plist";
+				"INFOPLIST_FILE[sdk=macosx*]" = "widgets/Puente-Info.plist";
+				LD_DYLIB_INSTALL_NAME = "@rpath/$(EXECUTABLE_PATH)";
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) /usr/lib/swift";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.widgetbridge;
+				PRODUCT_NAME = SytueWidgetBridge;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			isa = XCBuildConfiguration;
+			name = Release;
+		};
+		4B2FAB3DB6F7ADABBA8C6A92 = {
+			baseConfigurationReference = 74CDE4CFE28F715C1EB95497;
+			buildSettings = {
+				ONLY_ACTIVE_ARCH = YES;
+			};
+			isa = XCBuildConfiguration;
+			name = Debug;
+		};
+		4C075BC88594FB019AEB6CE8 = {
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = bases/widgets/ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = bases/widgets/macos.entitlements;
+				INFOPLIST_FILE = bases/widgets/Info.plist;
+				"INFOPLIST_FILE[sdk=macosx*]" = bases/widgets/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../../Frameworks /usr/lib/swift";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "$(inherited) @executable_path/../../../../Frameworks /usr/lib/swift";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.bases.widgets;
+				PRODUCT_NAME = "Sytue-bases-Widgets";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			isa = XCBuildConfiguration;
+			name = Release;
+		};
+		4CCD11C0680934EFB1980018 = {
+			baseConfigurationReference = 74CDE4CFE28F715C1EB95497;
+			buildSettings = {
+			};
+			isa = XCBuildConfiguration;
+			name = Release;
+		};
+		511ADADEA4F29D87677E2296 = {
+			buildSettings = {
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = diapos/ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = diapos/tienda.entitlements;
+				EXECUTABLE_NAME = "sytue-diapos";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.diapos;
+				PRODUCT_NAME = "Sytue Diapos";
+				SYTUE_APP = diapos;
+			};
+			isa = XCBuildConfiguration;
+			name = Release;
+		};
+		537794031FA851803E58089E = {
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = cast/widgets/ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = cast/widgets/macos.entitlements;
+				INFOPLIST_FILE = cast/widgets/Info.plist;
+				"INFOPLIST_FILE[sdk=macosx*]" = cast/widgets/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../../Frameworks /usr/lib/swift";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "$(inherited) @executable_path/../../../../Frameworks /usr/lib/swift";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.cast.widgets;
+				PRODUCT_NAME = "Sytue-cast-Widgets";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			isa = XCBuildConfiguration;
+			name = Release;
+		};
+		571661C385D2DC3CD1E8EE47 = {
+			buildSettings = {
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = mail/ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = mail/tienda.entitlements;
+				EXECUTABLE_NAME = "sytue-mail";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.mail;
+				PRODUCT_NAME = "Sytue Mail";
+				SYTUE_APP = mail;
+			};
+			isa = XCBuildConfiguration;
+			name = Release;
+		};
+		58573F8A35DB084C13B72100 = {
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = erp/widgets/ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = erp/widgets/macos.entitlements;
+				INFOPLIST_FILE = erp/widgets/Info.plist;
+				"INFOPLIST_FILE[sdk=macosx*]" = erp/widgets/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../../Frameworks /usr/lib/swift";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "$(inherited) @executable_path/../../../../Frameworks /usr/lib/swift";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.erp.widgets;
+				PRODUCT_NAME = "Sytue-erp-Widgets";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			isa = XCBuildConfiguration;
+			name = Release;
+		};
+		5BB1E1652B5CC102F7680926 = {
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = bases/widgets/ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = bases/widgets/macos.entitlements;
+				INFOPLIST_FILE = bases/widgets/Info.plist;
+				"INFOPLIST_FILE[sdk=macosx*]" = bases/widgets/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../../Frameworks /usr/lib/swift";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "$(inherited) @executable_path/../../../../Frameworks /usr/lib/swift";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.bases.widgets;
+				PRODUCT_NAME = "Sytue-bases-Widgets";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			isa = XCBuildConfiguration;
+			name = Debug;
+		};
+		5C7BF91A500BD1F56014B95D = {
+			buildSettings = {
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = contacts/ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = contacts/tienda.entitlements;
+				EXECUTABLE_NAME = "sytue-contacts";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.contacts;
+				PRODUCT_NAME = "Sytue Contacts";
+				SYTUE_APP = contacts;
+			};
+			isa = XCBuildConfiguration;
+			name = Release;
+		};
+		5DECC11E4309E8DC777A183B = {
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = hub/widgets/ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = hub/widgets/macos.entitlements;
+				INFOPLIST_FILE = hub/widgets/Info.plist;
+				"INFOPLIST_FILE[sdk=macosx*]" = hub/widgets/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../../Frameworks /usr/lib/swift";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "$(inherited) @executable_path/../../../../Frameworks /usr/lib/swift";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.one.widgets;
+				PRODUCT_NAME = "Sytue-hub-Widgets";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			isa = XCBuildConfiguration;
+			name = Release;
+		};
+		616186F594F47C54A45CCF96 = {
+			buildSettings = {
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = calcus/ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = calcus/tienda.entitlements;
+				EXECUTABLE_NAME = "sytue-calcus";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.calcus;
+				PRODUCT_NAME = "Sytue Calcus";
+				SYTUE_APP = calcus;
+			};
+			isa = XCBuildConfiguration;
+			name = Debug;
+		};
+		6701521DFCAE57E079152E43 = {
+			buildSettings = {
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = bases/ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = bases/tienda.entitlements;
+				EXECUTABLE_NAME = "sytue-bases";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.bases;
+				PRODUCT_NAME = "Sytue Bases";
+				SYTUE_APP = bases;
+			};
+			isa = XCBuildConfiguration;
+			name = Release;
+		};
+		6BAE6D1B1A6F5A97E2C37DA7 = {
+			buildSettings = {
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = rooms/ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = rooms/tienda.entitlements;
+				EXECUTABLE_NAME = "sytue-rooms";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.rooms;
+				PRODUCT_NAME = "Sytue Rooms";
+				SYTUE_APP = rooms;
+			};
+			isa = XCBuildConfiguration;
+			name = Debug;
+		};
+		6D7E48CF0ADA64E9528B7B77 = {
+			buildSettings = {
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = drive/ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = drive/tienda.entitlements;
+				EXECUTABLE_NAME = "sytue-drive";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.drive;
+				PRODUCT_NAME = "Sytue Drive";
+				SYTUE_APP = drive;
+			};
+			isa = XCBuildConfiguration;
+			name = Release;
+		};
+		72B897394A861677CED0DC97 = {
+			buildSettings = {
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = notes/ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = notes/tienda.entitlements;
+				EXECUTABLE_NAME = "sytue-notes";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.notes;
+				PRODUCT_NAME = "Sytue Notepads";
+				SYTUE_APP = notes;
+			};
+			isa = XCBuildConfiguration;
+			name = Debug;
+		};
+		7D68EE83D6C00B8E3ACDF362 = {
+			buildSettings = {
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = certipdf/ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = certipdf/tienda.entitlements;
+				EXECUTABLE_NAME = "sytue-certipdf";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.certipdf;
+				PRODUCT_NAME = "Sytue CertiPDF";
+				SYTUE_APP = certipdf;
+			};
+			isa = XCBuildConfiguration;
+			name = Release;
+		};
+		81F64830C282A41FD97A8DD9 = {
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = photos/widgets/ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = photos/widgets/macos.entitlements;
+				INFOPLIST_FILE = photos/widgets/Info.plist;
+				"INFOPLIST_FILE[sdk=macosx*]" = photos/widgets/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../../Frameworks /usr/lib/swift";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "$(inherited) @executable_path/../../../../Frameworks /usr/lib/swift";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.photos.widgets;
+				PRODUCT_NAME = "Sytue-photos-Widgets";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			isa = XCBuildConfiguration;
+			name = Debug;
+		};
+		820CC83C6CA3AC04FF95ACE7 = {
+			buildSettings = {
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = calendar/ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = calendar/tienda.entitlements;
+				EXECUTABLE_NAME = "sytue-calendar";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.calendar;
+				PRODUCT_NAME = "Sytue Calendar";
+				SYTUE_APP = calendar;
+			};
+			isa = XCBuildConfiguration;
+			name = Debug;
+		};
+		82C32FDCB333DDD9EC5D1FE4 = {
+			buildSettings = {
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = erp/ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = erp/tienda.entitlements;
+				EXECUTABLE_NAME = "sytue-erp";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.erp;
+				PRODUCT_NAME = "Sytue ERP";
+				SYTUE_APP = erp;
+			};
+			isa = XCBuildConfiguration;
+			name = Debug;
+		};
+		834A1B7C8E1AB59A5033CC0F = {
+			buildSettings = {
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = notes/ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = notes/tienda.entitlements;
+				EXECUTABLE_NAME = "sytue-notes";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.notes;
+				PRODUCT_NAME = "Sytue Notepads";
+				SYTUE_APP = notes;
+			};
+			isa = XCBuildConfiguration;
+			name = Release;
+		};
+		84E9918B94361E9008D9C630 = {
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = diapos/widgets/ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = diapos/widgets/macos.entitlements;
+				INFOPLIST_FILE = diapos/widgets/Info.plist;
+				"INFOPLIST_FILE[sdk=macosx*]" = diapos/widgets/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../../Frameworks /usr/lib/swift";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "$(inherited) @executable_path/../../../../Frameworks /usr/lib/swift";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.diapos.widgets;
+				PRODUCT_NAME = "Sytue-diapos-Widgets";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			isa = XCBuildConfiguration;
+			name = Release;
+		};
+		8893F411D6FF6DA5F660E135 = {
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = calendar/widgets/ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = calendar/widgets/macos.entitlements;
+				INFOPLIST_FILE = calendar/widgets/Info.plist;
+				"INFOPLIST_FILE[sdk=macosx*]" = calendar/widgets/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../../Frameworks /usr/lib/swift";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "$(inherited) @executable_path/../../../../Frameworks /usr/lib/swift";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.calendar.widgets;
+				PRODUCT_NAME = "Sytue-calendar-Widgets";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			isa = XCBuildConfiguration;
+			name = Release;
+		};
+		8C3B44CC4708428A7A87DC50 = {
+			buildSettings = {
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = calendar/ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = calendar/tienda.entitlements;
+				EXECUTABLE_NAME = "sytue-calendar";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.calendar;
+				PRODUCT_NAME = "Sytue Calendar";
+				SYTUE_APP = calendar;
+			};
+			isa = XCBuildConfiguration;
+			name = Release;
+		};
+		94B7062B492FC9497905B342 = {
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = rooms/widgets/ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = rooms/widgets/macos.entitlements;
+				INFOPLIST_FILE = rooms/widgets/Info.plist;
+				"INFOPLIST_FILE[sdk=macosx*]" = rooms/widgets/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../../Frameworks /usr/lib/swift";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "$(inherited) @executable_path/../../../../Frameworks /usr/lib/swift";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.rooms.widgets;
+				PRODUCT_NAME = "Sytue-rooms-Widgets";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			isa = XCBuildConfiguration;
+			name = Debug;
+		};
+		9854852E60263B2DA538C935 = {
+			buildSettings = {
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = docus/ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = docus/tienda.entitlements;
+				EXECUTABLE_NAME = "sytue-docus";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.docus;
+				PRODUCT_NAME = "Sytue Docus";
+				SYTUE_APP = docus;
+			};
+			isa = XCBuildConfiguration;
+			name = Debug;
+		};
+		9AFE515A1617993B61712CC5 = {
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				DEFINES_MODULE = YES;
+				INFOPLIST_FILE = "widgets/Puente-Info.plist";
+				"INFOPLIST_FILE[sdk=macosx*]" = "widgets/Puente-Info.plist";
+				LD_DYLIB_INSTALL_NAME = "@rpath/$(EXECUTABLE_PATH)";
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) /usr/lib/swift";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.widgetbridge;
+				PRODUCT_NAME = SytueWidgetBridge;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			isa = XCBuildConfiguration;
+			name = Debug;
+		};
+		9B5F65A51856381D9D1F9976 = {
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = mail/widgets/ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = mail/widgets/macos.entitlements;
+				INFOPLIST_FILE = mail/widgets/Info.plist;
+				"INFOPLIST_FILE[sdk=macosx*]" = mail/widgets/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../../Frameworks /usr/lib/swift";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "$(inherited) @executable_path/../../../../Frameworks /usr/lib/swift";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.mail.widgets;
+				PRODUCT_NAME = "Sytue-mail-Widgets";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			isa = XCBuildConfiguration;
+			name = Release;
+		};
+		B3EE295687EF2498748A6361 = {
+			buildSettings = {
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = calcus/ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = calcus/tienda.entitlements;
+				EXECUTABLE_NAME = "sytue-calcus";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.calcus;
+				PRODUCT_NAME = "Sytue Calcus";
+				SYTUE_APP = calcus;
+			};
+			isa = XCBuildConfiguration;
+			name = Release;
+		};
+		B61CD205A9A5CBD7C64BC609 = {
+			buildSettings = {
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = drive/ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = drive/tienda.entitlements;
+				EXECUTABLE_NAME = "sytue-drive";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.drive;
+				PRODUCT_NAME = "Sytue Drive";
+				SYTUE_APP = drive;
+			};
+			isa = XCBuildConfiguration;
+			name = Debug;
+		};
+		B7913A2659DAE0003B945905 = {
+			buildSettings = {
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = docus/ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = docus/tienda.entitlements;
+				EXECUTABLE_NAME = "sytue-docus";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.docus;
+				PRODUCT_NAME = "Sytue Docus";
+				SYTUE_APP = docus;
+			};
+			isa = XCBuildConfiguration;
+			name = Release;
+		};
+		B7A9E9692989AAEE675B3C5C = {
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = mail/widgets/ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = mail/widgets/macos.entitlements;
+				INFOPLIST_FILE = mail/widgets/Info.plist;
+				"INFOPLIST_FILE[sdk=macosx*]" = mail/widgets/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../../Frameworks /usr/lib/swift";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "$(inherited) @executable_path/../../../../Frameworks /usr/lib/swift";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.mail.widgets;
+				PRODUCT_NAME = "Sytue-mail-Widgets";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			isa = XCBuildConfiguration;
+			name = Debug;
+		};
+		B9D858F4A03A30A72C6032A2 = {
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = calendar/widgets/ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = calendar/widgets/macos.entitlements;
+				INFOPLIST_FILE = calendar/widgets/Info.plist;
+				"INFOPLIST_FILE[sdk=macosx*]" = calendar/widgets/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../../Frameworks /usr/lib/swift";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "$(inherited) @executable_path/../../../../Frameworks /usr/lib/swift";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.calendar.widgets;
+				PRODUCT_NAME = "Sytue-calendar-Widgets";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			isa = XCBuildConfiguration;
+			name = Debug;
+		};
+		BBF08756987DD8B75A2C9A45 = {
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = diapos/widgets/ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = diapos/widgets/macos.entitlements;
+				INFOPLIST_FILE = diapos/widgets/Info.plist;
+				"INFOPLIST_FILE[sdk=macosx*]" = diapos/widgets/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../../Frameworks /usr/lib/swift";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "$(inherited) @executable_path/../../../../Frameworks /usr/lib/swift";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.diapos.widgets;
+				PRODUCT_NAME = "Sytue-diapos-Widgets";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			isa = XCBuildConfiguration;
+			name = Debug;
+		};
+		C906C7F53465F50338937AD6 = {
+			buildSettings = {
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = hub/ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = hub/tienda.entitlements;
+				EXECUTABLE_NAME = "sytue-hub";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.one;
+				PRODUCT_NAME = "Sytue Hub";
+				SYTUE_APP = hub;
+			};
+			isa = XCBuildConfiguration;
+			name = Release;
+		};
+		CE864967AF266ED901A6C134 = {
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = drive/widgets/ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = drive/widgets/macos.entitlements;
+				INFOPLIST_FILE = drive/widgets/Info.plist;
+				"INFOPLIST_FILE[sdk=macosx*]" = drive/widgets/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../../Frameworks /usr/lib/swift";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "$(inherited) @executable_path/../../../../Frameworks /usr/lib/swift";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.drive.widgets;
+				PRODUCT_NAME = "Sytue-drive-Widgets";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			isa = XCBuildConfiguration;
+			name = Release;
+		};
+		D230CC0FC29D18D82F8E61C2 = {
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = rooms/widgets/ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = rooms/widgets/macos.entitlements;
+				INFOPLIST_FILE = rooms/widgets/Info.plist;
+				"INFOPLIST_FILE[sdk=macosx*]" = rooms/widgets/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../../Frameworks /usr/lib/swift";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "$(inherited) @executable_path/../../../../Frameworks /usr/lib/swift";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.rooms.widgets;
+				PRODUCT_NAME = "Sytue-rooms-Widgets";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			isa = XCBuildConfiguration;
+			name = Release;
+		};
+		D442903810AFFD625F6A3766 = {
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = cast/widgets/ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = cast/widgets/macos.entitlements;
+				INFOPLIST_FILE = cast/widgets/Info.plist;
+				"INFOPLIST_FILE[sdk=macosx*]" = cast/widgets/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../../Frameworks /usr/lib/swift";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "$(inherited) @executable_path/../../../../Frameworks /usr/lib/swift";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.cast.widgets;
+				PRODUCT_NAME = "Sytue-cast-Widgets";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			isa = XCBuildConfiguration;
+			name = Debug;
+		};
+		D465B06EE4503C291599D0A8 = {
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = notes/widgets/ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = notes/widgets/macos.entitlements;
+				INFOPLIST_FILE = notes/widgets/Info.plist;
+				"INFOPLIST_FILE[sdk=macosx*]" = notes/widgets/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../../Frameworks /usr/lib/swift";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "$(inherited) @executable_path/../../../../Frameworks /usr/lib/swift";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.notes.widgets;
+				PRODUCT_NAME = "Sytue-notes-Widgets";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			isa = XCBuildConfiguration;
+			name = Debug;
+		};
+		DD017198F0144E16F203E0F3 = {
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = drive/widgets/ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = drive/widgets/macos.entitlements;
+				INFOPLIST_FILE = drive/widgets/Info.plist;
+				"INFOPLIST_FILE[sdk=macosx*]" = drive/widgets/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../../Frameworks /usr/lib/swift";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "$(inherited) @executable_path/../../../../Frameworks /usr/lib/swift";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.drive.widgets;
+				PRODUCT_NAME = "Sytue-drive-Widgets";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			isa = XCBuildConfiguration;
+			name = Debug;
+		};
+		E96FF632D799B63B046E8847 = {
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = contacts/widgets/ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = contacts/widgets/macos.entitlements;
+				INFOPLIST_FILE = contacts/widgets/Info.plist;
+				"INFOPLIST_FILE[sdk=macosx*]" = contacts/widgets/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../../Frameworks /usr/lib/swift";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "$(inherited) @executable_path/../../../../Frameworks /usr/lib/swift";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.contacts.widgets;
+				PRODUCT_NAME = "Sytue-contacts-Widgets";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			isa = XCBuildConfiguration;
+			name = Release;
+		};
+		EB7C74CA3F5C3F39CB629357 = {
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = drive/archivos/ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = drive/archivos/macos.entitlements;
+				INFOPLIST_FILE = drive/archivos/Info.plist;
+				"INFOPLIST_FILE[sdk=macosx*]" = drive/archivos/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks @executable_path/../../Frameworks";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "$(inherited) @executable_path/../Frameworks @executable_path/../../../../Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.drive.archivos;
+				PRODUCT_NAME = Archivos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				SYTUE_GRUPO_ARCHIVOS = group.eu.sytue.drive;
+				"SYTUE_GRUPO_ARCHIVOS[sdk=macosx*]" = VHC5QW7BZ3.eu.sytue.drive;
+			};
+			isa = XCBuildConfiguration;
+			name = Debug;
+		};
+		F0463B3049A44D176DEC246B = {
+			buildSettings = {
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = photos/ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = photos/tienda.entitlements;
+				EXECUTABLE_NAME = "sytue-photos";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.photos;
+				PRODUCT_NAME = "Sytue Photos";
+				SYTUE_APP = photos;
+			};
+			isa = XCBuildConfiguration;
+			name = Release;
+		};
+		F28A4AF3BE23EA2A0F72CF0E = {
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = docus/widgets/ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = docus/widgets/macos.entitlements;
+				INFOPLIST_FILE = docus/widgets/Info.plist;
+				"INFOPLIST_FILE[sdk=macosx*]" = docus/widgets/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../../Frameworks /usr/lib/swift";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "$(inherited) @executable_path/../../../../Frameworks /usr/lib/swift";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.docus.widgets;
+				PRODUCT_NAME = "Sytue-docus-Widgets";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			isa = XCBuildConfiguration;
+			name = Release;
+		};
+		F32F245754267D2D1093B3BF = {
+			buildSettings = {
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = mail/ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = mail/tienda.entitlements;
+				EXECUTABLE_NAME = "sytue-mail";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.mail;
+				PRODUCT_NAME = "Sytue Mail";
+				SYTUE_APP = mail;
+			};
+			isa = XCBuildConfiguration;
+			name = Debug;
+		};
+		F42D03441417F77362F6CE2E = {
+			buildSettings = {
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = erp/ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = erp/tienda.entitlements;
+				EXECUTABLE_NAME = "sytue-erp";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.erp;
+				PRODUCT_NAME = "Sytue ERP";
+				SYTUE_APP = erp;
+			};
+			isa = XCBuildConfiguration;
+			name = Release;
+		};
+		F58B0511F61D0161F111595C = {
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = docus/widgets/ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = docus/widgets/macos.entitlements;
+				INFOPLIST_FILE = docus/widgets/Info.plist;
+				"INFOPLIST_FILE[sdk=macosx*]" = docus/widgets/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../../Frameworks /usr/lib/swift";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "$(inherited) @executable_path/../../../../Frameworks /usr/lib/swift";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.docus.widgets;
+				PRODUCT_NAME = "Sytue-docus-Widgets";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			isa = XCBuildConfiguration;
+			name = Debug;
+		};
+		F5D8D9E8652EA6EE5E5DB2D6 = {
+			buildSettings = {
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = cast/ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = cast/tienda.entitlements;
+				EXECUTABLE_NAME = "sytue-cast";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.cast;
+				PRODUCT_NAME = "Sytue Cast";
+				SYTUE_APP = cast;
+			};
+			isa = XCBuildConfiguration;
+			name = Debug;
+		};
+		FA838878EED7ABF695F51DE0 = {
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = photos/widgets/ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = photos/widgets/macos.entitlements;
+				INFOPLIST_FILE = photos/widgets/Info.plist;
+				"INFOPLIST_FILE[sdk=macosx*]" = photos/widgets/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../../Frameworks /usr/lib/swift";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "$(inherited) @executable_path/../../../../Frameworks /usr/lib/swift";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.photos.widgets;
+				PRODUCT_NAME = "Sytue-photos-Widgets";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			isa = XCBuildConfiguration;
+			name = Release;
+		};
+		FF1F9B79E2924053609D350B = {
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = hub/widgets/ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = hub/widgets/macos.entitlements;
+				INFOPLIST_FILE = hub/widgets/Info.plist;
+				"INFOPLIST_FILE[sdk=macosx*]" = hub/widgets/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../../Frameworks /usr/lib/swift";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "$(inherited) @executable_path/../../../../Frameworks /usr/lib/swift";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.one.widgets;
+				PRODUCT_NAME = "Sytue-hub-Widgets";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			isa = XCBuildConfiguration;
+			name = Debug;
+		};
+		FFE721535A4B0E4FC4232A6E = {
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = calcus/widgets/ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = calcus/widgets/macos.entitlements;
+				INFOPLIST_FILE = calcus/widgets/Info.plist;
+				"INFOPLIST_FILE[sdk=macosx*]" = calcus/widgets/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../../Frameworks /usr/lib/swift";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "$(inherited) @executable_path/../../../../Frameworks /usr/lib/swift";
+				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.calcus.widgets;
+				PRODUCT_NAME = "Sytue-calcus-Widgets";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			isa = XCBuildConfiguration;
+			name = Release;
+		};
+		00B96F77A909C4C449A798B3 = {
+			buildConfigurations = (
+				02F154C2513F88DDCA5510FF,
+				F0463B3049A44D176DEC246B,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+			isa = XCConfigurationList;
+		};
+		00E614CB8FC399E7FF3259BC = {
+			buildConfigurations = (
+				3C50FFD862FED9EDA317BDAD,
+				3B37A38440095E2C37C8E67F,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+			isa = XCConfigurationList;
+		};
+		0FC7AA4EDB77FA8F7D69A400 = {
+			buildConfigurations = (
+				2E66F7C31A122467E8448179,
+				E96FF632D799B63B046E8847,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+			isa = XCConfigurationList;
+		};
+		16E07C692445C6E897F2E1E0 = {
+			buildConfigurations = (
+				B9D858F4A03A30A72C6032A2,
+				8893F411D6FF6DA5F660E135,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+			isa = XCConfigurationList;
+		};
+		280A5DE6D86629DBEA2F8C83 = {
+			buildConfigurations = (
+				BBF08756987DD8B75A2C9A45,
+				84E9918B94361E9008D9C630,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+			isa = XCConfigurationList;
+		};
+		283BEA14DAE065CA446083E1 = {
+			buildConfigurations = (
+				392B784C0566141965108771,
+				5C7BF91A500BD1F56014B95D,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+			isa = XCConfigurationList;
+		};
+		2B6B5EC6603780A089744B30 = {
+			buildConfigurations = (
+				232C1D0FAF176D8594FC46F9,
+				511ADADEA4F29D87677E2296,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+			isa = XCConfigurationList;
+		};
+		316F064688417E0A159B6FD9 = {
+			buildConfigurations = (
+				DD017198F0144E16F203E0F3,
+				CE864967AF266ED901A6C134,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+			isa = XCConfigurationList;
+		};
+		33EA5B8BC5163FB6588DF42E = {
+			buildConfigurations = (
+				B61CD205A9A5CBD7C64BC609,
+				6D7E48CF0ADA64E9528B7B77,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+			isa = XCConfigurationList;
+		};
+		4197DA0CF2081EF14D905FBA = {
+			buildConfigurations = (
+				EB7C74CA3F5C3F39CB629357,
+				1BD5044FDF286715CD116C4B,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+			isa = XCConfigurationList;
+		};
+		4F604E6B070207A396EEEA3B = {
+			buildConfigurations = (
+				0A3A2273A432579BD01A16AC,
+				C906C7F53465F50338937AD6,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+			isa = XCConfigurationList;
+		};
+		61D47CF10DE4EEFADA99F5C4 = {
+			buildConfigurations = (
+				D442903810AFFD625F6A3766,
+				537794031FA851803E58089E,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+			isa = XCConfigurationList;
+		};
+		62062608C167096D2AA2D940 = {
+			buildConfigurations = (
+				94B7062B492FC9497905B342,
+				D230CC0FC29D18D82F8E61C2,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+			isa = XCConfigurationList;
+		};
+		66C81A11F14FACB3976B0BAC = {
+			buildConfigurations = (
+				F58B0511F61D0161F111595C,
+				F28A4AF3BE23EA2A0F72CF0E,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+			isa = XCConfigurationList;
+		};
+		6715C315515097E95BBF5384 = {
+			buildConfigurations = (
+				4B2FAB3DB6F7ADABBA8C6A92,
+				4CCD11C0680934EFB1980018,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+			isa = XCConfigurationList;
+		};
+		6B375AB7898DC909495761B9 = {
+			buildConfigurations = (
+				72B897394A861677CED0DC97,
+				834A1B7C8E1AB59A5033CC0F,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+			isa = XCConfigurationList;
+		};
+		71A25576582E5EB9A3E9AA23 = {
+			buildConfigurations = (
+				D465B06EE4503C291599D0A8,
+				208A3B3DDCC3BA628975B403,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+			isa = XCConfigurationList;
+		};
+		722CCCD35E86A9B122EAA116 = {
+			buildConfigurations = (
+				9AFE515A1617993B61712CC5,
+				4402AE03477BAA70CCB79B70,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+			isa = XCConfigurationList;
+		};
+		7C305009BFA925E01278FA6E = {
+			buildConfigurations = (
+				6BAE6D1B1A6F5A97E2C37DA7,
+				09CC2915C2E51AA2A9D1BF1E,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+			isa = XCConfigurationList;
+		};
+		818769A4F4B7CB10757236A2 = {
+			buildConfigurations = (
+				9854852E60263B2DA538C935,
+				B7913A2659DAE0003B945905,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+			isa = XCConfigurationList;
+		};
+		84E86FF6184886C9527190C6 = {
+			buildConfigurations = (
+				616186F594F47C54A45CCF96,
+				B3EE295687EF2498748A6361,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+			isa = XCConfigurationList;
+		};
+		868CEFAC090F825139AB25B0 = {
+			buildConfigurations = (
+				098515EA4C06E4A1B24A4159,
+				6701521DFCAE57E079152E43,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+			isa = XCConfigurationList;
+		};
+		8E4E510D5BCAB629CFF094D7 = {
+			buildConfigurations = (
+				F5D8D9E8652EA6EE5E5DB2D6,
+				0316095A4D756F5A4F948560,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+			isa = XCConfigurationList;
+		};
+		9CF91AD315BBCBBF1473B0F8 = {
+			buildConfigurations = (
+				234185362D3355E34F5B291C,
+				7D68EE83D6C00B8E3ACDF362,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+			isa = XCConfigurationList;
+		};
+		A5B12CA1B6C4B730DCD74320 = {
+			buildConfigurations = (
+				82C32FDCB333DDD9EC5D1FE4,
+				F42D03441417F77362F6CE2E,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+			isa = XCConfigurationList;
+		};
+		A88768C1C174EDBD165CBB81 = {
+			buildConfigurations = (
+				5BB1E1652B5CC102F7680926,
+				4C075BC88594FB019AEB6CE8,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+			isa = XCConfigurationList;
+		};
+		ABC0CFDF18F73239A082477D = {
+			buildConfigurations = (
+				81F64830C282A41FD97A8DD9,
+				FA838878EED7ABF695F51DE0,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+			isa = XCConfigurationList;
+		};
+		AD569DCDA840590D1F53AB39 = {
+			buildConfigurations = (
+				FF1F9B79E2924053609D350B,
+				5DECC11E4309E8DC777A183B,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+			isa = XCConfigurationList;
+		};
+		B1DB9FA6EF96BD19E069F0B5 = {
+			buildConfigurations = (
+				B7A9E9692989AAEE675B3C5C,
+				9B5F65A51856381D9D1F9976,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+			isa = XCConfigurationList;
+		};
+		BFC3517E16C3AA8A99D5CAD9 = {
+			buildConfigurations = (
+				F32F245754267D2D1093B3BF,
+				571661C385D2DC3CD1E8EE47,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+			isa = XCConfigurationList;
+		};
+		C1317A6997B7FF88841F9988 = {
+			buildConfigurations = (
+				0BF8B0809E33FDF170EB44E4,
+				58573F8A35DB084C13B72100,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+			isa = XCConfigurationList;
+		};
+		E0B897DD29ADFDB78100B560 = {
+			buildConfigurations = (
+				820CC83C6CA3AC04FF95ACE7,
+				8C3B44CC4708428A7A87DC50,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+			isa = XCConfigurationList;
+		};
+		E37FCE34EC1CF95CF1216DE7 = {
+			buildConfigurations = (
+				2602971AC117A668FEA5F135,
+				FFE721535A4B0E4FC4232A6E,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+			isa = XCConfigurationList;
+		};
+	};
+	rootObject = 7B6581EE30595C57D6133265;
+}

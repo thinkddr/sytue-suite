@@ -1,0 +1,29 @@
+{
+ "id": "b",
+ "boxes": [
+  {
+   "id": "b-titulo",
+   "x": 8,
+   "y": 8,
+   "w": 84,
+   "h": 16,
+   "html": "<h1>{{b_comparativa.titulo}}</h1>"
+  },
+  {
+   "id": "b-izquierda",
+   "x": 8,
+   "y": 30,
+   "w": 40,
+   "h": 60,
+   "html": "<h2>{{b_comparativa.opcion_a}}</h2><ul><li>{{b_comparativa.punto}}</li><li>{{b_comparativa.punto}}</li><li>{{b_comparativa.punto}}</li></ul>"
+  },
+  {
+   "id": "b-derecha",
+   "x": 52,
+   "y": 30,
+   "w": 40,
+   "h": 60,
+   "html": "<h2>{{b_comparativa.opcion_b}}</h2><ul><li>{{b_comparativa.punto}}</li><li>{{b_comparativa.punto}}</li><li>{{b_comparativa.punto}}</li></ul>"
+  }
+ ]
+}

@@ -1,0 +1,143 @@
+---
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: (c) 2026 Daniel Delgado Ramos
+ *
+ * Privacidad y RGPD — página legal con estructura estándar RGPD (responsable,
+ * datos, base legal, derechos, DPO) pero SIN texto contractual inventado: cada
+ * sección recoge solo hechos que el resto del sitio ya afirma, y un aviso
+ * visible deja claro que el texto vinculante está en revisión legal.
+ *
+ * El texto es JURÍDICO: sale tal cual del catálogo en los 26 idiomas. Esta
+ * plantilla pone la estructura y los enlaces; no reescribe ni resume nada.
+ */
+import { LOCALES } from '@sytue/i18n';
+import MarketingLayout from '../../layouts/MarketingLayout.astro';
+import { localeFromParam, localeParams, useT } from '../../i18n';
+
+export const getStaticPaths = localeParams;
+
+const locale = localeFromParam(Astro.params.locale);
+const t = useT(locale);
+
+const PRIVACY_MAIL = 'privacidad@sytue.eu';
+
+// Lista OFICIAL de autoridades de control nacionales (CEPD). El texto dice «tu
+// autoridad de control» y no nombra ninguna: quien lea la página en español puede
+// estar en Bruselas y quien la lea en alemán, en Viena. El enlace es lo que
+// convierte el genérico en accionable, y el CEPD lo publica en los 26 (islandés y noruego incluidos).
+const AUTHORITIES_URL = `https://www.edpb.europa.eu/about-edpb/our-members_${locale}`;
+
+// Secciones de solo título + cuerpo, en el orden del texto legal. Las que llevan
+// enlace o lista van escritas aparte, abajo, para no inventarles una plantilla.
+const middle = ['basis', 'retention', 'processors', 'security', 'cookies', 'transfers'] as const;
+const tail = ['minors', 'changes'] as const;
+---
+
+<MarketingLayout
+  locale={locale}
+  path="/privacy"
+  title={t('meta.privacy.title')}
+  description={t('meta.privacy.description')}
+  alternates={LOCALES}
+>
+  <article class="mx-auto max-w-2xl px-6 py-16 md:py-20">
+    <span class="sytue-overline text-primary-text">{t('legal.overline')}</span>
+    <h1 class="sytue-h1 text-text mt-3 text-balance">{t('privacy.title')}</h1>
+
+    <p class="text-text-muted mt-3 text-base">{t('legal.updated')}</p>
+
+    <div
+      role="note"
+      class="border-border bg-warning-bg text-warning-text mt-6 rounded-md border px-4 py-3 text-sm leading-relaxed"
+    >
+      <strong>{t('legal.review.title')}</strong> {t('privacy.review.body')}
+    </div>
+
+    <div class="text-text mt-8 flex flex-col gap-8 text-base leading-relaxed">
+      <section>
+        <h2 class="sytue-h3 text-text text-balance">{t('privacy.controller.title')}</h2>
+        <p class="text-text-muted mt-2">
+          {t('privacy.controller.body')}{' '}
+          <a
+            href={`mailto:${PRIVACY_MAIL}`}
+            class="text-primary-text font-semibold break-words hover:underline"
+          >
+            {PRIVACY_MAIL}
+          </a>
+          .
+        </p>
+      </section>
+
+      <section>
+        <h2 class="sytue-h3 text-text text-balance">{t('privacy.data.title')}</h2>
+        <ul class="text-text-muted mt-2 flex list-disc flex-col gap-2 pl-5">
+          <li>
+            <strong class="text-text">{t('privacy.data.account.label')}</strong>{' '}
+            {t('privacy.data.account.body')}
+          </li>
+          <li>
+            <strong class="text-text">{t('privacy.data.content.label')}</strong>{' '}
+            {t('privacy.data.content.body')}
+          </li>
+          <li>
+            <strong class="text-text">{t('privacy.data.technical.label')}</strong>{' '}
+            {t('privacy.data.technical.body')}
+          </li>
+        </ul>
+        <p class="text-text-muted mt-2">{t('privacy.data.note')}</p>
+      </section>
+
+      {middle.map((key) => (
+        <section>
+          <h2 class="sytue-h3 text-text text-balance">{t(`privacy.${key}.title`)}</h2>
+          <p class="text-text-muted mt-2">{t(`privacy.${key}.body`)}</p>
+        </section>
+      ))}
+
+      <section>
+        <h2 class="sytue-h3 text-text text-balance">{t('privacy.rights.title')}</h2>
+        <p class="text-text-muted mt-2">
+          {t('privacy.rights.body1')}{' '}
+          <a
+            href={`mailto:${PRIVACY_MAIL}`}
+            class="text-primary-text font-semibold break-words hover:underline"
+          >
+            {PRIVACY_MAIL}
+          </a>
+          {t('privacy.rights.body2')}{' '}
+          <a
+            href={AUTHORITIES_URL}
+            rel="noreferrer"
+            target="_blank"
+            class="text-primary-text font-semibold hover:underline"
+          >
+            {t('privacy.rights.authority')}
+          </a>
+          .
+        </p>
+      </section>
+
+      <section>
+        <h2 class="sytue-h3 text-text text-balance">{t('privacy.dpo.title')}</h2>
+        <p class="text-text-muted mt-2">
+          {t('privacy.dpo.body')}{' '}
+          <a
+            href={`mailto:${PRIVACY_MAIL}`}
+            class="text-primary-text font-semibold break-words hover:underline"
+          >
+            {PRIVACY_MAIL}
+          </a>
+          .
+        </p>
+      </section>
+
+      {tail.map((key) => (
+        <section>
+          <h2 class="sytue-h3 text-text text-balance">{t(`privacy.${key}.title`)}</h2>
+          <p class="text-text-muted mt-2">{t(`privacy.${key}.body`)}</p>
+        </section>
+      ))}
+    </div>
+  </article>
+</MarketingLayout>

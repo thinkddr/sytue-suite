@@ -1,0 +1,161 @@
+{
+ "active": 0,
+ "sheets": [
+  {
+   "name": "{{factura.hoja}}",
+   "cells": {
+    "A1": "<b>{{factura.titulo}}</b>",
+    "A3": "<b>{{factura.emisor}}</b>",
+    "A4": "<b>{{factura.cliente}}</b>",
+    "A5": "<b>{{factura.numero}}</b>",
+    "A6": "<b>{{gastos.fecha}}</b>",
+    "A8": "<b>{{gastos.concepto}}</b>",
+    "B8": "<b>{{factura.cantidad}}</b>",
+    "C8": "<b>{{factura.precio}}</b>",
+    "D8": "<b>{{gastos.importe}}</b>",
+    "A9": "{{factura.linea}}",
+    "D9": "=B9*C9",
+    "D10": "=B10*C10",
+    "D11": "=B11*C11",
+    "D12": "=B12*C12",
+    "D13": "=B13*C13",
+    "D14": "=B14*C14",
+    "A16": "{{factura.subtotal}}",
+    "D16": "=SUM(D9:D14)",
+    "A17": "{{factura.iva}}",
+    "B17": "0.21",
+    "D17": "=D16*B17",
+    "A18": "<b>{{presupuesto.total}}</b>",
+    "D18": "=D16+D17",
+    "A20": "<b>{{factura.pago}}</b>",
+    "A21": "{{factura.pago_texto}}"
+   },
+   "formats": {
+    "B9": {
+     "id": "number"
+    },
+    "C9": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "D9": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "B10": {
+     "id": "number"
+    },
+    "C10": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "D10": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "B11": {
+     "id": "number"
+    },
+    "C11": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "D11": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "B12": {
+     "id": "number"
+    },
+    "C12": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "D12": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "B13": {
+     "id": "number"
+    },
+    "C13": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "D13": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "B14": {
+     "id": "number"
+    },
+    "C14": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "D14": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "D16": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "D17": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "D18": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "B17": {
+     "id": "percent",
+     "decimals": 0
+    }
+   },
+   "styles": {
+    "A8": {
+     "border": {
+      "b": true
+     }
+    },
+    "A18": {
+     "border": {
+      "t": true
+     }
+    },
+    "B8": {
+     "border": {
+      "b": true
+     }
+    },
+    "B18": {
+     "border": {
+      "t": true
+     }
+    },
+    "C8": {
+     "border": {
+      "b": true
+     }
+    },
+    "C18": {
+     "border": {
+      "t": true
+     }
+    },
+    "D8": {
+     "border": {
+      "b": true
+     }
+    },
+    "D18": {
+     "border": {
+      "t": true
+     }
+    }
+   }
+  }
+ ]
+}

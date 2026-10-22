@@ -1,0 +1,131 @@
+# Sytue Analytics — COLECTOR (ADR 0026). global.* lo inyecta el umbrella.
+# Una sola imagen para los dos binarios: el ENTRYPOINT por defecto YA es el colector,
+# asi que aqui no se toca el comando (la API si lo sobreescribe).
+enabled: true
+component: analytics-ingest
+# Suelo de 2 replicas: el colector es el endpoint publico de mas volumen y perder la
+# unica replica durante un drain apaga la medicion de TODOS los clientes a la vez.
+replicaCount: 2
+
+image:
+  registry: ""                 # cae a global.imageRegistry (Scaleway Registry, UE)
+  # MISMA imagen que analytics-api (services/analytics/Dockerfile trae los dos
+  # binarios). No hay build-arg BINARY: lo que cambia es el proceso, no la imagen.
+  repository: sytue-analytics
+  tag: "1.0.0"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  # ¡8094 y NO 80! El controlador de Cloud codifica el puerto del colector
+  # (analyticsIngestPort en internal/controller/kubeplatform.go): el Service
+  # ExternalName del namespace de cada tenant y la ruta /_sytue del Ingress apuntan
+  # a 8094. Traefik resuelve el ExternalName y marca directamente ESE puerto contra
+  # este Service, asi que publicarlo en 80 dejaria la medicion en 502.
+  port: 8094
+  targetPort: 8094             # puerto del SPEC (CONVENTIONS §6)
+
+# SIN Ingress propio, a proposito (ADR 0026 §6). La medicion se sirve en PRIMERA
+# PARTE bajo el dominio de cada cliente: el controlador de Cloud anade la ruta
+# /_sytue al Ingress de la app apuntando a un Service ExternalName hacia este
+# colector (ver cloud-controller.config.analytics). Publicar aqui un
+# analytics.<dominio>: reintroduciria el dominio de terceros que el ADR elimina
+# (CORS, CSP del cliente, bloqueadores) y devolveria la clase de ataque «inflar los
+# numeros de otro», porque el sitio dejaria de identificarse por el Host.
+
+# Endpoint de mas volumen de la plataforma y con trabajo por evento acotado (parsear
+# el beacon, HMAC, buscar el pais en memoria y encolar): escala HORIZONTAL, no vertical.
+# El techo por replica es 1 CPU a proposito -> GOMAXPROCS=1, sin throttling CFS ni
+# context-switching, y el HPA reparte. Memoria: la tabla DB-IP en memoria (~10-20 MiB)
+# + la cola de QUEUE_SIZE eventos + los cubos de rate-limit por sitio/IP.
+# Requests MEDIDOS en producción (kubectl top, 2026-08-09), no estimados: en
+# Kubernetes la factura la fija lo RESERVADO, no lo usado, y estos pods pedían
+# 25-75 veces su consumo real. Esa reserva inflada obligó a un tercer nodo cuando
+# la CPU real del clúster estaba al 3 %.
+#
+# El límite NO se toca: un pico sigue pudiendo usar toda la CPU que necesite. Y
+# bajar el request hace al HPA MÁS sensible —calcula el porcentaje sobre el
+# request—, que es justo lo que hace falta para escalar por demanda real.
+resources:
+  requests:
+    cpu: 25m
+    memory: 128Mi
+  limits:
+    cpu: "1"
+    memory: 384Mi
+
+autoscaling:
+  # Etiqueta `job` de la serie de metricas, para el HPA por demanda real.
+  # Es el ServiceName del BINARIO, que no siempre coincide con el nombre del
+  # chart ni con el del directorio; por eso se escribe y no se deduce.
+  metricJob: sytue-analytics-ingest
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  # Al 70% queda margen para la rampa: el trafico de beacons llega en picos (una
+  # portada que se comparte), y aqui una peticion perdida es una medicion perdida.
+  targetCPUUtilizationPercentage: 70
+  # Sin memoria: en Go la RSS queda alta tras el GC (mala señal de escalado) y
+  # GOMEMLIMIT (~85% de limits.memory) ya la acota -> se escala solo por CPU.
+
+networkPolicy:
+  enabled: true
+
+serviceMonitor:
+  enabled: true
+  path: /metrics
+  interval: 30s
+
+# Configuracion de la app (no secretos). Nombres de env:
+# services/analytics/internal/config/config.go. Los defaults del servicio ya son los
+# del ADR (retencion 48 h, lotes de 500/1 s, cola de 10000, TRUST_PROXY_HEADERS=true
+# porque en la plataforma el colector SIEMPRE esta detras de Traefik): no se repiten
+# aqui para no tener dos fuentes de verdad.
+config:
+  # Tamano del pool pgx por replica (DB_MAX_CONNS). Prod lo baja (ver values-prod.yaml
+  # del umbrella): PgBouncer multiplexa hacia la RDB y aqui hay muchas replicas.
+  dbMaxConns: 10
+  logLevel: info
+  # Puerto del POD de Sytue ID, para el recolector de logs (NetworkPolicy).
+  idApiPort: 8081
+
+# Postgres EXTERNO (Scaleway RDB). DSN por secret (nunca en git).
+# El colector NO migra ni hace mantenimiento: eso es de analytics-api, que es el
+# unico que necesita el DSN directo.
+postgresql:
+  existingSecret: sytue-analytics-db
+  dsnKey: dsn
+
+# Secreto propio: la KEK AES-256 (base64, 32 bytes) que cifra la SAL DIARIA en
+# reposo. NO lleva `optional: true` a proposito: sin ella el servicio arranca igual
+# pero guarda la sal EN CLARO, y un volcado de la RDB bastaria para recalcular los
+# identificadores del dia — justo lo que el ADR promete que es imposible. Que el pod
+# no arranque es la señal correcta.
+existingSecret: sytue-analytics
+
+# PodDisruptionBudget: garantiza disponibilidad durante drains/upgrades del cluster.
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# Reparto anti-afinidad suave por zona y nodo (alta disponibilidad multi-AZ, UE).
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: ScheduleAnyway
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: ScheduleAnyway
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  fsGroup: 10001
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]

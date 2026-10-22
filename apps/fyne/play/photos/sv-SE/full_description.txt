@@ -1,0 +1,18 @@
+Fotogalleri och bildredigerare: originalen i Drive, redigeringarna som ett recept.
+
+• En tidslinje per månad med sökning på namn.
+• Album med omslag; helskärmsvisning.
+• Redigering av ljus, färg, rotation, spegling och beskärning i realtid.
+• Varje redigering är ett recept: originalet rörs aldrig.
+• En tidslinje grupperad per månad, med sökning på namn och skarpa miniatyrer.
+• Album: skapa, byt namn, välj omslag, lägg till från visningen och ta bort.
+• En redigerare med fyra reglage (exponering, kontrast, mättnad, temperatur), rotation och spegling.
+• Varje redigering är ett recept som sparas separat: originalet i Drive ändras aldrig.
+• Export i full upplösning, renderad på servern med samma formler som i förhandsvisningen.
+• Papperskorg med återställning.
+• Originalen finns i din Sytue Drive; härledda versioner är en cache som kan återskapas.
+• EXIF-data läses från själva filen; allt i Europeiska unionen.
+• Markera flera per månad: till ett nytt album, till papperskorgen eller ladda ned alla på en gång.
+• Bildspel, full storlek, rotation från visningen och beskärning med fast förhållande.
+
+Krypterat under överföring (TLS 1.3). Sytues infrastruktur finns i EU. Var externa tjänster finns beror på deras leverantör.

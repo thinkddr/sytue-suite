@@ -1,0 +1,22 @@
+{
+  "key": "miro",
+  "tier": "tier2",
+  "manifest": {
+    "name": "Miro",
+    "description": "Pizarra colaborativa en línea, con inicio de sesión único.",
+    "category": "Colaboración",
+    "color": "#050038",
+    "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#050038\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"3\" y=\"4\" width=\"18\" height=\"16\" rx=\"2\"/><rect x=\"6\" y=\"7\" width=\"5\" height=\"5\" rx=\"1\"/><rect x=\"13\" y=\"10\" width=\"5\" height=\"6\" rx=\"1\"/></svg>",
+    "identity": {
+      "kind": "saml",
+      "entity_id": "https://miro.com",
+      "acs_url": "https://miro.com/sso/saml/",
+      "name_id_format": "email"
+    },
+    "provisioning": "none",
+    "launch": {
+      "kind": "url",
+      "url": "https://miro.com/app/dashboard/"
+    }
+  }
+}

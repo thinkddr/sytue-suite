@@ -1,0 +1,414 @@
+---
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: (c) 2026 Daniel Delgado Ramos
+ *
+ * Portada del sitio público, en los CINCO idiomas desde una sola plantilla.
+ * `[...locale]` es un parámetro rest, y un rest casa también con CERO segmentos:
+ * con `locale: undefined` este mismo fichero genera `/` (inglés, el idioma base)
+ * y con `'es' | 'fr' | 'de' | 'it'` genera `/es`, `/fr`, `/de`, `/it`.
+ */
+import { LOCALES } from '@sytue/i18n';
+import { Glifo } from '@sytue/ui';
+import { appDomains } from '@sytue/config';
+import MarketingLayout from '../../layouts/MarketingLayout.astro';
+import ProductGrid from '../../components/ProductGrid';
+import { localeFromParam, localeParams, localePath, useT } from '../../i18n';
+import { organizationJsonLd, webSiteJsonLd, softwareApplicationJsonLd } from '../../lib/seo';
+import { APPS_CON_IDENTIDAD } from '../../lib/product-content';
+
+export const getStaticPaths = localeParams;
+
+const locale = localeFromParam(Astro.params.locale);
+const t = useT(locale);
+
+// Datos estructurados de la portada (schema.org): la marca (Organization), el
+// sitio (WebSite) y el producto (SoftwareApplication). Alimenta rich results.
+const jsonLd = [organizationJsonLd(t), webSiteJsonLd(), softwareApplicationJsonLd(t)];
+
+/*
+ * Cifras COMPROBABLES, y solo esas. Antes había cuatro y solo una lo era: «0
+ * datos fuera de la UE» y «100 % RGPD» no son métricas sino la misma afirmación
+ * del titular repetida en grande, y «10+ apps» era vago teniendo el número
+ * exacto. Un número enorme que no se puede verificar resta credibilidad al que
+ * está al lado y sí se puede.
+ *
+ * Y comprobable no basta si además no se comprueba: el número de aplicaciones
+ * estaba escrito a mano y se quedó en 8 mientras la rejilla de abajo enseñaba
+ * catorce abiertas. Ahora lo cuenta el catálogo.
+ */
+const stats = [
+  { value: '2', label: t('home.stats.regions'), accent: false },
+  { value: String(APPS_CON_IDENTIDAD), label: t('home.stats.apps'), accent: false },
+  { value: '5', label: t('home.stats.standards'), accent: true },
+];
+
+/*
+ * Un glifo por tarjeta. Las seis llevaban el MISMO tick porque el icono estaba
+ * dentro del map: seis veces el mismo dibujo no distingue nada, solo rellena el
+ * hueco donde «va un icono». Mismo lenguaje que @sytue/ui: rejilla de 24,
+ * trazo 2, extremos redondos.
+ */
+const GLIFOS = {
+  // Llave: una credencial abre toda la suite.
+  llave: 'M12 3.5a3.75 3.75 0 1 0 0 7.5 3.75 3.75 0 0 0 0-7.5ZM12 11v9.5M12 15h3.5M12 18h2.5',
+  // Ventana con su barra: el cromo compartido de la suite.
+  ventana:
+    'M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1ZM3 9.5h18M6.5 7.2h.01',
+  // Dos flechas que se cruzan: adjuntar de Drive en Mail, crear evento desde un correo.
+  cruce: 'M4 8h11l-3-3M20 16H9l3 3',
+  // Círculo con meridianos: territorio.
+  europa: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18ZM3.5 12h17M12 3a14 14 0 0 1 0 18 14 14 0 0 1 0-18Z',
+  // Escudo: la norma que protege.
+  escudo: 'M12 3.5 4.5 6.6v5.4c0 4.3 3 7.5 7.5 9 4.5-1.5 7.5-4.7 7.5-9V6.6L12 3.5Z',
+  // Candado ABIERTO: lo contrario del lock-in se dibuja, no se explica.
+  abierto:
+    'M8 10V7a4 4 0 0 1 7.5-2M5 11a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-8Z',
+} as const;
+
+const integration = [
+  { title: t('home.integration.sso.title'), body: t('home.integration.sso.body'), d: GLIFOS.llave },
+  {
+    title: t('home.integration.shell.title'),
+    body: t('home.integration.shell.body'),
+    d: GLIFOS.ventana,
+  },
+  {
+    title: t('home.integration.cross.title'),
+    body: t('home.integration.cross.body'),
+    d: GLIFOS.cruce,
+  },
+];
+
+// Las cuatro cosas que hay que saber del precio, y ninguna en letra pequeña: la
+// revalorización pactada, qué entra, qué se cobra aparte y cómo funciona el
+// almacenamiento compartido.
+const pricing = [
+  { title: t('home.pricing.commitment.title'), body: t('home.pricing.commitment.body') },
+  { title: t('home.pricing.included.title'), body: t('home.pricing.included.body') },
+  { title: t('home.pricing.metered.title'), body: t('home.pricing.metered.body') },
+  { title: t('home.pricing.storage.title'), body: t('home.pricing.storage.body') },
+];
+
+const sovereignty = [
+  { title: t('home.sovereignty.eu.title'), body: t('home.sovereignty.eu.body'), d: GLIFOS.europa },
+  {
+    title: t('home.sovereignty.gdpr.title'),
+    body: t('home.sovereignty.gdpr.body'),
+    d: GLIFOS.escudo,
+  },
+  {
+    title: t('home.sovereignty.lockin.title'),
+    body: t('home.sovereignty.lockin.body'),
+    d: GLIFOS.abierto,
+  },
+];
+---
+
+<MarketingLayout
+  locale={locale}
+  path="/"
+  title={t('meta.home.title')}
+  description={t('meta.home.description')}
+  ogType="website"
+  alternates={LOCALES}
+  jsonLd={jsonLd}
+>
+  <!-- Hero: superficie plana (anti-slop: sin degradados; ver docs/design.md) -->
+  <section class="border-border border-b">
+    <div class="mx-auto max-w-4xl px-6 py-20 text-center md:py-28">
+      {/* El espacio va explícito: Astro no lo conserva entre una expresión y el
+        elemento siguiente, y sin él «Produktivität,souverän» se vuelve una sola
+        palabra que a 360 px no rompe y desborda la pantalla. */}
+      <h1 class="sytue-display text-text text-balance">
+        {t('home.hero.lead')} <span class="text-primary-text">{t('home.hero.accent')}</span>.
+      </h1>
+      <p class="text-text-muted mx-auto mt-5 max-w-2xl text-lg text-pretty">
+        {t('home.hero.subtitle')}
+      </p>
+      <div class="mt-8 flex flex-wrap items-center justify-center gap-3">
+        <a
+          href={`${appDomains.id}/signup`}
+          class="bg-primary sytue-focus-ring-inset inline-flex h-11 items-center rounded-control px-6 font-semibold text-[var(--sytue-on-primary)] shadow-[var(--shadow-xs)] transition-colors hover:bg-[var(--sytue-primary-hover)] active:bg-[var(--sytue-primary-active)] pointer-coarse:min-h-[max(44px,2.75rem)]"
+        >
+          {t('cta.start')}
+        </a>
+        <a
+          href="#products"
+          class="border-border-strong bg-surface text-text hover:bg-bg-subtle active:bg-surface-sunken inline-flex h-11 items-center rounded-control border px-6 font-semibold transition-colors pointer-coarse:min-h-[max(44px,2.75rem)]"
+        >
+          {t('cta.seeSuite')}
+        </a>
+      </div>
+      <p class="text-text-subtle mt-4 text-sm">{t('home.hero.note')}</p>
+      <a
+        href="#privacy"
+        class="text-primary-text mt-5 inline-block rounded-sm text-sm font-semibold text-balance hover:underline"
+      >
+        {t('home.privacy.body')}
+      </a>
+    </div>
+  </section>
+
+  <!-- Huella europea (cifras sobrias, sin humo) -->
+  <section aria-label={t('home.stats.aria')} class="border-border bg-surface border-b">
+    <dl class="md:divide-border mx-auto grid max-w-5xl grid-cols-1 gap-x-6 gap-y-8 px-6 py-12 text-center sm:grid-cols-3 md:grid-cols-3 md:divide-x">
+      {stats.map((s) => (
+        <div class="flex flex-col md:px-4">
+          <dd
+            class:list={[
+              'order-first text-3xl font-bold tracking-tight tabular-nums md:text-4xl',
+              s.accent ? 'text-primary-text' : 'text-text',
+            ]}
+          >
+            {s.value}
+          </dd>
+          <dt class="text-text-muted mt-1.5 text-sm text-balance">{s.label}</dt>
+        </div>
+      ))}
+    </dl>
+  </section>
+
+  <section
+    id="privacy"
+    aria-labelledby="privacy-title"
+    class="border-border bg-surface-sunken scroll-mt-16 border-b"
+  >
+    <div class="mx-auto grid max-w-6xl items-start gap-8 px-6 py-12 md:grid-cols-2 md:gap-12">
+      <div>
+        <h2 id="privacy-title" class="sytue-h2 text-text text-balance">
+          {t('home.privacy.title')}
+        </h2>
+        <p class="text-text-muted mt-3 text-base text-pretty">{t('home.privacy.body')}</p>
+        <div class="mt-6 flex flex-wrap items-center gap-4">
+          <a
+            href={`${appDomains.id}/signup`}
+            class="bg-primary sytue-focus-ring-inset inline-flex min-h-11 items-center rounded-control px-6 py-2 font-semibold text-[var(--sytue-on-primary)] shadow-[var(--shadow-xs)] transition-colors hover:bg-[var(--sytue-primary-hover)] active:bg-[var(--sytue-primary-active)] pointer-coarse:min-h-[max(44px,2.75rem)]"
+          >
+            {t('cta.start')}
+          </a>
+          <a
+            href={localePath(locale, '/privacy')}
+            class="text-primary-text rounded-sm font-semibold hover:underline"
+          >
+            {t('home.privacy.link')}
+          </a>
+        </div>
+      </div>
+      <ul class="text-text-muted flex flex-col gap-6 text-base">
+        <li class="flex items-start gap-3">
+          <span class="text-primary-text mt-1 shrink-0" aria-hidden="true">
+            <Glifo d={GLIFOS.escudo} size={20} />
+          </span>
+          <p class="text-pretty">{t('home.privacy.anonymity')}</p>
+        </li>
+        <li class="flex items-start gap-3">
+          <span class="text-primary-text mt-1 shrink-0" aria-hidden="true">
+            <Glifo d={GLIFOS.llave} size={20} />
+          </span>
+          <p class="text-pretty">{t('home.privacy.account')}</p>
+        </li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- Productos -->
+  <section id="products" class="mx-auto max-w-6xl scroll-mt-16 px-6 py-16 md:py-20">
+    <div class="mb-10 text-center">
+      <h2 class="sytue-h2 text-text text-balance">{t('home.products.title')}</h2>
+      <p class="text-text-muted mx-auto mt-3 max-w-2xl text-base text-pretty">
+        {t('home.products.subtitle')}
+      </p>
+    </div>
+    <ProductGrid locale={locale} />
+  </section>
+
+  <!-- Integración sin fisuras -->
+  <section class="border-border bg-surface-sunken border-y">
+    <div class="mx-auto max-w-6xl px-6 py-16 md:py-20">
+      <div class="mb-10 max-w-2xl">
+        <h2 class="sytue-h2 text-text text-balance">{t('home.integration.title')}</h2>
+        <p class="text-text-muted mt-3 text-base text-pretty">{t('home.integration.subtitle')}</p>
+      </div>
+      <div class="grid gap-6 md:grid-cols-3">
+        {integration.map((f) => (
+          <div class="border-border bg-surface-raised hover:border-border-strong rounded-lg border p-6 shadow-[var(--shadow-xs)] transition-colors">
+            <span
+              class="bg-info-bg text-info-text grid h-9 w-9 place-items-center rounded-md"
+              aria-hidden="true"
+            >
+              <Glifo d={f.d} size={18} />
+            </span>
+            <h3 class="sytue-h4 text-text mt-4 text-balance">{f.title}</h3>
+            <p class="text-text-muted mt-2 text-base text-pretty">{f.body}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- Soberanía -->
+  <section id="sovereignty" class="mx-auto max-w-6xl scroll-mt-16 px-6 py-16 md:py-20">
+    <div class="grid items-start gap-10 md:grid-cols-2">
+      <div>
+        <h2 class="sytue-h2 text-text text-balance">{t('home.sovereignty.title')}</h2>
+        <p class="text-text-muted mt-3 text-base text-pretty">{t('home.sovereignty.body')}</p>
+        <a
+          href="#standards"
+          class="text-primary-text mt-5 inline-flex items-center gap-1 rounded-sm font-semibold hover:underline"
+        >
+          {t('home.sovereignty.link')}
+          <span aria-hidden="true">→</span>
+        </a>
+      </div>
+      <div class="grid gap-4">
+        {sovereignty.map((s) => (
+          <div class="border-border bg-surface hover:border-border-strong flex items-start gap-4 rounded-lg border p-5 transition-colors">
+            <span
+              class="bg-info-bg text-info-text mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-md"
+              aria-hidden="true"
+            >
+              <Glifo d={s.d} size={16} />
+            </span>
+            <div class="min-w-0">
+              <h3 class="text-text font-semibold text-balance">{s.title}</h3>
+              <p class="text-text-muted mt-1.5 text-base text-pretty">{s.body}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- Estándares abiertos: superficie oscura plana (anti-slop: sin degradados) -->
+  <section id="standards" class="border-border border-y bg-[var(--sytue-neutral-1000)] text-white">
+    <div class="mx-auto max-w-4xl scroll-mt-16 px-6 py-16 text-center md:py-20">
+      <span class="sytue-overline text-primary-400">{t('home.standards.overline')}</span>
+      <h2 class="sytue-h2 mt-3 text-balance text-white">{t('home.standards.title')}</h2>
+      <p class="mx-auto mt-3 max-w-2xl text-base text-pretty text-white/70">
+        {t('home.standards.body')}
+      </p>
+      <div class="mt-8 flex justify-center">
+        <a
+          href="#products"
+          class="bg-primary inline-flex h-11 items-center rounded-control px-6 font-semibold text-[var(--sytue-on-primary)] shadow-[var(--shadow-xs)] transition-colors hover:bg-[var(--sytue-primary-hover)] sytue-focus-ring-inset active:bg-[var(--sytue-primary-active)] pointer-coarse:min-h-[max(44px,2.75rem)]"
+        >
+          {t('cta.seeSuite')}
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Precio: uno solo, y lo que se cobra aparte dicho aquí y no en la letra pequeña -->
+  <section id="pricing" class="border-border bg-surface-sunken scroll-mt-16 border-t">
+    <div class="mx-auto max-w-6xl px-6 py-16 md:py-20">
+      <h2 class="sytue-h2 text-text text-balance">{t('home.pricing.title')}</h2>
+      <p class="text-text-muted mt-3 max-w-2xl text-base text-pretty">{t('home.pricing.body')}</p>
+
+      <div class="mt-8 grid gap-6 lg:grid-cols-3">
+        {/* Tres planes y los mismos productos en los tres (ADR 0038, precios del
+             2026-09-13): lo que cambia es el espacio por usuario. GRATIS va el
+             primero porque es la puerta que no pide hablar con nadie: el botón
+             lleva al alta, no a ventas. Los de pago valen para una organización
+             (por usuario) y para una persona sola. */}
+        <div class="border-border bg-surface flex flex-col rounded-lg border p-6">
+          <p class="text-text-muted text-sm">{t('home.pricing.personal.title')}</p>
+          <p class="text-text mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+            <span class="sytue-h1">0 €</span>
+            <span class="text-text-muted text-base">{t('home.pricing.personal.freeStorage')}</span>
+          </p>
+          <p class="text-text-muted mt-3 text-base text-pretty">
+            {t('home.pricing.personal.freeBody')}
+          </p>
+          <p class="text-text-muted mt-3 text-sm text-pretty">{t('home.pricing.personal.note')}</p>
+          <div class="mt-auto flex justify-center pt-6">
+            <a
+              href={`${appDomains.id}/signup`}
+              class="bg-primary sytue-focus-ring-inset inline-flex h-11 items-center justify-center rounded-control px-6 font-semibold text-[var(--sytue-on-primary)] hover:bg-[var(--sytue-primary-hover)] pointer-coarse:min-h-[max(44px,2.75rem)]"
+            >
+              {t('home.pricing.personal.cta')}
+            </a>
+          </div>
+        </div>
+        {[
+          {
+            title: t('home.pricing.pro.title'),
+            amount: t('home.pricing.amount'),
+            storage: t('home.pricing.pro.storage'),
+            extra: t('home.pricing.education'),
+          },
+          {
+            title: t('home.pricing.enterprise.title'),
+            amount: t('home.pricing.enterprise.amount'),
+            storage: t('home.pricing.enterprise.storage'),
+            extra: t('home.pricing.enterprise.support'),
+          },
+        ].map((plan) => (
+          <div class="border-border bg-surface flex flex-col rounded-lg border p-6">
+            <p class="text-text-muted text-sm">
+              {plan.title}
+              {/* Los planes de pago aún no se pueden contratar (commerce.PersonalUpgradeAvailable
+                    y Mollie sin configurar): se dice al lado del nombre, no en la letra pequeña. */}
+              <span class="text-text-muted"> · {t('home.pricing.soon')}</span>
+            </p>
+            <p class="text-text mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+              <span class="sytue-h1 tabular-nums">{plan.amount}</span>
+              <span class="text-text-muted text-base">{t('home.pricing.per')}</span>
+            </p>
+            <p class="text-text mt-2 text-base font-semibold">{plan.storage}</p>
+            <p class="text-text-muted mt-1 text-sm">{plan.extra}</p>
+            {/* El impuesto, junto al precio y no en la letra pequeña: quien compara
+                  suites suma mal, y se entera al recibir la primera factura. */}
+            <p class="text-text-muted mt-1 text-sm">{t('home.pricing.tax')}</p>
+            <p class="text-text-muted mt-3 text-base text-pretty">{t('home.pricing.paidBody')}</p>
+            <div class="mt-auto flex justify-center pt-6">
+              <a
+                href="mailto:ventas@sytue.eu"
+                class="bg-primary sytue-focus-ring-inset inline-flex h-11 items-center justify-center rounded-control px-6 font-semibold text-[var(--sytue-on-primary)] hover:bg-[var(--sytue-primary-hover)] pointer-coarse:min-h-[max(44px,2.75rem)]"
+              >
+                {t('home.pricing.cta')}
+              </a>
+            </div>
+          </div>
+        ))}
+      </div>
+      <p class="text-text-muted mt-6 max-w-3xl text-sm text-pretty">
+        {t('home.pricing.thirdParty')}
+      </p>
+      <div class="mt-8">
+        <ul class="grid gap-4 sm:grid-cols-2">
+          {pricing.map((x) => (
+            <li class="border-border bg-surface rounded-lg border p-5">
+              <h3 class="text-text font-semibold text-balance">{x.title}</h3>
+              <p class="text-text-muted mt-1.5 text-base text-pretty">{x.body}</p>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA final -->
+  <section class="border-border bg-surface-sunken border-t">
+    <div class="mx-auto max-w-3xl px-6 py-16 text-center md:py-20">
+      <h2 class="sytue-h2 text-text text-balance">{t('home.cta.title')}</h2>
+      <p class="text-text-muted mx-auto mt-3 max-w-xl text-base text-pretty">
+        {t('home.cta.body')}
+      </p>
+      <div class="mt-8 flex flex-wrap items-center justify-center gap-3">
+        <a
+          href={`${appDomains.id}/signup`}
+          class="bg-primary sytue-focus-ring-inset inline-flex h-11 items-center rounded-control px-6 font-semibold text-[var(--sytue-on-primary)] shadow-[var(--shadow-xs)] transition-colors hover:bg-[var(--sytue-primary-hover)] active:bg-[var(--sytue-primary-active)] pointer-coarse:min-h-[max(44px,2.75rem)]"
+        >
+          {t('home.cta.primary')}
+        </a>
+        <a
+          href="mailto:ventas@sytue.eu"
+          class="border-border-strong bg-surface text-text hover:bg-bg-subtle active:bg-surface-sunken sytue-focus-ring-inset inline-flex h-11 items-center rounded-control border px-6 font-semibold transition-colors focus-visible:outline-none pointer-coarse:min-h-[max(44px,2.75rem)]"
+        >
+          {t('home.cta.secondary')}
+        </a>
+      </div>
+    </div>
+  </section>
+</MarketingLayout>

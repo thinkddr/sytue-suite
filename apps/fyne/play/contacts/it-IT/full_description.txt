@@ -1,0 +1,18 @@
+Contatti CardDAV, condivisi nella tua organizzazione.
+
+• Rubrica condivisa in tutta l’organizzazione.
+• Importa ed esporta in vCard.
+• Unisci i duplicati senza perdere dati.
+• Compatibile con qualsiasi client CardDAV.
+• Rubriche, compresa quella condivisa della tua organizzazione.
+• Scheda completa: telefoni, e-mail, indirizzi, organizzazione, compleanno, note e foto.
+• Etichette e preferiti per raggruppare e trovare.
+• Rilevamento e unione dei duplicati senza perdere dati.
+• Importa ed esporta vCard e CSV; esporta un singolo contatto.
+• Azioni in blocco e cestino con recupero.
+• Ricerca istantanea e completamento automatico scrivendo in Mail.
+• Compatibile con qualsiasi client CardDAV.
+• Prossimi compleanni della tua rubrica, con quelli di questo mese in evidenza.
+• Crea una riunione con un contatto o copia la sua email senza uscire dalla scheda.
+
+Cifratura in transito (TLS 1.3). L’infrastruttura di Sytue si trova nell’UE. La posizione dei servizi esterni dipende dal loro fornitore.

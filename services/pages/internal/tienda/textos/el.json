@@ -1,0 +1,10 @@
+{
+  "order_paid_buyer_subject": "Επιβεβαίωση παραγγελίας {number}",
+  "order_paid_buyer_body": "Σας ευχαριστούμε για την αγορά σας. Η παραγγελία {number} έχει επιβεβαιωθεί.",
+  "order_paid_store_subject": "Νέα παραγγελία: {number}",
+  "order_paid_store_body": "Λάβατε μια νέα παραγγελία {number} αξίας {total}.",
+  "withdrawal_ack_subject": "Επιβεβαίωση υπαναχώρησης: {number}",
+  "withdrawal_ack_body": "Το αίτημα υπαναχώρησής σας για την παραγγελία {number} έχει καταγραφεί.",
+  "form_received_subject": "Υποβολή φόρμας: {form_id}",
+  "form_received_body": "Λήφθηκε νέα υποβολή για τη φόρμα {form_id}."
+}

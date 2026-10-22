@@ -1,0 +1,1596 @@
+{
+  "undo": {
+    "labelKey": "action.undo",
+    "kinds": ["document"],
+    "tab": "inicio",
+    "group": "group.clipboard",
+    "edits": true,
+    "shortcuts": [
+      {
+        "keys": "Ctrl+Z",
+        "canvas": true
+      }
+    ],
+    "telemetry": true
+  },
+  "redo": {
+    "labelKey": "action.redo",
+    "kinds": ["document"],
+    "tab": "inicio",
+    "group": "group.clipboard",
+    "edits": true,
+    "shortcuts": [
+      {
+        "keys": "Ctrl+Y",
+        "canvas": true
+      }
+    ],
+    "telemetry": true
+  },
+  "copy": {
+    "labelKey": "cmd.copy",
+    "kinds": ["spreadsheet"],
+    "tab": "inicio",
+    "group": "group.clipboard",
+    "edits": false,
+    "script": true,
+    "shortcuts": [
+      {
+        "keys": "Ctrl+C"
+      },
+      {
+        "keys": "Ctrl+X",
+        "value": "cut"
+      }
+    ],
+    "telemetry": true
+  },
+  "paste": {
+    "labelKey": "cmd.paste",
+    "kinds": ["spreadsheet"],
+    "tab": "inicio",
+    "group": "group.clipboard",
+    "edits": true,
+    "script": true,
+    "shortcuts": [
+      {
+        "keys": "Ctrl+V"
+      },
+      {
+        "keys": "Ctrl+Shift+V",
+        "value": "values"
+      }
+    ],
+    "telemetry": true
+  },
+  "font": {
+    "labelKey": "font.family",
+    "kinds": ["document", "presentation"],
+    "tab": "inicio",
+    "group": "group.font",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "size": {
+    "labelKey": "font.size",
+    "kinds": ["document", "presentation"],
+    "tab": "inicio",
+    "group": "group.font",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "bold": {
+    "labelKey": "format.bold",
+    "kinds": ["document", "spreadsheet", "presentation"],
+    "tab": "inicio",
+    "group": "group.font",
+    "edits": true,
+    "script": true,
+    "shortcuts": [
+      {
+        "keys": "Ctrl+B"
+      }
+    ],
+    "telemetry": true
+  },
+  "italic": {
+    "labelKey": "format.italic",
+    "kinds": ["document", "spreadsheet", "presentation"],
+    "tab": "inicio",
+    "group": "group.font",
+    "edits": true,
+    "script": true,
+    "shortcuts": [
+      {
+        "keys": "Ctrl+I"
+      }
+    ],
+    "telemetry": true
+  },
+  "underline": {
+    "labelKey": "format.underline",
+    "kinds": ["document", "presentation"],
+    "tab": "inicio",
+    "group": "group.font",
+    "edits": true,
+    "script": true,
+    "shortcuts": [
+      {
+        "keys": "Ctrl+U"
+      }
+    ],
+    "telemetry": true
+  },
+  "strike": {
+    "labelKey": "format.strike",
+    "kinds": ["document", "presentation"],
+    "tab": "inicio",
+    "group": "group.font",
+    "edits": true,
+    "script": true,
+    "shortcuts": [
+      {
+        "keys": "Ctrl+Shift+X"
+      }
+    ],
+    "telemetry": true
+  },
+  "superscript": {
+    "labelKey": "format.superscript",
+    "kinds": ["document"],
+    "tab": "inicio",
+    "group": "group.font",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "subscript": {
+    "labelKey": "format.subscript",
+    "kinds": ["document"],
+    "tab": "inicio",
+    "group": "group.font",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "color": {
+    "labelKey": "format.textColor",
+    "kinds": ["document", "presentation"],
+    "tab": "inicio",
+    "group": "group.font",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "highlight": {
+    "labelKey": "format.highlight",
+    "kinds": ["document", "presentation"],
+    "tab": "inicio",
+    "group": "group.font",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "clearFormat": {
+    "labelKey": "format.clear",
+    "kinds": ["document", "presentation"],
+    "tab": "inicio",
+    "group": "group.font",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "style": {
+    "labelKey": "group.styles",
+    "kinds": ["spreadsheet"],
+    "tab": "inicio",
+    "group": "group.font",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "clearstyle": {
+    "labelKey": "format.clear",
+    "kinds": ["spreadsheet"],
+    "tab": "inicio",
+    "group": "group.font",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "alignLeft": {
+    "labelKey": "align.left",
+    "kinds": ["document", "presentation"],
+    "tab": "inicio",
+    "group": "group.paragraph",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "alignCenter": {
+    "labelKey": "align.center",
+    "kinds": ["document", "presentation"],
+    "tab": "inicio",
+    "group": "group.paragraph",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "alignRight": {
+    "labelKey": "align.right",
+    "kinds": ["document", "presentation"],
+    "tab": "inicio",
+    "group": "group.paragraph",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "alignJustify": {
+    "labelKey": "align.justify",
+    "kinds": ["document"],
+    "tab": "inicio",
+    "group": "group.paragraph",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "listBullet": {
+    "labelKey": "list.bullet",
+    "kinds": ["document", "presentation"],
+    "tab": "inicio",
+    "group": "group.paragraph",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "listNumber": {
+    "labelKey": "list.number",
+    "kinds": ["document", "presentation"],
+    "tab": "inicio",
+    "group": "group.paragraph",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "outdent": {
+    "labelKey": "indent.decrease",
+    "kinds": ["document"],
+    "tab": "inicio",
+    "group": "group.paragraph",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "indent": {
+    "labelKey": "indent.increase",
+    "kinds": ["document"],
+    "tab": "inicio",
+    "group": "group.paragraph",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "lineHeight": {
+    "labelKey": "paragraph.lineHeight",
+    "kinds": ["document", "presentation"],
+    "tab": "inicio",
+    "group": "group.paragraph",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "heading": {
+    "labelKey": "paragraph.style",
+    "kinds": ["document", "presentation"],
+    "tab": "inicio",
+    "group": "group.styles",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "align": {
+    "labelKey": "group.alignment",
+    "kinds": ["spreadsheet"],
+    "tab": "inicio",
+    "group": "group.alignment",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "border": {
+    "labelKey": "sheet.borders",
+    "kinds": ["spreadsheet"],
+    "tab": "inicio",
+    "group": "group.alignment",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "numfmt": {
+    "labelKey": "sheet.numberFormat",
+    "kinds": ["spreadsheet"],
+    "tab": "inicio",
+    "group": "group.number",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "decimals": {
+    "labelKey": "sheet.decimals.increase",
+    "kinds": ["spreadsheet"],
+    "tab": "inicio",
+    "group": "group.number",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "condadd": {
+    "labelKey": "cf.title",
+    "kinds": ["spreadsheet"],
+    "tab": "inicio",
+    "group": "group.styles",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "conddel": {
+    "labelKey": "cf.title",
+    "kinds": ["spreadsheet"],
+    "tab": "inicio",
+    "group": "group.styles",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "condmove": {
+    "labelKey": "cf.title",
+    "kinds": ["spreadsheet"],
+    "tab": "inicio",
+    "group": "group.styles",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "merge": {
+    "labelKey": "sheet.merge",
+    "kinds": ["spreadsheet"],
+    "tab": "inicio",
+    "group": "group.merge",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "nueva": {
+    "labelKey": "slides.new",
+    "kinds": ["presentation"],
+    "tab": "inicio",
+    "group": "group.slide",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "disposicion": {
+    "labelKey": "slides.layout",
+    "kinds": ["presentation"],
+    "tab": "inicio",
+    "group": "group.slide",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "organizar": {
+    "labelKey": "slides.arrange",
+    "kinds": ["presentation"],
+    "tab": "inicio",
+    "group": "group.arrange",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "tamano": {
+    "labelKey": "slides.size",
+    "kinds": ["presentation"],
+    "tab": "diseno",
+    "group": "group.design",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "patron": {
+    "labelKey": "slides.master",
+    "kinds": ["presentation"],
+    "tab": "diseno",
+    "group": "group.master",
+    "edits": true,
+    "telemetry": true
+  },
+  "presentar": {
+    "labelKey": "slides.present",
+    "kinds": ["presentation"],
+    "tab": "presentar",
+    "group": "group.slideshow",
+    "edits": false,
+    "telemetry": true
+  },
+  "aiPanel": {
+    "labelKey": "ai.open",
+    "kinds": ["document", "spreadsheet", "presentation"],
+    "tab": "inicio",
+    "group": "group.assistant",
+    "edits": false,
+    "telemetry": true
+  },
+  "aifill": {
+    "labelKey": "ai.open",
+    "kinds": ["spreadsheet"],
+    "tab": "formulas",
+    "group": "group.assistant",
+    "edits": true,
+    "telemetry": false
+  },
+  "iafill": {
+    "labelKey": "ai.open",
+    "kinds": ["presentation"],
+    "tab": "inicio",
+    "group": "group.assistant",
+    "edits": true,
+    "telemetry": false
+  },
+  "insertTable": {
+    "labelKey": "insert.table",
+    "kinds": ["document", "presentation"],
+    "tab": "insertar",
+    "group": "settings.table",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "tableRowAbove": {
+    "labelKey": "table.rowAbove",
+    "kinds": ["document"],
+    "tab": "insertar",
+    "group": "group.tableTools",
+    "edits": true,
+    "script": true,
+    "selection": "table",
+    "telemetry": true
+  },
+  "tableRowBelow": {
+    "labelKey": "table.rowBelow",
+    "kinds": ["document"],
+    "tab": "insertar",
+    "group": "group.tableTools",
+    "edits": true,
+    "script": true,
+    "selection": "table",
+    "telemetry": true
+  },
+  "tableColLeft": {
+    "labelKey": "table.colLeft",
+    "kinds": ["document"],
+    "tab": "insertar",
+    "group": "group.tableTools",
+    "edits": true,
+    "script": true,
+    "selection": "table",
+    "telemetry": true
+  },
+  "tableColRight": {
+    "labelKey": "table.colRight",
+    "kinds": ["document"],
+    "tab": "insertar",
+    "group": "group.tableTools",
+    "edits": true,
+    "script": true,
+    "selection": "table",
+    "telemetry": true
+  },
+  "tableDelRow": {
+    "labelKey": "table.deleteRows",
+    "kinds": ["document"],
+    "tab": "insertar",
+    "group": "group.tableTools",
+    "edits": true,
+    "script": true,
+    "selection": "table",
+    "telemetry": true
+  },
+  "tableDelCol": {
+    "labelKey": "table.deleteCols",
+    "kinds": ["document"],
+    "tab": "insertar",
+    "group": "group.tableTools",
+    "edits": true,
+    "script": true,
+    "selection": "table",
+    "telemetry": true
+  },
+  "tableDelete": {
+    "labelKey": "table.delete",
+    "kinds": ["document"],
+    "tab": "insertar",
+    "group": "group.tableTools",
+    "edits": true,
+    "script": true,
+    "selection": "table",
+    "telemetry": true
+  },
+  "tableMergeCells": {
+    "labelKey": "sheet.merge",
+    "kinds": ["document"],
+    "tab": "insertar",
+    "group": "group.tableTools",
+    "edits": true,
+    "script": true,
+    "selection": "table",
+    "telemetry": true
+  },
+  "tableSplitCell": {
+    "labelKey": "table.splitCell",
+    "kinds": ["document"],
+    "tab": "insertar",
+    "group": "group.tableTools",
+    "edits": true,
+    "script": true,
+    "selection": "table",
+    "telemetry": true
+  },
+  "tableCellBg": {
+    "labelKey": "table.cellColor",
+    "kinds": ["document"],
+    "tab": "insertar",
+    "group": "group.tableTools",
+    "edits": true,
+    "script": true,
+    "selection": "table",
+    "telemetry": true
+  },
+  "tableCellValign": {
+    "labelKey": "table.cellVAlign",
+    "kinds": ["document"],
+    "tab": "insertar",
+    "group": "group.tableTools",
+    "edits": true,
+    "script": true,
+    "selection": "table",
+    "telemetry": true
+  },
+  "insertImage": {
+    "labelKey": "insert.image",
+    "kinds": ["document"],
+    "tab": "insertar",
+    "group": "slides.box.image",
+    "edits": true,
+    "telemetry": true
+  },
+  "imagen": {
+    "labelKey": "insert.image",
+    "kinds": ["presentation"],
+    "tab": "insertar",
+    "group": "slides.box.image",
+    "edits": true,
+    "telemetry": true
+  },
+  "forma": {
+    "labelKey": "blocks.shapes",
+    "kinds": ["presentation"],
+    "tab": "insertar",
+    "group": "blocks.shapes",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "figure": {
+    "labelKey": "blocks.shapes",
+    "kinds": ["document"],
+    "tab": "insertar",
+    "group": "blocks.shapes",
+    "edits": true,
+    "telemetry": true
+  },
+  "grafico": {
+    "labelKey": "blocks.chart",
+    "kinds": ["document", "presentation"],
+    "tab": "insertar",
+    "group": "blocks.chart",
+    "edits": true,
+    "telemetry": true
+  },
+  "smartart": {
+    "labelKey": "smartart.title",
+    "kinds": ["document", "presentation"],
+    "tab": "insertar",
+    "group": "smartart.title",
+    "edits": true,
+    "telemetry": true
+  },
+  "conector": {
+    "labelKey": "group.connectors",
+    "kinds": ["presentation"],
+    "tab": "insertar",
+    "group": "group.connectors",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "media": {
+    "labelKey": "insert.media",
+    "kinds": ["presentation"],
+    "tab": "insertar",
+    "group": "group.media",
+    "edits": true,
+    "telemetry": true
+  },
+  "powerBi": {
+    "labelKey": "insert.powerBi",
+    "kinds": ["document"],
+    "tab": "insertar",
+    "group": "group.embeddedData",
+    "edits": true,
+    "telemetry": true
+  },
+  "imageWrap": {
+    "labelKey": "image.wrap",
+    "kinds": ["document"],
+    "tab": "insertar",
+    "group": "group.image",
+    "edits": true,
+    "selection": "image",
+    "telemetry": true
+  },
+  "imageAlign": {
+    "labelKey": "image.align.picker",
+    "kinds": ["document"],
+    "tab": "insertar",
+    "group": "group.image",
+    "edits": true,
+    "selection": "image",
+    "telemetry": true
+  },
+  "imageAlt": {
+    "labelKey": "image.alt",
+    "kinds": ["document"],
+    "tab": "insertar",
+    "group": "group.image",
+    "edits": true,
+    "selection": "image",
+    "telemetry": true
+  },
+  "imageRemoveCrop": {
+    "labelKey": "image.removeCrop",
+    "kinds": ["document"],
+    "tab": "insertar",
+    "group": "group.image",
+    "edits": true,
+    "selection": "image",
+    "telemetry": true
+  },
+  "imageRemove": {
+    "labelKey": "image.remove",
+    "kinds": ["document"],
+    "tab": "insertar",
+    "group": "group.image",
+    "edits": true,
+    "selection": "image",
+    "telemetry": true
+  },
+  "imageDeselect": {
+    "labelKey": "image.toolbar",
+    "kinds": ["document"],
+    "tab": "insertar",
+    "group": "group.image",
+    "edits": false,
+    "selection": "image",
+    "telemetry": false
+  },
+  "insertLink": {
+    "labelKey": "insert.link",
+    "kinds": ["document", "presentation"],
+    "tab": "insertar",
+    "group": "group.link",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "insertHr": {
+    "labelKey": "insert.horizontalRule",
+    "kinds": ["document", "presentation"],
+    "tab": "insertar",
+    "group": "group.elements",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "pageBreak": {
+    "labelKey": "insert.pageBreak",
+    "kinds": ["document", "presentation"],
+    "tab": "insertar",
+    "group": "group.elements",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "bloque": {
+    "labelKey": "blocks.insert",
+    "kinds": ["document", "presentation"],
+    "tab": "insertar",
+    "group": "blocks.group",
+    "edits": true,
+    "telemetry": true
+  },
+  "insertText": {
+    "labelKey": "insert.symbol",
+    "kinds": ["document", "presentation"],
+    "tab": "insertar",
+    "group": "group.elements",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "header": {
+    "labelKey": "insert.header",
+    "kinds": ["document"],
+    "tab": "insertar",
+    "group": "group.headerFooter",
+    "edits": true,
+    "telemetry": true
+  },
+  "footer": {
+    "labelKey": "insert.footer",
+    "kinds": ["document"],
+    "tab": "insertar",
+    "group": "group.headerFooter",
+    "edits": true,
+    "telemetry": true
+  },
+  "pageNumber": {
+    "labelKey": "insert.pageNumber",
+    "kinds": ["document"],
+    "tab": "insertar",
+    "group": "group.headerFooter",
+    "edits": true,
+    "telemetry": true
+  },
+  "differentFirstPage": {
+    "labelKey": "insert.differentFirstPage",
+    "kinds": ["document"],
+    "tab": "insertar",
+    "group": "group.headerFooter",
+    "edits": true,
+    "telemetry": true
+  },
+  "formField": {
+    "labelKey": "form.field.insert",
+    "kinds": ["document"],
+    "tab": "insertar",
+    "group": "group.form",
+    "edits": true,
+    "telemetry": true
+  },
+  "formFill": {
+    "labelKey": "form.fill",
+    "kinds": ["document"],
+    "tab": "insertar",
+    "group": "group.form",
+    "edits": false,
+    "telemetry": true
+  },
+  "formResponses": {
+    "labelKey": "form.responses",
+    "kinds": ["document"],
+    "tab": "insertar",
+    "group": "group.form",
+    "edits": false,
+    "telemetry": true
+  },
+  "commentInsert": {
+    "labelKey": "insert.comment",
+    "kinds": ["document", "presentation"],
+    "tab": "insertar",
+    "group": "group.comment",
+    "edits": false,
+    "telemetry": true
+  },
+  "extdata": {
+    "labelKey": "data.getExternal",
+    "kinds": ["spreadsheet"],
+    "tab": "datos",
+    "group": "group.externalData",
+    "edits": true,
+    "telemetry": true
+  },
+  "extTransform": {
+    "labelKey": "data.transform",
+    "kinds": ["spreadsheet"],
+    "tab": "datos",
+    "group": "group.externalData",
+    "edits": true,
+    "telemetry": true
+  },
+  "extRefresh": {
+    "labelKey": "data.refreshCurrent",
+    "kinds": ["spreadsheet"],
+    "tab": "datos",
+    "group": "group.externalData",
+    "edits": true,
+    "telemetry": true
+  },
+  "extRefreshAll": {
+    "labelKey": "data.refreshAll",
+    "kinds": ["spreadsheet"],
+    "tab": "datos",
+    "group": "group.externalData",
+    "edits": true,
+    "telemetry": true
+  },
+  "pivotrefresh": {
+    "labelKey": "data.refreshCurrent",
+    "kinds": ["spreadsheet"],
+    "tab": "datos",
+    "group": "group.externalData",
+    "edits": true,
+    "telemetry": true
+  },
+  "sort": {
+    "labelKey": "data.sortAsc",
+    "kinds": ["spreadsheet"],
+    "tab": "datos",
+    "group": "group.sortFilter",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "autofilter": {
+    "labelKey": "data.autofilter",
+    "kinds": ["spreadsheet"],
+    "tab": "datos",
+    "group": "group.sortFilter",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "filterset": {
+    "labelKey": "data.autofilter",
+    "kinds": ["spreadsheet"],
+    "tab": "datos",
+    "group": "group.sortFilter",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "filtercond": {
+    "labelKey": "data.autofilter",
+    "kinds": ["spreadsheet"],
+    "tab": "datos",
+    "group": "group.sortFilter",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "filtersort": {
+    "labelKey": "data.sortAsc",
+    "kinds": ["spreadsheet"],
+    "tab": "datos",
+    "group": "group.sortFilter",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "sliceradd": {
+    "labelKey": "data.slicer.insert",
+    "kinds": ["spreadsheet"],
+    "tab": "datos",
+    "group": "group.sortFilter",
+    "edits": true,
+    "telemetry": true
+  },
+  "tableadd": {
+    "labelKey": "data.table.format",
+    "kinds": ["spreadsheet"],
+    "tab": "datos",
+    "group": "settings.table",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "tabledel": {
+    "labelKey": "data.table.remove",
+    "kinds": ["spreadsheet"],
+    "tab": "datos",
+    "group": "settings.table",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "tablestyle": {
+    "labelKey": "data.table.style",
+    "kinds": ["spreadsheet"],
+    "tab": "datos",
+    "group": "settings.table",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "tabletotals": {
+    "labelKey": "data.table.totalsRow",
+    "kinds": ["spreadsheet"],
+    "tab": "datos",
+    "group": "settings.table",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "tabletotalfn": {
+    "labelKey": "data.table.totalsRow",
+    "kinds": ["spreadsheet"],
+    "tab": "datos",
+    "group": "settings.table",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "dedupe": {
+    "labelKey": "data.removeDuplicates",
+    "kinds": ["spreadsheet"],
+    "tab": "datos",
+    "group": "group.tools",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "text2cols": {
+    "labelKey": "data.textToColumns",
+    "kinds": ["spreadsheet"],
+    "tab": "datos",
+    "group": "group.tools",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "validadd": {
+    "labelKey": "data.validation",
+    "kinds": ["spreadsheet"],
+    "tab": "datos",
+    "group": "group.tools",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "validdel": {
+    "labelKey": "data.validation.remove",
+    "kinds": ["spreadsheet"],
+    "tab": "datos",
+    "group": "group.tools",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "fillcells": {
+    "labelKey": "data.aiFill",
+    "kinds": ["spreadsheet"],
+    "tab": "datos",
+    "group": "group.tools",
+    "edits": true,
+    "script": true,
+    "telemetry": false
+  },
+  "insrow": {
+    "labelKey": "table.rowAbove",
+    "kinds": ["spreadsheet"],
+    "tab": "datos",
+    "group": "group.cells",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "inscol": {
+    "labelKey": "table.colLeft",
+    "kinds": ["spreadsheet"],
+    "tab": "datos",
+    "group": "group.cells",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "delrow": {
+    "labelKey": "table.deleteRows",
+    "kinds": ["spreadsheet"],
+    "tab": "datos",
+    "group": "group.cells",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "delcol": {
+    "labelKey": "table.deleteCols",
+    "kinds": ["spreadsheet"],
+    "tab": "datos",
+    "group": "group.cells",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "bloquehoja": {
+    "labelKey": "blocks.insert",
+    "kinds": ["spreadsheet"],
+    "tab": "datos",
+    "group": "blocks.group",
+    "edits": true,
+    "telemetry": true
+  },
+  "chartadd": {
+    "labelKey": "data.chart.insert",
+    "kinds": ["spreadsheet"],
+    "tab": "datos",
+    "group": "slides.box.chart",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "sparkadd": {
+    "labelKey": "data.sparkline.insert",
+    "kinds": ["spreadsheet"],
+    "tab": "datos",
+    "group": "extdata.step.review",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "sparkdel": {
+    "labelKey": "data.sparkline.remove",
+    "kinds": ["spreadsheet"],
+    "tab": "datos",
+    "group": "extdata.step.review",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "pivot": {
+    "labelKey": "data.pivot",
+    "kinds": ["spreadsheet"],
+    "tab": "datos",
+    "group": "extdata.step.review",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "pivotdel": {
+    "labelKey": "data.pivot",
+    "kinds": ["spreadsheet"],
+    "tab": "datos",
+    "group": "extdata.step.review",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "outline": {
+    "labelKey": "rail.outline.title",
+    "kinds": ["spreadsheet"],
+    "tab": "datos",
+    "group": "rail.outline.title",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "subtotal": {
+    "labelKey": "data.subtotals",
+    "kinds": ["spreadsheet"],
+    "tab": "datos",
+    "group": "rail.outline.title",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "goalseek": {
+    "labelKey": "data.goalSeek",
+    "kinds": ["spreadsheet"],
+    "tab": "formulas",
+    "group": "group.whatIf",
+    "edits": true,
+    "telemetry": true
+  },
+  "solverapply": {
+    "labelKey": "data.solver",
+    "kinds": ["spreadsheet"],
+    "tab": "formulas",
+    "group": "group.whatIf",
+    "edits": true,
+    "telemetry": true
+  },
+  "datatable": {
+    "labelKey": "data.dataTable",
+    "kinds": ["spreadsheet"],
+    "tab": "formulas",
+    "group": "group.whatIf",
+    "edits": true,
+    "telemetry": true
+  },
+  "scenadd": {
+    "labelKey": "data.scenario.new",
+    "kinds": ["spreadsheet"],
+    "tab": "formulas",
+    "group": "group.whatIf",
+    "edits": true,
+    "telemetry": true
+  },
+  "scenupdate": {
+    "labelKey": "data.scenario.refresh",
+    "kinds": ["spreadsheet"],
+    "tab": "formulas",
+    "group": "group.whatIf",
+    "edits": true,
+    "telemetry": true
+  },
+  "scenapply": {
+    "labelKey": "data.scenarios",
+    "kinds": ["spreadsheet"],
+    "tab": "formulas",
+    "group": "group.whatIf",
+    "edits": true,
+    "telemetry": true
+  },
+  "scendel": {
+    "labelKey": "data.scenario.delete",
+    "kinds": ["spreadsheet"],
+    "tab": "formulas",
+    "group": "group.whatIf",
+    "edits": true,
+    "telemetry": true
+  },
+  "scenreport": {
+    "labelKey": "data.summaryReport",
+    "kinds": ["spreadsheet"],
+    "tab": "formulas",
+    "group": "group.whatIf",
+    "edits": true,
+    "telemetry": true
+  },
+  "freeze": {
+    "labelKey": "data.freezePanes",
+    "kinds": ["spreadsheet"],
+    "tab": "datos",
+    "group": "group.window",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "protect": {
+    "labelKey": "data.protectSheet",
+    "kinds": ["spreadsheet"],
+    "tab": "datos",
+    "group": "group.protect",
+    "edits": true,
+    "telemetry": false
+  },
+  "unprotect": {
+    "labelKey": "data.protect.unprotectSheet",
+    "kinds": ["spreadsheet"],
+    "tab": "datos",
+    "group": "group.protect",
+    "edits": true,
+    "telemetry": false
+  },
+  "protectbook": {
+    "labelKey": "data.protectBook",
+    "kinds": ["spreadsheet"],
+    "tab": "datos",
+    "group": "group.protect",
+    "edits": true,
+    "telemetry": false
+  },
+  "unprotectbook": {
+    "labelKey": "data.protect.unprotectBook",
+    "kinds": ["spreadsheet"],
+    "tab": "datos",
+    "group": "group.protect",
+    "edits": true,
+    "telemetry": false
+  },
+  "nameset": {
+    "labelKey": "names.title",
+    "kinds": ["spreadsheet"],
+    "tab": "datos",
+    "group": "names.group",
+    "edits": true,
+    "telemetry": false
+  },
+  "namedel": {
+    "labelKey": "names.title",
+    "kinds": ["spreadsheet"],
+    "tab": "datos",
+    "group": "names.group",
+    "edits": true,
+    "telemetry": false
+  },
+  "pageMargins": {
+    "labelKey": "layout.margins.label",
+    "kinds": ["document"],
+    "tab": "diseno",
+    "group": "layout.margins",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "pageOrientation": {
+    "labelKey": "layout.orientation",
+    "kinds": ["document"],
+    "tab": "diseno",
+    "group": "layout.orientation",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "pageSize": {
+    "labelKey": "layout.size.label",
+    "kinds": ["document"],
+    "tab": "diseno",
+    "group": "layout.size",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "pageColor": {
+    "labelKey": "layout.pageColor",
+    "kinds": ["document"],
+    "tab": "diseno",
+    "group": "layout.pageColor",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "watermark": {
+    "labelKey": "watermark.group",
+    "kinds": ["document"],
+    "tab": "diseno",
+    "group": "watermark.group",
+    "edits": true,
+    "telemetry": true
+  },
+  "pageBorder": {
+    "labelKey": "border.group",
+    "kinds": ["document"],
+    "tab": "diseno",
+    "group": "border.group",
+    "edits": true,
+    "telemetry": true
+  },
+  "pageNumbering": {
+    "labelKey": "layout.numbering.label",
+    "kinds": ["document"],
+    "tab": "diseno",
+    "group": "layout.numbering",
+    "edits": true,
+    "telemetry": true
+  },
+  "columns": {
+    "labelKey": "layout.columns.label",
+    "kinds": ["document"],
+    "tab": "diseno",
+    "group": "layout.columns",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "insertToc": {
+    "labelKey": "ref.tocInsert",
+    "kinds": ["document"],
+    "tab": "referencias",
+    "group": "ref.toc",
+    "edits": true,
+    "telemetry": true
+  },
+  "updateToc": {
+    "labelKey": "ref.tocUpdate",
+    "kinds": ["document"],
+    "tab": "referencias",
+    "group": "ref.toc",
+    "edits": true,
+    "telemetry": true
+  },
+  "indexMark": {
+    "labelKey": "ref.indexMark",
+    "kinds": ["document"],
+    "tab": "referencias",
+    "group": "group.index",
+    "edits": true,
+    "telemetry": true
+  },
+  "indexBuild": {
+    "labelKey": "ref.indexBuild",
+    "kinds": ["document"],
+    "tab": "referencias",
+    "group": "group.index",
+    "edits": true,
+    "telemetry": true
+  },
+  "caption": {
+    "labelKey": "ref.captionTable",
+    "kinds": ["document"],
+    "tab": "referencias",
+    "group": "group.captions",
+    "edits": true,
+    "telemetry": true
+  },
+  "crossReference": {
+    "labelKey": "ref.crossReference.insert",
+    "kinds": ["document"],
+    "tab": "referencias",
+    "group": "group.captions",
+    "edits": true,
+    "telemetry": true
+  },
+  "captionsUpdate": {
+    "labelKey": "ref.captionsUpdate",
+    "kinds": ["document"],
+    "tab": "referencias",
+    "group": "group.captions",
+    "edits": true,
+    "telemetry": true
+  },
+  "footnote": {
+    "labelKey": "ref.footnote",
+    "kinds": ["document"],
+    "tab": "referencias",
+    "group": "group.notes",
+    "edits": true,
+    "telemetry": true
+  },
+  "endnote": {
+    "labelKey": "ref.endnote",
+    "kinds": ["document"],
+    "tab": "referencias",
+    "group": "group.notes",
+    "edits": true,
+    "telemetry": true
+  },
+  "endnotesUpdate": {
+    "labelKey": "ref.endnotesUpdate",
+    "kinds": ["document"],
+    "tab": "referencias",
+    "group": "group.notes",
+    "edits": true,
+    "telemetry": true
+  },
+  "bibSources": {
+    "labelKey": "bib.sources.manage",
+    "kinds": ["document"],
+    "tab": "referencias",
+    "group": "bib.group",
+    "edits": true,
+    "telemetry": true
+  },
+  "bibCite": {
+    "labelKey": "bib.cite",
+    "kinds": ["document"],
+    "tab": "referencias",
+    "group": "bib.group",
+    "edits": true,
+    "telemetry": true
+  },
+  "bibUpdate": {
+    "labelKey": "bib.update",
+    "kinds": ["document"],
+    "tab": "referencias",
+    "group": "bib.group",
+    "edits": true,
+    "telemetry": true
+  },
+  "mergeSource": {
+    "labelKey": "group.mailMerge",
+    "kinds": ["document"],
+    "tab": "referencias",
+    "group": "group.mailMerge",
+    "edits": true,
+    "telemetry": true
+  },
+  "mergeField": {
+    "labelKey": "form.field.insert",
+    "kinds": ["document"],
+    "tab": "referencias",
+    "group": "group.mailMerge",
+    "edits": true,
+    "telemetry": true
+  },
+  "mergePreview": {
+    "labelKey": "merge.preview",
+    "kinds": ["document"],
+    "tab": "referencias",
+    "group": "group.mailMerge",
+    "edits": false,
+    "telemetry": true
+  },
+  "mergePrevRecord": {
+    "labelKey": "merge.prevRecord",
+    "kinds": ["document"],
+    "tab": "referencias",
+    "group": "group.mailMerge",
+    "edits": false,
+    "telemetry": true
+  },
+  "mergeNextRecord": {
+    "labelKey": "merge.nextRecord",
+    "kinds": ["document"],
+    "tab": "referencias",
+    "group": "group.mailMerge",
+    "edits": false,
+    "telemetry": true
+  },
+  "mergeReplace": {
+    "labelKey": "merge.replaceDocument",
+    "kinds": ["document"],
+    "tab": "referencias",
+    "group": "group.mailMerge",
+    "edits": true,
+    "telemetry": true
+  },
+  "mergeFinish": {
+    "labelKey": "merge.finish",
+    "kinds": ["document"],
+    "tab": "referencias",
+    "group": "group.mailMerge",
+    "edits": false,
+    "telemetry": true
+  },
+  "commentNew": {
+    "labelKey": "comments.new",
+    "kinds": ["document", "spreadsheet", "presentation"],
+    "tab": "revisar",
+    "group": "group.comments",
+    "edits": false,
+    "telemetry": true
+  },
+  "commentsPanel": {
+    "labelKey": "comments.show",
+    "kinds": ["document", "spreadsheet", "presentation"],
+    "tab": "revisar",
+    "group": "group.comments",
+    "edits": false,
+    "telemetry": true
+  },
+  "trackChanges": {
+    "labelKey": "review.track",
+    "kinds": ["document"],
+    "tab": "revisar",
+    "group": "group.review",
+    "edits": true,
+    "telemetry": true
+  },
+  "reviewPanel": {
+    "labelKey": "review.panel",
+    "kinds": ["document"],
+    "tab": "revisar",
+    "group": "group.review",
+    "edits": false,
+    "telemetry": true
+  },
+  "acceptAllChanges": {
+    "labelKey": "review.acceptAll",
+    "kinds": ["document"],
+    "tab": "revisar",
+    "group": "group.review",
+    "edits": true,
+    "telemetry": true
+  },
+  "rejectAllChanges": {
+    "labelKey": "review.rejectAll",
+    "kinds": ["document"],
+    "tab": "revisar",
+    "group": "group.review",
+    "edits": true,
+    "telemetry": true
+  },
+  "versionSave": {
+    "labelKey": "versions.save",
+    "kinds": ["document", "spreadsheet", "presentation"],
+    "tab": "revisar",
+    "group": "group.versions",
+    "edits": true,
+    "telemetry": true
+  },
+  "versionHistory": {
+    "labelKey": "versions.history",
+    "kinds": ["document", "spreadsheet", "presentation"],
+    "tab": "revisar",
+    "group": "group.versions",
+    "edits": false,
+    "telemetry": true
+  },
+  "share": {
+    "labelKey": "share.action",
+    "kinds": ["document", "spreadsheet", "presentation"],
+    "tab": "revisar",
+    "group": "group.share",
+    "edits": false,
+    "telemetry": true
+  },
+  "zoomOut": {
+    "labelKey": "view.zoomOut",
+    "kinds": ["document", "spreadsheet", "presentation"],
+    "tab": "vista",
+    "group": "group.zoom",
+    "edits": false,
+    "telemetry": true
+  },
+  "zoomSet": {
+    "labelKey": "status.zoom",
+    "kinds": ["document", "spreadsheet", "presentation"],
+    "tab": "vista",
+    "group": "group.zoom",
+    "edits": false,
+    "telemetry": true
+  },
+  "zoomIn": {
+    "labelKey": "view.zoomIn",
+    "kinds": ["document", "spreadsheet", "presentation"],
+    "tab": "vista",
+    "group": "group.zoom",
+    "edits": false,
+    "telemetry": true
+  },
+  "fitWidth": {
+    "labelKey": "view.fitWidth",
+    "kinds": ["document"],
+    "tab": "vista",
+    "group": "group.zoom",
+    "edits": false,
+    "telemetry": true
+  },
+  "ruler": {
+    "labelKey": "view.ruler",
+    "kinds": ["document"],
+    "tab": "vista",
+    "group": "group.show",
+    "edits": false,
+    "telemetry": true
+  },
+  "settingsPanel": {
+    "labelKey": "view.settingsPanel",
+    "kinds": ["document", "spreadsheet", "presentation"],
+    "tab": "vista",
+    "group": "group.show",
+    "edits": false,
+    "telemetry": true
+  },
+  "fullscreen": {
+    "labelKey": "view.fullscreen",
+    "kinds": ["document", "spreadsheet", "presentation"],
+    "tab": "vista",
+    "group": "group.screen",
+    "edits": false,
+    "telemetry": true
+  },
+  "canvasTheme": {
+    "labelKey": "group.canvasTheme",
+    "kinds": ["document", "spreadsheet", "presentation"],
+    "tab": "vista",
+    "group": "group.canvasTheme",
+    "edits": false,
+    "telemetry": true
+  },
+  "macroRecord": {
+    "labelKey": "macros.record",
+    "kinds": ["document", "spreadsheet", "presentation"],
+    "tab": "vista",
+    "group": "group.macros",
+    "edits": true,
+    "telemetry": true
+  },
+  "macroManage": {
+    "labelKey": "macros.manage",
+    "kinds": ["document", "spreadsheet", "presentation"],
+    "tab": "vista",
+    "group": "group.macros",
+    "edits": false,
+    "telemetry": true
+  },
+  "scriptsManage": {
+    "labelKey": "scripts.open",
+    "kinds": ["document", "spreadsheet", "presentation"],
+    "tab": "vista",
+    "group": "group.scripts",
+    "edits": false,
+    "telemetry": true
+  }
+}

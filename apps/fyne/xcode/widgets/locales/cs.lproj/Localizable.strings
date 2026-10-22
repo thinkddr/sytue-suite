@@ -1,0 +1,17 @@
+"widgets.open" = "Otevřít";
+"widgets.compose" = "Napsat";
+"widgets.create" = "Vytvořit událost";
+"widgets.notes" = "Poznámky";
+"widgets.rows" = "Řádky";
+"widgets.pending" = "Čekající";
+"widgets.channels" = "Kanály";
+"widgets.photos" = "Fotky";
+"widgets.episodes" = "Epizody";
+"widgets.apps" = "Aplikace";
+"widgets.calendars" = "Kalendáře";
+"widgets.address_books" = "Adresáře";
+"search.label" = "Globální vyhledávání";
+"dataflow.item.files" = "Soubory";
+"dataflow.item.events" = "Kalendář";
+"dataflow.item.documents" = "Dokumenty";
+"dataflow.item.contacts" = "Kontakty";

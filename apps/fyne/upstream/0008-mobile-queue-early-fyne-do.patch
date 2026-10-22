@@ -1,0 +1,78 @@
+From ae1ae7880c93692cf3ecb4d3322a8bb2d7ea6942 Mon Sep 17 00:00:00 2001
+From: Daniel Delgado <admin@sytue.eu>
+Date: Fri, 25 Sep 2026 18:06:40 +0200
+Subject: [PATCH] fix(mobile): queue fyne.Do calls made before the event loop
+ starts
+
+A goroutine that finished before Run created the queue ran fn on its own goroutine,
+concurrently with the main thread, and crashed in the text shaper (Sytue CertiPDF on the
+iOS simulator: a request that fails fast at launch). The queue now exists from
+NewGoMobileDriver, so those calls run on the main goroutine once the loop starts.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+---
+ internal/driver/mobile/driver.go      | 10 +++++-----
+ internal/driver/mobile/driver_test.go | 15 +++++++++++++++
+ 2 files changed, 20 insertions(+), 5 deletions(-)
+
+diff --git a/internal/driver/mobile/driver.go b/internal/driver/mobile/driver.go
+index 2e9880686..4c71eb457 100644
+--- a/internal/driver/mobile/driver.go
++++ b/internal/driver/mobile/driver.go
+@@ -76,10 +76,6 @@ func init() {
+ 
+ func (d *driver) DoFromGoroutine(fn func(), wait bool) {
+ 	caller := func() {
+-		if d.queuedFuncs == nil {
+-			fn() // before the app actually starts
+-			return
+-		}
+ 		var done chan struct{}
+ 		if wait {
+ 			done = common.DonePool.Get()
+@@ -181,7 +177,6 @@ func (d *driver) Run() {
+ 	app.Main(func(a app.App) {
+ 		async.SetMainGoroutine()
+ 		d.app = a
+-		d.queuedFuncs = async.NewUnboundedChan[func()]()
+ 
+ 		fyne.CurrentApp().Settings().AddListener(func(s fyne.Settings) {
+ 			painter.ClearFontCache()
+@@ -686,6 +681,11 @@ func (d *driver) DoubleTapDelay() time.Duration {
+ func NewGoMobileDriver() fyne.Driver {
+ 	d := &driver{
+ 		theme: fyne.ThemeVariant(2), // unspecified
++		// Created here and not in Run: a fyne.Do from a goroutine that finishes before the
++		// event loop starts (a request that fails fast at launch) used to run fn on that
++		// goroutine, concurrently with the main thread, and crashed in the text shaper.
++		// Queued now, it runs on the main goroutine once the loop starts.
++		queuedFuncs: async.NewUnboundedChan[func()](),
+ 	}
+ 
+ 	registerRepository(d)
+diff --git a/internal/driver/mobile/driver_test.go b/internal/driver/mobile/driver_test.go
+index a0eb37d48..1d540949f 100644
+--- a/internal/driver/mobile/driver_test.go
++++ b/internal/driver/mobile/driver_test.go
+@@ -80,3 +80,18 @@ func Test_mobileDriver_AbsolutePositionForObject(t *testing.T) {
+ 		})
+ 	}
+ }
++
++// A fyne.Do issued before the event loop starts is queued, not run on the caller: run
++// there, it raced the main thread (Sytue CertiPDF crashed in the text shaper on iOS).
++func TestDoFromGoroutineBeforeRunIsQueued(t *testing.T) {
++	d := NewGoMobileDriver().(*driver)
++	ran := false
++	d.DoFromGoroutine(func() { ran = true }, false)
++	if ran {
++		t.Fatal("fn ran on the calling goroutine before the loop started")
++	}
++	(<-d.queuedFuncs.Out())()
++	if !ran {
++		t.Fatal("the queued fn did not run")
++	}
++}
+-- 
+2.54.0 (Apple Git-157)
+

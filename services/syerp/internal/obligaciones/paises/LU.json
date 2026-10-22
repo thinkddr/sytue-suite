@@ -1,0 +1,315 @@
+{
+ "pais": "LU",
+ "verificado": true,
+ "moneda": "EUR",
+ "formas": [
+  {
+   "clave": "independant",
+   "nombre": "Indépendant",
+   "tipo": "persona_fisica"
+  },
+  {
+   "clave": "sarl",
+   "nombre": "SARL",
+   "tipo": "sociedad"
+  },
+  {
+   "clave": "sarls",
+   "nombre": "SARL-S (simplifiée)",
+   "tipo": "sociedad"
+  },
+  {
+   "clave": "sa",
+   "nombre": "SA",
+   "tipo": "sociedad"
+  },
+  {
+   "clave": "sas",
+   "nombre": "SAS",
+   "tipo": "sociedad"
+  }
+ ],
+ "portales": {
+  "myguichet": {
+   "nombre": "MyGuichet.lu / eCDF",
+   "url": "https://guichet.public.lu/fr/entreprises.html"
+  },
+  "ccss": {
+   "nombre": "CCSS — SECUline",
+   "url": "https://ccss.public.lu/"
+  },
+  "rcs": {
+   "nombre": "RCS — Luxembourg Business Registers",
+   "url": "https://www.lbr.lu/"
+  }
+ },
+ "obligaciones": [
+  {
+   "clave": "lu_tva_m",
+   "nombre": "Déclaration de TVA mensuelle",
+   "concepto": "iva_periodica",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "15"
+   },
+   "margen_dias": 7,
+   "portal": "myguichet",
+   "aplica": {
+    "condiciones": [
+     "iva",
+     "iva_mensual"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 25000,
+    "nota": "Amende de 250 € à 10 000 € pour dépôt tardif ; intérêts de retard de 7,2 % par an. Mensuelle si le chiffre d'affaires dépasse 620 000 €."
+   },
+   "calculo": {
+    "tipo": "saldo_neto",
+    "haber": [
+     "477"
+    ],
+    "debe": [
+     "472"
+    ]
+   }
+  },
+  {
+   "clave": "lu_tva_t",
+   "nombre": "Déclaration de TVA trimestrielle",
+   "concepto": "iva_periodica",
+   "ambito": "fiscal",
+   "periodicidad": "trimestral",
+   "plazos": {
+    "T": "15"
+   },
+   "margen_dias": 7,
+   "portal": "myguichet",
+   "aplica": {
+    "condiciones": [
+     "iva",
+     "!iva_mensual"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 25000,
+    "nota": "Périodicité selon le chiffre d'affaires : annuelle sous 112 000 €, trimestrielle jusqu'à 620 000 €, mensuelle au-delà ; dépôt par eCDF. Amende de 250 € à 10 000 € ; trimestrielle entre 112 000 € et 620 000 € de chiffre d'affaires (annuelle en dessous)."
+   },
+   "calculo": {
+    "tipo": "saldo_neto",
+    "haber": [
+     "477"
+    ],
+    "debe": [
+     "472"
+    ]
+   }
+  },
+  {
+   "clave": "lu_tva_annuelle",
+   "nombre": "Déclaration annuelle de TVA",
+   "concepto": "iva_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "05-01+1"
+   },
+   "margen_dias": 30,
+   "portal": "myguichet",
+   "aplica": {
+    "condiciones": [
+     "iva"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 25000,
+    "nota": "Amende de 250 € à 10 000 € ; 1er mars pour les déclarants annuels, 1er mai pour les autres."
+   }
+  },
+  {
+   "clave": "lu_recap",
+   "nombre": "État récapitulatif (livraisons intracommunautaires)",
+   "concepto": "operaciones_intracomunitarias",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "25"
+   },
+   "margen_dias": 7,
+   "portal": "myguichet",
+   "aplica": {
+    "condiciones": [
+     "intracomunitario"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 25000,
+    "nota": "Amende de 250 € à 10 000 €."
+   }
+  },
+  {
+   "clave": "lu_retenue",
+   "nombre": "Retenue d'impôt sur salaires (déclaration 950)",
+   "concepto": "retenciones_trabajo",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "10"
+   },
+   "margen_dias": 7,
+   "portal": "myguichet",
+   "aplica": {
+    "condiciones": [
+     "empleados"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_pct_mes": 0.6,
+    "recargo_max_pct": 7.2,
+    "nota": "Intérêts de retard de 0,6 % par mois et supplément de retard jusqu'à 10 %."
+   }
+  },
+  {
+   "clave": "lu_ccss",
+   "nombre": "Cotisations sociales (CCSS)",
+   "concepto": "seguridad_social",
+   "ambito": "laboral",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "ultimo"
+   },
+   "margen_dias": 7,
+   "portal": "ccss",
+   "aplica": {
+    "condiciones": [
+     "empleados"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_pct_mes": 0.6,
+    "recargo_max_pct": 7.2,
+    "nota": "Intérêts moratoires de 0,6 % par mois sur les cotisations facturées mensuellement."
+   }
+  },
+  {
+   "clave": "lu_ccss_indep",
+   "nombre": "Cotisations sociales de l'indépendant",
+   "concepto": "cuota_autonomos",
+   "ambito": "laboral",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "ultimo"
+   },
+   "margen_dias": 7,
+   "portal": "ccss",
+   "aplica": {
+    "tipos": [
+     "persona_fisica"
+    ]
+   },
+   "sancion": {
+    "tipo": "nota",
+    "nota": "Intérêts moratoires de 0,6 % par mois."
+   }
+  },
+  {
+   "clave": "lu_irc",
+   "nombre": "Déclaration IRC / ICC / IF (sociétés)",
+   "concepto": "sociedades_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "12-31+1"
+   },
+   "margen_dias": 60,
+   "portal": "myguichet",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_max_pct": 10,
+    "fija_centimos": 25000,
+    "nota": "Supplément pour dépôt tardif jusqu'à 10 % de l'impôt et astreinte jusqu'à 25 000 € ; délai reporté au 31 décembre depuis l'année d'imposition 2022."
+   }
+  },
+  {
+   "clave": "lu_avances",
+   "nombre": "Avances d'impôt (IRC/ICC)",
+   "concepto": "pago_fraccionado_sociedades",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "1P": "03-10",
+    "2P": "06-10",
+    "3P": "09-10",
+    "4P": "12-10"
+   },
+   "margen_dias": 7,
+   "portal": "myguichet",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_pct_mes": 0.6,
+    "nota": "Intérêts de retard de 0,6 % par mois."
+   }
+  },
+  {
+   "clave": "lu_ir",
+   "nombre": "Déclaration pour l'impôt sur le revenu (modèle 100)",
+   "concepto": "renta_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "12-31+1"
+   },
+   "margen_dias": 60,
+   "portal": "myguichet",
+   "aplica": {
+    "tipos": [
+     "persona_fisica"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_max_pct": 10,
+    "nota": "Supplément pour dépôt tardif jusqu'à 10 % de l'impôt."
+   }
+  },
+  {
+   "clave": "lu_comptes",
+   "nombre": "Dépôt des comptes annuels (RCS)",
+   "concepto": "cuentas_anuales",
+   "ambito": "mercantil",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "07-31+1"
+   },
+   "margen_dias": 30,
+   "portal": "rcs",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 5000,
+    "nota": "Frais de dépôt tardif majorés (50 € à 500 € selon le retard) et amende pénale de 500 € à 25 000 € ; dans le mois de l'approbation et au plus tard sept mois après la clôture."
+   }
+  }
+ ]
+}

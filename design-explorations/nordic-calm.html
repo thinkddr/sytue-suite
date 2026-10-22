@@ -1,0 +1,736 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sytue — Nordic Calm · Rooms</title>
+<meta name="description" content="Exploración de diseño «Nordic Calm» para la suite Sytue — vista de Rooms." />
+<style>
+/* ============================================================================
+   SYTUE · NORDIC CALM — sistema de diseño (exploración)
+   Minimalismo escandinavo: papel cálido casi blanco, un único acento azul frío
+   desaturado (fiordo), hairlines finas, iconografía line 1.5px, mucho aire.
+   Autocontenido: sin dependencias, sin CDNs, sin JS. Todo el texto cumple WCAG AA
+   (ratios verificados; ver tira inferior). Escala 4px, densidad media-alta.
+   ========================================================================== */
+
+:root{
+  /* — Papel cálido (neutros templados, hue ~44) — */
+  --paper:#FBFBF9;        /* superficie principal: conversación */
+  --surface:#FFFFFF;      /* superficie elevada: composer, tarjetas */
+  --canvas:#F4F3EE;       /* lienzo recesado del marco */
+  --panel:#F3F1EB;        /* columna de canales */
+  --fill:#EDEBE3;         /* relleno sutil / hover sobre papel */
+  --fill-panel:#EAE7DF;   /* hover sobre panel */
+  --code-bg:#F1EEE6;      /* fondo de código inline */
+
+  /* — Espina fría (rail) — */
+  --rail:#2C3A47;         /* pizarra azulada profunda: el único bloque oscuro */
+  --rail-hover:rgba(255,255,255,.07);
+  --rail-fg:#9BA7B2;      /* iconos/etiquetas inactivas (4.75:1 sobre rail) */
+  --rail-fg-active:#EEF2F6;
+
+  /* — Hairlines cálidas — */
+  --hair:#E6E3DA;
+  --hair-strong:#D9D5CA;
+
+  /* — Texto (tinta cálida) — */
+  --text:#23211D;         /* 15.5:1 */
+  --text-muted:#5E5A50;   /* 6.6:1 */
+  --text-subtle:#6E695E;  /* 5.3:1 — timestamps, meta */
+
+  /* — Acento único: azul fiordo frío desaturado — */
+  --accent:#3A5A78;       /* enlaces, activo, relleno primario (7.0:1 texto) */
+  --accent-hover:#33516C;
+  --accent-active:#2C475F;
+  --accent-weak:#E8EDF2;  /* tinte frío: selección, @mención */
+  --accent-weak-h:#DDE6EE;/* hover del tinte */
+  --accent-line:#C3D2DF;  /* hairline en contexto de acento */
+  --on-accent:#FFFFFF;
+
+  /* — Presencia / semántica (calmada, desaturada) — */
+  --online:#4C8A6A;
+  --away:#B98436;
+  --dnd:#B0574E;
+  --success-text:#3E6E54;
+  --away-text:#8A5E1F;
+  --danger-text:#9A403A;
+
+  /* — Radios (esquinas suaves) — */
+  --r-xs:5px; --r-sm:7px; --r-md:9px; --r-lg:11px; --r-xl:13px; --r-2xl:16px; --r-pill:999px;
+
+  /* — Tipografía humanista — */
+  --sans:'Inter','Söhne',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
+  --mono:ui-monospace,'SF Mono','JetBrains Mono',Menlo,Consolas,monospace;
+
+  --shell-min:1140px;
+}
+
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  font-family:var(--sans);
+  font-size:14px; line-height:22px;
+  color:var(--text);
+  background:var(--canvas);
+  -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+  font-feature-settings:'cv08','ss01','tnum' 0;
+}
+:focus-visible{outline:none; box-shadow:0 0 0 2px var(--paper),0 0 0 4px var(--accent);}
+button{font-family:inherit; cursor:pointer; border:0; background:none; color:inherit;}
+.tnum{font-variant-numeric:tabular-nums;}
+.truncate{overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.sr-only{position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0;}
+.skip{position:absolute; left:12px; top:-40px; z-index:100; background:var(--surface); color:var(--accent);
+  border:1px solid var(--hair-strong); border-radius:var(--r-md); padding:8px 12px; font-weight:600; font-size:13px; transition:top .12s;}
+.skip:focus{top:12px;}
+
+/* — Iconos line 1.5 — */
+.ic{width:19px; height:19px; fill:none; stroke:currentColor; stroke-width:1.5;
+  stroke-linecap:round; stroke-linejoin:round; flex:none; display:block;}
+.ic--sm{width:16px; height:16px;}
+.ic--lg{width:22px; height:22px;}
+.ic .fill{fill:currentColor; stroke:none;}
+
+/* ======================= SHELL ======================= */
+.shell{
+  display:flex; height:100vh; min-height:760px; min-width:var(--shell-min);
+  background:var(--canvas); overflow:hidden;
+}
+
+/* ---------- (a) Rail de módulos ---------- */
+.rail{
+  width:64px; flex:none; background:var(--rail); color:var(--rail-fg);
+  display:flex; flex-direction:column; align-items:center;
+  padding:12px 0 14px; gap:4px;
+}
+.brand{
+  width:38px; height:38px; border-radius:10px; margin-bottom:10px;
+  background:linear-gradient(180deg,#45688A,#3A5A78);
+  display:grid; place-items:center; color:#fff; box-shadow:inset 0 0 0 1px rgba(255,255,255,.12);
+}
+.brand svg{width:20px; height:20px;}
+.rail-nav{display:flex; flex-direction:column; align-items:center; gap:2px; width:100%;}
+.rail-item{
+  width:48px; padding:7px 0 5px; border-radius:11px; color:var(--rail-fg);
+  display:flex; flex-direction:column; align-items:center; gap:4px;
+  transition:background .12s,color .12s; position:relative;
+}
+.rail-item .lbl{font-size:9.5px; line-height:10px; font-weight:600; letter-spacing:.01em;}
+.rail-item:hover{background:var(--rail-hover); color:var(--rail-fg-active);}
+.rail-item[aria-current="page"]{background:var(--accent); color:#fff;}
+.rail-item[aria-current="page"]::before{
+  content:""; position:absolute; left:-8px; top:50%; transform:translateY(-50%);
+  width:3px; height:22px; border-radius:0 3px 3px 0; background:var(--accent);
+}
+.rail-spacer{flex:1;}
+.rail-btn{width:40px; height:40px; border-radius:11px; display:grid; place-items:center; color:var(--rail-fg); transition:background .12s,color .12s;}
+.rail-btn:hover{background:var(--rail-hover); color:var(--rail-fg-active);}
+.rail-av{width:32px; height:32px; border-radius:9px; background:#45688A; color:#fff;
+  display:grid; place-items:center; font-size:12px; font-weight:600; position:relative; box-shadow:inset 0 0 0 1px rgba(255,255,255,.14);}
+.rail-av .dot{position:absolute; right:-2px; bottom:-2px; width:11px; height:11px; border-radius:50%; background:var(--online); box-shadow:0 0 0 2px var(--rail);}
+
+/* ---------- (b) Panel de canales ---------- */
+.channels{
+  width:272px; flex:none; background:var(--panel);
+  border-right:1px solid var(--hair);
+  display:flex; flex-direction:column; min-height:0;
+}
+.ws{
+  height:56px; flex:none; display:flex; align-items:center; gap:8px;
+  padding:0 10px 0 14px; border-bottom:1px solid var(--hair);
+}
+.ws-name{font-size:15px; font-weight:600; letter-spacing:-.01em; color:var(--text); flex:1; min-width:0; display:flex; align-items:center; gap:6px;}
+.ws-name .ic{color:var(--text-subtle);}
+.icbtn{
+  width:30px; height:30px; border-radius:var(--r-md); display:grid; place-items:center;
+  color:var(--text-subtle); transition:background .12s,color .12s;
+}
+.icbtn:hover{background:var(--fill-panel); color:var(--text);}
+.search{
+  margin:10px 12px 4px; height:34px; flex:none; display:flex; align-items:center; gap:8px;
+  padding:0 10px; background:var(--surface); border:1px solid var(--hair-strong); border-radius:var(--r-md);
+  color:var(--text-subtle); transition:border-color .12s, box-shadow .12s;
+}
+.search:hover{border-color:#CBC7BB;}
+.search:focus-within{border-color:var(--accent); box-shadow:0 0 0 3px rgba(58,90,120,.14);}
+.search input{border:0; background:none; outline:none; flex:1; font:inherit; font-size:13px; color:var(--text);}
+.search input::placeholder{color:var(--text-subtle);}
+.search kbd{
+  font-family:var(--mono); font-size:11px; color:var(--text-subtle);
+  border:1px solid var(--hair-strong); border-bottom-width:2px; border-radius:5px; padding:1px 5px; background:var(--paper);
+}
+.chan-scroll{overflow-y:auto; padding:6px 8px 16px; flex:1; min-height:0;}
+.chan-scroll::-webkit-scrollbar{width:10px;}
+.chan-scroll::-webkit-scrollbar-thumb{background:#D8D4C9; border-radius:99px; border:3px solid var(--panel);}
+
+.qlink{display:flex; align-items:center; gap:10px; height:32px; padding:0 8px; border-radius:var(--r-sm);
+  color:var(--text-muted); transition:background .12s,color .12s; width:100%; text-align:left;}
+.qlink:hover{background:var(--fill-panel); color:var(--text);}
+.qlink .ic{color:var(--text-subtle);}
+.qlink .lbl{flex:1; font-size:13.5px; font-weight:500;}
+.qlink .n{font-size:11px; font-weight:700; color:#fff; background:var(--accent);
+  min-width:18px; height:18px; padding:0 5px; border-radius:var(--r-pill); display:grid; place-items:center;}
+
+.grp{display:flex; align-items:center; gap:6px; padding:16px 8px 4px 10px;}
+.grp .ov{font-size:11px; font-weight:700; letter-spacing:.07em; text-transform:uppercase; color:var(--text-subtle); flex:1;}
+.grp button{width:22px; height:22px; border-radius:6px; display:grid; place-items:center; color:var(--text-subtle); transition:background .12s,color .12s;}
+.grp button:hover{background:var(--fill-panel); color:var(--text);}
+
+.chan{
+  display:flex; align-items:center; gap:9px; height:32px; padding:0 8px; border-radius:var(--r-sm);
+  color:var(--text-muted); position:relative; transition:background .12s,color .12s; width:100%; text-align:left;
+}
+.chan:hover{background:var(--fill-panel);}
+.chan .gl{color:var(--text-subtle); width:16px; display:grid; place-items:center; flex:none;}
+.chan .nm{flex:1; min-width:0; font-size:13.5px; font-weight:500;}
+.chan--unread .nm{color:var(--text); font-weight:600;}
+.chan--muted{color:var(--text-subtle);}
+.chan--muted .nm{font-weight:400;}
+.chan[aria-current="page"]{background:var(--accent-weak); color:var(--accent);}
+.chan[aria-current="page"] .nm{color:var(--accent); font-weight:600;}
+.chan[aria-current="page"] .gl{color:var(--accent);}
+.chan[aria-current="page"]::before{content:""; position:absolute; left:-8px; top:6px; bottom:6px; width:3px; border-radius:0 3px 3px 0; background:var(--accent);}
+.count{font-size:11px; font-weight:600; color:var(--text); background:var(--hair-strong);
+  min-width:19px; height:18px; padding:0 5px; border-radius:var(--r-pill); display:grid; place-items:center;}
+.mention{font-size:11px; font-weight:700; color:#fff; background:var(--accent);
+  min-width:22px; height:18px; padding:0 6px; border-radius:var(--r-pill); display:grid; place-items:center;}
+
+.dm-av{width:20px; height:20px; border-radius:6px; display:grid; place-items:center; font-size:9.5px; font-weight:600; position:relative; flex:none;}
+.dm-av .dot{position:absolute; right:-3px; bottom:-3px; width:9px; height:9px; border-radius:50%; box-shadow:0 0 0 2px var(--panel);}
+.dot--online{background:var(--online);} .dot--away{background:var(--away);}
+.dot--offline{background:transparent; box-shadow:inset 0 0 0 1.5px #B4B0A4,0 0 0 2px var(--panel);}
+
+/* Avatares (tintes calmados, dos tonos AA) */
+.av{border-radius:9px; display:grid; place-items:center; font-weight:600; flex:none; letter-spacing:-.01em;}
+.av--slate{background:#DCE3EA; color:#33506B;}
+.av--sage{background:#DCE6DE; color:#3E6E54;}
+.av--clay{background:#ECDFD8; color:#8A5030;}
+.av--ochre{background:#ECE5D4; color:#6F5A1C;}
+.av--plum{background:#E5DEE8; color:#5E4B72;}
+.av--teal{background:#D8E5E5; color:#2E6360;}
+
+/* ---------- (c/d/e) Conversación ---------- */
+.convo{flex:1; min-width:0; display:flex; flex-direction:column; background:var(--paper);}
+
+/* (d) Cabecera de canal */
+.chead{height:56px; flex:none; display:flex; align-items:center; gap:12px; padding:0 12px 0 18px; border-bottom:1px solid var(--hair);}
+.chead .htile{width:34px; height:34px; border-radius:var(--r-md); background:var(--fill); color:var(--accent);
+  display:grid; place-items:center; flex:none;}
+.chead-txt{min-width:0; flex:1;}
+.chead-title{display:flex; align-items:center; gap:8px; min-width:0;}
+.chead-title h1{margin:0; font-size:15.5px; font-weight:600; letter-spacing:-.01em; color:var(--text); line-height:20px;}
+.chead-title .chev{color:var(--text-subtle);}
+.chead .topic{font-size:12.5px; line-height:15px; color:var(--text-muted); margin:1px 0 0;}
+.chead .topic b{color:var(--text); font-weight:600;}
+.hact{display:flex; align-items:center; gap:4px; flex:none;}
+
+.stack{display:flex; align-items:center; padding-right:4px;}
+.stack .av{width:26px; height:26px; font-size:10.5px; margin-left:-7px; box-shadow:0 0 0 2px var(--paper);}
+.stack .av:first-child{margin-left:0;}
+.stack .more{width:26px; height:26px; margin-left:-7px; border-radius:9px; background:var(--fill); color:var(--text-muted);
+  display:grid; place-items:center; font-size:10.5px; font-weight:600; box-shadow:0 0 0 2px var(--paper);}
+
+.hbtn{height:32px; min-width:32px; padding:0 7px; border-radius:var(--r-md); display:inline-flex; align-items:center; gap:5px;
+  color:var(--text-subtle); transition:background .12s,color .12s;}
+.hbtn:hover{background:var(--fill); color:var(--text);}
+.hbtn .n{font-size:12px; font-weight:600; color:var(--text-muted);}
+.hsep{width:1px; height:22px; background:var(--hair); margin:0 4px;}
+.btn-sec{height:32px; padding:0 12px; border-radius:var(--r-md); display:inline-flex; align-items:center; gap:7px;
+  border:1px solid var(--hair-strong); background:var(--surface); color:var(--text); font-size:13px; font-weight:600;
+  transition:background .12s,border-color .12s;}
+.btn-sec:hover{background:var(--fill); border-color:#CBC7BB;}
+.btn-sec .ic{color:var(--accent);}
+
+/* Tira de fijados */
+.pins{height:34px; flex:none; display:flex; align-items:center; gap:8px; padding:0 18px;
+  background:var(--paper); border-bottom:1px solid var(--hair); color:var(--text-muted); font-size:12.5px;}
+.pins .ic{color:var(--text-subtle);}
+.pins b{color:var(--text); font-weight:600;}
+.pins .lnk{color:var(--accent); font-weight:600; margin-left:auto;}
+.pins .lnk:hover{text-decoration:underline;}
+
+/* (c) Timeline */
+.timeline{flex:1; min-height:0; overflow-y:auto; padding:6px 8px 8px;}
+.timeline::-webkit-scrollbar{width:11px;}
+.timeline::-webkit-scrollbar-thumb{background:#DCD8CD; border-radius:99px; border:3px solid var(--paper);}
+
+.daysep{display:flex; align-items:center; gap:14px; margin:14px 10px;}
+.daysep .ln{height:1px; flex:1; background:var(--hair);}
+.daysep .pill{font-size:11.5px; font-weight:600; color:var(--text-muted); background:var(--surface);
+  border:1px solid var(--hair); border-radius:var(--r-pill); padding:2px 12px;}
+
+.sysmsg{text-align:center; font-size:12px; color:var(--text-subtle); margin:10px 0;}
+.sysmsg b{color:var(--text-muted); font-weight:600;}
+
+.msg{position:relative; display:flex; gap:12px; padding:3px 12px 3px 10px; border-radius:var(--r-md); transition:background .12s;}
+.msg:hover{background:var(--fill);}
+.msg--lead{margin-top:10px;}
+.msg .col-av{width:38px; flex:none; padding-top:2px;}
+.msg .col-av .av{width:38px; height:38px; font-size:14px; border-radius:10px;}
+.msg .time-grp{font-size:10.5px; color:var(--text-subtle); text-align:right; padding-top:3px; opacity:0; transition:opacity .12s;}
+.msg:hover .time-grp{opacity:1;}
+.msg .body{min-width:0; flex:1;}
+.msg .meta{display:flex; align-items:baseline; gap:8px; margin-bottom:1px;}
+.msg .author{font-size:14px; font-weight:600; color:var(--text); letter-spacing:-.005em;}
+.msg .role{font-size:11px; color:var(--text-subtle); border:1px solid var(--hair); border-radius:var(--r-pill); padding:0 7px; line-height:15px;}
+.msg .ts{font-size:11px; color:var(--text-subtle);}
+.msg .txt{font-size:14px; line-height:22px; color:var(--text); white-space:pre-wrap; overflow-wrap:break-word;}
+.msg .txt a{color:var(--accent); text-decoration:none; font-weight:500;}
+.msg .txt a:hover{text-decoration:underline;}
+.men{color:var(--accent); background:var(--accent-weak); border-radius:5px; padding:0 4px; font-weight:600; white-space:nowrap;}
+.men--self{background:#EFE7D6; color:var(--away-text);}
+code.inl{font-family:var(--mono); font-size:12.5px; background:var(--code-bg); border:1px solid var(--hair); border-radius:5px; padding:1px 5px; color:var(--text-muted);}
+
+/* Barra de acciones al hover */
+.actions{position:absolute; top:-14px; right:14px; display:flex; align-items:center; gap:1px;
+  background:var(--surface); border:1px solid var(--hair); border-radius:var(--r-md); padding:2px;
+  box-shadow:0 4px 12px -4px rgba(35,33,29,.14); opacity:0; transition:opacity .12s; pointer-events:none;}
+.msg:hover .actions,.msg--demo .actions{opacity:1; pointer-events:auto;}
+.actions button{width:28px; height:28px; border-radius:var(--r-sm); display:grid; place-items:center; color:var(--text-subtle); transition:background .12s,color .12s;}
+.actions button:hover{background:var(--fill); color:var(--text);}
+
+/* Reacciones */
+.reacts{display:flex; flex-wrap:wrap; gap:6px; margin-top:6px;}
+.react{display:inline-flex; align-items:center; gap:6px; height:26px; padding:0 9px; border-radius:var(--r-pill);
+  border:1px solid var(--hair-strong); background:var(--surface); font-size:12px; font-weight:600; color:var(--text-muted); transition:border-color .12s,background .12s;}
+.react:hover{border-color:#CBC7BB;}
+.react .em{font-size:13px;}
+.react--mine{background:var(--accent-weak); border-color:var(--accent-line); color:var(--accent);}
+.react-add{width:26px; height:26px; border-radius:var(--r-pill); border:1px dashed var(--hair-strong); color:var(--text-subtle);
+  display:grid; place-items:center; transition:border-color .12s,color .12s;}
+.react-add:hover{border-color:var(--accent-line); color:var(--accent);}
+
+/* Adjunto de archivo */
+.attach{display:flex; align-items:center; gap:12px; margin-top:8px; max-width:420px;
+  border:1px solid var(--hair); border-radius:var(--r-lg); padding:10px 12px; background:var(--surface); transition:border-color .12s,background .12s;}
+.attach:hover{border-color:var(--hair-strong); background:var(--paper);}
+.attach .thumb{width:38px; height:38px; border-radius:var(--r-md); background:#DCE6DE; color:#3E6E54; display:grid; place-items:center; flex:none;}
+.attach .fmeta{min-width:0; flex:1;}
+.attach .fname{font-size:13px; font-weight:600; color:var(--text);}
+.attach .fsub{font-size:11.5px; color:var(--text-subtle);}
+.attach .dl{width:30px; height:30px; border-radius:var(--r-md); display:grid; place-items:center; color:var(--text-subtle); transition:background .12s,color .12s;}
+.attach .dl:hover{background:var(--fill); color:var(--accent);}
+
+/* Enlace enriquecido */
+.rich{display:flex; gap:0; margin-top:8px; max-width:460px; border:1px solid var(--hair); border-radius:var(--r-lg); overflow:hidden; background:var(--surface); transition:border-color .12s;}
+.rich:hover{border-color:var(--hair-strong);}
+.rich .ico{width:58px; flex:none; background:var(--accent-weak); color:var(--accent); display:grid; place-items:center; border-right:1px solid var(--accent-line);}
+.rich .rc{padding:10px 14px; min-width:0;}
+.rich .dom{font-size:11px; color:var(--text-subtle); letter-spacing:.01em; display:flex; align-items:center; gap:5px;}
+.rich .dom .fav{width:12px; height:12px; border-radius:3px; background:var(--accent);}
+.rich .rt{font-size:13.5px; font-weight:600; color:var(--accent); margin:2px 0 2px;}
+.rich .rd{font-size:12.5px; line-height:17px; color:var(--text-muted);}
+
+/* Hilo con respuestas (anidado) */
+.thread{margin:6px 0 2px 50px; position:relative;}
+.thread::before{content:""; position:absolute; left:-31px; top:2px; bottom:14px; width:1.5px; background:var(--hair-strong); border-radius:2px;}
+.treply{display:flex; gap:10px; padding:3px 8px; border-radius:var(--r-sm); transition:background .12s;}
+.treply:hover{background:var(--fill);}
+.treply .av{width:26px; height:26px; font-size:10.5px; border-radius:8px;}
+.treply .tmeta{display:flex; align-items:baseline; gap:7px;}
+.treply .ta{font-size:13px; font-weight:600; color:var(--text);}
+.treply .tt{font-size:10.5px; color:var(--text-subtle);}
+.treply .tx{font-size:13.5px; line-height:20px; color:var(--text);}
+.tmore{display:inline-flex; align-items:center; gap:8px; margin:6px 0 0 8px; padding:4px 10px 4px 4px; border-radius:var(--r-pill);
+  color:var(--accent); font-size:12.5px; font-weight:600; transition:background .12s;}
+.tmore:hover{background:var(--accent-weak);}
+.tmore .avs{display:flex;}
+.tmore .avs .av{width:20px; height:20px; font-size:9px; border-radius:6px; margin-left:-6px; box-shadow:0 0 0 1.5px var(--paper);}
+.tmore .avs .av:first-child{margin-left:0;}
+.tmore .last{color:var(--text-subtle); font-weight:500;}
+
+/* (e) Composer */
+.composer{flex:none; padding:6px 18px 16px;}
+.cbox{border:1px solid var(--hair-strong); border-radius:var(--r-xl); background:var(--surface); overflow:hidden; transition:border-color .12s, box-shadow .12s;}
+.cbox:focus-within{border-color:var(--accent); box-shadow:0 0 0 3px rgba(58,90,120,.13);}
+.ctools{display:flex; align-items:center; gap:1px; padding:6px 8px; border-bottom:1px solid var(--hair);}
+.ct{width:30px; height:30px; border-radius:var(--r-sm); display:grid; place-items:center; color:var(--text-subtle); transition:background .12s,color .12s; font-size:14px;}
+.ct:hover{background:var(--fill); color:var(--text);}
+.ct b{font-weight:700;} .ct i{font-weight:600; font-style:italic; font-family:Georgia,'Times New Roman',serif;}
+.ct s{font-weight:600;}
+.ctsep{width:1px; height:18px; background:var(--hair); margin:0 5px;}
+.cfield{padding:11px 14px; font-size:14px; line-height:22px; color:var(--text-subtle); min-height:24px;}
+.cfield .cursor{display:inline-block; width:1.5px; height:17px; background:var(--accent); vertical-align:-3px; margin-left:1px; opacity:.65;}
+.cfoot{display:flex; align-items:center; gap:4px; padding:6px 8px 8px;}
+.cfoot .ct{color:var(--text-subtle);}
+.cfoot .spacer{flex:1;}
+.cfoot .hint{font-size:11.5px; color:var(--text-subtle); margin-right:6px;}
+.cfoot .hint kbd{font-family:var(--mono); font-size:10.5px; border:1px solid var(--hair-strong); border-bottom-width:2px; border-radius:4px; padding:0 4px; color:var(--text-muted);}
+.btn-send{height:32px; padding:0 14px; border-radius:var(--r-md); display:inline-flex; align-items:center; gap:7px;
+  background:var(--accent); color:#fff; font-size:13px; font-weight:600; transition:background .12s;}
+.btn-send:hover{background:var(--accent-hover);}
+.btn-send:active{background:var(--accent-active);}
+.btn-send .ic{width:16px; height:16px;}
+
+/* ======================= MINI STYLE-GUIDE ======================= */
+.guide{background:var(--surface); border-top:1px solid var(--hair); padding:26px 34px 34px; min-width:var(--shell-min);}
+.guide-h{display:flex; align-items:baseline; gap:12px; margin-bottom:20px;}
+.guide-h .k{font-size:11px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--accent);}
+.guide-h .t{font-size:17px; font-weight:600; letter-spacing:-.01em; color:var(--text);}
+.guide-h .d{font-size:12.5px; color:var(--text-muted);}
+.guide-grid{display:grid; grid-template-columns:1.35fr 1fr .8fr; gap:40px; max-width:1400px;}
+.gcol h3{font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--text-subtle); margin:0 0 12px;}
+
+.sw-row{display:flex; flex-wrap:wrap; gap:8px 10px;}
+.sw{display:flex; align-items:center; gap:9px; width:calc(50% - 5px);}
+.sw .chip{width:30px; height:30px; border-radius:8px; flex:none; box-shadow:inset 0 0 0 1px rgba(35,33,29,.08);}
+.sw .role{font-size:12px; font-weight:600; color:var(--text); line-height:14px;}
+.sw .hex{font-family:var(--mono); font-size:11px; color:var(--text-subtle); letter-spacing:.02em;}
+
+.type-spec > div{margin-bottom:11px;}
+.type-spec .lab{font-size:10.5px; color:var(--text-subtle); font-family:var(--mono); margin-bottom:1px;}
+.t-display{font-size:30px; font-weight:700; letter-spacing:-.02em; line-height:1;}
+.t-h3{font-size:18px; font-weight:600; letter-spacing:-.01em;}
+.t-body{font-size:14px; font-weight:400;}
+.t-over{font-size:11px; font-weight:700; letter-spacing:.07em; text-transform:uppercase; color:var(--text-muted);}
+.t-cap{font-size:12px; color:var(--text-subtle);}
+.t-mono{font-family:var(--mono); font-size:12.5px; color:var(--text-muted);}
+.weights{display:flex; gap:16px; flex-wrap:wrap; margin-top:2px;}
+.weights span{font-size:15px;}
+.w4{font-weight:400;} .w5{font-weight:500;} .w6{font-weight:600;} .w7{font-weight:700;}
+
+.icon-set{display:flex; flex-wrap:wrap; gap:14px;}
+.icon-set .cell{width:38px; height:38px; border:1px solid var(--hair); border-radius:var(--r-md); display:grid; place-items:center; color:var(--text-muted);}
+
+.principles{font-size:12.5px; line-height:19px; color:var(--text-muted); margin:16px 0 0; max-width:1400px;}
+.principles b{color:var(--text); font-weight:600;}
+</style>
+</head>
+<body>
+<a class="skip" href="#contenido">Saltar al contenido</a>
+
+<!-- ===================== SPRITE DE ICONOS (line 1.5) ===================== -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-rooms" viewBox="0 0 24 24"><path d="M4 5.5h16A1.5 1.5 0 0 1 21.5 7v8a1.5 1.5 0 0 1-1.5 1.5H10l-4.5 3.4V16.5H4A1.5 1.5 0 0 1 2.5 15V7A1.5 1.5 0 0 1 4 5.5z"/><path d="M7 9.8h10M7 12.6h6.5"/></symbol>
+  <symbol id="i-docs" viewBox="0 0 24 24"><path d="M7 3.5h6.2L18 8.3V19.5a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4.5a1 1 0 0 1 1-1z"/><path d="M13 3.6V8.5h4.6"/><path d="M9 12.5h6M9 15.5h6M9 9.5h2.5"/></symbol>
+  <symbol id="i-sheets" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="1.6"/><path d="M4 10h16M4 15h16M10 4v16"/></symbol>
+  <symbol id="i-slides" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="12" rx="1.6"/><path d="M12 17v3M9 20h6"/><path d="M7 9h7M7 12.5h4.5"/></symbol>
+  <symbol id="i-meet" viewBox="0 0 24 24"><rect x="3" y="6.5" width="12" height="11" rx="1.8"/><path d="M15 10.7l5.5-3.2v9l-5.5-3.2z"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.2"/><path d="M20 20l-4.4-4.4"/></symbol>
+  <symbol id="i-edit" viewBox="0 0 24 24"><path d="M16.5 4.5l3 3-10.5 10.5-3.8.8.8-3.8z"/><path d="M14 7l3 3"/></symbol>
+  <symbol id="i-chevron-d" viewBox="0 0 24 24"><path d="M6.5 9.5l5.5 5 5.5-5"/></symbol>
+  <symbol id="i-chevron-r" viewBox="0 0 24 24"><path d="M9.5 6l6 6-6 6"/></symbol>
+  <symbol id="i-hash" viewBox="0 0 24 24"><path d="M9.5 4L7.8 20M16.2 4l-1.7 16M4.5 9h15M3.8 15h15"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5.5" y="10.5" width="13" height="9" rx="1.6"/><path d="M8.2 10.5V8a3.8 3.8 0 0 1 7.6 0v2.5"/></symbol>
+  <symbol id="i-thread" viewBox="0 0 24 24"><path d="M4 6.5h16A1.5 1.5 0 0 1 21.5 8v6a1.5 1.5 0 0 1-1.5 1.5h-8l-4 3v-3H4A1.5 1.5 0 0 1 2.5 14V8A1.5 1.5 0 0 1 4 6.5z"/><path d="M7 10h10M7 12.5h6"/></symbol>
+  <symbol id="i-at" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.8"/><path d="M15.8 12v1.4a2.6 2.6 0 0 0 5.2 0V12a9 9 0 1 0-3.4 7.1"/></symbol>
+  <symbol id="i-bookmark" viewBox="0 0 24 24"><path d="M6.5 4.5h11a.5.5 0 0 1 .5.5v14.5l-6-4-6 4V5a.5.5 0 0 1 .5-.5z"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M9 4h6l-1 6 3 3v2H7v-2l3-3-1-6z"/><path d="M12 15v5"/></symbol>
+  <symbol id="i-people" viewBox="0 0 24 24"><circle cx="8.5" cy="9" r="3.1"/><path d="M3 19a5.5 5.5 0 0 1 11 0"/><path d="M15.5 6.4a3 3 0 0 1 0 5.6"/><path d="M16.5 13.6a5 5 0 0 1 4.5 5"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6.5 10a5.5 5.5 0 0 1 11 0c0 4 1.4 5 2 6.2H4.5c.6-1.2 2-2.2 2-6.2z"/><path d="M10 19a2 2 0 0 0 4 0"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><circle class="fill" cx="6" cy="12" r="1.3"/><circle class="fill" cx="12" cy="12" r="1.3"/><circle class="fill" cx="18" cy="12" r="1.3"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5.5v13M5.5 12h13"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v10M8 10.5l4 4 4-4"/><path d="M5 19h14"/></symbol>
+  <symbol id="i-filesheet" viewBox="0 0 24 24"><path d="M7 3.5h6.2L18 8.3V19.5a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4.5a1 1 0 0 1 1-1z"/><path d="M13 3.6V8.5h4.6"/><path d="M8.5 12h7M8.5 15.5h7M12 12v6.5"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M10.5 13.5a3.8 3.8 0 0 0 5.4 0l2.2-2.2a3.8 3.8 0 0 0-5.4-5.4l-1 1"/><path d="M13.5 10.5a3.8 3.8 0 0 0-5.4 0l-2.2 2.2a3.8 3.8 0 0 0 5.4 5.4l1-1"/></symbol>
+  <symbol id="i-smiley" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M9 10.2h.02M15 10.2h.02"/><path d="M8.6 14.2a4.3 4.3 0 0 0 6.8 0"/></symbol>
+  <symbol id="i-list-ul" viewBox="0 0 24 24"><path d="M9 6.5h11M9 12h11M9 17.5h11"/><circle class="fill" cx="4.8" cy="6.5" r="1.1"/><circle class="fill" cx="4.8" cy="12" r="1.1"/><circle class="fill" cx="4.8" cy="17.5" r="1.1"/></symbol>
+  <symbol id="i-list-ol" viewBox="0 0 24 24"><path d="M10 6.5h10M10 12h10M10 17.5h10"/><path d="M4 5.4l1-.6v3.4M3.7 8.4h2M3.6 11h1.8l-1.8 2.2h1.9"/></symbol>
+  <symbol id="i-code" viewBox="0 0 24 24"><path d="M8.5 8.5L4.5 12l4 3.5M15.5 8.5l4 3.5-4 3.5M13.5 6l-3 12"/></symbol>
+  <symbol id="i-quote" viewBox="0 0 24 24"><path d="M5.5 5.5v13"/><path d="M9.5 8.5h9M9.5 12h6.5M9.5 15.5h8"/></symbol>
+  <symbol id="i-attach" viewBox="0 0 24 24"><path d="M15.8 8.4l-6.6 6.6a2.5 2.5 0 0 0 3.5 3.5l7-7a4.2 4.2 0 0 0-6-6l-7.1 7.1a6 6 0 0 0 8.5 8.5l5-5"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><path d="M4 11.6L20.5 4.5 13.6 20.5l-2.7-6.2z"/><path d="M10.9 14.3l3.6-3.6"/></symbol>
+  <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M9.7 9.6a2.4 2.4 0 1 1 3.1 2.3c-.9.3-1.3.8-1.3 1.7"/><path d="M11.5 16.4h.02"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3v2.4M12 18.6V21M4.2 7.5l2 1.2M17.8 15.3l2 1.2M4.2 16.5l2-1.2M17.8 8.7l2-1.2"/></symbol>
+  <symbol id="i-video" viewBox="0 0 24 24"><rect x="3" y="6.5" width="12" height="11" rx="1.8"/><path d="M15 10.7l5.5-3.2v9l-5.5-3.2z"/></symbol>
+  <symbol id="i-mentions" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.6"/><path d="M15.6 12v1.4a2.5 2.5 0 0 0 5 0V12a9 9 0 1 0-3.3 7"/></symbol>
+</svg>
+
+<!-- ============================== APP SHELL ============================== -->
+<div class="shell">
+
+  <!-- (a) Rail de módulos -->
+  <nav class="rail" aria-label="Módulos de Sytue">
+    <div class="brand" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M16.5 7.2A4.5 4.5 0 0 0 8 8.3c0 3.6 8.5 1.8 8.5 5.6A4.5 4.5 0 0 1 7.5 16.6"/></svg>
+    </div>
+    <div class="rail-nav">
+      <a class="rail-item" href="#contenido" aria-current="page" aria-label="Rooms"><svg class="ic ic--lg"><use href="#i-rooms"/></svg><span class="lbl">Rooms</span></a>
+      <a class="rail-item" href="#" aria-label="Docs"><svg class="ic ic--lg"><use href="#i-docs"/></svg><span class="lbl">Docs</span></a>
+      <a class="rail-item" href="#" aria-label="Sheets"><svg class="ic ic--lg"><use href="#i-sheets"/></svg><span class="lbl">Sheets</span></a>
+      <a class="rail-item" href="#" aria-label="Slides"><svg class="ic ic--lg"><use href="#i-slides"/></svg><span class="lbl">Slides</span></a>
+      <a class="rail-item" href="#" aria-label="Meet"><svg class="ic ic--lg"><use href="#i-meet"/></svg><span class="lbl">Meet</span></a>
+    </div>
+    <div class="rail-spacer"></div>
+    <button class="rail-btn" aria-label="Ayuda"><svg class="ic"><use href="#i-help"/></svg></button>
+    <button class="rail-btn" aria-label="Ajustes"><svg class="ic"><use href="#i-gear"/></svg></button>
+    <button class="rail-av" aria-label="Cuenta: Daniel Delgado, en línea" title="Daniel Delgado — En línea">DD<span class="dot"></span></button>
+  </nav>
+
+  <!-- (b) Panel de canales -->
+  <aside class="channels" aria-label="Canales y mensajes directos">
+    <div class="ws">
+      <span class="ws-name"><span class="truncate">Grupo Ibérica</span><svg class="ic ic--sm"><use href="#i-chevron-d"/></svg></span>
+      <button class="icbtn" aria-label="Redactar mensaje"><svg class="ic ic--sm"><use href="#i-edit"/></svg></button>
+    </div>
+    <div class="search" role="search">
+      <svg class="ic ic--sm"><use href="#i-search"/></svg>
+      <input type="text" placeholder="Buscar en Grupo Ibérica" aria-label="Buscar" />
+      <kbd>⌘K</kbd>
+    </div>
+
+    <div class="chan-scroll">
+      <button class="qlink"><svg class="ic ic--sm"><use href="#i-thread"/></svg><span class="lbl">Hilos</span></button>
+      <button class="qlink"><svg class="ic ic--sm"><use href="#i-mentions"/></svg><span class="lbl">Menciones y reacciones</span><span class="n tnum">2</span></button>
+      <button class="qlink"><svg class="ic ic--sm"><use href="#i-bookmark"/></svg><span class="lbl">Guardados</span></button>
+
+      <div class="grp"><span class="ov">Canales</span><button aria-label="Añadir canal"><svg class="ic ic--sm"><use href="#i-plus"/></svg></button></div>
+      <button class="chan"><span class="gl"><svg class="ic ic--sm"><use href="#i-hash"/></svg></span><span class="nm truncate">Anuncios</span></button>
+      <button class="chan" aria-current="page"><span class="gl"><svg class="ic ic--sm"><use href="#i-hash"/></svg></span><span class="nm truncate">Dirección Financiera</span></button>
+      <button class="chan chan--unread"><span class="gl"><svg class="ic ic--sm"><use href="#i-hash"/></svg></span><span class="nm truncate">Legal — Contratos</span><span class="count tnum">3</span></button>
+      <button class="chan"><span class="gl"><svg class="ic ic--sm"><use href="#i-hash"/></svg></span><span class="nm truncate">Operaciones</span></button>
+      <button class="chan chan--unread"><span class="gl"><svg class="ic ic--sm"><use href="#i-hash"/></svg></span><span class="nm truncate">Producto — Roadmap</span><span class="mention tnum">@2</span></button>
+      <button class="chan chan--muted"><span class="gl"><svg class="ic ic--sm"><use href="#i-hash"/></svg></span><span class="nm truncate">Recursos Humanos</span></button>
+      <button class="chan chan--muted"><span class="gl"><svg class="ic ic--sm"><use href="#i-lock"/></svg></span><span class="nm truncate">Seguridad TI</span></button>
+
+      <div class="grp"><span class="ov">Mensajes directos</span><button aria-label="Nuevo mensaje directo"><svg class="ic ic--sm"><use href="#i-plus"/></svg></button></div>
+      <button class="chan chan--unread"><span class="dm-av av--slate">AV<span class="dot dot--online"></span></span><span class="nm truncate">Ana Vidal</span><span class="count tnum">1</span></button>
+      <button class="chan"><span class="dm-av av--clay">MP<span class="dot dot--away"></span></span><span class="nm truncate">Marc Puig</span></button>
+      <button class="chan chan--muted"><span class="dm-av av--plum">ER<span class="dot dot--offline"></span></span><span class="nm truncate">Elena Ríos</span></button>
+      <button class="chan"><span class="dm-av av--teal">CD<span class="dot dot--online"></span></span><span class="nm truncate">Comité de Dirección</span></button>
+    </div>
+  </aside>
+
+  <!-- (c/d/e) Conversación -->
+  <main class="convo" id="contenido" tabindex="-1" aria-label="Dirección Financiera">
+
+    <!-- (d) Cabecera de canal -->
+    <header class="chead">
+      <span class="htile" aria-hidden="true"><svg class="ic ic--lg"><use href="#i-hash"/></svg></span>
+      <div class="chead-txt">
+        <div class="chead-title">
+          <h1 class="truncate">Dirección Financiera</h1>
+          <button class="icbtn" aria-label="Opciones del canal"><svg class="ic ic--sm chev"><use href="#i-chevron-d"/></svg></button>
+        </div>
+        <p class="topic truncate">Cierre trimestral · <b>Presupuesto 2026</b> · Reporte al Consejo</p>
+      </div>
+      <div class="hact">
+        <div class="stack" aria-label="16 miembros">
+          <span class="av av--slate" title="Ana Vidal">AV</span>
+          <span class="av av--clay" title="Marc Puig">MP</span>
+          <span class="av av--ochre" title="David Serra">DS</span>
+          <span class="av av--sage" title="Núria Camps">NC</span>
+          <span class="more tnum">+12</span>
+        </div>
+        <button class="hbtn" aria-label="Buscar en el canal"><svg class="ic ic--sm"><use href="#i-search"/></svg></button>
+        <button class="hbtn" aria-label="Mensajes fijados: 2"><svg class="ic ic--sm"><use href="#i-pin"/></svg><span class="n tnum">2</span></button>
+        <button class="hbtn" aria-label="Miembros: 16"><svg class="ic ic--sm"><use href="#i-people"/></svg><span class="n tnum">16</span></button>
+        <button class="hbtn" aria-label="Notificaciones del canal"><svg class="ic ic--sm"><use href="#i-bell"/></svg></button>
+        <span class="hsep" aria-hidden="true"></span>
+        <button class="btn-sec"><svg class="ic ic--sm"><use href="#i-video"/></svg>Iniciar reunión</button>
+        <button class="hbtn" aria-label="Más acciones"><svg class="ic ic--sm"><use href="#i-more"/></svg></button>
+      </div>
+    </header>
+
+    <!-- Tira de fijados -->
+    <div class="pins">
+      <svg class="ic ic--sm"><use href="#i-pin"/></svg>
+      <span><b>2</b> mensajes fijados</span>
+      <a class="pins lnk" href="#" style="border:0;padding:0;height:auto;background:none">Ver fijados</a>
+    </div>
+
+    <!-- (c) Timeline -->
+    <div class="timeline">
+
+      <div class="daysep"><span class="ln"></span><span class="pill">Hoy</span><span class="ln"></span></div>
+
+      <p class="sysmsg"><b>Elena Ríos</b> se unió al canal · 08:54</p>
+
+      <!-- Marc Puig -->
+      <div class="msg msg--lead">
+        <div class="col-av"><span class="av av--clay">MP</span></div>
+        <div class="body">
+          <div class="meta"><span class="author">Marc Puig</span><span class="role">Controlling</span><span class="ts">09:12</span></div>
+          <p class="txt">Buenos días. Ya está cerrado el consolidado de diciembre. Los números finales de EBITDA quedan un <b>3,2 %</b> por encima del <i>forecast</i> de noviembre — el detalle por unidad de negocio, en el libro adjunto.</p>
+          <a class="attach" href="#" aria-label="Descargar Cierre_Diciembre_2025_consolidado.xlsx">
+            <span class="thumb"><svg class="ic"><use href="#i-filesheet"/></svg></span>
+            <span class="fmeta">
+              <div class="fname truncate">Cierre_Diciembre_2025_consolidado.xlsx</div>
+              <div class="fsub tnum">Hoja de cálculo · 1,8 MB · 14 pestañas</div>
+            </span>
+            <span class="dl" aria-hidden="true"><svg class="ic ic--sm"><use href="#i-download"/></svg></span>
+          </a>
+        </div>
+      </div>
+
+      <!-- Ana Vidal (con @mención + barra de acciones demo + reacciones) -->
+      <div class="msg msg--lead msg--demo">
+        <div class="actions" role="toolbar" aria-label="Acciones del mensaje">
+          <button aria-label="Añadir reacción"><svg class="ic ic--sm"><use href="#i-smiley"/></svg></button>
+          <button aria-label="Responder en hilo"><svg class="ic ic--sm"><use href="#i-thread"/></svg></button>
+          <button aria-label="Guardar"><svg class="ic ic--sm"><use href="#i-bookmark"/></svg></button>
+          <button aria-label="Más acciones"><svg class="ic ic--sm"><use href="#i-more"/></svg></button>
+        </div>
+        <div class="col-av"><span class="av av--slate">AV</span></div>
+        <div class="body">
+          <div class="meta"><span class="author">Ana Vidal</span><span class="role">Directora Financiera</span><span class="ts">09:18</span></div>
+          <p class="txt">Gracias, <span class="men">@Marc Puig</span>. Reviso las desviaciones de la unidad Ibérica esta mañana — hay una partida de <code class="inl">provisiones</code> que quiero cuadrar antes del comité.</p>
+          <div class="reacts">
+            <button class="react react--mine"><span class="em">👍</span><span class="tnum">4</span></button>
+            <button class="react"><span class="em">✅</span><span class="tnum">2</span></button>
+            <button class="react-add" aria-label="Añadir reacción"><svg class="ic ic--sm"><use href="#i-smiley"/></svg></button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Ana Vidal (agrupado) con enlace enriquecido -->
+      <div class="msg">
+        <div class="col-av"><span class="time-grp">09:21</span></div>
+        <div class="body">
+          <p class="txt">Os dejo el acta del último comité con los puntos que quedaron abiertos:</p>
+          <a class="rich" href="#" aria-label="Acta — Comité de Dirección, 8 de julio de 2026, en docs.sytue.com">
+            <span class="ico"><svg class="ic ic--lg"><use href="#i-docs"/></svg></span>
+            <span class="rc">
+              <span class="dom"><span class="fav" aria-hidden="true"></span>docs.sytue.com</span>
+              <div class="rt truncate">Acta — Comité de Dirección · 8 jul 2026</div>
+              <div class="rd">Puntos abiertos del cierre trimestral, provisión de la unidad Ibérica y calendario de auditoría externa.</div>
+            </span>
+          </a>
+        </div>
+      </div>
+
+      <!-- David Serra: mensaje raíz + hilo con respuestas -->
+      <div class="msg msg--lead">
+        <div class="col-av"><span class="av av--ochre">DS</span></div>
+        <div class="body">
+          <div class="meta"><span class="author">David Serra</span><span class="role">Auditoría Interna</span><span class="ts">09:34</span></div>
+          <p class="txt">¿Confirmamos la fecha de la revisión con la auditoría externa? Propongo el <b>21 de julio</b> para dejar margen antes de la presentación al Consejo.</p>
+
+          <div class="thread" role="group" aria-label="Hilo: 5 respuestas">
+            <div class="treply">
+              <span class="av av--slate">AV</span>
+              <div>
+                <div class="tmeta"><span class="ta">Ana Vidal</span><span class="tt">09:41</span></div>
+                <div class="tx">El 21 me encaja. Bloqueo la mañana en la agenda del comité.</div>
+              </div>
+            </div>
+            <div class="treply">
+              <span class="av av--clay">MP</span>
+              <div>
+                <div class="tmeta"><span class="ta">Marc Puig</span><span class="tt">09:44</span></div>
+                <div class="tx">Perfecto. Aviso a la firma para confirmar disponibilidad del equipo.</div>
+              </div>
+            </div>
+            <button class="tmore">
+              <span class="avs"><span class="av av--slate">AV</span><span class="av av--clay">MP</span><span class="av av--sage">NC</span></span>
+              Ver 3 respuestas más
+              <span class="last">· última hace 12 min</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Núria Camps -->
+      <div class="msg msg--lead">
+        <div class="col-av"><span class="av av--sage">NC</span></div>
+        <div class="body">
+          <div class="meta"><span class="author">Núria Camps</span><span class="role">Tesorería</span><span class="ts">09:52</span></div>
+          <p class="txt">Anotado. Preparo la conciliación de tesorería para esa fecha y comparto el borrador por aquí en cuanto lo tenga cerrado.</p>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- (e) Composer con barra de formato -->
+    <div class="composer">
+      <div class="cbox">
+        <div class="ctools" role="toolbar" aria-label="Formato del mensaje">
+          <button class="ct" aria-label="Negrita"><b>B</b></button>
+          <button class="ct" aria-label="Cursiva"><i>I</i></button>
+          <button class="ct" aria-label="Tachado"><s>S</s></button>
+          <span class="ctsep" aria-hidden="true"></span>
+          <button class="ct" aria-label="Lista con viñetas"><svg class="ic ic--sm"><use href="#i-list-ul"/></svg></button>
+          <button class="ct" aria-label="Lista numerada"><svg class="ic ic--sm"><use href="#i-list-ol"/></svg></button>
+          <button class="ct" aria-label="Cita"><svg class="ic ic--sm"><use href="#i-quote"/></svg></button>
+          <span class="ctsep" aria-hidden="true"></span>
+          <button class="ct" aria-label="Enlace"><svg class="ic ic--sm"><use href="#i-link"/></svg></button>
+          <button class="ct" aria-label="Código"><svg class="ic ic--sm"><use href="#i-code"/></svg></button>
+        </div>
+        <div class="cfield">Escribe a #Dirección Financiera<span class="cursor" aria-hidden="true"></span></div>
+        <div class="cfoot">
+          <button class="ct" aria-label="Adjuntar archivo"><svg class="ic ic--sm"><use href="#i-attach"/></svg></button>
+          <button class="ct" aria-label="Mencionar a alguien"><svg class="ic ic--sm"><use href="#i-at"/></svg></button>
+          <button class="ct" aria-label="Emoji"><svg class="ic ic--sm"><use href="#i-smiley"/></svg></button>
+          <span class="spacer"></span>
+          <span class="hint"><kbd>Enter</kbd> para enviar · <kbd>⇧ Enter</kbd> salto de línea</span>
+          <button class="btn-send"><svg class="ic"><use href="#i-send"/></svg>Enviar</button>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ===================== MINI STYLE-GUIDE ===================== -->
+<section class="guide" aria-label="Guía de estilo Nordic Calm">
+  <div class="guide-h">
+    <span class="k">Sytue · Nordic Calm</span>
+    <span class="t">Sistema de diseño</span>
+    <span class="d">Papel cálido · un único azul fiordo frío · hairlines · iconografía line 1.5px · WCAG AA verificado</span>
+  </div>
+
+  <div class="guide-grid">
+    <!-- Paleta -->
+    <div class="gcol">
+      <h3>Paleta · rol / hex</h3>
+      <div class="sw-row">
+        <div class="sw"><span class="chip" style="background:#FBFBF9"></span><span><span class="role">Papel</span><br><span class="hex">#FBFBF9</span></span></div>
+        <div class="sw"><span class="chip" style="background:#F3F1EB"></span><span><span class="role">Panel</span><br><span class="hex">#F3F1EB</span></span></div>
+        <div class="sw"><span class="chip" style="background:#2C3A47"></span><span><span class="role">Rail · pizarra</span><br><span class="hex">#2C3A47</span></span></div>
+        <div class="sw"><span class="chip" style="background:#3A5A78"></span><span><span class="role">Acento · fiordo</span><br><span class="hex">#3A5A78</span></span></div>
+        <div class="sw"><span class="chip" style="background:#E8EDF2"></span><span><span class="role">Acento tenue</span><br><span class="hex">#E8EDF2</span></span></div>
+        <div class="sw"><span class="chip" style="background:#23211D"></span><span><span class="role">Tinta</span><br><span class="hex">#23211D</span></span></div>
+        <div class="sw"><span class="chip" style="background:#5E5A50"></span><span><span class="role">Texto atenuado</span><br><span class="hex">#5E5A50</span></span></div>
+        <div class="sw"><span class="chip" style="background:#E6E3DA"></span><span><span class="role">Hairline</span><br><span class="hex">#E6E3DA</span></span></div>
+        <div class="sw"><span class="chip" style="background:#4C8A6A"></span><span><span class="role">En línea</span><br><span class="hex">#4C8A6A</span></span></div>
+        <div class="sw"><span class="chip" style="background:#B98436"></span><span><span class="role">Ausente</span><br><span class="hex">#B98436</span></span></div>
+        <div class="sw"><span class="chip" style="background:#B0574E"></span><span><span class="role">Ocupado / alerta</span><br><span class="hex">#B0574E</span></span></div>
+        <div class="sw"><span class="chip" style="background:#FFFFFF"></span><span><span class="role">Superficie</span><br><span class="hex">#FFFFFF</span></span></div>
+      </div>
+    </div>
+
+    <!-- Tipografía -->
+    <div class="gcol">
+      <h3>Tipografía · sans humanista</h3>
+      <div class="type-spec">
+        <div><div class="lab">display · 30 / 700 / -0.02em</div><div class="t-display">Solvencia serena</div></div>
+        <div><div class="lab">h3 · 18 / 600</div><div class="t-h3">Dirección Financiera</div></div>
+        <div><div class="lab">body · 14 / 400 · base</div><div class="t-body">Cierre trimestral y reporte al Consejo de Administración.</div></div>
+        <div><div class="lab">overline · 11 / 700 / caps</div><div class="t-over">Canales</div></div>
+        <div><div class="lab">caption · 12 / 400</div><div class="t-cap">Editado · 09:41 · hace 12 minutos</div></div>
+        <div><div class="lab">mono · números tabulares</div><div class="t-mono tnum">EBITDA +3,2 % · 1.842.500 €</div></div>
+        <div>
+          <div class="lab">pesos</div>
+          <div class="weights"><span class="w4">Regular 400</span><span class="w5">Medium 500</span><span class="w6">Semibold 600</span><span class="w7">Bold 700</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Iconografía -->
+    <div class="gcol">
+      <h3>Iconografía · line 1.5px</h3>
+      <div class="icon-set">
+        <span class="cell"><svg class="ic"><use href="#i-rooms"/></svg></span>
+        <span class="cell"><svg class="ic"><use href="#i-docs"/></svg></span>
+        <span class="cell"><svg class="ic"><use href="#i-sheets"/></svg></span>
+        <span class="cell"><svg class="ic"><use href="#i-slides"/></svg></span>
+        <span class="cell"><svg class="ic"><use href="#i-meet"/></svg></span>
+        <span class="cell"><svg class="ic"><use href="#i-search"/></svg></span>
+        <span class="cell"><svg class="ic"><use href="#i-at"/></svg></span>
+        <span class="cell"><svg class="ic"><use href="#i-thread"/></svg></span>
+        <span class="cell"><svg class="ic"><use href="#i-pin"/></svg></span>
+        <span class="cell"><svg class="ic"><use href="#i-bookmark"/></svg></span>
+        <span class="cell"><svg class="ic"><use href="#i-people"/></svg></span>
+        <span class="cell"><svg class="ic"><use href="#i-bell"/></svg></span>
+        <span class="cell"><svg class="ic"><use href="#i-link"/></svg></span>
+        <span class="cell"><svg class="ic"><use href="#i-send"/></svg></span>
+      </div>
+    </div>
+  </div>
+
+  <p class="principles"><b>Territorio.</b> Minimalismo escandinavo: papel cálido casi puro (~#FBFBF9) predominante, una única espina fría de pizarra (el rail) como ancla institucional, y un solo acento azul fiordo desaturado (#3A5A78) reservado a estado activo, enlaces, @menciones y la acción primaria — nunca un azul corporativo saturado. Separación por <b>hairlines</b> y espacio, no por sombras. Densidad media-alta pero respirada (filas de 32px, rejilla de 4px). Todo par texto/fondo cumple <b>WCAG AA</b> (contraste ≥ 4.5:1 en texto; ≥ 3:1 en UI y puntos de presencia); el estado nunca depende solo del color.</p>
+</section>
+
+</body>
+</html>

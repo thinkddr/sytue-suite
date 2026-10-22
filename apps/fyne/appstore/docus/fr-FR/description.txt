@@ -1,0 +1,16 @@
+Coédition en temps réel
+
+• Tout est enregistré dans votre Drive européen.
+• Édition collaborative en temps réel, avec présence et sans se marcher dessus.
+• Un ruban à onglets : Accueil, Insertion, Références, Publipostage et Révision.
+• Tableaux, images, formes, SmartArt, graphiques, symboles et filigranes.
+• Références : table des matières, notes de bas de page, citations et bibliographie.
+• Publipostage : fusion de données pour lettres et étiquettes.
+• Commentaires en fil, révision des modifications et versions.
+• Assistant IA optionnel pour réécrire, traduire ou résumer, seulement si votre organisation l’active.
+• Export en ODT, DOCX et PDF ; ouverture des fichiers Word depuis Drive.
+• En-têtes, pieds de page, numérotation et blocs réutilisables.
+• Enregistrement automatique dans votre Drive européen, avec historique.
+• Téléchargez depuis la page d’accueil en PDF, HTML, Markdown, OpenDocument ou Microsoft Office.
+
+Chiffrement en transit (TLS 1.3). L’infrastructure de Sytue se trouve dans l’UE. La localisation des services externes dépend de leur fournisseur.

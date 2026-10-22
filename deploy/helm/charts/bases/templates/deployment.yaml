@@ -1,0 +1,84 @@
+{{- $globalObjectStorage := ((.Values.global).objectStorage | default dict) -}}
+{{- $objectStorage := .Values.objectStorage | default dict -}}
+{{- $objectStorageSecret := $objectStorage.existingSecret | default $globalObjectStorage.existingSecret | default "sytue-object-storage" -}}
+{{- $objectStorageRegion := $objectStorage.region | default $globalObjectStorage.region | default "fr-par" -}}
+{{- $objectStorageUseSSL := true -}}
+{{- if hasKey $globalObjectStorage "useSSL" -}}
+  {{- $objectStorageUseSSL = $globalObjectStorage.useSSL -}}
+{{- end -}}
+{{- if hasKey $objectStorage "useSSL" -}}
+  {{- $objectStorageUseSSL = $objectStorage.useSSL -}}
+{{- end -}}
+{{- if .Values.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "sytue-bases.fullname" . }}
+  labels: {{- include "sytue-bases.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector: { matchLabels: { app.kubernetes.io/name: sytue-bases, app.kubernetes.io/instance: {{ .Release.Name }} } }
+  template:
+    metadata:
+      labels: {{- include "sytue-bases.labels" . | nindent 8 }}
+    spec:
+      automountServiceAccountToken: false
+      securityContext: {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: bases
+          image: "{{ include "sytue-bases.registry" . }}/{{ .Values.image.repository }}:{{ ((.Values.global).image | default dict).tag | default .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext: {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          ports: [{ name: http, containerPort: {{ .Values.service.targetPort }} }]
+          env:
+            - { name: ENV, value: {{ include "sytue-bases.env" . | quote }} }
+            - { name: PORT, value: {{ .Values.service.targetPort | quote }} }
+            - { name: LOG_LEVEL, value: {{ .Values.config.logLevel | quote }} }
+            - name: DATABASE_URL
+              valueFrom: { secretKeyRef: { name: {{ .Values.postgresql.existingSecret }}, key: {{ .Values.postgresql.dsnKey }} } }
+            - { name: DB_MAX_CONNS, value: {{ .Values.config.dbMaxConns | quote }} }
+            - { name: OIDC_ISSUER, value: {{ printf "https://id.%s" (include "sytue-bases.domain" .) | quote }} }
+            # Firma de los retos ALTCHA de los formularios públicos. Obligatoria fuera de
+            # desarrollo: sin ella el servicio no arranca (config.go).
+            - name: BASES_ALTCHA_SECRET
+              valueFrom: { secretKeyRef: { name: {{ .Values.secrets.existingSecret }}, key: {{ .Values.secrets.altchaKey }} } }
+            # Comentarios y menciones (bases-2): el aviso va al centro de notificaciones del
+            # Hub con el secreto interno que genera el umbrella, el enlace lleva el host de
+            # la web y el nombre de quien comenta sale de Sytue ID por dentro del clúster.
+            - { name: PUBLIC_URL, value: {{ printf "https://bases.%s" (include "sytue-bases.domain" .) | quote }} }
+            - { name: HUB_BASE_URL, value: {{ .Values.config.hubUrl | default (printf "http://%s-hub" .Release.Name) | quote }} }
+            - name: HUB_INTERNAL_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: sytue-hub-internal
+                  key: secret
+            - { name: ID_BASE_URL, value: {{ .Values.config.idUrl | default (printf "http://%s-id" .Release.Name) | quote }} }
+            # Adjuntos (bases-2): los ficheros van al almacén de objetos de la suite, con su
+            # mismo secreto. Las tres referencias son `optional`: donde ese secreto no
+            # existe el pod arranca igual y los adjuntos responden 503 (config.S3Configurado),
+            # en vez de quedarse en CreateContainerConfigError.
+            - name: S3_ENDPOINT
+              valueFrom: { secretKeyRef: { name: {{ $objectStorageSecret }}, key: endpoint, optional: true } }
+            - name: S3_ACCESS_KEY
+              valueFrom: { secretKeyRef: { name: {{ $objectStorageSecret }}, key: access-key, optional: true } }
+            - name: S3_SECRET_KEY
+              valueFrom: { secretKeyRef: { name: {{ $objectStorageSecret }}, key: secret-key, optional: true } }
+            - { name: S3_USE_SSL, value: {{ $objectStorageUseSSL | quote }} }
+            - { name: S3_REGION, value: {{ $objectStorageRegion | quote }} }
+            - { name: S3_BUCKET, value: {{ .Values.config.s3Bucket | quote }} }
+          startupProbe: { httpGet: { path: /healthz, port: http }, periodSeconds: 5, failureThreshold: 30 }
+          livenessProbe: { httpGet: { path: /healthz, port: http }, periodSeconds: 20 }
+          readinessProbe: { httpGet: { path: /readyz, port: http }, periodSeconds: 10 }
+          resources: {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- range . }}
+        - maxSkew: {{ .maxSkew }}
+          topologyKey: {{ .topologyKey }}
+          whenUnsatisfiable: {{ .whenUnsatisfiable }}
+          labelSelector:
+            matchLabels:
+              {{- include "sytue-bases.selector" $ | nindent 14 }}
+        {{- end }}
+      {{- end }}
+{{- end }}

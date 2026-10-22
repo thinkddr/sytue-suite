@@ -1,0 +1,18 @@
+Ventiquattro moduli e un libro in partita doppia che il database non lascia sbilanciare.
+
+• Ventiquattro moduli e trentasei modelli: contatti, vendite, acquisti, magazzino, produzione, fatturazione, contabilità, progetti e risorse umane.
+• Aggiungere un modulo significa scrivere un JSON: senza migrazione, senza nuova rotta e senza toccare l’interfaccia.
+• Gli importi sono in centesimi interi, mai in virgola mobile, e il pareggio lo impone il database.
+• Ciò che è registrato non si tocca: si corregge con un’altra scrittura, ed è questo che distingue un libro da un foglio di calcolo.
+• Ventiquattro moduli e trentasei modelli in un solo servizio e un solo database.
+• Il catalogo dei modelli è dato: ogni modulo dichiara campi, stati e colonne dell’elenco.
+• Un modulo nuovo è un file JSON — senza DDL, senza migrazione e senza bloccare una tabella.
+• Una sola API per i trentasei modelli e una sola interfaccia generata dal catalogo.
+• Contabilità in partita doppia con importi in centesimi interi; nemmeno un numero in virgola mobile.
+• Il pareggio lo verifica il database al commit della transazione, non il codice applicativo.
+• Le scritture chiuse sono immutabili: non si modificano, non si cancellano e non accettano nuove righe.
+• Un documento, una scrittura: un nuovo tentativo o due schede non possono duplicare un ricavo.
+• Le etichette comuni ci sono in tutte le 26 lingue, e un campo non tradotto impedisce l’avvio.
+• Elenchi serviti da indice: la prima pagina di ventimila righe arriva in meno di un millisecondo.
+
+Cifratura in transito (TLS 1.3). L’infrastruttura di Sytue si trova nell’UE. La posizione dei servizi esterni dipende dal loro fornitore.

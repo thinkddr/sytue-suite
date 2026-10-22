@@ -1,0 +1,33 @@
+{{- if .Values.ingress.enabled }}
+{{- $host := include "sytue-hub.host" . }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "sytue-hub.fullname" . }}
+  labels:
+    {{- include "sytue-hub.labels" . | nindent 4 }}
+  annotations:
+    cert-manager.io/cluster-issuer: {{ include "sytue-hub.clusterIssuer" . | quote }}
+    # SSE/WebSocket (notificaciones/presencia): Traefik no bufferea ni limita el cuerpo
+    # por defecto; el streaming funciona sin anotaciones extra.
+    {{- with .Values.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  tls:
+    - hosts:
+        - {{ $host | quote }}
+      secretName: {{ .Values.ingress.tls.secretName }}
+  rules:
+    - host: {{ $host | quote }}
+      http:
+        paths:
+          - path: {{ .Values.ingress.path | default "/" }}
+            pathType: {{ .Values.ingress.pathType | default "Prefix" }}
+            backend:
+              service:
+                name: {{ include "sytue-hub.fullname" . }}
+                port:
+                  name: http
+{{- end }}

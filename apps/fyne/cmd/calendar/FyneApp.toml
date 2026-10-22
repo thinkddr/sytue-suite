@@ -1,0 +1,46 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Daniel Delgado Ramos
+#
+# METADATOS DE SYTUE CALENDAR, en el formato propio de Fyne: los lee `fyne package`
+# él solo, así que `apps/fyne/scripts/empaquetar.sh` no tiene una segunda tabla de
+# productos que se desincronice. Que este fichero exista es lo que hace que la
+# cadena empaquete este directorio.
+#
+# EL ICONO es `Icon.png`, al lado: la marca a sangre de `branding/marks`,
+# con el contorno del selector de apps; lo genera `scripts/gen-iconos-fyne.sh` y
+# `sesion/esquemas_test.go` comprueba el color y el contorno.
+Website = "https://sytue.eu"
+
+[Details]
+  Name = "Sytue Calendar"
+  ID = "eu.sytue.calendar"
+  Icon = "Icon.png"
+  Version = "0.1.0"
+  Build = 1
+
+# CÓMO LA LLAMAN LAS DEMÁS. Cada producto de la suite es su propia aplicación también
+# en escritorio y en móvil (`docs/CONVENTIONS.md` §13.6), y se invocan entre sí por su
+# esquema de URL. `empaquetar.sh` lo lee de aquí y lo escribe en los cinco sitios: el
+# intent-filter del AndroidManifest, `CFBundleURLTypes` en macOS y iOS,
+# `MimeType=x-scheme-handler/…` en el .desktop de Linux y la clave de registro del
+# instalador de Windows.
+#
+# Este esquema tiene DOS usuarios de verdad, y los dos ya existen en la web:
+#   · el intent «crear evento desde un correo» que compone Sytue Hub
+#     (`?action=create&title=&attendees=`), y
+#   · el «Crear reunión» de la ficha de un contacto, que en la web abre
+#     `appUrl('calendar')` con esos mismos parámetros. En nativo eso es
+#     `sytue-calendar://?action=create&…`, que es exactamente la costura que §13.6
+#     describe: una acción que delega en el sistema, nunca una pantalla más del
+#     mismo binario.
+#
+# Va en `[Development]`, la tabla de metadatos propios de Fyne, así que el programa lo
+# lee también en tiempo de ejecución
+# (`fyne.CurrentApp().Metadata().Custom["esquema"]`) — que es donde hace falta: es el
+# redirect_uri del login (RFC 8252 §7.1) y tiene que coincidir con lo registrado en
+# Sytue ID.
+[Development]
+  esquema = "sytue-calendar"
+  widget_acciones = "open,create,search"
+  # El instalador de escritorio que la lleva (empaquetar.sh): «Sytue One» o «Sytue Drive».
+  bundle = "one"

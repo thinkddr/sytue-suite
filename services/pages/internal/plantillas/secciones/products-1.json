@@ -1,0 +1,49 @@
+{
+  "children": [
+    {
+      "content": {
+        "en": [
+          {
+            "text": "Featured Products"
+          }
+        ],
+        "es": [
+          {
+            "text": "Productos destacados"
+          }
+        ]
+      },
+      "id": "tex0000001",
+      "tag": "h2",
+      "type": "text"
+    },
+    {
+      "columns": 3,
+      "id": "pro0000001",
+      "limit": 6,
+      "show_add_to_cart": true,
+      "show_price": true,
+      "source": {
+        "all": true
+      },
+      "type": "product_grid"
+    }
+  ],
+  "full_bleed": false,
+  "id": "sec0000001",
+  "kind": "products",
+  "layout": {
+    "direction": "column",
+    "gap": 24,
+    "padding": [
+      32,
+      32,
+      32,
+      32
+    ],
+    "align": "center",
+    "justify": "center",
+    "wrap": false
+  },
+  "type": "section"
+}

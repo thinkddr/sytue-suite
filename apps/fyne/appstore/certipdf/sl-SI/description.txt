@@ -1,0 +1,17 @@
+PDF od začetka do konca, v vašem brskalniku.
+
+• Označevanje, podčrtovanje, komentiranje in risanje po dokumentu.
+• Obrazci: izpolnjevanje polj ali ustvarjanje lastnih.
+• Združevanje, izvlečenje, sukanje, oštevilčenje in vodni žig.
+• Plošča s podpisi, trajno zakrivanje in z geslom zaščiteni dokumenti.
+• Hiter pregledovalnik s strukturo, sličicami, iskanjem in povečavo na stran ali širino.
+• Pripombe: označevanje, podčrtovanje, prečrtovanje, komentarji, risanje, oblike, puščice in žigi.
+• Polja z besedilom, meritve in posnetki območij.
+• Obrazci: izpolnjevanje obstoječih polj ali dodajanje lastnih.
+• Plošča za podpisovanje dokumentov.
+• Trajno zakrivanje: kar označite, izgine iz datoteke, ne le iz pogleda.
+• Strani: združevanje, izvlečenje, brisanje, sukanje, oštevilčenje (tudi Bates), glave in noge.
+• Vodni žig, ozadje in metapodatki, ki jih je mogoče urejati.
+• Z geslom zaščiteni dokumenti in dovoljenja.
+
+Šifrirano med prenosom (TLS 1.3). Infrastruktura Sytue je v EU. Lokacija zunanjih storitev je odvisna od njihovega ponudnika.

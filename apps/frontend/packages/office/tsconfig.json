@@ -1,0 +1,17 @@
+{
+  "extends": "../config/tsconfig.astro.json",
+  "compilerOptions": {
+    "paths": {
+      "@sytue/ui": ["../ui/src/index.ts"],
+      "@sytue/ui/*": ["../ui/src/*"],
+      "@sytue/shell": ["../shell/src/index.ts"],
+      "@sytue/auth": ["../auth/src/index.ts"],
+      "@sytue/auth/server": ["../auth/src/server/index.ts"],
+      "@sytue/auth/client": ["../auth/src/client/index.ts"],
+      "@sytue/api-clients": ["../api-clients/src/index.ts"],
+      "@sytue/config": ["../config/src/index.ts"]
+    }
+  },
+  "include": ["src", "test", "env.d.ts"],
+  "exclude": ["dist", ".astro", "node_modules"]
+}

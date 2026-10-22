@@ -1,0 +1,17 @@
+"widgets.open" = "Öppna";
+"widgets.compose" = "Skriv";
+"widgets.create" = "Skapa händelse";
+"widgets.notes" = "Anteckningar";
+"widgets.rows" = "Rader";
+"widgets.pending" = "Väntande";
+"widgets.channels" = "Kanaler";
+"widgets.photos" = "Foton";
+"widgets.episodes" = "Avsnitt";
+"widgets.apps" = "Appar";
+"widgets.calendars" = "Kalendrar";
+"widgets.address_books" = "Adressböcker";
+"search.label" = "Global sökning";
+"dataflow.item.files" = "Filer";
+"dataflow.item.events" = "Kalender";
+"dataflow.item.documents" = "Dokument";
+"dataflow.item.contacts" = "Kontakter";

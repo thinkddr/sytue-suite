@@ -1,0 +1,65 @@
+{
+  "active": 0,
+  "sheets": [
+    {
+      "name": "{{presupuesto.hoja}}",
+      "cells": {
+        "A1": "<b>{{presupuesto.titulo}}</b>",
+        "A3": "<b>{{presupuesto.partida}}</b>",
+        "B3": "<b>{{presupuesto.previsto}}</b>",
+        "C3": "<b>{{presupuesto.real}}</b>",
+        "D3": "<b>{{presupuesto.diferencia}}</b>",
+        "A4": "{{presupuesto.personal}}",
+        "A5": "{{presupuesto.local}}",
+        "A6": "{{presupuesto.material}}",
+        "A7": "{{presupuesto.viajes}}",
+        "A8": "{{presupuesto.formacion}}",
+        "A9": "{{presupuesto.otros}}",
+        "D4": "=B4-C4",
+        "D5": "=B5-C5",
+        "D6": "=B6-C6",
+        "D7": "=B7-C7",
+        "D8": "=B8-C8",
+        "D9": "=B9-C9",
+        "A10": "<b>{{presupuesto.total}}</b>",
+        "B10": "=SUM(B4:B9)",
+        "C10": "=SUM(C4:C9)",
+        "D10": "=B10-C10"
+      },
+      "formats": {
+        "B4": { "id": "currency", "decimals": 2 },
+        "C4": { "id": "currency", "decimals": 2 },
+        "D4": { "id": "currency", "decimals": 2 },
+        "B5": { "id": "currency", "decimals": 2 },
+        "C5": { "id": "currency", "decimals": 2 },
+        "D5": { "id": "currency", "decimals": 2 },
+        "B6": { "id": "currency", "decimals": 2 },
+        "C6": { "id": "currency", "decimals": 2 },
+        "D6": { "id": "currency", "decimals": 2 },
+        "B7": { "id": "currency", "decimals": 2 },
+        "C7": { "id": "currency", "decimals": 2 },
+        "D7": { "id": "currency", "decimals": 2 },
+        "B8": { "id": "currency", "decimals": 2 },
+        "C8": { "id": "currency", "decimals": 2 },
+        "D8": { "id": "currency", "decimals": 2 },
+        "B9": { "id": "currency", "decimals": 2 },
+        "C9": { "id": "currency", "decimals": 2 },
+        "D9": { "id": "currency", "decimals": 2 },
+        "B10": { "id": "currency", "decimals": 2 },
+        "C10": { "id": "currency", "decimals": 2 },
+        "D10": { "id": "currency", "decimals": 2 }
+      },
+      "styles": {
+        "A3": { "border": { "b": true } },
+        "B3": { "border": { "b": true } },
+        "C3": { "border": { "b": true } },
+        "D3": { "border": { "b": true } },
+        "A10": { "border": { "t": true } },
+        "B10": { "border": { "t": true } },
+        "C10": { "border": { "t": true } },
+        "D10": { "border": { "t": true } }
+      },
+      "freeze": { "cols": 0, "rows": 3 }
+    }
+  ]
+}

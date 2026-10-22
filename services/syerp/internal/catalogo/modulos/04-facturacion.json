@@ -1,0 +1,95 @@
+[
+  {
+    "clave": "factura_venta", "modulo": "facturacion", "secuencia": "FV",
+    "etiqueta": {"en":"Customer invoices","es":"Facturas de cliente","fr":"Factures clients","de":"Ausgangsrechnungen","it":"Fatture di vendita","bg":"Фактури към клиенти","cs":"Vydané faktury","da":"Kundefakturaer","el":"Τιμολόγια πελατών","et":"Müügiarved","fi":"Asiakaslaskut","ga":"Sonraisc custaiméirí","hr":"Izlazni računi","hu":"Vevői számlák","is":"Sölureikningar","lt":"Sąskaitos klientams","lv":"Klientu rēķini","mt":"Fatturi tal-klijenti","nb":"Kundefakturaer","nl":"Klantfacturen","pl":"Faktury sprzedaży","pt":"Faturas a clientes","ro":"Facturi clienți","sk":"Vydané faktúry","sl":"Izdani računi","sv":"Kundfakturor"},
+    "estados": ["borrador","confirmado","pagado","anulado"],
+    "campos": [
+      {"clave":"cliente","tipo":"relacion","modelo":"contacto","requerido":true},
+      {"clave":"pedido","tipo":"relacion","modelo":"pedido_venta"},
+      {"clave":"fecha","tipo":"fecha","requerido":true},
+      {"clave":"vencimiento","tipo":"fecha"},
+      {"clave":"base","tipo":"dinero","requerido":true},
+      {"clave":"iva","tipo":"dinero"},
+      {"clave":"total","tipo":"dinero"},
+      {"clave":"regimen_iva","tipo":"seleccion","opciones":["iva_general","iva_exenta","iva_exportacion","iva_entrega_ue","iva_no_sujeta","iva_inversion"]},
+      {"clave":"tipo_factura","tipo":"seleccion","opciones":["F1","F2"]},
+      {"clave":"rectifica","tipo":"relacion","modelo":"factura_venta"},
+      {"clave":"notas","tipo":"texto_largo"},
+      {"clave":"externo_id","tipo":"texto"},
+      {"clave":"tpv_operacion","tipo":"texto"},
+      {"clave":"sesion","tipo":"texto"},
+      {"clave":"medio_pago","tipo":"seleccion","opciones":["efectivo","tarjeta"]},
+      {"clave":"tpv_huella","tipo":"texto"}
+    ],
+    "lista": ["ref","cliente","fecha","vencimiento","total","estado"],
+    "contable": {
+      "diario": "ventas",
+      "campo_base": "base", "campo_iva": "iva", "campo_tercero": "cliente",
+      "cuenta_contrapartida": "430000",
+      "cuenta_ingreso_gasto": "700000",
+      "cuenta_iva": "477000",
+      "cobro": true
+    }
+  },
+  {
+    "clave": "linea_factura", "modulo": "facturacion", "titulo": "descripcion",
+    "etiqueta": {"en":"Invoice lines","es":"Líneas de factura","fr":"Invoice lines","de":"Invoice lines","it":"Invoice lines","bg":"Invoice lines","cs":"Invoice lines","da":"Invoice lines","el":"Invoice lines","et":"Invoice lines","fi":"Invoice lines","ga":"Invoice lines","hr":"Invoice lines","hu":"Invoice lines","is":"Invoice lines","lt":"Invoice lines","lv":"Invoice lines","mt":"Invoice lines","nb":"Invoice lines","nl":"Invoice lines","pl":"Invoice lines","pt":"Invoice lines","ro":"Invoice lines","sk":"Invoice lines","sl":"Invoice lines","sv":"Invoice lines"},
+    "campos": [
+      {"clave":"factura","tipo":"relacion","modelo":"factura_venta","requerido":true},
+      {"clave":"descripcion","tipo":"texto","requerido":true},
+      {"clave":"cantidad","tipo":"decimal","requerido":true},
+      {"clave":"precio_con_iva","tipo":"dinero","requerido":true},
+      {"clave":"tipo_iva","tipo":"seleccion","requerido":true,"opciones":["21","10","5","4","0"]}
+    ],
+    "lista": ["factura","descripcion","cantidad","precio_con_iva","tipo_iva"]
+  },
+  {
+    "clave": "factura_compra", "modulo": "facturacion", "secuencia": "FC",
+    "etiqueta": {"en":"Vendor bills","es":"Facturas de proveedor","fr":"Factures fournisseurs","de":"Eingangsrechnungen","it":"Fatture di acquisto","bg":"Фактури от доставчици","cs":"Přijaté faktury","da":"Leverandørfakturaer","el":"Τιμολόγια προμηθευτών","et":"Ostuarved","fi":"Ostolaskut","ga":"Billí díoltóirí","hr":"Ulazni računi","hu":"Szállítói számlák","is":"Innkaupareikningar","lt":"Tiekėjų sąskaitos","lv":"Piegādātāju rēķini","mt":"Fatturi tal-fornituri","nb":"Leverandørfakturaer","nl":"Leveranciersfacturen","pl":"Faktury zakupu","pt":"Faturas de fornecedores","ro":"Facturi furnizori","sk":"Prijaté faktúry","sl":"Prejeti računi","sv":"Leverantörsfakturor"},
+    "estados": ["borrador","confirmado","pagado","anulado"],
+    "campos": [
+      {"clave":"proveedor","tipo":"relacion","modelo":"contacto","requerido":true},
+      {"clave":"pedido","tipo":"relacion","modelo":"pedido_compra"},
+      {"clave":"fecha","tipo":"fecha","requerido":true},
+      {"clave":"vencimiento","tipo":"fecha"},
+      {"clave":"base","tipo":"dinero","requerido":true},
+      {"clave":"iva","tipo":"dinero"},
+      {"clave":"total","tipo":"dinero"},
+      {"clave":"notas","tipo":"texto_largo"},
+      {"clave":"externo_id","tipo":"texto"}
+    ],
+    "lista": ["ref","proveedor","fecha","vencimiento","total","estado"],
+    "contable": {
+      "diario": "compras",
+      "campo_base": "base", "campo_iva": "iva", "campo_tercero": "proveedor",
+      "cuenta_contrapartida": "400000",
+      "cuenta_ingreso_gasto": "600000",
+      "cuenta_iva": "472000",
+      "cobro": false
+    }
+  },
+  {
+    "clave": "gasto", "modulo": "gastos", "secuencia": "GAS",
+    "etiqueta": {"en":"Expenses","es":"Gastos","fr":"Notes de frais","de":"Spesen","it":"Note spese","bg":"Разходи","cs":"Výdaje","da":"Udlæg","el":"Έξοδα","et":"Kulud","fi":"Kulut","ga":"Speansais","hr":"Troškovi","hu":"Költségek","is":"Útgjöld","lt":"Išlaidos","lv":"Izdevumi","mt":"Spejjeż","nb":"Utlegg","nl":"Onkosten","pl":"Wydatki","pt":"Despesas","ro":"Cheltuieli","sk":"Výdavky","sl":"Stroški","sv":"Utlägg"},
+    "estados": ["borrador","pendiente","aprobado","pagado","rechazado"],
+    "campos": [
+      {"clave":"empleado","tipo":"relacion","modelo":"empleado","requerido":true},
+      {"clave":"descripcion","tipo":"texto","requerido":true},
+      {"clave":"fecha","tipo":"fecha","requerido":true},
+      {"clave":"categoria","tipo":"texto"},
+      {"clave":"base","tipo":"dinero","requerido":true},
+      {"clave":"iva","tipo":"dinero"},
+      {"clave":"total","tipo":"dinero"},
+      {"clave":"proyecto","tipo":"relacion","modelo":"proyecto"}
+    ],
+    "lista": ["ref","empleado","descripcion","fecha","total","estado"],
+    "contable": {
+      "diario": "gastos",
+      "campo_base": "base", "campo_iva": "iva", "campo_tercero": "empleado",
+      "cuenta_contrapartida": "410000",
+      "cuenta_ingreso_gasto": "629000",
+      "cuenta_iva": "472000",
+      "cobro": false
+    }
+  }
+]

@@ -1,0 +1,96 @@
+[
+  {
+    "clave": "pedido_compra", "modulo": "compras", "secuencia": "PC",
+    "etiqueta": {"en":"Purchase orders","es":"Pedidos de compra","fr":"Bons de commande","de":"Bestellungen","it":"Ordini di acquisto","bg":"Поръчки за покупка","cs":"Nákupní objednávky","da":"Indkøbsordrer","el":"Παραγγελίες αγοράς","et":"Ostutellimused","fi":"Ostotilaukset","ga":"Orduithe ceannaigh","hr":"Nabavni nalozi","hu":"Beszerzési rendelések","is":"Innkaupapantanir","lt":"Pirkimo užsakymai","lv":"Iepirkuma pasūtījumi","mt":"Ordnijiet tax-xiri","nb":"Innkjøpsordrer","nl":"Inkooporders","pl":"Zamówienia zakupu","pt":"Encomendas de compra","ro":"Comenzi de achiziție","sk":"Nákupné objednávky","sl":"Nabavna naročila","sv":"Inköpsorder"},
+    "estados": ["borrador","confirmado","recibido","facturado","cancelado"],
+    "campos": [
+      {"clave":"proveedor","tipo":"relacion","modelo":"contacto","requerido":true},
+      {"clave":"fecha","tipo":"fecha","requerido":true},
+      {"clave":"vencimiento","tipo":"fecha"},
+      {"clave":"almacen","tipo":"relacion","modelo":"almacen"},
+      {"clave":"base","tipo":"dinero","requerido":true},
+      {"clave":"iva","tipo":"dinero"},
+      {"clave":"total","tipo":"dinero"},
+      {"clave":"notas","tipo":"texto_largo"}
+    ],
+    "lista": ["ref","proveedor","fecha","total","estado"]
+  },
+  {
+    "clave": "almacen", "modulo": "inventario", "titulo": "nombre",
+    "etiqueta": {"en":"Warehouses","es":"Almacenes","fr":"Entrepôts","de":"Lager","it":"Magazzini","bg":"Складове","cs":"Sklady","da":"Lagre","el":"Αποθήκες","et":"Laod","fi":"Varastot","ga":"Stórais","hr":"Skladišta","hu":"Raktárak","is":"Vöruhús","lt":"Sandėliai","lv":"Noliktavas","mt":"Imħażen","nb":"Lagre","nl":"Magazijnen","pl":"Magazyny","pt":"Armazéns","ro":"Depozite","sk":"Sklady","sl":"Skladišča","sv":"Lager"},
+    "campos": [
+      {"clave":"nombre","tipo":"texto","requerido":true},
+      {"clave":"codigo","tipo":"texto"},
+      {"clave":"direccion","tipo":"texto"},
+      {"clave":"ciudad","tipo":"texto"},
+      {"clave":"responsable","tipo":"texto"}
+    ],
+    "lista": ["codigo","nombre","ciudad","responsable"]
+  },
+  {
+    "clave": "albaran", "modulo": "inventario", "secuencia": "ALB",
+    "etiqueta": {"en":"Transfers","es":"Albaranes","fr":"Transferts","de":"Lieferscheine","it":"Trasferimenti","bg":"Трансфери","cs":"Převody","da":"Overførsler","el":"Μεταφορές","et":"Ülekanded","fi":"Siirrot","ga":"Aistrithe","hr":"Prijenosi","hu":"Áthelyezések","is":"Tilfærslur","lt":"Perkėlimai","lv":"Pārvietošanas","mt":"Trasferimenti","nb":"Overføringer","nl":"Overboekingen","pl":"Przesunięcia","pt":"Transferências","ro":"Transferuri","sk":"Presuny","sl":"Prenosi","sv":"Överföringar"},
+    "estados": ["borrador","confirmado","entregado","cancelado"],
+    "campos": [
+      {"clave":"tipo","tipo":"seleccion","opciones":["entrada","salida","traslado"],"requerido":true},
+      {"clave":"contacto","tipo":"relacion","modelo":"contacto"},
+      {"clave":"origen","tipo":"relacion","modelo":"almacen"},
+      {"clave":"destino","tipo":"relacion","modelo":"almacen"},
+      {"clave":"fecha","tipo":"fecha","requerido":true},
+      {"clave":"pedido","tipo":"relacion","modelo":"pedido_venta"},
+      {"clave":"notas","tipo":"texto_largo"}
+    ],
+    "lista": ["ref","tipo","contacto","fecha","estado"]
+  },
+  {
+    "clave": "existencia", "modulo": "inventario", "titulo": "lote",
+    "etiqueta": {"en":"Stock on hand","es":"Existencias","fr":"Stock disponible","de":"Lagerbestand","it":"Giacenze","bg":"Наличности","cs":"Stav zásob","da":"Lagerbeholdning","el":"Διαθέσιμο απόθεμα","et":"Laoseis","fi":"Varastosaldot","ga":"Stoc ar láimh","hr":"Stanje zaliha","hu":"Készleten lévő mennyiség","is":"Birgðastaða","lt":"Atsargų likučiai","lv":"Krājumu atlikumi","mt":"Stokk disponibbli","nb":"Lagerbeholdning","nl":"Voorraad","pl":"Stany magazynowe","pt":"Existências","ro":"Stoc disponibil","sk":"Stav zásob","sl":"Stanje zalog","sv":"Lagersaldo"},
+    "campos": [
+      {"clave":"producto","tipo":"relacion","modelo":"producto","requerido":true},
+      {"clave":"almacen","tipo":"relacion","modelo":"almacen","requerido":true},
+      {"clave":"lote","tipo":"texto"},
+      {"clave":"existencias","tipo":"decimal","requerido":true},
+      {"clave":"vencimiento","tipo":"fecha"}
+    ],
+    "lista": ["producto","almacen","lote","existencias","vencimiento"]
+  },
+  {
+    "clave": "orden_fabricacion", "modulo": "fabricacion", "secuencia": "OF",
+    "etiqueta": {"en":"Manufacturing orders","es":"Órdenes de fabricación","fr":"Ordres de fabrication","de":"Fertigungsaufträge","it":"Ordini di produzione","bg":"Производствени поръчки","cs":"Výrobní zakázky","da":"Produktionsordrer","el":"Εντολές παραγωγής","et":"Tootmistellimused","fi":"Valmistustilaukset","ga":"Orduithe monaraithe","hr":"Proizvodni nalozi","hu":"Gyártási rendelések","is":"Framleiðslupantanir","lt":"Gamybos užsakymai","lv":"Ražošanas pasūtījumi","mt":"Ordnijiet ta' manifattura","nb":"Produksjonsordrer","nl":"Productieorders","pl":"Zlecenia produkcyjne","pt":"Ordens de produção","ro":"Comenzi de producție","sk":"Výrobné zákazky","sl":"Proizvodni nalogi","sv":"Tillverkningsorder"},
+    "estados": ["borrador","confirmado","en_curso","hecho","cancelado"],
+    "campos": [
+      {"clave":"producto","tipo":"relacion","modelo":"producto","requerido":true},
+      {"clave":"cantidad","tipo":"decimal","requerido":true},
+      {"clave":"almacen","tipo":"relacion","modelo":"almacen"},
+      {"clave":"fecha_inicio","tipo":"fecha","requerido":true},
+      {"clave":"fecha_fin","tipo":"fecha"},
+      {"clave":"responsable","tipo":"texto"},
+      {"clave":"coste","tipo":"dinero"}
+    ],
+    "lista": ["ref","producto","cantidad","fecha_inicio","estado"]
+  },
+  {
+    "clave": "lista_materiales", "modulo": "fabricacion", "titulo": "nombre",
+    "etiqueta": {"en":"Bills of materials","es":"Listas de materiales","fr":"Nomenclatures","de":"Stücklisten","it":"Distinte base","bg":"Спецификации на материалите","cs":"Kusovníky","da":"Styklister","el":"Κατάλογοι υλικών","et":"Materjalide nimekirjad","fi":"Osaluettelot","ga":"Billí ábhar","hr":"Sastavnice","hu":"Anyagjegyzékek","is":"Efnislistar","lt":"Medžiagų žiniaraščiai","lv":"Materiālu saraksti","mt":"Listi tal-materjali","nb":"Stykklister","nl":"Stuklijsten","pl":"Listy materiałowe","pt":"Listas de materiais","ro":"Liste de materiale","sk":"Kusovníky","sl":"Kosovnice","sv":"Materiallistor"},
+    "campos": [
+      {"clave":"nombre","tipo":"texto","requerido":true},
+      {"clave":"producto","tipo":"relacion","modelo":"producto","requerido":true},
+      {"clave":"cantidad","tipo":"decimal","requerido":true},
+      {"clave":"notas","tipo":"texto_largo"}
+    ],
+    "lista": ["nombre","producto","cantidad"]
+  },
+  {
+    "clave": "control_calidad", "modulo": "calidad", "secuencia": "QC",
+    "etiqueta": {"en":"Quality checks","es":"Controles de calidad","fr":"Contrôles qualité","de":"Qualitätsprüfungen","it":"Controlli qualità","bg":"Проверки на качеството","cs":"Kontroly kvality","da":"Kvalitetskontroller","el":"Έλεγχοι ποιότητας","et":"Kvaliteedikontrollid","fi":"Laaduntarkastukset","ga":"Seiceálacha cáilíochta","hr":"Kontrole kvalitete","hu":"Minőségellenőrzések","is":"Gæðaeftirlit","lt":"Kokybės patikros","lv":"Kvalitātes pārbaudes","mt":"Kontrolli tal-kwalità","nb":"Kvalitetskontroller","nl":"Kwaliteitscontroles","pl":"Kontrole jakości","pt":"Controlos de qualidade","ro":"Controale de calitate","sk":"Kontroly kvality","sl":"Kontrole kakovosti","sv":"Kvalitetskontroller"},
+    "estados": ["pendiente","apto","no_apto"],
+    "campos": [
+      {"clave":"producto","tipo":"relacion","modelo":"producto","requerido":true},
+      {"clave":"lote","tipo":"texto"},
+      {"clave":"fecha","tipo":"fecha","requerido":true},
+      {"clave":"tecnico","tipo":"texto"},
+      {"clave":"resultado","tipo":"texto_largo"}
+    ],
+    "lista": ["ref","producto","lote","fecha","estado"]
+  }
+]

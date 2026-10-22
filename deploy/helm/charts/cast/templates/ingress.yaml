@@ -1,0 +1,33 @@
+{{- if .Values.ingress.enabled }}
+{{- $host := include "sytue-cast.host" . }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "sytue-cast.fullname" . }}
+  labels:
+    {{- include "sytue-cast.labels" . | nindent 4 }}
+  annotations:
+    cert-manager.io/cluster-issuer: {{ include "sytue-cast.clusterIssuer" . | quote }}
+    {{- with .Values.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  tls:
+    - hosts:
+        - {{ $host | quote }}
+      secretName: {{ .Values.ingress.tls.secretName }}
+  rules:
+    - host: {{ $host | quote }}
+      http:
+        paths:
+          {{- range .Values.ingress.paths }}
+          - path: {{ .path }}
+            pathType: {{ .pathType | default "Prefix" }}
+            backend:
+              service:
+                name: {{ include "sytue-cast.fullname" $ }}
+                port:
+                  name: http
+          {{- end }}
+{{- end }}

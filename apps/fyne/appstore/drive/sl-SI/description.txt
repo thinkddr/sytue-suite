@@ -1,0 +1,16 @@
+Datoteke in sodelovanje pod vašo lastno blagovno znamko.
+
+• Nalaganje, urejanje in deljenje z nadzorovanimi povezavami (dovoljenja in potek).
+• Predogled dokumentov in slik neposredno na strani.
+• Pripenjanje v Mail brez podvajanja datoteke.
+• Shramba S3 v evropskih regijah.
+• Moj disk, diski ekip, v skupni rabi z mano, nedavno, priljubljeno in koš.
+• Povezave za deljenje z dvema ravnema (ogled ali urejanje), geslom in potekom.
+• Zgodovina različic z obnovitvijo.
+• Predogled dokumentov, slik in PDF-jev brez prenosa.
+• Odpiranje in urejanje pisarniških dokumentov v Docus, Calcus in Diapos; PDF-jev v CertiPDF.
+• Oznake občutljivosti, ki blokirajo javne povezave tam, kjer jim ni mesto.
+• Deljenje v kanal Rooms ali pripenjanje v Mail brez podvajanja datoteke.
+• Shramba S3 v evropskih regijah, s kvoto vedno na vidiku.
+
+Šifrirano med prenosom (TLS 1.3). Infrastruktura Sytue je v EU. Lokacija zunanjih storitev je odvisna od njihovega ponudnika.

@@ -1,0 +1,106 @@
+{{- $ns := include "tenant.namespace" . -}}
+{{- $slug := include "tenant.slug" . -}}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ $ns }}
+  labels:
+    {{- include "tenant.labels" . | nindent 4 }}
+    {{- if .Values.podSecurity.enabled }}
+    # Pod Security Admission (restricted): deny-by-default de pods privilegiados en
+    # el namespace del tenant. Refuerza el aislamiento multi-tenant (defensa en profundidad).
+    pod-security.kubernetes.io/enforce: {{ .Values.podSecurity.enforce | default "restricted" | quote }}
+    pod-security.kubernetes.io/enforce-version: {{ .Values.podSecurity.enforceVersion | default "latest" | quote }}
+    pod-security.kubernetes.io/audit: {{ .Values.podSecurity.audit | default "restricted" | quote }}
+    pod-security.kubernetes.io/audit-version: {{ .Values.podSecurity.auditVersion | default "latest" | quote }}
+    pod-security.kubernetes.io/warn: {{ .Values.podSecurity.warn | default "restricted" | quote }}
+    pod-security.kubernetes.io/warn-version: {{ .Values.podSecurity.warnVersion | default "latest" | quote }}
+    {{- end }}
+  annotations:
+    sytue.eu/display-name: {{ .Values.tenant.displayName | default $slug | quote }}
+    sytue.eu/plan: {{ .Values.tenant.plan | quote }}
+    sytue.eu/id-group: {{ .Values.mappings.idGroup | default (printf "org/%s" $slug) | quote }}
+    sytue.eu/db-schema: {{ .Values.mappings.dbSchema | default (printf "tenant_%s" (regexReplaceAll "-" $slug "_")) | quote }}
+    sytue.eu/mail-domain: {{ .Values.mappings.mailDomain | default (printf "%s.sytue.eu" $slug) | quote }}
+    sytue.eu/s3-prefix: {{ .Values.mappings.s3Prefix | default (printf "tenant/%s/" $slug) | quote }}
+{{- if .Values.resourceQuota.enabled }}
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: {{ $ns }}-quota
+  namespace: {{ $ns }}
+  labels:
+    {{- include "tenant.labels" . | nindent 4 }}
+spec:
+  hard:
+    {{- toYaml .Values.resourceQuota.hard | nindent 4 }}
+{{- end }}
+{{- if .Values.limitRange.enabled }}
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: {{ $ns }}-limits
+  namespace: {{ $ns }}
+  labels:
+    {{- include "tenant.labels" . | nindent 4 }}
+spec:
+  limits:
+    - type: Container
+      default:
+        {{- toYaml .Values.limitRange.default | nindent 8 }}
+      defaultRequest:
+        {{- toYaml .Values.limitRange.defaultRequest | nindent 8 }}
+      max:
+        {{- toYaml .Values.limitRange.max | nindent 8 }}
+{{- end }}
+{{- if .Values.networkPolicy.enabled }}
+---
+# Aislamiento por defecto: deny-all salvo intra-namespace, ingress controller y DNS.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $ns }}-isolation
+  namespace: {{ $ns }}
+  labels:
+    {{- include "tenant.labels" . | nindent 4 }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Tráfico dentro del propio namespace del tenant.
+    - from:
+        - podSelector: {}
+    # Desde el ingress controller (apps publicadas del tenant).
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              sytue.eu/role: {{ .Values.networkPolicy.ingressNamespaceSelectorLabel | quote }}
+  egress:
+    # DNS
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Intra-namespace
+    - to:
+        - podSelector: {}
+    {{- if .Values.networkPolicy.allowExternalEgress }}
+    # Egress a Internet/servicios gestionados (HTTPS). NO se permite cruzar a otros tenants.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 169.254.0.0/16
+              - 10.0.0.0/8           # bloquea tráfico lateral a la red de pods/otros tenants
+      ports:
+        - protocol: TCP
+          port: 443
+    {{- end }}
+{{- end }}

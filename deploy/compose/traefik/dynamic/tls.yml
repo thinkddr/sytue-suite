@@ -1,0 +1,38 @@
+# Traefik 3 — configuración dinámica: TLS local (mkcert) + middlewares de seguridad.
+#
+# Genera los certificados con mkcert (ver README) ANTES de `make dev-up`:
+#   mkcert -install
+#   mkcert -cert-file traefik/certs/sytue-localhost.pem \
+#          -key-file  traefik/certs/sytue-localhost-key.pem \
+#          "sytue.localhost" "*.sytue.localhost"
+
+tls:
+  stores:
+    default:
+      defaultCertificate:
+        certFile: /etc/traefik/certs/sytue-localhost.pem
+        keyFile: /etc/traefik/certs/sytue-localhost-key.pem
+  certificates:
+    - certFile: /etc/traefik/certs/sytue-localhost.pem
+      keyFile: /etc/traefik/certs/sytue-localhost-key.pem
+      stores:
+        - default
+  options:
+    default:
+      minVersion: VersionTLS12
+      sniStrict: false
+    modern:
+      minVersion: VersionTLS13
+
+http:
+  middlewares:
+    # Cabeceras de seguridad comunes (dev). En prod se endurecen en Helm.
+    sytue-secure-headers:
+      headers:
+        frameDeny: false           # los clientes Astro embeben visores/editores propios
+        browserXssFilter: true
+        contentTypeNosniff: true
+        referrerPolicy: "strict-origin-when-cross-origin"
+        stsSeconds: 0              # sin HSTS en dev (.localhost)
+    sytue-compress:
+      compress: {}

@@ -1,0 +1,10 @@
+{
+  "order_paid_buyer_subject": "Potvrda narudžbe {number}",
+  "order_paid_buyer_body": "Hvala vam na kupnji. Narudžba {number} je potvrđena.",
+  "order_paid_store_subject": "Zaprimljena nova narudžba: {number}",
+  "order_paid_store_body": "Zaprimili ste novu narudžbu {number} u iznosu od {total}.",
+  "withdrawal_ack_subject": "Potvrda o odustajanju zaprimljena: {number}",
+  "withdrawal_ack_body": "Vaš zahtjev za odustajanje od narudžbe {number} je zabilježen.",
+  "form_received_subject": "Zaprimljen unos obrasca: {form_id}",
+  "form_received_body": "Zaprimljen je novi unos za obrazac {form_id}."
+}

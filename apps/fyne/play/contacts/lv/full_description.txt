@@ -1,0 +1,18 @@
+CardDAV kontakti, kopīgoti visā organizācijā.
+
+• Kopīga adrešu grāmata visai organizācijai.
+• Importēšana un eksportēšana vCard formātā.
+• Dublikātu apvienošana bez datu zaudēšanas.
+• Darbojas ar jebkuru CardDAV klientu.
+• Adrešu grāmatas, tostarp jūsu organizācijas kopīgā.
+• Pilna kartīte: tālruņi, e-pasti, adreses, organizācija, dzimšanas diena, piezīmes un foto.
+• Iezīmes un izlase grupēšanai un atrašanai.
+• Dublikātu noteikšana un apvienošana bez datu zaudēšanas.
+• vCard un CSV importēšana un eksportēšana; viena kontakta eksportēšana.
+• Lielapjoma darbības un atkritne ar atkopšanu.
+• Tūlītēja meklēšana un automātiska pabeigšana, rakstot Mail.
+• Darbojas ar jebkuru CardDAV klientu.
+• Gaidāmās dzimšanas dienas no adrešu grāmatas, izceļot šī mēneša.
+• Sapulces izveide ar kontaktu vai kontakta e-pasta adreses kopēšana, nepametot kartīti.
+
+Šifrēts pārsūtīšanas laikā (TLS 1.3). Sytue infrastruktūra atrodas ES. Ārējo pakalpojumu atrašanās vieta ir atkarīga no to sniedzēja.

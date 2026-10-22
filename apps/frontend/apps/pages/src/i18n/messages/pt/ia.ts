@@ -1,0 +1,201 @@
+/**
+ * Textos em português da inteligência artificial (ia).
+ * Prefixo: ai.*
+ */
+export const ia = {
+  // Definições
+  'ai.settings.provider': 'Fornecedor de IA',
+  'ai.settings.model': 'Modelo',
+  'ai.settings.key': 'Chave de API própria (BYOK)',
+  'ai.settings.key_placeholder': 'Introduza a sua chave de API secreta…',
+  'ai.settings.key_help':
+    'A chave é guardada cifrada com AES-256-GCM. Nunca é devolvida ao navegador.',
+  'ai.settings.check_key': 'Testar chave',
+  'ai.settings.delete_key': 'Eliminar chave',
+  'ai.settings.status_configured': 'Chave configurada',
+  'ai.settings.tested_at': 'Verificada em',
+  'ai.settings.quota_title': 'Quota mensal de IA',
+  'ai.settings.quota_reset': 'Renova-se a {date}',
+  'ai.settings.notice_eu_title': 'Aviso de transferência de dados para fora do EEE',
+  'ai.settings.notice_eu_desc':
+    'O fornecedor selecionado ({provider}) trata dados fora do Espaço Económico Europeu. Nos termos do artigo 49.º, n.º 1, alínea a), do RGPD, tem de consentir expressamente esta transferência para continuar.',
+  'ai.settings.notice_eu_accept':
+    'Consinto a transferência internacional de dados para fora do EEE nos pedidos de IA a este fornecedor.',
+  'ai.settings.success_save': 'Chave guardada e verificada.',
+  'ai.settings.error_check': 'Erro ao verificar a chave junto do fornecedor.',
+  'ai.settings.form_title': 'Configure a sua própria chave (BYOK)',
+  'ai.settings.form_help':
+    'Use as suas credenciais da Mistral AI, OpenAI, Anthropic ou Zhipu AI para não depender da quota mensal.',
+  'ai.settings.provider_mistral': 'Mistral AI (UE, RGPD)',
+  'ai.settings.provider_openai': 'OpenAI (EUA)',
+  'ai.settings.provider_anthropic': 'Anthropic (EUA)',
+  'ai.settings.provider_zai': 'Zhipu AI (GLM)',
+  'ai.region.eu_fr': 'UE, França',
+  'ai.region.us': 'EUA',
+  'ai.region.intl': 'Internacional',
+  'ai.settings.show_key': 'Mostrar chave',
+  'ai.settings.hide_key': 'Ocultar chave',
+  'ai.settings.key_required': 'Introduza uma chave.',
+  'ai.settings.notice_required': 'Tem de aceitar o aviso sobre transferências para fora do EEE.',
+  'ai.settings.check_ok': 'Chave verificada junto do fornecedor.',
+  'ai.settings.error_save': 'Não foi possível guardar a chave.',
+  'ai.settings.error_delete': 'Não foi possível eliminar a chave.',
+  'ai.settings.checking': 'A verificar…',
+  'ai.settings.save_activate': 'Guardar e ativar',
+  'ai.settings.key_deleted': 'Chave eliminada. Passa a aplicar-se a quota mensal predefinida.',
+  'ai.settings.active_provider': 'Fornecedor ativo: {provider} ({model})',
+  'ai.settings.no_key_default':
+    'Não há nenhuma chave própria configurada. Aplica-se o limite mensal do plano.',
+  'ai.settings.status_plan': 'Quota do plano',
+  'ai.settings.quota_unlimited': 'Ilimitada',
+  'ai.settings.quota_unlimited_help': 'Pedidos tratados com a sua própria chave de API.',
+  'ai.settings.quota_jobs': 'Tarefas de design, tradução e exportação.',
+  'ai.settings.loading': 'A carregar as definições de IA',
+  'ai.settings.load_error': 'Não foi possível carregar as definições de IA.',
+  'ai.settings.load_error_help':
+    'Não foi possível contactar o serviço. As suas definições não foram alteradas.',
+  'ai.settings.key_invalid': 'O fornecedor rejeitou a chave. Verifique se está correta e ativa.',
+  'ai.settings.encryption_unavailable':
+    'O serviço ainda não está preparado para guardar chaves de forma segura. Contacte o suporte.',
+  'ai.settings.invalid_model': 'Escolha um modelo válido para este fornecedor.',
+  'ai.settings.key_state': 'Estado da chave',
+
+  'ai.common.cancel': 'Cancelar',
+
+  // Contexto partilhado: quota, aviso do RGPD, erros e estado das tarefas
+  'ai.context.quota_label': 'Quota mensal de IA',
+  'ai.context.quota_used': '{used} de {limit} tarefas este mês',
+  'ai.context.quota_reset': 'Renova-se a {date}.',
+  'ai.context.quota_exhausted_title': 'A quota mensal de IA esgotou-se',
+  'ai.context.quota_exhausted_desc':
+    'Pode lançar mais tarefas a {date}. Quem administra a organização pode levantar o limite adicionando uma chave de API própria nas definições de IA.',
+  'ai.context.byok': 'A sua organização usa uma chave de API própria: esta tarefa não gasta quota.',
+  'ai.context.loading': 'A verificar a quota de IA',
+  'ai.context.load_error': 'Não foi possível verificar a quota de IA. Mesmo assim, pode tentar.',
+  'ai.context.retry': 'Tentar de novo',
+  'ai.notice.eu': 'Os textos são tratados dentro da UE, nos termos do RGPD.',
+  'ai.notice.non_eu_title': 'Esta tarefa sai do Espaço Económico Europeu',
+  'ai.notice.non_eu_desc':
+    'A chave própria da sua organização pertence a {provider}, que trata dados fora do EEE. A sua organização aceitou essa transferência (artigo 49.º, n.º 1, alínea a), do RGPD) ao guardar a chave.',
+  'ai.error.quota': 'A quota mensal de IA esgotou-se. Renova-se a {date}.',
+  'ai.error.quota_nodate': 'A quota mensal de IA esgotou-se.',
+  'ai.error.busy': 'Já há tarefas de IA em curso. Aguarde que terminem e tente de novo.',
+  'ai.error.admin': 'Só quem administra a organização pode fazer isto.',
+  'ai.error.prompt': 'Descreva o seu site antes de gerar a proposta.',
+  'ai.error.languages': 'Escolha pelo menos um idioma de destino.',
+  'ai.error.session': 'A sessão expirou. Recarregue a página e inicie sessão de novo.',
+  'ai.error.generic': 'Não foi possível iniciar a tarefa. Tente de novo dentro de alguns minutos.',
+  'ai.error.draft_not_saved':
+    'Não foi possível guardar o rascunho. Resolva o problema ao guardar e volte a iniciar a IA.',
+  'ai.job.state_queued': 'Em fila',
+  'ai.job.state_running': 'Em curso',
+  'ai.job.state_done': 'Concluída',
+  'ai.job.state_failed': 'Falhou',
+  'ai.job.queued_text': 'A aguardar que o servidor aceite a tarefa…',
+  'ai.job.running_text': 'A IA está a trabalhar. Pode demorar alguns minutos.',
+  'ai.job.done_text': 'A tarefa terminou.',
+  'ai.job.failed_text': 'Não foi possível concluir a tarefa.',
+  'ai.job.lost_text': 'Perdeu-se a ligação ao servidor.',
+  'ai.job.elapsed': 'Tempo decorrido: {time}',
+  'ai.job.detail': 'Detalhe técnico: {detail}',
+  'ai.job.model': 'Modelo: {model}',
+  'ai.job.badge_eu': 'Dentro da UE',
+  'ai.job.badge_non_eu': 'Fora do EEE',
+  'ai.job.badge_byok': 'Chave própria',
+  'ai.job.back': 'Voltar',
+  'ai.job.retry': 'Tentar de novo',
+  'ai.job.stop': 'Deixar de aguardar',
+  'ai.job.stop_help': 'A tarefa continua a correr no servidor e conta para a sua quota.',
+
+  // Design
+  'ai.design.title': 'Criar o design com IA',
+  'ai.design.desc':
+    'Descreva o seu negócio e a IA propõe as secções da página, com textos prontos a editar.',
+  'ai.design.prompt_label': 'Descreva o seu site ou negócio',
+  'ai.design.prompt_placeholder':
+    'Por exemplo: loja de moda feminina sustentável com catálogo e marcações…',
+  'ai.design.prompt_help':
+    'Quanto mais concreta for a descrição (o que oferece, a quem e o que devem fazer as pessoas que visitam o site), melhor será a proposta.',
+  'ai.design.ideas_label': 'Ideias para começar',
+  'ai.design.idea_1': 'Loja gourmet de queijos e vinhos artesanais com encomendas online',
+  'ai.design.idea_2': 'Atelier de arquitetura e remodelações com galeria de projetos',
+  'ai.design.idea_3': 'Clínica dentária com marcações, equipa médica e perguntas frequentes',
+  'ai.design.idea_4': 'Restaurante italiano com menu de degustação e reserva de mesa',
+  'ai.design.style_label': 'Estilo visual',
+  'ai.design.style_modern': 'Moderno e limpo',
+  'ai.design.style_elegant': 'Elegante e requintado',
+  'ai.design.style_bold': 'Ousado e vibrante',
+  'ai.design.style_minimal': 'Minimalista',
+  'ai.design.lang_label': 'Idioma do conteúdo',
+  'ai.design.button_generate': 'Gerar proposta',
+  'ai.design.job_title': 'A criar a proposta',
+  'ai.design.result_title': 'Proposta pronta',
+  'ai.design.result_sections': {
+    one: '{count} secção pronta a adicionar à tela.',
+    many: '{count} secções prontas a adicionar à tela.',
+    other: '{count} secções prontas a adicionar à tela.',
+  },
+  'ai.design.result_help': 'São adicionadas à página que está a editar e pode ajustá-las depois.',
+  'ai.design.result_empty': 'A IA não devolveu nenhuma secção aproveitável.',
+  'ai.design.button_apply': 'Adicionar à tela',
+  'ai.design.button_again': 'Experimentar outra ideia',
+
+  // Tradução
+  'ai.translate.title': 'Traduzir com IA',
+  'ai.translate.desc': 'Traduza os textos do site para outros idiomas sem mexer no design.',
+  'ai.translate.from_label': 'Idioma de origem',
+  'ai.translate.to_label': 'Idiomas de destino',
+  'ai.translate.to_help':
+    'Escolha pelo menos um. O idioma de origem não pode ser de destino. Ao aplicar o resultado, os novos idiomas são adicionados ao site.',
+  'ai.translate.scope_label': 'Âmbito da tradução',
+  'ai.translate.scope_site': 'Site inteiro',
+  'ai.translate.scope_page': 'Página atual',
+  'ai.translate.scope_store': 'Só o catálogo da loja',
+  'ai.translate.store_unavailable': 'A tradução do catálogo da loja ainda não está disponível.',
+  'ai.translate.scope_invalid': 'Escolha uma página existente ou o site inteiro para traduzir.',
+  'ai.translate.overwrite_label': 'Substituir as traduções que já existem',
+  'ai.translate.button_translate': 'Traduzir',
+  'ai.translate.job_title': 'A traduzir os textos',
+  'ai.translate.result_title': 'Traduções prontas',
+  'ai.translate.result_texts': {
+    one: '{count} texto traduzido.',
+    many: '{count} textos traduzidos.',
+    other: '{count} textos traduzidos.',
+  },
+  'ai.translate.result_help': 'São adicionadas ao rascunho; o design não muda.',
+  'ai.translate.result_empty': 'A IA não devolveu nenhuma tradução.',
+  'ai.translate.button_apply': 'Aplicar traduções',
+  'ai.translate.button_again': 'Traduzir para outros idiomas',
+
+  // Exportação
+  'ai.export.title': 'Exportar com IA',
+  'ai.export.desc':
+    'Gere um pacote com o seu site pronto a levar para outra plataforma, sem depender do Sytue.',
+  'ai.export.destination_label': 'Plataforma de destino',
+  'ai.export.dest_shopify': 'Shopify Online Store 2.0',
+  'ai.export.dest_shopify_desc':
+    'Tema completo com modelos JSON e secções Liquid, mais o catálogo em CSV para importar a partir da administração da Shopify.',
+  'ai.export.dest_react': 'React + Tailwind CSS',
+  'ai.export.dest_react_desc':
+    'Projeto de página única ligado à API pública do Sytue, com checkout e formulários.',
+  'ai.export.dest_nextjs': 'Next.js App Router',
+  'ai.export.dest_nextjs_desc':
+    'Aplicação renderizada no servidor ou estática, com o gateway de pagamento integrado.',
+  'ai.export.dest_woocommerce': 'WooCommerce / WordPress',
+  'ai.export.dest_woocommerce_desc':
+    'Tema de blocos nativo do WordPress, com exportação de produtos e atributos.',
+  'ai.export.badge_available': 'Disponível',
+  'ai.export.badge_soon': 'Em breve',
+  'ai.export.button_export': 'Gerar pacote',
+  'ai.export.job_title': 'A gerar o pacote para {destination}',
+  'ai.export.result_title': 'Pacote pronto',
+  'ai.export.result_help': 'O tema e o CSV do catálogo vêm juntos num único ZIP.',
+  'ai.export.steps_title': 'Como o instalar na Shopify',
+  'ai.export.step_1': 'Transfira o ficheiro ZIP.',
+  'ai.export.step_2':
+    'Na administração da Shopify, vá a Loja online > Temas e escolha «Carregar ficheiro zip».',
+  'ai.export.step_3':
+    'Para os produtos, vá a Produtos > Importar e carregue o ficheiro products_export_shopify.csv que está dentro do ZIP.',
+  'ai.export.button_download': 'Transferir ZIP',
+  'ai.export.button_again': 'Gerar outra exportação',
+};

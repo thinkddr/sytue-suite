@@ -1,0 +1,8 @@
+{
+  "not_found_mensaje": "The requested resource does not exist.",
+  "not_found_titulo": "Page not found",
+  "suspended_mensaje": "This website has been temporarily suspended.",
+  "suspended_titulo": "This website is unavailable",
+  "unpublished_mensaje": "The requested website has not been published yet.",
+  "unpublished_titulo": "This website is not yet published"
+}

@@ -1,0 +1,41 @@
+---
+/**
+ * ERP — vista principal. SSR: el layout exige sesión; la isla ErpApp
+ * (client:load) monta la Sytue Shell y la interfaz generada del catálogo.
+ *
+ * `?m=` es el deep-link con el que llega la búsqueda unificada del Hub: abre ese
+ * modelo en vez de aterrizar en la pantalla de inicio. `?r=` selecciona además
+ * una ficha concreta.
+ */
+import AppLayout from '../layouts/AppLayout.astro';
+import { serverEnv } from '@sytue/auth/server';
+import { ErpApp } from '../components/ErpApp.js';
+import { bff, toBffContext } from '../lib/bff.js';
+import { requireSession } from '@sytue/auth/server';
+
+export const prerender = false;
+
+// SyERP es de organizaciones. Una cuenta personal —una persona cuya
+// organización es su correo— no lo tiene, y se le dice con un 403 y no con un
+// redirect al login, que ya tiene: es la misma verja que pone el servicio Go
+// (RequireOrgKind), aquí para no pintar una app que va a fallar.
+const guard = await requireSession(bff, toBffContext(Astro), { orgKinds: ['org'] });
+if (guard instanceof Response) return guard;
+const { session } = guard;
+const env = serverEnv(import.meta.env);
+const hubBaseUrl = env.SYTUE_HUB_BASE_URL ?? 'https://hub.sytue.eu';
+const modeloInicial = Astro.url.searchParams.get('m') ?? undefined;
+const registroInicial = Astro.url.searchParams.get('r') ?? undefined;
+---
+
+<AppLayout title="ERP">
+  <ErpApp
+    slot="app"
+    client:load
+    user={session.user}
+    hubBaseUrl={hubBaseUrl}
+    locale={Astro.locals.locale}
+    modeloInicial={modeloInicial}
+    registroInicial={registroInicial}
+  />
+</AppLayout>

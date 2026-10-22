@@ -1,0 +1,14 @@
+---
+/**
+ * Banco de pruebas de DESARROLLO de CertiPDF (`@sytue/office`, vista `dev/Pdf`): en
+ * producción, 404. Vive aquí, con los demás bancos de la ofimática, para que la auditoría
+ * de accesibilidad (test/e2e/correr-accesibilidad.sh) levante un solo servidor.
+ */
+import Banco from '@sytue/office/vistas/dev/Pdf.astro';
+
+export const prerender = false;
+
+if (!import.meta.env.DEV) return new Response(null, { status: 404 });
+---
+
+<Banco />

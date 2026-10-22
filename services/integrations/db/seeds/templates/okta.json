@@ -1,0 +1,31 @@
+{
+  "key": "okta",
+  "tier": "tier2",
+  "manifest": {
+    "name": "Okta",
+    "description": "Directorio e inicio de sesión de Okta. Conectado, Sytue ID actúa de proveedor de identidad para tu organización de Okta.",
+    "category": "Identidad",
+    "color": "#007DC1",
+    "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#007DC1\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"8\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/></svg>",
+    "identity": {
+      "kind": "oidc",
+      "redirect_uris": [
+        "https://{domain}/oauth2/v1/authorize/callback"
+      ]
+    },
+    "provisioning": "none",
+    "launch": {
+      "kind": "url",
+      "url": "https://{domain}"
+    },
+    "fields": [
+      {
+        "key": "domain",
+        "label": "Dominio de Okta",
+        "placeholder": "acme.okta.com",
+        "help": "El dominio de tu organización, tal cual aparece en la barra del navegador al entrar en Okta. Si usas dominio propio, el de la forma login.tuempresa.com.",
+        "required": true
+      }
+    ]
+  }
+}

@@ -1,0 +1,13 @@
+---
+/** Sytue Docus — /edit?id=<id>, el editor (`@sytue/office`, vista `Edicion`). */
+import Edicion from '@sytue/office/vistas/Edicion.astro';
+import { entrarEnDocumento } from '@sytue/office/vistas';
+
+export const prerender = false;
+
+// Un documento de otro tipo se va a la app de su producto.
+const entrada = await entrarEnDocumento(Astro, 'document');
+if (entrada instanceof Response) return entrada;
+---
+
+<Edicion {...entrada} />

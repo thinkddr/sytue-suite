@@ -1,0 +1,31 @@
+{
+  "name": "@sytue/auth",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sytue One — cliente OIDC Authorization Code + PKCE contra Sytue ID y helpers BFF con cookies host-only __Host- httpOnly. SSO entre subdominios mediante el IdP. TypeScript estricto.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./server": "./src/server/index.ts",
+    "./client": "./src/client/index.ts"
+  },
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.lib.json",
+    "test": "bun test",
+    "typecheck": "tsc -p tsconfig.lib.json --noEmit"
+  },
+  "dependencies": {
+    "@sytue/config": "workspace:*",
+    "@sytue/i18n": "workspace:*",
+    "jose": "6.2.12",
+    "@sytue/api-clients": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "6.0.3"
+  }
+}

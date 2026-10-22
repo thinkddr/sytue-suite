@@ -1,0 +1,37 @@
+{
+  "key": "docusign",
+  "tier": "tier2",
+  "manifest": {
+    "name": "DocuSign",
+    "description": "Firma electrónica de documentos, con inicio de sesión único para toda la organización.",
+    "category": "Documentos",
+    "color": "#8A6D00",
+    "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#8A6D00\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M5 18c3-1 4-9 6.5-9S14 15 16.5 15c1 0 1.7-.6 2.5-1.5\"/><path d=\"M4 21h16\"/></svg>",
+    "identity": {
+      "kind": "saml",
+      "entity_id": "{entity_id}",
+      "acs_url": "{acs_url}",
+      "name_id_format": "email"
+    },
+    "provisioning": "none",
+    "launch": {
+      "kind": "initiate"
+    },
+    "fields": [
+      {
+        "key": "entity_id",
+        "label": "Identificador de entidad (Entity ID)",
+        "placeholder": "https://account.docusign.com/organizations/00000000-0000-0000-0000-000000000000/saml2/sp",
+        "help": "Lo tienes en DocuSign Admin, en Inicio de sesión único, dentro del bloque del proveedor de servicio. Ahí se llama «Service Provider Entity ID».",
+        "required": true
+      },
+      {
+        "key": "acs_url",
+        "label": "URL de consumo de aserciones (ACS)",
+        "placeholder": "https://account.docusign.com/organizations/00000000-0000-0000-0000-000000000000/saml2/login/sp",
+        "help": "Lo tienes en DocuSign Admin, en Inicio de sesión único, dentro del bloque del proveedor de servicio. Ahí se llama «Service Provider Assertion Consumer Service URL».",
+        "required": true
+      }
+    ]
+  }
+}

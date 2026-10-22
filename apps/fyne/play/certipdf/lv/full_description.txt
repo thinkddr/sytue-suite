@@ -1,0 +1,17 @@
+PDF no sākuma līdz beigām jūsu pārlūkā.
+
+• Iezīmēšana, pasvītrošana, komentāri un zīmēšana dokumentā.
+• Veidlapas: lauku aizpildīšana vai savu veidošana.
+• Apvienošana, izgūšana, pagriešana, numurēšana un ūdenszīme.
+• Parakstu panelis, neatgriezeniska aizklāšana un ar paroli aizsargāti dokumenti.
+• Ātrs skatītājs ar struktūru, sīktēliem, meklēšanu un tālummaiņu pēc lappuses vai platuma.
+• Anotācijas: iezīmēšana, pasvītrošana, pārsvītrošana, komentāri, zīmējumi, formas, bultas un zīmogi.
+• Teksta lodziņi, mērījumi un apgabala momentuzņēmumi.
+• Veidlapas: esošo lauku aizpildīšana vai savu lauku pievienošana.
+• Dokumentu parakstīšanas panelis.
+• Neatgriezeniska aizklāšana: atzīmētais pazūd no faila, ne tikai no skata.
+• Lappuses: apvienošana, izgūšana, dzēšana, pagriešana, numurēšana (arī Bates), galvenes un kājenes.
+• Ūdenszīme, fons un rediģējami metadati.
+• Ar paroli aizsargāti dokumenti un atļaujas.
+
+Šifrēts pārsūtīšanas laikā (TLS 1.3). Sytue infrastruktūra atrodas ES. Ārējo pakalpojumu atrašanās vieta ir atkarīga no to sniedzēja.

@@ -1,0 +1,123 @@
+---
+/**
+ * Ajustes — configuración global de la organización en Sytue DevX: identidad,
+ * región por defecto y zona de peligro. Server-rendered con @sytue/ui.
+ */
+import DashboardLayout from '../layouts/DashboardLayout.astro';
+import DemoBanner from '../components/DemoBanner';
+import { Card, CardBody, CardHeader, CardTitle, Badge, Icon, SectionHeader } from '@sytue/ui';
+import { adminUrl } from '@sytue/config';
+import { requireSession } from '@sytue/auth/server';
+import { canonicaConOrg } from '@sytue/config';
+import { getBff, toBffContext } from '../server/bff.js';
+import { loadOrg } from '../lib/cloud.js';
+import { useT } from '../i18n/index.js';
+
+export const prerender = false;
+
+// El idioma lo negocia el middleware una vez por petición; aquí solo se usa y
+// baja a las islas por props (detectarlo en el cliente rompería la hidratación).
+const locale = Astro.locals.locale;
+const t = useT(locale);
+
+const guard = await requireSession(getBff(), toBffContext(Astro));
+if (guard instanceof Response) return guard;
+// Ruta en `sinOrg` (su nombre colisiona con el namespace de organizaciones):
+// con sesión, un salto local a la canónica con la org activa (ADR 0056).
+const canonica = canonicaConOrg(Astro.url, getBff().basePath, guard.session.user.tenant);
+if (canonica) return Astro.redirect(canonica);
+
+const { live, data: org, error } = await loadOrg(guard.session);
+const planLabel = { free: 'Free', pro: 'Pro', team: 'Team' }[org.plan] ?? org.plan;
+---
+
+<DashboardLayout title={t('nav.settings')} section="settings" error={error}>
+  <DemoBanner live={live} locale={locale} error={error} />
+  <SectionHeader
+    icon={<Icon name="settings" size={20} />}
+    title={t('nav.settings')}
+    subtitle={t('settings.subtitle')}
+    actions={<Badge tone="primary">{planLabel}</Badge>}
+    level={1}
+  />
+  <div class="cloud-content">
+    <div class="flex flex-col gap-4">
+      <Card>
+        <CardHeader>
+          <CardTitle as="h2">{t('settings.org')}</CardTitle>
+        </CardHeader>
+        <CardBody class="flex flex-col gap-3">
+          <div class="flex items-center justify-between gap-3">
+            <div>
+              <p class="text-text text-base font-medium">{t('settings.org.name')}</p>
+              <p class="text-text-muted text-sm">{t('settings.org.name.help')}</p>
+            </div>
+            <span class="text-text font-mono text-sm">{org.name}</span>
+          </div>
+          <div class="border-border flex items-center justify-between gap-3 border-t pt-3">
+            <div>
+              <p class="text-text text-base font-medium">{t('settings.org.region')}</p>
+              <p class="text-text-muted text-sm">{t('settings.org.region.help')}</p>
+            </div>
+            <Badge tone="accent">{t('settings.org.regionBadge', { region: org.region })}</Badge>
+          </div>
+          <div class="border-border flex items-center justify-between gap-3 border-t pt-3">
+            <div>
+              <p class="text-text text-base font-medium">{t('settings.org.plan')}</p>
+              <p class="text-text-muted text-sm">{t('settings.org.plan.help')}</p>
+            </div>
+            <Badge tone="primary">{planLabel}</Badge>
+          </div>
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle as="h2">{t('settings.identity')}</CardTitle>
+          <Badge tone="success">Sytue ID</Badge>
+        </CardHeader>
+        <CardBody class="flex flex-col gap-2">
+          <p class="text-text text-base">{t('settings.identity.line')}</p>
+          <p class="text-text-muted text-sm">{t('settings.identity.note')}</p>
+          <div class="mt-1">
+            <a
+              href={adminUrl()}
+              target="_blank"
+              rel="noopener"
+              class="text-primary-text sytue-focus-ring-inset inline-flex w-fit items-center gap-1.5 rounded-sm text-sm font-semibold hover:underline focus-visible:outline-none"
+            >
+              {t('settings.openConsole')}
+              <Icon name="chevronRight" size={16} />
+            </a>
+          </div>
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle as="h2">
+            <span class="text-danger-text flex items-center gap-2">
+              <Icon name="warning" size={20} />
+              {t('settings.danger')}
+            </span>
+          </CardTitle>
+        </CardHeader>
+        <CardBody class="flex flex-col gap-2">
+          <p class="text-text text-base">{t('settings.danger.line')}</p>
+          <p class="text-text-muted text-sm">{t('settings.danger.note')}</p>
+          <div class="mt-1">
+            <a
+              href={adminUrl()}
+              target="_blank"
+              rel="noopener"
+              class="text-primary-text sytue-focus-ring-inset inline-flex w-fit items-center gap-1.5 rounded-sm text-sm font-semibold hover:underline focus-visible:outline-none"
+            >
+              {t('settings.openConsole')}
+              <Icon name="chevronRight" size={16} />
+            </a>
+          </div>
+        </CardBody>
+      </Card>
+    </div>
+  </div>
+</DashboardLayout>

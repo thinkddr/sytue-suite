@@ -1,0 +1,23 @@
+{{- $root := . -}}
+{{- if $root.Values.podDisruptionBudget.enabled }}
+{{- range $app, $cfg := .Values.apps }}
+{{- if $cfg.enabled }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "sytue-frontend.appFullname" (dict "ctx" $root "app" $app) }}
+  labels:
+    {{- include "sytue-frontend.appLabels" (dict "ctx" $root "app" $app) | nindent 4 }}
+spec:
+  {{- if $root.Values.podDisruptionBudget.minAvailable }}
+  minAvailable: {{ $root.Values.podDisruptionBudget.minAvailable }}
+  {{- else }}
+  maxUnavailable: {{ $root.Values.podDisruptionBudget.maxUnavailable | default 1 }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "sytue-frontend.appSelectorLabels" (dict "ctx" $root "app" $app) | nindent 6 }}
+{{- end }}
+{{- end }}
+{{- end }}

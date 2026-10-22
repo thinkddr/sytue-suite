@@ -1,0 +1,18 @@
+Taccuini che tengono di tutto: testo, file, eventi, documenti interi.
+
+• Taccuini annidati, su tela libera, a colonne o a elenco.
+• Note di ogni tipo: testo, attività, link, file, eventi del calendario, documenti di Docs.
+• Decidi tu che cosa entra nella ricerca, e che cosa non entra mai.
+• Quaderni annidati con icona e colore; tre disposizioni: libera, colonne ed elenco.
+• Dodici tipi di nota: testo, attività, link, colore, immagine e riferimenti a Drive, Docus, Calendar, Rooms e altre note.
+• Un editor con formattazione (grassetto, elenchi, link) che salva all’uscita.
+• Etichette, fissare, duplicare, spostare tra taccuini, raggruppare e trascinare sulla tela.
+• Visibilità per quaderno: privato, personale, organizzazione o link pubblico.
+• Decidi tu quali quaderni entrano nella ricerca della suite.
+• Backlink: vedi quali note puntano a questa.
+• Esporta un intero quaderno in HTML, PDF, Markdown e altro; importa copie.
+• Condividi una nota in un canale di Rooms; trascina o incolla per creare note.
+• Tabelle nell’editor e scorciatoie Markdown mentre scrivi: «- », «# », «> » e «```».
+• Sposta una nota in un altro taccuino, esporta una singola nota e ordina il taccuino come vuoi.
+
+Cifratura in transito (TLS 1.3). L’infrastruttura di Sytue si trova nell’UE. La posizione dei servizi esterni dipende dal loro fornitore.

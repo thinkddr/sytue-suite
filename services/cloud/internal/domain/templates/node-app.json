@@ -1,0 +1,16 @@
+{
+  "id": "node-app",
+  "name": "App Node/Bun",
+  "description": "Empieza con estos ajustes para una app Node o Bun (detección por buildpacks).",
+  "version": "1.0.0",
+  "license": "Apache-2.0",
+  "maintainer": "Sytue",
+  "framework": "node",
+  "build": {
+    "strategy": "buildpacks",
+    "install": "bun install --frozen-lockfile",
+    "build": "bun run build"
+  },
+  "docs_url": "https://nodejs.org/en/docs",
+  "tags": ["node", "backend"]
+}

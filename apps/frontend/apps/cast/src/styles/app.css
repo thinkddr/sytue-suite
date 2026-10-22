@@ -1,0 +1,7 @@
+/**
+ * Sytue Cast — entrada de estilos: importa el design system (Tailwind v4 +
+ * tokens de marca Sytue). Sin tema propio. Lenguaje visual Sytue.
+ */
+@import '@sytue/ui/styles.css';
+
+@source '../**/*.{astro,ts,tsx}';

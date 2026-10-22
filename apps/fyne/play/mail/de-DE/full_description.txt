@@ -1,0 +1,19 @@
+Private, europäische E-Mail über JMAP — ohne Tracker und Werbung.
+
+• Schneller Posteingang mit Threads, Labels, Filtern und Suche.
+• Dateien direkt aus Sytue Drive anhängen.
+• Aus einer E-Mail einen Calendar-Termin machen.
+• Verschlüsselt bei der Übertragung (TLS 1.3). Die Infrastruktur von Sytue befindet sich in der EU. Der Standort externer Dienste hängt von ihrem Anbieter ab.
+• Unterhaltungsstränge mit Lesen, Antworten und Weiterleiten in einem Klick.
+• Ordner, farbige Labels und Suche mit Operatoren (from:, has:attachment, is:unread…).
+• Automatische Regeln, die Post beim Eingang archivieren, kennzeichnen oder verschieben.
+• Zeitversetztes Senden und „Senden rückgängig“.
+• Signaturen, Adress-Aliasse und automatische Abwesenheitsantwort.
+• Geteilte und delegierte Postfächer mit Lese- und Senderechten.
+• Editor mit Rich-Text und Anhängen aus Sytue Drive, ohne Dateien zu duplizieren.
+• Externe Inhalte standardmäßig blockiert: niemand erfährt, wann Sie eine E-Mail öffnen.
+• Signierte Post (PGP und S/MIME) wird erkannt und markiert; TLS beim Transport.
+• Zugriff auch aus Thunderbird, Outlook, Apple Mail oder vom Handy, mit App-Passwörtern.
+• Adressen als Chips mit dem Adressbuch aus Contacts einen Klick entfernt, und Hinweis, wenn du «Anhang» schreibst, ohne etwas anzuhängen.
+
+Verschlüsselt bei der Übertragung (TLS 1.3). Die Infrastruktur von Sytue befindet sich in der EU. Der Standort externer Dienste hängt von ihrem Anbieter ab.

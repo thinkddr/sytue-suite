@@ -1,0 +1,174 @@
+---
+/**
+ * Búsqueda cross-app del portal — vista de resultados (SSR). Consulta el Sytue
+ * Hub (búsqueda federada) en el servidor con el access token de la sesión, que
+ * JAMÁS llega al navegador, y renderiza los resultados agrupados por producto.
+ *
+ * Formulario GET nativo, sin JS de cliente: la shell ya ofrece el popover rápido
+ * en la topbar; esta es la vista «ver todos los resultados». Degrada a un estado
+ * claro si el Hub no responde. docs/CONVENTIONS.md §11.
+ */
+import AppLayout from '../layouts/AppLayout.astro';
+import { useT } from '../i18n/index.js';
+import { bff, toBffContext } from '../lib/auth';
+import { canonicaConOrg, returnToCanonico } from '@sytue/config';
+import { hubClient } from '../lib/hub';
+import { groupBySource } from '../lib/search';
+import { appForKey, Icon, ProductIcon } from '@sytue/ui';
+import AvisoOrigenesCaidos from '../components/AvisoOrigenesCaidos.astro';
+import type { SearchResult } from '@sytue/api-clients';
+
+export const prerender = false;
+
+const session = await bff.getSession(toBffContext(Astro));
+if (!session) {
+  // ADR 0056: la entrada org-ful llega reescrita con la marca ?__org=; el returnTo
+  // sale canónico, no en la forma interna, o tras el login la barra se queda con ella.
+  const returnTo = returnToCanonico(Astro.url, bff.basePath);
+  const redireccionLogin = Astro.redirect(
+    `${bff.basePath}/auth/login?returnTo=${encodeURIComponent(returnTo)}`,
+  );
+  redireccionLogin.headers.set('cache-control', 'no-store');
+  return redireccionLogin;
+}
+// Ruta en `sinOrg` (su nombre colisiona con el namespace de organizaciones):
+// con sesión, un salto local a la canónica con la org activa.
+const canonica = canonicaConOrg(Astro.url, bff.basePath, session.user.tenant);
+if (canonica) return Astro.redirect(canonica);
+
+// Consulta acotada (defensa en el borde: el Hub también valida/limita).
+const q = (Astro.url.searchParams.get('q') ?? '').trim().slice(0, 200);
+
+let results: SearchResult[] = [];
+let failed = false;
+// Orígenes que NO contestaron, y cuántos resultados hay en total.
+//
+// La búsqueda es FEDERADA: si Mail se cae y Drive responde, el Hub devuelve lo de
+// Drive y anota el fallo de Mail. Sin pintar ese aviso, la pantalla enseña unos
+// pocos resultados —o ninguno— y quien busca da por perdido un correo que sí
+// existe. Es el mismo fallo que ya se corrigió DENTRO de Mail y de Drive, aquí
+// aplicado a los fallos PARCIALES: `failed` solo cubre que se caiga el Hub entero.
+let fallidos: { source: string; error: string }[] = [];
+let total = 0;
+if (q) {
+  try {
+    const res = await hubClient(session.tokens.accessToken).search(q);
+    results = res.results;
+    fallidos = res.fallidos;
+    total = res.total;
+  } catch {
+    // Degradación elegante: el Hub no responde -> estado de error con reintento.
+    failed = true;
+  }
+}
+const groups = groupBySource(results);
+const shortName = (name: string) => name.replace('Sytue ', '');
+const t = useT(Astro.locals.locale);
+---
+
+<AppLayout title={q ? t('page.searchQuery', { query: q }) : t('page.search')}>
+  <div class="mx-auto w-full max-w-[var(--container-content,1280px)] px-6 py-8">
+    <header class="mb-6">
+      <p class="sytue-overline text-text-subtle">{t('search.overline')}</p>
+      <h1 class="sytue-h1 text-text mt-1.5">{t('search.heading')}</h1>
+    </header>
+
+    <form method="get" action="/buscar" role="search" class="mb-8 flex gap-2">
+      <div class="relative min-w-0 flex-1">
+        <span class="text-text-subtle pointer-events-none absolute top-1/2 left-3 -translate-y-1/2">
+          <Icon name="search" size={18} />
+        </span>
+        <input
+          type="search"
+          name="q"
+          value={q}
+          autofocus={!q}
+          placeholder={t('search.placeholder')}
+          aria-label={t('search.aria')}
+          class="border-border-strong bg-surface text-text placeholder:text-text-subtle hover:border-text-subtle sytue-focus-ring h-10 w-full rounded-md border pr-3 pl-10 text-base"
+        />
+      </div>
+      <button
+        type="submit"
+        class="bg-primary sytue-focus-ring-inset inline-flex h-10 shrink-0 items-center rounded-control px-5 font-semibold text-[var(--sytue-on-primary)] transition-colors hover:bg-[var(--sytue-primary-hover)] focus-visible:outline-none active:bg-[var(--sytue-primary-active)]"
+      >
+        {t('search.submit')}
+      </button>
+    </form>
+
+    {!q ? (
+      <p class="text-text-muted max-w-xl text-base">{t('search.hint')}</p>
+    ) : failed ? (
+      <div
+        role="alert"
+        class="border-border bg-surface flex max-w-md flex-col items-start gap-1.5 rounded-lg border p-6"
+      >
+        <p class="text-text text-base font-semibold">{t('search.failedTitle')}</p>
+        <p class="text-text-muted text-sm">{t('search.failedBody')}</p>
+        {/* Sin esto el error era un callejón: el texto decía «vuelve a intentarlo»
+              y no había nada que pulsar, salvo recargar a mano. Enlace a la MISMA
+              URL —misma consulta— igual que en la actividad reciente. */}
+        <a
+          href={Astro.url.pathname + Astro.url.search}
+          class="text-primary-text sytue-focus-ring mt-2 rounded text-sm font-semibold hover:underline"
+        >
+          {t('search.retry')}
+        </a>
+      </div>
+    ) : results.length === 0 ? (
+      <div class="flex flex-col gap-3">
+        <p class="text-text-muted text-base">{t('search.empty', { query: q })}</p>
+        {/* Aquí es donde más importa: sin este aviso, «no hay resultados» es una
+              afirmación falsa cuando el único origen que los tenía no contestó. */}
+        {fallidos.length > 0 ? <AvisoOrigenesCaidos fallidos={fallidos} t={t} /> : null}
+      </div>
+    ) : (
+      <div class="flex flex-col gap-6">
+        <p class="sr-only" role="status">
+          {t('search.count', { count: results.length })}
+        </p>
+        {fallidos.length > 0 ? <AvisoOrigenesCaidos fallidos={fallidos} t={t} /> : null}
+        {/* «Se muestran 20 de 143» en vez de enseñar veinte y callar. El Hub manda
+              el total desde siempre; hasta ahora el SDK lo descartaba y no había
+              forma de saber que faltaban resultados. */}
+        {total > results.length ? (
+          <p class="text-text-muted text-sm">
+            {t('search.showing', { count: results.length, total })}
+          </p>
+        ) : null}
+        {groups.map((group) => {
+          const app = appForKey(group.key);
+          const label = app ? shortName(app.name) : group.key;
+          return (
+            <section aria-label={label}>
+              <h2 class="mb-2 flex items-center gap-2">
+                {app ? <ProductIcon appKey={app.key} size={16} /> : null}
+                {/* Sin color de producto: como texto de 12 px incumplía AA en oscuro. */}
+                <span class="sytue-overline text-text-muted">{label}</span>
+              </h2>
+              <ul class="divide-border border-border bg-surface divide-y overflow-hidden rounded-lg border">
+                {group.items.map((item) => (
+                  <li>
+                    <a
+                      href={item.url}
+                      class="hover:bg-bg-subtle focus-visible:bg-bg-subtle active:bg-surface-sunken flex flex-col gap-0.5 px-4 py-3 transition-colors focus-visible:outline-none"
+                    >
+                      <span class="text-text truncate font-medium" title={item.title}>
+                        {item.title}
+                      </span>
+                      {item.snippet ? (
+                        <span class="text-text-muted truncate text-sm" title={item.snippet}>
+                          {item.snippet}
+                        </span>
+                      ) : null}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          );
+        })}
+      </div>
+    )}
+  </div>
+</AppLayout>

@@ -1,0 +1,1012 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sytue Rooms — Editorial Serif</title>
+<style>
+  /* ============================================================
+     SYTUE · Territorio de diseño "EDITORIAL SERIF"
+     Autoridad editorial (FT / Bloomberg / The Economist).
+     Fondo hueso · serif de alto contraste para titulares y nombres ·
+     sans limpia para UI de datos · burdeos/tinta + rojo editorial de señal.
+     100% autocontenido: CSS en un <style>, iconos SVG inline (sprite <symbol>),
+     sin dependencias, sin CDN, sin JS necesario para verse.
+     Densidad, escala 4px, semántica de elevación, motion y AA reutilizados
+     del sistema Sytue (docs/design-system.md, branding/tokens/*).
+     ============================================================ */
+
+  :root {
+    /* — Familias — (sin fuentes externas: pilas de sistema de alta calidad) */
+    --serif: "Hoefler Text", "Baskerville", "Baskerville Old Face", "Iowan Old Style",
+             "Palatino Linotype", Palatino, "Book Antiqua", Georgia, "Times New Roman", serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Segoe UI", Roboto,
+            system-ui, Arial, sans-serif;
+    --mono: "SF Mono", ui-monospace, "JetBrains Mono", Menlo, Consolas, monospace;
+
+    /* — Superficies (papel / hueso) — */
+    --paper:        #FDFBF6;  /* superficie de conversación (la más clara) */
+    --bone:         #F5F1E8;  /* fondo de app · panel de canales */
+    --bone-sunken:  #ECE6D9;  /* hover · hundido · bloques de cita/código */
+    --ink-900:      #1B1712;  /* rail sólido · cabeceras profundas (casi negro cálido) */
+    --ink-800:      #29231A;
+
+    /* — Texto sobre papel/hueso — (AA verificado) */
+    --text:         #211C15;  /* AAA sobre papel (~15:1) */
+    --text-muted:   #56503F;  /* ~7:1 sobre papel */
+    --text-subtle:  #736A57;  /* ~4.9:1 sobre papel */
+
+    /* — Marca: burdeos / tinta — */
+    --bordeaux:      #6E1526;  /* primario · marca · activo (texto ~8:1 sobre papel) */
+    --bordeaux-hover:#57101D;
+    --bordeaux-050:  #F3E7E2;  /* tinte de fondo: canal seleccionado, @mención */
+    --on-bordeaux:   #FFFDF8;  /* texto sobre relleno burdeos (~9:1) */
+
+    /* — Rojo editorial de señal — (parco: no-leídos, barra activa, urgente) */
+    --signal:       #C1121F;  /* relleno decorativo: punto no-leído, subrayado activo */
+    --signal-fill:  #B21120;  /* relleno de badge con texto claro encima (AA) */
+    --signal-text:  #A20E1A;  /* como texto sobre hueso (~5.7:1) */
+    --signal-bg:    #FBEAE7;  /* tinte de resaltado de mención/aviso */
+
+    /* — Texto sobre tinta (rail/cabeceras oscuras) — */
+    --ink-fg:        rgba(255, 253, 248, 0.94);
+    --ink-fg-muted:  rgba(255, 253, 248, 0.62);
+    --ink-hover:     rgba(255, 253, 248, 0.09);
+
+    /* — Hairlines (reglas finas, tintadas cálidas) — */
+    --rule:          rgba(33, 28, 21, 0.13);
+    --rule-strong:   rgba(33, 28, 21, 0.22);
+
+    /* — Presencia (parca, tonos editoriales; nunca solo color) — */
+    --online:  #2F6B47;
+    --away:    #9A6410;
+    --dnd:     #A20E1A;
+    --offline: #A69C88;
+
+    /* — Foco — */
+    --focus-ring: rgba(110, 21, 38, 0.42);
+
+    /* — Elevación (semántica, no decorativa) — */
+    --shadow-xs: 0 1px 2px rgba(27, 20, 12, 0.07);
+    --shadow-sm: 0 1px 3px rgba(27, 20, 12, 0.10), 0 1px 2px rgba(27, 20, 12, 0.06);
+    --shadow-md: 0 6px 20px rgba(27, 20, 12, 0.12);
+
+    /* — Motion — */
+    --dur-fast: 120ms;
+    --dur-base: 150ms;
+    --ease: cubic-bezier(0.2, 0, 0, 1);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--text);
+    background: var(--bone);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Números tabulares para toda meta/dato (timestamps, contadores) */
+  .tnum { font-variant-numeric: tabular-nums; }
+
+  /* Accesibilidad: enlace de salto + utilitario visually-hidden */
+  .skip {
+    position: fixed; left: 8px; top: -48px; z-index: 100;
+    background: var(--paper); color: var(--text);
+    border: 1px solid var(--rule-strong); border-radius: 8px;
+    padding: 8px 14px; font-weight: 600; text-decoration: none;
+    transition: top var(--dur-base) var(--ease);
+  }
+  .skip:focus { top: 8px; }
+  .vh {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+
+  /* Foco visible coherente en todo elemento enfocable */
+  a:focus-visible, button:focus-visible, [tabindex]:focus-visible, .chan:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--focus-ring);
+    border-radius: 8px;
+    position: relative; z-index: 2;
+  }
+
+  /* ---------- Iconografía (line, grid 24, trazo uniforme) ---------- */
+  .ico {
+    width: 20px; height: 20px; flex: none;
+    fill: none; stroke: currentColor; stroke-width: 1.75;
+    stroke-linecap: round; stroke-linejoin: round;
+    vector-effect: non-scaling-stroke;
+  }
+  .ico--16 { width: 16px; height: 16px; }
+  .ico--18 { width: 18px; height: 18px; }
+  .ico--22 { width: 22px; height: 22px; }
+  .ico--dots circle { fill: currentColor; stroke: none; }
+
+  /* ============================================================
+     LAYOUT · AppShell (rail + panel de canales + conversación)
+     ============================================================ */
+  .app {
+    display: grid;
+    grid-template-columns: 64px 288px 1fr;
+    height: 100vh;
+    min-height: 640px;
+  }
+
+  /* ---------- 1 · Rail de módulos (tinta sólida) ---------- */
+  .rail {
+    background: var(--ink-900);
+    display: flex; flex-direction: column; align-items: center;
+    padding: 12px 0;
+    gap: 4px;
+  }
+  .brand {
+    width: 40px; height: 40px; border-radius: 9px;
+    background: var(--bordeaux); color: var(--on-bordeaux);
+    display: grid; place-items: center;
+    font-family: var(--serif); font-size: 22px; font-weight: 600;
+    line-height: 1; margin-bottom: 10px;
+    box-shadow: inset 0 0 0 1px rgba(255,253,248,0.06);
+  }
+  .rail-sep { width: 28px; height: 1px; background: rgba(255,253,248,0.12); margin: 6px 0 10px; }
+  .rail-nav { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+  .rail-btn {
+    -webkit-appearance: none; appearance: none; border: 0; cursor: pointer;
+    width: 44px; height: 44px; border-radius: 10px;
+    display: grid; place-items: center;
+    background: transparent; color: var(--ink-fg-muted);
+    transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+    position: relative;
+  }
+  .rail-btn:hover { background: var(--ink-hover); color: var(--ink-fg); }
+  .rail-btn[aria-current="page"] {
+    background: var(--bone); color: var(--bordeaux);
+  }
+  /* Acento editorial de módulo activo: filete rojo a la izquierda */
+  .rail-btn[aria-current="page"]::before {
+    content: ""; position: absolute; left: -12px; top: 10px; bottom: 10px;
+    width: 3px; border-radius: 0 3px 3px 0; background: var(--signal);
+  }
+  .rail-foot { margin-top: auto; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .rail-avatar {
+    width: 34px; height: 34px; border-radius: 50%;
+    background: #3A5A6B; color: #F3F7F9;
+    display: grid; place-items: center;
+    font-size: 12px; font-weight: 700; letter-spacing: 0.01em;
+    position: relative; border: 0; cursor: pointer;
+  }
+  .rail-avatar .dot {
+    position: absolute; right: -1px; bottom: -1px;
+    width: 11px; height: 11px; border-radius: 50%;
+    background: var(--online); border: 2px solid var(--ink-900);
+  }
+
+  /* ---------- 2 · Panel de canales (hueso) ---------- */
+  .panel {
+    background: var(--bone);
+    border-right: 1px solid var(--rule);
+    display: flex; flex-direction: column;
+    min-width: 0;
+  }
+  .ws {
+    padding: 12px 14px 10px;
+    /* Doble filete de cabecera (guiño a la mancheta de un diario) */
+    border-bottom: 1px solid var(--rule-strong);
+    box-shadow: 0 3px 0 -2px var(--rule);
+  }
+  .ws-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .ws-name {
+    font-family: var(--serif); font-size: 18px; font-weight: 600;
+    letter-spacing: -0.01em; color: var(--text);
+    display: flex; align-items: center; gap: 6px; min-width: 0;
+  }
+  .ws-name .caret { color: var(--text-subtle); }
+  .ws-sub { font-size: 11px; color: var(--text-subtle); margin-top: 1px; letter-spacing: 0.01em; }
+  .icobtn {
+    -webkit-appearance: none; appearance: none; cursor: pointer;
+    background: transparent; border: 1px solid transparent; border-radius: 8px;
+    color: var(--text-muted); padding: 6px;
+    display: inline-grid; place-items: center;
+    transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+  }
+  .icobtn:hover { background: var(--bone-sunken); color: var(--text); }
+
+  .search {
+    margin: 10px 14px 4px;
+    display: flex; align-items: center; gap: 8px;
+    background: var(--paper); border: 1px solid var(--rule-strong);
+    border-radius: 8px; padding: 0 10px; height: 34px;
+    color: var(--text-subtle);
+    transition: border-color var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
+  }
+  .search:focus-within { border-color: var(--bordeaux); box-shadow: 0 0 0 3px var(--focus-ring); }
+  .search input {
+    border: 0; outline: none; background: transparent; flex: 1; min-width: 0;
+    font-family: var(--sans); font-size: 13px; color: var(--text);
+  }
+  .search input::placeholder { color: var(--text-subtle); }
+  .search kbd {
+    font-family: var(--mono); font-size: 11px; color: var(--text-subtle);
+    border: 1px solid var(--rule-strong); border-radius: 4px; padding: 1px 5px;
+    background: var(--bone);
+  }
+
+  .chan-scroll { flex: 1; overflow-y: auto; padding: 6px 8px 16px; }
+
+  .sec { margin-top: 14px; }
+  .sec:first-child { margin-top: 6px; }
+  .sec-hd {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 4px 8px 2px 6px;
+    font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--text-subtle);
+  }
+  .sec-hd .icobtn { padding: 3px; }
+
+  .chan {
+    display: flex; align-items: center; gap: 8px;
+    height: 30px; padding: 0 8px 0 6px; border-radius: 8px;
+    color: var(--text-muted); text-decoration: none; cursor: pointer;
+    position: relative;
+    transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+  }
+  .chan .ico { color: var(--text-subtle); }
+  .chan-name {
+    flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-size: 13.5px; font-weight: 400;
+  }
+  .chan:hover { background: var(--bone-sunken); color: var(--text); }
+  .chan.unread { color: var(--text); }
+  .chan.unread .chan-name { font-weight: 600; }
+  .chan.unread .ico { color: var(--text-muted); }
+  /* Punto de no-leído (rojo editorial) — acompañado de peso y contador (nunca solo color) */
+  .chan.unread::before {
+    content: ""; position: absolute; left: -1px; top: 50%; transform: translateY(-50%);
+    width: 5px; height: 5px; border-radius: 50%; background: var(--signal);
+  }
+  .chan.active {
+    background: var(--paper); color: var(--text);
+    box-shadow: inset 0 0 0 1px var(--rule);
+  }
+  .chan.active .chan-name { font-weight: 600; }
+  .chan.active .ico { color: var(--bordeaux); }
+  /* Filete de canal activo (izquierda, burdeos) */
+  .chan.active::after {
+    content: ""; position: absolute; left: -8px; top: 4px; bottom: 4px;
+    width: 3px; border-radius: 0 3px 3px 0; background: var(--bordeaux);
+  }
+  .badge {
+    font-size: 11px; font-weight: 700; line-height: 1;
+    color: var(--on-bordeaux); background: var(--signal-fill);
+    border-radius: 999px; padding: 3px 6px; min-width: 18px; text-align: center;
+  }
+  .badge--muted {
+    color: var(--text-muted); background: var(--bone-sunken);
+  }
+  .chan-avatar {
+    width: 20px; height: 20px; border-radius: 50%; flex: none;
+    display: grid; place-items: center; font-size: 9px; font-weight: 700;
+    color: var(--on-bordeaux); position: relative;
+  }
+  .chan-avatar .dot {
+    position: absolute; right: -1px; bottom: -1px; width: 8px; height: 8px;
+    border-radius: 50%; border: 1.5px solid var(--bone);
+  }
+
+  /* ---------- 3 · Conversación (papel) ---------- */
+  .conv { display: flex; flex-direction: column; min-width: 0; background: var(--paper); }
+
+  .conv-hd {
+    display: flex; align-items: center; gap: 14px;
+    padding: 10px 20px; min-height: 56px;
+    border-bottom: 1px solid var(--rule-strong);
+    box-shadow: 0 3px 0 -2px var(--rule); /* segundo filete: mancheta */
+    background: var(--paper);
+  }
+  .conv-title { min-width: 0; flex: 1; }
+  .conv-title h1 {
+    margin: 0; font-family: var(--serif); font-size: 20px; font-weight: 600;
+    letter-spacing: -0.01em; color: var(--text);
+    display: flex; align-items: center; gap: 7px; line-height: 1.15;
+  }
+  .conv-title h1 .hash { color: var(--text-subtle); font-family: var(--sans); font-weight: 500; }
+  .conv-title h1 .star { color: var(--away); }
+  .conv-topic {
+    font-size: 12.5px; color: var(--text-subtle); margin-top: 2px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .conv-topic b { color: var(--text-muted); font-weight: 600; }
+  .conv-actions { display: flex; align-items: center; gap: 2px; }
+  .facepile { display: flex; align-items: center; margin-right: 6px; }
+  .facepile .fp {
+    width: 26px; height: 26px; border-radius: 50%; margin-left: -7px;
+    border: 2px solid var(--paper); display: grid; place-items: center;
+    font-size: 10px; font-weight: 700; color: var(--on-bordeaux);
+  }
+  .facepile .fp:first-child { margin-left: 0; }
+  .facepile .more { background: var(--bone-sunken); color: var(--text-muted); }
+  .hd-action {
+    -webkit-appearance: none; appearance: none; cursor: pointer;
+    background: transparent; border: 1px solid transparent; border-radius: 8px;
+    color: var(--text-muted); height: 34px; padding: 0 8px;
+    display: inline-flex; align-items: center; gap: 6px;
+    font-family: var(--sans); font-size: 13px; font-weight: 500;
+    transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+  }
+  .hd-action:hover { background: var(--bone-sunken); color: var(--text); }
+  .hd-action.call { color: var(--bordeaux); border-color: var(--rule-strong); }
+  .hd-action.call:hover { background: var(--bordeaux-050); border-color: var(--bordeaux); }
+  .hd-icon { width: 34px; padding: 0; justify-content: center; }
+
+  /* — Historial de mensajes — */
+  .msgs { flex: 1; overflow-y: auto; padding: 8px 0 4px; }
+
+  /* Separador de día: filetes + etiqueta serif en cursiva (editorial) */
+  .day { display: flex; align-items: center; gap: 14px; margin: 16px 20px 8px; }
+  .day .line { flex: 1; height: 1px; background: var(--rule); }
+  .day .lbl {
+    font-family: var(--serif); font-style: italic; font-size: 13px;
+    color: var(--text-subtle);
+    background: var(--paper); padding: 0 4px;
+  }
+
+  /* Divisor "Mensajes nuevos" (rojo de señal) */
+  .newline { display: flex; align-items: center; gap: 12px; margin: 14px 20px 4px; }
+  .newline .line { flex: 1; height: 1px; background: var(--signal); opacity: 0.55; }
+  .newline .lbl {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--signal-text);
+  }
+
+  .msg {
+    position: relative; display: flex; gap: 12px;
+    padding: 3px 20px; margin-top: 0;
+    transition: background var(--dur-fast) var(--ease);
+  }
+  .msg.lead { margin-top: 10px; }
+  .msg:hover { background: var(--bone-sunken); }
+  .msg-gutter { width: 40px; flex: none; display: flex; justify-content: flex-end; padding-top: 3px; }
+  .avatar {
+    width: 40px; height: 40px; border-radius: 50%;
+    display: grid; place-items: center;
+    font-size: 14px; font-weight: 700; color: var(--on-bordeaux);
+    letter-spacing: 0.01em;
+  }
+  .msg .stamp-hover {
+    font-size: 11px; color: var(--text-subtle); opacity: 0;
+    transition: opacity var(--dur-fast) var(--ease); padding-top: 3px;
+  }
+  .msg:hover .stamp-hover { opacity: 1; }
+  .msg-main { min-width: 0; flex: 1; }
+  .msg-hd { display: flex; align-items: baseline; gap: 8px; }
+  .author {
+    font-family: var(--serif); font-size: 15px; font-weight: 600;
+    color: var(--text); letter-spacing: 0; line-height: 1.2;
+  }
+  .role-tag {
+    font-size: 10px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase;
+    color: var(--text-subtle); border: 1px solid var(--rule-strong);
+    border-radius: 4px; padding: 0 4px; position: relative; top: -1px;
+  }
+  .stamp { font-size: 11px; color: var(--text-subtle); }
+  .msg-body { font-size: 14px; line-height: 1.55; color: var(--text); margin: 1px 0 0; }
+  .msg-body p { margin: 0 0 2px; }
+
+  /* @mención — resalte burdeos sobre tinte */
+  .mention {
+    color: var(--bordeaux); background: var(--bordeaux-050);
+    font-weight: 600; border-radius: 4px; padding: 0 3px;
+    white-space: nowrap;
+  }
+  .mention.wide { color: var(--signal-text); background: var(--signal-bg); }
+
+  /* Barra de acciones al hover (reacción rápida, hilo, más) */
+  .actions {
+    position: absolute; top: -14px; right: 20px; z-index: 3;
+    display: flex; align-items: center; gap: 2px;
+    background: var(--paper); border: 1px solid var(--rule-strong);
+    border-radius: 8px; padding: 2px; box-shadow: var(--shadow-sm);
+    opacity: 0; pointer-events: none;
+    transition: opacity var(--dur-fast) var(--ease);
+  }
+  .msg:hover .actions, .msg:focus-within .actions { opacity: 1; pointer-events: auto; }
+  .act {
+    -webkit-appearance: none; appearance: none; cursor: pointer;
+    background: transparent; border: 0; border-radius: 6px;
+    width: 28px; height: 28px; display: grid; place-items: center;
+    color: var(--text-muted);
+    transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+  }
+  .act:hover { background: var(--bone-sunken); color: var(--text); }
+
+  /* Chips de reacción (line-icon + contador; sin emoji como icono) */
+  .reacts { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; }
+  .react {
+    -webkit-appearance: none; appearance: none; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 5px;
+    height: 24px; padding: 0 9px; border-radius: 999px;
+    font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums;
+    border: 1px solid var(--rule-strong); background: var(--paper); color: var(--text-muted);
+    transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+  }
+  .react .ico { color: var(--text-subtle); }
+  .react:hover { background: var(--bone-sunken); border-color: var(--rule-strong); color: var(--text); }
+  .react.mine {
+    border-color: var(--bordeaux); background: var(--bordeaux-050); color: var(--bordeaux);
+  }
+  .react.mine .ico { color: var(--bordeaux); }
+
+  /* Indicador de hilo */
+  .thread {
+    -webkit-appearance: none; appearance: none; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 8px; margin-top: 6px;
+    background: transparent; border: 1px solid transparent; border-radius: 8px;
+    padding: 4px 8px 4px 4px; color: var(--bordeaux);
+    transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+  }
+  .thread:hover { background: var(--bordeaux-050); border-color: var(--rule); }
+  .thread .tf { display: flex; }
+  .thread .tf .fp {
+    width: 22px; height: 22px; border-radius: 50%; margin-left: -6px;
+    border: 2px solid var(--paper); display: grid; place-items: center;
+    font-size: 9px; font-weight: 700; color: var(--on-bordeaux);
+  }
+  .thread .tf .fp:first-child { margin-left: 0; }
+  .thread .tcount { font-size: 12.5px; font-weight: 600; }
+  .thread .tlast { font-size: 11.5px; color: var(--text-subtle); font-weight: 400; }
+
+  /* Tarjeta de enlace enriquecido (adjunto) */
+  .rich {
+    display: flex; gap: 14px; align-items: stretch;
+    margin-top: 8px; max-width: 560px;
+    border: 1px solid var(--rule-strong); border-left: 3px solid var(--bordeaux);
+    border-radius: 10px; background: var(--paper); overflow: hidden;
+    transition: box-shadow var(--dur-base) var(--ease), border-color var(--dur-base) var(--ease);
+    text-decoration: none; color: inherit;
+  }
+  .rich:hover { box-shadow: var(--shadow-sm); border-color: var(--rule-strong); }
+  .rich-thumb {
+    width: 118px; flex: none; background: var(--bone-sunken);
+    display: grid; place-items: center; color: var(--bordeaux);
+    border-right: 1px solid var(--rule);
+  }
+  .rich-body { padding: 11px 14px 12px 2px; min-width: 0; }
+  .rich-kicker {
+    font-size: 10.5px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase;
+    color: var(--text-subtle); display: flex; align-items: center; gap: 6px; margin-bottom: 3px;
+  }
+  .rich-title {
+    font-family: var(--serif); font-size: 15.5px; font-weight: 600; line-height: 1.25;
+    color: var(--text); margin: 0 0 3px;
+  }
+  .rich-desc { font-size: 12.5px; color: var(--text-muted); line-height: 1.45; margin: 0 0 7px; }
+  .rich-meta { font-size: 11.5px; color: var(--text-subtle); }
+
+  /* — Composer — */
+  .composer { padding: 8px 20px 14px; border-top: 1px solid var(--rule); }
+  .composer-box {
+    border: 1px solid var(--rule-strong); border-radius: 12px; background: var(--paper);
+    box-shadow: var(--shadow-xs);
+    transition: border-color var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
+  }
+  .composer-box:focus-within { border-color: var(--bordeaux); box-shadow: 0 0 0 3px var(--focus-ring); }
+  .format {
+    display: flex; align-items: center; gap: 1px;
+    padding: 5px 6px; border-bottom: 1px solid var(--rule);
+  }
+  .fbtn {
+    -webkit-appearance: none; appearance: none; cursor: pointer;
+    background: transparent; border: 0; border-radius: 6px;
+    width: 30px; height: 30px; display: grid; place-items: center;
+    color: var(--text-muted);
+    transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+  }
+  .fbtn:hover { background: var(--bone-sunken); color: var(--text); }
+  .fsep { width: 1px; height: 18px; background: var(--rule); margin: 0 5px; }
+  .composer-input {
+    display: flex; align-items: flex-end; gap: 10px; padding: 8px 10px 8px 14px;
+  }
+  .composer-input .field { flex: 1; min-width: 0; }
+  .composer-input .field-text {
+    font-size: 14.5px; color: var(--text-subtle); line-height: 1.5; padding: 3px 0;
+  }
+  .send {
+    -webkit-appearance: none; appearance: none; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 7px;
+    height: 34px; padding: 0 14px; border-radius: 8px; border: 0;
+    background: var(--bordeaux); color: var(--on-bordeaux);
+    font-family: var(--sans); font-size: 13.5px; font-weight: 600;
+    transition: background var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease);
+  }
+  .send:hover { background: var(--bordeaux-hover); }
+  .send:active { transform: translateY(0.5px); }
+  .composer-hint {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-top: 6px; padding: 0 2px; font-size: 11.5px; color: var(--text-subtle);
+  }
+  .composer-hint kbd {
+    font-family: var(--mono); font-size: 10.5px; color: var(--text-muted);
+    border: 1px solid var(--rule); border-radius: 4px; padding: 0 4px; background: var(--bone);
+  }
+
+  /* ============================================================
+     Mini style-guide (tira discreta al pie)
+     ============================================================ */
+  .guide {
+    border-top: 1px solid var(--rule-strong);
+    background: var(--bone);
+    padding: 16px 24px 20px;
+    display: flex; flex-wrap: wrap; gap: 40px; align-items: flex-start;
+  }
+  .guide h2 {
+    grid-column: 1/-1; width: 100%; margin: 0 0 2px;
+    font-family: var(--serif); font-size: 15px; font-weight: 600; color: var(--text);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .guide h2 .rule2 { flex: 1; height: 0; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); box-shadow: 0 2px 0 -1px var(--rule); }
+  .guide-col { }
+  .guide-label {
+    font-size: 10.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--text-subtle); margin-bottom: 10px;
+  }
+  .swatches { display: flex; flex-wrap: wrap; gap: 10px; max-width: 560px; }
+  .sw { display: flex; align-items: center; gap: 8px; }
+  .sw .chip {
+    width: 30px; height: 30px; border-radius: 6px; border: 1px solid var(--rule-strong); flex: none;
+  }
+  .sw .meta { line-height: 1.25; }
+  .sw .role { font-size: 11.5px; font-weight: 600; color: var(--text); }
+  .sw .hex { font-family: var(--mono); font-size: 11px; color: var(--text-subtle); }
+  .type-rows { display: flex; flex-direction: column; gap: 12px; }
+  .type-row { display: flex; align-items: baseline; gap: 14px; }
+  .type-row .tk {
+    font-size: 10.5px; color: var(--text-subtle); width: 128px; flex: none;
+    font-family: var(--mono);
+  }
+  .t-display { font-family: var(--serif); font-size: 30px; font-weight: 600; letter-spacing: -0.01em; line-height: 1; color: var(--text); }
+  .t-name { font-family: var(--serif); font-size: 15px; font-weight: 600; color: var(--text); }
+  .t-body { font-family: var(--sans); font-size: 14px; color: var(--text); }
+  .t-overline { font-family: var(--sans); font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-subtle); }
+  .t-caption { font-family: var(--sans); font-size: 12px; color: var(--text-subtle); }
+  .t-tnum { font-family: var(--sans); font-size: 13px; font-variant-numeric: tabular-nums; color: var(--text-muted); }
+  .icon-samples { display: flex; flex-wrap: wrap; gap: 14px; color: var(--text-muted); max-width: 320px; }
+  .icon-samples .ico { width: 22px; height: 22px; }
+
+  /* Respetar prefers-reduced-motion */
+  @media (prefers-reduced-motion: reduce) {
+    * { transition-duration: 0ms !important; }
+  }
+</style>
+</head>
+<body>
+<a class="skip" href="#conv">Saltar a la conversación</a>
+
+<!-- ============ Sprite de iconos (line, grid 24) ============ -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <symbol id="i-rooms" viewBox="0 0 24 24"><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v6A2.5 2.5 0 0 1 17.5 15H9l-4.2 3.4A.4.4 0 0 1 4 18.1z"/><path d="M8.5 8.5h7M8.5 11.5h4"/></symbol>
+  <symbol id="i-docs" viewBox="0 0 24 24"><path d="M7 3.5h6.5L18 8v11.5a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1v-15a1 1 0 0 1 1-1z"/><path d="M13 3.7V8h4.3"/><path d="M9 12.5h6M9 15.5h6"/></symbol>
+  <symbol id="i-sheets" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="1.6"/><path d="M4 9.5h16M4 14.5h16M9.5 4v16"/></symbol>
+  <symbol id="i-slides" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="11" rx="1.6"/><path d="M9 19.5h6M12 16.5v3"/><path d="M10.5 8.6v3.8l3.2-1.9z"/></symbol>
+  <symbol id="i-meet" viewBox="0 0 24 24"><rect x="3.5" y="6.5" width="12" height="11" rx="2"/><path d="M15.5 10.4l4.7-2.7a.4.4 0 0 1 .6.35v7.9a.4.4 0 0 1-.6.35l-4.7-2.7z"/></symbol>
+  <symbol id="i-hash" viewBox="0 0 24 24"><path d="M9.5 4L7.5 20M16.5 4l-2 16M5 9h14.5M4.5 15H19"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="9.5" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 4.2l2.35 4.76 5.25.76-3.8 3.7.9 5.23L12 16.94l-4.7 2.47.9-5.23-3.8-3.7 5.25-.76z"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.2"/><path d="M20 20l-4.4-4.4"/></symbol>
+  <symbol id="i-phone" viewBox="0 0 24 24"><path d="M6 4h3l1.6 4-2 1.4a11.5 11.5 0 0 0 5 5l1.4-2 4 1.6v3a2 2 0 0 1-2.1 2A16.5 16.5 0 0 1 4 6.1 2 2 0 0 1 6 4z"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19.5a5.5 5.5 0 0 1 11 0"/><path d="M15.5 5.2a3.2 3.2 0 0 1 0 6.2M16.5 15.2a5.5 5.5 0 0 1 4 4.3"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M9 4h6l-1 6 3 3v2h-4.5v5l-.5 1-.5-1v-5H6v-2l3-3z"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 10.5a6 6 0 0 1 12 0c0 3.8 1.4 4.8 2 5.8H4c.6-1 2-2 2-5.8z"/><path d="M10 19.5a2 2 0 0 0 4 0"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5.2" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="18.8" cy="12" r="1.4"/></symbol>
+  <symbol id="i-caret" viewBox="0 0 24 24"><path d="M6.5 9.5L12 15l5.5-5.5"/></symbol>
+  <symbol id="i-compose" viewBox="0 0 24 24"><path d="M16.5 4.5l3 3-9.5 9.5-3.8.8.8-3.8z"/><path d="M4.5 20.5h15"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5.5v13M5.5 12h13"/></symbol>
+  <symbol id="i-bold" viewBox="0 0 24 24"><path d="M8 5h5.2a3.4 3.4 0 0 1 0 6.8H8zM8 11.8h6a3.6 3.6 0 0 1 0 7.2H8z"/></symbol>
+  <symbol id="i-italic" viewBox="0 0 24 24"><path d="M10.5 5h6M7.5 19h6M14 5l-4 14"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M10.3 13.2a3.8 3.8 0 0 0 5.6.4l2.3-2.3a3.8 3.8 0 0 0-5.4-5.4l-1 1"/><path d="M13.7 10.8a3.8 3.8 0 0 0-5.6-.4l-2.3 2.3a3.8 3.8 0 0 0 5.4 5.4l1-1"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6.5h11M9 12h11M9 17.5h11"/><circle cx="4.5" cy="6.5" r="1.1"/><circle cx="4.5" cy="12" r="1.1"/><circle cx="4.5" cy="17.5" r="1.1"/></symbol>
+  <symbol id="i-quote" viewBox="0 0 24 24"><path d="M6 7.5h4v4.5A3.5 3.5 0 0 1 6.5 15.5H6zM14 7.5h4v4.5a3.5 3.5 0 0 1-3.5 3.5H14z"/></symbol>
+  <symbol id="i-code" viewBox="0 0 24 24"><path d="M9 8l-4 4 4 4M15 8l4 4-4 4"/></symbol>
+  <symbol id="i-attach" viewBox="0 0 24 24"><path d="M18.5 8.2l-7.6 7.6a3.1 3.1 0 0 1-4.4-4.4l7.7-7.7a2.1 2.1 0 0 1 3 3l-7.4 7.4a1 1 0 0 1-1.5-1.5l6.7-6.7"/></symbol>
+  <symbol id="i-at" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.7"/><path d="M15.7 12v1.3a2.5 2.5 0 0 0 5 0V12a8.7 8.7 0 1 0-3.6 7"/></symbol>
+  <symbol id="i-emoji" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="9.2" cy="10.2" r="0.6"/><circle cx="14.8" cy="10.2" r="0.6"/><path d="M8.8 14.2a4 4 0 0 0 6.4 0"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><path d="M20.5 3.8L3.7 10.6l6.4 2.3 2.3 6.4z"/><path d="M20.5 3.8L10.1 12.9"/></symbol>
+  <symbol id="i-reply" viewBox="0 0 24 24"><path d="M10 8.5L5.5 12.5 10 16.5"/><path d="M5.5 12.5H14a4.5 4.5 0 0 1 4.5 4.5v1"/></symbol>
+  <symbol id="i-thumb" viewBox="0 0 24 24"><path d="M4 11.5h3v8.5H4z"/><path d="M7 11.5l3.8-6.9a1.9 1.9 0 0 1 3.5 1.4L13.5 11h4.9a2 2 0 0 1 2 2.4l-1.1 5.6a2 2 0 0 1-2 1.5H7"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.2 4.2L19 7"/></symbol>
+  <symbol id="i-external" viewBox="0 0 24 24"><path d="M13.5 5.5H19v5.5M19 5.5l-8 8"/><path d="M17.5 14v4a1.5 1.5 0 0 1-1.5 1.5H6.5A1.5 1.5 0 0 1 5 18V8.5A1.5 1.5 0 0 1 6.5 7h4"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24"><path d="M5 4.5v15h15"/><path d="M9 15.5v-4M13 15.5V7.5M17 15.5v-6"/></symbol>
+</svg>
+
+<div class="app">
+  <!-- ===================== 1 · Rail de módulos ===================== -->
+  <nav class="rail" aria-label="Módulos de Sytue">
+    <div class="brand" aria-hidden="true">S</div>
+    <div class="rail-nav">
+      <button class="rail-btn" type="button" aria-current="page" aria-label="Rooms" title="Rooms">
+        <svg class="ico ico--22"><use href="#i-rooms"/></svg>
+      </button>
+      <button class="rail-btn" type="button" aria-label="Docs" title="Docs">
+        <svg class="ico ico--22"><use href="#i-docs"/></svg>
+      </button>
+      <button class="rail-btn" type="button" aria-label="Sheets" title="Sheets">
+        <svg class="ico ico--22"><use href="#i-sheets"/></svg>
+      </button>
+      <button class="rail-btn" type="button" aria-label="Slides" title="Slides">
+        <svg class="ico ico--22"><use href="#i-slides"/></svg>
+      </button>
+      <button class="rail-btn" type="button" aria-label="Meet" title="Meet">
+        <svg class="ico ico--22"><use href="#i-meet"/></svg>
+      </button>
+    </div>
+    <div class="rail-foot">
+      <button class="icobtn" type="button" aria-label="Notificaciones" title="Notificaciones" style="color:var(--ink-fg-muted)">
+        <svg class="ico"><use href="#i-bell"/></svg>
+      </button>
+      <button class="rail-avatar" type="button" aria-label="Tu cuenta: Daniel Delgado, en línea" title="Daniel Delgado — En línea">
+        DD<span class="dot" aria-hidden="true"></span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- ===================== 2 · Panel de canales ===================== -->
+  <nav class="panel" aria-label="Canales del espacio Grupo Ibérica">
+    <div class="ws">
+      <div class="ws-top">
+        <span class="ws-name">Grupo Ibérica <svg class="ico ico--16 caret"><use href="#i-caret"/></svg></span>
+        <button class="icobtn" type="button" aria-label="Redactar mensaje" title="Redactar">
+          <svg class="ico ico--18"><use href="#i-compose"/></svg>
+        </button>
+      </div>
+      <div class="ws-sub">Espacio corporativo · 1.842 miembros</div>
+    </div>
+
+    <label class="search">
+      <svg class="ico ico--16" aria-hidden="true"><use href="#i-search"/></svg>
+      <input type="search" placeholder="Buscar en Rooms" aria-label="Buscar en Rooms">
+      <kbd>⌘K</kbd>
+    </label>
+
+    <div class="chan-scroll">
+      <div class="sec" role="group" aria-label="Favoritos">
+        <div class="sec-hd"><span>Favoritos</span></div>
+        <a class="chan active" href="#conv" aria-current="true">
+          <svg class="ico ico--18"><use href="#i-hash"/></svg>
+          <span class="chan-name">direccion-financiera</span>
+        </a>
+        <a class="chan unread" href="#conv">
+          <svg class="ico ico--18"><use href="#i-lock"/></svg>
+          <span class="chan-name">legal-contratos</span>
+          <span class="badge tnum">4</span>
+        </a>
+        <a class="chan" href="#conv">
+          <svg class="ico ico--18"><use href="#i-hash"/></svg>
+          <span class="chan-name">anuncios</span>
+        </a>
+      </div>
+
+      <div class="sec" role="group" aria-label="Canales">
+        <div class="sec-hd">
+          <span>Canales</span>
+          <button class="icobtn" type="button" aria-label="Añadir canal" title="Añadir canal"><svg class="ico ico--16"><use href="#i-plus"/></svg></button>
+        </div>
+        <a class="chan" href="#conv">
+          <svg class="ico ico--18"><use href="#i-hash"/></svg>
+          <span class="chan-name">tesoreria</span>
+        </a>
+        <a class="chan unread" href="#conv">
+          <svg class="ico ico--18"><use href="#i-lock"/></svg>
+          <span class="chan-name">ma-project-atlas</span>
+          <span class="badge tnum">12</span>
+        </a>
+        <a class="chan" href="#conv">
+          <svg class="ico ico--18"><use href="#i-hash"/></svg>
+          <span class="chan-name">comite-riesgos</span>
+        </a>
+        <a class="chan" href="#conv">
+          <svg class="ico ico--18"><use href="#i-hash"/></svg>
+          <span class="chan-name">auditoria-interna</span>
+        </a>
+        <a class="chan unread" href="#conv">
+          <svg class="ico ico--18"><use href="#i-hash"/></svg>
+          <span class="chan-name">it-seguridad</span>
+          <span class="badge tnum">2</span>
+        </a>
+        <a class="chan" href="#conv">
+          <svg class="ico ico--18"><use href="#i-hash"/></svg>
+          <span class="chan-name">relaciones-inversores</span>
+        </a>
+      </div>
+
+      <div class="sec" role="group" aria-label="Mensajes directos">
+        <div class="sec-hd">
+          <span>Mensajes directos</span>
+          <button class="icobtn" type="button" aria-label="Nuevo mensaje directo" title="Nuevo mensaje directo"><svg class="ico ico--16"><use href="#i-plus"/></svg></button>
+        </div>
+        <a class="chan" href="#conv">
+          <span class="chan-avatar" style="background:#7A1E2B"><span class="dot" style="background:var(--online)"></span>AV</span>
+          <span class="chan-name">Ana Vidal</span>
+        </a>
+        <a class="chan unread" href="#conv">
+          <span class="chan-avatar" style="background:#2F4A5B"><span class="dot" style="background:var(--away)"></span>MP</span>
+          <span class="chan-name">Marc Puig</span>
+          <span class="badge tnum">1</span>
+        </a>
+        <a class="chan" href="#conv">
+          <span class="chan-avatar" style="background:#4A5636"><span class="dot" style="background:var(--offline)"></span>ES</span>
+          <span class="chan-name">Elena Sáez</span>
+        </a>
+        <a class="chan" href="#conv">
+          <span class="chan-avatar" style="background:#6B4A22"><span class="dot" style="background:var(--dnd)"></span>JM</span>
+          <span class="chan-name">Javier Muñoz</span>
+        </a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ===================== 3 · Conversación ===================== -->
+  <main class="conv" id="conv">
+    <!-- Cabecera del canal -->
+    <header class="conv-hd">
+      <div class="conv-title">
+        <h1><span class="hash">#</span>direccion-financiera <svg class="ico ico--18 star" aria-label="Canal favorito" role="img"><use href="#i-star"/></svg></h1>
+        <div class="conv-topic"><b>Cierre mensual · Tesorería · Reporting a Dirección General</b> — Coordinación del área financiera del Grupo</div>
+      </div>
+      <div class="conv-actions">
+        <div class="facepile" aria-hidden="true">
+          <span class="fp" style="background:#7A1E2B">AV</span>
+          <span class="fp" style="background:#2F4A5B">MP</span>
+          <span class="fp" style="background:#4A5636">ES</span>
+          <span class="fp" style="background:#6B4A22">JM</span>
+          <span class="fp more tnum">+20</span>
+        </div>
+        <button class="hd-action call" type="button" title="Iniciar llamada en el canal">
+          <svg class="ico ico--18" aria-hidden="true"><use href="#i-phone"/></svg>Llamada
+        </button>
+        <button class="hd-action" type="button" aria-label="24 miembros" title="Miembros">
+          <svg class="ico ico--18" aria-hidden="true"><use href="#i-users"/></svg><span class="tnum">24</span>
+        </button>
+        <button class="hd-action hd-icon" type="button" aria-label="Mensajes fijados" title="Fijados"><svg class="ico ico--18"><use href="#i-pin"/></svg></button>
+        <button class="hd-action hd-icon" type="button" aria-label="Buscar en el canal" title="Buscar"><svg class="ico ico--18"><use href="#i-search"/></svg></button>
+        <button class="hd-action hd-icon" type="button" aria-label="Más acciones del canal" title="Más"><svg class="ico ico--18"><use href="#i-more"/></svg></button>
+      </div>
+    </header>
+
+    <!-- Historial -->
+    <div class="msgs" role="log" aria-label="Mensajes de direccion-financiera">
+
+      <div class="day" role="separator"><span class="line"></span><span class="lbl">Hoy</span><span class="line"></span></div>
+
+      <!-- Mensaje 1 (cabeza de grupo) -->
+      <article class="msg lead">
+        <div class="actions" role="toolbar" aria-label="Acciones del mensaje">
+          <button class="act" type="button" aria-label="Reaccionar"><svg class="ico ico--18"><use href="#i-emoji"/></svg></button>
+          <button class="act" type="button" aria-label="Responder en hilo"><svg class="ico ico--18"><use href="#i-reply"/></svg></button>
+          <button class="act" type="button" aria-label="Más acciones"><svg class="ico ico--18"><use href="#i-more"/></svg></button>
+        </div>
+        <div class="msg-gutter"><span class="avatar" style="background:#7A1E2B" aria-hidden="true">AV</span></div>
+        <div class="msg-main">
+          <div class="msg-hd">
+            <span class="author">Ana Vidal</span>
+            <span class="role-tag">CFO</span>
+            <span class="stamp tnum">09:12</span>
+          </div>
+          <div class="msg-body">
+            <p>Buenos días. He cerrado la conciliación del cierre de junio: las desviaciones de tesorería quedan dentro del umbral del 2 %. Subo el informe en cuanto Auditoría lo valide.</p>
+          </div>
+        </div>
+      </article>
+
+      <!-- Mensaje 2 (mismo autor, agrupado) -->
+      <article class="msg">
+        <div class="actions" role="toolbar" aria-label="Acciones del mensaje">
+          <button class="act" type="button" aria-label="Reaccionar"><svg class="ico ico--18"><use href="#i-emoji"/></svg></button>
+          <button class="act" type="button" aria-label="Responder en hilo"><svg class="ico ico--18"><use href="#i-reply"/></svg></button>
+          <button class="act" type="button" aria-label="Más acciones"><svg class="ico ico--18"><use href="#i-more"/></svg></button>
+        </div>
+        <div class="msg-gutter"><span class="stamp-hover tnum">09:13</span></div>
+        <div class="msg-main">
+          <div class="msg-body">
+            <p>Prioridad de hoy: dejar cerrado el forecast de tesorería antes del comité de las 12:00.</p>
+          </div>
+          <div class="reacts">
+            <button class="react mine" type="button" aria-label="Aprobado, 6 reacciones, incluida la tuya">
+              <svg class="ico ico--16"><use href="#i-thumb"/></svg>6
+            </button>
+            <button class="react" type="button" aria-label="Visto, 3 reacciones">
+              <svg class="ico ico--16"><use href="#i-check"/></svg>3
+            </button>
+          </div>
+        </div>
+      </article>
+
+      <!-- Mensaje 3: con @mención -->
+      <article class="msg lead">
+        <div class="actions" role="toolbar" aria-label="Acciones del mensaje">
+          <button class="act" type="button" aria-label="Reaccionar"><svg class="ico ico--18"><use href="#i-emoji"/></svg></button>
+          <button class="act" type="button" aria-label="Responder en hilo"><svg class="ico ico--18"><use href="#i-reply"/></svg></button>
+          <button class="act" type="button" aria-label="Más acciones"><svg class="ico ico--18"><use href="#i-more"/></svg></button>
+        </div>
+        <div class="msg-gutter"><span class="avatar" style="background:#2F4A5B" aria-hidden="true">MP</span></div>
+        <div class="msg-main">
+          <div class="msg-hd">
+            <span class="author">Marc Puig</span>
+            <span class="role-tag">Controlling</span>
+            <span class="stamp tnum">09:15</span>
+          </div>
+          <div class="msg-body">
+            <p>Gracias, Ana. <span class="mention">@Elena Sáez</span> ¿puedes revisar la partida de provisiones antes del comité? Sobre todo el importe pendiente del contrato con Endesa.</p>
+          </div>
+        </div>
+      </article>
+
+      <!-- Mensaje 4: respuesta con adjunto enriquecido -->
+      <article class="msg lead">
+        <div class="actions" role="toolbar" aria-label="Acciones del mensaje">
+          <button class="act" type="button" aria-label="Reaccionar"><svg class="ico ico--18"><use href="#i-emoji"/></svg></button>
+          <button class="act" type="button" aria-label="Responder en hilo"><svg class="ico ico--18"><use href="#i-reply"/></svg></button>
+          <button class="act" type="button" aria-label="Más acciones"><svg class="ico ico--18"><use href="#i-more"/></svg></button>
+        </div>
+        <div class="msg-gutter"><span class="avatar" style="background:#4A5636" aria-hidden="true">ES</span></div>
+        <div class="msg-main">
+          <div class="msg-hd">
+            <span class="author">Elena Sáez</span>
+            <span class="role-tag">Reporting</span>
+            <span class="stamp tnum">09:18</span>
+          </div>
+          <div class="msg-body">
+            <p>Voy con ello. La provisión por litigios ya la he ajustado con Legal; queda pendiente confirmar el importe de Endesa. Os dejo el borrador del cierre para que lo reviséis:</p>
+          </div>
+          <a class="rich" href="#conv">
+            <span class="rich-thumb" aria-hidden="true"><svg class="ico" style="width:40px;height:40px"><use href="#i-chart"/></svg></span>
+            <span class="rich-body">
+              <span class="rich-kicker"><svg class="ico ico--16"><use href="#i-external"/></svg>Sytue Sheets · docs.griberica.com</span>
+              <span class="rich-title">Cierre financiero — Junio 2025 (v4)</span>
+              <span class="rich-desc">Resumen ejecutivo, conciliación de tesorería y desviaciones por unidad de negocio.</span>
+              <span class="rich-meta tnum">Actualizado hoy 09:16 · 1,2 MB · Elena Sáez</span>
+            </span>
+          </a>
+        </div>
+      </article>
+
+      <!-- Mensaje 5: raíz de hilo -->
+      <article class="msg lead">
+        <div class="actions" role="toolbar" aria-label="Acciones del mensaje">
+          <button class="act" type="button" aria-label="Reaccionar"><svg class="ico ico--18"><use href="#i-emoji"/></svg></button>
+          <button class="act" type="button" aria-label="Responder en hilo"><svg class="ico ico--18"><use href="#i-reply"/></svg></button>
+          <button class="act" type="button" aria-label="Más acciones"><svg class="ico ico--18"><use href="#i-more"/></svg></button>
+        </div>
+        <div class="msg-gutter"><span class="avatar" style="background:#6B4A22" aria-hidden="true">JM</span></div>
+        <div class="msg-main">
+          <div class="msg-hd">
+            <span class="author">Javier Muñoz</span>
+            <span class="role-tag">Tesorería</span>
+            <span class="stamp tnum">09:24</span>
+          </div>
+          <div class="msg-body">
+            <p>Propongo adelantar la revisión del <em>forecast Q3</em> al jueves para no solaparla con el consejo. ¿Lo veis viable?</p>
+          </div>
+          <button class="thread" type="button" aria-label="Hilo con 3 respuestas, última hace 8 minutos">
+            <span class="tf" aria-hidden="true">
+              <span class="fp" style="background:#7A1E2B">AV</span>
+              <span class="fp" style="background:#4A5636">ES</span>
+              <span class="fp" style="background:#2F4A5B">MP</span>
+            </span>
+            <span class="tcount">3 respuestas en hilo</span>
+            <span class="tlast">· última hace 8 min</span>
+          </button>
+        </div>
+      </article>
+
+      <!-- Divisor de mensajes nuevos -->
+      <div class="newline" role="separator" aria-label="Mensajes nuevos">
+        <span class="lbl">Mensajes nuevos</span><span class="line"></span>
+      </div>
+
+      <!-- Mensaje 6: con @here -->
+      <article class="msg lead">
+        <div class="actions" role="toolbar" aria-label="Acciones del mensaje">
+          <button class="act" type="button" aria-label="Reaccionar"><svg class="ico ico--18"><use href="#i-emoji"/></svg></button>
+          <button class="act" type="button" aria-label="Responder en hilo"><svg class="ico ico--18"><use href="#i-reply"/></svg></button>
+          <button class="act" type="button" aria-label="Más acciones"><svg class="ico ico--18"><use href="#i-more"/></svg></button>
+        </div>
+        <div class="msg-gutter"><span class="avatar" style="background:#7A1E2B" aria-hidden="true">AV</span></div>
+        <div class="msg-main">
+          <div class="msg-hd">
+            <span class="author">Ana Vidal</span>
+            <span class="role-tag">CFO</span>
+            <span class="stamp tnum">09:31</span>
+          </div>
+          <div class="msg-body">
+            <p><span class="mention wide">@here</span> Confirmado: comité a las 12:00 en la sala Barcelona. Traed el forecast revisado y el cuadro de covenants. Gracias a todos.</p>
+          </div>
+        </div>
+      </article>
+
+    </div>
+
+    <!-- Composer -->
+    <div class="composer">
+      <div class="composer-box">
+        <div class="format" role="toolbar" aria-label="Formato del mensaje">
+          <button class="fbtn" type="button" aria-label="Negrita" title="Negrita"><svg class="ico ico--18"><use href="#i-bold"/></svg></button>
+          <button class="fbtn" type="button" aria-label="Cursiva" title="Cursiva"><svg class="ico ico--18"><use href="#i-italic"/></svg></button>
+          <button class="fbtn" type="button" aria-label="Enlace" title="Enlace"><svg class="ico ico--18"><use href="#i-link"/></svg></button>
+          <span class="fsep" aria-hidden="true"></span>
+          <button class="fbtn" type="button" aria-label="Lista" title="Lista"><svg class="ico ico--18"><use href="#i-list"/></svg></button>
+          <button class="fbtn" type="button" aria-label="Cita" title="Cita"><svg class="ico ico--18"><use href="#i-quote"/></svg></button>
+          <button class="fbtn" type="button" aria-label="Código" title="Código"><svg class="ico ico--18"><use href="#i-code"/></svg></button>
+          <span class="fsep" aria-hidden="true"></span>
+          <button class="fbtn" type="button" aria-label="Adjuntar archivo" title="Adjuntar"><svg class="ico ico--18"><use href="#i-attach"/></svg></button>
+          <button class="fbtn" type="button" aria-label="Mencionar" title="Mencionar"><svg class="ico ico--18"><use href="#i-at"/></svg></button>
+          <button class="fbtn" type="button" aria-label="Emoji" title="Emoji"><svg class="ico ico--18"><use href="#i-emoji"/></svg></button>
+        </div>
+        <div class="composer-input">
+          <div class="field">
+            <label class="vh" for="ci">Escribe un mensaje en direccion-financiera</label>
+            <div class="field-text" id="ci" role="textbox" aria-readonly="true">Escribe en #direccion-financiera…</div>
+          </div>
+          <button class="send" type="button">Enviar <svg class="ico ico--16" aria-hidden="true"><use href="#i-send"/></svg></button>
+        </div>
+      </div>
+      <div class="composer-hint">
+        <span><kbd>Intro</kbd> para enviar · <kbd>Mayús</kbd>+<kbd>Intro</kbd> para salto de línea</span>
+        <span>Formato Markdown admitido</span>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ===================== Mini style-guide ===================== -->
+<section class="guide" aria-label="Guía de estilo — Editorial Serif">
+  <h2>Editorial Serif <span class="rule2" aria-hidden="true"></span> Sytue · sistema de diseño</h2>
+
+  <div class="guide-col">
+    <div class="guide-label">Paleta · rol / hex</div>
+    <div class="swatches">
+      <div class="sw"><span class="chip" style="background:#F7F4EE"></span><span class="meta"><span class="role">Hueso · fondo</span><br><span class="hex">#F7F4EE</span></span></div>
+      <div class="sw"><span class="chip" style="background:#FDFBF6"></span><span class="meta"><span class="role">Papel · superficie</span><br><span class="hex">#FDFBF6</span></span></div>
+      <div class="sw"><span class="chip" style="background:#ECE6D9"></span><span class="meta"><span class="role">Hueso hundido</span><br><span class="hex">#ECE6D9</span></span></div>
+      <div class="sw"><span class="chip" style="background:#1B1712"></span><span class="meta"><span class="role">Tinta · rail/cabecera</span><br><span class="hex">#1B1712</span></span></div>
+      <div class="sw"><span class="chip" style="background:#211C15"></span><span class="meta"><span class="role">Texto</span><br><span class="hex">#211C15</span></span></div>
+      <div class="sw"><span class="chip" style="background:#56503F"></span><span class="meta"><span class="role">Texto atenuado</span><br><span class="hex">#56503F</span></span></div>
+      <div class="sw"><span class="chip" style="background:#6E1526"></span><span class="meta"><span class="role">Burdeos · marca</span><br><span class="hex">#6E1526</span></span></div>
+      <div class="sw"><span class="chip" style="background:#A20E1A"></span><span class="meta"><span class="role">Rojo señal · texto</span><br><span class="hex">#A20E1A</span></span></div>
+      <div class="sw"><span class="chip" style="background:#C1121F"></span><span class="meta"><span class="role">Rojo señal · relleno</span><br><span class="hex">#C1121F</span></span></div>
+      <div class="sw"><span class="chip" style="background:#F3E7E2"></span><span class="meta"><span class="role">Tinte burdeos</span><br><span class="hex">#F3E7E2</span></span></div>
+      <div class="sw"><span class="chip" style="background:#2F6B47"></span><span class="meta"><span class="role">Presencia · en línea</span><br><span class="hex">#2F6B47</span></span></div>
+      <div class="sw"><span class="chip" style="background:#9A6410"></span><span class="meta"><span class="role">Presencia · ausente</span><br><span class="hex">#9A6410</span></span></div>
+    </div>
+  </div>
+
+  <div class="guide-col">
+    <div class="guide-label">Tipografía · rol</div>
+    <div class="type-rows">
+      <div class="type-row"><span class="tk">serif · display 30/600</span><span class="t-display">Solvencia</span></div>
+      <div class="type-row"><span class="tk">serif · nombre 15/600</span><span class="t-name">Ana Vidal — Dirección Financiera</span></div>
+      <div class="type-row"><span class="tk">sans · cuerpo 14/400</span><span class="t-body">Cuerpo de mensaje y UI de datos, legible y denso.</span></div>
+      <div class="type-row"><span class="tk">sans · overline 11/600</span><span class="t-overline">Mensajes directos</span></div>
+      <div class="type-row"><span class="tk">sans · caption 12/400</span><span class="t-caption">Timestamps, meta y ayuda contextual.</span></div>
+      <div class="type-row"><span class="tk">sans · tabular</span><span class="t-tnum">09:12 · +20 · 1.842 · 2 %</span></div>
+    </div>
+    <div class="guide-label" style="margin-top:18px">Iconografía · line, grid 24, trazo 1,75</div>
+    <div class="icon-samples">
+      <svg class="ico" aria-hidden="true"><use href="#i-rooms"/></svg>
+      <svg class="ico" aria-hidden="true"><use href="#i-hash"/></svg>
+      <svg class="ico" aria-hidden="true"><use href="#i-lock"/></svg>
+      <svg class="ico" aria-hidden="true"><use href="#i-phone"/></svg>
+      <svg class="ico" aria-hidden="true"><use href="#i-users"/></svg>
+      <svg class="ico" aria-hidden="true"><use href="#i-pin"/></svg>
+      <svg class="ico" aria-hidden="true"><use href="#i-reply"/></svg>
+      <svg class="ico" aria-hidden="true"><use href="#i-at"/></svg>
+      <svg class="ico" aria-hidden="true"><use href="#i-attach"/></svg>
+      <svg class="ico" aria-hidden="true"><use href="#i-send"/></svg>
+    </div>
+  </div>
+</section>
+
+</body>
+</html>

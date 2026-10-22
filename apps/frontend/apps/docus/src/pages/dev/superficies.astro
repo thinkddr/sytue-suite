@@ -1,0 +1,10 @@
+---
+/** Banco de pruebas de DESARROLLO (`@sytue/office`, vista `dev/Superficies`): en producción, 404. */
+import Banco from '@sytue/office/vistas/dev/Superficies.astro';
+
+export const prerender = false;
+
+if (!import.meta.env.DEV) return new Response(null, { status: 404 });
+---
+
+<Banco />

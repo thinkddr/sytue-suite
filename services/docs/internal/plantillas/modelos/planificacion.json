@@ -1,0 +1,255 @@
+{
+ "active": 0,
+ "sheets": [
+  {
+   "cells": {
+    "A1": "<b>{{planificacion.titulo}}</b>",
+    "A3": "<b>{{planificacion.tarea}}</b>",
+    "A4": "{{planificacion.tarea1}}",
+    "A5": "{{planificacion.tarea2}}",
+    "A6": "{{planificacion.tarea3}}",
+    "A7": "{{planificacion.tarea4}}",
+    "A8": "{{planificacion.tarea5}}",
+    "B3": "<b>{{planificacion.responsable}}</b>",
+    "C3": "<b>{{planificacion.inicio}}</b>",
+    "D3": "<b>{{planificacion.fin}}</b>",
+    "E3": "<b>{{planificacion.estado}}</b>",
+    "E4": "{{planificacion.pendiente}}",
+    "E5": "{{planificacion.pendiente}}",
+    "E6": "{{planificacion.pendiente}}",
+    "E7": "{{planificacion.pendiente}}",
+    "E8": "{{planificacion.pendiente}}",
+    "F3": "<b>{{planificacion.notas}}</b>"
+   },
+   "formats": {
+    "C10": {
+     "id": "date"
+    },
+    "C11": {
+     "id": "date"
+    },
+    "C12": {
+     "id": "date"
+    },
+    "C13": {
+     "id": "date"
+    },
+    "C14": {
+     "id": "date"
+    },
+    "C15": {
+     "id": "date"
+    },
+    "C16": {
+     "id": "date"
+    },
+    "C17": {
+     "id": "date"
+    },
+    "C18": {
+     "id": "date"
+    },
+    "C19": {
+     "id": "date"
+    },
+    "C20": {
+     "id": "date"
+    },
+    "C21": {
+     "id": "date"
+    },
+    "C22": {
+     "id": "date"
+    },
+    "C23": {
+     "id": "date"
+    },
+    "C24": {
+     "id": "date"
+    },
+    "C25": {
+     "id": "date"
+    },
+    "C26": {
+     "id": "date"
+    },
+    "C27": {
+     "id": "date"
+    },
+    "C28": {
+     "id": "date"
+    },
+    "C29": {
+     "id": "date"
+    },
+    "C30": {
+     "id": "date"
+    },
+    "C31": {
+     "id": "date"
+    },
+    "C32": {
+     "id": "date"
+    },
+    "C33": {
+     "id": "date"
+    },
+    "C4": {
+     "id": "date"
+    },
+    "C5": {
+     "id": "date"
+    },
+    "C6": {
+     "id": "date"
+    },
+    "C7": {
+     "id": "date"
+    },
+    "C8": {
+     "id": "date"
+    },
+    "C9": {
+     "id": "date"
+    },
+    "D10": {
+     "id": "date"
+    },
+    "D11": {
+     "id": "date"
+    },
+    "D12": {
+     "id": "date"
+    },
+    "D13": {
+     "id": "date"
+    },
+    "D14": {
+     "id": "date"
+    },
+    "D15": {
+     "id": "date"
+    },
+    "D16": {
+     "id": "date"
+    },
+    "D17": {
+     "id": "date"
+    },
+    "D18": {
+     "id": "date"
+    },
+    "D19": {
+     "id": "date"
+    },
+    "D20": {
+     "id": "date"
+    },
+    "D21": {
+     "id": "date"
+    },
+    "D22": {
+     "id": "date"
+    },
+    "D23": {
+     "id": "date"
+    },
+    "D24": {
+     "id": "date"
+    },
+    "D25": {
+     "id": "date"
+    },
+    "D26": {
+     "id": "date"
+    },
+    "D27": {
+     "id": "date"
+    },
+    "D28": {
+     "id": "date"
+    },
+    "D29": {
+     "id": "date"
+    },
+    "D30": {
+     "id": "date"
+    },
+    "D31": {
+     "id": "date"
+    },
+    "D32": {
+     "id": "date"
+    },
+    "D33": {
+     "id": "date"
+    },
+    "D4": {
+     "id": "date"
+    },
+    "D5": {
+     "id": "date"
+    },
+    "D6": {
+     "id": "date"
+    },
+    "D7": {
+     "id": "date"
+    },
+    "D8": {
+     "id": "date"
+    },
+    "D9": {
+     "id": "date"
+    }
+   },
+   "freeze": {
+    "cols": 0,
+    "rows": 3
+   },
+   "name": "{{planificacion.hoja}}",
+   "styles": {
+    "A3": {
+     "border": {
+      "b": true
+     }
+    },
+    "B3": {
+     "border": {
+      "b": true
+     }
+    },
+    "C3": {
+     "border": {
+      "b": true
+     }
+    },
+    "D3": {
+     "border": {
+      "b": true
+     }
+    },
+    "E3": {
+     "border": {
+      "b": true
+     }
+    },
+    "F3": {
+     "border": {
+      "b": true
+     }
+    }
+   },
+   "validations": [
+    {
+     "range": "E4:E33",
+     "values": [
+      "{{=planificacion.pendiente}}",
+      "{{=planificacion.en_curso}}",
+      "{{=planificacion.hecho}}"
+     ]
+    }
+   ]
+  }
+ ]
+}

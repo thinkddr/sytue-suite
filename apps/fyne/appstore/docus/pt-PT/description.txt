@@ -1,0 +1,16 @@
+Coedição em tempo real
+
+• Tudo guardado no seu Drive europeu.
+• Coedição em tempo real, com presença e sem sobreposições.
+• Friso com separadores: Base, Inserir, Referências, Correspondência e Rever.
+• Tabelas, imagens, formas, SmartArt, gráficos, símbolos e marcas de água.
+• Referências: índice, notas de rodapé, citações e bibliografia.
+• Correspondência: impressão em série para cartas e etiquetas.
+• Comentários em conversa, revisão de alterações e versões.
+• Assistente de IA opcional para reescrever, traduzir ou resumir, só se a sua organização o ativar.
+• Exportação para ODT, DOCX e PDF; abrir ficheiros do Word a partir do Drive.
+• Cabeçalhos, rodapés, numeração de páginas e blocos reutilizáveis.
+• Gravação automática no seu Drive europeu, com histórico.
+• Transferência a partir da página inicial em PDF, HTML, Markdown, OpenDocument ou Microsoft Office.
+
+Cifrado em trânsito (TLS 1.3). A infraestrutura da Sytue está na UE. A localização dos serviços externos depende do respetivo fornecedor.

@@ -1,0 +1,37 @@
+{{- if .Values.mailService.enabled }}
+# Servicio de correo expuesto (SMTP entrante + submission + IMAPS) via LoadBalancer
+# Scaleway (UE). El JMAP/HTTP va por el Ingress (mail.sytue.eu); aqui se publican los
+# puertos de transporte de correo bajo mx.sytue.eu (IP dedicada del LB).
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "sytue-mail.fullname" . }}-mx
+  labels:
+    {{- include "sytue-mail.labels" . | nindent 4 }}
+  {{- with .Values.mailService.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.mailService.type }}
+  externalTrafficPolicy: {{ .Values.mailService.externalTrafficPolicy }}
+  ports:
+    - name: smtp
+      port: {{ .Values.mailService.ports.smtp }}
+      targetPort: smtp
+      protocol: TCP
+    - name: submissions
+      port: {{ .Values.mailService.ports.submissions }}
+      targetPort: submissions
+      protocol: TCP
+    - name: submission
+      port: {{ .Values.mailService.ports.submission }}
+      targetPort: submission
+      protocol: TCP
+    - name: imaps
+      port: {{ .Values.mailService.ports.imaps }}
+      targetPort: imaps
+      protocol: TCP
+  selector:
+    {{- include "sytue-mail.selectorLabels" . | nindent 4 }}
+{{- end }}

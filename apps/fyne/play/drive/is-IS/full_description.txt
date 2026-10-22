@@ -1,0 +1,16 @@
+Skrár og samvinna undir þínu eigin vörumerki.
+
+• Hladdu upp, skipuleggðu og deildu með stýrðum tenglum (heimildir og gildistími).
+• Forskoðun skjala og mynda beint á síðunni.
+• Hengdu við í Mail án þess að afrita skrána.
+• Geymsla byggð á S3 á evrópskum svæðum.
+• Drifið mitt, teymisdrif, deilt með mér, nýlegt, eftirlæti og rusl.
+• Deilitenglar með tveimur stigum (skoða eða breyta), lykilorði og gildistíma.
+• Útgáfuferill með endurheimt.
+• Forskoðun skjala, mynda og PDF-skjala án niðurhals.
+• Opnaðu og breyttu skrifstofuskjölum í Docus, Calcus og Diapos; PDF í CertiPDF.
+• Næmismerki sem loka á opinbera tengla þar sem þeir eiga ekki heima.
+• Deildu í rás í Rooms eða hengdu við í Mail án þess að afrita skrána.
+• S3-geymsla á evrópskum svæðum, með kvótann alltaf sýnilegan.
+
+Dulkóðað í flutningi (TLS 1.3). Innviðir Sytue eru innan ESB. Staðsetning ytri þjónustu fer eftir þjónustuveitanda hennar.

@@ -1,0 +1,169 @@
+{
+ "pais": "LI",
+ "verificado": false,
+ "moneda": "CHF",
+ "formas": [
+  {
+   "clave": "einzelunternehmen",
+   "nombre": "Einzelunternehmen",
+   "tipo": "persona_fisica"
+  },
+  {
+   "clave": "kollektivgesellschaft",
+   "nombre": "Kollektivgesellschaft",
+   "tipo": "persona_fisica"
+  },
+  {
+   "clave": "gmbh",
+   "nombre": "GmbH",
+   "tipo": "sociedad"
+  },
+  {
+   "clave": "ag",
+   "nombre": "AG",
+   "tipo": "sociedad"
+  },
+  {
+   "clave": "anstalt",
+   "nombre": "Anstalt",
+   "tipo": "sociedad"
+  }
+ ],
+ "portales": {
+  "etax": {
+   "nombre": "Steuerverwaltung — eTax",
+   "url": "https://www.llv.li/de/landesverwaltung/steuerverwaltung/etax-elektronische-steuererklaerung"
+  },
+  "emwst": {
+   "nombre": "Steuerverwaltung — eMWST",
+   "url": "https://www.llv.li/de/landesverwaltung/steuerverwaltung/mehrwertsteuer/e-mwst"
+  },
+  "ahv": {
+   "nombre": "AHV-IV-FAK Liechtenstein",
+   "url": "https://www.ahv.li/"
+  },
+  "handelsregister": {
+   "nombre": "Amt für Justiz — Handelsregister",
+   "url": "https://www.llv.li/de/landesverwaltung/amt-fuer-justiz/handelsregister"
+  }
+ },
+ "obligaciones": [
+  {
+   "clave": "li_mwst",
+   "nombre": "MWST-Abrechnung (vierteljährlich)",
+   "concepto": "iva_periodica",
+   "ambito": "fiscal",
+   "periodicidad": "trimestral",
+   "plazos": {
+    "T1": "05-30",
+    "T2": "08-29",
+    "T3": "11-29",
+    "T4": "02-28+1"
+   },
+   "margen_dias": 14,
+   "portal": "emwst",
+   "aplica": {
+    "condiciones": [
+     "iva"
+    ]
+   },
+   "sancion": {
+    "tipo": "nota",
+    "nota": "Einreichung im eMWST-Portal und Zahlung innert 60 Tagen nach Quartalsende (hier der 60. Tag). Saldosteuersatz: halbjährlich. Verzugszins ab Fälligkeit; Fristverlängerung nur auf Gesuch."
+   },
+   "calculo": {
+    "tipo": "saldo_neto",
+    "haber": [
+     "477"
+    ],
+    "debe": [
+     "472"
+    ]
+   }
+  },
+  {
+   "clave": "li_ahv",
+   "nombre": "AHV-IV-FAK- und ALV-Beiträge",
+   "concepto": "seguridad_social",
+   "ambito": "laboral",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "10"
+   },
+   "margen_dias": 5,
+   "portal": "ahv",
+   "aplica": {
+    "condiciones": [
+     "empleados"
+    ]
+   },
+   "sancion": {
+    "tipo": "nota",
+    "nota": "Akontobeiträge monatlich (vierteljährlich bei kleiner Lohnsumme), zahlbar innert 10 Tagen nach Ablauf der Periode; Lohnsummenmeldung bis Ende Januar. Verzugszinsen auf verspätete Zahlungen."
+   }
+  },
+  {
+   "clave": "li_steuer_jp",
+   "nombre": "Steuererklärung juristische Personen",
+   "concepto": "sociedades_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "07-01+1"
+   },
+   "margen_dias": 30,
+   "portal": "etax",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "nota",
+    "nota": "Frist 1. Juli des Folgejahres, Fristverlängerung über eTax. Mindestertragssteuer CHF 1 800. Nach Mahnung Busse und Ermessensveranlagung."
+   }
+  },
+  {
+   "clave": "li_steuer_np",
+   "nombre": "Steuererklärung natürliche Personen (Erwerbstätigkeit)",
+   "concepto": "renta_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "04-30+1"
+   },
+   "margen_dias": 30,
+   "portal": "etax",
+   "aplica": {
+    "tipos": [
+     "persona_fisica"
+    ]
+   },
+   "sancion": {
+    "tipo": "nota",
+    "nota": "Frist Ende April, Fristverlängerung über eTax. Nach Mahnung Busse und Ermessensveranlagung."
+   }
+  },
+  {
+   "clave": "li_jahresrechnung",
+   "nombre": "Jahresrechnung beim Handelsregister einreichen",
+   "concepto": "cuentas_anuales",
+   "ambito": "mercantil",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "12-31+1"
+   },
+   "margen_dias": 60,
+   "portal": "handelsregister",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "nota",
+    "nota": "Offenlegung nach Art. 1122 ff. PGR spätestens zwölf Monate nach Ende des Geschäftsjahres (kleine Gesellschaften: Kurzbilanz). Ordnungsbusse durch das Amt für Justiz bei Verzug."
+   }
+  }
+ ]
+}

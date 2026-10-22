@@ -1,0 +1,33 @@
+{
+  "name": "@sytue/shell",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sytue Shell — topbar global, app switcher (9 puntos), busqueda global (Sytue Hub), centro de notificaciones (SSE), presencia y menu de cuenta (logout SSO). Se monta en CADA app de la suite. docs/CONVENTIONS.md §11.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.lib.json",
+    "typecheck": "tsc -p tsconfig.lib.json --noEmit",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@sytue/config": "workspace:*",
+    "@sytue/i18n": "workspace:*",
+    "@sytue/offline": "workspace:*",
+    "@sytue/ui": "workspace:*",
+    "@sytue/auth": "workspace:*",
+    "@sytue/api-clients": "workspace:*",
+    "preact": "10.29.8"
+  },
+  "devDependencies": {
+    "@happy-dom/global-registrator": "20.14.5",
+    "@types/node": "catalog:",
+    "typescript": "6.0.3"
+  }
+}

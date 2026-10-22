@@ -1,0 +1,204 @@
+---
+/**
+ * Uso y facturación — vista global de la organización: consumo del período en
+ * lenguaje claro (sin jerga) y plan actual. Server-rendered con @sytue/ui.
+ */
+import DashboardLayout from '../layouts/DashboardLayout.astro';
+import DemoBanner from '../components/DemoBanner';
+import UsageCostTable from '../components/UsageCostTable';
+import UsageByProjectTable from '../components/UsageByProjectTable';
+import { Card, CardBody, CardHeader, CardTitle, Badge, Icon, SectionHeader } from '@sytue/ui';
+import { requireSession } from '@sytue/auth/server';
+import { canonicaConOrg } from '@sytue/config';
+import { getBff, toBffContext } from '../server/bff.js';
+import {
+  loadProjects,
+  loadOrg,
+  loadUsage,
+  loadUsageByProject,
+  loadBillingAccount,
+  loadBillingPricing,
+  firstSourceError,
+} from '../lib/cloud.js';
+import { estimateCost, describeIncluded } from '../lib/pricing.js';
+import { formatEur } from '../lib/format.js';
+import { useT } from '../i18n/index.js';
+
+export const prerender = false;
+
+// El idioma lo negocia el middleware una vez por petición; aquí solo se usa y
+// baja a las islas por props (detectarlo en el cliente rompería la hidratación).
+const locale = Astro.locals.locale;
+const t = useT(locale);
+
+const guard = await requireSession(getBff(), toBffContext(Astro));
+if (guard instanceof Response) return guard;
+// Ruta en `sinOrg` (su nombre colisiona con el namespace de organizaciones):
+// con sesión, un salto local a la canónica con la org activa (ADR 0056).
+const canonica = canonicaConOrg(Astro.url, getBff().basePath, guard.session.user.tenant);
+if (canonica) return Astro.redirect(canonica);
+
+const sources = await Promise.all([
+  loadProjects(guard.session),
+  loadOrg(guard.session),
+  loadUsage(guard.session, locale),
+  loadBillingAccount(guard.session),
+  loadBillingPricing(guard.session),
+]);
+const [
+  { data: projects },
+  { live: orgLive, data: org },
+  { live: usageLive, data: usage },
+  { live: accountLive, data: account },
+  { live: pricingLive, data: pricing },
+] = sources;
+
+// El reparto por proyecto necesita los proyectos para poner nombre a cada UUID, así
+// que va después y no dentro del Promise.all.
+const { data: usageByProject } = await loadUsageByProject(
+  guard.session,
+  projects,
+  t('usage.byProject.org'),
+);
+// Un 403 no es «modo demostración»: el aviso debe decir la verdad.
+const loadError = firstSourceError(...sources);
+// Las CINCO fuentes cuentan, no solo las dos de consumo: esta página pinta el
+// gasto, el plan y la etiqueta de «al día» con lo que devuelven /billing/account
+// y /billing/pricing. Dejarlas fuera hacía que un fallo suyo se pintase como
+// dato bueno (0 € gastados, insignia verde). Mismo criterio que billing.astro.
+const live = orgLive && usageLive && accountLive && pricingLive;
+
+// Estado de cuenta derivado del gasto real vs límite (no hardcodeado): coherente
+// con billing.astro (SpendLimitForm). Sin límite o por debajo → al día.
+const overLimit =
+  account.spendLimitEur != null &&
+  account.spendLimitEur > 0 &&
+  account.currentSpendEur > account.spendLimitEur;
+
+// Estimación de coste (€) a partir de las métricas facturables reales; ignora las
+// que no tienen precio conocido. Ver src/lib/pricing.ts — es una estimación.
+const costInput = usage.flatMap((m) =>
+  m.metric && typeof m.quantity === 'number' ? [{ metric: m.metric, total: m.quantity }] : [],
+);
+const cost = estimateCost(costInput);
+
+/*
+ * El plan se describe con lo que FACTURA el control-plane (GET /billing/pricing),
+ * no con una tabla local: había una tabla escrita a mano que anunciaba Pro 49 €/mes
+ * y Team 199 €/mes cuando el backend cobra 19 € y 49 €, y prometía 100 GB en Pro
+ * cuando el plan incluye 25. Anunciar un precio distinto del que se cobra no es un
+ * detalle cosmético. Misma fuente que billing.astro, así que ambas páginas no
+ * pueden volver a divergir.
+ */
+const PLAN_LABEL: Record<string, string> = { free: 'Free', pro: 'Pro', team: 'Team' };
+const planSpec = pricing.plans.find((p) => p.id === org.plan);
+const planMeta = {
+  label: PLAN_LABEL[org.plan] ?? org.plan,
+  price: planSpec ? t('usage.perMonth', { price: formatEur(locale, planSpec.baseEur) }) : '—',
+  blurb: planSpec ? describeIncluded(t, planSpec.included) : '',
+};
+---
+
+<DashboardLayout title={t('nav.usage')} section="usage" error={loadError}>
+  <DemoBanner live={live} locale={locale} error={loadError} />
+  <SectionHeader
+    icon={<Icon name="chart" size={20} />}
+    title={t('nav.usage')}
+    subtitle={t('usage.subtitle')}
+    actions={<Badge tone="primary">{t('billing.planBadge', { plan: planMeta.label })}</Badge>}
+    level={1}
+  />
+  <div class="cloud-content">
+    <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      {usage.map((m) => (
+        <Card raised={false}>
+          <CardBody>
+            <p class="text-text-muted truncate text-sm">{m.label}</p>
+            <p class="sytue-h3 text-text mt-1 tabular-nums">{m.value}</p>
+            {m.delta ? (
+              <p
+                class={
+                  'mt-0.5 text-sm font-medium tabular-nums ' +
+                  (m.trend === 'down' ? 'text-success-text' : 'text-text-muted')
+                }
+              >
+                {m.delta}
+              </p>
+            ) : null}
+          </CardBody>
+        </Card>
+      ))}
+      <Card raised={false}>
+        <CardBody>
+          <p class="text-text-muted truncate text-sm">{t('usage.costTile')}</p>
+          <p class="sytue-h3 text-text mt-1 tabular-nums">{formatEur(locale, cost.total)}</p>
+          <p class="text-text-subtle mt-0.5 text-sm">{t('usage.estimateNoVat')}</p>
+        </CardBody>
+      </Card>
+    </div>
+
+    <Card class="mt-4">
+      <CardHeader>
+        <CardTitle as="h2">{t('usage.estimatedCost')}</CardTitle>
+        <Badge tone="neutral">{t('usage.estimate')}</Badge>
+      </CardHeader>
+      <CardBody>
+        {cost.lines.length === 0 ? (
+          <p class="text-text-muted text-sm">{t('usage.nothing')}</p>
+        ) : (
+          <>
+            <UsageCostTable lines={cost.lines} total={cost.total} locale={locale} />
+            <p class="text-text-subtle mt-3 text-xs">{t('usage.estimateNote')}</p>
+          </>
+        )}
+      </CardBody>
+    </Card>
+
+    <Card class="mt-4">
+      <CardHeader>
+        <CardTitle as="h2">{t('usage.byProject')}</CardTitle>
+        <Badge tone="neutral">{t('usage.estimate')}</Badge>
+      </CardHeader>
+      <CardBody>
+        {usageByProject.length === 0 ? (
+          <p class="text-text-muted text-sm">{t('usage.byProject.none')}</p>
+        ) : (
+          <>
+            <UsageByProjectTable usage={usageByProject} locale={locale} />
+            <p class="text-text-subtle mt-3 text-xs">{t('usage.byProject.note')}</p>
+          </>
+        )}
+      </CardBody>
+    </Card>
+
+    <div class="mt-4 grid gap-4 lg:grid-cols-2">
+      <Card>
+        <CardHeader>
+          <CardTitle as="h2">{t('usage.currentPlan')}</CardTitle>
+          {overLimit ? (
+            <Badge tone="danger">{t('usage.overLimit')}</Badge>
+          ) : (
+            <Badge tone="success">{t('usage.upToDate')}</Badge>
+          )}
+        </CardHeader>
+        <CardBody class="flex flex-col gap-2">
+          <p class="text-text text-base">
+            <span class="font-semibold">{planMeta.label}</span> · {planMeta.price} ·{' '}
+            {t('usage.activeProjects', { count: projects.length })}
+          </p>
+          <p class="text-text-muted text-sm">{planMeta.blurb}</p>
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle as="h2">{t('usage.billingData')}</CardTitle>
+        </CardHeader>
+        <CardBody class="flex flex-col gap-2">
+          <p class="text-text text-base">{t('usage.billingData.line')}</p>
+          <p class="text-text-muted text-sm">{t('usage.billingData.note')}</p>
+        </CardBody>
+      </Card>
+    </div>
+  </div>
+</DashboardLayout>

@@ -1,0 +1,53 @@
+---
+/**
+ * Equipo — miembros de la organización. Además de dar acceso, cada miembro es un
+ * puesto de suite facturable, así que el precio se lee del control-plane y se
+ * muestra junto a la lista.
+ */
+import DashboardLayout from '../layouts/DashboardLayout.astro';
+import MembersPanel from '../components/MembersPanel';
+import { requireSession } from '@sytue/auth/server';
+import { canonicaConOrg } from '@sytue/config';
+import { getBff, toBffContext } from '../server/bff.js';
+import {
+  loadMembers,
+  loadMemberInvitations,
+  loadBillingPricing,
+  firstSourceError,
+} from '../lib/cloud.js';
+
+import { useT } from '../i18n/index.js';
+
+export const prerender = false;
+
+// El idioma lo negocia el middleware una vez por petición y baja a la isla por
+// props: detectarlo en el cliente desajustaría la hidratación.
+const locale = Astro.locals.locale;
+const t = useT(locale);
+
+const guard = await requireSession(getBff(), toBffContext(Astro));
+if (guard instanceof Response) return guard;
+// Ruta en `sinOrg` (su nombre colisiona con el namespace de organizaciones):
+// con sesión, un salto local a la canónica con la org activa (ADR 0056).
+const canonica = canonicaConOrg(Astro.url, getBff().basePath, guard.session.user.tenant);
+if (canonica) return Astro.redirect(canonica);
+
+const [membersSrc, invitationsSrc, pricingSrc] = await Promise.all([
+  loadMembers(guard.session),
+  loadMemberInvitations(guard.session),
+  loadBillingPricing(guard.session),
+]);
+const loadError = firstSourceError(membersSrc, invitationsSrc, pricingSrc);
+---
+
+<DashboardLayout title={t('nav.team')} section="team" error={loadError}>
+  <MembersPanel
+    client:load
+    members={membersSrc.data}
+    invitations={invitationsSrc.data}
+    live={membersSrc.live}
+    error={loadError}
+    seatPriceEur={pricingSrc.data.suite.seatPriceEur}
+    locale={locale}
+  />
+</DashboardLayout>

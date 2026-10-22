@@ -1,0 +1,30 @@
+{
+ "cells": {
+  "A1": "<b>{{presupuesto.partida}}</b>",
+  "B1": "<b>{{b_resumen.valor}}</b>",
+  "A2": "{{trimestral.t1}}",
+  "B2": "120",
+  "A3": "{{trimestral.t2}}",
+  "B3": "135",
+  "A4": "{{trimestral.t3}}",
+  "B4": "128",
+  "A5": "{{trimestral.t4}}",
+  "B5": "150"
+ },
+ "formats": {},
+ "styles": {
+  "A1": {
+   "tema": "papel"
+  },
+  "B1": {
+   "tema": "papel"
+  }
+ },
+ "charts": [
+  {
+   "type": "bar",
+   "range": "A1:B5",
+   "title": "{{=b_grafico.titulo}}"
+  }
+ ]
+}

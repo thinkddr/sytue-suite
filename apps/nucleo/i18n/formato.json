@@ -1,0 +1,1666 @@
+{
+  "en": {
+    "grupo": ",",
+    "decimal": ".",
+    "menos": "-",
+    "min_grupo": 1,
+    "porcentaje": "{n}%",
+    "moneda": "€{n}",
+    "moneda_menos": "-€{n}",
+    "lista_par": " and ",
+    "lista_entre": ", ",
+    "lista_final": " and ",
+    "monedas": {
+      "BGN": {
+        "moneda": "BGN {n}",
+        "moneda_menos": "-BGN {n}",
+        "decimales": 2
+      },
+      "CHF": {
+        "moneda": "CHF {n}",
+        "moneda_menos": "-CHF {n}",
+        "decimales": 2
+      },
+      "CZK": {
+        "moneda": "CZK {n}",
+        "moneda_menos": "-CZK {n}",
+        "decimales": 2
+      },
+      "DKK": {
+        "moneda": "DKK {n}",
+        "moneda_menos": "-DKK {n}",
+        "decimales": 2
+      },
+      "HUF": {
+        "moneda": "HUF {n}",
+        "moneda_menos": "-HUF {n}",
+        "decimales": 2
+      },
+      "ISK": {
+        "moneda": "ISK {n}",
+        "moneda_menos": "-ISK {n}",
+        "decimales": 0
+      },
+      "NOK": {
+        "moneda": "NOK {n}",
+        "moneda_menos": "-NOK {n}",
+        "decimales": 2
+      },
+      "PLN": {
+        "moneda": "PLN {n}",
+        "moneda_menos": "-PLN {n}",
+        "decimales": 2
+      },
+      "RON": {
+        "moneda": "RON {n}",
+        "moneda_menos": "-RON {n}",
+        "decimales": 2
+      },
+      "SEK": {
+        "moneda": "SEK {n}",
+        "moneda_menos": "-SEK {n}",
+        "decimales": 2
+      }
+    }
+  },
+  "bg": {
+    "grupo": " ",
+    "decimal": ",",
+    "menos": "-",
+    "min_grupo": 2,
+    "porcentaje": "{n}%",
+    "moneda": "{n} €",
+    "moneda_menos": "-{n} €",
+    "lista_par": " и ",
+    "lista_entre": ", ",
+    "lista_final": " и ",
+    "monedas": {
+      "BGN": {
+        "moneda": "{n} лв.",
+        "moneda_menos": "-{n} лв.",
+        "decimales": 2
+      },
+      "CHF": {
+        "moneda": "{n} CHF",
+        "moneda_menos": "-{n} CHF",
+        "decimales": 2
+      },
+      "CZK": {
+        "moneda": "{n} CZK",
+        "moneda_menos": "-{n} CZK",
+        "decimales": 2
+      },
+      "DKK": {
+        "moneda": "{n} DKK",
+        "moneda_menos": "-{n} DKK",
+        "decimales": 2
+      },
+      "HUF": {
+        "moneda": "{n} HUF",
+        "moneda_menos": "-{n} HUF",
+        "decimales": 2
+      },
+      "ISK": {
+        "moneda": "{n} ISK",
+        "moneda_menos": "-{n} ISK",
+        "decimales": 0
+      },
+      "NOK": {
+        "moneda": "{n} NOK",
+        "moneda_menos": "-{n} NOK",
+        "decimales": 2
+      },
+      "PLN": {
+        "moneda": "{n} PLN",
+        "moneda_menos": "-{n} PLN",
+        "decimales": 2
+      },
+      "RON": {
+        "moneda": "{n} RON",
+        "moneda_menos": "-{n} RON",
+        "decimales": 2
+      },
+      "SEK": {
+        "moneda": "{n} SEK",
+        "moneda_menos": "-{n} SEK",
+        "decimales": 2
+      }
+    }
+  },
+  "cs": {
+    "grupo": " ",
+    "decimal": ",",
+    "menos": "-",
+    "min_grupo": 1,
+    "porcentaje": "{n} %",
+    "moneda": "{n} €",
+    "moneda_menos": "-{n} €",
+    "lista_par": " a ",
+    "lista_entre": ", ",
+    "lista_final": " a ",
+    "monedas": {
+      "BGN": {
+        "moneda": "{n} BGN",
+        "moneda_menos": "-{n} BGN",
+        "decimales": 2
+      },
+      "CHF": {
+        "moneda": "{n} CHF",
+        "moneda_menos": "-{n} CHF",
+        "decimales": 2
+      },
+      "CZK": {
+        "moneda": "{n} Kč",
+        "moneda_menos": "-{n} Kč",
+        "decimales": 2
+      },
+      "DKK": {
+        "moneda": "{n} DKK",
+        "moneda_menos": "-{n} DKK",
+        "decimales": 2
+      },
+      "HUF": {
+        "moneda": "{n} HUF",
+        "moneda_menos": "-{n} HUF",
+        "decimales": 2
+      },
+      "ISK": {
+        "moneda": "{n} ISK",
+        "moneda_menos": "-{n} ISK",
+        "decimales": 0
+      },
+      "NOK": {
+        "moneda": "{n} NOK",
+        "moneda_menos": "-{n} NOK",
+        "decimales": 2
+      },
+      "PLN": {
+        "moneda": "{n} PLN",
+        "moneda_menos": "-{n} PLN",
+        "decimales": 2
+      },
+      "RON": {
+        "moneda": "{n} RON",
+        "moneda_menos": "-{n} RON",
+        "decimales": 2
+      },
+      "SEK": {
+        "moneda": "{n} SEK",
+        "moneda_menos": "-{n} SEK",
+        "decimales": 2
+      }
+    }
+  },
+  "da": {
+    "grupo": ".",
+    "decimal": ",",
+    "menos": "-",
+    "min_grupo": 1,
+    "porcentaje": "{n} %",
+    "moneda": "{n} €",
+    "moneda_menos": "-{n} €",
+    "lista_par": " og ",
+    "lista_entre": ", ",
+    "lista_final": " og ",
+    "monedas": {
+      "BGN": {
+        "moneda": "{n} BGN",
+        "moneda_menos": "-{n} BGN",
+        "decimales": 2
+      },
+      "CHF": {
+        "moneda": "{n} CHF",
+        "moneda_menos": "-{n} CHF",
+        "decimales": 2
+      },
+      "CZK": {
+        "moneda": "{n} CZK",
+        "moneda_menos": "-{n} CZK",
+        "decimales": 2
+      },
+      "DKK": {
+        "moneda": "{n} kr.",
+        "moneda_menos": "-{n} kr.",
+        "decimales": 2
+      },
+      "HUF": {
+        "moneda": "{n} HUF",
+        "moneda_menos": "-{n} HUF",
+        "decimales": 2
+      },
+      "ISK": {
+        "moneda": "{n} ISK",
+        "moneda_menos": "-{n} ISK",
+        "decimales": 0
+      },
+      "NOK": {
+        "moneda": "{n} NOK",
+        "moneda_menos": "-{n} NOK",
+        "decimales": 2
+      },
+      "PLN": {
+        "moneda": "{n} PLN",
+        "moneda_menos": "-{n} PLN",
+        "decimales": 2
+      },
+      "RON": {
+        "moneda": "{n} RON",
+        "moneda_menos": "-{n} RON",
+        "decimales": 2
+      },
+      "SEK": {
+        "moneda": "{n} SEK",
+        "moneda_menos": "-{n} SEK",
+        "decimales": 2
+      }
+    }
+  },
+  "de": {
+    "grupo": ".",
+    "decimal": ",",
+    "menos": "-",
+    "min_grupo": 1,
+    "porcentaje": "{n} %",
+    "moneda": "{n} €",
+    "moneda_menos": "-{n} €",
+    "lista_par": " und ",
+    "lista_entre": ", ",
+    "lista_final": " und ",
+    "monedas": {
+      "BGN": {
+        "moneda": "{n} BGN",
+        "moneda_menos": "-{n} BGN",
+        "decimales": 2
+      },
+      "CHF": {
+        "moneda": "{n} CHF",
+        "moneda_menos": "-{n} CHF",
+        "decimales": 2
+      },
+      "CZK": {
+        "moneda": "{n} CZK",
+        "moneda_menos": "-{n} CZK",
+        "decimales": 2
+      },
+      "DKK": {
+        "moneda": "{n} DKK",
+        "moneda_menos": "-{n} DKK",
+        "decimales": 2
+      },
+      "HUF": {
+        "moneda": "{n} HUF",
+        "moneda_menos": "-{n} HUF",
+        "decimales": 2
+      },
+      "ISK": {
+        "moneda": "{n} ISK",
+        "moneda_menos": "-{n} ISK",
+        "decimales": 0
+      },
+      "NOK": {
+        "moneda": "{n} NOK",
+        "moneda_menos": "-{n} NOK",
+        "decimales": 2
+      },
+      "PLN": {
+        "moneda": "{n} PLN",
+        "moneda_menos": "-{n} PLN",
+        "decimales": 2
+      },
+      "RON": {
+        "moneda": "{n} RON",
+        "moneda_menos": "-{n} RON",
+        "decimales": 2
+      },
+      "SEK": {
+        "moneda": "{n} SEK",
+        "moneda_menos": "-{n} SEK",
+        "decimales": 2
+      }
+    }
+  },
+  "el": {
+    "grupo": ".",
+    "decimal": ",",
+    "menos": "-",
+    "min_grupo": 1,
+    "porcentaje": "{n}%",
+    "moneda": "{n} €",
+    "moneda_menos": "-{n} €",
+    "lista_par": " και ",
+    "lista_entre": ", ",
+    "lista_final": " και ",
+    "monedas": {
+      "BGN": {
+        "moneda": "{n} BGN",
+        "moneda_menos": "-{n} BGN",
+        "decimales": 2
+      },
+      "CHF": {
+        "moneda": "{n} CHF",
+        "moneda_menos": "-{n} CHF",
+        "decimales": 2
+      },
+      "CZK": {
+        "moneda": "{n} CZK",
+        "moneda_menos": "-{n} CZK",
+        "decimales": 2
+      },
+      "DKK": {
+        "moneda": "{n} DKK",
+        "moneda_menos": "-{n} DKK",
+        "decimales": 2
+      },
+      "HUF": {
+        "moneda": "{n} HUF",
+        "moneda_menos": "-{n} HUF",
+        "decimales": 2
+      },
+      "ISK": {
+        "moneda": "{n} ISK",
+        "moneda_menos": "-{n} ISK",
+        "decimales": 0
+      },
+      "NOK": {
+        "moneda": "{n} NOK",
+        "moneda_menos": "-{n} NOK",
+        "decimales": 2
+      },
+      "PLN": {
+        "moneda": "{n} PLN",
+        "moneda_menos": "-{n} PLN",
+        "decimales": 2
+      },
+      "RON": {
+        "moneda": "{n} RON",
+        "moneda_menos": "-{n} RON",
+        "decimales": 2
+      },
+      "SEK": {
+        "moneda": "{n} SEK",
+        "moneda_menos": "-{n} SEK",
+        "decimales": 2
+      }
+    }
+  },
+  "es": {
+    "grupo": ".",
+    "decimal": ",",
+    "menos": "-",
+    "min_grupo": 2,
+    "porcentaje": "{n} %",
+    "moneda": "{n} €",
+    "moneda_menos": "-{n} €",
+    "lista_par": " y ",
+    "lista_entre": ", ",
+    "lista_final": " y ",
+    "monedas": {
+      "BGN": {
+        "moneda": "{n} BGN",
+        "moneda_menos": "-{n} BGN",
+        "decimales": 2
+      },
+      "CHF": {
+        "moneda": "{n} CHF",
+        "moneda_menos": "-{n} CHF",
+        "decimales": 2
+      },
+      "CZK": {
+        "moneda": "{n} CZK",
+        "moneda_menos": "-{n} CZK",
+        "decimales": 2
+      },
+      "DKK": {
+        "moneda": "{n} DKK",
+        "moneda_menos": "-{n} DKK",
+        "decimales": 2
+      },
+      "HUF": {
+        "moneda": "{n} HUF",
+        "moneda_menos": "-{n} HUF",
+        "decimales": 2
+      },
+      "ISK": {
+        "moneda": "{n} ISK",
+        "moneda_menos": "-{n} ISK",
+        "decimales": 0
+      },
+      "NOK": {
+        "moneda": "{n} NOK",
+        "moneda_menos": "-{n} NOK",
+        "decimales": 2
+      },
+      "PLN": {
+        "moneda": "{n} PLN",
+        "moneda_menos": "-{n} PLN",
+        "decimales": 2
+      },
+      "RON": {
+        "moneda": "{n} RON",
+        "moneda_menos": "-{n} RON",
+        "decimales": 2
+      },
+      "SEK": {
+        "moneda": "{n} SEK",
+        "moneda_menos": "-{n} SEK",
+        "decimales": 2
+      }
+    }
+  },
+  "et": {
+    "grupo": " ",
+    "decimal": ",",
+    "menos": "−",
+    "min_grupo": 2,
+    "porcentaje": "{n}%",
+    "moneda": "{n} €",
+    "moneda_menos": "−{n} €",
+    "lista_par": " ja ",
+    "lista_entre": ", ",
+    "lista_final": " ja ",
+    "monedas": {
+      "BGN": {
+        "moneda": "{n} BGN",
+        "moneda_menos": "−{n} BGN",
+        "decimales": 2
+      },
+      "CHF": {
+        "moneda": "{n} CHF",
+        "moneda_menos": "−{n} CHF",
+        "decimales": 2
+      },
+      "CZK": {
+        "moneda": "{n} CZK",
+        "moneda_menos": "−{n} CZK",
+        "decimales": 2
+      },
+      "DKK": {
+        "moneda": "{n} DKK",
+        "moneda_menos": "−{n} DKK",
+        "decimales": 2
+      },
+      "HUF": {
+        "moneda": "{n} HUF",
+        "moneda_menos": "−{n} HUF",
+        "decimales": 2
+      },
+      "ISK": {
+        "moneda": "{n} ISK",
+        "moneda_menos": "−{n} ISK",
+        "decimales": 0
+      },
+      "NOK": {
+        "moneda": "{n} NOK",
+        "moneda_menos": "−{n} NOK",
+        "decimales": 2
+      },
+      "PLN": {
+        "moneda": "{n} PLN",
+        "moneda_menos": "−{n} PLN",
+        "decimales": 2
+      },
+      "RON": {
+        "moneda": "{n} RON",
+        "moneda_menos": "−{n} RON",
+        "decimales": 2
+      },
+      "SEK": {
+        "moneda": "{n} SEK",
+        "moneda_menos": "−{n} SEK",
+        "decimales": 2
+      }
+    }
+  },
+  "fi": {
+    "grupo": " ",
+    "decimal": ",",
+    "menos": "−",
+    "min_grupo": 1,
+    "porcentaje": "{n} %",
+    "moneda": "{n} €",
+    "moneda_menos": "−{n} €",
+    "lista_par": " ja ",
+    "lista_entre": ", ",
+    "lista_final": " ja ",
+    "monedas": {
+      "BGN": {
+        "moneda": "{n} BGN",
+        "moneda_menos": "−{n} BGN",
+        "decimales": 2
+      },
+      "CHF": {
+        "moneda": "{n} CHF",
+        "moneda_menos": "−{n} CHF",
+        "decimales": 2
+      },
+      "CZK": {
+        "moneda": "{n} CZK",
+        "moneda_menos": "−{n} CZK",
+        "decimales": 2
+      },
+      "DKK": {
+        "moneda": "{n} DKK",
+        "moneda_menos": "−{n} DKK",
+        "decimales": 2
+      },
+      "HUF": {
+        "moneda": "{n} HUF",
+        "moneda_menos": "−{n} HUF",
+        "decimales": 2
+      },
+      "ISK": {
+        "moneda": "{n} ISK",
+        "moneda_menos": "−{n} ISK",
+        "decimales": 0
+      },
+      "NOK": {
+        "moneda": "{n} NOK",
+        "moneda_menos": "−{n} NOK",
+        "decimales": 2
+      },
+      "PLN": {
+        "moneda": "{n} PLN",
+        "moneda_menos": "−{n} PLN",
+        "decimales": 2
+      },
+      "RON": {
+        "moneda": "{n} RON",
+        "moneda_menos": "−{n} RON",
+        "decimales": 2
+      },
+      "SEK": {
+        "moneda": "{n} SEK",
+        "moneda_menos": "−{n} SEK",
+        "decimales": 2
+      }
+    }
+  },
+  "fr": {
+    "grupo": " ",
+    "decimal": ",",
+    "menos": "-",
+    "min_grupo": 1,
+    "porcentaje": "{n} %",
+    "moneda": "{n} €",
+    "moneda_menos": "-{n} €",
+    "lista_par": " et ",
+    "lista_entre": ", ",
+    "lista_final": " et ",
+    "monedas": {
+      "BGN": {
+        "moneda": "{n} BGN",
+        "moneda_menos": "-{n} BGN",
+        "decimales": 2
+      },
+      "CHF": {
+        "moneda": "{n} CHF",
+        "moneda_menos": "-{n} CHF",
+        "decimales": 2
+      },
+      "CZK": {
+        "moneda": "{n} CZK",
+        "moneda_menos": "-{n} CZK",
+        "decimales": 2
+      },
+      "DKK": {
+        "moneda": "{n} DKK",
+        "moneda_menos": "-{n} DKK",
+        "decimales": 2
+      },
+      "HUF": {
+        "moneda": "{n} HUF",
+        "moneda_menos": "-{n} HUF",
+        "decimales": 2
+      },
+      "ISK": {
+        "moneda": "{n} ISK",
+        "moneda_menos": "-{n} ISK",
+        "decimales": 0
+      },
+      "NOK": {
+        "moneda": "{n} NOK",
+        "moneda_menos": "-{n} NOK",
+        "decimales": 2
+      },
+      "PLN": {
+        "moneda": "{n} PLN",
+        "moneda_menos": "-{n} PLN",
+        "decimales": 2
+      },
+      "RON": {
+        "moneda": "{n} RON",
+        "moneda_menos": "-{n} RON",
+        "decimales": 2
+      },
+      "SEK": {
+        "moneda": "{n} SEK",
+        "moneda_menos": "-{n} SEK",
+        "decimales": 2
+      }
+    }
+  },
+  "ga": {
+    "grupo": ",",
+    "decimal": ".",
+    "menos": "-",
+    "min_grupo": 1,
+    "porcentaje": "{n}%",
+    "moneda": "€{n}",
+    "moneda_menos": "-€{n}",
+    "lista_par": " agus ",
+    "lista_entre": ", ",
+    "lista_final": " agus ",
+    "monedas": {
+      "BGN": {
+        "moneda": "BGN {n}",
+        "moneda_menos": "-BGN {n}",
+        "decimales": 2
+      },
+      "CHF": {
+        "moneda": "CHF {n}",
+        "moneda_menos": "-CHF {n}",
+        "decimales": 2
+      },
+      "CZK": {
+        "moneda": "CZK {n}",
+        "moneda_menos": "-CZK {n}",
+        "decimales": 2
+      },
+      "DKK": {
+        "moneda": "DKK {n}",
+        "moneda_menos": "-DKK {n}",
+        "decimales": 2
+      },
+      "HUF": {
+        "moneda": "HUF {n}",
+        "moneda_menos": "-HUF {n}",
+        "decimales": 2
+      },
+      "ISK": {
+        "moneda": "ISK {n}",
+        "moneda_menos": "-ISK {n}",
+        "decimales": 0
+      },
+      "NOK": {
+        "moneda": "NOK {n}",
+        "moneda_menos": "-NOK {n}",
+        "decimales": 2
+      },
+      "PLN": {
+        "moneda": "PLN {n}",
+        "moneda_menos": "-PLN {n}",
+        "decimales": 2
+      },
+      "RON": {
+        "moneda": "RON {n}",
+        "moneda_menos": "-RON {n}",
+        "decimales": 2
+      },
+      "SEK": {
+        "moneda": "SEK {n}",
+        "moneda_menos": "-SEK {n}",
+        "decimales": 2
+      }
+    }
+  },
+  "hr": {
+    "grupo": ".",
+    "decimal": ",",
+    "menos": "−",
+    "min_grupo": 1,
+    "porcentaje": "{n} %",
+    "moneda": "{n} €",
+    "moneda_menos": "−{n} €",
+    "lista_par": " i ",
+    "lista_entre": ", ",
+    "lista_final": " i ",
+    "monedas": {
+      "BGN": {
+        "moneda": "{n} BGN",
+        "moneda_menos": "−{n} BGN",
+        "decimales": 2
+      },
+      "CHF": {
+        "moneda": "{n} CHF",
+        "moneda_menos": "−{n} CHF",
+        "decimales": 2
+      },
+      "CZK": {
+        "moneda": "{n} CZK",
+        "moneda_menos": "−{n} CZK",
+        "decimales": 2
+      },
+      "DKK": {
+        "moneda": "{n} DKK",
+        "moneda_menos": "−{n} DKK",
+        "decimales": 2
+      },
+      "HUF": {
+        "moneda": "{n} HUF",
+        "moneda_menos": "−{n} HUF",
+        "decimales": 2
+      },
+      "ISK": {
+        "moneda": "{n} ISK",
+        "moneda_menos": "−{n} ISK",
+        "decimales": 0
+      },
+      "NOK": {
+        "moneda": "{n} NOK",
+        "moneda_menos": "−{n} NOK",
+        "decimales": 2
+      },
+      "PLN": {
+        "moneda": "{n} PLN",
+        "moneda_menos": "−{n} PLN",
+        "decimales": 2
+      },
+      "RON": {
+        "moneda": "{n} RON",
+        "moneda_menos": "−{n} RON",
+        "decimales": 2
+      },
+      "SEK": {
+        "moneda": "{n} SEK",
+        "moneda_menos": "−{n} SEK",
+        "decimales": 2
+      }
+    }
+  },
+  "hu": {
+    "grupo": " ",
+    "decimal": ",",
+    "menos": "-",
+    "min_grupo": 2,
+    "porcentaje": "{n}%",
+    "moneda": "{n} EUR",
+    "moneda_menos": "-{n} EUR",
+    "lista_par": " és ",
+    "lista_entre": ", ",
+    "lista_final": " és ",
+    "monedas": {
+      "BGN": {
+        "moneda": "{n} BGN",
+        "moneda_menos": "-{n} BGN",
+        "decimales": 2
+      },
+      "CHF": {
+        "moneda": "{n} CHF",
+        "moneda_menos": "-{n} CHF",
+        "decimales": 2
+      },
+      "CZK": {
+        "moneda": "{n} CZK",
+        "moneda_menos": "-{n} CZK",
+        "decimales": 2
+      },
+      "DKK": {
+        "moneda": "{n} DKK",
+        "moneda_menos": "-{n} DKK",
+        "decimales": 2
+      },
+      "HUF": {
+        "moneda": "{n} Ft",
+        "moneda_menos": "-{n} Ft",
+        "decimales": 2
+      },
+      "ISK": {
+        "moneda": "{n} ISK",
+        "moneda_menos": "-{n} ISK",
+        "decimales": 0
+      },
+      "NOK": {
+        "moneda": "{n} NOK",
+        "moneda_menos": "-{n} NOK",
+        "decimales": 2
+      },
+      "PLN": {
+        "moneda": "{n} PLN",
+        "moneda_menos": "-{n} PLN",
+        "decimales": 2
+      },
+      "RON": {
+        "moneda": "{n} RON",
+        "moneda_menos": "-{n} RON",
+        "decimales": 2
+      },
+      "SEK": {
+        "moneda": "{n} SEK",
+        "moneda_menos": "-{n} SEK",
+        "decimales": 2
+      }
+    }
+  },
+  "is": {
+    "grupo": ".",
+    "decimal": ",",
+    "menos": "-",
+    "min_grupo": 1,
+    "porcentaje": "{n}%",
+    "moneda": "{n} EUR",
+    "moneda_menos": "-{n} EUR",
+    "lista_par": " og ",
+    "lista_entre": ", ",
+    "lista_final": " og ",
+    "monedas": {
+      "BGN": {
+        "moneda": "{n} BGN",
+        "moneda_menos": "-{n} BGN",
+        "decimales": 2
+      },
+      "CHF": {
+        "moneda": "{n} CHF",
+        "moneda_menos": "-{n} CHF",
+        "decimales": 2
+      },
+      "CZK": {
+        "moneda": "{n} CZK",
+        "moneda_menos": "-{n} CZK",
+        "decimales": 2
+      },
+      "DKK": {
+        "moneda": "{n} DKK",
+        "moneda_menos": "-{n} DKK",
+        "decimales": 2
+      },
+      "HUF": {
+        "moneda": "{n} HUF",
+        "moneda_menos": "-{n} HUF",
+        "decimales": 2
+      },
+      "ISK": {
+        "moneda": "{n} kr.",
+        "moneda_menos": "-{n} kr.",
+        "decimales": 0
+      },
+      "NOK": {
+        "moneda": "{n} NOK",
+        "moneda_menos": "-{n} NOK",
+        "decimales": 2
+      },
+      "PLN": {
+        "moneda": "{n} PLN",
+        "moneda_menos": "-{n} PLN",
+        "decimales": 2
+      },
+      "RON": {
+        "moneda": "{n} RON",
+        "moneda_menos": "-{n} RON",
+        "decimales": 2
+      },
+      "SEK": {
+        "moneda": "{n} SEK",
+        "moneda_menos": "-{n} SEK",
+        "decimales": 2
+      }
+    }
+  },
+  "it": {
+    "grupo": ".",
+    "decimal": ",",
+    "menos": "-",
+    "min_grupo": 2,
+    "porcentaje": "{n}%",
+    "moneda": "{n} €",
+    "moneda_menos": "-{n} €",
+    "lista_par": " e ",
+    "lista_entre": ", ",
+    "lista_final": " e ",
+    "monedas": {
+      "BGN": {
+        "moneda": "{n} BGN",
+        "moneda_menos": "-{n} BGN",
+        "decimales": 2
+      },
+      "CHF": {
+        "moneda": "{n} CHF",
+        "moneda_menos": "-{n} CHF",
+        "decimales": 2
+      },
+      "CZK": {
+        "moneda": "{n} CZK",
+        "moneda_menos": "-{n} CZK",
+        "decimales": 2
+      },
+      "DKK": {
+        "moneda": "{n} DKK",
+        "moneda_menos": "-{n} DKK",
+        "decimales": 2
+      },
+      "HUF": {
+        "moneda": "{n} HUF",
+        "moneda_menos": "-{n} HUF",
+        "decimales": 2
+      },
+      "ISK": {
+        "moneda": "{n} ISK",
+        "moneda_menos": "-{n} ISK",
+        "decimales": 0
+      },
+      "NOK": {
+        "moneda": "{n} NOK",
+        "moneda_menos": "-{n} NOK",
+        "decimales": 2
+      },
+      "PLN": {
+        "moneda": "{n} PLN",
+        "moneda_menos": "-{n} PLN",
+        "decimales": 2
+      },
+      "RON": {
+        "moneda": "{n} RON",
+        "moneda_menos": "-{n} RON",
+        "decimales": 2
+      },
+      "SEK": {
+        "moneda": "{n} SEK",
+        "moneda_menos": "-{n} SEK",
+        "decimales": 2
+      }
+    }
+  },
+  "lt": {
+    "grupo": " ",
+    "decimal": ",",
+    "menos": "−",
+    "min_grupo": 1,
+    "porcentaje": "{n} %",
+    "moneda": "{n} €",
+    "moneda_menos": "−{n} €",
+    "lista_par": " ir ",
+    "lista_entre": ", ",
+    "lista_final": " ir ",
+    "monedas": {
+      "BGN": {
+        "moneda": "{n} BGN",
+        "moneda_menos": "−{n} BGN",
+        "decimales": 2
+      },
+      "CHF": {
+        "moneda": "{n} CHF",
+        "moneda_menos": "−{n} CHF",
+        "decimales": 2
+      },
+      "CZK": {
+        "moneda": "{n} CZK",
+        "moneda_menos": "−{n} CZK",
+        "decimales": 2
+      },
+      "DKK": {
+        "moneda": "{n} DKK",
+        "moneda_menos": "−{n} DKK",
+        "decimales": 2
+      },
+      "HUF": {
+        "moneda": "{n} HUF",
+        "moneda_menos": "−{n} HUF",
+        "decimales": 2
+      },
+      "ISK": {
+        "moneda": "{n} ISK",
+        "moneda_menos": "−{n} ISK",
+        "decimales": 0
+      },
+      "NOK": {
+        "moneda": "{n} NOK",
+        "moneda_menos": "−{n} NOK",
+        "decimales": 2
+      },
+      "PLN": {
+        "moneda": "{n} PLN",
+        "moneda_menos": "−{n} PLN",
+        "decimales": 2
+      },
+      "RON": {
+        "moneda": "{n} RON",
+        "moneda_menos": "−{n} RON",
+        "decimales": 2
+      },
+      "SEK": {
+        "moneda": "{n} SEK",
+        "moneda_menos": "−{n} SEK",
+        "decimales": 2
+      }
+    }
+  },
+  "lv": {
+    "grupo": " ",
+    "decimal": ",",
+    "menos": "-",
+    "min_grupo": 2,
+    "porcentaje": "{n}%",
+    "moneda": "{n} €",
+    "moneda_menos": "-{n} €",
+    "lista_par": " un ",
+    "lista_entre": ", ",
+    "lista_final": " un ",
+    "monedas": {
+      "BGN": {
+        "moneda": "{n} BGN",
+        "moneda_menos": "-{n} BGN",
+        "decimales": 2
+      },
+      "CHF": {
+        "moneda": "{n} CHF",
+        "moneda_menos": "-{n} CHF",
+        "decimales": 2
+      },
+      "CZK": {
+        "moneda": "{n} CZK",
+        "moneda_menos": "-{n} CZK",
+        "decimales": 2
+      },
+      "DKK": {
+        "moneda": "{n} DKK",
+        "moneda_menos": "-{n} DKK",
+        "decimales": 2
+      },
+      "HUF": {
+        "moneda": "{n} HUF",
+        "moneda_menos": "-{n} HUF",
+        "decimales": 2
+      },
+      "ISK": {
+        "moneda": "{n} ISK",
+        "moneda_menos": "-{n} ISK",
+        "decimales": 0
+      },
+      "NOK": {
+        "moneda": "{n} NOK",
+        "moneda_menos": "-{n} NOK",
+        "decimales": 2
+      },
+      "PLN": {
+        "moneda": "{n} PLN",
+        "moneda_menos": "-{n} PLN",
+        "decimales": 2
+      },
+      "RON": {
+        "moneda": "{n} RON",
+        "moneda_menos": "-{n} RON",
+        "decimales": 2
+      },
+      "SEK": {
+        "moneda": "{n} SEK",
+        "moneda_menos": "-{n} SEK",
+        "decimales": 2
+      }
+    }
+  },
+  "mt": {
+    "grupo": ",",
+    "decimal": ".",
+    "menos": "-",
+    "min_grupo": 1,
+    "porcentaje": "{n}%",
+    "moneda": "€{n}",
+    "moneda_menos": "-€{n}",
+    "lista_par": " u ",
+    "lista_entre": ", ",
+    "lista_final": ", u ",
+    "monedas": {
+      "BGN": {
+        "moneda": "BGN {n}",
+        "moneda_menos": "-BGN {n}",
+        "decimales": 2
+      },
+      "CHF": {
+        "moneda": "CHF {n}",
+        "moneda_menos": "-CHF {n}",
+        "decimales": 2
+      },
+      "CZK": {
+        "moneda": "CZK {n}",
+        "moneda_menos": "-CZK {n}",
+        "decimales": 2
+      },
+      "DKK": {
+        "moneda": "DKK {n}",
+        "moneda_menos": "-DKK {n}",
+        "decimales": 2
+      },
+      "HUF": {
+        "moneda": "HUF {n}",
+        "moneda_menos": "-HUF {n}",
+        "decimales": 2
+      },
+      "ISK": {
+        "moneda": "ISK {n}",
+        "moneda_menos": "-ISK {n}",
+        "decimales": 0
+      },
+      "NOK": {
+        "moneda": "NOK {n}",
+        "moneda_menos": "-NOK {n}",
+        "decimales": 2
+      },
+      "PLN": {
+        "moneda": "PLN {n}",
+        "moneda_menos": "-PLN {n}",
+        "decimales": 2
+      },
+      "RON": {
+        "moneda": "RON {n}",
+        "moneda_menos": "-RON {n}",
+        "decimales": 2
+      },
+      "SEK": {
+        "moneda": "SEK {n}",
+        "moneda_menos": "-SEK {n}",
+        "decimales": 2
+      }
+    }
+  },
+  "nb": {
+    "grupo": " ",
+    "decimal": ",",
+    "menos": "−",
+    "min_grupo": 1,
+    "porcentaje": "{n} %",
+    "moneda": "{n} €",
+    "moneda_menos": "−{n} €",
+    "lista_par": " og ",
+    "lista_entre": ", ",
+    "lista_final": " og ",
+    "monedas": {
+      "BGN": {
+        "moneda": "{n} BGN",
+        "moneda_menos": "−{n} BGN",
+        "decimales": 2
+      },
+      "CHF": {
+        "moneda": "{n} CHF",
+        "moneda_menos": "−{n} CHF",
+        "decimales": 2
+      },
+      "CZK": {
+        "moneda": "{n} CZK",
+        "moneda_menos": "−{n} CZK",
+        "decimales": 2
+      },
+      "DKK": {
+        "moneda": "{n} DKK",
+        "moneda_menos": "−{n} DKK",
+        "decimales": 2
+      },
+      "HUF": {
+        "moneda": "{n} HUF",
+        "moneda_menos": "−{n} HUF",
+        "decimales": 2
+      },
+      "ISK": {
+        "moneda": "{n} ISK",
+        "moneda_menos": "−{n} ISK",
+        "decimales": 0
+      },
+      "NOK": {
+        "moneda": "{n} kr",
+        "moneda_menos": "−{n} kr",
+        "decimales": 2
+      },
+      "PLN": {
+        "moneda": "{n} PLN",
+        "moneda_menos": "−{n} PLN",
+        "decimales": 2
+      },
+      "RON": {
+        "moneda": "{n} RON",
+        "moneda_menos": "−{n} RON",
+        "decimales": 2
+      },
+      "SEK": {
+        "moneda": "{n} SEK",
+        "moneda_menos": "−{n} SEK",
+        "decimales": 2
+      }
+    }
+  },
+  "nl": {
+    "grupo": ".",
+    "decimal": ",",
+    "menos": "-",
+    "min_grupo": 1,
+    "porcentaje": "{n}%",
+    "moneda": "€ {n}",
+    "moneda_menos": "€ -{n}",
+    "lista_par": " en ",
+    "lista_entre": ", ",
+    "lista_final": " en ",
+    "monedas": {
+      "BGN": {
+        "moneda": "BGN {n}",
+        "moneda_menos": "BGN -{n}",
+        "decimales": 2
+      },
+      "CHF": {
+        "moneda": "CHF {n}",
+        "moneda_menos": "CHF -{n}",
+        "decimales": 2
+      },
+      "CZK": {
+        "moneda": "CZK {n}",
+        "moneda_menos": "CZK -{n}",
+        "decimales": 2
+      },
+      "DKK": {
+        "moneda": "DKK {n}",
+        "moneda_menos": "DKK -{n}",
+        "decimales": 2
+      },
+      "HUF": {
+        "moneda": "HUF {n}",
+        "moneda_menos": "HUF -{n}",
+        "decimales": 2
+      },
+      "ISK": {
+        "moneda": "ISK {n}",
+        "moneda_menos": "ISK -{n}",
+        "decimales": 0
+      },
+      "NOK": {
+        "moneda": "NOK {n}",
+        "moneda_menos": "NOK -{n}",
+        "decimales": 2
+      },
+      "PLN": {
+        "moneda": "PLN {n}",
+        "moneda_menos": "PLN -{n}",
+        "decimales": 2
+      },
+      "RON": {
+        "moneda": "RON {n}",
+        "moneda_menos": "RON -{n}",
+        "decimales": 2
+      },
+      "SEK": {
+        "moneda": "SEK {n}",
+        "moneda_menos": "SEK -{n}",
+        "decimales": 2
+      }
+    }
+  },
+  "pl": {
+    "grupo": " ",
+    "decimal": ",",
+    "menos": "-",
+    "min_grupo": 2,
+    "porcentaje": "{n}%",
+    "moneda": "{n} €",
+    "moneda_menos": "-{n} €",
+    "lista_par": " i ",
+    "lista_entre": ", ",
+    "lista_final": " i ",
+    "monedas": {
+      "BGN": {
+        "moneda": "{n} BGN",
+        "moneda_menos": "-{n} BGN",
+        "decimales": 2
+      },
+      "CHF": {
+        "moneda": "{n} CHF",
+        "moneda_menos": "-{n} CHF",
+        "decimales": 2
+      },
+      "CZK": {
+        "moneda": "{n} CZK",
+        "moneda_menos": "-{n} CZK",
+        "decimales": 2
+      },
+      "DKK": {
+        "moneda": "{n} DKK",
+        "moneda_menos": "-{n} DKK",
+        "decimales": 2
+      },
+      "HUF": {
+        "moneda": "{n} HUF",
+        "moneda_menos": "-{n} HUF",
+        "decimales": 2
+      },
+      "ISK": {
+        "moneda": "{n} ISK",
+        "moneda_menos": "-{n} ISK",
+        "decimales": 0
+      },
+      "NOK": {
+        "moneda": "{n} NOK",
+        "moneda_menos": "-{n} NOK",
+        "decimales": 2
+      },
+      "PLN": {
+        "moneda": "{n} zł",
+        "moneda_menos": "-{n} zł",
+        "decimales": 2
+      },
+      "RON": {
+        "moneda": "{n} RON",
+        "moneda_menos": "-{n} RON",
+        "decimales": 2
+      },
+      "SEK": {
+        "moneda": "{n} SEK",
+        "moneda_menos": "-{n} SEK",
+        "decimales": 2
+      }
+    }
+  },
+  "pt": {
+    "grupo": " ",
+    "decimal": ",",
+    "menos": "-",
+    "min_grupo": 2,
+    "porcentaje": "{n}%",
+    "moneda": "{n} €",
+    "moneda_menos": "-{n} €",
+    "lista_par": " e ",
+    "lista_entre": ", ",
+    "lista_final": " e ",
+    "monedas": {
+      "BGN": {
+        "moneda": "{n} BGN",
+        "moneda_menos": "-{n} BGN",
+        "decimales": 2
+      },
+      "CHF": {
+        "moneda": "{n} CHF",
+        "moneda_menos": "-{n} CHF",
+        "decimales": 2
+      },
+      "CZK": {
+        "moneda": "{n} CZK",
+        "moneda_menos": "-{n} CZK",
+        "decimales": 2
+      },
+      "DKK": {
+        "moneda": "{n} DKK",
+        "moneda_menos": "-{n} DKK",
+        "decimales": 2
+      },
+      "HUF": {
+        "moneda": "{n} HUF",
+        "moneda_menos": "-{n} HUF",
+        "decimales": 2
+      },
+      "ISK": {
+        "moneda": "{n} ISK",
+        "moneda_menos": "-{n} ISK",
+        "decimales": 0
+      },
+      "NOK": {
+        "moneda": "{n} NOK",
+        "moneda_menos": "-{n} NOK",
+        "decimales": 2
+      },
+      "PLN": {
+        "moneda": "{n} PLN",
+        "moneda_menos": "-{n} PLN",
+        "decimales": 2
+      },
+      "RON": {
+        "moneda": "{n} RON",
+        "moneda_menos": "-{n} RON",
+        "decimales": 2
+      },
+      "SEK": {
+        "moneda": "{n} SEK",
+        "moneda_menos": "-{n} SEK",
+        "decimales": 2
+      }
+    }
+  },
+  "ro": {
+    "grupo": ".",
+    "decimal": ",",
+    "menos": "-",
+    "min_grupo": 1,
+    "porcentaje": "{n} %",
+    "moneda": "{n} EUR",
+    "moneda_menos": "-{n} EUR",
+    "lista_par": " și ",
+    "lista_entre": ", ",
+    "lista_final": " și ",
+    "monedas": {
+      "BGN": {
+        "moneda": "{n} BGN",
+        "moneda_menos": "-{n} BGN",
+        "decimales": 2
+      },
+      "CHF": {
+        "moneda": "{n} CHF",
+        "moneda_menos": "-{n} CHF",
+        "decimales": 2
+      },
+      "CZK": {
+        "moneda": "{n} CZK",
+        "moneda_menos": "-{n} CZK",
+        "decimales": 2
+      },
+      "DKK": {
+        "moneda": "{n} DKK",
+        "moneda_menos": "-{n} DKK",
+        "decimales": 2
+      },
+      "HUF": {
+        "moneda": "{n} HUF",
+        "moneda_menos": "-{n} HUF",
+        "decimales": 2
+      },
+      "ISK": {
+        "moneda": "{n} ISK",
+        "moneda_menos": "-{n} ISK",
+        "decimales": 0
+      },
+      "NOK": {
+        "moneda": "{n} NOK",
+        "moneda_menos": "-{n} NOK",
+        "decimales": 2
+      },
+      "PLN": {
+        "moneda": "{n} PLN",
+        "moneda_menos": "-{n} PLN",
+        "decimales": 2
+      },
+      "RON": {
+        "moneda": "{n} RON",
+        "moneda_menos": "-{n} RON",
+        "decimales": 2
+      },
+      "SEK": {
+        "moneda": "{n} SEK",
+        "moneda_menos": "-{n} SEK",
+        "decimales": 2
+      }
+    }
+  },
+  "sk": {
+    "grupo": " ",
+    "decimal": ",",
+    "menos": "-",
+    "min_grupo": 1,
+    "porcentaje": "{n} %",
+    "moneda": "{n} €",
+    "moneda_menos": "-{n} €",
+    "lista_par": " a ",
+    "lista_entre": ", ",
+    "lista_final": " a ",
+    "monedas": {
+      "BGN": {
+        "moneda": "{n} BGN",
+        "moneda_menos": "-{n} BGN",
+        "decimales": 2
+      },
+      "CHF": {
+        "moneda": "{n} CHF",
+        "moneda_menos": "-{n} CHF",
+        "decimales": 2
+      },
+      "CZK": {
+        "moneda": "{n} CZK",
+        "moneda_menos": "-{n} CZK",
+        "decimales": 2
+      },
+      "DKK": {
+        "moneda": "{n} DKK",
+        "moneda_menos": "-{n} DKK",
+        "decimales": 2
+      },
+      "HUF": {
+        "moneda": "{n} HUF",
+        "moneda_menos": "-{n} HUF",
+        "decimales": 2
+      },
+      "ISK": {
+        "moneda": "{n} ISK",
+        "moneda_menos": "-{n} ISK",
+        "decimales": 0
+      },
+      "NOK": {
+        "moneda": "{n} NOK",
+        "moneda_menos": "-{n} NOK",
+        "decimales": 2
+      },
+      "PLN": {
+        "moneda": "{n} PLN",
+        "moneda_menos": "-{n} PLN",
+        "decimales": 2
+      },
+      "RON": {
+        "moneda": "{n} RON",
+        "moneda_menos": "-{n} RON",
+        "decimales": 2
+      },
+      "SEK": {
+        "moneda": "{n} SEK",
+        "moneda_menos": "-{n} SEK",
+        "decimales": 2
+      }
+    }
+  },
+  "sl": {
+    "grupo": ".",
+    "decimal": ",",
+    "menos": "−",
+    "min_grupo": 2,
+    "porcentaje": "{n} %",
+    "moneda": "{n} €",
+    "moneda_menos": "−{n} €",
+    "lista_par": " in ",
+    "lista_entre": ", ",
+    "lista_final": " in ",
+    "monedas": {
+      "BGN": {
+        "moneda": "{n} BGN",
+        "moneda_menos": "−{n} BGN",
+        "decimales": 2
+      },
+      "CHF": {
+        "moneda": "{n} CHF",
+        "moneda_menos": "−{n} CHF",
+        "decimales": 2
+      },
+      "CZK": {
+        "moneda": "{n} CZK",
+        "moneda_menos": "−{n} CZK",
+        "decimales": 2
+      },
+      "DKK": {
+        "moneda": "{n} DKK",
+        "moneda_menos": "−{n} DKK",
+        "decimales": 2
+      },
+      "HUF": {
+        "moneda": "{n} HUF",
+        "moneda_menos": "−{n} HUF",
+        "decimales": 2
+      },
+      "ISK": {
+        "moneda": "{n} ISK",
+        "moneda_menos": "−{n} ISK",
+        "decimales": 0
+      },
+      "NOK": {
+        "moneda": "{n} NOK",
+        "moneda_menos": "−{n} NOK",
+        "decimales": 2
+      },
+      "PLN": {
+        "moneda": "{n} PLN",
+        "moneda_menos": "−{n} PLN",
+        "decimales": 2
+      },
+      "RON": {
+        "moneda": "{n} RON",
+        "moneda_menos": "−{n} RON",
+        "decimales": 2
+      },
+      "SEK": {
+        "moneda": "{n} SEK",
+        "moneda_menos": "−{n} SEK",
+        "decimales": 2
+      }
+    }
+  },
+  "sv": {
+    "grupo": " ",
+    "decimal": ",",
+    "menos": "−",
+    "min_grupo": 1,
+    "porcentaje": "{n} %",
+    "moneda": "{n} €",
+    "moneda_menos": "−{n} €",
+    "lista_par": " och ",
+    "lista_entre": ", ",
+    "lista_final": " och ",
+    "monedas": {
+      "BGN": {
+        "moneda": "{n} BGN",
+        "moneda_menos": "−{n} BGN",
+        "decimales": 2
+      },
+      "CHF": {
+        "moneda": "{n} CHF",
+        "moneda_menos": "−{n} CHF",
+        "decimales": 2
+      },
+      "CZK": {
+        "moneda": "{n} CZK",
+        "moneda_menos": "−{n} CZK",
+        "decimales": 2
+      },
+      "DKK": {
+        "moneda": "{n} Dkr",
+        "moneda_menos": "−{n} Dkr",
+        "decimales": 2
+      },
+      "HUF": {
+        "moneda": "{n} HUF",
+        "moneda_menos": "−{n} HUF",
+        "decimales": 2
+      },
+      "ISK": {
+        "moneda": "{n} Ikr",
+        "moneda_menos": "−{n} Ikr",
+        "decimales": 0
+      },
+      "NOK": {
+        "moneda": "{n} Nkr",
+        "moneda_menos": "−{n} Nkr",
+        "decimales": 2
+      },
+      "PLN": {
+        "moneda": "{n} PLN",
+        "moneda_menos": "−{n} PLN",
+        "decimales": 2
+      },
+      "RON": {
+        "moneda": "{n} RON",
+        "moneda_menos": "−{n} RON",
+        "decimales": 2
+      },
+      "SEK": {
+        "moneda": "{n} kr",
+        "moneda_menos": "−{n} kr",
+        "decimales": 2
+      }
+    }
+  }
+}

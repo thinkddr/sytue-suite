@@ -1,0 +1,385 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: (c) 2026 Daniel Delgado Ramos
+ *
+ * Tokens locales del editor Sytue Docs (BLUEPRINT.md §8) + estilos de contenido
+ * de la página. Únicos hex nuevos permitidos: el cromo usa tokens --sytue-*.
+ */
+.sytue-editor {
+  /* Lienzo greige cálido (Graphite & Brass) sobre el que flota la página blanca. */
+  --editor-canvas-bg: #e9e6dd;
+  --editor-canvas-bg-sepia: #ece4d2; /* modo lectura sepia (Vista) */
+  --editor-page-bg: #ffffff; /* papel: blanco también en modo oscuro */
+  --editor-page-shadow: 0 1px 2px rgba(15, 23, 42, 0.1), 0 6px 20px rgba(15, 23, 42, 0.12);
+  --editor-ruler-margin: rgba(15, 23, 42, 0.08);
+  /* Tinta de la regla. Va aquí, fija, y no en tokens de TEMA: la regla se pinta sobre el
+     papel, que es blanco en los dos temas, así que en oscuro los rótulos salían a 3,05:1
+     y los marcadores a 2,42:1 sobre blanco. Con la tinta de marca: 8,0:1 y los ticks
+     (grafismo, 3:1) a 3,7:1. */
+  --editor-ruler-ink: rgba(40, 36, 30, 0.8);
+  --editor-ruler-ink-hover: rgb(40, 36, 30);
+  --editor-ruler-border: rgba(40, 36, 30, 0.16);
+
+  /* Cuadrícula de Sheets, por el MISMO motivo que la tinta de la regla de arriba y
+     con el mismo criterio: las celdas se pintan sobre --editor-page-bg, que es
+     blanco en los dos temas, pero la rejilla usaba `border-border` —un token de
+     TEMA que en oscuro se aclara para contrastar contra fondos oscuros—. El
+     resultado era una línea casi blanca sobre papel blanco: en modo noche la
+     cuadrícula desaparecía.
+     0.22 y no 0.16 como la regla: la regla es un adorno del margen y estas líneas
+     son la estructura que se lee para saber en qué celda se está. Sobre blanco
+     queda en ~#d2cfcc, la banda en la que Excel y Numbers pintan la suya. */
+  --editor-grid-line: rgba(40, 36, 30, 0.22);
+
+  /* Tinta de las REFERENCIAS de una fórmula (Sheets): cada referencia distinta lleva su
+     color, el mismo en el texto de la fórmula y en el marco que la señala en la rejilla.
+     Es feedback de UI, no color de contenido, y se pinta sobre DOS fondos opuestos —el
+     papel, blanco en los dos temas, y la barra fx, que es cromo y sí sigue el tema—, de
+     ahí los dos juegos. Seis familias de tono separadas, cada una con ≥5:1 sobre su
+     fondo. La paleta de avatares (lo obvio de reusar) no vale: dos de sus seis son el
+     mismo azul y, aclaradas para el tema oscuro, quedan indistinguibles. */
+  --editor-ref-1: #3171b9;
+  --editor-ref-2: #8c36c9;
+  --editor-ref-3: #c5347c;
+  --editor-ref-4: #9e602a;
+  --editor-ref-5: #227f22;
+  --editor-ref-6: #217a77;
+  --editor-ref-fx-1: var(--editor-ref-1);
+  --editor-ref-fx-2: var(--editor-ref-2);
+  --editor-ref-fx-3: var(--editor-ref-3);
+  --editor-ref-fx-4: var(--editor-ref-4);
+  --editor-ref-fx-5: var(--editor-ref-5);
+  --editor-ref-fx-6: var(--editor-ref-6);
+  --editor-page-break: rgba(15, 23, 42, 0.3); /* línea de salto de página sobre papel blanco */
+
+  /* Métricas del cromo (§6). */
+  --editor-header-h: 48px;
+  --editor-tabs-h: 32px;
+  --editor-groups-h: 68px;
+  --editor-status-h: 28px;
+  --editor-ruler-h: 20px;
+  --editor-rail-w: 40px;
+  --editor-panel-w: 288px;
+
+  /* Página A4 a zoom 100 (96 dpi). Los mismos números viven en
+     `canvas/metrics.ts`, que es de donde los lee el código: una hoja de estilos no
+     puede importar TypeScript, así que se cambian a la vez o no se cambian. */
+  --editor-page-w: 794px;
+  --editor-page-h: 1123px;
+  --editor-page-margin: 96px;
+}
+
+/* En oscuro solo cambia el juego de la barra fx: el papel sigue siendo blanco, así que las
+   referencias que se pintan SOBRE él conservan sus tonos oscuros. */
+[data-theme='dark'] .sytue-editor {
+  --editor-canvas-bg: #181a1c;
+  --editor-page-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 8px 24px rgba(0, 0, 0, 0.45);
+  --editor-ref-fx-1: #6693c5;
+  --editor-ref-fx-2: #ab7bcd;
+  --editor-ref-fx-3: #ca749f;
+  --editor-ref-fx-4: #bd8350;
+  --editor-ref-fx-5: #46b946;
+  --editor-ref-fx-6: #46b9b5;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) .sytue-editor {
+    --editor-ref-fx-1: #6693c5;
+    --editor-ref-fx-2: #ab7bcd;
+    --editor-ref-fx-3: #ca749f;
+    --editor-ref-fx-4: #bd8350;
+    --editor-ref-fx-5: #46b946;
+    --editor-ref-fx-6: #46b9b5;
+    --editor-canvas-bg: #181a1c;
+    --editor-page-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 8px 24px rgba(0, 0, 0, 0.45);
+  }
+}
+
+/* ---- La página (folio): tipografía de CONTENIDO sobre papel blanco. ---- */
+.sytue-page {
+  background: var(--editor-page-bg);
+  box-shadow: var(--editor-page-shadow);
+  color: #0a0a0a; /* texto de contenido: negro de marca, fijo (el papel es blanco siempre) */
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.5;
+  /* Tinta de las líneas de CONTENIDO (tablas, hr, blockquote): slate a baja
+     opacidad sobre el papel blanco — misma receta Compass que el cromo. */
+  --page-rule: rgba(15, 23, 42, 0.16);
+  /* Caret en el acento de suite: --sytue-primary es LATÓN (Graphite & Brass);
+     --sytue-accent (grafito) queda de reserva. */
+  caret-color: var(--sytue-primary, var(--sytue-accent));
+  outline: none; /* el caret es el indicador de foco del folio */
+  word-wrap: break-word;
+  /* Contexto de apilamiento propio: una imagen anclada «detrás del texto»
+     (z-index:-1) pinta sobre el fondo del folio pero bajo su contenido. Sin
+     esto, el z-index negativo escaparía al wrapper con transform y la imagen
+     quedaría bajo el papel blanco (invisible). */
+  isolation: isolate;
+}
+/* Selección de texto teñida con el acento vigente (latón). */
+.sytue-page ::selection {
+  background: color-mix(in srgb, var(--sytue-primary) 25%, transparent);
+}
+
+.sytue-page h1 {
+  font-size: 2em;
+  font-weight: 700;
+  margin: 0.67em 0 0.35em;
+}
+.sytue-page h2 {
+  font-size: 1.5em;
+  font-weight: 600;
+  margin: 0.83em 0 0.35em;
+}
+.sytue-page h3 {
+  font-size: 1.17em;
+  font-weight: 600;
+  margin: 1em 0 0.35em;
+}
+.sytue-page p {
+  margin: 0 0 0.5em;
+}
+.sytue-page blockquote {
+  margin: 0 0 0.5em;
+  padding: 2px 0 2px 12px;
+  border-left: 3px solid var(--page-rule); /* contenido, no cromo: misma tinta que hr/td */
+  color: #475569;
+  font-style: italic;
+}
+/* list-style: revert devuelve viñeta/número que el reset global (Preflight) anula. */
+.sytue-page ul,
+.sytue-page ol {
+  margin: 0 0 0.5em;
+  padding-left: 1.5em;
+  list-style: revert;
+}
+.sytue-page a {
+  /* Enlace sobre papel blanco: escalón 700 del latón (≈ 6.9:1 AA sobre blanco).
+     NO usar --sytue-primary-text: en dark vira a latón claro e invisibiliza el
+     enlace sobre el folio, que es blanco siempre. */
+  color: var(--sytue-primary-700);
+  text-decoration: underline;
+}
+.sytue-page hr {
+  border: none;
+  border-top: 1px solid var(--page-rule);
+  margin: 1em 0;
+}
+.sytue-page img {
+  max-width: 100%;
+  height: auto;
+}
+/* Imagen gestionada (manejo avanzado): objeto atómico (contenteditable=false)
+   seleccionable por clic; su tamaño, ajuste de texto, recorte (clip-path) y
+   anclaje viven en el `style` en línea —que ES el modelo y viaja al export—. */
+.sytue-page img[data-sytue-image] {
+  cursor: default;
+  user-select: none;
+}
+.sytue-page table {
+  border-collapse: collapse;
+  width: 100%;
+  table-layout: fixed;
+  margin: 0 0 0.5em;
+}
+.sytue-page td,
+.sytue-page th {
+  border: 1px solid var(--page-rule);
+  padding: 4px 8px;
+  vertical-align: top;
+}
+.sytue-page nav[data-toc] {
+  border: 1px dashed var(--page-rule);
+  padding: 8px 12px;
+  margin: 0 0 0.5em;
+}
+/* Comentario anclado: resaltado sutil en el acento del producto (mismo tinte que
+   caret/::selection). El <mark> vive en el HTML del folio y persiste con el autosave. */
+.sytue-page mark[data-comment-id] {
+  background: color-mix(in srgb, var(--sytue-primary) 16%, transparent);
+  color: inherit;
+  border-radius: 2px;
+  box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--sytue-primary) 55%, transparent);
+  cursor: pointer;
+}
+
+/* ---- Control de cambios: inserciones (<ins>) y borrados (<del>) con autoría. ----
+   Las marcas viven en el HTML del folio (data-track) y persisten con el autosave;
+   el color por autor va inline (--sytue-track = token de la paleta de marca que
+   hornea trackchanges.ts, el MISMO que el caret y el avatar de ese autor) para
+   distinguir autores sin registro externo. El folio es blanco siempre, así que
+   estos colores de contenido no dependen del tema; la paleta de marca está
+   calibrada a ≥ 6:1 contra blanco, así que el texto rastreado cumple AA. */
+.sytue-page ins[data-track],
+.sytue-page del[data-track] {
+  color: var(--sytue-track, var(--sytue-avatar-1));
+  text-decoration-color: var(--sytue-track, var(--sytue-avatar-1));
+}
+.sytue-page ins[data-track] {
+  text-decoration: underline;
+  background: color-mix(in srgb, var(--sytue-track, var(--sytue-avatar-1)) 10%, transparent);
+}
+.sytue-page del[data-track] {
+  text-decoration: line-through;
+  opacity: 0.75;
+}
+
+/* ---- Fondo de página: capas de marca de agua y borde (embebidas en el folio). ----
+   Las capas viven en el HTML del folio como <div> posicionados; TODO su aspecto va
+   en el `style` en línea que hornea pagedecor.ts. La marca de agua se pinta DETRÁS
+   del contenido (z-index:-1): para que asiente sobre el papel y no escape al wrapper
+   con transform —quedando bajo el folio blanco, invisible—, la página debe ser
+   contexto de apilamiento propio. Declaración idempotente: la comparte el manejo de
+   imágenes ancladas «detrás del texto», que la necesita por lo mismo. */
+.sytue-page {
+  isolation: isolate;
+}
+
+/* ---- Campos de formulario rellenables (fichas inline sobrias). ---- */
+/* El VALOR vive en el HTML del campo (texto = contenido; casilla = data-checked;
+   desplegable = data-value); el aspecto va aquí, keyed por atributos. */
+.sytue-page [data-formfield] {
+  display: inline-block;
+  min-width: 2.5em;
+  padding: 0 4px;
+  border: 1px solid var(--page-rule);
+  border-radius: 3px;
+  background: rgba(15, 23, 42, 0.03); /* fondo tenue: distingue del texto normal */
+  line-height: 1.35;
+  white-space: nowrap;
+}
+/* Texto vacío y desplegable sin elegir: marcador de posición tenue. Es texto real
+   (no decoración), así que cumple AA: #6e7379 da 4,7:1 sobre el folio blanco,
+   mientras el #94a3b8 anterior se quedaba en 2,56:1. */
+.sytue-page [data-formfield='text']:empty::before,
+.sytue-page [data-formfield='select'][data-value='']::before {
+  content: attr(data-placeholder);
+  color: #6e7379;
+}
+/* Desplegable elegido: muestra el valor + caret sobrio. */
+.sytue-page [data-formfield='select'][data-value]:not([data-value=''])::before {
+  content: attr(data-value);
+}
+.sytue-page [data-formfield='select']::after {
+  content: '▾';
+  margin-left: 6px;
+  color: #475569;
+}
+/* Casilla: caja cuadrada; la marca aparece con data-checked="1". */
+.sytue-page [data-formfield='checkbox'] {
+  min-width: 0;
+  width: 1.1em;
+  height: 1.1em;
+  padding: 0;
+  text-align: center;
+  vertical-align: -0.15em;
+}
+.sytue-page [data-formfield='checkbox'][data-checked='1']::before {
+  content: '✓';
+  color: var(--sytue-primary-700);
+  font-weight: 700;
+}
+/* Modo «Rellenar formulario»: los campos invitan a la acción (acento latón). */
+.sytue-page[data-form-fill] [data-formfield] {
+  background: color-mix(in srgb, var(--sytue-primary) 6%, transparent);
+  border-color: color-mix(in srgb, var(--sytue-primary) 35%, transparent);
+}
+.sytue-page[data-form-fill] [data-formfield='checkbox'],
+.sytue-page[data-form-fill] [data-formfield='select'] {
+  cursor: pointer;
+}
+.sytue-page[data-form-fill] [data-formfield]:focus-visible {
+  outline: none;
+  /* Un anillo de latón, como el resto de la suite: el token ya contrasta 3,87:1
+     sobre el papel blanco por su cuenta, así que el contorno neutro que había
+     aquí —y que sobre el folio se veía como un recuadro negro— sobra. */
+  box-shadow: 0 0 0 2px var(--sytue-focus-ring);
+}
+
+/* Etiqueta con el nombre de un cursor remoto: visible al moverse el peer y luego
+   se desvanece (la clave React de la etiqueta cambia con la posición, así que la
+   animación reinicia en cada movimiento). El caret/marco sigue visible aparte. */
+@keyframes sytue-peer-label-fade {
+  0%,
+  55% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+.sytue-peer-label {
+  animation: sytue-peer-label-fade 2.6s ease-out forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  /* Sin animación: la etiqueta queda fija (accesibilidad). */
+  .sytue-peer-label {
+    animation: none;
+    opacity: 1;
+  }
+}
+
+/* ---- En una pantalla estrecha la banda de la cinta es UNA fila de controles. ----
+   Sin los rótulos de grupo (ver `RibbonGroup`): 4 + 44 + 4 y su línea, 53 px. Es el alto
+   que conserva el hueco con la banda desplegada sobre el lienzo, igual que los 68 en
+   escritorio (6 + 44 + 2 + 11 + 4 y la línea), y el que mide la cinta nativa. */
+@media (width < 48rem) {
+  .sytue-editor {
+    --editor-groups-h: 53px;
+  }
+}
+
+/* ---- Con el dedo, las franjas de altura fija suben con sus variables. ----
+   El suelo de 44 px de los controles (`data-suelo-tactil` en la raíz del editor, de
+   @sytue/ui) los haría salirse de ellas: la tira de pestañas, la barra de estado y el
+   carril son de 32, 28 y 40 px. `pointer: coarse`, no el ancho de la ventana.
+
+   El carril lleva además SU FILETE (`border-r` o `border-l`, 1 px) y mide con él dentro: con
+   44 justos el botón de 44 no cabía en los 43 que quedaban y asomaba medio píxel por cada
+   lado. En el carril de la derecha ese medio píxel pasaba del borde de la ventana y
+   ensanchaba el documento («+2 px ← ?» en el barrido, sin culpable a la vista). */
+@media (pointer: coarse) {
+  .sytue-editor {
+    --editor-tabs-h: max(44px, 2.75rem);
+    --editor-status-h: max(44px, 2.75rem);
+    --editor-rail-w: calc(max(44px, 2.75rem) + 1px);
+  }
+}
+
+/* ---- Control de zoom de la barra de estado. ----
+   El deslizador nativo pintaba una pista gruesa y gris con el pulgar del sistema; aquí
+   queda una pista fina y un pulgar en el color de acción con un aro de superficie que lo
+   separa de la pista. Solo tokens: sigue el tema (tinta en claro, azul en oscuro). */
+.sytue-zoom {
+  appearance: none;
+  background: transparent;
+  height: 20px;
+}
+.sytue-zoom::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 9999px;
+  background: var(--sytue-border);
+}
+.sytue-zoom::-moz-range-track {
+  height: 4px;
+  border-radius: 9999px;
+  background: var(--sytue-border);
+}
+.sytue-zoom::-webkit-slider-thumb {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -5px;
+  border-radius: 9999px;
+  border: 2px solid var(--sytue-surface);
+  background: var(--sytue-primary);
+  box-shadow: 0 0 0 1px var(--sytue-primary);
+}
+.sytue-zoom::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  border-radius: 9999px;
+  border: 2px solid var(--sytue-surface);
+  background: var(--sytue-primary);
+  box-shadow: 0 0 0 1px var(--sytue-primary);
+}

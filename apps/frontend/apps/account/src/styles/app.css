@@ -1,0 +1,9 @@
+/**
+ * Mi cuenta — entrada de estilos: importa el design system (Tailwind v4 +
+ * tokens de marca Sytue). Sin tema propio. Lenguaje visual Sytue.
+ */
+@import '@sytue/ui/styles.css';
+
+/* Detectar clases usadas en las islas Preact y páginas de esta app. Lo que hay
+   dentro de @sytue/ui lo declara el propio paquete. */
+@source '../**/*.{astro,ts,tsx}';

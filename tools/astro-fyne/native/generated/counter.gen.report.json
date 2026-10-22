@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "generator": "astro-fyne",
+  "name": "Counter",
+  "sourceHash": "b9c1219bb79e78455335a472f8231a4ae556d7e528c5cab83e1050260f39b2b9",
+  "sources": [
+    {
+      "path": "example/src/components/Counter.tsx",
+      "hash": "7bb26d070f38750c36c859e709d7f98f2ba6fb2ecfa7ea475ddf5938b2ff7c3f"
+    },
+    {
+      "path": "example/src/pages/index.astro",
+      "hash": "e06e784cefa50ad1db6143ecf8a03500f2c4cd7a85e333a521d6a2c3037f66e2"
+    }
+  ],
+  "resources": [],
+  "actions": [],
+  "components": [
+    "Counter_fd415ca4",
+    "index_26df59de"
+  ],
+  "compatibility": "declarative-stage-1",
+  "visual": {
+    "measured": false,
+    "pixelPerfectVerified": false
+  }
+}

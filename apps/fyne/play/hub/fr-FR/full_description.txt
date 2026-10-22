@@ -1,0 +1,14 @@
+Votre page d’accueil de la suite : applications, accès rapides, activité récente et avis.
+
+• Un lanceur avec toutes vos applications et celles que votre organisation connecte.
+• Votre agenda du jour et le courrier non lu en page d’accueil, à côté des éléments récents de toute la suite et des notifications.
+• Connectez vos appareils et téléchargez les applications natives.
+• Un lanceur avec les applications de la suite et les applications tierces que votre organisation connecte.
+• Accès rapides : écrire un courriel, nouveau document, envoyer vers Drive, créer un événement.
+• Récents de toute la suite : vos dernières actions dans Drive, Docus, Mail ou Rooms.
+• Centre de notifications et présence partagés par toute la suite.
+• Connectez vos appareils : profil pour iPhone et Mac, Android et bureau, en deux étapes.
+• Téléchargement des applications natives de bureau et mobiles.
+• Un assistant de bienvenue qui prépare l’organisation sans manuel.
+
+Chiffrement en transit (TLS 1.3). L’infrastructure de Sytue se trouve dans l’UE. La localisation des services externes dépend de leur fournisseur.

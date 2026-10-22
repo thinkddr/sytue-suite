@@ -1,0 +1,20 @@
+Kanaler, beskeder og videoopkald for teamet samlet ét sted.
+
+• Kanaler pr. team eller projekt.
+• Et videoopkald indbygget i hver kanal.
+• Omtaler og notifikationer samlet på tværs af pakken.
+• Søgbar historik fra hvor som helst i Sytue One.
+• Offentlige og private kanaler i kategorier; direkte beskeder og grupper.
+• Tråde, reaktioner, omtaler, fastgjorte og gemte beskeder og kladder.
+• Formatering med en “Aa”-bjælke og genveje: fed, kursiv, kode, citater, lister og links.
+• Vedhæftede filer, billeder, GIF’er og egne emoji; filer fra Drive.
+• Planlagt afsendelse, prioritet, læsekvittering og “set af”.
+• Skråstregskommandoer og kort: afstemninger og opgaver, der kan tildeles.
+• Videoopkald i kanalen: kamera, skærm, rækken hånden op, chat og optagelse.
+• Planlagte møder og invitationslinks.
+• Bots, webhooks og integrationer med andre værktøjer.
+• Tilstedeværelse og brugerdefineret status; notifikationsindstillinger pr. kanal.
+• Søg i historikken, også fra hele pakken.
+• Realtid over WebSocket, med genforbindelse og uden tabte beskeder.
+
+Krypteret under overførsel (TLS 1.3). Sytues infrastruktur er i EU. Eksterne tjenesters placering afhænger af deres udbyder.

@@ -1,0 +1,73 @@
+{{- if .Values.ingress.enabled }}
+{{- $host := include "sytue-id.host" . }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "sytue-id.fullname" . }}
+  labels:
+    {{- include "sytue-id.labels" . | nindent 4 }}
+  annotations:
+    cert-manager.io/cluster-issuer: {{ include "sytue-id.clusterIssuer" . | quote }}
+    {{- with .Values.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  tls:
+    - hosts:
+        - {{ $host | quote }}
+      secretName: {{ .Values.ingress.tls.secretName }}
+  rules:
+    - host: {{ $host | quote }}
+      http:
+        paths:
+          {{- range .Values.ingress.paths }}
+          - path: {{ .path }}
+            pathType: {{ .pathType | default "Prefix" }}
+            backend:
+              service:
+                name: {{ include "sytue-id.fullname" $ }}
+                port:
+                  name: http
+          {{- end }}
+{{- end }}
+{{- if and .Values.ingress.enabled .Values.ingress.rutasDeCuenta }}
+{{- $host := include "sytue-id.host" . }}
+---
+{{/*
+  LAS RUTAS DE CUENTA DE GO, POR ENCIMA DE LA APP «MI CUENTA».
+
+  En `id.<dominio>` la app sirve `/account` (su Ingress, en sytue-frontend, lleva
+  prioridad 100 para ganarle al `/` de este servicio). Estas rutas exactas vuelven a
+  Go con 200. Sin cert-manager a propósito: el certificado lo emite y renueva el
+  Ingress de arriba, y dos objetos gestionando el mismo secreto gastan los límites
+  de ACME sin que nadie lo vea.
+*/}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "sytue-id.fullname" . }}-cuenta
+  labels:
+    {{- include "sytue-id.labels" . | nindent 4 }}
+  annotations:
+    traefik.ingress.kubernetes.io/router.priority: "200"
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  tls:
+    - hosts:
+        - {{ $host | quote }}
+      secretName: {{ .Values.ingress.tls.secretName }}
+  rules:
+    - host: {{ $host | quote }}
+      http:
+        paths:
+          {{- range .Values.ingress.rutasDeCuenta }}
+          - path: {{ . }}
+            pathType: Exact
+            backend:
+              service:
+                name: {{ include "sytue-id.fullname" $ }}
+                port:
+                  name: http
+          {{- end }}
+{{- end }}

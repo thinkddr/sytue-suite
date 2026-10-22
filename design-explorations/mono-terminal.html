@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sytue Rooms · Monochrome Terminal</title>
+<style>
+/* ============================================================
+   SYTUE · MONOCHROME TERMINAL — sistema de diseño
+   Bloomberg Terminal encuentra a Linear. Chasis uniformemente
+   oscuro en escala de grises NEUTRA muy afinada; la jerarquía
+   se construye con peso, espacio y hairlines — NO con color.
+   Un único acento de señal (verde) reservado a estado/actividad;
+   el rojo aparece SOLO como semántica de incumplimiento (dato),
+   nunca como decoración. Números tabulares y mono para todo dato.
+   Autocontenido: sin dependencias, sin CDNs, sin JS.
+   Grid 24 · stroke 1.60 · base 13.5px · filas 30–34px ·
+   contraste WCAG AA verificado en todo el texto.
+   ============================================================ */
+:root{
+  /* ---- Rampa neutra (void → superficies elevadas) ---- */
+  --void:#0B0C0E;        /* fondo base — el vacío del terminal        */
+  --surface:#101215;     /* panel: rail, canales, sala                */
+  --surface-2:#16181C;   /* elevado: hover, fila activa               */
+  --surface-3:#1D2025;   /* elevado alto: chips, press, badges        */
+  --line:#23262B;        /* hairline estructural                      */
+  --line-2:#2E323A;      /* borde de control / keyline                */
+  --line-3:#3A3F48;      /* borde de control enfatizado               */
+  /* ---- Texto sobre void/superficie (AA verificado) ---- */
+  --fg:#E6E8EB;          /* primario · 13.9:1                         */
+  --fg-2:#A2A7AE;        /* secundario · 7.8:1                        */
+  --fg-3:#7E838C;        /* meta / timestamps · 4.9:1                 */
+  --fg-4:#5C616A;        /* desactivado / marca de agua (no-texto)    */
+  /* ---- Señal (acento único · verde de instrumento) ---- */
+  --sig:#4EB87B;         /* señal · puntos, marcas, relleno de dato   */
+  --sig-bright:#6FCB90;  /* glifo/texto activo sobre oscuro · 9.9:1   */
+  --sig-wash:rgba(78,184,123,.11);
+  --sig-line:rgba(78,184,123,.44);
+  --sig-hair:rgba(78,184,123,.26);
+  /* ---- Semántica de dato (solo estado, nunca decoración) ---- */
+  --down:#E0736E;        /* incumplimiento / a la baja · 6.0:1        */
+  --down-wash:rgba(224,115,110,.10); --down-line:rgba(224,115,110,.40);
+  /* ---- Avatares monocromos (tono neutro, inicial mono) ---- */
+  --av-ink:#C4C9D0;
+  --av-a:#191C21; --av-b:#1E2228; --av-c:#23272E; --av-d:#14171B;
+  /* ---- Radios (contenidos, de instrumento) ---- */
+  --r-xs:3px; --r-sm:4px; --r-md:6px; --r-lg:8px; --r-pill:999px;
+  /* ---- Tipografía ---- */
+  --sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI","Inter",system-ui,"Helvetica Neue",Arial,sans-serif;
+  --mono:"SF Mono",ui-monospace,"JetBrains Mono","Roboto Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.2,.6,.2,1);
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{
+  background:var(--void); color:var(--fg);
+  font-family:var(--sans); font-size:13.5px; line-height:1.5;
+  -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+  font-feature-settings:"calt","ss01"; font-variant-ligatures:none;
+}
+::selection{background:var(--sig-wash)}
+a{color:inherit;text-decoration:none}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums;font-feature-settings:"tnum"}
+
+/* Scrollbars de instrumento — finos, neutros */
+*{scrollbar-width:thin;scrollbar-color:#2b2f36 transparent}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:#282c33;border-radius:8px;border:3px solid transparent;background-clip:content-box}
+::-webkit-scrollbar-thumb:hover{background:#343943;background-clip:content-box}
+
+/* Foco visible — anillo de señal, siempre */
+:focus-visible{outline:2px solid var(--sig);outline-offset:2px;border-radius:3px}
+.skip{position:absolute;left:-999px;top:8px;z-index:100;background:var(--surface-2);
+  color:var(--fg);padding:8px 14px;border-radius:var(--r-md);border:1px solid var(--line-2)}
+.skip:focus{left:12px}
+
+/* Iconografía: line-icons neutros, grid 24, stroke 1.60 */
+.ic{width:19px;height:19px;flex:0 0 auto;stroke:currentColor;fill:none;
+  stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;overflow:visible}
+.ic--22{width:22px;height:22px} .ic--18{width:18px;height:18px}
+.ic--16{width:16px;height:16px} .ic--13{width:13px;height:13px} .ic--12{width:12px;height:12px}
+.sprite{position:absolute;width:0;height:0;overflow:hidden}
+
+/* Micro-etiqueta uppercase — firma tipográfica del terminal */
+.eyerow{font-size:10px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:var(--fg-3)}
+
+/* ====== APP SHELL: rail | canales | sala ====== */
+.app{height:100vh;display:grid;grid-template-columns:60px 288px minmax(0,1fr);overflow:hidden}
+
+/* ---- Rail de módulos (60px) ---- */
+.rail{background:var(--surface);border-right:1px solid var(--line);
+  display:flex;flex-direction:column;align-items:center;padding:11px 0 12px;gap:3px}
+.brand{width:36px;height:36px;border-radius:var(--r-md);background:var(--surface-3);
+  display:grid;place-items:center;box-shadow:inset 0 0 0 1px var(--line-3);margin-bottom:12px}
+.brand svg{width:20px;height:20px;stroke:var(--sig-bright);fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.rail-nav{display:flex;flex-direction:column;gap:2px;width:100%;align-items:center}
+.mod{position:relative;width:48px;height:46px;border-radius:var(--r-md);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+  color:var(--fg-3);transition:color .12s var(--ease),background .12s var(--ease)}
+.mod span{font-size:9px;font-weight:700;letter-spacing:.03em;line-height:1;text-transform:uppercase}
+.mod:hover{color:var(--fg-2);background:var(--surface-2)}
+.mod[aria-current]{color:var(--fg);background:var(--surface-2)}
+.mod[aria-current]::before{content:"";position:absolute;left:-11px;top:50%;transform:translateY(-50%);
+  width:2px;height:22px;border-radius:0 2px 2px 0;background:var(--sig)}
+.mod .dot-n{position:absolute;top:7px;right:11px;width:5px;height:5px;border-radius:50%;
+  background:var(--sig);box-shadow:0 0 0 2px var(--surface)}
+.rail-foot{margin-top:auto;display:flex;flex-direction:column;align-items:center;gap:10px}
+.rail-foot .icbtn{color:var(--fg-3)}
+
+/* ---- Panel de canales (288px) ---- */
+.channels{background:var(--surface);border-right:1px solid var(--line);
+  display:grid;grid-template-rows:auto auto 1fr;min-height:0;color:var(--fg-2)}
+.ws{height:48px;display:flex;align-items:center;gap:8px;padding:0 8px 0 15px;border-bottom:1px solid var(--line)}
+.ws-name{font-size:14px;font-weight:650;letter-spacing:-.01em;color:var(--fg);display:flex;align-items:center;gap:6px}
+.ws-name .ic{color:var(--fg-3);width:14px;height:14px}
+.ws-sub{font-size:10.5px;color:var(--fg-3);margin-top:1px;letter-spacing:.02em}
+.ws .spacer{flex:1}
+.icbtn{width:29px;height:29px;border-radius:var(--r-md);display:grid;place-items:center;
+  color:var(--fg-2);transition:background .12s var(--ease),color .12s var(--ease)}
+.icbtn:hover{background:var(--surface-2);color:var(--fg)}
+
+.search-wrap{padding:9px 10px;border-bottom:1px solid var(--line)}
+.search{height:32px;display:flex;align-items:center;gap:8px;padding:0 7px 0 9px;
+  background:var(--void);border:1px solid var(--line-2);border-radius:var(--r-md);
+  color:var(--fg-3);transition:border-color .12s var(--ease)}
+.search:focus-within{border-color:var(--sig-line)}
+.search .ic{width:15px;height:15px}
+.search input{flex:1;background:none;border:0;outline:none;color:var(--fg);font-size:12.5px}
+.search input::placeholder{color:var(--fg-3)}
+.kbd{font-family:var(--mono);font-size:10.5px;color:var(--fg-3);border:1px solid var(--line-2);
+  border-radius:4px;padding:1px 5px;letter-spacing:.02em}
+
+.ch-scroll{overflow-y:auto;padding:6px 8px 20px}
+.grp{margin-top:13px}.grp:first-child{margin-top:5px}
+.grp-h{display:flex;align-items:center;gap:6px;height:24px;padding:0 6px 0 8px;color:var(--fg-3);user-select:none}
+.grp-h .ic{width:11px;height:11px}
+.grp-h b{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
+.grp-h .spacer{flex:1}
+.grp-h .count{font-family:var(--mono);font-size:10px;color:var(--fg-4);font-variant-numeric:tabular-nums}
+.grp-h .add{opacity:0;transition:opacity .12s var(--ease);width:21px;height:21px;color:var(--fg-3)}
+.grp:hover .grp-h .add{opacity:1}.grp-h .add:hover{color:var(--fg);background:var(--surface-2)}
+
+.ci{position:relative;display:flex;align-items:center;gap:8px;height:30px;padding:0 7px 0 9px;
+  border-radius:var(--r-sm);color:var(--fg-2);transition:background .1s var(--ease),color .1s var(--ease);margin-top:1px}
+.ci:hover{background:var(--surface-2);color:var(--fg)}
+.ci .gl{width:15px;height:15px;color:var(--fg-3);flex:0 0 auto}
+.ci .nm{flex:1;font-size:13px;font-weight:450;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.005em}
+.ci .badge{font-family:var(--mono);font-size:10.5px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1;
+  min-width:17px;height:17px;padding:0 5px;border-radius:var(--r-xs);display:inline-flex;align-items:center;justify-content:center;
+  background:var(--surface-3);color:var(--fg-2)}
+.ci .badge.mention{background:transparent;color:var(--sig-bright);box-shadow:inset 0 0 0 1px var(--sig-line)}
+.ci.unread .nm{color:var(--fg);font-weight:600}
+.ci.unread .gl{color:var(--fg-2)}
+.ci.unread::after{content:"";position:absolute;left:2px;top:50%;transform:translateY(-50%);width:4px;height:4px;border-radius:50%;background:var(--sig)}
+.ci.muted{color:var(--fg-4)}.ci.muted .gl{opacity:.55}
+.ci.active{background:var(--surface-2)}
+.ci.active .nm{color:var(--fg);font-weight:650}
+.ci.active .gl{color:var(--sig-bright)}
+.ci.active::before{content:"";position:absolute;left:-8px;top:50%;transform:translateY(-50%);width:2px;height:18px;border-radius:0 2px 2px 0;background:var(--sig)}
+
+/* Avatar monocromo + presencia */
+.av{border-radius:var(--r-xs);display:grid;place-items:center;color:var(--av-ink);font-family:var(--mono);
+  font-weight:600;letter-spacing:.01em;flex:0 0 auto;user-select:none;box-shadow:inset 0 0 0 1px var(--line-2)}
+.av-20{width:20px;height:20px;font-size:8.5px} .av-22{width:22px;height:22px;font-size:9px}
+.av-26{width:26px;height:26px;font-size:10px} .av-36{width:36px;height:36px;font-size:12.5px}
+.av--a{background:var(--av-a)} .av--b{background:var(--av-b)} .av--c{background:var(--av-c)} .av--d{background:var(--av-d)}
+.pw{position:relative;flex:0 0 auto}
+.pw .dot{position:absolute;right:-2px;bottom:-2px;width:9px;height:9px;border-radius:50%;box-shadow:0 0 0 2px var(--surface)}
+.pw.on-void .dot{box-shadow:0 0 0 2px var(--void)}
+.dot.online{background:var(--sig)} .dot.away{background:var(--fg-3)}
+.dot.offline{background:transparent;box-shadow:0 0 0 2px var(--surface),inset 0 0 0 1.4px var(--fg-4)}
+
+/* ---- Sala (main) ---- */
+.room{display:grid;grid-template-rows:auto auto 1fr auto;min-height:0;background:var(--void)}
+
+/* Cabecera */
+.room-head{height:48px;display:flex;align-items:center;gap:11px;padding:0 10px 0 17px;
+  border-bottom:1px solid var(--line);background:var(--surface)}
+.rh-title{display:flex;align-items:center;gap:7px;min-width:0}
+.rh-title .hash{color:var(--fg-3);width:16px;height:16px}
+.rh-title h1{font-size:14px;font-weight:650;letter-spacing:-.01em;margin:0;white-space:nowrap;color:var(--fg)}
+.rh-topic{color:var(--fg-3);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  border-left:1px solid var(--line-2);padding-left:11px;margin-left:1px;min-width:0}
+.rh-sp{flex:1}
+.rh-actions{display:flex;align-items:center;gap:1px}
+.chip{display:inline-flex;align-items:center;gap:6px;height:29px;padding:0 9px;border-radius:var(--r-md);
+  color:var(--fg-2);font-size:12px;font-weight:500;transition:background .12s var(--ease),color .12s var(--ease)}
+.chip:hover{background:var(--surface-2);color:var(--fg)}
+.chip .ic{width:15px;height:15px}
+.chip.star-on{color:var(--sig-bright)}
+.chip b{font-family:var(--mono);font-variant-numeric:tabular-nums;font-weight:600}
+.face-stack{display:flex}
+.face-stack .av{box-shadow:0 0 0 2px var(--surface),inset 0 0 0 1px var(--line-2)}
+.face-stack .av:not(:first-child){margin-left:-6px}
+
+/* Cinta de estado — firma tipo Bloomberg (mono tabular) */
+.tape{height:30px;display:flex;align-items:stretch;background:var(--surface);border-bottom:1px solid var(--line);
+  font-family:var(--mono);font-size:11px;font-variant-numeric:tabular-nums;color:var(--fg-3);overflow:hidden}
+.tape .live{display:inline-flex;align-items:center;gap:7px;padding:0 13px 0 15px;color:var(--sig-bright);font-weight:600;
+  letter-spacing:.04em;border-right:1px solid var(--line)}
+.tape .live .bt{width:6px;height:6px;border-radius:50%;background:var(--sig);box-shadow:0 0 0 3px var(--sig-wash)}
+.tape .cell{display:inline-flex;align-items:center;gap:7px;padding:0 14px;border-right:1px solid var(--line);white-space:nowrap}
+.tape .cell .k{color:var(--fg-4);letter-spacing:.06em}
+.tape .cell .v{color:var(--fg-2)}
+.tape .cell .v.up{color:var(--sig-bright)} .tape .cell .v.dn{color:var(--down)}
+.tape .rt{margin-left:auto;padding:0 15px;display:inline-flex;align-items:center;color:var(--fg-4);border-left:1px solid var(--line);border-right:0}
+
+/* Timeline */
+.stream{overflow-y:auto;padding:6px 0 14px}
+.daysep{display:flex;align-items:center;margin:12px 18px 6px;color:var(--fg-3)}
+.daysep::before,.daysep::after{content:"";height:1px;background:var(--line);flex:1}
+.daysep b{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;padding:0 11px}
+.sys{display:flex;align-items:center;gap:8px;justify-content:center;color:var(--fg-3);font-size:11.5px;margin:7px 18px}
+.sys .ic{width:13px;height:13px;color:var(--sig);opacity:.9}
+.sys time{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.newsep{display:flex;align-items:center;gap:10px;margin:12px 18px 4px;color:var(--sig-bright)}
+.newsep::before{content:"";height:1px;background:var(--sig-line);flex:1}
+.newsep b{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.11em;text-transform:uppercase}
+
+.msg{position:relative;padding:4px 64px 4px 64px}
+.msg:hover{background:var(--surface)}
+.msg .pw{position:absolute;left:17px;top:6px}
+.msg .whom{display:flex;align-items:baseline;gap:8px;margin-bottom:1px}
+.msg .whom .who{font-size:13.5px;font-weight:650;letter-spacing:-.005em;color:var(--fg)}
+.msg .whom .role{font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+  color:var(--fg-3);border:1px solid var(--line-2);border-radius:var(--r-xs);padding:0 5px;line-height:14px}
+.msg .whom .role.you{color:var(--sig-bright);border-color:var(--sig-line)}
+.msg .whom time{font-family:var(--mono);font-size:11px;color:var(--fg-3);font-variant-numeric:tabular-nums}
+.msg .body{font-size:13.5px;line-height:1.55;color:var(--fg);max-width:min(740px,100%)}
+.msg .body p{margin:0}
+.msg .edited{color:var(--fg-3);font-size:11px}
+.msg.group{padding-top:2px;padding-bottom:2px}
+.msg.group .gtime{position:absolute;left:14px;top:5px;width:46px;text-align:right;font-family:var(--mono);
+  font-size:10px;color:var(--fg-3);font-variant-numeric:tabular-nums;opacity:0;transition:opacity .1s}
+.msg.group:hover .gtime{opacity:1}
+
+.mention{color:var(--sig-bright);font-weight:550;white-space:nowrap}
+.mention.me{background:var(--sig-wash);border:1px solid var(--sig-line);border-radius:var(--r-xs);padding:0 4px}
+.mention.here{color:var(--sig-bright);background:var(--sig-wash);border:1px solid var(--sig-line);border-radius:var(--r-xs);padding:0 4px}
+.tdn{color:var(--down);font-weight:550}
+code.inl{font-family:var(--mono);font-size:12px;background:var(--surface-2);border:1px solid var(--line-2);
+  border-radius:var(--r-xs);padding:1px 5px;color:var(--fg-2);font-variant-numeric:tabular-nums}
+
+/* Reacciones (glifos SVG, nunca emoji) */
+.reacts{display:flex;gap:6px;margin-top:7px;flex-wrap:wrap}
+.react{display:inline-flex;align-items:center;gap:6px;height:23px;padding:0 8px;border-radius:var(--r-md);
+  border:1px solid var(--line-2);background:var(--surface);color:var(--fg-2);font-family:var(--mono);font-size:11.5px;font-weight:600;
+  font-variant-numeric:tabular-nums;transition:border-color .12s var(--ease),background .12s var(--ease)}
+.react:hover{border-color:var(--line-3);background:var(--surface-2)}
+.react .ic{width:13px;height:13px}
+.react.me{border-color:var(--sig-line);background:var(--sig-wash);color:var(--sig-bright)}
+.react.add{color:var(--fg-3);padding:0 7px}
+
+/* Hilo */
+.thread{display:inline-flex;align-items:center;gap:9px;margin-top:7px;height:29px;padding:0 11px 0 6px;
+  border-radius:var(--r-md);border:1px solid var(--line-2);background:var(--surface);
+  transition:border-color .12s var(--ease),background .12s var(--ease);cursor:pointer}
+.thread:hover{border-color:var(--sig-line);background:var(--surface-2)}
+.thread .n{color:var(--sig-bright);font-size:12px;font-weight:600}
+.thread .last{color:var(--fg-3);font-size:11px;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.thread .go{color:var(--fg-3);display:flex}.thread:hover .go{color:var(--sig-bright)}
+
+/* Tarjeta de adjunto */
+.file{display:flex;align-items:center;gap:12px;margin-top:9px;max-width:440px;padding:10px 12px;
+  border:1px solid var(--line-2);border-radius:var(--r-lg);background:var(--surface)}
+.file .thumb{width:36px;height:36px;border-radius:var(--r-md);display:grid;place-items:center;flex:0 0 auto;
+  background:var(--surface-2);color:var(--sig-bright);box-shadow:inset 0 0 0 1px var(--line-2)}
+.file .meta{min-width:0;flex:1}
+.file .fn{font-size:13px;font-weight:600;color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.file .sub{font-family:var(--mono);font-size:10.5px;color:var(--fg-3);font-variant-numeric:tabular-nums;margin-top:2px}
+.file .dl{color:var(--fg-3)}.file .dl:hover{color:var(--fg);background:var(--surface-2)}
+
+/* Enlace enriquecido */
+.link{display:flex;margin-top:9px;max-width:520px;border:1px solid var(--line-2);border-radius:var(--r-lg);
+  background:var(--surface);overflow:hidden}
+.link .bar{width:2px;background:var(--sig);flex:0 0 auto}
+.link .lc{padding:11px 13px;min-width:0;flex:1}
+.link .src{display:flex;align-items:center;gap:7px;color:var(--fg-3);font-family:var(--mono);font-size:11px;margin-bottom:5px}
+.link .src .g{width:16px;height:16px;border-radius:var(--r-xs);background:var(--surface-2);color:var(--sig-bright);
+  display:grid;place-items:center;box-shadow:inset 0 0 0 1px var(--line-2)}
+.link .src .g .ic{width:11px;height:11px}
+.link .lt{font-size:13.5px;font-weight:650;color:var(--fg);letter-spacing:-.005em}
+.link .ld{font-size:12px;color:var(--fg-2);line-height:1.5;margin-top:4px;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.link .lp{width:116px;flex:0 0 auto;border-left:1px solid var(--line);background:var(--void);display:grid;place-items:center;padding:9px}
+.spark{width:90px;height:42px;overflow:visible}
+.spark path.area{fill:var(--sig-wash);stroke:none}
+.spark path.line{fill:none;stroke:var(--sig);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.spark circle{fill:var(--sig-bright)}
+
+/* Barra de acciones al hover */
+.tools{position:absolute;top:-13px;right:18px;display:flex;gap:1px;padding:2px;background:var(--surface-2);
+  border:1px solid var(--line-2);border-radius:var(--r-md);opacity:0;transform:translateY(2px);
+  transition:opacity .12s var(--ease),transform .12s var(--ease)}
+.msg:hover .tools,.msg.hovered .tools{opacity:1;transform:none}
+.tools button{width:27px;height:27px;border-radius:var(--r-xs);display:grid;place-items:center;color:var(--fg-2)}
+.tools button:hover{background:var(--surface-3);color:var(--fg)}
+.tools button.acc:hover{color:var(--sig-bright)}
+.tools .ic{width:15px;height:15px}
+.tools .sep{width:1px;background:var(--line-2);margin:4px 2px}
+
+/* ---- Composer ---- */
+.composer{padding:0 18px 14px;background:var(--void)}
+.cbox{border:1px solid var(--line-2);border-radius:var(--r-lg);background:var(--surface);overflow:hidden;
+  transition:border-color .12s var(--ease),box-shadow .12s var(--ease)}
+.cbox:focus-within{border-color:var(--sig-line);box-shadow:0 0 0 3px var(--sig-wash)}
+.cformat{display:flex;align-items:center;gap:1px;padding:5px 7px;border-bottom:1px solid var(--line)}
+.cformat button{width:27px;height:27px;border-radius:var(--r-xs);display:grid;place-items:center;color:var(--fg-3)}
+.cformat button:hover{background:var(--surface-2);color:var(--fg)}
+.cformat .sep{width:1px;height:16px;background:var(--line-2);margin:0 5px}
+.cfield{padding:11px 13px;color:var(--fg-3);font-size:13.5px;min-height:21px}
+.cfoot{display:flex;align-items:center;gap:2px;padding:5px 7px 7px}
+.cfoot .lead{display:flex;gap:1px}
+.cfoot button.tool{width:29px;height:29px;border-radius:var(--r-xs);display:grid;place-items:center;color:var(--fg-3)}
+.cfoot button.tool:hover{background:var(--surface-2);color:var(--fg)}
+.cfoot .sp{flex:1}
+.send{display:inline-flex;align-items:center;gap:8px;height:31px;padding:0 11px 0 13px;border-radius:var(--r-md);
+  background:var(--surface-3);color:var(--fg);font-size:12.5px;font-weight:600;
+  box-shadow:inset 0 0 0 1px var(--sig-line);transition:background .12s var(--ease)}
+.send:hover{background:#22262d}
+.send .ic{width:15px;height:15px;color:var(--sig-bright)}
+.chint{display:flex;align-items:center;gap:14px;margin-top:8px;padding:0 2px;color:var(--fg-3);font-size:11px}
+.chint b{font-family:var(--mono);font-weight:500;color:var(--fg-2)}
+
+/* ====== Mini style-guide ====== */
+.sg{border-top:1px solid var(--line);background:var(--surface);padding:22px 24px 32px}
+.sg-top{display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap}
+.sg-top .mark{width:24px;height:24px;border-radius:var(--r-sm);background:var(--surface-3);display:grid;place-items:center;box-shadow:inset 0 0 0 1px var(--line-3)}
+.sg-top .mark svg{width:14px;height:14px;stroke:var(--sig-bright);fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.sg-top h2{margin:0;font-family:var(--mono);font-size:16px;font-weight:600;letter-spacing:.02em;color:var(--fg)}
+.sg-top h2 .sl{color:var(--sig-bright)}
+.sg-top span{font-size:11.5px;color:var(--fg-3)}
+.sg-grid{display:grid;grid-template-columns:1.55fr 1fr;gap:34px}
+@media(max-width:920px){.sg-grid{grid-template-columns:1fr}}
+.sg-lab{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--fg-3);margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.sg-lab::after{content:"";height:1px;flex:1;background:var(--line)}
+.sw-block{margin-bottom:15px}
+.sw-cap{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--fg-3);margin-bottom:9px}
+.sw-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:9px}
+.sw{border:1px solid var(--line);border-radius:var(--r-sm);overflow:hidden;background:var(--void)}
+.sw .chip-c{height:38px;border-bottom:1px solid var(--line)}
+.sw .info{padding:6px 8px}
+.sw .role{font-size:10.5px;font-weight:600;color:var(--fg);line-height:1.3}
+.sw .hex{font-family:var(--mono);font-size:10px;color:var(--fg-3);letter-spacing:.02em;text-transform:uppercase;margin-top:2px}
+.type-row{display:flex;flex-direction:column;gap:14px}
+.type-row .tl{color:var(--fg-3);font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px}
+.t-display{font-family:var(--mono);font-size:25px;font-weight:600;letter-spacing:.01em;color:var(--fg)}
+.t-display .sl{color:var(--sig-bright)}
+.t-weights{font-size:15px;color:var(--fg)}
+.t-weights .w4{font-weight:400;color:var(--fg-2)} .t-weights .w5{font-weight:500} .t-weights .w6{font-weight:650} .t-weights .w7{font-weight:750}
+.t-over{font-size:10.5px;font-weight:700;letter-spacing:.11em;text-transform:uppercase;color:var(--fg-3)}
+.t-body{font-size:13.5px;line-height:1.55;color:var(--fg-2);max-width:54ch}
+.t-mono{font-family:var(--mono);font-size:12.5px;color:var(--fg-2);font-variant-numeric:tabular-nums}
+.t-mono .up{color:var(--sig-bright)} .t-mono .dn{color:var(--down)}
+.sg-foot{margin-top:22px;padding-top:14px;border-top:1px solid var(--line);display:flex;gap:10px;align-items:flex-start;
+  color:var(--fg-3);font-size:11px;line-height:1.55;flex-wrap:wrap}
+.sg-foot .tt{display:inline-flex;flex:0 0 auto;width:26px;height:16px;border-radius:4px;overflow:hidden;border:1px solid var(--line-2);margin-top:1px}
+.sg-foot .tt i{display:block;height:100%}
+.sg-foot .tt i.a{width:82%;background:var(--surface-2)} .sg-foot .tt i.b{width:18%;background:var(--sig)}
+.sg-foot strong{color:var(--fg-2);font-weight:600}
+</style>
+</head>
+<body>
+<a class="skip" href="#stream">Saltar al contenido</a>
+
+<!-- ============ SPRITE DE ICONOS (line, grid 24, stroke 1.60) ============ -->
+<svg class="sprite" aria-hidden="true" focusable="false"><defs>
+<symbol id="i-rooms" viewBox="0 0 24 24"><path d="M5 5.5h14a1.5 1.5 0 0 1 1.5 1.5v7a1.5 1.5 0 0 1-1.5 1.5H10l-4 3v-3H5A1.5 1.5 0 0 1 3.5 14V7A1.5 1.5 0 0 1 5 5.5Z"/></symbol>
+<symbol id="i-docs" viewBox="0 0 24 24"><path d="M6.5 4.5h6l4 4v10a1.5 1.5 0 0 1-1.5 1.5h-8.5a1.5 1.5 0 0 1-1.5-1.5v-12.5a1.5 1.5 0 0 1 1.5-1.5Z"/><path d="M12.5 4.5v3.5a.5.5 0 0 0 .5.5h3.5"/><path d="M9 12.5h6M9 15.5h4.5"/></symbol>
+<symbol id="i-sheets" viewBox="0 0 24 24"><path d="M5.5 5.5h13a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1h-13a1 1 0 0 1-1-1v-11a1 1 0 0 1 1-1Z"/><path d="M4.5 10h15M4.5 14.5h15M9.5 5.5v13"/></symbol>
+<symbol id="i-slides" viewBox="0 0 24 24"><path d="M4.5 6h15a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1Z"/><path d="M12 17.5v2.5M9 20h6"/><path d="M8.5 14v-2.3M12 14v-4.4M15.5 14v-3.2"/></symbol>
+<symbol id="i-meet" viewBox="0 0 24 24"><path d="M4.5 8.5A1.5 1.5 0 0 1 6 7h7.5A1.5 1.5 0 0 1 15 8.5v7A1.5 1.5 0 0 1 13.5 17H6a1.5 1.5 0 0 1-1.5-1.5Z"/><path d="M15 11l3.7-2.3a.6.6 0 0 1 .9.5v5.6a.6.6 0 0 1-.9.5L15 13Z"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><path d="M11 4.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13Z"/><path d="M15.8 15.8 20 20"/></symbol>
+<symbol id="i-hash" viewBox="0 0 24 24"><path d="M8.5 4 7 20M17 4l-1.5 16M4.5 9h14M3.8 15h14"/></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24"><path d="M6.5 10.5h11a1 1 0 0 1 1 1v6.5a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1v-6.5a1 1 0 0 1 1-1Z"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5M12 14v2.3"/></symbol>
+<symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 16.5h12c-1-1-1.5-2.2-1.5-4.5V11a4.5 4.5 0 0 0-9 0v1c0 2.3-.5 3.5-1.5 4.5Z"/><path d="M10.3 19a1.8 1.8 0 0 0 3.4 0"/></symbol>
+<symbol id="i-pin" viewBox="0 0 24 24"><path d="M9 4.5h6M10 4.5l.7 6.5-2.7 2.5v1.5h8v-1.5l-2.7-2.5.7-6.5M12 15v4.5"/></symbol>
+<symbol id="i-people" viewBox="0 0 24 24"><path d="M8.5 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM3.8 18.5a5 5 0 0 1 9.4 0"/><path d="M15 5.4a3 3 0 0 1 0 5.2M15.6 14a5 5 0 0 1 4.6 4.5"/></symbol>
+<symbol id="i-kebab" viewBox="0 0 24 24"><circle cx="12" cy="5.5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="18.5" r="1.5"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="i-pencil" viewBox="0 0 24 24"><path d="M15.5 5.5l3 3M5 19l1-4L16 5l3 3L9 18Z"/></symbol>
+<symbol id="i-clip" viewBox="0 0 24 24"><path d="M18 9.6l-7.6 7.6a3.3 3.3 0 0 1-4.7-4.7l7.9-7.9a2.2 2.2 0 0 1 3.1 3.1l-7.9 7.9a1.1 1.1 0 0 1-1.6-1.6l7.1-7.1"/></symbol>
+<symbol id="i-at" viewBox="0 0 24 24"><path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Z"/><path d="M15.5 12v1.75a2 2 0 0 0 4 0V12a7.5 7.5 0 1 0-2.9 5.9"/></symbol>
+<symbol id="i-bold" viewBox="0 0 24 24"><path d="M8.5 5.5v13M8.5 5.5h4.2a3 3 0 0 1 0 6h-4.2M8.5 11.5h5a3.2 3.2 0 0 1 0 7h-5"/></symbol>
+<symbol id="i-italic" viewBox="0 0 24 24"><path d="M11 5h6M7 19h6M14.5 5l-5 14"/></symbol>
+<symbol id="i-strike" viewBox="0 0 24 24"><path d="M5.5 12h13M8 9c0-2.1 1.8-3.4 4-3.4s3.7 1 3.9 2.8M8 15c.2 2 1.8 3 4 3.2"/></symbol>
+<symbol id="i-link" viewBox="0 0 24 24"><path d="M10.5 13.5a3.5 3.5 0 0 0 5 0l2.2-2.2a3.5 3.5 0 0 0-5-5l-1 1"/><path d="M13.5 10.5a3.5 3.5 0 0 0-5 0L6.3 12.7a3.5 3.5 0 0 0 5 5l1-1"/></symbol>
+<symbol id="i-code" viewBox="0 0 24 24"><path d="M9.5 8.5 6 12l3.5 3.5M14.5 8.5 18 12l-3.5 3.5"/></symbol>
+<symbol id="i-list" viewBox="0 0 24 24"><path d="M8.5 6.5h10M8.5 12h10M8.5 17.5h10M5 6.5h.5M5 12h.5M5 17.5h.5"/></symbol>
+<symbol id="i-quote" viewBox="0 0 24 24"><path d="M6 8h4v4a4 4 0 0 1-4 4M14 8h4v4a4 4 0 0 1-4 4"/></symbol>
+<symbol id="i-react" viewBox="0 0 24 24"><path d="M12 4.5a7.5 7.5 0 1 0 0 15 7.5 7.5 0 0 0 0-15Z"/><path d="M8.7 13.5a4 4 0 0 0 6.6 0M9.4 10v.6M14.6 10v.6"/></symbol>
+<symbol id="i-send" viewBox="0 0 24 24"><path d="M20 4 9.5 14.5M20 4l-6.4 16-3.9-7.6L2 8.6Z"/></symbol>
+<symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4.5 8.5h8M16 8.5h3.5M4.5 15.5h3.5M11.5 15.5h8"/><circle cx="14.3" cy="8.5" r="1.9"/><circle cx="9.7" cy="15.5" r="1.9"/></symbol>
+<symbol id="i-chevron" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5"/></symbol>
+<symbol id="i-chevron-r" viewBox="0 0 24 24"><path d="M10 7l5 5-5 5"/></symbol>
+<symbol id="i-star" viewBox="0 0 24 24"><path d="M12 4.5l2.3 4.7 5.2.75-3.75 3.65.9 5.15L12 16.3l-4.65 2.45.9-5.15L4.5 9.95l5.2-.75Z"/></symbol>
+<symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3.5l6.5 2.2v5.1c0 4.1-2.8 7-6.5 8.2-3.7-1.2-6.5-4.1-6.5-8.2V5.7Z"/><path d="M9.3 12.2l1.9 1.9 3.6-3.8"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+<symbol id="i-check2" viewBox="0 0 24 24"><path d="M4 12.5l3.5 3.5L14 8M10 15l1 1L20.5 6.5"/></symbol>
+<symbol id="i-external" viewBox="0 0 24 24"><path d="M13.5 5.5H19V11M19 5.5l-7 7"/><path d="M17 13.8V16a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h2.2"/></symbol>
+<symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4.5v10M8 11l4 4 4-4M6 19h12"/></symbol>
+<symbol id="i-reply" viewBox="0 0 24 24"><path d="M9.5 7 5.5 11l4 4M5.5 11H14a4.5 4.5 0 0 1 4.5 4.5V17"/></symbol>
+<symbol id="i-bookmark" viewBox="0 0 24 24"><path d="M7 4.5h10a1 1 0 0 1 1 1V20l-6-3.2L6 20V5.5a1 1 0 0 1 1-1Z"/></symbol>
+<!-- Sello de marca: monograma de terminal (cursor sobre corchete) -->
+<symbol id="i-brand" viewBox="0 0 24 24"><path d="M8.5 6 4.5 12l4 6M15.5 6l4 6-4 6"/><path d="M11 13.5h2.2"/></symbol>
+</defs></svg>
+
+<div class="app">
+
+  <!-- ============ RAIL DE MÓDULOS ============ -->
+  <aside class="rail" aria-label="Módulos de Sytue">
+    <div class="brand" title="Sytue"><svg viewBox="0 0 24 24"><use href="#i-brand"/></svg></div>
+    <nav class="rail-nav" aria-label="Cambiar de módulo">
+      <a class="mod" href="#" aria-current="page" aria-label="Rooms"><svg class="ic ic--22"><use href="#i-rooms"/></svg><span>Rooms</span></a>
+      <a class="mod" href="#" aria-label="Docs"><span class="dot-n" aria-hidden="true"></span><svg class="ic ic--22"><use href="#i-docs"/></svg><span>Docs</span></a>
+      <a class="mod" href="#" aria-label="Sheets"><svg class="ic ic--22"><use href="#i-sheets"/></svg><span>Sheets</span></a>
+      <a class="mod" href="#" aria-label="Slides"><svg class="ic ic--22"><use href="#i-slides"/></svg><span>Slides</span></a>
+      <a class="mod" href="#" aria-label="Meet"><span class="dot-n" aria-hidden="true"></span><svg class="ic ic--22"><use href="#i-meet"/></svg><span>Meet</span></a>
+    </nav>
+    <div class="rail-foot">
+      <button class="icbtn" aria-label="Preferencias"><svg class="ic ic--22"><use href="#i-sliders"/></svg></button>
+      <div class="pw" title="Elena Vidal — En línea">
+        <div class="av av-26 av--c">EV</div><span class="dot online" aria-hidden="true"></span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ============ PANEL DE CANALES ============ -->
+  <aside class="channels" aria-label="Canales">
+    <div class="ws">
+      <div>
+        <div class="ws-name">Nexor Energía <svg class="ic"><use href="#i-chevron"/></svg></div>
+        <div class="ws-sub">Operación 24/7 · 6,2 GW gestionados</div>
+      </div>
+      <div class="spacer"></div>
+      <button class="icbtn" aria-label="Redactar mensaje"><svg class="ic ic--18"><use href="#i-pencil"/></svg></button>
+    </div>
+
+    <div class="search-wrap">
+      <div class="search">
+        <svg class="ic"><use href="#i-search"/></svg>
+        <input type="text" placeholder="Buscar · canales, personas, mensajes" aria-label="Buscar">
+        <span class="kbd">⌘K</span>
+      </div>
+    </div>
+
+    <nav class="ch-scroll" aria-label="Lista de canales">
+      <div class="grp">
+        <div class="grp-h"><svg class="ic"><use href="#i-chevron"/></svg><b>Fijados</b><span class="spacer"></span></div>
+        <a class="ci unread" href="#"><svg class="ic gl"><use href="#i-hash"/></svg><span class="nm">parte-de-operación</span><span class="badge mention">1</span></a>
+        <a class="ci active" href="#" aria-current="page"><svg class="ic gl"><use href="#i-hash"/></svg><span class="nm">mesa-mayorista</span></a>
+      </div>
+
+      <div class="grp">
+        <div class="grp-h"><svg class="ic"><use href="#i-chevron"/></svg><b>Mesas · Trading</b><span class="spacer"></span><span class="count">6</span><button class="icbtn add" aria-label="Añadir canal"><svg class="ic ic--16"><use href="#i-plus"/></svg></button></div>
+        <a class="ci unread" href="#"><svg class="ic gl"><use href="#i-hash"/></svg><span class="nm">trading-intradía</span><span class="badge">3</span></a>
+        <a class="ci" href="#"><svg class="ic gl"><use href="#i-hash"/></svg><span class="nm">casación-diaria</span></a>
+        <a class="ci" href="#"><svg class="ic gl"><use href="#i-hash"/></svg><span class="nm">cobertura-y-riesgo</span></a>
+        <a class="ci unread" href="#"><svg class="ic gl"><use href="#i-shield"/></svg><span class="nm">liquidez-y-garantías</span><span class="badge">5</span></a>
+        <a class="ci muted" href="#"><svg class="ic gl"><use href="#i-hash"/></svg><span class="nm">posición-de-cartera</span></a>
+      </div>
+
+      <div class="grp">
+        <div class="grp-h"><svg class="ic"><use href="#i-chevron"/></svg><b>Operación de red</b><span class="spacer"></span><span class="count">4</span><button class="icbtn add" aria-label="Añadir canal"><svg class="ic ic--16"><use href="#i-plus"/></svg></button></div>
+        <a class="ci unread" href="#"><svg class="ic gl"><use href="#i-lock"/></svg><span class="nm">despacho-de-red</span><span class="badge mention">2</span></a>
+        <a class="ci" href="#"><svg class="ic gl"><use href="#i-hash"/></svg><span class="nm">restricciones-técnicas</span></a>
+        <a class="ci" href="#"><svg class="ic gl"><use href="#i-hash"/></svg><span class="nm">incidencias-red</span></a>
+        <a class="ci" href="#"><svg class="ic gl"><use href="#i-shield"/></svg><span class="nm">regulatorio-cnmc</span></a>
+      </div>
+
+      <div class="grp">
+        <div class="grp-h"><svg class="ic"><use href="#i-chevron"/></svg><b>Directos</b><span class="spacer"></span><button class="icbtn add" aria-label="Nuevo mensaje directo"><svg class="ic ic--16"><use href="#i-plus"/></svg></button></div>
+        <a class="ci unread" href="#"><span class="pw"><span class="av av-20 av--a">MT</span><span class="dot online"></span></span><span class="nm">Marc Torrent</span><span class="badge">2</span></a>
+        <a class="ci" href="#"><span class="pw"><span class="av av-20 av--b">NB</span><span class="dot away"></span></span><span class="nm">Nuria Belmonte</span></a>
+        <a class="ci" href="#"><span class="pw"><span class="av av-20 av--c">OP</span><span class="dot offline"></span></span><span class="nm">Óscar Peña</span></a>
+        <a class="ci muted" href="#"><span class="av av-20 av--d" style="font-size:0"><svg class="ic ic--16" style="color:var(--av-ink)"><use href="#i-people"/></svg></span><span class="nm">Guardia 24/7 · Mesa</span></a>
+      </div>
+    </nav>
+  </aside>
+
+  <!-- ============ SALA ============ -->
+  <main class="room" aria-label="Canal mesa-mayorista">
+    <header class="room-head">
+      <div class="rh-title">
+        <svg class="ic hash"><use href="#i-hash"/></svg>
+        <h1>mesa-mayorista</h1>
+      </div>
+      <div class="rh-topic">Casación diaria, desvíos y cobertura intradía · OMIE / MIBEL</div>
+      <div class="rh-sp"></div>
+      <div class="rh-actions">
+        <button class="chip star-on" aria-label="Quitar de fijados" title="Fijado"><svg class="ic"><use href="#i-star"/></svg></button>
+        <button class="chip" aria-label="3 mensajes fijados"><svg class="ic"><use href="#i-pin"/></svg><b>3</b></button>
+        <button class="chip" aria-label="18 miembros">
+          <span class="face-stack" aria-hidden="true">
+            <span class="av av-22 av--a">MT</span><span class="av av-22 av--b">NB</span><span class="av av-22 av--c">OP</span><span class="av av-22 av--d">JR</span>
+          </span><b>18</b>
+        </button>
+        <button class="chip" aria-label="Buscar en el canal"><svg class="ic"><use href="#i-search"/></svg></button>
+        <button class="chip" aria-label="Notificaciones del canal"><svg class="ic"><use href="#i-bell"/></svg></button>
+        <button class="chip" aria-label="Más acciones"><svg class="ic"><use href="#i-kebab"/></svg></button>
+      </div>
+    </header>
+
+    <!-- Cinta de estado — firma tipo terminal (mono tabular) -->
+    <div class="tape" role="group" aria-label="Estado de sesión de mercado">
+      <span class="live"><span class="bt" aria-hidden="true"></span>MESA ABIERTA</span>
+      <span class="cell"><span class="k">OMIE D+1</span><span class="v up">72,40 €/MWh</span></span>
+      <span class="cell"><span class="k">DESVÍO</span><span class="v up">+42 MWh</span></span>
+      <span class="cell"><span class="k">BANDA</span><span class="v">15′</span></span>
+      <span class="cell"><span class="k">LÍMITES</span><span class="v dn">1</span></span>
+      <span class="cell"><span class="k">CASACIÓN</span><span class="v">20:00</span></span>
+      <span class="rt">CET 09:42 · LAT 34 ms</span>
+    </div>
+
+    <section class="stream" id="stream" tabindex="-1">
+
+      <div class="daysep"><b>Hoy · jueves 9 jul</b></div>
+
+      <div class="sys">
+        <svg class="ic"><use href="#i-pin"/></svg>
+        <span>Elena Vidal fijó el parte de operación de la sesión D-1</span>
+        <span aria-hidden="true">·</span><time>08:47</time>
+      </div>
+
+      <!-- Marc Torrent -->
+      <article class="msg">
+        <span class="pw on-void"><span class="av av-36 av--a">MT</span></span>
+        <div class="whom"><span class="who">Marc Torrent</span><span class="role">Trading Intradía</span><time>09:04</time></div>
+        <div class="body"><p>Buenos días. Cerrada la casación de OMIE para D+1: precio medio <span class="mono">72,40 €/MWh</span> y valle sobre las 4 h en <span class="mono">18,90</span>. La rampa solar de mediodía vuelve a presionar el tramo central; mantengo la venta programada en las horas 13–16.</p></div>
+        <div class="tools"><button class="acc" aria-label="Reaccionar"><svg class="ic"><use href="#i-react"/></svg></button><button class="acc" aria-label="Responder en hilo"><svg class="ic"><use href="#i-reply"/></svg></button><button aria-label="Guardar"><svg class="ic"><use href="#i-bookmark"/></svg></button><span class="sep"></span><button aria-label="Más"><svg class="ic"><use href="#i-kebab"/></svg></button></div>
+      </article>
+      <article class="msg group">
+        <span class="gtime">09:06</span>
+        <div class="body"><p>Propongo cubrir el desvío intradía en la sesión de las 14:00: <span class="mono">+40 MWh</span> a mercado y dejar banda de <span class="mono">15′</span> hasta el redespacho. <span class="edited">(editado)</span></p></div>
+        <div class="reacts">
+          <button class="react me"><svg class="ic"><use href="#i-check"/></svg>7</button>
+          <button class="react"><svg class="ic"><use href="#i-check2"/></svg>4</button>
+          <button class="react add" aria-label="Añadir reacción"><svg class="ic"><use href="#i-react"/></svg></button>
+        </div>
+        <button class="thread" aria-label="Hilo: 5 respuestas">
+          <span class="face-stack" aria-hidden="true">
+            <span class="av av-22 av--b">NB</span><span class="av av-22 av--c">OP</span><span class="av av-22 av--d">EV</span>
+          </span>
+          <span class="n">5 respuestas</span><span class="last">Última 09:39</span>
+          <span class="go"><svg class="ic ic--16"><use href="#i-chevron-r"/></svg></span>
+        </button>
+        <div class="tools"><button class="acc" aria-label="Reaccionar"><svg class="ic"><use href="#i-react"/></svg></button><button class="acc" aria-label="Responder en hilo"><svg class="ic"><use href="#i-reply"/></svg></button><button aria-label="Guardar"><svg class="ic"><use href="#i-bookmark"/></svg></button><span class="sep"></span><button aria-label="Más"><svg class="ic"><use href="#i-kebab"/></svg></button></div>
+      </article>
+
+      <div class="newsep"><b>Nuevos mensajes</b></div>
+
+      <!-- Nuria Belmonte — @menciones (a ti + a otro) -->
+      <article class="msg">
+        <span class="pw on-void"><span class="av av-36 av--b">NB</span></span>
+        <div class="whom"><span class="who">Nuria Belmonte</span><span class="role">Despacho de Red</span><time>09:21</time></div>
+        <div class="body"><p><span class="mention me">@Elena Vidal</span> <span class="mention">@Marc Torrent</span> confirmado redespacho por restricción técnica en el nudo de Peñalba. Antes de casar, dejad margen: <code class="inl">desvío +42 MWh · banda 15′ · nudo PEN-220</code>. Reviso la orden de bajada con Operación en 10 minutos.</p></div>
+        <div class="tools"><button class="acc" aria-label="Reaccionar"><svg class="ic"><use href="#i-react"/></svg></button><button class="acc" aria-label="Responder en hilo"><svg class="ic"><use href="#i-reply"/></svg></button><button aria-label="Fijar"><svg class="ic"><use href="#i-pin"/></svg></button><span class="sep"></span><button aria-label="Más"><svg class="ic"><use href="#i-kebab"/></svg></button></div>
+      </article>
+
+      <!-- Óscar Peña — adjunto con incumplimiento (rojo semántico) -->
+      <article class="msg hovered">
+        <span class="pw on-void"><span class="av av-36 av--c">OP</span></span>
+        <div class="whom"><span class="who">Óscar Peña</span><span class="role">Análisis Cuantitativo</span><time>09:29</time></div>
+        <div class="body"><p>Subo la casación consolidada D+1 con la posición por nudo. Marcada en <span class="tdn">rojo</span> la única línea que excede el límite de posición: <span class="mono">PEN-220, +12 MWh sobre banda</span>. El resto queda dentro de tolerancia.</p></div>
+        <div class="file">
+          <div class="thumb"><svg class="ic ic--22"><use href="#i-sheets"/></svg></div>
+          <div class="meta">
+            <div class="fn">Casación_D+1_MIBEL_v3.sheet</div>
+            <div class="sub">Sytue Sheets · 2,4 MB · actualizado hace 4 min</div>
+          </div>
+          <button class="icbtn dl" aria-label="Descargar"><svg class="ic ic--18"><use href="#i-download"/></svg></button>
+        </div>
+        <div class="tools"><button class="acc" aria-label="Reaccionar"><svg class="ic"><use href="#i-react"/></svg></button><button class="acc" aria-label="Responder en hilo"><svg class="ic"><use href="#i-reply"/></svg></button><button aria-label="Guardar"><svg class="ic"><use href="#i-bookmark"/></svg></button><span class="sep"></span><button aria-label="Más"><svg class="ic"><use href="#i-kebab"/></svg></button></div>
+      </article>
+
+      <!-- Javier Roldán — enlace enriquecido -->
+      <article class="msg">
+        <span class="pw on-void"><span class="av av-36 av--d">JR</span></span>
+        <div class="whom"><span class="who">Javier Roldán</span><span class="role">Regulatorio</span><time>09:37</time></div>
+        <div class="body"><p>Contexto para el comité de las 12: nota con la curva de precios y el impacto del nuevo mecanismo de ajuste.</p></div>
+        <a class="link" href="#">
+          <span class="bar" aria-hidden="true"></span>
+          <span class="lc">
+            <span class="src"><span class="g"><svg class="ic"><use href="#i-docs"/></svg></span>docs.nexor-energia.sytue.com<svg class="ic ic--12" style="margin-left:2px;color:var(--fg-3)"><use href="#i-external"/></svg></span>
+            <span class="lt">Nota de mercado — Semana 28</span>
+            <span class="ld">Curva OMIE D+7, evolución del spread intradía y sensibilidad de la cartera al mecanismo de ajuste por restricciones técnicas.</span>
+          </span>
+          <span class="lp" aria-hidden="true">
+            <svg class="spark" viewBox="0 0 90 42" preserveAspectRatio="none">
+              <path class="area" d="M2 29 17 22 32 26 47 14 62 18 88 8 88 42 2 42Z"/>
+              <path class="line" d="M2 29 17 22 32 26 47 14 62 18 88 8"/>
+              <circle cx="88" cy="8" r="2.3"/>
+            </svg>
+          </span>
+        </a>
+        <div class="tools"><button class="acc" aria-label="Reaccionar"><svg class="ic"><use href="#i-react"/></svg></button><button class="acc" aria-label="Responder en hilo"><svg class="ic"><use href="#i-reply"/></svg></button><button aria-label="Guardar"><svg class="ic"><use href="#i-bookmark"/></svg></button><span class="sep"></span><button aria-label="Más"><svg class="ic"><use href="#i-kebab"/></svg></button></div>
+      </article>
+
+      <!-- Elena Vidal (tú) — @aquí -->
+      <article class="msg">
+        <span class="pw on-void"><span class="av av-36 av--c">EV</span></span>
+        <div class="whom"><span class="who">Elena Vidal</span><span class="role you">Directora de Operación</span><time>09:42</time></div>
+        <div class="body"><p>Gracias a los tres. <span class="mention here">@aquí</span> cerramos la posición a las 12:00 con el comité. Si el redespacho de Peñalba no libera banda antes de las 11:30, subidlo al hilo de Marc para revisarlo con Regulatorio antes de casar.</p></div>
+        <div class="tools"><button class="acc" aria-label="Reaccionar"><svg class="ic"><use href="#i-react"/></svg></button><button class="acc" aria-label="Responder en hilo"><svg class="ic"><use href="#i-reply"/></svg></button><button aria-label="Fijar"><svg class="ic"><use href="#i-pin"/></svg></button><span class="sep"></span><button aria-label="Más"><svg class="ic"><use href="#i-kebab"/></svg></button></div>
+      </article>
+
+    </section>
+
+    <!-- ============ COMPOSER ============ -->
+    <div class="composer">
+      <div class="cbox">
+        <div class="cformat">
+          <button aria-label="Negrita"><svg class="ic ic--18"><use href="#i-bold"/></svg></button>
+          <button aria-label="Cursiva"><svg class="ic ic--18"><use href="#i-italic"/></svg></button>
+          <button aria-label="Tachado"><svg class="ic ic--18"><use href="#i-strike"/></svg></button>
+          <span class="sep"></span>
+          <button aria-label="Enlace"><svg class="ic ic--18"><use href="#i-link"/></svg></button>
+          <button aria-label="Lista"><svg class="ic ic--18"><use href="#i-list"/></svg></button>
+          <button aria-label="Cita"><svg class="ic ic--18"><use href="#i-quote"/></svg></button>
+          <button aria-label="Código"><svg class="ic ic--18"><use href="#i-code"/></svg></button>
+        </div>
+        <div class="cfield">Escribe un mensaje en #mesa-mayorista</div>
+        <div class="cfoot">
+          <div class="lead">
+            <button class="tool" aria-label="Adjuntar archivo"><svg class="ic ic--18"><use href="#i-clip"/></svg></button>
+            <button class="tool" aria-label="Mencionar"><svg class="ic ic--18"><use href="#i-at"/></svg></button>
+            <button class="tool" aria-label="Emoji"><svg class="ic ic--18"><use href="#i-react"/></svg></button>
+          </div>
+          <div class="sp"></div>
+          <button class="send"><svg class="ic"><use href="#i-send"/></svg>Enviar</button>
+        </div>
+      </div>
+      <div class="chint"><span><b>Intro</b> para enviar</span><span><b>Mayús+Intro</b> salto de línea</span><span><b>@</b> menciona · <b>#</b> enlaza canal · <b>/</b> comandos</span></div>
+    </div>
+  </main>
+</div>
+
+<!-- ============ MINI STYLE-GUIDE ============ -->
+<section class="sg" aria-label="Mini guía de estilo Monochrome Terminal">
+  <div class="sg-top">
+    <span class="mark"><svg viewBox="0 0 24 24"><use href="#i-brand"/></svg></span>
+    <h2>Monochrome <span class="sl">/</span> Terminal</h2>
+    <span>Sistema de diseño de Sytue · escala de grises neutra, densidad de instrumento, señal única</span>
+  </div>
+
+  <div class="sg-grid">
+    <div>
+      <div class="sg-lab">Paleta · rol / hex / contraste</div>
+
+      <div class="sw-block">
+        <div class="sw-cap">Rampa neutra · void → superficies</div>
+        <div class="sw-row">
+          <div class="sw"><div class="chip-c" style="background:#0B0C0E"></div><div class="info"><div class="role">Void · base</div><div class="hex">#0B0C0E</div></div></div>
+          <div class="sw"><div class="chip-c" style="background:#101215"></div><div class="info"><div class="role">Superficie</div><div class="hex">#101215</div></div></div>
+          <div class="sw"><div class="chip-c" style="background:#16181C"></div><div class="info"><div class="role">Elevado / hover</div><div class="hex">#16181C</div></div></div>
+          <div class="sw"><div class="chip-c" style="background:#1D2025"></div><div class="info"><div class="role">Elevado alto</div><div class="hex">#1D2025</div></div></div>
+          <div class="sw"><div class="chip-c" style="background:#23262B"></div><div class="info"><div class="role">Hairline</div><div class="hex">#23262B</div></div></div>
+          <div class="sw"><div class="chip-c" style="background:#2E323A"></div><div class="info"><div class="role">Borde control</div><div class="hex">#2E323A</div></div></div>
+        </div>
+      </div>
+
+      <div class="sw-block">
+        <div class="sw-cap">Texto · jerarquía por peso, no por color</div>
+        <div class="sw-row">
+          <div class="sw"><div class="chip-c" style="background:#E6E8EB"></div><div class="info"><div class="role">Primario · 13.9:1</div><div class="hex">#E6E8EB</div></div></div>
+          <div class="sw"><div class="chip-c" style="background:#A2A7AE"></div><div class="info"><div class="role">Secundario · 7.8:1</div><div class="hex">#A2A7AE</div></div></div>
+          <div class="sw"><div class="chip-c" style="background:#7E838C"></div><div class="info"><div class="role">Meta · 4.9:1</div><div class="hex">#7E838C</div></div></div>
+        </div>
+      </div>
+
+      <div class="sw-block">
+        <div class="sw-cap">Señal — acento único (estado) + semántica de dato</div>
+        <div class="sw-row">
+          <div class="sw"><div class="chip-c" style="background:#4EB87B"></div><div class="info"><div class="role">Señal · actividad</div><div class="hex">#4EB87B</div></div></div>
+          <div class="sw"><div class="chip-c" style="background:#6FCB90"></div><div class="info"><div class="role">Señal texto · 9.9:1</div><div class="hex">#6FCB90</div></div></div>
+          <div class="sw"><div class="chip-c" style="background:#E0736E"></div><div class="info"><div class="role">Incumpl. · 6.0:1</div><div class="hex">#E0736E</div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="sg-lab">Tipografía · sans de interfaz + mono para todo dato</div>
+      <div class="type-row">
+        <div><div class="tl">Marca · mono · 25 · tracking +0.01em</div><div class="t-display">SYTUE <span class="sl">/</span> ROOMS</div></div>
+        <div><div class="tl">Pesos — interfaz</div><div class="t-weights"><span class="w4">Regular 400</span> · <span class="w5">Medium 500</span> · <span class="w6">Semibold 650</span> · <span class="w7">Bold 750</span></div></div>
+        <div><div class="tl">Overline — micro-etiqueta</div><div class="t-over">Mesas · Operación de red · Fijados</div></div>
+        <div><div class="tl">Cuerpo — 13.5 / 1.55</div><div class="t-body">La conversación se lee a 13,5px con interlínea 1.55: densidad de instrumento sin fatiga, apta para hilos largos en una mesa de operación 24/7.</div></div>
+        <div><div class="tl">Mono tabular — datos, cinta y atajos</div><div class="t-mono">09:42 · <span class="up">72,40 €/MWh</span> · +42 MWh · <span class="dn">LÍM 1</span> · 2,4 MB · ⌘K</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sg-foot">
+    <span class="tt" aria-hidden="true"><i class="a"></i><i class="b"></i></span>
+    <span><strong>Monocromo disciplinado:</strong> todo el chasis vive en una rampa de grises neutra muy afinada; la jerarquía se construye con <strong>peso, espacio y hairlines</strong>, nunca con color. El verde de señal es el <strong>único</strong> acento —presencia, no leídos, mesa abierta, foco— y el rojo aparece <strong>solo</strong> como semántica de incumplimiento de dato. Números tabulares y mono en toda métrica · line-icons 1.60 en grid 24 · contraste WCAG AA verificado en todo el texto.</span>
+  </div>
+</section>
+
+</body>
+</html>

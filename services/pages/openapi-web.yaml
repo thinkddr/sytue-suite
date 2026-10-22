@@ -1,0 +1,659 @@
+openapi: 3.1.0
+info:
+  title: Sytue Web Web API
+  description: Contrato público versionado v1 de las rutas bajo /_pages/* para webs de clientes y código exportado (§9.5, §6.4).
+  version: 1.0.0
+servers:
+  - url: https://{host}
+    description: Host canónico de la web publicada
+    variables:
+      host:
+        default: ejemplo.sytue.eu
+paths:
+  /_pages/altcha:
+    get:
+      summary: Obtener reto ALTCHA
+      description: Emite un reto ALTCHA criptográfico válido durante 10 minutos (§6.4).
+      operationId: getAltcha
+      responses:
+        '200':
+          description: Reto emitido
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - algorithm
+                  - challenge
+                  - salt
+                  - signature
+                properties:
+                  algorithm:
+                    type: string
+                    example: SHA-256
+                  challenge:
+                    type: string
+                  salt:
+                    type: string
+                  signature:
+                    type: string
+                  maxnumber:
+                    type: integer
+
+  /_pages/catalog:
+    get:
+      summary: Consultar precios y disponibilidad
+      description: Devuelve el precio actual, comparativa y estado de existencias para una lista de SKUs (§6.4).
+      operationId: getCatalog
+      parameters:
+        - name: skus
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Lista de SKUs separados por comas
+      responses:
+        '200':
+          description: Catálogo consultado
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - items
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required:
+                        - sku
+                        - price_cents
+                        - available
+                        - stock_state
+                      properties:
+                        sku:
+                          type: string
+                        price_cents:
+                          type: integer
+                        compare_at_cents:
+                          type: integer
+                          nullable: true
+                        lowest_30d_cents:
+                          type: integer
+                          nullable: true
+                        available:
+                          type: boolean
+                        stock_state:
+                          type: string
+                          enum: [in, low, out]
+
+  /_pages/products:
+    get:
+      summary: Listar productos publicados
+      description: Devuelve el catálogo completo de productos publicados con imágenes absolutas y variantes (§9.5).
+      operationId: getProducts
+      parameters:
+        - name: lang
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Idioma preferido para nombres y descripciones
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Cursor de paginación
+      responses:
+        '200':
+          description: Lista de productos
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - items
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required:
+                        - id
+                        - slug
+                        - name
+                        - description
+                        - category
+                        - images
+                        - vat_rate
+                        - options
+                        - kind
+                        - withdrawal_exempt
+                        - max_per_order
+                        - variants
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                        slug:
+                          type: string
+                        name:
+                          type: string
+                        description:
+                          type: string
+                        category:
+                          type: string
+                        images:
+                          type: array
+                          items:
+                            type: string
+                            format: uri
+                        vat_rate:
+                          type: number
+                        options:
+                          type: array
+                          items:
+                            type: object
+                        kind:
+                          type: string
+                          enum: [general, food]
+                        gpsr:
+                          type: object
+                        food:
+                          type: object
+                        withdrawal_exempt:
+                          type: string
+                        max_per_order:
+                          type: integer
+                        variants:
+                          type: array
+                          items:
+                            type: object
+                            required:
+                              - id
+                              - sku
+                              - options
+                              - price_cents
+                              - available
+                              - stock_state
+                            properties:
+                              id:
+                                type: string
+                                format: uuid
+                              sku:
+                                type: string
+                              options:
+                                type: object
+                              price_cents:
+                                type: integer
+                              compare_at_cents:
+                                type: integer
+                                nullable: true
+                              available:
+                                type: boolean
+                              stock_state:
+                                type: string
+                                enum: [in, low, out]
+                  next_cursor:
+                    type: string
+                    nullable: true
+
+  /_pages/forms/{form_id}:
+    get:
+      summary: Obtener definición pública del formulario
+      description: Devuelve los campos, requisitos y consentimientos del formulario publicado (§9.5).
+      operationId: getFormDefinition
+      parameters:
+        - name: form_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Definición del formulario
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - form_id
+                  - fields
+                  - consent_text
+                properties:
+                  form_id:
+                    type: string
+                  fields:
+                    type: array
+                    items:
+                      type: object
+                  consent_text:
+                    type: object
+        '404':
+          description: Formulario no encontrado
+    post:
+      summary: Enviar formulario público
+      description: Registra las respuestas validadas contra el formulario publicado (§10.6).
+      operationId: submitForm
+      parameters:
+        - name: form_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - fields
+                - consent
+                - language
+                - altcha
+              properties:
+                fields:
+                  type: object
+                consent:
+                  type: boolean
+                language:
+                  type: string
+                altcha:
+                  type: string
+      responses:
+        '204':
+          description: Envío registrado correctamente
+        '400':
+          description: Datos no válidos
+        '404':
+          description: Formulario no encontrado
+
+  /_pages/checkout:
+    post:
+      summary: Crear pedido y reservar existencias
+      description: Calcula el total, reserva stock por 35 minutos y prepara el pago en la pasarela (§10.4).
+      operationId: checkout
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - checkout_token
+                - items
+                - buyer
+                - shipping
+                - payment
+                - terms_version
+                - language
+                - altcha
+              properties:
+                checkout_token:
+                  type: string
+                  format: uuid
+                items:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - sku
+                      - qty
+                    properties:
+                      sku:
+                        type: string
+                      qty:
+                        type: integer
+                buyer:
+                  type: object
+                  required:
+                    - email
+                    - name
+                  properties:
+                    email:
+                      type: string
+                      format: email
+                    name:
+                      type: string
+                    phone:
+                      type: string
+                shipping:
+                  type: object
+                  required:
+                    - method_id
+                  properties:
+                    method_id:
+                      type: string
+                    address:
+                      type: object
+                invoice:
+                  type: object
+                  required:
+                    - tax_id
+                    - name
+                  properties:
+                    tax_id:
+                      type: string
+                    name:
+                      type: string
+                    address:
+                      type: object
+                payment:
+                  type: object
+                  required:
+                    - gateway
+                  properties:
+                    gateway:
+                      type: string
+                      enum: [mollie, adyen, redsys, stripe]
+                    method:
+                      type: string
+                terms_version:
+                  type: integer
+                language:
+                  type: string
+                altcha:
+                  type: string
+                base:
+                  type: string
+                return_url:
+                  type: string
+      responses:
+        '200':
+          description: Pedido creado o recuperado (idempotente)
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - order_id
+                  - order_token
+                  - pay
+                properties:
+                  order_id:
+                    type: string
+                    format: uuid
+                  order_token:
+                    type: string
+                  pay:
+                    type: object
+                    required:
+                      - payment_id
+                    properties:
+                      payment_id:
+                        type: string
+                        format: uuid
+                      url:
+                        type: string
+                      formulario:
+                        type: object
+        '403':
+          description: Origen no permitido
+        '409':
+          description: Existencias agotadas o demasiados intentos
+        '422':
+          description: Parámetros inválidos, NIF incorrecto o factura obligatoria
+        '429':
+          description: Tienda ocupada (store_busy), ese comprador ya tiene tres pedidos sin pagar (too_many_pending_orders) o demasiados checkouts desde esa IP
+
+  /_pages/pay/{payment_id}:
+    post:
+      summary: Proceder al pago
+      description: Envía al comprador a la pasarela (303) o genera el formulario autoenviado de Redsys (§10.4).
+      operationId: pay
+      parameters:
+        - name: payment_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required:
+                - token
+              properties:
+                token:
+                  type: string
+          application/json:
+            schema:
+              type: object
+              required:
+                - token
+              properties:
+                token:
+                  type: string
+      responses:
+        '200':
+          description: Formulario autoenviado (Redsys)
+        '303':
+          description: Redirección a la pasarela
+        '401':
+          description: Token de pedido incorrecto
+        '404':
+          description: Pago no encontrado
+        '409':
+          description: Demasiados intentos de pago
+
+  /_pages/orders/{id}:
+    get:
+      summary: Consultar estado del pedido
+      description: Devuelve la vista pública reducida del pedido requiriendo el token en X-Sytue-Pedido (§6.4, S23).
+      operationId: getOrder
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: X-Sytue-Pedido
+          in: header
+          required: true
+          schema:
+            type: string
+          description: Token secreto del pedido
+      responses:
+        '200':
+          description: Estado del pedido
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - id
+                  - number
+                  - status
+                  - created_at
+                  - currency
+                  - subtotal_cents
+                  - shipping_cents
+                  - total_cents
+                  - vat_cents
+                  - vat_breakdown
+                  - items
+                  - withdrawal_period_days
+                  - has_invoice
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  number:
+                    type: string
+                  status:
+                    type: string
+                  created_at:
+                    type: string
+                    format: date-time
+                  currency:
+                    type: string
+                  subtotal_cents:
+                    type: integer
+                  shipping_cents:
+                    type: integer
+                  total_cents:
+                    type: integer
+                  vat_cents:
+                    type: integer
+                  vat_breakdown:
+                    type: object
+                  items:
+                    type: array
+                    items:
+                      type: object
+                  withdrawal_period_days:
+                    type: integer
+                  has_invoice:
+                    type: boolean
+                  erp_invoice_ref:
+                    type: string
+        '401':
+          description: Token incorrecto
+        '404':
+          description: Pedido no encontrado
+
+  /_pages/orders/{id}/invoice:
+    post:
+      summary: Solicitar factura del pedido
+      description: Devuelve el HTML imprimible de la factura si está disponible en el ERP (§10.8).
+      operationId: getInvoice
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - token
+              properties:
+                token:
+                  type: string
+      responses:
+        '200':
+          description: HTML imprimible de la factura
+          content:
+            text/html:
+              schema:
+                type: string
+        '401':
+          description: Token incorrecto
+        '404':
+          description: Factura no disponible o pedido no encontrado
+
+  /_pages/withdrawals:
+    post:
+      summary: Solicitar desistimiento legal
+      description: Registra una solicitud de desistimiento legal desde la página legal (§10.7). Siempre responde 204.
+      operationId: submitWithdrawal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - order_number
+                - email
+                - altcha
+              properties:
+                order_number:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                name:
+                  type: string
+                reason:
+                  type: string
+                altcha:
+                  type: string
+      responses:
+        '204':
+          description: Solicitud recibida sin oráculo de existencia
+
+  /_pages/orders/{id}/withdrawal:
+    post:
+      summary: Solicitar desistimiento autenticado
+      description: Registra el desistimiento prerrellenado desde la página del pedido (§10.7).
+      operationId: submitOrderWithdrawal
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: X-Sytue-Pedido
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - altcha
+              properties:
+                name:
+                  type: string
+                reason:
+                  type: string
+                altcha:
+                  type: string
+      responses:
+        '204':
+          description: Desistimiento confirmado
+        '401':
+          description: Token no válido
+
+  /_pages/reports:
+    post:
+      summary: Enviar denuncia de contenido
+      description: Notifica un informe de abuso o contenido ilegal para el sitio (§8.3).
+      operationId: submitReport
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - reason
+                - details
+                - path
+                - altcha
+              properties:
+                reason:
+                  type: string
+                  enum: [phishing, malware, illegal, copyright, other]
+                details:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                path:
+                  type: string
+                altcha:
+                  type: string
+      responses:
+        '204':
+          description: Denuncia recibida
+        '400':
+          description: Parámetros incorrectos

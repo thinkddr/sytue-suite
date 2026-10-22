@@ -1,0 +1,18 @@
+Galerie et éditeur de photos : vos originaux dans Drive, vos réglages sous forme de recette.
+
+• Une frise par mois avec recherche par nom.
+• Albums avec couverture ; visionneuse plein écran.
+• Un éditeur avec lumière, couleur, rotation, miroir et recadrage, en temps réel.
+• Chaque retouche est une recette : l’original n’est jamais touché.
+• Une frise groupée par mois, avec recherche par nom et vignettes nettes.
+• Albums : créer, renommer, choisir la couverture, ajouter depuis la visionneuse et retirer.
+• Un éditeur à quatre curseurs (exposition, contraste, saturation, température), rotation et miroir.
+• Chaque retouche est une recette enregistrée à part : l’original de Drive n’est jamais modifié.
+• Export en pleine résolution, calculé sur le serveur avec les mêmes formules que celles affichées.
+• Corbeille avec restauration.
+• Les originaux vivent dans votre Sytue Drive ; les dérivés sont un cache régénérable.
+• Données EXIF lues dans le fichier lui-même ; tout dans l’Union européenne.
+• Sélection multiple par mois : vers un nouvel album, vers la corbeille ou téléchargées d’un coup.
+• Diaporama, taille réelle, rotation depuis la visionneuse et recadrage à proportion fixe.
+
+Chiffrement en transit (TLS 1.3). L’infrastructure de Sytue se trouve dans l’UE. La localisation des services externes dépend de leur fournisseur.

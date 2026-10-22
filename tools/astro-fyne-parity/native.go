@@ -1,0 +1,103 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Daniel Delgado Ramos
+
+//go:build paridad_astro_fyne
+
+// La etiqueta lo saca del módulo raíz: este fichero importa Fyne, que solo declara
+// apps/fyne, y run.ts lo copia allí para compilarlo. Sin ella, `./...` en la raíz
+// falla y tumba govulncheck, go-licenses y la integración (v3.12.1).
+
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"image/color"
+	"image/png"
+	"os"
+	"path/filepath"
+
+	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/test"
+	"git.sytue.eu/sytue/one/apps/fyne/tema"
+	"git.sytue.eu/sytue/one/apps/fyne/ui"
+	"git.sytue.eu/sytue/one/apps/fyne/webui/sytue"
+	js "github.com/thinkddr/astro-fyne/native/javascript"
+	"github.com/thinkddr/astro-fyne/native/reverse"
+)
+
+func main() {
+	out := os.Args[1]
+	app := test.NewApp()
+	defer app.Quit()
+	app.Settings().SetTheme(tema.Sytue{})
+	tema.FormaDeLosGuardianes()
+	count := 0
+	b := ui.NuevoBoton("Paridad", func() { count++ }).Con(ui.Primario, ui.TallaSM)
+	window := app.NewWindow("Paridad")
+	window.SetPadded(false)
+	window.Resize(fyne.NewSize(320, 200))
+	window.SetContent(b)
+	window.Show()
+	capture := func(name string) {
+		file, err := os.Create(filepath.Join(out, name))
+		if err != nil {
+			panic(err)
+		}
+		if err = png.Encode(file, window.Canvas().Capture()); err != nil {
+			panic(err)
+		}
+		if err = file.Close(); err != nil {
+			panic(err)
+		}
+	}
+	capture("sytue-native-original.png")
+	test.Tap(b)
+	if count != 1 {
+		panic("el botón original no ejecutó su callback")
+	}
+	b.Disable()
+	test.Tap(b)
+	if count != 1 {
+		panic("el botón original inerte ejecutó su callback")
+	}
+	capture("sytue-native-disabled.png")
+	b.Enable()
+	window.Canvas().Unfocus()
+	_, err := reverse.Export(b, reverse.Options{
+		Viewport: reverse.Viewport{Width: window.Canvas().Size().Width, Height: window.Canvas().Size().Height, Scale: window.Canvas().Scale()},
+		Canvas:   window.Canvas(), CanvasBackground: color.Transparent,
+	})
+	result := map[string]any{"source": "apps/fyne/ui/boton.go", "nativeType": "ui.Boton", "callbackCount": count, "disabledCallbackSuppressed": true, "exportSucceeded": err == nil, "pixelParityVerified": false}
+	if err != nil {
+		result["diagnostic"] = err.Error()
+	}
+	// Exercise the real optional host adapter with the same original archives.
+	// It supplies the product fork, theme and fonts, without stripping CSS classes.
+	files, err := filepath.Glob(filepath.Join(out, "Case*.json"))
+	if err != nil {
+		panic(err)
+	}
+	converted := []map[string]any{}
+	for _, path := range files {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			panic(err)
+		}
+		var archive js.Archive
+		if err = json.Unmarshal(data, &archive); err != nil {
+			panic(err)
+		}
+		view, err := js.New(archive, nil, sytue.Backend{})
+		item := map[string]any{"id": filepath.Base(path[:len(path)-len(".json")]), "mounted": err == nil, "backend": "sytue.Backend"}
+		if err != nil {
+			item["diagnostic"] = err.Error()
+		} else {
+			view.Close()
+		}
+		converted = append(converted, item)
+	}
+	result["converted"] = converted
+	data, _ := json.Marshal(result)
+	fmt.Println(string(data))
+}

@@ -1,0 +1,88 @@
+[
+  {
+    "clave": "ubicacion", "modulo": "inventario", "titulo": "nombre",
+    "etiqueta": {"en":"Locations","es":"Ubicaciones","fr":"Emplacements","de":"Lagerorte","it":"Ubicazioni","bg":"Локации","cs":"Umístění","da":"Lokationer","el":"Θέσεις αποθήκευσης","et":"Asukohad","fi":"Sijainnit","ga":"Suíomhanna","hr":"Lokacije","hu":"Helyek","is":"Staðsetningar","lt":"Vietos","lv":"Atrašanās vietas","mt":"Postijiet","nb":"Lokasjoner","nl":"Locaties","pl":"Lokalizacje","pt":"Localizações","ro":"Locații","sk":"Umiestnenia","sl":"Lokacije","sv":"Lagerplatser"},
+    "campos": [
+      {"clave":"nombre","tipo":"texto","requerido":true},
+      {"clave":"codigo","tipo":"texto"},
+      {"clave":"almacen","tipo":"relacion","modelo":"almacen","requerido":true},
+      {"clave":"padre","tipo":"relacion","modelo":"ubicacion"},
+      {"clave":"tipo","tipo":"seleccion","opciones":["interna","entrada","salida"],"requerido":true}
+    ],
+    "lista": ["codigo","nombre","almacen","padre","tipo"]
+  },
+  {
+    "clave": "numero_serie", "modulo": "inventario", "titulo": "codigo",
+    "etiqueta": {"en":"Lots / Serial numbers","es":"Lotes y números de serie","fr":"Lots / N° de série","de":"Chargen / Seriennummern","it":"Lotti / Numeri di serie","bg":"Партиди / Серийни номера","cs":"Šarže / Sériová čísla","da":"Partier / Serienumre","el":"Παρτίδες / Σειριακοί αριθμοί","et":"Partiid / Seerianumbrid","fi":"Erät / Sarjanumerot","ga":"Baisceanna / Sraithuimhreacha","hr":"Serije / Serijski brojevi","hu":"Tételek / Sorozatszámok","is":"Lotur / Raðnúmer","lt":"Partijos / Serijos numeriai","lv":"Partijas / Sērijas numuri","mt":"Lottijiet / Numri tas-serje","nb":"Partier / Serienumre","nl":"Partijen / Serienummers","pl":"Partie / Numery seryjne","pt":"Lotes / Números de série","ro":"Loturi / Numere de serie","sk":"Šarže / Sériové čísla","sl":"Serije / Serijske številke","sv":"Partier / Serienummer"},
+    "campos": [
+      {"clave":"codigo","tipo":"texto","requerido":true},
+      {"clave":"producto","tipo":"relacion","modelo":"producto","requerido":true},
+      {"clave":"tipo","tipo":"seleccion","opciones":["serie","lote"],"requerido":true},
+      {"clave":"cantidad","tipo":"decimal"},
+      {"clave":"ubicacion","tipo":"relacion","modelo":"ubicacion"},
+      {"clave":"proveedor","tipo":"relacion","modelo":"contacto"},
+      {"clave":"fecha","tipo":"fecha"},
+      {"clave":"vencimiento","tipo":"fecha"}
+    ],
+    "lista": ["codigo","producto","tipo","cantidad","ubicacion","vencimiento"]
+  },
+  {
+    "clave": "movimiento_stock", "modulo": "inventario", "secuencia": "MOV",
+    "etiqueta": {"en":"Stock moves","es":"Movimientos de existencias","fr":"Mouvements de stock","de":"Lagerbewegungen","it":"Movimenti di magazzino","bg":"Складови движения","cs":"Skladové pohyby","da":"Lagerbevægelser","el":"Κινήσεις αποθήκης","et":"Laoliikumised","fi":"Varastosiirrot","ga":"Gluaiseachtaí stoic","hr":"Kretanja zaliha","hu":"Készletmozgások","is":"Birgðahreyfingar","lt":"Atsargų judėjimai","lv":"Krājumu kustība","mt":"Movimenti tal-istokk","nb":"Lagerbevegelser","nl":"Voorraadmutaties","pl":"Ruchy magazynowe","pt":"Movimentos de stock","ro":"Mișcări de stoc","sk":"Skladové pohyby","sl":"Premiki zalog","sv":"Lagerrörelser"},
+    "estados": ["borrador","confirmado","hecho","cancelado"],
+    "campos": [
+      {"clave":"producto","tipo":"relacion","modelo":"producto","requerido":true},
+      {"clave":"numero_serie","tipo":"relacion","modelo":"numero_serie"},
+      {"clave":"cantidad","tipo":"decimal","requerido":true},
+      {"clave":"origen","tipo":"relacion","modelo":"ubicacion"},
+      {"clave":"destino","tipo":"relacion","modelo":"ubicacion"},
+      {"clave":"albaran","tipo":"relacion","modelo":"albaran"},
+      {"clave":"fecha","tipo":"fechahora","requerido":true}
+    ],
+    "lista": ["ref","producto","numero_serie","cantidad","fecha","estado"]
+  },
+  {
+    "clave": "centro_trabajo", "modulo": "fabricacion", "titulo": "nombre",
+    "etiqueta": {"en":"Work centers","es":"Centros de trabajo","fr":"Postes de travail","de":"Arbeitsplätze","it":"Centri di lavoro","bg":"Работни центрове","cs":"Pracoviště","da":"Arbejdsstationer","el":"Κέντρα εργασίας","et":"Töökeskused","fi":"Työpisteet","ga":"Ionaid oibre","hr":"Radni centri","hu":"Munkaállomások","is":"Vinnustöðvar","lt":"Darbo centrai","lv":"Darba centri","mt":"Ċentri tax-xogħol","nb":"Arbeidsstasjoner","nl":"Werkplekken","pl":"Gniazda robocze","pt":"Centros de trabalho","ro":"Centre de lucru","sk":"Pracoviská","sl":"Delovna mesta","sv":"Arbetsstationer"},
+    "estados": ["disponible","averiado","pausada"],
+    "campos": [
+      {"clave":"nombre","tipo":"texto","requerido":true},
+      {"clave":"codigo","tipo":"texto"},
+      {"clave":"almacen","tipo":"relacion","modelo":"almacen"},
+      {"clave":"capacidad","tipo":"decimal"},
+      {"clave":"coste_hora","tipo":"dinero"},
+      {"clave":"responsable","tipo":"texto"}
+    ],
+    "lista": ["codigo","nombre","almacen","coste_hora","estado"]
+  },
+  {
+    "clave": "orden_trabajo", "modulo": "fabricacion", "secuencia": "OT",
+    "etiqueta": {"en":"Work orders","es":"Órdenes de trabajo","fr":"Ordres de travail","de":"Arbeitsgänge","it":"Ordini di lavoro","bg":"Работни поръчки","cs":"Pracovní příkazy","da":"Arbejdsordrer","el":"Εντολές εργασίας","et":"Töökäsud","fi":"Työmääräykset","ga":"Orduithe oibre","hr":"Radni nalozi","hu":"Munkautasítások","is":"Verkbeiðnir","lt":"Darbo užsakymai","lv":"Darba uzdevumi","mt":"Ordnijiet tax-xogħol","nb":"Arbeidsordrer","nl":"Werkorders","pl":"Zlecenia robocze","pt":"Ordens de trabalho","ro":"Ordine de lucru","sk":"Pracovné príkazy","sl":"Delovni nalogi","sv":"Arbetsorder"},
+    "estados": ["pendiente","en_curso","hecho","cancelado"],
+    "campos": [
+      {"clave":"orden_fabricacion","tipo":"relacion","modelo":"orden_fabricacion","requerido":true},
+      {"clave":"centro_trabajo","tipo":"relacion","modelo":"centro_trabajo","requerido":true},
+      {"clave":"nombre","tipo":"texto","requerido":true},
+      {"clave":"duracion","tipo":"decimal"},
+      {"clave":"empleado","tipo":"relacion","modelo":"empleado"},
+      {"clave":"fecha_inicio","tipo":"fechahora"},
+      {"clave":"fecha_fin","tipo":"fechahora"}
+    ],
+    "lista": ["ref","orden_fabricacion","centro_trabajo","nombre","duracion","estado"]
+  },
+  {
+    "clave": "cambio_ingenieria", "modulo": "plm", "secuencia": "ECO",
+    "etiqueta": {"en":"Engineering changes","es":"Cambios de ingeniería","fr":"Modifications techniques","de":"Änderungsaufträge","it":"Modifiche tecniche","bg":"Инженерни промени","cs":"Konstrukční změny","da":"Konstruktionsændringer","el":"Τεχνικές αλλαγές","et":"Tehnilised muudatused","fi":"Suunnittelumuutokset","ga":"Athruithe innealtóireachta","hr":"Tehničke izmjene","hu":"Műszaki változtatások","is":"Hönnunarbreytingar","lt":"Inžineriniai pakeitimai","lv":"Inženiertehniskās izmaiņas","mt":"Bidliet tal-inġinerija","nb":"Konstruksjonsendringer","nl":"Technische wijzigingen","pl":"Zmiany konstrukcyjne","pt":"Alterações de engenharia","ro":"Modificări de inginerie","sk":"Konštrukčné zmeny","sl":"Tehnične spremembe","sv":"Konstruktionsändringar"},
+    "estados": ["borrador","en_curso","aprobado","hecho","rechazado"],
+    "campos": [
+      {"clave":"asunto","tipo":"texto","requerido":true},
+      {"clave":"producto","tipo":"relacion","modelo":"producto"},
+      {"clave":"lista_materiales","tipo":"relacion","modelo":"lista_materiales"},
+      {"clave":"prioridad","tipo":"seleccion","opciones":["baja","media","alta","urgente"]},
+      {"clave":"responsable","tipo":"texto"},
+      {"clave":"fecha","tipo":"fecha","requerido":true},
+      {"clave":"motivo","tipo":"texto_largo"}
+    ],
+    "lista": ["ref","asunto","producto","responsable","fecha","estado"]
+  }
+]

@@ -1,0 +1,16 @@
+Fortell historien; lysbildet henger med.
+
+• Presentasjonstemaer med organisasjonens identitet.
+• Presentatørvisning med notater og neste lysbilde.
+• Bilder, figurer, diagrammer og SmartArt.
+• Eksport til ODP, PPTX og PDF; åpne PowerPoint-filer.
+• Temaer og paletter i tråd med organisasjonens merke.
+• Et lerret med figurer, bilder, diagrammer, SmartArt og koblingslinjer.
+• Presenter i fullskjerm med presentatørvisning og notater.
+• Samarbeid i sanntid med tilstedeværelse og kommentarer.
+• Lysbilder med bakgrunner, plakater og oppsett.
+• Eksport til ODP, PPTX og PDF.
+• Åpne PowerPoint-filer fra Drive.
+• Automatisk lagring med versjoner.
+
+Kryptert under overføring (TLS 1.3). Sytues infrastruktur er i EU. Plasseringen av eksterne tjenester avhenger av leverandøren deres.

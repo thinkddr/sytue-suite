@@ -1,0 +1,19 @@
+CalDAV-kalender, mis on seotud ülejäänud komplektiga.
+
+• Päeva-, nädala- ja kuuvaade.
+• Korduvad sündmused ja meeldetuletused.
+• Sündmused otse Maili e-kirjast.
+• Töötab iga CalDAV-kliendiga.
+• Kuu-, nädala-, päeva- ja päevakavavaade, minikalendri ja nupuga „Täna“.
+• Igapäevane, iganädalane või igakuine kordus lõpuga; muuda ainult seda, seda ja järgmisi või kõiki.
+• Meeldetuletused iga sündmuse kohta ja teavitused komplektis.
+• Kutsed koos vastusega (osalen, võib-olla, ei) ja jälgimisega.
+• „Leia aeg“, mis sobib kõigile osalejatele.
+• Broneeritavad ruumid ja ressursid koos saadavusega.
+• Jagatud kalendrid õigustega ning teiega jagatud kalendrid.
+• Väliste kalendrite tellimine (ICS) ja mitu värvikoodiga kalendrit.
+• Sündmuse loomine Maili sõnumist või märkmest.
+• Töötab iga CalDAV-kliendiga: Apple Calendar, Thunderbird ja teised.
+• Sündmuse dubleerimine või kopeerimine oma kalendrisse ning allalaadimine .ics-failina väljaspool Sytuet olijatele.
+
+Krüpteeritud edastamisel (TLS 1.3). Sytue taristu asub ELis. Väliste teenuste asukoht sõltub nende pakkujast.

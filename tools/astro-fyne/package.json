@@ -1,0 +1,34 @@
+{
+  "name": "@astro-fyne/compiler",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "scripts": {
+    "generate": "bun src/cli.ts generate --config astro-fyne.json",
+    "check": "bun src/cli.ts check --config astro-fyne.json",
+    "watch": "bun src/cli.ts watch --config astro-fyne.json",
+    "test": "bun test src",
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --write src example astro-fyne.json package.json tsconfig.json"
+  },
+  "dependencies": {
+    "@astrojs/compiler": "4.0.0",
+    "entities": "8.1.0",
+    "typescript": "6.0.3"
+  },
+  "devDependencies": {
+    "@types/bun": "1.4.2",
+    "prettier": "3.9.9",
+    "astro": "7.3.5",
+    "@astrojs/preact": "6.0.5",
+    "preact": "10.29.8",
+    "playwright": "1.63.0"
+  },
+  "overrides": {
+    "http-cache-semantics": "4.3.0",
+    "vite": "8.3.4",
+    "postcss": "8.5.30",
+    "nanoid": "3.3.20"
+  }
+}

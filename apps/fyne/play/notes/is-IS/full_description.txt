@@ -1,0 +1,18 @@
+Glósubækur sem rúma hvað sem er: texta, skrár, viðburði, heil skjöl.
+
+• Hreiðraðar glósubækur á frjálsum striga, í dálkum eða sem listi.
+• Glósur af öllu tagi: texti, verkefni, tenglar, skrár, viðburðir úr Calendar, skjöl úr Docs.
+• Þú ræður hvað fer í leitina — og hvað aldrei.
+• Hreiðraðar glósubækur með tákni og lit; þrjú útlit: frjálst, dálkar og listi.
+• Tólf tegundir glósa: texti, verkefni, tenglar, litur, mynd og tilvísanir í Drive, Docus, Calendar, Rooms og aðrar glósur.
+• Ritill með sniði (feitletrun, listar, tenglar) sem vistar þegar þú ferð út.
+• Merki, festa, tvítaka, færa milli glósubóka, flokka og draga á striganum.
+• Sýnileiki fyrir hverja glósubók: einkamál, persónuleg, fyrirtæki eða opinber tengill.
+• Þú ræður hvaða glósubækur fara í leit pakkans.
+• Baktenglar: sjáðu hvaða glósur vísa á þessa.
+• Fluttu heila glósubók út í HTML, PDF, Markdown og fleira; fluttu inn afrit.
+• Deildu glósu í rás í Rooms; slepptu eða límdu til að búa til glósur.
+• Töflur í ritlinum og Markdown-flýtileiðir meðan þú skrifar: „- “, „# “, „> “ og „```“.
+• Færðu glósu í aðra glósubók, fluttu út staka glósu og raðaðu glósubókinni eins og þér hentar.
+
+Dulkóðað í flutningi (TLS 1.3). Innviðir Sytue eru innan ESB. Staðsetning ytri þjónustu fer eftir þjónustuveitanda hennar.

@@ -1,0 +1,31 @@
+{
+  "key": "notion",
+  "tier": "tier2",
+  "manifest": {
+    "name": "Notion",
+    "description": "Espacio de trabajo de notas, docs y wikis, con inicio de sesión único.",
+    "category": "Productividad",
+    "color": "#191919",
+    "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#191919\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"4\" y=\"4\" width=\"16\" height=\"16\" rx=\"2\"/><path d=\"M9 16V9l6 7V9\"/></svg>",
+    "identity": {
+      "kind": "saml",
+      "entity_id": "https://www.notion.so",
+      "acs_url": "https://www.notion.so/sso/saml/acs",
+      "name_id_format": "email"
+    },
+    "provisioning": "none",
+    "launch": {
+      "kind": "url",
+      "url": "https://www.notion.so/{workspace}"
+    },
+    "fields": [
+      {
+        "key": "workspace",
+        "label": "Workspace de Notion",
+        "placeholder": "acme",
+        "help": "El identificador de tu workspace: https://www.notion.so/WORKSPACE",
+        "required": true
+      }
+    ]
+  }
+}

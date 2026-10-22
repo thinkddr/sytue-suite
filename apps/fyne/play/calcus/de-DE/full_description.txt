@@ -1,0 +1,18 @@
+Zahlen, die man versteht, in einem Blatt, das mitarbeitet.
+
+• Formeln, bedingte Formatierung und Datenprüfung.
+• Externe Daten einbinden und abfragen, ohne das Blatt zu verlassen.
+• Diagramme, Sparklines, Datenschnitte und Datentabellen.
+• Export als ODS und XLSX; Excel-Dateien öffnen.
+• Formeln mit Kontexthilfe und sofortiger Neuberechnung.
+• Bedingte Formatierung, Datenprüfung und regionale Zahlenformate.
+• Diagramme mehrerer Typen, Sparklines und Datenschnitte.
+• Datentabellen mit Summen und Sortierung; Pivot-Tabelle.
+• Externe Daten: eine Quelle verbinden und aus dem Blatt abfragen.
+• Solver, um den Wert zu finden, der ein Ziel erfüllt.
+• Makros zur Automatisierung wiederkehrender Aufgaben.
+• Zusammenarbeit in Echtzeit mit Präsenz und Kommentaren.
+• Filter, Datenschnitte und Suche im Blatt.
+• Export als ODS, XLSX und PDF; Excel-Dateien aus Drive öffnen.
+
+Verschlüsselt bei der Übertragung (TLS 1.3). Die Infrastruktur von Sytue befindet sich in der EU. Der Standort externer Dienste hängt von ihrem Anbieter ab.

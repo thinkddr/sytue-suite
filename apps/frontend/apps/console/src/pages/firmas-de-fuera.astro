@@ -1,0 +1,33 @@
+---
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: (c) 2026 Daniel Delgado Ramos
+ *
+ * Qué hace la organización con las peticiones de firma de CertiPDF que le llegan de
+ * otras organizaciones (ADR 0059): abiertas, cerradas o solo de las de confianza.
+ */
+import ConsoleLayout from '../layouts/ConsoleLayout.astro';
+import { useT } from '../i18n/index.js';
+import ExternalSignaturesPanel from '../components/ExternalSignaturesPanel';
+import { requireSession } from '@sytue/auth/server';
+import { canonicaConOrg } from '@sytue/config';
+import { getBff, toBffContext } from '../server/bff.js';
+
+export const prerender = false;
+
+const guard = await requireSession(getBff(), toBffContext(Astro), {
+  roles: ['admin', 'owner'],
+});
+if (guard instanceof Response) return guard;
+// Ruta en `sinOrg` (su nombre colisiona con el namespace de organizaciones):
+// con sesión, un salto local a la canónica con la org activa (ADR 0056).
+const canonica = canonicaConOrg(Astro.url, getBff().basePath, guard.session.user.tenant);
+if (canonica) return Astro.redirect(canonica);
+
+const locale = Astro.locals.locale;
+const t = useT(locale);
+---
+
+<ConsoleLayout title={t('page.externalSignatures')} section="external-signatures">
+  <ExternalSignaturesPanel client:load locale={locale} />
+</ConsoleLayout>

@@ -1,0 +1,18 @@
+CardDAV-tengiliðir, sameiginlegir í öllu fyrirtækinu.
+
+• Sameiginleg nafnaskrá fyrir allt fyrirtækið.
+• Innflutningur og útflutningur á vCard-sniði.
+• Sameinaðu tvítekningar án þess að tapa gögnum.
+• Virkar með hvaða CardDAV-biðlara sem er.
+• Nafnaskrár, þar á meðal sameiginleg nafnaskrá fyrirtækisins.
+• Fullkomið spjald: símanúmer, netföng, heimilisföng, fyrirtæki, afmælisdagur, glósur og mynd.
+• Merki og eftirlæti til að flokka og finna.
+• Greining og sameining tvítekninga án þess að tapa gögnum.
+• Innflutningur og útflutningur á vCard og CSV; útflutningur á stökum tengilið.
+• Fjöldaaðgerðir og rusl með endurheimt.
+• Tafarlaus leit og sjálfvirk útfylling meðan þú skrifar í Mail.
+• Virkar með hvaða CardDAV-biðlara sem er.
+• Væntanlegir afmælisdagar úr nafnaskránni, með afmælum mánaðarins merktum.
+• Búðu til fund með tengilið eða afritaðu netfang tengiliðarins án þess að fara af spjaldinu.
+
+Dulkóðað í flutningi (TLS 1.3). Innviðir Sytue eru innan ESB. Staðsetning ytri þjónustu fer eftir þjónustuveitanda hennar.

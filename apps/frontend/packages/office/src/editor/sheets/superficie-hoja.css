@@ -1,0 +1,61 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: (c) 2026 Daniel Delgado Ramos
+ *
+ * Acabado de la rejilla de Calcus: cabeceras en la selección, líneas de la cuadrícula y el
+ * «papel» de los objetos que flotan sobre las celdas. Solo presentación: nada de esto toca
+ * la geometría (los píxeles de celda viven en SheetCanvas) ni se pinta por celda.
+ */
+.sytue-editor {
+  /* Líneas de la cuadrícula: un punto más suaves que el 22 % de antes, para que se lea el
+     dato y no la rejilla. Marina fija (no la tinta del tema): se pintan sobre papel blanco,
+     que no cambia en oscuro. */
+  --editor-grid-line: color-mix(in srgb, var(--sytue-accent-800) 17%, transparent);
+}
+
+/* Cabecera de fila o columna dentro de la selección. Opaca: el fondo de una fila congelada es
+   papel blanco, y un tinte translúcido sobre blanco dejaba, en oscuro, texto claro sobre
+   celeste pálido. La arista del lado de la rejilla marca por dónde va la selección. */
+.sytue-grid-head-hl {
+  background: color-mix(
+    in srgb,
+    var(--editor-select) var(--sytue-selected-strength),
+    var(--sytue-bg-subtle)
+  );
+  color: var(--sytue-text);
+  font-weight: 500;
+}
+.sytue-grid-head-hl[role='columnheader'] {
+  box-shadow: inset 0 -2px 0 var(--editor-select);
+}
+.sytue-grid-head-hl[role='rowheader'] {
+  box-shadow: inset -2px 0 0 var(--editor-select);
+}
+
+/* «Papel»: gráficos y segmentadores flotan sobre celdas que son blancas en los dos temas, y su
+   contenido (ejes, rótulos, líneas) usa tinta de papel. Con los tokens del tema, en oscuro la
+   tarjeta se volvía oscura con ejes y título casi invisibles. Aquí se fijan los roles del tema
+   claro para todo lo de dentro (incluido el editor de datos del gráfico). Hay que reasignar las
+   variables de Tailwind (`--color-*`) y no solo las `--sytue-*`: aquéllas se resuelven en la
+   raíz y no siguen a un cambio local. */
+.sytue-papel {
+  --sytue-text: var(--sytue-accent-800);
+  --sytue-text-muted: var(--sytue-neutral-600);
+  --sytue-text-subtle: var(--sytue-neutral-500);
+  --sytue-border-subtle: color-mix(in srgb, var(--sytue-accent-800) 8%, transparent);
+  --sytue-border: color-mix(in srgb, var(--sytue-accent-800) 12%, transparent);
+  --sytue-border-strong: color-mix(in srgb, var(--sytue-accent-800) 54%, transparent);
+  --sytue-surface: var(--sytue-neutral-0);
+  --sytue-bg-subtle: var(--sytue-neutral-100);
+  --sytue-selected: color-mix(in srgb, var(--sytue-primary-500) 10%, transparent);
+  --color-text: var(--sytue-text);
+  --color-text-muted: var(--sytue-text-muted);
+  --color-text-subtle: var(--sytue-text-subtle);
+  --color-border-subtle: var(--sytue-border-subtle);
+  --color-border: var(--sytue-border);
+  --color-border-strong: var(--sytue-border-strong);
+  --color-surface: var(--sytue-surface);
+  --color-bg-subtle: var(--sytue-bg-subtle);
+  --color-selected: var(--sytue-selected);
+  color: var(--sytue-text);
+}

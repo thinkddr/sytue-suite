@@ -1,0 +1,66 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: (c) 2026 Daniel Delgado Ramos
+ *
+ * Acabado de las TRES superficies de edición —la página de Docus, la rejilla de Calcus y el
+ * escenario de Diapos—: el lienzo sobre el que se apoya el papel, la sombra de ese papel, el
+ * azul de selección y el tinte de las marcas de revisión. Todo sale de tokens de marca; el
+ * único literal es el papel blanco, que es de contenido y no cambia con el tema.
+ *
+ * Va APARTE de `editor.css` (que es del cromo) y se carga después de él desde cada lienzo, así
+ * que en la misma especificidad gana lo de aquí. Si el cromo llega a fijar las mismas
+ * variables, se borra de uno de los dos sitios.
+ */
+.sytue-editor {
+  /* El lienzo es PAPEL HUNDIDO, de la misma familia cálida que el resto de la suite (antes
+     un greige verdoso suelto, #e9e6dd, que no era de ninguna escala). En oscuro, el fondo
+     de la aplicación: el papel blanco es lo único claro y se lee como una hoja sobre la mesa. */
+  --editor-canvas-bg: var(--sytue-neutral-150);
+
+  /* El azul de selección de la suite (primary-500, ≥ 3:1 sobre blanco). Es fijo en los dos
+     temas porque lo que se selecciona —una celda, una imagen, una caja— se pinta sobre papel
+     blanco en los dos; `--sytue-primary` es tinta en claro y no sirve para señalar. */
+  --editor-select: var(--sytue-primary-500);
+
+  /* Sombra del papel: un filete de tinta que lo recorta del lienzo y un halo corto y frío.
+     Antes eran dos sombras de 6 y 20 px de difuminado que dejaban una banda sucia a cada lado
+     de la hoja. En la hoja la elevación es mínima: separa, no flota. */
+  --editor-page-shadow:
+    0 0 0 1px color-mix(in srgb, var(--sytue-accent-900) 14%, transparent),
+    0 2px 8px -2px color-mix(in srgb, var(--sytue-accent-900) 16%, transparent);
+}
+
+[data-theme='dark'] .sytue-editor {
+  --editor-canvas-bg: var(--sytue-surface-sunken);
+  --editor-page-shadow:
+    0 0 0 1px color-mix(in srgb, var(--sytue-neutral-0) 10%, transparent),
+    0 4px 16px -2px color-mix(in srgb, var(--sytue-neutral-1000) 70%, transparent);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) .sytue-editor {
+    --editor-canvas-bg: var(--sytue-surface-sunken);
+    --editor-page-shadow:
+      0 0 0 1px color-mix(in srgb, var(--sytue-neutral-0) 10%, transparent),
+      0 4px 16px -2px color-mix(in srgb, var(--sytue-neutral-1000) 70%, transparent);
+  }
+}
+
+/* ---- La página (Docus) ---- */
+
+/* Texto seleccionado: el azul de selección. Con `--sytue-primary` (tinta en claro) salía un
+   gris plomo, y en oscuro un azul distinto del claro. */
+.sytue-page ::selection {
+  background: color-mix(in srgb, var(--editor-select) 30%, transparent);
+}
+
+/* Comentario anclado: realce ámbar con los tokens de aviso. Antes salía de `--sytue-primary`,
+   que en claro es tinta (un gris sobre el papel, que no se lee como marca) y en oscuro azul:
+   dos aspectos para lo mismo. */
+.sytue-page mark[data-comment-id] {
+  background: color-mix(in srgb, var(--sytue-warning) 20%, transparent);
+  box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--sytue-warning) 55%, transparent);
+  border-radius: 1px;
+}
+.sytue-page mark[data-comment-id]:hover {
+  background: color-mix(in srgb, var(--sytue-warning) 30%, transparent);
+}

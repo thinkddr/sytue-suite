@@ -1,0 +1,130 @@
+{
+ "slides": [
+  {
+   "id": "s1",
+   "boxes": [
+    {
+     "id": "s1-titulo",
+     "x": 10,
+     "y": 35,
+     "w": 80,
+     "h": 20,
+     "html": "<h1>{{formacion.titulo}}</h1>"
+    },
+    {
+     "id": "s1-subtitulo",
+     "x": 10,
+     "y": 58,
+     "w": 80,
+     "h": 10,
+     "html": "<p>{{formacion.subtitulo}}</p>"
+    }
+   ]
+  },
+  {
+   "id": "s2",
+   "boxes": [
+    {
+     "id": "s2-titulo",
+     "x": 8,
+     "y": 8,
+     "w": 84,
+     "h": 16,
+     "html": "<h1>{{formacion.objetivos}}</h1>"
+    },
+    {
+     "id": "s2-cuerpo",
+     "x": 8,
+     "y": 30,
+     "w": 84,
+     "h": 60,
+     "html": "<ul><li>{{formacion.objetivo}}</li><li>{{formacion.objetivo}}</li><li>{{formacion.objetivo}}</li></ul>"
+    }
+   ]
+  },
+  {
+   "id": "s3",
+   "boxes": [
+    {
+     "id": "s3-titulo",
+     "x": 8,
+     "y": 8,
+     "w": 84,
+     "h": 16,
+     "html": "<h1>{{formacion.agenda}}</h1>"
+    },
+    {
+     "id": "s3-cuerpo",
+     "x": 8,
+     "y": 30,
+     "w": 84,
+     "h": 60,
+     "html": "<ul><li>{{formacion.tema}}</li><li>{{formacion.tema}}</li><li>{{formacion.tema}}</li><li>{{formacion.tema}}</li></ul>"
+    }
+   ]
+  },
+  {
+   "id": "s4",
+   "boxes": [
+    {
+     "id": "s4-titulo",
+     "x": 8,
+     "y": 8,
+     "w": 84,
+     "h": 16,
+     "html": "<h1>{{formacion.ideas}}</h1>"
+    },
+    {
+     "id": "s4-cuerpo",
+     "x": 8,
+     "y": 30,
+     "w": 84,
+     "h": 60,
+     "html": "<ul><li>{{formacion.idea1}}</li><li>{{formacion.idea2}}</li><li>{{formacion.idea3}}</li></ul>"
+    }
+   ]
+  },
+  {
+   "id": "s5",
+   "boxes": [
+    {
+     "id": "s5-titulo",
+     "x": 8,
+     "y": 8,
+     "w": 84,
+     "h": 16,
+     "html": "<h1>{{formacion.practica}}</h1>"
+    },
+    {
+     "id": "s5-cuerpo",
+     "x": 8,
+     "y": 30,
+     "w": 84,
+     "h": 60,
+     "html": "<ul><li>{{formacion.practica1}}</li><li>{{formacion.practica2}}</li></ul>"
+    }
+   ]
+  },
+  {
+   "id": "s6",
+   "boxes": [
+    {
+     "id": "s6-titulo",
+     "x": 8,
+     "y": 8,
+     "w": 84,
+     "h": 16,
+     "html": "<h1>{{formacion.cierre}}</h1>"
+    },
+    {
+     "id": "s6-cuerpo",
+     "x": 8,
+     "y": 30,
+     "w": 84,
+     "h": 60,
+     "html": "<ul><li>{{formacion.cierre1}}</li><li>{{formacion.cierre2}}</li></ul>"
+    }
+   ]
+  }
+ ]
+}

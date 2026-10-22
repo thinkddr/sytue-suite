@@ -1,0 +1,19 @@
+Private, European mail over JMAP — no trackers, no ads.
+
+• A fast inbox with threads, labels, filters and search.
+• Attach files straight from Sytue Drive.
+• Turn an email into a Calendar event.
+• Encrypted in transit (TLS 1.3). Sytue’s infrastructure is in the EU. The location of external services depends on their provider.
+• Conversation threads with reading, reply and forward in one click.
+• Folders, colour labels and search with operators (from:, has:attachment, is:unread…).
+• Automatic rules that archive, label or move mail as it arrives.
+• Scheduled send and “Undo send”.
+• Signatures, sender aliases and an automatic vacation reply.
+• Shared and delegated mailboxes with read and send permissions.
+• Rich-text composer with attachments from Sytue Drive without duplicating files.
+• Remote content blocked by default: nobody learns when you open an email.
+• Signed mail (PGP and S/MIME) recognised and flagged; TLS in transit.
+• Access from Thunderbird, Outlook, Apple Mail or your phone too, with app passwords.
+• Recipient chips with the Contacts address book one click away, and a warning if you say «attached» without attaching.
+
+Encrypted in transit (TLS 1.3). Sytue’s infrastructure is in the EU. The location of external services depends on their provider.

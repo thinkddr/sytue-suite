@@ -1,0 +1,1 @@
+Wspólne tabele relacyjne dla klientów, zamówień lub zapasów, w UE.

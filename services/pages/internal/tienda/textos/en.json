@@ -1,0 +1,10 @@
+{
+  "order_paid_buyer_subject": "Order confirmation {number}",
+  "order_paid_buyer_body": "Thank you for your purchase. Order {number} has been confirmed.",
+  "order_paid_store_subject": "New order received: {number}",
+  "order_paid_store_body": "You have received a new order {number} for {total}.",
+  "withdrawal_ack_subject": "Withdrawal request received: {number}",
+  "withdrawal_ack_body": "Your withdrawal request for order {number} has been registered.",
+  "form_received_subject": "Form submission received: {form_id}",
+  "form_received_body": "A new submission has been received for form {form_id}."
+}

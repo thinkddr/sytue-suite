@@ -1,0 +1,35 @@
+---
+import ConsoleLayout from '../layouts/ConsoleLayout.astro';
+import { useT } from '../i18n/index.js';
+import GroupsPanel from '../components/GroupsPanel';
+import { requireSession } from '@sytue/auth/server';
+import { canonicaConOrg } from '@sytue/config';
+import { getBff, toBffContext } from '../server/bff.js';
+import { loadAdminGroups, loadUsers } from '../lib/admin.js';
+
+export const prerender = false;
+
+const guard = await requireSession(getBff(), toBffContext(Astro), {
+  roles: ['admin', 'owner'],
+  perms: ['groups.manage'],
+});
+if (guard instanceof Response) return guard;
+// Ruta en `sinOrg` (su nombre colisiona con el namespace de organizaciones):
+// con sesión, un salto local a la canónica con la org activa (ADR 0056).
+const canonica = canonicaConOrg(Astro.url, getBff().basePath, guard.session.user.tenant);
+if (canonica) return Astro.redirect(canonica);
+
+// Grupos gestionables + primera página del directorio para el picker de miembros.
+const [{ live, data: groups }, { data: usersPage }] = await Promise.all([
+  loadAdminGroups(guard.session),
+  loadUsers(guard.session, undefined, { limit: 200 }),
+]);
+
+// El idioma lo negoció el middleware; la isla lo recibe por props (nunca lo detecta).
+const locale = Astro.locals.locale;
+const t = useT(locale);
+---
+
+<ConsoleLayout title={t('page.groups')} section="groups">
+  <GroupsPanel client:load locale={locale} groups={groups} users={usersPage.items} live={live} />
+</ConsoleLayout>

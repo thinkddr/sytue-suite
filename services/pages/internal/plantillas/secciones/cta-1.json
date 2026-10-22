@@ -1,0 +1,50 @@
+{
+  "children": [
+    {
+      "content": {
+        "en": [
+          {
+            "text": "Ready to take the next step?"
+          }
+        ],
+        "es": [
+          {
+            "text": "¿Listo para dar el siguiente paso?"
+          }
+        ]
+      },
+      "id": "tex0000001",
+      "tag": "h2",
+      "type": "text"
+    },
+    {
+      "action": {
+        "page": "pag0000003"
+      },
+      "id": "but0000001",
+      "label": {
+        "en": "Contact Team",
+        "es": "Contactar equipo"
+      },
+      "type": "button",
+      "variant": "primary"
+    }
+  ],
+  "full_bleed": false,
+  "id": "sec0000001",
+  "kind": "cta",
+  "layout": {
+    "direction": "column",
+    "gap": 24,
+    "padding": [
+      32,
+      32,
+      32,
+      32
+    ],
+    "align": "center",
+    "justify": "center",
+    "wrap": false
+  },
+  "type": "section"
+}

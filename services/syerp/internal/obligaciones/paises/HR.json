@@ -1,0 +1,239 @@
+{
+ "pais": "HR",
+ "verificado": true,
+ "moneda": "EUR",
+ "formas": [
+  {
+   "clave": "obrt",
+   "nombre": "Obrt",
+   "tipo": "persona_fisica"
+  },
+  {
+   "clave": "slobodno",
+   "nombre": "Slobodno zanimanje",
+   "tipo": "persona_fisica"
+  },
+  {
+   "clave": "doo",
+   "nombre": "Društvo s ograničenom odgovornošću (d.o.o.)",
+   "tipo": "sociedad"
+  },
+  {
+   "clave": "jdoo",
+   "nombre": "Jednostavno d.o.o. (j.d.o.o.)",
+   "tipo": "sociedad"
+  },
+  {
+   "clave": "dd",
+   "nombre": "Dioničko društvo (d.d.)",
+   "tipo": "sociedad"
+  }
+ ],
+ "portales": {
+  "eporezna": {
+   "nombre": "ePorezna (Porezna uprava)",
+   "url": "https://e-porezna.porezna-uprava.hr/"
+  },
+  "fina": {
+   "nombre": "FINA — Registar godišnjih financijskih izvještaja",
+   "url": "https://www.fina.hr/"
+  }
+ },
+ "obligaciones": [
+  {
+   "clave": "hr_pdv_m",
+   "nombre": "Prijava PDV-a (mjesečna)",
+   "concepto": "iva_periodica",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "20"
+   },
+   "margen_dias": 7,
+   "portal": "eporezna",
+   "aplica": {
+    "condiciones": [
+     "iva",
+     "iva_mensual"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 26000,
+    "nota": "Novčana kazna od 260 € do 66 360 € (čl. 131 Zakona o PDV-u); zatezne kamate na nepravodobno plaćen porez."
+   },
+   "calculo": {
+    "tipo": "saldo_neto",
+    "haber": [
+     "477"
+    ],
+    "debe": [
+     "472"
+    ]
+   }
+  },
+  {
+   "clave": "hr_pdv_q",
+   "nombre": "Prijava PDV-a (tromjesečna)",
+   "concepto": "iva_periodica",
+   "ambito": "fiscal",
+   "periodicidad": "trimestral",
+   "plazos": {
+    "T": "20"
+   },
+   "margen_dias": 7,
+   "portal": "eporezna",
+   "aplica": {
+    "condiciones": [
+     "iva",
+     "!iva_mensual"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 26000,
+    "nota": "Do 20. dana u mjesecu koji slijedi nakon tromjesečja; tromjesečni obveznik koji započne transakcije unutar EU prelazi na mjesečnu prijavu. Novčana kazna od 260 € do 66 360 €; tromjesečno za vrijednost isporuka do 110 000 € godišnje."
+   },
+   "calculo": {
+    "tipo": "saldo_neto",
+    "haber": [
+     "477"
+    ],
+    "debe": [
+     "472"
+    ]
+   }
+  },
+  {
+   "clave": "hr_zp",
+   "nombre": "Zbirna prijava (ZP)",
+   "concepto": "operaciones_intracomunitarias",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "20"
+   },
+   "margen_dias": 7,
+   "portal": "eporezna",
+   "aplica": {
+    "condiciones": [
+     "intracomunitario"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 26000,
+    "nota": "Novčana kazna od 260 € do 66 360 €."
+   }
+  },
+  {
+   "clave": "hr_joppd",
+   "nombre": "JOPPD obrazac i doprinosi",
+   "concepto": "nominas",
+   "ambito": "laboral",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "15"
+   },
+   "margen_dias": 7,
+   "portal": "eporezna",
+   "aplica": {
+    "condiciones": [
+     "empleados"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 26000,
+    "nota": "JOPPD na dan isplate plaće (najkasnije 15. u mjesecu); doprinosi do 15. u mjesecu za prethodni mjesec."
+   }
+  },
+  {
+   "clave": "hr_pd",
+   "nombre": "Prijava poreza na dobit (PD)",
+   "concepto": "sociedades_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "04-30+1"
+   },
+   "margen_dias": 30,
+   "portal": "eporezna",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 26000,
+    "nota": "Novčana kazna od 260 € do 26 540 €; četiri mjeseca nakon isteka poreznog razdoblja."
+   }
+  },
+  {
+   "clave": "hr_predujam",
+   "nombre": "Predujam poreza na dobit",
+   "concepto": "pago_fraccionado_sociedades",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "ultimo"
+   },
+   "margen_dias": 7,
+   "portal": "eporezna",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "nota",
+    "nota": "Zatezne kamate na neplaćeni predujam."
+   }
+  },
+  {
+   "clave": "hr_doh",
+   "nombre": "Prijava poreza na dohodak (DOH)",
+   "concepto": "renta_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "02-ultimo+1"
+   },
+   "margen_dias": 30,
+   "portal": "eporezna",
+   "aplica": {
+    "tipos": [
+     "persona_fisica"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 26000,
+    "nota": "Novčana kazna od 260 € do 13 270 €."
+   }
+  },
+  {
+   "clave": "hr_gfi",
+   "nombre": "Godišnji financijski izvještaji (FINA)",
+   "concepto": "cuentas_anuales",
+   "ambito": "mercantil",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "04-30+1"
+   },
+   "margen_dias": 30,
+   "portal": "fina",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 130000,
+    "nota": "Novčana kazna od 1 320 € do 13 270 € za društvo; za statističke potrebe do 30. travnja, za javnu objavu do 30. lipnja."
+   }
+  }
+ ]
+}

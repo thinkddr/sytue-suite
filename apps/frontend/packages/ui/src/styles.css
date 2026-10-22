@@ -1,0 +1,692 @@
+/**
+ * @sytue/ui — hoja de estilos del design system.
+ *
+ * Importa Tailwind v4 y la capa de tema Sytue (tokens de marca). Las apps
+ * que montan @sytue/ui importan SOLO este fichero: obtienen Tailwind + tokens
+ * + utilidades de componentes + la tipografía de la suite.
+ *
+ *   import "@sytue/ui/styles.css";
+ */
+@import 'tailwindcss';
+@import '@sytue/config/theme.css';
+/* Las dos tipografías de la suite (SIL OFL), autoalojadas: Figtree para el latín e
+   Inter para griego y cirílico (ver `--font-sans` en theme.css). Van AQUÍ y no en cada
+   layout por lo mismo que los `@source` de abajo: una app nueva las hereda sin
+   acordarse. Cada paquete trae una `@font-face` por alfabeto con su `unicode-range`,
+   así que el navegador solo baja lo que la página pinta —el latín de Figtree casi
+   siempre; Inter solo si aparece griego o cirílico—, y `font-display: swap` deja el
+   texto visible con la fuente de sistema mientras llega.
+
+   Y la CURSIVA de Figtree, que es otro fichero: sin él, `italic` la sintetiza el
+   navegador inclinando la recta, con los avances de la recta, y la misma frase medía
+   un 2,6 % menos que en las apps nativas, que pintan la Figtree Italic de verdad. Solo
+   se baja si la página tiene algo en cursiva. */
+@import '@fontsource-variable/figtree';
+@import '@fontsource-variable/figtree/wght-italic.css';
+@import '@fontsource-variable/inter';
+
+/* Detectar clases en los paquetes compartidos (Tailwind v4 @source).
+   Tailwind v4 NO escanea node_modules, así que sin esto las utilidades que solo
+   aparecen dentro de estos componentes no se generan y la app las pierde.
+
+   LAS PROPIAS VAN AQUÍ y no en cada app, que es como estaba: las diez que ya
+   existían copiaban la misma línea a mano y la once —Mi cuenta— se montó sin
+   ella. El resultado no parecía un fallo de estilos: el selector de aplicaciones
+   se desplegaba en UNA COLUMNA que bajaba fuera de la pantalla (sin `grid-cols-3`)
+   y los botones salían como texto suelto (sin `bg-primary`). Una app nueva ya no
+   puede olvidarlo porque no tiene que acordarse. */
+@source './**/*.{ts,tsx}';
+@source '../../shell/src/**/*.{ts,tsx}';
+
+/* Controles nativos (select, scrollbars, date pickers) acordes al tema:
+   sin esto, en modo oscuro el navegador los pinta claros. */
+:root {
+  color-scheme: light;
+}
+[data-theme='dark'] {
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+  }
+}
+
+/* La lista NATIVA de opciones es otra superficie: el select cerrado puede ser un
+   cristal o estar sobre el cromo, pero su lista no puede heredar ese fondo ni su
+   tinta. Chromium pinta el alfa de las opciones sin el desenfoque del control. */
+select option,
+select optgroup {
+  background-color: var(--sytue-menu-surface);
+  color: var(--sytue-text);
+}
+/* La tinta explícita de arriba sustituye también al GrayText del navegador: se
+   devuelve la distinción de deshabilitado, incluidas las opciones de un grupo
+   deshabilitado, que también coinciden con `:disabled`. */
+select option:disabled,
+select optgroup:disabled {
+  color: var(--sytue-text-muted);
+}
+
+/* La ayuda es una superficie INVERTIDA, incluso dentro de una tarjeta de color.
+   Los tokens crudos evitan heredar la tinta blanca de la tarjeta como fondo de la
+   flecha. appearance.css la excluye de la restauración de tinta de los menús. */
+.sytue-tooltip-surface,
+.sytue-tooltip-arrow {
+  background: var(--sytue-text);
+}
+.sytue-tooltip-surface {
+  color: var(--sytue-bg);
+}
+
+/* Acabado de la suite entera, FUERA DE TODA `@layer` por lo mismo que el anillo
+   de foco (ver más abajo): son detalles que ninguna utilidad debe poder apagar
+   sin decirlo.
+
+   Barras de desplazamiento finas y del color del borde. La de fábrica —15px
+   grises con flechas— era lo primero que se veía en el lienzo del editor de
+   Docs y en cualquier lista larga, y no tiene nada que ver con el resto del
+   cromo. `transparent` en la pista para que la barra se lea como parte del
+   panel, no como un carril aparte. Safari ignora estas dos propiedades y sigue
+   con las suyas, que ya son finas. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--sytue-border-strong) transparent;
+}
+
+/* La selección de texto lleva el azul de la casa, diluido: es el mismo color que
+   ya marca el foco y la fila elegida. Solo el fondo: el texto conserva su color para
+   que lo seleccionado siga leyéndose igual en claro y en oscuro. */
+::selection {
+  background-color: color-mix(in srgb, var(--sytue-focus-ring) 26%, transparent);
+}
+
+/* -----------------------------------------------------------------------------
+   Glifos duotono: de qué color es el relleno (components/Glifo.tsx).
+
+   El relleno de un icono es `--sytue-glyph-fill`, que cae en el primario: el
+   color de marca bajo una tinta NEUTRA. Aquí están las dos excepciones generales,
+   y en las dos el relleno pasa a ser la propia tinta (`currentColor`):
+
+   1. SOBRE UN RELLENO DE COLOR —el botón principal, el de peligro, una insignia
+      sólida, la tesela de un producto—, porque acento sobre acento no se ve.
+   2. CON LA TINTA YA DE COLOR sobre fondo neutro —rojo de peligro, verde de
+      éxito, ámbar de aviso, el color de un producto—: el relleno sigue a la
+      tinta. Marca bajo un trazo rojo son dos colores peleando.
+
+   Se reconoce por la TINTA y no por el fondo ni por el componente: quien escribe
+   en color usa una de estas utilidades, así que no hay que acordarse en cada
+   botón ni en cada aviso. `[class*=…]` y no la clase exacta para que entren las
+   dos formas de cada estado (`text-danger` y `text-danger-text`). Quien pone el
+   color con `style` —el de un producto— añade `sytue-glifo-tinta`.
+
+   `:where()` para que pese cero: cualquier regla que quiera otro relleno en un
+   sitio concreto —el carril de color, con su ámbar— gana sin pelearse con esta.
+   Ojo, eso sí: esto declara el valor EN el elemento, y un valor heredado pierde
+   contra uno declarado; el carril tiene que fijar el suyo también en lo que
+   lleve estas tintas dentro.
+   ----------------------------------------------------------------------------- */
+:where(
+  .text-white,
+  .text-\[var\(--sytue-on-primary\)\],
+  [class*='text-on-card-solid-'],
+  [class*='text-danger'],
+  [class*='text-success'],
+  [class*='text-warning'],
+  [class*='text-info'],
+  [class*='text-violet-'],
+  [class*='text-red-'],
+  [class*='text-green-'],
+  [class*='text-amber-'],
+  .sytue-glifo-tinta
+) {
+  --sytue-glyph-fill: currentColor;
+}
+
+/* -----------------------------------------------------------------------------
+   Anillo de foco canónico. UNA definición para toda la suite.
+
+   Un solo anillo azul: el token ya contrasta ≥3:1 por su cuenta (ver
+   `--sytue-focus-ring` en tokens/colors.css). Con `FOCUS_RING` redeclarado en 29
+   ficheros del editor, cada copia podía perder algo por su cuenta, y varias lo
+   hicieron; por eso vive aquí y en un único sitio.
+
+   FUERA DE TODA `@layer`, y esto es lo que hace que funcione. Estaba en
+   `@layer components` con el comentario «si el elemento trae otra sombra, gana la
+   que se declara», y era falso: las capas mandan sobre la especificidad, así que
+   una utilidad `shadow-xs` de Tailwind —que vive en `utilities`, la capa
+   posterior— apagaba el aro entero sin error ni aviso. Medido en el CSS
+   compilado: `components` abre en el byte 7502 y `utilities` en el 9708, y la
+   última gana. Los botones sólidos de la portada son exactamente ese caso:
+   `shadow-[var(--shadow-xs)]` más esta clase, y se quedaban SIN foco visible.
+
+   El CSS sin capa gana a cualquier capa, así que aquí el aro siempre se pinta.
+   Que es lo que tiene que hacer un indicador de foco: no depender de qué otras
+   clases traiga el elemento.
+   ----------------------------------------------------------------------------- */
+/* GROSOR: 2px, y ya está. Los 2px son los que exige el área mínima de WCAG
+     2.4.13; el 3:1 de contraste de WCAG 1.4.11 lo cumple el propio azul (ver
+     `--sytue-focus-ring` en tokens/colors.css: ≥3,2:1 sobre blanco, papel, hundido
+     y tinta).
+
+     Aquí había un tercer píxel de contorno casi negro. Cumplía, pero era lo que se
+     veía: el aro se leía como una línea negra alrededor del campo. Con un color que
+     contrasta por su cuenta, ese píxel sobra. */
+.sytue-focus-ring:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--sytue-focus-ring);
+}
+
+/* Variante INTERIOR, para filas y celdas a ancho completo: un anillo exterior las
+     sacaría de su contenedor o lo taparía el hermano siguiente. Existe porque no
+     existía: seis sitios la escribían a mano —Rooms y Contacts— y los seis perdían
+     el contorno neutro por el camino, que es el defecto que este archivo ya
+     documenta arriba. */
+.sytue-focus-ring-inner:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--sytue-focus-ring);
+}
+
+/* Variante para controles sobre RELLENO (botones sólidos): abre un hueco del color de
+     la superficie antes del anillo, o el anillo se funde con el relleno azul.
+     1px de hueco + 2px de anillo = 3px. Nueve sitios escribían esto a mano con el
+     doble de todo —2px de hueco, 2px de latón y 2px de contorno negro, 6px en
+     total— y son los que se veían como un marco: los asistentes de admin, drive y
+     rooms, la lista de Docs y los botones sólidos de toda la suite. */
+.sytue-focus-ring-inset:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 1px var(--sytue-surface),
+    0 0 0 3px var(--sytue-focus-ring);
+}
+
+/* Variante para la casilla y el radio NATIVOS, que va en un `<span>` alrededor del
+     `<input>`: Chromium le deja a 0 el `border-radius` —aunque lleve `rounded-full`—, y
+     un `box-shadow` sobre radio 0 es un cuadrado. El `<span>` trae la esquina con una
+     utilidad `rounded-*` y el aro la sigue; el `<input>` se queda sin el suyo, que
+     sería el del global de theme.css. Ver `Choice` en Form.tsx. */
+.sytue-focus-ring-choice {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+.sytue-focus-ring-choice:has(> :focus-visible) {
+  box-shadow: 0 0 0 2px var(--sytue-focus-ring);
+}
+.sytue-focus-ring-choice > :focus-visible {
+  box-shadow: none;
+}
+
+/* El PANEL de un diálogo (`Modal`) recibe el foco por código —con el dedo, para no sacar
+     el teclado— y el lector lo anuncia como el diálogo; no es un control y no lleva aro.
+     Sin esto el global de theme.css, que no va en capa y gana a cualquier utilidad, le
+     ponía una línea de color por el canto de la hoja y le quitaba la sombra a la
+     tarjeta. Fuera de capa y con una clase, como el resto de esta familia. */
+.sytue-hoja-movil:focus-visible {
+  box-shadow: var(--shadow-xl);
+}
+@media (width < 48rem) {
+  .sytue-hoja-movil:focus-visible {
+    box-shadow: none;
+  }
+}
+
+/* El campo de `PaletaDeComandos` es lo único enfocable del diálogo y el foco no sale de
+     él: el cursor y la opción resaltada ya dicen dónde se está. El aro global le pintaba
+     una caja cortada contra el canto de arriba de la tarjeta (medido en Sytue Cloud el
+     2026-10-16). Fuera de capa y con una clase, como el resto de esta familia. */
+.sytue-campo-paleta:focus-visible {
+  box-shadow: none;
+}
+
+/* Variante para una ETIQUETA que envuelve un control oculto (`sr-only`): el radio de un
+     grupo segmentado, el `<input type="file">` de una zona de subida. El foco lo recibe
+     el control, que no se ve, así que `.sytue-focus-ring` en la etiqueta no pintaba nada
+     —cuelga del `:focus-visible` del propio nodo, y una etiqueta nunca lo tiene—. Aquí la
+     etiqueta pinta el aro cuando algo de dentro tiene el foco, con su propia esquina.
+     `-inset-within` es lo mismo con el hueco de `-inset`, para tarjetas sobre relleno
+     (ver `ChoiceCard`). */
+.sytue-focus-ring-within:has(:focus-visible) {
+  box-shadow: 0 0 0 2px var(--sytue-focus-ring);
+}
+.sytue-focus-ring-inset-within:has(:focus-visible) {
+  box-shadow:
+    0 0 0 1px var(--sytue-surface),
+    0 0 0 3px var(--sytue-focus-ring);
+}
+
+/* Sobre el CROMO (topbar, menú lateral), el aro es blanco (`--sytue-chrome-focus`):
+     el azul se queda en 3,4:1 sobre el carril claro. Se cambia el COLOR y no la sombra.
+     Lo que había era `focus-visible:shadow-[0_0_0_2px_var(--sytue-chrome-focus)]` en 27
+     sitios, y ninguno pintaba: la utilidad vive en `@layer utilities` y el aro global de
+     theme.css va sin capa, así que ganaba siempre él, en azul. Medido en producción en
+     la barra de Calendar el 2026-09-26: 47 de 48 controles con el azul y solo la casilla
+     —que ya cambiaba la variable— en blanco. Una variable no compite con nadie: la leen
+     el aro global y todas las variantes de arriba.
+
+     Va en el CONTROL y no en el contenedor del cromo: los menús que se abren desde la
+     barra se montan dentro de ella y son superficie clara, donde el blanco no se vería. */
+.sytue-focus-ring-chrome {
+  --sytue-focus-ring: var(--sytue-chrome-focus);
+}
+
+/* -----------------------------------------------------------------------------
+   NINGÚN CAMPO POR DEBAJO DE 16px CUANDO SE TOCA CON EL DEDO.
+
+   Safari de iOS AMPLÍA la página entera al enfocar un campo cuya letra mide
+   menos de 16px, y al desenfocar NO vuelve: la página se queda escalada, los
+   márgenes descuadrados y la barra de la aplicación fuera de sitio hasta que
+   alguien la pellizca a mano. Se vio en el redactor de Sytue Mail, cuyos
+   desplegables de tipografía miden 12px, pero el defecto no es de Mail: son 66
+   ficheros de diez aplicaciones los que tienen algún campo por debajo del
+   umbral.
+
+   POR ESO VA AQUÍ y no en cada uno. Es la misma decisión que ya tomó el anillo
+   de foco unas líneas más arriba: una regla en el sistema en vez de sesenta y
+   seis copias que se pierden de una en una.
+
+   FUERA DE TODA `@layer`, por lo mismo que el anillo: las utilidades de
+   Tailwind viven en la capa `utilities` y una capa posterior gana a la
+   especificidad, así que un `text-xs` apagaría esto sin decir nada.
+
+   Y SOLO CON `pointer: coarse`, que es donde existe el problema: en escritorio
+   la densidad de una barra de edición se mantiene intacta. Ninguna aplicación
+   pide hoy un campo MAYOR de 16px, así que fijar el valor no encoge nada; si
+   alguna vez hace falta uno más grande, este es el sitio donde se dice.
+
+   NO se toca el viewport para arreglarlo. `maximum-scale=1` o
+   `user-scalable=no` también quitan el zoom, y de paso le quitan a quien no ve
+   bien la capacidad de ampliar la página (WCAG 1.4.4). El campo se agranda; la
+   página se queda como estaba.
+   ----------------------------------------------------------------------------- */
+@media (pointer: coarse) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']),
+  select,
+  textarea,
+  /* Y EL CAMPO RICO, que no es ninguno de los tres. El cuerpo de un correo es un
+     `div[contenteditable]`, así que esta regla no lo alcanzaba: medía 12,25px
+     —`text-sm` con la raíz en 14— y al tocarlo para escribir, iOS hacía zoom y
+     el redactor se salía de la pantalla. Medido en producción sobre un iPhone
+     14 Pro: de 34 elementos enfocables en siete apps, ese era el ÚNICO por
+     debajo de 16.
+
+     ES OPT-IN Y NO `[contenteditable]` A SECAS, y la diferencia importa: el
+     lienzo de un documento y el de unas diapositivas también son
+     `contenteditable` —y también `role="textbox"`, así que tampoco vale acotar
+     por el rol—, pero ahí el tamaño de letra ES el del documento. Forzarle un
+     suelo de 16px rompería el WYSIWYG: lo que se ve dejaría de ser lo que se
+     imprime. Un CAMPO se marca; un lienzo no. */
+  .sytue-campo-tactil {
+    /* `max(16px, 1rem)` Y NO `1rem` A SECAS, que es lo que había y no bastaba.
+       El umbral de iOS son 16 px ABSOLUTOS, y `1rem` solo los mide si la raíz
+       está en 16. Con la base del navegador en 14 —un ajuste de accesibilidad
+       corriente, y el que tiene la persona que reportó esto— `1rem` daba 14 px
+       y el zoom seguía saltando: la regla estaba escrita, comentada y sin
+       efecto para justo quien más la necesitaba.
+
+       El `max` conserva lo que la regla buscaba. Fijar `16px` a secas habría
+       arreglado el zoom y roto lo contrario: a quien SUBE la base a 20 le
+       encogería el campo por debajo de su preferencia. Así, 16 es un suelo y
+       nunca un techo. Es el mismo error de unidad que la rejilla de Sheets
+       —medir en rem lo que se compara contra píxeles— y se arregla igual. */
+    font-size: max(16px, 1rem);
+  }
+
+  /* SUELO TÁCTIL DE UNA ZONA ENTERA, OPT-IN: `data-suelo-tactil` en la raíz de un editor.
+     Con el dedo, ningún botón, pestaña, desplegable ni campo de dentro baja de 44 × 44 px
+     (WCAG 2.5.5).
+
+     Existe porque no se podía cumplir clase a clase: la cinta de un editor pinta decenas de
+     botones y campos con las mismas cadenas de clases copiadas (`h-7 w-7`, `h-6`), y cada copia
+     nueva nacía de 25 px aunque `Button` y `BOTON_DE_BARRA` ya traigan su `pointer-coarse:`. Una
+     regla por zona los alcanza a todos, también a los que se añadan. Es un MÍNIMO (`min-*`): no
+     encoge nada ni pisa lo que ya mida más.
+
+     `pointer: coarse` y no el ancho de la ventana: una ventana estrecha con ratón no necesita
+     botones de dedo, y una tableta ancha sí. `max(44px, 2.75rem)`: con el `rem` de 14 px de la
+     suite, `2.75rem` solos serían 38,5.
+
+     `data-sin-tactil` en un subárbol lo deja fuera: lo que el LIENZO dibuja con sus controles
+     (las flechas de filtro de una celda, los tiradores de una caja) mide lo que mide la celda o
+     la caja, y subirlo rompería la maqueta del propio documento. */
+  [data-suelo-tactil]
+    :where(
+      button,
+      a[href],
+      [role='tab'],
+      [role='menuitem'],
+      [role='menuitemradio'],
+      [role='menuitemcheckbox'],
+      select,
+      input:not([type='checkbox'], [type='radio'], [type='hidden'])
+    ):not([data-sin-tactil] *) {
+    min-height: max(44px, 2.75rem);
+  }
+  [data-suelo-tactil]
+    :where(button, a[href], [role='tab'], [role='menuitem']):not([data-sin-tactil] *) {
+    min-width: max(44px, 2.75rem);
+  }
+}
+
+@layer components {
+  /* Roles tipograficos canonicos (docs/design.md §4). */
+
+  /* Los cuatro escalones grandes parten palabra cuando no cabe. No es cosmetica:
+     a 320px una sola palabra larga («Nutzungsbedingungen») es mas ancha que su
+     caja, y con `overflow-wrap: normal` se sale y arrastra el DOCUMENTO ENTERO a
+     scroll horizontal — medido en produccion en 27 combinaciones de ruta/perfil
+     de www, hasta +80px en aleman. A 360px el culpable es otro: `text-balance`
+     elige una linea mas ancha que la caja; `hyphens` le da por donde partirla.
+     La particion silabica es utilizable porque el documento declara su `lang`
+     (en-GB/es-ES/fr-FR/de-DE/it-IT). Va en la CLASE y no en cada llamante: no es
+     un fallo de la ficha de producto de www, es del escalon tipografico. */
+  .sytue-display,
+  .sytue-h1,
+  .sytue-h2,
+  .sytue-h3 {
+    /* Sin `-webkit-hyphens`: se probó y Lightning CSS lo BORRA del bundle, que
+       para eso lleva los `targets` de Tailwind v4 (Safari 16.4+). Escribirlo a
+       mano solo deja en el fuente una línea que no llega a salir. */
+    hyphens: auto;
+    overflow-wrap: break-word;
+  }
+  .sytue-display {
+    font-size: var(--text-4xl);
+    line-height: var(--text-4xl--line-height);
+    font-weight: var(--font-weight-bold);
+    letter-spacing: -0.01em;
+  }
+  /* Peso y cuerpo son tokens de FORMA: dentro de la hoja de «Marco» los títulos van un
+     10 % más grandes y un escalón más gruesos; fuera de ella y en «Carril», como siempre
+     (700/600 y escala 1; theme.css, «Tokens de forma»). */
+  .sytue-h1 {
+    font-size: calc(var(--text-3xl) * var(--sytue-title-scale));
+    line-height: calc(var(--text-3xl--line-height) * var(--sytue-title-scale));
+    font-weight: var(--sytue-title-weight);
+    letter-spacing: -0.01em;
+  }
+  .sytue-h2 {
+    font-size: calc(var(--text-2xl) * var(--sytue-title-scale));
+    line-height: calc(var(--text-2xl--line-height) * var(--sytue-title-scale));
+    font-weight: var(--sytue-title-weight);
+  }
+  .sytue-h3 {
+    font-size: calc(var(--text-xl) * var(--sytue-title-scale));
+    line-height: calc(var(--text-xl--line-height) * var(--sytue-title-scale));
+    font-weight: var(--sytue-subtitle-weight);
+  }
+  .sytue-h4 {
+    font-size: calc(var(--text-lg) * var(--sytue-title-scale));
+    line-height: calc(var(--text-lg--line-height) * var(--sytue-title-scale));
+    font-weight: var(--sytue-subtitle-weight);
+  }
+  /* 0.06em y no 0.04: a 12px y en negrita, las versalitas se apelmazan en rótulos
+     como «USUARIOS» o «FACTURAS» si no se les da aire. */
+  .sytue-overline {
+    font-size: var(--text-xs);
+    line-height: var(--text-xs--line-height);
+    font-weight: var(--font-weight-semibold);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .sytue-code {
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+  }
+
+  /* -----------------------------------------------------------------------------
+     Roles del texto de APOYO: `label` (la etiqueta de un control) y `meta` (el dato
+     accesorio — autor, fecha, contador, estado vacío).
+
+     A diferencia de display/h1-h4/overline, estos DOS SÍ fijan el color, y es
+     deliberado: son roles SEMÁNTICOS, no escalones de una escala tipográfica. Sin el
+     color serían `text-xs` y `text-2xs` con otro nombre, que es justo el alias inútil
+     que no hacía falta crear. El valor está en la COMBINACIÓN: medida en el código,
+     tamaño y color viajaban siempre juntos.
+
+     Los valores son los de HOY, no una propuesta: adoptarlos no mueve un píxel. Y la
+     razón de que hagan falta está en el recuento — `text-xs` con `text-text-subtle`
+     aparecía 175 veces y con `text-text-muted` 162, casi empatados: no había convención,
+     se elegía uno u otro casi al azar. Eso es lo que un rol con nombre corta.
+     ----------------------------------------------------------------------------- */
+  .sytue-label {
+    font-size: var(--text-xs);
+    line-height: var(--text-xs--line-height);
+    color: var(--sytue-text-muted);
+  }
+  /* `meta` tiene DOS densidades, y no por descuido: medido en el código, las apps de
+     producto (Rooms, Consola, Drive, Calendar…) escriben el dato accesorio a 12 px en 169
+     sitios, y el editor —que es una herramienta densa, con su ribbon y sus paneles— a
+     11 px en 98. Son la misma intención con dos aires, igual que `Button` tiene `xs` para
+     el cromo del ribbon y `sm` para el resto.
+
+     El rol BASE es el de la suite; la densidad apretada se pide por su nombre. Antes era
+     al revés —`.sytue-meta` valía 11 px, o sea el caso minoritario y específico de una
+     sola app—, y un nombre así se adopta mal: quien lo lee no espera lo que hace. */
+  .sytue-meta {
+    font-size: var(--text-xs);
+    line-height: var(--text-xs--line-height);
+    color: var(--sytue-text-subtle);
+  }
+  .sytue-meta-dense {
+    font-size: var(--text-2xs);
+    line-height: var(--text-2xs--line-height);
+    color: var(--sytue-text-subtle);
+  }
+
+  /* Microinteracciones discretas (150-200ms, easing estandar).
+     prefers-reduced-motion se respeta globalmente en theme.css. */
+  .sytue-fade-in {
+    animation: sytue-fade-in 150ms var(--ease-standard) both;
+  }
+  .sytue-pop-in {
+    animation: sytue-pop-in 150ms var(--ease-standard) both;
+  }
+  .sytue-modal-in {
+    animation: sytue-modal-in 180ms var(--ease-standard) both;
+  }
+  .sytue-drawer-in {
+    animation: sytue-drawer-in 180ms var(--ease-standard) both;
+  }
+  .sytue-panel-in {
+    animation: sytue-panel-in 180ms var(--ease-standard) both;
+  }
+  /* El diálogo en el teléfono es una hoja y SUBE desde abajo, en vez de crecer en el
+     sitio: va después de `sytue-modal-in` y `sytue-panel-in` para ganarles con la misma
+     especificidad. `backwards` y no `both`: acabada la entrada no deja un `transform`
+     puesto, que taparía el `translateY` con el que el dedo arrastra la hoja. */
+  @media (width < 48rem) {
+    .sytue-hoja-movil {
+      animation: sytue-hoja-in 220ms var(--ease-standard) backwards;
+    }
+  }
+  .sytue-popover-surface {
+    background: var(--sytue-menu-surface);
+  }
+  .sytue-toast-in {
+    animation: sytue-toast-in 180ms var(--ease-standard) both;
+  }
+
+  /* Skeleton: pulso de opacidad. Era un barrido con degradado —el ÚNICO degradado de
+     todo el sistema de diseño, y decoración pura: no comunicaba progreso, solo llamaba
+     la atención sobre lo que aún no ha cargado—. Un pulso dice lo mismo (esto está
+     llegando) sin introducir una técnica que no se usa en ningún otro sitio. Con
+     prefers-reduced-motion la animación global queda a 0 → bloque estático. */
+  .sytue-skeleton {
+    background-color: var(--sytue-bg-subtle);
+    animation: sytue-skeleton-pulse 1600ms var(--ease-standard) infinite;
+  }
+
+  /* ProgressBar sin valor: un tercio de barra que la recorre. Con
+     prefers-reduced-motion se queda quieto al principio, que sigue diciendo
+     «en marcha» sin moverse. */
+  .sytue-progreso-indeterminado {
+    animation: sytue-progreso-indeterminado 1400ms var(--ease-standard) infinite;
+  }
+}
+
+@keyframes sytue-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes sytue-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes sytue-modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes sytue-hoja-in {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+@keyframes sytue-drawer-in {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: none;
+  }
+}
+@keyframes sytue-panel-in {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes sytue-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes sytue-skeleton-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * IMPRIMIR (Ctrl+P) — las doce apps
+ *
+ * No había NI UNA regla de impresión en toda la suite. Ctrl+P sacaba la barra
+ * superior, el carril, la cinta y la barra de estado, y del contenido solo la
+ * primera pantalla: los contenedores del lienzo llevan `overflow` y altura de
+ * viewport, así que el navegador imprimía lo que cabía en la caja y tiraba el
+ * resto. En un procesador de textos y en una hoja de cálculo eso no es un
+ * detalle: imprimir es una de las razones de existir del producto.
+ *
+ * SE OCULTA EL CROMO POR SU ROL, no por clases inventadas. `role="banner"`
+ * (TopBar), `role="toolbar"` (cintas y barras de acciones) y `role="tablist"` ya
+ * están en el marcado compartido, así que esto vale para las doce sin tocar
+ * ninguna. El carril de navegación y el del editor no tienen rol propio, así que
+ * llevan `sytue-no-print` explícito — un selector inventado que no engancha con
+ * nada es peor que no tener regla: parece que cubre algo.
+ *
+ * ponytail: el `!important` es necesario aquí y solo aquí. Las alturas y los
+ * `overflow` vienen de utilidades de Tailwind con más especificidad, y en la hoja
+ * de impresión no hay nada con quien competir — es la última palabra antes del
+ * papel.
+ * --------------------------------------------------------------------------- */
+@media print {
+  /* Papel blanco y tinta negra: el cromo de la interfaz se lleva el tóner y en
+     una impresora sin color queda un gris ilegible. */
+  :root,
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  [role='banner'],
+  [role='toolbar'],
+  [role='tablist'],
+  .sytue-no-print {
+    display: none !important;
+  }
+
+  .sytue-solo-print {
+    display: revert !important;
+  }
+
+  /* Sin esto se imprime SOLO la primera pantalla. Los lienzos y las listas viven
+     en contenedores con `h-[100dvh]` y `overflow-auto`, que en papel significan
+     «recorta aquí». */
+  main,
+  main * {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  /* Un diálogo abierto ES lo que se está mirando, así que se imprime él y no la
+     página de debajo — que además saldría con el velo encima. */
+  body:has(dialog[open]) > *:not(dialog),
+  body:has([role='dialog']) [role='banner'] {
+    display: none !important;
+  }
+  dialog[open] {
+    position: static !important;
+    border: 0 !important;
+    max-width: none !important;
+    max-height: none !important;
+  }
+
+  /* Nada de sombras ni de velos: en papel son manchas grises. */
+  * {
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  /* Un encabezado o una fila no se parten entre dos folios si se puede evitar. */
+  h1,
+  h2,
+  h3,
+  h4 {
+    break-after: avoid-page;
+  }
+  tr,
+  li,
+  figure,
+  blockquote {
+    break-inside: avoid;
+  }
+}
+@keyframes sytue-progreso-indeterminado {
+  from {
+    left: -33%;
+  }
+  to {
+    left: 100%;
+  }
+}

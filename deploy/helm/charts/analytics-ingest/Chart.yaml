@@ -1,0 +1,22 @@
+apiVersion: v2
+name: sytue-analytics-ingest
+description: >-
+  Sytue Analytics — COLECTOR (ADR 0026). Servicio Go propio: sirve /_sytue/s.js y recibe
+  /_sytue/e. Es el endpoint PUBLICO, SIN AUTENTICAR y de mayor volumen de la plataforma,
+  y por eso corre como proceso aparte de la API de lectura. NO publica hostname propio:
+  la medicion es de PRIMERA PARTE y la ruta la anade el controlador de Cloud al Ingress
+  de cada app de cliente, via Service ExternalName hacia este colector. Identidad efimera
+  por HMAC con sal diaria cifrada; jamas persiste IP. Estado en PostgreSQL
+  (esquema sytue_analytics); sin Redis/Valkey. Código Apache-2.0, (c) 2026 Daniel Delgado Ramos.
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+kubeVersion: ">=1.31.0-0"
+home: https://sytue.eu
+keywords: [sytue, analytics, privacy, first-party, ingest, go]
+maintainers:
+  - name: Sytue Platform
+    email: platform@sytue.eu
+annotations:
+  licenses: MIT
+  sytue.eu/stack: go

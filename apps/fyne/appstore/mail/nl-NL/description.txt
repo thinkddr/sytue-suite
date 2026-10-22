@@ -1,0 +1,19 @@
+Privé, Europese e-mail via JMAP — zonder trackers en zonder advertenties.
+
+• Een snelle inbox met gesprekken, labels, filters en zoeken.
+• Voeg bestanden direct toe vanuit Sytue Drive.
+• Maak van een e-mail een afspraak in Calendar.
+• Versleuteld tijdens transport (TLS 1.3). De infrastructuur van Sytue staat in de EU. De locatie van externe diensten hangt af van hun aanbieder.
+• Gesprekken met lezen, beantwoorden en doorsturen in één klik.
+• Mappen, gekleurde labels en zoeken met operatoren (from:, has:attachment, is:unread…).
+• Automatische regels die e-mail bij binnenkomst archiveren, labelen of verplaatsen.
+• Gepland verzenden en “Verzenden ongedaan maken”.
+• Handtekeningen, afzenderaliassen en een automatisch afwezigheidsbericht.
+• Gedeelde en gedelegeerde postvakken met lees- en verzendrechten.
+• Opmaakeditor met bijlagen uit Sytue Drive zonder bestanden te dupliceren.
+• Externe inhoud standaard geblokkeerd: niemand komt te weten wanneer je een e-mail opent.
+• Ondertekende e-mail (PGP en S/MIME) herkend en gemarkeerd; TLS tijdens transport.
+• Ook toegang via Thunderbird, Outlook, Apple Mail of je telefoon, met app-wachtwoorden.
+• Ontvangers als chips met het adresboek van Contacts op één klik, en een waarschuwing als je “bijgevoegd” schrijft zonder iets bij te voegen.
+
+Versleuteld tijdens transport (TLS 1.3). De infrastructuur van Sytue staat in de EU. De locatie van externe diensten hangt af van hun aanbieder.

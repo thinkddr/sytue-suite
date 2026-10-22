@@ -1,0 +1,64 @@
+{
+  "id": "miniflux",
+  "name": "Miniflux",
+  "description": "Lector de noticias por RSS, minimalista y rápido. Un binario, sin JavaScript de más y con lectura sin distracciones. Usa el PostgreSQL del proyecto.",
+  "category": "productivity",
+  "license": "Apache-2.0",
+  "homepage": "https://miniflux.app/",
+  "source": "https://github.com/miniflux/v2",
+  "upstream": "ghcr.io/miniflux/miniflux:2.2.15",
+  "upstream_digest": "sha256:9a1f95a7a05b77040d19bb7be96194af4c222de02fb84165fb808f65700c064f",
+  "version": "2.2.15",
+  "needs": [
+    "postgres"
+  ],
+  "ports": [
+    {
+      "name": "http",
+      "port": 8080
+    }
+  ],
+  "web_port": 8080,
+  "exports": [
+    {
+      "key": "MINIFLUX_URL",
+      "value": "http://{host}:{port}"
+    }
+  ],
+  "env": [
+    {
+      "key": "DATABASE_URL",
+      "value": "{db_url}?sslmode=disable"
+    },
+    {
+      "key": "RUN_MIGRATIONS",
+      "value": "1"
+    },
+    {
+      "key": "BASE_URL",
+      "value": "{web_url}"
+    },
+    {
+      "key": "CREATE_ADMIN",
+      "value": "1"
+    },
+    {
+      "key": "ADMIN_USERNAME",
+      "value": "admin"
+    },
+    {
+      "key": "ADMIN_PASSWORD",
+      "generate": true,
+      "export": true
+    },
+    {
+      "key": "LISTEN_ADDR",
+      "value": "0.0.0.0:8080"
+    }
+  ],
+  "disk_gib": 0,
+  "memory_mib": 256,
+  "cpu_milli": 500,
+  "run_as_user": 65534,
+  "health_path": "/healthcheck"
+}

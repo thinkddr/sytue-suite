@@ -1,0 +1,17 @@
+PDF fra start til slut, i din browser.
+
+• Fremhæv, understreg, kommenter og tegn i dokumentet.
+• Formularer: udfyld felter eller opret dine egne.
+• Flet, udtræk, roter, nummerer og tilføj vandmærke.
+• Signaturpanel, permanent sløring og adgangskodebeskyttede dokumenter.
+• En hurtig fremviser med disposition, miniaturer, søgning og zoom til side eller bredde.
+• Kommentarer: fremhæv, understreg, gennemstreg, kommenter, tegn, figurer, pile og stempler.
+• Tekstfelter, målinger og snapshots af områder.
+• Formularer: udfyld eksisterende felter, eller tilføj dine egne.
+• Panel til underskrift af dokumenter.
+• Permanent sløring: det, du markerer, forsvinder fra filen, ikke kun fra visningen.
+• Sider: flet, udtræk, slet, roter, nummerer (også Bates), sidehoveder og sidefødder.
+• Vandmærke, baggrund og redigerbare metadata.
+• Adgangskodebeskyttede dokumenter og tilladelser.
+
+Krypteret under overførsel (TLS 1.3). Sytues infrastruktur er i EU. Eksterne tjenesters placering afhænger af deres udbyder.

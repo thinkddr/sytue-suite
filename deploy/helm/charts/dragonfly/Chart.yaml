@@ -1,0 +1,23 @@
+apiVersion: v2
+name: sytue-dragonfly
+description: >-
+  Dragonfly (BUSL 1.1 con conversion a Apache 2.0; se usa SIN modificar y como
+  servicio interno, no se ofrece como servicio gestionado a terceros) como cache
+  EFIMERA compatible con el protocolo Redis. La usan Sytue Hub (presencia y
+  pub/sub entre replicas), Sytue Rooms y Sytue Docs. Nada durable vive aqui: lo
+  que tiene que sobrevivir esta en PostgreSQL, y si esto cae los servicios
+  degradan a no-op (platform/pkg/cache) en vez de fallar.
+type: application
+version: 1.1.0
+appVersion: "1.40.1"
+kubeVersion: ">=1.31.0-0"
+home: https://www.dragonflydb.io
+keywords: [sytue, dragonfly, cache, redis, presencia, pubsub]
+maintainers:
+  - name: Sytue Platform
+    email: platform@sytue.eu
+annotations:
+  # BUSL 1.1: permite el uso interno sin restriccion; lo que prohibe es ofrecer
+  # Dragonfly EN SI como servicio gestionado a terceros, que no es el caso.
+  # Convierte a Apache 2.0 a los cuatro anios de cada version.
+  licenses: BUSL-1.1

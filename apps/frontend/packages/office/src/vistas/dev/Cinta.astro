@@ -1,0 +1,34 @@
+---
+/**
+ * Banco de pruebas de la cinta del editor (editor/dev/CintaDemo.tsx), para la prueba
+ * visual de Playwright. SOLO en desarrollo: en producción es un 404, y no figura en la
+ * navegación ni lo enlaza nada.
+ */
+import '../../styles/global.css';
+import { CintaDemo } from '../../editor/dev/CintaDemo';
+
+const q = Astro.url.searchParams;
+const kind = ['spreadsheet', 'presentation'].includes(q.get('kind') ?? '')
+  ? (q.get('kind') as 'spreadsheet' | 'presentation')
+  : 'document';
+const lang = ['en', 'de', 'fr'].includes(q.get('lang') ?? '')
+  ? (q.get('lang') as 'en' | 'de' | 'fr')
+  : 'es';
+---
+
+<!doctype html>
+<html lang={lang} class="h-full">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Cinta (banco de pruebas)</title>
+  </head>
+  <body class="h-full">
+    <CintaDemo
+      client:only="preact"
+      kind={kind}
+      locale={lang}
+      soloLectura={q.get('lectura') === '1'}
+    />
+  </body>
+</html>

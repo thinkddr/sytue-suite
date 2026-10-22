@@ -1,0 +1,27 @@
+---
+/** Real Console connection wizard for remote browser checks. Production returns 404. */
+import '../../styles/app.css';
+import { basePathScript } from '@sytue/ui';
+import { ConnectAppDemo } from '../../components/dev/ConnectAppDemo';
+
+export const prerender = false;
+
+if (!import.meta.env.DEV) return new Response(null, { status: 404 });
+
+const configured = Astro.url.searchParams.get('fields') === '1';
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Sytue Admin</title>
+    <script is:inline set:html={basePathScript('/admin')}></script>
+  </head>
+  <body class="bg-bg text-text min-h-dvh antialiased">
+    <ConnectAppDemo client:only="preact" configured={configured} />
+  </body>
+</html>

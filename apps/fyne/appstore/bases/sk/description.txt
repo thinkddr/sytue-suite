@@ -1,0 +1,11 @@
+Prepojené tabuľky na vedenie zákazníkov, objednávok alebo zásob, s oprávneniami a záznamom každej zmeny.
+
+• Zákazníci, objednávky alebo zásoby v prepojených tabuľkách, bez znalosti databáz.
+• Zdieľajte so svojou organizáciou s rolou, ktorú zvolíte.
+• Každá zmena sa zaznamená: kto ju urobil a aká bola predchádzajúca hodnota.
+• Vaše dáta zostávajú v EÚ a exportujete ich, kedy chcete.
+• Tabuľky s poľami pre text, číslo, dátum, začiarkavacie políčko, jednu voľbu aj viac volieb.
+• Vzťahy medzi tabuľkami: prepojte objednávku so zákazníkom a databáza nedovolí väzbu pretrhnúť.
+• Oprávnenia pre databázu aj pre tabuľku: vlastník, editor, komentujúci a čitateľ.
+
+Šifrovanie pri prenose (TLS 1.3). Infraštruktúra Sytue je v EÚ. Umiestnenie externých služieb závisí od ich poskytovateľa.

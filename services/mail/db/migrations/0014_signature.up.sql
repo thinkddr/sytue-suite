@@ -1,0 +1,25 @@
+-- SPDX-License-Identifier: Apache-2.0
+-- Copyright (c) 2026 Daniel Delgado Ramos
+--
+-- FIRMA DE CORREO POR CUENTA, en el servidor.
+--
+-- Hasta ahora vivía en localStorage del navegador: se perdía al cambiar de
+-- equipo, al abrir el correo desde el móvil o al vaciar el almacenamiento, y
+-- cada dispositivo tenía la suya. Para una firma corporativa —cargo, teléfono,
+-- aviso legal— eso no es una limitación menor: es que la firma no existe salvo
+-- en el portátil donde la escribiste.
+--
+-- Va como COLUMNA de `accounts` y no como tabla nueva: es un valor escalar por
+-- cuenta, con la misma vida que la cuenta (y el mismo ON DELETE). Una tabla
+-- aparte solo añadiría un JOIN y una fila huérfana que mantener.
+--
+-- Sin RLS que declarar: `accounts` ya va con ENABLE *y* FORCE ROW LEVEL SECURITY
+-- desde 0001_init, y las políticas son de tabla, no de columna. La política de
+-- fusión de organizaciones (0010) también se genera por tabla, así que una
+-- columna nueva queda cubierta sin tocar nada.
+--
+-- Texto plano (el editor de firma es un textarea): el compositor lo convierte a
+-- HTML al insertarlo, escapándolo. Guardar HTML aquí sería guardar la entrada
+-- del usuario sin sanear para inyectarla luego en el cuerpo del correo.
+
+ALTER TABLE accounts ADD COLUMN signature text NOT NULL DEFAULT '';

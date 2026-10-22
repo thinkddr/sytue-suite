@@ -1,0 +1,111 @@
+# Sytue OCR — reconocimiento de texto para Sytue PDF (docs/decisions.md#0034).
+#
+# El motor Tesseract 5 va DENTRO de la imagen. Eso quiere decir dos cosas que
+# mandan sobre todo lo que hay debajo: la imagen es grande (~450 MB) y arranca
+# lento, y el trabajo es CPU pura sin espera de red.
+
+replicaCount: 2
+
+image:
+  # Sin registro explícito: lo pone global.imageRegistry del umbrella
+  # (rg.fr-par.scw.cloud/sytue-prod-platform). Un `image:` sin barra aquí haría
+  # que el gate de cadena de suministro dedujera docker.io, que no es el caso.
+  repository: sytue-ocr
+  tag: ""
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 8096
+  targetPort: 8096
+
+# SIN ingress a propósito y no por olvido: este servicio reconoce el contenido de
+# nóminas, contratos y expedientes. Lo llama Sytue Docs desde dentro del clúster
+# y no tiene ninguna razón para ser alcanzable desde fuera. No hay `ingress:` que
+# activar; para exponerlo habría que escribir la plantilla, que es exactamente la
+# fricción que se quiere.
+
+config:
+  logLevel: info
+  # Plazo por página. Una A4 a 300 ppp tarda entre uno y cuatro segundos; un
+  # plano a 600 ppp puede irse a treinta.
+  timeout: 60s
+  # Reconocimientos simultáneos POR RÉPLICA. Va atado a resources.limits.cpu:
+  # Tesseract usa la CPU a tope y no respeta el límite del pod, así que con más
+  # trabajos que núcleos el planificador estrangula el contenedor y TODOS van a
+  # cámara lenta. Con 2 CPU, 2 trabajos.
+  maxConcurrentes: 2
+
+resources:
+  requests:
+    cpu: 250m
+    # La petición de memoria es alta para lo que hace porque los datos de idioma
+    # se cargan en memoria: con menos, el pod se programa en un nodo donde luego
+    # no cabe y entra en bucle de OOM.
+    memory: 512Mi
+  limits:
+    cpu: "2"
+    memory: 1536Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 8
+  # Por CPU y no por peticiones: aquí la CPU ES la carga. Y al 65 % porque la
+  # imagen tarda en arrancar, así que hay que escalar ANTES de saturar.
+  targetCPUUtilizationPercentage: 65
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+networkPolicy:
+  enabled: true
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  runAsGroup: 65532
+  fsGroup: 65532
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
+# El motor escribe un fichero temporal por página. Con el sistema de ficheros de
+# solo lectura, ese temporal necesita un volumen: emptyDir en MEMORIA para que
+# una página escaneada no toque nunca el disco del nodo.
+tmpSizeLimit: 512Mi
+
+serviceMonitor:
+  enabled: false
+
+# Reparto por nodo, como el resto de los charts de la suite. Aquí importa más que
+# en ninguno: son las DOS réplicas que más CPU piden de todo el despliegue (250m
+# cada una), así que juntas en la misma máquina se comen un tercio de un nodo y
+# dejan sin sitio a lo que llegue después —el 2026-08-17 el tercer pod de Traefik
+# se quedó Pending por exactamente 100m—.
+#
+# `ScheduleAnyway` y no `DoNotSchedule`: con tres nodos y HPA de por medio, una
+# regla dura dejaría réplicas sin arrancar en cuanto un nodo se vacíe para
+# mantenimiento. Se prefiere repartir; no se exige.
+#
+# Y conviene saber lo que esto NO hace: Kubernetes coloca, pero no reequilibra. Un
+# pod ya colocado no se mueve nunca. Si los nodos aparecen de uno en uno —como al
+# recrear el pool— todo cae en el primero y ahí se queda hasta el próximo
+# despliegue, que es cuando esta regla vuelve a tener algo que decir.
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: ScheduleAnyway
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: ScheduleAnyway
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

@@ -1,0 +1,48 @@
+{
+  "children": [
+    {
+      "content": {
+        "en": [
+          {
+            "text": "Location and Headquarters"
+          }
+        ],
+        "es": [
+          {
+            "text": "Ubicación y sede"
+          }
+        ]
+      },
+      "id": "tex0000001",
+      "tag": "h2",
+      "type": "text"
+    },
+    {
+      "id": "emb0000001",
+      "provider": "osm",
+      "ref": "40.4168,-3.7038,15",
+      "title": {
+        "en": "Map location",
+        "es": "Ubicación en mapa"
+      },
+      "type": "embed"
+    }
+  ],
+  "full_bleed": false,
+  "id": "sec0000001",
+  "kind": "map",
+  "layout": {
+    "direction": "column",
+    "gap": 24,
+    "padding": [
+      32,
+      32,
+      32,
+      32
+    ],
+    "align": "center",
+    "justify": "center",
+    "wrap": false
+  },
+  "type": "section"
+}

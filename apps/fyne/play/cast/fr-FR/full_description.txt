@@ -1,0 +1,17 @@
+Vidéo à la demande et direct : téléverser, diffuser et partager, dans l’UE.
+
+• Téléversez une vidéo : elle est transcodée en plusieurs qualités pour tout écran.
+• Passez en direct depuis un logiciel de diffusion, le navigateur ou l’application.
+• Quatre niveaux de visibilité : public, non répertorié, organisation ou personnes précises.
+• Tchat en direct et commentaires, avec une modération de base par la personne qui publie.
+• Téléversez des vidéos jusqu’à 8 Gio ; l’original est conservé.
+• Direct depuis un logiciel de diffusion via RTMP, avec une clé de flux par personne.
+• Direct depuis le navigateur ou l’application : caméra, écran et micro.
+• Les enregistrements des directs deviennent automatiquement des vidéos à la demande.
+• Une page d’accueil publique et une chaîne par organisation, indexables.
+• Liens non répertoriés, vidéos réservées à l’organisation ou accès à des personnes précises par @identifiant.
+• Tchat en direct et commentaires en fil, modérés par la personne qui publie et l’administration de l’organisation.
+• Le stockage est décompté de votre quota Sytue Drive ; tout dans l’Union européenne.
+• « Importer dans Cast » depuis Sytue Drive : une copie de la vidéo part dans Cast et le fichier reste dans Drive.
+
+Chiffrement en transit (TLS 1.3). L’infrastructure de Sytue se trouve dans l’UE. La localisation des services externes dépend de leur fournisseur.

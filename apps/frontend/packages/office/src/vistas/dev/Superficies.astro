@@ -1,0 +1,37 @@
+---
+/**
+ * Banco de pruebas de las superficies de edición (editor/dev/SuperficiesDemo.tsx): hoja,
+ * presentación y documento con contenido de muestra, para medir y capturar su acabado.
+ * SOLO en desarrollo: en producción es un 404, y no figura en la navegación ni lo enlaza
+ * nada.
+ */
+import '../../styles/global.css';
+import { SuperficiesDemo } from '../../editor/dev/SuperficiesDemo';
+
+const q = Astro.url.searchParams;
+const kind = ['spreadsheet', 'presentation'].includes(q.get('kind') ?? '')
+  ? (q.get('kind') as 'spreadsheet' | 'presentation')
+  : 'document';
+const lang = ['en', 'de', 'fr'].includes(q.get('lang') ?? '')
+  ? (q.get('lang') as 'en' | 'de' | 'fr')
+  : 'es';
+---
+
+<!doctype html>
+<html lang={lang} class="h-full">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Superficies (banco de pruebas)</title>
+  </head>
+  <body class="h-full">
+    <SuperficiesDemo
+      client:only="preact"
+      kind={kind}
+      locale={lang}
+      soloLectura={q.get('lectura') === '1'}
+      remotos={q.get('remotos') === '1'}
+      filas={Math.min(100000, Math.max(24, Number(q.get('filas')) || 24))}
+    />
+  </body>
+</html>

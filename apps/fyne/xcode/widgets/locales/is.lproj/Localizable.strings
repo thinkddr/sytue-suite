@@ -1,0 +1,17 @@
+"widgets.open" = "Opna";
+"widgets.compose" = "Skrifa";
+"widgets.create" = "Búa til viðburð";
+"widgets.notes" = "Glósur";
+"widgets.rows" = "Raðir";
+"widgets.pending" = "Í bið";
+"widgets.channels" = "Rásir";
+"widgets.photos" = "Myndir";
+"widgets.episodes" = "Þættir";
+"widgets.apps" = "Forrit";
+"widgets.calendars" = "Dagatöl";
+"widgets.address_books" = "Heimilisfangaskrár";
+"search.label" = "Altæk leit";
+"dataflow.item.files" = "Skrár";
+"dataflow.item.events" = "Dagatal";
+"dataflow.item.documents" = "Skjöl";
+"dataflow.item.contacts" = "Tengiliðir";

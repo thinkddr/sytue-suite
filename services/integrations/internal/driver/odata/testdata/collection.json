@@ -1,0 +1,20 @@
+{
+  "@odata.context": "$metadata#Products",
+  "value": [
+    {
+      "@odata.etag": "W/\"1\"",
+      "ID": 1,
+      "Name": "Widget",
+      "Price": 9.99,
+      "Active": true
+    },
+    {
+      "@odata.etag": "W/\"2\"",
+      "ID": 2,
+      "Name": "Gadget",
+      "Price": 19.5,
+      "Active": false
+    }
+  ],
+  "@odata.nextLink": "Products?$skiptoken=PAGE2"
+}

@@ -1,0 +1,29 @@
+{
+  "name": "@sytue/offline",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Infraestructura offline-first compartida de Sytue One: IndexedDB por cuenta, conectividad, shell nativo y service worker de lectura segura.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./preact": "./src/preact.ts",
+    "./worker": "./src/worker.ts"
+  },
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.lib.json",
+    "typecheck": "tsc -p tsconfig.lib.json --noEmit",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@sytue/config": "workspace:*",
+    "preact": "10.29.8"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "6.0.3"
+  }
+}

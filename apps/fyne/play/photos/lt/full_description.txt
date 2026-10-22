@@ -1,0 +1,18 @@
+Nuotraukų galerija ir redaktorius: originalai Drive, pakeitimai – kaip receptas.
+
+• Laiko juosta pagal mėnesius su paieška pagal pavadinimą.
+• Albumai su viršeliu; peržiūra visame ekrane.
+• Šviesos, spalvų, pasukimo, veidrodinio atvaizdo ir apkarpymo redaktorius realiuoju laiku.
+• Kiekvienas pakeitimas yra receptas: originalas niekada neliečiamas.
+• Laiko juosta, sugrupuota pagal mėnesius, su paieška pagal pavadinimą ir ryškiomis miniatiūromis.
+• Albumai: kūrimas, pervardijimas, viršelio pasirinkimas, pridėjimas iš peržiūros ir šalinimas.
+• Redaktorius su keturiais slankikliais (ekspozicija, kontrastas, sodrumas, temperatūra), pasukimu ir veidrodiniu atvaizdu.
+• Kiekvienas pakeitimas yra atskirai saugomas receptas: originalas Drive niekada nekeičiamas.
+• Eksportavimas visa raiška, atvaizduojamas serveryje tomis pačiomis formulėmis kaip peržiūroje.
+• Šiukšlinė su atkūrimu.
+• Originalai saugomi jūsų Sytue Drive; išvestinės versijos yra atkuriama talpykla.
+• EXIF duomenys skaitomi iš paties failo; viskas Europos Sąjungoje.
+• Kelių nuotraukų pasirinkimas pagal mėnesį: į naują albumą, į šiukšlinę arba atsisiuntimas vienu kartu.
+• Skaidrių peržiūra, visas dydis, pasukimas iš peržiūros ir apkarpymas fiksuotu santykiu.
+
+Šifruojama perduodant (TLS 1.3). „Sytue“ infrastruktūra yra ES. Išorinių paslaugų vieta priklauso nuo jų teikėjo.

@@ -1,0 +1,18 @@
+Értelmes számok egy táblázatban, amely együtt dolgozik Önnel.
+
+• Képletek, feltételes formázás és adatérvényesítés.
+• Külső adatok behozása és lekérdezése a táblázat elhagyása nélkül.
+• Diagramok, értékgörbék, szeletelők és adattáblák.
+• Exportálás ODS és XLSX formátumba; Excel-fájlok megnyitása.
+• Képletek környezetfüggő súgóval és azonnali újraszámolással.
+• Feltételes formázás, adatérvényesítés és területi beállítás szerinti számformátumok.
+• Többféle diagram, értékgörbék és szeletelők.
+• Adattáblák összegekkel és rendezéssel; kimutatás.
+• Külső adatok: csatlakoztasson egy forrást, és kérdezze le a táblázatból.
+• Solver a célt teljesítő érték megtalálásához.
+• Makrók az ismétlődő feladatok automatizálásához.
+• Valós idejű együttműködés jelenléttel és megjegyzésekkel.
+• Szűrők, szeletelők és keresés a táblázaton belül.
+• Exportálás ODS, XLSX és PDF formátumba; Excel-fájlok megnyitása a Drive-ból.
+
+Titkosítás átvitel közben (TLS 1.3). A Sytue infrastruktúrája az EU-ban található. A külső szolgáltatások helye a szolgáltatójuktól függ.

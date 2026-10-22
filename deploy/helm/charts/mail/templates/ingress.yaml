@@ -1,0 +1,98 @@
+{{- if .Values.ingress.enabled }}
+{{- $host := include "sytue-mail.host" . }}
+{{/* Hosts adicionales del MISMO servicio (autoconfig./autodiscover.): existen solo
+     para el autodescubrimiento de clientes de correo, asi que sirven las mismas
+     rutas y comparten el certificado (SAN) con mail.<dominio>. */}}
+{{- $domain := include "sytue-mail.domain" . }}
+{{- $hosts := list $host }}
+{{- range .Values.ingress.extraSubdomains }}
+{{- $hosts = append $hosts (printf "%s.%s" . $domain) }}
+{{- end }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "sytue-mail.fullname" . }}
+  labels:
+    {{- include "sytue-mail.labels" . | nindent 4 }}
+  annotations:
+    cert-manager.io/cluster-issuer: {{ include "sytue-mail.clusterIssuer" . | quote }}
+    {{- with .Values.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  tls:
+    - hosts:
+        {{- range $hosts }}
+        - {{ . | quote }}
+        {{- end }}
+      secretName: {{ .Values.ingress.tls.secretName }}
+  rules:
+    {{- range $h := $hosts }}
+    - host: {{ $h | quote }}
+      http:
+        paths:
+          {{- range $.Values.ingress.paths }}
+          - path: {{ .path }}
+            pathType: {{ .pathType | default "Prefix" }}
+            backend:
+              service:
+                name: {{ include "sytue-mail.fullname" $ }}
+                port:
+                  name: http
+          {{- end }}
+    {{- end }}
+{{- end }}
+{{- if and .Values.ingress.enabled .Values.ingress.anchorTlsSecret .Values.ingress.anchorHosts }}
+{{/*
+  EL ANCLA S/MIME EN EL DOMINIO RAIZ.
+
+  Un Ingress aparte y no una ruta mas del de arriba porque el host es otro: el
+  raiz lo sirve `www` (sytue-frontend) en `PathPrefix(/)`, y aqui solo se le
+  quita de las manos un prefijo concreto para mandarlo al backend de correo.
+
+  SIN la anotacion de cert-manager, a proposito: el certificado de estos dos
+  nombres ya lo emite y renueva el Ingress de `www`. Anotarlo aqui pondria a dos
+  objetos a gestionar el mismo secreto, que es como se gastan los limites de ACME
+  sin que nadie lo note hasta que una renovacion falla.
+*/}}
+{{- $domain := include "sytue-mail.domain" . }}
+{{- $anchorHosts := list }}
+{{- range .Values.ingress.anchorHosts }}
+{{- $anchorHosts = append $anchorHosts (ternary $domain (printf "%s.%s" . $domain) (eq . "@")) }}
+{{- end }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ printf "%s-smime-anchor" (include "sytue-mail.fullname" .) }}
+  labels:
+    {{- include "sytue-mail.labels" . | nindent 4 }}
+  annotations:
+    # Traefik ordena los routers por la LONGITUD de la regla, asi que
+    # `PathPrefix(/.well-known/smime)` ya ganaria al `PathPrefix(/)` de `www`.
+    # La prioridad va escrita igual porque el fallo, si alguna vez dejara de
+    # ganar, seria mudo: el 404 de la web en vez del certificado.
+    traefik.ingress.kubernetes.io/router.priority: "2000"
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  tls:
+    - hosts:
+        {{- range $anchorHosts }}
+        - {{ . | quote }}
+        {{- end }}
+      secretName: {{ .Values.ingress.anchorTlsSecret | quote }}
+  rules:
+    {{- range $h := $anchorHosts }}
+    - host: {{ $h | quote }}
+      http:
+        paths:
+          - path: /.well-known/smime
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "sytue-mail.fullname" $ }}
+                port:
+                  name: http
+    {{- end }}
+{{- end }}

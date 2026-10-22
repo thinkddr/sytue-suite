@@ -1,0 +1,210 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Daniel Delgado Ramos
+from lib import *
+from looks import LOOKS
+
+KEY = "autoescuela"
+
+# Como COLEGIADO: el 00-0000 lo detecta domain.TextosDemo y el sitio no se publica hasta cambiarlo.
+AUTORIZACION = ("Autoescuela autorizada. Nº de autorización del centro: 00-0000",
+                "Authorised driving school. Centre authorisation no.: 00-0000")
+
+
+def build():
+    nueva(KEY)
+    look = dict(LOOKS["marino"], fuentes=("montserrat", "work-sans"))
+    nav = [("inicio", ("Inicio", "Home")), ("permisos", ("Permisos y precios", "Licences and prices")),
+           ("proceso", ("Clases y exámenes", "Lessons and tests")), ("contacto", ("Contacto", "Contact"))]
+    horas = [(("Lunes a viernes", "Monday to Friday"),
+              ("10:00 a 13:30 y de 16:30 a 20:30", "10:00 am to 1:30 pm and 4:30 pm to 8:30 pm")),
+             (("Sábado", "Saturday"), ("10:00 a 13:00", "10:00 am to 1:00 pm")),
+             (("Domingo", "Sunday"), ("Cerrado", "Closed")),
+             (("Prácticas", "Driving lessons"), ("A la hora que acordemos contigo", "At a time we agree with you"))]
+    cta_cab = marco([llamar(t=("Llamar", "Call")), whatsapp("secondary", t=("WhatsApp", "WhatsApp"))],
+                    dir="row", gap=8, wrap=True)
+    matricula = lambda v="primary": boton(("Matricularme", "Enrol"), a_pagina("contacto", "contacto"), v)
+    nota = ("Precios de ejemplo: cámbialos por los tuyos. Las tasas de Tráfico no están incluidas y se pagan aparte.",
+            "Example prices: replace them with your own. Traffic authority fees are not included and are paid separately.")
+
+    inicio = pagina("inicio", ("", ""), ("Autoescuela", "Driving school"),
+                    ("Autoescuela con permisos B, A2, A, AM y C, clases teóricas con horario, test online, prácticas a tu medida y ayuda con los trámites.",
+                     "Driving school offering B, A2, A, AM and C licences, theory classes with a timetable, online tests, driving lessons to suit you and help with the paperwork."), [
+        hero(("Tu carnet de conducir, paso a paso", "Your driving licence, step by step"),
+             ("Teórica en el centro o con test online, prácticas a la hora que te venga bien y ayuda con todo el papeleo. Te explicamos cada paso antes de darlo.",
+              "Theory at the school or with online tests, driving lessons at a time that suits you and help with all the paperwork. We explain each step before you take it."),
+             [llamar(), whatsapp(), matricula("ghost")],
+             eyebrow=("Autoescuela", "Driving school"), variante="centro",
+             extra=peq(AUTORIZACION, color="$muted")),
+        bloque_valores(("Permisos que preparamos", "Licences we prepare you for"), [
+            (("B: coche", "B: car"),
+             ("El permiso de coche, para turismos y furgonetas hasta 3.500 kg.", "The car licence, for cars and vans up to 3,500 kg.")),
+            (("A2 y A: moto", "A2 and A: motorbike"),
+             ("Motos de potencia limitada (A2) o sin límite (A). Te explicamos qué permiso te toca según tu caso.",
+              "Power-limited motorbikes (A2) or unlimited (A). We explain which licence applies to your case.")),
+            (("AM: ciclomotor", "AM: moped"),
+             ("Para ciclomotores y vehículos ligeros, con teórica y prácticas más cortas.",
+              "For mopeds and light vehicles, with shorter theory and driving lessons.")),
+            (("C: camión", "C: lorry"),
+             ("Para quien conduce por trabajo. Hablamos de los requisitos de edad y de cursos aparte antes de empezar.",
+              "For those who drive for work. We go over age requirements and separate courses before you start.")),
+        ], eyebrow=("Permisos", "Licences"), cols=2, estilo="borde"),
+        bloque_pasos(("Cómo se saca el carnet", "How to get your licence"), [
+            (("Matrícula", "Enrolment"), ("Traes tus documentos y empiezas. Te damos el material y el acceso a los test.", "You bring your documents and start. We give you the material and access to the tests.")),
+            (("Teórica", "Theory"), ("Clases en el centro con horario fijo o estudio con test online, o las dos cosas.", "Classes at the school at set times or study with online tests, or both.")),
+            (("Prácticas", "Driving lessons"), ("Clases de 45 minutos con tu profesor, a las horas que acordéis.", "45-minute lessons with your instructor, at times you agree.")),
+            (("Exámenes", "Tests"), ("Te presentamos cuando estés preparado, y no antes.", "We put you forward when you are ready, and not before.")),
+        ], tono="relleno"),
+        bloque_checks(("Lo que te damos", "What you get"), [
+            ("Clases teóricas con horario de mañana, tarde y sábado.", "Theory classes in the morning, afternoon and on Saturdays."),
+            ("Test online para practicar desde casa, con preguntas como las del examen.", "Online tests to practise at home, with questions like those in the exam."),
+            ("Prácticas con coche del centro, de doble mando.", "Driving lessons in a school car with dual controls."),
+            ("Ayuda con los trámites ante Tráfico.", "Help with the paperwork with the traffic authority."),
+            ("Si suspendes, te decimos cómo repetir y cuánto cuesta, sin sorpresas.", "If you fail, we tell you how to retake it and what it costs, with no surprises."),
+            ("Precios claros por escrito antes de matricularte.", "Clear prices in writing before you enrol."),
+        ], eyebrow=("Incluye", "Included"), anchor="incluye"),
+        bloque_opiniones(("Lo que dicen nuestros alumnos", "What our students say"),
+                         [("las clases", "the lessons"), ("el profesor", "the instructor"), ("el trato", "the service")],
+                         tono="relleno"),
+        bloque_cta(("¿Empezamos?", "Shall we get started?"),
+                   ("Pasa por el centro o escríbenos. Te decimos qué permiso necesitas, cuánto cuesta y cuándo puedes empezar.",
+                    "Drop in or message us. We will tell you which licence you need, how much it costs and when you can start."),
+                   [matricula(), llamar("secondary")], tono="base"),
+    ])
+
+    permisos = pagina("permisos", ("permisos-y-precios", "licences-and-prices"), ("Permisos y precios", "Licences and prices"),
+                      ("Matrícula y precio de las clases prácticas de cada permiso (B, A2, A, AM y C), otros conceptos y documentos para matricularse.",
+                       "Enrolment and driving lesson prices for each licence (B, A2, A, AM and C), other items and the documents you need to enrol."), [
+        hero(("Permisos y precios", "Licences and prices"),
+             ("La matrícula incluye la teórica y el acceso a los test. Las clases prácticas se pagan por clase o en bonos.",
+              "Enrolment includes theory and access to the tests. Driving lessons are paid per lesson or in bundles."),
+             [matricula(), llamar("secondary")], variante="texto"),
+        bloque_precios(("Matrícula y clases prácticas", "Enrolment and driving lessons"),
+                       ("Precios de matrícula y de clase práctica por permiso", "Enrolment and driving lesson prices by licence"),
+                       [("Permiso", "Licence"), ("Para conducir", "To drive"), ("Matrícula", "Enrolment"),
+                        ("Clase práctica (45 min)", "Driving lesson (45 min)")],
+                       [(("B", "B"), ("Coche y furgoneta hasta 3.500 kg", "Car and van up to 3,500 kg"), eur(190), eur(32)),
+                        (("A2", "A2"), ("Moto de potencia limitada", "Power-limited motorbike"), eur(190), eur(35)),
+                        (("A", "A"), ("Moto sin límite de potencia", "Unlimited-power motorbike"), eur(210), eur(35)),
+                        (("AM", "AM"), ("Ciclomotor", "Moped"), eur(130), eur(30)),
+                        (("C", "C"), ("Camión", "Lorry"), eur(380), eur(65))],
+                       nota=nota, anchor="precios", tono="base"),
+        bloque_precios(("Bonos y otros conceptos", "Bundles and other items"),
+                       ("Precios de bonos de clases y otros conceptos", "Prices of lesson bundles and other items"),
+                       [("Concepto", "Item"), ("Precio", "Price")],
+                       [(("Bono de 10 clases prácticas del permiso B", "Bundle of 10 driving lessons, licence B"), eur(300)),
+                        (("Clase práctica suelta del permiso B", "Single driving lesson, licence B"), eur(32)),
+                        (("Presentación al examen práctico", "Entry to the practical test"), eur(60)),
+                        (("Repetir un examen teórico (presentación)", "Retaking a theory test (entry)"), eur(25)),
+                        (("Clase teórica suelta", "Single theory class"), eur(8))],
+                       nota=nota, anchor="bonos", tono="relleno"),
+        bloque_checks(("Documentos para matricularte", "Documents to enrol"), [
+            ("DNI o NIE en vigor (el original).", "A valid ID card or NIE (the original)."),
+            ("Una fotografía reciente, tamaño carnet.", "A recent passport-size photograph."),
+            ("Certificado médico de aptitud para conducir, que se hace en un centro de reconocimiento.",
+             "A medical certificate of fitness to drive, issued by an approved medical centre."),
+            ("Si ya tienes otro permiso, tráelo.", "If you already hold another licence, bring it."),
+            ("Un teléfono y un correo, para avisarte de clases y exámenes.", "A phone number and an email, so we can let you know about lessons and tests."),
+        ], intro=("Si te falta algo, empezamos con lo que tengas y te decimos cómo conseguir el resto.",
+                  "If something is missing, we start with what you have and tell you how to get the rest."),
+            eyebrow=("Papeles", "Paperwork"), anchor="documentos"),
+        bloque_cta(("¿Quieres tu presupuesto por escrito?", "Do you want your quote in writing?"),
+                   ("Dinos qué permiso quieres y cuántas clases crees que necesitas, y te lo preparamos.",
+                    "Tell us which licence you want and how many lessons you think you need, and we will prepare it."),
+                   [matricula(), whatsapp("ghost")], tono="relleno"),
+    ])
+
+    proceso = pagina("proceso", ("clases-y-examenes", "lessons-and-tests"), ("Clases y exámenes", "Lessons and tests"),
+                     ("Proceso del permiso en pasos, horario de las clases teóricas, test online y cómo repetir un examen.",
+                      "The licence process in steps, theory class timetable, online tests and how to retake a test."), [
+        hero(("Clases y exámenes", "Lessons and tests"),
+             ("Qué pasa desde que te matriculas hasta que apruebas, cuánto tardas y qué ocurre si hay que repetir.",
+              "What happens from enrolment until you pass, how long it takes and what happens if you have to retake."),
+             [matricula(), llamar("secondary")], variante="texto"),
+        bloque_pasos(("El proceso, en cuatro pasos", "The process in four steps"), [
+            (("1. Matrícula", "1. Enrolment"), ("Traes los documentos y fijamos tu grupo de teórica y tu primera clase práctica.", "You bring your documents and we set your theory group and your first driving lesson.")),
+            (("2. Teórica", "2. Theory"), ("Aprendes las normas y las señales, y haces test hasta que apruebes con margen.", "You learn the rules and the signs and do tests until you pass with room to spare.")),
+            (("3. Examen teórico", "3. Theory test"), ("Te presentamos cuando tus resultados en los test son buenos.", "We put you forward when your test results are good.")),
+            (("4. Prácticas y examen", "4. Lessons and practical test"), ("Clases con tu profesor hasta que conduces con soltura y te presentamos al examen práctico.", "Lessons with your instructor until you drive with confidence, then we put you forward for the practical test.")),
+        ], intro=("El tiempo depende de cuántas clases hagas por semana. Te damos una estimación al matricularte.",
+                  "The time depends on how many lessons you take per week. We give you an estimate at enrolment."),
+            anchor="pasos"),
+        seccion("text", [titular(("Clases teóricas", "Theory classes"),
+                                 ("Puedes venir a clase, estudiar con los test o hacer las dos cosas. Elige el grupo que te venga mejor.",
+                                  "You can come to class, study with the tests or do both. Choose the group that suits you best.")),
+                         tabla(("Horario de las clases teóricas", "Theory class timetable"),
+                               [("Grupo", "Group"), ("Días", "Days"), ("Hora", "Time")],
+                               [(("Mañana", "Morning"), ("Lunes, miércoles y viernes", "Monday, Wednesday and Friday"), ("10:30 a 11:30", "10:30 to 11:30 am")),
+                                (("Tarde", "Afternoon"), ("Martes y jueves", "Tuesday and Thursday"), ("19:00 a 20:00", "7:00 to 8:00 pm")),
+                                (("Sábado", "Saturday"), ("Sábados", "Saturdays"), ("10:00 a 12:00", "10:00 am to 12:00 pm"))]),
+                         peq(("Los grupos se abren cuando hay alumnos suficientes. Pregúntanos por el próximo.",
+                              "Groups open when there are enough students. Ask us about the next one."), color="$muted")],
+                tono="relleno", anchor="horario-teorica", gap=24),
+        bloque_valores(("Test online", "Online tests"), [
+            (("Desde donde quieras", "From wherever you like"),
+             ("Con tu matrícula tienes acceso a los test desde el móvil, la tableta o el ordenador.",
+              "With your enrolment you can use the tests from your phone, tablet or computer.")),
+            (("Como en el examen", "Like the real test"),
+             ("Preguntas del mismo tipo y con el mismo tiempo que en el examen, para que llegues sin sorpresas.",
+              "Questions of the same type and with the same time limit as in the test, so you arrive with no surprises.")),
+            (("Tus fallos, a la vista", "Your mistakes, in view"),
+             ("Vemos qué temas fallas más y los repasamos en clase.", "We see which topics you miss most and go over them in class.")),
+        ], eyebrow=("Estudia a tu ritmo", "Study at your own pace"), estilo="relleno", anchor="test-online"),
+        bloque_checks(("Si hay que repetir un examen", "If you have to retake a test"), [
+            ("Suspender le pasa a mucha gente. Se repite con calma.", "Plenty of people fail once. You simply retake it calmly."),
+            ("Repasamos contigo en qué has fallado antes de volver a presentarte.", "We go over where you went wrong before you sit it again."),
+            ("Los plazos para volver a examinarte los fija Tráfico, y te decimos cuáles son.", "The waiting periods for retaking are set by the traffic authority, and we tell you what they are."),
+            ("Cada nueva presentación tiene su precio. Te lo decimos antes y está en la tabla de precios.", "Each new entry has its price. We tell you beforehand and it is in the price table."),
+            ("Puedes pedir clases de refuerzo antes del siguiente examen.", "You can ask for extra lessons before the next test."),
+        ], eyebrow=("Repetición", "Retakes"), tono="base", anchor="repetir"),
+        bloque_faq(("Preguntas frecuentes", "Frequently asked questions"), [
+            (("¿Cuánto tardaré en sacarme el carnet?", "How long will it take me to get my licence?"),
+             ("Depende de cuánto estudies y de cuántas clases prácticas hagas por semana. Con constancia, unos pocos meses; te damos una estimación al matricularte.",
+              "It depends on how much you study and how many lessons you take per week. With regular effort, a few months; we give you an estimate at enrolment.")),
+            (("¿Cuántas clases prácticas necesitaré?", "How many driving lessons will I need?"),
+             ("Cada persona es distinta. Tu profesor te lo dirá según cómo conduzcas, y solo te presentamos cuando estés preparado.",
+              "Everyone is different. Your instructor will tell you based on how you drive, and we only put you forward when you are ready.")),
+            (("¿Puedo compaginarlo con el trabajo?", "Can I combine it with work?"),
+             ("Sí. Tenemos teórica de mañana, tarde y sábado, y las prácticas se acuerdan con tu horario.",
+              "Yes. We have morning, afternoon and Saturday theory, and driving lessons are agreed around your schedule.")),
+            (("¿Qué pasa si falto a una clase práctica?", "What if I miss a driving lesson?"),
+             ("Avisa con 24 horas y la cambiamos sin coste. Con menos aviso, se cobra.",
+              "Let us know 24 hours ahead and we change it at no cost. With less notice, it is charged.")),
+        ], tono="relleno"),
+    ])
+
+    cont = pagina("contacto", ("contacto", "contact"), ("Contacto y matrícula", "Contact and enrolment"),
+                  ("Matricúlate o pide información por teléfono, WhatsApp o con el formulario. Horario del centro y cómo llegar.",
+                   "Enrol or ask for information by phone, WhatsApp or with the form. School opening hours and how to find us."), [
+        hero(("Matricúlate o pide información", "Enrol or ask for information"),
+             ("Llámanos, escríbenos por WhatsApp o rellena el formulario. Te decimos qué permiso necesitas y cuándo puedes empezar.",
+              "Call us, message us on WhatsApp or fill in the form. We tell you which licence you need and when you can start."),
+             [llamar(), whatsapp()], variante="texto", extra=peq(AUTORIZACION, color="$muted")),
+        bloque_contacto(("Cuéntanos qué permiso quieres", "Tell us which licence you want"),
+                        ("Con unos datos te llamamos para explicarte los pasos y los precios.",
+                         "With a few details we will call you to explain the steps and the prices."),
+                        campos_cita(servicios=[("Permiso B (coche)", "Licence B (car)"), ("Permiso A2 (moto)", "Licence A2 (motorbike)"),
+                                               ("Permiso A (moto)", "Licence A (motorbike)"), ("Permiso AM (ciclomotor)", "Licence AM (moped)"),
+                                               ("Permiso C (camión)", "Licence C (lorry)"), ("Otro", "Other")],
+                                    fecha=False,
+                                    extra=[campo("inicio", "select", ("¿Cuándo quieres empezar?", "When do you want to start?"), False,
+                                                 opciones=[("Lo antes posible", "As soon as possible"), ("Este mes", "This month"),
+                                                           ("El mes que viene", "Next month"), ("Aún no lo sé", "I do not know yet")])]),
+                        ("Pedir información", "Ask for information"), horas,
+                        exito=("Gracias. Te llamamos para explicarte los pasos y los precios.",
+                               "Thank you. We will call you to explain the steps and the prices.")),
+        bloque_mapa(("Cómo llegar", "How to find us"),
+                    ("Estamos cerca de la parada de autobús. Las prácticas salen desde la puerta de la autoescuela.",
+                     "We are near the bus stop. Driving lessons start from the school's front door."), tono="relleno"),
+    ])
+
+    return plantilla(KEY, ("Autoescuela", "Driving school"),
+                     ("Autoescuela con permisos B, A2, A, AM y C, tabla de matrícula y precios, proceso en pasos, horario de teórica, test online y formulario de matrícula.",
+                      "Driving school with B, A2, A, AM and C licences, enrolment and price table, process in steps, theory timetable, online tests and an enrolment form."),
+                     "motor", ("autoescuela escuela de conducir carnet de conducir permiso de conducir carnet de coche carnet de moto permiso b a2 teorica practicas examen dgt test matricula",
+                               "driving school driving lessons driving licence driving test theory test car licence motorbike licence learner instructor"),
+                     look, cabecera(nav, cta_cab),
+                     pie(nav, ("Autoescuela. Autorización del centro nº 00-0000. Teórica, prácticas y trámites.",
+                               "Driving school. Centre authorisation no. 00-0000. Theory, driving lessons and paperwork."),
+                         ("Lunes a viernes 10:00 a 13:30 y 16:30 a 20:30. Sábado 10:00 a 13:00.",
+                          "Monday to Friday 10 am to 1:30 pm and 4:30 to 8:30 pm. Saturday 10 am to 1 pm.")),
+                     [inicio, permisos, proceso, cont])

@@ -1,0 +1,49 @@
+{
+  "document": [
+    "heading",
+    "imageAlign",
+    "imageAlt",
+    "imageDeselect",
+    "imageRemove",
+    "imageRemoveCrop",
+    "imageWrap",
+    "mergeFinish",
+    "mergeNextRecord",
+    "mergePrevRecord",
+    "mergeReplace",
+    "tableCellBg",
+    "tableCellValign",
+    "tableColLeft",
+    "tableColRight",
+    "tableDelCol",
+    "tableDelRow",
+    "tableDelete",
+    "tableMergeCells",
+    "tableRowAbove",
+    "tableRowBelow",
+    "tableSplitCell"
+  ],
+  "spreadsheet": [
+    "aiPanel",
+    "aifill",
+    "copy",
+    "paste",
+    "scenadd",
+    "scendel",
+    "scenreport",
+    "scenupdate",
+    "sparkdel",
+    "tabledel",
+    "tablestyle",
+    "tabletotalfn",
+    "tabletotals",
+    "unprotect",
+    "unprotectbook",
+    "validdel"
+  ],
+  "presentation": [
+    "aiPanel",
+    "grafico",
+    "iafill"
+  ]
+}

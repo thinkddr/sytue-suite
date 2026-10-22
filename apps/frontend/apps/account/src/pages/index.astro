@@ -1,0 +1,48 @@
+---
+/**
+ * Mi cuenta — vista principal. SSR: el layout exige sesión; la isla AccountApp
+ * (client:load) monta la Sytue Shell y las secciones.
+ *
+ * El nombre y el correo se resuelven en el servidor desde los claims de la
+ * sesión: sin esto la tarjeta se pintaría vacía y se rellenaría al hidratar, con
+ * el parpadeo que eso supone en la primera pantalla que ve quien entra.
+ */
+import { returnToCanonico } from '@sytue/config';
+import AppLayout from '../layouts/AppLayout.astro';
+import { serverEnv } from '@sytue/auth/server';
+import { AccountApp } from '../components/AccountApp.js';
+import { bff, toBffContext } from '../lib/bff.js';
+
+export const prerender = false;
+
+const session = await bff.getSession(toBffContext(Astro));
+if (!session) {
+  // ADR 0056: la entrada org-ful llega reescrita con la marca ?__org=; el returnTo
+  // sale canónico, no en la forma interna, o tras el login la barra se queda con ella.
+  const returnTo = returnToCanonico(Astro.url, bff.basePath);
+  const redireccionLogin = Astro.redirect(
+    `${bff.basePath}/auth/login?returnTo=${encodeURIComponent(returnTo)}`,
+  );
+  // Contiene el retorno a una ruta autenticada: no puede cachearse.
+  redireccionLogin.headers.set('cache-control', 'no-store');
+  return redireccionLogin;
+}
+const env = serverEnv(import.meta.env);
+const hubBaseUrl = env.SYTUE_HUB_BASE_URL ?? 'https://hub.sytue.eu';
+// El issuer PÚBLICO, no el Service interno: esto viaja al navegador, que es quien
+// sigue el enlace del perfil de Apple llevando su cookie de sesión del IdP.
+const idBaseUrl = (env.SYTUE_OIDC_ISSUER ?? 'https://id.sytue.eu').replace(/\/$/, '');
+---
+
+<AppLayout title="Mi cuenta">
+  <AccountApp
+    slot="app"
+    client:load
+    user={session.user}
+    hubBaseUrl={hubBaseUrl}
+    idBaseUrl={idBaseUrl}
+    locale={Astro.locals.locale}
+    nombreInicial={session.user.name ?? ''}
+    email={session.user.email ?? ''}
+  />
+</AppLayout>

@@ -1,0 +1,74 @@
+{{- if .Values.global.networkPolicy.enabled }}
+{{- $cidrs := .Values.global.networkPolicy.loadBalancerSourceCIDRs | default list -}}
+{{- $slb := .Values.global.networkPolicy.serviceLB | default dict -}}
+{{- if and (not $cidrs) (not $slb.namespace) }}
+{{- fail "con networkPolicy activada hace falta global.networkPolicy.loadBalancerSourceCIDRs (LB gestionado) o global.networkPolicy.serviceLB.namespace (balanceador dentro del clúster)" -}}
+{{- end }}
+{{- if not $cidrs }}
+# BALANCEADOR DENTRO DEL CLÚSTER. No hay red privada que permitir: el tráfico
+# llega de los pods del serviceLB, y de eso ya se encarga la baseline, que
+# selecciona TODOS los pods del namespace —incluido Traefik— y cuyas reglas se
+# UNEN a las de aquí. Por lo mismo, la salida al API de Kubernetes va por la
+# ClusterIP en el 443, que allowExternalEgress ya abre. Así que en este modo esta
+# política se reduce a la excepción del verificador de acceso.
+{{- end }}
+# La baseline deny-all también selecciona Traefik. Sin esta excepción, el LB
+# abre la conexión TCP pero Cilium descarta el tráfico antes del ingress; ACME
+# ve EOF y todas las superficies parecen caídas aunque los pods estén Ready.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "sytue-one.fullname" . }}-traefik
+  labels:
+    {{- include "sytue-one.labels" (dict "context" . "component" "ingress") | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: traefik
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    {{- if $cidrs }}
+    - from:
+        {{- range $cidr := $cidrs }}
+        - ipBlock:
+            cidr: {{ $cidr | quote }}
+        {{- end }}
+      ports:
+        - { protocol: TCP, port: 8000 }
+        - { protocol: TCP, port: 8443 }
+        - { protocol: TCP, port: 5349 }
+    {{- end }}
+    # El verificador de acceso corre DENTRO del clúster y ataca esta misma
+    # ClusterIP a propósito, para no depender de que el balanceador admita
+    # tráfico desde dentro —el hairpin es una propiedad del proveedor, no del
+    # producto—. La baseline deny-all descartaba sus paquetes y el Job moría con
+    # «i/o timeout», indistinguible de una caída real del ingress.
+    #
+    # Es una excepción estrecha: una etiqueta concreta, del mismo namespace, y
+    # solo el puerto TLS. El Job vive lo que dura la verificación.
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: verify-access
+      ports:
+        - { protocol: TCP, port: 8443 }
+  egress:
+    # Backends de la suite y solvers HTTP-01 efímeros del mismo namespace.
+    - to:
+        - podSelector: {}
+    # Kubernetes API de Kapsule. El Service kubernetes.default publica 443,
+    # pero Cilium aplica la política después del DNAT al control plane privado
+    # en TCP/6443. Sin esta regla Traefik queda Ready sin poder observar ningún
+    # Ingress: toda la suite y los retos ACME responden 404.
+    {{- if $cidrs }}
+    - to:
+        {{- range $cidr := $cidrs }}
+        - ipBlock:
+            cidr: {{ $cidr | quote }}
+        {{- end }}
+      ports:
+        - { protocol: TCP, port: 6443 }
+    {{- end }}
+{{- end }}

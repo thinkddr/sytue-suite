@@ -1,0 +1,17 @@
+"widgets.open" = "Avaa";
+"widgets.compose" = "Kirjoita";
+"widgets.create" = "Luo tapahtuma";
+"widgets.notes" = "Muistiinpanot";
+"widgets.rows" = "Rivit";
+"widgets.pending" = "Odottaa";
+"widgets.channels" = "Kanavat";
+"widgets.photos" = "Kuvat";
+"widgets.episodes" = "Jaksot";
+"widgets.apps" = "Sovellukset";
+"widgets.calendars" = "Kalenterit";
+"widgets.address_books" = "Osoitekirjat";
+"search.label" = "Yleinen haku";
+"dataflow.item.files" = "Tiedostot";
+"dataflow.item.events" = "Kalenteri";
+"dataflow.item.documents" = "Asiakirjat";
+"dataflow.item.contacts" = "Yhteystiedot";

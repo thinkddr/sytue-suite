@@ -1,0 +1,32 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Daniel Delgado Ramos
+#
+# METADATOS DE SYTUE CONTACTS. Los lee `fyne package` él solo; que este fichero
+# exista es lo que hace que `apps/fyne/scripts/empaquetar.sh` empaquete este
+# directorio.
+Website = "https://sytue.eu"
+
+[Details]
+  Name = "Sytue Contacts"
+  ID = "eu.sytue.contacts"
+  Icon = "Icon.png"
+  Version = "0.1.0"
+  Build = 1
+
+# El esquema con el que las demás apps abren Contacts. Su usuario de verdad es el
+# «Enviar correo» al revés: desde Sytue Mail, abrir la ficha de quien manda un
+# correo. En la web eso es ir a otro subdominio; aquí es
+# `sytue-contacts://contacto?email=…`, una acción que delega en el sistema y no una
+# pantalla más del mismo binario (`docs/CONVENTIONS.md` §13.6).
+#
+# También es el redirect_uri del login (RFC 8252 §7.1), y tiene que coincidir con lo
+# registrado en Sytue ID.
+[Development]
+  esquema = "sytue-contacts"
+  widget_acciones = "open,search"
+  # El instalador de escritorio que la lleva (empaquetar.sh): «Sytue One» o «Sytue Drive».
+  bundle = "one"
+  # Abre ficheros del equipo que la persona elige (subir, adjuntar, importar, insertar): en
+  # la Mac App Store, `empaquetar.sh macappstore` le da el derecho de sandbox
+  # `files.user-selected.read-write`. Las que no lo declaran no lo llevan.
+  ficheros = "si"

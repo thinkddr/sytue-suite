@@ -1,0 +1,37 @@
+# SPDX-License-Identifier: Apache-2.0
+name: conformance
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: conformance-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  compiler-and-native:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: native/go.mod
+          cache: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.2
+      - name: Compiler, native behavior and exact visual comparison
+        run: bash ci/run.sh
+      - name: Preserve evidence, including failures
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: conformance-${{ github.sha }}
+          path: |
+            artifacts
+            native/generated
+            native/go.sum
+            native/go.mod
+          if-no-files-found: warn

@@ -1,0 +1,352 @@
+{{- $globalObjectStorage := ((.Values.global).objectStorage | default dict) -}}
+{{- $objectStorage := .Values.objectStorage | default dict -}}
+{{- $objectStorageSecret := $objectStorage.existingSecret | default $globalObjectStorage.existingSecret | default "sytue-object-storage" -}}
+{{- $objectStorageRegion := $objectStorage.region | default $globalObjectStorage.region | default "fr-par" -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "sytue-rooms.fullname" . }}
+  labels:
+    {{- include "sytue-rooms.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "sytue-rooms.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "sytue-rooms.labels" . | nindent 8 }}
+      annotations:
+        kubectl.kubernetes.io/default-container: rooms
+    spec:
+      automountServiceAccountToken: false
+      {{- with (.Values.global).imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: rooms
+          image: "{{ include "sytue-rooms.imageRegistry" . }}/{{ .Values.image.repository }}:{{ ((.Values.global).image | default dict).tag | default .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.targetPort }}
+          env:
+            - name: SYTUE_ROOMS_MATRIX_REQUIRED
+              value: {{ .Values.config.matrix.required | quote }}
+            {{- if .Values.config.matrix.enabled }}
+            - name: SYTUE_ROOMS_MATRIX_INTERNAL_URL
+              value: {{ .Values.config.matrix.internalURL | quote }}
+            - name: SYTUE_ROOMS_MATRIX_HOMESERVER_URL
+              value: {{ .Values.config.matrix.homeserverURL | default (printf "https://matrix.%s" (.Values.global).domain) | quote }}
+            - name: SYTUE_ROOMS_MATRIX_SERVER_NAME
+              value: {{ .Values.config.matrix.serverName | default (printf "matrix.%s" (.Values.global).domain) | quote }}
+            - name: SYTUE_ROOMS_MATRIX_SSO_PROVIDER_ID
+              value: {{ .Values.config.matrix.ssoProviderID | quote }}
+            - name: MATRIX_SOURCE_URL
+              value: {{ .Values.config.matrix.sourceURL | quote }}
+            - name: SYTUE_ROOMS_MATRIX_ADMIN_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.config.matrix.existingSecret | quote }}
+                  key: controller-token
+            - name: SYTUE_ROOMS_MATRIX_LIFECYCLE_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.config.matrix.existingSecret | quote }}
+                  key: lifecycle-secret
+            - name: SYTUE_ROOMS_MATRIX_IDENTITY_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: sytue-id-orgs-persona
+                  key: secret
+            {{- end }}
+            {{- include "sytue.documentCallsEnv" (dict "root" . "prefix" "SYTUE_ROOMS" "secretSuffix" "DOCUMENT_CALL_ACCESS_SECRET") | nindent 12 }}
+            {{- if (.Values.global).otlp }}
+            {{- if (.Values.global).otlp.endpoint }}
+            # Telemetria: metricas OTLP directas a Cockpit, sin agente intermedio.
+            # Sale del umbrella y no de este chart para que los catorce escriban al
+            # MISMO sitio; si cada uno apuntara al suyo, no habria con que comparar.
+            # Vacio => no se exporta y el servicio sigue sirviendo igual.
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ (.Values.global).otlp.endpoint | quote }}
+            {{- end }}
+            {{- if (.Values.global).otlp.tokenSecret }}
+            # Por Secret y nunca por values: aunque el token solo permita escribir,
+            # con el se puede envenenar la serie que decide un escalado.
+            - name: OTEL_EXPORTER_OTLP_HEADERS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ (.Values.global).otlp.tokenSecret }}
+                  key: {{ (.Values.global).otlp.tokenKey | default "otlp-headers" }}
+                  optional: true
+            {{- end }}
+            {{- end }}
+            {{- if (.Values.global).dragonflyUrl }}
+            # Cache efimera compartida entre replicas (Dragonfly). Sale del
+            # umbrella y no de cada chart para que los tres servicios que la usan
+            # apunten al MISMO sitio: si divergen, la presencia se parte igual
+            # que si no hubiera cache.
+            #
+            # Ausente ⇒ platform/pkg/cache degrada a no-op y el servicio sigue
+            # sirviendo con estado en memoria del proceso. Eso solo es correcto
+            # con UNA replica, y por eso el autoescalado de estos servicios
+            # depende de que esta variable exista.
+            - name: DRAGONFLY_URL
+              value: {{ (.Values.global).dragonflyUrl | quote }}
+            {{- if ((.Values.global).cache).secretName }}
+            # La contraseña va por Secret y APARTE de la URL. La URL no es un secreto
+            # —es la misma en dev y en prod— y se deja como `value:` a la vista para
+            # que se pueda comprobar que los siete servicios apuntan a la MISMA cache;
+            # meterla dentro de la URL obligaría a mandar la URL entera por Secret y
+            # ese gate se quedaría ciego.
+            #
+            # `optional: true` a propósito: sin la clave en el Secret, Dragonfly
+            # tampoco la exige (misma referencia opcional en su chart) y el conjunto
+            # sigue funcionando sin autenticación, que es el comportamiento previo.
+            - name: DRAGONFLY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ ((.Values.global).cache).secretName }}
+                  key: {{ ((.Values.global).cache).passwordKey | default "dragonfly-password" }}
+                  optional: true
+            {{- end }}
+            {{- end }}
+            # Runtime Go atado a los limites del pod (helper sytue.goRuntimeEnv del umbrella):
+            # GOMAXPROCS=techo(limits.cpu) via downward API; GOMEMLIMIT=~85% de limits.memory.
+            {{- include "sytue.goRuntimeEnv" (dict "container" "rooms" "memLimit" .Values.resources.limits.memory) | nindent 12 }}
+            {{- include "sytue.logCollectorEnv" . | nindent 12 }}
+            - name: ENV
+              value: {{ include "sytue-rooms.env" . | quote }}
+            - name: HTTP_ADDR
+              value: ":{{ .Values.service.targetPort }}"
+            - name: LOG_LEVEL
+              value: {{ .Values.config.logLevel | quote }}
+            # Avisos al centro de notificaciones de la suite (topBar y apps
+            # nativas): mismo patrón que syerp/cloud-api.
+            - name: INTEGRATIONS_URL
+              value: {{ .Values.config.integrationsUrl | default (printf "http://%s-integrations" .Release.Name) | quote }}
+            - name: INTEGRATIONS_INTERNAL_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.config.integrationsSecret | default "sytue-integrations" }}
+                  key: internal-secret
+                  optional: true
+            - name: HUB_BASE_URL
+              value: {{ .Values.config.hubUrl | default (printf "http://%s-hub" .Release.Name) | quote }}
+            # El secreto de la puerta interna del Hub (/internal/notifications), el MISMO en
+            # el Hub y en cada servicio que avisa. Lo genera el chart paraguas
+            # (sytue-one/templates/secretos-internos.yaml); sin él, fuera de dev, el
+            # servicio no arranca.
+            - name: HUB_INTERNAL_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: sytue-hub-internal
+                  key: secret
+            - name: PUBLIC_URL
+              value: "https://{{ include "sytue-rooms.host" . }}"
+            {{- with .Values.config.channelMailDomain }}
+            # Correo a canal: el MISMO dominio que el CHANNEL_MAIL_DOMAIN de Mail. Rooms
+            # solo lo publica con el secreto de cada entrante (ver values.yaml).
+            - name: CHANNEL_MAIL_DOMAIN
+              value: {{ . | quote }}
+            {{- end }}
+            # ----- Sytue ID (OIDC; validacion JWT via JWKS) -----
+            - name: OIDC_ISSUER
+              value: {{ include "sytue-rooms.oidcIssuer" . | quote }}
+            - name: OIDC_JWKS_URL
+              value: {{ include "sytue.oidcJwksUrl" . | quote }}
+            # Sytue ID por el Service interno: encuentra a la persona de OTRA
+            # organizacion cuando se teclea su correo o su @usuario para escribirle o
+            # llamarle (people:resolve, ADR 0040). Sin el, nadie de fuera.
+            - name: ID_URL
+              value: {{ include "sytue.oidcInternalBaseUrl" . | quote }}
+            # El nombre visible de la organizacion de fuera en las invitaciones (Sytue ID,
+            # /internal/orgs/names). Sin el, solo su identificador.
+            - name: ID_NOMBRES_ORGS_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: sytue-id-nombres-orgs
+                  key: secret
+                  optional: true
+            # Sytue Docs por el Service interno: decide quien entra a la sala de un documento
+            # («Llamar desde el documento», ADR 0070). Rooms le presenta el token de quien
+            # llama; sin respuesta, esas salas quedan cerradas.
+            - name: DOCS_URL
+              value: {{ printf "http://%s-docs" .Release.Name | quote }}
+            # Sytue Calendar por el Service interno: quién está invitado a la reunión de
+            # un evento. Rooms le presenta el token de quien llama; sin respuesta, solo
+            # entran quien la convocó, quien ya estuvo y quien trae la clave del enlace.
+            - name: CALENDAR_URL
+              value: {{ printf "http://%s-calendar" .Release.Name | quote }}
+            # ----- Endpoint INTERNO service-to-service -----
+            # Secreto compartido que autentica /internal/channel-access: la verja que
+            # consulta Sytue Drive para servir un adjunto solo a los miembros del canal.
+            # OPCIONAL: sin el no se monta esa ruta y los adjuntos con ambito de canal no
+            # se sirven (fail-closed). El MISMO valor debe estar en el secret de drive.
+            #
+            # El aviso de «llamada finalizada» ya NO usa esto: la videollamada es parte
+            # de este mismo servicio y lo publica en proceso.
+            - name: ROOMS_INTERNAL_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret }}
+                  key: rooms-internal-secret
+                  optional: true
+            # ----- Secretos de firma de las integraciones salientes, at-rest -----
+            # KEK AES-256 (base64) con la que se sellan los `signing_secret` de los
+            # webhooks salientes y de los slash commands. OBLIGATORIA en prod: el
+            # servicio se niega a arrancar sin ella, porque un secreto de firma en
+            # claro en la base deja que cualquiera que la lea firme peticiones
+            # haciendose pasar por nosotros ante el endpoint del cliente — justo lo
+            # que la firma existe para impedir.
+            - name: SYTUE_ROOMS_KEY_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret }}
+                  key: key-encryption-key
+            # ----- Web Push (VAPID) -----
+            # El servicio, su endpoint de clave publica y el frontend estaban
+            # ESCRITOS Y PROBADOS desde la Ola 18, y el chart no le pasaba las
+            # claves: `NewPushSender` devolvia (nil, nil) y las notificaciones no
+            # salian de produccion sin que nada fallara ni lo dijera. Una funcion
+            # apagada en silencio es un fallo, no una opcion de configuracion.
+            #
+            # Las tres van juntas a proposito. Con solo una de las dos claves el
+            # servicio ARRANCA CON ERROR explicito, que es lo correcto: media
+            # configuracion es peor que ninguna. `optional: true` mantiene el
+            # arranque en entornos que aun no las tengan materializadas.
+            - name: SYTUE_VAPID_PUBLIC
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret }}
+                  key: vapid-public
+                  optional: true
+            - name: SYTUE_VAPID_PRIVATE
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret }}
+                  key: vapid-private
+                  optional: true
+            # El `sub` del JWT VAPID: un mailto: de contacto real al que los
+            # servicios de push (Google, Mozilla, Apple) escriben si nuestras
+            # notificaciones dan problemas. No es decorativo: sin contacto valido
+            # pueden dejar de aceptarlas.
+            - name: SYTUE_VAPID_SUBJECT
+              value: {{ .Values.webPush.subject | quote }}
+            # ----- Postgres EXTERNO (Scaleway RDB; unica fuente de verdad) -----
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgresql.existingSecret }}
+                  key: {{ .Values.postgresql.dsnKey }}
+            # ----- Videollamada: el SFU LiveKit (la otra mitad de Rooms) -----
+            - name: LIVEKIT_URL
+              value: {{ .Values.config.livekitUrl | default (printf "wss://%s" (include "sytue-rooms.host" .)) | quote }}
+            - name: LIVEKIT_HOST
+              value: {{ .Values.config.livekitApiHost | default (printf "http://%s-livekit:7880" .Release.Name) | quote }}
+            - name: LIVEKIT_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: sytue-livekit-keys
+                  key: api-key
+            - name: LIVEKIT_API_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: sytue-livekit-keys
+                  key: api-secret
+            # ----- Grabación de reuniones (egress → Object Storage) -----------
+            #
+            # Sin `RECORDING_BUCKET` la función queda apagada y el botón de grabar
+            # responde «esta instalación no guarda grabaciones»: se comprueba a la
+            # entrada, ANTES de que el grabador entre en la sala y avise a todo el
+            # mundo de que se está grabando.
+            #
+            # Las credenciales son las mismas del Object Storage de la suite, y las
+            # necesita de LECTURA además de escritura: quien firma la descarga es
+            # este servicio, no el egress.
+            - name: RECORDING_BUCKET
+              value: {{ .Values.config.recordingBucket | quote }}
+            - name: RECORDING_REGION
+              value: {{ $objectStorageRegion | quote }}
+            - name: RECORDING_LAYOUT
+              value: {{ .Values.config.recordingLayout | quote }}
+            - name: RECORDING_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $objectStorageSecret }}
+                  key: endpoint
+                  optional: true
+            - name: RECORDING_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $objectStorageSecret }}
+                  key: access-key
+                  optional: true
+            - name: RECORDING_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $objectStorageSecret }}
+                  key: secret-key
+                  optional: true
+            # Pool pgx POR replica (bajo en prod: PgBouncer multiplexa hacia la RDB).
+            - name: DB_MAX_CONNS
+              value: {{ .Values.config.dbMaxConns | quote }}
+            # DSN DIRECTO a la RDB (bypass del pooler) para estado de sesion:
+            # LISTEN/NOTIFY y advisory locks de migraciones (platform/pkg/pg).
+            # Opcional: sin PgBouncer (staging/dev) no existe y se usa DATABASE_URL.
+            - name: DATABASE_DIRECT_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgresql.existingSecret }}
+                  key: {{ .Values.postgresql.dsnDirectKey }}
+                  optional: true
+
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 3
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+      {{- with .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- range . }}
+        - maxSkew: {{ .maxSkew }}
+          topologyKey: {{ .topologyKey }}
+          whenUnsatisfiable: {{ .whenUnsatisfiable }}
+          labelSelector:
+            matchLabels:
+              {{- include "sytue-rooms.selectorLabels" $ | nindent 14 }}
+        {{- end }}
+      {{- end }}

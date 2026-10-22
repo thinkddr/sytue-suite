@@ -1,0 +1,18 @@
+Galeria i edytor zdjęć: oryginały na Dysku, zmiany jako przepis.
+
+• Oś czasu według miesięcy z wyszukiwaniem po nazwie.
+• Albumy z okładką; przeglądarka pełnoekranowa.
+• Edytor światła, koloru, obrotu, odbicia i kadrowania w czasie rzeczywistym.
+• Każda zmiana to przepis: oryginał pozostaje nietknięty.
+• Oś czasu pogrupowana według miesięcy, z wyszukiwaniem po nazwie i ostrymi miniaturami.
+• Albumy: tworzenie, zmiana nazwy, wybór okładki, dodawanie z przeglądarki i usuwanie.
+• Edytor z czterema suwakami (ekspozycja, kontrast, nasycenie, temperatura), obrotem i odbiciem.
+• Każda zmiana to przepis zapisany osobno: oryginał na Dysku nigdy się nie zmienia.
+• Eksport w pełnej rozdzielczości, renderowany na serwerze tymi samymi formułami co podgląd.
+• Kosz z przywracaniem.
+• Oryginały są na Twoim Sytue Drive; wersje pochodne to pamięć podręczna, którą można odtworzyć.
+• Dane EXIF odczytywane z samego pliku; wszystko w Unii Europejskiej.
+• Wielokrotny wybór według miesiąca: do nowego albumu, do kosza lub do pobrania za jednym razem.
+• Pokaz slajdów, pełny rozmiar, obrót z przeglądarki i kadrowanie ze stałymi proporcjami.
+
+Szyfrowanie w transmisji (TLS 1.3). Infrastruktura Sytue znajduje się w UE. Lokalizacja usług zewnętrznych zależy od ich dostawcy.

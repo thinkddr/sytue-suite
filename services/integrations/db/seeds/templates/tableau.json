@@ -1,0 +1,37 @@
+{
+  "key": "tableau",
+  "tier": "tier2",
+  "manifest": {
+    "name": "Tableau Cloud",
+    "description": "Analítica y cuadros de mando, con inicio de sesión único.",
+    "category": "Análisis",
+    "color": "#E8762D",
+    "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#E8762D\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"3\" y=\"3\" width=\"7\" height=\"7\" rx=\"1\"/><rect x=\"14\" y=\"3\" width=\"7\" height=\"7\" rx=\"1\"/><rect x=\"3\" y=\"14\" width=\"7\" height=\"7\" rx=\"1\"/><rect x=\"14\" y=\"14\" width=\"7\" height=\"7\" rx=\"1\"/></svg>",
+    "identity": {
+      "kind": "saml",
+      "entity_id": "https://{pod}.online.tableau.com/public/sp/metadata",
+      "acs_url": "https://{pod}.online.tableau.com/public/sp/ACS",
+      "name_id_format": "email"
+    },
+    "provisioning": "none",
+    "launch": {
+      "kind": "initiate"
+    },
+    "fields": [
+      {
+        "key": "pod",
+        "label": "Pod de Tableau Cloud",
+        "placeholder": "10ax",
+        "help": "La región/pod de tu sitio: https://POD.online.tableau.com",
+        "required": true
+      },
+      {
+        "key": "site",
+        "label": "Sitio de Tableau",
+        "placeholder": "acme",
+        "help": "El «content URL» de tu sitio (para el aprovisionamiento SCIM).",
+        "required": true
+      }
+    ]
+  }
+}

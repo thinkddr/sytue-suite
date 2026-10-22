@@ -1,0 +1,16 @@
+Filer og samarbejde under dit eget brand.
+
+• Upload, organiser og del med kontrollerede links (tilladelser og udløb).
+• Forhåndsvisning af dokumenter og billeder direkte på siden.
+• Vedhæft i Mail uden at kopiere filen.
+• Lager baseret på S3 i europæiske regioner.
+• Mit drev, teamdrev, delt med mig, seneste, favoritter og papirkurv.
+• Delingslinks med to niveauer (se eller redigere), adgangskode og udløb.
+• Versionshistorik med gendannelse.
+• Forhåndsvis dokumenter, billeder og PDF’er uden at downloade.
+• Åbn og rediger kontordokumenter i Docus, Calcus og Diapos; PDF’er i CertiPDF.
+• Følsomhedsetiketter, der blokerer offentlige links, hvor de ikke hører hjemme.
+• Del til en kanal i Rooms, eller vedhæft i Mail uden at kopiere filen.
+• S3-lager i europæiske regioner, med din kvote altid synlig.
+
+Krypteret under overførsel (TLS 1.3). Sytues infrastruktur er i EU. Eksterne tjenesters placering afhænger af deres udbyder.

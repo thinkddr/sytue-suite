@@ -1,0 +1,57 @@
+{
+  "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.16/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.16",
+  "version": "1.0.0",
+  "id": "e4c5b367-9c98-4b72-8752-972173f27361",
+  "packageName": "eu.sytue.rooms",
+  "developer": {
+    "name": "Sytue",
+    "websiteUrl": "https://sytue.eu",
+    "privacyUrl": "https://sytue.eu/legal/privacy",
+    "termsOfUseUrl": "https://sytue.eu/legal/terms"
+  },
+  "icons": {
+    "color": "color.png",
+    "outline": "outline.png"
+  },
+  "name": {
+    "short": "Sytue Rooms",
+    "full": "Sytue Rooms & Meetings para Microsoft Teams"
+  },
+  "description": {
+    "short": "Puentes de canal bidireccionales y reuniones WebRTC con Sytue Rooms.",
+    "full": "Conecta tus canales de Microsoft Teams con Sytue Rooms. Videollamadas seguras, puentes de chat bidireccionales y colaboración unificada sin fronteras ni bloqueos de proveedor."
+  },
+  "accentColor": "#5059C9",
+  "configurableTabs": [],
+  "staticTabs": [
+    {
+      "entityId": "sytueRoomsTab",
+      "name": "Sytue Rooms",
+      "contentUrl": "https://rooms.sytue.eu/teams/tab",
+      "websiteUrl": "https://rooms.sytue.eu",
+      "scopes": ["personal", "team"]
+    }
+  ],
+  "bots": [],
+  "connectors": [
+    {
+      "connectorId": "e4c5b367-9c98-4b72-8752-972173f27361",
+      "configurationUrl": "https://rooms.sytue.eu/teams/connector",
+      "scopes": ["team"]
+    }
+  ],
+  "permissions": [
+    "identity",
+    "messageTeamMembers"
+  ],
+  "validDomains": [
+    "rooms.sytue.eu",
+    "integrations.sytue.eu",
+    "*.sytue.eu"
+  ],
+  "webApplicationInfo": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "resource": "api://rooms.sytue.eu/00000000-0000-0000-0000-000000000000"
+  }
+}

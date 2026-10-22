@@ -1,0 +1,17 @@
+"widgets.open" = "Iftaħ";
+"widgets.compose" = "Ikteb";
+"widgets.create" = "Oħloq avveniment";
+"widgets.notes" = "Noti";
+"widgets.rows" = "Ringieli";
+"widgets.pending" = "Pendenti";
+"widgets.channels" = "Kanali";
+"widgets.photos" = "Ritratti";
+"widgets.episodes" = "Episodji";
+"widgets.apps" = "Apps";
+"widgets.calendars" = "Kalendarji";
+"widgets.address_books" = "Kotba tal-indirizzi";
+"search.label" = "Tfittxija globali";
+"dataflow.item.files" = "Fajls";
+"dataflow.item.events" = "Kalendarju";
+"dataflow.item.documents" = "Dokumenti";
+"dataflow.item.contacts" = "Kuntatti";

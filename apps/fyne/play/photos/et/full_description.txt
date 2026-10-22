@@ -1,0 +1,18 @@
+Fotogalerii ja -redaktor: originaalid Drive’is, muudatused retseptina.
+
+• Kuude kaupa ajajoon nimeotsinguga.
+• Kaanepildiga albumid; täisekraanvaatur.
+• Redaktor valguse, värvi, pööramise, peegeldamise ja kärpimise jaoks reaalajas.
+• Iga muudatus on retsept: originaali ei puudutata kunagi.
+• Kuude kaupa rühmitatud ajajoon nimeotsingu ja teravate pisipiltidega.
+• Albumid: loomine, ümbernimetamine, kaanepildi valimine, lisamine vaaturist ja eemaldamine.
+• Redaktor nelja liuguriga (säritus, kontrast, küllastus, temperatuur), pööramise ja peegeldamisega.
+• Iga muudatus on eraldi salvestatud retsept: Drive’i originaali ei muudeta kunagi.
+• Eksport täislahutusega, renderdatud serveris samade valemitega nagu eelvaates.
+• Taastamisvõimalusega prügikast.
+• Originaalid asuvad teie Sytue Drive’is; tuletised on uuesti loodav vahemälu.
+• EXIF-andmed loetakse failist endast; kõik Euroopa Liidus.
+• Mitmikvalik kuu kaupa: uude albumisse, prügikasti või korraga allalaadimiseks.
+• Slaidiseanss, täissuurus, pööramine vaaturist ja kärpimine fikseeritud kuvasuhtega.
+
+Krüpteeritud edastamisel (TLS 1.3). Sytue taristu asub ELis. Väliste teenuste asukoht sõltub nende pakkujast.

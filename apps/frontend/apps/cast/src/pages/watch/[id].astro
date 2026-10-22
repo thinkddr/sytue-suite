@@ -1,0 +1,64 @@
+---
+/**
+ * Sytue Cast — /watch/<id>. La sesión decide qué ficha se pide: con ella, la de
+ * `/api/v1/videos/<id>` (con su ACL: organización, personas invitadas); sin ella,
+ * la pública. Sin sesión y sin ficha pública, el vídeo puede existir para quien
+ * entre: se manda al login en vez de decir «no existe».
+ *
+ * Solo un vídeo PÚBLICO se indexa y lleva tarjeta al compartir; uno no listado se
+ * ve con el enlace pero no se anuncia a ningún buscador.
+ */
+import AppLayout from '../../layouts/AppLayout.astro';
+import { WatchApp } from '../../islands/WatchApp.js';
+import { WS_BASE, consultar } from '../../lib/servicio.js';
+import { RE_UUID, alLogin, falloDeStatus, hubBaseUrl, sesionDe } from '../../lib/pagina.js';
+import type { Video } from '../../lib/tipos.js';
+import { useT } from '../../i18n/index.js';
+
+export const prerender = false;
+
+const id = Astro.params.id ?? '';
+if (!RE_UUID.test(id)) return new Response(null, { status: 404 });
+const session = await sesionDe(Astro);
+const r = session
+  ? await consultar<Video>(`/api/v1/videos/${id}`, session.tokens.accessToken)
+  : await consultar<Video>(`/api/v1/public/videos/${id}`);
+// Sin sesión y sin ficha pública: al login (el redirect en una constante, que el
+// comprobador de Astro no ve lo que va tras `return`).
+const redireccion = !session && !r.ok && r.status === 404 ? alLogin(Astro) : null;
+if (redireccion) return redireccion;
+if (!r.ok) Astro.response.status = r.status === 404 || r.status === 403 ? 404 : 503;
+const t = useT(Astro.locals.locale);
+const v = r.ok ? r.datos : null;
+const origen = Astro.url.origin;
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const publico = v?.visibility === 'public';
+const imagen = v?.poster_url ? `${origen}${base}${v.poster_url}` : null;
+---
+
+<AppLayout
+  title={v ? `${v.title} · ${t('app.title')}` : t('app.title')}
+  {...(v?.description ? { description: v.description.slice(0, 200) } : {})}
+  indexable={publico}
+  imagen={imagen}
+  canonica={`${origen}${base}/watch/${id}`}
+>
+  {v && (v.visibility === 'public' || v.visibility === 'unlisted') ? (
+    <link
+      slot="head"
+      rel="alternate"
+      type="application/json+oembed"
+      href={`${origen}${base}/oembed?url=${encodeURIComponent(`${origen}${base}/watch/${id}`)}&format=json`}
+    />
+  ) : null}
+  <WatchApp
+    slot="app"
+    client:load
+    locale={Astro.locals.locale}
+    user={session?.user ?? null}
+    hubBaseUrl={hubBaseUrl()}
+    wsBase={WS_BASE}
+    inicial={v}
+    fallo={r.ok ? null : falloDeStatus(r.status)}
+  />
+</AppLayout>

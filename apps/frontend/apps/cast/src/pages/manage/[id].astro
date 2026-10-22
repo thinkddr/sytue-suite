@@ -1,0 +1,31 @@
+---
+/**
+ * Sytue Cast — /manage/<id>. Exige sesión; si el vídeo no es de quien pregunta, la
+ * isla lo dice (sin permiso) con lo que conteste el servicio.
+ */
+import AppLayout from '../../layouts/AppLayout.astro';
+import { ManageApp } from '../../islands/ManageApp.js';
+import { RE_UUID, alLogin, hubBaseUrl, sesionDe } from '../../lib/pagina.js';
+import { useT } from '../../i18n/index.js';
+
+export const prerender = false;
+
+const id = Astro.params.id ?? '';
+if (!RE_UUID.test(id)) return new Response(null, { status: 404 });
+const session = await sesionDe(Astro);
+// El redirect en una constante: el comprobador de Astro no ve lo que va tras `return`.
+const redireccion = session ? null : alLogin(Astro);
+if (redireccion || !session) return redireccion;
+const t = useT(Astro.locals.locale);
+---
+
+<AppLayout title={`${t('manage.title')} · ${t('app.title')}`}>
+  <ManageApp
+    slot="app"
+    client:load
+    locale={Astro.locals.locale}
+    user={session.user}
+    hubBaseUrl={hubBaseUrl()}
+    id={id}
+  />
+</AppLayout>

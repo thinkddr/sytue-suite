@@ -1,0 +1,73 @@
+# Servicio de señalización (WS/HTTP). Lo enruta el Ingress (rooms.sytue.eu).
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "livekit.fullname" . }}
+  labels:
+    {{- include "livekit.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: {{ .Values.ports.http }}
+      targetPort: http
+      protocol: TCP
+    {{- if .Values.turn.enabled }}
+    # Backends internos de las entrypoints TURN de Traefik.
+    - name: turn-tls
+      port: {{ .Values.turn.tlsPort }}
+      targetPort: turn-tls
+      protocol: TCP
+    - name: turn-udp
+      port: {{ .Values.turn.udpPort }}
+      targetPort: turn-udp
+      protocol: UDP
+    {{- end }}
+  selector:
+    {{- include "livekit.selectorLabels" . | nindent 4 }}
+---
+# Servicio de MEDIA WebRTC vía LoadBalancer (UE). Scaleway solo publica TCP;
+# otros proveedores pueden habilitar también el mux UDP con exposeUdp.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "livekit.fullname" . }}-media
+  labels:
+    {{- include "livekit.labels" . | nindent 4 }}
+  {{- if ne .Values.mediaService.type "ClusterIP" }}
+  {{- with .Values.mediaService.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- end }}
+spec:
+  type: {{ .Values.mediaService.type }}
+  {{- if ne .Values.mediaService.type "ClusterIP" }}
+  # El apiserver RECHAZA este campo en un ClusterIP («may only be set when type
+  # is NodePort or LoadBalancer»), y `helm template` no lo ve: el render sale
+  # limpio y el fallo aparece en el `helm upgrade`. Igual con las anotaciones de
+  # arriba, que son de LoadBalancer y sin LB no las lee nadie.
+  externalTrafficPolicy: {{ .Values.mediaService.externalTrafficPolicy }}
+  {{- end }}
+  {{- if ne .Values.mediaService.type "ClusterIP" }}
+  {{- with .Values.mediaService.loadBalancerIP }}
+  # Solo con LoadBalancer. El despliegue pasa esta IP SIEMPRE —sale de un output
+  # de OpenTofu, no de si el Service la usa—, así que sin la guarda se quedaba
+  # escrita en un ClusterIP: el apiserver la acepta sin rechistar y lo que queda
+  # es un Service que aparenta tener un balanceador que no existe.
+  loadBalancerIP: {{ . | quote }}
+  {{- end }}
+  {{- end }}
+  ports:
+    - name: rtc-tcp
+      port: {{ .Values.ports.rtcTcp }}
+      targetPort: rtc-tcp
+      protocol: TCP
+    {{- if .Values.mediaService.exposeUdp }}
+    - name: rtc-udp
+      port: {{ .Values.ports.rtcUdp }}
+      targetPort: rtc-udp
+      protocol: UDP
+    {{- end }}
+  selector:
+    {{- include "livekit.selectorLabels" . | nindent 4 }}

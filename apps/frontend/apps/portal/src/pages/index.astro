@@ -1,0 +1,108 @@
+---
+/**
+ * Portal Sytue One — inicio. Lanzador de la suite: AppGrid hacia todos los
+ * productos, accesos rápidos cross-app y actividad reciente del Hub. Montado
+ * dentro de la Sytue Shell (topbar + app switcher + búsqueda + cuenta).
+ */
+import { returnToCanonico } from '@sytue/config';
+import AppLayout from '../layouts/AppLayout.astro';
+import { useT } from '../i18n/index.js';
+import { Launcher } from '../components/Launcher';
+import { bff, toBffContext, idBaseUrl, hubInternalUrl, driveInternalUrl } from '../lib/auth';
+import { almacenamientoExternoDisponible } from '../lib/almacenamiento-externo';
+import { puedeAdministrar } from '@sytue/ui';
+import { permsFromAccessToken } from '@sytue/auth/server';
+import { esCuentaPersonal, sinAdminPorPlan } from '@sytue/auth';
+
+export const prerender = false;
+
+const session = await bff.getSession(toBffContext(Astro));
+if (!session) {
+  // ADR 0056: la entrada org-ful llega reescrita con la marca ?__org=; el returnTo
+  // sale canónico, no en la forma interna, o tras el login la barra se queda con ella.
+  const returnTo = returnToCanonico(Astro.url, bff.basePath);
+  const redireccionLogin = Astro.redirect(
+    `${bff.basePath}/auth/login?returnTo=${encodeURIComponent(returnTo)}`,
+  );
+  redireccionLogin.headers.set('cache-control', 'no-store');
+  return redireccionLogin;
+}
+
+// Primer contacto: quien todavía no pertenece a ninguna organización (sin claim
+// `tenant`) va al alta guiada. La comprobación contra Sytue ID SOLO se hace en ese
+// caso —el resto del mundo no paga ni una consulta al abrir el portal— y deja de
+// redirigir en cuanto el alta consta completada. Si el servicio no responde, no se
+// redirige: mejor el lanzador que un asistente que no puede cargar.
+// Quién ve la tesela de Sytue Admin. SE DECIDE EN EL SERVIDOR y no en el
+// navegador: aquí están el rol y el access token sin tener que exponer nada al
+// cliente. No es la comprobación de seguridad —`apps/console` rechaza a quien no
+// deba entrar—, es no ofrecer una puerta que va a dar un 403.
+// …y tampoco a quien Sytue Admin se le cierra por plan: una cuenta personal
+// gratuita es `owner` de su organización personal y por rol vería la tesela.
+const puedeAdmin =
+  puedeAdministrar(session.user.roles, permsFromAccessToken(session.tokens.accessToken)) &&
+  !sinAdminPorPlan(session.user);
+
+// Se consulta en paralelo a las apps desplegadas. El permiso de Admin no sirve
+// aquí: cerraría el acceso a las cuentas individuales gratuitas.
+const almacenamientoDisponible = almacenamientoExternoDisponible(
+  session.user,
+  session.tokens.accessToken,
+  driveInternalUrl(),
+);
+
+// Qué aplicaciones levanta esta instalación, resuelto ya en SSR: evita el desfase
+// de hidratación de Preact (p. ej. si Sytue DevX está apagado y no debe pintar tesela).
+let desplegadas: string[] | undefined;
+try {
+  const res = await fetch(`${hubInternalUrl().replace(/\/$/, '')}/api/v1/apps`, {
+    headers: { authorization: `Bearer ${session.tokens.accessToken}` },
+    signal: AbortSignal.timeout(1500),
+  });
+  if (res.ok) {
+    const wire = (await res.json()) as { apps?: unknown };
+    if (Array.isArray(wire.apps) && wire.apps.length > 0) {
+      desplegadas = wire.apps.filter((a): a is string => typeof a === 'string');
+    }
+  }
+} catch {
+  /* Hub no responde o timeout: degradación segura */
+}
+
+if (!session.user.tenant) {
+  try {
+    const res = await fetch(`${idBaseUrl()}/api/v1/onboarding`, {
+      headers: { authorization: `Bearer ${session.tokens.accessToken}` },
+    });
+    const state = res.ok ? ((await res.json()) as { completed?: boolean }) : null;
+    // El prefijo va inline y no con el helper `r()`: `astro check` marca su
+    // import como no leído cuando el ÚNICO uso está en el frontmatter —el resto
+    // del repo lo usa en el template, que sí ve— y eso deja `quality` en rojo.
+    // `BASE_URL` es lo que `r()` consulta por dentro, así que el destino es el
+    // mismo: `/one/bienvenida`, no `/bienvenida`, que sería un 404.
+    if (state && state.completed !== true) {
+      return Astro.redirect(`${import.meta.env.BASE_URL.replace(/\/+$/, '')}/bienvenida`);
+    }
+  } catch {
+    /* Sytue ID no responde: seguimos al lanzador. */
+  }
+}
+const t = useT(Astro.locals.locale);
+const puedeAlmacenamientoExterno = await almacenamientoDisponible;
+---
+
+<AppLayout title={t('page.home')}>
+  <Launcher
+    client:load
+    locale={Astro.locals.locale}
+    puedeAdmin={puedeAdmin}
+    puedeAlmacenamientoExterno={puedeAlmacenamientoExterno}
+    cuentaPersonal={esCuentaPersonal(session.user)}
+    desplegadasIniciales={desplegadas}
+    org={session.user.tenant}
+    nombre={session.user.givenName ?? session.user.name?.split(' ')[0]}
+  />
+  <p class="text-text-muted mx-auto max-w-3xl px-6 pt-2 pb-8 text-center text-xs">
+    {t('privacy.notice')}
+  </p>
+</AppLayout>

@@ -1,0 +1,10 @@
+{
+  "order_paid_buyer_subject": "Potrditev naročila {number}",
+  "order_paid_buyer_body": "Hvala za vaš nakup. Naročilo {number} je potrjeno.",
+  "order_paid_store_subject": "Prejeto novo naročilo: {number}",
+  "order_paid_store_body": "Prejeli ste novo naročilo {number} v znesku {total}.",
+  "withdrawal_ack_subject": "Potrdilo o odstopu prejeto: {number}",
+  "withdrawal_ack_body": "Vaša zahteva za odstop od naročila {number} je bila zabeležena.",
+  "form_received_subject": "Prejeto pošiljanje obrazca: {form_id}",
+  "form_received_body": "Prejeto je bilo novo pošiljanje za obrazec {form_id}."
+}

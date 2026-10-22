@@ -1,0 +1,405 @@
+{
+ "active": 0,
+ "sheets": [
+  {
+   "name": "{{inventario.hoja}}",
+   "cells": {
+    "A1": "<b>{{inventario.titulo}}</b>",
+    "A3": "<b>{{inventario.codigo}}</b>",
+    "B3": "<b>{{inventario.articulo}}</b>",
+    "C3": "<b>{{inventario.ubicacion}}</b>",
+    "D3": "<b>{{inventario.existencias}}</b>",
+    "E3": "<b>{{inventario.minimo}}</b>",
+    "F3": "<b>{{inventario.coste}}</b>",
+    "G3": "<b>{{inventario.valor}}</b>",
+    "H3": "<b>{{inventario.reponer}}</b>",
+    "A4": "{{inventario.ej_codigo}}",
+    "B4": "{{inventario.ej_articulo}}",
+    "C4": "{{inventario.ej_ubicacion}}",
+    "G4": "=D4*F4",
+    "H4": "=MAX(E4-D4,0)",
+    "G5": "=D5*F5",
+    "H5": "=MAX(E5-D5,0)",
+    "G6": "=D6*F6",
+    "H6": "=MAX(E6-D6,0)",
+    "G7": "=D7*F7",
+    "H7": "=MAX(E7-D7,0)",
+    "G8": "=D8*F8",
+    "H8": "=MAX(E8-D8,0)",
+    "G9": "=D9*F9",
+    "H9": "=MAX(E9-D9,0)",
+    "G10": "=D10*F10",
+    "H10": "=MAX(E10-D10,0)",
+    "G11": "=D11*F11",
+    "H11": "=MAX(E11-D11,0)",
+    "G12": "=D12*F12",
+    "H12": "=MAX(E12-D12,0)",
+    "G13": "=D13*F13",
+    "H13": "=MAX(E13-D13,0)",
+    "G14": "=D14*F14",
+    "H14": "=MAX(E14-D14,0)",
+    "G15": "=D15*F15",
+    "H15": "=MAX(E15-D15,0)",
+    "G16": "=D16*F16",
+    "H16": "=MAX(E16-D16,0)",
+    "G17": "=D17*F17",
+    "H17": "=MAX(E17-D17,0)",
+    "G18": "=D18*F18",
+    "H18": "=MAX(E18-D18,0)",
+    "A20": "<b>{{presupuesto.total}}</b>",
+    "G20": "=SUM(G4:G18)",
+    "H20": "=SUM(H4:H18)"
+   },
+   "formats": {
+    "F4": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "F5": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "F6": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "F7": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "F8": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "F9": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "F10": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "F11": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "F12": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "F13": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "F14": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "F15": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "F16": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "F17": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "F18": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "G4": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "G5": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "G6": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "G7": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "G8": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "G9": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "G10": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "G11": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "G12": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "G13": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "G14": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "G15": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "G16": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "G17": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "G18": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "G20": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "D4": {
+     "id": "number"
+    },
+    "D5": {
+     "id": "number"
+    },
+    "D6": {
+     "id": "number"
+    },
+    "D7": {
+     "id": "number"
+    },
+    "D8": {
+     "id": "number"
+    },
+    "D9": {
+     "id": "number"
+    },
+    "D10": {
+     "id": "number"
+    },
+    "D11": {
+     "id": "number"
+    },
+    "D12": {
+     "id": "number"
+    },
+    "D13": {
+     "id": "number"
+    },
+    "D14": {
+     "id": "number"
+    },
+    "D15": {
+     "id": "number"
+    },
+    "D16": {
+     "id": "number"
+    },
+    "D17": {
+     "id": "number"
+    },
+    "D18": {
+     "id": "number"
+    },
+    "E4": {
+     "id": "number"
+    },
+    "E5": {
+     "id": "number"
+    },
+    "E6": {
+     "id": "number"
+    },
+    "E7": {
+     "id": "number"
+    },
+    "E8": {
+     "id": "number"
+    },
+    "E9": {
+     "id": "number"
+    },
+    "E10": {
+     "id": "number"
+    },
+    "E11": {
+     "id": "number"
+    },
+    "E12": {
+     "id": "number"
+    },
+    "E13": {
+     "id": "number"
+    },
+    "E14": {
+     "id": "number"
+    },
+    "E15": {
+     "id": "number"
+    },
+    "E16": {
+     "id": "number"
+    },
+    "E17": {
+     "id": "number"
+    },
+    "E18": {
+     "id": "number"
+    },
+    "H4": {
+     "id": "number"
+    },
+    "H5": {
+     "id": "number"
+    },
+    "H6": {
+     "id": "number"
+    },
+    "H7": {
+     "id": "number"
+    },
+    "H8": {
+     "id": "number"
+    },
+    "H9": {
+     "id": "number"
+    },
+    "H10": {
+     "id": "number"
+    },
+    "H11": {
+     "id": "number"
+    },
+    "H12": {
+     "id": "number"
+    },
+    "H13": {
+     "id": "number"
+    },
+    "H14": {
+     "id": "number"
+    },
+    "H15": {
+     "id": "number"
+    },
+    "H16": {
+     "id": "number"
+    },
+    "H17": {
+     "id": "number"
+    },
+    "H18": {
+     "id": "number"
+    },
+    "H20": {
+     "id": "number"
+    }
+   },
+   "styles": {
+    "A3": {
+     "border": {
+      "b": true
+     }
+    },
+    "B3": {
+     "border": {
+      "b": true
+     }
+    },
+    "C3": {
+     "border": {
+      "b": true
+     }
+    },
+    "D3": {
+     "border": {
+      "b": true
+     }
+    },
+    "E3": {
+     "border": {
+      "b": true
+     }
+    },
+    "F3": {
+     "border": {
+      "b": true
+     }
+    },
+    "G3": {
+     "border": {
+      "b": true
+     }
+    },
+    "H3": {
+     "border": {
+      "b": true
+     }
+    },
+    "A20": {
+     "border": {
+      "t": true
+     }
+    },
+    "B20": {
+     "border": {
+      "t": true
+     }
+    },
+    "C20": {
+     "border": {
+      "t": true
+     }
+    },
+    "D20": {
+     "border": {
+      "t": true
+     }
+    },
+    "E20": {
+     "border": {
+      "t": true
+     }
+    },
+    "F20": {
+     "border": {
+      "t": true
+     }
+    },
+    "G20": {
+     "border": {
+      "t": true
+     }
+    },
+    "H20": {
+     "border": {
+      "t": true
+     }
+    }
+   },
+   "freeze": {
+    "cols": 0,
+    "rows": 3
+   }
+  }
+ ]
+}

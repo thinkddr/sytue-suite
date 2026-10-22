@@ -1,0 +1,13 @@
+import { chromium } from 'playwright';
+import { fileURLToPath } from 'node:url';
+const S = fileURLToPath(new URL('.auth/admin.json', import.meta.url));
+const b = await chromium.launch();
+const c = await b.newContext({ storageState: S, ignoreHTTPSErrors: true, viewport: { width: 1440, height: 900 } });
+const p = await c.newPage();
+await p.goto('https://rooms.sytue.localhost/', { waitUntil: 'domcontentloaded', timeout: 60000 });
+await p.waitForTimeout(7000);
+await p.locator('button[aria-haspopup="menu"][aria-expanded]').first().click();
+await p.waitForTimeout(800);
+await p.screenshot({ path: '/tmp/switcher-rooms.png', clip: { x: 0, y: 0, width: 700, height: 520 } });
+console.log('OK');
+await b.close();

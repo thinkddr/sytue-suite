@@ -1,0 +1,104 @@
+From d943ebc78bec43afc918f17677311f3ea8bab8d9 Mon Sep 17 00:00:00 2001
+From: Daniel Delgado <328510259+thinkddr@users.noreply.github.com>
+Date: Mon, 28 Sep 2026 19:55:40 +0200
+Subject: [PATCH] fix(mobile/android): map key event actions, not key states,
+ to directions
+
+AKeyEvent_getAction returns AKEY_EVENT_ACTION_DOWN (0) or AKEY_EVENT_ACTION_UP (1),
+but it was compared with AKEY_STATE_DOWN (1) and AKEY_STATE_UP (0), which have the
+opposite values. Every release was delivered as a press. With the soft keyboard up
+the IME types the press through the text watcher and the release came back as a
+second press, so each character from a hardware keyboard (or adb input text) was
+typed twice.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+---
+ internal/driver/mobile/app/android.go         |  9 +-----
+ internal/driver/mobile/app/keydirection.go    | 28 +++++++++++++++++++
+ .../driver/mobile/app/keydirection_test.go    | 19 +++++++++++++
+ 3 files changed, 48 insertions(+), 8 deletions(-)
+ create mode 100644 internal/driver/mobile/app/keydirection.go
+ create mode 100644 internal/driver/mobile/app/keydirection_test.go
+
+diff --git a/internal/driver/mobile/app/android.go b/internal/driver/mobile/app/android.go
+index e0a133cdd..882c8a1ba 100644
+--- a/internal/driver/mobile/app/android.go
++++ b/internal/driver/mobile/app/android.go
+@@ -646,14 +646,7 @@ func processKey(env *C.JNIEnv, e *C.AInputEvent) bool {
+ 	if k.Rune >= '0' && k.Rune <= '9' { // GBoard generates key events for numbers, but we see them in textChanged
+ 		return false
+ 	}
+-	switch C.AKeyEvent_getAction(e) {
+-	case C.AKEY_STATE_DOWN:
+-		k.Direction = key.DirPress
+-	case C.AKEY_STATE_UP:
+-		k.Direction = key.DirRelease
+-	default:
+-		k.Direction = key.DirNone
+-	}
++	k.Direction = keyDirection(int32(C.AKeyEvent_getAction(e)))
+ 	// TODO(crawshaw): set Modifiers.
+ 	theApp.events.In() <- k
+ 
+diff --git a/internal/driver/mobile/app/keydirection.go b/internal/driver/mobile/app/keydirection.go
+new file mode 100644
+index 000000000..b8564694a
+--- /dev/null
++++ b/internal/driver/mobile/app/keydirection.go
+@@ -0,0 +1,28 @@
++package app
++
++import "fyne.io/fyne/v2/internal/driver/mobile/event/key"
++
++// Android key event actions (AKEY_EVENT_ACTION_* in android/input.h).
++const (
++	androidKeyActionDown = 0
++	androidKeyActionUp   = 1
++)
++
++// keyDirection maps an Android key event action to a key direction.
++//
++// The actions are AKEY_EVENT_ACTION_DOWN (0) and AKEY_EVENT_ACTION_UP (1). They
++// used to be compared with AKEY_STATE_DOWN (1) and AKEY_STATE_UP (0), which are key
++// states, not actions, and have the opposite values: every release was delivered as a
++// press. While the soft keyboard is up the IME takes the press and types it through
++// the text watcher, and the release came back to us as a second press, so every
++// character from a hardware keyboard (or `adb shell input text`) was typed twice.
++func keyDirection(action int32) key.Direction {
++	switch action {
++	case androidKeyActionDown:
++		return key.DirPress
++	case androidKeyActionUp:
++		return key.DirRelease
++	default:
++		return key.DirNone
++	}
++}
+diff --git a/internal/driver/mobile/app/keydirection_test.go b/internal/driver/mobile/app/keydirection_test.go
+new file mode 100644
+index 000000000..91de39508
+--- /dev/null
++++ b/internal/driver/mobile/app/keydirection_test.go
+@@ -0,0 +1,19 @@
++package app
++
++import (
++	"testing"
++
++	"fyne.io/fyne/v2/internal/driver/mobile/event/key"
++)
++
++func TestKeyDirection(t *testing.T) {
++	for action, want := range map[int32]key.Direction{
++		androidKeyActionDown: key.DirPress,
++		androidKeyActionUp:   key.DirRelease,
++		2:                    key.DirNone, // AKEY_EVENT_ACTION_MULTIPLE
++	} {
++		if got := keyDirection(action); got != want {
++			t.Errorf("action %d gives %v, want %v", action, got, want)
++		}
++	}
++}
+-- 
+2.54.0 (Apple Git-157)
+

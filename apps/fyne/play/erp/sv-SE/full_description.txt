@@ -1,0 +1,18 @@
+Tjugofyra moduler och en dubbel bokföring som databasen inte låter hamna i obalans.
+
+• Tjugofyra moduler och trettiosex modeller: kontakter, försäljning, inköp, lager, tillverkning, fakturering, bokföring, projekt och HR.
+• Att lägga till en modul innebär att skriva en JSON-fil: ingen migrering, ingen ny route och inget gränssnittsarbete.
+• Belopp lagras i hela cent, aldrig som flyttal, och databasen upprätthåller balansen.
+• Bokförda verifikationer är orörbara: de rättas med en ny verifikation, och det är det som skiljer en huvudbok från ett kalkylblad.
+• Tjugofyra moduler och trettiosex modeller i en tjänst och en databas.
+• Modellkatalogen är data: varje modul anger sina fält, sina tillstånd och sina listkolumner.
+• En ny modul är en enda JSON-fil — ingen DDL, ingen migrering och ingen tabellåsning.
+• Ett API för alla trettiosex modeller och ett gränssnitt som genereras från katalogen.
+• Dubbel bokföring med belopp i hela cent; inte ett enda flyttal.
+• Databasen kontrollerar balansen när transaktionen genomförs, inte applikationskoden.
+• Stängda verifikationer är oföränderliga: de kan inte redigeras, tas bort eller få nya rader.
+• Ett underlag, en verifikation: ett nytt försök eller två öppna flikar kan inte dubbla intäkterna.
+• Gemensamma benämningar finns på alla 26 språk, och ett oöversatt fält hindrar tjänsten från att starta.
+• Indexerade listor: första sidan av tjugotusen rader levereras på under en millisekund.
+
+Krypterat under överföring (TLS 1.3). Sytues infrastruktur finns i EU. Var externa tjänster finns beror på deras leverantör.

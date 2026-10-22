@@ -1,0 +1,92 @@
+{
+  "children": [
+    {
+      "content": {
+        "en": [
+          {
+            "text": "Key Features"
+          }
+        ],
+        "es": [
+          {
+            "text": "Características principales"
+          }
+        ]
+      },
+      "id": "tex0000001",
+      "tag": "h2",
+      "type": "text"
+    },
+    {
+      "children": [
+        {
+          "content": {
+            "en": [
+              {
+                "text": "Optimal Performance"
+              }
+            ],
+            "es": [
+              {
+                "text": "Rendimiento óptimo"
+              }
+            ]
+          },
+          "id": "tex0000002",
+          "tag": "h3",
+          "type": "text"
+        },
+        {
+          "content": {
+            "en": [
+              {
+                "text": "Built-in Security"
+              }
+            ],
+            "es": [
+              {
+                "text": "Seguridad integrada"
+              }
+            ]
+          },
+          "id": "tex0000003",
+          "tag": "h3",
+          "type": "text"
+        }
+      ],
+      "id": "fra0000001",
+      "layout": {
+        "direction": "row",
+        "gap": 16,
+        "padding": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "align": "start",
+        "justify": "center",
+        "wrap": true
+      },
+      "tag": "div",
+      "type": "frame"
+    }
+  ],
+  "full_bleed": false,
+  "id": "sec0000001",
+  "kind": "features",
+  "layout": {
+    "direction": "column",
+    "gap": 24,
+    "padding": [
+      32,
+      32,
+      32,
+      32
+    ],
+    "align": "center",
+    "justify": "center",
+    "wrap": false
+  },
+  "type": "section"
+}

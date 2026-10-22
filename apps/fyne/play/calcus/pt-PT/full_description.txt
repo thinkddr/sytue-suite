@@ -1,0 +1,18 @@
+Números que fazem sentido, numa folha que trabalha consigo.
+
+• Fórmulas, formatação condicional e validação de dados.
+• Traga dados externos e consulte-os sem sair da folha.
+• Gráficos, gráficos sparkline, segmentações e tabelas de dados.
+• Exportação para ODS e XLSX; abrir ficheiros do Excel.
+• Fórmulas com ajuda contextual e recálculo imediato.
+• Formatação condicional, validação de dados e formatos numéricos de acordo com a região.
+• Gráficos de vários tipos, sparklines e segmentações.
+• Tabelas de dados com totais e ordenação; tabela dinâmica.
+• Dados externos: ligue uma origem e consulte-a a partir da folha.
+• Solver para encontrar o valor que cumpre um objetivo.
+• Macros para automatizar tarefas repetitivas.
+• Colaboração em tempo real com presença e comentários.
+• Filtros, segmentações e pesquisa dentro da folha.
+• Exportação para ODS, XLSX e PDF; abrir ficheiros do Excel a partir do Drive.
+
+Cifrado em trânsito (TLS 1.3). A infraestrutura da Sytue está na UE. A localização dos serviços externos depende do respetivo fornecedor.

@@ -1,0 +1,18 @@
+CardDAV-contacten, gedeeld binnen je hele organisatie.
+
+• Een gedeeld adresboek voor je hele organisatie.
+• Importeren en exporteren in vCard.
+• Dubbele contacten samenvoegen zonder gegevens te verliezen.
+• Werkt met elke CardDAV-client.
+• Adresboeken, waaronder het gedeelde adresboek van je organisatie.
+• Een volledige kaart: telefoonnummers, e-mails, adressen, organisatie, verjaardag, notities en foto.
+• Labels en favorieten om te groeperen en te vinden.
+• Dubbele contacten opsporen en samenvoegen zonder gegevens te verliezen.
+• vCard en CSV importeren en exporteren; één contact exporteren.
+• Bulkacties en een prullenbak met herstel.
+• Direct zoeken en automatisch aanvullen tijdens het typen in Mail.
+• Werkt met elke CardDAV-client.
+• Aankomende verjaardagen uit je adresboek, met die van deze maand gemarkeerd.
+• Een vergadering plannen met een contact of het e-mailadres van het contact kopiëren zonder de kaart te verlaten.
+
+Versleuteld tijdens transport (TLS 1.3). De infrastructuur van Sytue staat in de EU. De locatie van externe diensten hangt af van hun aanbieder.

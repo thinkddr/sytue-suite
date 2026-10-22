@@ -1,0 +1,18 @@
+CardDAV contacts, shared across your organisation.
+
+• A shared address book across your organisation.
+• Import and export in vCard.
+• Merge duplicates without losing data.
+• Works with any CardDAV client.
+• Address books, including your organisation’s shared one.
+• A full card: phones, emails, addresses, organisation, birthday, notes and photo.
+• Labels and favourites to group and find.
+• Duplicate detection and merging without losing data.
+• Import and export vCard and CSV; export a single contact.
+• Batch actions and a trash with recovery.
+• Instant search and autocomplete as you type in Mail.
+• Works with any CardDAV client.
+• Upcoming birthdays from your address book, flagging this month’s.
+• Create a meeting with a contact or copy their email without leaving their card.
+
+Encrypted in transit (TLS 1.3). Sytue’s infrastructure is in the EU. The location of external services depends on their provider.

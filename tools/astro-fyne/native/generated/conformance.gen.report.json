@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "generator": "astro-fyne",
+  "name": "Conformance",
+  "sourceHash": "dce95a2259a5b7b40194838487fbe094a5c31147fb3a8fa57f001a4a86622c76",
+  "sources": [
+    {
+      "path": "example/src/components/Conformance.tsx",
+      "hash": "1dd1c5156600c5391592434e924d76eff702fed4adc1077ca9a5918bfd906efa"
+    }
+  ],
+  "resources": [],
+  "actions": [
+    "observe",
+    "t"
+  ],
+  "components": [
+    "Conformance_17a88bbb",
+    "DestructuredProperties_17a88bbb",
+    "ObjectProperties_17a88bbb",
+    "StatefulUnit_17a88bbb"
+  ],
+  "compatibility": "declarative-stage-1",
+  "visual": {
+    "measured": false,
+    "pixelPerfectVerified": false
+  }
+}

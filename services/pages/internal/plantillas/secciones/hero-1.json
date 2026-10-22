@@ -1,0 +1,67 @@
+{
+  "children": [
+    {
+      "content": {
+        "en": [
+          {
+            "text": "Professional solution 1"
+          }
+        ],
+        "es": [
+          {
+            "text": "Solución profesional 1"
+          }
+        ]
+      },
+      "id": "tex0000001",
+      "tag": "h1",
+      "type": "text"
+    },
+    {
+      "content": {
+        "en": [
+          {
+            "text": "Designed to boost your business growth with reliability and quality."
+          }
+        ],
+        "es": [
+          {
+            "text": "Diseñado para impulsar el crecimiento de su empresa con fiabilidad y calidad."
+          }
+        ]
+      },
+      "id": "tex0000002",
+      "tag": "p",
+      "type": "text"
+    },
+    {
+      "action": {
+        "page": "pag0000001"
+      },
+      "id": "but0000001",
+      "label": {
+        "en": "Get Started",
+        "es": "Empezar ahora"
+      },
+      "type": "button",
+      "variant": "primary"
+    }
+  ],
+  "full_bleed": false,
+  "id": "sec0000001",
+  "kind": "hero",
+  "layout": {
+    "direction": "column",
+    "gap": 24,
+    "padding": [
+      32,
+      32,
+      32,
+      32
+    ],
+    "align": "center",
+    "justify": "center",
+    "wrap": false
+  },
+  "type": "section"
+}

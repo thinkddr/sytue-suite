@@ -1,0 +1,6 @@
+{
+  "kind": "admin#directory#users",
+  "users": [
+    { "id": "103", "primaryEmail": "grace@acme.com", "isAdmin": false, "suspended": true }
+  ]
+}

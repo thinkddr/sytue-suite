@@ -1,0 +1,83 @@
+{
+ "active": 0,
+ "sheets": [
+  {
+   "name": "{{semanal.hoja}}",
+   "cells": {
+    "A1": "<b>{{semanal.titulo}}</b>",
+    "A2": "<b>{{semanal.semana}}</b>",
+    "A4": "<b>{{semanal.hora}}</b>",
+    "B4": "<b>{{semanal.lun}}</b>",
+    "C4": "<b>{{semanal.mar}}</b>",
+    "D4": "<b>{{semanal.mie}}</b>",
+    "E4": "<b>{{semanal.jue}}</b>",
+    "F4": "<b>{{semanal.vie}}</b>",
+    "G4": "<b>{{semanal.sab}}</b>",
+    "H4": "<b>{{semanal.dom}}</b>",
+    "A5": "08:00",
+    "A6": "09:00",
+    "A7": "10:00",
+    "A8": "11:00",
+    "A9": "12:00",
+    "A10": "13:00",
+    "A11": "14:00",
+    "A12": "15:00",
+    "A13": "16:00",
+    "A14": "17:00",
+    "A16": "<b>{{semanal.prioridades}}</b>",
+    "A21": "<b>{{planificacion.notas}}</b>"
+   },
+   "formats": {
+    "B2": {
+     "id": "date"
+    }
+   },
+   "styles": {
+    "A4": {
+     "border": {
+      "b": true
+     }
+    },
+    "B4": {
+     "border": {
+      "b": true
+     }
+    },
+    "C4": {
+     "border": {
+      "b": true
+     }
+    },
+    "D4": {
+     "border": {
+      "b": true
+     }
+    },
+    "E4": {
+     "border": {
+      "b": true
+     }
+    },
+    "F4": {
+     "border": {
+      "b": true
+     }
+    },
+    "G4": {
+     "border": {
+      "b": true
+     }
+    },
+    "H4": {
+     "border": {
+      "b": true
+     }
+    }
+   },
+   "freeze": {
+    "cols": 0,
+    "rows": 4
+   }
+  }
+ ]
+}

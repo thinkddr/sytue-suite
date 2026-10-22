@@ -1,0 +1,69 @@
+---
+/**
+ * Sytue Docs — /wopi/editor. La pantalla que abre un fichero que vive en OTRO
+ * sitio (hoy Sytue Drive) sin crear ningún documento aquí.
+ *
+ * A esta ruta NO se llega escribiéndola: llega el navegador desde el puente
+ * `/wopi/view` (servicio Go), que es quien recibe el POST del host, comprueba
+ * que ese host está admitido y deja `src` y `token` en el fragmento.
+ *
+ * SIN SESIÓN, aposta. Es lo que separa esto del resto de la app: la credencial
+ * es el token del host, no una cookie de Sytue ID, así que no se usa AppLayout
+ * —que redirige a login— sino este documento mínimo. Quien llegue sin fragmento
+ * ve el mensaje de enlace caducado, que es exactamente lo que ha pasado.
+ */
+import { SUFIJO_ICONOS, basePathScript, themeInitScript, withBase } from '@sytue/ui';
+import { serverEnv } from '@sytue/auth/server';
+import { htmlLangAttrs } from '@sytue/i18n';
+import { WopiViewer } from '../components/WopiViewer';
+import { docsT } from '../i18n';
+import '../styles/global.css';
+
+const locale = Astro.locals.locale;
+const { lang, dir } = htmlLangAttrs(locale);
+const title = docsT(locale)('wopi.page.title');
+
+// Prefijo REAL bajo el que se sirve esta superficie: el del host si el servidor
+// lo publica (SYTUE_BASE_PATH) y, si no, el del build. Los assets del <head> se
+// unen con `withBase` y NO con `${BASE_URL}fichero`: BASE_URL llega SIN barra
+// final (`/mail`) y esa concatenación daba `/mailfavicon.svg`, un 404 medido en
+// producción con el que ninguna app de la suite tenía icono. ID sí lo tenía
+// porque es Go y escribe `/favicon.svg` a mano; por eso el fallo parecía de ID.
+const prefijo = serverEnv(import.meta.env).SYTUE_BASE_PATH ?? import.meta.env.BASE_URL;
+---
+
+<!doctype html>
+<html lang={lang} dir={dir} class="h-full">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="robots" content="noindex, nofollow" />
+    <link rel="icon" href={withBase(prefijo, '/favicon.ico') + SUFIJO_ICONOS} sizes="32x32" />
+    <link
+      rel="icon"
+      href={withBase(prefijo, '/favicon.svg') + SUFIJO_ICONOS}
+      type="image/svg+xml"
+    />
+    <link
+      rel="apple-touch-icon"
+      href={withBase(prefijo, '/apple-touch-icon.png') + SUFIJO_ICONOS}
+    />
+    <title>{title}</title>
+    <!-- Prefija /api y /auth con el `base` de esta app: en producción cada
+         app se sirve bajo su prefijo y la raíz del host es un 404. -->
+    <script
+      is:inline
+      set:html={basePathScript(
+        serverEnv(import.meta.env).SYTUE_BASE_PATH ?? import.meta.env.BASE_URL,
+      )}
+    ></script>
+    <script is:inline set:html={themeInitScript}></script>
+  </head>
+  <body class="bg-bg text-text h-full antialiased">
+    <!-- client:only y no client:load: todo lo que pinta depende del fragmento de
+         la URL, que en el servidor no existe. Renderizarlo en SSR daría una
+         pantalla vacía y luego un salto. -->
+    <WopiViewer client:only="preact" locale={locale} />
+  </body>
+</html>

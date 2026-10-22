@@ -1,0 +1,18 @@
+Contacts CardDAV, partagés dans votre organisation.
+
+• Carnet d’adresses partagé dans toute l’organisation.
+• Import et export au format vCard.
+• Fusionnez les doublons sans rien perdre.
+• Compatible avec n’importe quel client CardDAV.
+• Carnets d’adresses, y compris celui partagé de votre organisation.
+• Fiche complète : téléphones, courriels, adresses, organisation, anniversaire, notes et photo.
+• Étiquettes et favoris pour regrouper et retrouver.
+• Détection et fusion des doublons sans perte de données.
+• Import et export vCard et CSV ; export d’un contact seul.
+• Actions par lot et corbeille avec récupération.
+• Recherche instantanée et saisie automatique dans Mail.
+• Compatible avec tout client CardDAV.
+• Prochains anniversaires de votre carnet, avec ceux du mois en évidence.
+• Créez une réunion avec un contact ou copiez son adresse sans quitter sa fiche.
+
+Chiffrement en transit (TLS 1.3). L’infrastructure de Sytue se trouve dans l’UE. La localisation des services externes dépend de leur fournisseur.

@@ -1,0 +1,265 @@
+{
+ "pais": "GR",
+ "verificado": true,
+ "moneda": "EUR",
+ "formas": [
+  {
+   "clave": "atomiki",
+   "nombre": "Ατομική επιχείρηση",
+   "tipo": "persona_fisica"
+  },
+  {
+   "clave": "oe",
+   "nombre": "Ομόρρυθμη Εταιρεία (ΟΕ)",
+   "tipo": "persona_fisica"
+  },
+  {
+   "clave": "ike",
+   "nombre": "ΙΚΕ",
+   "tipo": "sociedad"
+  },
+  {
+   "clave": "epe",
+   "nombre": "ΕΠΕ",
+   "tipo": "sociedad"
+  },
+  {
+   "clave": "ae",
+   "nombre": "Ανώνυμη Εταιρεία (ΑΕ)",
+   "tipo": "sociedad"
+  }
+ ],
+ "portales": {
+  "aade": {
+   "nombre": "myAADE",
+   "url": "https://www.aade.gr/"
+  },
+  "efka": {
+   "nombre": "e-ΕΦΚΑ",
+   "url": "https://www.efka.gov.gr/"
+  },
+  "gemi": {
+   "nombre": "ΓΕΜΗ (businessportal)",
+   "url": "https://www.businessportal.gr/"
+  }
+ },
+ "obligaciones": [
+  {
+   "clave": "gr_fpa_q",
+   "nombre": "Δήλωση ΦΠΑ (τρίμηνο, απλογραφικά)",
+   "concepto": "iva_periodica",
+   "ambito": "fiscal",
+   "periodicidad": "trimestral",
+   "plazos": {
+    "T": "ultimo_habil"
+   },
+   "margen_dias": 7,
+   "portal": "aade",
+   "aplica": {
+    "condiciones": [
+     "iva",
+     "!iva_mensual"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 10000,
+    "nota": "Έως την τελευταία εργάσιμη ημέρα του επόμενου μήνα από τη λήξη του τριμήνου (απλογραφικά)· μηνιαία για διπλογραφικά. Πρόστιμο 100 € (απλογραφικά) ή 250 € (διπλογραφικά) για εκπρόθεσμη δήλωση, με τόκο 0,73 % μηνιαίως επί του φόρου."
+   },
+   "calculo": {
+    "tipo": "saldo_neto",
+    "haber": [
+     "477"
+    ],
+    "debe": [
+     "472"
+    ]
+   }
+  },
+  {
+   "clave": "gr_fpa_m",
+   "nombre": "Δήλωση ΦΠΑ (μήνας, διπλογραφικά)",
+   "concepto": "iva_periodica",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "ultimo_habil"
+   },
+   "margen_dias": 7,
+   "portal": "aade",
+   "aplica": {
+    "condiciones": [
+     "iva",
+     "iva_mensual"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 25000,
+    "nota": "Πρόστιμο 250 € και τόκος 0,73 % μηνιαίως."
+   },
+   "calculo": {
+    "tipo": "saldo_neto",
+    "haber": [
+     "477"
+    ],
+    "debe": [
+     "472"
+    ]
+   }
+  },
+  {
+   "clave": "gr_vies",
+   "nombre": "Ανακεφαλαιωτικός πίνακας ενδοκοινοτικών (VIES)",
+   "concepto": "operaciones_intracomunitarias",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "26"
+   },
+   "margen_dias": 7,
+   "portal": "aade",
+   "aplica": {
+    "condiciones": [
+     "intracomunitario"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 10000,
+    "nota": "Πρόστιμο 100 € ανά δήλωση."
+   }
+  },
+  {
+   "clave": "gr_fmy",
+   "nombre": "Παρακρατούμενος φόρος μισθωτών (ΦΜΥ)",
+   "concepto": "retenciones_trabajo",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "ultimo+2"
+   },
+   "margen_dias": 7,
+   "portal": "aade",
+   "aplica": {
+    "condiciones": [
+     "empleados"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 10000,
+    "nota": "Πρόστιμο 100 € έως 500 € και τόκος 0,73 % μηνιαίως."
+   }
+  },
+  {
+   "clave": "gr_efka",
+   "nombre": "Εισφορές e-ΕΦΚΑ (ΑΠΔ)",
+   "concepto": "seguridad_social",
+   "ambito": "laboral",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "ultimo_habil"
+   },
+   "margen_dias": 7,
+   "portal": "efka",
+   "aplica": {
+    "condiciones": [
+     "empleados"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_pct_mes": 1,
+    "recargo_max_pct": 30,
+    "nota": "Προσαύξηση εκπρόθεσμης καταβολής και πρόστιμο 3 % επί των εισφορών για εκπρόθεσμη ΑΠΔ."
+   }
+  },
+  {
+   "clave": "gr_efka_atomiki",
+   "nombre": "Εισφορές μη μισθωτών e-ΕΦΚΑ",
+   "concepto": "cuota_autonomos",
+   "ambito": "laboral",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "ultimo"
+   },
+   "margen_dias": 7,
+   "portal": "efka",
+   "aplica": {
+    "tipos": [
+     "persona_fisica"
+    ]
+   },
+   "sancion": {
+    "tipo": "nota",
+    "nota": "Προσαυξήσεις εκπρόθεσμης καταβολής."
+   }
+  },
+  {
+   "clave": "gr_n",
+   "nombre": "Δήλωση φορολογίας εισοδήματος νομικών προσώπων (Ν)",
+   "concepto": "sociedades_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "07-31+1"
+   },
+   "margen_dias": 30,
+   "portal": "aade",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 25000,
+    "nota": "Πρόστιμο 250 € (διπλογραφικά) και προκαταβολή φόρου σε δόσεις από Ιούλιο."
+   }
+  },
+  {
+   "clave": "gr_e1",
+   "nombre": "Δήλωση φορολογίας εισοδήματος (Ε1/Ε3)",
+   "concepto": "renta_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "07-15+1"
+   },
+   "margen_dias": 30,
+   "portal": "aade",
+   "aplica": {
+    "tipos": [
+     "persona_fisica"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 10000,
+    "nota": "Πρόστιμο 100 € έως 250 €."
+   }
+  },
+  {
+   "clave": "gr_gemi",
+   "nombre": "Δημοσίευση οικονομικών καταστάσεων στο ΓΕΜΗ",
+   "concepto": "cuentas_anuales",
+   "ambito": "mercantil",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "09-30+1"
+   },
+   "margen_dias": 30,
+   "portal": "gemi",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "nota",
+    "nota": "Πρόστιμο από 100 € έως 1.500 € (ΙΚΕ/ΕΠΕ) ή περισσότερο για ΑΕ· εντός 9 μηνών από τη λήξη της χρήσης."
+   }
+  }
+ ]
+}

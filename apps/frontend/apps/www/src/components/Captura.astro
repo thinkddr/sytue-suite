@@ -1,0 +1,31 @@
+---
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: (c) 2026 Daniel Delgado Ramos
+ *
+ * Una captura del producto dentro de su marco.
+ *
+ * Las medidas van EN EL MARCADO y no solo en CSS: sin `width`/`height` el
+ * navegador no reserva el hueco hasta que la imagen llega, y la ficha entera
+ * salta cuando aparece. `aspect-[16/10]` es la misma proporción con la que las
+ * genera `test/e2e/capturas-producto.mjs` (1440×900), así que una imagen
+ * recortada de otro tamaño se ve encajada y no deformada.
+ */
+interface Props {
+  src: string;
+  alt: string;
+}
+const { src, alt } = Astro.props;
+---
+
+<figure class="border-border bg-surface-sunken mt-10 overflow-hidden rounded-lg border shadow-[var(--shadow-sm)]">
+  <img
+    src={src}
+    alt={alt}
+    width="1440"
+    height="900"
+    loading="lazy"
+    decoding="async"
+    class="block aspect-[16/10] w-full object-cover"
+  />
+</figure>

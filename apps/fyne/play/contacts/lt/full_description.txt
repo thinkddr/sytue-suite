@@ -1,0 +1,18 @@
+CardDAV kontaktai, bendrinami visoje organizacijoje.
+
+• Bendra adresų knyga visai organizacijai.
+• Importavimas ir eksportavimas vCard formatu.
+• Dublikatų suliejimas neprarandant duomenų.
+• Veikia su bet kuria CardDAV kliento programa.
+• Adresų knygos, įskaitant bendrą jūsų organizacijos adresų knygą.
+• Išsami kortelė: telefonai, el. pašto adresai, adresai, organizacija, gimtadienis, pastabos ir nuotrauka.
+• Žymos ir mėgstamiausi grupavimui ir paieškai.
+• Dublikatų aptikimas ir suliejimas neprarandant duomenų.
+• vCard ir CSV importavimas ir eksportavimas; vieno kontakto eksportavimas.
+• Masiniai veiksmai ir šiukšlinė su atkūrimu.
+• Akimirksnio paieška ir automatinis užbaigimas rašant Mail.
+• Veikia su bet kuria CardDAV kliento programa.
+• Artėjantys gimtadieniai iš adresų knygos, pažymint šio mėnesio.
+• Susitikimo su kontaktu sukūrimas arba kontakto el. pašto adreso kopijavimas neišeinant iš kortelės.
+
+Šifruojama perduodant (TLS 1.3). „Sytue“ infrastruktūra yra ES. Išorinių paslaugų vieta priklauso nuo jų teikėjo.

@@ -1,0 +1,59 @@
+{
+  "id": "windmill",
+  "name": "Windmill",
+  "description": "Automatiza lo que hoy haces a mano: encadena scripts y llamadas a APIs en flujos con reintentos, programación y aprobaciones. Alternativa abierta a n8n y Zapier.",
+  "category": "devtools",
+  "license": "AGPL-3.0-only",
+  "homepage": "https://www.windmill.dev/",
+  "source": "https://github.com/windmill-labs/windmill",
+  "upstream": "ghcr.io/windmill-labs/windmill:1.600.0",
+  "upstream_digest": "sha256:db14d959b1e02017b044c122db9fc69f9a71e769b4f4d2a500dfca8907bf366e",
+  "version": "1.600.0",
+  "needs": [
+    "postgres"
+  ],
+  "ports": [
+    {
+      "name": "http",
+      "port": 8000
+    }
+  ],
+  "web_port": 8000,
+  "exports": [
+    {
+      "key": "WINDMILL_URL",
+      "value": "http://{host}:{port}"
+    }
+  ],
+  "env": [
+    {
+      "key": "DATABASE_URL",
+      "value": "{db_url}?sslmode=disable"
+    },
+    {
+      "key": "BASE_URL",
+      "value": "{web_url}"
+    },
+    {
+      "key": "MODE",
+      "value": "standalone"
+    },
+    {
+      "key": "NUM_WORKERS",
+      "value": "2"
+    },
+    {
+      "key": "DISABLE_SERVER",
+      "value": "false"
+    },
+    {
+      "key": "RUST_LOG",
+      "value": "info"
+    }
+  ],
+  "disk_gib": 0,
+  "memory_mib": 4096,
+  "cpu_milli": 2000,
+  "run_as_user": 1000,
+  "health_path": "/api/version"
+}

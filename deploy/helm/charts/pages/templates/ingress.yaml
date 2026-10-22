@@ -1,0 +1,67 @@
+{{- if .Values.enabled }}
+{{- $pages := include "sytue-pages.fullname" . -}}
+{{- $sitios := include "sytue-pages.sitiosFullname" . -}}
+{{- $domain := include "sytue-pages.domain" . -}}
+{{- /* El host del producto y, si lo hay, el anterior: los dos publican lo mismo
+     (ver `hostAnterior` en values.yaml). La lista es la MISMA que lleva el Ingress
+     del frontend en su bloque `tls`, porque comparten secreto. */}}
+{{- $hosts := list (printf "%s.%s" .Values.subdomain $domain) -}}
+{{- with .Values.hostAnterior }}{{- $hosts = append $hosts (printf "%s.%s" . $domain) }}{{- end }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $pages }}
+  labels: {{- include "sytue-pages.labels" . | nindent 4 }}
+  annotations:
+    cert-manager.io/cluster-issuer: {{ ((.Values.global).tls).issuer | default "sytue-letsencrypt-staging" | quote }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  tls:
+    - hosts:
+        {{- range $h := $hosts }}
+        - {{ $h | quote }}
+        {{- end }}
+      secretName: {{ .Values.ingress.tlsSecret }}
+  rules:
+    {{- range $h := $hosts }}
+    - host: {{ $h | quote }}
+      http:
+        paths:
+          - path: /webhooks
+            pathType: Prefix
+            backend: { service: { name: {{ $pages }}, port: { name: http } } }
+          - path: /_borde
+            pathType: Prefix
+            backend: { service: { name: {{ $pages }}, port: { name: http } } }
+    {{- end }}
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: {{ $sitios }}
+  labels: {{- include "sytue-pages.labels" . | nindent 4 }}
+spec:
+  entryPoints: [websecure]
+  routes:
+    {{- /* Las webs bajo el dominio de la suite y, si lo hay, bajo el de contenido de
+         clientes (WEB-09): con él, las de la suite solo redirigen a las nuevas. */}}
+    {{- $zonas := list $domain }}
+    {{- with (.Values.global).dominioDeClientes }}{{- $zonas = append $zonas . }}{{- end }}
+    {{- range $zona := $zonas }}
+    - match: "HostRegexp(`^[a-z0-9-]+\\.sites\\.{{ $zona }}$`) && PathPrefix(`/_pages`)"
+      kind: Rule
+      priority: 30
+      services: [{ name: {{ $pages }}, port: http }]
+    {{- if $.Values.config.analyticsEnabled }}
+    - match: "HostRegexp(`^[a-z0-9-]+\\.sites\\.{{ $zona }}$`) && PathPrefix(`/_sytue`)"
+      kind: Rule
+      priority: 30
+      services: [{ name: {{ $.Values.config.analyticsIngestService | default (printf "%s-analytics-ingest" $.Release.Name) }}, port: http }]
+    {{- end }}
+    - match: "HostRegexp(`^[a-z0-9-]+\\.sites\\.{{ $zona }}$`)"
+      kind: Rule
+      priority: 20
+      services: [{ name: {{ $sitios }}, port: http }]
+    {{- end }}
+  tls: {}
+{{- end }}

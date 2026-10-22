@@ -1,0 +1,12 @@
+import { chromium } from 'playwright';
+const b = await chromium.launch();
+const c = await b.newContext({ ignoreHTTPSErrors: true, locale: 'de-DE', extraHTTPHeaders: { 'accept-language': 'de-DE,de;q=0.9' }, viewport: { width: 1100, height: 800 } });
+const p = await c.newPage();
+await p.goto('https://one.sytue.localhost/', { waitUntil: 'domcontentloaded' });
+await p.waitForTimeout(4000);
+console.log('url:', p.url());
+console.log('lang:', await p.evaluate(() => document.documentElement.lang));
+const txt = await p.evaluate(() => document.body.innerText);
+console.log('texto:', txt.slice(0, 220).replace(/\n+/g, ' | '));
+await p.screenshot({ path: '/tmp/login-de.png' });
+await b.close();

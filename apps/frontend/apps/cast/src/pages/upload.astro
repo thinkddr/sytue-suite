@@ -1,0 +1,33 @@
+---
+/**
+ * Sytue Cast — /upload. Exige sesión.
+ */
+import AppLayout from '../layouts/AppLayout.astro';
+import { UploadApp } from '../islands/UploadApp.js';
+import { alLogin, hubBaseUrl, sesionDe } from '../lib/pagina.js';
+import { useT } from '../i18n/index.js';
+import { idDeDrive } from '../lib/desde-drive.js';
+
+export const prerender = false;
+
+const session = await sesionDe(Astro);
+// El redirect en una constante: el comprobador de Astro no ve lo que va tras `return`.
+const redireccion = session ? null : alLogin(Astro);
+if (redireccion || !session) return redireccion;
+const t = useT(Astro.locals.locale);
+// «Subir a Cast» desde Drive: /cast/upload?drive=<id>.
+const drive = idDeDrive(Astro.url.search);
+---
+
+<AppLayout
+  title={`${t(drive === null ? 'upload.title' : 'upload.drive.title')} · ${t('app.title')}`}
+>
+  <UploadApp
+    slot="app"
+    client:load
+    locale={Astro.locals.locale}
+    user={session.user}
+    hubBaseUrl={hubBaseUrl()}
+    drive={drive}
+  />
+</AppLayout>

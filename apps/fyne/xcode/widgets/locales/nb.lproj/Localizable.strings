@@ -1,0 +1,17 @@
+"widgets.open" = "Åpne";
+"widgets.compose" = "Skriv";
+"widgets.create" = "Opprett hendelse";
+"widgets.notes" = "Notater";
+"widgets.rows" = "Rader";
+"widgets.pending" = "Ventende";
+"widgets.channels" = "Kanaler";
+"widgets.photos" = "Bilder";
+"widgets.episodes" = "Episoder";
+"widgets.apps" = "Apper";
+"widgets.calendars" = "Kalendere";
+"widgets.address_books" = "Adressebøker";
+"search.label" = "Globalt søk";
+"dataflow.item.files" = "Filer";
+"dataflow.item.events" = "Kalender";
+"dataflow.item.documents" = "Dokumenter";
+"dataflow.item.contacts" = "Kontakter";

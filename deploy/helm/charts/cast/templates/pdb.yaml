@@ -1,0 +1,19 @@
+{{- if .Values.podDisruptionBudget.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "sytue-cast.fullname" . }}
+  labels:
+    {{- include "sytue-cast.labels" . | nindent 4 }}
+spec:
+  {{- if .Values.podDisruptionBudget.minAvailable }}
+  minAvailable: {{ .Values.podDisruptionBudget.minAvailable }}
+  {{- else }}
+  maxUnavailable: {{ .Values.podDisruptionBudget.maxUnavailable | default 1 }}
+  {{- end }}
+  # Solo el servicio HTTP (ver values.yaml): el transcodificador va con una
+  # réplica y un PDB sobre él bloquearía el drain del nodo.
+  selector:
+    matchLabels:
+      {{- include "sytue-cast.selectorLabels" . | nindent 6 }}
+{{- end }}

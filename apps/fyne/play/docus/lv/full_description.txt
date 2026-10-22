@@ -1,0 +1,16 @@
+Kopīga rediģēšana reāllaikā
+
+• Viss saglabāts jūsu Eiropas Drive.
+• Kopīga rediģēšana reāllaikā ar klātbūtni un bez savstarpējas traucēšanas.
+• Lente ar cilnēm: Sākums, Ievietošana, Atsauces, Sūtījumi un Pārskatīšana.
+• Tabulas, attēli, formas, SmartArt, diagrammas, simboli un ūdenszīmes.
+• Atsauces: satura rādītājs, vēres, citāti un bibliogrāfija.
+• Sūtījumi: datu sapludināšana vēstulēm un uzlīmēm.
+• Komentāru pavedieni, izmaiņu pārskatīšana un versijas.
+• Neobligāts MI palīgs pārrakstīšanai, tulkošanai vai kopsavilkumam, tikai ja jūsu organizācija to iespējo.
+• Eksports uz ODT, DOCX un PDF; Word failu atvēršana no Drive.
+• Galvenes, kājenes, lappušu numerācija un atkārtoti izmantojami bloki.
+• Automātiska saglabāšana jūsu Eiropas Drive ar vēsturi.
+• Lejupielāde no sākumlapas PDF, HTML, Markdown, OpenDocument vai Microsoft Office formātā.
+
+Šifrēts pārsūtīšanas laikā (TLS 1.3). Sytue infrastruktūra atrodas ES. Ārējo pakalpojumu atrašanās vieta ir atkarīga no to sniedzēja.

@@ -1,0 +1,37 @@
+{
+  "key": "google-meet",
+  "tier": "tier2",
+  "manifest": {
+    "name": "Google Meet",
+    "description": "Crea un enlace de Google Meet desde Sytue Rooms y compártelo en tu canal.",
+    "category": "Comunicación",
+    "color": "#00832D",
+    "icon": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#00832D\" stroke-width=\"2\" stroke-linejoin=\"round\"><rect x=\"3\" y=\"5\" width=\"12\" height=\"14\" rx=\"2\"/><path d=\"m15 10 6-4v12l-6-4Z\"/></svg>",
+    "identity": {
+      "kind": "none"
+    },
+    "provisioning": "none",
+    "launch": {
+      "kind": "url",
+      "url": "https://meet.google.com/"
+    },
+    "oauth": {
+      "authorize_url": "https://accounts.google.com/o/oauth2/v2/auth",
+      "token_url": "https://oauth2.googleapis.com/token",
+      "scopes": [
+        "https://www.googleapis.com/auth/meetings.space.created"
+      ],
+      "authorize_params": {
+        "access_type": "offline",
+        "prompt": "consent"
+      },
+      "revoke_url": "https://oauth2.googleapis.com/revoke"
+    },
+    "substitutes": [
+      {
+        "product": "meet",
+        "open_url": "https://meet.google.com/"
+      }
+    ]
+  }
+}

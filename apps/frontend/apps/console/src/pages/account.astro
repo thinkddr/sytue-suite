@@ -1,0 +1,33 @@
+---
+/*
+ * Mi cuenta — vista self-service del propio usuario. Por ahora solo edición del
+ * perfil (display name); el email verificado y la seguridad viven en otros flujos.
+ * El nombre inicial sale de la sesión (claims del token), sin ida y vuelta extra.
+ */
+import ConsoleLayout from '../layouts/ConsoleLayout.astro';
+import { useT } from '../i18n/index.js';
+import ProfileCard from '../components/ProfileCard';
+import { requireSession } from '@sytue/auth/server';
+import { getBff, toBffContext } from '../server/bff.js';
+
+export const prerender = false;
+
+// Auto-servicio del propio usuario: basta con estar autenticado (el layout ya
+// exige ser admin o admin delegado para llegar hasta aquí).
+const guard = await requireSession(getBff(), toBffContext(Astro));
+if (guard instanceof Response) return guard;
+const { user } = guard.session;
+
+// El idioma lo negoció el middleware; la isla lo recibe por props (nunca lo detecta).
+const locale = Astro.locals.locale;
+const t = useT(locale);
+---
+
+<ConsoleLayout title={t('page.account')} section="account">
+  {/* Esta vista es una sola Card, sin cabecera que titule: sin este h1 quien
+      navega por encabezados no encontraba de que iba la pagina. */}
+  <h1 class="sr-only">{t('page.account')}</h1>
+  <div class="px-4 pt-4 pb-4">
+    <ProfileCard client:load locale={locale} name={user.name} email={user.email} />
+  </div>
+</ConsoleLayout>

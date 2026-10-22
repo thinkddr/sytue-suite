@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "display": "@sytue/config — preset para apps Astro (extiende el base estricto)",
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "allowJs": true,
+    /* `types` explícito APAGA la inclusión automática de `@types/*`, así que aquí hay
+       que nombrar lo que se usa. Sin «bun», los ficheros de test de cada app —que
+       importan `bun:test` y usan `Bun.sleep`/`import.meta.dir`— salían en rojo en el
+       editor, y la consola no se enteraba porque los `include` de las apps ni los
+       miraban. Tres apps llegaron a declarar `@types/bun` en su package.json sin que
+       sirviera de nada, precisamente por esta línea. */
+    "types": ["astro/client", "bun"]
+  }
+}

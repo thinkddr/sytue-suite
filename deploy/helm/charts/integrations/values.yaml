@@ -1,0 +1,157 @@
+# Sytue Integration Gateway — defaults del subchart (servicio Go). global.* lo inyecta
+# el umbrella. Estado en PostgreSQL con RLS por organizacion; sin Redis/Valkey.
+enabled: true
+subdomain: integrations
+
+# Dónde vive la consola de plataforma, para devolver al admin al terminar el
+# consentimiento OAuth. El prefijo NO es opcional: la app se sirve bajo `/admin`
+# y el servicio compone `<consoleURL>/<sección>`.
+console:
+  subdomain: admin
+  path: /admin
+component: integrations
+replicaCount: 2
+
+image:
+  registry: ""                 # cae a global.imageRegistry (Scaleway Registry, UE)
+  repository: sytue-integrations
+  tag: "1.0.0"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8093             # puerto del SPEC (Sytue Integration Gateway)
+
+ingress:
+  enabled: true
+  className: traefik
+  # integrations.sytue.eu NO tiene SPA propio: el host entero es la API del gateway,
+  # que consume el BFF de Sytue Admin. Por eso "/" y no una lista de prefijos.
+  path: /
+  pathType: Prefix
+  annotations: {}
+  tls:
+    secretName: tls-integrations-sytue-eu
+
+# Right-sized al footprint MEDIDO (Go ~6-40MiB RSS idle): requests modestos para
+# densidad/coste; limits con cabecera para picos (reconcile SCIM y paginas de datos
+# tabulares hacia Sheets; burstable).
+# Requests MEDIDOS en producción (kubectl top, 2026-08-09), no estimados: en
+# Kubernetes la factura la fija lo RESERVADO, no lo usado, y estos pods pedían
+# 25-75 veces su consumo real. Esa reserva inflada obligó a un tercer nodo cuando
+# la CPU real del clúster estaba al 3 %.
+#
+# El límite NO se toca: un pico sigue pudiendo usar toda la CPU que necesite. Y
+# bajar el request hace al HPA MÁS sensible —calcula el porcentaje sobre el
+# request—, que es justo lo que hace falta para escalar por demanda real.
+resources:
+  requests:
+    cpu: 15m
+    memory: 64Mi
+  limits:
+    cpu: "1"
+    memory: 192Mi
+
+autoscaling:
+  # Etiqueta `job` de la serie de metricas, para el HPA por demanda real.
+  # Es el ServiceName del BINARIO, que no siempre coincide con el nombre del
+  # chart ni con el del directorio; por eso se escribe y no se deduce.
+  metricJob: sytue-integrations
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 8
+  targetCPUUtilizationPercentage: 70
+  # Sin memoria: en Go la RSS queda alta tras el GC (mala señal de escalado) y
+  # GOMEMLIMIT (~85% de limits.memory) ya la acota -> se escala solo por CPU.
+
+networkPolicy:
+  enabled: true
+
+serviceMonitor:
+  enabled: true
+  path: /metrics
+  interval: 30s
+
+# Configuracion de la app (no secretos). El gateway solo habla con Sytue ID dentro del
+# cluster; TODO lo demas es egress a terceros por el RoundTripper con politica.
+config:
+  # Tamano del pool pgx por replica (DB_MAX_CONNS). Prod lo baja (3-5):
+  # PgBouncer multiplexa hacia la RDB (ver values-prod.yaml del umbrella).
+  dbMaxConns: 10
+  logLevel: info
+  # URL interna de Sytue ID: de ahi salen el directorio (usuarios/grupos que se
+  # aprovisionan) y el canje de tokens delegados de la migracion de contenido.
+  idUrl: ""
+  # Origen público del BFF que termina el consentimiento de almacenamiento.
+  # Vacío => https://drive.<dominio del despliegue>. Nunca la URL interna.
+  drivePublicUrl: ""
+  # Origen público del BFF que termina el consentimiento de las apps de Rooms.
+  roomsPublicUrl: ""
+  # Meta Embedded Signup v4: public configuration identifier, never an app secret.
+  # Empty keeps guided WhatsApp onboarding unavailable until the operator configures it.
+  whatsappConfigId: ""
+  whatsappGraphVersion: v26.0
+  # URL interna de Sytue Rooms: destino de los equipos y canales que trae la
+  # migracion desde Microsoft Teams. Vacia => el Service del release.
+  roomsUrl: ""
+  # Sytue Cloud (destino de las aplicaciones migradas). Vacio = el servicio
+  # cloud-api del propio release.
+  cloudUrl: ""
+  # Sytue Git: la forja a la que llegan los repositorios importados desde GitHub
+  # (API de Gitea). Vacia => el asistente no ofrece migrar repositorios. El token de
+  # administrador va en el secret existingSecret, clave git-token.
+  gitUrl: ""
+  # Egress hacia terceros: cubeta por (organizacion, instancia). Los defaults del
+  # servicio son 20/s con rafaga 40; se suben aqui solo con medicion delante.
+  egressRatePerSec: 20
+  egressBurst: 40
+  egressTimeout: 15s
+  egressMaxRedirects: 5
+  # Cache de politicas de gobernanza por organizacion (L5).
+  policyCacheTTL: 30s
+
+# Postgres EXTERNO (Scaleway RDB). DSN por secret (nunca en git).
+postgresql:
+  existingSecret: sytue-integrations-db
+  dsnKey: dsn
+  # DSN directo a la RDB (bypass PgBouncer) para LISTEN/migraciones; opcional.
+  dsnDirectKey: dsn-direct
+
+# Secretos: oidc-client-secret (y los que requiera el servicio).
+existingSecret: sytue-integrations
+
+# Registro OAuth de Sytue ante proveedores. El JSON con client_id/client_secret
+# vive fuera de Helm; cada persona solo otorga consentimiento. Secret independiente
+# para conservarlo cuando deploy.sh actualiza los secretos internos del servicio.
+platformOAuth:
+  existingSecret: sytue-integrations-platform-oauth
+  clientsKey: clients.json
+
+# PodDisruptionBudget: garantiza disponibilidad durante drains/upgrades del cluster.
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+  # maxUnavailable: 1   # alternativa a minAvailable (usar uno u otro)
+
+# Reparto anti-afinidad suave por zona y nodo (alta disponibilidad multi-AZ, UE).
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: ScheduleAnyway
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: ScheduleAnyway
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  fsGroup: 10001
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]

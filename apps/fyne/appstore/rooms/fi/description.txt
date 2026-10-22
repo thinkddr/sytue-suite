@@ -1,0 +1,20 @@
+Kanavat, viestit ja tiimin videopuhelut yhdessä paikassa.
+
+• Kanavat tiimeittäin tai projekteittain.
+• Videopuhelu upotettuna jokaiseen kanavaan.
+• Maininnat ja ilmoitukset yhtenäisinä koko kokonaisuudessa.
+• Haettava historia mistä tahansa Sytue Onessa.
+• Julkiset ja yksityiset kanavat luokissa; yksityisviestit ja ryhmät.
+• Ketjut, reaktiot, maininnat, kiinnitetyt ja tallennetut viestit sekä luonnokset.
+• Muotoilu ”Aa”-palkilla ja pikanäppäimillä: lihavointi, kursiivi, koodi, lainaukset, luettelot ja linkit.
+• Liitteet, kuvat, GIFit ja omat emojit; tiedostot Drivesta.
+• Ajastettu lähetys, prioriteetti, lukukuittaus ja ”nähneet”.
+• Kauttaviivakomennot ja kortit: äänestykset ja osoitettavat tehtävät.
+• Videopuhelut kanavalla: kamera, näyttö, käden nosto, chat ja tallennus.
+• Ajastetut kokoukset ja kutsulinkit.
+• Botit, webhookit ja integraatiot muihin työkaluihin.
+• Läsnäolo ja mukautettu tila; kanavakohtaiset ilmoitusasetukset.
+• Hae historiasta, myös koko kokonaisuudesta.
+• Reaaliaikaisuus WebSocketin kautta, uudelleenyhdistyksellä ja ilman kadonneita viestejä.
+
+Salattu siirron aikana (TLS 1.3). Sytuen infrastruktuuri sijaitsee EU:ssa. Ulkoisten palvelujen sijainti riippuu niiden tarjoajasta.

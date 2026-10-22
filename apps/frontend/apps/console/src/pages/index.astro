@@ -1,0 +1,107 @@
+---
+import ConsoleLayout from '../layouts/ConsoleLayout.astro';
+import { useT } from '../i18n/index.js';
+import DashboardPanel from '../components/DashboardPanel';
+import PasswordPolicyCard from '../components/PasswordPolicyCard';
+import OrgDomainCard from '../components/OrgDomainCard';
+import OrgLogoCard from '../components/OrgLogoCard';
+import { OrgColorCard, OrgFormaCard } from '../components/OrgAppearanceCard';
+import { requireSession, permsFromAccessToken } from '@sytue/auth/server';
+import { esCuentaPersonal } from '@sytue/auth';
+import { DEFAULT_COLOR, DEFAULT_FORMA } from '@sytue/ui';
+import { firstSectionPath } from '../lib/sections.js';
+import { getBff, isPlatformSurface, toBffContext } from '../server/bff.js';
+import {
+  loadTenants,
+  loadUsers,
+  loadAudit,
+  loadPasswordPolicy,
+  loadOrgMailDomains,
+  loadInsights,
+  buildMetrics,
+} from '../lib/admin.js';
+
+export const prerender = false;
+
+/*
+ * El panel agrega organizaciones + política de contraseñas, que Sytue ID reserva a
+ * owner/admin. A un admin DELEGADO no se le enseña un 403: se le lleva a la primera
+ * sección que su permiso sí abre (si no tuviera ninguna, el layout ya lo habría
+ * rechazado antes de llegar aquí).
+ */
+const guard = await requireSession(getBff(), toBffContext(Astro));
+if (guard instanceof Response) return guard;
+const { session } = guard;
+// La superficie de plataforma tiene otra portada: el panel de abajo agrega
+// organizaciones, usuarios y política de UNA organización, y quien entra en
+// platform.<dominio> viene a administrar la plataforma, no a la suya. Sin esto, un
+// admin global sin rol en ninguna organización acababa en «Mi cuenta».
+// prefijo-ok: esta superficie (platform.<dominio>) se sirve en la RAÍZ, no bajo
+// `/admin`. La misma imagen sirve las dos y aquí el prefijo del build no vale.
+if (isPlatformSurface()) return Astro.redirect('/platform');
+const perms = permsFromAccessToken(session.tokens.accessToken);
+// UNA CUENTA PERSONAL NUNCA VE ESTE PANEL. Es `owner` de su organización
+// personal, así que por rol contaba como superusuario y aterrizaba aquí: la
+// página pedía tenants, usuarios y auditoría, Sytue ID contestaba 403 y el
+// cargador degradaba al seed —«ACME Europa», 42 usuarios—, o sea que una cuenta
+// recién registrada veía organizaciones de mentira como si fueran suyas. Se la
+// lleva a lo suyo: apps si tiene plan de pago; «Mi cuenta» si no.
+if (esCuentaPersonal(session.user)) {
+  return Astro.redirect(
+    firstSectionPath(session.user.roles, perms, session.user.orgKind, session.user.plan),
+  );
+}
+const isSuper = session.user.roles.includes('owner') || session.user.roles.includes('admin');
+const redirectTo = isSuper ? null : firstSectionPath(session.user.roles, perms);
+if (redirectTo !== null) return Astro.redirect(redirectTo);
+
+const [
+  { data: tenants },
+  { data: usersPage },
+  { data: auditPage },
+  { data: policy, live: policyLive },
+  { data: orgDomain, live: domainLive },
+] = await Promise.all([
+  loadTenants(session),
+  loadUsers(session),
+  loadAudit(session, { limit: 10 }),
+  loadPasswordPolicy(session),
+  loadOrgMailDomains(session),
+]);
+// Los avisos van en la misma tanda pero con su propio await: no comparten forma
+// con los demás (no llevan `data`/`live`) y mezclarlos en el destructuring de
+// arriba obligaría a un cast que oculta justo eso.
+const insights = await loadInsights(session);
+const metrics = buildMetrics(tenants, usersPage.items);
+
+// El idioma lo negoció el middleware; la isla lo recibe por props (nunca lo detecta).
+const locale = Astro.locals.locale;
+const t = useT(locale);
+---
+
+<ConsoleLayout title={t('page.dashboard')} section="dashboard">
+  <DashboardPanel
+    client:load
+    locale={locale}
+    metrics={metrics}
+    tenants={tenants}
+    events={auditPage.items}
+    insights={insights}
+  />
+  {/* client:visible, no client:load: estas tres tarjetas van BAJO el panel y su
+      HTML ya lo pinta el servidor con los datos de arriba, así que hidratarlas al
+      cargar solo adelanta trabajo de CPU que nadie ve. El panel de arriba sí es
+      client:load: es lo primero que se mira. */}
+  <div class="grid gap-4 px-4 pb-4 lg:grid-cols-2">
+    <OrgDomainCard client:visible locale={locale} state={orgDomain} live={domainLive} />
+    <OrgLogoCard
+      client:visible
+      locale={locale}
+      slug={session.user.tenant ?? ''}
+      logoHash={session.user.orgLogo ?? ''}
+    />
+    <OrgColorCard client:visible locale={locale} color={session.user.orgColor ?? DEFAULT_COLOR} />
+    <OrgFormaCard client:visible locale={locale} forma={session.user.orgForma ?? DEFAULT_FORMA} />
+    <PasswordPolicyCard client:visible locale={locale} policy={policy} live={policyLive} />
+  </div>
+</ConsoleLayout>

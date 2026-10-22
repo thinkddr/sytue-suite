@@ -1,0 +1,14 @@
+{
+  "producto": "Sytue — Google Meet",
+  "oauth_client": {
+    "application_type": "web",
+    "authorized_redirect_uris": [
+      "https://integrations.sytue.eu/api/v1/oauth/callback"
+    ],
+    "scopes": [
+      "https://www.googleapis.com/auth/meetings.space.readonly",
+      "https://www.googleapis.com/auth/calendar.readonly"
+    ]
+  },
+  "nota": "Sin semilla en el catálogo todavía (llega con la ola de integraciones de Meet); scopes estándar de Meet/Calendar de solo lectura."
+}

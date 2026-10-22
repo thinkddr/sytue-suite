@@ -1,0 +1,13 @@
+/**
+ * Sytue Chat — entrada de estilos: importa el design system (Tailwind v4 +
+ * tokens de marca Sytue). Sin tema propio; coherencia transversal de la suite.
+ */
+@import '@sytue/ui/styles.css';
+
+@source '../**/*.{astro,ts,tsx}';
+
+/* Ancho del panel derecho (RHS) de Rooms: un único token local para los cinco
+   paneles (búsqueda, mensajes, hilos, programados, hilo). En móvil siguen a w-full. */
+:root {
+  --rooms-rhs-width: 22rem;
+}

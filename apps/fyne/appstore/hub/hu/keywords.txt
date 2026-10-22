@@ -1,0 +1,1 @@
+suite,SSO,csomag,portálja,indítója

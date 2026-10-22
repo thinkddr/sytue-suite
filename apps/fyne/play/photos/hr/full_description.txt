@@ -1,0 +1,18 @@
+Galerija i uređivač fotografija: izvornici u Driveu, izmjene kao recept.
+
+• Vremenska crta po mjesecima s pretraživanjem po nazivu.
+• Albumi s naslovnicom; preglednik preko cijelog zaslona.
+• Uređivač svjetla, boje, zakretanja, zrcaljenja i obrezivanja u stvarnom vremenu.
+• Svaka izmjena je recept: izvornik ostaje netaknut.
+• Vremenska crta grupirana po mjesecima, s pretraživanjem po nazivu i oštrim minijaturama.
+• Albumi: stvaranje, preimenovanje, odabir naslovnice, dodavanje iz preglednika i uklanjanje.
+• Uređivač s četiri klizača (ekspozicija, kontrast, zasićenost, temperatura), zakretanjem i zrcaljenjem.
+• Svaka izmjena je recept spremljen zasebno: izvornik u Driveu nikad se ne mijenja.
+• Izvoz u punoj razlučivosti, iscrtan na poslužitelju istim formulama kao u pretpregledu.
+• Smeće s vraćanjem.
+• Izvornici su u vašem Sytue Driveu; izvedenice su predmemorija koja se može ponovno stvoriti.
+• Podaci EXIF čitaju se iz same datoteke; sve u Europskoj uniji.
+• Višestruki odabir po mjesecu: u novi album, u smeće ili preuzimanje odjednom.
+• Dijaprojekcija, puna veličina, zakretanje iz preglednika i obrezivanje s fiksnim omjerom.
+
+Šifrirano u prijenosu (TLS 1.3). Infrastruktura Sytuea nalazi se u EU-u. Lokacija vanjskih usluga ovisi o njihovu pružatelju.

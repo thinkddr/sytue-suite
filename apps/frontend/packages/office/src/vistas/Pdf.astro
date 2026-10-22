@@ -1,0 +1,50 @@
+---
+/**
+ * Sytue PDF — /pdf?path=<ruta en Drive>. Visor y editor de PDF, cuarto tipo de
+ * Sytue Docs. Montado a pantalla completa bajo la Sytue Shell.
+ *
+ * Se abre por RUTA DE DRIVE y no por identificador de documento: un PDF que se
+ * anota no deja de ser el fichero que ya estaba en Drive, y convertirlo a un
+ * documento de Docs para poder verlo obligaría a mantener dos copias. La ACL, el
+ * historial de versiones y quién puede abrirlo son los de Drive, que es donde el
+ * usuario lo guardó.
+ */
+import type { SytueSession } from '@sytue/auth';
+import AppLayout from '../layouts/AppLayout.astro';
+import { PdfApp } from '../pdf/PdfApp';
+import { PortadaPdf } from '../pdf/Portada';
+import { docsT } from '../i18n';
+import { volverA } from '@sytue/config';
+
+interface Props {
+  /** La de `entrar(Astro, { canonica: true })`: login y forma canónica ya resueltos. */
+  sesion: SytueSession;
+}
+
+const { sesion: session } = Astro.props;
+
+const path = Astro.url.searchParams.get('path');
+// De dónde vino, si vino de Drive. `volverA` es la verja: solo una RUTA, porque
+// un destino completo en la query haría de esta página un redirector abierto.
+const volver = volverA(Astro.url.searchParams.get('volver'));
+
+const locale = Astro.locals.locale;
+const t = docsT(locale);
+const nombre = path ? (path.split('/').filter(Boolean).pop() ?? path) : t('pdf.open.title');
+---
+
+<AppLayout title={`${nombre} — ${t('pdf.title')}`} producto="pdf">
+  <div class="h-[calc(100dvh-var(--spacing-topbar)-var(--sytue-safe-bottom,0px))] min-h-0">
+    {path ? (
+      <PdfApp
+        client:only="preact"
+        path={path}
+        locale={locale}
+        autor={session.user.name ?? session.user.email ?? ''}
+        volverA={volver}
+      />
+    ) : (
+      <PortadaPdf client:only="preact" locale={locale} />
+    )}
+  </div>
+</AppLayout>

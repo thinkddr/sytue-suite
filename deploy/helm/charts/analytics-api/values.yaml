@@ -1,0 +1,116 @@
+# Sytue Analytics — API DE LECTURA + crons. global.* lo inyecta el umbrella.
+# Misma imagen que el colector: trae los DOS binarios y su ENTRYPOINT por defecto es
+# el colector, asi que aqui se sobreescribe el comando (no hay build-arg BINARY).
+enabled: true
+component: analytics-api
+# SINGLETON, como cloud-controller y por el mismo motivo: este proceso lleva DENTRO
+# el cron del servicio (runMaintenance en cmd/analytics-api/main.go: rota la sal del
+# dia, crea/retira particiones y recalcula el rollup). Duplicarlo no aporta lectura
+# —el panel es de bajisimo volumen— y multiplica DDL concurrente sobre las
+# particiones. Si algun dia hace falta escalar la LECTURA, hay que sacar antes el
+# cron a un proceso propio; no basta con subir replicas.
+replicaCount: 1
+
+image:
+  registry: ""                 # cae a global.imageRegistry (Scaleway Registry, UE)
+  repository: sytue-analytics  # MISMA imagen que analytics-ingest
+  tag: "1.0.0"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8095             # puerto del SPEC (CONVENTIONS §6)
+
+# SIN Ingress: la API es INTERNA. La consume el BFF del panel (cloud-dashboard) por
+# el Service del release, y el navegador nunca la ve. Publicar un analytics.<dominio>
+# solo añadiria superficie y un certificado que nadie usa.
+
+# El panel lee AGREGADOS ya calculados (analytics_hourly/daily/breakdown) y es de
+# muy bajo volumen; el trabajo pesado del proceso es el rollup periodico, que es a
+# rafagas. De ahi requests modestos y limits con cabecera para el ciclo del cron.
+# Requests MEDIDOS en producción (kubectl top, 2026-08-09), no estimados: en
+# Kubernetes la factura la fija lo RESERVADO, no lo usado, y estos pods pedían
+# 25-75 veces su consumo real. Esa reserva inflada obligó a un tercer nodo cuando
+# la CPU real del clúster estaba al 3 %.
+#
+# El límite NO se toca: un pico sigue pudiendo usar toda la CPU que necesite. Y
+# bajar el request hace al HPA MÁS sensible —calcula el porcentaje sobre el
+# request—, que es justo lo que hace falta para escalar por demanda real.
+resources:
+  requests:
+    cpu: 15m
+    memory: 64Mi
+  limits:
+    cpu: "1"
+    memory: 512Mi
+
+# Sin HPA a proposito: ver replicaCount (el cron vive en este proceso).
+
+networkPolicy:
+  enabled: true
+
+serviceMonitor:
+  enabled: true
+  path: /metrics
+  interval: 30s
+
+# Configuracion de la app (no secretos). Nombres de env:
+# services/analytics/internal/config/config.go. Los parametros del ADR
+# (RAW_RETENTION_DAYS=2, PARTITIONS_AHEAD=7, ROLLUP_INTERVAL=5m, BREAKDOWN_TOP_N=100)
+# son los defaults del servicio y no se repiten aqui.
+config:
+  # Pool pgx por replica (DB_MAX_CONNS). Prod lo baja: PgBouncer multiplexa.
+  dbMaxConns: 10
+  logLevel: info
+  # Origenes del navegador admitidos. Vacio => se derivan del dominio: el panel de
+  # analitica es una SECCION de cloud-dashboard (cloud.<dominio>) y Sytue Admin.
+  # El default del servicio es la allowlist de primera parte de sytue.eu, que en
+  # staging apuntaria al dominio equivocado.
+  corsAllowedOrigins: ""
+  # Los hosts bajo este sufijo solo se registran por Pages usando la ruta interna.
+  reservedHostSuffixes: ""
+  analyticsPagesSecret: sytue-analytics-pages
+
+# Postgres EXTERNO (Scaleway RDB). DSN por secret (nunca en git).
+postgresql:
+  existingSecret: sytue-analytics-db
+  dsnKey: dsn
+  # DSN DIRECTO a la RDB (bypass del pooler). platform/pkg/pg lo lee del entorno para
+  # las MIGRACIONES: golang-migrate serializa con pg_advisory_lock (lock de SESION),
+  # que a traves de PgBouncer en pool_mode=transaction se rompe. Opcional: sin
+  # PgBouncer (staging/dev) no existe y se usa DATABASE_URL.
+  dsnDirectKey: dsn-direct
+
+# Secreto propio: la KEK AES-256 (base64, 32 bytes) de la SAL DIARIA, compartida con
+# el colector. Aqui hace falta para poder DESCIFRAR la sal que se rota cada dia.
+# Sin `optional: true`: sin KEK la sal quedaria en claro (ver values del colector).
+existingSecret: sytue-analytics
+
+# PodDisruptionBudget: singleton, asi que maxUnavailable (minAvailable=1 bloquearia
+# los drains del nodo con una sola replica).
+podDisruptionBudget:
+  enabled: true
+  maxUnavailable: 1
+
+# Reparto anti-afinidad suave por zona y nodo (cuando hay >1 replica).
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: ScheduleAnyway
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: ScheduleAnyway
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  fsGroup: 10001
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]

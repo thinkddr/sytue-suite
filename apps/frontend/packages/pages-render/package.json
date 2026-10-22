@@ -1,0 +1,35 @@
+{
+  "name": "@sytue/pages-render",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sytue Web — el IR del diseño de una web (tipos, tabla de campos, validador espejo del de services/pages/internal/ir), el renderizador determinista (lienzo y publicación), el exportador Astro+Preact y las islas. Un solo renderizador para el navegador y el BFF.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./contexto": "./src/contexto.ts",
+    "./pintar": "./src/pintar/index.ts",
+    "./exportar": "./src/exportar/index.ts",
+    "./islas": "./src/islas/index.ts"
+  },
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.lib.json",
+    "typecheck": "tsc -p tsconfig.lib.json --noEmit",
+    "test": "bun test",
+    "islas": "bun scripts/islas.ts",
+    "fixtures:lighthouse": "bun scripts/fixtures-lighthouse.ts"
+  },
+  "dependencies": {
+    "preact": "10.29.8"
+  },
+  "devDependencies": {
+    "@sytue/config": "workspace:*",
+    "@sytue/i18n": "workspace:*",
+    "@types/bun": "1.4.2",
+    "@types/node": "catalog:",
+    "typescript": "6.0.3"
+  }
+}

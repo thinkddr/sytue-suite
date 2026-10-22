@@ -1,0 +1,3685 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Daniel Delgado Ramos
+openapi: 3.1.0
+info:
+  title: Sytue Cloud API
+  version: "1.0"
+  description: >
+    Control plane del PaaS de Sytue One (Vercel × Supabase × Google Cloud):
+    organizaciones/tenants, proyectos, builds, deployments, dominios+TLS,
+    variables/secretos, servicios gestionados (Sytue Postgres/PostgREST, Storage,
+    Functions, Cron, Auth) y uso/facturación. Estado en PostgreSQL; soberanía UE.
+  license:
+    name: MIT
+    url: https://sytue.eu/legal/licencia
+servers:
+  - url: https://cloud.sytue.eu/api/v1
+    description: Producción
+  - url: https://cloud.sytue.localhost/api/v1
+    description: Desarrollo local (Traefik)
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: org
+    description: Organización (tenant) del usuario autenticado.
+  - name: projects
+    description: Proyectos desplegables conectados a un repositorio git.
+  - name: templates
+    description: Catálogo estático de plantillas de arranque (presets por stack).
+  - name: deployments
+    description: Despliegues (prod/preview), rollback, cancelación, logs y terminal.
+  - name: builds
+    description: Construcciones de imagen OCI (BuildKit/buildpacks) y sus logs.
+  - name: domains
+    description: Dominios personalizados + TLS.
+  - name: env
+    description: Variables de entorno y secretos del proyecto.
+  - name: services
+    description: Servicios gestionados (Postgres, Storage, Functions, Cron, Job, Auth).
+  - name: storage
+    description: Object Storage del proyecto (listado y URLs prefirmadas).
+  - name: db
+    description: >
+      Sytue DB Studio: introspección, lectura de filas y consola SQL del Postgres
+      gestionado del proyecto. Solo usuarios (no tokens de API): expone datos de
+      negocio del cliente.
+  - name: usage
+    description: Uso agregado, detalle y auditoría del tenant.
+  - name: billing
+    description: Facturación (cuenta, precios, facturas, tope de gasto).
+  - name: tokens
+    description: Tokens de API programáticos (CI/CLI).
+  - name: members
+    description: Colaboradores de la organización (RBAC).
+  - name: uptime
+    description: Sondas de disponibilidad HTTP por proyecto.
+  - name: alerts
+    description: Políticas de alerta por evento (webhook saliente).
+  - name: webhooks
+    description: Endpoints públicos de webhooks git (autenticación por firma HMAC).
+
+paths:
+  # El contrato se sirve a sí mismo: público (como el discovery de OIDC) y fuera
+  # de /api/v1, para que un generador de SDK no necesite credenciales.
+  /openapi.yaml:
+    servers:
+      - url: https://cloud-api.sytue.eu
+        description: Raíz del servicio (fuera del prefijo /api/v1)
+    get:
+      operationId: getOpenApiSpec
+      tags: [meta]
+      summary: Contrato OpenAPI de esta API
+      description: >-
+        Devuelve la especificación OpenAPI 3.1 embebida en el binario en ejecución,
+        de modo que siempre corresponde a la versión desplegada. No requiere
+        autenticación.
+      security: []
+      responses:
+        "200":
+          description: Documento OpenAPI en YAML
+          content:
+            application/yaml:
+              schema: { type: string }
+  /org:
+    get:
+      operationId: getOrg
+      tags: [org]
+      summary: Organización del usuario autenticado (creada perezosamente)
+      responses:
+        "200": { $ref: "#/components/responses/Organization" }
+    patch:
+      operationId: patchOrg
+      tags: [org]
+      summary: Actualizar nombre/URL de aviso de la organización (admin/owner)
+      description: >
+        El plan no se cambia por aquí: cambia tras un pago confirmado o lo cambia
+        el operador. Una petición con `plan` responde 403.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                notify_webhook_url:
+                  type: string
+                  description: >
+                    URL destino (http/https) del webhook de aviso de deploy
+                    (ready/error) por defecto de la organización; un proyecto puede
+                    sobreescribirla. Cadena vacía la desactiva. Validada anti-SSRF
+                    (rechaza destinos internos/metadata).
+      responses:
+        "200": { $ref: "#/components/responses/Organization" }
+        "400": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+
+  /app-catalog:
+    get:
+      operationId: getAppCatalog
+      tags: [templates]
+      summary: Catálogo de apps open-source que se pueden levantar junto a la app
+      description: >
+        Qué se puede aprovisionar como servicio gestionado del tipo `app`: caché,
+        buscador, cola, CMS. La imagen NUNCA la elige el cliente — se elige una
+        entrada por su `id` y el resto lo pone la plataforma (ADR 0029): imagen
+        fijada por digest, replicada en el registro de la UE, licencia comprobada
+        contra la allowlist y límites de recursos obligatorios.
+
+
+        Devuelve dos listas. `apps` son las que se pueden crear ahora; `pending`
+        son las escritas y revisadas cuya imagen todavía no se ha replicado. Se
+        enseñan como «en camino» en vez de ofrecerlas: crearlas fallaría al tirar
+        de la imagen, después de haber prometido el servicio.
+
+
+        Catálogo público del producto: lectura para cualquier miembro autenticado.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  apps:
+                    type: array
+                    items: { $ref: "#/components/schemas/CatalogApp" }
+                  pending:
+                    type: array
+                    description: Ids escritos y validados cuya imagen aún no está replicada.
+                    items: { type: string }
+                  allowed_licenses:
+                    type: array
+                    description: >
+                      Licencias SPDX que el catálogo admite. Se enseñan para que quien
+                      despliega software de otro sepa bajo qué términos lo hace.
+                    items: { type: string }
+        "401": { $ref: "#/components/responses/Error" }
+
+  /projects:scaffold:
+    post:
+      operationId: startScaffold
+      tags: [projects]
+      summary: Empieza el alta creando un repositorio nuevo en Sytue Git
+      description: >
+        La tercera vía del alta, para quien todavía no tiene repositorio: Sytue Cloud
+        le crea uno copiando el esqueleto del stack elegido (`starter_repo` de la
+        plantilla) y da de alta el proyecto sobre él.
+
+
+        Devuelve **a dónde mandar al usuario a autorizar**, no un proyecto: el
+        repositorio se crea EN SU CUENTA de la forja, así que hace falta su
+        consentimiento. Cloud usa credenciales de una aplicación OAuth2 registrada en
+        Sytue Git —no un token de administrador—, de modo que lo que puede hacer es
+        exactamente lo que cada usuario autoriza, y él lo revoca desde su cuenta.
+
+
+        El token que se obtiene al volver se usa para crear el repositorio y se
+        descarta: no se guarda en ninguna parte.
+
+
+        Requiere scope `deploy`: al volver, el alta encola un despliegue.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [template_id, slug]
+              properties:
+                template_id:
+                  type: string
+                  description: Plantilla del catálogo. Tiene que declarar `starter_repo`.
+                slug: { type: string, description: Nombre del proyecto (subdominio público). }
+                name: { type: string }
+                repo_name:
+                  type: string
+                  description: Nombre del repositorio en la forja; vacío = el slug.
+      responses:
+        "200":
+          description: A dónde mandar al usuario a dar su consentimiento.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  authorize_url: { type: string, format: uri }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+
+  /forge/callback:
+    get:
+      operationId: forgeCallback
+      tags: [projects]
+      summary: Retorno del consentimiento de Sytue Git
+      description: >
+        A esta ruta vuelve el NAVEGADOR desde la forja. Canjea el código, crea el
+        repositorio copiando el esqueleto y aplica la plantilla —proyecto, servicios,
+        variables y primer despliegue, en una transacción—. Responde con un **redirect**
+        al panel del proyecto: devolver JSON dejaría al usuario mirando un objeto en
+        una pestaña en blanco después de pulsar «autorizar».
+
+
+        El `state` lo emitió el servidor, es de un solo uso y va atado al sub que lo
+        pidió: sin eso, un `state` robado dejaría que otra persona completase el alta
+        dentro de la organización de la víctima. El motivo de un fallo NO viaja en la
+        URL de retorno —acabaría en el historial y en el Referer siguiente—.
+      parameters:
+        - name: code
+          in: query
+          schema: { type: string }
+        - name: state
+          in: query
+          schema: { type: string }
+      responses:
+        "302":
+          description: Redirect al panel del proyecto creado, o a la lista con el motivo.
+        "401": { $ref: "#/components/responses/Error" }
+
+  /inspect-repo:
+    get:
+      operationId: inspectRepo
+      tags: [templates]
+      summary: Deduce cómo desplegar un repositorio sin clonarlo
+      description: >
+        Mira la raíz del repositorio por la API de su forja y devuelve el framework,
+        la estrategia de build y los comandos, para que el alta no pregunte lo que ya
+        está escrito en el repo (`output_dir` no es una pregunta para quien empieza:
+        es un muro).
+
+
+        **Nunca falla el alta.** Una forja que no se sabe leer, un repositorio privado
+        o un servidor caído devuelven `detected:false` con el motivo, y el formulario
+        enseña los campos como antes. Por eso responde 200 también en ese caso: no se
+        ha pedido crear nada.
+
+
+        La petición sale hacia un host que escribe el usuario, así que va acotada por
+        dos puertas independientes: una allowlist de forjas conocidas (Sytue Git,
+        GitHub, Codeberg) y el guardián de SSRF, que no alcanza redes privadas ni el
+        metadata del proveedor aunque el DNS de un host permitido apunte allí.
+
+
+        `confident:false` significa que se dedujo algo razonable pero no comprobable
+        —un metaframework con servidor propio, o un lenguaje que aquí no se mira—: el
+        formulario debe enseñarlo en vez de aplicarlo en silencio.
+      parameters:
+        - name: repo_url
+          in: query
+          required: true
+          schema: { type: string, format: uri }
+          description: URL https del repositorio.
+        - name: root_dir
+          in: query
+          schema: { type: string }
+          description: Subdirectorio a mirar, para monorepos.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detected: { type: boolean }
+                  reason:
+                    type: string
+                    description: Por qué no se pudo mirar. Solo con detected:false.
+                  detection:
+                    type: object
+                    properties:
+                      framework: { type: string }
+                      build_strategy: { type: string, enum: [dockerfile, buildpacks] }
+                      install_command: { type: string }
+                      build_command: { type: string }
+                      output_dir: { type: string }
+                      confident:
+                        type: boolean
+                        description: >
+                          Si se puede aplicar sin preguntar. En falso, el formulario
+                          enseña los campos: mejor una pregunta que un despliegue que
+                          sirve una página en blanco.
+                      evidence:
+                        type: string
+                        description: >
+                          El fichero que lo delató. Se ENSEÑA: «detectado: Astro» hay
+                          que creérselo, «astro.config.mjs → Astro» se comprueba.
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+
+  /templates:
+    get:
+      operationId: getTemplates
+      tags: [templates]
+      summary: Catálogo de plantillas (manifiestos declarativos embebidos)
+      description: >
+        Catálogo curado y ESTÁTICO de manifiestos: framework, ajustes de build,
+        servicios gestionados que se aprovisionan de verdad y variables con su
+        origen. Se aplica entero de una vez con POST /projects:from-template.
+
+        NO despliega apps de terceros ni clona repos; docs_url, si aparece,
+        apunta a documentación oficial. Catálogo público del producto: lectura
+        para cualquier miembro autenticado.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  templates:
+                    type: array
+                    items: { $ref: "#/components/schemas/StarterTemplate" }
+              example:
+                templates:
+                  - id: astro-static
+                    name: Sitio estático (Astro)
+                    description: Empieza con estos ajustes para un sitio Astro generado estáticamente.
+                    version: 1.0.0
+                    license: MIT
+                    maintainer: Sytue
+                    framework: astro
+                    build:
+                      install: bun install --frozen-lockfile
+                      build: bun run build
+                      output_dir: dist
+                    tags: [static, ssg]
+                    starter_repo: sytue-starters/astro
+                    docs_url: https://docs.astro.build
+                  - id: go-api-postgres
+                    name: API en Go + Postgres
+                    description: API en Go con una base Sytue Postgres conectada de fábrica.
+                    version: 1.0.0
+                    license: MIT
+                    maintainer: Sytue
+                    framework: go
+                    services: [postgres]
+                    env:
+                      - key: DATABASE_URL
+                        origin: from_service
+                        service: postgres
+                      - key: SESSION_SECRET
+                        origin: generate
+                        secret: true
+                    tags: [api, backend]
+                    docs_url: https://go.dev/doc/
+
+  /projects:from-template:
+    post:
+      operationId: createProjectFromTemplate
+      tags: [projects, templates]
+      summary: Crear un proyecto entero desde una plantilla (todo o nada)
+      description: >
+        Crea el proyecto, aprovisiona los servicios del manifiesto, fija las
+        variables y encola el primer despliegue EN UNA SOLA TRANSACCIÓN. Si algo
+        falla no queda nada: antes esto eran cuatro o más peticiones sin relación
+        y la tercera que fallara dejaba un proyecto huérfano con servicios a
+        medias que además ya se estaba facturando.
+
+        Las variables con origin=generate las genera la plataforma y se guardan
+        cifradas: su valor en claro NO se devuelve. Las de origin=from_service ni
+        siquiera se persisten (las inyecta el controlador al desplegar).
+
+        answers responde SOLO a las variables con origin=ask que DECLARA la
+        plantilla; una clave que no declara es un 400, porque si no sería un
+        canal para escribir variables de entorno arbitrarias en el pod de la app.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [template_id, slug]
+              properties:
+                template_id: { type: string }
+                slug: { type: string }
+                name: { type: string }
+                repo_url: { type: string }
+                answers:
+                  type: object
+                  additionalProperties: { type: string }
+                  description: Respuestas a las variables con origin=ask.
+                instance_size:
+                  type: string
+                  description: Pisa el tamaño sugerido por la plantilla ("" = el suyo).
+      responses:
+        "201":
+          description: Creado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  project: { $ref: "#/components/schemas/Project" }
+                  services:
+                    type: array
+                    items: { $ref: "#/components/schemas/ManagedService" }
+                  env:
+                    type: array
+                    items: { $ref: "#/components/schemas/EnvVar" }
+                  build: { $ref: "#/components/schemas/Build" }
+                  deployment: { $ref: "#/components/schemas/Deployment" }
+                  template_id: { type: string }
+                  template_version:
+                    type: string
+                    description: Con qué revisión del catálogo se creó el proyecto.
+                  webhook_url: { type: string }
+                  webhook_secret:
+                    type: string
+                    description: >
+                      Secreto del webhook git EN CLARO, devuelto UNA sola vez.
+                      No vuelve a estar disponible.
+        "400": { $ref: "#/components/responses/Error" }
+        "402": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+
+  /projects/{id}/sizing:
+    parameters:
+      - { $ref: "#/components/parameters/IdPath" }
+    get:
+      operationId: getProjectSizing
+      tags: [projects]
+      summary: Recomendación de tamaño según el uso REAL
+      description: >
+        Qué hacer con el tamaño de instancia del proyecto a partir de su consumo
+        medido (muestras de metrics.k8s.io), y cuánto cambia eso la factura.
+
+        NO existe un endpoint hermano de "aplicar": aplicar la recomendación es
+        PATCH /projects/{id} con instance_size, que ya valida contra el catálogo,
+        audita y respeta la cuota del plan. Un verbo propio duplicaría esas tres
+        cosas y sería el único camino de cambio de tamaño capaz de saltarse
+        alguna.
+
+        Sin muestras suficientes responde 200 con action=keep y
+        reason=insufficient_data — es la respuesta correcta de un proyecto
+        recién creado, no un error ni un cuerpo vacío.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SizingAdvice" }
+              example:
+                action: down
+                reason: over_provisioned
+                from: standard
+                to: basic
+                monthly_delta_eur: -3.285
+                p95_memory_percent: 12
+                peak_memory_percent: 30
+                p95_cpu_milli: 50
+                samples: 400
+                window_hours: 100
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+
+  /projects/{id}/probe-health:
+    parameters:
+      - { $ref: "#/components/parameters/IdPath" }
+    post:
+      operationId: probeHealthPaths
+      tags: [projects]
+      summary: Detectar la ruta de salud sondeando la app
+      description: >
+        Sondea la app de PRODUCCIÓN del proyecto con las rutas de salud de
+        convención (/healthz, /health, /livez, /readyz, /_health, /api/health,
+        /api/healthz, /) y devuelve qué contestó cada una, además de cuál se
+        recomienda. NO cambia nada: la ruta elegida se guarda con el PATCH del
+        proyecto. La URL la construye el servidor a partir del proyecto —no se
+        acepta ninguna del cliente— y el sondeo sale por el cliente endurecido del
+        prober (guard anti-SSRF en el dial, sin seguir redirecciones).
+        `recommended` viene vacío si ninguna ruta responde 2xx: en ese caso no se
+        propone nada, porque configurar una ruta que la app no sirve haría que las
+        sondas de Kubernetes la reiniciaran en bucle.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HealthProbeReport" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+
+  /suggest-slug:
+    get:
+      operationId: suggestProjectSlug
+      tags: [projects]
+      summary: Nombre libre sugerido para un proyecto nuevo
+      description: >
+        Devuelve un nombre con la forma «sustantivo + adjetivo» y COMPROBADO contra
+        el índice de slugs, que es único en toda la plataforma porque el slug es el
+        subdominio público de la app. Existe porque inventarse un nombre acaba en un
+        409 cuyo motivo el usuario no puede ver: lo tiene otra organización.
+        El nombre se construye con la GRAMÁTICA del idioma negociado, no traduciendo
+        palabra a palabra: en español, francés e italiano el adjetivo va detrás y
+        concuerda en género (puerto-sereno, duna-serena, port-serein, dune-sereine);
+        en inglés va delante y no concuerda (serene-harbor); en alemán va delante,
+        hay tres géneros y el adjetivo antepuesto se declina en nominativo fuerte
+        (ruhiger-hafen, ruhige-insel, ruhiges-tal).
+        `available: false` significa que no se pudo confirmar libre tras varios
+        intentos; el nombre sirve igual como punto de partida y la creación validará.
+        NO reserva nada: dos personas pueden recibir el mismo nombre a la vez.
+      parameters:
+        - $ref: "#/components/parameters/SlugLang"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  slug: { type: string }
+                  available:
+                    type: boolean
+                    description: Se confirmó que está libre.
+                  lang:
+                    $ref: "#/components/schemas/ProductLanguage"
+              example: { slug: puerto-sereno, available: true, lang: es }
+
+  /check-slug:
+    get:
+      operationId: checkProjectSlug
+      tags: [projects]
+      summary: Disponibilidad de un nombre concreto, con alternativas libres
+      description: >
+        Dice si el nombre que ha escrito el usuario está libre y, cuando no lo está,
+        devuelve alternativas YA COMPROBADAS. Pensado para llamarse mientras se
+        teclea (con debounce en el cliente): el slug es el subdominio público y su
+        índice es único en TODA la plataforma, así que sin esto el usuario no se
+        entera hasta el 409 de la creación, y ese 409 no puede decirle quién lo tiene.
+        Las alternativas se derivan de SU nombre —sufijo numérico primero, luego
+        variantes con adjetivo—, no son nombres aleatorios sin relación; solo al
+        agotarlas se ofrecen nombres del catálogo. Como el género del sustantivo que
+        escribió el usuario es desconocido, las variantes con adjetivo usan
+        únicamente adjetivos INVARIABLES en las lenguas con género (mi-tienda-firme,
+        nunca mi-tienda-sereno); en alemán, donde el adjetivo antepuesto siempre se
+        declina, no se ofrece ninguna variante con adjetivo.
+        La comprobación es CROSS-TENANT (mira toda la plataforma) y resuelve el
+        nombre y todos los candidatos en UNA sola consulta. NO reserva nada.
+      parameters:
+        - name: slug
+          in: query
+          required: true
+          description: Nombre a comprobar. Se normaliza a minúsculas y sin espacios.
+          schema: { type: string, maxLength: 40 }
+        - $ref: "#/components/parameters/SlugLang"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [slug, available, alternatives]
+                properties:
+                  slug:
+                    type: string
+                    description: El nombre comprobado, ya normalizado; es el que hay que enviar al crear.
+                  available:
+                    type: boolean
+                    description: Nadie en la plataforma lo tiene.
+                  alternatives:
+                    type: array
+                    description: >
+                      Nombres LIBRES derivados del pedido. Vacío cuando el pedido está
+                      disponible: no hay nada que ofrecer.
+                    items: { type: string }
+                  lang:
+                    $ref: "#/components/schemas/ProductLanguage"
+              examples:
+                libre:
+                  value: { slug: mi-tienda, available: true, alternatives: [], lang: es }
+                ocupado:
+                  value:
+                    slug: mi-tienda
+                    available: false
+                    alternatives: [mi-tienda-2, mi-tienda-3, mi-tienda-firme, mi-tienda-verde, duna-serena]
+                    lang: es
+        "400": { $ref: "#/components/responses/Error" }
+
+  /instance-sizes:
+    get:
+      operationId: getInstanceSizes
+      tags: [templates]
+      summary: Catálogo de tamaños de instancia
+      description: >
+        Tamaños con los que puede correr una app: lo que se reserva, lo que se
+        limita y la memoria que se factura como compute_gb_hours. Catálogo CERRADO
+        (no se piden CPU/memoria libres) para que el precio y las cuotas del plan
+        sean predecibles. Catálogo público del producto, como /templates: lectura
+        para cualquier miembro autenticado, sin datos de tenant.
+        Consúmelo en vez de replicarlo: es la única forma de no ofrecer un tamaño
+        que el control-plane ya no acepta.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  instance_sizes:
+                    type: array
+                    items: { $ref: "#/components/schemas/InstanceSize" }
+                  default:
+                    type: string
+                    description: Tamaño de una app que no elige ninguno.
+                  max_count:
+                    type: integer
+                    description: >
+                      Tope de instancias por app. El techo REAL lo pone la cuota del
+                      plan; esto solo evita que un número absurdo llegue a Kubernetes.
+              example:
+                instance_sizes:
+                  - name: basic
+                    label: Básico
+                    cpu_request: 100m
+                    memory_request: 128Mi
+                    cpu_limit: 1000m
+                    memory_limit: 512Mi
+                    memory_gib: 0.5
+                default: basic
+                max_count: 50
+
+  /projects:
+    get:
+      operationId: getProjects
+      tags: [projects]
+      summary: Listar proyectos
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  projects:
+                    type: array
+                    items: { $ref: "#/components/schemas/Project" }
+    post:
+      operationId: postProjects
+      tags: [projects]
+      summary: Crear proyecto (conectar repositorio git)
+      description: >
+        La respuesta incluye, UNA sola vez, el secreto HMAC del webhook git del
+        proyecto (webhook_secret) y la URL del endpoint (webhook_url) para pegarlos
+        en el proveedor. El secreto se persiste solo cifrado; después solo lo revela
+        GET del proyecto a un admin/owner.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateProject" }
+      responses:
+        "201": { $ref: "#/components/responses/Project" }
+        "402": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+
+  /projects/{id}:
+    parameters:
+      - { $ref: "#/components/parameters/IdPath" }
+    get:
+      operationId: getProjectsById
+      tags: [projects]
+      summary: Obtener proyecto (a admin/owner incluye webhook_secret + webhook_url)
+      responses:
+        "200": { $ref: "#/components/responses/Project" }
+        "404": { $ref: "#/components/responses/Error" }
+    patch:
+      operationId: patchProjectsById
+      tags: [projects]
+      summary: Actualizar configuración del proyecto
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateProject" }
+      responses:
+        "200": { $ref: "#/components/responses/Project" }
+    delete:
+      operationId: deleteProjectsById
+      tags: [projects]
+      summary: Borrar proyecto (admin/owner)
+      responses:
+        "204": { description: Borrado }
+
+  /projects/{id}/github:
+    parameters:
+      - { $ref: "#/components/parameters/IdPath" }
+    post:
+      operationId: postProjectsByIdGithub
+      tags: [projects]
+      summary: Conectar una GitHub App al proyecto (admin/owner)
+      description: >
+        FAIL-CLOSED: este endpoint NO liga la instalación por sí solo. Ligar un
+        installation_id crudo (entero enumerable, no secreto) sería un
+        confused-deputy cross-tenant. Valida las precondiciones (installation_id
+        > 0 y repo github.com) y devuelve 403: la instalación solo se liga tras
+        probar su propiedad en el callback OAuth (GET /github/callback), que
+        canjea el `code` del usuario y exige que la instalación esté entre las
+        suyas. Habilita clone de repos privados + comentario de preview en el PR.
+        GitLab queda como follow-up (mismo patrón con token de proyecto).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [installation_id]
+              properties:
+                installation_id:
+                  type: integer
+                  format: int64
+                  description: ID de la instalación de la GitHub App.
+      responses:
+        "200":
+          description: Conectada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  connected: { type: boolean }
+                  installation_id: { type: integer, format: int64 }
+        "400": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+    delete:
+      operationId: deleteProjectsByIdGithub
+      tags: [projects]
+      summary: Desconectar la GitHub App del proyecto (admin/owner)
+      responses:
+        "204": { description: Desconectada }
+        "404": { $ref: "#/components/responses/Error" }
+
+  /github/callback:
+    get:
+      operationId: getGithubCallback
+      tags: [projects]
+      summary: Callback OAuth de instalación de la GitHub App (admin/owner)
+      description: >
+        Setup/callback URL de la GitHub App. Al instalar/autorizar la App,
+        GitHub redirige aquí con state (project id), installation_id y code. Liga
+        la instalación al proyecto SOLO tras PROBAR su propiedad: canjea el `code`
+        por un user access token y exige que installation_id esté entre las
+        instalaciones del usuario (GET /user/installations). Si no pertenece →
+        403 sin persistir. Sin GITHUB_APP_CLIENT_ID/SECRET → 409 (OAuth no
+        configurado). El project id del `state` se resuelve bajo RLS (un proyecto
+        de otro tenant no existe en el contexto ⇒ 404), cerrando la confusión de
+        proyecto. El `code` no se registra ni se refleja.
+      parameters:
+        - { name: state, in: query, required: true, schema: { type: string, format: uuid }, description: Project id (state del flujo OAuth). }
+        - { name: installation_id, in: query, required: true, schema: { type: integer, format: int64 } }
+        - { name: code, in: query, required: true, schema: { type: string }, description: Código OAuth de un solo uso de GitHub. }
+      responses:
+        "200":
+          description: Conectada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  connected: { type: boolean }
+                  installation_id: { type: integer, format: int64 }
+        "400": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+
+  /projects/{id}/deployments:
+    parameters:
+      - { $ref: "#/components/parameters/IdPath" }
+    get:
+      operationId: getProjectsByIdDeployments
+      tags: [deployments]
+      summary: Listar deployments del proyecto (keyset, más recientes primero)
+      parameters:
+        - { $ref: "#/components/parameters/Limit" }
+        - { $ref: "#/components/parameters/Cursor" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deployments:
+                    type: array
+                    items: { $ref: "#/components/schemas/Deployment" }
+                  next_cursor:
+                    type: string
+                    description: >
+                      Token opaco de continuación; presente solo si hay más
+                      resultados. Se pasa tal cual en ?cursor= de la siguiente
+                      petición.
+    post:
+      operationId: postProjectsByIdDeployments
+      tags: [deployments]
+      summary: Disparar despliegue (build + deploy, o BYO-image sin build)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                commit_sha: { type: string }
+                git_ref: { type: string }
+                target: { type: string, enum: [production, preview] }
+                pr_number: { type: integer }
+                image_ref:
+                  type: string
+                  description: >
+                    Imagen OCI ya construida (BYO) a desplegar SIN build desde git.
+                    Debe residir en el registry de la plataforma (EU) y llevar tag
+                    o digest, p. ej. rg.fr-par.scw.cloud/sytue/app@sha256:…
+      responses:
+        "202":
+          description: Aceptado (build encolada)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deployment: { $ref: "#/components/schemas/Deployment" }
+                  build: { $ref: "#/components/schemas/Build" }
+        "400": { $ref: "#/components/responses/Error" }
+        "402":
+          description: >
+            Cuota del plan (quota_exceeded) o tope de gasto del mes
+            (spend_limit_exceeded) superado; el deploy se rechaza en el choke point
+            antes de encolar el build.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+
+  /deployments/{id}:
+    parameters:
+      - { $ref: "#/components/parameters/IdPath" }
+    get:
+      operationId: getDeploymentsById
+      tags: [deployments]
+      summary: Obtener deployment
+      responses:
+        "200": { $ref: "#/components/responses/Deployment" }
+    delete:
+      operationId: deleteDeploymentsById
+      tags: [deployments]
+      summary: Cancelar deployment
+      responses:
+        "204": { description: Cancelado }
+
+  /deployments/{id}/rollback:
+    parameters:
+      - { $ref: "#/components/parameters/IdPath" }
+    post:
+      tags: [deployments]
+      operationId: rollbackDeployment
+      summary: Promover un deployment de producción anterior (rollback)
+      responses:
+        "200": { $ref: "#/components/responses/Deployment" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+
+  /deployments/{id}/promote:
+    parameters:
+      - { $ref: "#/components/parameters/IdPath" }
+    post:
+      tags: [deployments]
+      operationId: promotePreview
+      summary: Publicar en producción la imagen de una preview
+      description: >
+        Crea un deployment de producción que REUSA la imagen ya construida de la
+        preview: no compila nada, no consume minutos de build y publica el mismo
+        artefacto que se revisó. Las variables de entorno NO se heredan — se
+        resuelven por entorno al aplicar, así que el nuevo despliegue recibe las
+        de producción. 409 si el deployment no es una preview (para volver a una
+        producción anterior está `/deployments/{id}/rollback`) o si aún no está
+        lista.
+      responses:
+        "201": { $ref: "#/components/responses/Deployment" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+
+  /projects/{id}/clone:
+    parameters:
+      - { $ref: "#/components/parameters/IdPath" }
+    post:
+      tags: [projects]
+      operationId: cloneProject
+      summary: Crear un proyecto igual que este (configuración + variables)
+      description: >
+        Copia repositorio, rama de producción, ajustes de compilación, escala,
+        puerto, sonda de salud, comando de release, reglas HTTP y TODAS las
+        variables de entorno (los secretos se copian cifrados; nunca se
+        descifran). NO copia dominios, servicios gestionados, historial de
+        despliegues ni el secreto del webhook, que es propio del proyecto nuevo.
+        Cuenta para la cuota de proyectos de la organización.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [slug]
+              properties:
+                slug: { type: string, example: web-staging }
+                name: { type: string, description: Por defecto, el del proyecto de origen. }
+      responses:
+        "201":
+          description: Proyecto clonado
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [project, webhook_secret, env_vars_copied]
+                properties:
+                  project: { $ref: "#/components/schemas/Project" }
+                  webhook_secret:
+                    type: string
+                    description: Secreto del webhook del proyecto NUEVO, en claro y solo esta vez.
+                  env_vars_copied: { type: integer, minimum: 0 }
+        "400": { $ref: "#/components/responses/Error" }
+        "402":
+          description: Cuota de proyectos de la organización alcanzada.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+
+  /projects/{id}/restart:
+    parameters:
+      - { $ref: "#/components/parameters/IdPath" }
+    post:
+      tags: [deployments]
+      operationId: restartApp
+      summary: Reiniciar las instancias de la producción activa
+      description: >
+        Reinicio rodante (mismo commit, misma imagen, mismo deployment): no
+        compila nada, no consume minutos de build y no cambia lo publicado.
+        Devuelve cuántas cargas de trabajo se reiniciaron; `0` significa que no
+        había ninguna corriendo. 409 si el proyecto está pausado.
+      responses:
+        "202":
+          description: Reinicio pedido al clúster.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [restarted]
+                properties:
+                  restarted: { type: integer, minimum: 0, example: 2 }
+        "400": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+
+  /projects/{id}/deployments/{deploymentId}/logs:
+    parameters:
+      - { $ref: "#/components/parameters/IdPath" }
+      - { name: deploymentId, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [deployments]
+      operationId: streamDeploymentLogs
+      summary: Logs en vivo del deployment (Server-Sent Events)
+      description: >
+        Stream SSE (text/event-stream) de los logs del pod del deployment. Conexión
+        de larga duración EXENTA del plazo de 30s; termina al desconectar el cliente.
+        SOLO HUMANOS con rol member/admin/owner (requireRole rechaza tokens de API):
+        los logs de producción pueden contener secretos/PII.
+      responses:
+        "200":
+          description: >
+            Stream de eventos SSE: cada línea de log llega como `data: <línea>`. Una
+            línea de más de 8 KiB se parte en varios eventos (el tope acota lo que
+            puede crecer el búfer con una app que escriba sin saltos de línea).
+          content:
+            text/event-stream:
+              schema: { type: string }
+        "400": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+
+  /projects/{id}/logs:
+    parameters:
+      - { $ref: "#/components/parameters/IdPath" }
+    get:
+      tags: [deployments]
+      operationId: searchProjectLogs
+      summary: Buscar en los logs de runtime del proyecto (keyset)
+      description: >
+        Busca en los logs que el recolector fue guardando de los deployments del
+        proyecto (los del stream SSE solo existen mientras alguien mira). Más
+        recientes primero, con paginación keyset (`cursor`/`next_cursor`, nunca
+        OFFSET), filtro por subcadena case-insensitive (`q`, tratada como TEXTO:
+        `%` y `_` no son comodines) y por rango de tiempo. La RETENCIÓN es de 14
+        días: más atrás no hay nada que buscar. MISMA verja que el stream en vivo:
+        solo humanos con rol member/admin/owner (los logs de producción pueden
+        contener secretos/PII).
+      parameters:
+        - { name: q, in: query, description: Subcadena case-insensitive de la línea., schema: { type: string, maxLength: 200 } }
+        - { name: since, in: query, description: "ts >= since (RFC3339 o AAAA-MM-DD).", schema: { type: string } }
+        - { name: until, in: query, description: "ts < until; una fecha suelta incluye el día entero.", schema: { type: string } }
+        - name: format
+          in: query
+          schema: { type: string, enum: [txt] }
+          description: >
+            `txt` descarga el conjunto filtrado ENTERO como `text/plain` (una
+            línea por línea de log, con su instante RFC3339 delante), en orden
+            cronológico y sin paginar. Tope duro de 200 000 líneas.
+        - { $ref: "#/components/parameters/Limit" }
+        - { $ref: "#/components/parameters/Cursor" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  lines:
+                    type: array
+                    items: { $ref: "#/components/schemas/LogLine" }
+                  next_cursor:
+                    type: string
+                    description: Presente solo si hay más páginas.
+        "400": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+
+  /projects/{id}/deployments/{deploymentId}/exec:
+    parameters:
+      - { $ref: "#/components/parameters/IdPath" }
+      - { name: deploymentId, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [deployments]
+      operationId: execDeployment
+      summary: Terminal interactiva sobre el pod del deployment (WebSocket)
+      description: >
+        Upgrade a WebSocket que abre /bin/sh en el pod del deployment (stdin/stdout
+        bidireccional, tope 30 min). Origin validado por allowlist Sytue. SOLO
+        HUMANOS admin/owner (requireRole rechaza tokens de API). No es una petición
+        REST: responde 101 Switching Protocols en el handshake.
+      responses:
+        "101": { description: Switching Protocols (sesión WS abierta). }
+        "400": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+
+  /projects/{id}/builds:
+    parameters:
+      - { $ref: "#/components/parameters/IdPath" }
+    get:
+      operationId: getProjectsByIdBuilds
+      tags: [builds]
+      summary: Listar builds del proyecto (keyset, más recientes primero)
+      parameters:
+        - { $ref: "#/components/parameters/Limit" }
+        - { $ref: "#/components/parameters/Cursor" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  builds:
+                    type: array
+                    items: { $ref: "#/components/schemas/Build" }
+                  next_cursor:
+                    type: string
+                    description: >
+                      Token opaco de continuación; presente solo si hay más
+                      resultados. Se pasa tal cual en ?cursor= de la siguiente
+                      petición.
+
+  /builds/{id}:
+    parameters:
+      - { $ref: "#/components/parameters/IdPath" }
+    get:
+      tags: [builds]
+      operationId: getBuild
+      summary: Obtener build
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Build" }
+        "404": { $ref: "#/components/responses/Error" }
+    delete:
+      tags: [builds]
+      operationId: cancelBuild
+      summary: Cancelar una build en cola o en curso (scope deploy)
+      responses:
+        "204": { description: Cancelada }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+
+  /builds/{id}/logs:
+    parameters:
+      - { $ref: "#/components/parameters/IdPath" }
+    get:
+      operationId: getBuildsByIdLogs
+      tags: [builds]
+      summary: Log de la build (texto plano)
+      description: >
+        Devuelve el log de la build como texto plano, leído del Object Storage por
+        su logs_key bajo el tenant del contexto (RLS). Filtrado server-side opcional
+        (stream + filter): `q` (subcadena, case-insensitive) y `level` (si las líneas
+        lo llevan) devuelven solo las líneas que casan (combinan en AND); `limit`
+        acota las líneas devueltas (tope por defecto para no cargar en memoria un log
+        enorme). Sin `q`/`level` devuelve el log completo hasta el tope. 404 si la
+        build no existe o el log aún no está disponible (build en curso / sin Object
+        Storage).
+      parameters:
+        - name: q
+          in: query
+          required: false
+          description: Subcadena case-insensitive; devuelve solo las líneas que la contienen.
+          schema: { type: string }
+        - name: level
+          in: query
+          required: false
+          description: Nivel de log (INFO/WARN/ERROR/…); casa las líneas que lo llevan como token.
+          schema: { type: string }
+        - name: limit
+          in: query
+          required: false
+          description: Máximo de líneas devueltas (por defecto y tope 5000).
+          schema: { type: integer, minimum: 1, maximum: 5000 }
+      responses:
+        "200":
+          description: OK
+          content:
+            text/plain:
+              schema: { type: string }
+        "404": { $ref: "#/components/responses/Error" }
+
+  /projects/{id}/domains:
+    parameters:
+      - { $ref: "#/components/parameters/IdPath" }
+    get:
+      operationId: getProjectsByIdDomains
+      tags: [domains]
+      summary: Listar dominios del proyecto
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  domains:
+                    type: array
+                    items: { $ref: "#/components/schemas/Domain" }
+    post:
+      operationId: postProjectsByIdDomains
+      tags: [domains]
+      summary: Añadir dominio personalizado (devuelve instrucciones DNS)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [hostname]
+              properties:
+                hostname: { type: string, example: app.cliente.com }
+      responses:
+        "201":
+          description: Creado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  domain: { $ref: "#/components/schemas/Domain" }
+                  dns:
+                    type: object
+                    properties:
+                      cname_target: { type: string }
+                      txt_record: { type: string }
+                      txt_value: { type: string }
+
+  /domains/{id}:
+    parameters:
+      - { $ref: "#/components/parameters/IdPath" }
+    patch:
+      tags: [domains]
+      operationId: patchDomain
+      summary: Actualizar dominio (marcar como principal)
+      description: >
+        Hoy solo admite is_primary=true, que promueve este dominio a principal
+        del proyecto (degrada al anterior). is_primary=false o un cuerpo vacío
+        devuelve 400 (sin cambios solicitados).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                is_primary: { type: boolean }
+              example: { is_primary: true }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  domain: { $ref: "#/components/schemas/Domain" }
+        "400": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+    delete:
+      tags: [domains]
+      operationId: removeDomain
+      summary: Eliminar dominio
+      responses:
+        "204": { description: Eliminado }
+
+  /projects/{id}/env:
+    parameters:
+      - { $ref: "#/components/parameters/IdPath" }
+    get:
+      operationId: getProjectsByIdEnv
+      tags: [env]
+      summary: Listar variables de entorno (valores de secretos ocultos)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  env:
+                    type: array
+                    items: { $ref: "#/components/schemas/EnvVar" }
+    put:
+      operationId: putProjectsByIdEnv
+      tags: [env]
+      summary: Crear/actualizar variable o secreto
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [key]
+              properties:
+                key: { type: string, example: API_TOKEN }
+                value: { type: string }
+                is_secret: { type: boolean }
+                scope:
+                  type: string
+                  enum: [all, production, preview]
+                  description: >
+                    Dónde aplica. `all` llega a producción y, si NO es secreto, también
+                    a las vistas previas. Un secreto `all` es de producción y una vista
+                    previa no lo recibe: si lo necesita, se le da uno propio con ámbito
+                    `preview`.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvVar" }
+
+  /projects/{id}/env/export:
+    parameters:
+      - { $ref: "#/components/parameters/IdPath" }
+      - name: target
+        in: query
+        schema: { type: string, enum: [production, preview], default: production }
+        description: Entorno cuyas variables se resuelven (mismas reglas de scope que un despliegue).
+    get:
+      tags: [env]
+      operationId: exportEnv
+      summary: Descargar las variables como fichero .env (admin/owner)
+      description: >
+        Simétrica de la importación. Devuelve `text/plain` con una variable por
+        línea, ordenadas alfabéticamente (para poder comparar dos descargas) y
+        con los valores entrecomillados cuando hace falta para que vuelvan a
+        leerse igual. **Revela los secretos en claro**, así que va con
+        admin/owner, SOLO humanos, `Cache-Control: no-store` y queda en la
+        auditoría como `env.export`. NO incluye las credenciales de los servicios
+        gestionados: las inyecta el controlador al desplegar y su DSN apunta
+        dentro del clúster (para eso está `/projects/{id}/db/credentials`).
+      responses:
+        "200":
+          description: Fichero .env
+          content:
+            text/plain:
+              schema: { type: string }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+
+  /env/{id}:
+    parameters:
+      - { $ref: "#/components/parameters/IdPath" }
+    delete:
+      operationId: deleteEnvById
+      tags: [env]
+      summary: Borrar variable
+      responses:
+        "204": { description: Borrada }
+
+  /projects/{id}/services:
+    parameters:
+      - { $ref: "#/components/parameters/IdPath" }
+    get:
+      operationId: getProjectsByIdServices
+      tags: [services]
+      summary: Listar servicios gestionados del proyecto
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  services:
+                    type: array
+                    items: { $ref: "#/components/schemas/ManagedService" }
+    post:
+      operationId: postProjectsByIdServices
+      tags: [services]
+      summary: Aprovisionar servicio gestionado (postgres/storage/functions/cron/job/auth)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kind]
+              properties:
+                kind: { type: string, enum: [postgres, storage, functions, cron, job, worker, auth] }
+                name: { type: string }
+                target:
+                  type: string
+                  enum: [production, preview]
+                  default: production
+                  description: >
+                    A qué despliegues entrega sus credenciales. Un servicio `preview`
+                    (solo postgres o storage) las entrega a las vistas previas del
+                    proyecto y nunca a producción; uno `production`, al revés. Una
+                    vista previa no recibe las credenciales de producción.
+                config:
+                  type: object
+                  additionalProperties: { type: string }
+                  description: >
+                    Config no sensible del servicio. cron requiere schedule (cron o
+                    @macro) + image (registry de plataforma) y admite command. job
+                    requiere image y admite command, parallelism, completions,
+                    backoff_limit y active_deadline_seconds. functions requiere image
+                    (acotada al repo del proyecto) y admite command; se despliega como
+                    un contenedor HTTP bajo <fn>.<projID>.fn.<appsdomain> con las
+                    credenciales de los servicios del proyecto (DATABASE_URL, S3_*)
+                    inyectadas.
+      responses:
+        "202":
+          description: Aprovisionando
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ManagedService" }
+
+  /services/{id}:
+    parameters:
+      - { $ref: "#/components/parameters/IdPath" }
+    get:
+      operationId: getServicesById
+      tags: [services]
+      summary: Obtener servicio gestionado
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ManagedService" }
+    delete:
+      operationId: deleteServicesById
+      tags: [services]
+      summary: Eliminar servicio gestionado (admin/owner)
+      responses:
+        "204": { description: Marcado para eliminación }
+    patch:
+      tags: [services]
+      operationId: updateService
+      summary: Cambiar nombre o configuración de un servicio gestionado (admin/owner)
+      description: >
+        El `config` se MEZCLA con el que hay: mandar el objeto entero borraría lo
+        que escribió el aprovisionamiento (host, bucket, URL pública), que el
+        panel necesita y el cliente no tiene.
+
+
+        Se valida con las MISMAS reglas que el alta —cron válido, imagen anclada
+        al repo del propio proyecto, URL sin destinos internos— y el servicio
+        vuelve a la cola de aprovisionamiento, así que responde 202: el cambio
+        llega al clúster en el siguiente ciclo del reconciliador.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                config:
+                  type: object
+                  additionalProperties: { type: string }
+                  example: { backup_schedule: "0 5 * * *" }
+      responses:
+        "202":
+          description: Cambio guardado; el servicio vuelve a aprovisionarse
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ManagedService" }
+        "400": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+
+  /services/{id}/backups:
+    parameters:
+      - { $ref: "#/components/parameters/IdPath" }
+    get:
+      operationId: listServiceBackups
+      tags: [services]
+      summary: Listar backups de un Sytue Postgres
+      description: >
+        Lista los backups diarios (pg_dump→Object Storage) del servicio Postgres.
+        El listado se hace bajo RLS sobre el prefijo S3 PROPIO del servicio
+        (backups/&lt;tenant&gt;/&lt;servicio&gt;/); el cliente no controla el prefijo.
+        `key` es SOLO el nombre de fichero, que es lo que se pasa a POST /restore.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  backups:
+                    type: array
+                    items: { $ref: "#/components/schemas/Backup" }
+        "404":
+          description: Servicio no encontrado (o de otro tenant).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "409":
+          description: El servicio no es de tipo postgres.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /services/{id}/logs:
+    parameters:
+      - { $ref: "#/components/parameters/IdPath" }
+    get:
+      tags: [services]
+      operationId: getServiceLogs
+      summary: Registro reciente de un servicio gestionado
+      description: >
+        Últimas líneas de los pods del servicio (función, tarea programada,
+        trabajo o app del catálogo), en orden cronológico. Los logs de la APP del
+        proyecto van por otro camino (`/deployments/{id}/logs`): un servicio
+        gestionado no es un deployment y su registro no era accesible desde
+        ninguna parte.
+
+
+        Lista vacía con 200: un servicio recién creado aún no ha escrito nada.
+      parameters:
+        - name: lines
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 1000, default: 200 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  lines:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        ts: { type: string, format: date-time }
+                        text: { type: string }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+
+  /services/{id}/backup:
+    parameters:
+      - { $ref: "#/components/parameters/IdPath" }
+    post:
+      tags: [services]
+      operationId: backupServiceNow
+      summary: Pedir una copia de seguridad inmediata (solo Postgres)
+      description: >
+        Clona el CronJob diario en un Job de una sola ejecución, así que la copia
+        sale con el MISMO script, retención y credenciales que las automáticas.
+        Responde 202: el Job corre en el clúster y el objeto aparece en
+        `GET /services/{id}/backups` cuando termina.
+      responses:
+        "202":
+          description: Copia solicitada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: requested }
+        "403": { $ref: "#/components/responses/Error" }
+        "404":
+          description: >
+            El servicio no existe, no es Postgres, o no tiene copias configuradas
+            (instalación sin Object Storage de plataforma).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /services/{id}/backups/download:
+    parameters:
+      - { $ref: "#/components/parameters/IdPath" }
+      - name: backup
+        in: query
+        required: true
+        schema: { type: string, example: 20260720T030000Z.sql.gz }
+        description: Nombre del fichero devuelto por `GET /services/{id}/backups`.
+    get:
+      tags: [services]
+      operationId: downloadServiceBackup
+      summary: URL temporal para descargar una copia de seguridad
+      description: >
+        Devuelve una URL prefirmada (15 min) al objeto de Object Storage, con
+        `Content-Disposition: attachment`. El objeto se compone SIEMPRE en
+        servidor a partir del prefijo del tenant y del servicio: el cliente solo
+        aporta el nombre de fichero. Es una credencial de un solo uso práctico —
+        quien la tenga se lleva el dump sin sesión —, por eso caduca pronto y la
+        descarga queda en la auditoría. Solo admin/owner y solo humanos.
+      responses:
+        "200":
+          description: URL firmada
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [url]
+                properties:
+                  url: { type: string, format: uri }
+        "400": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+
+  /services/{id}/run:
+    parameters:
+      - { $ref: "#/components/parameters/IdPath" }
+    post:
+      tags: [services]
+      operationId: runServiceNow
+      summary: Ejecutar ahora una tarea programada o puntual
+      description: >
+        Lanza la tarea sin esperar a su horario, con la MISMA imagen, comando,
+        credenciales y límites que su ejecución automática: clona la plantilla
+        del CronJob (o la spec del Job puntual) en un Job nuevo, sin alterar la
+        configuración guardada. Solo `kind` cron y job; el resto responde 409.
+        Responde 202 —el Job corre en el clúster— y el resultado se sigue por
+        `GET /services/{id}/logs`.
+      responses:
+        "202":
+          description: Ejecución solicitada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: requested }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409":
+          description: El servicio no es una tarea (cron o job).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /services/{id}/restore:
+    parameters:
+      - { $ref: "#/components/parameters/IdPath" }
+    post:
+      operationId: restoreServiceBackup
+      tags: [services]
+      summary: Restaurar un backup elegido (admin/owner + scope deploy, DESTRUCTIVO)
+      description: >
+        Restaura sobre el Postgres del servicio el backup indicado. El cuerpo lleva
+        SOLO el nombre de fichero del backup (no una ruta); se valida con un patrón
+        estricto y el objeto S3 final se compone en servidor como
+        backups/&lt;tenant&gt;/&lt;servicio&gt;/&lt;backup&gt;. Operación destructiva:
+        exige usuario admin/owner y, para tokens de API, scope deploy.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [backup]
+              properties:
+                backup:
+                  type: string
+                  description: Nombre de fichero del backup (p. ej. "20260720T030000Z.sql.gz").
+                  example: "20260720T030000Z.sql.gz"
+      responses:
+        "202":
+          description: Restauración solicitada (se ejecuta en segundo plano).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  restoring: { type: boolean }
+                  backup: { type: string }
+        "400":
+          description: Nombre de backup inválido (con ruta, vacío o fuera de patrón).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Servicio o backup no encontrado.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "409":
+          description: El servicio no es de tipo postgres.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /projects/{id}/webhook-secret:rotate:
+    parameters:
+      - { $ref: "#/components/parameters/IdPath" }
+    post:
+      tags: [projects]
+      operationId: rotateWebhookSecret
+      summary: Emitir un secreto de webhook nuevo para el proyecto
+      description: >
+        Devuelve el secreto en claro UNA vez. El anterior deja de valer en el
+        acto, así que los push del proveedor git fallarán la verificación de
+        firma hasta que se pegue el nuevo allí — que es exactamente lo que se
+        quiere al rotar una credencial comprometida.
+
+
+        Solo humanos con rol admin/owner: una credencial de máquina no debe poder
+        invalidar otra.
+      responses:
+        "200":
+          description: Secreto nuevo
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  webhook_secret: { type: string }
+                  webhook_url: { type: string, format: uri }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+
+  /quota:
+    get:
+      tags: [organization]
+      operationId: getQuota
+      summary: Uso de la organización frente a los límites de su plan
+      description: >
+        Los límites existían y se aplicaban —crear el proyecto de más devuelve
+        402— pero no se podían mirar. `max: 0` significa SIN LÍMITE, no
+        «desconocido».
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  plan: { type: string, enum: [free, pro, team] }
+                  projects:
+                    type: object
+                    properties:
+                      used: { type: integer }
+                      max: { type: integer }
+                  services:
+                    type: object
+                    properties:
+                      used: { type: integer }
+                      max: { type: integer }
+                  max_pods: { type: integer }
+                  request_cpu: { type: string }
+                  request_memory: { type: string }
+                  limit_cpu: { type: string }
+                  limit_memory: { type: string }
+                  postgres_pvc_size: { type: string }
+                  backup_retention_days: { type: integer }
+
+  /projects/{id}/preview-protection:
+    parameters:
+      - { $ref: "#/components/parameters/IdPath" }
+    post:
+      tags: [projects]
+      operationId: protectPreviews
+      summary: Cerrar las previews del proyecto con contraseña (admin/owner)
+      description: >
+        Una preview publica en internet una rama SIN REVISAR, con datos de prueba
+        y una URL que se puede indexar. Esto la cierra con autenticación básica
+        (middleware de Traefik) y devuelve la contraseña EN CLARO una sola vez: lo
+        que se guarda es su bcrypt, así que no hay forma de recuperarla después.
+
+
+        Sobre una protección ya activa, ROTA la contraseña. Producción no se toca
+        nunca.
+      responses:
+        "200":
+          description: Previews cerradas
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  username: { type: string, example: preview }
+                  password: { type: string }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+    delete:
+      tags: [projects]
+      operationId: unprotectPreviews
+      summary: Volver a dejar las previews abiertas (admin/owner)
+      responses:
+        "204": { description: Previews abiertas }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+
+  /projects/{id}/metrics:
+    parameters:
+      - { $ref: "#/components/parameters/IdPath" }
+    get:
+      tags: [projects]
+      operationId: getProjectMetrics
+      summary: Consumo observado del proyecto (CPU y memoria)
+      description: >
+        Serie temporal del uso REAL de los pods de producción, con el techo del
+        tamaño actual para poder leerla. Es el dato del que sale la recomendación
+        de /sizing, expuesto aparte porque «qué está pasando» tiene respuesta
+        aunque «qué hago» sea todavía «no he medido bastante».
+
+
+        Una serie vacía se devuelve con 200: un proyecto recién creado, o un
+        clúster sin metrics-server, no es un error.
+      parameters:
+        - name: hours
+          in: query
+          required: false
+          description: >
+            Ventana en horas (por defecto 24, máximo 168). Fuera de rango se
+            acota en vez de rechazarse.
+          schema: { type: integer, minimum: 1, maximum: 168, default: 24 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProjectMetrics" }
+        "404": { $ref: "#/components/responses/Error" }
+
+  /projects/{id}/storage/objects:
+    parameters:
+      - { $ref: "#/components/parameters/IdPath" }
+    get:
+      tags: [storage]
+      operationId: listStorageObjects
+      summary: Listar objetos del bucket de Object Storage del proyecto
+      parameters:
+        - name: prefix
+          in: query
+          required: false
+          description: Prefijo de clave para filtrar objetos (listado por prefijo).
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  storage: { $ref: "#/components/schemas/StorageInfo" }
+                  objects:
+                    type: array
+                    items: { $ref: "#/components/schemas/StorageObject" }
+        "404": { $ref: "#/components/responses/Error" }
+    delete:
+      tags: [storage]
+      operationId: deleteStorageObject
+      summary: Borrar un objeto del bucket del proyecto
+      description: >
+        Destructivo y sin deshacer (el bucket no versiona), por eso exige rol
+        admin/owner. La clave va en query porque las de S3 llevan barras dentro.
+        Borrar una clave inexistente devuelve 204: S3 lo trata como éxito y el
+        reintento tras un fallo de red no debe ver un 404 falso.
+      parameters:
+        - name: key
+          in: query
+          required: true
+          description: Clave completa del objeto dentro del bucket.
+          schema: { type: string }
+          example: assets/img/logo.png
+      responses:
+        "204": { description: Borrado }
+        "400": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+
+  /projects/{id}/storage/presign:
+    parameters:
+      - { $ref: "#/components/parameters/IdPath" }
+    post:
+      tags: [storage]
+      operationId: presignStorage
+      summary: URL prefirmada (15 min) para subir/descargar un objeto
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [key]
+              properties:
+                key: { type: string, example: uploads/foto.png }
+                method:
+                  type: string
+                  description: Método HTTP de la URL prefirmada (GET descarga, PUT subida). Por defecto GET.
+                  example: PUT
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  url: { type: string, format: uri, description: URL prefirmada válida 15 minutos. }
+        "400": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+
+  # Sytue DB Studio. Todas estas rutas exigen un USUARIO (los tokens de API se
+  # rechazan) con rol member o superior; la consola SQL sube a admin/owner. El
+  # {id} admite el UUID del proyecto o su slug (el dashboard navega por slug) y
+  # se resuelve siempre dentro del tenant autenticado.
+  /projects/{id}/db/tables:
+    parameters:
+      - { $ref: "#/components/parameters/ProjectRefPath" }
+    get:
+      tags: [db]
+      operationId: listDbTables
+      summary: Introspección del esquema del Postgres del proyecto (member+)
+      description: >
+        Lista hasta 200 tablas de los esquemas de usuario con sus columnas, tipos,
+        clave primaria, defectos y FK simples. 404 si el proyecto no tiene un Sytue
+        Postgres listo.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/DbTable" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+
+  /projects/{id}/db/tables/{table}/rows:
+    parameters:
+      - { $ref: "#/components/parameters/ProjectRefPath" }
+      - name: table
+        in: path
+        required: true
+        description: Tabla cualificada `esquema.nombre`. Debe existir en el catálogo; el identificador se sanea antes de componer la consulta.
+        schema: { type: string }
+        example: public.clientes
+    get:
+      tags: [db]
+      operationId: getDbTableRows
+      summary: Primeras filas de una tabla (member+)
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          description: Filas a devolver (1-200, por defecto 50).
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DbRows" }
+        "400": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+
+  /projects/{id}/db/api:
+    parameters:
+      - { $ref: "#/components/parameters/ProjectRefPath" }
+    get:
+      tags: [db]
+      operationId: getDbApiInfo
+      summary: API REST automática y credenciales enmascaradas (member+)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DbApiInfo" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+
+  /projects/{id}/db/credentials:
+    parameters:
+      - { $ref: "#/components/parameters/ProjectRefPath" }
+    get:
+      tags: [db]
+      operationId: getDbCredentials
+      summary: Cadena de conexión COMPLETA del Postgres del proyecto (admin/owner)
+      description: >
+        Devuelve el DSN con contraseña, para conectarse con `psql`, un cliente
+        gráfico o hacer un `pg_dump` propio. Son datos del cliente, no de la
+        plataforma, así que puede verlos; lo que se controla es quién y con qué
+        rastro: admin/owner, SOLO humanos (un token de API no se lleva la
+        contraseña de la base) y cada lectura queda en la auditoría como
+        `db.credentials.reveal`. Respuesta `Cache-Control: no-store`.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [connection_string]
+                properties:
+                  connection_string:
+                    type: string
+                    example: postgres://app:…@pg-abc123.tenant-acme:5432/app?sslmode=require
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+
+  /projects/{id}/db/query:
+    parameters:
+      - { $ref: "#/components/parameters/ProjectRefPath" }
+    post:
+      tags: [db]
+      operationId: runDbQuery
+      summary: Ejecutar SQL contra el Postgres del proyecto (admin/owner)
+      description: >
+        Ejecuta UNA sentencia sobre la base de datos del propio cliente (se permiten
+        escrituras y DDL: es su BD). Límites de plataforma: statement_timeout de 8 s,
+        500 filas y ~1 MiB por respuesta, y conexión efímera que se cierra siempre.
+        Los errores de SQL vuelven con 200 y el campo `error`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sql]
+              properties:
+                sql: { type: string, maxLength: 65536, example: "select id, email from clientes limit 20" }
+      responses:
+        "200":
+          description: OK (incluye errores de SQL en el campo `error`)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SqlResult" }
+        "400": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+
+  /audit:
+    get:
+      tags: [usage]
+      operationId: listAudit
+      summary: Consultar y exportar la auditoría de la organización (admin/owner)
+      description: >
+        Página de la traza de auditoría de la organización, más recientes primero, con
+        paginación keyset (`cursor`/`next_cursor`, nunca OFFSET) y filtros por actor
+        (subcadena), acción (prefijo) y rango de fechas. Con `?format=csv` descarga el
+        MISMO conjunto filtrado como CSV (columnas ts, actor, action, target, detail),
+        apto para ingesta SIEM; el export ignora el cursor (es del filtro entero) y
+        está acotado a 100 000 filas.
+      parameters:
+        - { name: actor, in: query, description: Subcadena del actor (case-insensitive)., schema: { type: string, maxLength: 200 } }
+        - { name: action, in: query, description: "Prefijo de la acción (p. ej. `billing.`).", schema: { type: string, maxLength: 200 } }
+        - { name: since, in: query, description: "occurred_at >= since (RFC3339 o AAAA-MM-DD).", schema: { type: string } }
+        - { name: until, in: query, description: "occurred_at < until; una fecha suelta incluye el día entero.", schema: { type: string } }
+        - { name: format, in: query, description: "`csv` descarga el conjunto filtrado en vez del JSON paginado.", schema: { type: string, enum: [csv] } }
+        - { $ref: "#/components/parameters/Limit" }
+        - { $ref: "#/components/parameters/Cursor" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  events:
+                    type: array
+                    items: { $ref: "#/components/schemas/AuditEvent" }
+                  next_cursor:
+                    type: string
+                    description: Presente solo si hay más páginas.
+            text/csv:
+              schema: { type: string }
+        "400": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+
+  /usage:
+    get:
+      operationId: getUsage
+      tags: [usage]
+      summary: Uso agregado de la organización en un periodo
+      parameters:
+        - { name: from, in: query, schema: { type: string, format: date-time } }
+        - { name: to, in: query, schema: { type: string, format: date-time } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  from: { type: string, format: date-time, description: "Inicio efectivo del periodo (eco de ?from; si vacío, último mes)." }
+                  to: { type: string, format: date-time, description: "Fin efectivo del periodo." }
+                  usage:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        metric: { type: string, example: build_minutes }
+                        total: { type: number, example: 1234.5 }
+                        unit: { type: string, example: min }
+
+  /usage/detail:
+    get:
+      operationId: getUsageDetail
+      tags: [usage]
+      summary: Detalle de registros de uso
+      parameters:
+        - { name: from, in: query, schema: { type: string, format: date-time } }
+        - { name: to, in: query, schema: { type: string, format: date-time } }
+        - { $ref: "#/components/parameters/Limit" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  records:
+                    type: array
+                    items: { $ref: "#/components/schemas/UsageRecord" }
+
+  /billing/account:
+    get:
+      operationId: getBillingAccount
+      tags: [billing]
+      summary: Cuenta de cobro del tenant (plan, tope de gasto, gasto month-to-date)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  account: { $ref: "#/components/schemas/BillingAccount" }
+                  current_spend_eur:
+                    type: number
+                    description: Gasto estimado del mes en curso (overage + base del plan).
+
+  /billing/pricing:
+    get:
+      operationId: getBillingPricing
+      tags: [billing]
+      summary: Tabla de precios autoritativa (EUR sin IVA) + planes
+      description: >
+        Precio unitario por métrica facturable (build_minutes, compute_gb_hours,
+        storage_gb) y definición de planes (base + cuotas incluidas). Es la fuente
+        de verdad del cobro; el front la consume para el estimador de coste.
+        Derivación en docs/business.md §13.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  currency: { type: string, example: EUR }
+                  metrics:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        metric: { type: string }
+                        unit: { type: string }
+                        price_per_unit_eur: { type: number }
+                  plans:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        plan: { type: string, enum: [free, pro, team] }
+                        base_eur: { type: number }
+                        included:
+                          type: object
+                          additionalProperties: { type: number }
+
+  /billing/spend-limit:
+    put:
+      operationId: putBillingSpendLimit
+      tags: [billing]
+      summary: Fijar/quitar el tope de gasto mensual EUR del tenant. Admin/owner.
+      description: >
+        spend_limit_eur nil/ausente quita el tope; un número (>= 0) lo fija. Con
+        tope, un despliegue que superaría el gasto del mes se rechaza (402) en el
+        choke point de deploy antes de encolar el build.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                spend_limit_eur:
+                  type: [number, "null"]
+                  description: EUR/mes; null quita el tope.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BillingAccount" }
+        "400": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+
+  /billing/invoices:
+    get:
+      operationId: getBillingInvoices
+      tags: [billing]
+      summary: Listar facturas del tenant (periodo DESC, keyset por ?cursor)
+      parameters:
+        - { name: cursor, in: query, schema: { type: string }, description: token opaco de continuación }
+        - { $ref: "#/components/parameters/Limit" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  invoices:
+                    type: array
+                    items: { $ref: "#/components/schemas/Invoice" }
+                  next_cursor: { type: string }
+
+  /billing/invoices:generate:
+    post:
+      operationId: postBillingInvoicesGenerate
+      tags: [billing]
+      summary: Generar la factura de un periodo (idempotente). Admin/owner.
+      description: >
+        Calcula la factura del periodo [from, to) (uso agregado + plan: cuota
+        incluida, overage al precio de PricingTable, base) y la persiste de forma
+        idempotente (UNIQUE por periodo → re-ejecutar devuelve la existente, no
+        duplica). Lo dispara un CronJob mensual de K8s (no hay scheduler propio).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [from, to]
+              properties:
+                from: { type: string, format: date-time }
+                to: { type: string, format: date-time }
+      responses:
+        "201":
+          description: Creada (o devuelta la existente del periodo)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Invoice" }
+        "400": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+
+  /billing/invoices/{id}:
+    parameters:
+      - { $ref: "#/components/parameters/IdPath" }
+    get:
+      operationId: getBillingInvoicesById
+      tags: [billing]
+      summary: Factura del tenant por id
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Invoice" }
+        "404": { $ref: "#/components/responses/Error" }
+
+  /tokens:
+    get:
+      operationId: getTokens
+      tags: [tokens]
+      summary: Listar tokens de API (metadatos; nunca el secreto). Admin/owner.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tokens:
+                    type: array
+                    items: { $ref: "#/components/schemas/APIToken" }
+        "403": { $ref: "#/components/responses/Error" }
+    post:
+      operationId: postTokens
+      tags: [tokens]
+      summary: Emitir un token de API. Admin/owner.
+      description: >
+        Devuelve el secreto en claro (campo `token`) UNA sola vez; después solo se
+        persiste su hash. El scope fija el alcance (read<write<deploy). project_id
+        opcional CONFINA el token a un proyecto (deploy-key): si se fija, el token
+        solo puede operar bajo /projects/{project_id}/* — no puede tocar otros
+        proyectos ni recursos tenant-wide (/org, /billing, /tokens, /deployments/{id}
+        desnudo, …); el poll de estado se hace vía GET /projects/{project_id}/deployments.
+        Si se omite (o null), el token es de alcance organización (comportamiento por
+        defecto). El proyecto debe existir en la organización.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+                scope: { type: string, enum: [read, write, deploy], default: read }
+                expires_at: { type: string, format: date-time, description: opcional }
+                project_id: { type: string, format: uuid, description: "opcional: confina el token a un proyecto" }
+      responses:
+        "201":
+          description: Creado (incluye el secreto una vez)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/APIToken" }
+        "400": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+
+  /tokens/{id}:
+    parameters:
+      - { $ref: "#/components/parameters/IdPath" }
+    delete:
+      operationId: deleteTokensById
+      tags: [tokens]
+      summary: Revocar un token de API. Admin/owner.
+      responses:
+        "204": { description: Revocado }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+
+  /members:
+    get:
+      operationId: getMembers
+      tags: [members]
+      summary: Listar colaboradores de la organización. Admin/owner.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  members:
+                    type: array
+                    items: { $ref: "#/components/schemas/Membership" }
+        "403": { $ref: "#/components/responses/Error" }
+    post:
+      operationId: postMembers
+      tags: [members]
+      summary: Invitar/actualizar un colaborador por sub. Admin/owner.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sub]
+              properties:
+                sub: { type: string, description: identificador de Sytue ID }
+                email: { type: string, description: informativo (no se persiste) }
+                role: { type: string, enum: [owner, admin, member, billing], default: member }
+      responses:
+        "201":
+          description: Creado/actualizado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Membership" }
+        "400": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+
+  /members/{sub}:
+    parameters:
+      - { name: sub, in: path, required: true, schema: { type: string } }
+    delete:
+      operationId: deleteMembersBySub
+      tags: [members]
+      summary: Eliminar un colaborador. Admin/owner.
+      responses:
+        "204": { description: Eliminado }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+
+  /invitations:
+    get:
+      operationId: getMemberInvitations
+      tags: [members]
+      summary: Listar invitaciones pendientes. Admin/owner.
+      description: Las invitaciones pendientes no son miembros ni cuentan como puestos facturables.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  invitations:
+                    type: array
+                    items: { $ref: "#/components/schemas/MemberInvitation" }
+        "403": { $ref: "#/components/responses/Error" }
+    post:
+      operationId: postMemberInvitation
+      tags: [members]
+      summary: Invitar o reenviar por correo. Admin/owner.
+      description: >
+        Sytue ID emite el token de un solo uso y materializa la pertenencia a la
+        organización. Si el correo ya es miembro de ID, Cloud crea directamente
+        su membresía. Solo una membresía materializada cuenta como puesto.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, role]
+              properties:
+                email: { type: string, format: email }
+                role: { type: string, enum: [owner, admin, member, billing] }
+      responses:
+        "201":
+          description: Invitación emitida o membresía materializada.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  invitation: { $ref: "#/components/schemas/MemberInvitation" }
+                  member: { $ref: "#/components/schemas/Membership" }
+        "400": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "503": { $ref: "#/components/responses/Error" }
+
+  /invitations/{id}:
+    parameters:
+      - { $ref: "#/components/parameters/IdPath" }
+    delete:
+      operationId: deleteMemberInvitation
+      tags: [members]
+      summary: Revocar una invitación pendiente en Cloud y Sytue ID. Admin/owner.
+      responses:
+        "204": { description: Revocada }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "503": { $ref: "#/components/responses/Error" }
+
+  /hooks/deploy/{token}:
+    parameters:
+      - name: token
+        in: path
+        required: true
+        schema: { type: string }
+        description: >
+          Token de API con scope `deploy` CONFINADO a un proyecto (el que emite
+          `POST /tokens` con `project_id`). La URL entera es la credencial.
+    post:
+      tags: [deployments]
+      operationId: deployHook
+      summary: Disparar un despliegue desde una URL secreta (sin cabeceras)
+      description: >
+        El «Deploy Hook» de Vercel / «webhook de redespliegue» de Coolify: para lo
+        que no puede mandar una cabecera de autorización — un CMS al pulsar
+        publicar, un cron de un tercero—. Publica la rama de producción del
+        proyecto al que está confinado el token. NO es una puerta trasera: pasa
+        por las mismas verjas que un despliegue normal (tope de gasto, requisito
+        de suscripción, cuota). Fuera de `/api/v1` y sin sesión, como el webhook
+        de git; comparte su limitador de peticiones.
+        **Cualquier fallo responde 404**, también un token válido sin scope
+        `deploy` o sin proyecto: distinguirlos solo ayudaría a quien prueba URLs.
+      responses:
+        "202":
+          description: Despliegue encolado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deployment_id: { type: string, format: uuid }
+                  status: { type: string, example: queued }
+        "402":
+          description: Tope de gasto alcanzado (igual que un despliegue normal).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Token inexistente, caducado, revocado, sin scope deploy o sin proyecto.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /webhooks/git:
+    post:
+      operationId: postWebhooksGit
+      tags: [webhooks]
+      summary: Webhook de push/PR (firma HMAC POR PROYECTO; sin auth de Sytue ID)
+      security: []
+      description: >
+        Recibe eventos de GitHub (X-GitHub-Event + X-Hub-Signature-256) o GitLab
+        (X-Gitlab-Event + X-Gitlab-Token). Push a la rama de producción despliega
+        producción; PR abierto/actualizado crea/actualiza una preview; cierre del
+        PR retira la preview. Idempotente por delivery id. La firma HMAC se verifica
+        con el secreto DEL PROYECTO destino (no uno global), cerrando la
+        falsificación cross-tenant. Endpoint público con rate-limit dedicado (429).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        "202": { description: Despliegue disparado o repo no asociado }
+        "200": { description: Evento ignorado (no push/PR) }
+        "401": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/Error" }
+
+  /projects/{id}/uptime-checks:
+    parameters:
+      - { $ref: "#/components/parameters/IdPath" }
+    get:
+      operationId: getProjectsByIdUptimeChecks
+      tags: [uptime]
+      summary: Listar sondas de uptime del proyecto
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  uptime_checks:
+                    type: array
+                    items: { $ref: "#/components/schemas/UptimeCheck" }
+    post:
+      operationId: postProjectsByIdUptimeChecks
+      tags: [uptime]
+      summary: Crear sonda de uptime (HTTP GET periódico)
+      description: >
+        target_url DEBE ser https pública (anti-SSRF: rechaza
+        loopback/RFC1918/link-local/metadata/nombres del clúster). Si se omite,
+        se usa la URL del deployment de producción activo del proyecto.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, example: "home" }
+                target_url: { type: string, example: "https://app.apps.sytue.eu" }
+                interval_seconds: { type: integer, minimum: 30, maximum: 86400, default: 60 }
+                enabled: { type: boolean, default: true }
+      responses:
+        "201":
+          description: Creada
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UptimeCheck" }
+        "400": { $ref: "#/components/responses/Error" }
+
+  /uptime-checks/{id}:
+    parameters:
+      - { $ref: "#/components/parameters/IdPath" }
+    get:
+      operationId: getUptimeChecksById
+      tags: [uptime]
+      summary: Obtener sonda de uptime
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UptimeCheck" }
+        "404": { $ref: "#/components/responses/Error" }
+    patch:
+      operationId: patchUptimeChecksById
+      tags: [uptime]
+      summary: Actualizar sonda (parcial)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                target_url: { type: string }
+                interval_seconds: { type: integer, minimum: 30, maximum: 86400 }
+                enabled: { type: boolean }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UptimeCheck" }
+        "400": { $ref: "#/components/responses/Error" }
+    delete:
+      operationId: deleteUptimeChecksById
+      tags: [uptime]
+      summary: Eliminar sonda
+      responses:
+        "204": { description: Eliminada }
+
+  /alerts:
+    get:
+      operationId: getAlerts
+      tags: [alerts]
+      summary: Listar políticas de alerta (admin/owner)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  alert_policies:
+                    type: array
+                    items: { $ref: "#/components/schemas/AlertPolicy" }
+    post:
+      operationId: postAlerts
+      tags: [alerts]
+      summary: Crear política de alerta (admin/owner)
+      description: >
+        Enruta un evento a un canal (webhook saliente genérico, POST JSON con
+        anti-SSRF). project_id opcional: si se omite, la política aplica a toda
+        la organización.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [event, channel_url]
+              properties:
+                project_id: { type: string, format: uuid }
+                event: { type: string, enum: [deploy.failed, deploy.ready, uptime.down, uptime.up, billing.spend_threshold, sizing.advice, metric.cpu_high, metric.memory_high] }
+                channel_url:
+                  type: string
+                  description: >
+                    Webhook http(s) —con las garantías anti-SSRF de siempre— o un
+                    `mailto:` con una dirección, que entrega la alerta por correo.
+                  example: "https://hooks.slack.com/services/…"
+                  examples: ["https://hooks.slack.com/services/…", "mailto:ops@empresa.com"]
+                enabled: { type: boolean, default: true }
+      responses:
+        "201":
+          description: Creada
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AlertPolicy" }
+        "400": { $ref: "#/components/responses/Error" }
+
+  /alerts/{id}:
+    parameters:
+      - { $ref: "#/components/parameters/IdPath" }
+    patch:
+      operationId: patchAlertsById
+      tags: [alerts]
+      summary: Actualizar política (parcial, admin/owner)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                event: { type: string, enum: [deploy.failed, deploy.ready, uptime.down, uptime.up, billing.spend_threshold, sizing.advice, metric.cpu_high, metric.memory_high] }
+                channel_url: { type: string }
+                enabled: { type: boolean }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AlertPolicy" }
+        "400": { $ref: "#/components/responses/Error" }
+    delete:
+      operationId: deleteAlertsById
+      tags: [alerts]
+      summary: Eliminar política (admin/owner)
+      responses:
+        "204": { description: Eliminada }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: >
+        Authorization: Bearer <token>. Acepta DOS credenciales: (1) el JWT de
+        sesión emitido por Sytue ID (audience sytue-cloud-api), para humanos —
+        autorizados por rol efectivo de membership (owner|admin|member|billing);
+        o (2) un token de API programático con prefijo `scl_` (CI/CLI),
+        autorizado por su scope en la escalera read<write<deploy. Un token de solo
+        lectura no puede usar métodos no seguros; disparar despliegues exige scope
+        deploy; la gestión de miembros y tokens es exclusiva de usuarios admin/owner.
+
+  parameters:
+    IdPath:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    # Referencia de proyecto que admite UUID o slug (rutas de DB Studio: el
+    # dashboard navega por slug y llama al control-plane con él).
+    ProjectRefPath:
+      name: id
+      in: path
+      required: true
+      description: UUID del proyecto o su slug.
+      schema: { type: string }
+      example: mi-app
+    Limit:
+      name: limit
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 200 }
+    Cursor:
+      name: cursor
+      in: query
+      description: Token opaco de paginación keyset devuelto como next_cursor.
+      schema: { type: string }
+    # Idioma del texto que GENERA la API (§13.1). Si se omite se negocia con la
+    # cabecera Accept-Language y, en último término, se usa el base (en).
+    SlugLang:
+      name: lang
+      in: query
+      description: >
+        Idioma de producto en el que generar el nombre. Si falta, se negocia con
+        Accept-Language (la `q` ausente vale 1; una etiqueta cuyo idioma no
+        hablamos pasa el turno a la siguiente) y, si tampoco sale nada, se usa el
+        base `en`.
+      schema: { $ref: "#/components/schemas/ProductLanguage" }
+      example: es
+
+  responses:
+    Organization:
+      description: OK
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Organization" }
+    Project:
+      description: OK
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Project" }
+    Deployment:
+      description: OK
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Deployment" }
+    Error:
+      description: Error
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+
+  schemas:
+    # Idiomas de producto (docs/CONVENTIONS.md §13.1). El primero es el BASE.
+    ProductLanguage:
+      type: string
+      enum: [en, es, fr, de, it]
+      default: en
+    Organization:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        slug: { type: string }
+        name: { type: string }
+        plan: { type: string, enum: [free, pro, team] }
+        region: { type: string }
+        notify_webhook_url:
+          type: string
+          description: URL de aviso de deploy por defecto de la organización (vacía si no se configuró).
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    AuditEvent:
+      type: object
+      description: Evento de la traza de auditoría de la organización.
+      properties:
+        id: { type: string, format: uuid }
+        actor_sub: { type: string, description: "Subject de quien lo provocó; vacío si lo hizo el sistema." }
+        action: { type: string, example: token.create }
+        resource: { type: string, description: "Objeto afectado (slug, id o nombre)." }
+        detail: { type: object, additionalProperties: true, description: Metadatos del evento. }
+        occurred_at: { type: string, format: date-time }
+
+    LogLine:
+      type: object
+      description: Línea de log de runtime de una app, ya persistida y buscable.
+      properties:
+        id: { type: string, format: uuid, description: Desempata el cursor keyset cuando varias líneas comparten ts. }
+        deployment_id: { type: string, format: uuid, description: Qué despliegue la escribió (producción o preview). }
+        ts: { type: string, format: date-time, description: "Instante que puso el runtime, no el de la ingesta." }
+        text: { type: string, description: "La línea tal cual (saneada de bytes no almacenables; truncada a 8 KiB)." }
+
+    ProjectMetrics:
+      type: object
+      description: >
+        Consumo observado del proyecto y el techo contra el que se compara. Sin el
+        techo la serie no se puede interpretar: 300 MiB es holgado en `standard` y
+        un OOMKill a punto en `basic`.
+      properties:
+        points:
+          type: array
+          items:
+            type: object
+            properties:
+              at: { type: string, format: date-time }
+              cpu_milli: { type: integer, description: Milicores consumidos en el cubo. }
+              memory_bytes: { type: integer, format: int64 }
+        memory_limit_bytes: { type: integer, format: int64 }
+        cpu_milli_limit: { type: integer }
+        instance_size: { type: string }
+        bucket_seconds:
+          type: integer
+          description: >
+            Separación entre puntos. La gráfica lo necesita para distinguir «no se
+            midió» de «no había nada corriendo».
+        window_hours: { type: integer }
+
+    HTTPRules:
+      type: object
+      description: >
+        Redirecciones y cabeceras que Traefik aplica ANTES de que la petición
+        llegue a la app — lo que en Vercel se escribe en `vercel.json`. Funciona
+        también en un sitio estático, donde no hay código que las resuelva.
+
+
+        El cliente NO escribe expresiones regulares: escribe rutas y la plataforma
+        las traduce escapando todo lo suyo. Una regex ajena en el borde es un
+        problema de rendimiento y de seguridad que no compensa.
+      properties:
+        redirects:
+          type: array
+          maxItems: 20
+          items:
+            type: object
+            required: [from, to]
+            properties:
+              from:
+                type: string
+                description: >
+                  Ruta de origen; empieza por «/» y admite un «*» FINAL para decir
+                  «y todo lo que cuelgue». El comodín en medio se rechaza.
+                example: /blog/*
+              to:
+                type: string
+                description: Ruta del mismo sitio o URL https completa.
+                example: /noticias
+              status:
+                type: integer
+                enum: [301, 302, 307, 308]
+                description: Ausente = 308, que preserva el método del navegador.
+        headers:
+          type: object
+          maxProperties: 20
+          additionalProperties: { type: string }
+          description: >
+            Cabeceras de respuesta. Se rechazan las que gobierna el servidor
+            (Host, Content-Length, Transfer-Encoding…) y cualquier valor con
+            saltos de línea, que permitiría escribir cabeceras de más.
+          example: { X-Frame-Options: DENY }
+
+    StarterTemplate:
+      type: object
+      description: >
+        Manifiesto declarativo de una plantilla del catálogo. NO es una imagen de
+        disco ni un repo clonable: describe con qué ajustes arranca un proyecto y
+        el servidor los aplica de una vez (POST /projects:from-template).
+
+        El esquema es una lista BLANCA cerrada: una plantilla no puede expresar
+        configuración de pod (securityContext, hostNetwork, capabilities,
+        volumes, nodeSelector, command). El PodSpec lo escribe el controlador, de
+        modo que "seguro por defecto" es el suelo estructural y ninguna plantilla
+        puede bajarlo. docs_url apunta a documentación oficial, nunca a un repo
+        que afirmemos desplegable.
+      properties:
+        id: { type: string, description: Slug estable de la plantilla. }
+        name: { type: string }
+        description: { type: string }
+        version: { type: string, description: Revisión del manifiesto (semver). }
+        license:
+          type: string
+          description: >
+            Licencia del stack que la plantilla configura. Obligatoria y contra
+            una allowlist permisiva, de modo que "nada de AGPL ni
+            source-available" es un gate mecánico y no una revisión humana.
+          enum: [MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, MPL-2.0]
+        maintainer: { type: string }
+        framework: { type: string, enum: [astro, static, node, go, docker, auto] }
+        build:
+          type: object
+          properties:
+            strategy: { type: string, enum: ["", dockerfile, buildpacks] }
+            install: { type: string }
+            build: { type: string }
+            output_dir: { type: string }
+        app_port: { type: integer, description: "0 = el default del producto." }
+        health_path: { type: string }
+        services:
+          type: array
+          items: { type: string, enum: [postgres, storage, auth] }
+          description: >
+            Servicios gestionados que la plantilla APROVISIONA de verdad (antes
+            esto era una sugerencia decorativa que no viajaba a ninguna parte).
+        env:
+          type: array
+          items: { $ref: "#/components/schemas/TemplateEnv" }
+        instance_size: { type: string }
+        tags:
+          type: array
+          items: { type: string }
+        docs_url:
+          type: string
+          description: URL https a la documentación oficial del framework (opcional).
+        starter_repo:
+          type: string
+          description: >
+            Repositorio PLANTILLA de Sytue Git («owner/repo») del que se copia el
+            esqueleto en el alta con repositorio nuevo. Ausente = esta plantilla solo
+            configura ajustes y el usuario trae su propio repositorio. Es una
+            referencia y no un árbol de ficheros embebido: un esqueleto envejece con
+            su ecosistema, y dentro del binario haría falta una release de la suite
+            para actualizar una dependencia de un fichero de ejemplo.
+
+    TemplateEnv:
+      type: object
+      description: >
+        Variable de entorno declarada por la plantilla y, sobre todo, DE DÓNDE
+        sale su valor. El usuario nunca inventa una contraseña.
+      properties:
+        key: { type: string, description: "Clave POSIX (MAYUS_CON_GUION_BAJO)." }
+        origin:
+          type: string
+          enum: [value, ask, generate, from_service]
+          description: >
+            value = literal del manifiesto (NUNCA puede ser secreto: vive en el
+            repositorio en claro). ask = lo pide el asistente. generate = secreto
+            aleatorio que genera la plataforma y se guarda cifrado; secret se
+            fuerza a true al parsear. from_service = lo inyecta el controlador
+            desde las credenciales del servicio gestionado; no se persiste.
+        value: { type: string, description: "Solo con origin=value." }
+        prompt: { type: string, description: "Solo con origin=ask; lo lee el usuario." }
+        secret: { type: boolean }
+        service: { type: string, enum: [postgres, storage, auth] }
+
+    SizingAdvice:
+      type: object
+      description: >
+        Qué hacer con el tamaño de instancia de un proyecto según su consumo
+        REAL, y cuánto cambia eso la factura. reason=insufficient_data con
+        action=keep es la respuesta CORRECTA de un proyecto recién creado, no un
+        error: sin muestras bastantes no se recomienda nada.
+      properties:
+        action: { type: string, enum: [keep, down, up] }
+        reason:
+          type: string
+          enum:
+            [
+              insufficient_data,
+              well_sized,
+              over_provisioned,
+              peak_blocks_downgrade,
+              near_limit,
+              at_largest,
+              at_smallest,
+              cohort_over_provisioned,
+            ]
+          description: >
+            peak_blocks_downgrade merece explicación: en régimen sobraría tamaño,
+            pero el PICO observado no cabría en el menor, así que ahorrar ahí
+            acabaría en OOMKill. Se dice en vez de callarlo.
+
+
+            cohort_over_provisioned es la única razón que NO se decide con datos
+            del propio proyecto: aún no los hay, y lo que sobra es el tamaño de
+            las apps COMPARABLES (ver benchmark). La interfaz tiene que decirlo
+            con esas palabras y no dar a entender que se midió esta app.
+        from: { type: string, description: Tamaño actual (nombre del catálogo). }
+        to: { type: string, description: "Tamaño propuesto; igual que from si action=keep." }
+        monthly_delta_eur:
+          type: number
+          description: Cambio en la factura mensual. NEGATIVO cuando se ahorra.
+        p95_memory_percent:
+          type: integer
+          description: Percentil 95 de memoria como porcentaje del límite actual.
+        peak_memory_percent: { type: integer }
+        p95_cpu_milli: { type: integer }
+        samples: { type: integer, description: Sobre cuántas muestras se decidió. }
+        window_hours: { type: integer, description: Horas de observación cubiertas. }
+        benchmark:
+          $ref: "#/components/schemas/CohortStat"
+
+    CatalogApp:
+      type: object
+      description: >
+        Entrada del catálogo de apps open-source. Todo lo que decide QUÉ se
+        arranca viene de aquí; el cliente solo manda el `id`. Una app puede
+        declarar además con qué OTRAS del catálogo se integra, y el control-plane
+        las conecta sin que nadie copie una URL de un panel a otro.
+      properties:
+        id: { type: string }
+        name: { type: string }
+        description: { type: string }
+        category: { type: string, enum: [cache, search, queue, cms, tools] }
+        license:
+          type: string
+          description: >
+            Identificador SPDX. Permisivas y copyleft fuerte (AGPL/GPL/LGPL), que
+            entran porque la imagen corre SIN MODIFICAR en el namespace del cliente
+            —el digest idéntico al del origen lo demuestra— y no hay obra derivada
+            (ADR 0032). Fuera quedan las «source available» (SSPL, BUSL, Elastic
+            v2, Sustainable Use), que prohíben exactamente esto: ofrecerlas como
+            servicio gestionado.
+        homepage: { type: string, format: uri }
+        source:
+          type: string
+          format: uri
+          description: >
+            Repositorio del código fuente. Presente siempre con licencia copyleft:
+            es cómo se cumple el AGPL §13 con quien usa el servicio, así que el
+            panel lo enseña junto a la licencia.
+        upstream:
+          type: string
+          description: >
+            De dónde se replicó, con su etiqueta. Se publica porque hace el espejo
+            AUDITABLE: cualquiera puede comprobar qué se copió.
+        upstream_digest:
+          type: string
+          description: >
+            Digest exacto del origen. Una copia fiel del manifiesto lo conserva, así
+            que tiene que coincidir con el de `image`: si difieren, no se copió lo
+            mismo.
+        mirrored_digest:
+          type: string
+          description: >
+            Digest de NUESTRA copia. Ausente mientras no se haya replicado. El
+            registro no viaja aquí: la referencia se compone con el REGISTRY_URL
+            del despliegue, porque el namespace del PaaS se llama distinto en dev
+            y en producción.
+        version: { type: string, description: "Versión legible de ese digest; el digest manda." }
+        ports:
+          type: array
+          items:
+            type: object
+            properties:
+              name: { type: string }
+              port: { type: integer }
+        exports:
+          type: array
+          description: >
+            Variables que este servicio inyecta en la app del cliente al
+            conectarse. Su valor admite DOS sustituciones, {host} y {port}, y
+            ninguna más.
+          items:
+            type: object
+            properties:
+              key: { type: string }
+              value: { type: string }
+        integrations:
+          type: array
+          description: >
+            Otras apps del catálogo con las que esta se conecta SOLA cuando
+            conviven en el mismo proyecto, en el orden en que se hayan creado. El
+            control-plane mira qué hay levantado y le inyecta estas variables; si
+            la otra no está, no aporta nada.
+          items:
+            type: object
+            properties:
+              app: { type: string, description: Id de la otra entrada del catálogo. }
+              docs:
+                type: string
+                format: uri
+                description: >
+                  Documentación OFICIAL del fabricante que describe la integración.
+                  Es obligatoria: sin ella, la plataforma estaría inventando la
+                  configuración de un proyecto ajeno.
+              env:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    key: { type: string }
+                    value: { type: string, description: "Plantilla con {host} y {port} de la OTRA app." }
+        disk_gib: { type: integer }
+        data_path: { type: string, description: Dónde se monta el disco. }
+        writable_paths:
+          type: array
+          description: >
+            Directorios que la imagen escribe fuera de su disco de datos y que la raíz
+            de solo lectura le impide. Se montan efímeros (emptyDir).
+          items: { type: string }
+        memory_mib: { type: integer }
+        cpu_milli: { type: integer }
+        run_as_user: { type: integer, description: "UID no-root; el namespace exige PodSecurity restricted." }
+        health_path: { type: string }
+        web_port:
+          type: integer
+          description: >
+            Puerto por el que la app se publica en internet, con hostname propio y
+            TLS. Ausente o 0 = no se publica y solo se alcanza desde dentro del
+            proyecto. Lo decide el CATÁLOGO, nunca el cliente: publicar el panel de
+            administración de una cola con la contraseña recién generada es una
+            brecha a un clic de distancia.
+
+    CohortStat:
+      type: object
+      description: >
+        Agregado ANÓNIMO de las apps comparables (mismo framework, mismos
+        servicios y mismo tamaño). Solo aparece mientras el proyecto no tiene
+        histórico propio: en cuanto lo tiene, sus datos mandan.
+
+
+        Nunca se publica una cohorte con menos de 5 EMPRESAS distintas —contadas
+        por empresa, no por proyecto—, y solo lleva porcentajes sobre el límite,
+        nunca cifras absolutas ni identificadores. El umbral se aplica al
+        calcular y lo vuelve a exigir un CHECK en la base de datos.
+      properties:
+        p50_memory_percent:
+          type: integer
+          description: Mediana del uso de memoria de la cohorte, en % del límite.
+        p90_memory_percent:
+          type: integer
+          description: >
+            Percentil 90 de la cohorte. Es el que decide: propone bajar solo si
+            nueve de cada diez apps comparables cabrían holgadas en el tamaño
+            menor.
+        tenants:
+          type: integer
+          minimum: 5
+          description: Empresas distintas que forman la cohorte. Sin esto la cifra no es contrastable.
+        projects: { type: integer, description: Proyectos observados en la cohorte. }
+
+    BillingAccount:
+      type: object
+      properties:
+        tenant: { type: string }
+        plan: { type: string, enum: [free, pro, team] }
+        spend_limit_eur:
+          type: [number, "null"]
+          description: Tope de gasto mensual EUR; null = sin tope.
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    InvoiceLine:
+      type: object
+      properties:
+        metric: { type: string }
+        quantity: { type: number, description: Cantidad facturable (exceso sobre la cuota incluida). }
+        unit_price_eur: { type: number }
+        subtotal_eur: { type: number }
+
+    Invoice:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        tenant: { type: string }
+        period_from: { type: string, format: date-time }
+        period_to: { type: string, format: date-time }
+        status: { type: string, enum: [draft, issued, paid, void] }
+        subtotal_eur: { type: number, description: Suma del overage de las líneas. }
+        total_eur: { type: number, description: subtotal + base del plan. }
+        lines:
+          type: array
+          items: { $ref: "#/components/schemas/InvoiceLine" }
+        created_at: { type: string, format: date-time }
+        issued_at: { type: [string, "null"], format: date-time }
+
+    CreateProject:
+      type: object
+      required: [slug]
+      description: >
+        `slug` es el ÚNICO campo obligatorio (DNS-compatible, ≤40 chars); si `name`
+        va vacío se copia del slug. Vacíos por defecto: git_provider=git,
+        production_ref=main, framework=auto, build_strategy='' (auto).
+      example:
+        slug: mi-app
+        repo_url: https://github.com/acme/mi-app
+        git_provider: github
+        production_ref: main
+        framework: astro
+      properties:
+        slug: { type: string, description: "Identificador DNS-compatible del proyecto (subdominios de apps/previews). Inmutable." }
+        name: { type: string }
+        repo_url: { type: string }
+        git_provider: { type: string, enum: [git, github, gitlab] }
+        production_ref: { type: string }
+        framework: { type: string, enum: [auto, astro, static, node, go, docker] }
+        build_strategy:
+          type: string
+          enum: ['', dockerfile, buildpacks]
+          description: >
+            Cómo construir la imagen: 'dockerfile' (BuildKit + Dockerfile propio o
+            generado) o 'buildpacks' (Cloud Native Buildpacks / Paketo, sin
+            Dockerfile). Vacío = auto: Dockerfile propio ⇒ dockerfile; resto ⇒ buildpacks.
+        root_dir: { type: string }
+        build_command: { type: string }
+        output_dir: { type: string }
+        install_command: { type: string }
+        instance_size: { type: string, description: 'Tamaño del catálogo; "" = basic.' }
+        instance_count: { type: integer, description: "Instancias deseadas (mínimo del autoescalado); 0 = 1." }
+        autoscale_max_count: { type: integer, description: "Techo del autoescalado; 0 = automático (5× las instancias, mínimo 3)." }
+        autoscale_cpu_target: { type: integer, description: "Objetivo de CPU en % (10-100); 0 = 75." }
+        app_port: { type: integer, description: "Puerto de escucha; 0 = 8080." }
+        health_path: { type: string, description: 'Ruta de las sondas; "" = "/".' }
+
+    UpdateProject:
+      type: object
+      description: >
+        Actualización parcial: solo se aplican los campos presentes (todos
+        opcionales). El slug y el git_provider no son mutables tras crear.
+      properties:
+        name: { type: string }
+        repo_url: { type: string }
+        production_ref: { type: string }
+        framework: { type: string, enum: [auto, astro, static, node, go, docker] }
+        build_strategy: { type: string, enum: ['', dockerfile, buildpacks] }
+        root_dir: { type: string }
+        build_command: { type: string }
+        output_dir: { type: string }
+        install_command: { type: string }
+        release_command:
+          type: string
+          maxLength: 2000
+          description: >
+            Comando previo al arranque de la versión nueva (migraciones). Cadena
+            vacía = quitarlo. Cambiarlo NO relanza nada: se ejecuta en el siguiente
+            despliegue.
+        paused:
+          type: boolean
+          description: >
+            true apaga el proyecto (cero réplicas, cero factura de cómputo) sin
+            borrar nada; false lo reanuda. El cambio reaplica la producción, así
+            que surte efecto en el siguiente ciclo del reconciliador.
+        http_rules:
+          allOf:
+            - $ref: "#/components/schemas/HTTPRules"
+          description: >
+            Sustituye ENTERAS las redirecciones y cabeceras: son listas, y mezclar
+            por clave no significaría nada sobre un array. Mandar `{}` las quita.
+        instance_size:
+          type: string
+          description: Tamaño del catálogo (ver GET /instance-sizes).
+        instance_count:
+          type: integer
+          minimum: 1
+          maximum: 50
+          description: Instancias deseadas (mínimo del autoescalado).
+        autoscale_max_count:
+          type: integer
+          minimum: 0
+          maximum: 50
+          description: Techo del autoescalado; 0 = automático (5× las instancias, mínimo 3).
+        autoscale_cpu_target:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: >
+            Objetivo de CPU del autoescalado en tanto por ciento (10-100). 0 lo
+            devuelve al defecto del producto (75).
+        app_port:
+          type: integer
+          description: Puerto en el que escucha la app.
+        health_path:
+          type: string
+          description: Ruta HTTP de las sondas de readiness/liveness.
+        notify_webhook_url:
+          type: string
+          description: >
+            URL destino (http/https) del webhook de aviso de deploy de este
+            proyecto; sobreescribe la de la organización. Cadena vacía la desactiva.
+            Validada anti-SSRF.
+        deploy_key:
+          type: string
+          writeOnly: true
+          description: >
+            SENSIBLE (write-only). Clave SSH privada para clonar un repo git
+            privado sin GitHub App. Se persiste cifrada y nunca se devuelve en las
+            respuestas; cadena vacía la borra.
+
+    Project:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        slug: { type: string }
+        name: { type: string }
+        repo_url: { type: string }
+        git_provider: { type: string }
+        production_ref: { type: string }
+        framework: { type: string }
+        build_strategy: { type: string, enum: ['', dockerfile, buildpacks] }
+        root_dir: { type: string }
+        build_command: { type: string }
+        output_dir: { type: string }
+        install_command: { type: string }
+        instance_size:
+          type: string
+          description: >
+            Tamaño de instancia del catálogo (ver GET /instance-sizes). Ausente =
+            el tamaño por defecto. Determina los recursos del contenedor y la
+            memoria que se factura como compute_gb_hours.
+        instance_count:
+          type: integer
+          minimum: 1
+          maximum: 50
+          description: >
+            Instancias deseadas; es el MÍNIMO del autoescalado, no un techo.
+            Ausente = 1. El techo real lo pone la cuota del plan.
+        autoscale_max_count:
+          type: integer
+          minimum: 0
+          maximum: 50
+          description: >
+            TECHO del autoescalado. 0 o ausente = automático (5× las instancias,
+            mínimo 3), que es la regla que regía antes de poder configurarlo. Si
+            queda por debajo de instance_count se aplica instance_count: un HPA con
+            máximo menor que el mínimo lo rechaza Kubernetes.
+        autoscale_cpu_target:
+          type: integer
+          minimum: 10
+          maximum: 100
+          description: >
+            Porcentaje de utilización de CPU al que el autoescalado añade
+            instancias. Ausente = 75.
+        app_port:
+          type: integer
+          description: Puerto en el que escucha la app. Ausente = 8080.
+        health_path:
+          type: string
+          description: Ruta HTTP de las sondas de readiness/liveness. Ausente = "/".
+        paused:
+          type: boolean
+          description: >
+            Proyecto apagado sin borrar: cero réplicas en el clúster y cero
+            facturación de cómputo. Dominio, TLS, variables, base de datos e
+            historial se conservan.
+        http_rules: { $ref: "#/components/schemas/HTTPRules" }
+        preview_protected:
+          type: boolean
+          description: >
+            Si las previews del proyecto piden contraseña. El hash NUNCA sale de la
+            API; esto es lo único que se publica del asunto.
+        release_command:
+          type: string
+          maxLength: 2000
+          description: >
+            Comando que se ejecuta ANTES de arrancar la versión nueva, con su misma
+            imagen y su mismo entorno: el sitio de una migración de base de datos.
+            Corre como un Job de una sola ejecución y, si falla, la versión nueva NO
+            arranca (el despliegue queda en error). Vacío = no hay paso de release.
+          example: npm run migrate
+        owner_sub:
+          type: string
+          description: sub de Sytue ID del creador del proyecto.
+        notify_webhook_url:
+          type: string
+          description: URL de aviso de deploy del proyecto (sobreescribe la de la organización).
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        webhook_secret:
+          type: string
+          description: >
+            Secreto HMAC del webhook git. Solo presente al crear el proyecto (una
+            vez) y en GET a un admin/owner; nunca en listados ni para tokens/miembros.
+        webhook_url:
+          type: string
+          description: URL del endpoint de webhooks para pegar en el proveedor git.
+
+    HealthProbeReport:
+      type: object
+      properties:
+        url: { type: string, description: URL de producción contra la que se sondeó. }
+        results:
+          type: array
+          items:
+            type: object
+            properties:
+              path: { type: string }
+              status: { type: integer, description: "Código HTTP, o 0 si no hubo respuesta (red/TLS/timeout)." }
+              healthy: { type: boolean, description: "Respondió 2xx. Un 3xx no cuenta: arrancar no es estar sano." }
+              latency_ms: { type: integer }
+        recommended:
+          type: string
+          description: Ruta a proponer, o vacío si ninguna respondió 2xx.
+        weak:
+          type: boolean
+          description: >
+            La recomendada es la raíz: sirve, pero responde también con la app rota
+            por dentro, así que es mala señal de salud.
+        reachable:
+          type: boolean
+          description: >
+            Alguna ruta dio respuesta HTTP. Distingue "la app no tiene ruta de
+            salud" de "la app no está en pie", que no se arreglan igual.
+
+    InstanceSize:
+      type: object
+      properties:
+        name: { type: string, description: Identificador estable que se persiste y viaja por la API. }
+        label: { type: string, description: Nombre en lenguaje llano para la interfaz. }
+        cpu_request: { type: string, description: "Reserva garantizada de CPU (notación Kubernetes)." }
+        memory_request: { type: string, description: "Reserva garantizada de memoria." }
+        cpu_limit: { type: string, description: Techo de CPU. }
+        memory_limit: { type: string, description: Techo de memoria. }
+        memory_gib:
+          type: number
+          description: Memoria en GiB; es la magnitud que se factura como compute_gb_hours.
+
+    APIToken:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        scope: { type: string, enum: [read, write, deploy] }
+        project_id:
+          type: string
+          format: uuid
+          description: "Si está presente, el token está confinado a ese proyecto (deploy-key); ausente = alcance organización."
+        created_by: { type: string }
+        expires_at: { type: string, format: date-time }
+        last_used_at: { type: string, format: date-time }
+        created_at: { type: string, format: date-time }
+        token:
+          type: string
+          description: Secreto en claro; presente SOLO en la respuesta de creación (una vez).
+
+    Membership:
+      type: object
+      properties:
+        sub: { type: string }
+        role: { type: string, enum: [owner, admin, member, billing] }
+        created_at: { type: string, format: date-time }
+
+    MemberInvitation:
+      type: object
+      description: Espejo sin token de una invitación vigente de Sytue ID.
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
+        role: { type: string, enum: [owner, admin, member, billing] }
+        invited_by: { type: string }
+        expires_at: { type: string, format: date-time }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    Build:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        project_id: { type: string, format: uuid }
+        commit_sha: { type: string }
+        git_ref: { type: string }
+        status: { type: string, enum: [queued, running, succeeded, failed, canceled] }
+        framework: { type: string }
+        image_ref: { type: string }
+        triggered_by: { type: string }
+        started_at: { type: string, format: date-time }
+        finished_at: { type: string, format: date-time }
+        error: { type: string }
+        created_at: { type: string, format: date-time }
+
+    Deployment:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        project_id: { type: string, format: uuid }
+        build_id: { type: string, format: uuid }
+        target: { type: string, enum: [production, preview] }
+        status: { type: string, enum: [queued, building, deploying, ready, error, canceled, retired] }
+        commit_sha: { type: string }
+        commit_message:
+          type: string
+          maxLength: 200
+          description: >
+            Asunto del commit desplegado (o título del PR/MR en las previews), tal
+            y como llegó del webhook git. Solo la primera línea, sin caracteres de
+            control y acotado. Vacío en los despliegues que no nacen de un push:
+            redeploy manual, rollback, plantilla e imagen BYO.
+        git_ref: { type: string }
+        pr_number: { type: integer }
+        url: { type: string }
+        replicas: { type: integer }
+        image_ref: { type: string, description: "imagen BYO desplegada sin build (vacío si build desde git)" }
+        created_by: { type: string, description: sub de Sytue ID (o id del token) que disparó el deploy. }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        ready_at: { type: string, format: date-time }
+        error: { type: string }
+
+    Domain:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        project_id: { type: string, format: uuid }
+        hostname: { type: string }
+        status: { type: string, enum: [pending, verified, active, failed] }
+        verify_token: { type: string }
+        is_primary: { type: boolean }
+        created_at: { type: string, format: date-time }
+        verified_at: { type: string, format: date-time }
+
+    UptimeCheck:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        project_id: { type: string, format: uuid }
+        name: { type: string }
+        target_url: { type: string }
+        interval_seconds: { type: integer }
+        enabled: { type: boolean }
+        next_run_at: { type: string, format: date-time }
+        last_status: { type: string, enum: ["", up, down] }
+        last_latency_ms: { type: integer }
+        last_checked_at: { type: string, format: date-time }
+        created_at: { type: string, format: date-time }
+
+    AlertPolicy:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        project_id: { type: string, format: uuid, description: "ausente = alcance organización" }
+        event: { type: string, enum: [deploy.failed, deploy.ready, uptime.down, uptime.up, billing.spend_threshold, sizing.advice, metric.cpu_high, metric.memory_high] }
+        channel_url: { type: string }
+        enabled: { type: boolean }
+        created_at: { type: string, format: date-time }
+
+    EnvVar:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        project_id: { type: string, format: uuid }
+        key: { type: string }
+        value: { type: string, description: "vacío para secretos" }
+        is_secret: { type: boolean }
+        scope: { type: string, enum: [all, production, preview] }
+        updated_at: { type: string, format: date-time }
+
+    ManagedService:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        project_id: { type: string, format: uuid }
+        kind: { type: string, enum: [postgres, storage, functions, cron, job, worker, auth] }
+        name: { type: string }
+        status: { type: string, enum: [provisioning, ready, failed, deleting] }
+        target:
+          type: string
+          enum: [production, preview]
+          description: A qué despliegues entrega sus credenciales el servicio.
+        config:
+          type: object
+          additionalProperties: { type: string }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    UsageRecord:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        project_id: { type: string, format: uuid }
+        metric: { type: string }
+        quantity: { type: number }
+        unit: { type: string }
+        period_from: { type: string, format: date-time }
+        period_to: { type: string, format: date-time }
+        created_at: { type: string, format: date-time }
+
+    StorageObject:
+      type: object
+      properties:
+        key: { type: string }
+        size: { type: integer, format: int64, description: Tamaño en bytes. }
+        last_modified: { type: string, format: date-time }
+
+    DbColumn:
+      type: object
+      description: Columna introspeccionada del Postgres del proyecto.
+      properties:
+        name: { type: string }
+        type: { type: string, description: "Tipo formateado por Postgres (format_type), p. ej. character varying(120)." }
+        nullable: { type: boolean }
+        isPrimaryKey: { type: boolean }
+        references: { type: string, description: "FK simple a la que apunta (\"tabla.columna\"); ausente si no hay." }
+        default: { type: string, description: Expresión de valor por defecto; ausente si no hay. }
+
+    DbTable:
+      type: object
+      description: Tabla del Postgres gestionado del proyecto.
+      properties:
+        schema: { type: string, example: public }
+        name: { type: string, example: clientes }
+        rowCount:
+          type: integer
+          format: int64
+          description: >
+            ESTIMACIÓN del planificador (pg_class.reltuples), no un conteo exacto:
+            contar cada tabla del listado sería un escaneo completo por tabla. El
+            conteo exacto se hace al abrir una tabla (totalRows de DbRows).
+        columns:
+          type: array
+          items: { $ref: "#/components/schemas/DbColumn" }
+        apiExposed:
+          type: boolean
+          description: Si PostgREST publica la tabla en la API REST automática (esquema `public`).
+
+    DbRows:
+      type: object
+      description: Primeras filas de una tabla (tope de 200 filas y ~1 MiB por respuesta).
+      properties:
+        columns:
+          type: array
+          items: { type: string }
+        rows:
+          type: array
+          items: { type: object, additionalProperties: true }
+        totalRows:
+          type: integer
+          format: int64
+          description: Conteo exacto de la tabla; cae a la estimación del planificador si no cabe en el statement_timeout.
+
+    DbApiInfo:
+      type: object
+      description: >
+        API REST automática (PostgREST) del proyecto. Las credenciales van SIEMPRE
+        enmascaradas: este endpoint no reparte secretos (se gestionan en Secrets y se
+        inyectan en los despliegues).
+      properties:
+        restUrl: { type: string, format: uri }
+        anonKeyPreview: { type: string, example: "JWT HS256 ••••" }
+        serviceKeyPreview: { type: string, example: "JWT HS256 ••••" }
+        connectionString:
+          type: string
+          description: DSN con la contraseña sustituida por la máscara.
+          example: "postgres://app:••••@svc-abc-postgres.tenant-acme.svc.cluster.local:5432/svc_abc?sslmode=disable"
+
+    SqlResult:
+      type: object
+      description: >
+        Resultado de la consola SQL. Un SQL inválido o cancelado por el
+        statement_timeout NO es un error HTTP: vuelve 200 con `error` relleno para
+        que el editor lo pinte.
+      properties:
+        columns:
+          type: array
+          items: { type: string }
+        rows:
+          type: array
+          items: { type: object, additionalProperties: true }
+        rowCount: { type: integer, description: "Filas devueltas, o filas afectadas en sentencias sin resultado." }
+        elapsedMs: { type: integer, format: int64 }
+        notice: { type: string, description: "Etiqueta de comando (\"UPDATE 3\") o aviso de truncado." }
+        error: { type: string, description: Mensaje de error de la consulta; ausente si fue bien. }
+
+    Backup:
+      type: object
+      description: >
+        Backup diario de un Sytue Postgres en Object Storage. `key` es SOLO el nombre
+        de fichero (sin prefijo): el prefijo tenant/servicio se compone en servidor y
+        `key` es lo que se pasa a POST /services/{id}/restore.
+      properties:
+        key:
+          type: string
+          description: Nombre de fichero del backup.
+          example: "20260720T030000Z.sql.gz"
+        size: { type: integer, format: int64, description: Tamaño en bytes. }
+        last_modified: { type: string, format: date-time }
+
+    StorageInfo:
+      type: object
+      description: Metadatos del bucket del servicio storage (access_key enmascarada).
+      properties:
+        bucket: { type: string }
+        endpoint: { type: string }
+        access_key: { type: string }
+        region: { type: string }
+
+    Error:
+      type: object
+      description: >
+        Envelope de error canónico de la API. `error.code` es un slug estable
+        (not_found, conflict, invalid_input, forbidden, unauthorized,
+        quota_exceeded, spend_limit_exceeded, internal); `request_id` correla con
+        los logs. Emitido en 400/401/402/403/404/409/500.
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              enum: [invalid_input, unauthorized, forbidden, not_found, conflict, quota_exceeded, spend_limit_exceeded, internal]
+            message: { type: string }
+            details: {}
+        request_id: { type: string }
+      example:
+        error: { code: not_found, message: "Recurso no encontrado." }
+        request_id: "01J8Z9E2Q0"

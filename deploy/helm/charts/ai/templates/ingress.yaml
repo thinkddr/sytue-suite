@@ -1,0 +1,33 @@
+{{- if .Values.ingress.enabled }}
+{{- $domain := include "sytue-ai.domain" . }}
+{{- $host := printf "%s.%s" .Values.ingress.subdomain $domain }}
+{{/* EL INGRESS QUE DA AL ESCRITORIO SU VÍA A LA IA: las apps nativas llevan
+     su propia sesión OIDC y llaman a /api/v1/* con Bearer directo — no hay
+     BFF que proxye. El servicio valida el token él mismo (RequireAuth), así
+     que exponerlo no abre nada: solo quita la dependencia de un navegador. */}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "sytue-ai.fullname" . }}
+  labels:
+    {{- include "sytue-ai.labels" . | nindent 4 }}
+  annotations:
+    cert-manager.io/cluster-issuer: {{ include "sytue-ai.clusterIssuer" . | quote }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  tls:
+    - hosts:
+        - {{ $host | quote }}
+      secretName: {{ .Values.ingress.tls.secretName }}
+  rules:
+    - host: {{ $host | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "sytue-ai.fullname" . }}
+                port:
+                  name: http
+{{- end }}

@@ -1,0 +1,41 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Daniel Delgado Ramos
+#
+# METADATOS DE SYTUE ERP, en el formato propio de Fyne: los lee `fyne package` él solo,
+# así que `apps/fyne/scripts/empaquetar.sh` no tiene una segunda tabla de productos que
+# se desincronice. Que este fichero exista es lo que hace que la cadena empaquete este
+# directorio.
+#
+# EL ICONO es `Icon.png`, al lado: la marca a sangre de `branding/marks`,
+# con el contorno del selector de apps; lo genera `scripts/gen-iconos-fyne.sh` y
+# `sesion/esquemas_test.go` comprueba el color y el contorno.
+Website = "https://sytue.eu"
+
+[Details]
+  Name = "Sytue ERP"
+  ID = "eu.sytue.erp"
+  Icon = "Icon.png"
+  Version = "0.1.0"
+  Build = 1
+
+# CÓMO LA LLAMAN LAS DEMÁS. Cada producto es su propia aplicación —una instalación por
+# producto, como en la web un subdominio por producto— y se invocan entre sí por su
+# esquema de URL. `empaquetar.sh` lo lee de aquí y lo escribe donde cada sistema lo
+# busca: el intent-filter del AndroidManifest, `CFBundleURLTypes` en macOS y iOS,
+# `MimeType=x-scheme-handler/…` en el .desktop de Linux y la clave de registro del
+# instalador de Windows. Una sola declaración, cinco destinos.
+#
+# Va en `[Development]`, que es la tabla de metadatos propios de Fyne, así que el
+# programa lo lee además en tiempo de ejecución
+# (`fyne.CurrentApp().Metadata().Custom["esquema"]`) — que es donde hace falta: es el
+# redirect_uri del login (RFC 8252 §7.1) y tiene que coincidir con lo registrado en
+# Sytue ID para el cliente `sytue-syerp`.
+[Development]
+  esquema = "sytue-erp"
+  widget_acciones = "open,search"
+  # El instalador de escritorio que la lleva (empaquetar.sh): «Sytue One» o «Sytue Drive».
+  bundle = "one"
+  # Abre ficheros del equipo que la persona elige (subir, adjuntar, importar, insertar): en
+  # la Mac App Store, `empaquetar.sh macappstore` le da el derecho de sandbox
+  # `files.user-selected.read-write`. Las que no lo declaran no lo llevan.
+  ficheros = "si"

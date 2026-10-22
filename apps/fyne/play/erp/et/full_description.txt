@@ -1,0 +1,18 @@
+Kakskümmend neli moodulit ja kahekordne raamatupidamine, mida andmebaas tasakaalust välja ei lase.
+
+• Kakskümmend neli moodulit ja kolmkümmend kuus mudelit: kontaktid, müük, ostud, laoseis, tootmine, arveldus, raamatupidamine, projektid ja personal.
+• Mooduli lisamine tähendab JSON-faili kirjutamist: ilma migratsiooni, uue marsruudi ja kasutajaliidese tööta.
+• Rahasummad salvestatakse täissentides, mitte kunagi ujukomaarvudena, ja tasakaalu tagab andmebaas.
+• Kirjendatud kanded on puutumatud: neid parandatakse uue kandega, ja just see eristab pearaamatut arvutustabelist.
+• Kakskümmend neli moodulit ja kolmkümmend kuus mudelit ühes teenuses ja ühes andmebaasis.
+• Mudelikataloog on andmed: iga moodul kirjeldab oma välju, olekuid ja loendi veerge.
+• Uus moodul on üks JSON-fail — ilma DDL-i, migratsiooni ja tabelilukuta.
+• Üks API kõigi kolmekümne kuue mudeli jaoks ja üks kataloogist genereeritud kasutajaliides.
+• Kahekordne raamatupidamine summadega täissentides; mitte ühtegi ujukomaarvu.
+• Tasakaalu kontrollib andmebaas tehingu kinnitamisel, mitte rakenduse kood.
+• Suletud kanded on muutumatud: neid ei saa muuta, kustutada ega neile ridu lisada.
+• Üks dokument, üks kanne: korduskatse ega kaks avatud vahekaarti ei saa tulu dubleerida.
+• Ühised nimetused on olemas kõigis 26 keeles ja tõlkimata väli takistab teenuse käivitumist.
+• Indeksipõhised loendid: kahekümne tuhande rea esimene lehekülg tagastatakse vähem kui millisekundiga.
+
+Krüpteeritud edastamisel (TLS 1.3). Sytue taristu asub ELis. Väliste teenuste asukoht sõltub nende pakkujast.

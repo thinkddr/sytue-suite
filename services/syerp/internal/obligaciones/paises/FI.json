@@ -1,0 +1,237 @@
+{
+ "pais": "FI",
+ "verificado": true,
+ "moneda": "EUR",
+ "formas": [
+  {
+   "clave": "toiminimi",
+   "nombre": "Toiminimi (Tmi)",
+   "tipo": "persona_fisica"
+  },
+  {
+   "clave": "ay",
+   "nombre": "Avoin yhtiö (Ay)",
+   "tipo": "persona_fisica"
+  },
+  {
+   "clave": "oy",
+   "nombre": "Osakeyhtiö (Oy)",
+   "tipo": "sociedad"
+  },
+  {
+   "clave": "oyj",
+   "nombre": "Julkinen osakeyhtiö (Oyj)",
+   "tipo": "sociedad"
+  },
+  {
+   "clave": "ky",
+   "nombre": "Kommandiittiyhtiö (Ky)",
+   "tipo": "sociedad"
+  }
+ ],
+ "portales": {
+  "omavero": {
+   "nombre": "OmaVero (Verohallinto)",
+   "url": "https://www.vero.fi/omavero"
+  },
+  "tulorekisteri": {
+   "nombre": "Tulorekisteri",
+   "url": "https://www.vero.fi/tulorekisteri/"
+  },
+  "prh": {
+   "nombre": "PRH — tilinpäätöksen rekisteröinti",
+   "url": "https://www.prh.fi/"
+  }
+ },
+ "obligaciones": [
+  {
+   "clave": "fi_alv_q",
+   "nombre": "Arvonlisäveroilmoitus (neljännesvuosi)",
+   "concepto": "iva_periodica",
+   "ambito": "fiscal",
+   "periodicidad": "trimestral",
+   "plazos": {
+    "T": "12+2"
+   },
+   "margen_dias": 7,
+   "portal": "omavero",
+   "aplica": {
+    "condiciones": [
+     "iva",
+     "!iva_mensual"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 13500,
+    "nota": "Ilmoitus ja maksu viimeistään verokautta seuraavan toisen kuukauden 12. päivänä OmaVerossa. Myöhästymismaksu 3 €/päivä 45 päivään asti, sen jälkeen 135 € + 2 % verosta (enintään 15 000 €); viivästyskorko 11 % (2025)."
+   },
+   "calculo": {
+    "tipo": "saldo_neto",
+    "haber": [
+     "477"
+    ],
+    "debe": [
+     "472"
+    ]
+   }
+  },
+  {
+   "clave": "fi_alv_m",
+   "nombre": "Arvonlisäveroilmoitus (kuukausi)",
+   "concepto": "iva_periodica",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "12+2"
+   },
+   "margen_dias": 7,
+   "portal": "omavero",
+   "aplica": {
+    "condiciones": [
+     "iva",
+     "iva_mensual"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 13500,
+    "nota": "Myöhästymismaksu 3 €/päivä 45 päivään asti, sen jälkeen 135 € + 2 % verosta."
+   },
+   "calculo": {
+    "tipo": "saldo_neto",
+    "haber": [
+     "477"
+    ],
+    "debe": [
+     "472"
+    ]
+   }
+  },
+  {
+   "clave": "fi_yhteenveto",
+   "nombre": "Arvonlisäveron yhteenvetoilmoitus",
+   "concepto": "operaciones_intracomunitarias",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "20"
+   },
+   "margen_dias": 7,
+   "portal": "omavero",
+   "aplica": {
+    "condiciones": [
+     "intracomunitario"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 13500,
+    "nota": "Myöhästymismaksu kuten oma-aloitteisilla veroilla."
+   }
+  },
+  {
+   "clave": "fi_tyonantaja",
+   "nombre": "Työnantajasuoritukset (ennakonpidätys, sava-maksu)",
+   "concepto": "retenciones_trabajo",
+   "ambito": "laboral",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "12"
+   },
+   "margen_dias": 7,
+   "portal": "omavero",
+   "aplica": {
+    "condiciones": [
+     "empleados"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 13500,
+    "nota": "Palkkatietoilmoitus tulorekisteriin 5 päivän kuluessa maksupäivästä; erillisilmoitus kuukausittain 5. päivään mennessä."
+   }
+  },
+  {
+   "clave": "fi_yhteisovero",
+   "nombre": "Yhteisön veroilmoitus (6B)",
+   "concepto": "sociedades_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "04-30+1"
+   },
+   "margen_dias": 30,
+   "portal": "omavero",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 10000,
+    "nota": "Myöhästymismaksu 100 € (yhteisöt); veronkorotus 2 % laiminlyönnistä. Neljän kuukauden kuluessa tilikauden päättymisestä."
+   }
+  },
+  {
+   "clave": "fi_ennakko",
+   "nombre": "Ennakkovero",
+   "concepto": "pago_fraccionado_sociedades",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "23+0"
+   },
+   "margen_dias": 7,
+   "portal": "omavero",
+   "sancion": {
+    "tipo": "nota",
+    "nota": "Huojennettu viivästyskorko (7 % vuonna 2025) maksamattomalle ennakolle."
+   }
+  },
+  {
+   "clave": "fi_elinkeino",
+   "nombre": "Elinkeinotoiminnan veroilmoitus (5)",
+   "concepto": "renta_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "04-01+1"
+   },
+   "margen_dias": 30,
+   "portal": "omavero",
+   "aplica": {
+    "tipos": [
+     "persona_fisica"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 5000,
+    "nota": "Myöhästymismaksu 50 € (luonnolliset henkilöt). Määräpäivä vaihtelee huhtikuun alun välillä."
+   }
+  },
+  {
+   "clave": "fi_tilinpaatos",
+   "nombre": "Tilinpäätöksen rekisteröinti (PRH)",
+   "concepto": "cuentas_anuales",
+   "ambito": "mercantil",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "08-31+1"
+   },
+   "margen_dias": 30,
+   "portal": "prh",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "nota",
+    "nota": "Laiminlyöntimaksu ja viime kädessä selvitystila tai poisto rekisteristä; kahden kuukauden kuluessa vahvistamisesta (vahvistus kuuden kuukauden kuluessa)."
+   }
+  }
+ ]
+}

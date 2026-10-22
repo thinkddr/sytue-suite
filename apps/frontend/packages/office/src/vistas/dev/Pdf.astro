@@ -1,0 +1,44 @@
+---
+/**
+ * Banco de pruebas de CertiPDF (PdfApp) para la auditoría de accesibilidad de Playwright
+ * (`test/e2e/accesibilidad-office.mjs`). SOLO en desarrollo: en producción es un 404.
+ *
+ * Sin sesión ni servicio: la prueba contesta a `/api/pdf*` con `page.route`. `?portada=1`
+ * monta la pantalla de abrir un fichero en vez del visor; `&shell=1` añade la Shell
+ * real y su reserva inferior, para la regresión del desplazamiento del inicio.
+ */
+import '../../styles/global.css';
+import { APP_VIEWPORT } from '@sytue/config';
+import { themeInitScript } from '@sytue/ui';
+import { PdfApp } from '../../pdf/PdfApp';
+import { PortadaPdf } from '../../pdf/Portada';
+import { InicioDemo } from '../../editor/dev/InicioDemo';
+
+const q = Astro.url.searchParams;
+const lang = ['en', 'de', 'fr'].includes(q.get('lang') ?? '')
+  ? (q.get('lang') as 'en' | 'de' | 'fr')
+  : 'es';
+---
+
+<!doctype html>
+<html lang={lang} class="h-full" data-app="pdf">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content={APP_VIEWPORT} />
+    <title>CertiPDF (banco de pruebas)</title>
+    <script is:inline set:html={themeInitScript}></script>
+  </head>
+  <body class="h-full">
+    {q.get('portada') === '1' && q.get('shell') === '1' ? (
+      <InicioDemo client:only="preact" kind="pdf" locale={lang} />
+    ) : (
+      <main class="h-dvh">
+        {q.get('portada') === '1' ? (
+          <PortadaPdf client:only="preact" locale={lang} />
+        ) : (
+          <PdfApp client:only="preact" path="/demo.pdf" locale={lang} autor="Demo" />
+        )}
+      </main>
+    )}
+  </body>
+</html>

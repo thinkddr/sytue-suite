@@ -1,0 +1,36 @@
+---
+/**
+ * Sytue Photos — vista principal. SSR: el layout exige sesión; la isla PhotosApp
+ * (client:load) monta la Sytue Shell + la línea de tiempo.
+ */
+import { returnToCanonico } from '@sytue/config';
+import AppLayout from '../layouts/AppLayout.astro';
+import { PhotosApp } from '../components/PhotosApp.js';
+import { serverEnv } from '@sytue/auth/server';
+import { bff, toBffContext } from '../lib/bff.js';
+
+export const prerender = false;
+
+const session = await bff.getSession(toBffContext(Astro));
+if (!session) {
+  // ADR 0056: la entrada org-ful llega reescrita con la marca ?__org=; el returnTo
+  // sale canónico, no en la forma interna, o tras el login la barra se queda con ella.
+  const returnTo = returnToCanonico(Astro.url, bff.basePath);
+  const redireccionLogin = Astro.redirect(
+    `${bff.basePath}/auth/login?returnTo=${encodeURIComponent(returnTo)}`,
+  );
+  redireccionLogin.headers.set('cache-control', 'no-store');
+  return redireccionLogin;
+}
+const hubBaseUrl = serverEnv(import.meta.env).SYTUE_HUB_BASE_URL ?? 'https://hub.sytue.eu';
+---
+
+<AppLayout title="Sytue Fotos">
+  <PhotosApp
+    slot="app"
+    client:load
+    locale={Astro.locals.locale}
+    user={session.user}
+    hubBaseUrl={hubBaseUrl}
+  />
+</AppLayout>

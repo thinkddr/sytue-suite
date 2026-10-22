@@ -1,0 +1,47 @@
+{{- if .Values.serviceAccount.create }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Values.serviceAccount.name | default (include "sytue-cloud-api.fullname" .) }}
+  labels:
+    {{- include "sytue-cloud-api.labels" . | nindent 4 }}
+{{- end }}
+{{- if .Values.rbac.create }}
+---
+# Catálogo de permisos para logs y terminal, SIN ClusterRoleBinding: definir el
+# rol no lo concede. El controller crea un RoleBinding solo dentro de cada
+# namespace tenant verificado; cloud-api no puede ejecutar en la plataforma ni
+# en kube-system. Sin deployments/services/secrets ni escritura de RBAC.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "sytue-cloud-api.fullname" . }}
+  labels:
+    {{- include "sytue-cloud-api.labels" . | nindent 4 }}
+rules:
+  # Localizar el pod del deployment (findPod: List por label sytue.eu/deployment).
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  # Tail de logs en vivo (GetLogs sobre pods/log).
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+  # Terminal interactivo (SPDY attach sobre pods/exec).
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create"]
+{{- end }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "sytue-cloud-api.runtimeAccessConfigMap" . }}
+  labels:
+    {{- include "sytue-cloud-api.labels" . | nindent 4 }}
+# Contrato único de identidad para el reconciliador, derivado de los valores
+# reales de la API; no se mantienen dos configuraciones de ServiceAccount.
+data:
+  CLOUD_API_CLUSTER_ROLE: {{ include "sytue-cloud-api.fullname" . | quote }}
+  CLOUD_API_SERVICE_ACCOUNT: {{ .Values.serviceAccount.name | default (include "sytue-cloud-api.fullname" .) | quote }}
+  CLOUD_API_NAMESPACE: {{ .Release.Namespace | quote }}

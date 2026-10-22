@@ -1,0 +1,22 @@
+{
+  "key": "asana",
+  "tier": "tier2",
+  "manifest": {
+    "name": "Asana",
+    "description": "Gestión de proyectos y tareas de equipo, con inicio de sesión único.",
+    "category": "Gestión de proyectos",
+    "color": "#F06A6A",
+    "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#F06A6A\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"8\"/><circle cx=\"12\" cy=\"12\" r=\"3.5\"/></svg>",
+    "identity": {
+      "kind": "saml",
+      "entity_id": "https://app.asana.com",
+      "acs_url": "https://app.asana.com/-/saml/consume",
+      "name_id_format": "email"
+    },
+    "provisioning": "none",
+    "launch": {
+      "kind": "url",
+      "url": "https://app.asana.com"
+    }
+  }
+}

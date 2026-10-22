@@ -1,0 +1,236 @@
+{
+ "pais": "BG",
+ "verificado": true,
+ "moneda": "BGN",
+ "formas": [
+  {
+   "clave": "et",
+   "nombre": "Едноличен търговец (ЕТ)",
+   "tipo": "persona_fisica"
+  },
+  {
+   "clave": "svobodna",
+   "nombre": "Свободна професия / самоосигуряващ се",
+   "tipo": "persona_fisica"
+  },
+  {
+   "clave": "eood",
+   "nombre": "ЕООД",
+   "tipo": "sociedad"
+  },
+  {
+   "clave": "ood",
+   "nombre": "ООД",
+   "tipo": "sociedad"
+  },
+  {
+   "clave": "ad",
+   "nombre": "АД",
+   "tipo": "sociedad"
+  }
+ ],
+ "portales": {
+  "nap": {
+   "nombre": "НАП — Портал за е-услуги",
+   "url": "https://portal.nra.bg/"
+  },
+  "registry": {
+   "nombre": "Търговски регистър (Агенция по вписванията)",
+   "url": "https://portal.registryagency.bg/"
+  }
+ },
+ "obligaciones": [
+  {
+   "clave": "bg_dds",
+   "nombre": "Справка-декларация по ЗДДС",
+   "concepto": "iva_periodica",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "14"
+   },
+   "margen_dias": 7,
+   "portal": "nap",
+   "aplica": {
+    "condiciones": [
+     "iva"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 50000,
+    "moneda": "BGN",
+    "nota": "Подава се до 14-о число на месеца, следващ данъчния период, само по електронен път с КЕП. Глоба от 500 до 10 000 лв. за неподаване в срок (чл. 179 ЗДДС); лихва за просрочие (ОЛП + 10 %)."
+   },
+   "calculo": {
+    "tipo": "saldo_neto",
+    "haber": [
+     "477"
+    ],
+    "debe": [
+     "472"
+    ]
+   }
+  },
+  {
+   "clave": "bg_vies",
+   "nombre": "VIES-декларация",
+   "concepto": "operaciones_intracomunitarias",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "14"
+   },
+   "margen_dias": 7,
+   "portal": "nap",
+   "aplica": {
+    "condiciones": [
+     "intracomunitario"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 50000,
+    "moneda": "BGN",
+    "nota": "Глоба от 500 до 10 000 лв."
+   }
+  },
+  {
+   "clave": "bg_d1d6",
+   "nombre": "Декларации образец 1 и 6 (осигуровки и ДДФЛ)",
+   "concepto": "nominas",
+   "ambito": "laboral",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "25"
+   },
+   "margen_dias": 7,
+   "portal": "nap",
+   "aplica": {
+    "condiciones": [
+     "empleados"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 50000,
+    "moneda": "BGN",
+    "nota": "Глоба от 500 до 5 000 лв.; лихва върху невнесените осигуровки."
+   }
+  },
+  {
+   "clave": "bg_soi",
+   "nombre": "Осигуровки на самоосигуряващо се лице",
+   "concepto": "cuota_autonomos",
+   "ambito": "laboral",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "25"
+   },
+   "margen_dias": 7,
+   "portal": "nap",
+   "aplica": {
+    "tipos": [
+     "persona_fisica"
+    ]
+   },
+   "sancion": {
+    "tipo": "nota",
+    "nota": "Лихва за просрочие върху невнесените вноски."
+   }
+  },
+  {
+   "clave": "bg_gdd92",
+   "nombre": "Годишна данъчна декларация по чл. 92 ЗКПО",
+   "concepto": "sociedades_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "06-30+1"
+   },
+   "margen_dias": 30,
+   "portal": "nap",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 50000,
+    "moneda": "BGN",
+    "nota": "Глоба от 500 до 3 000 лв. за неподаване в срок; подава се от 1 март до 30 юни."
+   }
+  },
+  {
+   "clave": "bg_avans",
+   "nombre": "Авансови вноски за корпоративен данък",
+   "concepto": "pago_fraccionado_sociedades",
+   "ambito": "fiscal",
+   "periodicidad": "trimestral",
+   "plazos": {
+    "T1": "04-15",
+    "T2": "07-15",
+    "T3": "12-15+0",
+    "T4": "12-15+0"
+   },
+   "margen_dias": 7,
+   "portal": "nap",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "nota",
+    "nota": "Лихва при превишение на дължимия данък над авансовите вноски с повече от 25 %. Тримесечни при приходи 300 000–3 000 000 лв.; месечни над 3 000 000 лв."
+   }
+  },
+  {
+   "clave": "bg_gdd50",
+   "nombre": "Годишна данъчна декларация по чл. 50 ЗДДФЛ",
+   "concepto": "renta_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "04-30+1"
+   },
+   "margen_dias": 30,
+   "portal": "nap",
+   "aplica": {
+    "tipos": [
+     "persona_fisica"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 50000,
+    "moneda": "BGN",
+    "nota": "Глоба до 500 лв. за неподаване в срок."
+   }
+  },
+  {
+   "clave": "bg_gfo",
+   "nombre": "Публикуване на годишен финансов отчет",
+   "concepto": "cuentas_anuales",
+   "ambito": "mercantil",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "09-30+1"
+   },
+   "margen_dias": 30,
+   "portal": "registry",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 20000,
+    "moneda": "BGN",
+    "nota": "Глоба от 200 до 3 000 лв. за управителя и 0,1–0,5 % от нетните приходи за дружеството (чл. 74 ЗСч)."
+   }
+  }
+ ]
+}

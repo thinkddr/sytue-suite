@@ -1,0 +1,67 @@
+{
+  "id": "wikijs",
+  "name": "Wiki.js",
+  "description": "La wiki del equipo: editor visual o markdown, permisos por página, búsqueda y control de versiones. Guarda todo en el PostgreSQL del proyecto.",
+  "category": "productivity",
+  "license": "AGPL-3.0-or-later",
+  "homepage": "https://js.wiki/",
+  "source": "https://github.com/requarks/wiki",
+  "upstream": "ghcr.io/requarks/wiki:2.5.308",
+  "upstream_digest": "sha256:1eaa2de751c2925871a95a02e0ddbdd5c48bf2e016653b2e4a8f0c646cc4ff83",
+  "version": "2.5.308",
+  "needs": [
+    "postgres"
+  ],
+  "ports": [
+    {
+      "name": "http",
+      "port": 3000
+    }
+  ],
+  "web_port": 3000,
+  "exports": [
+    {
+      "key": "WIKI_URL",
+      "value": "http://{host}:{port}"
+    }
+  ],
+  "env": [
+    {
+      "key": "DB_TYPE",
+      "value": "postgres"
+    },
+    {
+      "key": "DB_HOST",
+      "value": "{db_host}"
+    },
+    {
+      "key": "DB_PORT",
+      "value": "{db_port}"
+    },
+    {
+      "key": "DB_NAME",
+      "value": "{db_name}"
+    },
+    {
+      "key": "DB_USER",
+      "value": "{db_user}"
+    },
+    {
+      "key": "DB_PASS",
+      "value": "{db_password}"
+    },
+    {
+      "key": "HA_ACTIVE",
+      "value": "false"
+    }
+  ],
+  "disk_gib": 0,
+  "writable_paths": [
+    "/wiki/data",
+    "/wiki/logs"
+  ],
+  "memory_mib": 1024,
+  "cpu_milli": 1000,
+  "run_as_user": 1000,
+  "health_path": "/healthz"
+}

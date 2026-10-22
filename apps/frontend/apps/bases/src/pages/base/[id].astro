@@ -1,0 +1,31 @@
+---
+import AppLayout from '../../layouts/AppLayout.astro';
+import { BaseApp } from '../../islands/BaseApp.js';
+import { protegerPagina, hubBaseUrl } from '../../lib/pagina.js';
+import { useT } from '../../i18n/index.js';
+
+export const prerender = false;
+
+const guard = await protegerPagina(Astro);
+if (guard instanceof Response) return guard;
+
+// Un id que no es un UUID no existe: 404 sin llamar al servicio.
+const id = Astro.params.id ?? '';
+if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+  return new Response(null, { status: 404 });
+}
+
+const locale = Astro.locals.locale;
+const t = useT(locale);
+---
+
+<AppLayout title={`${t('nav.title')} · Bases`}>
+  <BaseApp
+    slot="app"
+    client:load
+    baseId={id}
+    locale={locale}
+    user={guard.session.user}
+    hubBaseUrl={hubBaseUrl()}
+  />
+</AppLayout>

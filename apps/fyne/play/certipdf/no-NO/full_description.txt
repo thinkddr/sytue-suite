@@ -1,0 +1,17 @@
+PDF fra start til slutt, i nettleseren din.
+
+• Uthev, understrek, kommenter og tegn i dokumentet.
+• Skjemaer: fyll ut felt eller lag dine egne.
+• Slå sammen, trekk ut, roter, nummerer og legg til vannmerke.
+• Signaturpanel, permanent sladding og passordbeskyttede dokumenter.
+• En rask visning med disposisjon, miniatyrer, søk og zoom til side eller bredde.
+• Merknader: uthev, understrek, gjennomstrek, kommenter, tegn, figurer, piler og stempler.
+• Tekstbokser, målinger og skjermbilder av områder.
+• Skjemaer: fyll ut eksisterende felt eller legg til dine egne.
+• Panel for signering av dokumenter.
+• Permanent sladding: det du markerer, forsvinner fra filen, ikke bare fra visningen.
+• Sider: slå sammen, trekk ut, slett, roter, nummerer (også Bates), topptekster og bunntekster.
+• Vannmerke, bakgrunn og redigerbare metadata.
+• Passordbeskyttede dokumenter og tillatelser.
+
+Kryptert under overføring (TLS 1.3). Sytues infrastruktur er i EU. Plasseringen av eksterne tjenester avhenger av leverandøren deres.

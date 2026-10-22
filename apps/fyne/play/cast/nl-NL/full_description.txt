@@ -1,0 +1,17 @@
+Je video’s en je livestreams, op aanvraag en in realtime, zonder Europa te verlaten.
+
+• Upload een video en die wordt omgezet in meerdere kwaliteiten voor elk scherm.
+• Ga live vanuit uitzendsoftware, vanuit de browser of vanuit de app.
+• Vier zichtbaarheidsniveaus: openbaar, verborgen, organisatie of specifieke personen.
+• Livechat en reacties, met basismoderatie door wie publiceert.
+• Upload video’s tot 8 GiB; het origineel blijft bewaard.
+• Livestreamen vanuit uitzendsoftware via RTMP, met een streamsleutel per persoon.
+• Live vanuit de browser of de app: camera, scherm en microfoon.
+• Opnames van livestreams worden vanzelf video’s op aanvraag.
+• Een openbare voorpagina en een kanaal per organisatie, indexeerbaar.
+• Verborgen links, video’s alleen voor de organisatie of toegang voor specifieke personen via @gebruikersnaam.
+• Livechat en reacties in threads, gemodereerd door wie publiceert en door de beheerders van de organisatie.
+• Opslag telt mee in je quotum van Sytue Drive; alles in de Europese Unie.
+• “Uploaden naar Cast” vanuit Sytue Drive: een kopie van de video gaat naar Cast en het bestand blijft in Drive.
+
+Versleuteld tijdens transport (TLS 1.3). De infrastructuur van Sytue staat in de EU. De locatie van externe diensten hangt af van hun aanbieder.

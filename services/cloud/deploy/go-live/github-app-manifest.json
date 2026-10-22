@@ -1,0 +1,61 @@
+{
+  "_spdx": "MIT — Copyright (c) 2026 Daniel Delgado Ramos",
+  "_usage": [
+    "Manifest para el flujo 'Create a GitHub App from a manifest' (creación en 1 clic).",
+    "Los campos con prefijo _ son documentación; GitHub ignora las claves que no reconoce.",
+    "",
+    "1) Sirve un formulario POST a https://github.com/settings/apps/new?state=<csrf>",
+    "   (o https://github.com/organizations/<ORG>/settings/apps/new?state=<csrf> para una org)",
+    "   con un <input type=hidden name=manifest> cuyo VALOR sea este JSON. El usuario pulsa",
+    "   'Create GitHub App' y GitHub muestra la pantalla de confirmación.",
+    "2) GitHub redirige a redirect_url con ?code=<tmp>. Canjea ese code UNA vez:",
+    "   POST https://api.github.com/app-manifests/<tmp>/conversions",
+    "   La respuesta trae las credenciales de la App.",
+    "3) Mapea la respuesta a la config de Sytue Cloud (services/cloud/internal/config/config.go),",
+    "   depositándolas en el Secret sytue-cloud-api (Scaleway Secret Manager + Sealed Secrets):",
+    "     respuesta.id             -> GITHUB_APP_ID           (App ID numérico)",
+    "     respuesta.pem            -> GITHUB_APP_PRIVATE_KEY  (clave privada PEM RS256)",
+    "     respuesta.client_id      -> GITHUB_APP_CLIENT_ID    (OAuth user-to-server)",
+    "     respuesta.client_secret  -> GITHUB_APP_CLIENT_SECRET(OAuth user-to-server)",
+    "     respuesta.webhook_secret -> WEBHOOK_SECRET          (HMAC de POST /webhooks/git)",
+    "",
+    "Permisos MÍNIMOS = exactamente los que usa el código (internal/github/client.go,",
+    "internal/service/github.go): contents:read para clonar el repo, pull_requests:write",
+    "para el comentario de preview (UpsertPRComment) y metadata:read (baseline). Eventos:",
+    "push y pull_request (disparan build/preview).",
+    "",
+    "request_oauth_on_install=true es OBLIGATORIO: el callback de instalación",
+    "GET /api/v1/github/callback (internal/http/handlers_github.go) EXIGE ?code= además de",
+    "?installation_id= y ?state=<projectID> para probar la propiedad de la instalación",
+    "(service.ConnectGitHubAppWithOwnership → ExchangeUserCode → UserInstallations). Sin el",
+    "code, el connect queda fail-closed.",
+    "",
+    "OJO (honestidad): GITHUB_APP_* y WEBHOOK_SECRET los LEE config.go, pero el chart",
+    "deploy/helm/charts/cloud-api hoy NO los cablea como env/secretKeyRef → hace falta",
+    "añadir esas entradas al template del chart antes de que el pod los reciba. Ver README.md."
+  ],
+  "name": "Sytue Cloud",
+  "url": "https://cloud.sytue.eu",
+  "description": "Sytue Cloud PaaS — clona repos privados sin deploy-key y comenta la preview en los PR.",
+  "public": false,
+  "redirect_url": "https://cloud.sytue.eu",
+  "setup_url": "https://cloud.sytue.eu/api/v1/github/callback",
+  "setup_on_update": true,
+  "request_oauth_on_install": true,
+  "callback_urls": [
+    "https://cloud.sytue.eu/api/v1/github/callback"
+  ],
+  "hook_attributes": {
+    "url": "https://cloud.sytue.eu/webhooks/git",
+    "active": true
+  },
+  "default_permissions": {
+    "contents": "read",
+    "pull_requests": "write",
+    "metadata": "read"
+  },
+  "default_events": [
+    "push",
+    "pull_request"
+  ]
+}

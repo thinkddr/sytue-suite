@@ -1,0 +1,16 @@
+Files and collaboration, under your own brand.
+
+• Upload, organise and share with controlled links (permission and expiry).
+• Inline preview for documents and images.
+• Attach to Mail without duplicating the file.
+• Storage backed by S3 in European regions.
+• My drive, team drives, shared with me, recent, favourites and trash.
+• Sharing links with two levels (view or edit), password and expiry.
+• Version history with restore.
+• Preview documents, images and PDFs without downloading.
+• Open and edit office documents in Docus, Calcus and Diapos; PDFs in CertiPDF.
+• Sensitivity labels that block public links where they do not belong.
+• Share to a Rooms channel or attach to Mail without duplicating the file.
+• S3 storage in European regions, with your quota always visible.
+
+Encrypted in transit (TLS 1.3). Sytue’s infrastructure is in the EU. The location of external services depends on their provider.

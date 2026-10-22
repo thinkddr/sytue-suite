@@ -1,0 +1,16 @@
+Failid ja koostöö teie enda kaubamärgi all.
+
+• Üleslaadimine, korraldamine ja jagamine kontrollitud linkidega (õigused ja aegumine).
+• Dokumentide ja piltide eelvaade otse lehel.
+• Manused Mailis ilma faili dubleerimata.
+• S3-põhine salvestus Euroopa piirkondades.
+• Minu ketas, meeskonna kettad, minuga jagatud, hiljutised, lemmikud ja prügikast.
+• Kahe tasemega jagamislingid (vaatamine või muutmine), parool ja aegumine.
+• Versiooniajalugu koos taastamisega.
+• Dokumentide, piltide ja PDF-ide eelvaade ilma allalaadimiseta.
+• Kontoridokumentide avamine ja muutmine Docuses, Calcuses ja Diaposes; PDF-id CertiPDF-is.
+• Tundlikkussildid, mis blokeerivad avalikud lingid seal, kuhu need ei kuulu.
+• Jagamine Roomsi kanalisse või manusena Mailis ilma faili dubleerimata.
+• S3-salvestus Euroopa piirkondades, kvoot alati nähtaval.
+
+Krüpteeritud edastamisel (TLS 1.3). Sytue taristu asub ELis. Väliste teenuste asukoht sõltub nende pakkujast.

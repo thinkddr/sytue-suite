@@ -1,0 +1,14 @@
+Rinkinio pradžios puslapis: programos, greitieji veiksmai, naujausia veikla ir pranešimai.
+
+• Paleidiklis su visomis jūsų programomis ir tomis, kurias prijungia jūsų organizacija.
+• Šiandienos darbotvarkė ir neskaityti laiškai pradžios puslapyje, šalia naujausios rinkinio veiklos ir jūsų pranešimų.
+• Prijunkite įrenginius ir atsisiųskite vietines programas.
+• Paleidiklis su rinkinio programomis ir trečiųjų šalių programomis, kurias prijungia jūsų organizacija.
+• Greitieji veiksmai: rašyti laišką, naujas dokumentas, įkelti į Drive, sukurti įvykį.
+• Naujausi rinkinyje: paskutiniai elementai iš Drive, Docus, Mail ar Rooms.
+• Pranešimų centras ir buvimo būsena, bendri visam rinkiniui.
+• Įrenginių prijungimas: profilis iPhone ir Mac, Android ir kompiuteriui, dviem žingsniais.
+• Vietinių kompiuterio ir mobiliųjų programų atsisiuntimai.
+• Pasveikinimo vedlys, kuris paruošia organizaciją be vadovų.
+
+Šifruojama perduodant (TLS 1.3). „Sytue“ infrastruktūra yra ES. Išorinių paslaugų vieta priklauso nuo jų teikėjo.

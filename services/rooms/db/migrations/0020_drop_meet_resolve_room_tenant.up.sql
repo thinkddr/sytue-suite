@@ -1,0 +1,26 @@
+-- SPDX-License-Identifier: Apache-2.0
+-- Copyright (c) 2026 Daniel Delgado Ramos
+--
+-- Retira `meet_resolve_room_tenant`, que NUNCA pudo funcionar.
+--
+-- Nació para resolver el tenant de una sala desde un webhook del SFU (que es global del
+-- despliegue y no porta contexto de Sytue ID) sin exponer más que el slug: una función
+-- SECURITY DEFINER que consulta `rooms` por nombre. Pero `rooms` lleva FORCE ROW LEVEL
+-- SECURITY, y FORCE somete también al DUEÑO de la tabla — que es justo quien ejecuta una
+-- SECURITY DEFINER. Sin `app.tenant` fijado, la política filtra todas las filas y la
+-- función devuelve cero. Verificado: con la sala presente en la tabla,
+-- `SELECT meet_resolve_room_tenant('<nombre>')` devuelve (0 rows).
+--
+-- El efecto era invisible y caro: el `room_finished` de una sala sin metadata (LiveKit
+-- crea la room por su cuenta cuando la anterior caducó por empty_timeout) se descartaba
+-- con un WARN y un 200. La sala quedaba «activa» para siempre en esta tabla y el canal
+-- de origen nunca recibía su tarjeta de «llamada finalizada».
+--
+-- Lo sustituye algo que no necesita consultar nada: el nombre técnico de la sala lleva
+-- delante el slug del tenant (`<tenant>_<opaco>`), y el nombre SÍ viaja en todos los
+-- eventos de LiveKit. El guion bajo separa sin ambigüedad porque un slug solo admite
+-- [a-z0-9-].
+--
+-- sytue:destructive-ok la función devolvía siempre cero filas bajo FORCE RLS, así que
+-- ningún binario —tampoco el anterior— dependía de su resultado.
+DROP FUNCTION IF EXISTS meet_resolve_room_tenant(text);

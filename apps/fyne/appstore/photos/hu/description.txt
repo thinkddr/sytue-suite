@@ -1,0 +1,18 @@
+Fotógaléria és -szerkesztő: az eredetik a Drive-ban, a szerkesztések receptként.
+
+• Havonkénti idővonal név szerinti kereséssel.
+• Albumok borítóképpel; teljes képernyős megjelenítő.
+• Szerkesztő fényhez, színhez, forgatáshoz, tükrözéshez és vágáshoz, valós időben.
+• Minden szerkesztés egy recept: az eredetihez soha nem nyúlunk.
+• Havonként csoportosított idővonal név szerinti kereséssel és éles miniatűrökkel.
+• Albumok: létrehozás, átnevezés, borítókép választása, hozzáadás a megjelenítőből és eltávolítás.
+• Szerkesztő négy csúszkával (expozíció, kontraszt, telítettség, színhőmérséklet), forgatással és tükrözéssel.
+• Minden szerkesztés külön tárolt recept: a Drive-ban lévő eredeti soha nem módosul.
+• Exportálás teljes felbontásban, a szerveren az előnézettel azonos képletekkel renderelve.
+• Kuka visszaállítással.
+• Az eredetik az Ön Sytue Drive-jában vannak; a származékok újragenerálható gyorsítótárat alkotnak.
+• Az EXIF-adatokat magából a fájlból olvassuk; minden az Európai Unióban.
+• Többszörös kijelölés hónaponként: új albumba, a kukába vagy egyszerre letöltve.
+• Diavetítés, teljes méret, forgatás a megjelenítőből és vágás rögzített képaránnyal.
+
+Titkosítás átvitel közben (TLS 1.3). A Sytue infrastruktúrája az EU-ban található. A külső szolgáltatások helye a szolgáltatójuktól függ.

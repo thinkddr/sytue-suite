@@ -1,0 +1,299 @@
+{
+ "pais": "PL",
+ "verificado": true,
+ "moneda": "PLN",
+ "formas": [
+  {
+   "clave": "jdg",
+   "nombre": "Jednoosobowa działalność gospodarcza (JDG)",
+   "tipo": "persona_fisica"
+  },
+  {
+   "clave": "sc",
+   "nombre": "Spółka cywilna",
+   "tipo": "persona_fisica"
+  },
+  {
+   "clave": "spzoo",
+   "nombre": "Sp. z o.o.",
+   "tipo": "sociedad"
+  },
+  {
+   "clave": "psa",
+   "nombre": "Prosta spółka akcyjna (P.S.A.)",
+   "tipo": "sociedad"
+  },
+  {
+   "clave": "sa",
+   "nombre": "Spółka akcyjna (S.A.)",
+   "tipo": "sociedad"
+  },
+  {
+   "clave": "spj",
+   "nombre": "Spółka jawna",
+   "tipo": "sociedad"
+  }
+ ],
+ "portales": {
+  "eus": {
+   "nombre": "e-Urząd Skarbowy",
+   "url": "https://www.podatki.gov.pl/e-urzad-skarbowy/"
+  },
+  "zus": {
+   "nombre": "PUE ZUS / eZUS",
+   "url": "https://www.zus.pl/"
+  },
+  "krs": {
+   "nombre": "eKRS — Repozytorium Dokumentów Finansowych",
+   "url": "https://ekrs.ms.gov.pl/"
+  }
+ },
+ "obligaciones": [
+  {
+   "clave": "pl_jpk_m",
+   "nombre": "JPK_V7M",
+   "concepto": "iva_periodica",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "25"
+   },
+   "margen_dias": 7,
+   "portal": "eus",
+   "aplica": {
+    "condiciones": [
+     "iva",
+     "iva_mensual"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_pct_mes": 1.2,
+    "recargo_max_pct": 30,
+    "nota": "JPK_VAT wyłącznie elektronicznie, do 25. dnia miesiąca za miesiąc poprzedni. Odsetki za zwłokę (14,5 % rocznie w 2025 r.) oraz kara grzywny z KKS za niezłożenie deklaracji w terminie; czynny żal łagodzi odpowiedzialność."
+   },
+   "calculo": {
+    "tipo": "saldo_neto",
+    "haber": [
+     "477"
+    ],
+    "debe": [
+     "472"
+    ]
+   }
+  },
+  {
+   "clave": "pl_jpk_k",
+   "nombre": "JPK_V7K (kwartalny)",
+   "concepto": "iva_periodica",
+   "ambito": "fiscal",
+   "periodicidad": "trimestral",
+   "plazos": {
+    "T": "25"
+   },
+   "margen_dias": 7,
+   "portal": "eus",
+   "aplica": {
+    "condiciones": [
+     "iva",
+     "!iva_mensual"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_pct_mes": 1.2,
+    "recargo_max_pct": 30,
+    "nota": "Część ewidencyjna co miesiąc do 25. dnia; odsetki za zwłokę i grzywna z KKS."
+   },
+   "calculo": {
+    "tipo": "saldo_neto",
+    "haber": [
+     "477"
+    ],
+    "debe": [
+     "472"
+    ]
+   }
+  },
+  {
+   "clave": "pl_vat_ue",
+   "nombre": "VAT-UE",
+   "concepto": "operaciones_intracomunitarias",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "25"
+   },
+   "margen_dias": 7,
+   "portal": "eus",
+   "aplica": {
+    "condiciones": [
+     "intracomunitario"
+    ]
+   },
+   "sancion": {
+    "tipo": "nota",
+    "nota": "Kara grzywny za wykroczenie skarbowe (KKS)."
+   }
+  },
+  {
+   "clave": "pl_pit4",
+   "nombre": "Zaliczki PIT-4 (pracownicy)",
+   "concepto": "retenciones_trabajo",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "20"
+   },
+   "margen_dias": 7,
+   "portal": "eus",
+   "aplica": {
+    "condiciones": [
+     "empleados"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_pct_mes": 1.2,
+    "recargo_max_pct": 30,
+    "nota": "Odsetki za zwłokę; PIT-4R do 31 stycznia następnego roku."
+   }
+  },
+  {
+   "clave": "pl_zus",
+   "nombre": "Składki ZUS (DRA)",
+   "concepto": "seguridad_social",
+   "ambito": "laboral",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "15"
+   },
+   "margen_dias": 7,
+   "portal": "zus",
+   "aplica": {
+    "condiciones": [
+     "empleados"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_pct_mes": 1.2,
+    "recargo_max_pct": 30,
+    "nota": "Odsetki za zwłokę i opłata dodatkowa do 100 % składek. Termin: 15. dnia (osoby prawne) lub 20. dnia (pozostali płatnicy)."
+   }
+  },
+  {
+   "clave": "pl_zus_jdg",
+   "nombre": "Składki ZUS przedsiębiorcy",
+   "concepto": "cuota_autonomos",
+   "ambito": "laboral",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "20"
+   },
+   "margen_dias": 7,
+   "portal": "zus",
+   "aplica": {
+    "tipos": [
+     "persona_fisica"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_pct_mes": 1.2,
+    "recargo_max_pct": 30,
+    "nota": "Odsetki za zwłokę; utrata prawa do zasiłku chorobowego."
+   }
+  },
+  {
+   "clave": "pl_cit8",
+   "nombre": "CIT-8",
+   "concepto": "sociedades_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "03-31+1"
+   },
+   "margen_dias": 30,
+   "portal": "eus",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_pct_mes": 1.2,
+    "recargo_max_pct": 30,
+    "nota": "Odsetki za zwłokę i grzywna z KKS. W ostatnich latach termin bywał przedłużany rozporządzeniem."
+   }
+  },
+  {
+   "clave": "pl_cit_zal",
+   "nombre": "Zaliczki CIT",
+   "concepto": "pago_fraccionado_sociedades",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "20"
+   },
+   "margen_dias": 7,
+   "portal": "eus",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_pct_mes": 1.2,
+    "recargo_max_pct": 30,
+    "nota": "Mali podatnicy mogą wpłacać zaliczki kwartalnie."
+   }
+  },
+  {
+   "clave": "pl_pit36",
+   "nombre": "PIT-36 / PIT-36L",
+   "concepto": "renta_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "04-30+1"
+   },
+   "margen_dias": 30,
+   "portal": "eus",
+   "aplica": {
+    "tipos": [
+     "persona_fisica"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_pct_mes": 1.2,
+    "recargo_max_pct": 30,
+    "nota": "Odsetki za zwłokę i grzywna z KKS."
+   }
+  },
+  {
+   "clave": "pl_sprawozdanie",
+   "nombre": "Sprawozdanie finansowe do KRS",
+   "concepto": "cuentas_anuales",
+   "ambito": "mercantil",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "07-15+1"
+   },
+   "margen_dias": 30,
+   "portal": "krs",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "nota",
+    "nota": "Grzywna lub ograniczenie wolności (art. 79 ustawy o rachunkowości); postępowanie przymuszające KRS. Złożenie w ciągu 15 dni od zatwierdzenia (zatwierdzenie do 30 czerwca)."
+   }
+  }
+ ]
+}

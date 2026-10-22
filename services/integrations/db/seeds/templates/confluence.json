@@ -1,0 +1,31 @@
+{
+  "key": "confluence",
+  "tier": "tier2",
+  "manifest": {
+    "name": "Confluence Cloud",
+    "description": "Wiki y base de conocimiento de equipo, con inicio de sesión único.",
+    "category": "Documentación",
+    "color": "#1868DB",
+    "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#1868DB\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M7 3h7l4 4v14H7z\"/><path d=\"M14 3v4h4\"/><line x1=\"10\" y1=\"13\" x2=\"15\" y2=\"13\"/><line x1=\"10\" y1=\"16\" x2=\"15\" y2=\"16\"/></svg>",
+    "identity": {
+      "kind": "saml",
+      "entity_id": "https://{site}.atlassian.net",
+      "acs_url": "https://{site}.atlassian.net/plugins/servlet/samlconsumer",
+      "name_id_format": "email"
+    },
+    "provisioning": "none",
+    "launch": {
+      "kind": "url",
+      "url": "https://{site}.atlassian.net/wiki"
+    },
+    "fields": [
+      {
+        "key": "site",
+        "label": "Sitio de Atlassian",
+        "placeholder": "acme",
+        "help": "El nombre de tu sitio: https://SITIO.atlassian.net",
+        "required": true
+      }
+    ]
+  }
+}

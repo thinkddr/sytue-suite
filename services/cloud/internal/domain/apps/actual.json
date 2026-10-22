@@ -1,0 +1,49 @@
+{
+  "id": "actual",
+  "name": "Actual Budget",
+  "description": "Presupuesto por sobres para tus cuentas, con sincronización entre dispositivos y cifrado de extremo a extremo opcional. Los datos son tuyos y se quedan aquí.",
+  "category": "productivity",
+  "license": "Apache-2.0",
+  "homepage": "https://actualbudget.org/",
+  "source": "https://github.com/actualbudget/actual",
+  "upstream": "docker.io/actualbudget/actual-server:25.12.0",
+  "upstream_digest": "sha256:7f38b450cc3b7523dd5377792895e58b9cf333769e5a27f89e643b6f5fc60565",
+  "version": "25.12.0",
+  "ports": [
+    {
+      "name": "http",
+      "port": 5006
+    }
+  ],
+  "web_port": 5006,
+  "exports": [
+    {
+      "key": "ACTUAL_URL",
+      "value": "http://{host}:{port}"
+    }
+  ],
+  "env": [
+    {
+      "key": "ACTUAL_PORT",
+      "value": "5006"
+    },
+    {
+      "key": "ACTUAL_DATA_DIR",
+      "value": "/data"
+    },
+    {
+      "key": "ACTUAL_UPLOAD_DIR",
+      "value": "/data/uploads"
+    },
+    {
+      "key": "ACTUAL_TRUSTED_PROXIES",
+      "value": "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+    }
+  ],
+  "disk_gib": 5,
+  "data_path": "/data",
+  "memory_mib": 512,
+  "cpu_milli": 500,
+  "run_as_user": 1000,
+  "health_path": "/health"
+}

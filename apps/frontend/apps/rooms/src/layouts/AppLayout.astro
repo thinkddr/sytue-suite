@@ -1,0 +1,114 @@
+---
+/**
+ * Layout base de Sytue Chat. Guarda de sesion del lado servidor, script de tema
+ * (sin flash) y slot para la isla raiz que monta la Sytue Shell + la app. El
+ * access token NO se envia al navegador como dato. docs/design.md §1.
+ */
+import { APP_VIEWPORT, appDomains, brand, returnToCanonico } from '@sytue/config';
+import { serverEnv } from '@sytue/auth/server';
+import '../styles/app.css';
+import {
+  SUFIJO_ICONOS,
+  basePathScript,
+  swRegisterScript,
+  themeInitScript,
+  withBase,
+} from '@sytue/ui';
+import { htmlLangAttrs } from '@sytue/i18n';
+import { bff, toBffContext } from '../lib/bff.js';
+import { roomsT } from '../i18n/index.js';
+
+interface Props {
+  title?: string;
+}
+
+// Idioma negociado en el middleware (cookie > Accept-Language > inglés). De aquí
+// salen el `<html lang/dir>` y los textos del `<head>`. docs/CONVENTIONS.md §13.1.
+const { lang, dir } = htmlLangAttrs(Astro.locals.locale);
+const t = roomsT(Astro.locals.locale);
+
+const { title = t('app.name') } = Astro.props;
+// Guard: en .astro el redirect debe RETORNARSE (throw de Response solo se sigue
+// en middleware). Sin sesion -> login SSO.
+if (!(await bff.getSession(toBffContext(Astro)))) {
+  // ADR 0056: la entrada org-ful llega reescrita con la marca ?__org=; el returnTo
+  // sale canónico, no en la forma interna, o tras el login la barra se queda con ella.
+  const returnTo = returnToCanonico(Astro.url, bff.basePath);
+  const redireccionLogin = Astro.redirect(
+    `${bff.basePath}/auth/login?returnTo=${encodeURIComponent(returnTo)}`,
+  );
+  redireccionLogin.headers.set('cache-control', 'no-store');
+  return redireccionLogin;
+}
+
+// Prefijo REAL bajo el que se sirve esta superficie: el del host si el servidor
+// lo publica (SYTUE_BASE_PATH) y, si no, el del build. Los assets del <head> se
+// unen con `withBase` y NO con `${BASE_URL}fichero`: BASE_URL llega SIN barra
+// final (`/mail`) y esa concatenación daba `/mailfavicon.svg`, un 404 medido en
+// producción con el que ninguna app de la suite tenía icono. ID sí lo tenía
+// porque es Go y escribe `/favicon.svg` a mano; por eso el fallo parecía de ID.
+const prefijo = serverEnv(import.meta.env).SYTUE_BASE_PATH ?? import.meta.env.BASE_URL;
+---
+
+<!doctype html>
+<html lang={lang} dir={dir} class="h-full">
+  <head>
+    <meta charset="utf-8" />
+    <!-- `interactive-widget=resizes-content`: sin esto el teclado virtual NO encoge el
+         viewport de maquetación, así que el `100dvh` de la app sigue midiendo la pantalla
+         entera y el compositor queda debajo del teclado — el navegador desplaza el
+         viewport visual para enseñar el campo y se lleva por delante el botón de enviar y
+         los chips de opciones. Con esto el alto disponible baja, la lista de mensajes se
+         encoge y la caja de escribir se queda pegada encima del teclado, que es lo que
+         hace cualquier app de mensajería. -->
+    <meta name="viewport" content={APP_VIEWPORT} />
+    <meta name="description" content={t('app.description')} />
+    <!-- Superficie autenticada: nunca se indexa (solo www indexa). -->
+    <meta name="robots" content="noindex, nofollow" />
+    <title>{title}</title>
+    <!-- El Hub es OTRO origen y la shell le hace 3 peticiones nada mas hidratar:
+         sin esto, la primera pagaba DNS + TCP + TLS enteros (3 RTT) DESPUES de
+         ejecutar el JS. Anonimo porque los clientes no mandan cookies (fetch
+         same-origin por defecto), que es lo que exige reutilizar la conexion. -->
+    <link rel="preconnect" href={appDomains.hub} crossorigin />
+    <link rel="icon" href={withBase(prefijo, '/favicon.ico') + SUFIJO_ICONOS} sizes="32x32" />
+    <link
+      rel="icon"
+      href={withBase(prefijo, '/favicon-64.png') + SUFIJO_ICONOS}
+      type="image/png"
+      sizes="64x64"
+    />
+    <link
+      rel="icon"
+      href={withBase(prefijo, '/favicon.svg') + SUFIJO_ICONOS}
+      type="image/svg+xml"
+    />
+    <!-- PWA (Ola 18): instalable + tema del cromo (barra del SO en standalone), uno por
+         esquema para que siga a la topbar: blanca en claro, tinta noche en oscuro. -->
+    <link rel="manifest" href={withBase(prefijo, '/manifest.webmanifest')} />
+    <meta name="theme-color" content={brand.neutral[0]} media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content={brand.neutral[900]} media="(prefers-color-scheme: dark)" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Sytue Rooms" />
+    <link
+      rel="apple-touch-icon"
+      href={withBase(prefijo, '/apple-touch-icon.png') + SUFIJO_ICONOS}
+    />
+    <!-- Prefija /api y /auth con el `base` de esta app: en producción cada
+         app se sirve bajo su prefijo y la raíz del host es un 404. -->
+    <script
+      is:inline
+      set:html={basePathScript(
+        serverEnv(import.meta.env).SYTUE_BASE_PATH ?? import.meta.env.BASE_URL,
+      )}
+    ></script>
+    <script is:inline set:html={themeInitScript}></script>
+    <!-- Registra el Service Worker (app-shell offline + Web Push). Tras la carga para no
+         competir con el arranque; no rompe el SSR (solo corre en el navegador). -->
+    <script is:inline set:html={swRegisterScript(import.meta.env.BASE_URL)}></script>
+  </head>
+  <body class="bg-bg text-text h-full antialiased">
+    <slot name="app" />
+  </body>
+</html>

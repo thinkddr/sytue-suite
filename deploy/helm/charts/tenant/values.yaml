@@ -1,0 +1,67 @@
+# Plantilla de onboarding de tenant. Instanciar por organización.
+# Ejemplo:
+#   helm install tenant-acme deploy/helm/charts/tenant \
+#     --set tenant.slug=acme --set tenant.displayName="ACME, S.L." \
+#     --set tenant.env=prod --set plan=team
+
+# Slug del tenant (a-z0-9-). Determina el namespace tenant-<slug> y el grupo org/<slug>.
+tenant:
+  slug: ""                 # OBLIGATORIO
+  displayName: ""
+  env: prod                # base | staging | prod
+  # Plan de recursos (preset). Sobrescribible con resourceQuota/limitRange.
+  plan: team               # free | team | business
+
+# Cuota de recursos del namespace. Valores por defecto del plan "team".
+resourceQuota:
+  enabled: true
+  hard:
+    requests.cpu: "8"
+    requests.memory: 16Gi
+    limits.cpu: "16"
+    limits.memory: 32Gi
+    persistentvolumeclaims: "20"
+    requests.storage: 200Gi
+    services.loadbalancers: "2"
+    pods: "100"
+    count/deployments.apps: "50"
+
+# Límites por contenedor/pod (defaults sanos para apps del PaaS).
+limitRange:
+  enabled: true
+  default:
+    cpu: 500m
+    memory: 512Mi
+  defaultRequest:
+    cpu: 50m
+    memory: 128Mi
+  max:
+    cpu: "4"
+    memory: 8Gi
+
+# Pod Security Admission del namespace del tenant (restricted = deny-by-default de
+# pods privilegiados). Refuerza el aislamiento multi-tenant. Se etiqueta el Namespace.
+podSecurity:
+  enabled: true
+  enforce: restricted
+  enforceVersion: latest
+  audit: restricted
+  auditVersion: latest
+  warn: restricted
+  warnVersion: latest
+
+# Aislamiento de red del tenant.
+networkPolicy:
+  enabled: true
+  # Permitir egress a Internet/servicios gestionados (PaaS necesita salir a 443).
+  allowExternalEgress: true
+  # Namespace del ingress controller (etiquetado sytue.eu/role=ingress).
+  ingressNamespaceSelectorLabel: ingress
+
+# Mapeos logicos del tenant (solo metadatos/anotaciones; el aprovisionamiento real lo
+# hace Sytue ID (grupo org/<slug>) + cada servicio Go por tenant). Nunca secretos aqui.
+mappings:
+  idGroup: ""              # se deriva: org/<slug> (grupo en Sytue ID)
+  dbSchema: ""             # se deriva: tenant_<slug> (esquema/RLS en PostgreSQL)
+  mailDomain: ""           # p.ej. <slug>.sytue.eu o dominio propio
+  s3Prefix: ""             # se deriva: tenant/<slug>/

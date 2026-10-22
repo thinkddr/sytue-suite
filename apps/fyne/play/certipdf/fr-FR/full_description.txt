@@ -1,0 +1,17 @@
+Le PDF, de bout en bout, dans votre navigateur.
+
+• Surligner, souligner, commenter et dessiner sur le document.
+• Formulaires : remplissez les champs ou créez les vôtres.
+• Fusionner, extraire, pivoter, numéroter et filigraner.
+• Panneau des signatures, caviardage définitif et documents protégés par mot de passe.
+• Une visionneuse rapide avec plan, vignettes, recherche et zoom à la page ou à la largeur.
+• Annotations : surligner, souligner, barrer, commenter, dessiner, formes, flèches et tampons.
+• Zones de texte, mesures et captures de zone.
+• Formulaires : remplissez les champs existants ou ajoutez les vôtres.
+• Panneau des signatures du document.
+• Caviardage définitif : ce qui est marqué disparaît du fichier, pas seulement de l’affichage.
+• Pages : fusionner, extraire, supprimer, pivoter, numéroter (Bates aussi), en-têtes et pieds de page.
+• Filigrane, arrière-plan et métadonnées modifiables.
+• Documents protégés par mot de passe et permissions.
+
+Chiffrement en transit (TLS 1.3). L’infrastructure de Sytue se trouve dans l’UE. La localisation des services externes dépend de leur fournisseur.

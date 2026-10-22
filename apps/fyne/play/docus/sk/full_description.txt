@@ -1,0 +1,16 @@
+Spoločné úpravy v reálnom čase
+
+• Všetko uložené vo vašom európskom Drive.
+• Spoločné úpravy v reálnom čase, s prítomnosťou a bez vzájomného prepisovania.
+• Pás s nástrojmi s kartami: Domov, Vložiť, Referencie, Korešpondencia a Revízia.
+• Tabuľky, obrázky, tvary, SmartArt, grafy, symboly a vodoznaky.
+• Referencie: obsah, poznámky pod čiarou, citácie a bibliografia.
+• Korešpondencia: hromadná korešpondencia pre listy a štítky.
+• Komentáre vo vláknach, revízia zmien a verzie.
+• Voliteľný asistent AI na prepis, preklad alebo zhrnutie, iba ak ho vaša organizácia povolí.
+• Export do ODT, DOCX a PDF; otváranie súborov Word z Drive.
+• Hlavičky, päty, číslovanie strán a opakovane použiteľné bloky.
+• Automatické ukladanie do vášho európskeho Drive, s históriou.
+• Stiahnutie z úvodnej stránky ako PDF, HTML, Markdown, OpenDocument alebo Microsoft Office.
+
+Šifrovanie pri prenose (TLS 1.3). Infraštruktúra Sytue je v EÚ. Umiestnenie externých služieb závisí od ich poskytovateľa.

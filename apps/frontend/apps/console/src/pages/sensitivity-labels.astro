@@ -1,0 +1,31 @@
+---
+import ConsoleLayout from '../layouts/ConsoleLayout.astro';
+import { useT } from '../i18n/index.js';
+import SensitivityLabelsPanel from '../components/SensitivityLabelsPanel';
+import { requireSession } from '@sytue/auth/server';
+import { canonicaConOrg } from '@sytue/config';
+import { getBff, toBffContext } from '../server/bff.js';
+import { loadSensitivityLabels } from '../lib/admin.js';
+
+export const prerender = false;
+
+// Reservado a owner/admin, como el resto del gobierno de la organización (roles, PIM,
+// cumplimiento): definir la taxonomía de clasificación no es una tarea delegable con el
+// catálogo de permisos actual. Sytue ID exige lo mismo.
+const guard = await requireSession(getBff(), toBffContext(Astro), { roles: ['admin', 'owner'] });
+if (guard instanceof Response) return guard;
+// Ruta en `sinOrg` (su nombre colisiona con el namespace de organizaciones):
+// con sesión, un salto local a la canónica con la org activa (ADR 0056).
+const canonica = canonicaConOrg(Astro.url, getBff().basePath, guard.session.user.tenant);
+if (canonica) return Astro.redirect(canonica);
+
+const labels = await loadSensitivityLabels(guard.session);
+
+// El idioma lo negoció el middleware; la isla lo recibe por props (nunca lo detecta).
+const locale = Astro.locals.locale;
+const t = useT(locale);
+---
+
+<ConsoleLayout title={t('page.sensitivityLabels')} section="sensitivity-labels">
+  <SensitivityLabelsPanel client:load locale={locale} labels={labels.data} live={labels.live} />
+</ConsoleLayout>

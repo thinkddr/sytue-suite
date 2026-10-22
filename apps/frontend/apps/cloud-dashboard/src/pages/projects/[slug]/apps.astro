@@ -1,0 +1,51 @@
+---
+import DashboardLayout from '../../../layouts/DashboardLayout.astro';
+import AppCatalogPanel from '../../../components/AppCatalogPanel';
+import { requireSession } from '@sytue/auth/server';
+import { canonicaConOrg } from '@sytue/config';
+import { getBff, toBffContext } from '../../../server/bff.js';
+import { loadProject, loadServices, loadAppCatalog } from '../../../lib/cloud.js';
+
+import { useT } from '../../../i18n/index.js';
+
+export const prerender = false;
+
+const locale = Astro.locals.locale;
+const t = useT(locale);
+
+const guard = await requireSession(getBff(), toBffContext(Astro));
+if (guard instanceof Response) return guard;
+// Ruta en `sinOrg` (su nombre colisiona con el namespace de organizaciones):
+// con sesión, un salto local a la canónica con la org activa (ADR 0056).
+const canonica = canonicaConOrg(Astro.url, getBff().basePath, guard.session.user.tenant);
+if (canonica) return Astro.redirect(canonica);
+
+const { session } = guard;
+
+const { slug } = Astro.params;
+const projectSourced = slug ? await loadProject(session, slug) : undefined;
+if (!projectSourced) return new Response(t('common.notFound'), { status: 404 });
+const project = projectSourced.data;
+
+const [catalog, services] = await Promise.all([
+  loadAppCatalog(session),
+  loadServices(session, project.slug),
+]);
+---
+
+<DashboardLayout
+  title={t('page.titleWithProject', { section: t('nav.apps'), project: project.name })}
+  project={project.slug}
+  section="apps"
+  hasDb={project.services.includes('postgres')}
+>
+  <AppCatalogPanel
+    client:load
+    projectSlug={project.slug}
+    catalog={catalog.data}
+    installed={services.data.filter((s) => s.kind === 'app')}
+    hayPostgres={services.data.some((s) => s.kind === 'postgres' && s.status === 'running')}
+    live={catalog.live}
+    locale={locale}
+  />
+</DashboardLayout>

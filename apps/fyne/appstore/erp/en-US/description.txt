@@ -1,0 +1,18 @@
+Twenty-four modules and a double-entry ledger the database will not let you unbalance.
+
+• Twenty-four modules and thirty-six models: contacts, sales, purchasing, inventory, manufacturing, invoicing, accounting, projects and HR.
+• Adding a module means writing a JSON file: no migration, no new route and no interface work.
+• Money is stored in whole cents, never in floating point, and the database enforces the balance.
+• Posted entries are untouchable: you correct them with another entry, which is what separates a ledger from a spreadsheet.
+• Twenty-four modules and thirty-six models in a single service and a single database.
+• The model catalogue is data: each module declares its fields, its states and its list columns.
+• A new module is one JSON file — no DDL, no migration and no table lock.
+• One API for all thirty-six models, and one interface generated from the catalogue.
+• Double-entry accounting with amounts in whole cents; not a single floating-point figure.
+• The database checks the balance when the transaction commits, not the application code.
+• Closed entries are immutable: they cannot be edited, deleted or given new lines.
+• One document, one entry: a retry or two open tabs cannot duplicate revenue.
+• Shared labels ship in all 26 languages, and an untranslated field stops the service from starting.
+• Index-backed listings: the first page of twenty thousand rows is served in under a millisecond.
+
+Encrypted in transit (TLS 1.3). Sytue’s infrastructure is in the EU. The location of external services depends on their provider.

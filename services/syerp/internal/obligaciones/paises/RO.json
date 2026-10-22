@@ -1,0 +1,269 @@
+{
+ "pais": "RO",
+ "verificado": true,
+ "moneda": "RON",
+ "formas": [
+  {
+   "clave": "pfa",
+   "nombre": "Persoană fizică autorizată (PFA)",
+   "tipo": "persona_fisica"
+  },
+  {
+   "clave": "ii",
+   "nombre": "Întreprindere individuală (II)",
+   "tipo": "persona_fisica"
+  },
+  {
+   "clave": "srl",
+   "nombre": "Societate cu răspundere limitată (SRL)",
+   "tipo": "sociedad"
+  },
+  {
+   "clave": "sa",
+   "nombre": "Societate pe acțiuni (SA)",
+   "tipo": "sociedad"
+  }
+ ],
+ "portales": {
+  "anaf": {
+   "nombre": "ANAF — Spațiul Privat Virtual",
+   "url": "https://www.anaf.ro/"
+  },
+  "onrc": {
+   "nombre": "ONRC — Registrul Comerțului",
+   "url": "https://www.onrc.ro/"
+  }
+ },
+ "obligaciones": [
+  {
+   "clave": "ro_d300_m",
+   "nombre": "Decont de TVA (D300, lunar)",
+   "concepto": "iva_periodica",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "25"
+   },
+   "margen_dias": 7,
+   "portal": "anaf",
+   "aplica": {
+    "condiciones": [
+     "iva",
+     "iva_mensual"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 100000,
+    "moneda": "RON",
+    "nota": "Amendă de 1 000–5 000 lei (contribuabili mijlocii și mari) sau 500–1 000 lei (ceilalți); dobânzi 0,02 %/zi și penalități de întârziere 0,01 %/zi."
+   },
+   "calculo": {
+    "tipo": "saldo_neto",
+    "haber": [
+     "477"
+    ],
+    "debe": [
+     "472"
+    ]
+   }
+  },
+  {
+   "clave": "ro_d300_q",
+   "nombre": "Decont de TVA (D300, trimestrial)",
+   "concepto": "iva_periodica",
+   "ambito": "fiscal",
+   "periodicidad": "trimestral",
+   "plazos": {
+    "T": "25"
+   },
+   "margen_dias": 7,
+   "portal": "anaf",
+   "aplica": {
+    "condiciones": [
+     "iva",
+     "!iva_mensual"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 50000,
+    "moneda": "RON",
+    "nota": "Decontul se depune până la data de 25 inclusiv a lunii următoare trimestrului. Amendă de 500–1 000 lei; dobânzi și penalități de întârziere."
+   },
+   "calculo": {
+    "tipo": "saldo_neto",
+    "haber": [
+     "477"
+    ],
+    "debe": [
+     "472"
+    ]
+   }
+  },
+  {
+   "clave": "ro_d394",
+   "nombre": "Declarația informativă D394",
+   "concepto": "operaciones_terceros",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "30"
+   },
+   "margen_dias": 7,
+   "portal": "anaf",
+   "aplica": {
+    "condiciones": [
+     "iva"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 100000,
+    "moneda": "RON",
+    "nota": "Amendă de 1 000–5 000 lei."
+   }
+  },
+  {
+   "clave": "ro_d390",
+   "nombre": "Declarația recapitulativă D390 (VIES)",
+   "concepto": "operaciones_intracomunitarias",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "25"
+   },
+   "margen_dias": 7,
+   "portal": "anaf",
+   "aplica": {
+    "condiciones": [
+     "intracomunitario"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 100000,
+    "moneda": "RON",
+    "nota": "Amendă de 1 000–5 000 lei."
+   }
+  },
+  {
+   "clave": "ro_d112",
+   "nombre": "Declarația D112 (impozit pe salarii și contribuții)",
+   "concepto": "nominas",
+   "ambito": "laboral",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "25"
+   },
+   "margen_dias": 7,
+   "portal": "anaf",
+   "aplica": {
+    "condiciones": [
+     "empleados"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 100000,
+    "moneda": "RON",
+    "nota": "Amendă de 1 000–5 000 lei; dobânzi 0,02 %/zi."
+   }
+  },
+  {
+   "clave": "ro_d101",
+   "nombre": "Declarația privind impozitul pe profit (D101)",
+   "concepto": "sociedades_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "03-25+1"
+   },
+   "margen_dias": 30,
+   "portal": "anaf",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 100000,
+    "moneda": "RON",
+    "nota": "Termen 25 martie inclusiv al anului următor (25 iunie pentru anii fiscali 2021-2025, OUG 153/2020). Amendă de 1 000–5 000 lei. Microîntreprinderile declară trimestrial impozitul pe venit (D100)."
+   }
+  },
+  {
+   "clave": "ro_d100",
+   "nombre": "Impozit pe profit trimestrial (D100)",
+   "concepto": "pago_fraccionado_sociedades",
+   "ambito": "fiscal",
+   "periodicidad": "trimestral",
+   "plazos": {
+    "T1": "04-25",
+    "T2": "07-25",
+    "T3": "10-25",
+    "T4": "12-25+0"
+   },
+   "margen_dias": 7,
+   "portal": "anaf",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 100000,
+    "moneda": "RON",
+    "nota": "Trimestrul IV se declară până la 25 decembrie (plată anticipată) sau prin D101."
+   }
+  },
+  {
+   "clave": "ro_d212",
+   "nombre": "Declarația unică (D212)",
+   "concepto": "renta_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "05-25+1"
+   },
+   "margen_dias": 30,
+   "portal": "anaf",
+   "aplica": {
+    "tipos": [
+     "persona_fisica"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 5000,
+    "moneda": "RON",
+    "nota": "Amendă de 50–100 lei pentru nedepunere în termen."
+   }
+  },
+  {
+   "clave": "ro_situatii",
+   "nombre": "Situații financiare anuale",
+   "concepto": "cuentas_anuales",
+   "ambito": "mercantil",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "05-30+1"
+   },
+   "margen_dias": 30,
+   "portal": "anaf",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 30000,
+    "moneda": "RON",
+    "nota": "Amendă de 300–1 000 lei (până la 15 zile), 1 000–3 000 lei (16–30 zile), 1 500–4 500 lei (peste 30 de zile). 150 de zile de la închiderea exercițiului."
+   }
+  }
+ ]
+}

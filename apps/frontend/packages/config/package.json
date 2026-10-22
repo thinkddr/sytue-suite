@@ -1,0 +1,50 @@
+{
+  "name": "@sytue/config",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sytue One — configuracion compartida del frontend: tsconfig estricto, ESLint plano (solo *.astro; el resto lo lintea oxlint), Prettier y preset Tailwind v4 que consume los tokens de branding/.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./tsconfig.base.json": "./tsconfig.base.json",
+    "./tsconfig.lib.json": "./tsconfig.lib.json",
+    "./tsconfig.astro.json": "./tsconfig.astro.json",
+    "./eslint": "./eslint.config.js",
+    "./prettier": "./prettier.config.js",
+    "./astro-health": "./src/astro-health.ts",
+    "./astro-404": "./src/astro-404.ts",
+    "./astro-security": "./src/astro-security.ts",
+    "./tailwind": "./src/tailwind.ts",
+    "./tokens": "./src/tokens.ts",
+    "./theme.css": "./src/theme.css",
+    "./astro-middleware": "./src/astro-middleware.ts"
+  },
+  "files": [
+    "src",
+    "tsconfig.base.json",
+    "tsconfig.lib.json",
+    "tsconfig.astro.json",
+    "eslint.config.js",
+    "prettier.config.js"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.lib.json",
+    "typecheck": "tsc -p tsconfig.lib.json --noEmit",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@sytue/i18n": "workspace:*",
+    "tailwindcss": "4.3.3"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "catalog:",
+    "eslint": "10.11.0",
+    "eslint-plugin-astro": "catalog:",
+    "prettier": "3.9.9",
+    "prettier-plugin-astro": "catalog:",
+    "prettier-plugin-tailwindcss": "0.8.1",
+    "typescript": "6.0.3"
+  }
+}

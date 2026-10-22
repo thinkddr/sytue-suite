@@ -1,0 +1,44 @@
+---
+/**
+ * Sytue Photos — el editor. SSR: el layout exige sesión; la isla Editor monta la
+ * Sytue Shell + el lienzo con la foto y sus controles.
+ *
+ * `?id=` es la foto. Sin id no hay nada que editar: se vuelve a la galería en
+ * vez de pintar un editor vacío que no sabe qué guardar.
+ */
+import AppLayout from '../layouts/AppLayout.astro';
+import { Editor } from '../components/Editor.js';
+import { bff, toBffContext } from '../lib/bff.js';
+import { canonicaConOrg, returnToCanonico, volverA } from '@sytue/config';
+
+export const prerender = false;
+
+const session = await bff.getSession(toBffContext(Astro));
+if (!session) {
+  // ADR 0056: la entrada org-ful llega reescrita con la marca ?__org=; el returnTo
+  // sale canónico, no en la forma interna, o tras el login la barra se queda con ella.
+  const returnTo = returnToCanonico(Astro.url, bff.basePath);
+  const redireccionLogin = Astro.redirect(
+    `${bff.basePath}/auth/login?returnTo=${encodeURIComponent(returnTo)}`,
+  );
+  redireccionLogin.headers.set('cache-control', 'no-store');
+  return redireccionLogin;
+}
+// Ruta en `sinOrg` (su nombre colisiona con el namespace de organizaciones):
+// con sesión, un salto local a la canónica con la org activa. Sin este guard la
+// forma sin org se serviría para siempre y el visor compondría la vuelta a Drive
+// con `orgActual('/photos')` = `edit` — la carpeta equivocada.
+const canonica = canonicaConOrg(Astro.url, bff.basePath, session.user.tenant);
+if (canonica) return Astro.redirect(canonica);
+const id = Astro.url.searchParams.get('id');
+// De dónde vino, si vino de Drive. `volverA` es la verja: solo una RUTA, porque
+// una URL completa aquí haría de esta página un redirector abierto.
+const volver = volverA(Astro.url.searchParams.get('volver'));
+if (!id) {
+  return Astro.redirect(`${import.meta.env.BASE_URL}`);
+}
+---
+
+<AppLayout title="Sytue Fotos">
+  <Editor slot="app" client:load locale={Astro.locals.locale} id={id} volverA={volver} />
+</AppLayout>

@@ -1,0 +1,81 @@
+---
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: (c) 2026 Daniel Delgado Ramos
+ *
+ * Declaración de accesibilidad (Ley Europea de Accesibilidad, EN 301 549 / WCAG
+ * 2.1 AA). Como la de privacidad: estructura estándar —norma, situación, medidas,
+ * limitaciones, contacto, vía de reclamación— y SOLO hechos que el código sostiene
+ * (sistema de diseño con foco y contraste, Lighthouse en la CI, ajustes del
+ * sistema respetados). La situación declarada es «parcialmente conforme»: no hay
+ * auditoría independiente y los editores complejos siguen en obra.
+ */
+import { LOCALES } from '@sytue/i18n';
+import MarketingLayout from '../../layouts/MarketingLayout.astro';
+import { localeFromParam, localeParams, useT } from '../../i18n';
+
+export const getStaticPaths = localeParams;
+
+const locale = localeFromParam(Astro.params.locale);
+const t = useT(locale);
+const SUPPORT_MAIL = 'soporte@sytue.eu';
+
+const measures = ['design', 'ci', 'system', 'text'] as const;
+const sections = ['standard', 'status'] as const;
+const tail = ['limits'] as const;
+---
+
+<MarketingLayout
+  locale={locale}
+  path="/accessibility"
+  title={t('meta.accessibility.title')}
+  description={t('meta.accessibility.description')}
+  alternates={LOCALES}
+>
+  <article class="mx-auto max-w-2xl px-6 py-16 md:py-20">
+    <span class="sytue-overline text-primary-text">{t('legal.overline')}</span>
+    <h1 class="sytue-h1 text-text mt-3 text-balance">{t('a11y.title')}</h1>
+    <p class="text-text-muted mt-3 text-base">{t('a11y.updated')}</p>
+
+    <div class="text-text mt-8 flex flex-col gap-8 text-base leading-relaxed">
+      <p class="text-text-muted">{t('a11y.intro')}</p>
+      {sections.map((key) => (
+        <section>
+          <h2 class="sytue-h3 text-text text-balance">{t(`a11y.${key}.title`)}</h2>
+          <p class="text-text-muted mt-2">{t(`a11y.${key}.body`)}</p>
+        </section>
+      ))}
+      <section>
+        <h2 class="sytue-h3 text-text text-balance">{t('a11y.measures.title')}</h2>
+        <ul class="text-text-muted mt-2 flex list-disc flex-col gap-2 pl-5">
+          {measures.map((key) => (
+            <li>{t(`a11y.measures.${key}`)}</li>
+          ))}
+        </ul>
+      </section>
+      {tail.map((key) => (
+        <section>
+          <h2 class="sytue-h3 text-text text-balance">{t(`a11y.${key}.title`)}</h2>
+          <p class="text-text-muted mt-2">{t(`a11y.${key}.body`)}</p>
+        </section>
+      ))}
+      <section>
+        <h2 class="sytue-h3 text-text text-balance">{t('a11y.feedback.title')}</h2>
+        <p class="text-text-muted mt-2">
+          {t('a11y.feedback.body')}{' '}
+          <a
+            href={`mailto:${SUPPORT_MAIL}`}
+            class="text-primary-text font-semibold break-words hover:underline"
+          >
+            {SUPPORT_MAIL}
+          </a>
+          .
+        </p>
+      </section>
+      <section>
+        <h2 class="sytue-h3 text-text text-balance">{t('a11y.enforcement.title')}</h2>
+        <p class="text-text-muted mt-2">{t('a11y.enforcement.body')}</p>
+      </section>
+    </div>
+  </article>
+</MarketingLayout>

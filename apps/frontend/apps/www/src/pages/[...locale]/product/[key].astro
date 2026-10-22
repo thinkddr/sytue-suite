@@ -1,0 +1,257 @@
+---
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: (c) 2026 Daniel Delgado Ramos
+ *
+ * Ficha de producto (marketing) — detalle por producto de la suite. Ruta
+ * estática (SSG) generada desde el catálogo canónico: cada producto tiene su
+ * página indexable en cada idioma, con SEO propio (canonical + JSON-LD
+ * SoftwareApplication) y CTA de acceso. Copy HONESTO: solo capacidades reales
+ * que la suite ya ofrece. docs/operations.md
+ *
+ * Dos parámetros: `[...locale]` (vacío = inglés, la ruta sin prefijo) y `[key]`.
+ * Son 5 idiomas × 14 productos = 70 páginas de una sola plantilla.
+ */
+import { DEFAULT_LOCALE, LOCALES } from '@sytue/i18n';
+import { appForKey, Badge, Glifo, ProductIcon } from '@sytue/ui';
+import { appDomains } from '@sytue/config';
+import MarketingLayout from '../../../layouts/MarketingLayout.astro';
+import Captura from '../../../components/Captura.astro';
+import { localeFromParam, localeParams, localePath, useT } from '../../../i18n';
+import {
+  esMotorPropio,
+  etiquetaEstado,
+  nombreEnWeb,
+  productInfo,
+  rutaDeFicha,
+  rutasDeFichas,
+  sePuedeAbrir,
+  soloOrganizaciones,
+  type MarketingKey,
+} from '../../../lib/product-content';
+import { SITE_ORIGIN, absoluteUrl, ofertaSuite } from '../../../lib/seo';
+
+// El parámetro `[key]` es el SEGMENTO de la URL, que casi siempre es la clave del
+// producto y en Sytue Web no (`/product/web`, clave `pages`); la clave viaja en props.
+export function getStaticPaths() {
+  return localeParams().flatMap(({ params }) =>
+    rutasDeFichas().map(({ slug, key, redirigeA }) => ({
+      params: { ...params, key: slug },
+      props: { clave: key, redirigeA },
+    })),
+  );
+}
+
+const locale = localeFromParam(Astro.params.locale);
+// La dirección anterior de una ficha: en un sitio estático esto es una página con
+// `<meta http-equiv="refresh">` a la nueva, en su mismo idioma.
+if (Astro.props.redirigeA) return Astro.redirect(localePath(locale, Astro.props.redirigeA));
+const t = useT(locale);
+
+const key = Astro.props.clave as MarketingKey;
+const app = appForKey(key);
+// getStaticPaths garantiza key ∈ PRODUCT_KEYS (rutasDeFichas); guarda por tipado/robustez.
+if (!app) throw new Error(`Producto desconocido: ${key}`);
+
+const info = productInfo(t, key);
+// Estado REAL del catálogo. Un producto que aún no existe se presenta igual que los
+// demás salvo en dos sitios, y los dos importan: lleva distintivo junto al nombre y NO
+// ofrece «Abrir», porque su subdominio no responde (encargo v4 §14).
+const estado = etiquetaEstado(t, key);
+const abrible = sePuedeAbrir(key);
+
+// Capturas del producto, SI LAS HAY. Van por convención de nombre y no por una
+// lista que mantener: dejar `<key>.<idioma>.webp` en `src/capturas/` la publica,
+// y su ausencia deja la ficha exactamente como estaba. Así una tanda de capturas
+// no obliga a tocar esta plantilla, y un producto sin captura no enseña un hueco.
+//
+// EL IDIOMA VA EN EL NOMBRE porque la pantalla también está traducida: enseñar
+// la captura en español dentro de la ficha alemana deja media página en un
+// idioma y la imagen que la ilustra en otro.
+//
+// Si falta la de este idioma se usa la del idioma por defecto, y solo si tampoco
+// está se queda sin imagen. Una tanda que falla en un idioma suelto —pasa: una
+// sesión que caduca a mitad— no puede dejar la ficha peor de lo que estaba.
+const capturas = import.meta.glob<string>('../../../capturas/*.webp', {
+  eager: true,
+  query: '?url',
+  import: 'default',
+});
+const capturaDe = (nombre: string): string | undefined =>
+  capturas[`../../../capturas/${nombre}.${locale}.webp`] ??
+  capturas[`../../../capturas/${nombre}.${DEFAULT_LOCALE}.webp`];
+const capturaPrincipal = capturaDe(key);
+const capturaFunciones = capturaDe(`${key}-funciones`);
+// El nombre de producto es MARCA: no se traduce en ningún idioma.
+const nombre = nombreEnWeb(app);
+const short = nombre.replace('Sytue ', '');
+// Por la puerta de cada producto: Calcus, Diapos y CertiPDF comparten despliegue
+// con Docus y entran por su ruta, no por el dominio a secas.
+const appUrl = app.href;
+const path = rutaDeFicha(key);
+const pageUrl = absoluteUrl(localePath(locale, path));
+
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'SoftwareApplication',
+  '@id': `${pageUrl}#software`,
+  name: nombre,
+  applicationCategory: 'BusinessApplication',
+  operatingSystem: 'Web',
+  url: pageUrl,
+  description: info.tagline,
+  featureList: [...info.points, ...info.features],
+  isPartOf: { '@id': `${SITE_ORIGIN}/#software` },
+  provider: { '@id': `${SITE_ORIGIN}/#organization` },
+  // La MISMA oferta que la suite, y no una por producto: no se vende ninguno
+  // suelto. Sin `offers`, un agregador enseña la ficha sin precio o se lo
+  // inventa del contexto; con una oferta propia insinuaría que este producto se
+  // compra aparte, que es justo lo contrario de «un precio, toda la suite».
+  //
+  // Y ninguna oferta si el producto no está disponible: los datos estructurados son
+  // una afirmación legible por máquina, y decirle a un agregador que algo se vende a
+  // 5 € cuando todavía no existe es la misma mentira que decírselo a una persona
+  // (encargo v4 §14, «datos estructurados reales»).
+  ...(abrible ? { offers: ofertaSuite(t) } : {}),
+};
+---
+
+<MarketingLayout
+  locale={locale}
+  path={path}
+  title={`${nombre} — ${info.tagline}`}
+  description={info.tagline}
+  alternates={LOCALES}
+  jsonLd={[jsonLd]}
+>
+  <article class="mx-auto max-w-4xl px-6 py-16 md:py-20">
+    <a
+      href={`${localePath(locale, '/')}#products`}
+      class="text-text-muted hover:text-text inline-flex items-center gap-1 rounded-sm text-sm font-medium transition-colors"
+    >
+      <span aria-hidden="true">←</span>
+      {t('productPage.back')}
+    </a>
+
+    <header class="mt-6 flex items-center gap-4">
+      <span
+        class="grid h-16 w-16 shrink-0 place-items-center rounded-2xl"
+        style={`background:color-mix(in srgb, ${app.color} 10%, transparent)`}
+      >
+        {/* `ProductIcon` y NO `app.iconUrl`. Son dos familias: `iconUrl` es el icono
+            de línea ANTERIOR, que ya solo queda de reserva, y la marca es la que
+            enseñan la rejilla de esta misma web, el conmutador y el lanzador. Con
+            `iconUrl` la ficha de Rooms sacaba el logotipo viejo —el bocadillo con
+            cámara— justo debajo de una rejilla que ya mostraba el nuevo. */}
+        <ProductIcon appKey={key} size={36} />
+      </span>
+      <div class="min-w-0">
+        {/* Sin color de producto: como texto de 12 px no llega a 4,5:1 en tema
+            oscuro. El color vive en el icono, que va justo al lado. */}
+        <span class="sytue-overline text-text-muted">{short}</span>
+        {
+          /* Mismo distintivo que en la rejilla y misma función (product-content):
+            si el producto no está disponible, se dice antes que nada. */
+          estado && (
+            <Badge tone="warning" class="ml-2 align-middle">
+              {estado}
+            </Badge>
+          )
+        }
+        {
+          /* Misma etiqueta que en la rejilla y misma lista (product-content):
+            una cuenta personal no entra aquí, y se dice antes del titular. */
+          soloOrganizaciones(key) && (
+            <Badge tone="primary" class="ml-2 align-middle">
+              {t('grid.orgOnly')}
+            </Badge>
+          )
+        }
+        <h1 class="sytue-h1 text-text mt-1 text-balance">{info.tagline}</h1>
+      </div>
+    </header>
+
+    {/* El estándar abierto sobre el que corre el producto es el argumento
+        anti-lock-in y merece decirse, pero no dentro de una píldora con un punto
+        de color: el punto no significaba nada y la cápsula convertía un dato
+        técnico en un adorno. Una línea de texto con el nombre destacado. */}
+    {
+      /* Lo primero que se lee bajo el titular cuando el producto aún no existe. Va
+        ANTES del estándar y de la lista de funciones a propósito: esa lista describe lo
+        que hará, y sin esta línea se leería como lo que hace hoy. */
+      !abrible && (
+        <p class="border-warning bg-warning-bg text-warning-text mt-6 rounded-md border px-4 py-3 text-base text-pretty">
+          {t('productPage.enDesarrollo')}
+        </p>
+      )
+    }
+    <p class="text-text-muted mt-6 text-base">
+      {t('productPage.builtOn', { standard: info.standard })}
+    </p>
+    {esMotorPropio(key) && (
+      <p class="text-text-muted mt-2 text-base">{t('productPage.fromScratch')}</p>
+    )}
+
+    {capturaPrincipal && (
+      <Captura src={capturaPrincipal} alt={t('productPage.shot', { name: short })} />
+    )}
+
+    <ul class="mt-8 grid gap-4 sm:grid-cols-2">
+      {
+        /* Sin icono: los cuatro puntos llevaban el MISMO tick, que no distinguía
+           uno de otro y solo ocupaba el hueco donde «va un icono». Lo que
+           identifica cada tarjeta es lo que dice. */
+        info.points.map((point) => (
+          <li class="border-border bg-surface rounded-lg border p-5">
+            <span class="text-text text-base text-pretty">{point}</span>
+          </li>
+        ))
+      }
+    </ul>
+
+    {/* La lista larga: todo lo que el producto hace hoy, en frases cortas y sin
+         adjetivos. Dos columnas en escritorio; una marca de verificación en latón y
+         no un icono por fila, que aquí lo que distingue es el texto. */}
+    {/* «Todo lo que hace X» solo si X existe. En un producto que el catálogo
+        declara `desarrollo` esa lista describe lo que HARÁ —lo dice el aviso de
+        arriba y lo dice el comentario de esta misma plantilla—, así que el rótulo
+        la contradecía tres líneas después de haberlo advertido. */}
+    <h2 class="sytue-h3 text-text mt-12 text-balance">
+      {t(abrible ? 'productPage.features' : 'productPage.featuresPlanned', { name: short })}
+    </h2>
+    <ul class="mt-4 grid gap-x-8 gap-y-3 sm:grid-cols-2">
+      {info.features.map((feature) => (
+        <li class="text-text-muted flex items-start gap-2.5 text-base">
+          <Glifo d="M5 12.5l4.5 4.5L19 7" size={18} class="text-primary-text mt-1" />
+          <span class="text-pretty">{feature}</span>
+        </li>
+      ))}
+    </ul>
+    {capturaFunciones && (
+      <Captura src={capturaFunciones} alt={t('productPage.shotFeatures', { name: short })} />
+    )}
+
+    <div class="mt-10 flex flex-wrap items-center gap-3">
+      <a
+        href={`${appDomains.one}/auth/login`}
+        class="bg-primary sytue-focus-ring-inset inline-flex h-11 items-center rounded-control px-6 font-semibold text-[var(--sytue-on-primary)] shadow-[var(--shadow-xs)] transition-colors hover:bg-[var(--sytue-primary-hover)] focus-visible:outline-none active:bg-[var(--sytue-primary-active)] pointer-coarse:min-h-[max(44px,2.75rem)]"
+      >
+        {t('cta.start')}
+      </a>
+      {
+        /* Sin «Abrir» si el producto no está: el botón llevaría a un subdominio que hoy
+          no responde, y un enlace roto es peor que un botón que no está. */
+        abrible && (
+          <a
+            href={appUrl}
+            class="border-border-strong bg-surface text-text hover:bg-bg-subtle active:bg-surface-sunken inline-flex h-11 items-center rounded-control border px-6 font-semibold transition-colors pointer-coarse:min-h-[max(44px,2.75rem)]"
+          >
+            {t('productPage.open', { name: short })}
+          </a>
+        )
+      }
+    </div>
+
+    <p class="text-text-subtle mt-8 max-w-2xl text-sm text-pretty">{t('productPage.included')}</p>
+  </article>
+</MarketingLayout>

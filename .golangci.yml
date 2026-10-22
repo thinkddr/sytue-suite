@@ -1,0 +1,292 @@
+version: "2"
+run:
+  modules-download-mode: readonly
+  tests: true
+  allow-parallel-runners: true
+  build-tags:
+    - goolm
+output:
+  formats:
+    text:
+      path: stdout
+linters:
+  default: none
+  enable:
+    - bidichk
+    - bodyclose
+    - contextcheck
+    - copyloopvar
+    - depguard
+    - dupword
+    - durationcheck
+    - errcheck
+    - errorlint
+    - exhaustive
+    - forcetypeassert
+    - gocognit
+    - gocritic
+    - gocyclo
+    - godot
+    - gosec
+    - govet
+    - ineffassign
+    - makezero
+    - nilerr
+    - nilnil
+    - noctx
+    - prealloc
+    - predeclared
+    - protogetter
+    - reassign
+    - revive
+    - rowserrcheck
+    - sqlclosecheck
+    - staticcheck
+    - tagliatelle
+    - unconvert
+    - unparam
+    - unused
+    - usestdlibvars
+    - wastedassign
+    - whitespace
+  settings:
+    depguard:
+      rules:
+        logging:
+          list-mode: lax
+          files:
+            - '!**/*_test.go'
+          deny:
+            - pkg: log$
+              desc: Usa log/slog (structured logging, §13), no el paquete 'log'.
+        no-forbidden-engines:
+          list-mode: lax
+          deny:
+            - pkg: github.com/redis/go-redis
+              desc: Redis prohibido (licencia no-OSI). Usa PostgreSQL o Valkey (§0.1).
+            - pkg: github.com/go-redis/redis
+              desc: Redis prohibido (licencia no-OSI). Usa PostgreSQL o Valkey (§0.1).
+            - pkg: github.com/gomodule/redigo
+              desc: Redis prohibido (licencia no-OSI). Usa PostgreSQL o Valkey (§0.1).
+    errcheck:
+      check-type-assertions: true
+      check-blank: false
+    exhaustive:
+      default-signifies-exhaustive: true
+    gocognit:
+      min-complexity: 30
+    gocritic:
+      disabled-checks:
+        - hugeParam
+        - rangeValCopy
+        - unnamedResult
+      enabled-tags:
+        - diagnostic
+        - performance
+        - style
+        - opinionated
+    gocyclo:
+      min-complexity: 20
+    gosec:
+      severity: low
+      confidence: low
+      # Taint analysis (SSRF G704, open-redirect G710, XSS G705): experimental en gosec v2,
+      # decenas de falsos positivos en proxies/OIDC/webhooks legitimos que construyen URLs
+      # desde config de confianza. Las clasicas (cookies, credenciales, overflow, form) SIGUEN.
+      excludes:
+        - G704
+        - G710
+        - G705
+    govet:
+      disable:
+        - fieldalignment
+        - shadow
+      enable-all: true
+    revive:
+      severity: warning
+      rules:
+        - name: exported
+        - name: error-return
+        - name: error-strings
+        - name: error-naming
+        - name: context-as-argument
+        - name: context-keys-type
+        - name: var-naming
+        - name: package-comments
+        - name: unreachable-code
+        - name: deep-exit
+        - name: bare-return
+        - name: unnecessary-stmt
+        - name: time-naming
+    tagliatelle:
+      case:
+        rules:
+          json: snake
+          yaml: snake
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      - linters:
+          - bodyclose
+          - dupword
+          - errcheck
+          - gocognit
+          - gocyclo
+          - gosec
+          - noctx
+          - contextcheck
+          - forcetypeassert
+          - unparam
+        path: _test\.go
+      # Los catálogos de traducción son lengua natural, y en ella repetir palabra es
+      # correcto: en irlandés «do do chuntas» es «para tu cuenta» y en neerlandés
+      # «bevestig je je identiteit» es «confirma tu identidad».
+      - linters:
+          - dupword
+        path: internal/i18n/catalogo\.go
+      - linters:
+          - revive
+        path: cmd/.*/main\.go
+        text: deep-exit
+      # La complejidad de un `run()` de arranque es de ENUMERACIÓN, no de lógica:
+      # monta config, logger, telemetría, verificador, proveedores y servidor, y
+      # cada pieza opcional añade su `if`. Partirla en dos no la simplifica, la
+      # reparte —y deja el orden de arranque contado en dos sitios—. Mismo
+      # criterio que el `deep-exit` de aquí arriba.
+      #
+      # No se relaja para el resto: donde hay lógica de verdad, el tope se
+      # respeta (`exif.Leer` se partió en vez de excluirse).
+      - linters:
+          - gocyclo
+          - gocognit
+        path: cmd/.*/main\.go
+      # Mismo caso que el de arriba, en el otro sitio donde viven binarios de
+      # línea de comandos: un `fatal()` que imprime y sale es lo normal en una
+      # herramienta, y sacarlo a `main` obligaría a encadenar el error por seis
+      # funciones para acabar haciendo exactamente lo mismo.
+      - linters:
+          - revive
+        path: tools/.*/main\.go
+        text: deep-exit
+      - linters:
+          - tagliatelle
+        path: services/id/internal/http/webauthn.*\.go
+      - linters:
+          - tagliatelle
+        path: services/id/internal/scim/
+      - linters:
+          - tagliatelle
+        path: services/mail/internal/jmap/
+      - linters:
+          - tagliatelle
+        path: platform/pkg/livekit/
+      # Sytue Fotos expone camelCase en el cable —`coverAssetId`, `takenAt`,
+      # `driveFileId`— y su frontend lo lee así en siete ficheros. El tag ES el
+      # contrato, igual que en los de arriba; la diferencia es que aquí el otro
+      # extremo es nuestro, así que esto NO está bien, es deuda.
+      #
+      # ponytail: la convención de la casa es snake en el cable y camel en
+      # TypeScript, con el SDK traduciendo (así lo hacen drive, mail y hub).
+      # Alinear Fotos es un cambio de API con su migración, no un arreglo de
+      # lint: se hace cuando toque tocar esos endpoints, no para poner el CI en
+      # verde con un despliegue a medias.
+      - linters:
+          - tagliatelle
+        path: services/syphotos/
+      # Y su cliente nativo, por lo mismo: habla con ESE cable. El día que Fotos pase a
+      # snake, esta línea se va con la de arriba.
+      - linters:
+          - tagliatelle
+        path: apps/nucleo/api/photos\.go
+      # Adaptadores de protocolos/APIs de TERCEROS: el tag JSON es el contrato del otro
+      # extremo (Microsoft Graph/OData, Google Workspace, Jira, Salesforce, ServiceNow,
+      # Power BI, SCIM saliente, tarjetas Teams/Slack, políticas IAM de Scaleway).
+      # Renombrarlo a snake rompe la integración. Mismo criterio que webauthn/jmap/livekit.
+      - linters:
+          - tagliatelle
+        path: services/integrations/internal/(driver|scimout)/
+      - linters:
+          - tagliatelle
+        path: services/rooms/internal/compat/
+      # Capa de compatibilidad ENTRANTE de Drive: los DTO son la forma literal de la
+      # API de Google Drive v3 y de Microsoft Graph (mimeType, driveItem, @odata.*).
+      # El tag JSON es el contrato del cliente que apunta a Sytue creyendo hablar con
+      # Google o Microsoft: renombrarlo rompe la emulación entera.
+      - linters:
+          - tagliatelle
+        path: services/drive/internal/(compat|http/handlers_compat)
+      - linters:
+          - tagliatelle
+        path: services/cloud/internal/controller/scwiam
+      # Migradores e importadores: leen la respuesta CRUDA de Google Workspace,
+      # Microsoft 365, Graph y Teams para traerse los datos de quien llega desde
+      # ahí. `displayName`, `messageType` o `primaryEmail` no son nuestros: son los
+      # nombres que devuelve el otro extremo, y el struct los declara tal cual
+      # porque es lo que hay que deserializar. Renombrarlos a snake no arregla un
+      # estilo, rompe la importación. Mismo criterio que los adaptadores de arriba.
+      - linters:
+          - tagliatelle
+        path: services/integrations/internal/migrate/
+      # Compatibilidad ENTRANTE de Calendar y Contacts: igual que la de Drive, los
+      # DTO son la forma literal de Google Calendar/People y de Microsoft Graph,
+      # porque el cliente que apunta aquí cree estar hablando con ellos.
+      - linters:
+          - tagliatelle
+        path: services/(calendar|contacts)/internal/compat/
+      # DB Studio de Sytue Cloud: sus DTO ya los consume el panel en camelCase
+      # (TableBrowser/ApiPanel leen isPrimaryKey, rowCount, apiExposed…). Renombrarlos a
+      # snake rompería la pantalla; el contrato ya está publicado.
+      - linters:
+          - tagliatelle
+        path: services/cloud/internal/service/dbstudio\.go
+      # Registro común de comandos y pestañas de la cinta (comandos.json, pestanas.json) y
+      # vectores de macros: son ficheros que LEE TAMBIÉN la web en TypeScript, en camelCase
+      # (`labelKey`, `soloLectura`) como el resto de su código. El tag es el contrato con el
+      # otro extremo, que es nuestro y comparte el fichero; pasarlo a snake obligaría a
+      # reescribir los dos lados a la vez (los protege el test de paridad de la taxonomía).
+      - linters:
+          - tagliatelle
+        path: apps/nucleo/office/
+      # bodyclose no sigue la indirección doGet()+readOK(): TODOS los drivers cierran el
+      # cuerpo en readOK/drainClose (defer). Falso positivo sistemático del paquete.
+      - linters:
+          - bodyclose
+        path: services/integrations/internal/driver/
+      # migcheck lee el values.yaml del chart de frontends, que usa camelCase
+      # (extraHosts, orgHost, clientId): el struct debe llevar el mismo tag o no
+      # deserializa. Mismo criterio que los adaptadores de protocolo de terceros.
+      - linters:
+          - tagliatelle
+        path: platform/pkg/migcheck/migcheck_test\.go
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+formatters:
+  enable:
+    - gofumpt
+    - goimports
+  settings:
+    gofumpt:
+      # `extra.group-params` sustituye a `extra-rules`, que 2.13 marca obsoleto y
+      # avisa en cada ejecución. Es la misma regla con otro nombre: agrupar los
+      # parámetros del mismo tipo en una firma.
+      extra:
+        group-params: true
+    goimports:
+      local-prefixes:
+        - git.sytue.eu/sytue/one
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

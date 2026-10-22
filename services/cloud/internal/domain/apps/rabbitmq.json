@@ -1,0 +1,48 @@
+{
+  "id": "rabbitmq",
+  "name": "RabbitMQ",
+  "description": "Cola de mensajes para trabajos en segundo plano: envíos de correo, informes, todo lo que no debe hacer esperar a quien pulsa el botón.",
+  "category": "queue",
+  "license": "MPL-2.0",
+  "homepage": "https://www.rabbitmq.com/",
+  "upstream": "docker.io/library/rabbitmq:4.3.4-management-alpine",
+  "upstream_digest": "sha256:cd624335f752f704e768239ea21501e5771ca13b3b278520da5ad1076eb86e55",
+  "version": "4.3.4",
+  "ports": [
+    {
+      "name": "amqp",
+      "port": 5672
+    },
+    {
+      "name": "management",
+      "port": 15672
+    }
+  ],
+  "exports": [
+    {
+      "key": "AMQP_URL",
+      "value": "amqp://{host}:{port}"
+    }
+  ],
+  "env": [
+    {
+      "key": "RABBITMQ_DEFAULT_USER",
+      "value": "sytue"
+    },
+    {
+      "key": "RABBITMQ_DEFAULT_PASS",
+      "generate": true,
+      "export": true
+    }
+  ],
+  "disk_gib": 5,
+  "data_path": "/var/lib/rabbitmq",
+  "writable_paths": [
+    "/etc/rabbitmq",
+    "/var/log/rabbitmq"
+  ],
+  "memory_mib": 1024,
+  "cpu_milli": 1000,
+  "run_as_user": 100,
+  "mirrored_digest": "sha256:cd624335f752f704e768239ea21501e5771ca13b3b278520da5ad1076eb86e55"
+}

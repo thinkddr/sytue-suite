@@ -1,0 +1,33 @@
+---
+/**
+ * La papelera de Docus, Calcus o Diapos (components/DocTrash.tsx): solo los
+ * documentos del tipo de la app que la monta.
+ */
+import type { DocKind } from '@sytue/api-clients';
+import type { SytueSession } from '@sytue/auth';
+import AppLayout from '../layouts/AppLayout.astro';
+import { DocTrash } from '../components/DocTrash';
+import { docsT } from '../i18n';
+import { productoDeKind } from '../lib/producto';
+
+interface Props {
+  /** La de `entrar(Astro, { canonica: true })`: login y forma canónica ya resueltos. */
+  sesion: SytueSession;
+  /** El tipo de la app que la monta: solo sus documentos. */
+  kind: DocKind;
+}
+
+const { sesion: session, kind } = Astro.props;
+
+const locale = Astro.locals.locale;
+const t = docsT(locale);
+---
+
+<AppLayout title={t('trash.title')} producto={productoDeKind(kind)}>
+  <DocTrash
+    client:load
+    locale={locale}
+    kind={kind}
+    org={Astro.locals.org ?? session.user.tenant ?? null}
+  />
+</AppLayout>

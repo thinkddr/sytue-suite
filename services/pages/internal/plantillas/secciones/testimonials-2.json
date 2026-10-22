@@ -1,0 +1,72 @@
+{
+  "children": [
+    {
+      "content": {
+        "en": [
+          {
+            "text": "Client Reviews"
+          }
+        ],
+        "es": [
+          {
+            "text": "Opiniones de clientes"
+          }
+        ]
+      },
+      "id": "tex0000001",
+      "tag": "h2",
+      "type": "text"
+    },
+    {
+      "content": {
+        "en": [
+          {
+            "text": "Here goes a real customer review about the service received."
+          }
+        ],
+        "es": [
+          {
+            "text": "Aquí va la opinión de un cliente real sobre el servicio recibido."
+          }
+        ]
+      },
+      "id": "tex0000002",
+      "tag": "blockquote",
+      "type": "text"
+    },
+    {
+      "content": {
+        "en": [
+          {
+            "text": "Firstname Lastname"
+          }
+        ],
+        "es": [
+          {
+            "text": "Nombre Apellido"
+          }
+        ]
+      },
+      "id": "tex0000003",
+      "tag": "p",
+      "type": "text"
+    }
+  ],
+  "full_bleed": false,
+  "id": "sec0000001",
+  "kind": "testimonials",
+  "layout": {
+    "direction": "column",
+    "gap": 24,
+    "padding": [
+      32,
+      32,
+      32,
+      32
+    ],
+    "align": "center",
+    "justify": "center",
+    "wrap": false
+  },
+  "type": "section"
+}

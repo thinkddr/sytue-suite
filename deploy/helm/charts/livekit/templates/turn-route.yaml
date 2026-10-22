@@ -1,0 +1,49 @@
+{{- if .Values.turn.enabled }}
+{{- $turnDomain := include "livekit.turnDomain" . -}}
+# El dominio TURN resuelve al ingress principal. cert-manager puede completar
+# HTTP-01 allí y Traefik usa el certificado resultante para terminar TURN/TLS.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "livekit.fullname" . }}-turn
+  labels:
+    {{- include "livekit.labels" . | nindent 4 }}
+spec:
+  secretName: {{ .Values.turn.tlsSecret }}
+  issuerRef:
+    name: {{ include "livekit.clusterIssuer" . }}
+    kind: ClusterIssuer
+  dnsNames:
+    - {{ $turnDomain | quote }}
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRouteTCP
+metadata:
+  name: {{ include "livekit.fullname" . }}-turn-tls
+  labels:
+    {{- include "livekit.labels" . | nindent 4 }}
+spec:
+  entryPoints:
+    - {{ .Values.turn.tlsEntryPoint }}
+  routes:
+    - match: {{ printf "HostSNI(`%s`)" $turnDomain | quote }}
+      services:
+        - name: {{ include "livekit.fullname" . }}
+          port: turn-tls
+  tls:
+    secretName: {{ .Values.turn.tlsSecret }}
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRouteUDP
+metadata:
+  name: {{ include "livekit.fullname" . }}-turn-udp
+  labels:
+    {{- include "livekit.labels" . | nindent 4 }}
+spec:
+  entryPoints:
+    - {{ .Values.turn.udpEntryPoint }}
+  routes:
+    - services:
+        - name: {{ include "livekit.fullname" . }}
+          port: turn-udp
+{{- end }}

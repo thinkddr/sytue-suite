@@ -1,0 +1,19 @@
+CalDAV-naptár, amely összekapcsolódik a programcsomag többi részével.
+
+• Napi, heti és havi nézet.
+• Ismétlődő események és emlékeztetők.
+• Események létrehozása közvetlenül egy Mail-levélből.
+• Bármely CalDAV-klienssel működik.
+• Havi, heti, napi és napirend nézet, mininaptárral és „Ma” gombbal.
+• Napi, heti vagy havi ismétlődés befejezéssel; csak ennek, ennek és a következőknek, vagy az összesnek a szerkesztése.
+• Eseményenkénti emlékeztetők és értesítések a programcsomagban.
+• Meghívók válasszal (részt veszek, talán, nem) és nyomon követéssel.
+• „Időpont keresése”, amely minden résztvevőnek szabad.
+• Foglalható termek és erőforrások elérhetőséggel.
+• Megosztott naptárak jogosultságokkal, és az Önnel megosztott naptárak.
+• Feliratkozás külső naptárakra (ICS) és több, színkóddal jelölt naptár.
+• Esemény létrehozása Mail-üzenetből vagy jegyzetből.
+• Bármely CalDAV-klienssel működik: Apple Calendar, Thunderbird és mások.
+• Esemény duplikálása vagy másolása a saját naptárba, és letöltése .ics fájlként a Sytue-n kívüliek számára.
+
+Titkosítás átvitel közben (TLS 1.3). A Sytue infrastruktúrája az EU-ban található. A külső szolgáltatások helye a szolgáltatójuktól függ.

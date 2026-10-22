@@ -1,0 +1,66 @@
+---
+/**
+ * Sytue Notepads — vista principal. SSR: el layout exige sesión; la isla NotesApp
+ * (client:load) monta la Sytue Shell + el árbol de cuadernos y el lienzo.
+ *
+ * `?notebook=` y `?note=` son el deep-link con el que llegan la búsqueda
+ * unificada del Hub y un enlace compartido en Rooms: la app abre ese cuaderno y
+ * selecciona esa nota en vez de aterrizar en el primero de la lista.
+ *
+ * `?link=<tipo>:<id>&label=<rótulo>` es el OTRO extremo de la referencia
+ * bidireccional: se llega desde la ficha de un evento de Sytue Calendar con
+ * «escribir una nota para este evento», y la app crea la nota ya vinculada. El
+ * cuaderno lo elige quien escribe —es el que tiene abierto—, porque es una
+ * decisión suya y no del calendario.
+ */
+import AppLayout from '../layouts/AppLayout.astro';
+import { serverEnv } from '@sytue/auth/server';
+import { appUrl, returnToCanonico } from '@sytue/config';
+import { NotesApp } from '../components/NotesApp.js';
+import { bff, toBffContext } from '../lib/bff.js';
+
+export const prerender = false;
+
+const session = await bff.getSession(toBffContext(Astro));
+if (!session) {
+  // ADR 0056: la entrada org-ful llega reescrita con la marca ?__org=; el returnTo
+  // sale canónico, no en la forma interna, o tras el login la barra se queda con ella.
+  const returnTo = returnToCanonico(Astro.url, bff.basePath);
+  const redireccionLogin = Astro.redirect(
+    `${bff.basePath}/auth/login?returnTo=${encodeURIComponent(returnTo)}`,
+  );
+  redireccionLogin.headers.set('cache-control', 'no-store');
+  return redireccionLogin;
+}
+const env = serverEnv(import.meta.env);
+const hubBaseUrl = env.SYTUE_HUB_BASE_URL ?? 'https://hub.sytue.eu';
+// Con el prefijo de la app y la org de la sesión (ADR 0056): de aquí salen los
+// enlaces entre notas, que salen canónicos. El enlace PÚBLICO de un cuaderno
+// (`/p/<token>`) NO sale de aquí: es para anónimos y lo compone NotebookSettings
+// sin org.
+const publicBase = appUrl('notes', '', session.user.tenant);
+const notebookInicial = Astro.url.searchParams.get('notebook') ?? undefined;
+const notaInicial = Astro.url.searchParams.get('note') ?? undefined;
+const anclaInicial = Astro.url.searchParams.get('h') ?? undefined;
+const vinculoInicial = Astro.url.searchParams.get('link') ?? undefined;
+const rotuloInicial = Astro.url.searchParams.get('label') ?? undefined;
+// Una nota que alguien me ha compartido (el aviso `notes.shared`, hubnotify.EnlaceNotaCompartida).
+const compartidaInicial = Astro.url.searchParams.get('shared') ?? undefined;
+---
+
+<AppLayout title="Sytue Notepads">
+  <NotesApp
+    slot="app"
+    client:load
+    user={session.user}
+    hubBaseUrl={hubBaseUrl}
+    locale={Astro.locals.locale}
+    publicBase={publicBase}
+    notebookInicial={notebookInicial}
+    notaInicial={notaInicial}
+    anclaInicial={anclaInicial}
+    vinculoInicial={vinculoInicial}
+    rotuloInicial={rotuloInicial}
+    compartidaInicial={compartidaInicial}
+  />
+</AppLayout>

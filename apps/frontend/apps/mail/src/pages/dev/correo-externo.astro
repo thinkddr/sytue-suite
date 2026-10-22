@@ -1,0 +1,26 @@
+---
+/** Real external-mail wizard. Synthetic API data only; production always returns 404. */
+import '../../styles/app.css';
+import { basePathScript } from '@sytue/ui';
+import { ExternalMailDemo } from '../../components/dev/ExternalMailDemo';
+export const prerender = false;
+if (!import.meta.env.DEV) return new Response(null, { status: 404 });
+const locale = Astro.url.searchParams.get('lang') === 'es' ? 'es' : 'en';
+---
+
+<!doctype html>
+<html lang={locale}>
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, interactive-widget=resizes-content"
+    />
+    <meta name="robots" content="noindex,nofollow" />
+    <title>Sytue Mail</title>
+    <script is:inline set:html={basePathScript('/mail')}></script>
+  </head>
+  <body class="bg-bg text-text min-h-dvh antialiased">
+    <ExternalMailDemo client:only="preact" locale={locale} />
+  </body>
+</html>

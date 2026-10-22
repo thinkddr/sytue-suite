@@ -1,0 +1,17 @@
+"widgets.open" = "Otvoriť";
+"widgets.compose" = "Napísať";
+"widgets.create" = "Vytvoriť udalosť";
+"widgets.notes" = "Poznámky";
+"widgets.rows" = "Riadky";
+"widgets.pending" = "Čakajúce";
+"widgets.channels" = "Kanály";
+"widgets.photos" = "Fotky";
+"widgets.episodes" = "Epizódy";
+"widgets.apps" = "Aplikácie";
+"widgets.calendars" = "Kalendáre";
+"widgets.address_books" = "Adresáre";
+"search.label" = "Globálne vyhľadávanie";
+"dataflow.item.files" = "Súbory";
+"dataflow.item.events" = "Kalendár";
+"dataflow.item.documents" = "Dokumenty";
+"dataflow.item.contacts" = "Kontakty";

@@ -1,0 +1,48 @@
+{
+  "$description": "Sytue — tokens de tipografía. Familia única para toda la suite (diseño 100% Sytue-native). La consume @sytue/ui.",
+  "meta": { "brand": "Sytue", "version": "1.0.0" },
+  "fontFamily": {
+    "sans": "\"Figtree Variable\", \"Inter Variable\", \"Segoe UI\", system-ui, -apple-system, BlinkMacSystemFont, \"Helvetica Neue\", Arial, sans-serif",
+    "mono": "\"JetBrains Mono\", \"SFMono-Regular\", ui-monospace, \"Cascadia Code\", \"Roboto Mono\", Menlo, Consolas, monospace",
+    "$note": "Figtree es la cara de la suite (SIL OFL — libre) para los 24 idiomas de alfabeto latino; Inter (OFL) pinta griego y cirílico y pasa delante en las páginas en griego y búlgaro. Las dos autoalojadas desde @fontsource-variable. JetBrains Mono (OFL) para código, logs del PaaS y editor SQL del DB Studio."
+  },
+  "fontWeight": {
+    "regular": 400,
+    "medium": 500,
+    "semibold": 600,
+    "bold": 700
+  },
+  "fontSize": {
+    "$note": "Escala modular (~1.2) sobre base 14px. Densidad media (diseño Sytue-native). Valores rem.",
+    "xs":   { "size": "0.75rem",  "lineHeight": "1rem",     "px": 12 },
+    "sm":   { "size": "0.8125rem","lineHeight": "1.125rem", "px": 13 },
+    "base": { "size": "0.875rem", "lineHeight": "1.375rem", "px": 14 },
+    "md":   { "size": "1rem",     "lineHeight": "1.5rem",   "px": 16 },
+    "lg":   { "size": "1.125rem", "lineHeight": "1.625rem", "px": 18 },
+    "xl":   { "size": "1.375rem", "lineHeight": "1.875rem", "px": 22 },
+    "2xl":  { "size": "1.75rem",  "lineHeight": "2.25rem",  "px": 28 },
+    "3xl":  { "size": "2.25rem",  "lineHeight": "2.625rem", "px": 36 },
+    "4xl":  { "size": "3rem",     "lineHeight": "3.25rem",  "px": 48 }
+  },
+  "letterSpacing": {
+    "tight": "-0.01em",
+    "normal": "0",
+    "wide": "0.02em",
+    "caps": "0.06em"
+  },
+  "roles": {
+    "$note": "Roles tipográficos canónicos usados por los componentes de @sytue/ui.",
+    "display":   { "size": "4xl", "weight": "bold",     "letterSpacing": "tight" },
+    "h1":        { "size": "3xl", "weight": "bold",     "letterSpacing": "tight" },
+    "h2":        { "size": "2xl", "weight": "bold",     "letterSpacing": "tight" },
+    "h3":        { "size": "xl",  "weight": "semibold", "letterSpacing": "normal" },
+    "h4":        { "size": "lg",  "weight": "semibold", "letterSpacing": "normal" },
+    "body":      { "size": "base","weight": "regular",  "letterSpacing": "normal" },
+    "body-md":   { "size": "md",  "weight": "regular",  "letterSpacing": "normal" },
+    "label":     { "size": "sm",  "weight": "semibold", "letterSpacing": "normal" },
+    "caption":   { "size": "xs",  "weight": "regular",  "letterSpacing": "normal" },
+    "overline":  { "size": "xs",  "weight": "semibold", "letterSpacing": "caps", "transform": "uppercase" },
+    "button":    { "size": "base","weight": "semibold", "letterSpacing": "normal" },
+    "code":      { "size": "sm",  "weight": "regular",  "family": "mono" }
+  }
+}

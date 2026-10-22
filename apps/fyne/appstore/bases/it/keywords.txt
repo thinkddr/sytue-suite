@@ -1,0 +1,1 @@
+database,CSV,JSON,Tabelle,relazionali,collaborative

@@ -1,0 +1,134 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "sytue-ocr.fullname" . }}
+  labels:
+    {{- include "sytue-ocr.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "sytue-ocr.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "sytue-ocr.labels" . | nindent 8 }}
+      annotations:
+        kubectl.kubernetes.io/default-container: ocr
+    spec:
+      automountServiceAccountToken: false
+      {{- with (.Values.global).imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: ocr
+          image: "{{ include "sytue-ocr.imageRegistry" . }}/{{ .Values.image.repository }}:{{ ((.Values.global).image | default dict).tag | default .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.targetPort }}
+          env:
+            {{- if (.Values.global).otlp }}
+            {{- if (.Values.global).otlp.endpoint }}
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ (.Values.global).otlp.endpoint | quote }}
+            {{- end }}
+            {{- if (.Values.global).otlp.tokenSecret }}
+            - name: OTEL_EXPORTER_OTLP_HEADERS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ (.Values.global).otlp.tokenSecret }}
+                  key: {{ (.Values.global).otlp.tokenKey | default "otlp-headers" }}
+                  optional: true
+            {{- end }}
+            {{- end }}
+            # Runtime Go atado a los limites del pod.
+            {{- include "sytue.goRuntimeEnv" (dict "container" "ocr" "memLimit" .Values.resources.limits.memory) | nindent 12 }}
+            {{- include "sytue.logCollectorEnv" . | nindent 12 }}
+            - name: SYTUE_OCR_ENV
+              value: {{ include "sytue-ocr.env" . | quote }}
+            - name: SYTUE_OCR_HTTP_ADDR
+              value: ":{{ .Values.service.targetPort }}"
+            # PORT lo lee el subcomando `ocr healthcheck` del HEALTHCHECK de Docker,
+            # que no comparte el cargador de config con el servidor.
+            - name: PORT
+              value: "{{ .Values.service.targetPort }}"
+            - name: SYTUE_OCR_LOG_LEVEL
+              value: {{ .Values.config.logLevel | quote }}
+            # ----- Sytue ID (OIDC; validacion del JWT que reenvia Docs) -----
+            - name: SYTUE_OCR_OIDC_ISSUER
+              value: {{ include "sytue-ocr.oidcIssuer" . | quote }}
+            - name: SYTUE_OCR_OIDC_JWKS_URL
+              value: {{ include "sytue.oidcJwksUrl" . | quote }}
+            # La suite comparte sesion: el token que llega trae la audiencia de
+            # Sytue Docs, no la de este servicio. Sin aceptarla, TODA peticion de
+            # OCR se rechazaria con 401 y la funcionalidad no arrancaria nunca.
+            - name: SYTUE_OCR_OIDC_ACCEPTED_AUDIENCES
+              value: "sytue-docs,sytue-ocr"
+            - name: SYTUE_OCR_TIMEOUT
+              value: {{ .Values.config.timeout | quote }}
+            - name: SYTUE_OCR_MAX_CONCURRENTES
+              value: "{{ .Values.config.maxConcurrentes }}"
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          # Arranque LENTO a proposito en la sonda: la imagen carga el motor y sus
+          # datos de idioma. Con el failureThreshold por defecto, Kubernetes matarïa
+          # el pod antes de que llegara a estar listo y entrarïa en bucle.
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 5
+            failureThreshold: 24
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 20
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        # En MEMORIA: una pagina escaneada —una nomina, un contrato— no debe
+        # quedar escrita en el disco del nodo ni un segundo.
+        - name: tmp
+          emptyDir:
+            medium: Memory
+            sizeLimit: {{ .Values.tmpSizeLimit }}
+      {{- with .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- range . }}
+        - maxSkew: {{ .maxSkew }}
+          topologyKey: {{ .topologyKey }}
+          whenUnsatisfiable: {{ .whenUnsatisfiable }}
+          labelSelector:
+            matchLabels:
+              {{- include "sytue-ocr.selectorLabels" $ | nindent 14 }}
+        {{- end }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

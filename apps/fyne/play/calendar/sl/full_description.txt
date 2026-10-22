@@ -1,0 +1,19 @@
+Koledar CalDAV, povezan s preostalim naborom.
+
+• Pogledi dneva, tedna in meseca.
+• Ponavljajoči se dogodki in opomniki.
+• Ustvarjanje dogodkov neposredno iz e-poštnega sporočila v Mail.
+• Deluje s katerim koli odjemalcem CalDAV.
+• Pogledi meseca, tedna, dneva in dnevnega reda, z majhnim koledarjem in gumbom »Danes«.
+• Dnevno, tedensko ali mesečno ponavljanje s koncem; urejanje samo tega, tega in naslednjih ali vseh.
+• Opomniki za vsak dogodek in obvestila v naboru.
+• Povabila z odgovorom (pridem, morda, ne) in spremljanjem.
+• »Poišči termin«, prost za vse povabljene osebe.
+• Rezervacija prostorov in virov z razpoložljivostjo.
+• Koledarji v skupni rabi z dovoljenji in koledarji, deljeni z vami.
+• Naročanje na zunanje koledarje (ICS) in več barvno označenih koledarjev.
+• Ustvarjanje dogodka iz sporočila v Mail ali iz zapiska.
+• Deluje s katerim koli odjemalcem CalDAV: Apple Calendar, Thunderbird in drugimi.
+• Podvajanje dogodka ali kopiranje v vaš koledar in prenos kot .ics za osebe zunaj Sytue.
+
+Šifrirano med prenosom (TLS 1.3). Infrastruktura Sytue je v EU. Lokacija zunanjih storitev je odvisna od njihovega ponudnika.

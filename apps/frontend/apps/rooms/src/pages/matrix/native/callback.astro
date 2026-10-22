@@ -1,0 +1,30 @@
+---
+import { roomsT } from '../../../i18n/index.js';
+export const prerender = false;
+Astro.response.headers.set('cache-control', 'no-store');
+Astro.response.headers.set('referrer-policy', 'no-referrer');
+const t = roomsT(Astro.locals.locale);
+---
+
+<!doctype html>
+<html lang={Astro.locals.locale}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <title>Sytue Rooms</title>
+  </head>
+  <body>
+    <p role="status" id="matrix-native-status" data-failed={t('whatsappConnection.sameAccount')}>
+      Sytue Rooms
+    </p>
+    <script>
+      import { completeMatrixNative } from '../../../client/matrix/native.js';
+      void completeMatrixNative()
+        .then((destination) => window.location.replace(destination))
+        .catch(() => {
+          const status = document.querySelector('#matrix-native-status');
+          if (status instanceof HTMLElement) status.textContent = status.dataset.failed ?? '';
+        });
+    </script>
+  </body>
+</html>

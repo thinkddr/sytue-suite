@@ -1,0 +1,18 @@
+Vinte e quatro módulos e uma contabilidade em partidas dobradas que a base de dados não deixa desequilibrar.
+
+• Vinte e quatro módulos e trinta e seis modelos: contactos, vendas, compras, inventário, produção, faturação, contabilidade, projetos e recursos humanos.
+• Adicionar um módulo é escrever um ficheiro JSON: sem migração, sem rota nova e sem trabalho de interface.
+• O dinheiro é guardado em cêntimos inteiros, nunca em vírgula flutuante, e é a base de dados que garante o equilíbrio.
+• Os lançamentos registados são intocáveis: corrigem-se com outro lançamento, e é isso que distingue um razão de uma folha de cálculo.
+• Vinte e quatro módulos e trinta e seis modelos num único serviço e numa única base de dados.
+• O catálogo de modelos são dados: cada módulo declara os seus campos, os seus estados e as colunas da sua lista.
+• Um módulo novo é um ficheiro JSON — sem DDL, sem migração e sem bloqueio de tabelas.
+• Uma API para os trinta e seis modelos e uma interface gerada a partir do catálogo.
+• Contabilidade em partidas dobradas com montantes em cêntimos inteiros; nem um número em vírgula flutuante.
+• É a base de dados que verifica o equilíbrio ao confirmar a transação, não o código da aplicação.
+• Os lançamentos fechados são imutáveis: não se podem editar, apagar nem receber linhas novas.
+• Um documento, um lançamento: uma nova tentativa ou dois separadores abertos não podem duplicar receitas.
+• Os rótulos comuns existem nos 26 idiomas, e um campo sem tradução impede o arranque do serviço.
+• Listagens com índices: a primeira página de vinte mil linhas chega em menos de um milissegundo.
+
+Cifrado em trânsito (TLS 1.3). A infraestrutura da Sytue está na UE. A localização dos serviços externos depende do respetivo fornecedor.

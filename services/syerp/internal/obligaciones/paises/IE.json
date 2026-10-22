@@ -1,0 +1,238 @@
+{
+ "pais": "IE",
+ "verificado": true,
+ "moneda": "EUR",
+ "formas": [
+  {
+   "clave": "sole_trader",
+   "nombre": "Sole trader",
+   "tipo": "persona_fisica"
+  },
+  {
+   "clave": "partnership",
+   "nombre": "Partnership",
+   "tipo": "persona_fisica"
+  },
+  {
+   "clave": "ltd",
+   "nombre": "Private company limited by shares (LTD)",
+   "tipo": "sociedad"
+  },
+  {
+   "clave": "dac",
+   "nombre": "Designated Activity Company (DAC)",
+   "tipo": "sociedad"
+  },
+  {
+   "clave": "plc",
+   "nombre": "Public Limited Company (PLC)",
+   "tipo": "sociedad"
+  }
+ ],
+ "portales": {
+  "ros": {
+   "nombre": "Revenue Online Service (ROS)",
+   "url": "https://www.ros.ie/"
+  },
+  "cro": {
+   "nombre": "Companies Registration Office (CORE)",
+   "url": "https://core.cro.ie/"
+  }
+ },
+ "obligaciones": [
+  {
+   "clave": "ie_vat3",
+   "nombre": "VAT3 return (bi-monthly)",
+   "concepto": "iva_periodica",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "1P": "03-23",
+    "2P": "05-23",
+    "3P": "07-23",
+    "4P": "09-23",
+    "5P": "11-23",
+    "6P": "01-23+1"
+   },
+   "margen_dias": 7,
+   "portal": "ros",
+   "aplica": {
+    "condiciones": [
+     "iva"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_pct_mes": 0.0274,
+    "recargo_max_pct": 10,
+    "nota": "Statutory date the 19th (14th for PAYE); the 23rd applies when the return is filed and paid through ROS. Interest at 0.0274 % per day on late payment; fixed penalty of €4,000 for failure to file. Bi-monthly periods (Jan/Feb, Mar/Apr…) due by the 23rd of the following month via ROS."
+   },
+   "calculo": {
+    "tipo": "saldo_neto",
+    "haber": [
+     "477"
+    ],
+    "debe": [
+     "472"
+    ]
+   }
+  },
+  {
+   "clave": "ie_rtd",
+   "nombre": "Annual Return of Trading Details (RTD)",
+   "concepto": "iva_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "01-23+1"
+   },
+   "margen_dias": 14,
+   "portal": "ros",
+   "aplica": {
+    "condiciones": [
+     "iva"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 400000,
+    "nota": "Penalty of €4,000 for non-filing; withholding of tax clearance."
+   }
+  },
+  {
+   "clave": "ie_vies",
+   "nombre": "VIES statement",
+   "concepto": "operaciones_intracomunitarias",
+   "ambito": "fiscal",
+   "periodicidad": "trimestral",
+   "plazos": {
+    "T": "23"
+   },
+   "margen_dias": 7,
+   "portal": "ros",
+   "aplica": {
+    "condiciones": [
+     "intracomunitario"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 400000,
+    "nota": "Penalty of €4,000 per return."
+   }
+  },
+  {
+   "clave": "ie_paye",
+   "nombre": "PAYE monthly return (employer)",
+   "concepto": "retenciones_trabajo",
+   "ambito": "laboral",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "23"
+   },
+   "margen_dias": 7,
+   "portal": "ros",
+   "aplica": {
+    "condiciones": [
+     "empleados"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_pct_mes": 0.0274,
+    "recargo_max_pct": 10,
+    "nota": "Statutory date the 19th (14th for PAYE); the 23rd applies when the return is filed and paid through ROS. Interest at 0.0274 % per day; €4,000 penalty for failure to file. Includes PRSI and USC."
+   }
+  },
+  {
+   "clave": "ie_ct1",
+   "nombre": "Corporation tax return (CT1)",
+   "concepto": "sociedades_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "09-23+1"
+   },
+   "margen_dias": 30,
+   "portal": "ros",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_base_pct": 5,
+    "recargo_max_pct": 10,
+    "nota": "Surcharge of 5 % (max €12,695) if under two months late, 10 % (max €63,485) thereafter. Due by the 23rd of the ninth month after the year end."
+   }
+  },
+  {
+   "clave": "ie_prelim",
+   "nombre": "Preliminary corporation tax",
+   "concepto": "pago_fraccionado_sociedades",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "11-23"
+   },
+   "margen_dias": 7,
+   "portal": "ros",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_pct_mes": 0.0274,
+    "nota": "Interest at 0.0274 % per day. Small companies: 100 % of prior year or 90 % of current year by the 23rd of the eleventh month."
+   }
+  },
+  {
+   "clave": "ie_form11",
+   "nombre": "Income tax return (Form 11)",
+   "concepto": "renta_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "10-31+1"
+   },
+   "margen_dias": 30,
+   "portal": "ros",
+   "aplica": {
+    "tipos": [
+     "persona_fisica"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_base_pct": 5,
+    "recargo_max_pct": 10,
+    "nota": "Surcharge of 5 % (max €12,695) if under two months late, 10 % thereafter. ROS filers get a mid-November extension."
+   }
+  },
+  {
+   "clave": "ie_b1",
+   "nombre": "Annual return (B1) with financial statements",
+   "concepto": "cuentas_anuales",
+   "ambito": "mercantil",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "10-25+1"
+   },
+   "margen_dias": 30,
+   "portal": "cro",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 10000,
+    "nota": "Late filing fee of €100 plus €3 per day (max €1,200) and loss of audit exemption. The date depends on the company's Annual Return Date (ARD); 56 days to file after the ARD."
+   }
+  }
+ ]
+}

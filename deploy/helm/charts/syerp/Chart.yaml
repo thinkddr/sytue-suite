@@ -1,0 +1,20 @@
+apiVersion: v2
+name: sytue-syerp
+description: >-
+  SyERP — servicio Go propio del ERP de la suite: 24 módulos y 36 modelos declarados
+  como DATO (catálogo embebido), CRUD genérico para todos ellos y libro diario por
+  partida doble con el cuadre impuesto por PostgreSQL. Conectores de entrada a
+  Salesforce (por el Integration Gateway) y a Stripe (webhook firmado). Estado en
+  PostgreSQL. Código Apache-2.0, (c) 2026 Daniel Delgado Ramos. Expuesto en erp.sytue.eu.
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+kubeVersion: ">=1.31.0-0"
+home: https://sytue.eu
+keywords: [sytue, syerp, erp, contabilidad, go]
+maintainers:
+  - name: Sytue Platform
+    email: platform@sytue.eu
+annotations:
+  licenses: MIT
+  sytue.eu/stack: go

@@ -1,0 +1,88 @@
+{
+  "children": [
+    {
+      "content": {
+        "en": [
+          {
+            "text": "Direct Contact"
+          }
+        ],
+        "es": [
+          {
+            "text": "Contacto directo"
+          }
+        ]
+      },
+      "id": "tex0000001",
+      "tag": "h2",
+      "type": "text"
+    },
+    {
+      "consent": {
+        "en": "I accept the privacy policy.",
+        "es": "Acepto la política de privacidad."
+      },
+      "fields": [
+        {
+          "id": "fld0000001",
+          "kind": "text",
+          "label": {
+            "en": "Full name",
+            "es": "Nombre completo"
+          },
+          "required": true
+        },
+        {
+          "id": "fld0000002",
+          "kind": "email",
+          "label": {
+            "en": "Email address",
+            "es": "Correo electrónico"
+          },
+          "required": true
+        }
+      ],
+      "form": "for0000002",
+      "id": "for0000001",
+      "layout": {
+        "direction": "column",
+        "gap": 12,
+        "padding": [
+          16,
+          16,
+          16,
+          16
+        ],
+        "align": "start",
+        "justify": "start",
+        "wrap": false
+      },
+      "submit": {
+        "en": "Send message",
+        "es": "Enviar mensaje"
+      },
+      "success": {
+        "en": "Message successfully received.",
+        "es": "Mensaje recibido correctamente."
+      },
+      "type": "form"
+    }
+  ],
+  "full_bleed": false,
+  "id": "sec0000001",
+  "kind": "contact",
+  "layout": {
+    "direction": "column",
+    "gap": 24,
+    "padding": [
+      32,
+      32,
+      32,
+      32
+    ],
+    "align": "center",
+    "justify": "center",
+    "wrap": false
+  },
+  "type": "section"
+}

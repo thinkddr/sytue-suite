@@ -1,0 +1,95 @@
+[
+  {
+    "clave": "impuesto", "modulo": "contabilidad", "titulo": "nombre",
+    "etiqueta": {"en":"Taxes","es":"Impuestos","fr":"Taxes","de":"Steuern","it":"Imposte","bg":"Данъци","cs":"Daně","da":"Skatter","el":"Φόροι","et":"Maksud","fi":"Verot","ga":"Cánacha","hr":"Porezi","hu":"Adók","is":"Skattar","lt":"Mokesčiai","lv":"Nodokļi","mt":"Taxxi","nb":"Avgifter","nl":"Belastingen","pl":"Podatki","pt":"Impostos","ro":"Taxe","sk":"Dane","sl":"Davki","sv":"Skatter"},
+    "estados": ["activa","pausada"],
+    "campos": [
+      {"clave":"nombre","tipo":"texto","requerido":true},
+      {"clave":"codigo","tipo":"texto"},
+      {"clave":"porcentaje","tipo":"decimal","requerido":true},
+      {"clave":"tipo","tipo":"seleccion","opciones":["repercutido","soportado"],"requerido":true},
+      {"clave":"cuenta","tipo":"relacion","modelo":"cuenta_contable"}
+    ],
+    "lista": ["nombre","porcentaje","tipo","cuenta","estado"]
+  },
+  {
+    "clave": "activo", "modulo": "contabilidad", "titulo": "nombre",
+    "etiqueta": {"en":"Assets","es":"Activos","fr":"Immobilisations","de":"Anlagegüter","it":"Cespiti","bg":"Активи","cs":"Majetek","da":"Anlægsaktiver","el":"Πάγια","et":"Varad","fi":"Käyttöomaisuus","ga":"Sócmhainní","hr":"Imovina","hu":"Eszközök","is":"Eignir","lt":"Turtas","lv":"Aktīvi","mt":"Assi","nb":"Anleggsmidler","nl":"Activa","pl":"Środki trwałe","pt":"Ativos","ro":"Active","sk":"Majetok","sl":"Osnovna sredstva","sv":"Anläggningstillgångar"},
+    "estados": ["borrador","activa","cerrado","cancelado"],
+    "campos": [
+      {"clave":"nombre","tipo":"texto","requerido":true},
+      {"clave":"cuenta","tipo":"relacion","modelo":"cuenta_contable"},
+      {"clave":"factura","tipo":"relacion","modelo":"factura_compra"},
+      {"clave":"fecha","tipo":"fecha","requerido":true},
+      {"clave":"importe","tipo":"dinero","requerido":true},
+      {"clave":"metodo","tipo":"seleccion","opciones":["lineal","degresivo"],"requerido":true},
+      {"clave":"vida_util","tipo":"entero","requerido":true},
+      {"clave":"amortizacion","tipo":"dinero"}
+    ],
+    "lista": ["nombre","fecha","importe","metodo","vida_util","estado"]
+  },
+  {
+    "clave": "extracto_bancario", "modulo": "contabilidad", "secuencia": "EXT",
+    "etiqueta": {"en":"Bank statements","es":"Extractos bancarios","fr":"Relevés bancaires","de":"Kontoauszüge","it":"Estratti conto","bg":"Банкови извлечения","cs":"Bankovní výpisy","da":"Kontoudtog","el":"Τραπεζικές κινήσεις","et":"Pangaväljavõtted","fi":"Tiliotteet","ga":"Ráitis bhainc","hr":"Bankovni izvodi","hu":"Bankkivonatok","is":"Bankayfirlit","lt":"Banko išrašai","lv":"Bankas izraksti","mt":"Rendikonti bankarji","nb":"Kontoutskrifter","nl":"Bankafschriften","pl":"Wyciągi bankowe","pt":"Extratos bancários","ro":"Extrase bancare","sk":"Bankové výpisy","sl":"Bančni izpiski","sv":"Kontoutdrag"},
+    "estados": ["borrador","confirmado","cerrado"],
+    "campos": [
+      {"clave":"cuenta","tipo":"relacion","modelo":"cuenta_contable","requerido":true},
+      {"clave":"fecha","tipo":"fecha","requerido":true},
+      {"clave":"saldo_inicial","tipo":"dinero"},
+      {"clave":"saldo_final","tipo":"dinero"},
+      {"clave":"externo_id","tipo":"texto"}
+    ],
+    "lista": ["ref","cuenta","fecha","saldo_final","estado"]
+  },
+  {
+    "clave": "linea_extracto", "modulo": "contabilidad", "titulo": "descripcion",
+    "etiqueta": {"en":"Statement lines","es":"Líneas de extracto","fr":"Lignes de relevé","de":"Auszugspositionen","it":"Righe estratto conto","bg":"Редове на извлечения","cs":"Řádky výpisu","da":"Udtogslinjer","el":"Γραμμές κινήσεων","et":"Väljavõtte read","fi":"Tiliotteen rivit","ga":"Línte ráitis","hr":"Stavke izvoda","hu":"Kivonat tételei","is":"Línur yfirlits","lt":"Išrašo eilutės","lv":"Izraksta rindas","mt":"Linji tar-rendikont","nb":"Utskriftslinjer","nl":"Afschriftregels","pl":"Pozycje wyciągu","pt":"Linhas de extrato","ro":"Linii de extras","sk":"Riadky výpisu","sl":"Postavke izpiska","sv":"Utdragsrader"},
+    "estados": ["pendiente","conciliado"],
+    "campos": [
+      {"clave":"extracto","tipo":"relacion","modelo":"extracto_bancario","requerido":true},
+      {"clave":"fecha","tipo":"fecha","requerido":true},
+      {"clave":"descripcion","tipo":"texto","requerido":true},
+      {"clave":"importe","tipo":"dinero","requerido":true},
+      {"clave":"contacto","tipo":"relacion","modelo":"contacto"},
+      {"clave":"factura_venta","tipo":"relacion","modelo":"factura_venta"},
+      {"clave":"factura_compra","tipo":"relacion","modelo":"factura_compra"},
+      {"clave":"motivo","tipo":"seleccion","opciones":["comision_bancaria","intereses","impuestos","seguridad_social","nomina","traspaso","prestamo","socios","otro"]},
+      {"clave":"empresa","tipo":"texto"},
+      {"clave":"web","tipo":"url"},
+      {"clave":"url_factura","tipo":"url"},
+      {"clave":"email_facturas","tipo":"correo"},
+      {"clave":"externo_id","tipo":"texto"}
+    ],
+    "lista": ["extracto","fecha","descripcion","importe","estado"]
+  },
+  {
+    "clave": "presupuesto_contable", "modulo": "contabilidad", "titulo": "nombre",
+    "etiqueta": {"en":"Budgets","es":"Presupuestos contables","fr":"Budgets","de":"Budgets","it":"Budget","bg":"Бюджети","cs":"Rozpočty","da":"Budgetter","el":"Προϋπολογισμοί","et":"Eelarved","fi":"Budjetit","ga":"Buiséid","hr":"Proračuni","hu":"Költségvetések","is":"Fjárhagsáætlanir","lt":"Biudžetai","lv":"Budžeti","mt":"Baġits","nb":"Budsjetter","nl":"Budgetten","pl":"Budżety","pt":"Orçamentos","ro":"Bugete","sk":"Rozpočty","sl":"Proračuni","sv":"Budgetar"},
+    "estados": ["borrador","confirmado","cerrado"],
+    "campos": [
+      {"clave":"nombre","tipo":"texto","requerido":true},
+      {"clave":"cuenta","tipo":"relacion","modelo":"cuenta_contable","requerido":true},
+      {"clave":"fecha_inicio","tipo":"fecha","requerido":true},
+      {"clave":"fecha_fin","tipo":"fecha","requerido":true},
+      {"clave":"importe","tipo":"dinero","requerido":true},
+      {"clave":"real","tipo":"dinero"},
+      {"clave":"responsable","tipo":"texto"}
+    ],
+    "lista": ["nombre","cuenta","fecha_inicio","fecha_fin","importe","estado"]
+  },
+  {
+    "clave": "consolidacion", "modulo": "consolidacion", "titulo": "nombre",
+    "etiqueta": {"en":"Consolidations","es":"Consolidaciones","fr":"Consolidations","de":"Konsolidierungen","it":"Consolidamenti","bg":"Консолидации","cs":"Konsolidace","da":"Konsolideringer","el":"Ενοποιήσεις","et":"Konsolideerimised","fi":"Konsolidoinnit","ga":"Comhdhlúthuithe","hr":"Konsolidacije","hu":"Konszolidációk","is":"Samstæðuuppgjör","lt":"Konsolidavimai","lv":"Konsolidācijas","mt":"Konsolidazzjonijiet","nb":"Konsolideringer","nl":"Consolidaties","pl":"Konsolidacje","pt":"Consolidações","ro":"Consolidări","sk":"Konsolidácie","sl":"Konsolidacije","sv":"Konsolideringar"},
+    "estados": ["borrador","en_curso","hecho","cancelado"],
+    "campos": [
+      {"clave":"nombre","tipo":"texto","requerido":true},
+      {"clave":"empresa","tipo":"relacion","modelo":"contacto","requerido":true},
+      {"clave":"fecha_inicio","tipo":"fecha","requerido":true},
+      {"clave":"fecha_fin","tipo":"fecha","requerido":true},
+      {"clave":"moneda","tipo":"texto"},
+      {"clave":"saldo","tipo":"dinero"},
+      {"clave":"responsable","tipo":"texto"}
+    ],
+    "lista": ["nombre","empresa","fecha_inicio","fecha_fin","saldo","estado"]
+  }
+]

@@ -1,0 +1,86 @@
+# Egress de LiveKit: el proceso que graba las reuniones.
+#
+# APAGADO por defecto. Encenderlo sin el resto de la cadena no da un error
+# ruidoso: da un pod sano que no graba nunca, porque el egress no expone API —se
+# queda escuchando un store de routing que quizá no existe—. Por eso el
+# Deployment comprueba sus dos dependencias y se niega a renderizar sin ellas.
+enabled: false
+
+replicaCount: 1
+
+image:
+  # Se resuelve contra el registry privado (global.imageRegistry) como el resto:
+  # producción no tira de Docker Hub. El digest lo fija el catálogo de
+  # deploy/production/upstream-images.txt y lo espeja el workflow de release.
+  repository: livekit-egress
+  tag: "v1.14.0"
+  pullPolicy: IfNotPresent
+  useGlobalRegistry: true
+
+# Store de routing (Dragonfly). Vacío = lo rellena el umbrella con la URL global.
+# Es el ÚNICO canal por el que el egress recibe trabajo.
+redis:
+  address: ""
+  db: 0
+  # Dragonfly EXIGE contraseña. Sin ella el egress arranca, pasa sus sondas y
+  # muere contra la cache con «NOAUTH Authentication required»: no graba NADA y
+  # el SFU no se entera. El SFU sí la pasaba desde el principio; aquí faltaba.
+  #
+  # Vacío => se usa `global.cache.secretName`, que es lo que rellena el
+  # despliegue para los ocho consumidores de la caché. Declararlo aquí solo hace
+  # falta si este egress apunta a una cache distinta de la del release.
+  #
+  # El helper que lo lee tolera que este bloque no exista; está escrito para que
+  # la opción se VEA al leer el values, que es lo único que faltaba tras el
+  # arreglo de la #123.
+  passwordSecret:
+    name: ""
+    key: dragonfly-password
+
+# WebSocket del SFU al que se conecta el grabador para unirse a la sala.
+livekit:
+  # Vacío => el SFU del propio release (ws://<release>-livekit:7880). Solo se
+  # rellena si el egress apunta a un SFU de otro release o fuera del clúster.
+  wsUrl: ""
+  # Secret con las claves de LiveKit (mismo que usa el SFU): clave = api_key.
+  keysSecret: sytue-livekit-keys
+  keysSecretKey: keys.yaml
+
+# Grabar es caro: compone vídeo con Chrome y lo codifica.
+#
+# CUATRO CPU, Y NO ES HOLGURA: es el mínimo que el propio egress exige para
+# aceptar una grabación de sala. `room_composite_cpu_cost` vale 4 en LiveKit, y
+# el monitor compara ese coste con la CPU del contenedor antes de aceptar cada
+# trabajo. Con menos, el pod arranca, pasa sus sondas, dice «service ready»… y
+# rechaza todas las peticiones. En el log solo queda esta línea:
+#
+#   ERROR  not enough cpu for some egress types  {"minimumCpu": 4, "available": 2}
+#
+# Estuvo en 2 —«el suelo con el que una sala a 720p no se atraganta»— y con eso
+# la grabación no funcionó NUNCA, con el pod en verde. Es el mismo fallo mudo
+# contra el que avisa el Deployment, por otra puerta.
+#
+# `requests` = `limits` a propósito: el monitor lee el límite del cgroup, así que
+# con un request menor creería tener 4 CPU que el nodo no puede darle y grabaría
+# a tirones en vez de negarse. Mejor que el planificador diga que no cabe.
+resources:
+  requests:
+    cpu: "4"
+    memory: 2Gi
+  limits:
+    cpu: "4"
+    memory: 4Gi
+
+# El compositor de Chrome necesita memoria compartida: con los 64 MiB que da
+# Kubernetes por defecto, el navegador se cae a mitad de la grabación.
+shmSize: 1Gi
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+podAnnotations: {}
+
+# Aislamiento de red. Ver templates/networkpolicy.yaml: sin ingress (nadie llama
+# al grabador) y con egress acotado a DNS, la suite y HTTPS de salida.
+networkPolicy:
+  enabled: true

@@ -1,0 +1,22 @@
+/**
+ * Sytue Mail — entrada de estilos. Importa el design system (Tailwind v4 +
+ * tokens de marca Sytue). Las apps NO definen tema propio: todo viene de
+ * @sytue/ui. Mattermost-moderno x Sytue. docs/design.md §1.
+ */
+@import '@sytue/ui/styles.css';
+
+/* Detectar clases usadas en las islas Preact de esta app (Tailwind v4 @source). */
+@source '../**/*.{astro,ts,tsx}';
+
+/* Las tarjetas de mensaje van sobre el fondo del lector (`var(--sytue-bg)`) y se
+   pintan en blanco (`var(--sytue-surface)`) para destacar sobre él. */
+.sytue-correo-tarjeta-clara {
+  background: var(--sytue-surface);
+}
+
+/* El iframe y su documento dejan ver la superficie continua de la tarjeta.
+   Los fondos internos de tablas, botones y resaltados del remitente se conservan. */
+.sytue-correo-cuerpo {
+  background: transparent;
+  border: 0;
+}

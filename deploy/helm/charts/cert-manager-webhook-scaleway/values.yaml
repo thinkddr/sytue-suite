@@ -1,0 +1,32 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Daniel Delgado Ramos
+
+enabled: false
+
+image:
+  repository: cert-manager-webhook-scaleway
+  tag: v0.1.3
+
+replicaCount: 2
+
+# El grupo que el ClusterIssuer nombra en `solvers.dns01.webhook.groupName`. Si
+# los dos no coinciden, cert-manager pide un solver que no existe y el reto se
+# queda en pendiente para siempre, sin error visible.
+groupName: acme.scaleway.com
+
+# Namespace donde corre cert-manager: el webhook necesita que su ServiceAccount
+# pueda pedirle certificados y leer el Secret del token.
+certManagerNamespace: cert-manager
+
+resources:
+  requests: { cpu: 20m, memory: 48Mi }
+  limits: { cpu: 500m, memory: 128Mi }
+
+# Namespace donde vive el Secret con la clave de API de Scaleway.
+#
+# NO es el del webhook: para un ClusterIssuer, cert-manager resuelve los
+# `secretRef` del solver en su `--cluster-resource-namespace`, que en este
+# despliegue es el suyo propio (`--cluster-resource-namespace=$(POD_NAMESPACE)`).
+# El Role de lectura tiene que estar AHÍ o el webhook no puede leer la
+# credencial, y el certificado se queda pendiente sin decir por qué.
+credentialsNamespace: cert-manager

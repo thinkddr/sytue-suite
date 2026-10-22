@@ -1,0 +1,17 @@
+Myndböndin þín og beinu útsendingarnar þínar, eftir pöntun og í rauntíma, án þess að yfirgefa Evrópu.
+
+• Hladdu upp myndbandi og það er umkóðað í nokkrum gæðum fyrir hvaða skjá sem er.
+• Farðu í beina útsendingu úr útsendingarforriti, úr vafranum eða úr forritinu.
+• Fjögur sýnileikastig: opinbert, óskráð, fyrirtæki eða tilteknir einstaklingar.
+• Spjall í beinni og athugasemdir, með grunnstýringu þess sem birtir.
+• Hladdu upp myndböndum allt að 8 GiB; upprunalega skráin er geymd.
+• Bein útsending úr útsendingarforriti um RTMP, með straumlykli fyrir hvern einstakling.
+• Í beinni úr vafranum eða forritinu: myndavél, skjár og hljóðnemi.
+• Upptökur af beinum útsendingum verða sjálfkrafa að myndböndum eftir pöntun.
+• Opinber forsíða og rás fyrir hvert fyrirtæki, skráanlegar í leitarvélum.
+• Óskráðir tenglar, myndbönd aðeins fyrir fyrirtækið eða aðgangur fyrir tiltekna einstaklinga eftir @notandanafni.
+• Spjall í beinni og athugasemdir í þráðum, stýrt af þeim sem birtir og stjórnendum fyrirtækisins.
+• Geymslan telst með í kvóta þínum í Sytue Drive; allt innan Evrópusambandsins.
+• „Hlaða upp í Cast“ úr Sytue Drive: afrit af myndbandinu fer í Cast og skráin verður áfram í Drive.
+
+Dulkóðað í flutningi (TLS 1.3). Innviðir Sytue eru innan ESB. Staðsetning ytri þjónustu fer eftir þjónustuveitanda hennar.

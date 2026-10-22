@@ -1,0 +1,12 @@
+---
+/** Sytue Diapos — la lista de sus presentaciones (`@sytue/office`, vista `Inicio`). */
+import Inicio from '@sytue/office/vistas/Inicio.astro';
+import { entrar } from '@sytue/office/vistas';
+
+export const prerender = false;
+
+const sesion = await entrar(Astro);
+if (sesion instanceof Response) return sesion;
+---
+
+<Inicio sesion={sesion} kind="presentation" />

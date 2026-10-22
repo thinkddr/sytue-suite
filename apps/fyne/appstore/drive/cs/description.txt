@@ -1,0 +1,16 @@
+Soubory a spolupráce pod vaší vlastní značkou.
+
+• Nahrávání, třídění a sdílení přes kontrolované odkazy (oprávnění a platnost).
+• Náhled dokumentů a obrázků přímo na stránce.
+• Přílohy v Mail bez duplikování souboru.
+• Úložiště S3 v evropských regionech.
+• Můj disk, týmové disky, sdíleno se mnou, nedávné, oblíbené a koš.
+• Odkazy ke sdílení se dvěma úrovněmi (zobrazení nebo úpravy), heslem a platností.
+• Historie verzí s obnovením.
+• Náhled dokumentů, obrázků a PDF bez stahování.
+• Otevírání a úpravy kancelářských dokumentů v Docus, Calcus a Diapos; PDF v CertiPDF.
+• Štítky citlivosti, které blokují veřejné odkazy tam, kam nepatří.
+• Sdílení do kanálu Rooms nebo příloha v Mail bez duplikování souboru.
+• Úložiště S3 v evropských regionech, s kvótou vždy na očích.
+
+Šifrování při přenosu (TLS 1.3). Infrastruktura Sytue je v EU. Umístění externích služeb závisí na jejich poskytovateli.

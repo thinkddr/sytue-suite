@@ -1,0 +1,20 @@
+{{- /*
+Service estable al que apuntan los DSN de los servicios (clave `dsn` de los
+secrets sytue-<svc>-db): host=pgbouncer, port=6432. No depende del nombre de la
+release porque los secrets existen antes de instalar Helm.
+*/ -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "sytue-pgbouncer.serviceName" . }}
+  labels:
+    {{- include "sytue-pgbouncer.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - name: pgbouncer
+      port: {{ .Values.service.port }}
+      targetPort: pgbouncer
+      protocol: TCP
+  selector:
+    {{- include "sytue-pgbouncer.selectorLabels" . | nindent 4 }}

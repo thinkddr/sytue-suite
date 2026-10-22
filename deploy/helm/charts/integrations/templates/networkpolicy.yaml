@@ -1,0 +1,74 @@
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "sytue-integrations.fullname" . }}
+  labels:
+    {{- include "sytue-integrations.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "sytue-integrations.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Desde el ingress controller (tráfico público integrations.sytue.eu).
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              sytue.eu/role: ingress
+      ports:
+        - protocol: TCP
+          port: {{ .Values.service.targetPort }}
+    # Desde otras superficies de la suite: el BFF de Sytue Admin administra las
+    # conexiones y Sytue Docs pide datos tabulares para Sheets (KindGateway).
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/part-of: sytue-one
+      ports:
+        - protocol: TCP
+          port: {{ .Values.service.targetPort }}
+  egress:
+    # DNS
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Sytue ID intra-suite: directorio de la organización y canje de tokens delegados.
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/part-of: sytue-one
+    # Postgres EXTERNO (RDB).
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 169.254.0.0/16
+      ports:
+        - protocol: TCP
+          port: 5432
+    # HTTPS a terceros: ESTE servicio es la única puerta de egress de la suite hacia
+    # el SaaS del cliente, así que necesita salir a Internet. Lo que NO puede es
+    # alcanzar la red privada: el filtro SSRF vive en la aplicación
+    # (platform/pkg/ssrfhttp valida destino y revalida cada redirección) y esto es la
+    # segunda barrera, en la red — si un día un driver esquivara el RoundTripper, el
+    # rango privado sigue siendo inalcanzable.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+              - 169.254.0.0/16
+              - 127.0.0.0/8
+      ports:
+        - protocol: TCP
+          port: 443
+{{- end }}

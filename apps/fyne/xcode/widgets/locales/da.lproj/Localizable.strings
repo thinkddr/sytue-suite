@@ -1,0 +1,17 @@
+"widgets.open" = "Åbn";
+"widgets.compose" = "Skriv";
+"widgets.create" = "Opret begivenhed";
+"widgets.notes" = "Noter";
+"widgets.rows" = "Rækker";
+"widgets.pending" = "Afventende";
+"widgets.channels" = "Kanaler";
+"widgets.photos" = "Billeder";
+"widgets.episodes" = "Episoder";
+"widgets.apps" = "Apps";
+"widgets.calendars" = "Kalendere";
+"widgets.address_books" = "Adressebøger";
+"search.label" = "Global søgning";
+"dataflow.item.files" = "Filer";
+"dataflow.item.events" = "Kalender";
+"dataflow.item.documents" = "Dokumenter";
+"dataflow.item.contacts" = "Kontakter";

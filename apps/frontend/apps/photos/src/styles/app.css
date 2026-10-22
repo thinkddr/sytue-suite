@@ -1,0 +1,149 @@
+/**
+ * Sytue Fotos — entrada de estilos: importa el design system (Tailwind v4 +
+ * tokens de marca Sytue). Sin tema propio. Lenguaje visual Sytue.
+ */
+@import '@sytue/ui/styles.css';
+
+@source '../**/*.{astro,ts,tsx}';
+
+/* -----------------------------------------------------------------------------
+   FILAS JUSTIFICADAS: la rejilla de fotos de toda la app (galería, álbum,
+   parecidas, por aquí, compartido y papelera).
+
+   Cada foto conserva su proporción, las filas llenan el ancho y la última no se
+   estira. Antes eran teselas CUADRADAS que recortaban cada foto al centro: medido
+   con una biblioteca de proporciones corrientes, se veía el 70 % de cada foto.
+
+   SIN JAVASCRIPT DE MAQUETACIÓN. Cada `<li>` trae su proporción en `--r`
+   (lib/filas.ts) y la usa tres veces: de base (`--r × --fila`), de crecimiento y
+   de `aspect-ratio`. Como en una fila todas crecen en proporción a su base, todas
+   acaban con el MISMO alto —el sobrante se reparte como si se subiera la altura
+   de la fila—, y el alto ya está reservado antes de que llegue la imagen: ni
+   observadores, ni saltos al cargar, ni recalcular al cambiar el ancho.
+
+   EL `::after` ES LA ÚLTIMA FILA. Crece un millón de veces más que una foto, así
+   que se queda con el sobrante y las fotos de esa fila no se estiran: tres fotos
+   sueltas al final no se convierten en tres pancartas.
+
+   `--fila` ES EL ALTO MÍNIMO DE UNA FILA, y crece con la pantalla como crecía la
+   tesela (9, 11 y 13 rem: en 1440 px la galería eran miniaturas de 133 px con
+   media pantalla vacía a los lados). Una fila mide entre eso y lo que haga falta
+   para llenarse; medido con proporciones corrientes, las filas llenas quedan de
+   media un 14 % por encima a 1280 (237 px) y un 17 % a 1440 (243 px).
+
+   EN UN TELÉFONO manda el ancho y no el tope: `(100cqw − hueco) / 3,6` es el alto
+   con el que DOS fotos 16:9 caben a la par (2 × 1,78 = 3,56). Con el tope a secas,
+   en 390 px cada apaisada se quedaba sola en su fila y medía 240 px de alto. Es
+   `cqw` y no `vw` porque lo que cuenta es el ancho de la rejilla, no el de la
+   ventana: cada pantalla trae sus márgenes.
+   -------------------------------------------------------------------------- */
+@layer components {
+  .filas {
+    container-type: inline-size;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    --fila-max: 9rem;
+    --fila: min(var(--fila-max), (100cqw - 0.25rem) / 3.6);
+  }
+  .filas::after {
+    content: '';
+    flex-grow: 999999;
+  }
+  .filas > li {
+    flex: var(--r, 1) 1 calc(var(--r, 1) * var(--fila));
+    aspect-ratio: var(--r, 1);
+    /* Un hijo flex no encoge por debajo de su contenido: sin esto, una panorámica
+       más ancha que un teléfono se saldría en vez de ocupar la fila. */
+    min-width: 0;
+  }
+  /* UN FILETE DE 1 PX con el borde sutil del tema, para que una foto clara no
+     desaparezca contra el fondo claro (ni una oscura contra el oscuro): una
+     captura en blanco se leía como un hueco en la fila. Es un `outline` hacia
+     dentro y no un borde: no cambia la caja —la cuenta de las filas es la
+     misma— y se pinta ENCIMA de la imagen. El radio lo hereda de quien la
+     recorta, que es quien lleva el `rounded-sm`. */
+  .filas > li img {
+    border-radius: inherit;
+    outline: 1px solid var(--sytue-border-subtle);
+    outline-offset: -1px;
+  }
+  /* Los cortes `sm` y `xl` de la casa. */
+  @media (min-width: 40rem) {
+    .filas {
+      --fila-max: 11rem;
+    }
+  }
+  @media (min-width: 80rem) {
+    .filas {
+      --fila-max: 13rem;
+    }
+  }
+}
+
+/* -----------------------------------------------------------------------------
+   LOS DESLIZADORES DEL EDITOR. Bipolares: el tramo lleno va del 0 al valor (`--desde`
+   y `--hasta`, que pone Editor.tsx), que es lo que dice hacia qué lado va un ajuste;
+   el `range` nativo con `accent-color` llenaba desde la izquierda y a 0 salía medio
+   lleno. Carril de 4 y pulgar de 14 con los tokens, como `ui.Deslizador` de Fyne. Con
+   el dedo la caja mide 44 de alto (medía 16): el carril se queda en el centro.
+   El degradado son tres tramos de color liso, no un degradado de adorno.
+   -------------------------------------------------------------------------- */
+@layer components {
+  .deslizador-ajuste {
+    appearance: none;
+    height: 1rem;
+    background: transparent;
+    cursor: pointer;
+  }
+  @media (pointer: coarse) {
+    .deslizador-ajuste {
+      height: 44px;
+    }
+  }
+  .deslizador-ajuste::-webkit-slider-runnable-track {
+    height: 4px;
+    border-radius: 9999px;
+    background: linear-gradient(
+      to right,
+      var(--sytue-border) var(--desde),
+      var(--sytue-primary) var(--desde) var(--hasta),
+      var(--sytue-border) var(--hasta)
+    );
+  }
+  .deslizador-ajuste::-moz-range-track {
+    height: 4px;
+    border-radius: 9999px;
+    background: linear-gradient(
+      to right,
+      var(--sytue-border) var(--desde),
+      var(--sytue-primary) var(--desde) var(--hasta),
+      var(--sytue-border) var(--hasta)
+    );
+  }
+  .deslizador-ajuste::-webkit-slider-thumb {
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    margin-top: -5px;
+    border-radius: 9999px;
+    background: var(--sytue-primary);
+  }
+  .deslizador-ajuste::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border: 0;
+    border-radius: 9999px;
+    background: var(--sytue-primary);
+  }
+  /* El aro en el pulgar, no en la caja entera del control. */
+  .deslizador-ajuste:focus-visible {
+    box-shadow: none;
+  }
+  .deslizador-ajuste:focus-visible::-webkit-slider-thumb {
+    box-shadow: 0 0 0 2px var(--sytue-focus-ring);
+  }
+  .deslizador-ajuste:focus-visible::-moz-range-thumb {
+    box-shadow: 0 0 0 2px var(--sytue-focus-ring);
+  }
+}

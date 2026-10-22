@@ -1,0 +1,17 @@
+"widgets.open" = "Odpri";
+"widgets.compose" = "Napiši";
+"widgets.create" = "Ustvari dogodek";
+"widgets.notes" = "Zapiski";
+"widgets.rows" = "Vrstice";
+"widgets.pending" = "Na čakanju";
+"widgets.channels" = "Kanali";
+"widgets.photos" = "Fotografije";
+"widgets.episodes" = "Epizode";
+"widgets.apps" = "Aplikacije";
+"widgets.calendars" = "Koledarji";
+"widgets.address_books" = "Imeniki";
+"search.label" = "Globalno iskanje";
+"dataflow.item.files" = "Datoteke";
+"dataflow.item.events" = "Koledar";
+"dataflow.item.documents" = "Dokumenti";
+"dataflow.item.contacts" = "Stiki";

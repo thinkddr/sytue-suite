@@ -1,0 +1,125 @@
+{
+ "slides": [
+  {
+   "id": "s1",
+   "boxes": [
+    {
+     "id": "s1-titulo",
+     "x": 10,
+     "y": 35,
+     "w": 80,
+     "h": 20,
+     "html": "<h1>{{cierre.titulo}}</h1>"
+    },
+    {
+     "id": "s1-subtitulo",
+     "x": 10,
+     "y": 58,
+     "w": 80,
+     "h": 10,
+     "html": "<p>{{cierre.subtitulo}}</p>"
+    }
+   ]
+  },
+  {
+   "id": "s2",
+   "boxes": [
+    {
+     "id": "s2-titulo",
+     "x": 8,
+     "y": 8,
+     "w": 84,
+     "h": 16,
+     "html": "<h1>{{cierre.resultados}}</h1>"
+    },
+    {
+     "id": "s2-cuerpo",
+     "x": 8,
+     "y": 30,
+     "w": 84,
+     "h": 60,
+     "html": "<ul><li>{{cierre.resultado1}}</li><li>{{cierre.resultado2}}</li><li>{{cierre.resultado3}}</li></ul>"
+    }
+   ]
+  },
+  {
+   "id": "s3",
+   "boxes": [
+    {
+     "id": "s3-titulo",
+     "x": 8,
+     "y": 8,
+     "w": 84,
+     "h": 16,
+     "html": "<h1>{{cierre.comparacion}}</h1>"
+    },
+    {
+     "id": "s3-izquierda",
+     "x": 8,
+     "y": 30,
+     "w": 40,
+     "h": 60,
+     "html": "<h2>{{trimestral.previsto}}</h2><ul><li>{{trimestral.objetivo}}</li><li>{{trimestral.objetivo}}</li></ul>"
+    },
+    {
+     "id": "s3-derecha",
+     "x": 52,
+     "y": 30,
+     "w": 40,
+     "h": 60,
+     "html": "<h2>{{trimestral.conseguido}}</h2><ul><li>{{trimestral.resultado}}</li><li>{{trimestral.resultado}}</li></ul>"
+    }
+   ]
+  },
+  {
+   "id": "s4",
+   "boxes": [
+    {
+     "id": "s4-titulo",
+     "x": 8,
+     "y": 8,
+     "w": 84,
+     "h": 16,
+     "html": "<h1>{{cierre.lecciones}}</h1>"
+    },
+    {
+     "id": "s4-izquierda",
+     "x": 8,
+     "y": 30,
+     "w": 40,
+     "h": 60,
+     "html": "<h2>{{cierre.bien}}</h2><ul><li>{{cierre.acierto}}</li><li>{{cierre.acierto}}</li></ul>"
+    },
+    {
+     "id": "s4-derecha",
+     "x": 52,
+     "y": 30,
+     "w": 40,
+     "h": 60,
+     "html": "<h2>{{cierre.mejorar}}</h2><ul><li>{{cierre.mejora}}</li><li>{{cierre.mejora}}</li></ul>"
+    }
+   ]
+  },
+  {
+   "id": "s5",
+   "boxes": [
+    {
+     "id": "s5-titulo",
+     "x": 8,
+     "y": 8,
+     "w": 84,
+     "h": 16,
+     "html": "<h1>{{cierre.traspaso}}</h1>"
+    },
+    {
+     "id": "s5-cuerpo",
+     "x": 8,
+     "y": 30,
+     "w": 84,
+     "h": 60,
+     "html": "<ul><li>{{cierre.traspaso1}}</li><li>{{cierre.traspaso2}}</li><li>{{cierre.traspaso3}}</li></ul>"
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,27 @@
+---
+/** Actual shared live-service panel; synthetic API data only. */
+import '../../styles/app.css';
+import { basePathScript } from '@sytue/ui';
+import { LinkedServicesDemo } from '../../components/dev/LinkedServicesDemo';
+export const prerender = false;
+if (!import.meta.env.DEV) return new Response(null, { status: 404 });
+const raw = Astro.url.searchParams.get('service');
+const service = raw === 'contacts' || raw === 'notes' ? raw : 'calendar';
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, interactive-widget=resizes-content"
+    />
+    <meta name="robots" content="noindex,nofollow" />
+    <title>Sytue</title>
+    <script is:inline set:html={basePathScript('/calendar')}></script>
+  </head>
+  <body class="bg-bg text-text min-h-dvh antialiased">
+    <LinkedServicesDemo client:only="preact" service={service} />
+  </body>
+</html>

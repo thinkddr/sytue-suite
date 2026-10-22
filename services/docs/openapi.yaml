@@ -1,0 +1,874 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Daniel Delgado Ramos
+openapi: 3.1.0
+info:
+  title: Sytue Docs API
+  version: "1.0.0"
+  description: >
+    API de Sytue Docs/Sheets/Slides — ofimática colaborativa Sytue-native.
+    Edición en tiempo real por WebSocket con CRDT (clean-room), versionado,
+    permisos deny-by-default y exports OOXML/ODF. Estado en PostgreSQL; blobs y
+    exports en Object Storage S3. Autenticación vía Sytue ID (OIDC, Bearer JWT).
+    Documentación de producto en español; identificadores en inglés.
+  license:
+    name: MIT
+servers:
+  - url: https://docs.sytue.eu
+    description: Producción
+  - url: http://docs.sytue.localhost:8083
+    description: Desarrollo (Traefik)
+security:
+  - bearerAuth: []
+tags:
+  - name: documents
+  - name: collaboration
+  - name: versions
+  - name: comments
+  - name: permissions
+  - name: exports
+  - name: share
+
+paths:
+  /v1/documents:
+    get:
+      tags: [documents]
+      summary: Lista documentos accesibles por el usuario
+      parameters:
+        - { name: kind, in: query, schema: { $ref: '#/components/schemas/Kind' } }
+        - { name: owner, in: query, schema: { type: string } }
+        - { name: q, in: query, schema: { type: string }, description: Búsqueda por título }
+        - { name: limit, in: query, schema: { type: integer, default: 50, maximum: 200 } }
+        - { name: offset, in: query, schema: { type: integer, default: 0 } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  documents:
+                    type: array
+                    items: { $ref: '#/components/schemas/Document' }
+    post:
+      tags: [documents]
+      summary: Crea un documento (el creador queda como owner)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kind]
+              properties:
+                kind: { $ref: '#/components/schemas/Kind' }
+                title: { type: string }
+                source_ref:
+                  type: string
+                  description: >-
+                    Fichero del que sale el documento («drive:<uuid>»). Con él la
+                    operación es idempotente (200 y el documento que ya había) y
+                    NO se crea un fichero nuevo en la unidad, porque ya existe.
+                    Sin él, el documento nace además como fichero en la carpeta
+                    «Sytue Docs» de la unidad de quien lo crea.
+      responses:
+        '201': { $ref: '#/components/responses/DocumentResponse' }
+        '200':
+          description: >-
+            El documento ya existía para ese `source_ref` y esa persona.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Document' }
+        '507':
+          description: >-
+            No queda espacio en la unidad para el fichero del documento. El
+            documento NO se crea: uno sin fichero sería invisible en la unidad y
+            no se podría guardar de vuelta.
+
+  /v1/documents/{id}:
+    parameters: [ { $ref: '#/components/parameters/DocId' } ]
+    get:
+      tags: [documents]
+      summary: Obtiene un documento y el rol efectivo del usuario
+      responses:
+        '200': { $ref: '#/components/responses/DocumentResponse' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    patch:
+      tags: [documents]
+      summary: Renombra el documento (rol editor)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [title], properties: { title: { type: string } } }
+      responses: { '204': { description: Sin contenido } }
+    delete:
+      tags: [documents]
+      summary: Envía el documento a la papelera (rol owner); su fichero de Drive va a la papelera de Drive antes
+      responses:
+        '204': { description: Sin contenido }
+        '503': { $ref: '#/components/responses/Error' }
+
+  /v1/trash:
+    parameters:
+      - { name: kind, in: query, required: false, schema: { $ref: '#/components/schemas/Kind' }, description: Solo ese tipo (lista y vaciado) }
+    get:
+      tags: [documents]
+      summary: La papelera de quien pide (sus documentos borrados, el último primero; hasta 200)
+      responses:
+        '200':
+          description: Documentos en la papelera
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  documents: { type: array, items: { $ref: '#/components/schemas/Document' } }
+    delete:
+      tags: [documents]
+      summary: Vacía la papelera (definitivo), con los ficheros que ya estén en la papelera de Drive
+      responses:
+        '200':
+          description: Recuento; `remaining` pide otra llamada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  purged: { type: integer }
+                  failed: { type: integer }
+                  remaining: { type: boolean }
+
+  /v1/trash/{id}/restore:
+    parameters: [ { $ref: '#/components/parameters/DocId' } ]
+    post:
+      tags: [documents]
+      summary: Saca el documento de la papelera, y su fichero de la de Drive
+      responses:
+        '204': { description: Sin contenido }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+
+  /v1/trash/{id}:
+    parameters: [ { $ref: '#/components/parameters/DocId' } ]
+    delete:
+      tags: [documents]
+      summary: Borra el documento para siempre (debe estar en la papelera)
+      responses:
+        '204': { description: Sin contenido }
+        '404': { $ref: '#/components/responses/Error' }
+        '423': { $ref: '#/components/responses/Error' }
+
+  /v1/documents/{id}/star:
+    parameters: [ { $ref: '#/components/parameters/DocId' } ]
+    put:
+      tags: [documents]
+      summary: Marca/desmarca favorito
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, properties: { starred: { type: boolean } } }
+      responses: { '204': { description: Sin contenido } }
+
+  /v1/documents/{id}/state:
+    parameters: [ { $ref: '#/components/parameters/DocId' } ]
+    get:
+      tags: [collaboration]
+      summary: Estado CRDT consolidado (carga inicial del editor)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  seq: { type: integer, format: int64 }
+                  state: { $ref: '#/components/schemas/CRDTState' }
+
+  /v1/documents/{id}/ops:
+    parameters: [ { $ref: '#/components/parameters/DocId' } ]
+    get:
+      tags: [collaboration]
+      summary: Operaciones posteriores a ?since (replay de reconexión)
+      parameters:
+        - { name: since, in: query, schema: { type: integer, format: int64, default: 0 } }
+        - { name: limit, in: query, schema: { type: integer, default: 1000 } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ops:
+                    type: array
+                    items: { $ref: '#/components/schemas/SequencedOp' }
+    post:
+      tags: [collaboration]
+      summary: Secuencia y persiste operaciones de edición (rol editor)
+      description: Alternativa REST al canal WebSocket; difunde a los pares conectados.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ops]
+              properties:
+                ops:
+                  type: array
+                  items: { $ref: '#/components/schemas/Op' }
+                base_seq:
+                  type: integer
+                  format: int64
+                  description: >
+                    Guardado condicional del registro completo (hojas y presentaciones):
+                    409 si otra persona escribió después alguna de las claves `set`.
+                    No afecta a los parches.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  seq: { type: integer, format: int64 }
+                  ops:
+                    type: array
+                    items: { $ref: '#/components/schemas/SequencedOp' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /v1/documents/{id}/ws:
+    parameters: [ { $ref: '#/components/parameters/DocId' } ]
+    get:
+      tags: [collaboration]
+      summary: Canal WebSocket de colaboración en tiempo real
+      description: >
+        Actualiza la conexión a WebSocket (subprotocolo JSON). Mensajes
+        cliente→servidor: hello (sincronización), ops (edición), cursor
+        (presencia), ping. Mensajes servidor→cliente: welcome, ops, ack,
+        presence, error. Requiere rol viewer (editar requiere editor).
+      responses:
+        '101': { description: Switching Protocols (WebSocket) }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /v1/documents/{id}/versions:
+    parameters: [ { $ref: '#/components/parameters/DocId' } ]
+    get:
+      tags: [versions]
+      summary: Historial de versiones
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  versions:
+                    type: array
+                    items: { $ref: '#/components/schemas/Version' }
+    post:
+      tags: [versions]
+      summary: Consolida un snapshot y registra una versión nombrada (rol editor)
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, properties: { label: { type: string } } }
+      responses:
+        '201':
+          description: Creada
+          content:
+            application/json:
+              schema: { type: object, properties: { version: { $ref: '#/components/schemas/Version' } } }
+
+  /v1/documents/{id}/versions/{versionId}/restore:
+    parameters:
+      - { $ref: '#/components/parameters/DocId' }
+      - { name: versionId, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [versions]
+      summary: Restaura el documento al estado de una versión (rol editor)
+      description: >-
+        Restauración no destructiva: el backend calcula el diff CRDT entre el
+        estado actual y el de la versión y lo añade como operaciones nuevas
+        (append-only, historial preservado y reversible). Las operaciones se
+        difunden a los colaboradores conectados por WebSocket.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  restored: { type: boolean }
+                  changed: { type: boolean, description: false si el documento ya coincidía }
+                  seq: { type: integer, format: int64, description: nueva seq del documento }
+                  version: { $ref: '#/components/schemas/Version' }
+                  ops:
+                    type: array
+                    items: { $ref: '#/components/schemas/SequencedOp' }
+
+  /v1/documents/{id}/comments:
+    parameters: [ { $ref: '#/components/parameters/DocId' } ]
+    get:
+      tags: [comments]
+      summary: Lista comentarios
+      parameters:
+        - { name: resolved, in: query, schema: { type: boolean }, description: incluir resueltos }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  comments:
+                    type: array
+                    items: { $ref: '#/components/schemas/Comment' }
+    post:
+      tags: [comments]
+      summary: Crea un comentario (rol commenter)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              properties:
+                parent_id: { type: string, format: uuid, nullable: true }
+                anchor: { type: object, description: ancla CRDT estable }
+                body: { type: string }
+      responses: { '201': { description: Creado } }
+
+  /v1/documents/{id}/comments/{commentId}/resolve:
+    parameters:
+      - { $ref: '#/components/parameters/DocId' }
+      - { name: commentId, in: path, required: true, schema: { type: string, format: uuid } }
+    put:
+      tags: [comments]
+      summary: Resuelve/reabre un comentario
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, properties: { resolved: { type: boolean } } }
+      responses: { '204': { description: Sin contenido } }
+
+  /v1/documents/{id}/comments/{commentId}:
+    parameters:
+      - { $ref: '#/components/parameters/DocId' }
+      - { name: commentId, in: path, required: true, schema: { type: string, format: uuid } }
+    delete:
+      tags: [comments]
+      summary: Borra (soft) un comentario
+      responses: { '204': { description: Sin contenido } }
+
+  /v1/documents/{id}/permissions:
+    parameters: [ { $ref: '#/components/parameters/DocId' } ]
+    get:
+      tags: [permissions]
+      summary: Lista la ACL del documento (rol owner)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  permissions:
+                    type: array
+                    items: { $ref: '#/components/schemas/Permission' }
+    put:
+      tags: [permissions]
+      summary: Concede o actualiza un permiso (rol owner)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [principal_kind, principal_id, role]
+              properties:
+                principal_kind: { type: string, enum: [user, group, tenant] }
+                principal_id: { type: string }
+                role: { $ref: '#/components/schemas/Role' }
+      responses: { '200': { description: OK } }
+    delete:
+      tags: [permissions]
+      summary: Revoca un permiso (rol owner)
+      parameters:
+        - { name: principal_kind, in: query, required: true, schema: { type: string } }
+        - { name: principal_id, in: query, required: true, schema: { type: string } }
+      responses: { '204': { description: Sin contenido } }
+
+  /v1/documents/{id}/shares:
+    parameters: [ { $ref: '#/components/parameters/DocId' } ]
+    get:
+      tags: [share]
+      summary: Lista los enlaces de compartición (rol owner)
+      responses: { '200': { description: OK } }
+    post:
+      tags: [share]
+      summary: Crea un enlace de compartición (rol owner). Devuelve el token una sola vez.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties:
+                role: { type: string, enum: [viewer, commenter, editor] }
+                expires_at: { type: string, format: date-time }
+      responses:
+        '201':
+          description: Creado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  share: { $ref: '#/components/schemas/ShareLink' }
+
+  /v1/documents/{id}/shares/{linkId}:
+    parameters:
+      - { $ref: '#/components/parameters/DocId' }
+      - { name: linkId, in: path, required: true, schema: { type: string, format: uuid } }
+    delete:
+      tags: [share]
+      summary: Revoca un enlace de compartición (rol owner)
+      responses: { '204': { description: Sin contenido } }
+
+  /v1/share/{token}:
+    parameters:
+      - { name: token, in: path, required: true, schema: { type: string } }
+    get:
+      tags: [share]
+      summary: Resuelve un enlace de compartición público (sin JWT)
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  document: { $ref: '#/components/schemas/Document' }
+                  role: { $ref: '#/components/schemas/Role' }
+        '410': { $ref: '#/components/responses/Error' }
+
+  /v1/share/{token}/view:
+    parameters:
+      - { name: token, in: path, required: true, schema: { type: string } }
+    get:
+      tags: [share]
+      summary: Vista de solo lectura de un enlace público, en HTML (sin JWT)
+      description: >-
+        Lo que pinta la página `/s/{token}` de la web. El HTML es el del editor, sin
+        sanear: quien lo muestre debe aislarlo (iframe con sandbox y sin scripts).
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string }
+                  title: { type: string }
+                  kind: { type: string, enum: [document, spreadsheet, presentation] }
+                  role: { $ref: '#/components/schemas/Role' }
+                  html: { type: string }
+        '410': { $ref: '#/components/responses/Error' }
+
+  /v1/share/redeem:
+    post:
+      tags: [share]
+      summary: Canjea un enlace de editor o comentarista por un permiso de quien llama
+      description: >-
+        También desde otra organización (ADR 0052): el permiso se escribe en la del
+        documento, marcado como externo, y vive lo que viva el enlace. El token va
+        en el cuerpo, no en la ruta, para que no quede en el log de peticiones.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  document_id: { type: string }
+                  role: { $ref: '#/components/schemas/Role' }
+        '403': { $ref: '#/components/responses/Error' }
+        '410': { $ref: '#/components/responses/Error' }
+
+  /v1/documents/{id}/exports:
+    parameters: [ { $ref: '#/components/parameters/DocId' } ]
+    get:
+      tags: [exports]
+      summary: Lista los exports materializados
+      responses: { '200': { description: OK } }
+    post:
+      tags: [exports]
+      summary: Materializa un export (OOXML/ODF/PDF/HTML/MD) y lo sube a S3
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [format]
+              properties:
+                format: { $ref: '#/components/schemas/BlobFormat' }
+      responses:
+        '201':
+          description: Creado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  export: { $ref: '#/components/schemas/Blob' }
+
+  /v1/documents/{id}/exports/{blobId}:
+    parameters:
+      - { $ref: '#/components/parameters/DocId' }
+      - { name: blobId, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [exports]
+      summary: Descarga un export (URL prefirmada S3, o ?inline=true para streaming)
+      parameters:
+        - { name: inline, in: query, schema: { type: boolean } }
+      responses: { '200': { description: OK } }
+
+  /v1/pdf/pages:
+    post:
+      tags: [pdf]
+      summary: Operaciones sobre un PDF (páginas, marcas de agua, numeración)
+      description: >
+        Conversión pura: entra uno o varios PDF y sale el PDF resultante. No hay
+        documento que autorizar ni nada que se guarde — la verja es la sesión.
+
+
+        Dos familias de operación. Las **de página** (`combinar`, `extraer`,
+        `borrar`, `rotar`) reorganizan el documento; las páginas se numeran DESDE
+        1, como las ve el usuario en su visor. `extraer` conserva el orden pedido
+        y admite repetidas, así que sirve también para reordenar y para duplicar
+        una página; `borrar` se niega a dejar el documento sin ninguna.
+
+
+        Las **de capa** (`marca-agua`, `numerar`, `bates`, `encabezado`, `pie`)
+        superponen texto en TODAS las páginas sin tocar el contenido original: se
+        añade un flujo detrás del que ya había, así que lo de debajo se sigue
+        dibujando. No llevan `paginas`; llevan `texto`, que admite los marcadores
+        `{pagina}` y `{total}`.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, op]
+              properties:
+                file:
+                  description: >
+                    El PDF. Varios ficheros solo tienen sentido con `combinar`;
+                    el resto de operaciones exigen uno.
+                  type: array
+                  items: { type: string, format: binary }
+                op:
+                  type: string
+                  enum:
+                    [combinar, extraer, borrar, rotar, marca-agua, numerar, bates, encabezado, pie]
+                paginas:
+                  description: >
+                    Lista 1-based con números y rangos, «1,3,5-8». Un rango al
+                    revés («8-5») son esas páginas invertidas. Obligatorio en las
+                    operaciones de página salvo `combinar`; las de capa no la usan.
+                  type: string
+                  example: "1,3,5-8"
+                grados:
+                  description: >
+                    Solo con `rotar`: múltiplo de 90 (90, 180, 270 o -90). Se
+                    SUMA a la rotación que ya tuviera cada página.
+                  type: integer
+                  example: 90
+                texto:
+                  description: >
+                    El texto de la capa (máximo 500 caracteres). Admite `{pagina}`
+                    y `{total}`. Obligatorio salvo en `numerar` y `bates`, que
+                    tienen formato por defecto. En `bates` es el PREFIJO que va
+                    delante del número.
+                  type: string
+                  example: "Página {pagina} de {total}"
+                posicion:
+                  description: >
+                    Solo con `numerar`. Un valor desconocido cae en el pie
+                    centrado en vez de dar error: es una preferencia estética y
+                    fallar por ella tiraría el trabajo entero.
+                  type: string
+                  enum:
+                    - superior-izquierda
+                    - superior-centro
+                    - superior-derecha
+                    - inferior-izquierda
+                    - inferior-centro
+                    - inferior-derecha
+                desde:
+                  description: Solo con `bates`. Número de la primera página (1 por defecto).
+                  type: integer
+                  example: 1
+                digitos:
+                  description: >
+                    Solo con `bates`. Ceros a la izquierda hasta esa anchura (6 por
+                    defecto, entre 1 y 12). Es lo que hace que ordenen bien como texto.
+                  type: integer
+                  example: 6
+      responses:
+        '200':
+          description: El PDF resultante
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+        '400':
+          description: >
+            Petición inválida — incluye los casos que el usuario puede corregir:
+            PDF protegido con contraseña, fichero que no es un PDF, páginas fuera
+            de rango o intentar borrarlas todas.
+        '413': { description: El fichero supera el tamaño máximo }
+
+  /v1/pdf/inspect:
+    post:
+      tags: [pdf]
+      summary: Índice de un PDF (páginas con tamaño y extracto de texto)
+      description: >
+        Devuelve qué páginas tiene el documento, cómo son y qué dice cada una,
+        para poder ELEGIRLAS reconociéndolas en vez de escribir su número de
+        memoria. No es una miniatura —rasterizar un PDF sin dependencias es otra
+        ola— pero basta para saber cuál es la portada y cuál el anexo.
+
+
+        Conversión pura: nada se guarda. Se indexan como máximo las primeras 500
+        páginas; para un expediente más largo, escribir el rango es más rápido de
+        todas formas.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  paginas:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        numero: { type: integer, description: 1-based, como lo ve el usuario }
+                        ancho: { type: number, description: En puntos, con la rotación aplicada }
+                        alto: { type: number }
+                        rotacion: { type: integer }
+                        extracto:
+                          type: string
+                          description: >
+                            Primeras palabras de la página. Vacío si solo tiene
+                            imágenes, que también es información útil.
+        '400': { description: No es un PDF, o está protegido con contraseña }
+        '413': { description: El fichero supera el tamaño máximo }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT emitido por Sytue ID (OIDC).
+  parameters:
+    DocId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+  responses:
+    DocumentResponse:
+      description: Documento
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              document: { $ref: '#/components/schemas/Document' }
+              role: { $ref: '#/components/schemas/Role' }
+    Error:
+      description: Error canónico de la API
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: object
+                properties:
+                  code: { type: string }
+                  message: { type: string }
+                  details: {}
+              request_id: { type: string }
+  schemas:
+    Kind:
+      type: string
+      enum: [document, spreadsheet, presentation]
+    Role:
+      type: string
+      enum: [viewer, commenter, editor, owner]
+    BlobFormat:
+      type: string
+      enum: [sytue-crdt, ooxml, odf, pdf, html, markdown]
+    Document:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        kind: { $ref: '#/components/schemas/Kind' }
+        title: { type: string }
+        owner_sub: { type: string }
+        seq: { type: integer, format: int64 }
+        starred: { type: boolean }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    Op:
+      type: object
+      description: Operación CRDT de bajo nivel (RGA + LWW).
+      required: [kind]
+      properties:
+        kind: { type: string, enum: [insert, delete, set, patch] }
+        dot:
+          type: object
+          properties:
+            a: { type: string, description: actor }
+            c: { type: integer, description: counter }
+        after: { type: object, nullable: true }
+        target: { type: object, nullable: true }
+        key: { type: string }
+        value: {}
+        lamport: { type: integer, format: int64 }
+        op_id:
+          type: string
+          maxLength: 64
+          description: >
+            patch: identificador del parche; reenviarlo no lo aplica dos veces. En el log
+            queda en el `set` que el servidor materializa (auditoría).
+        base: { type: integer, format: int64, description: 'patch: seq que conocía quien lo manda (informativa).' }
+        cambios:
+          type: array
+          description: >
+            patch (solo sobre doc:sheet o doc:slides): modificaciones puntuales del modelo.
+            El servidor las aplica sobre el contenido vigente, en orden de llegada, y las
+            guarda como un `set` ordinario del registro; no hay 409.
+          items:
+            type: object
+            required: [path]
+            properties:
+              path:
+                type: array
+                description: 'Claves (string) y elementos de lista por id ({"id": "..."}), p. ej. ["sheets", {"id":"h1"}, "cells", "A1"].'
+                items: {}
+              value: {}
+              del: { type: boolean }
+    SequencedOp:
+      type: object
+      description: Operación ya secuenciada por el servidor.
+      properties:
+        document_id: { type: string, format: uuid }
+        seq: { type: integer, format: int64 }
+        actor: { type: string }
+        author_sub: { type: string }
+        lamport: { type: integer, format: int64 }
+        op: { $ref: '#/components/schemas/Op' }
+    CRDTState:
+      type: object
+      description: Estado CRDT materializado (secuencia RGA + registros LWW).
+      properties:
+        seq: { type: integer, format: int64 }
+        lamport: { type: integer, format: int64 }
+        elements: { type: array, items: { type: object } }
+        registers: { type: object, additionalProperties: { type: object } }
+    Version:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        document_id: { type: string, format: uuid }
+        snapshot_id: { type: string, format: uuid }
+        label: { type: string, nullable: true }
+        author_sub: { type: string }
+        seq: { type: integer, format: int64 }
+        auto: { type: boolean }
+        created_at: { type: string, format: date-time }
+    Comment:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        document_id: { type: string, format: uuid }
+        parent_id: { type: string, format: uuid, nullable: true }
+        author_sub: { type: string }
+        anchor: { type: object }
+        body: { type: string }
+        resolved: { type: boolean }
+        created_at: { type: string, format: date-time }
+    Permission:
+      type: object
+      properties:
+        document_id: { type: string, format: uuid }
+        principal_kind: { type: string, enum: [user, group, tenant, public] }
+        principal_id: { type: string }
+        role: { $ref: '#/components/schemas/Role' }
+        granted_by: { type: string }
+        created_at: { type: string, format: date-time }
+    ShareLink:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        document_id: { type: string, format: uuid }
+        role: { $ref: '#/components/schemas/Role' }
+        token: { type: string, description: Solo presente al crear (una vez). }
+        expires_at: { type: string, format: date-time, nullable: true }
+        revoked_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time }
+    Blob:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        document_id: { type: string, format: uuid }
+        format: { $ref: '#/components/schemas/BlobFormat' }
+        seq: { type: integer, format: int64 }
+        size_bytes: { type: integer, format: int64 }
+        content_type: { type: string }
+        created_by: { type: string }
+        created_at: { type: string, format: date-time }

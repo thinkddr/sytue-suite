@@ -1,0 +1,17 @@
+PDF alusta loppuun, selaimessasi.
+
+• Korosta, alleviivaa, kommentoi ja piirrä asiakirjaan.
+• Lomakkeet: täytä kenttiä tai luo omia.
+• Yhdistä, poimi, kierrä, numeroi ja lisää vesileima.
+• Allekirjoituspaneeli, pysyvä peittäminen ja salasanalla suojatut asiakirjat.
+• Nopea katseluohjelma jäsennyksellä, pikkukuvilla, haulla ja zoomauksella sivun tai leveyden mukaan.
+• Merkinnät: korostus, alleviivaus, yliviivaus, kommentit, piirrokset, muodot, nuolet ja leimat.
+• Tekstiruudut, mittaukset ja alueen tilannekuvat.
+• Lomakkeet: täytä olemassa olevia kenttiä tai lisää omia.
+• Asiakirjojen allekirjoituspaneeli.
+• Pysyvä peittäminen: merkitsemäsi sisältö katoaa tiedostosta, ei vain näkymästä.
+• Sivut: yhdistä, poimi, poista, kierrä, numeroi (myös Bates), ylä- ja alatunnisteet.
+• Vesileima, tausta ja muokattavat metatiedot.
+• Salasanalla suojatut asiakirjat ja oikeudet.
+
+Salattu siirron aikana (TLS 1.3). Sytuen infrastruktuuri sijaitsee EU:ssa. Ulkoisten palvelujen sijainti riippuu niiden tarjoajasta.

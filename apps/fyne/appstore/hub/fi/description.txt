@@ -1,0 +1,14 @@
+Kokonaisuuden etusivu: sovellukset, pikatoiminnot, viimeaikainen toiminta ja ilmoitukset.
+
+• Käynnistin, jossa ovat kaikki sovelluksesi ja organisaatiosi yhdistämät sovellukset.
+• Päivän ohjelma ja lukemattomat sähköpostit etusivulla, kokonaisuuden viimeaikaisten asioiden ja ilmoitustesi vieressä.
+• Yhdistä laitteesi ja lataa natiivisovellukset.
+• Käynnistin kokonaisuuden sovelluksille ja kolmansien osapuolten sovelluksille, jotka organisaatiosi yhdistää.
+• Pikatoiminnot: kirjoita sähköposti, uusi asiakirja, lataa Driveen, luo tapahtuma.
+• Viimeaikaiset koko kokonaisuudessa: viimeisimmät kohteet Drivesta, Docusista, Mailista tai Roomsista.
+• Ilmoituskeskus ja läsnäolo yhteisinä koko kokonaisuudessa.
+• Yhdistä laitteesi: profiili iPhonelle ja Macille, Androidille ja tietokoneelle, kahdessa vaiheessa.
+• Natiivien työpöytä- ja mobiilisovellusten lataukset.
+• Tervetuloapuri, joka valmistelee organisaation ilman käyttöoppaita.
+
+Salattu siirron aikana (TLS 1.3). Sytuen infrastruktuuri sijaitsee EU:ssa. Ulkoisten palvelujen sijainti riippuu niiden tarjoajasta.

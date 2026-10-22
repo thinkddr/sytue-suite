@@ -1,0 +1,17 @@
+"widgets.open" = "Ava";
+"widgets.compose" = "Koosta kiri";
+"widgets.create" = "Loo sündmus";
+"widgets.notes" = "Märkmed";
+"widgets.rows" = "Read";
+"widgets.pending" = "Ootel";
+"widgets.channels" = "Kanalid";
+"widgets.photos" = "Fotod";
+"widgets.episodes" = "Episoodid";
+"widgets.apps" = "Rakendused";
+"widgets.calendars" = "Kalendrid";
+"widgets.address_books" = "Aadressiraamatud";
+"search.label" = "Üldotsing";
+"dataflow.item.files" = "Failid";
+"dataflow.item.events" = "Kalender";
+"dataflow.item.documents" = "Dokumendid";
+"dataflow.item.contacts" = "Kontaktid";

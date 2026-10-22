@@ -1,0 +1,42 @@
+{
+  "id": "prometheus",
+  "name": "Prometheus",
+  "description": "Recoge métricas de tus servicios cada pocos segundos y guarda su historia. Es la fuente de datos que espera Grafana, y trae ya configurado el descubrimiento de las apps del proyecto.",
+  "category": "observability",
+  "license": "Apache-2.0",
+  "homepage": "https://prometheus.io/",
+  "source": "https://github.com/prometheus/prometheus",
+  "upstream": "docker.io/prom/prometheus:v3.10.0",
+  "upstream_digest": "sha256:4a61322ac1103a0e3aea2a61ef1718422a48fa046441f299d71e660a3bc71ae9",
+  "version": "3.10.0",
+  "ports": [
+    {
+      "name": "http",
+      "port": 9090
+    }
+  ],
+  "exports": [
+    {
+      "key": "PROMETHEUS_URL",
+      "value": "http://{host}:{port}"
+    }
+  ],
+  "config_files": [
+    {
+      "path": "/etc/prometheus/prometheus.yml",
+      "content": "# Configuración que aporta el catálogo de Sytue Cloud.\n#\n# Descubre por DNS los servicios del propio namespace en vez de traer una\n# lista fija: en este proyecto los nombres los pone el aprovisionador, así que\n# una lista escrita a mano estaría mal desde el primer día.\nglobal:\n  scrape_interval: 30s\n  evaluation_interval: 30s\n\nscrape_configs:\n  # Él mismo, que es lo que permite ver si está recogiendo.\n  - job_name: prometheus\n    static_configs:\n      - targets: ['localhost:9090']\n\n  # Todo lo que exponga /metrics en el namespace del proyecto. Sin credenciales\n  # de la API de Kubernetes: el pod no monta ninguna a propósito, así que el\n  # descubrimiento es por DNS y no por la API.\n  - job_name: proyecto\n    dns_sd_configs:\n      - names: ['sytue-metrics.local']\n        type: A\n        port: 9090\n    metrics_path: /metrics\n"
+    }
+  ],
+  "env": [
+    {
+      "key": "TZ",
+      "value": "UTC"
+    }
+  ],
+  "disk_gib": 20,
+  "data_path": "/prometheus",
+  "memory_mib": 2048,
+  "cpu_milli": 1000,
+  "run_as_user": 65534,
+  "health_path": "/-/healthy"
+}

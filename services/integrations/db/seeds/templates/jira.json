@@ -1,0 +1,50 @@
+{
+  "key": "jira-cloud",
+  "tier": "tier1",
+  "manifest": {
+    "name": "Jira Cloud",
+    "description": "Seguimiento de incidencias y proyectos ágiles, con inicio de sesión único.",
+    "category": "Ingeniería",
+    "color": "#2684FF",
+    "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#2684FF\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 2 3 11l9 9 9-9Z\"/><path d=\"M12 8.5 15.5 12 12 15.5 8.5 12Z\"/></svg>",
+    "identity": {
+      "kind": "saml",
+      "entity_id": "https://{site}.atlassian.net",
+      "acs_url": "https://{site}.atlassian.net/plugins/servlet/samlconsumer",
+      "name_id_format": "email"
+    },
+    "provisioning": "none",
+    "data": "jira",
+    "launch": {
+      "kind": "initiate"
+    },
+    "fields": [
+      {
+        "key": "site",
+        "label": "Sitio de Atlassian",
+        "placeholder": "acme",
+        "help": "El nombre de tu sitio: https://SITIO.atlassian.net",
+        "required": true
+      },
+      {
+        "key": "email",
+        "label": "Correo de la cuenta de integración",
+        "placeholder": "integraciones@acme.com",
+        "help": "Solo si conectas con un token pegado en vez de por consentimiento: ese modo autentica con correo + token."
+      }
+    ],
+    "secret": {
+      "label": "Token de API de Atlassian",
+      "help": "Alternativa al consentimiento (p. ej. Jira Data Center). Conectando con Atlassian no hace falta pegar nada."
+    },
+    "oauth": {
+      "authorize_url": "https://auth.atlassian.com/authorize?audience=api.atlassian.com&prompt=consent",
+      "token_url": "https://auth.atlassian.com/oauth/token",
+      "scopes": [
+        "read:jira-work",
+        "read:jira-user",
+        "offline_access"
+      ]
+    }
+  }
+}

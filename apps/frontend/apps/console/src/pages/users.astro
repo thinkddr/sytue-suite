@@ -1,0 +1,47 @@
+---
+import ConsoleLayout from '../layouts/ConsoleLayout.astro';
+import { useT } from '../i18n/index.js';
+import UsersPanel from '../components/UsersPanel';
+import { requireSession } from '@sytue/auth/server';
+import { canonicaConOrg } from '@sytue/config';
+import { getBff, toBffContext } from '../server/bff.js';
+import { loadUsers, loadTenants } from '../lib/admin.js';
+
+export const prerender = false;
+
+const guard = await requireSession(getBff(), toBffContext(Astro), {
+  roles: ['admin', 'owner'],
+  perms: ['users.read', 'users.manage'],
+});
+if (guard instanceof Response) return guard;
+// Ruta en `sinOrg` (su nombre colisiona con el namespace de organizaciones):
+// con sesión, un salto local a la canónica con la org activa (ADR 0056).
+const canonica = canonicaConOrg(Astro.url, getBff().basePath, guard.session.user.tenant);
+if (canonica) return Astro.redirect(canonica);
+
+const { session } = guard;
+
+// `live` NO se descarta: sin Sytue ID el directorio degrada al seed de
+// demostración, y una lista de gente inventada que se lee como la plantilla real
+// es peor que una pantalla vacía — se suspende a alguien que no existe y el
+// fallo se atribuye a la acción, no a que no hay servicio detrás.
+const [{ data: usersPage, live }, { data: tenants }] = await Promise.all([
+  loadUsers(session),
+  loadTenants(session),
+]);
+
+// El idioma lo negoció el middleware; la isla lo recibe por props (nunca lo detecta).
+const locale = Astro.locals.locale;
+const t = useT(locale);
+---
+
+<ConsoleLayout title={t('page.users')} section="users">
+  <UsersPanel
+    client:load
+    locale={locale}
+    users={usersPage.items}
+    tenants={tenants}
+    nextCursor={usersPage.nextCursor}
+    live={live}
+  />
+</ConsoleLayout>

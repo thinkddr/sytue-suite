@@ -1,0 +1,25 @@
+<!--
+  Fragmento para android/app/src/main/AndroidManifest.xml (tras `npx cap add android`).
+  Anade estos <intent-filter> DENTRO del <activity android:name=".MainActivity">.
+  Capacitor App emite `appUrlOpen` para ambos, que native.js enruta al canal.
+
+  Push (FCM): NO requiere manifest — @capacitor/push-notifications lo cablea al
+  hacer `cap sync`; solo hace falta android/app/google-services.json (ver README).
+-->
+
+<!-- Deep-links por esquema propio: sytue-rooms://open?url=... -->
+<intent-filter>
+	<action android:name="android.intent.action.VIEW" />
+	<category android:name="android.intent.category.DEFAULT" />
+	<category android:name="android.intent.category.BROWSABLE" />
+	<data android:scheme="sytue-rooms" />
+</intent-filter>
+
+<!-- App Links (https verificados): https://rooms.sytue.eu/channels/x  -->
+<!-- android:autoVerify="true" exige assetlinks.json en el dominio de Rooms (ver README). -->
+<intent-filter android:autoVerify="true">
+	<action android:name="android.intent.action.VIEW" />
+	<category android:name="android.intent.category.DEFAULT" />
+	<category android:name="android.intent.category.BROWSABLE" />
+	<data android:scheme="https" android:host="rooms.sytue.eu" />
+</intent-filter>

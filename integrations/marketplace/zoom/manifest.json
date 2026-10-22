@@ -1,0 +1,30 @@
+{
+  "app_name": "Sytue Rooms Interop",
+  "app_type": "oauth",
+  "description": "Vinculación directa de reuniones de Zoom con Sytue Rooms, creación automática de puentes y sincronización de grabaciones.",
+  "developer": {
+    "name": "Sytue Support",
+    "email": "support@sytue.eu",
+    "company": "Sytue"
+  },
+  "redirect_uri": "https://integrations.sytue.eu/api/v1/oauth/callback",
+  "whitelist_urls": [
+    "https://integrations.sytue.eu",
+    "https://rooms.sytue.eu"
+  ],
+  "scopes": [
+    "meeting:read",
+    "meeting:write",
+    "user:read"
+  ],
+  "event_subscriptions": [
+    {
+      "event": "meeting.started",
+      "endpoint_url": "https://rooms.sytue.eu/api/integrations/zoom/events"
+    },
+    {
+      "event": "meeting.ended",
+      "endpoint_url": "https://rooms.sytue.eu/api/integrations/zoom/events"
+    }
+  ]
+}

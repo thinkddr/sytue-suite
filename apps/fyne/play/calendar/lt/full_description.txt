@@ -1,0 +1,19 @@
+CalDAV kalendorius, susietas su visu rinkiniu.
+
+• Dienos, savaitės ir mėnesio rodiniai.
+• Pasikartojantys įvykiai ir priminimai.
+• Įvykių kūrimas tiesiai iš laiško programoje Mail.
+• Veikia su bet kuria CalDAV kliento programa.
+• Mėnesio, savaitės, dienos ir darbotvarkės rodiniai su mažu kalendoriumi ir „Šiandien“.
+• Kasdienis, kassavaitinis ar kasmėnesinis kartojimas su pabaiga; redaguoti tik šį, šį ir paskesnius arba visus.
+• Priminimai kiekvienam įvykiui ir pranešimai rinkinyje.
+• Kvietimai su atsakymu (dalyvausiu, galbūt, ne) ir stebėsena.
+• „Rasti laiką“, laisvą visiems pakviestiems asmenims.
+• Rezervuojamos patalpos ir ištekliai su užimtumu.
+• Bendrinami kalendoriai su teisėmis ir su jumis bendrinami kalendoriai.
+• Išorinių kalendorių (ICS) prenumerata ir keli spalvomis pažymėti kalendoriai.
+• Įvykio kūrimas iš Mail laiško arba iš užrašo.
+• Veikia su bet kuria CalDAV kliento programa: Apple Calendar, Thunderbird ir kitomis.
+• Įvykio dubliavimas arba kopijavimas į jūsų kalendorių ir atsisiuntimas .ics formatu asmenims už Sytue ribų.
+
+Šifruojama perduodant (TLS 1.3). „Sytue“ infrastruktūra yra ES. Išorinių paslaugų vieta priklauso nuo jų teikėjo.

@@ -1,0 +1,45 @@
+{
+  "id": "jenkins",
+  "name": "Jenkins",
+  "description": "El servidor de automatización de siempre: compila, prueba y despliega con más de mil complementos. Para lo que no encaja en el CI de tu forja.",
+  "category": "devtools",
+  "license": "Apache-2.0",
+  "homepage": "https://www.jenkins.io/",
+  "source": "https://github.com/jenkinsci/jenkins",
+  "upstream": "docker.io/jenkins/jenkins:2.541-jdk21",
+  "upstream_digest": "sha256:25c00068a3f02defd29bd7aa94677a00f640f19473aa18c352d14152abc02bca",
+  "version": "2.541",
+  "ports": [
+    {
+      "name": "http",
+      "port": 8080
+    },
+    {
+      "name": "agents",
+      "port": 50000
+    }
+  ],
+  "web_port": 8080,
+  "exports": [
+    {
+      "key": "JENKINS_URL",
+      "value": "http://{host}:{port}"
+    }
+  ],
+  "env": [
+    {
+      "key": "JENKINS_OPTS",
+      "value": "--prefix="
+    },
+    {
+      "key": "JAVA_OPTS",
+      "value": "-Djenkins.install.runSetupWizard=true -Dhudson.model.DownloadService.noSignatureCheck=false"
+    }
+  ],
+  "disk_gib": 30,
+  "data_path": "/var/jenkins_home",
+  "memory_mib": 4096,
+  "cpu_milli": 2000,
+  "run_as_user": 1000,
+  "health_path": "/login"
+}

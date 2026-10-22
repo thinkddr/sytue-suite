@@ -1,0 +1,43 @@
+---
+/**
+ * Auditoría — quién hizo qué en la organización. El endpoint existía y no había
+ * ninguna pantalla que lo mostrara.
+ */
+import DashboardLayout from '../layouts/DashboardLayout.astro';
+import AuditPanel from '../components/AuditPanel';
+import { requireSession } from '@sytue/auth/server';
+import { canonicaConOrg } from '@sytue/config';
+import { getBff, toBffContext } from '../server/bff.js';
+import { loadAudit } from '../lib/cloud.js';
+
+import { useT } from '../i18n/index.js';
+
+export const prerender = false;
+
+// El idioma lo negocia el middleware una vez por petición y baja a la isla por
+// props: detectarlo en el cliente desajustaría la hidratación.
+const locale = Astro.locals.locale;
+const t = useT(locale);
+
+const guard = await requireSession(getBff(), toBffContext(Astro));
+if (guard instanceof Response) return guard;
+// Ruta en `sinOrg` (su nombre colisiona con el namespace de organizaciones):
+// con sesión, un salto local a la canónica con la org activa (ADR 0056).
+const canonica = canonicaConOrg(Astro.url, getBff().basePath, guard.session.user.tenant);
+if (canonica) return Astro.redirect(canonica);
+
+// Primera página en el SSR (la pantalla llega con datos); las siguientes y los
+// filtros los pide la isla al BFF por cursor keyset.
+const { live, data: page, error } = await loadAudit(guard.session);
+---
+
+<DashboardLayout title={t('nav.audit')} section="audit" error={error}>
+  <AuditPanel
+    client:load
+    events={page.events}
+    nextCursor={page.nextCursor}
+    live={live}
+    error={error}
+    locale={locale}
+  />
+</DashboardLayout>

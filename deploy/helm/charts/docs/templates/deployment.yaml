@@ -1,0 +1,359 @@
+{{- $globalObjectStorage := ((.Values.global).objectStorage | default dict) -}}
+{{- $objectStorage := .Values.objectStorage | default dict -}}
+{{- $remote := ((.Values.global).objectStorageRemote | default dict) -}}
+{{- $remoteSecret := $remote.existingSecret | default "sytue-object-storage-remote" -}}
+{{- $objectStorageSecret := $objectStorage.existingSecret | default $globalObjectStorage.existingSecret | default "sytue-object-storage" -}}
+{{- $objectStorageRegion := $objectStorage.region | default $globalObjectStorage.region | default "fr-par" -}}
+{{- $objectStorageUseSSL := true -}}
+{{- if hasKey $globalObjectStorage "useSSL" -}}
+  {{- $objectStorageUseSSL = $globalObjectStorage.useSSL -}}
+{{- end -}}
+{{- if hasKey $objectStorage "useSSL" -}}
+  {{- $objectStorageUseSSL = $objectStorage.useSSL -}}
+{{- end -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "sytue-docs.fullname" . }}
+  labels:
+    {{- include "sytue-docs.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "sytue-docs.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "sytue-docs.labels" . | nindent 8 }}
+      annotations:
+        kubectl.kubernetes.io/default-container: docs
+    spec:
+      automountServiceAccountToken: false
+      {{- with (.Values.global).imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: docs
+          image: "{{ include "sytue-docs.imageRegistry" . }}/{{ .Values.image.repository }}:{{ ((.Values.global).image | default dict).tag | default .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.targetPort }}
+          env:
+            {{- include "sytue.documentCallsEnv" (dict "root" . "prefix" "SYTUE_DOCS" "secretSuffix" "ROOMS_CALL_ACCESS_SECRET") | nindent 12 }}
+            - name: SYTUE_DOCS_ROOMS_URL
+              value: {{ printf "http://%s-rooms" .Release.Name | quote }}
+            {{- if (.Values.global).otlp }}
+            {{- if (.Values.global).otlp.endpoint }}
+            # Telemetria: metricas OTLP directas a Cockpit, sin agente intermedio.
+            # Sale del umbrella y no de este chart para que los catorce escriban al
+            # MISMO sitio; si cada uno apuntara al suyo, no habria con que comparar.
+            # Vacio => no se exporta y el servicio sigue sirviendo igual.
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ (.Values.global).otlp.endpoint | quote }}
+            {{- end }}
+            {{- if (.Values.global).otlp.tokenSecret }}
+            # Por Secret y nunca por values: aunque el token solo permita escribir,
+            # con el se puede envenenar la serie que decide un escalado.
+            - name: OTEL_EXPORTER_OTLP_HEADERS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ (.Values.global).otlp.tokenSecret }}
+                  key: {{ (.Values.global).otlp.tokenKey | default "otlp-headers" }}
+                  optional: true
+            {{- end }}
+            {{- end }}
+            {{- if (.Values.global).dragonflyUrl }}
+            # Cache efimera compartida entre replicas (Dragonfly). Sale del
+            # umbrella y no de cada chart para que los tres servicios que la usan
+            # apunten al MISMO sitio: si divergen, la presencia se parte igual
+            # que si no hubiera cache.
+            #
+            # Ausente ⇒ platform/pkg/cache degrada a no-op y el servicio sigue
+            # sirviendo con estado en memoria del proceso. Eso solo es correcto
+            # con UNA replica, y por eso el autoescalado de estos servicios
+            # depende de que esta variable exista.
+            # PREFIJO. Sytue Docs carga su configuracion con `config.NewLoader
+            # ("SYTUE_DOCS")`, asi que busca SYTUE_DOCS_DRAGONFLY_URL. Esta era la
+            # UNICA variable del chart sin el prefijo, y por eso la cache de la
+            # coedicion nunca llego a activarse: el binario no encontraba la URL,
+            # `platform/pkg/cache` degradaba a no-op y el estado quedaba en memoria
+            # de cada replica —correcto con UNA, y solo con una—. Hub, Rooms,
+            # Calendar y Contacts leen la variable sin prefijo y por eso a ellos si
+            # les llegaba.
+            - name: SYTUE_DOCS_DRAGONFLY_URL
+              value: {{ (.Values.global).dragonflyUrl | quote }}
+            {{- if ((.Values.global).cache).secretName }}
+            # La contraseña va por Secret y APARTE de la URL. La URL no es un secreto
+            # —es la misma en dev y en prod— y se deja como `value:` a la vista para
+            # que se pueda comprobar que los siete servicios apuntan a la MISMA cache;
+            # meterla dentro de la URL obligaría a mandar la URL entera por Secret y
+            # ese gate se quedaría ciego.
+            #
+            # `optional: true` a propósito: sin la clave en el Secret, Dragonfly
+            # tampoco la exige (misma referencia opcional en su chart) y el conjunto
+            # sigue funcionando sin autenticación, que es el comportamiento previo.
+            - name: SYTUE_DOCS_DRAGONFLY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ ((.Values.global).cache).secretName }}
+                  key: {{ ((.Values.global).cache).passwordKey | default "dragonfly-password" }}
+                  optional: true
+            {{- end }}
+            {{- end }}
+            # Runtime Go atado a los limites del pod (helper sytue.goRuntimeEnv del umbrella):
+            # GOMAXPROCS=techo(limits.cpu) via downward API; GOMEMLIMIT=~85% de limits.memory.
+            {{- include "sytue.goRuntimeEnv" (dict "container" "docs" "memLimit" .Values.resources.limits.memory) | nindent 12 }}
+            {{- include "sytue.logCollectorEnv" . | nindent 12 }}
+            # ----- Sytue OCR (ADR-0034) -----
+            # Se pasa SIEMPRE y sin condicion. Una URL vacia aqui no significa
+            # "sin OCR": significa un despliegue a medias, y el binario apaga la
+            # herramienta en silencio. Es exactamente el patron que dejo a Sytue AI
+            # sin chart durante meses, asi que aqui el valor es fijo y el interruptor
+            # es `ocr.enabled` del umbrella, que se ve.
+            - name: SYTUE_DOCS_OCR_URL
+              value: "http://{{ .Release.Name }}-ocr:{{ (.Values.global).ocrPort | default 8096 }}"
+            # ----- Sytue Drive: donde vive el fichero de cada documento -----
+            # Un documento nuevo se crea TAMBIEN como fichero en la unidad de su
+            # dueno (services/docs/internal/drive, docs/architecture.md#docs-en-drive). Sin esta
+            # variable el binario cae a su valor por defecto `http://drive:8082`,
+            # que NO existe en Kubernetes: aqui el Service se llama
+            # `<release>-drive` y escucha en el 80. O sea, el defecto del binario
+            # sirve para docker-compose y en el cluster habria dejado todos los
+            # documentos fuera de la unidad SIN un solo error visible —el mismo
+            # fallo silencioso que dejo WOPI apagado en produccion por un nombre de
+            # variable—. Se pasa SIEMPRE y sin condicion, por eso mismo.
+            - name: SYTUE_DOCS_DRIVE_URL
+              value: "http://{{ .Release.Name }}-drive"
+            # Sytue Bases: origen de datos de solo lectura de Calcus (ADR 0068). Raíz FIJA
+            # e interna: el token de una conexión nunca se manda a un host que elija nadie.
+            - name: SYTUE_DOCS_BASES_URL
+              value: "http://{{ .Release.Name }}-bases"
+            # La papelera compartida con Drive (un documento y su fichero van juntos a
+            # la papelera y salen juntos): secreto PROPIO de Docs y Drive, que genera el
+            # chart paraguas (secretos-internos.yaml). Sin él, cada papelera por su lado.
+            - name: SYTUE_DOCS_DRIVE_INTERNAL_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: sytue-docs-drive-internal
+                  key: secret
+                  optional: true
+            # ----- Sello de tiempo de las firmas (RFC 3161) -----
+            # Se pasa SIEMPRE: sin autoridad, una firma prueba quién firmó pero no
+            # cuándo, así que deja de verificarse en cuanto el certificado caduca. La
+            # autoridad es un prestador CUALIFICADO de la lista de confianza de la UE
+            # (docs/decisions.md#0051), y la interfaz dice qué firmas llevan sello.
+            - name: SYTUE_DOCS_SELLO_URL
+              value: {{ (.Values.config).selloUrl | default "" | quote }}
+            {{- if (.Values.config).selloAnclas }}
+            # La raíz de la cadena de la autoridad: con ella se AUTENTICA cada token,
+            # que llega por HTTP plano. Es un certificado público, no un secreto.
+            - name: SYTUE_DOCS_SELLO_ANCLAS
+              value: {{ .Values.config.selloAnclas | quote }}
+            {{- end }}
+            {{- if (.Values.config).selloPolitica }}
+            - name: SYTUE_DOCS_SELLO_POLITICA
+              value: {{ .Values.config.selloPolitica | quote }}
+            {{- end }}
+            {{- if (.Values.config).selloSecret }}
+            # Por Secret y nunca por values: con la credencial de la autoridad se
+            # pueden emitir sellos a nombre de la organización.
+            - name: SYTUE_DOCS_SELLO_USUARIO
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.config.selloSecret }}
+                  key: sello-usuario
+                  optional: true
+            - name: SYTUE_DOCS_SELLO_CLAVE
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.config.selloSecret }}
+                  key: sello-clave
+                  optional: true
+            {{- end }}
+            - name: SYTUE_DOCS_ENV
+              value: {{ include "sytue-docs.env" . | quote }}
+            - name: SYTUE_DOCS_HTTP_ADDR
+              value: ":{{ .Values.service.targetPort }}"
+            - name: SYTUE_DOCS_LOG_LEVEL
+              value: {{ .Values.config.logLevel | quote }}
+            # ----- Sytue ID (OIDC; validacion JWT via JWKS) -----
+            - name: SYTUE_DOCS_OIDC_ISSUER
+              value: {{ include "sytue-docs.oidcIssuer" . | quote }}
+            - name: SYTUE_DOCS_OIDC_JWKS_URL
+              value: {{ include "sytue.oidcJwksUrl" . | quote }}
+            # `OIDC_CLIENT_ID`/`OIDC_CLIENT_SECRET` vivieron aqui sin que ningun
+            # binario Go los leyera: este servicio valida el JWT por JWKS y no hace
+            # ningun flujo de codigo. Quien usa credenciales de cliente es el BFF, y
+            # las suyas se llaman SYTUE_OIDC_CLIENT_SECRET. Montaban un secreto real
+            # en un pod que no lo usa, y ademas tapaban el gate de prefijos.
+            # ----- Postgres EXTERNO (Scaleway RDB; unica fuente de verdad) -----
+            - name: SYTUE_DOCS_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgresql.existingSecret }}
+                  key: {{ .Values.postgresql.dsnKey }}
+            # Pool pgx POR replica (bajo en prod: PgBouncer multiplexa hacia la RDB).
+            # Sin esto, platform/pkg/pg cae al default 10 -> a HPA-max desborda LA CUENTA
+            # de PgBouncer (values-prod cuenta docs a 4/replica).
+            - name: SYTUE_DOCS_DB_MAX_CONNS
+              value: {{ .Values.config.dbMaxConns | quote }}
+            # ----- Object Storage S3 (Scaleway fr-par, UE) -----
+            - name: SYTUE_DOCS_S3_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $objectStorageSecret }}
+                  key: endpoint
+            - name: SYTUE_DOCS_S3_USE_SSL
+              value: {{ $objectStorageUseSSL | quote }}
+            - name: SYTUE_DOCS_S3_REGION
+              value: {{ $objectStorageRegion | quote }}
+            # Hosts WOPI cuyos ficheros se aceptan abrir. Vacío => solo el Drive
+            # de esta suite, derivado de la URL pública. Abrirlo a un host ajeno
+            # es una decisión explícita: sin lista, Docs sería el convertidor
+            # gratuito de cualquiera que le mandara un WOPISrc.
+            #
+            # LAS DOS VAN CON PREFIJO. Docs carga con `config.NewLoader("SYTUE_DOCS")`
+            # y el loader compone `SYTUE_DOCS_<NOMBRE>`: pasarlas desnudas era pasarlas
+            # a nadie, y con `PublicURL` vacía /wopi/discovery.xml respondía 503 en
+            # producción, así que «abrir en el editor» no existía para ningún cliente.
+            - name: SYTUE_DOCS_WOPI_ALLOWED_HOSTS
+              value: {{ .Values.config.wopiAllowedHosts | default "" | quote }}
+            # Raíz PÚBLICA de Sytue Docs: la que compone las URL del catálogo WOPI, con
+            # las que un host abre cada tipo de fichero. Tiene que ser la que ve el
+            # NAVEGADOR de la persona, no la interna del clúster.
+            # Avisos al centro de notificaciones de la suite (topBar y apps
+            # nativas): mismo patrón que syerp/cloud-api.
+            - name: SYTUE_DOCS_HUB_BASE_URL
+              value: {{ .Values.config.hubUrl | default (printf "http://%s-hub" .Release.Name) | quote }}
+            # El secreto de la puerta interna del Hub (/internal/notifications), el MISMO en
+            # el Hub y en cada servicio que avisa. Lo genera el chart paraguas
+            # (sytue-one/templates/secretos-internos.yaml); sin él, fuera de dev, el
+            # servicio no arranca.
+            - name: SYTUE_DOCS_HUB_INTERNAL_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: sytue-hub-internal
+                  key: secret
+            # «Te piden editar» (peticiones.go): el correo del dueño sale de Sytue ID
+            # con la sesión de quien pide, y el correo, del MSA de Sytue Mail con la
+            # credencial de un BUZÓN propio de Docs, como en Calendar. Sin `from` no
+            # sale ninguno: el aviso del Hub llega igual.
+            - name: SYTUE_DOCS_ID_BASE_URL
+              value: {{ .Values.config.idUrl | default (printf "http://%s-id" .Release.Name) | quote }}
+            # `docs avisos-historicos`: de quién es hoy la dirección de una mención
+            # (Sytue ID, /internal/directory/resolve). Sin él, las menciones no se
+            # reconstruyen; nada más lo usa.
+            - name: SYTUE_DOCS_ID_DIRECTORIO_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: sytue-id-directorio
+                  key: secret
+                  optional: true
+            # Las peticiones de firma a gente de fuera (ADR 0059): en qué
+            # organizaciones está quien firma (Sytue ID, /internal/people/orgs), para
+            # aplicar su política. Sin él no se pide firma fuera.
+            - name: SYTUE_DOCS_ID_ORGS_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: sytue-id-orgs-persona
+                  key: secret
+                  optional: true
+            {{- include "sytue.correoEnv" (dict "root" . "prefijo" "SYTUE_DOCS_") | nindent 12 }}
+            - name: SYTUE_DOCS_PUBLIC_URL
+              value: {{ .Values.config.publicUrl | default (printf "https://%s" (include "sytue-docs.host" .)) | quote }}
+            - name: SYTUE_DOCS_S3_BUCKET
+              value: {{ .Values.config.s3Bucket | quote }}
+            - name: SYTUE_DOCS_S3_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $objectStorageSecret }}
+                  key: access-key
+            - name: SYTUE_DOCS_S3_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $objectStorageSecret }}
+                  key: secret-key
+            {{- if $remote.enabled }}
+            # ----- Almacén remoto: todo lo nuevo a Scaleway One Zone (ADR 0038) -----
+            - name: SYTUE_DOCS_S3_REMOTE_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $remoteSecret }}
+                  key: endpoint
+            - name: SYTUE_DOCS_S3_REMOTE_REGION
+              value: {{ $remote.region | default "fr-par" | quote }}
+            - name: SYTUE_DOCS_S3_REMOTE_STORAGE_CLASS
+              value: {{ $remote.storageClass | default "ONEZONE_IA" | quote }}
+            - name: SYTUE_DOCS_S3_REMOTE_BUCKET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $remoteSecret }}
+                  key: bucket
+            - name: SYTUE_DOCS_S3_REMOTE_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $remoteSecret }}
+                  key: access-key
+            - name: SYTUE_DOCS_S3_REMOTE_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $remoteSecret }}
+                  key: secret-key
+            - name: SYTUE_DOCS_S3_LOCAL_TENANTS
+              value: {{ $remote.localTenants | default "" | quote }}
+            {{- end }}
+            - name: SYTUE_DOCS_SECRET_ENC_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret }}
+                  key: secret-enc-key
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 3
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+      {{- with .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- range . }}
+        - maxSkew: {{ .maxSkew }}
+          topologyKey: {{ .topologyKey }}
+          whenUnsatisfiable: {{ .whenUnsatisfiable }}
+          labelSelector:
+            matchLabels:
+              {{- include "sytue-docs.selectorLabels" $ | nindent 14 }}
+        {{- end }}
+      {{- end }}

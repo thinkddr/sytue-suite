@@ -1,0 +1,48 @@
+{
+  "key": "databricks",
+  "tier": "tier1",
+  "manifest": {
+    "name": "Databricks",
+    "description": "Consultas SQL sobre el lakehouse (Statement Execution API) traídas a Sytue Sheets como tabla. El inicio de sesión lo gobierna el proveedor de identidad del workspace; aquí Sytue no actúa de IdP.",
+    "category": "Datos",
+    "color": "#FF3621",
+    "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#FF3621\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M3 7 12 3l9 4-9 4Z\"/><path d=\"m3 12 9 4 9-4\"/><path d=\"m3 17 9 4 9-4\"/></svg>",
+    "identity": {
+      "kind": "none"
+    },
+    "provisioning": "none",
+    "data": "databricks",
+    "launch": {
+      "kind": "url",
+      "url": "{workspace_url}"
+    },
+    "fields": [
+      {
+        "key": "workspace_url",
+        "label": "URL del workspace",
+        "placeholder": "https://dbc-1234abcd-5678.cloud.databricks.com",
+        "help": "La raíz del workspace de Databricks. Contra ella se envían las sentencias SQL.",
+        "required": true
+      },
+      {
+        "key": "warehouse_id",
+        "label": "SQL warehouse",
+        "placeholder": "a1b2c3d4e5f60789",
+        "help": "El id del SQL warehouse que ejecuta las sentencias. Cada consulta puede indicar otro.",
+        "required": true
+      }
+    ],
+    "secret": {
+      "label": "Token de acceso personal (PAT)",
+      "help": "Un token del workspace con permiso de uso del warehouse. La pasarela lo inyecta como Bearer en cada llamada; el conector nunca lo ve."
+    },
+    "oauth": {
+      "authorize_url": "{workspace_url}/oidc/v1/authorize",
+      "token_url": "{workspace_url}/oidc/v1/token",
+      "scopes": [
+        "all-apis",
+        "offline_access"
+      ]
+    }
+  }
+}

@@ -1,0 +1,16 @@
+Ficheiros e colaboração, com a sua própria marca.
+
+• Carregar, organizar e partilhar com ligações controladas (permissões e validade).
+• Pré-visualização de documentos e imagens na própria página.
+• Anexar no Mail sem duplicar o ficheiro.
+• Armazenamento S3 em regiões europeias.
+• A minha unidade, unidades de equipa, partilhados comigo, recentes, favoritos e lixo.
+• Ligações de partilha com dois níveis (ver ou editar), palavra-passe e validade.
+• Histórico de versões com restauro.
+• Pré-visualizar documentos, imagens e PDF sem transferir.
+• Abrir e editar documentos de escritório no Docus, Calcus e Diapos; PDF no CertiPDF.
+• Etiquetas de sensibilidade que bloqueiam ligações públicas onde não devem existir.
+• Partilhar num canal do Rooms ou anexar no Mail sem duplicar o ficheiro.
+• Armazenamento S3 em regiões europeias, com a quota sempre visível.
+
+Cifrado em trânsito (TLS 1.3). A infraestrutura da Sytue está na UE. A localização dos serviços externos depende do respetivo fornecedor.

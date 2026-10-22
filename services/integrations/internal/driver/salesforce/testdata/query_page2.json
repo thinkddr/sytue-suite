@@ -1,0 +1,12 @@
+{
+  "totalSize": 3,
+  "done": true,
+  "records": [
+    {
+      "attributes": { "type": "Account", "url": "/services/data/v61.0/sobjects/Account/0015e00000CCC333" },
+      "Id": "0015e00000CCC333",
+      "Name": "Initech",
+      "AnnualRevenue": null
+    }
+  ]
+}

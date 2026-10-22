@@ -1,0 +1,18 @@
+Zošity, do ktorých sa zmestí čokoľvek: text, súbory, udalosti aj celé dokumenty.
+
+• Vnorené zošity na voľnom plátne, v stĺpcoch alebo ako zoznam.
+• Poznámky každého druhu: text, úlohy, odkazy, súbory, udalosti z Calendar, dokumenty z Docs.
+• Rozhodujete, čo sa dostane do vyhľadávania — a čo nikdy.
+• Vnorené zošity s ikonou a farbou; tri rozloženia: voľné, stĺpce a zoznam.
+• Dvanásť typov poznámok: text, úlohy, odkazy, farba, obrázok a odkazy na Drive, Docus, Calendar, Rooms a ďalšie poznámky.
+• Editor s formátovaním (tučné písmo, zoznamy, odkazy), ktorý ukladá pri odchode.
+• Štítky, pripnutie, duplikovanie, presun medzi zošitmi, zoskupovanie a presúvanie na plátne.
+• Viditeľnosť pre každý zošit: súkromný, osobný, organizácia alebo verejný odkaz.
+• Rozhodujete, ktoré zošity sa dostanú do vyhľadávania v balíku.
+• Spätné odkazy: ktoré poznámky odkazujú na túto.
+• Export celého zošita do HTML, PDF, Markdown a ďalších; import kópií.
+• Zdieľanie poznámky do kanála Rooms; presunutím alebo vložením vznikajú poznámky.
+• Tabuľky v editore a skratky Markdown pri písaní: „- “, „# “, „> “ a „```“.
+• Presun poznámky do iného zošita, export jednej poznámky a triedenie zošita podľa potreby.
+
+Šifrovanie pri prenose (TLS 1.3). Infraštruktúra Sytue je v EÚ. Umiestnenie externých služieb závisí od ich poskytovateľa.

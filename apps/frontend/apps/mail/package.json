@@ -1,0 +1,38 @@
+{
+  "name": "@sytue/mail",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sytue Mail — cliente de correo (Astro 7 + Preact 10) sobre el protocolo abierto JMAP del servicio Go propio Sytue Mail (mail.sytue.eu). Monta la Sytue Shell y usa @sytue/ui. BFF JMAP + OIDC/PKCE. Producto Sytue-native, propietario. docs/CONVENTIONS.md §1.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev --port 4325 --host",
+    "build": "astro build",
+    "preview": "astro preview --port 4325 --host",
+    "start": "bun ./dist/server/entry.mjs",
+    "typecheck": "astro check",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@astrojs/node": "catalog:",
+    "@astrojs/preact": "catalog:",
+    "@sytue/ai": "workspace:*",
+    "@sytue/api-clients": "workspace:*",
+    "@sytue/auth": "workspace:*",
+    "@sytue/config": "workspace:*",
+    "@sytue/i18n": "workspace:*",
+    "@sytue/offline": "workspace:*",
+    "@sytue/shell": "workspace:*",
+    "@sytue/ui": "workspace:*",
+    "astro": "catalog:",
+    "preact": "10.29.8"
+  },
+  "devDependencies": {
+    "@astrojs/check": "catalog:",
+    "@happy-dom/global-registrator": "20.14.5",
+    "@tailwindcss/vite": "4.3.3",
+    "@types/node": "catalog:",
+    "tailwindcss": "4.3.3",
+    "typescript": "6.0.3"
+  }
+}

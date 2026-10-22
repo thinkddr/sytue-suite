@@ -1,0 +1,18 @@
+Cijfers die kloppen, in een spreadsheet die met je meewerkt.
+
+• Formules, voorwaardelijke opmaak en gegevensvalidatie.
+• Haal externe gegevens binnen en bevraag ze zonder de spreadsheet te verlaten.
+• Grafieken, sparklines, slicers en gegevenstabellen.
+• Exporteren naar ODS en XLSX; Excel-bestanden openen.
+• Formules met contextuele hulp en directe herberekening.
+• Voorwaardelijke opmaak, gegevensvalidatie en getalnotatie per landinstelling.
+• Grafieken van diverse soorten, sparklines en slicers.
+• Gegevenstabellen met totalen en sorteren; draaitabel.
+• Externe gegevens: koppel een bron en bevraag die vanuit de spreadsheet.
+• Oplosser om de waarde te vinden die een doel haalt.
+• Macro's om terugkerende taken te automatiseren.
+• Realtime samenwerken met aanwezigheid en opmerkingen.
+• Filters, slicers en zoeken in de spreadsheet.
+• Exporteren naar ODS, XLSX en PDF; Excel-bestanden openen vanuit Drive.
+
+Versleuteld tijdens transport (TLS 1.3). De infrastructuur van Sytue staat in de EU. De locatie van externe diensten hangt af van hun aanbieder.

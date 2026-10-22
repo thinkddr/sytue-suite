@@ -1,0 +1,12 @@
+{
+  "schema": 1,
+  "package": "generated",
+  "entries": [
+    {
+      "name": "UpdaterConformance",
+      "source": "example/src/components/UpdaterConformance.tsx",
+      "export": "UpdaterConformance",
+      "output": "native/generated/updater-conformance.gen.go"
+    }
+  ]
+}

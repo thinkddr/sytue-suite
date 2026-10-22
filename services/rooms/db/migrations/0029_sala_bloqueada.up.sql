@@ -1,0 +1,11 @@
+-- Bloquear una sala: nadie NUEVO entra hasta que el anfitrión la reabra.
+--
+-- Es lo que falta cuando en una reunión sensible se cuela alguien por el enlace:
+-- expulsarlo sirve de poco si puede volver a entrar tres segundos después. El
+-- estado vive aquí y no en la metadata de LiveKit porque tiene que sobrevivir a
+-- que el SFU recree la sala —lo hace cuando se vacía— y porque la puerta que lo
+-- comprueba es la nuestra, no la suya.
+--
+-- Columna con DEFAULT y NOT NULL: solo AMPLÍA. El binario anterior no la lee y
+-- sigue funcionando con la migración aplicada.
+ALTER TABLE rooms ADD COLUMN IF NOT EXISTS locked boolean NOT NULL DEFAULT false;

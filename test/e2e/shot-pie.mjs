@@ -1,0 +1,11 @@
+import { chromium } from 'playwright';
+const b = await chromium.launch();
+const c = await b.newContext({ ignoreHTTPSErrors: true, viewport: { width: 1280, height: 900 } });
+const p = await c.newPage();
+await p.goto('https://sytue.localhost/es/', { waitUntil: 'domcontentloaded', timeout: 45000 });
+await p.waitForTimeout(2500);
+await p.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+await p.waitForTimeout(600);
+await p.screenshot({ path: '/tmp/pie.png' });
+console.log('ok');
+await b.close();

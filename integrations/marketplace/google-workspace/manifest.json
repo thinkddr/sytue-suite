@@ -1,0 +1,32 @@
+{
+  "timeZone": "Europe/Madrid",
+  "dependencies": {},
+  "chat": {
+    "addToSpaceFallback": true
+  },
+  "oauthScopes": [
+    "https://www.googleapis.com/auth/chat.bot",
+    "https://www.googleapis.com/auth/chat.messages",
+    "https://www.googleapis.com/auth/chat.spaces.readonly",
+    "https://www.googleapis.com/auth/userinfo.email"
+  ],
+  "addOns": {
+    "common": {
+      "name": "Sytue Rooms",
+      "logoUrl": "https://rooms.sytue.eu/assets/logo.png",
+      "layoutProperties": {
+        "primaryColor": "#1f2937",
+        "secondaryColor": "#3b82f6"
+      },
+      "openLinkUrlPrefixes": [
+        "https://rooms.sytue.eu/",
+        "https://meet.sytue.eu/"
+      ]
+    },
+    "chat": {
+      "onMessage": {
+        "runFunction": "onChatMessage"
+      }
+    }
+  }
+}

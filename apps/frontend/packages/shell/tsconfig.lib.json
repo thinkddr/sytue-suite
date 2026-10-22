@@ -1,0 +1,20 @@
+{
+  "extends": "@sytue/config/tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "outDir": "dist",
+    "rootDir": "src",
+    "noEmit": false,
+    "tsBuildInfoFile": "dist/.tsbuildinfo"
+  },
+  "references": [
+    { "path": "../config/tsconfig.lib.json" },
+    { "path": "../i18n/tsconfig.lib.json" },
+    { "path": "../ui/tsconfig.lib.json" },
+    { "path": "../auth/tsconfig.lib.json" },
+    { "path": "../api-clients/tsconfig.lib.json" },
+    { "path": "../offline/tsconfig.lib.json" }
+  ],
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"]
+}

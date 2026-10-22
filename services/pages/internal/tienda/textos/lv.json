@@ -1,0 +1,10 @@
+{
+  "order_paid_buyer_subject": "Pasūtījuma apstiprinājums {number}",
+  "order_paid_buyer_body": "Paldies par pirkumu. Pasūtījums {number} ir apstiprināts.",
+  "order_paid_store_subject": "Saņemts jauns pasūtījums: {number}",
+  "order_paid_store_body": "Esat saņēmis jaunu pasūtījumu {number} par summu {total}.",
+  "withdrawal_ack_subject": "Atteikuma apstiprinājums saņemts: {number}",
+  "withdrawal_ack_body": "Jūsu atteikuma pieprasījums pasūtījumam {number} ir reģistrēts.",
+  "form_received_subject": "Saņemts veidlapas iesniegums: {form_id}",
+  "form_received_body": "Saņemts jauns veidlapas {form_id} iesniegums."
+}

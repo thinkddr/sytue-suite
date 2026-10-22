@@ -1,0 +1,12 @@
+{
+  "@odata.context": "https://graph.microsoft.com/v1.0/$metadata#users",
+  "value": [
+    {
+      "@odata.etag": "W/\"3\"",
+      "id": "33333333-3333-3333-3333-333333333333",
+      "displayName": "Grace Hopper",
+      "userPrincipalName": "grace@contoso.com",
+      "accountEnabled": true
+    }
+  ]
+}

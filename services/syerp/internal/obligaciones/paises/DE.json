@@ -1,0 +1,322 @@
+{
+ "pais": "DE",
+ "verificado": true,
+ "moneda": "EUR",
+ "formas": [
+  {
+   "clave": "einzelunternehmer",
+   "nombre": "Einzelunternehmer / Freiberufler",
+   "tipo": "persona_fisica"
+  },
+  {
+   "clave": "gbr",
+   "nombre": "GbR",
+   "tipo": "persona_fisica"
+  },
+  {
+   "clave": "gmbh",
+   "nombre": "GmbH",
+   "tipo": "sociedad"
+  },
+  {
+   "clave": "ug",
+   "nombre": "UG (haftungsbeschränkt)",
+   "tipo": "sociedad"
+  },
+  {
+   "clave": "ag",
+   "nombre": "AG",
+   "tipo": "sociedad"
+  },
+  {
+   "clave": "kg",
+   "nombre": "KG",
+   "tipo": "sociedad"
+  }
+ ],
+ "portales": {
+  "elster": {
+   "nombre": "ELSTER (Finanzverwaltung)",
+   "url": "https://www.elster.de/"
+  },
+  "bundesanzeiger": {
+   "nombre": "Unternehmensregister / Bundesanzeiger",
+   "url": "https://www.unternehmensregister.de/"
+  },
+  "sv": {
+   "nombre": "Sozialversicherung (SV-Meldeportal)",
+   "url": "https://www.sv-meldeportal.de/"
+  }
+ },
+ "obligaciones": [
+  {
+   "clave": "de_ustva_q",
+   "nombre": "Umsatzsteuer-Voranmeldung",
+   "concepto": "iva_periodica",
+   "ambito": "fiscal",
+   "periodicidad": "trimestral",
+   "plazos": {
+    "T": "10"
+   },
+   "margen_dias": 7,
+   "portal": "elster",
+   "aplica": {
+    "condiciones": [
+     "iva",
+     "!iva_mensual"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_pct_mes": 1,
+    "recargo_max_pct": 10,
+    "nota": "Vierteljährlich, wenn die Steuer des Vorjahres 9.000 € nicht überstieg; bis 2.000 € kann das Finanzamt von Voranmeldungen befreien, darüber monatlich (§ 18 UStG). Säumniszuschlag 1 % je angefangenen Monat (§ 240 AO); Verspätungszuschlag bis 10 %, mind. 25 € je Monat (§ 152 AO)."
+   },
+   "calculo": {
+    "tipo": "saldo_neto",
+    "haber": [
+     "477"
+    ],
+    "debe": [
+     "472"
+    ]
+   }
+  },
+  {
+   "clave": "de_ustva_m",
+   "nombre": "Umsatzsteuer-Voranmeldung (monatlich)",
+   "concepto": "iva_periodica",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "10"
+   },
+   "margen_dias": 7,
+   "portal": "elster",
+   "aplica": {
+    "condiciones": [
+     "iva",
+     "iva_mensual"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_pct_mes": 1,
+    "recargo_max_pct": 10,
+    "nota": "Säumniszuschlag 1 % je angefangenen Monat (§ 240 AO)."
+   },
+   "calculo": {
+    "tipo": "saldo_neto",
+    "haber": [
+     "477"
+    ],
+    "debe": [
+     "472"
+    ]
+   }
+  },
+  {
+   "clave": "de_ust_jahr",
+   "nombre": "Umsatzsteuer-Jahreserklärung",
+   "concepto": "iva_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "07-31+1"
+   },
+   "margen_dias": 30,
+   "portal": "elster",
+   "aplica": {
+    "condiciones": [
+     "iva"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_pct_mes": 0.25,
+    "recargo_max_pct": 10,
+    "fija_centimos": 2500,
+    "nota": "Verspätungszuschlag 0,25 % der festgesetzten Steuer je Monat, mindestens 25 € je Monat (§ 152 AO). Mit Steuerberater bis Ende Februar des übernächsten Jahres (§ 149 Abs. 3 AO)."
+   }
+  },
+  {
+   "clave": "de_zm",
+   "nombre": "Zusammenfassende Meldung",
+   "concepto": "operaciones_intracomunitarias",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "25"
+   },
+   "margen_dias": 7,
+   "portal": "elster",
+   "aplica": {
+    "condiciones": [
+     "intracomunitario"
+    ]
+   },
+   "sancion": {
+    "tipo": "nota",
+    "nota": "Bis zum 25. Tag nach dem Meldezeitraum; vierteljährlich, wenn die innergemeinschaftlichen Lieferungen weder im laufenden noch in einem der vier vorangegangenen Quartale 50.000 € überstiegen (§ 18a UStG). Verspätungszuschlag bis 1 % der Bemessungsgrundlage, höchstens 2.500 €."
+   }
+  },
+  {
+   "clave": "de_lohnsteuer",
+   "nombre": "Lohnsteuer-Anmeldung",
+   "concepto": "retenciones_trabajo",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "10"
+   },
+   "margen_dias": 7,
+   "portal": "elster",
+   "aplica": {
+    "condiciones": [
+     "empleados"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_pct_mes": 1,
+    "recargo_max_pct": 10,
+    "nota": "Säumniszuschlag 1 % je angefangenen Monat."
+   }
+  },
+  {
+   "clave": "de_sv",
+   "nombre": "Sozialversicherungsbeiträge",
+   "concepto": "seguridad_social",
+   "ambito": "laboral",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "27+0"
+   },
+   "margen_dias": 5,
+   "portal": "sv",
+   "aplica": {
+    "condiciones": [
+     "empleados"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_pct_mes": 1,
+    "recargo_max_pct": 12,
+    "nota": "Säumniszuschlag 1 % je angefangenen Monat (§ 24 SGB IV). Fällig am drittletzten Bankarbeitstag des Monats."
+   }
+  },
+  {
+   "clave": "de_kst",
+   "nombre": "Körperschaftsteuererklärung",
+   "concepto": "sociedades_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "07-31+1"
+   },
+   "margen_dias": 30,
+   "portal": "elster",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_pct_mes": 0.25,
+    "recargo_max_pct": 10,
+    "fija_centimos": 2500,
+    "nota": "Verspätungszuschlag 0,25 % je Monat, mind. 25 € je Monat (§ 152 AO). Mit Steuerberater bis Ende Februar des übernächsten Jahres (§ 149 Abs. 3 AO)."
+   }
+  },
+  {
+   "clave": "de_kst_vz",
+   "nombre": "Körperschaftsteuer-Vorauszahlung",
+   "concepto": "pago_fraccionado_sociedades",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "1P": "03-10",
+    "2P": "06-10",
+    "3P": "09-10",
+    "4P": "12-10"
+   },
+   "margen_dias": 7,
+   "portal": "elster",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_pct_mes": 1,
+    "recargo_max_pct": 10,
+    "nota": "Säumniszuschlag 1 % je angefangenen Monat."
+   }
+  },
+  {
+   "clave": "de_gewst",
+   "nombre": "Gewerbesteuererklärung",
+   "concepto": "impuesto_actividades",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "07-31+1"
+   },
+   "margen_dias": 30,
+   "portal": "elster",
+   "sancion": {
+    "tipo": "nota",
+    "nota": "Verspätungszuschlag nach § 152 AO; Vorauszahlungen am 15.2., 15.5., 15.8. und 15.11."
+   }
+  },
+  {
+   "clave": "de_est",
+   "nombre": "Einkommensteuererklärung",
+   "concepto": "renta_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "07-31+1"
+   },
+   "margen_dias": 30,
+   "portal": "elster",
+   "aplica": {
+    "tipos": [
+     "persona_fisica"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_pct_mes": 0.25,
+    "recargo_max_pct": 10,
+    "fija_centimos": 2500,
+    "nota": "Verspätungszuschlag 0,25 % je Monat, mind. 25 € je Monat (§ 152 AO). Mit Steuerberater bis Ende Februar des übernächsten Jahres (§ 149 Abs. 3 AO)."
+   }
+  },
+  {
+   "clave": "de_offenlegung",
+   "nombre": "Offenlegung des Jahresabschlusses",
+   "concepto": "cuentas_anuales",
+   "ambito": "mercantil",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "12-31+1"
+   },
+   "margen_dias": 60,
+   "portal": "bundesanzeiger",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 250000,
+    "nota": "Ordnungsgeld ab 2.500 € bis 25.000 € (§ 335 HGB) nach Androhung durch das Bundesamt für Justiz."
+   }
+  }
+ ]
+}

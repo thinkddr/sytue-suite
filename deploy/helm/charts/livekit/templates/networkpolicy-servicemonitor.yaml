@@ -1,0 +1,90 @@
+{{- /* Mismo interruptor global que el resto de charts: sin el Prometheus Operator,
+     el CRD no existe y aplicar esto tumba el despliegue entero. Ver values-prod.yaml
+     (global.metrics.serviceMonitor.enabled). La NetworkPolicy que sigue solo existe
+     para permitir el scrape, así que se apaga con él. */}}
+{{- if and .Values.serviceMonitor.enabled (ne ((((.Values.global).metrics) | default dict).serviceMonitor | default dict).enabled false) }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "livekit.fullname" . }}
+  labels:
+    {{- include "livekit.labels" . | nindent 4 }}
+    {{- with ((.Values.global).metrics | default dict).serviceMonitor }}
+    {{- with .labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- end }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "livekit.selectorLabels" . | nindent 6 }}
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: {{ .Values.serviceMonitor.interval }}
+{{- end }}
+{{- if .Values.networkPolicy.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "livekit.fullname" . }}
+  labels:
+    {{- include "livekit.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "livekit.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Señalización WS desde el ingress (Traefik) y el resto de la suite.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              sytue.eu/role: ingress
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/part-of: sytue-one
+      ports:
+        - protocol: TCP
+          port: {{ .Values.ports.http }}
+    # Media WebRTC entrante (ICE/TCP + mux UDP) desde clientes vía el LB de media.
+    - ports:
+        - protocol: TCP
+          port: {{ .Values.ports.rtcTcp }}
+        - protocol: UDP
+          port: {{ .Values.ports.rtcUdp }}
+    {{- if .Values.turn.enabled }}
+    # TURN llega desde las entrypoints TCP/UDP del ingress canónico.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              sytue.eu/role: ingress
+      ports:
+        - protocol: TCP
+          port: {{ .Values.turn.tlsPort }}
+        - protocol: UDP
+          port: {{ .Values.turn.udpPort }}
+    {{- end }}
+  egress:
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Resto de la suite (el servicio Go sytue-rooms habla con la API del SFU).
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/part-of: sytue-one
+    # Media saliente hacia clientes (egress UDP del SFU) — internet UE.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 169.254.0.0/16
+{{- end }}

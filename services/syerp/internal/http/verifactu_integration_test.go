@@ -1,0 +1,120 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Daniel Delgado Ramos
+
+//go:build integration
+
+package syerphttp
+
+import (
+	"context"
+	"encoding/json"
+	"encoding/xml"
+	"net/http"
+	"strings"
+	"testing"
+
+	"git.sytue.eu/sytue/one/platform/pkg/pgtest"
+	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
+	"git.sytue.eu/sytue/one/services/syerp/db"
+	"git.sytue.eu/sytue/one/services/syerp/internal/store"
+	"git.sytue.eu/sytue/one/services/syerp/internal/verifactu"
+)
+
+// VERI*FACTU visto desde la interfaz: qué impide activarlo, que la factura
+// emitida sale con su QR impreso y en la Facturae, que ya no se deja cambiar y que
+// la declaración responsable y la exportación están a mano.
+func TestVerifactuPorHTTP(t *testing.T) {
+	harness := pgtest.New(t, db.Migrations, db.MigrationsDir)
+	st := store.New(harness.Pool)
+	st.Version = "v-test"
+	hs := manejadoresCompletos(t, st)
+	perfil := func(tenant, cp string) {
+		w := llamar(t, tenant, http.MethodPut, "/api/v1/organizacion", "application/json",
+			`{"nombre":"Acme Ibérica SL","nif":"B12345678","direccion":"Gran Vía 1","cp":"`+cp+`","ciudad":"Madrid","pais":"ES","forma":"sl"}`,
+			nil, hs.GuardarOrganizacion)
+		if w.Code != http.StatusOK {
+			t.Fatalf("perfil: %d %s", w.Code, w.Body.String())
+		}
+	}
+	motivo := func(tenant string) string {
+		w := llamar(t, tenant, http.MethodGet, "/api/v1/verifactu", "", "", nil, hs.Verifactu)
+		var e estadoVerifactu
+		if err := json.Unmarshal(w.Body.Bytes(), &e); err != nil || w.Code != http.StatusOK || e.Entorno != "pruebas" {
+			t.Fatalf("estado: %d %s", w.Code, w.Body.String())
+		}
+		return e.Motivo
+	}
+
+	if m := motivo("acme"); m != motivoSinPerfil {
+		t.Fatalf("sin perfil: %q", m)
+	}
+	perfil("acme", "28013")
+	if m := motivo("acme"); m != motivoSinCertificado {
+		t.Fatalf("sin certificado: %q", m)
+	}
+	w := llamar(t, "acme", http.MethodPost, "/api/v1/verifactu/activar", "", "", nil, hs.ActivarVerifactu)
+	if w.Code != http.StatusConflict || !strings.Contains(w.Body.String(), motivoSinCertificado) {
+		t.Fatalf("activar sin certificado: %d %s", w.Code, w.Body.String())
+	}
+	hs.verifactu = &verifactu.Cliente{}
+	perfil("bilbao", "48001")
+	if m := motivo("bilbao"); m != motivoForal {
+		t.Fatalf("Bizkaia usa TicketBAI: %q", m)
+	}
+	w = llamar(t, "acme", http.MethodPost, "/api/v1/verifactu/activar", "", "", nil, hs.ActivarVerifactu)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"activo":true`) {
+		t.Fatalf("activar: %d %s", w.Code, w.Body.String())
+	}
+
+	ctx := tenancy.Into(context.Background(), tenancy.Tenant{Slug: "acme"})
+	contacto, _ := hs.cat.Modelo("contacto")
+	factura, _ := hs.cat.Modelo("factura_venta")
+	cliente := crear(ctx, t, st, contacto, `{"nombre":"Cafetería Cliente S.L.","tipo":"organizacion","nif":"B12345674","direccion":"Calle Sol 2","cp":"28004","ciudad":"Madrid"}`)
+	fv := crear(ctx, t, st, factura, `{"cliente":"`+cliente.ID+`","fecha":"2026-09-12","base":100000,"iva":21000,"total":121000,"notas":"Pan de septiembre"}`)
+	params := map[string]string{"modelo": "factura_venta", "id": fv.ID}
+	w = comoPersona(t, "jefa", []string{"owner"}, http.MethodPost, "/api/v1/factura_venta/"+fv.ID+"/estado", `{"estado":"confirmado"}`, params, http.HandlerFunc(hs.CambiarEstado))
+	if w.Code != http.StatusOK {
+		t.Fatalf("confirmar: %d %s", w.Code, w.Body.String())
+	}
+
+	w = llamar(t, "acme", http.MethodGet, "/api/v1/factura_venta/"+fv.ID+"/verifactu", "", "", params, hs.RegistrosFacturaVerifactu)
+	var vf struct {
+		Registros []store.RegistroVerifactu `json:"registros"`
+		QR        string                    `json:"qr"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &vf); err != nil || len(vf.Registros) != 1 ||
+		vf.QR != "https://prewww2.aeat.es/wlpl/TIKE-CONT/ValidarQR?nif=B12345678&numserie=FV-2026-00001&fecha=12-09-2026&importe=1210.00" {
+		t.Fatalf("registros: %d %s", w.Code, w.Body.String())
+	}
+
+	w = llamar(t, "acme", http.MethodGet, "/api/v1/factura_venta/"+fv.ID+"/imprimir", "", "", params, hs.Imprimir)
+	for _, parte := range []string{"QR tributario:", "VERI*FACTU", "data:image/png;base64,", "Factura FV-2026-00001", "1.210,00 €", "IVA 21 %", "Cafetería Cliente S.L."} {
+		if !strings.Contains(w.Body.String(), parte) {
+			t.Errorf("la factura impresa no lleva %q", parte)
+		}
+	}
+	w = llamar(t, "acme", http.MethodGet, "/api/v1/factura_venta/"+fv.ID+"/facturae", "", "", params, hs.Facturae)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "<InvoiceAdditionalInformation>VERI*FACTU. QR tributario: https://prewww2.aeat.es/") {
+		t.Fatalf("facturae: %d %s", w.Code, w.Body.String())
+	}
+
+	w = llamar(t, "acme", http.MethodPut, "/api/v1/factura_venta/"+fv.ID, "application/json",
+		`{"data":{"cliente":"`+cliente.ID+`","fecha":"2026-09-12","base":90000,"iva":18900,"total":108900}}`, params, hs.Actualizar)
+	if w.Code != http.StatusConflict || !strings.Contains(w.Body.String(), "factura_emitida") {
+		t.Fatalf("cambiar una factura emitida: %d %s", w.Code, w.Body.String())
+	}
+
+	w = llamar(t, "acme", http.MethodGet, "/api/v1/verifactu/declaracion", "", "", nil, hs.DeclaracionVerifactu)
+	if !strings.Contains(w.Body.String(), verifactu.ProductorNIF) || !strings.Contains(w.Body.String(), "Pendiente de suscribir") {
+		t.Fatalf("declaración: %s", w.Body.String())
+	}
+	w = llamar(t, "acme", http.MethodGet, "/api/v1/verifactu/exportar", "", "", nil, hs.ExportarVerifactu)
+	var exportado struct {
+		Altas []struct {
+			Serie string `xml:"IDFactura>NumSerieFactura"`
+		} `xml:"RegistroAlta"`
+	}
+	if err := xml.Unmarshal(w.Body.Bytes(), &exportado); err != nil || len(exportado.Altas) != 1 || exportado.Altas[0].Serie != "FV-2026-00001" {
+		t.Fatalf("exportar: %v %s", err, w.Body.String())
+	}
+}

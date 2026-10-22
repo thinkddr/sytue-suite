@@ -1,0 +1,229 @@
+{
+ "pais": "SI",
+ "verificado": true,
+ "moneda": "EUR",
+ "formas": [
+  {
+   "clave": "sp",
+   "nombre": "Samostojni podjetnik (s.p.)",
+   "tipo": "persona_fisica"
+  },
+  {
+   "clave": "doo",
+   "nombre": "Družba z omejeno odgovornostjo (d.o.o.)",
+   "tipo": "sociedad"
+  },
+  {
+   "clave": "dd",
+   "nombre": "Delniška družba (d.d.)",
+   "tipo": "sociedad"
+  }
+ ],
+ "portales": {
+  "edavki": {
+   "nombre": "eDavki (FURS)",
+   "url": "https://edavki.durs.si/"
+  },
+  "ajpes": {
+   "nombre": "AJPES — letna poročila",
+   "url": "https://www.ajpes.si/"
+  }
+ },
+ "obligaciones": [
+  {
+   "clave": "si_ddvo_m",
+   "nombre": "Obračun DDV-O (mesečni)",
+   "concepto": "iva_periodica",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "ultimo_habil"
+   },
+   "margen_dias": 7,
+   "portal": "edavki",
+   "aplica": {
+    "condiciones": [
+     "iva",
+     "iva_mensual"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 200000,
+    "nota": "Do zadnjega delovnega dne naslednjega meseca; zavezanec, ki predloži rekapitulacijsko poročilo, do 20. dne. Globa od 2 000 € do 125 000 € za pravno osebo (čl. 140 ZDDV-1); zamudne obresti."
+   },
+   "calculo": {
+    "tipo": "saldo_neto",
+    "haber": [
+     "477"
+    ],
+    "debe": [
+     "472"
+    ]
+   }
+  },
+  {
+   "clave": "si_ddvo_q",
+   "nombre": "Obračun DDV-O (trimesečni)",
+   "concepto": "iva_periodica",
+   "ambito": "fiscal",
+   "periodicidad": "trimestral",
+   "plazos": {
+    "T": "ultimo_habil"
+   },
+   "margen_dias": 7,
+   "portal": "edavki",
+   "aplica": {
+    "condiciones": [
+     "iva",
+     "!iva_mensual"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 200000,
+    "nota": "Globa od 2 000 € do 125 000 €; trimesečno pri prometu do 210 000 €."
+   },
+   "calculo": {
+    "tipo": "saldo_neto",
+    "haber": [
+     "477"
+    ],
+    "debe": [
+     "472"
+    ]
+   }
+  },
+  {
+   "clave": "si_rpo",
+   "nombre": "Rekapitulacijsko poročilo (RP-O)",
+   "concepto": "operaciones_intracomunitarias",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "20"
+   },
+   "margen_dias": 7,
+   "portal": "edavki",
+   "aplica": {
+    "condiciones": [
+     "intracomunitario"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 200000,
+    "nota": "Globa od 2 000 € do 125 000 €."
+   }
+  },
+  {
+   "clave": "si_rek",
+   "nombre": "REK-O obrazec in prispevki",
+   "concepto": "nominas",
+   "ambito": "laboral",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "20"
+   },
+   "margen_dias": 7,
+   "portal": "edavki",
+   "aplica": {
+    "condiciones": [
+     "empleados"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 80000,
+    "nota": "Globa od 800 € do 30 000 €; REK-O na dan izplačila, prispevki do 20. v mesecu."
+   }
+  },
+  {
+   "clave": "si_sp_prispevki",
+   "nombre": "Prispevki s.p.",
+   "concepto": "cuota_autonomos",
+   "ambito": "laboral",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "20"
+   },
+   "margen_dias": 7,
+   "portal": "edavki",
+   "aplica": {
+    "tipos": [
+     "persona_fisica"
+    ]
+   },
+   "sancion": {
+    "tipo": "nota",
+    "nota": "Zamudne obresti; obračun prispevkov (OPSVZ) do 15. v mesecu."
+   }
+  },
+  {
+   "clave": "si_ddpo",
+   "nombre": "Obračun DDPO",
+   "concepto": "sociedades_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "03-31+1"
+   },
+   "margen_dias": 30,
+   "portal": "edavki",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 120000,
+    "nota": "Globa od 1 200 € do 30 000 €; akontacije mesečno do 20. v mesecu."
+   }
+  },
+  {
+   "clave": "si_dohdej",
+   "nombre": "Davčni obračun akontacije dohodnine (DohDej)",
+   "concepto": "renta_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "03-31+1"
+   },
+   "margen_dias": 30,
+   "portal": "edavki",
+   "aplica": {
+    "tipos": [
+     "persona_fisica"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 40000,
+    "nota": "Globa od 400 € do 5 000 €."
+   }
+  },
+  {
+   "clave": "si_ajpes",
+   "nombre": "Letno poročilo (AJPES)",
+   "concepto": "cuentas_anuales",
+   "ambito": "mercantil",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "03-31+1"
+   },
+   "margen_dias": 30,
+   "portal": "ajpes",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 60000,
+    "nota": "Globa od 600 € do 15 000 € (čl. 686 ZGD-1); tri mesece po koncu poslovnega leta (osem mesecev za revidirana poročila)."
+   }
+  }
+ ]
+}

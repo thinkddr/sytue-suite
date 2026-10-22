@@ -1,0 +1,303 @@
+{
+ "pais": "SK",
+ "verificado": true,
+ "moneda": "EUR",
+ "formas": [
+  {
+   "clave": "szco",
+   "nombre": "Živnostník (SZČO)",
+   "tipo": "persona_fisica"
+  },
+  {
+   "clave": "sro",
+   "nombre": "Spoločnosť s ručením obmedzeným (s.r.o.)",
+   "tipo": "sociedad"
+  },
+  {
+   "clave": "as",
+   "nombre": "Akciová spoločnosť (a.s.)",
+   "tipo": "sociedad"
+  },
+  {
+   "clave": "jsa",
+   "nombre": "Jednoduchá spoločnosť na akcie (j.s.a.)",
+   "tipo": "sociedad"
+  }
+ ],
+ "portales": {
+  "fs": {
+   "nombre": "Finančná správa — portál",
+   "url": "https://www.financnasprava.sk/"
+  },
+  "socpoist": {
+   "nombre": "Sociálna poisťovňa — eSlužby",
+   "url": "https://esluzby.socpoist.sk/"
+  },
+  "ruz": {
+   "nombre": "Register účtovných závierok",
+   "url": "https://www.registeruz.sk/"
+  }
+ },
+ "obligaciones": [
+  {
+   "clave": "sk_dph_m",
+   "nombre": "Daňové priznanie k DPH (mesačné)",
+   "concepto": "iva_periodica",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "25"
+   },
+   "margen_dias": 7,
+   "portal": "fs",
+   "aplica": {
+    "condiciones": [
+     "iva",
+     "iva_mensual"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 3000,
+    "nota": "Pokuta od 30 € do 16 000 € za oneskorené podanie (§ 155 daňového poriadku); úrok z omeškania 15 % p. a. (min. štvornásobok sadzby ECB)."
+   },
+   "calculo": {
+    "tipo": "saldo_neto",
+    "haber": [
+     "477"
+    ],
+    "debe": [
+     "472"
+    ]
+   }
+  },
+  {
+   "clave": "sk_dph_q",
+   "nombre": "Daňové priznanie k DPH (štvrťročné)",
+   "concepto": "iva_periodica",
+   "ambito": "fiscal",
+   "periodicidad": "trimestral",
+   "plazos": {
+    "T": "25"
+   },
+   "margen_dias": 7,
+   "portal": "fs",
+   "aplica": {
+    "condiciones": [
+     "iva",
+     "!iva_mensual"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 3000,
+    "nota": "Pokuta od 30 € do 16 000 €; štvrťročne pri obrate do 100 000 € po 12 mesiacoch registrácie."
+   },
+   "calculo": {
+    "tipo": "saldo_neto",
+    "haber": [
+     "477"
+    ],
+    "debe": [
+     "472"
+    ]
+   }
+  },
+  {
+   "clave": "sk_kv",
+   "nombre": "Kontrolný výkaz DPH",
+   "concepto": "control_iva",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "25"
+   },
+   "margen_dias": 7,
+   "portal": "fs",
+   "aplica": {
+    "condiciones": [
+     "iva"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 3000,
+    "nota": "Pokuta do 10 000 € (do 100 000 € pri opakovaní)."
+   }
+  },
+  {
+   "clave": "sk_sv",
+   "nombre": "Súhrnný výkaz",
+   "concepto": "operaciones_intracomunitarias",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "25"
+   },
+   "margen_dias": 7,
+   "portal": "fs",
+   "aplica": {
+    "condiciones": [
+     "intracomunitario"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 3000,
+    "nota": "Do 25 dní po skončení kalendárneho mesiaca; štvrťročne, ak hodnota dodaní nepresiahne 50 000 € v danom ani v štyroch predchádzajúcich štvrťrokoch. Pokuta od 30 € do 16 000 €."
+   }
+  },
+  {
+   "clave": "sk_prehlad",
+   "nombre": "Prehľad o zrazených preddavkoch (závislá činnosť)",
+   "concepto": "retenciones_trabajo",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "ultimo"
+   },
+   "margen_dias": 7,
+   "portal": "fs",
+   "aplica": {
+    "condiciones": [
+     "empleados"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 3000,
+    "nota": "Pokuta od 30 € do 3 000 €; preddavky odvedené do 5 dní po výplate."
+   }
+  },
+  {
+   "clave": "sk_odvody",
+   "nombre": "Odvody do Sociálnej a zdravotnej poisťovne",
+   "concepto": "seguridad_social",
+   "ambito": "laboral",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "8"
+   },
+   "margen_dias": 7,
+   "portal": "socpoist",
+   "aplica": {
+    "condiciones": [
+     "empleados"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_pct_mes": 0.42,
+    "recargo_max_pct": 10,
+    "nota": "Penále 0,05 % z dlžnej sumy za každý deň omeškania; splatné v deň výplaty, najneskôr do 8. dňa nasledujúceho mesiaca."
+   }
+  },
+  {
+   "clave": "sk_odvody_szco",
+   "nombre": "Odvody SZČO",
+   "concepto": "cuota_autonomos",
+   "ambito": "laboral",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "8"
+   },
+   "margen_dias": 7,
+   "portal": "socpoist",
+   "aplica": {
+    "tipos": [
+     "persona_fisica"
+    ]
+   },
+   "sancion": {
+    "tipo": "nota",
+    "nota": "Penále 0,05 % z dlžnej sumy za každý deň omeškania."
+   }
+  },
+  {
+   "clave": "sk_dppo",
+   "nombre": "Daňové priznanie k dani z príjmov PO",
+   "concepto": "sociedades_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "03-31+1"
+   },
+   "margen_dias": 30,
+   "portal": "fs",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 3000,
+    "nota": "Pokuta od 30 € do 16 000 €; predĺženie lehoty o tri mesiace oznámením. Účtovná závierka sa ukladá spolu s priznaním."
+   }
+  },
+  {
+   "clave": "sk_preddavky",
+   "nombre": "Preddavky na daň z príjmov PO",
+   "concepto": "pago_fraccionado_sociedades",
+   "ambito": "fiscal",
+   "periodicidad": "trimestral",
+   "plazos": {
+    "T": "ultimo+0"
+   },
+   "margen_dias": 7,
+   "portal": "fs",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "nota",
+    "nota": "Štvrťročné pri poslednej známej daňovej povinnosti 5 000–16 600 €, mesačné nad 16 600 €."
+   }
+  },
+  {
+   "clave": "sk_dpfo",
+   "nombre": "Daňové priznanie k dani z príjmov FO (typ B)",
+   "concepto": "renta_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "03-31+1"
+   },
+   "margen_dias": 30,
+   "portal": "fs",
+   "aplica": {
+    "tipos": [
+     "persona_fisica"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 3000,
+    "nota": "Pokuta od 30 € do 16 000 €."
+   }
+  },
+  {
+   "clave": "sk_uz",
+   "nombre": "Účtovná závierka do registra",
+   "concepto": "cuentas_anuales",
+   "ambito": "mercantil",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "06-30+1"
+   },
+   "margen_dias": 30,
+   "portal": "ruz",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "nota",
+    "nota": "Pokuta do 2 % z celkovej sumy majetku, najviac 1 000 000 € (zákon o účtovníctve); schválená závierka do 6 mesiacov od zostavenia."
+   }
+  }
+ ]
+}

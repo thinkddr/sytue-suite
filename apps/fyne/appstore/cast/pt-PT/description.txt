@@ -1,0 +1,17 @@
+Vídeo a pedido e em direto: carregar, emitir e partilhar, na UE.
+
+• Carregue um vídeo e é transcodificado em várias qualidades para qualquer ecrã.
+• Entre em direto a partir de um programa de emissão, do navegador ou da aplicação.
+• Quatro níveis de visibilidade: público, não listado, organização ou pessoas específicas.
+• Chat em direto e comentários, com moderação básica por quem publica.
+• Carregue vídeos até 8 GiB; o original é conservado.
+• Direto a partir de um programa de emissão por RTMP, com uma chave de emissão por pessoa.
+• Direto a partir do navegador ou da aplicação: câmara, ecrã e microfone.
+• As gravações dos diretos tornam-se vídeos a pedido automaticamente.
+• Uma página inicial pública e um canal por organização, indexáveis.
+• Ligações não listadas, vídeos só para a organização ou acesso a pessoas específicas por @utilizador.
+• Chat em direto e comentários em fio, moderados por quem publica e pela administração da organização.
+• O armazenamento conta na sua quota do Sytue Drive; tudo na União Europeia.
+• «Carregar no Cast» a partir do Sytue Drive: uma cópia do vídeo passa para o Cast e o ficheiro fica no Drive.
+
+Cifrado em trânsito (TLS 1.3). A infraestrutura da Sytue está na UE. A localização dos serviços externos depende do respetivo fornecedor.

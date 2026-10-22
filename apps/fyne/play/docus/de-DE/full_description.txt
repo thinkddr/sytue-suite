@@ -1,0 +1,16 @@
+Kollaboratives Bearbeiten in Echtzeit
+
+• Alles gespeichert in Ihrem europäischen Drive.
+• Gemeinsames Bearbeiten in Echtzeit, mit Präsenz und ohne sich in die Quere zu kommen.
+• Ein Menüband mit Registern: Start, Einfügen, Referenzen, Seriendruck und Überprüfen.
+• Tabellen, Bilder, Formen, SmartArt, Diagramme, Symbole und Wasserzeichen.
+• Referenzen: Inhaltsverzeichnis, Fußnoten, Zitate und Literaturverzeichnis.
+• Seriendruck: Datenzusammenführung für Briefe und Etiketten.
+• Kommentare im Strang, Änderungsprüfung und Versionen.
+• Optionaler KI-Assistent zum Umschreiben, Übersetzen oder Zusammenfassen, nur wenn Ihre Organisation ihn aktiviert.
+• Export als ODT, DOCX und PDF; Word-Dateien aus Drive öffnen.
+• Kopf- und Fußzeilen, Seitennummern und wiederverwendbare Bausteine.
+• Automatisches Speichern in Ihrem europäischen Drive, mit Verlauf.
+• Lade von der Startseite als PDF, HTML, Markdown, OpenDocument oder Microsoft Office herunter.
+
+Verschlüsselt bei der Übertragung (TLS 1.3). Die Infrastruktur von Sytue befindet sich in der EU. Der Standort externer Dienste hängt von ihrem Anbieter ab.

@@ -1,0 +1,54 @@
+{
+  "children": [
+    {
+      "content": {
+        "en": [
+          {
+            "text": "Image Gallery"
+          }
+        ],
+        "es": [
+          {
+            "text": "Galería de imágenes"
+          }
+        ]
+      },
+      "id": "tex0000001",
+      "tag": "h2",
+      "type": "text"
+    },
+    {
+      "alt": {
+        "en": "Facilities and team",
+        "es": "Instalaciones y equipo"
+      },
+      "fit": "cover",
+      "id": "ima0000001",
+      "size": {
+        "width": 600,
+        "height": 400
+      },
+      "src": {
+        "placeholder": "photo"
+      },
+      "type": "image"
+    }
+  ],
+  "full_bleed": false,
+  "id": "sec0000001",
+  "kind": "gallery",
+  "layout": {
+    "direction": "column",
+    "gap": 24,
+    "padding": [
+      32,
+      32,
+      32,
+      32
+    ],
+    "align": "center",
+    "justify": "center",
+    "wrap": false
+  },
+  "type": "section"
+}

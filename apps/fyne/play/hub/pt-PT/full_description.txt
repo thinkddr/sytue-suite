@@ -1,0 +1,14 @@
+A página inicial da suite: aplicações, ações rápidas, atividade recente e avisos.
+
+• Um lançador com todas as suas aplicações e as que a sua organização liga.
+• A agenda de hoje e o correio por ler na página inicial, junto ao que é recente na suite e às suas notificações.
+• Ligue os seus dispositivos e transfira as aplicações nativas.
+• Um lançador com as aplicações da suite e as de terceiros que a sua organização liga.
+• Ações rápidas: escrever um email, novo documento, carregar para o Drive, criar um evento.
+• Recente em toda a suite: os últimos elementos do Drive, Docus, Mail ou Rooms.
+• Centro de notificações e presença partilhados em toda a suite.
+• Ligar os seus dispositivos: perfil para iPhone e Mac, Android e computador, em dois passos.
+• Transferências das aplicações nativas para computador e telemóvel.
+• Um assistente de boas-vindas que prepara a organização sem manuais.
+
+Cifrado em trânsito (TLS 1.3). A infraestrutura da Sytue está na UE. A localização dos serviços externos depende do respetivo fornecedor.

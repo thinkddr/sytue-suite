@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Daniel Delgado Ramos
+#
+# Configuración de shellcheck para todo el repositorio. La usa `make sh-lint`,
+# que corre con `-x -P SCRIPTDIR` para seguir los `source`.
+#
+# Solo se apagan DOS comprobaciones, y las dos porque aquí no dicen nada:
+
+# SC2016 — «las expresiones no se expanden entre comillas simples». Veinticinco
+# avisos, y los veinticinco son a propósito: filtros de `jq`, programas de `awk`,
+# `jsonpath` de kubectl y órdenes que se mandan por `ssh` para que las expanda la
+# máquina remota. Justo el caso en el que NO se quiere expandir aquí. Silenciarlo
+# uno a uno serían veinticinco comentarios repitiendo lo mismo, y cada uno un
+# sitio donde el próximo aviso de verdad se escondería.
+disable=SC2016
+
+# SC1091 — «no puedo seguir este source». Son los `.env` que solo existen EN EL
+# SERVIDOR: el del piloto, el de la forja, el del SFU. Que no estén en el
+# repositorio es la razón de que existan, no un defecto que arreglar.
+disable=SC1091

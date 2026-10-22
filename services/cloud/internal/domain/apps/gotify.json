@@ -1,0 +1,58 @@
+{
+  "id": "gotify",
+  "name": "Gotify",
+  "description": "Servidor de notificaciones propio con usuarios y tokens: cada aplicación tiene el suyo y se revoca por separado. Con app de Android y clientes de escritorio.",
+  "category": "tools",
+  "license": "Apache-2.0",
+  "homepage": "https://gotify.net/",
+  "source": "https://github.com/gotify/server",
+  "upstream": "docker.io/gotify/server:2.6.3",
+  "upstream_digest": "sha256:dfbee7fc4701b300936a24b01d24620b4d62e405204c71fd749a63abfb9b4ec4",
+  "version": "2.6.3",
+  "ports": [
+    {
+      "name": "http",
+      "port": 8080
+    }
+  ],
+  "web_port": 8080,
+  "exports": [
+    {
+      "key": "GOTIFY_URL",
+      "value": "http://{host}:{port}"
+    }
+  ],
+  "env": [
+    {
+      "key": "GOTIFY_SERVER_PORT",
+      "value": "8080"
+    },
+    {
+      "key": "GOTIFY_DATABASE_DIALECT",
+      "value": "sqlite3"
+    },
+    {
+      "key": "GOTIFY_DATABASE_CONNECTION",
+      "value": "/app/data/gotify.db"
+    },
+    {
+      "key": "GOTIFY_UPLOADEDIMAGESDIR",
+      "value": "/app/data/images"
+    },
+    {
+      "key": "GOTIFY_DEFAULTUSER_PASS",
+      "generate": true,
+      "export": true
+    },
+    {
+      "key": "GOTIFY_PASSSTRENGTH",
+      "value": "10"
+    }
+  ],
+  "disk_gib": 5,
+  "data_path": "/app/data",
+  "memory_mib": 256,
+  "cpu_milli": 500,
+  "run_as_user": 1000,
+  "health_path": "/health"
+}

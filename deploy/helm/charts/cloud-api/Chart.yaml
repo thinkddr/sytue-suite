@@ -1,0 +1,20 @@
+apiVersion: v2
+name: sytue-cloud-api
+description: >-
+  Sytue Cloud API — servicio Go propio: plano de control del PaaS (Vercel × Supabase ×
+  Google Cloud): proyectos, deploys, servicios gestionados (Sytue Postgres/PostgREST,
+  Storage, Functions, Cron, Secrets), webhooks de git y orquestacion de builds (delega
+  en el builder/Kaniko). Estado en PostgreSQL; sin Redis/Valkey. Código Apache-2.0, (c) 2026
+  Daniel Delgado Ramos. Expuesto en cloud.sytue.eu (API bajo /api).
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+kubeVersion: ">=1.31.0-0"
+home: https://sytue.eu
+keywords: [sytue, cloud, paas, control-plane, go]
+maintainers:
+  - name: Sytue Platform
+    email: platform@sytue.eu
+annotations:
+  licenses: MIT
+  sytue.eu/stack: go

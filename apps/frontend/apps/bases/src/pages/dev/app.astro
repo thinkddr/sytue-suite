@@ -1,0 +1,53 @@
+---
+/**
+ * Banco de pruebas de las PANTALLAS ENTERAS de Sytue Bases (marco, lista de bases y una
+ * base abierta con sus diálogos), para la auditoría de accesibilidad
+ * (test/e2e/accesibilidad-bases.mjs). Monta las islas REALES; no hay sesión ni servicio
+ * detrás: la auditoría contesta a `/bases/api/*` con `page.route`.
+ * SOLO en desarrollo: en producción es un 404 y nada lo enlaza.
+ */
+import '../../styles/app.css';
+import { BasesApp } from '../../islands/BasesApp.js';
+import { BaseApp } from '../../islands/BaseApp.js';
+
+export const prerender = false;
+
+if (!import.meta.env.DEV) return new Response(null, { status: 404 });
+
+const q = Astro.url.searchParams;
+const lang = ['en', 'de', 'fr'].includes(q.get('lang') ?? '')
+  ? (q.get('lang') as 'en' | 'de' | 'fr')
+  : 'es';
+const usuario = {
+  id: 'demo-user',
+  email: 'demo@sytue.test',
+  emailVerified: true,
+  name: 'Demo',
+  preferredUsername: 'demo',
+  roles: [],
+  groups: [],
+};
+const hub = 'http://127.0.0.1:9';
+---
+
+<!doctype html>
+<html lang={lang} class="h-full">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Bases (banco de pruebas)</title>
+  </head>
+  <body class="bg-bg text-text h-full antialiased">
+    {q.get('que') === 'base' ? (
+      <BaseApp
+        client:only="preact"
+        baseId="00000000-0000-4000-8000-0000000000b1"
+        locale={lang}
+        user={usuario}
+        hubBaseUrl={hub}
+      />
+    ) : (
+      <BasesApp client:only="preact" locale={lang} user={usuario} hubBaseUrl={hub} />
+    )}
+  </body>
+</html>

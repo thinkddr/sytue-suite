@@ -1,0 +1,19 @@
+Súkromná európska pošta cez JMAP — bez sledovania a bez reklám.
+
+• Rýchla schránka s vláknami, štítkami, filtrami a vyhľadávaním.
+• Prílohy priamo zo Sytue Drive.
+• Z e-mailu udalosť v Calendar.
+• Šifrovanie pri prenose (TLS 1.3). Infraštruktúra Sytue je v EÚ. Umiestnenie externých služieb závisí od ich poskytovateľa.
+• Konverzácie vo vláknach s čítaním, odpoveďou a preposlaním na jedno kliknutie.
+• Priečinky, farebné štítky a vyhľadávanie s operátormi (from:, has:attachment, is:unread…).
+• Automatické pravidlá, ktoré poštu pri doručení archivujú, označia štítkom alebo presunú.
+• Plánované odoslanie a „Vrátiť odoslanie“.
+• Podpisy, aliasy adries a automatická odpoveď v neprítomnosti.
+• Zdieľané a delegované schránky s oprávnením na čítanie a odosielanie.
+• Editor formátovaného textu s prílohami zo Sytue Drive bez duplikovania súborov.
+• Vzdialený obsah je predvolene blokovaný: nikto sa nedozvie, kedy e-mail otvoríte.
+• Podpísaná pošta (PGP a S/MIME) sa rozpozná a označí; TLS pri prenose.
+• Prístup aj z Thunderbirdu, Outlooku, Apple Mail alebo telefónu, s heslami aplikácií.
+• Adresy ako štítky s adresárom Contacts na jedno kliknutie a upozornenie, keď napíšete „v prílohe“ a nič nepriložíte.
+
+Šifrovanie pri prenose (TLS 1.3). Infraštruktúra Sytue je v EÚ. Umiestnenie externých služieb závisí od ich poskytovateľa.

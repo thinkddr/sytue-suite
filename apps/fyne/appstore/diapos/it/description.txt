@@ -1,0 +1,16 @@
+Racconta la storia; la diapositiva tiene il passo.
+
+• Temi di presentazione con l’identità della tua organizzazione.
+• Vista relatore con note e diapositiva successiva.
+• Immagini, forme, grafici e SmartArt.
+• Esporta in ODP, PPTX e PDF; apre i file PowerPoint.
+• Temi e tavolozze coerenti con il marchio della tua organizzazione.
+• Una tela con forme, immagini, grafici, SmartArt e connettori.
+• Presenta a schermo intero con vista relatore e note.
+• Collaborazione in tempo reale con presenza e commenti.
+• Diapositive con sfondo, poster e layout.
+• Esporta in ODP, PPTX e PDF.
+• Apre i file PowerPoint da Drive.
+• Salvataggio automatico con versioni.
+
+Cifratura in transito (TLS 1.3). L’infrastruttura di Sytue si trova nell’UE. La posizione dei servizi esterni dipende dal loro fornitore.

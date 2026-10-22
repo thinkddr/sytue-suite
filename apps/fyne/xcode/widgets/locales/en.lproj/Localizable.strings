@@ -1,0 +1,17 @@
+"widgets.open" = "Open";
+"widgets.compose" = "Compose";
+"widgets.create" = "Create event";
+"widgets.notes" = "Notes";
+"widgets.rows" = "Rows";
+"widgets.pending" = "Pending";
+"widgets.channels" = "Channels";
+"widgets.photos" = "Photos";
+"widgets.episodes" = "Episodes";
+"widgets.apps" = "Apps";
+"widgets.calendars" = "Calendars";
+"widgets.address_books" = "Address books";
+"search.label" = "Global search";
+"dataflow.item.files" = "Files";
+"dataflow.item.events" = "Calendar";
+"dataflow.item.documents" = "Documents";
+"dataflow.item.contacts" = "Contacts";

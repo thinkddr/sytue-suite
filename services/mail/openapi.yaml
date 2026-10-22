@@ -1,0 +1,328 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Daniel Delgado Ramos
+openapi: 3.1.0
+info:
+  title: Sytue Mail API
+  description: >-
+    API de cara al cliente de Sytue Mail (servidor de correo Sytue-native).
+    Incluye el recurso de sesión JMAP (RFC 8620), el endpoint JMAP por lotes y
+    una API REST de conveniencia (mismo modelo) que usa @sytue/api-clients.
+    Los sobres de mensaje viven en PostgreSQL; los .eml crudos y adjuntos en
+    Object Storage S3. SMTP (25/465/587) e IMAPS (993) se sirven aparte para
+    clientes de terceros. Clean-room © Sytue; sin motores de correo AGPL.
+  version: "1.0.0"
+  license:
+    name: MIT
+servers:
+  - url: https://mail.sytue.eu
+    description: Producción
+  - url: https://mail.sytue.localhost
+    description: Desarrollo (Traefik + mkcert)
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: jmap
+  - name: mailboxes
+  - name: messages
+  - name: send
+
+paths:
+  /healthz:
+    get:
+      summary: Liveness
+      security: []
+      responses:
+        "200": { description: Proceso vivo }
+  /readyz:
+    get:
+      summary: Readiness (PostgreSQL + S3)
+      security: []
+      responses:
+        "200": { description: Listo }
+        "503": { description: Alguna dependencia no disponible }
+
+  /.well-known/jmap:
+    get:
+      tags: [jmap]
+      summary: Descubrimiento JMAP (RFC 8620 §2.2)
+      security: []
+      responses:
+        "308": { description: Redirección al recurso de sesión }
+
+  /jmap/session:
+    get:
+      tags: [jmap]
+      summary: Recurso de sesión JMAP (capacidades, cuentas, URLs)
+      responses:
+        "200":
+          description: Sesión JMAP
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/JmapSession" }
+
+  /jmap:
+    post:
+      tags: [jmap]
+      summary: Endpoint JMAP (sobre Request -> Response por lotes, RFC 8620 §3.3)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/JmapRequest" }
+      responses:
+        "200":
+          description: Respuesta JMAP por lotes
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/JmapResponse" }
+
+  /api/v1/mailboxes:
+    get:
+      tags: [mailboxes]
+      summary: Listar buzones de la cuenta (con contadores)
+      responses:
+        "200":
+          description: Lista de buzones
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  mailboxes:
+                    type: array
+                    items: { $ref: "#/components/schemas/Mailbox" }
+    post:
+      tags: [mailboxes]
+      summary: Crear un buzón de usuario
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+                parent_id: { type: string, format: uuid, nullable: true }
+      responses:
+        "201":
+          description: Buzón creado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Mailbox" }
+        "409": { description: Ya existe un buzón con ese nombre }
+
+  /api/v1/mailboxes/{mailboxID}/messages:
+    get:
+      tags: [messages]
+      summary: Listar sobres de un buzón (paginado keyset, más recientes primero)
+      parameters:
+        - { name: mailboxID, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: limit, in: query, schema: { type: integer, default: 50, maximum: 200 } }
+        - name: cursor
+          in: query
+          description: >-
+            Cursor keyset "received_at,id" (RFC 3339 + uuid) del último mensaje
+            de la página anterior; se toma tal cual del next_cursor de la
+            respuesta previa. Vacío u omitido = primera página.
+          schema: { type: string }
+      responses:
+        "200":
+          description: Lista de mensajes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  messages:
+                    type: array
+                    items: { $ref: "#/components/schemas/Message" }
+                  limit: { type: integer }
+                  next_cursor:
+                    type: string
+                    description: Cursor de la página siguiente ("" si no hay más).
+
+  /api/v1/threads/{threadID}/messages:
+    get:
+      tags: [messages]
+      summary: Listar el hilo completo, atravesando carpetas
+      description: >-
+        Todos los mensajes vivos de un hilo de la cuenta, estén en la carpeta que
+        estén (Recibidos, Enviados, Archivo): es lo que la vista de conversación
+        no puede armar desde el listado de UNA carpeta. Más recientes primero,
+        igual que el listado de buzón. Sin paginación (tope de 200 mensajes por
+        hilo). Owner-scoped: un hilo de otra cuenta devuelve la lista vacía, no
+        404 —no se confirma su existencia—.
+      parameters:
+        - { name: threadID, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: Mensajes del hilo (lista vacía si no es de la cuenta)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  messages:
+                    type: array
+                    items: { $ref: "#/components/schemas/Message" }
+
+  /api/v1/messages/{messageID}:
+    get:
+      tags: [messages]
+      summary: Obtener el sobre de un mensaje
+      parameters:
+        - { name: messageID, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: Mensaje
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Message" }
+        "404": { description: No encontrado }
+    delete:
+      tags: [messages]
+      summary: Borrar (soft) un mensaje
+      parameters:
+        - { name: messageID, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "204": { description: Borrado }
+
+  /api/v1/messages/{messageID}/raw:
+    get:
+      tags: [messages]
+      summary: Descargar el .eml crudo (RFC 5322) desde S3
+      parameters:
+        - { name: messageID, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: Mensaje crudo
+          content:
+            message/rfc822: {}
+
+  /api/v1/messages/{messageID}/flags:
+    post:
+      tags: [messages]
+      summary: Añadir/quitar un flag o keyword (\Seen, \Flagged, ...)
+      parameters:
+        - { name: messageID, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [flag, add]
+              properties:
+                flag: { type: string, example: "\\Seen" }
+                add: { type: boolean }
+      responses:
+        "204": { description: Aplicado }
+
+  /api/v1/messages/{messageID}/move:
+    post:
+      tags: [messages]
+      summary: Mover un mensaje a otro buzón
+      parameters:
+        - { name: messageID, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mailbox_id]
+              properties:
+                mailbox_id: { type: string, format: uuid }
+      responses:
+        "204": { description: Movido }
+
+  /api/v1/send:
+    post:
+      tags: [send]
+      summary: Encolar un mensaje saliente (firma DKIM + cola PostgreSQL)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [recipients, raw]
+              properties:
+                from: { type: string, format: email }
+                recipients:
+                  type: array
+                  items: { type: string, format: email }
+                raw:
+                  type: string
+                  description: Mensaje RFC 5322 completo construido por el cliente
+      responses:
+        "202": { description: Encolado para entrega diferida }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT de Sytue ID (OIDC), validado por JWKS.
+  schemas:
+    Mailbox:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        parent_id: { type: string, format: uuid, nullable: true }
+        name: { type: string }
+        role:
+          type: string
+          enum: ["", inbox, sent, drafts, trash, junk, archive]
+        total_emails: { type: integer }
+        unread_emails: { type: integer }
+    Message:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        mailbox_id: { type: string, format: uuid }
+        thread_id: { type: string, format: uuid }
+        message_id: { type: string }
+        subject: { type: string }
+        from: { type: string }
+        from_name: { type: string }
+        to: { type: array, items: { type: string } }
+        cc: { type: array, items: { type: string } }
+        preview: { type: string }
+        size: { type: integer }
+        keywords: { type: array, items: { type: string } }
+        has_attachment: { type: boolean }
+        received_at: { type: string, format: date-time }
+        date: { type: string, format: date-time }
+    JmapSession:
+      type: object
+      properties:
+        capabilities: { type: object, additionalProperties: true }
+        accounts: { type: object, additionalProperties: true }
+        primaryAccounts: { type: object, additionalProperties: { type: string } }
+        username: { type: string }
+        apiUrl: { type: string }
+        downloadUrl: { type: string }
+        uploadUrl: { type: string }
+        state: { type: string }
+    JmapRequest:
+      type: object
+      required: [using, methodCalls]
+      properties:
+        using: { type: array, items: { type: string } }
+        methodCalls:
+          type: array
+          items:
+            type: array
+            description: "[methodName, arguments, callId]"
+    JmapResponse:
+      type: object
+      properties:
+        methodResponses:
+          type: array
+          items: { type: array }
+        sessionState: { type: string }

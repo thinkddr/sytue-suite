@@ -1,0 +1,28 @@
+{
+  "key": "gmail-mail",
+  "tier": "tier2",
+  "manifest": {
+    "name": "Gmail",
+    "description": "Conecta tu cuenta personal de correo para leer y enviar mensajes desde Sytue Mail.",
+    "category": "Correo",
+    "color": "#DB4437",
+    "icon": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><rect x=\"3\" y=\"5\" width=\"18\" height=\"14\" rx=\"2\"/><path d=\"m3 6 9 7 9-7\"/></svg>",
+    "identity": {
+      "kind": "none"
+    },
+    "provisioning": "none",
+    "launch": {
+      "kind": "none"
+    },
+    "oauth": {
+      "authorize_url": "https://accounts.google.com/o/oauth2/v2/auth",
+      "token_url": "https://oauth2.googleapis.com/token",
+      "revoke_url": "https://oauth2.googleapis.com/revoke",
+      "scopes": ["https://www.googleapis.com/auth/gmail.modify"],
+      "authorize_params": {
+        "access_type": "offline",
+        "prompt": "consent"
+      }
+    }
+  }
+}

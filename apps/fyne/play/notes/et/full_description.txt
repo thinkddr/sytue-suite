@@ -1,0 +1,18 @@
+Märkmikud, kuhu mahub kõik: tekst, failid, sündmused, terved dokumendid.
+
+• Pesastatud märkmikud vabal lõuendil, veergudes või loendina.
+• Igasugused märkmed: tekst, ülesanded, lingid, failid, Calendari sündmused, Docsi dokumendid.
+• Teie otsustate, mis otsingusse jõuab — ja mis mitte kunagi.
+• Pesastatud märkmikud ikooni ja värviga; kolm paigutust: vaba, veerud ja loend.
+• Kaksteist märkmetüüpi: tekst, ülesanded, lingid, värv, pilt ning viited Drive’ile, Docusele, Calendarile, Roomsile ja teistele märkmetele.
+• Vormindusega redaktor (paks kiri, loendid, lingid), mis salvestab lahkumisel.
+• Sildid, kinnitamine, dubleerimine, teisaldamine märkmike vahel, rühmitamine ja lohistamine lõuendil.
+• Nähtavus märkmiku kaupa: privaatne, isiklik, organisatsioon või avalik link.
+• Teie otsustate, millised märkmikud komplekti otsingusse jõuavad.
+• Tagasilingid: millised märkmed sellele viitavad.
+• Terve märkmiku eksport HTML-, PDF-, Markdown- ja muudesse vormingutesse; koopiate import.
+• Märkme jagamine Roomsi kanalisse; märkmete loomine lohistades või kleepides.
+• Tabelid redaktoris ja Markdowni otseteed kirjutamise ajal: „- “, „# “, „> “ ja „```“.
+• Märkme teisaldamine teise märkmikku, üksiku märkme eksport ja märkmiku sortimine soovitud viisil.
+
+Krüpteeritud edastamisel (TLS 1.3). Sytue taristu asub ELis. Väliste teenuste asukoht sõltub nende pakkujast.

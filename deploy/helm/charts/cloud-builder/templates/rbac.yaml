@@ -1,0 +1,64 @@
+{{- if .Values.serviceAccount.create }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Values.serviceAccount.name | default (include "sytue-cloud-builder.fullname" .) }}
+  labels:
+    {{- include "sytue-cloud-builder.labels" . | nindent 4 }}
+{{- end }}
+{{- if .Values.rbac.create }}
+---
+# Namespace aislado donde corren los Jobs Kaniko/CNB (código no confiable de
+# tenant): PodSecurity restricted, misma postura que los namespaces de tenant
+# (EnsureNamespace, kubeplatform.go). El aislamiento de red vive en
+# networkpolicy.yaml (deny-by-default + egress allowlist).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.config.buildNamespace }}
+  annotations:
+    # El Secret de push se materializa fuera de Helm desde Secret Manager.
+    # Borrar este namespace durante el rollback de una primera instalación
+    # elimina esa credencial y hace imposible reintentar 03 sin ejecutar 02b.
+    # El namespace no contiene datos de tenant y 02b lo reconcilia de forma
+    # idempotente, por lo que conservarlo es el ciclo de vida correcto.
+    helm.sh/resource-policy: keep
+  labels:
+    {{- include "sytue-cloud-builder.labels" . | nindent 4 }}
+    sytue.eu/role: paas-builds
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+---
+# El builder solo gestiona Jobs/pods en el namespace de builds (no cluster-wide).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "sytue-cloud-builder.fullname" . }}
+  namespace: {{ .Values.config.buildNamespace }}
+  labels:
+    {{- include "sytue-cloud-builder.labels" . | nindent 4 }}
+rules:
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+  - apiGroups: [""]
+    resources: ["pods", "pods/log", "configmaps", "secrets"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "sytue-cloud-builder.fullname" . }}
+  namespace: {{ .Values.config.buildNamespace }}
+  labels:
+    {{- include "sytue-cloud-builder.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "sytue-cloud-builder.fullname" . }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Values.serviceAccount.name | default (include "sytue-cloud-builder.fullname" .) }}
+    namespace: {{ .Release.Namespace }}
+{{- end }}

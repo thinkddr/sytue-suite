@@ -1,0 +1,239 @@
+# Sytue AI — el asistente de la suite (docs/decisions.md#0034).
+#
+# Al revés que sytue-ocr, aquí NO hay motor dentro de la imagen: el trabajo se va
+# a Scaleway Generative APIs y este pod es un proxy con autenticación, límite de
+# tasa y defensa anti-inyección. Eso manda sobre todo lo de abajo: la imagen es
+# pequeña, arranca rápido, no gasta CPU y se pasa la vida ESPERANDO A LA RED.
+
+replicaCount: 2
+
+image:
+  # Sin registro explícito: lo pone global.imageRegistry del umbrella. Un
+  # `image:` sin barra aquí haría que el gate de cadena de suministro dedujera
+  # docker.io, que no es el caso.
+  repository: sytue-ai
+  tag: ""
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  # PUERTO 80, COMO EL RESTO DE LA SUITE, y no el 8084 del contenedor. Es la
+  # convención que da por hecha quien llama: el helper del frontend compone
+  # `http://<release>-ai.<ns>.svc.cluster.local` SIN puerto —«todos los Services
+  # de la suite exponen el 80», dice su comentario— así que un Service en 8084
+  # deja al BFF llamando al 80, donde no escucha nadie.
+  #
+  # Se ve fatal desde fuera y por eso queda escrito: el 2026-09-10 el servicio
+  # estaba sano, con sus dos réplicas, sus sondas en verde y la URL correcta en
+  # los doce frontales, y aun así `fetch` desde el pod de Docs devolvía «Unable
+  # to connect». El chart venía copiado del de sytue-ocr, que expone 8096 porque
+  # a él lo llama Sytue Docs con el puerto explícito.
+  port: 80
+  # El puerto del contenedor, al que apunta `targetPort: http`. Es también el que
+  # abre la NetworkPolicy de entrada.
+  targetPort: 8084
+
+# El ingress que da a las apps nativas su vía a la IA (ver templates/ingress.yaml).
+# Estuvo apagado a propósito cuando al servicio solo lo llamaba el BFF desde
+# dentro del clúster; con las apps de escritorio en Go + Fyne la sesión OIDC viaja
+# en el cliente, que llama a /api/v1/* con Bearer directo.
+#
+# SIN ESTE BLOQUE la plantilla revienta el despliegue ENTERO con
+# `nil pointer evaluating interface {}.enabled`: Helm no asume nada de lo que un
+# values.yaml no declara, y ningún overlay del umbrella define `ai.ingress`.
+# Así falló v3.1.0 el 2026-09-19 (UPGRADE FAILED antes de tocar el clúster).
+ingress:
+  enabled: true
+  subdomain: ai
+  className: traefik
+  annotations: {}
+  tls:
+    secretName: tls-ai-sytue-eu
+
+config:
+  logLevel: info
+
+  # --- Proveedor -----------------------------------------------------------
+  provider: scaleway
+  baseURL: https://api.scaleway.ai
+
+  # DOS MODELOS, y la razón está medida (2026-09-09, Scaleway, tres
+  # repeticiones por tarea y sin tope de salida):
+  #
+  #                    mistral-small-3.2      gemma-4-26b
+  #   latencia         0,6 s (mediana)        14,0 s
+  #   coste            0,59 €/10.000          5,66 €/10.000
+  #   fórmula Calcus   mal 3 de 3             bien 3 de 3
+  #   revelado Fotos   +1 paso (el doble)     +0,5/+0,1/+0,3 (acertado)
+  #
+  # Gemma razona antes de responder: por eso acierta y por eso tarda. Catorce
+  # segundos en un panel en línea es un usuario que ya lo ha escrito a mano, así
+  # que el rápido atiende lo interactivo y el bueno lo que puede esperar. Lo
+  # elige QUIEN LLAMA con `"modo":"calidad"`, no el servicio adivinando.
+  # Interactivo: qwen3.8-27b (preferencia declarada 2026-09-19, todo
+  # serverless de Generative APIs — cero GPU dedicada).
+  model: qwen3.8-27b
+  modelCalidad: gemma-4-26b-a4b-it
+
+  # Tope de salida del interactivo. Mistral responde con 49 tokens de mediana.
+  maxTokens: 1024
+  # El del modelo de calidad es CUATRO VECES MAYOR y no es holgura: los tokens
+  # de razonamiento salen por aquí. Con 1024, gemma-4 se queda a media frase y
+  # devuelve la respuesta VACÍA —medido—, que llega al usuario como un 502 sin
+  # causa visible. Mediana 692; la fórmula de Calcus pasa de 2000.
+  maxTokensCalidad: 4096
+
+  # Plazos. El de calidad no es el mismo por lo mismo: 14 s de mediana y 34 s en
+  # el peor caso medido, así que 60 s dejaría fuera la cola larga.
+  timeout: 60s
+  timeoutCalidad: 120s
+
+  # `reasoning_effort` del modelo de calidad: none | low | medium | high.
+  #
+  # `high` Y NO EL DEFECTO DEL MODELO, que es contraintuitivo y por eso queda
+  # escrito. Medido el 2026-09-09, tres repeticiones sobre fórmula de Calcus,
+  # extracción de factura y receta de revelado:
+  #
+  #   none       0,76 €/10.000   1,0 s   bien en TEXTO, mal en VISIÓN
+  #   low        6,13 €/10.000   9,9 s   7 de 9
+  #   medium     6,21 €/10.000   9,9 s   9 de 9
+  #   high       5,43 €/10.000   8,1 s   9 de 9
+  #   sin fijar  6,07 €/10.000   8,8 s   9 de 9
+  #
+  # `high` gana al defecto en coste, en tiempo y en aciertos: razona mejor y
+  # para antes, mientras que los intermedios divagan. Quien llame puede pedir
+  # `none` por petición cuando sepa que su tarea es solo de texto: son ocho
+  # veces menos, con el mismo acierto.
+  esfuerzoCalidad: high
+
+  # --- Modelos especializados ----------------------------------------------
+  #
+  # Ninguno pasa por el presupuesto del modelo caro. Whisper se factura por
+  # MINUTO DE AUDIO (0,003 €): una reunión de una hora cuesta 18 céntimos, así
+  # que lo que lo acota es el rate limit y el tope de tamaño, no un contador de
+  # euros. Los embeddings cuestan 0,10 €/millón y solo de entrada.
+  modelAudio: whisper-large-v3
+  modelEmbeddings: qwen3-embedding-8b
+
+  # --- Presupuesto por usuario ----------------------------------------------
+  #
+  # Tope BLANDO en euros por usuario y mes sobre el modelo de calidad. Al
+  # agotarlo NO se corta: la petición se sirve con el modelo rápido y la
+  # respuesta lo dice (`degradado: true`) para que la interfaz pueda avisar.
+  #
+  # Con 1,50 € salen unas 27.000 peticiones de calidad al mes por usuario a la
+  # tarifa medida (5,43 €/10.000 con esfuerzo `high`). Nadie normal se acerca;
+  # lo que esto para es la pestaña con un bucle y el uso automatizado.
+  #
+  # Es BLANDO en tres sentidos, y los tres están asumidos: se comprueba antes y
+  # se cobra después —así que la petición que cruza el tope se sirve entera—; el
+  # contador vive en la caché efímera, así que un vaciado regala el mes; y sin
+  # caché no hay cuenta y no hay tope. 0 => sin tope.
+  presupuestoMensualEur: 1.50
+
+  # Precios del proveedor, "modelo:entrada:salida" en €/millón, separados por
+  # comas. SE DECLARAN Y NO SE CODIFICAN porque los cambia el proveedor sin
+  # avisar, y una tarifa vieja no falla de forma visible: cobra mal. Un modelo
+  # que no aparezca aquí se sirve igual pero no se cobra, y se dice en el log.
+  # Consultados el 2026-09-09 en la página de precios de Scaleway.
+  tarifas: >-
+    mistral-small-3.2-24b-instruct-2506:0.15:0.35,
+    gemma-4-26b-a4b-it:0.25:0.50,
+    qwen3-embedding-8b:0.10:0
+
+  # --- Frontera de confianza -----------------------------------------------
+  maxInstructionBytes: 8192
+  # 256 KiB = el mismo tope que aplica el BFF antes de leer el cuerpo.
+  maxContextBytes: 262144
+
+  # Límite POR USUARIO Y RÉPLICA. Bajo a propósito: cada petición cuesta dinero
+  # de verdad en el proveedor, y este es el único freno entre una pestaña con un
+  # bucle y la factura. Que sea por réplica es una simplificación conocida.
+  rateLimitPerMinute: 20
+  rateLimitBurst: 5
+
+  # --- Integración con Pages (§9.1) ----------------------------------------
+  timeoutPages: 300s
+  maxTokensTope: 16384
+  modelCodigo: qwen3.5-397b-a17b
+
+# La clave del proveedor. NO se pone aquí: se lee de un Secret que crea el
+# despliegue. Sin ella el servicio arranca sano y /assist responde 503
+# ai_not_configured, que es lo que el panel del editor ya sabe interpretar para
+# ocultarse. Degradación honesta, no bucle de reinicio.
+#
+# UNA SOLA CLAVE, Y NO EL PAR DE SCALEWAY. Una API key de Scaleway se emite como
+# access key (`SCW…`, 20 caracteres) + secret key (UUID), pero Generative APIs
+# solo usa la SECRET KEY como Bearer. Comprobado contra la API el 2026-09-09:
+#
+#   Bearer <secret key>              -> 200
+#   Bearer <access key>              -> 403
+#   Bearer <access key>:<secret key> -> 403
+#
+# La access key hace falta donde hay firma SigV4 (Object Storage) o donde la CLI
+# y OpenTofu tocan infraestructura, no aquí. Es la misma convención que ya sigue
+# el repo: deploy/efimero/guardian-remoto.sh manda `X-Auth-Token: $SCW_SECRET_KEY`
+# a secas, y generate-secrets.sh del híbrido solo pide SCW_SECRET_KEY.
+apiKeySecret:
+  name: ""
+  key: api-key
+
+pagesSecret:
+  name: sytue-ai-pages
+  key: pages-secret
+
+resources:
+  requests:
+    # Pide poco porque hace poco: serializa un JSON y espera. El trabajo de
+    # verdad ocurre en Scaleway.
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 6
+  # Al 70 % y por CPU, aunque la carga real sea espera de red. Es una métrica
+  # mediocre para este servicio —un pod bloqueado en una respuesta de catorce
+  # segundos no consume CPU y no dispara nada—, pero el límite que de verdad
+  # protege es el rate limit por usuario, no el número de réplicas.
+  targetCPUUtilizationPercentage: 70
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+networkPolicy:
+  enabled: true
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  runAsGroup: 65532
+  fsGroup: 65532
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
+serviceMonitor:
+  enabled: false
+
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: ScheduleAnyway
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: ScheduleAnyway
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

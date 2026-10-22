@@ -1,0 +1,11 @@
+Tabelas ligadas para gerir clientes, encomendas ou stocks, com permissões e registo de cada alteração.
+
+• Clientes, encomendas ou stocks em tabelas ligadas, sem saber nada de bases de dados.
+• Partilhe com a sua organização com a função que decidir.
+• Cada alteração fica registada: quem a fez e qual era o valor anterior.
+• Os seus dados ficam na UE e exporta-os quando quiser.
+• Tabelas com campos de texto, número, data, caixa de verificação, escolha única e escolha múltipla.
+• Relações entre tabelas: ligue uma encomenda ao seu cliente e a base de dados não deixa quebrar a ligação.
+• Permissões por base e por tabela: proprietário, editor, comentador e leitor.
+
+Cifrado em trânsito (TLS 1.3). A infraestrutura da Sytue está na UE. A localização dos serviços externos depende do respetivo fornecedor.

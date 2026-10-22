@@ -1,0 +1,330 @@
+{
+ "pais": "FR",
+ "verificado": true,
+ "moneda": "EUR",
+ "formas": [
+  {
+   "clave": "micro",
+   "nombre": "Micro-entrepreneur / EI",
+   "tipo": "persona_fisica"
+  },
+  {
+   "clave": "ei",
+   "nombre": "Entreprise individuelle (EI)",
+   "tipo": "persona_fisica"
+  },
+  {
+   "clave": "eurl",
+   "nombre": "EURL",
+   "tipo": "sociedad"
+  },
+  {
+   "clave": "sarl",
+   "nombre": "SARL",
+   "tipo": "sociedad"
+  },
+  {
+   "clave": "sasu",
+   "nombre": "SASU",
+   "tipo": "sociedad"
+  },
+  {
+   "clave": "sas",
+   "nombre": "SAS",
+   "tipo": "sociedad"
+  },
+  {
+   "clave": "sa",
+   "nombre": "SA",
+   "tipo": "sociedad"
+  }
+ ],
+ "portales": {
+  "impots": {
+   "nombre": "impots.gouv.fr — Espace professionnel",
+   "url": "https://www.impots.gouv.fr/professionnel"
+  },
+  "urssaf": {
+   "nombre": "URSSAF / net-entreprises (DSN)",
+   "url": "https://www.net-entreprises.fr/"
+  },
+  "greffe": {
+   "nombre": "Infogreffe — dépôt des comptes",
+   "url": "https://www.infogreffe.fr/"
+  }
+ },
+ "obligaciones": [
+  {
+   "clave": "fr_ca3",
+   "nombre": "Déclaration de TVA CA3",
+   "concepto": "iva_periodica",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "24"
+   },
+   "margen_dias": 7,
+   "portal": "impots",
+   "aplica": {
+    "condiciones": [
+     "iva",
+     "iva_mensual"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_base_pct": 10,
+    "recargo_pct_mes": 0.2,
+    "con_requerimiento_pct": [
+     40,
+     40
+    ],
+    "nota": "Réel normal : CA3 entre le 15 et le 24 du mois suivant selon l'entreprise (ici le 24). Option trimestrielle si la TVA annuelle est inférieure à 4 000 €. Majoration de 10 % pour dépôt tardif (40 % après mise en demeure) et intérêt de retard de 0,20 % par mois (art. 1728 et 1727 CGI)."
+   },
+   "calculo": {
+    "tipo": "saldo_neto",
+    "haber": [
+     "477"
+    ],
+    "debe": [
+     "472"
+    ]
+   }
+  },
+  {
+   "clave": "fr_ca12",
+   "nombre": "Déclaration annuelle de TVA CA12 (réel simplifié)",
+   "concepto": "iva_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "05-03+1"
+   },
+   "margen_dias": 30,
+   "portal": "impots",
+   "aplica": {
+    "condiciones": [
+     "iva",
+     "!iva_mensual"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_base_pct": 10,
+    "recargo_pct_mes": 0.2,
+    "con_requerimiento_pct": [
+     40,
+     40
+    ],
+    "nota": "Réel simplifié (CA < 840 000 € ventes / 254 000 € services et TVA < 15 000 €) : CA12 au plus tard le 2e jour ouvré suivant le 1er mai — ici le 3 mai, jamais après la date légale. Majoration de 10 % et intérêt de retard de 0,20 % par mois."
+   },
+   "calculo": {
+    "tipo": "saldo_neto",
+    "haber": [
+     "477"
+    ],
+    "debe": [
+     "472"
+    ]
+   }
+  },
+  {
+   "clave": "fr_tva_acomptes",
+   "nombre": "Acomptes de TVA (réel simplifié, avis 3514)",
+   "concepto": "iva_periodica",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "1P": "07-15",
+    "2P": "12-15"
+   },
+   "margen_dias": 7,
+   "portal": "impots",
+   "aplica": {
+    "condiciones": [
+     "iva",
+     "!iva_mensual"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_base_pct": 5,
+    "recargo_pct_mes": 0.2,
+    "nota": "55 % en juillet et 40 % en décembre de la TVA due l'année précédente, entre le 15 et le 24 selon l'entreprise (ici le 15). Dispense si la TVA de l'année précédente est inférieure à 1 000 €. Majoration de 5 % et intérêt de retard de 0,20 % par mois."
+   }
+  },
+  {
+   "clave": "fr_dec",
+   "nombre": "État récapitulatif TVA / DEB (EMEBI)",
+   "concepto": "operaciones_intracomunitarias",
+   "ambito": "fiscal",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "10"
+   },
+   "margen_dias": 7,
+   "portal": "impots",
+   "aplica": {
+    "condiciones": [
+     "intracomunitario"
+    ]
+   },
+   "sancion": {
+    "tipo": "nota",
+    "nota": "Amende de 750 € par déclaration manquante (1 500 € après mise en demeure) ; 15 € par omission ou inexactitude."
+   }
+  },
+  {
+   "clave": "fr_dsn",
+   "nombre": "DSN mensuelle",
+   "concepto": "nominas",
+   "ambito": "laboral",
+   "periodicidad": "mensual",
+   "plazos": {
+    "M": "15"
+   },
+   "margen_dias": 7,
+   "portal": "urssaf",
+   "aplica": {
+    "condiciones": [
+     "empleados"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_base_pct": 5,
+    "recargo_pct_mes": 0.2,
+    "nota": "Majoration de 5 % des cotisations non versées à l'échéance plus 0,20 % par mois de retard (URSSAF). DSN au 5 du mois pour les entreprises de 50 salariés et plus."
+   }
+  },
+  {
+   "clave": "fr_is_solde",
+   "nombre": "Relevé de solde d'IS (2572)",
+   "concepto": "sociedades_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "05-15+1"
+   },
+   "margen_dias": 30,
+   "portal": "impots",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_base_pct": 10,
+    "recargo_pct_mes": 0.2,
+    "nota": "Majoration de 10 % et intérêt de retard de 0,20 % par mois."
+   }
+  },
+  {
+   "clave": "fr_is_acomptes",
+   "nombre": "Acomptes d'IS (2571)",
+   "concepto": "pago_fraccionado_sociedades",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "1P": "03-15",
+    "2P": "06-15",
+    "3P": "09-15",
+    "4P": "12-15"
+   },
+   "margen_dias": 7,
+   "portal": "impots",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_base_pct": 5,
+    "recargo_pct_mes": 0.2,
+    "nota": "Majoration de 5 % pour paiement tardif et intérêt de retard de 0,20 % par mois."
+   }
+  },
+  {
+   "clave": "fr_liasse",
+   "nombre": "Liasse fiscale (2065 / 2031)",
+   "concepto": "sociedades_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "05-18+1"
+   },
+   "margen_dias": 30,
+   "portal": "impots",
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_base_pct": 10,
+    "recargo_pct_mes": 0.2,
+    "nota": "Dépôt en ligne : deuxième jour ouvré suivant le 1er mai, plus 15 jours."
+   }
+  },
+  {
+   "clave": "fr_ir",
+   "nombre": "Déclaration de revenus (2042 / 2042-C-PRO)",
+   "concepto": "renta_anual",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "06-01+1"
+   },
+   "margen_dias": 30,
+   "portal": "impots",
+   "aplica": {
+    "tipos": [
+     "persona_fisica"
+    ]
+   },
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_base_pct": 10,
+    "recargo_pct_mes": 0.2,
+    "nota": "La date exacte dépend du département (fin mai à début juin)."
+   }
+  },
+  {
+   "clave": "fr_comptes",
+   "nombre": "Dépôt des comptes annuels au greffe",
+   "concepto": "cuentas_anuales",
+   "ambito": "mercantil",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "07-31+1"
+   },
+   "margen_dias": 30,
+   "portal": "greffe",
+   "aplica": {
+    "tipos": [
+     "sociedad"
+    ]
+   },
+   "sancion": {
+    "tipo": "fija",
+    "fija_centimos": 150000,
+    "nota": "Amende de 1 500 € (3 000 € en cas de récidive) et injonction du président du tribunal de commerce ; dépôt dans le mois suivant l'approbation, sous 7 mois après la clôture."
+   }
+  },
+  {
+   "clave": "fr_cfe",
+   "nombre": "Cotisation foncière des entreprises (CFE)",
+   "concepto": "impuesto_actividades",
+   "ambito": "fiscal",
+   "periodicidad": "anual",
+   "plazos": {
+    "A": "12-15"
+   },
+   "margen_dias": 14,
+   "portal": "impots",
+   "sancion": {
+    "tipo": "recargo",
+    "recargo_base_pct": 5,
+    "nota": "Majoration de 5 % pour paiement tardif."
+   }
+  }
+ ]
+}

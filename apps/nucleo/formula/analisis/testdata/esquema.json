@@ -1,0 +1,144 @@
+{
+  "_": "Vectores COMPARTIDOS del esquema y del asistente de Subtotales. Los leen la web (packages/office/test/sheets-outline-vectores.test.ts, contra sheets/outline.ts) y Go (esquema_test.go). Filas y columnas 0-based. En `subtotales`, la hoja se lee así: el crudo es la celda; la clave de grupo, el crudo; es número si el crudo es un número; y tiene algo si no está vacía. Rótulos: «Total general», «Total» y «Total <clave>». `desde[f]` = de qué fila viene la fila f (−1: vacía o nueva).",
+  "grupos": [
+    { "nombre": "agrupar sin nada", "op": "agrupar", "grupos": [], "a": 2, "b": 5, "max": 100, "esperado": [{ "start": 2, "end": 5, "level": 1 }] },
+    { "nombre": "agrupar dentro anida", "op": "agrupar", "grupos": [{ "start": 2, "end": 5, "level": 1 }], "a": 3, "b": 4, "max": 100, "esperado": [{ "start": 2, "end": 5, "level": 1 }, { "start": 3, "end": 4, "level": 2 }] },
+    { "nombre": "agrupar al revés", "op": "agrupar", "grupos": [], "a": 5, "b": 2, "max": 100, "esperado": [{ "start": 2, "end": 5, "level": 1 }] },
+    { "nombre": "agrupar lo mismo anida otro nivel", "op": "agrupar", "grupos": [{ "start": 2, "end": 5, "level": 1 }], "a": 2, "b": 5, "max": 100, "esperado": [{ "start": 2, "end": 5, "level": 1 }, { "start": 2, "end": 5, "level": 2 }] },
+    { "nombre": "agrupar no pasa del séptimo nivel", "op": "agrupar", "grupos": [{ "start": 0, "end": 9, "level": 1 }, { "start": 0, "end": 9, "level": 2 }, { "start": 0, "end": 9, "level": 3 }, { "start": 0, "end": 9, "level": 4 }, { "start": 0, "end": 9, "level": 5 }, { "start": 0, "end": 9, "level": 6 }, { "start": 0, "end": 9, "level": 7 }], "a": 0, "b": 9, "max": 100, "esperado": [{ "start": 0, "end": 9, "level": 1 }, { "start": 0, "end": 9, "level": 2 }, { "start": 0, "end": 9, "level": 3 }, { "start": 0, "end": 9, "level": 4 }, { "start": 0, "end": 9, "level": 5 }, { "start": 0, "end": 9, "level": 6 }, { "start": 0, "end": 9, "level": 7 }] },
+    { "nombre": "agrupar recorta a la rejilla", "op": "agrupar", "grupos": [], "a": -3, "b": 200, "max": 100, "esperado": [{ "start": 0, "end": 99, "level": 1 }] },
+    { "nombre": "desagrupar pela el nivel más hondo", "op": "desagrupar", "grupos": [{ "start": 2, "end": 5, "level": 1 }, { "start": 3, "end": 4, "level": 2 }], "a": 3, "b": 3, "esperado": [{ "start": 2, "end": 5, "level": 1 }] },
+    { "nombre": "desagrupar sin solape no cambia", "op": "desagrupar", "grupos": [{ "start": 2, "end": 5, "level": 1 }], "a": 8, "b": 9, "esperado": [{ "start": 2, "end": 5, "level": 1 }] },
+    { "nombre": "mostrar hasta el nivel 2", "op": "nivel", "grupos": [{ "start": 1, "end": 2, "level": 2 }, { "start": 4, "end": 4, "level": 2 }, { "start": 1, "end": 5, "level": 1 }], "nivel": 2, "esperado": [{ "start": 1, "end": 2, "level": 2, "collapsed": true }, { "start": 4, "end": 4, "level": 2, "collapsed": true }, { "start": 1, "end": 5, "level": 1 }] },
+    { "nombre": "mostrar hasta el nivel 1", "op": "nivel", "grupos": [{ "start": 1, "end": 2, "level": 2 }, { "start": 1, "end": 5, "level": 1, "collapsed": true }], "nivel": 1, "esperado": [{ "start": 1, "end": 2, "level": 2, "collapsed": true }, { "start": 1, "end": 5, "level": 1, "collapsed": true }] },
+    { "nombre": "mostrar hasta el nivel 3 lo abre todo", "op": "nivel", "grupos": [{ "start": 1, "end": 2, "level": 2, "collapsed": true }, { "start": 1, "end": 5, "level": 1, "collapsed": true }], "nivel": 3, "esperado": [{ "start": 1, "end": 2, "level": 2 }, { "start": 1, "end": 5, "level": 1 }] },
+    { "nombre": "conmutar contrae", "op": "conmutar", "grupos": [{ "start": 2, "end": 5, "level": 1 }, { "start": 3, "end": 4, "level": 2 }], "a": 2, "b": 5, "nivel": 1, "esperado": [{ "start": 2, "end": 5, "level": 1, "collapsed": true }, { "start": 3, "end": 4, "level": 2 }] },
+    { "nombre": "conmutar expande", "op": "conmutar", "grupos": [{ "start": 2, "end": 5, "level": 1, "collapsed": true }], "a": 2, "b": 5, "nivel": 1, "esperado": [{ "start": 2, "end": 5, "level": 1 }] },
+    { "nombre": "conmutar uno que no está no hace nada", "op": "conmutar", "grupos": [{ "start": 2, "end": 5, "level": 1 }], "a": 2, "b": 5, "nivel": 2, "esperado": [{ "start": 2, "end": 5, "level": 1 }] },
+    { "nombre": "ocultas son el detalle de los contraídos", "op": "ocultas", "grupos": [{ "start": 1, "end": 2, "level": 2, "collapsed": true }, { "start": 4, "end": 4, "level": 2 }, { "start": 6, "end": 7, "level": 1, "collapsed": true }], "esperado": [1, 2, 6, 7] },
+    { "nombre": "niveles es el más hondo", "op": "niveles", "grupos": [{ "start": 1, "end": 2, "level": 2 }, { "start": 1, "end": 5, "level": 1 }], "esperado": 2 },
+    { "nombre": "sin grupos no hay niveles", "op": "niveles", "grupos": [], "esperado": 0 },
+    { "nombre": "sanear filtra lo que no vale y ordena", "op": "sanear", "crudo": [{ "start": 5, "end": 8, "level": 1 }, "basura", { "start": 0, "end": 3, "level": 1 }, { "start": 0, "end": 3, "level": 2 }, { "start": "2", "end": 3, "level": 1, "collapsed": true }, { "start": 5, "end": 2, "level": 1 }, { "start": 0, "end": 200, "level": 1 }, { "start": 0, "end": 5, "level": 0 }, { "start": 0, "end": 5, "level": 8 }, { "start": 0, "end": 1, "level": 1, "collapsed": false }, { "end": 4, "level": 1 }, [1, 2], null], "max": 100, "esperado": [{ "start": 0, "end": 1, "level": 1 }, { "start": 0, "end": 3, "level": 1 }, { "start": 0, "end": 3, "level": 2 }, { "start": 2, "end": 3, "level": 1, "collapsed": true }, { "start": 5, "end": 8, "level": 1 }] },
+    { "nombre": "sanear algo que no es una lista", "op": "sanear", "crudo": { "start": 0, "end": 1, "level": 1 }, "max": 100, "esperado": [] }
+  ],
+  "subtotales": [
+    {
+      "nombre": "dos zonas, con la columna de números elegida sola",
+      "celdas": { "A1": "Zona", "B1": "Ventas", "C1": "Nota", "A2": "Norte", "B2": "10", "C2": "a", "A3": "Norte", "B3": "20", "A4": "Sur", "B4": "5" },
+      "peticion": { "c1": 0, "r1": 0, "c2": 2, "r2": 3, "groupCol": 0, "fn": "sum", "rows": 12 },
+      "esperado": {
+        "desde": [0, 1, 2, -1, 3, -1, -1, 4, 5, 6, 7, 8],
+        "escrituras": [
+          { "c": 0, "r": 3, "text": "Total Norte" }, { "c": 1, "r": 3, "text": "=SUBTOTAL(9;B2:B3)" },
+          { "c": 0, "r": 5, "text": "Total Sur" }, { "c": 1, "r": 5, "text": "=SUBTOTAL(9;B5:B5)" },
+          { "c": 0, "r": 6, "text": "Total general" }, { "c": 1, "r": 6, "text": "=SUBTOTAL(9;B2:B6)" }
+        ],
+        "grupos": [{ "start": 1, "end": 2, "level": 2 }, { "start": 4, "end": 4, "level": 2 }, { "start": 1, "end": 5, "level": 1 }],
+        "ultimaFila": 6,
+        "bloques": 2
+      }
+    },
+    {
+      "nombre": "volver a aplicar sustituye los subtotales que había",
+      "celdas": { "A1": "Zona", "B1": "Ventas", "C1": "Nota", "A2": "Norte", "B2": "10", "C2": "a", "A3": "Norte", "B3": "20", "A4": "Total Norte", "B4": "=SUBTOTAL(9;B2:B3)", "A5": "Sur", "B5": "5", "A6": "Total Sur", "B6": "=SUBTOTAL(9;B5:B5)", "A7": "Total general", "B7": "=SUBTOTAL(9;B2:B6)" },
+      "peticion": { "c1": 0, "r1": 0, "c2": 2, "r2": 6, "groupCol": 0, "fn": "average", "cols": [1], "rows": 12 },
+      "esperado": {
+        "desde": [0, 1, 2, -1, 4, -1, -1, 7, 8, 9, 10, 11],
+        "escrituras": [
+          { "c": 0, "r": 3, "text": "Total Norte" }, { "c": 1, "r": 3, "text": "=SUBTOTAL(1;B2:B3)" },
+          { "c": 0, "r": 5, "text": "Total Sur" }, { "c": 1, "r": 5, "text": "=SUBTOTAL(1;B5:B5)" },
+          { "c": 0, "r": 6, "text": "Total general" }, { "c": 1, "r": 6, "text": "=SUBTOTAL(1;B2:B6)" }
+        ],
+        "grupos": [{ "start": 1, "end": 2, "level": 2 }, { "start": 4, "end": 4, "level": 2 }, { "start": 1, "end": 5, "level": 1 }],
+        "ultimaFila": 6,
+        "bloques": 2
+      }
+    },
+    {
+      "nombre": "quitar todos deja los datos y sube lo de debajo",
+      "celdas": { "A1": "Zona", "B1": "Ventas", "C1": "Nota", "A2": "Norte", "B2": "10", "C2": "a", "A3": "Norte", "B3": "20", "A4": "Total Norte", "B4": "=SUBTOTAL(9;B2:B3)", "A5": "Sur", "B5": "5", "A6": "Total Sur", "B6": "=SUBTOTAL(9;B5:B5)", "A7": "Total general", "B7": "=SUBTOTAL(9;B2:B6)" },
+      "peticion": { "c1": 0, "r1": 0, "c2": 2, "r2": 6, "groupCol": 0, "fn": "sum", "remove": true, "rows": 12 },
+      "esperado": {
+        "desde": [0, 1, 2, 4, 7, 8, 9, 10, 11, -1, -1, -1],
+        "escrituras": [],
+        "grupos": [],
+        "ultimaFila": 3,
+        "bloques": 0
+      }
+    },
+    {
+      "nombre": "sin filas de datos",
+      "celdas": { "A1": "Zona", "B1": "Ventas" },
+      "peticion": { "c1": 0, "r1": 0, "c2": 1, "r2": 5, "groupCol": 0, "fn": "sum", "rows": 12 },
+      "esperado": { "error": "no-data" }
+    },
+    {
+      "nombre": "si no cabe no se toca nada",
+      "celdas": { "A1": "Zona", "B1": "V", "A2": "a", "B2": "1", "A3": "b", "B3": "2", "A4": "a", "B4": "3", "A5": "b", "B5": "4" },
+      "peticion": { "c1": 0, "r1": 0, "c2": 1, "r2": 4, "groupCol": 0, "fn": "sum", "rows": 6 },
+      "esperado": { "error": "no-room" }
+    },
+    {
+      "nombre": "lo de fuera del rango se mueve con su fila",
+      "celdas": { "A1": "Zona", "B1": "V", "A2": "N", "B2": "1", "E2": "nota", "A3": "S", "B3": "2", "A9": "pie" },
+      "peticion": { "c1": 0, "r1": 0, "c2": 1, "r2": 2, "groupCol": 0, "fn": "sum", "rows": 14 },
+      "esperado": {
+        "desde": [0, 1, -1, 2, -1, -1, 3, 4, 5, 6, 7, 8, 9, 10],
+        "escrituras": [
+          { "c": 0, "r": 2, "text": "Total N" }, { "c": 1, "r": 2, "text": "=SUBTOTAL(9;B2:B2)" },
+          { "c": 0, "r": 4, "text": "Total S" }, { "c": 1, "r": 4, "text": "=SUBTOTAL(9;B4:B4)" },
+          { "c": 0, "r": 5, "text": "Total general" }, { "c": 1, "r": 5, "text": "=SUBTOTAL(9;B2:B5)" }
+        ],
+        "grupos": [{ "start": 1, "end": 1, "level": 2 }, { "start": 3, "end": 3, "level": 2 }, { "start": 1, "end": 4, "level": 1 }],
+        "ultimaFila": 5,
+        "bloques": 2
+      }
+    },
+    {
+      "nombre": "una clave vacía se rotula «Total»",
+      "celdas": { "A1": "K", "B1": "V", "B2": "1", "A3": "x", "B3": "2" },
+      "peticion": { "c1": 0, "r1": 0, "c2": 1, "r2": 2, "groupCol": 0, "fn": "sum", "rows": 8 },
+      "esperado": {
+        "desde": [0, 1, -1, 2, -1, -1, 3, 4],
+        "escrituras": [
+          { "c": 0, "r": 2, "text": "Total" }, { "c": 1, "r": 2, "text": "=SUBTOTAL(9;B2:B2)" },
+          { "c": 0, "r": 4, "text": "Total x" }, { "c": 1, "r": 4, "text": "=SUBTOTAL(9;B4:B4)" },
+          { "c": 0, "r": 5, "text": "Total general" }, { "c": 1, "r": 5, "text": "=SUBTOTAL(9;B2:B5)" }
+        ],
+        "grupos": [{ "start": 1, "end": 1, "level": 2 }, { "start": 3, "end": 3, "level": 2 }, { "start": 1, "end": 4, "level": 1 }],
+        "ultimaFila": 5,
+        "bloques": 2
+      }
+    },
+    {
+      "nombre": "contar lo no vacío elige las columnas de texto",
+      "celdas": { "A1": "K", "B1": "T", "A2": "a", "B2": "x", "A3": "a", "B3": "y" },
+      "peticion": { "c1": 0, "r1": 0, "c2": 1, "r2": 2, "groupCol": 0, "fn": "counta", "rows": 6 },
+      "esperado": {
+        "desde": [0, 1, 2, -1, -1, 3],
+        "escrituras": [
+          { "c": 0, "r": 3, "text": "Total a" }, { "c": 1, "r": 3, "text": "=SUBTOTAL(3;B2:B3)" },
+          { "c": 0, "r": 4, "text": "Total general" }, { "c": 1, "r": 4, "text": "=SUBTOTAL(3;B2:B4)" }
+        ],
+        "grupos": [{ "start": 1, "end": 2, "level": 2 }, { "start": 1, "end": 3, "level": 1 }],
+        "ultimaFila": 4,
+        "bloques": 1
+      }
+    },
+    {
+      "nombre": "sin columnas elegidas solo se rotula",
+      "celdas": { "A1": "K", "B1": "T", "A2": "a", "B2": "1", "A3": "a", "B3": "2" },
+      "peticion": { "c1": 0, "r1": 0, "c2": 1, "r2": 2, "groupCol": 0, "fn": "sum", "cols": [], "rows": 6 },
+      "esperado": {
+        "desde": [0, 1, 2, -1, -1, 3],
+        "escrituras": [
+          { "c": 0, "r": 3, "text": "Total a" },
+          { "c": 0, "r": 4, "text": "Total general" }
+        ],
+        "grupos": [{ "start": 1, "end": 2, "level": 2 }, { "start": 1, "end": 3, "level": 1 }],
+        "ultimaFila": 4,
+        "bloques": 1
+      }
+    }
+  ]
+}

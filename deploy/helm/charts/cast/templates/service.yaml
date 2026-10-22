@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "sytue-cast.fullname" . }}
+  labels:
+    {{- include "sytue-cast.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - name: http
+      port: {{ .Values.service.port }}
+      targetPort: http
+      protocol: TCP
+  # Solo el servicio HTTP: el transcodificador lleva otro `component` y nadie le habla.
+  selector:
+    {{- include "sytue-cast.selectorLabels" . | nindent 4 }}

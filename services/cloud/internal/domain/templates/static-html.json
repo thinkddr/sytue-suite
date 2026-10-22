@@ -1,0 +1,14 @@
+{
+  "id": "static-html",
+  "name": "Sitio estático simple (HTML)",
+  "description": "Empieza con estos ajustes para HTML/CSS/JS servido tal cual.",
+  "version": "1.0.0",
+  "license": "Apache-2.0",
+  "maintainer": "Sytue",
+  "framework": "static",
+  "build": {
+    "output_dir": "."
+  },
+  "docs_url": "https://developer.mozilla.org/es/docs/Learn/HTML",
+  "tags": ["static"]
+}

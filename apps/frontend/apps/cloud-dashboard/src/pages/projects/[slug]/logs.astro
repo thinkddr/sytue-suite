@@ -1,0 +1,69 @@
+---
+import DashboardLayout from '../../../layouts/DashboardLayout.astro';
+import LogsPanel from '../../../components/LogsPanel';
+import { requireSession } from '@sytue/auth/server';
+import { canonicaConOrg } from '@sytue/config';
+import { getBff, toBffContext } from '../../../server/bff.js';
+import {
+  loadProject,
+  loadUsage,
+  loadLogs,
+  loadDeployments,
+  pickRuntimeDeployment,
+} from '../../../lib/cloud.js';
+
+import { useT } from '../../../i18n/index.js';
+
+export const prerender = false;
+
+// El idioma lo negocia el middleware una vez por peticion y baja a la isla por
+// props: detectarlo en el cliente desajustaria la hidratacion.
+const locale = Astro.locals.locale;
+const t = useT(locale);
+
+const guard = await requireSession(getBff(), toBffContext(Astro));
+if (guard instanceof Response) return guard;
+// Ruta en `sinOrg` (su nombre colisiona con el namespace de organizaciones):
+// con sesión, un salto local a la canónica con la org activa (ADR 0056).
+const canonica = canonicaConOrg(Astro.url, getBff().basePath, guard.session.user.tenant);
+if (canonica) return Astro.redirect(canonica);
+
+const { session } = guard;
+
+const { slug } = Astro.params;
+const projectSourced = slug ? await loadProject(session, slug) : undefined;
+if (!projectSourced) return new Response(t('common.notFound'), { status: 404 });
+const project = projectSourced.data;
+// Los despliegues se cargan aquí para saber QUÉ contenedor sigue el stream en
+// vivo: la pestaña «En vivo» necesita un deployment id real, no el slug.
+const [{ data: usage }, logsSourced, { data: deployments }] = await Promise.all([
+  loadUsage(session, locale, project.slug),
+  loadLogs(session, project.slug),
+  loadDeployments(session, project.slug),
+]);
+const runtime = pickRuntimeDeployment(deployments);
+const deployment = runtime
+  ? {
+      id: runtime.id,
+      label: runtime.commitSha ? `commit ${runtime.commitSha}` : t('deployments.production'),
+    }
+  : undefined;
+---
+
+<DashboardLayout
+  title={t('page.titleWithProject', { section: t('nav.logs'), project: project.name })}
+  project={project.slug}
+  section="logs"
+  hasDb={project.services.includes('postgres')}
+>
+  <LogsPanel
+    client:load
+    project={project.slug}
+    logs={logsSourced.data}
+    usage={usage}
+    live={logsSourced.live}
+    error={logsSourced.error}
+    deployment={deployment}
+    locale={locale}
+  />
+</DashboardLayout>

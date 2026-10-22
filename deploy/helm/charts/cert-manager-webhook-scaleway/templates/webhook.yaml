@@ -1,0 +1,294 @@
+{{- if .Values.enabled }}
+{{- $reg := (.Values.global).imageRegistry | default "" -}}
+{{- $img := printf "%s/%s:%s" $reg .Values.image.repository .Values.image.tag -}}
+{{- $ns := .Release.Namespace -}}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cert-manager-webhook-scaleway
+  namespace: {{ $ns }}
+---
+# Un webhook de cert-manager es un servidor de API agregado, así que necesita lo
+# mismo que cualquiera: delegar la autenticación y leer la configuración de
+# autenticación del apiserver. Sin esto, cert-manager recibe 401 al pedirle que
+# resuelva un reto y el certificado se queda en `pending` sin decir por qué.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cert-manager-webhook-scaleway-auth-delegator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:auth-delegator
+subjects:
+  - kind: ServiceAccount
+    name: cert-manager-webhook-scaleway
+    namespace: {{ $ns }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: cert-manager-webhook-scaleway-auth-reader
+  namespace: kube-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: extension-apiserver-authentication-reader
+subjects:
+  - kind: ServiceAccount
+    name: cert-manager-webhook-scaleway
+    namespace: {{ $ns }}
+---
+# Leer el Secret con la clave de API. Acotado por NOMBRE, no al namespace
+# entero: es una credencial con escritura en DNS, o sea que quien la tenga puede
+# emitir un certificado de cualquier subdominio nuestro.
+#
+# Y en el namespace donde ESTÁ, que no es este. El webhook resuelve los
+# `secretRef` del solver en `ch.ResourceNamespace`, y para un ClusterIssuer eso
+# es el `--cluster-resource-namespace` de cert-manager (`cert-manager` en este
+# despliegue), no el namespace del webhook. Con el Role aquí, el webhook pedía
+# el Secret donde no tenía permiso —y donde tampoco estaba—, y el certificado se
+# quedaba `pending` sin un solo error que lo dijera.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: cert-manager-webhook-scaleway-secret
+  namespace: {{ .Values.credentialsNamespace | default "cert-manager" }}
+rules:
+  - apiGroups: [""]
+    resources: [secrets]
+    resourceNames: [scaleway-dns-api-key]
+    verbs: [get, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: cert-manager-webhook-scaleway-secret
+  namespace: {{ .Values.credentialsNamespace | default "cert-manager" }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: cert-manager-webhook-scaleway-secret
+subjects:
+  - kind: ServiceAccount
+    name: cert-manager-webhook-scaleway
+    namespace: {{ $ns }}
+---
+# Quien INVOCA al webhook es cert-manager, no un humano: hay que darle permiso
+# sobre el recurso virtual que expone el APIService.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cert-manager-webhook-scaleway-flowcontrol
+rules:
+  - apiGroups: [{{ .Values.groupName | quote }}]
+    resources: ["*"]
+    verbs: [create]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cert-manager-webhook-scaleway-flowcontrol
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cert-manager-webhook-scaleway-flowcontrol
+subjects:
+  - kind: ServiceAccount
+    name: cert-manager
+    namespace: {{ .Values.certManagerNamespace }}
+---
+# TLS del webhook. Se emite con cert-manager mismo (CA propia, no la de ACME) y
+# se inyecta en el APIService con `inject-ca-from`: así el apiserver verifica de
+# verdad en vez de saltarse la comprobación.
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: cert-manager-webhook-scaleway-selfsign
+  namespace: {{ $ns }}
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: cert-manager-webhook-scaleway-ca
+  namespace: {{ $ns }}
+spec:
+  secretName: cert-manager-webhook-scaleway-ca
+  duration: 43800h
+  renewBefore: 8760h
+  isCA: true
+  commonName: ca.cert-manager-webhook-scaleway
+  issuerRef:
+    name: cert-manager-webhook-scaleway-selfsign
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: cert-manager-webhook-scaleway-ca
+  namespace: {{ $ns }}
+spec:
+  ca:
+    secretName: cert-manager-webhook-scaleway-ca
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: cert-manager-webhook-scaleway-tls
+  namespace: {{ $ns }}
+spec:
+  secretName: cert-manager-webhook-scaleway-tls
+  duration: 8760h
+  renewBefore: 720h
+  dnsNames:
+    - cert-manager-webhook-scaleway
+    - cert-manager-webhook-scaleway.{{ $ns }}
+    - cert-manager-webhook-scaleway.{{ $ns }}.svc
+  issuerRef:
+    name: cert-manager-webhook-scaleway-ca
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cert-manager-webhook-scaleway
+  namespace: {{ $ns }}
+spec:
+  selector:
+    app.kubernetes.io/name: cert-manager-webhook-scaleway
+  ports:
+    - name: https
+      port: 443
+      targetPort: 8443
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cert-manager-webhook-scaleway
+  namespace: {{ $ns }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: cert-manager-webhook-scaleway
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: cert-manager-webhook-scaleway
+    spec:
+      # Las dos réplicas, en nodos DISTINTOS. Es el resolvedor DNS-01 de
+      # cert-manager: mientras esté caído no se emite ni se renueva ningún
+      # certificado, y las dos estaban en el mismo nodo por casualidad del
+      # planificador. Ver el comentario largo en el chart de prometheus-adapter.
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: cert-manager-webhook-scaleway
+      serviceAccountName: cert-manager-webhook-scaleway
+      {{- with (.Values.global).imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: webhook
+          image: {{ $img | quote }}
+          args:
+            - --tls-cert-file=/tls/tls.crt
+            - --tls-private-key-file=/tls/tls.key
+            - --secure-port=8443
+          env:
+            - name: GROUP_NAME
+              value: {{ .Values.groupName | quote }}
+            # LAS CREDENCIALES POR ENTORNO, que es la vía que funciona con
+            # cualquier versión del webhook.
+            #
+            # El `config` del solver admite `accessKeySecretRef`/`secretKeySecretRef`
+            # en las versiones recientes, pero el nombre de esos campos ha cambiado
+            # entre versiones y el webhook resuelve el Secret en un namespace que
+            # depende de si el emisor es Issuer o ClusterIssuer. Cuando algo de eso
+            # no encaja, el campo llega VACÍO y el único rastro es
+            # «scaleway-sdk-go: access key cannot be empty» en un evento del
+            # Challenge —el certificado se queda pendiente para siempre, sin error
+            # en ningún pod—. El SDK de Scaleway lee estas dos variables por su
+            # cuenta, así que con ellas puestas da igual qué entienda el `config`.
+            #
+            # `optional: true`: sin el Secret el webhook arranca igual y falla al
+            # resolver un reto, que es exactamente lo que hacía antes. No se cambia
+            # «no hay credencial» por «el pod no levanta».
+            - name: SCW_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: scaleway-dns-api-key
+                  key: access-key
+                  optional: true
+            - name: SCW_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: scaleway-dns-api-key
+                  key: secret-key
+                  optional: true
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          ports:
+            - name: https
+              containerPort: 8443
+          volumeMounts:
+            - { name: tls, mountPath: /tls, readOnly: true }
+          livenessProbe:
+            httpGet: { path: /healthz, port: https, scheme: HTTPS }
+            initialDelaySeconds: 20
+          readinessProbe:
+            httpGet: { path: /healthz, port: https, scheme: HTTPS }
+            initialDelaySeconds: 20
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: tls
+          secret:
+            secretName: cert-manager-webhook-scaleway-tls
+---
+apiVersion: apiregistration.k8s.io/v1
+kind: APIService
+metadata:
+  name: v1alpha1.{{ .Values.groupName }}
+  annotations:
+    cert-manager.io/inject-ca-from: {{ printf "%s/cert-manager-webhook-scaleway-tls" $ns | quote }}
+spec:
+  service:
+    name: cert-manager-webhook-scaleway
+    namespace: {{ $ns }}
+    port: 443
+  group: {{ .Values.groupName | quote }}
+  version: v1alpha1
+  groupPriorityMinimum: 1000
+  versionPriority: 15
+{{- if .Capabilities.APIVersions.Has "cilium.io/v2" }}
+---
+# Mismo motivo que en el adapter: Cilium trata el apiserver como una entidad, no
+# como una IP, y el `default-deny` del namespace excluye los rangos privados de
+# su salida por 443. Sin esto el webhook arranca pero no puede servir su API.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: cert-manager-webhook-scaleway
+  namespace: {{ $ns }}
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: cert-manager-webhook-scaleway
+  egress:
+    - toEntities:
+        - kube-apiserver
+{{- end }}
+{{- end }}

@@ -1,0 +1,19 @@
+Un agenda CalDAV relié au reste de la suite.
+
+• Vues jour, semaine et mois.
+• Évènements récurrents et rappels.
+• Créez un évènement directement depuis un e-mail dans Mail.
+• Compatible avec n’importe quel client CalDAV.
+• Vues mois, semaine, jour et agenda, avec mini-calendrier et « Aujourd’hui ».
+• Répétition quotidienne, hebdomadaire ou mensuelle avec fin ; modifiez celui-ci, celui-ci et les suivants, ou tous.
+• Rappels par événement et notifications dans la suite.
+• Invitations avec réponse (présent, peut-être, non) et suivi.
+• « Trouver un créneau » libre pour toutes les personnes invitées.
+• Salles et ressources réservables avec disponibilité.
+• Calendriers partagés avec permissions, et ceux que d’autres partagent avec vous.
+• Abonnement à des calendriers externes (ICS) et plusieurs calendriers en couleur.
+• Créez un événement depuis un courriel de Mail ou depuis une note.
+• Compatible avec tout client CalDAV : Apple Calendrier, Thunderbird et plus.
+• Dupliquez un événement ou copiez-le dans votre calendrier, et téléchargez-le en .ics pour les personnes qui ne sont pas sur Sytue.
+
+Chiffrement en transit (TLS 1.3). L’infrastructure de Sytue se trouve dans l’UE. La localisation des services externes dépend de leur fournisseur.

@@ -1,0 +1,19 @@
+Privatus europietiškas paštas per JMAP — be sekiklių ir be reklamų.
+
+• Greita pašto dėžutė su gijomis, žymomis, filtrais ir paieška.
+• Failų pridėjimas tiesiai iš Sytue Drive.
+• Laiško pavertimas Calendar įvykiu.
+• Šifruojama perduodant (TLS 1.3). „Sytue“ infrastruktūra yra ES. Išorinių paslaugų vieta priklauso nuo jų teikėjo.
+• Pokalbių gijos su skaitymu, atsakymu ir persiuntimu vienu spustelėjimu.
+• Aplankai, spalvotos žymos ir paieška su operatoriais (from:, has:attachment, is:unread…).
+• Automatinės taisyklės, kurios gaunamus laiškus archyvuoja, pažymi arba perkelia.
+• Suplanuotas siuntimas ir „Atšaukti siuntimą“.
+• Parašai, adresų slapyvardžiai ir automatinis atsakymas atostogų metu.
+• Bendrinamos ir deleguotos pašto dėžutės su skaitymo ir siuntimo teisėmis.
+• Formatuoto teksto rengyklė su priedais iš Sytue Drive, nesukuriant failų kopijų.
+• Nuotolinis turinys pagal numatytuosius nustatymus blokuojamas: niekas nesužino, kada atidarote laišką.
+• Pasirašyti laiškai (PGP ir S/MIME) atpažįstami ir pažymimi; TLS perduodant.
+• Prieiga ir iš Thunderbird, Outlook, Apple Mail ar telefono, naudojant programų slaptažodžius.
+• Adresai kaip žymos, Contacts adresų knyga vienu spustelėjimu ir įspėjimas, jei parašote „prisegta“, bet nieko neprisegate.
+
+Šifruojama perduodant (TLS 1.3). „Sytue“ infrastruktūra yra ES. Išorinių paslaugų vieta priklauso nuo jų teikėjo.

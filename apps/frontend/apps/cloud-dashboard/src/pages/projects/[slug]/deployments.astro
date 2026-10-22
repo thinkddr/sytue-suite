@@ -1,0 +1,49 @@
+---
+import DashboardLayout from '../../../layouts/DashboardLayout.astro';
+import DeploymentsPanel from '../../../components/DeploymentsPanel';
+import { requireSession } from '@sytue/auth/server';
+import { canonicaConOrg } from '@sytue/config';
+import { getBff, toBffContext } from '../../../server/bff.js';
+import { firstSourceError, loadProject, loadDeployments } from '../../../lib/cloud.js';
+
+import { useT } from '../../../i18n/index.js';
+
+export const prerender = false;
+
+// El idioma lo negocia el middleware una vez por peticion y baja a la isla por
+// props: detectarlo en el cliente desajustaria la hidratacion.
+const locale = Astro.locals.locale;
+const t = useT(locale);
+
+const guard = await requireSession(getBff(), toBffContext(Astro));
+if (guard instanceof Response) return guard;
+// Ruta en `sinOrg` (su nombre colisiona con el namespace de organizaciones):
+// con sesión, un salto local a la canónica con la org activa (ADR 0056).
+const canonica = canonicaConOrg(Astro.url, getBff().basePath, guard.session.user.tenant);
+if (canonica) return Astro.redirect(canonica);
+
+const { session } = guard;
+
+const { slug } = Astro.params;
+const projectSourced = slug ? await loadProject(session, slug) : undefined;
+if (!projectSourced) return new Response(t('common.notFound'), { status: 404 });
+const project = projectSourced.data;
+const deploymentsSourced = await loadDeployments(session, project.slug);
+const { data: deployments, live } = deploymentsSourced;
+---
+
+<DashboardLayout
+  title={t('page.titleWithProject', { section: t('nav.deployments'), project: project.name })}
+  project={project.slug}
+  section="deployments"
+  hasDb={project.services.includes('postgres')}
+>
+  <DeploymentsPanel
+    client:load
+    project={project.slug}
+    deployments={deployments}
+    live={live}
+    locale={locale}
+    error={firstSourceError(projectSourced, deploymentsSourced)}
+  />
+</DashboardLayout>

@@ -1,0 +1,11 @@
+Povezane tablice za vođenje klijenata, narudžbi ili zaliha, s dopuštenjima i zapisom svake promjene.
+
+• Klijenti, narudžbe ili zalihe u povezanim tablicama, bez znanja o bazama podataka.
+• Dijelite s organizacijom s ulogom koju odaberete.
+• Svaka je promjena zabilježena: tko ju je napravio i što je bilo prije.
+• Vaši podaci ostaju u EU, a izvozite ih kad god želite.
+• Tablice s poljima za tekst, broj, datum, potvrdni okvir te jedan i više izbora.
+• Veze među tablicama: povežite narudžbu s klijentom, a baza podataka ne dopušta prekid veze.
+• Dopuštenja po bazi i po tablici: vlasnik, urednik, komentator i čitatelj.
+
+Šifrirano u prijenosu (TLS 1.3). Infrastruktura Sytuea nalazi se u EU-u. Lokacija vanjskih usluga ovisi o njihovu pružatelju.

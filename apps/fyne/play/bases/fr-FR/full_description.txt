@@ -1,0 +1,11 @@
+Des tables liées pour suivre clients, commandes ou stocks, avec droits d’accès et historique de chaque modification.
+
+• Clients, commandes ou stocks dans des tables liées, sans rien connaître aux bases de données.
+• Partagez avec votre organisation, avec le rôle de votre choix.
+• Chaque modification est enregistrée : qui l’a faite et quelle était la valeur précédente.
+• Vos données restent dans l’UE et vous les exportez quand vous voulez.
+• Tables avec champs texte, nombre, date, case à cocher, choix unique et choix multiple.
+• Relations entre tables : liez une commande à son client et la base de données refuse de rompre le lien.
+• Droits par base et par table : propriétaire, éditeur, commentateur et lecteur.
+
+Chiffrement en transit (TLS 1.3). L’infrastructure de Sytue se trouve dans l’UE. La localisation des services externes dépend de leur fournisseur.

@@ -1,0 +1,3 @@
+# Los certificados mkcert se generan localmente y NUNCA se versionan.
+# Ejecuta `make dev-certs` (o los comandos mkcert del README) para crear:
+#   sytue-localhost.pem  ·  sytue-localhost-key.pem

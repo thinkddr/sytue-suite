@@ -1,0 +1,25 @@
+{{- /* El ServiceMonitor exige el CRD monitoring.coreos.com/v1: sin el Prometheus
+     Operator, aplicarlo hace fallar el despliegue ENTERO. `global.metrics.serviceMonitor.enabled:
+     false` los apaga todos de una vez; un `values` no puede olvidarse de un servicio.
+     Se compara con false a propósito: sin global definido, la clave vale nil y manda la local. */}}
+{{- if and .Values.serviceMonitor.enabled (ne ((((.Values.global).metrics) | default dict).serviceMonitor | default dict).enabled false) }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "sytue-cast.fullname" . }}
+  labels:
+    {{- include "sytue-cast.labels" . | nindent 4 }}
+    {{- with ((.Values.global).metrics | default dict).serviceMonitor }}
+    {{- with .labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- end }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "sytue-cast.selectorLabels" . | nindent 6 }}
+  endpoints:
+    - port: http
+      path: {{ .Values.serviceMonitor.path }}
+      interval: {{ .Values.serviceMonitor.interval }}
+{{- end }}

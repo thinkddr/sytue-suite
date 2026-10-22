@@ -1,0 +1,17 @@
+PDF från början till slut, i din webbläsare.
+
+• Markera, understryk, kommentera och rita i dokumentet.
+• Formulär: fyll i fält eller skapa egna.
+• Slå ihop, extrahera, rotera, numrera och lägg till vattenstämpel.
+• Signaturpanel, permanent maskering och lösenordsskyddade dokument.
+• En snabb visare med disposition, miniatyrer, sökning och zoom till sida eller bredd.
+• Anteckningar: markera, understryka, stryka över, kommentera, rita, former, pilar och stämplar.
+• Textrutor, mätningar och ögonblicksbilder av områden.
+• Formulär: fyll i befintliga fält eller lägg till egna.
+• Panel för signering av dokument.
+• Permanent maskering: det du markerar försvinner ur filen, inte bara ur vyn.
+• Sidor: slå ihop, extrahera, ta bort, rotera, numrera (även Bates), sidhuvuden och sidfötter.
+• Vattenstämpel, bakgrund och redigerbara metadata.
+• Lösenordsskyddade dokument och behörigheter.
+
+Krypterat under överföring (TLS 1.3). Sytues infrastruktur finns i EU. Var externa tjänster finns beror på deras leverantör.

@@ -1,0 +1,10 @@
+{
+  "order_paid_buyer_subject": "Ordrebekræftelse {number}",
+  "order_paid_buyer_body": "Tak for dit køb. Ordre {number} er bekræftet.",
+  "order_paid_store_subject": "Ny ordre modtaget: {number}",
+  "order_paid_store_body": "Du har modtaget en ny ordre {number} på {total}.",
+  "withdrawal_ack_subject": "Kvittering for fortrydelse modtaget: {number}",
+  "withdrawal_ack_body": "Din fortrydelsesanmodning for ordre {number} er registreret.",
+  "form_received_subject": "Formularindsendelse modtaget: {form_id}",
+  "form_received_body": "Der er modtaget en ny indsendelse for formularen {form_id}."
+}

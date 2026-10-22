@@ -1,0 +1,18 @@
+Notesy, które pomieszczą wszystko: tekst, pliki, wydarzenia, całe dokumenty.
+
+• Zagnieżdżone notesy na swobodnej tablicy, w kolumnach lub jako lista.
+• Notatki każdego rodzaju: tekst, zadania, linki, pliki, wydarzenia z Kalendarza, dokumenty z Docs.
+• To Ty decydujesz, co trafia do wyszukiwania — a co nigdy.
+• Zagnieżdżone notesy z ikoną i kolorem; trzy układy: swobodny, kolumny i lista.
+• Dwanaście typów notatek: tekst, zadania, linki, kolor, obraz i odwołania do Dysku, Docus, Kalendarza, Rooms i innych notatek.
+• Edytor z formatowaniem (pogrubienie, listy, linki), który zapisuje przy wyjściu.
+• Tagi, przypinanie, duplikowanie, przenoszenie między notesami, grupowanie i przeciąganie na tablicy.
+• Widoczność każdego notesu: prywatny, osobisty, organizacji lub publiczny link.
+• To Ty decydujesz, które notesy trafiają do wyszukiwania w pakiecie.
+• Linki zwrotne: które notatki odsyłają do tej.
+• Eksport całego notesu do HTML, PDF, Markdown i innych formatów; import kopii.
+• Udostępnianie notatki na kanale Rooms; tworzenie notatek przez upuszczenie lub wklejenie.
+• Tabele w edytorze i skróty Markdown podczas pisania: „- ”, „# ”, „> ” i „```”.
+• Przenoszenie notatki do innego notesu, eksport pojedynczej notatki i sortowanie notesu według uznania.
+
+Szyfrowanie w transmisji (TLS 1.3). Infrastruktura Sytue znajduje się w UE. Lokalizacja usług zewnętrznych zależy od ich dostawcy.

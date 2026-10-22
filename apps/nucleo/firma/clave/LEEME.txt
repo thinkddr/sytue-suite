@@ -1,0 +1,3 @@
+Aquí va la copia de deploy/firma/publicacion.pub, con el nombre publicacion.pub.
+Mientras no exista, las apps se actualizan en modo aviso (solo con la suma del Hub).
+firma_test.go exige que las dos copias sean iguales byte a byte, o que no exista ninguna.

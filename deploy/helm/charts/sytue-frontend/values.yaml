@@ -1,0 +1,439 @@
+# Sytue Frontend — superficies Astro+Preact. global.* lo inyecta el umbrella.
+# Cada app monta @sytue/shell + @sytue/ui (design system Sytue). NADA de UI ad-hoc.
+# Repuntadas a los servicios Go via @sytue/api-clients. Sin motores AGPL.
+enabled: true
+
+image:
+  registry: ""                 # cae a global.imageRegistry
+  # Repo base; la imagen de cada app es <repoBase>-<app>:<tag>
+  repoBase: sytue-frontend
+  tag: "1.0.0"
+  pullPolicy: IfNotPresent
+
+# Defaults aplicados a todas las apps (cada app puede sobrescribir).
+defaults:
+  replicaCount: 2
+  port: 8080                   # BFF Astro (SSR) servido con Bun (no Node) escucha en 8080
+  # Requests MEDIDOS en producción (kubectl top, 2026-08-09), no estimados: en
+  # Kubernetes la factura la fija lo RESERVADO, no lo usado, y estos pods pedían
+  # 25-75 veces su consumo real. Esa reserva inflada obligó a un tercer nodo cuando
+  # la CPU real del clúster estaba al 3 %.
+  #
+  # El límite NO se toca: un pico sigue pudiendo usar toda la CPU que necesite. Y
+  # bajar el request hace al HPA MÁS sensible —calcula el porcentaje sobre el
+  # request—, que es justo lo que hace falta para escalar por demanda real.
+  resources:
+    requests:
+      cpu: 20m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 384Mi
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 70
+  ingress:
+    className: traefik
+    annotations: {}
+
+networkPolicy:
+  enabled: true
+
+serviceMonitor:
+  enabled: true
+  path: /metrics
+  interval: 30s
+
+# PodDisruptionBudget (aplicado a cada app frontend). Mantiene disponibilidad
+# durante drains/upgrades del cluster.
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# Reparto anti-afinidad suave por zona y nodo (alta disponibilidad multi-AZ, UE).
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: ScheduleAnyway
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: ScheduleAnyway
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10010
+  fsGroup: 10010
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
+# Secreto compartido del BFF: cookie-secret y client-secret OIDC por app.
+# Convención de claves: <app>-oidc-client-secret. Cookies host-only __Host-.
+existingSecret: sytue-frontend-bff
+# Secreto y subdominio de Sytue Integrations. Los lee la superficie de plataforma
+# para hablar con su API de operador; van aquí y no duplicados en cada app porque
+# el destino es uno solo.
+integrationsSecret: sytue-integrations
+integrationsSubdomain: integrations
+
+# De donde saca el portal los instaladores nativos: un bucket PRIVADO al que el
+# CI publica y del que el portal firma URLs de corta vida. La credencial vive en
+# un Secret aparte (claves `access-key` y `secret-key`), nunca en estos valores, y
+# solo puede leer este bucket: lo acota la politica del bucket, no un permission
+# set de proyecto.
+downloadsBucket: sytue-prod-downloads
+downloadsEndpoint: https://s3.fr-par.scw.cloud
+# El endpoint con el que se FIRMA la URL que abre el navegador, cuando no puede
+# ser el mismo que el de arriba. Con un S3 dentro del clúster hay que ponerlo:
+# el nombre de servicio interno no lo resuelve nadie desde fuera, y la firma de
+# SigV4 lleva el host dentro, así que no vale reescribirlo después. Vacío ⇒ se
+# firma con `downloadsEndpoint`, que es lo correcto con un S3 ya público.
+downloadsPublicEndpoint: ''
+downloadsRegion: fr-par
+downloadsSecret: sytue-downloads
+
+# Base pública de descarga de los instaladores nativos (macOS/Windows/Linux).
+# El repositorio es INTERNO, así que un asset de la forja no vale: un visitante
+# anónimo no puede descargarlo. Apunta al bucket público de Scaleway (UE) que
+# rellena el job `publicar-release`. Vacía ⇒ el sitio dice «próximamente».
+#
+# DOCUMENTA el destino; NO lo inyecta. `www` es SSG y lee esta base al construir
+# la imagen, no al arrancar: quien la hornea de verdad es el `--build-arg
+# PUBLIC_SYTUE_DOWNLOADS_BASE` del job de release. Mantener los dos valores
+# iguales; si divergen, manda el del build.
+downloadsBase: "https://sytue-prod-downloads.s3.fr-par.scw.cloud/latest"
+
+# Scopes OIDC que el BFF solicita. Todos deben existir en scopes_supported de
+# Sytue ID Y en los scopes del client, o authorize responde invalid_scope. Los
+# roles del tenant llegan como CLAIM, no como scope: no se piden aquí.
+oidcScopes: "openid profile email offline_access"
+
+# -----------------------------------------------------------------------------
+# Catálogo de apps. clave = nombre de la superficie; subdomain = host del SPEC;
+# clientId = client OIDC del SPEC (§8). Cada una se despliega con su Ingress.
+# -----------------------------------------------------------------------------
+# Host de organizacion. Cada cliente entra por <slug>.<dominio> y sus apps cuelgan
+# del path: https://corporation.sytue.eu/mail, /admin, /one...
+#
+# LA DIRECCION CANONICA es la de PRODUCTO desde el 2026-09-26: es la que se
+# anuncia en `PUBLIC_URL` y en el `redirect_uri` de OIDC (migracion 0099), igual
+# que ya lo hacen los enlaces entre apps, los avisos y las apps nativas. La
+# organizacion NO vive en el host —viaja firmada en el token (claim `tenant`)—,
+# asi que el login no la necesita en la URL y entrar por el host de producto
+# evita el 302 previo al IdP que costaba la canonica de organizacion.
+#
+# `<slug>.<dominio>` queda en TRANSICION: sigue sirviendo el MISMO prefijo —el
+# `base` de Astro se hornea al construir y una imagen no puede servir a la vez
+# en `/` y bajo `/mail`—, y su login redirige al host de producto (el BFF
+# empieza el flujo en el host del callback). Cuando el norte se complete —la
+# organizacion como segmento de PATH dentro de cada producto— se convierte en
+# 301 y se retira; el subdominio seguira existiendo como dominio de CORREO.
+# Ese 301 de cierre se prepara tras `retirarComodin`, mas abajo (apagado).
+#
+# `canonical` es el slug de la organizacion que opera la plataforma. Deja de
+# componer la canonica, pero sigue definido: el Ingress comodin lo sigue
+# sirviendo y TestRedirectUrisDeLosHostsDeSuiteCubrenElChart sigue exigiendo que
+# su callback este registrado durante la transicion.
+orgHost:
+  canonical: corporate
+  # UN certificado comodin para todas las organizaciones. Exige que el emisor
+  # resuelva por DNS-01 (HTTP-01 no valida comodines), y desde el 2026-08-14 lo
+  # hace: ver docs/roadmap.md#ingreso-por-organizacion-pendiente.
+  tlsSecret: tls-wildcard-sytue-eu
+  # Cierre de la transición (ADR 0056): true convierte el comodín de
+  # organización en 301 al host de producto. Encenderlo SOLO cuando el frente
+  # en producto lleve suficientes días en producción; es la fase final.
+  retirarComodin: false
+
+apps:
+  portal:
+    # Unica superficie que sirve los instaladores nativos: recibe
+    # SYTUE_DOWNLOADS_API y el token de lectura de la forja. Van AQUI y no en el
+    # sitio publico porque bajarlos exige cuenta y suscripcion viva.
+    downloads: true
+    subdomain: one
+    # Y su prefijo bajo el host de organización: las DOS direcciones son
+    # válidas, `one.<dominio>/one` y `<slug>.<dominio>/one`.
+    path: /one
+    clientId: sytue-one
+    tlsSecret: tls-one-sytue-eu
+    # Dirección corporativa de la organización que opera la plataforma. Cada
+    # organización tiene la suya en <slug>.sytue.eu; la de Sytue es `corporate`
+    # (su slug), y como el resto lleva a la entrada de la suite conservando
+    # path y query.
+    # `corporate` YA NO es un legacyHost, y no es un detalle: es el slug de la
+    # organización que opera la plataforma, o sea el host CANÓNICO de organización
+    # (`orgHost.canonical`). Dejarlo aquí lo rompía todo, porque en Traefik un host
+    # exacto gana al comodín: `corporate.sytue.eu/mail` habría entrado por este
+    # Ingress y acabado redirigido a `one.sytue.eu/mail` en vez de servir Mail.
+    #
+    # Su raíz la cubre el middleware `-org-raiz`, que manda `/` a `/one`.
+    enabled: true
+  # Administración GLOBAL de la plataforma (todas las organizaciones). Corre la
+  # MISMA imagen que la Console —es la misma app Astro— pero con su propio host y
+  # su propio client OIDC, para que administrar Sytue no comparta sesión ni
+  # superficie con administrar una organización cliente. Quién entra lo decide
+  # Sytue ID: allowlist `platform_admins` + segundo factor.
+  platform:
+    subdomain: platform
+    # Esta superficie NO cuelga de un prefijo: se sirve en la raíz de su host.
+    # Pero su portada es `/platform`, y `/` no existe en el build —quien escribía
+    # `platform.sytue.eu` recibía el 404 de Astro—. `homePath` es la portada a la
+    # que redirige la raíz; `path`, cuando lo hay, manda sobre esto.
+    homePath: /platform
+    clientId: sytue-platform
+    image: sytue-frontend-console
+    tlsSecret: tls-platform-sytue-eu
+    # Gestión de las credenciales con las que Sytue se presenta ante cada
+    # proveedor de terceros. SOLO aquí: son de la plataforma y sirven a todos los
+    # clientes, así que la consola de una organización no debe ni verlas.
+    platformConnections: true
+    # Administración GLOBAL: solo desde el túnel administrativo.
+    #
+    # `163.172.172.187` es la forja, que es por donde sale WireGuard. No se pone
+    # aquí la IP de ningún puesto: eso es lo que se estuvo arreglando cada vez que
+    # un ISP la cambiaba. El navegador tiene que salir por el túnel para entrar
+    # (con deploy/sytue-git/puesto/navegador-admin.sh), y los runners NO están en la lista
+    # porque ninguna automatización administra la plataforma por aquí.
+    allowedSourceIPs:
+      - 163.172.172.187/32
+    enabled: true
+  console:
+    subdomain: admin
+    # Y su prefijo bajo el host de organización: las DOS direcciones son
+    # válidas, `admin.<dominio>/admin` y `<slug>.<dominio>/admin`.
+    path: /admin
+    clientId: sytue-console
+    tlsSecret: tls-admin-sytue-eu
+    # El identificador interno sigue siendo console; el host público es `admin`.
+    # `console.sytue.eu` fue su host antiguo y respondió 301 hasta el 2026-09-11.
+    # Retirado: un 301 que nadie sigue es un nombre más que certificar, un
+    # registro más que mantener y una superficie más que vigilar.
+    enabled: true
+  cloud-dashboard:
+    subdomain: cloud
+    # Y su prefijo bajo el host de organización: las DOS direcciones son
+    # válidas, `cloud.<dominio>/cloud` y `<slug>.<dominio>/cloud`.
+    path: /cloud
+    clientId: sytue-cloud
+    tlsSecret: tls-cloud-sytue-eu
+    # Unica app con seccion de analitica: recibe SYTUE_ANALYTICS_API_URL.
+    analytics: true
+    # Y la unica que habla con el control-plane del PaaS: recibe
+    # SYTUE_CLOUD_API_URL. Sin ella el panel se queda en modo demostracion.
+    cloudApi: true
+    enabled: true
+  mail:
+    subdomain: mail
+    # Y su prefijo bajo el host de organización: las DOS direcciones son
+    # válidas, `mail.<dominio>/mail` y `<slug>.<dominio>/mail`.
+    path: /mail
+    clientId: sytue-mail
+    tlsSecret: tls-mail-sytue-eu
+    enabled: true
+  # Hosts compartidos con el backend Go (mismo subdominio): se reutiliza un UNICO
+  # secret TLS por host (un solo Certificate cert-manager). El SPA sirve "/" y el
+  # backend rutas /api,/dav,/ws,... (ver charts/<svc>/values.yaml ingress.paths).
+  drive:
+    subdomain: drive
+    # Y su prefijo bajo el host de organización: las DOS direcciones son
+    # válidas, `drive.<dominio>/drive` y `<slug>.<dominio>/drive`.
+    path: /drive
+    clientId: sytue-drive
+    tlsSecret: tls-drive-sytue-eu
+    enabled: true
+  calendar:
+    subdomain: calendar
+    # Y su prefijo bajo el host de organización: las DOS direcciones son
+    # válidas, `calendar.<dominio>/calendar` y `<slug>.<dominio>/calendar`.
+    path: /calendar
+    clientId: sytue-calendar
+    tlsSecret: tls-calendar-sytue-eu
+    enabled: true
+  contacts:
+    subdomain: contacts
+    # Y su prefijo bajo el host de organización: las DOS direcciones son
+    # válidas, `contacts.<dominio>/contacts` y `<slug>.<dominio>/contacts`.
+    path: /contacts
+    clientId: sytue-contacts
+    tlsSecret: tls-contacts-sytue-eu
+    enabled: true
+  # La ofimática, una app por producto (decisión del dueño del 2026-10-12): Docus,
+  # Calcus, Diapos y CertiPDF, cada una con su host, su prefijo y su client OIDC
+  # (migración 0111 de Sytue ID). Montan el mismo paquete (`@sytue/office`) y hablan
+  # con el único servicio Go de documentos, cuya API sigue en `docs.<dominio>`. La app
+  # conjunta que servía los cuatro en `docs.<dominio>/docs` se retiró sin
+  # redirecciones (ADR 0076).
+  docus:
+    subdomain: docus
+    path: /docus
+    clientId: sytue-docus
+    tlsSecret: tls-docus-sytue-eu
+    enabled: true
+  calcus:
+    subdomain: calcus
+    path: /calcus
+    clientId: sytue-calcus
+    tlsSecret: tls-calcus-sytue-eu
+    enabled: true
+  diapos:
+    subdomain: diapos
+    path: /diapos
+    clientId: sytue-diapos
+    tlsSecret: tls-diapos-sytue-eu
+    enabled: true
+  certipdf:
+    subdomain: certipdf
+    path: /certipdf
+    clientId: sytue-certipdf
+    tlsSecret: tls-certipdf-sytue-eu
+    enabled: true
+  notes:
+    subdomain: notes
+    # Y su prefijo bajo el host de organización: las DOS direcciones son
+    # válidas, `notes.<dominio>/notes` y `<slug>.<dominio>/notes`.
+    path: /notes
+    clientId: sytue-notes
+    tlsSecret: tls-notes-sytue-eu
+    enabled: true
+  # Sytue Photos — photos.sytue.eu. Galería y editor de imágenes; los originales
+  # viven en Drive y este frontend solo habla con su servicio Go (8097).
+  photos:
+    subdomain: photos
+    path: /photos
+    clientId: sytue-syphotos
+    tlsSecret: tls-photos-sytue-eu
+    enabled: true
+  # SyERP — erp.sytue.eu. El ERP de la suite. Esta superficie NO tiene pantallas
+  # por módulo: las genera del catálogo que le sirve su servicio Go (8098), así
+  # que encender Fabricación o Flota no cambia nada aquí.
+  #
+  # Comparte host con su backend, que publica `/api/v1` y `/webhooks` —el de
+  # Stripe, que no pasa por este BFF porque no trae sesión—. Un solo secret TLS
+  # para los dos Ingress, como en Drive, Contacts y Fotos.
+  erp:
+    subdomain: erp
+    # Y su prefijo bajo el host de organización: las DOS direcciones son
+    # válidas, `erp.<dominio>/erp` y `<slug>.<dominio>/erp`.
+    path: /erp
+    clientId: sytue-syerp
+    tlsSecret: tls-erp-sytue-eu
+    enabled: true
+  # Sytue Cast — cast.sytue.eu. Vídeo bajo demanda y directo (ADR 0061). El
+  # frontend sirve `/` (la app Astro bajo `/cast`, con la portada pública y el
+  # canal por organización sin sesión) y el servicio Go (8099) `/api/v1`, `/ws`,
+  # `/webhooks` y `/media` del mismo host. Un solo secret TLS para los dos
+  # Ingress, como en Drive, Contacts y Fotos.
+  cast:
+    subdomain: cast
+    # Y su prefijo bajo el host de organización: las DOS direcciones son
+    # válidas, `cast.<dominio>/cast` y `<slug>.<dominio>/cast`.
+    path: /cast
+    clientId: sytue-cast
+    tlsSecret: tls-cast-sytue-eu
+    enabled: true
+  # Sytue Bases — bases.sytue.eu (ADR 0068). El frontend sirve la app Astro bajo
+  # `/bases` (y el formulario público `/bases/f/<token>`, sin sesión); el servicio Go
+  # (8102) publica solo `/api/v1` en este host, para las apps nativas; el BFF lo llama
+  # por dentro. Encendida por defecto, como su
+  # servicio (`bases.enabled` del umbrella): se apagan las dos a la vez.
+  bases:
+    subdomain: bases
+    path: /bases
+    clientId: sytue-bases
+    tlsSecret: tls-bases-sytue-eu
+    enabled: true
+  # Sytue Web — web.sytue.eu. La clave sigue siendo `pages` (antes «Sytue Pages»):
+  # es el nombre de la imagen, del client OIDC y del secreto, y no cambia.
+  #
+  # Pages comparte host con la API, pero el BFF es quien firma la publicación;
+  # la clave se entrega solo a esta superficie y nunca a `pages sitios`.
+  pages:
+    subdomain: web
+    # Y su prefijo bajo el host de organización: las DOS direcciones son
+    # válidas, `web.<dominio>/web` y `<slug>.<dominio>/web`.
+    path: /web
+    # EL PREFIJO ANTERIOR. La app se construye con UN `base` y ya no responde
+    # bajo `/pages`, así que lo que llegue ahí —enlaces de avisos y correos ya
+    # enviados, marcadores, lo que abren las apps nativas ya instaladas—
+    # recibe un 302 al mismo host con `/web`, conservando el resto de la ruta
+    # y la query. Sin interruptor: es en el mismo host, que ya resuelve, y la
+    # alternativa es un 404.
+    pathAnterior: /pages
+    clientId: sytue-pages
+    tlsSecret: tls-pages-sytue-eu
+    # EL HOST ANTERIOR, `pages.<dominio>`, que fue la dirección hasta el
+    # 2026-10-04. Sigue SIRVIENDO la app tal cual —mismo Ingress, mismo
+    # certificado, sus callbacks siguen registrados (migración 0102)— hasta
+    # que `redirigirHostAnterior` lo convierta en un 302 a `web.<dominio>`
+    # conservando ruta y query. APAGADO por defecto: encenderlo es el último
+    # paso del corte, cuando `web.<dominio>` ya se ha visto servir la app
+    # (docs/operations.md#sytue-web-cambio-de-direccion). Lo que publica el
+    # servicio Go en este host —`/webhooks` y `/_borde`— NO redirige nunca:
+    # las pasarelas de pago no siguen redirecciones.
+    hostAnterior: pages
+    redirigirHostAnterior: false
+    publicador: true
+    resources:
+      limits:
+        memory: 1Gi
+    enabled: true
+  # Sytue Rooms — rooms.sytue.eu. Mensajería y videollamada son UNA app sobre UN
+  # backend (services/rooms): el frontend sirve `/` y el servicio Go `/api`, `/ws` y
+  # `/hooks` del mismo host. La app de Meet se retiró: la llamada vive embebida en el
+  # canal.
+  rooms:
+    subdomain: rooms
+    # Y su prefijo bajo el host de organización: las DOS direcciones son
+    # válidas, `rooms.<dominio>/rooms` y `<slug>.<dominio>/rooms`.
+    path: /rooms
+    # El client de Rooms es `sytue-chat`: la migración 0023 le renombró a «Sytue
+    # Rooms» y le añadió los callbacks de rooms.*, pero CONSERVÓ el id, que es
+    # clave ajena de sesiones, tokens y consentimientos. Pedir `sytue-rooms`
+    # daba invalid_client: ese client no existe.
+    clientId: sytue-chat
+    tlsSecret: tls-rooms-sytue-eu
+    # Sirve en la raíz de rooms.<dominio> los ficheros de App Links y Universal Links
+    # (ingress.yaml, `-bff`): el enlace de una reunión abre la app nativa si está.
+    # Sus datos de firma van en `env`: SYTUE_ANDROID_CERT_SHA256 y SYTUE_IOS_TEAM_ID.
+    enlacesApp: true
+    # El dominio del correo a canal ya no va aqui: lo publica el servicio de Rooms
+    # (`rooms.config.channelMailDomain`) con el secreto de cada webhook entrante, y
+    # asi la web y las apps nativas lo enseñan solo cuando de verdad funciona.
+    env: {}
+    enabled: true
+  # Mi cuenta — id.sytue.eu/account. La pantalla de perfil, sesiones y seguridad de
+  # Sytue ID, que era HTML servido por el propio servicio y ahora es app Astro
+  # con su BFF. Se llama `id` en el selector de apps porque ES Sytue ID: no es un
+  # producto aparte y no aparece dos veces.
+  account:
+    subdomain: account
+    path: /account
+    # LA CUENTA ES DE LA PERSONA, NO DE UNA ORGANIZACIÓN (decisión del dueño,
+    # 2026-09-24). Su dirección es GLOBAL: `id.<dominio>/account`, que es la que
+    # se anuncia y la del `redirect_uri`. `account.<dominio>/account` sigue
+    # sirviéndola, y `<slug>.<dominio>/account` solo redirige aquí, nunca al revés.
+    #
+    # Comparte así el origen de Sytue ID, y recibe sus cookies: riesgo aceptado,
+    # docs/security.md#riesgo-aceptado-mi-cuenta-en-el-origen-del-idp. Las rutas
+    # de Go bajo `/account/` vuelven a Go por el chart de `id` (`rutasDeCuenta`).
+    globalHost: id
+    # El certificado de `id.<dominio>`: lo emite el Ingress del chart de `id`, este
+    # solo lo usa.
+    globalTlsSecret: tls-id-sytue-eu
+    clientId: sytue-account
+    tlsSecret: tls-account-sytue-eu
+    enabled: true
+  www:
+    subdomain: www
+    clientId: ""               # sitio público, sin login obligatorio
+    tlsSecret: tls-www-sytue-eu
+    extraHosts: ["@"]          # también el ápex sytue.eu (lo resuelve el Ingress raíz)
+    enabled: true

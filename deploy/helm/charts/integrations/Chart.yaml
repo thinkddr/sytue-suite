@@ -1,0 +1,22 @@
+apiVersion: v2
+name: sytue-integrations
+description: >-
+  Sytue Integration Gateway — servicio Go propio de interoperabilidad SALIENTE (BYO-SaaS):
+  la unica puerta de egress hacia el SaaS del cliente, con destino SSRF-safe, rate-limit
+  por organizacion, auditoria de egress y politicas/DLP evaluadas dentro del unico
+  RoundTripper. Sirve el SSO saliente (materializado en Sytue ID), el aprovisionamiento
+  SCIM 2.0, los datos tabulares hacia Sytue Sheets, la incrustacion de informes y la
+  gobernanza. Estado en PostgreSQL con RLS por organizacion; SIN Redis/Valkey.
+  Código Apache-2.0, (c) 2026 Daniel Delgado Ramos. Expuesto en integrations.sytue.eu.
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+kubeVersion: ">=1.31.0-0"
+home: https://sytue.eu
+keywords: [sytue, integrations, gateway, scim, sso, dlp, egress, go]
+maintainers:
+  - name: Sytue Platform
+    email: platform@sytue.eu
+annotations:
+  licenses: MIT
+  sytue.eu/stack: go

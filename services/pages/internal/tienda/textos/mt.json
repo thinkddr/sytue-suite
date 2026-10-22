@@ -1,0 +1,10 @@
+{
+  "order_paid_buyer_subject": "Konferma tal-ordni {number}",
+  "order_paid_buyer_body": "Grazzi tax-xiri tiegħek. L-ordni {number} ġiet ikkonfermata.",
+  "order_paid_store_subject": "Ordni ġdida riċevuta: {number}",
+  "order_paid_store_body": "Irċevejt ordni ġdida {number} għal {total}.",
+  "withdrawal_ack_subject": "Konferma ta' kanċellazzjoni riċevuta: {number}",
+  "withdrawal_ack_body": "It-talba tiegħek ta' kanċellazzjoni għall-ordni {number} ġiet irreġistrata.",
+  "form_received_subject": "Sottomissjoni tal-formola riċevuta: {form_id}",
+  "form_received_body": "Ġiet riċevuta sottomissjoni ġdida għall-formola {form_id}."
+}

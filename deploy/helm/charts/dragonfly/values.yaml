@@ -1,0 +1,108 @@
+# =============================================================================
+# sytue-dragonfly — cache EFIMERA compartida entre replicas.
+#
+# POR QUE EXISTE, Y POR QUE AHORA. Sytue Hub guarda la presencia de cada usuario
+# (quien esta conectado, en que app) y publica los eventos que Rooms y Docs
+# consumen. Con UNA replica eso puede vivir en memoria del proceso; con dos, no:
+# un usuario aparecería conectado en un pod y desconectado en el otro, y un
+# evento publicado en uno no llegaria a los clientes atendidos por el otro.
+#
+# Es decir: esto NO es una optimizacion, es el requisito que hay que cumplir
+# ANTES de escalar Hub o Rooms por encima de una replica. El compose de
+# desarrollo lo levanta desde hace tiempo y su comentario dice «prod: Helm»,
+# pero ese chart no existia: en produccion no habia ningun Dragonfly y los
+# servicios corrian degradados sin que nada lo dijera.
+#
+# NADA DURABLE VIVE AQUI. Las notificaciones y el outbox estan en PostgreSQL;
+# esto es cache y pub/sub. Si el pod cae o se reinicia, `platform/pkg/cache`
+# degrada a no-op y los servicios siguen sirviendo: se pierde la presencia en
+# vivo hasta que vuelve, no datos de nadie. Por eso NO hay volumen, ni
+# StatefulSet, ni backup — y por eso puede reiniciarse sin ceremonia.
+# =============================================================================
+enabled: true
+component: dragonfly
+
+# Una replica, y es deliberado. Dragonfly no replica sin su modo cluster, y
+# montarlo para una cache que puede perderse entera sin consecuencias seria
+# complejidad sin beneficio: dos replicas independientes SERIAN el problema que
+# esto viene a resolver (cada una con media presencia). Si algun dia hace falta
+# tolerancia a fallo aqui, la respuesta es el modo cluster, no subir este numero.
+replicaCount: 1
+
+image:
+  # Tag FIJA (nunca `latest`) y con digest: una cache que cambia de version sola
+  # en un rollout es un fallo dificil de atribuir.
+  repository: docker.dragonflydb.io/dragonflydb/dragonfly
+  # 1.40.0 es el mínimo por CVE-2026-62357 (`CMS.INITBYDIM`, escritura fuera de
+  # límites sin autenticar, afecta a < 1.40). Se fija la 1.40.1, que es la última.
+  tag: v1.40.2@sha256:18afa43e911f1dff18c7d1eb452361876d9702bb1cdff5c5d75c69617a4065c9
+  # Digest del INDICE multi-arch (no del hijo de una arquitectura). Vacio =>
+  # se referencia solo por tag. Se fija en produccion, donde ademas hoy se tira
+  # del origen sin espejo: ver deploy/production/upstream-directo.txt.
+  digest: ""
+  pullPolicy: IfNotPresent
+  # false por defecto, como pgbouncer y livekit: fuera de produccion se tira del
+  # origen. En produccion, `values-prod.yaml` lo pone a true Y reescribe
+  # `repository` al NOMBRE CORTO con el que el mirror publica la imagen
+  # (`dragonfly`, no la ruta completa). Sin esa reescritura, el helper compone
+  # `<mirror>/docker.dragonflydb.io/dragonflydb/dragonfly` y el pull falla con un
+  # 404 que parece que la imagen no existe.
+  useGlobalRegistry: false
+
+service:
+  # Nombre DNS estable: los servicios lo reciben como `redis://dragonfly:6379`,
+  # la misma URL que en el compose de desarrollo.
+  name: dragonfly
+  port: 6379
+
+# La NetworkPolicy sigue siendo obligatoria, y ahora NO es el unico control.
+#
+# Hasta el 2026-08-16 era el unico: Dragonfly iba sin contrasena y quien alcanzara
+# el puerto leia y escribia todo. El problema no era el volumen de datos efimeros
+# —eso se pierde sin consecuencias— sino que ahi dentro vive la resolucion de los
+# tokens de API, que `cloud` aceptaba tal cual como identidad autenticada. Es
+# decir: alcanzar el puerto equivalia a emitir credenciales de cualquier tenant.
+#
+# Ahora hay tres capas y cada una tapa un fallo distinto de las otras:
+#   1. Esta NetworkPolicy: quien puede siquiera intentarlo.
+#   2. La contrasena (global.cache.secretName): que llegar no baste.
+#   3. El sello HMAC de platform/pkg/cache: que escribir no sea falsificar.
+# La 3 es la que sigue en pie aunque las otras dos fallen, que es el motivo de
+# que exista.
+networkPolicy:
+  enabled: true
+
+# Memoria: `maxmemory` va POR DEBAJO del limite del contenedor a proposito.
+# Dragonfly evicciona al llegar a maxmemory (cache_mode); si el limite del
+# contenedor llegara antes, el kernel mataria el proceso en vez de evictar, y un
+# OOMKill de la cache es un corte de presencia para todo el mundo.
+#
+# Dragonfly exige >= 256 MiB por hilo, asi que el numero de hilos y la memoria
+# se mueven juntos: 2 hilos con 2 GiB de maxmemory dentro de 3 GiB de limite.
+#
+# SUBIDO DE 1 A 2 GiB el 2026-09-12. Se mantiene la proporcion de 1,5x entre el
+# limite del contenedor y maxmemory, que es lo que deja sitio a la sobrecarga del
+# proceso —tablas, buffers y la propia fragmentacion— para que el que corte sea
+# SIEMPRE el evictor de Dragonfly y nunca el kernel. Subir maxmemory sin subir el
+# limite invierte eso y convierte una cache llena en un OOMKill.
+settings:
+  proactorThreads: 2
+  maxMemory: 2gb
+  # Evicta lo mas viejo al llenarse en vez de rechazar escrituras. Es lo correcto
+  # para presencia: perder una entrada antigua no rompe nada, rechazar una nueva
+  # deja a alguien invisible.
+  cacheMode: true
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 512Mi
+  limits:
+    # Sin limite de CPU a proposito: Dragonfly es sensible a la latencia y el
+    # throttling del cgroup se traduce en presencia que tarda en actualizarse.
+    # El limite de memoria SI, y por encima de maxMemory (ver arriba).
+    memory: 3072Mi
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

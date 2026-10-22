@@ -1,0 +1,10 @@
+{
+  "order_paid_buyer_subject": "Ordrebekreftelse {number}",
+  "order_paid_buyer_body": "Takk for kjøpet. Ordre {number} er bekreftet.",
+  "order_paid_store_subject": "Ny ordre mottatt: {number}",
+  "order_paid_store_body": "Du har mottatt en ny ordre {number} på {total}.",
+  "withdrawal_ack_subject": "Angrebekreftelse mottatt: {number}",
+  "withdrawal_ack_body": "Din forespørsel om angrerett for ordre {number} er registrert.",
+  "form_received_subject": "Skjemainnsending mottatt: {form_id}",
+  "form_received_body": "En ny innsending er mottatt for skjema {form_id}."
+}

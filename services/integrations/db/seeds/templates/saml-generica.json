@@ -1,0 +1,37 @@
+{
+  "key": "saml-generica",
+  "tier": "tier2",
+  "manifest": {
+    "name": "Aplicación SAML",
+    "description": "Cualquier servicio que admita inicio de sesión único por SAML 2.0: pega su Entity ID y su URL de ACS y Sytue ID pasa a ser su proveedor de identidad. Es la vía para los SaaS que aún no tienen plantilla propia.",
+    "category": "Identidad",
+    "color": "#3B5BDB",
+    "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#3B5BDB\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"3\" y=\"11\" width=\"18\" height=\"10\" rx=\"2\"/><path d=\"M7 11V7a5 5 0 0 1 10 0v4\"/></svg>",
+    "identity": {
+      "kind": "saml",
+      "entity_id": "{entity_id}",
+      "acs_url": "{acs_url}",
+      "name_id_format": "email"
+    },
+    "provisioning": "none",
+    "launch": {
+      "kind": "initiate"
+    },
+    "fields": [
+      {
+        "key": "entity_id",
+        "label": "Entity ID (Audience) del servicio",
+        "placeholder": "https://app.ejemplo.com/saml/metadata",
+        "help": "El identificador SAML que declara el servicio en su página de SSO. Suele llamarse Entity ID, Audience URI o SP Identifier.",
+        "required": true
+      },
+      {
+        "key": "acs_url",
+        "label": "URL de ACS (Reply URL)",
+        "placeholder": "https://app.ejemplo.com/saml/acs",
+        "help": "A dónde devuelve Sytue ID la aserción firmada. En el servicio aparece como ACS URL, Reply URL o Single Sign-On URL.",
+        "required": true
+      }
+    ]
+  }
+}

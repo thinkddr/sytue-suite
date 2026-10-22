@@ -1,0 +1,16 @@
+Berätta historien; bilden hänger med.
+
+• Presentationsteman med organisationens identitet.
+• Talarvy med anteckningar och nästa bild.
+• Bilder, former, diagram och SmartArt.
+• Export till ODP, PPTX och PDF; öppna PowerPoint-filer.
+• Teman och paletter i linje med organisationens varumärke.
+• En arbetsyta med former, bilder, diagram, SmartArt och kopplingslinjer.
+• Presentera i helskärm med talarvy och anteckningar.
+• Samarbete i realtid med närvaro och kommentarer.
+• Bilder med bakgrunder, affischer och layouter.
+• Export till ODP, PPTX och PDF.
+• Öppna PowerPoint-filer från Drive.
+• Automatisk sparning med versioner.
+
+Krypterat under överföring (TLS 1.3). Sytues infrastruktur finns i EU. Var externa tjänster finns beror på deras leverantör.

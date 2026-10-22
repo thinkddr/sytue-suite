@@ -1,0 +1,45 @@
+Sytue Analytics — atribuciones de terceros
+==========================================
+
+Este servicio no incorpora ninguna dependencia de código de terceros más allá de
+las del módulo git.sytue.eu/sytue/one. Sí incorpora DOS CONJUNTOS DE DATOS cuyas
+licencias exigen atribución, y esta es:
+
+
+1. DB-IP IP to Country Lite
+---------------------------
+IP Geolocation by DB-IP — https://db-ip.com
+Licencia: Creative Commons Attribution 4.0 International (CC BY 4.0)
+          https://creativecommons.org/licenses/by/4.0/
+
+El fichero se descarga en tiempo de build (ver Dockerfile) y viaja dentro de la
+imagen en /app/data. Se usa para resolver el país de una petición EN MEMORIA; la
+dirección IP no se persiste en ninguna forma.
+
+
+2. crawler-user-agents
+----------------------
+Copyright (c) Martin Monperrus y contribuyentes
+https://github.com/monperrus/crawler-user-agents
+Licencia: MIT
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"), to deal
+    in the Software without restriction, including without limitation the rights
+    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in
+    all copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+    SOFTWARE.
+
+La lista de patrones se deriva de crawler-user-agents.json y vive en
+internal/domain/bots.txt, cuya cabecera documenta la transformación aplicada.

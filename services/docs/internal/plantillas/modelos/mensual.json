@@ -1,0 +1,319 @@
+{
+ "active": 0,
+ "sheets": [
+  {
+   "name": "{{mensual.hoja}}",
+   "cells": {
+    "A1": "<b>{{mensual.titulo}}</b>",
+    "B3": "<b>{{presupuesto.previsto}}</b>",
+    "B8": "<b>{{presupuesto.previsto}}</b>",
+    "C3": "<b>{{presupuesto.real}}</b>",
+    "C8": "<b>{{presupuesto.real}}</b>",
+    "D3": "<b>{{presupuesto.diferencia}}</b>",
+    "D8": "<b>{{presupuesto.diferencia}}</b>",
+    "A3": "<b>{{mensual.ingresos}}</b>",
+    "A4": "{{mensual.sueldo}}",
+    "A5": "{{mensual.otros_ingresos}}",
+    "A6": "<b>{{mensual.total_ingresos}}</b>",
+    "A8": "<b>{{mensual.gastos}}</b>",
+    "A9": "{{mensual.vivienda}}",
+    "A10": "{{mensual.suministros}}",
+    "A11": "{{mensual.alimentacion}}",
+    "A12": "{{mensual.transporte}}",
+    "A13": "{{mensual.ocio}}",
+    "A14": "{{mensual.otros_gastos}}",
+    "A15": "<b>{{mensual.total_gastos}}</b>",
+    "A17": "<b>{{mensual.saldo}}</b>",
+    "D4": "=C4-B4",
+    "D5": "=C5-B5",
+    "D9": "=C9-B9",
+    "D10": "=C10-B10",
+    "D11": "=C11-B11",
+    "D12": "=C12-B12",
+    "D13": "=C13-B13",
+    "D14": "=C14-B14",
+    "B6": "=SUM(B4:B5)",
+    "B15": "=SUM(B9:B14)",
+    "B17": "=B6-B15",
+    "C6": "=SUM(C4:C5)",
+    "C15": "=SUM(C9:C14)",
+    "C17": "=C6-C15",
+    "D6": "=C6-B6",
+    "D15": "=C15-B15",
+    "D17": "=C17-B17"
+   },
+   "formats": {
+    "B4": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "B5": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "B6": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "B7": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "B8": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "B9": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "B10": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "B11": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "B12": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "B13": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "B14": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "B15": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "B16": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "B17": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "C4": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "C5": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "C6": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "C7": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "C8": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "C9": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "C10": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "C11": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "C12": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "C13": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "C14": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "C15": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "C16": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "C17": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "D4": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "D5": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "D6": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "D7": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "D8": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "D9": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "D10": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "D11": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "D12": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "D13": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "D14": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "D15": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "D16": {
+     "id": "currency",
+     "decimals": 2
+    },
+    "D17": {
+     "id": "currency",
+     "decimals": 2
+    }
+   },
+   "styles": {
+    "A3": {
+     "border": {
+      "b": true
+     }
+    },
+    "B3": {
+     "border": {
+      "b": true
+     }
+    },
+    "C3": {
+     "border": {
+      "b": true
+     }
+    },
+    "D3": {
+     "border": {
+      "b": true
+     }
+    },
+    "A8": {
+     "border": {
+      "b": true
+     }
+    },
+    "B8": {
+     "border": {
+      "b": true
+     }
+    },
+    "C8": {
+     "border": {
+      "b": true
+     }
+    },
+    "D8": {
+     "border": {
+      "b": true
+     }
+    },
+    "A6": {
+     "border": {
+      "t": true
+     }
+    },
+    "B6": {
+     "border": {
+      "t": true
+     }
+    },
+    "C6": {
+     "border": {
+      "t": true
+     }
+    },
+    "D6": {
+     "border": {
+      "t": true
+     }
+    },
+    "A15": {
+     "border": {
+      "t": true
+     }
+    },
+    "B15": {
+     "border": {
+      "t": true
+     }
+    },
+    "C15": {
+     "border": {
+      "t": true
+     }
+    },
+    "D15": {
+     "border": {
+      "t": true
+     }
+    },
+    "A17": {
+     "border": {
+      "t": true
+     }
+    },
+    "B17": {
+     "border": {
+      "t": true
+     }
+    },
+    "C17": {
+     "border": {
+      "t": true
+     }
+    },
+    "D17": {
+     "border": {
+      "t": true
+     }
+    }
+   }
+  }
+ ]
+}

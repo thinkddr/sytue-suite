@@ -1,0 +1,106 @@
+{
+  "tolerancias": {
+    "pronostico": {
+      "tol": 0.02,
+      "motivo": "Ni Excel ni LibreOffice publican su optimizador. Con todo por defecto, el pronóstico de Calcus queda a un 0,35 % de mediana del de LibreOffice 7.4.7 y a un 1,79 % como máximo en las diez series del corpus."
+    },
+    "intervalo": {
+      "tol": 1,
+      "motivo": "El intervalo de LibreOffice sale de una simulación y NO es determinista: el mismo fichero da valores un ±15 % distintos en cada ejecución (se guarda la media de 25). El de Calcus es analítico (varianza de Hyndman para ETS aditivo) y determinista; queda un 30 % de mediana por encima. Solo se exige el mismo orden de magnitud; lo que se valida de verdad son sus propiedades (crece con el horizonte y con la confianza, es simétrico y cubre el ~95 % con ruido conocido) en src/functions/ets.test.ts."
+    },
+    "estacionalidad": {
+      "tol": 0,
+      "motivo": "El periodo detectado es un entero: coincide o no."
+    },
+    "parametro": {
+      "tol": null,
+      "motivo": "Alfa, beta y gamma no son comparables: el mínimo es plano (muchas ternas dan casi el mismo error) y LibreOffice los biseca a 0,001 con otra inicialización. Se comprueba que están en [0, 1] y que el pronóstico resultante coincide."
+    },
+    "error": {
+      "tol": 1,
+      "motivo": "MASE, SMAPE, MAE y RMSE dependen de los parámetros y de desde qué punto se cuentan los errores (Calcus, desde el segundo periodo, para no medir sobre los datos con los que se inicializa). Quedan a un 18 % de mediana de los de LibreOffice; solo se exige el mismo orden de magnitud."
+    },
+    "paso": {
+      "tol": 0,
+      "motivo": "El paso de la línea de tiempo es exacto (1 en meses para una línea mensual, como LibreOffice)."
+    }
+  },
+  "divergencias": {
+    "=FORECAST.ETS.SEASONALITY(U1:U30,T1:T30)": {
+      "quien": "modelo",
+      "motivo": "LibreOffice declara un periodo en series que no tienen estacionalidad (o un múltiplo del verdadero: 20 en la semanal de periodo 4). Calcus exige un máximo local de la autocorrelación por encima de la banda del ruido blanco (2/√n) y toma el primero que llega al 90 % del mayor."
+    },
+    "=FORECAST.ETS.SEASONALITY(AA1:AA30,Z1:Z30)": {
+      "quien": "modelo",
+      "motivo": "LibreOffice declara un periodo en series que no tienen estacionalidad (o un múltiplo del verdadero: 20 en la semanal de periodo 4). Calcus exige un máximo local de la autocorrelación por encima de la banda del ruido blanco (2/√n) y toma el primero que llega al 90 % del mayor."
+    },
+    "=FORECAST.ETS.SEASONALITY(AC1:AC25,AB1:AB25)": {
+      "quien": "modelo",
+      "motivo": "LibreOffice declara un periodo en series que no tienen estacionalidad (o un múltiplo del verdadero: 20 en la semanal de periodo 4). Calcus exige un máximo local de la autocorrelación por encima de la banda del ruido blanco (2/√n) y toma el primero que llega al 90 % del mayor."
+    },
+    "=FORECAST.ETS.SEASONALITY(AI1:AI40,AH1:AH40)": {
+      "quien": "modelo",
+      "motivo": "LibreOffice declara un periodo en series que no tienen estacionalidad (o un múltiplo del verdadero: 20 en la semanal de periodo 4). Calcus exige un máximo local de la autocorrelación por encima de la banda del ruido blanco (2/√n) y toma el primero que llega al 90 % del mayor."
+    },
+    "=FORECAST.ETS.ADD(37,Y1:Y36,X1:X36,0)": {
+      "quien": "modelo",
+      "motivo": "Uso fuera de modelo: sin estacionalidad (o con un periodo que no es el suyo) sobre una serie que sí la tiene, o sobre ruido puro, la suma de cuadrados es casi plana en beta y cada optimizador acaba en un mínimo distinto (LibreOffice biseca a 0,001; Calcus recorre una rejilla y afina a 1e-4). El de Calcus es el de menor error a un paso."
+    },
+    "=FORECAST.ETS.MULT(39,Y1:Y36,X1:X36,0)": {
+      "quien": "modelo",
+      "motivo": "Uso fuera de modelo: sin estacionalidad (o con un periodo que no es el suyo) sobre una serie que sí la tiene, o sobre ruido puro, la suma de cuadrados es casi plana en beta y cada optimizador acaba en un mínimo distinto (LibreOffice biseca a 0,001; Calcus recorre una rejilla y afina a 1e-4). El de Calcus es el de menor error a un paso."
+    },
+    "=FORECAST.ETS.ADD(31,AA1:AA30,Z1:Z30,0)": {
+      "quien": "modelo",
+      "motivo": "Uso fuera de modelo: sin estacionalidad (o con un periodo que no es el suyo) sobre una serie que sí la tiene, o sobre ruido puro, la suma de cuadrados es casi plana en beta y cada optimizador acaba en un mínimo distinto (LibreOffice biseca a 0,001; Calcus recorre una rejilla y afina a 1e-4). El de Calcus es el de menor error a un paso."
+    },
+    "=FORECAST.ETS.MULT(33,AA1:AA30,Z1:Z30,0)": {
+      "quien": "modelo",
+      "motivo": "Uso fuera de modelo: sin estacionalidad (o con un periodo que no es el suyo) sobre una serie que sí la tiene, o sobre ruido puro, la suma de cuadrados es casi plana en beta y cada optimizador acaba en un mínimo distinto (LibreOffice biseca a 0,001; Calcus recorre una rejilla y afina a 1e-4). El de Calcus es el de menor error a un paso."
+    },
+    "=FORECAST.ETS.ADD(60,W1:W48,V1:V48,6)": {
+      "quien": "modelo",
+      "motivo": "Uso fuera de modelo: sin estacionalidad (o con un periodo que no es el suyo) sobre una serie que sí la tiene, o sobre ruido puro, la suma de cuadrados es casi plana en beta y cada optimizador acaba en un mínimo distinto (LibreOffice biseca a 0,001; Calcus recorre una rejilla y afina a 1e-4). El de Calcus es el de menor error a un paso."
+    },
+    "=FORECAST.ETS.MULT(60,W1:W48,V1:V48,4)": {
+      "quien": "modelo",
+      "motivo": "Uso fuera de modelo: sin estacionalidad (o con un periodo que no es el suyo) sobre una serie que sí la tiene, o sobre ruido puro, la suma de cuadrados es casi plana en beta y cada optimizador acaba en un mínimo distinto (LibreOffice biseca a 0,001; Calcus recorre una rejilla y afina a 1e-4). El de Calcus es el de menor error a un paso."
+    },
+    "=FORECAST.ETS.ADD(25,AE1:AE28,AD1:AD28,1,1,2)": {
+      "quien": "libreoffice",
+      "motivo": "Agregación COUNT/COUNTA: Calcus pronostica la serie de recuentos por instante (1, 2 o 3 valores), que es lo que dice la documentación; LibreOffice devuelve 59,08, un valor de la serie original."
+    },
+    "=FORECAST.ETS.ADD(25,AE1:AE28,AD1:AD28,1,1,3)": {
+      "quien": "libreoffice",
+      "motivo": "Agregación COUNT/COUNTA: Calcus pronostica la serie de recuentos por instante (1, 2 o 3 valores), que es lo que dice la documentación; LibreOffice devuelve 59,08, un valor de la serie original."
+    },
+    "=FORECAST.ETS.ADD(31,AC1:AC25,AB1:AB25,1,0)": {
+      "quien": "modelo",
+      "motivo": "data_completion = 0: los cinco huecos entran como ceros en una serie que ronda 10–70, y con esos saltos cada optimizador acaba en un mínimo distinto. Con data_completion = 1 (el valor por defecto) coinciden al 1,2 %."
+    },
+    "=FORECAST.ETS.ADD(31,AC1:AC25,AB1:AB25,0,0)": {
+      "quien": "modelo",
+      "motivo": "data_completion = 0: los cinco huecos entran como ceros en una serie que ronda 10–70, y con esos saltos cada optimizador acaba en un mínimo distinto. Con data_completion = 1 (el valor por defecto) coinciden al 1,2 %."
+    },
+    "=FORECAST.ETS.ADD(60,W1:W48,T1:T30)": {
+      "quien": "libreoffice",
+      "motivo": "Valores y línea de tiempo de distinto tamaño: Microsoft documenta #N/A; LibreOffice da #NUM!."
+    },
+    "=FORECAST.ETS.ADD(20,W1:W48,V1:V48)": {
+      "quien": "libreoffice",
+      "motivo": "Objetivo anterior al final del histórico: Microsoft documenta #NUM!; LibreOffice devuelve el valor ajustado de ese instante."
+    },
+    "=FORECAST.ETS.PI.ADD(60,W1:W48,V1:V48,1)": {
+      "quien": "libreoffice",
+      "motivo": "Nivel de confianza fuera de (0, 1): Microsoft documenta #NUM!; LibreOffice contesta un número (y distinto en cada ejecución)."
+    },
+    "=FORECAST.ETS.PI.ADD(60,W1:W48,V1:V48,0)": {
+      "quien": "libreoffice",
+      "motivo": "Nivel de confianza fuera de (0, 1): Microsoft documenta #NUM!; LibreOffice devuelve 0."
+    },
+    "=FORECAST.ETS.STAT.ADD(W1:W48,V1:V48,9)": {
+      "quien": "libreoffice",
+      "motivo": "Tipo de estadística fuera de 1..8: Microsoft documenta #NUM!; LibreOffice devuelve 12 (el periodo)."
+    }
+  }
+}

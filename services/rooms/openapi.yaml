@@ -1,0 +1,1605 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Daniel Delgado Ramos
+openapi: 3.1.0
+info:
+  title: Sytue Chat API
+  description: >-
+    API REST propia de Sytue Chat (mensajería en tiempo real Sytue-native).
+    Gestiona equipos (teams) por tenant, canales, miembros, mensajes, hilos,
+    reacciones, menciones, estado de lectura y búsqueda. El estado vive en
+    PostgreSQL; el fan-out en tiempo real se hace por LISTEN/NOTIFY y se entrega
+    a los clientes vía WebSocket en /ws. Los adjuntos referencian ficheros de
+    Sytue Drive. Clean-room © Sytue; sin motores AGPL (Mattermost fuera).
+  version: "1.0.0"
+  license:
+    name: MIT
+servers:
+  - url: https://rooms.sytue.eu
+    description: Producción
+  - url: https://rooms-api.sytue.localhost
+    description: Desarrollo (Traefik + mkcert)
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: teams
+  - name: channels
+  - name: messages
+  - name: reactions
+  - name: emoji
+  - name: realtime
+
+paths:
+  /healthz:
+    get:
+      summary: Liveness
+      security: []
+      responses:
+        "200": { description: Proceso vivo }
+  /readyz:
+    get:
+      summary: Readiness (PostgreSQL)
+      security: []
+      responses:
+        "200": { description: Listo }
+        "503": { description: Alguna dependencia no disponible }
+
+  /ws:
+    get:
+      tags: [realtime]
+      summary: Canal WebSocket de tiempo real
+      description: >-
+        Actualiza la conexión a WebSocket (RFC 6455) para recibir mensajes,
+        ediciones, borrados, reacciones, indicadores de escritura (typing) y
+        presencia de los canales suscritos. Autenticación por cabecera
+        Authorization o por query `access_token` (el navegador no puede fijar
+        cabeceras en el handshake). Protocolo JSON: el cliente envía
+        {type:"subscribe"|"unsubscribe"|"typing"|"presence"|"ping", channel_id};
+        el servidor envía {type:"ready"|"message"|"message_edited"|
+        "message_deleted"|"reaction"|"typing"|"presence"|"error"|"pong", ...}.
+      parameters:
+        - in: query
+          name: access_token
+          schema: { type: string }
+          description: JWT de Sytue ID (alternativa a la cabecera Authorization).
+      responses:
+        "101": { description: Conexión actualizada a WebSocket }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/v1/teams:
+    get:
+      tags: [teams]
+      summary: Listar mis equipos
+      responses:
+        "200":
+          description: Equipos del usuario
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  teams:
+                    type: array
+                    items: { $ref: "#/components/schemas/Team" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [teams]
+      summary: Crear un equipo
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, maxLength: 100 }
+                description: { type: string }
+      responses:
+        "201":
+          description: Equipo creado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Team" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /api/v1/teams/{teamID}:
+    parameters:
+      - $ref: "#/components/parameters/TeamID"
+    get:
+      tags: [teams]
+      summary: Obtener un equipo
+      responses:
+        "200":
+          description: Equipo
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Team" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/teams/{teamID}/members:
+    parameters:
+      - $ref: "#/components/parameters/TeamID"
+    get:
+      tags: [teams]
+      summary: Listar miembros del equipo
+      responses:
+        "200":
+          description: Miembros
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  members:
+                    type: array
+                    items: { $ref: "#/components/schemas/Member" }
+    post:
+      tags: [teams]
+      summary: Añadir un miembro (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [subject]
+              properties:
+                subject: { type: string }
+                name: { type: string }
+                role: { type: string, enum: [admin, member] }
+      responses:
+        "204": { description: Miembro añadido }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/v1/teams/{teamID}/members/{sub}:
+    parameters:
+      - $ref: "#/components/parameters/TeamID"
+      - in: path
+        name: sub
+        required: true
+        schema: { type: string }
+    delete:
+      tags: [teams]
+      summary: Eliminar un miembro (admin o uno mismo)
+      responses:
+        "204": { description: Miembro eliminado }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/teams/{teamID}/unread:
+    parameters:
+      - $ref: "#/components/parameters/TeamID"
+    get:
+      tags: [teams]
+      summary: No leídos por canal (badges)
+      responses:
+        "200":
+          description: Contadores de no leídos
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  channels:
+                    type: array
+                    items: { $ref: "#/components/schemas/ReadState" }
+
+  /api/v1/search:
+    parameters:
+      - in: query
+        name: q
+        required: true
+        description: >-
+          Texto libre + operadores estilo Slack/Mattermost, TODO combinado con AND.
+          Texto: cada palabra es un término y el mensaje debe contener TODAS, en
+          cualquier orden («reunión viernes» encuentra «el viernes hay reunión»);
+          `"frase exacta"` entre comillas casa la secuencia literal; `-palabra` (o
+          `-"frase"`) excluye. Los comodines `%` y `_` que escriba el usuario son
+          LITERALES. Operadores: `from:<nombre|sub>`, `in:<canal>`,
+          `before:<YYYY-MM-DD>`, `after:<YYYY-MM-DD>`, `on:<YYYY-MM-DD>` (día
+          exacto), `has:link`, `has:file`, `is:saved` (del propio llamante),
+          `is:pinned`. Los operadores solo acotan; una fecha inválida o un operador
+          sin valor se ignoran en silencio, y un `has:`/`is:` con valor desconocido
+          cae a texto libre. Sin ranking: el orden es cronológico descendente.
+        schema: { type: string }
+      - in: query
+        name: limit
+        schema: { type: integer, maximum: 100 }
+    get:
+      tags: [messages]
+      summary: Buscar mensajes en todos los canales accesibles (cross-team; respalda la búsqueda federada del Hub)
+      responses:
+        "200":
+          description: Resultados
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  messages:
+                    type: array
+                    items: { $ref: "#/components/schemas/Message" }
+
+  /api/v1/teams/{teamID}/search:
+    parameters:
+      - $ref: "#/components/parameters/TeamID"
+      - in: query
+        name: q
+        required: true
+        description: >-
+          Igual que en `/api/v1/search` (mismo parser y mismos filtros): AND de
+          términos, `"frase exacta"`, `-exclusión` y operadores `from:`, `in:`,
+          `before:`, `after:`, `on:`, `has:link`, `has:file`, `is:saved`,
+          `is:pinned`.
+        schema: { type: string }
+      - in: query
+        name: limit
+        schema: { type: integer, maximum: 100 }
+    get:
+      tags: [messages]
+      summary: Buscar mensajes en el equipo
+      responses:
+        "200":
+          description: Resultados
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  messages:
+                    type: array
+                    items: { $ref: "#/components/schemas/Message" }
+
+  /api/v1/teams/{teamID}/channels:
+    parameters:
+      - $ref: "#/components/parameters/TeamID"
+    get:
+      tags: [channels]
+      summary: Listar canales accesibles
+      parameters:
+        - in: query
+          name: archived
+          schema: { type: string, enum: ["1"] }
+      responses:
+        "200":
+          description: Canales
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  channels:
+                    type: array
+                    items: { $ref: "#/components/schemas/Channel" }
+    post:
+      tags: [channels]
+      summary: Crear un canal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, maxLength: 100 }
+                topic: { type: string }
+                kind: { type: string, enum: [public, private, direct] }
+                members:
+                  type: array
+                  items: { type: string }
+      responses:
+        "201":
+          description: Canal creado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Channel" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /api/v1/channels/{channelID}:
+    parameters:
+      - $ref: "#/components/parameters/ChannelID"
+    get:
+      tags: [channels]
+      summary: Obtener un canal
+      responses:
+        "200":
+          description: Canal
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Channel" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [channels]
+      summary: Renombrar / retematizar / archivar (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                topic: { type: string }
+                archived: { type: boolean }
+      responses:
+        "200":
+          description: Canal actualizado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Channel" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    delete:
+      tags: [channels]
+      summary: Borrar un canal público o privado (admin del canal o del equipo; nunca un directo)
+      responses:
+        "204": { description: Hecho }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/channels/{channelID}/join:
+    parameters:
+      - $ref: "#/components/parameters/ChannelID"
+    post:
+      tags: [channels]
+      summary: Unirse a un canal público
+      responses:
+        "200":
+          description: Canal
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Channel" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/v1/channels/{channelID}/leave:
+    parameters:
+      - $ref: "#/components/parameters/ChannelID"
+    post:
+      tags: [channels]
+      summary: Abandonar un canal
+      description: 409 `last_admin` si es el último admin de un canal privado con más miembros.
+      responses:
+        "204": { description: Hecho }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /api/v1/channels/{channelID}/hide:
+    parameters:
+      - $ref: "#/components/parameters/ChannelID"
+    post:
+      tags: [channels]
+      summary: Borrar un mensaje directo solo para quien lo pide
+      description: >-
+        Lo quita de su barra lateral y esconde para él el historial anterior; los
+        demás conservan el suyo. Si alguien vuelve a escribir, reaparece solo con lo nuevo.
+      responses:
+        "204": { description: Hecho }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/channels/{channelID}/read:
+    parameters:
+      - $ref: "#/components/parameters/ChannelID"
+    post:
+      tags: [channels]
+      summary: Marcar canal como leído
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message_id: { type: string, format: uuid }
+      responses:
+        "204": { description: Hecho }
+
+  /api/v1/channels/{channelID}/prefs:
+    parameters:
+      - $ref: "#/components/parameters/ChannelID"
+    post:
+      tags: [channels]
+      summary: Fijar preferencias del canal (favorito / silenciado) del usuario
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                favorite: { type: boolean }
+                muted: { type: boolean }
+      responses:
+        "200":
+          description: Canal con las preferencias resueltas
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Channel" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/v1/channels/{channelID}/category:
+    parameters:
+      - $ref: "#/components/parameters/ChannelID"
+    post:
+      tags: [channels]
+      summary: Asignar el canal a una categoría del sidebar del usuario (Ola 11)
+      description: >
+        Estado per-usuario. `category_id` vacío/ausente mueve el canal a la categoría por
+        defecto según su kind (Favoritos si favorito, DMs si directo, si no Canales);
+        un uuid lo asigna a esa categoría (que debe ser del propio usuario). `sort_order`
+        opcional fija su orden dentro de la categoría.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                category_id:
+                  type: string
+                  format: uuid
+                  nullable: true
+                  description: Categoría destino; vacío/ausente = categoría por defecto.
+                sort_order: { type: integer }
+      responses:
+        "200":
+          description: Canal con la categoría/orden resueltos
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Channel" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/teams/{teamID}/channels/browse:
+    parameters:
+      - $ref: "#/components/parameters/TeamID"
+    get:
+      tags: [channels]
+      summary: Explorar canales públicos del team a los que no perteneces
+      parameters:
+        - { in: query, name: q, schema: { type: string }, description: Filtro por nombre }
+        - { in: query, name: limit, schema: { type: integer } }
+      responses:
+        "200":
+          description: Canales unibles
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  channels:
+                    type: array
+                    items: { $ref: "#/components/schemas/Channel" }
+
+  /api/v1/teams/{teamID}/dms:
+    parameters:
+      - $ref: "#/components/parameters/TeamID"
+    post:
+      tags: [channels]
+      summary: Abrir (idempotente) un DM (1:1 o de grupo) con miembros del team
+      description: >
+        Reutiliza el canal directo existente para el mismo CONJUNTO de participantes
+        en este team (clave por slug determinista del conjunto ordenado) o lo crea con
+        todos como miembros. Acepta `subject` (1:1) o `subjects` (forma canónica; sirve
+        para 1:1 y para grupo, 3..8 participantes en total incluido el usuario actual).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Debe traer `subject` o `subjects` (al menos uno).
+              properties:
+                subject: { type: string, description: Sub del otro participante (DM 1:1) }
+                subjects:
+                  type: array
+                  items: { type: string }
+                  description: Subs de los otros participantes (DM de grupo o 1:1)
+      responses:
+        "200":
+          description: Canal directo (nuevo o reutilizado)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Channel" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/v1/channels/{channelID}/pins:
+    parameters:
+      - $ref: "#/components/parameters/ChannelID"
+    get:
+      tags: [messages]
+      summary: Listar los mensajes fijados de un canal (más reciente primero)
+      responses:
+        "200":
+          description: Fijados del canal
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pins:
+                    type: array
+                    items: { $ref: "#/components/schemas/Message" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/v1/channels/{channelID}/messages:
+    parameters:
+      - $ref: "#/components/parameters/ChannelID"
+    get:
+      tags: [messages]
+      summary: Listar mensajes (paginación keyset)
+      parameters:
+        - in: query
+          name: before
+          schema: { type: string, format: date-time }
+          description: Pagina hacia mensajes anteriores a este instante (RFC3339).
+        - in: query
+          name: limit
+          schema: { type: integer, maximum: 200 }
+      responses:
+        "200":
+          description: Página de mensajes (orden cronológico inverso)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  messages:
+                    type: array
+                    items: { $ref: "#/components/schemas/Message" }
+                  next_before: { type: string, format: date-time }
+    post:
+      tags: [messages]
+      summary: Publicar un mensaje
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PostMessage" }
+      responses:
+        "201":
+          description: Mensaje creado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Message" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/v1/channels/{channelID}/messages/around:
+    parameters:
+      - $ref: "#/components/parameters/ChannelID"
+    get:
+      tags: [messages]
+      summary: Ventana de mensajes centrada en un mensaje (permalink / scroll-to-message)
+      description: >
+        Fetch-around por keyset (Ola 16): N/2 mensajes anteriores + el objetivo + N/2
+        posteriores, en orden cronológico ASCENDENTE. Respalda el permalink y el
+        scroll-to-message sin cargar todo el historial.
+      parameters:
+        - in: query
+          name: message
+          required: true
+          schema: { type: string, format: uuid }
+          description: Mensaje raíz objetivo, en el centro de la ventana.
+        - in: query
+          name: limit
+          schema: { type: integer, maximum: 200 }
+      responses:
+        "200":
+          description: Ventana de mensajes (orden cronológico ascendente)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  messages:
+                    type: array
+                    items: { $ref: "#/components/schemas/Message" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/channels/{channelID}/receipts:
+    parameters:
+      - $ref: "#/components/parameters/ChannelID"
+    get:
+      tags: [messages]
+      summary: Acuse de lectura de los otros miembros de un DM («Visto»)
+      description: >
+        Devuelve el last_read_at de los OTROS miembros del canal (Ola 16), para marcar
+        «Visto» en el último mensaje del usuario. Solo tiene contenido en canales
+        directos (DM 1:1 o de grupo): en canales grandes devuelve una lista vacía, para
+        no pagar el coste (paridad Mattermost). Consulta agregada, sin N+1.
+      responses:
+        "200":
+          description: Receipts de los otros miembros (vacío si el canal no es un DM)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  receipts:
+                    type: array
+                    items: { $ref: "#/components/schemas/Receipt" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/v1/unfurl:
+    get:
+      tags: [messages]
+      summary: Vista previa (OpenGraph) de una URL http/https
+      description: >
+        Unfurl de enlaces (Ola 16): obtiene los metadatos OpenGraph de una URL y los
+        cachea por tenant. El fetch remoto es SSRF-safe (rechaza destinos privados/
+        loopback/link-local/ULA/CGNAT y no filtra credenciales). Si la URL no da
+        metadatos, devuelve un unfurl vacío (el cliente degrada sin tarjeta).
+      parameters:
+        - in: query
+          name: url
+          required: true
+          schema: { type: string, format: uri }
+          description: URL http/https a previsualizar.
+      responses:
+        "200":
+          description: Vista previa (posiblemente vacía)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  unfurl: { $ref: "#/components/schemas/LinkUnfurl" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+  /api/v1/messages/{messageID}/thread:
+    parameters:
+      - $ref: "#/components/parameters/MessageID"
+    get:
+      tags: [messages]
+      summary: Obtener un hilo (raíz + respuestas)
+      responses:
+        "200":
+          description: Hilo
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  root: { $ref: "#/components/schemas/Message" }
+                  replies:
+                    type: array
+                    items: { $ref: "#/components/schemas/Message" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/messages/{messageID}/replies:
+    parameters:
+      - $ref: "#/components/parameters/MessageID"
+    post:
+      tags: [messages]
+      summary: Responder en un hilo
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PostMessage" }
+      responses:
+        "201":
+          description: Respuesta creada
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Message" }
+
+  /api/v1/messages/{messageID}:
+    parameters:
+      - $ref: "#/components/parameters/MessageID"
+    patch:
+      tags: [messages]
+      summary: Editar un mensaje (autor)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              properties:
+                body: { type: string }
+      responses:
+        "200":
+          description: Mensaje editado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Message" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    delete:
+      tags: [messages]
+      summary: Borrar un mensaje (autor o admin)
+      responses:
+        "204": { description: Borrado }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/messages/{messageID}/reactions/{emoji}:
+    parameters:
+      - $ref: "#/components/parameters/MessageID"
+      - in: path
+        name: emoji
+        required: true
+        schema: { type: string, maxLength: 64 }
+    put:
+      tags: [reactions]
+      summary: Añadir una reacción
+      responses:
+        "204": { description: Hecho }
+        "400": { $ref: "#/components/responses/BadRequest" }
+    delete:
+      tags: [reactions]
+      summary: Retirar una reacción
+      responses:
+        "204": { description: Hecho }
+
+  /api/v1/emoji:
+    get:
+      tags: [emoji]
+      summary: Listar los emoji personalizados del tenant
+      responses:
+        "200":
+          description: Catálogo del tenant
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  emoji:
+                    type: array
+                    items: { $ref: "#/components/schemas/CustomEmoji" }
+    post:
+      tags: [emoji]
+      summary: "Crear un emoji personalizado (liga un :name: a una imagen de Drive)"
+      description: >-
+        La imagen se sube antes a Sytue Drive (reusa el flujo de adjuntos → file_id);
+        el servicio la resuelve en Drive para exigir que sea una imagen accesible por
+        el autor y denormaliza su content_type. La imagen se sirve luego por el proxy
+        de adjuntos con nosniff.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, file_id]
+              properties:
+                name:
+                  type: string
+                  pattern: "^[a-z0-9_-]{1,64}$"
+                  description: Shortcode (minúsculas/dígitos/_/-, 1..64).
+                file_id: { type: string, format: uuid, description: Fichero de Sytue Drive (imagen). }
+      responses:
+        "201":
+          description: Emoji creado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CustomEmoji" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /api/v1/emoji/{name}:
+    parameters:
+      - in: path
+        name: name
+        required: true
+        schema: { type: string, pattern: "^[a-z0-9_-]{1,64}$" }
+    delete:
+      tags: [emoji]
+      summary: Borrar un emoji personalizado (autor o admin del workspace)
+      responses:
+        "204": { description: Borrado }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/messages/{messageID}/pin:
+    parameters:
+      - $ref: "#/components/parameters/MessageID"
+    post:
+      tags: [messages]
+      summary: Fijar un mensaje (cualquier miembro del canal)
+      responses:
+        "200":
+          description: Mensaje fijado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Message" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [messages]
+      summary: Desfijar un mensaje
+      responses:
+        "204": { description: Hecho }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/messages/{messageID}/save:
+    parameters:
+      - $ref: "#/components/parameters/MessageID"
+    post:
+      tags: [messages]
+      summary: Guardar un mensaje (marcador por-usuario)
+      responses:
+        "204": { description: Hecho }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [messages]
+      summary: Quitar un mensaje de guardados
+      responses:
+        "204": { description: Hecho }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/messages/{messageID}/unread:
+    parameters:
+      - $ref: "#/components/parameters/MessageID"
+    post:
+      tags: [messages]
+      summary: Marcar el canal como no leído a partir de este mensaje
+      responses:
+        "204": { description: Hecho }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/messages/{messageID}/ack:
+    parameters:
+      - $ref: "#/components/parameters/MessageID"
+    post:
+      tags: [messages]
+      summary: Acusar recibo de un mensaje que lo pide (Ola 12)
+      description: >
+        Registra el acuse del usuario sobre un mensaje con requires_ack=true.
+        Idempotente. Devuelve el nuevo total de confirmaciones.
+      responses:
+        "200":
+          description: Acuse registrado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count: { type: integer, description: "Total de confirmaciones «Confirmado por N»." }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/me/scheduled:
+    get:
+      tags: [messages]
+      summary: Listar mis mensajes programados (Ola 12; opcionalmente por canal)
+      parameters:
+        - in: query
+          name: channel_id
+          schema: { type: string, format: uuid }
+          description: Acota a un canal concreto (opcional).
+      responses:
+        "200":
+          description: Programados del usuario (por send_at ascendente)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  scheduled:
+                    type: array
+                    items: { $ref: "#/components/schemas/ScheduledMessage" }
+
+  /api/v1/scheduled/{scheduledID}:
+    parameters:
+      - in: path
+        name: scheduledID
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      tags: [messages]
+      summary: Editar un mensaje programado (cuerpo / instante / adjuntos)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                body: { type: string }
+                send_at: { type: string, format: date-time, description: "Nuevo instante (RFC3339 futuro)." }
+                file_ids:
+                  type: array
+                  items: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Programado actualizado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ScheduledMessage" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [messages]
+      summary: Cancelar (borrar) un mensaje programado
+      responses:
+        "204": { description: Cancelado }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/me/saved:
+    get:
+      tags: [messages]
+      summary: Listar mis mensajes guardados (cross-canal, keyset por fecha)
+      parameters:
+        - in: query
+          name: before
+          schema: { type: string, format: date-time }
+          description: Pagina hacia guardados anteriores a esta fecha de guardado (RFC3339).
+        - in: query
+          name: limit
+          schema: { type: integer, maximum: 100 }
+      responses:
+        "200":
+          description: Página de guardados (más reciente primero)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  messages:
+                    type: array
+                    items: { $ref: "#/components/schemas/Message" }
+                  next_before: { type: string, format: date-time }
+
+  /api/v1/me/categories:
+    get:
+      tags: [channels]
+      summary: Listar mis categorías del sidebar (Ola 11, per-usuario, ordenadas)
+      responses:
+        "200":
+          description: Categorías del usuario
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  categories:
+                    type: array
+                    items: { $ref: "#/components/schemas/Category" }
+    post:
+      tags: [channels]
+      summary: Crear una categoría del sidebar (al final del orden)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+      responses:
+        "201":
+          description: Categoría creada
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Category" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+  /api/v1/me/categories/{categoryID}:
+    parameters:
+      - in: path
+        name: categoryID
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      tags: [channels]
+      summary: Renombrar, colapsar/expandir y/o reordenar una categoría del usuario
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                sort_order: { type: integer }
+                collapsed: { type: boolean }
+      responses:
+        "200":
+          description: Categoría actualizada
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Category" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [channels]
+      summary: Borrar una categoría (sus canales recaen a la por defecto)
+      responses:
+        "204": { description: Hecho }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  # --- Videollamada -----------------------------------------------------------
+  # Las salas y su señalización las sirve ESTE MISMO servicio desde la fusión:
+  # vivían en un contrato aparte (services/meet/openapi.yaml) que desapareció con
+  # el servicio, dejando media API sin declarar.
+  /api/v1/rooms:
+    post:
+      tags: [rooms]
+      summary: Crear una sala (la aprovisiona en LiveKit)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateRoomRequest" }
+      responses:
+        "201":
+          description: Sala creada
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Room" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "409": { $ref: "#/components/responses/Conflict" }
+    get:
+      tags: [rooms]
+      summary: Listar salas del tenant
+      parameters:
+        - in: query
+          name: status
+          schema: { type: string, enum: [scheduled, active, ended] }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 50, maximum: 200 }
+      responses:
+        "200":
+          description: Lista de salas
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rooms:
+                    type: array
+                    items: { $ref: "#/components/schemas/Room" }
+  /api/v1/rooms/from-source:
+    post:
+      tags: [rooms]
+      summary: Crear una sala desde un evento de Calendar o un canal de Chat
+      description: >
+        Intent cross-app del Hub ("crear sala desde evento"). Enlaza la sala con
+        el recurso de origen (kind + ref_id) y emite meet.room.created con la
+        referencia de origen para el enlace inverso.
+        Idempotente por (source.kind, source.ref_id): si ya existe una sala viva
+        (status != ended) enlazada a ese origen, se devuelve esa misma sala en
+        lugar de crear una duplicada. Así el Hub puede reintentar el intent y el
+        cliente puede llamar repetidamente sin acumular una sala por canal/evento.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateFromSourceRequest" }
+      responses:
+        "201":
+          description: Sala creada y enlazada al origen
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Room" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/v1/rooms/by-source:
+    get:
+      tags: [rooms]
+      summary: Sala VIVA de un origen (sin crearla)
+      description: >-
+        Indicador de «llamada en curso» para un canal o un evento de Calendar: devuelve
+        la sala activa de ese origen SIN crear ninguna, a diferencia de
+        `/rooms/from-source`. Ruta estática: el router la resuelve antes que
+        `/rooms/{id}`.
+      parameters:
+        - in: query
+          name: kind
+          required: true
+          schema: { type: string, enum: [chat, calendar] }
+          description: Tipo de origen. `chat` es un canal de Rooms.
+        - in: query
+          name: ref_id
+          required: true
+          schema: { type: string }
+          description: Identificador del recurso de origen (canal o evento).
+      responses:
+        "200":
+          description: La sala viva de ese origen
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Room" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/rooms/{id}:
+    parameters:
+      - { $ref: "#/components/parameters/RoomID" }
+    get:
+      tags: [rooms]
+      summary: Obtener una sala por ID
+      responses:
+        "200":
+          description: Sala
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Room" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [rooms]
+      summary: Cerrar la sala (anfitrión o admin/owner); la cierra en LiveKit
+      responses:
+        "200":
+          description: Sala cerrada
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Room" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/rooms/{id}/join:
+    parameters:
+      - { $ref: "#/components/parameters/RoomID" }
+    post:
+      tags: [rooms]
+      summary: Unirse a la sala — mintea el JWT de LiveKit del participante
+      description: >-
+        Autoriza al usuario (JWT de Sytue ID) y devuelve el token de acceso a
+        LiveKit con los grants del rol efectivo más la URL de señalización del SFU.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/JoinRequest" }
+      responses:
+        "200":
+          description: Token de acceso y datos de conexión
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/JoinResult" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/v1/rooms/{id}/participants:
+    parameters:
+      - { $ref: "#/components/parameters/RoomID" }
+    get:
+      tags: [participants]
+      summary: Listar participantes (historial; ?present=1 solo conectados)
+      parameters:
+        - in: query
+          name: present
+          schema: { type: string, enum: ["1"] }
+      responses:
+        "200":
+          description: Participantes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  participants:
+                    type: array
+                    items: { $ref: "#/components/schemas/Participant" }
+  /api/v1/rooms/{id}/participants/{identity}:
+    parameters:
+      - { $ref: "#/components/parameters/RoomID" }
+      - in: path
+        name: identity
+        required: true
+        schema: { type: string }
+    delete:
+      tags: [participants]
+      summary: Expulsar a un participante (moderación; admin/owner)
+      responses:
+        "204": { description: Participante expulsado }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/rooms/{id}/recordings:
+    parameters:
+      - { $ref: "#/components/parameters/RoomID" }
+    get:
+      tags: [recordings]
+      summary: Listar metadatos de grabación de la sala
+      responses:
+        "200":
+          description: Grabaciones
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  recordings:
+                    type: array
+                    items: { $ref: "#/components/schemas/Recording" }
+  /webhooks/livekit:
+    post:
+      tags: [webhooks]
+      summary: Webhook de LiveKit (room/participant/egress)
+      description: >-
+        Recibe eventos de LiveKit. La autenticidad se valida por la firma HMAC del
+        cuerpo (cabecera Authorization: JWT firmado con el api_secret), NO por OIDC.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/webhook+json:
+            schema: { type: object }
+          application/json:
+            schema: { type: object }
+      responses:
+        "200": { description: Procesado }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "500": { $ref: "#/components/responses/Error" }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT emitido por Sytue ID (validado vía JWKS).
+
+  parameters:
+    # `id` de una SALA de vídeo (no de un canal): las rutas /api/v1/rooms/{id} lo usan.
+    RoomID:
+      in: path
+      name: id
+      required: true
+      schema: { type: string, format: uuid }
+    TeamID:
+      in: path
+      name: teamID
+      required: true
+      schema: { type: string, format: uuid }
+    ChannelID:
+      in: path
+      name: channelID
+      required: true
+      schema: { type: string, format: uuid }
+    MessageID:
+      in: path
+      name: messageID
+      required: true
+      schema: { type: string, format: uuid }
+
+  responses:
+    # `Error` es el 500 genérico que usa el webhook del SFU: LiveKit REINTENTA ante un
+    # 5xx, así que la forma del cuerpo importa tanto como el código.
+    Error:
+      description: Error del servidor
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    BadRequest:
+      description: Solicitud inválida
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Unauthorized:
+      description: Autenticación requerida
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Forbidden:
+      description: Sin permiso / no eres miembro
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NotFound:
+      description: No encontrado
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Conflict:
+      description: Conflicto (nombre duplicado o canal archivado)
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code: { type: string }
+            message: { type: string }
+            details: {}
+        request_id: { type: string }
+    Team:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        slug: { type: string }
+        name: { type: string }
+        description: { type: string }
+        created_by: { type: string }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    Channel:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        team_id: { type: string, format: uuid }
+        slug: { type: string }
+        name: { type: string }
+        topic: { type: string }
+        kind: { type: string, enum: [public, private, direct] }
+        archived: { type: boolean }
+        created_by: { type: string }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        last_message_at: { type: string, format: date-time, nullable: true }
+        favorite: { type: boolean, description: Favorito del usuario actual (per-usuario) }
+        muted: { type: boolean, description: Silenciado por el usuario actual (per-usuario) }
+        category_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: >
+            Categoría del sidebar (per-usuario) a la que el usuario asignó el canal;
+            ausente/null = categoría por defecto según kind. Presente solo al listar los
+            canales del usuario (Ola 11).
+        sort_order:
+          type: integer
+          description: Orden del canal dentro de su categoría (per-usuario, Ola 11).
+        peers:
+          type: array
+          items: { type: string }
+          description: >
+            Nombres de los OTROS miembros de un DM (directo), resueltos per-visor.
+            Presente solo al listar los canales del usuario; permite distinguir un DM
+            de grupo (varios) de un 1:1 y componer la cabecera.
+    Category:
+      type: object
+      description: >
+        Grupo personalizado y colapsable de canales en el sidebar de un usuario (Ola 11,
+        estilo Mattermost/Slack). Estado per-usuario.
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        sort_order: { type: integer }
+        collapsed: { type: boolean }
+        created_at: { type: string, format: date-time }
+    Member:
+      type: object
+      properties:
+        subject: { type: string }
+        name: { type: string }
+        role: { type: string, enum: [admin, member] }
+        joined_at: { type: string, format: date-time }
+    Attachment:
+      type: object
+      properties:
+        file_id: { type: string, format: uuid }
+        name: { type: string }
+        content_type: { type: string }
+        size_bytes: { type: integer, format: int64 }
+    Reaction:
+      type: object
+      properties:
+        emoji: { type: string }
+        count: { type: integer }
+        subs:
+          type: array
+          items: { type: string }
+    CustomEmoji:
+      type: object
+      description: >-
+        Emoji personalizado del tenant (Ola 14): liga un :name: a una imagen de Sytue
+        Drive (file_id). La imagen se sirve por el proxy de adjuntos con nosniff.
+      properties:
+        name: { type: string, pattern: "^[a-z0-9_-]{1,64}$" }
+        file_id: { type: string, format: uuid }
+        content_type: { type: string }
+        created_by: { type: string }
+        created_at: { type: string, format: date-time }
+    Message:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        channel_id: { type: string, format: uuid }
+        parent_id: { type: string, format: uuid, nullable: true }
+        author_sub: { type: string }
+        author_name: { type: string }
+        body: { type: string }
+        mentions:
+          type: array
+          items: { type: string }
+        attachments:
+          type: array
+          items: { $ref: "#/components/schemas/Attachment" }
+        reactions:
+          type: array
+          items: { $ref: "#/components/schemas/Reaction" }
+        reply_count: { type: integer }
+        edited_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time }
+        priority:
+          type: string
+          enum: [normal, important, urgent]
+          description: "Prioridad (Ola 12); el cliente pinta un badge con texto (WCAG AA)."
+        requires_ack: { type: boolean, description: "El autor pide acuse de recibo explícito." }
+        ack_count: { type: integer, description: "Nº de lectores que confirmaron (agregado, sin N+1)." }
+        acked: { type: boolean, description: "El visor de esta lectura ya confirmó." }
+    PostMessage:
+      type: object
+      properties:
+        body: { type: string, description: "Obligatorio salvo que haya file_ids." }
+        mentions:
+          type: array
+          items: { type: string, description: "subs de Sytue ID mencionados" }
+        file_ids:
+          type: array
+          items: { type: string, format: uuid, description: "ficheros de Sytue Drive" }
+        priority:
+          type: string
+          enum: [normal, important, urgent]
+          description: "Prioridad del mensaje (Ola 12; por defecto normal)."
+        requires_ack: { type: boolean, description: "Pide acuse de recibo a los lectores." }
+        send_at:
+          type: string
+          format: date-time
+          description: >
+            Si viene (RFC3339 futuro), PROGRAMA el envío en vez de publicarlo ya: la
+            respuesta es un ScheduledMessage, no un Message.
+    ScheduledMessage:
+      type: object
+      description: Mensaje redactado para publicarse en send_at; un worker lo envía al vencer (Ola 12).
+      properties:
+        id: { type: string, format: uuid }
+        channel_id: { type: string, format: uuid }
+        parent_id: { type: string, format: uuid, nullable: true }
+        author_sub: { type: string }
+        author_name: { type: string }
+        body: { type: string }
+        file_ids:
+          type: array
+          items: { type: string, format: uuid }
+        send_at: { type: string, format: date-time }
+        created_at: { type: string, format: date-time }
+    ReadState:
+      type: object
+      properties:
+        channel_id: { type: string, format: uuid }
+        last_read_at: { type: string, format: date-time }
+        last_read_message_id: { type: string, format: uuid, nullable: true }
+        unread: { type: integer }
+    LinkUnfurl:
+      type: object
+      description: >
+        Vista previa (OpenGraph) cacheada de una URL (Ola 16). Campos vacíos = la URL
+        no expuso metadatos (el cliente no pinta tarjeta).
+      properties:
+        url: { type: string, format: uri }
+        title: { type: string }
+        description: { type: string }
+        image_url:
+          type: string
+          format: uri
+          description: og:image (http/https). El cliente la carga con referrerpolicy=no-referrer.
+        site_name: { type: string }
+        fetched_at: { type: string, format: date-time }
+    Receipt:
+      type: object
+      description: >
+        Acuse de lectura de otro miembro de un DM (Ola 16 · «Visto»): hasta cuándo ha
+        leído el canal.
+      properties:
+        subject: { type: string }
+        name: { type: string }
+        last_read_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: null si el miembro nunca abrió el canal.
+
+    # --- Videollamada (antes en services/meet/openapi.yaml) ---
+    CreateRoomRequest:
+      type: object
+      required: [title]
+      properties:
+        title: { type: string, maxLength: 200 }
+        name:
+          type: string
+          description: Nombre técnico opcional; si se omite se genera uno opaco.
+        max_participants: { type: integer, minimum: 0 }
+        intent:
+          type: string
+          description: Origen cross-app (chat|calendar) para intents del Hub.
+        source: { $ref: "#/components/schemas/RoomSource" }
+        metadata: { type: object, additionalProperties: true }
+    RoomSource:
+      type: object
+      required: [kind, ref_id]
+      description: >
+        Enlace con el recurso de origen cross-app (evento de Calendar o canal de
+        Chat). Se persiste en la metadata de la sala para el enlace bidireccional.
+      properties:
+        kind: { type: string, enum: [calendar, chat, direct] }
+        ref_id:
+          type: string
+          maxLength: 256
+          description: ID opaco del evento/canal en su servicio de origen.
+        title: { type: string }
+    CreateFromSourceRequest:
+      type: object
+      required: [kind, ref_id, title]
+      properties:
+        kind: { type: string, enum: [calendar, chat] }
+        ref_id: { type: string, maxLength: 256 }
+        title: { type: string, maxLength: 200 }
+        max_participants: { type: integer, minimum: 0 }
+    JoinRequest:
+      type: object
+      properties:
+        role:
+          type: string
+          enum: [host, speaker, viewer]
+          description: Rol solicitado; el servicio lo acota según permisos.
+        display_name: { type: string }
+    JoinResult:
+      type: object
+      properties:
+        room: { $ref: "#/components/schemas/Room" }
+        token:
+          type: string
+          description: JWT de acceso a LiveKit (entregar al cliente web SDK).
+        livekit_url:
+          type: string
+          description: URL de señalización WebRTC del SFU (wss://...).
+        identity: { type: string }
+        role: { type: string, enum: [host, speaker, viewer] }
+        expires_at_ms: { type: integer, format: int64 }
+    Room:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        title: { type: string }
+        status: { type: string, enum: [scheduled, active, ended] }
+        created_by: { type: string }
+        max_participants: { type: integer }
+        empty_timeout_seconds: { type: integer }
+        livekit_sid: { type: string }
+        metadata: { type: object, additionalProperties: true }
+        started_at: { type: string, format: date-time, nullable: true }
+        ended_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    Participant:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        room_id: { type: string, format: uuid }
+        identity: { type: string }
+        name: { type: string }
+        role: { type: string, enum: [host, speaker, viewer] }
+        livekit_sid: { type: string }
+        joined_at: { type: string, format: date-time }
+        left_at: { type: string, format: date-time, nullable: true }
+    Recording:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        room_id: { type: string, format: uuid }
+        egress_id: { type: string }
+        status: { type: string, enum: [started, completed, failed] }
+        storage_key: { type: string }
+        size_bytes: { type: integer, format: int64 }
+        duration_sec: { type: integer, format: int64 }
+        started_at: { type: string, format: date-time }
+        ended_at: { type: string, format: date-time, nullable: true }

@@ -1,0 +1,94 @@
+{{- if .Values.autoscaling.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "sytue-drive.fullname" . }}
+  labels:
+    {{- include "sytue-drive.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "sytue-drive.fullname" . }}
+  minReplicas: {{ .Values.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.autoscaling.maxReplicas }}
+  # Ritmo de escalado (`behavior`, lo que aporta autoscaling/v2 sobre v1).
+  #
+  # SIN esto rigen los valores por defecto de Kubernetes, y no son los que
+  # queremos: al BAJAR, tras 5 minutos de estabilización puede retirar el 100 %
+  # de las réplicas de una vez. Para un servicio con conexiones vivas —WebSocket
+  # de presencia, una subida a medias— eso es un corte visible provocado por un
+  # ahorro de céntimos.
+  #
+  # ASIMÉTRICO A PROPÓSITO: subir es urgente y bajar no.
+  #   · Al subir, sin ventana de espera: un pico de carga se atiende ahora, y
+  #     equivocarse cuesta un pod de más durante unos minutos.
+  #   · Al bajar, ventana larga y en escalones: se exige que la calma se
+  #     sostenga antes de retirar nada, y se retira POCO a POCO. Así no oscila
+  #     —subir y bajar en bucle es peor que no escalar— y las conexiones vivas
+  #     tienen tiempo de terminar.
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: {{ .Values.autoscaling.scaleUpStabilizationSeconds | default 0 }}
+      policies:
+        - type: Percent
+          value: {{ .Values.autoscaling.scaleUpPercent | default 100 }}
+          periodSeconds: 30
+        # El suelo de 2 pods/30 s importa cuando hay pocas réplicas: un 100 %
+        # sobre 1 réplica solo da 1 más, y así se sale del hueco más rápido.
+        - type: Pods
+          value: 2
+          periodSeconds: 30
+      selectPolicy: Max
+    scaleDown:
+      stabilizationWindowSeconds: {{ .Values.autoscaling.scaleDownStabilizationSeconds | default 600 }}
+      policies:
+        - type: Percent
+          value: {{ .Values.autoscaling.scaleDownPercent | default 50 }}
+          periodSeconds: 120
+      selectPolicy: Max
+  metrics:
+    {{- if .Values.autoscaling.targetCPUUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.autoscaling.targetCPUUtilizationPercentage }}
+    {{- end }}
+    {{- if .Values.autoscaling.targetMemoryUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.autoscaling.targetMemoryUtilizationPercentage }}
+    {{- end }}
+    {{- if .Values.autoscaling.targetRequestsPerSecond }}
+    # DEMANDA REAL. La CPU de arriba es un proxy: un servicio que espera en la
+    # base o en la red la tiene plana mientras las peticiones se acumulan, y el
+    # escalado llega tarde justo cuando hace falta. Esto mide lo que de verdad
+    # importa, peticiones por segundo y replica.
+    #
+    # Es `External` y no `Pods` porque la serie NO lleva etiqueta de pod: el
+    # recurso que manda el exportador son el nombre, la version y el entorno del
+    # servicio, y de ahi sale `job`. Con AverageValue el HPA reparte la tasa
+    # agregada entre las replicas, que es el comportamiento que se busca.
+    #
+    # El nombre lo publica prometheus-adapter; el `job` es el ServiceName del
+    # binario, que coincide con el nombre del chart salvo donde no (ver values).
+    #
+    # Sin valor NO se emite: un HPA con una metrica que nadie sirve deja de
+    # escalar en silencio, y por eso la CPU se queda siempre como red.
+    - type: External
+      external:
+        metric:
+          name: http_server_requests_per_second
+          selector:
+            matchLabels:
+              job: {{ .Values.autoscaling.metricJob | default .Chart.Name }}
+        target:
+          type: AverageValue
+          averageValue: "{{ .Values.autoscaling.targetRequestsPerSecond }}"
+    {{- end }}
+{{- end }}

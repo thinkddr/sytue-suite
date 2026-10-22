@@ -1,0 +1,18 @@
+Mõistlikud numbrid tabelis, mis töötab koos teiega.
+
+• Valemid, tingimusvormindus ja andmete valideerimine.
+• Tooge sisse välised andmed ja pärige neid tabelist lahkumata.
+• Diagrammid, minidiagrammid, tükeldid ja andmetabelid.
+• Eksport ODS- ja XLSX-vormingusse; Exceli failide avamine.
+• Valemid kontekstipõhise abi ja kohese ümberarvutusega.
+• Tingimusvormindus, andmete valideerimine ja lokaadipõhised numbrivormingud.
+• Mitut tüüpi diagrammid, minidiagrammid ja tükeldid.
+• Andmetabelid kokkuvõtete ja sortimisega; liigendtabel.
+• Välised andmed: ühendage allikas ja pärige seda tabelist.
+• Lahendaja eesmärki täitva väärtuse leidmiseks.
+• Makrod korduvate ülesannete automatiseerimiseks.
+• Koostöö reaalajas kohaloleku ja kommentaaridega.
+• Filtrid, tükeldid ja otsing tabeli sees.
+• Eksport ODS-, XLSX- ja PDF-vormingusse; Exceli failide avamine Drive’ist.
+
+Krüpteeritud edastamisel (TLS 1.3). Sytue taristu asub ELis. Väliste teenuste asukoht sõltub nende pakkujast.

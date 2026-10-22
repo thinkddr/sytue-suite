@@ -1,0 +1,42 @@
+{
+  "key": "azure",
+  "tier": "tier1",
+  "manifest": {
+    "name": "Microsoft Azure",
+    "description": "Plataforma de aplicaciones e infraestructura de Microsoft. Conectada, puede sustituir a Sytue Cloud: el lanzador abre el portal de Azure en su lugar.",
+    "category": "Infraestructura",
+    "color": "#0078D4",
+    "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#0078D4\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M10 3 3 18h5l6-15z\"/><path d=\"M13 8 8 21h13l-4-6h-4l3-4z\"/></svg>",
+    "identity": {
+      "kind": "none"
+    },
+    "provisioning": "none",
+    "launch": {
+      "kind": "url",
+      "url": "https://portal.azure.com/"
+    },
+    "fields": [
+      {
+        "key": "tenant",
+        "label": "Inquilino de Entra (tenant)",
+        "placeholder": "contoso.onmicrosoft.com",
+        "help": "El dominio o el GUID del inquilino de Microsoft Entra ID. Lo encuentras en el portal de Entra, en «Información general».",
+        "required": true
+      }
+    ],
+    "oauth": {
+      "authorize_url": "https://login.microsoftonline.com/{tenant}/oauth2/v2.0/authorize",
+      "token_url": "https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token",
+      "scopes": [
+        "offline_access",
+        "https://management.azure.com/user_impersonation"
+      ]
+    },
+    "substitutes": [
+      {
+        "product": "cloud",
+        "open_url": "https://portal.azure.com/"
+      }
+    ]
+  }
+}

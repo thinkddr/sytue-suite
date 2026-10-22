@@ -1,0 +1,18 @@
+Tjuefire moduler og en dobbel bokføring som databasen ikke lar komme ut av balanse.
+
+• Tjuefire moduler og trettiseks modeller: kontakter, salg, innkjøp, lager, produksjon, fakturering, regnskap, prosjekter og HR.
+• Å legge til en modul betyr å skrive en JSON-fil: ingen migrering, ingen ny rute og ikke noe grensesnittarbeid.
+• Beløp lagres i hele cent, aldri som flyttall, og databasen håndhever balansen.
+• Bokførte posteringer er urørlige: de rettes med en ny postering, og det er det som skiller en hovedbok fra et regneark.
+• Tjuefire moduler og trettiseks modeller i én tjeneste og én database.
+• Modellkatalogen er data: hver modul angir feltene sine, tilstandene sine og listekolonnene sine.
+• En ny modul er én JSON-fil — ingen DDL, ingen migrering og ingen tabellåsing.
+• Ett API for alle de trettiseks modellene, og ett grensesnitt generert fra katalogen.
+• Dobbelt bokføring med beløp i hele cent; ikke ett eneste flyttall.
+• Databasen kontrollerer balansen når transaksjonen bekreftes, ikke applikasjonskoden.
+• Avsluttede posteringer kan ikke endres: de kan ikke redigeres, slettes eller få nye linjer.
+• Ett bilag, én postering: et nytt forsøk eller to åpne faner kan ikke doble inntektene.
+• Felles betegnelser finnes på alle 26 språkene, og et uoversatt felt hindrer tjenesten i å starte.
+• Indeksbaserte lister: den første siden av tjue tusen rader leveres på under ett millisekund.
+
+Kryptert under overføring (TLS 1.3). Sytues infrastruktur er i EU. Plasseringen av eksterne tjenester avhenger av leverandøren deres.

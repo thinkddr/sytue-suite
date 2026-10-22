@@ -1,0 +1,30 @@
+---
+import { roomsT } from '../../i18n/index.js';
+const t = roomsT(Astro.locals.locale);
+export const prerender = false;
+Astro.response.headers.set('cache-control', 'no-store');
+Astro.response.headers.set('referrer-policy', 'no-referrer');
+---
+
+<!doctype html>
+<html lang={Astro.locals.locale}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <title>Sytue Rooms</title>
+  </head>
+  <body>
+    <p role="status" id="matrix-status" data-failed={t('appConnection.failed')}>
+      Sytue Rooms
+    </p>
+    <script>
+      import { completeMatrixSso } from '../../client/matrix/auth.js';
+      void completeMatrixSso()
+        .then((returnTo) => window.location.replace(returnTo))
+        .catch(() => {
+          const status = document.querySelector('#matrix-status');
+          if (status instanceof HTMLElement) status.textContent = status.dataset.failed ?? '';
+        });
+    </script>
+  </body>
+</html>

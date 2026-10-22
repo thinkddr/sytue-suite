@@ -1,0 +1,244 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "sytue-syerp.fullname" . }}
+  labels:
+    {{- include "sytue-syerp.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "sytue-syerp.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "sytue-syerp.labels" . | nindent 8 }}
+      annotations:
+        kubectl.kubernetes.io/default-container: syerp
+    spec:
+      automountServiceAccountToken: false
+      {{- with (.Values.global).imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: syerp
+          image: "{{ include "sytue-syerp.imageRegistry" . }}/{{ .Values.image.repository }}:{{ ((.Values.global).image | default dict).tag | default .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.targetPort }}
+          env:
+            {{- if (.Values.global).otlp }}
+            {{- if (.Values.global).otlp.endpoint }}
+            # Telemetria: metricas OTLP directas a Cockpit, sin agente intermedio.
+            # Sale del umbrella y no de este chart para que los catorce escriban al
+            # MISMO sitio; si cada uno apuntara al suyo, no habria con que comparar.
+            # Vacio => no se exporta y el servicio sigue sirviendo igual.
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ (.Values.global).otlp.endpoint | quote }}
+            {{- end }}
+            {{- if (.Values.global).otlp.tokenSecret }}
+            # Por Secret y nunca por values: aunque el token solo permita escribir,
+            # con el se puede envenenar la serie que decide un escalado.
+            - name: OTEL_EXPORTER_OTLP_HEADERS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ (.Values.global).otlp.tokenSecret }}
+                  key: {{ (.Values.global).otlp.tokenKey | default "otlp-headers" }}
+                  optional: true
+            {{- end }}
+            {{- end }}
+            # Runtime Go atado a los limites del pod (helper sytue.goRuntimeEnv del umbrella):
+            # GOMAXPROCS=techo(limits.cpu) via downward API; GOMEMLIMIT=~85% de limits.memory.
+            {{- include "sytue.goRuntimeEnv" (dict "container" "syerp" "memLimit" .Values.resources.limits.memory) | nindent 12 }}
+            {{- include "sytue.logCollectorEnv" . | nindent 12 }}
+            - name: ENV
+              value: {{ include "sytue-syerp.env" . | quote }}
+            - name: HTTP_ADDR
+              value: ":{{ .Values.service.targetPort }}"
+            - name: LOG_LEVEL
+              value: {{ .Values.config.logLevel | quote }}
+            - name: PUBLIC_URL
+              value: "https://{{ include "sytue-syerp.host" . }}"
+            # ----- Sytue ID (OIDC; validacion JWT via JWKS) -----
+            - name: OIDC_ISSUER
+              value: {{ include "sytue-syerp.oidcIssuer" . | quote }}
+            - name: OIDC_JWKS_URL
+              value: {{ include "sytue.oidcJwksUrl" . | quote }}
+            # SIN `OIDC_CLIENT_ID` ni `OIDC_CLIENT_SECRET`, y no es un olvido: este
+            # binario valida el JWT por JWKS y no ejecuta ningun flujo de codigo.
+            # Quien usa credenciales de cliente es el BFF de la app Astro, y las
+            # suyas se llaman SYTUE_OIDC_CLIENT_SECRET y viven en otro secret.
+            # Montarlas aqui seria un secreto real en un pod que no lo usa (le
+            # paso a Fotos hasta que se retiraron).
+            # ----- Postgres EXTERNO (Scaleway RDB; unica fuente de verdad) -----
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgresql.existingSecret }}
+                  key: {{ .Values.postgresql.dsnKey }}
+            # Pool pgx POR replica (bajo en prod: PgBouncer multiplexa hacia la RDB).
+            - name: DB_MAX_CONNS
+              value: {{ .Values.config.dbMaxConns | quote }}
+            # DSN DIRECTO a la RDB (bypass del pooler) para estado de sesion:
+            # LISTEN/NOTIFY y advisory locks de migraciones (platform/pkg/pg).
+            # Opcional: sin PgBouncer (staging/dev) no existe y se usa DATABASE_URL.
+            - name: DATABASE_DIRECT_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgresql.existingSecret }}
+                  key: {{ .Values.postgresql.dsnDirectKey }}
+                  optional: true
+
+            # ----- Sytue Integration Gateway: la UNICA salida a terceros -----
+            # Por aqui va Salesforce. Este servicio no abre conexiones a un SaaS
+            # por su cuenta: la pasarela es la que tiene el SSRF, el limite de
+            # peticiones, la auditoria de egress y los secretos sellados.
+            - name: INTEGRATIONS_BASE_URL
+              value: {{ .Values.config.integrationsUrl | default (printf "http://%s-integrations.%s.svc.cluster.local" .Release.Name .Release.Namespace) | quote }}
+
+            # ----- Sytue AI y las apps de las que lee un informe -----
+            # Se les habla con el token de quien pide el informe: cada una aplica
+            # sus permisos. SYTUE_AI_URL es la BASE, sin /api/v1/assist.
+            - name: SYTUE_AI_URL
+              value: {{ .Values.config.aiUrl | default (printf "http://%s-ai.%s.svc.cluster.local" .Release.Name .Release.Namespace) | quote }}
+            - name: ID_BASE_URL
+              value: {{ .Values.config.idUrl | default (printf "http://%s-id" .Release.Name) | quote }}
+            - name: CONTACTS_BASE_URL
+              value: {{ .Values.config.contactsUrl | default (printf "http://%s-contacts" .Release.Name) | quote }}
+            - name: CALENDAR_BASE_URL
+              value: {{ .Values.config.calendarUrl | default (printf "http://%s-calendar" .Release.Name) | quote }}
+            - name: ROOMS_BASE_URL
+              value: {{ .Values.config.roomsUrl | default (printf "http://%s-rooms" .Release.Name) | quote }}
+            # Sytue PDF lee el texto del PDF de una factura para rellenar la ficha.
+            - name: DOCS_BASE_URL
+              value: {{ .Values.config.docsUrl | default (printf "http://%s-docs" .Release.Name) | quote }}
+            # Sytue Bases: la fuente «Sytue Bases» de los informes lee por su conector de solo lectura.
+            - name: BASES_BASE_URL
+              value: {{ .Values.config.basesUrl | default (printf "http://%s-bases" .Release.Name) | quote }}
+            # La tarea que crea Sytue AI («sube la factura en PDF») le llega también
+            # como notificación a quien la pidió, con SU token.
+            - name: HUB_BASE_URL
+              value: {{ .Values.config.hubUrl | default (printf "http://%s-hub" .Release.Name) | quote }}
+            # El secreto de la puerta interna del Hub (/internal/notifications), el MISMO en
+            # el Hub y en cada servicio que avisa. Lo genera el chart paraguas
+            # (sytue-one/templates/secretos-internos.yaml); sin él, fuera de dev, el
+            # servicio no arranca.
+            - name: HUB_INTERNAL_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: sytue-hub-internal
+                  key: secret
+            # Pages es el único consumidor de estos endpoints. El Secret es
+            # opcional para que instalaciones sin Pages no creen una ruta útil.
+            - name: PEDIDOS_TIENDA_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: sytue-syerp-pedidos-tienda
+                  key: secret
+                  optional: true
+
+            # ----- Avisos de obligaciones por correo («quedan 10 días») -----
+            # Salen del MSA de Sytue Mail con la credencial de un BUZÓN propio del
+            # ERP, no con la sesión de nadie: el aviso corre de madrugada. Sin
+            # dirección no sale ninguno y el binario lo dice una vez al arrancar.
+            {{- with .Values.config.smtp }}
+            - name: SMTP_ADDR
+              value: {{ .addr | default (printf "%s-mail-mx:587" $.Release.Name) | quote }}
+            - name: SMTP_FROM
+              value: {{ .from | quote }}
+            - name: SMTP_TLS_SERVER_NAME
+              value: {{ .tlsServerName | quote }}
+            {{- end }}
+            - name: SMTP_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecret }}
+                  key: smtp-user
+                  optional: true
+            - name: SMTP_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecret }}
+                  key: smtp-password
+                  optional: true
+
+            # ----- VERI*FACTU -----
+            # Entorno de la AEAT (pruebas|produccion) y, en el secret, el
+            # certificado cualificado con el que se presenta. Sin certificado no
+            # sale ningún registro y ninguna organización puede activarlo.
+            - name: VERIFACTU_ENTORNO
+              value: {{ (.Values.config.verifactu).entorno | default "pruebas" | quote }}
+            - name: VERIFACTU_SELLO
+              value: {{ (.Values.config.verifactu).sello | default false | quote }}
+            - name: VERIFACTU_CERT_PEM
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecret }}
+                  key: verifactu-cert-pem
+                  optional: true
+            - name: VERIFACTU_KEY_PEM
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecret }}
+                  key: verifactu-key-pem
+                  optional: true
+
+            # ----- Sellado de los secretos de firma de webhooks (AES-256) -----
+            # SIN `optional: true`, a diferencia del DSN directo de arriba: el
+            # binario se planta en prod si falta, y debe hacerlo. Un despliegue
+            # que arranca sin esta clave es un despliegue donde nadie puede
+            # configurar Stripe —o, peor, donde el secreto acabaria en claro—.
+            - name: SECRET_ENC_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecret }}
+                  key: {{ .Values.secrets.encKey }}
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 3
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+      {{- with .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- range . }}
+        - maxSkew: {{ .maxSkew }}
+          topologyKey: {{ .topologyKey }}
+          whenUnsatisfiable: {{ .whenUnsatisfiable }}
+          labelSelector:
+            matchLabels:
+              {{- include "sytue-syerp.selectorLabels" $ | nindent 14 }}
+        {{- end }}
+      {{- end }}

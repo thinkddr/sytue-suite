@@ -1,0 +1,64 @@
+---
+/*
+ * Conexiones con terceros — SECCIÓN PROPIA de Sytue Platform.
+ *
+ * Estaba al final de la pantalla de administración global, debajo de las
+ * organizaciones, el aforo y el registro. No es lo mismo: aquello es operar
+ * clientes y esto es configurar con qué credenciales se presenta Sytue ante
+ * Google, Microsoft o Airtable. Son de la PLATAFORMA y sirven a todos los
+ * clientes a la vez, así que merecen su propia entrada en el menú en vez de
+ * aparecer al hacer scroll en otra pantalla.
+ *
+ * Mismo gate que el resto de la superficie: alcance global, segundo factor y
+ * elevación viva. Y el mismo filtro por el que las credenciales no viajan en el
+ * HTML de quien no puede verlas.
+ */
+import ConsoleLayout from '../layouts/ConsoleLayout.astro';
+import { useT } from '../i18n/index.js';
+import { requireSession } from '@sytue/auth/server';
+import { getBff, isPlatformSurface, toBffContext } from '../server/bff.js';
+import { accesoDePlataforma, loadPlatformActivation } from '../lib/platform.js';
+import ConnectionsPanel from '../components/ConnectionsPanel';
+import { integrationsPublicUrl, loadConnections, type Entorno } from '../lib/connections.js';
+
+export const prerender = false;
+
+// Igual que /platform: fuera de su superficie esta pantalla no existe, no es que
+// esté vacía. En la consola de una organización no hay puerta a esto.
+if (!isPlatformSurface()) return new Response(null, { status: 404 });
+
+const guard = await requireSession(getBff(), toBffContext(Astro));
+if (guard instanceof Response) return guard;
+
+const [activacion, conexiones] = await Promise.all([
+  loadPlatformActivation(guard.session),
+  loadConnections(import.meta.env as unknown as Entorno),
+]);
+// `problema` es el estado por el que no hay que pintar credenciales: sin alcance,
+// sin segundo factor o —lo normal— sin elevar. Se propaga tal cual al panel, que
+// ya sabe distinguirlos.
+const { problema } = accesoDePlataforma(activacion);
+
+const locale = Astro.locals.locale;
+const t = useT(locale);
+---
+
+<ConsoleLayout title={t('nav.connections')} section="connections">
+  {/*
+      Las credenciales solo viajan al navegador de quien PUEDE verlas.
+      `loadConnections` usa el token de OPERADOR del despliegue —no la sesión de
+      quien mira—, y las props de una isla `client:load` van serializadas en el
+      HTML: sin este filtro, cualquiera con sesión aquí se llevaba en el fuente
+      qué proveedores hay y con qué client_id, mientras la pantalla le decía que
+      no puede verlo.
+    */}
+  <ConnectionsPanel
+    client:load
+    locale={locale}
+    clients={problema === undefined ? conexiones.clients : []}
+    templates={problema === undefined ? conexiones.templates : []}
+    problema={problema ?? conexiones.problema}
+    catalogoRoto={conexiones.catalogoRoto}
+    publicUrl={integrationsPublicUrl(import.meta.env as unknown as Entorno)}
+  />
+</ConsoleLayout>

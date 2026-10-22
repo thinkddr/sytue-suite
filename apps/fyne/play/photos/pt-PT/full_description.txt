@@ -1,0 +1,18 @@
+Galeria e editor de fotografias: os originais no Drive, as edições como receita.
+
+• Cronologia por mês com pesquisa por nome.
+• Álbuns com capa; visualizador em ecrã inteiro.
+• Editor de luz, cor, rotação, espelho e recorte, em tempo real.
+• Cada edição é uma receita: o original nunca é alterado.
+• Cronologia agrupada por mês, com pesquisa por nome e miniaturas nítidas.
+• Álbuns: criar, mudar o nome, escolher capa, adicionar a partir do visualizador e remover.
+• Editor com quatro controlos deslizantes (exposição, contraste, saturação, temperatura), rotação e espelho.
+• Cada edição é uma receita guardada à parte: o original no Drive nunca é modificado.
+• Exportação em resolução total, processada no servidor com as mesmas fórmulas da pré-visualização.
+• Lixo com restauro.
+• Os originais ficam no seu Sytue Drive; os derivados são uma cache regenerável.
+• Dados EXIF lidos do próprio ficheiro; tudo na União Europeia.
+• Seleção múltipla por mês: para um álbum novo, para o lixo ou transferir de uma vez.
+• Apresentação de diapositivos, tamanho real, rotação a partir do visualizador e recorte com proporção fixa.
+
+Cifrado em trânsito (TLS 1.3). A infraestrutura da Sytue está na UE. A localização dos serviços externos depende do respetivo fornecedor.

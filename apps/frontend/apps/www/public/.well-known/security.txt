@@ -1,0 +1,9 @@
+# Cómo informar de un fallo de seguridad en Sytue (RFC 9116).
+#
+# Si has encontrado algo, escríbenos antes de publicarlo y te responderemos.
+# No hace falta que seas cliente ni que tengas cuenta.
+
+Contact: mailto:security@sytue.eu
+Expires: 2027-08-13T00:00:00.000Z
+Preferred-Languages: es, en, fr, de, it
+Canonical: https://sytue.eu/.well-known/security.txt

@@ -1,0 +1,26 @@
+---
+import AppLayout from '../../layouts/AppLayout.astro';
+import { EditorApp } from '../../editor/EditorApp.js';
+import { protegerPagina } from '../../lib/pagina.js';
+import { administra } from '../../lib/roles.js';
+import { t } from '../../i18n/index.js';
+
+export const prerender = false;
+
+const guard = await protegerPagina(Astro);
+if (guard instanceof Response) return guard;
+
+const { id } = Astro.params;
+const siteId = id || '';
+const locale = Astro.locals.locale;
+---
+
+<AppLayout title={`${t(locale, 'editor.title')} · ${t(locale, 'nav.title')}`}>
+  <EditorApp
+    slot="app"
+    client:only="preact"
+    siteId={siteId}
+    locale={locale}
+    administra={administra(guard.session.user)}
+  />
+</AppLayout>

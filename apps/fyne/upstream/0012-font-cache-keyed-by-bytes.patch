@@ -1,0 +1,130 @@
+From bec3cd5300f9547ef22d9c17d8efc77f0bbca0b1 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Mon, 28 Sep 2026 07:18:42 +0000
+Subject: [PATCH] painter: identify a theme font by its bytes, not by the
+ Resource value
+
+The font cache key held the fyne.Resource the theme returned. Two ways that
+goes wrong: a Resource whose dynamic type is not comparable (a struct holding
+its bytes as a slice) panics as a map key, and a theme that wraps the same
+bytes in a new Resource on every Font call misses the cache each time, parsing
+and keeping the font again, which is the growth the previous change removed.
+
+The key is now the style, the font's name and where its bytes live and how
+many there are. Content returns the slice the Resource holds, so this is as
+cheap as before, and the pointer keeps those bytes alive, so it cannot be
+reused by another font while the entry exists.
+
+TestCachedFontFace_FreshResourceSameBytes and
+TestCachedFontFace_ResourceNotComparable fail without this change.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01GsxktwzHzHwn5GgHsJ3aFH
+---
+ internal/painter/font.go      | 22 +++++++++++++++--
+ internal/painter/font_test.go | 45 +++++++++++++++++++++++++++++++++++
+ 2 files changed, 65 insertions(+), 2 deletions(-)
+
+diff --git a/internal/painter/font.go b/internal/painter/font.go
+index a4b7d8733..cb683ff04 100644
+--- a/internal/painter/font.go
++++ b/internal/painter/font.go
+@@ -8,6 +8,7 @@ import (
+ 	"slices"
+ 	"strings"
+ 	"sync"
++	"unsafe"
+ 
+ 	"github.com/go-text/render"
+ 	"github.com/go-text/typesetting/di"
+@@ -140,7 +141,7 @@ func CachedFontFace(style fyne.TextStyle, source fyne.Resource, o fyne.CanvasObj
+ 	// theme, emoji and symbol fonts again and kept them for good.
+ 	th := theme.CurrentForWidget(o)
+ 	font1 := th.Font(style)
+-	id := cacheID{style: style, font: font1}
++	id := fontCacheID(style, font1)
+ 
+ 	val, ok := fontCache.Load(id)
+ 	if !ok {
+@@ -499,7 +500,24 @@ type FontCacheItem struct {
+ 
+ type cacheID struct {
+ 	style fyne.TextStyle
+-	font  fyne.Resource
++	name  string
++	data  *byte // where the font's bytes live, not the Resource: its type may not be comparable
++	size  int
++}
++
++// fontCacheID identifies a font by its name and the bytes it holds rather than by the
++// Resource value. A Resource whose type is not comparable would panic as a map key, and a
++// theme that wraps the same bytes in a new Resource on every call would parse them again.
++// Content returns the slice the Resource holds, so this costs no copy.
++func fontCacheID(style fyne.TextStyle, res fyne.Resource) cacheID {
++	id := cacheID{style: style}
++	if res == nil {
++		return id
++	}
++
++	data := res.Content()
++	id.name, id.data, id.size = res.Name(), unsafe.SliceData(data), len(data)
++	return id
+ }
+ 
+ var (
+diff --git a/internal/painter/font_test.go b/internal/painter/font_test.go
+index e520082ae..c696754c7 100644
+--- a/internal/painter/font_test.go
++++ b/internal/painter/font_test.go
+@@ -202,3 +202,48 @@ type monoTheme struct{ fyne.Theme }
+ func (m *monoTheme) Font(fyne.TextStyle) fyne.Resource {
+ 	return m.Theme.Font(fyne.TextStyle{Monospace: true})
+ }
++
++// TestCachedFontFace_FreshResourceSameBytes: a theme that wraps the same font bytes in a
++// new Resource on every call still reuses the faces parsed before. Keyed by the Resource
++// value, each call missed and parsed the font again, and kept it.
++func TestCachedFontFace_FreshResourceSameBytes(t *testing.T) {
++	test.NewTempApp(t)
++	first, second := canvas.NewText("a", color.Black), canvas.NewText("b", color.Black)
++	container.NewThemeOverride(container.NewStack(first), &freshTheme{test.Theme()})
++	container.NewThemeOverride(container.NewStack(second), &freshTheme{test.Theme()})
++	assert.Same(t, painter.CachedFontFace(fyne.TextStyle{}, nil, first),
++		painter.CachedFontFace(fyne.TextStyle{}, nil, second), "same bytes, same faces")
++}
++
++// TestCachedFontFace_ResourceNotComparable: a Resource whose dynamic type is not
++// comparable must not panic as part of the cache key.
++func TestCachedFontFace_ResourceNotComparable(t *testing.T) {
++	test.NewTempApp(t)
++	text := canvas.NewText("a", color.Black)
++	container.NewThemeOverride(container.NewStack(text), &sliceTheme{test.Theme()})
++	assert.NotPanics(t, func() { painter.CachedFontFace(fyne.TextStyle{}, nil, text) })
++}
++
++// freshTheme returns a new Resource holding the same bytes on every call.
++type freshTheme struct{ fyne.Theme }
++
++func (f *freshTheme) Font(s fyne.TextStyle) fyne.Resource {
++	res := f.Theme.Font(s)
++	return fyne.NewStaticResource(res.Name(), res.Content())
++}
++
++// sliceTheme returns its font as a value whose type holds a slice, so it is not comparable.
++type sliceTheme struct{ fyne.Theme }
++
++func (s *sliceTheme) Font(st fyne.TextStyle) fyne.Resource {
++	res := s.Theme.Font(st)
++	return sliceResource{name: res.Name(), data: res.Content()}
++}
++
++type sliceResource struct {
++	name string
++	data []byte
++}
++
++func (r sliceResource) Name() string    { return r.name }
++func (r sliceResource) Content() []byte { return r.data }
+-- 
+2.43.0
+

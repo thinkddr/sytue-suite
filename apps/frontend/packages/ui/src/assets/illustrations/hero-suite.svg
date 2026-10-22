@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480" viewBox="0 0 640 480" fill="none" role="img" aria-label="Sytue One: la suite europea, soberana y libre">
+  <title>Sytue One — suite integrada</title>
+  <desc>Constelación de tiles de producto en torno al símbolo de marca, sobre superficie de marca. Line-art sobrio.</desc>
+  <!-- Superficie de marca (azul profundo). Self-contained: superficie fija de marca como el logo blanco. -->
+  <rect width="640" height="480" rx="20" fill="#142f6e"/>
+  <!-- Rejilla técnica muy sutil -->
+  <g stroke="#1e3f86" stroke-width="1">
+    <line x1="0" y1="120" x2="640" y2="120"/><line x1="0" y1="240" x2="640" y2="240"/><line x1="0" y1="360" x2="640" y2="360"/>
+    <line x1="160" y1="0" x2="160" y2="480"/><line x1="320" y1="0" x2="320" y2="480"/><line x1="480" y1="0" x2="480" y2="480"/>
+  </g>
+  <!-- Órbitas de conexión (una sola app integrada) -->
+  <g stroke="#3a5aa8" stroke-width="1.5" stroke-linecap="round">
+    <path d="M320 240 L188 152"/><path d="M320 240 L452 152"/><path d="M320 240 L188 328"/>
+    <path d="M320 240 L452 328"/><path d="M320 240 L320 116"/><path d="M320 240 L320 364"/>
+  </g>
+  <!-- Tiles de producto satélite: line-art blanco, mismo molde rx que la marca -->
+  <g stroke="#ffffff" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Mail -->
+    <g transform="translate(164 128)"><rect width="48" height="48" rx="12"/><rect x="11" y="16" width="26" height="18" rx="3"/><path d="M12 18l12 8 12-8"/></g>
+    <!-- Drive -->
+    <g transform="translate(428 128)"><rect width="48" height="48" rx="12"/><path d="M11 18h10l3 3h13v14a2 2 0 0 1-2 2H13a2 2 0 0 1-2-2V18z"/></g>
+    <!-- Calendar -->
+    <g transform="translate(164 304)"><rect width="48" height="48" rx="12"/><rect x="12" y="15" width="24" height="21" rx="3"/><path d="M12 22h24"/><path d="M18 12v6M30 12v6"/></g>
+    <!-- Chat -->
+    <g transform="translate(428 304)"><rect width="48" height="48" rx="12"/><path d="M12 18a3 3 0 0 1 3-3h18a3 3 0 0 1 3 3v10a3 3 0 0 1-3 3H22l-7 6v-6h0a3 3 0 0 1-3-3V18z"/></g>
+    <!-- Cloud (arriba) -->
+    <g transform="translate(296 92)"><rect width="48" height="48" rx="12"/><path d="M15 33h13a6 6 0 0 0 .6-11.9A8 8 0 0 0 14 19.2 5.8 5.8 0 0 0 15 33z"/></g>
+  </g>
+  <!-- Núcleo: símbolo de marca (tile + S-swoosh) en teal de acento -->
+  <g transform="translate(276 196)">
+    <rect width="88" height="88" rx="22" fill="#2b6cff"/>
+    <path d="M26 62c6.4 5.3 27 5.3 27-6.4 0-10.3-21.6-6.8-21.6-15.8 0-7.9 18-8.6 24.2-3.5"
+          fill="none" stroke="#ffffff" stroke-width="6.6" stroke-linecap="round"/>
+  </g>
+  <!-- Soberanía europea: círculo de estrellas UE, sobrio, esquina inferior -->
+  <g transform="translate(548 400)" fill="#8aead8">
+    <circle cx="0" cy="-26" r="2.2"/><circle cx="13" cy="-22.5" r="2.2"/><circle cx="22.5" cy="-13" r="2.2"/>
+    <circle cx="26" cy="0" r="2.2"/><circle cx="22.5" cy="13" r="2.2"/><circle cx="13" cy="22.5" r="2.2"/>
+    <circle cx="0" cy="26" r="2.2"/><circle cx="-13" cy="22.5" r="2.2"/><circle cx="-22.5" cy="13" r="2.2"/>
+    <circle cx="-26" cy="0" r="2.2"/><circle cx="-22.5" cy="-13" r="2.2"/><circle cx="-13" cy="-22.5" r="2.2"/>
+  </g>
+</svg>

@@ -1,0 +1,1 @@
+Cada cambio queda registrado: quién lo hizo y qué valía antes.

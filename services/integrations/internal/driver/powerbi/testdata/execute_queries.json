@@ -1,0 +1,14 @@
+{
+  "results": [
+    {
+      "tables": [
+        {
+          "rows": [
+            { "Product[Category]": "Bikes", "Product[Units]": 120, "Product[Active]": true },
+            { "Product[Category]": "Helmets", "Product[Units]": 45, "Product[Active]": false }
+          ]
+        }
+      ]
+    }
+  ]
+}

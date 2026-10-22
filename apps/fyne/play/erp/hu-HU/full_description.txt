@@ -1,0 +1,18 @@
+Huszonnégy modul és kettős könyvvitel, amelyet az adatbázis nem enged kibillenni az egyensúlyból.
+
+• Huszonnégy modul és harminchat modell: partnerek, értékesítés, beszerzés, készlet, gyártás, számlázás, könyvelés, projektek és HR.
+• Egy modul hozzáadása egy JSON-fájl megírását jelenti: nincs migráció, nincs új útvonal és nincs felületi munka.
+• A pénzösszegek egész centben tárolódnak, soha nem lebegőpontosan, és az egyensúlyt az adatbázis kényszeríti ki.
+• A lekönyvelt tételek érinthetetlenek: egy újabb tétellel javíthatók, és éppen ez különbözteti meg a főkönyvet a táblázattól.
+• Huszonnégy modul és harminchat modell egyetlen szolgáltatásban és egyetlen adatbázisban.
+• A modellkatalógus adat: minden modul deklarálja a mezőit, állapotait és listaoszlopait.
+• Egy új modul egyetlen JSON-fájl — DDL, migráció és táblazárolás nélkül.
+• Egy API mind a harminchat modellhez és egy, a katalógusból generált felület.
+• Kettős könyvvitel egész centben tárolt összegekkel; egyetlen lebegőpontos szám sincs.
+• Az egyensúlyt az adatbázis ellenőrzi a tranzakció véglegesítésekor, nem az alkalmazás kódja.
+• A lezárt tételek megváltoztathatatlanok: nem szerkeszthetők, nem törölhetők, és nem kaphatnak új sorokat.
+• Egy bizonylat, egy tétel: egy újrapróbálkozás vagy két nyitott lap sem tudja megkettőzni a bevételt.
+• A közös megnevezések mind a 26 nyelven elérhetők, és egy lefordítatlan mező megakadályozza a szolgáltatás indulását.
+• Indexelt listák: húszezer sor első oldala egy ezredmásodpercnél rövidebb idő alatt érkezik.
+
+Titkosítás átvitel közben (TLS 1.3). A Sytue infrastruktúrája az EU-ban található. A külső szolgáltatások helye a szolgáltatójuktól függ.

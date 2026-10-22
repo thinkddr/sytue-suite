@@ -1,0 +1,21 @@
+{
+  "extends": "@sytue/config/tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "outDir": "dist",
+    "rootDir": "src",
+    "noEmit": false,
+    "lib": ["ES2023", "DOM"],
+    "tsBuildInfoFile": "dist/.tsbuildinfo"
+  },
+  "references": [
+    {
+      "path": "../config/tsconfig.lib.json"
+    },
+    {
+      "path": "../api-clients/tsconfig.lib.json"
+    }
+  ],
+  "include": ["src/**/*.ts"],
+  "exclude": ["src/**/*.test.ts"]
+}

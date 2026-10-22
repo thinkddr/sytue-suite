@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!-- SPDX-License-Identifier: Apache-2.0. Copyright (c) 2026 Daniel Delgado Ramos -->
+<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" count="16" uniqueCount="16"><si><t>Zona</t></si><si><t>Kilos</t></si><si><t>Doble</t></si><si><t>Ecológico</t></si><si><t>Fecha</t></si><si><t>Importe</t></si><si><t>Margen</t></si><si><t>Densidad</t></si><si><t>Norte</t></si><si><t>Sur</t></si><si><t>Este</t></si><si><t>Total del trimestre</t></si><si><t>Total kilos</t></si><si><t>Media</t></si><si><t>Objetivo</t></si><si><t>Cumplimiento</t></si></sst>

@@ -1,0 +1,17 @@
+"widgets.open" = "Openen";
+"widgets.compose" = "Opstellen";
+"widgets.create" = "Afspraak maken";
+"widgets.notes" = "Notities";
+"widgets.rows" = "Rijen";
+"widgets.pending" = "In behandeling";
+"widgets.channels" = "Kanalen";
+"widgets.photos" = "Foto’s";
+"widgets.episodes" = "Afleveringen";
+"widgets.apps" = "Apps";
+"widgets.calendars" = "Agenda’s";
+"widgets.address_books" = "Adresboeken";
+"search.label" = "Algemeen zoeken";
+"dataflow.item.files" = "Bestanden";
+"dataflow.item.events" = "Agenda";
+"dataflow.item.documents" = "Documenten";
+"dataflow.item.contacts" = "Contacten";

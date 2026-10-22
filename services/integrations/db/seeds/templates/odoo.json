@@ -1,0 +1,43 @@
+{
+  "key": "odoo",
+  "tier": "tier1",
+  "manifest": {
+    "name": "Odoo",
+    "description": "ERP y CRM de código abierto: ventas, inventario y contabilidad, con datos en la suite.",
+    "category": "ERP",
+    "color": "#714B67",
+    "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#714B67\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"9\" cy=\"12\" r=\"5.5\"/><circle cx=\"15.5\" cy=\"12\" r=\"5.5\"/></svg>",
+    "identity": {
+      "kind": "oidc",
+      "redirect_uris": ["{base_url}/auth_oauth/signin"]
+    },
+    "provisioning": "none",
+    "data": "odoo",
+    "launch": { "kind": "url", "url": "{base_url}" },
+    "fields": [
+      {
+        "key": "base_url",
+        "label": "URL de Odoo",
+        "placeholder": "https://acme.odoo.com",
+        "help": "La raíz de tu instancia Odoo (con https://).",
+        "required": true
+      },
+      {
+        "key": "database",
+        "label": "Base de datos",
+        "placeholder": "acme-prod",
+        "required": true
+      },
+      {
+        "key": "login",
+        "label": "Usuario de servicio",
+        "placeholder": "svc@acme.com",
+        "required": true
+      }
+    ],
+    "secret": {
+      "label": "Clave o API key de Odoo",
+      "help": "Del usuario de servicio: lee datos vía JSON-RPC."
+    }
+  }
+}

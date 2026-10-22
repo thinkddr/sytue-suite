@@ -1,0 +1,62 @@
+{{- /*
+Gobierno del namespace de la plataforma Sytue One (Release.Namespace):
+  - Pod Security Admission (restricted): rechaza pods privilegiados por defecto
+    (deny-by-default), coherente con el securityContext restrictivo de cada chart.
+  - ResourceQuota + LimitRange: acotan el consumo agregado y obligan requests/limits.
+El Namespace solo se crea/etiqueta si platformNamespace.manageNamespace=true; en ese
+caso instalar SIN --create-namespace. Si el namespace lo gestiona otra herramienta,
+las etiquetas PSA deben aplicarse fuera del chart (ver values: platformNamespace).
+*/ -}}
+{{- $pns := .Values.platformNamespace | default dict -}}
+{{- $psa := $pns.podSecurity | default dict -}}
+{{- if $pns.manageNamespace }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Release.Namespace }}
+  labels:
+    {{- include "sytue-one.labels" (dict "context" . "component" "platform") | nindent 4 }}
+    {{- if $pns.ingressRole }}
+    sytue.eu/role: ingress
+    {{- end }}
+    {{- if $psa.enabled }}
+    pod-security.kubernetes.io/enforce: {{ $psa.enforce | default "restricted" | quote }}
+    pod-security.kubernetes.io/enforce-version: {{ $psa.enforceVersion | default "latest" | quote }}
+    pod-security.kubernetes.io/audit: {{ $psa.audit | default "restricted" | quote }}
+    pod-security.kubernetes.io/audit-version: {{ $psa.auditVersion | default "latest" | quote }}
+    pod-security.kubernetes.io/warn: {{ $psa.warn | default "restricted" | quote }}
+    pod-security.kubernetes.io/warn-version: {{ $psa.warnVersion | default "latest" | quote }}
+    {{- end }}
+{{- end }}
+{{- if $pns.resourceQuota.enabled }}
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: {{ include "sytue-one.fullname" . }}-quota
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "sytue-one.labels" (dict "context" . "component" "platform") | nindent 4 }}
+spec:
+  hard:
+    {{- toYaml $pns.resourceQuota.hard | nindent 4 }}
+{{- end }}
+{{- if $pns.limitRange.enabled }}
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: {{ include "sytue-one.fullname" . }}-limits
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "sytue-one.labels" (dict "context" . "component" "platform") | nindent 4 }}
+spec:
+  limits:
+    - type: Container
+      default:
+        {{- toYaml $pns.limitRange.default | nindent 8 }}
+      defaultRequest:
+        {{- toYaml $pns.limitRange.defaultRequest | nindent 8 }}
+      max:
+        {{- toYaml $pns.limitRange.max | nindent 8 }}
+{{- end }}

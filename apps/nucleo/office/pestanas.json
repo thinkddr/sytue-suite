@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "pestanas": [
+    {
+      "id": "inicio",
+      "labelKey": "ribbon.tab.home",
+      "kinds": ["document", "spreadsheet", "presentation"]
+    },
+    { "id": "insertar", "labelKey": "ribbon.tab.insert", "kinds": ["document", "presentation"] },
+    { "id": "diseno", "labelKey": "ribbon.tab.design", "kinds": ["document", "presentation"] },
+    { "id": "referencias", "labelKey": "ribbon.tab.references", "kinds": ["document"] },
+    { "id": "datos", "labelKey": "ribbon.tab.data", "kinds": ["spreadsheet"] },
+    { "id": "formulas", "labelKey": "ribbon.tab.formulas", "kinds": ["spreadsheet"] },
+    { "id": "presentar", "labelKey": "ribbon.tab.present", "kinds": ["presentation"] },
+    {
+      "id": "revisar",
+      "labelKey": "ribbon.tab.review",
+      "kinds": ["document", "spreadsheet", "presentation"]
+    },
+    {
+      "id": "vista",
+      "labelKey": "ribbon.tab.view",
+      "kinds": ["document", "spreadsheet", "presentation"]
+    }
+  ]
+}

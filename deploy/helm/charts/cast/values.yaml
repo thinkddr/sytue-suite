@@ -1,0 +1,226 @@
+# sytue-cast — defaults del subchart (servicio Go). global.* lo inyecta el umbrella.
+# Estado en PostgreSQL (RDB Scaleway, UE), ficheros en S3. Sin Redis/Valkey ni motores AGPL.
+#
+# DOS Deployments con el MISMO binario (CAST-ENCARGO §2, §7):
+#   - `cast`: el servicio HTTP (API, WebSocket del chat, webhooks de LiveKit, /media).
+#   - `cast-transcoder`: el trabajador de ffmpeg (subcomando `transcoder`, otra
+#     imagen sobre debian-slim). Sin Service ni Ingress: solo saca trabajos de la
+#     cola `transcode_jobs` y sube los resultados a S3.
+enabled: true
+subdomain: cast
+component: cast
+replicaCount: 2
+
+image:
+  registry: ""                 # cae a global.imageRegistry (Scaleway Registry, UE)
+  repository: sytue-cast
+  tag: "1.0.0"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8099             # puerto del SPEC (CONVENTIONS §6: el siguiente tras SyERP)
+
+ingress:
+  enabled: true
+  className: traefik
+  annotations: {}
+  # cast.sytue.eu: la app Astro (sytue-frontend) sirve "/"; el backend Go expone
+  # solo lo suyo. `/public` NO va al ingress a propósito: la web lo pregunta por
+  # dentro del clúster y las apps nativas entran por `/api/v1/public`
+  # (services/cast/internal/http/ingress_test.go contrasta el router con esta lista).
+  paths:
+    # `/api/v1` y NO `/api`: el BFF de la app Astro sirve sus propias rutas bajo
+    # /api/<recurso>, y un Prefix en /api se las quedaría TODAS mandándolas al
+    # servicio Go (el mismo fallo que ya se corrigió en contacts).
+    - path: /api/v1
+      pathType: Prefix
+    # El WebSocket del chat del directo (server.go: /ws/videos/{id}/chat).
+    - path: /ws
+      pathType: Prefix
+    # Avisos del SFU (server.go: /webhooks/livekit). El SFU vive FUERA del clúster
+    # en el piloto (deploy/rooms-sfu/) y sus POST entran por el ingress; la ruta
+    # exige la firma de LiveKit y sin ella responde 401, así que con el SFU dentro
+    # la regla sobra pero no estorba (mismo criterio que Rooms).
+    - path: /webhooks
+      pathType: Prefix
+    # Los ficheros (HLS, WebM, póster, original) con el token firmado de
+    # CAST-ENCARGO §5.1: los pide el <video> del navegador y la app de Fyne.
+    - path: /media
+      pathType: Prefix
+  tls:
+    secretName: tls-cast-sytue-eu
+
+# Right-sized al footprint MEDIDO del resto de servicios Go (~6-40MiB RSS idle):
+# requests modestos para densidad/coste; limits con cabecera para picos.
+#
+# MEMORIA: 512Mi como Photos, y por una razón parecida a la suya: este servicio
+# hace de PROXY de ficheros grandes (una subida de hasta 8 GiB entra en streaming
+# hacia S3, y /media sirve segmentos y WebM desde S3 en streaming). Nada se carga
+# entero en memoria, pero los búferes de N subidas y N reproducciones a la vez
+# suman; con 192Mi un pico de reproducciones caería en OOM. La transcodificación
+# —lo caro de verdad— NO corre aquí: vive en `transcoder`, con sus límites.
+resources:
+  requests:
+    cpu: 15m
+    memory: 128Mi
+  limits:
+    cpu: "1"
+    memory: 512Mi
+
+autoscaling:
+  # Etiqueta `job` de la serie de metricas, para el HPA por demanda real.
+  # Es el ServiceName del BINARIO (config.ServiceName), que aquí coincide con el
+  # nombre del chart; se escribe y no se deduce, como en los demás.
+  metricJob: sytue-cast
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 8
+  targetCPUUtilizationPercentage: 70
+  # Sin memoria: en Go la RSS queda alta tras el GC (mala señal de escalado) y
+  # GOMEMLIMIT (~85% de limits.memory) ya la acota -> se escala solo por CPU.
+
+# El transcodificador (segundo Deployment). Un job a la vez por réplica, ffmpeg con
+# `-threads 2`: por eso 2 CPU de límite, y 4 GiB porque un 1080p con tres
+# escaleras HLS y un VP9 a la vez es lo más caro en memoria de toda la suite.
+# UNA réplica: la cola se reparte con FOR UPDATE SKIP LOCKED, así que subir el
+# número es seguro cuando haga falta; hoy no hay tráfico que lo pida.
+transcoder:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: sytue-cast-transcoder
+    # Vacío = la misma etiqueta que la imagen del servicio (global.image.tag /
+    # image.tag): son el MISMO binario en dos empaquetados y van a la par.
+    tag: ""
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: "2"
+      memory: 4Gi
+  # Dónde se descargan los originales y se escriben las derivadas antes de subirlas.
+  # emptyDir con tope: el original puede llegar a 8 GiB (CAST-ENCARGO §1.6) y las
+  # derivadas de un 1080p rondan la mitad; 20 GiB dejan sitio para uno grande.
+  tmpDir: /tmp
+  tmpSizeLimit: 20Gi
+  # Cuántos hilos da a ffmpeg y cuánto puede durar un trabajo antes de matarlo.
+  threads: 2
+  maxMinutes: 120
+  # La sonda: el trabajador no escucha en ningún puerto; late en
+  # $TRANSCODER_TMPDIR/sytue-cast-transcoder.latido en cada vuelta del bucle, y
+  # `cast transcoder-healthcheck` comprueba que exista y tenga menos de 5 min
+  # (transcoder.EdadMaximaLatido). Un `test -f` a secas daría por vivo un bucle
+  # colgado: el fichero sigue ahí aunque nadie lo toque.
+  probe:
+    command: ["/app/cast", "transcoder-healthcheck"]
+
+networkPolicy:
+  enabled: true
+
+serviceMonitor:
+  enabled: true
+  path: /metrics
+  interval: 30s
+
+config:
+  # Bucket PROPIO de Cast: original, HLS, WebM y pósteres, con prefijo por
+  # organización. Cast guarda aquí pero su uso cuenta en la cuota de Drive
+  # (CAST-ENCARGO §8). No es el de Drive ni el de las grabaciones de Rooms.
+  s3Bucket: sytue-prod-cast-medios
+  # Dónde vive Sytue Drive dentro del clúster (la cuota del plan). Vacío = se deriva
+  # del Release, como hacen todos los demás (`sytue-frontend/_helpers.tpl`). Sin
+  # puerto: los Services de la suite exponen el 80.
+  driveUrl: ""
+  # Sytue ID por dentro (people:resolve): vacío = derivado del Release.
+  idUrl: ""
+  # El Hub por dentro (avisos «está en directo»): vacío = http://<release>-hub.
+  hubUrl: ""
+  # --- Directo (LiveKit Ingress + Egress, junto al SFU de Rooms) --------------
+  # livekitUrl: URL pública WS de señalización que reciben los espectadores y el
+  # emisor del navegador. Vacío => wss://rooms.<dominio> (el host del SFU de Rooms).
+  livekitUrl: ""
+  # livekitApiHost: endpoint de la API server-to-server (RoomService, Ingress,
+  # Egress). Vacío => http://<release>-livekit:7880 (el SFU dentro del clúster).
+  # El piloto lo pone a https://rooms-sfu.<dominio> porque su SFU vive fuera.
+  livekitApiHost: ""
+  # Endpoint S3 visto DESDE el egress externo (URL completa http[s]://host[:puerto]).
+  # Vacío => el mismo S3_ENDPOINT que usa Cast. Solo cambia el camino de red al
+  # MISMO almacén: bucket, región y credenciales siguen siendo los de S3_*.
+  # Un nombre *.svc.cluster.local no resuelve en el frontal fuera del clúster.
+  recordingEndpoint: ""
+  # ingestRtmpUrl: lo que se le enseña a OBS. Vacío => rtmp://cast-ingest.<dominio>/live.
+  ingestRtmpUrl: ""
+  # pollInterval: sondeo de respaldo del webhook de LiveKit (Go time.Duration).
+  # "0" lo apaga; 5 s es lo que pide CAST-ENCARGO §6.
+  pollInterval: 5s
+  # Orígenes admitidos en el handshake del WebSocket del chat, además del host de
+  # la petición y el de la organización del token. Coma-separados; vacío = solo esos.
+  allowedOrigins: ""
+  # Cada cuánto se retira el chat más viejo que la retención (30 días tras el fin
+  # del directo). Solo decide cuánto tarda en notarse.
+  chatCleanupInterval: 1h
+  # El barrido periódico (service/barrido.go): purga del almacén y elimina los
+  # vídeos borrados hace más de `sweepDeletedGrace`, y da por fallidas las subidas
+  # que llevan más de `sweepStaleUpload` en `uploading`. Corre en este Deployment,
+  # una réplica a la vez (advisory lock). Go time.Duration; sweepInterval "0" lo
+  # apaga; sweepStaleUpload no baja de 3h (la copia desde Drive dura hasta 2h).
+  sweepInterval: 1h
+  sweepDeletedGrace: 168h
+  sweepStaleUpload: 6h
+  # Relleno de calidades (decisión del dueño, 2026-09-28: todos los vídeos): los
+  # vídeos de antes de la escalera WebM reciben 1080p/720p/360p poco a poco. En
+  # cada pasada del barrido la cola de trabajos de calidades se completa hasta
+  # este número, para no tapar al transcodificador lo que sube la gente. 0 lo apaga.
+  sweepBackfillQualities: 8
+  # Tamano del pool pgx por replica (DB_MAX_CONNS). Prod lo baja (3-5):
+  # PgBouncer multiplexa hacia la RDB (ver values-prod.yaml del umbrella).
+  dbMaxConns: 10
+  logLevel: info
+
+# Postgres EXTERNO (Scaleway RDB). DSN por secret (nunca en git).
+postgresql:
+  existingSecret: sytue-cast-db
+  dsnKey: dsn
+  # DSN directo a la RDB (bypass PgBouncer) para LISTEN/migraciones; opcional.
+  dsnDirectKey: dsn-direct
+
+# Secret PROPIO del servicio: `media-signing-key` (firma de los enlaces de /media)
+# y `cast-internal-secret` (la puerta interna de la cuota en Drive; el MISMO valor
+# se añade al Secret `sytue-drive` con la misma clave). Lo materializan
+# 02b-secretos.sh (producción) y deploy.sh (piloto). Sin client secret OIDC: este
+# servicio valida el JWT de Sytue ID por JWKS y no ejecuta ningún flujo de código;
+# quien sí lo tiene es el BFF de la app Astro, en `sytue-frontend-bff`.
+existingSecret: sytue-cast
+
+# PodDisruptionBudget: garantiza disponibilidad durante drains/upgrades del cluster.
+# Solo para el servicio HTTP: el transcodificador va con UNA réplica y un PDB con
+# minAvailable 1 bloquearía el drain del nodo.
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+  # maxUnavailable: 1   # alternativa a minAvailable (usar uno u otro)
+
+# Reparto anti-afinidad suave por zona y nodo (alta disponibilidad multi-AZ, UE).
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: ScheduleAnyway
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: ScheduleAnyway
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  fsGroup: 10001
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]

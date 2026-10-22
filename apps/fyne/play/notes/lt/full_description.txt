@@ -1,0 +1,18 @@
+Užrašų knygelės, talpinančios bet ką: tekstą, failus, įvykius, ištisus dokumentus.
+
+• Įdėtinės užrašų knygelės laisvoje drobėje, stulpeliuose arba sąraše.
+• Bet kokie užrašai: tekstas, užduotys, nuorodos, failai, Calendar įvykiai, Docs dokumentai.
+• Jūs sprendžiate, kas patenka į paiešką — ir kas niekada.
+• Įdėtinės užrašų knygelės su piktograma ir spalva; trys išdėstymai: laisvas, stulpeliai ir sąrašas.
+• Dvylika užrašų tipų: tekstas, užduotys, nuorodos, spalva, vaizdas ir nuorodos į Drive, Docus, Calendar, Rooms bei kitus užrašus.
+• Rengyklė su formatavimu (paryškinimas, sąrašai, nuorodos), išsauganti išeinant.
+• Žymos, prisegimas, dubliavimas, perkėlimas tarp užrašų knygelių, grupavimas ir tempimas drobėje.
+• Matomumas kiekvienai užrašų knygelei: privati, asmeninė, organizacijos arba vieša nuoroda.
+• Jūs sprendžiate, kurios užrašų knygelės patenka į rinkinio paiešką.
+• Atgalinės nuorodos: kurie užrašai nurodo į šį.
+• Visos užrašų knygelės eksportavimas į HTML, PDF, Markdown ir kitus formatus; kopijų importavimas.
+• Užrašo bendrinimas Rooms kanale; užrašų kūrimas numetant arba įklijuojant.
+• Lentelės rengyklėje ir Markdown spartieji keliai rašant: „- “, „# “, „> “ ir „```“.
+• Užrašo perkėlimas į kitą užrašų knygelę, vieno užrašo eksportavimas ir užrašų knygelės rikiavimas pagal poreikį.
+
+Šifruojama perduodant (TLS 1.3). „Sytue“ infrastruktūra yra ES. Išorinių paslaugų vieta priklauso nuo jų teikėjo.

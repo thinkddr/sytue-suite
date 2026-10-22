@@ -1,0 +1,83 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Daniel Delgado Ramos
+#
+# Sytue One — override/perfil de test e2e (opcional).
+# ---------------------------------------------------------------------------
+# Añade un contenedor efímero `e2e-smoke` que ejecuta scripts/e2e/smoke.sh
+# DESDE DENTRO de la red de Docker Compose (`sytue-edge`), enrutando por Traefik
+# igual que un cliente real. Útil en CI o donde el host NO resuelve
+# *.sytue.localhost.
+#
+# Cómo resuelve *.sytue.localhost dentro de la red: este override AÑADE alias de
+# red al servicio `traefik` en la red `edge`, de modo que cualquier contenedor
+# de esa red (incluido `e2e-smoke`) resuelve `id.sytue.localhost`,
+# `drive.sytue.localhost`, etc. a la IP de Traefik, que enruta por Host().
+#
+# NO forma parte de `make dev-up`: se activa con el perfil `e2e`. La pila ya
+# debe estar levantada (`make dev-up`) antes de correr esto.
+#
+# Uso (desde deploy/compose, con la pila ya arriba):
+#   docker compose \
+#     -f docker-compose.yml \
+#     -f ../../scripts/e2e/docker-compose.e2e.yml \
+#     up -d traefik                                   # recrea traefik con alias
+#   docker compose \
+#     -f docker-compose.yml \
+#     -f ../../scripts/e2e/docker-compose.e2e.yml \
+#     --profile e2e run --rm e2e-smoke
+#
+# O, más simple, corre el script en el HOST (requiere *.sytue.localhost resuelto
+# y el CA mkcert instalado):  scripts/e2e/smoke.sh
+#
+# Sin secretos: este contenedor solo hace peticiones HTTP de salud/OIDC.
+# ---------------------------------------------------------------------------
+
+name: sytue-one-dev
+
+services:
+  # Extiende Traefik: alias de red para *.sytue.localhost en la red `edge`, así
+  # los contenedores de test resuelven los hosts de ingress a Traefik.
+  traefik:
+    networks:
+      edge:
+        aliases:
+          - id.sytue.localhost
+          - drive.sytue.localhost
+          - docs-api.sytue.localhost
+          - chat-api.sytue.localhost
+          - mail-api.sytue.localhost
+          - calendar.sytue.localhost
+          - contacts.sytue.localhost
+          - meet-api.sytue.localhost
+          - cloud-api.sytue.localhost
+          - hub.sytue.localhost
+          - one.sytue.localhost
+
+  # Runner efímero del smoke test (perfil `e2e`; no arranca con `make dev-up`).
+  e2e-smoke:
+    image: alpine:3.24@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
+    profiles: ["e2e"]
+    # bash + curl + openssl: dependencias del smoke test. awk lo aporta busybox.
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >
+        apk add --no-cache bash curl openssl >/dev/null &&
+        exec bash /e2e/smoke.sh
+    environment:
+      # El CA mkcert no está dentro del contenedor: saltamos verificación TLS
+      # (solo dev; el objetivo del e2e es la conectividad/flujo, no el pinning).
+      E2E_INSECURE: "1"
+      E2E_BASE_DOMAIN: "sytue.localhost"
+      E2E_SCHEME: "https"
+      # Arranque en frío: reintenta si la pila aún está estabilizándose.
+      E2E_RETRIES: "10"
+      E2E_RETRY_WAIT: "3"
+      E2E_TIMEOUT: "10"
+      NO_COLOR: "1"
+    volumes:
+      - "../../scripts/e2e:/e2e:ro"
+    networks: [edge]
+    depends_on:
+      traefik:
+        condition: service_healthy
+    restart: "no"

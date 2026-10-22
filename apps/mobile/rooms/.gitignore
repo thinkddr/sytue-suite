@@ -1,0 +1,24 @@
+# Deps (fuera del workspace Bun; se instalan con npm/bun install aqui).
+node_modules/
+
+# Proyectos nativos GENERADOS por `npx cap add ios/android` (no se versionan en el
+# MVP; se regeneran desde capacitor.config.ts + resources/ + los fragmentos de
+# native/). Follow-up: si se firma/publica desde CI, versionar carpetas concretas.
+/ios/
+/android/
+
+# Assets nativos generados por @capacitor/assets (fuentes en resources/).
+/resources/android/
+/resources/ios/
+
+# Secretos de firma/push: NUNCA en git.
+google-services.json
+GoogleService-Info.plist
+*.keystore
+*.jks
+*.p8
+*.p12
+*.mobileprovision
+
+*.log
+.DS_Store

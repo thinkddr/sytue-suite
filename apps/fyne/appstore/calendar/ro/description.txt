@@ -1,0 +1,19 @@
+Un calendar CalDAV conectat la restul suitei.
+
+• Vizualizări pe zi, săptămână și lună.
+• Evenimente recurente și mementouri.
+• Creați evenimente direct dintr-un e-mail în Mail.
+• Funcționează cu orice client CalDAV.
+• Vizualizări pe lună, săptămână, zi și agendă, cu minicalendar și „Astăzi”.
+• Repetare zilnică, săptămânală sau lunară cu final; editați doar acesta, acesta și următoarele sau toate.
+• Mementouri pentru fiecare eveniment și notificări în suită.
+• Invitații cu răspuns (particip, poate, nu) și urmărire.
+• „Găsiți un interval” liber pentru toate persoanele invitate.
+• Săli și resurse rezervabile, cu disponibilitate.
+• Calendare partajate cu permisiuni și cele partajate cu dumneavoastră.
+• Abonare la calendare externe (ICS) și mai multe calendare cu coduri de culoare.
+• Crearea unui eveniment dintr-un mesaj Mail sau dintr-o notiță.
+• Funcționează cu orice client CalDAV: Apple Calendar, Thunderbird și altele.
+• Duplicarea unui eveniment sau copierea lui în calendarul dumneavoastră și descărcarea ca .ics pentru persoane din afara Sytue.
+
+Criptare în tranzit (TLS 1.3). Infrastructura Sytue se află în UE. Locația serviciilor externe depinde de furnizorul lor.

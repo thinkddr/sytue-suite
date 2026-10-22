@@ -1,0 +1,63 @@
+{{- if .Values.networkPolicy.enabled }}
+{{- /*
+Aislamiento de red del grabador.
+
+Este chart era uno de los DOS deployments del clúster sin NetworkPolicy
+(auditoría 2026-08-18: 32 deployments, 32 políticas, y la cobertura no era 1:1).
+El otro es el webhook de cert-manager, que es de terceros; este es de la casa.
+
+Importa más aquí que en un servicio de la suite: el egress descarga la sala, la
+transcodifica y SUBE el resultado a almacenamiento externo, así que es el
+componente con más salida a Internet de toda la plataforma. Sin política, además,
+cualquier pod del clúster podía abrirle conexiones.
+
+SIN INGRESS A PROPÓSITO: el egress no atiende peticiones. Toma su trabajo de la
+cola de Dragonfly y publica el resultado; nadie le llama. `policyTypes` incluye
+`Ingress` con una lista vacía, que es como se escribe «no entra nadie» — omitir
+el tipo dejaría el ingreso ABIERTO, que es justo lo contrario.
+*/}}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "livekit-egress.fullname" . }}
+  labels:
+    {{- include "livekit-egress.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "livekit-egress.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress: []
+  egress:
+    # DNS. Va primero porque sin él lo demás no resuelve y el síntoma aparece
+    # lejos: el pod arranca, no encuentra Dragonfly y parece un fallo de
+    # credenciales.
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # La suite: Dragonfly —de donde saca el trabajo— y el SFU, del que baja la
+    # sala. Los dos llevan la etiqueta de la plataforma.
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/part-of: sytue-one
+    # Salida a Internet SOLO por HTTPS, para subir la grabación al
+    # almacenamiento. Se excluye el rango de metadatos de la instancia
+    # (169.254.0.0/16): un proceso que ejecuta transcodificación sobre contenido
+    # de usuario no tiene por qué poder preguntarle sus credenciales al
+    # hipervisor.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 169.254.0.0/16
+      ports:
+        - protocol: TCP
+          port: 443
+{{- end }}

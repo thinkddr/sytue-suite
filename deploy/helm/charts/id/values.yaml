@@ -1,0 +1,242 @@
+# Sytue ID — defaults del subchart (servicio Go). global.* lo inyecta el umbrella.
+enabled: true
+subdomain: id
+component: id
+replicaCount: 2
+
+image:
+  registry: ""                 # cae a global.imageRegistry (Scaleway Registry, UE)
+  repository: sytue-id
+  tag: "1.0.0"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8081             # puerto del SPEC (Sytue ID HTTP)
+
+ingress:
+  enabled: true
+  className: traefik
+  annotations: {}
+  # Sytue ID es el host completo id.sytue.eu (login, OIDC, JWKS, discovery, SCIM).
+  paths:
+    - path: /
+      pathType: Prefix
+  tls:
+    secretName: tls-id-sytue-eu
+  # LAS RUTAS DE CUENTA QUE SON DE GO, una a una y exactas. En `id.<dominio>` el
+  # prefijo `/account` lo sirve la app «Mi cuenta» (sytue-frontend, prioridad 100);
+  # estas se lo quitan con prioridad 200. Son formularios POST, el avatar del claim
+  # `picture` de los tokens ya emitidos y el perfil de Apple de `sytue-clients.json`.
+  # `/account` a secas NO está: esa es la página de la app.
+  #
+  # Una ruta nueva de Go bajo `/account/` que no se añada aquí cae en la app y da su
+  # 404; lo vigila deploy/production/tests/ingress-comodin-test.sh, que las lee del
+  # router de `services/id/internal/http/server.go`.
+  rutasDeCuenta:
+    - /account/avatar
+    - /account/apple.mobileconfig
+    - /account/sessions/revoke
+    - /account/sessions/revoke-others
+    - /account/profile
+    - /account/password
+    - /account/mfa/totp/enroll
+    - /account/mfa/totp/confirm
+    - /account/mfa/totp/disable
+    - /account/mfa/totp/recovery/regenerate
+    - /account/app-passwords
+    - /account/app-passwords/revoke
+    - /account/passkeys/begin
+    - /account/passkeys/finish
+    - /account/passkeys/delete
+    - /account/devices/trust
+    # «Borrar mi cuenta» (ADR 0054): la URL que publica Google Play.
+    - /account/delete
+
+# Right-sized al footprint MEDIDO (Go ~6-40MiB RSS idle): requests modestos para
+# densidad/coste; limits con cabecera para picos (firma JWT/JWKS; burstable).
+# Requests MEDIDOS en producción (kubectl top, 2026-08-09), no estimados: en
+# Kubernetes la factura la fija lo RESERVADO, no lo usado, y estos pods pedían
+# 25-75 veces su consumo real. Esa reserva inflada obligó a un tercer nodo cuando
+# la CPU real del clúster estaba al 3 %.
+#
+# El límite NO se toca: un pico sigue pudiendo usar toda la CPU que necesite. Y
+# bajar el request hace al HPA MÁS sensible —calcula el porcentaje sobre el
+# request—, que es justo lo que hace falta para escalar por demanda real.
+resources:
+  requests:
+    # 50m y no 25m, corregido con la medición del 2026-08-10: Sytue ID NO consume
+    # como el resto. Los demás servicios se mueven en 1-3m, pero el IdP llega a
+    # 21m en marcha y a 32m recién arrancado —migraciones, JWKS, el primer tráfico
+    # de sesiones—, así que un request de 25m lo deja al 128 % de su reserva.
+    #
+    # Y eso no es solo estrechez: el HPA calcula el porcentaje SOBRE EL REQUEST,
+    # de modo que un request corto lo hace escalar por un pico de arranque. Pasó:
+    # ID subió a cinco réplicas durante un rollout, una no cupo en los dos nodos y
+    # el `helm upgrade` agotó su plazo esperándola.
+    cpu: 50m
+    # 192Mi: los pods estabilizados usan 133-147Mi, por encima de los 96Mi que
+    # pedían. El límite no cambia.
+    memory: 192Mi
+  limits:
+    cpu: "2"
+    memory: 256Mi
+
+autoscaling:
+  # Etiqueta `job` de la serie de metricas, para el HPA por demanda real.
+  # Es el ServiceName del BINARIO, que no siempre coincide con el nombre del
+  # chart ni con el del directorio; por eso se escribe y no se deduce.
+  metricJob: sytue-id
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 8
+  targetCPUUtilizationPercentage: 70
+  # Sin memoria: en Go la RSS queda alta tras el GC (mala señal de escalado) y
+  # GOMEMLIMIT (~85% de limits.memory) ya la acota -> se escala solo por CPU.
+
+networkPolicy:
+  enabled: true
+
+serviceMonitor:
+  enabled: true
+  path: /metrics
+  interval: 30s
+
+# Configuracion de la app (no secretos). Estado en Postgres (RDB externa).
+config:
+  matrix:
+    enabled: false
+    roomsURL: ""
+    existingSecret: sytue-matrix
+  # Tamano del pool pgx por replica (SYTUE_ID_DB_MAX_CONNS). Prod lo baja
+  # (3-5): PgBouncer multiplexa hacia la RDB (ver values-prod.yaml del umbrella).
+  dbMaxConns: 10
+  logLevel: info
+  # Bypass de pruebas del captcha de login (ADR 0056): la clave HMAC con la que
+  # los barridos del CI firman la cabecera X-Sytue-Test-Auth y se saltan el PoW.
+  # VACIA por defecto: sin ella el bypass no existe y el captcha es obligatorio
+  # para todo el mundo. Rellenarla SOLO desde el secreto del despliegue
+  # (SYTUE_ID_LOGIN_BYPASS_KEY en el Secret del IdP, con el prefijo que pide el
+  # loader): nunca en un values versionado.
+  loginBypassKey: ""
+  realm: sytue                 # cae a global.identity.realm
+  # Raiz del Service interno de Sytue Contacts (propagacion del avatar propio).
+  # Vacia => se cae al Service estandar del mismo Release, como idInternalUrl
+  # en el chart de mail. El secreto va aparte, en el Secret compartido
+  # sytue-contacts-internal.
+  contactsInternalUrl: ""
+  # Puerto de submission (MSA) de Sytue Mail por el que salen los correos
+  # transaccionales. 587 con STARTTLS, no 25: el 25 es el MX entrante y se niega
+  # a relayar a dominios ajenos (no es un relay abierto).
+  mailSubmissionPort: 587
+  # El host del MTA, para EXIGIRLO en el certificado del relé interno. Tiene que
+  # ser el MISMO que `config.mxHost` del chart de Mail: si se separan, el
+  # STARTTLS falla y las invitaciones no salen —pasó, con el nombre escrito a
+  # mano aquí—. Lo comprueba `helm-so-test.sh`.
+  mxHost: mx
+  # Puerto HTTP de la API de Sytue Mail (el targetPort de su Service, no el 80
+  # que publica). El reconciliador de buzones de `id` llama ahí cada 30 s para
+  # crear el buzón de cada usuario aprovisionado; la NetworkPolicy filtra por el
+  # puerto del POD, así que abrir el 80 no serviría de nada.
+  mailApiPort: 8086
+  # Raíz y puerto del POD de Sytue Hub, para el evento de «cambió la foto».
+  # Vacía => el Service estándar del mismo Release.
+  hubUrl: ""
+  hubApiPort: 8092
+  # Puerto del POD de Sytue Contacts, para /internal/avatar-sync (la raíz es
+  # contactsInternalUrl, arriba).
+  contactsApiPort: 8088
+  # Puerto del POD de Sytue Rooms, para SYTUE_ID_ROOMS_CALL_ACCESS_URL.
+  roomsApiPort: 8085
+  # Organización que OPERA la plataforma; es el tenant del remitente
+  # transaccional. Debe coincidir con el slug que crea `id bootstrap-owner`.
+  # `corporate` porque el slug es la dirección: la organización de Sytue vive en
+  # corporate.sytue.eu, igual que cualquier cliente en <slug>.sytue.eu.
+  platformOrgSlug: corporate
+  # IP(s) del ORIGEN con las que se publica la dirección de una organización que
+  # tiene BUZONES en su propio nombre. Lista separada por comas; v4 ⇒ A, v6 ⇒ AAAA.
+  #
+  # Existe por una regla del DNS que no se negocia: un CNAME no admite ningún otro
+  # registro en el mismo nombre (RFC 1034 §3.6.2, RFC 2181 §10.1). Una organización
+  # con correo en `@<slug>.<dominio>` tiene ahí su MX y su SPF, así que su dirección
+  # NO puede ser el CNAME de siempre: va con A/AAAA, que sí conviven con el correo.
+  #
+  # Vacío ⇒ esas altas quedan en `failed` con motivo, que es la verdad: no hay forma
+  # legal de publicarlas. Nunca se degrada a un CNAME que el proveedor rechazará.
+  #
+  # OJO CON EL TÚNEL: si la web entra por Cloudflare Tunnel, el resto de nombres son
+  # CNAME al túnel y este NO puede serlo. Un A proxied hacia esta IP funciona solo si
+  # el 443 llega de verdad a la máquina; detrás de CGNAT, no. Ver la nota del túnel
+  # en deploy/helm/.env.example.
+  tenantDNSAddress: ""
+  # En prod ningún token de tenant se emite sin una suscripción Mollie pagada.
+  requirePaidSubscription: false
+  # Instancia que alguien opera para sí mismo, no la suite comercial. ÚNICO modo
+  # de arrancar en prod sin verja de pago; no relaja ninguna otra guarda (cifrado,
+  # SMTP y TLS se siguen exigiendo). Ver services/id/internal/http/config.go.
+  selfHosted: false
+  # Alta autoservicio de cuentas personales (gratis, 5 GB). Apagado, /signup
+  # no existe y el enlace desaparece del login; las cuentas ya creadas entran.
+  signupEnabled: true
+  # Rotación deshabilitada en dev; producción la activa semanalmente.
+  keyRotationInterval: 0s
+  # Debe superar el TTL del access token (15m) para no invalidar tokens en vuelo.
+  keyRetireAfter: 30m
+  # Sin caches/colas externas: Postgres es la unica fuente de verdad (sin Redis/Valkey).
+
+# Postgres EXTERNO (Scaleway RDB). Conexion por secret (DSN completo).
+postgresql:
+  existingSecret: sytue-id-db  # claves: dsn (y dsn-direct con PgBouncer)
+  dsnKey: dsn
+  # DSN directo a la RDB (bypass PgBouncer) para las migraciones; opcional.
+  dsnDirectKey: dsn-direct
+
+# Secretos de Sytue ID: clave de firma JWKS, cookie/secret de sesion, etc.
+existingSecret: sytue-id       # claves: key-encryption-key, mollie-api-key (prod), sms-sweego-api-key (opcional)
+
+# PodDisruptionBudget: garantiza disponibilidad durante drains/upgrades del cluster.
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+  # maxUnavailable: 1   # alternativa a minAvailable (usar uno u otro)
+
+# Reparto anti-afinidad suave por zona y nodo (alta disponibilidad multi-AZ, UE).
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: ScheduleAnyway
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: ScheduleAnyway
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  fsGroup: 10001
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
+# Secretos de los clients OIDC de primera parte (las superficies de la suite).
+#
+# Los clients confidenciales se siembran con secret_hash NULL a propósito y el
+# token endpoint los rechaza con `invalid_client` hasta que el despliegue fija su
+# secreto. Este bloque es ese paso: un Secret con UNA CLAVE POR CLIENT —el nombre
+# de la clave es el client_id y el valor su secreto— que un initContainer
+# reconcilia antes de que el servicio acepte tráfico.
+#
+#   kubectl -n <ns> create secret generic sytue-id-client-secrets \
+#     --from-literal=sytue-git='...' --from-literal=sytue-mail='...'
+#
+# Desactivado por defecto: en un entorno sin ese Secret, el pod no debe intentar
+# montar algo que no existe. Actívalo donde haya clients que habilitar.
+clientSecrets:
+  enabled: false
+  existingSecret: sytue-id-client-secrets
+  mountPath: /etc/sytue-id/client-secrets

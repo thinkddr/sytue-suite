@@ -1,0 +1,53 @@
+---
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: (c) 2026 Daniel Delgado Ramos
+ *
+ * La ruta `/404` de las superficies SSR. No se copia a cada app: la inyecta
+ * `sytueNoEncontrada()` (`@sytue/config/astro-404`), igual que `/healthz`.
+ *
+ * Documento propio y no el `AppLayout` de la app: ese layout exige sesión y
+ * redirigiría al login a quien solo ha seguido un enlace roto, que es justo lo
+ * que no hay que hacer con un 404 — se entraría, y la ruta seguiría sin existir.
+ *
+ * El idioma ya lo negoció el middleware de la suite, que también corre para esta
+ * ruta; si faltara, inglés, como en el resto.
+ */
+import { DEFAULT_LOCALE, htmlLangAttrs, translate, type MessageKey } from '@sytue/i18n';
+import '../styles.css';
+import { SUFIJO_ICONOS, withBase } from '../basePath.js';
+import { themeInitScript } from '../theme/ThemeProvider.js';
+import { PaginaNoEncontrada } from '../components/PaginaNoEncontrada.js';
+
+const locale = Astro.locals.locale ?? DEFAULT_LOCALE;
+const { lang, dir } = htmlLangAttrs(locale);
+const t = (clave: MessageKey): string => translate(locale, clave);
+// El prefijo del HOST manda sobre el del build, como en los layouts de las apps:
+// la consola se sirve bajo `/admin` y también en la raíz de `platform.<dominio>`.
+const prefijo = process.env.SYTUE_BASE_PATH ?? import.meta.env.BASE_URL;
+---
+
+<!doctype html>
+<html lang={lang} dir={dir}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>{t('notFound.title')} — Sytue One</title>
+    <link
+      rel="icon"
+      href={withBase(prefijo, '/favicon.svg') + SUFIJO_ICONOS}
+      type="image/svg+xml"
+    />
+    <script is:inline set:html={themeInitScript}></script>
+  </head>
+  <body class="bg-bg text-text antialiased">
+    <PaginaNoEncontrada
+      overline={t('notFound.overline')}
+      title={t('notFound.title')}
+      description={t('notFound.description')}
+      action={t('notFound.action')}
+      href={withBase(prefijo, '/')}
+    />
+  </body>
+</html>

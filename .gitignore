@@ -1,0 +1,213 @@
+# =============================================================================
+# Sytue One — .gitignore raíz
+# Regla nuclear: NINGÚN secreto en git (docs/CONVENTIONS.md §10).
+# =============================================================================
+
+# --- Secretos / entorno ------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.local
+secrets/
+*.secret
+# Estado de sesión de Playwright (cookies del admin dev)
+test/e2e/.auth/
+*-key.pem
+*.key
+*.pem
+!**/certs/.gitkeep
+# Presentaciones de Keynote de prueba (ZIP, no claves): las revisa la prueba de iWork.
+!services/docs/internal/domain/testdata/iwork/*.key
+
+# --- Go (módulo único git.sytue.eu/sytue/one) ---------------------------------
+# Lo escribe `fyne build` junto al fuente MIENTRAS compila: si no se ignora, todo
+# binario publicado sale marcado `vcs.modified=true` (+dirty) y la marca de Go deja de
+# decir si salió del árbol del tag (FYP-07).
+fyne_metadata_init.go
+# Binarios compilados de los servicios (un binario por servicio).
+bin/
+# Operational automation is source, not a compiled Go binary directory.
+!deploy/sytue-git/bin/
+!deploy/sytue-git/bin/**
+# Y los del perfil on-premise, por lo mismo. Estuvieron fuera de git desde
+# siempre: su README documenta `./bin/install-host.sh`, `./bin/deploy.sh` y tres
+# más, y en un clone limpio no existe ninguno — el perfil entero era inejecutable
+# fuera de la máquina donde se escribió. La regla `bin/` de arriba está pensada
+# para los binarios compilados, no para scripts.
+!deploy/helm/bin/
+!deploy/helm/bin/**
+# Y los de `production` e `hybrid-production`, por lo mismo: también son GUIONES,
+# no binarios compilados. Faltaban, y eso costó caro: `hay-imagen-mas-nueva.sh`
+# se escribió, se hizo `git add` y git lo descartó SIN DECIR NADA por la regla
+# `bin/` de arriba. Su test entró en el commit, el guion no, y el resultado
+# fueron nueve comprobaciones en rojo permanente con «exit 127» — el rojo que
+# enseña a ignorar el rojo, que es justo lo que ese test dice combatir.
+!deploy/production/bin/
+!deploy/production/bin/**
+!deploy/hybrid-production/bin/
+!deploy/hybrid-production/bin/**
+# Binarios de `tools/` compilados en la raíz: `go build ./tools/eusupply` deja
+# aquí un ejecutable con el nombre del paquete, y `bin/` no lo tapa. Uno de 3 MB
+# llegó a aparecer como untracked listo para entrar en un commit.
+/eusupply
+/docslinks
+# Tests y artefactos de cobertura/profiling de Go.
+*.test
+*.out
+coverage.out
+coverage-integracion.out
+coverage.txt
+*.prof
+*.pprof
+# Caché/workspace de Go (no se versionan; el módulo vive en go.mod/go.sum).
+vendor/
+go.work
+go.work.sum
+
+# --- Node / pnpm -------------------------------------------------------------
+node_modules/
+.pnpm-store/
+.pnpm-debug.log*
+npm-debug.log*
+yarn-error.log*
+
+# --- Builds / artefactos -----------------------------------------------------
+dist/
+# Ya no hay acciones vendorizadas con un `dist/` que salvar: `upload-artifact`
+# se usa desde GitHub fijada por SHA (2026-09-27). Si vuelve a vendorizarse una,
+# su `dist/` necesita aquí su excepción, con la ruta REAL del directorio: la
+# última vez se quedó con el nombre viejo al renombrarlo y el CI moría con
+# «Cannot find module …/dist/index.js» sin que en local se notara.
+build/
+.build/
+out/
+.output/
+.astro/
+.cache/
+coverage/
+*.tsbuildinfo
+
+# --- Terraform ---------------------------------------------------------------
+.terraform/
+.terraform.lock.hcl
+# Los entornos son root modules desplegables: sus checksums fijan exactamente
+# los providers admitidos en producción. Los lockfiles de módulos reutilizables
+# siguen ignorados porque no gobiernan la selección del consumidor.
+!infra/terraform/environments/*/.terraform.lock.hcl
+# Los planes de OpenTofu llevan los valores en claro: contraseña de la RDB,
+# claves de LiveKit, kubeconfig. Un `git add -A` distraído los publicaría.
+*.plan
+.plan-*.bin
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+# Kubeconfigs generados por el bootstrap de producción contienen credenciales.
+infra/terraform/environments/*/.kubeconfig-*
+# tfvars contienen valores reales; solo se versionan los .example
+*.tfvars
+# Excepción: el perfil de arranque es DIMENSIONAMIENTO, no credenciales. Va
+# versionado a propósito para que el despliegue sea reproducible.
+!deploy/production/perfil-*.tfvars
+*.tfvars.json
+!*.tfvars.example
+# Planes guardados: binarios, efímeros y con valores resueltos del state.
+*.tfplan
+
+# --- Helm --------------------------------------------------------------------
+# NADA DE LO QUE ESCRIBE UN DESPLIEGUE SE VERSIONA. Los .tgz de
+# `sytue-one/charts/` los produce `helm dependency build` empaquetando
+# `deploy/helm/charts/<svc>`, y `helm package` copia al tar la FECHA DE
+# MODIFICACIÓN de cada fichero. Git no guarda mtimes: cada clon, cada worktree y
+# cada `git checkout` los reescribe con la hora de ese instante, así que un .tgz
+# versionado NUNCA vuelve a coincidir con el que reconstruye la máquina de al
+# lado —mismo contenido byte a byte dentro del tar, distinta cabecera—.
+#
+# Estuvieron versionados hasta 2026-09-06 (llegaron en el commit de migración,
+# ANTES de que existiera esta regla, y por eso git seguía siguiéndolos pese a
+# ella) y costaron dos familias de fallos:
+#   · El árbol quedaba sucio en los 21 tras CADA despliegue, sin haber tocado
+#     una línea de fuente, y el `git checkout` siguiente abortaba con «los
+#     cambios locales serán sobrescritos». El 2026-09-05 tumbó tres despliegues
+#     seguidos, ida y vuelta atrás.
+#   · Tres checkouts de la misma máquina con tres versiones distintas del mismo
+#     .tgz, una con `initContainers` detrás de `containers` que el API server
+#     rechaza (2026-08-17, R-1 de AUDITORIA-2026-08-18): el fuente enseñaba el
+#     arreglo y el clúster aplicaba lo viejo.
+# Se regeneran solos en cada despliegue, preflight, lint y gate de render, así
+# que no hay nada que guardar aquí.
+deploy/helm/**/charts/*.tgz
+# Desempaquetado de prepare-helm-vendor.sh a partir del .tgz de
+# `deploy/helm/upstream/` (ese SÍ va versionado: es fuente de terceros con su
+# sha256 fijado, no una salida de compilación) más los parches propios.
+deploy/helm/.vendor/
+deploy/helm/**/Chart.lock
+# El umbrella fija exactamente la versión/digest del único chart remoto.
+!deploy/helm/sytue-one/Chart.lock
+deploy/helm/**/requirements.lock
+
+# --- Docker / Compose --------------------------------------------------------
+deploy/compose/traefik/certs/*.pem
+
+# --- Kubernetes / credenciales locales ---------------------------------------
+kubeconfig
+*.kubeconfig
+# El directorio entero, no solo el fichero: `kubeconfig` y `*.kubeconfig` NO
+# cubren `.kube/config`, que es como se llama de verdad en el sitio donde
+# kubectl lo busca. Y kubectl escribe ahí su caché de descubrimiento sin avisar
+# —basta con ejecutarlo con el HOME apuntando dentro del repositorio— así que
+# aparece solo, sin seguimiento, esperando a un `git add -A` distraído.
+.kube/
+
+# --- IDE / SO ----------------------------------------------------------------
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+*.swo
+*~
+
+# --- Python ------------------------------------------------------------------
+# Cachés del intérprete para los guiones de deploy: los regenera él solo.
+__pycache__/
+*.pyc
+
+# --- Logs --------------------------------------------------------------------
+*.log
+logs/
+
+# Overrides locales de compose (p. ej. pin de versión de imagen por el volumen dev). No versionar.
+deploy/compose/docker-compose.override.yml
+
+# Artefactos locales de Lighthouse-CI (`bunx @lhci/cli autorun`): informes por corrida.
+.lighthouseci/
+apps/frontend/packages/pages-render/.lighthouse-pages/
+
+# Artefactos de una ejecución de Playwright (trazas y contexto de fallos):
+# los regenera el propio `bun test`, no son fuente.
+test/e2e/test-results/
+test/e2e/playwright-report/
+
+# Artefactos de sesión de los agentes (tareas programadas, ajustes locales).
+# No son del proyecto: cambian por máquina y por sesión.
+.claude/
+
+# Bundles de marketplaces de vendors: salida de scripts/empaquetar-marketplace.sh
+dist-marketplace/
+
+# Lo trabajado en Gio y en el escritorio de Wails, retirado del repositorio el
+# 2026-09-23 por decisión del dueño («añade a gitignore una carpeta con lo
+# trabajado en gio en vez de borrar»). Vive solo en la copia local; su LEEME.md
+# dice de qué commit sale y cómo recuperarlo.
+gio-archivado/
+
+# Verified upstream native SDK source, materialized by preparar-livekit.sh.
+/.deps/

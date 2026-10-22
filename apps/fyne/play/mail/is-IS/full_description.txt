@@ -1,0 +1,19 @@
+Einkapóstur frá Evrópu yfir JMAP — án rekjara og án auglýsinga.
+
+• Hraðvirkt innhólf með þráðum, merkjum, síum og leit.
+• Hengdu við skrár beint úr Sytue Drive.
+• Breyttu tölvupósti í viðburð í Calendar.
+• Dulkóðað í flutningi (TLS 1.3). Innviðir Sytue eru innan ESB. Staðsetning ytri þjónustu fer eftir þjónustuveitanda hennar.
+• Samtalsþræðir með lestri, svari og áframsendingu í einum smelli.
+• Möppur, lituð merki og leit með virkjum (from:, has:attachment, is:unread…).
+• Sjálfvirkar reglur sem setja póst í safn, merkja hann eða færa um leið og hann berst.
+• Tímasett sending og „Afturkalla sendingu“.
+• Undirskriftir, samnefni netfanga og sjálfvirkt fjarvistarsvar.
+• Sameiginleg og framseld pósthólf með heimildum til að lesa og senda.
+• Ritill með sniðnum texta og viðhengjum úr Sytue Drive án afritunar skráa.
+• Ytra efni er sjálfgefið lokað: enginn fær að vita hvenær þú opnar tölvupóst.
+• Undirritaður póstur (PGP og S/MIME) er greindur og merktur; TLS í flutningi.
+• Aðgangur líka úr Thunderbird, Outlook, Apple Mail eða símanum, með forritalykilorðum.
+• Netföng sem merki, nafnaskrá Contacts í einum smelli og viðvörun ef þú skrifar „í viðhengi“ án þess að hengja neitt við.
+
+Dulkóðað í flutningi (TLS 1.3). Innviðir Sytue eru innan ESB. Staðsetning ytri þjónustu fer eftir þjónustuveitanda hennar.

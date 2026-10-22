@@ -1,0 +1,55 @@
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "sytue-ocr.fullname" . }}
+  labels:
+    {{- include "sytue-ocr.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "sytue-ocr.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # SOLO desde la suite. NO hay regla para el ingress controller, y es
+    # deliberado: este servicio ve el contenido de documentos escaneados y no
+    # tiene por qué ser alcanzable desde fuera del clúster.
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/part-of: sytue-one
+      ports:
+        - protocol: TCP
+          port: {{ .Values.service.targetPort }}
+  egress:
+    # DNS
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Sytue ID, para el JWKS con el que se valida el token del usuario. Es la
+    # ÚNICA salida: el motor está en la imagen, así que no hay ninguna llamada a
+    # un proveedor de OCR ni a internet. Si algún día apareciera tráfico saliente
+    # desde este pod, sería un incidente y no una configuración que falta.
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/part-of: sytue-one
+      ports:
+        - protocol: TCP
+          port: 8081
+    # Cockpit (OTLP) para métricas.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 169.254.0.0/16
+      ports:
+        - protocol: TCP
+          port: 443
+{{- end }}

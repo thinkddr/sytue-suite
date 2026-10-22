@@ -1,0 +1,18 @@
+Tuttugu og fjórar einingar og tvíhliða bókhald sem gagnagrunnurinn leyfir ekki að fari úr jafnvægi.
+
+• Tuttugu og fjórar einingar og þrjátíu og sex líkön: tengiliðir, sala, innkaup, birgðir, framleiðsla, reikningagerð, bókhald, verkefni og mannauður.
+• Að bæta við einingu þýðir að skrifa JSON-skrá: enginn flutningur, engin ný leið og engin vinna við viðmótið.
+• Upphæðir eru geymdar í heilum sentum, aldrei sem fleytitölur, og gagnagrunnurinn tryggir jafnvægið.
+• Bókaðar færslur eru ósnertanlegar: þær eru leiðréttar með nýrri færslu, og það skilur höfuðbók frá töflureikni.
+• Tuttugu og fjórar einingar og þrjátíu og sex líkön í einni þjónustu og einum gagnagrunni.
+• Líkanaskráin er gögn: hver eining lýsir reitum sínum, stöðum og listadálkum.
+• Ný eining er ein JSON-skrá — ekkert DDL, enginn flutningur og engin töflulæsing.
+• Eitt API fyrir öll þrjátíu og sex líkönin og eitt viðmót útbúið úr skránni.
+• Tvíhliða bókhald með upphæðum í heilum sentum; ekki ein einasta fleytitala.
+• Gagnagrunnurinn kannar jafnvægið þegar færslan er staðfest, ekki kóði forritsins.
+• Lokaðar færslur eru óbreytanlegar: þeim er ekki hægt að breyta, eyða né bæta línum við þær.
+• Eitt fylgiskjal, ein færsla: endurtekin tilraun eða tveir opnir flipar geta ekki tvöfaldað tekjurnar.
+• Sameiginleg heiti eru til á öllum 26 tungumálunum, og óþýddur reitur kemur í veg fyrir að þjónustan ræsist.
+• Listar byggðir á vísum: fyrsta síðan af tuttugu þúsund línum berst á innan við millisekúndu.
+
+Dulkóðað í flutningi (TLS 1.3). Innviðir Sytue eru innan ESB. Staðsetning ytri þjónustu fer eftir þjónustuveitanda hennar.

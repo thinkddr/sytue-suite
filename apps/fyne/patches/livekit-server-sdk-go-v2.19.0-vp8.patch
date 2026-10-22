@@ -1,0 +1,274 @@
+# SPDX-License-Identifier: Apache-2.0
+# Sytue codec framing and strict encrypted-data policy; upstream crypto preserved.
+# Zero context avoids treating unified-diff context prefixes as Go whitespace.
+# The exact upstream ZIP SHA and removed lines still pin every applied hunk.
+--- a/e2ee.go
++++ b/e2ee.go
+@@ -48,0 +49,2 @@
++	// CodecVP8 selects the LiveKit JS VP8 key/delta authenticated-header format.
++	CodecVP8
+@@ -86,0 +89,2 @@
++	case CodecVP8:
++		return EncryptGCMVP8SampleCustomCipher, nil
+@@ -98,0 +103,2 @@
++	case CodecVP8:
++		return DecryptGCMVP8SampleCustomCipher, nil
+--- a/encryption.go
++++ b/encryption.go
+@@ -126,0 +127,6 @@
++	return decryptGCMSample(sample, sifTrailer, cipherBlock, unencrypted_audio_bytes)
++}
++
++// Codec framing changes only the authenticated clear header length. GCM, nonce
++// generation, key derivation and the wire trailer remain the maintained SDK path.
++func decryptGCMSample(sample, sifTrailer []byte, cipherBlock cipher.Block, headerBytes int) ([]byte, error) {
+@@ -148,3 +154,6 @@
+-	frameHeader := sample[:unencrypted_audio_bytes] // first unencrypted bytes are "frameHeader" and used for authentication later
+-	frameTrailer := sample[len(sample)-2:]          // last 2 bytes having IV_LENGTH and KID (1 byte each)
+-	ivLength := int(frameTrailer[0])                // single byte, Endianness doesn't matter
++	if headerBytes < 0 || len(sample) < headerBytes+LIVEKIT_IV_LENGTH+16+2 {
++		return nil, ErrIncorrectIVLength
++	}
++	frameHeader := sample[:headerBytes]    // first unencrypted bytes are "frameHeader" and used for authentication later
++	frameTrailer := sample[len(sample)-2:] // last 2 bytes having IV_LENGTH and KID (1 byte each)
++	ivLength := int(frameTrailer[0])       // single byte, Endianness doesn't matter
+@@ -152 +161 @@
+-	if ivStart < 0 {
++	if ivLength != LIVEKIT_IV_LENGTH || ivStart < len(frameHeader)+16 {
+@@ -210,0 +220,4 @@
++	return encryptGCMSample(sample, kid, cipherBlock, unencrypted_audio_bytes)
++}
++
++func encryptGCMSample(sample []byte, kid uint8, cipherBlock cipher.Block, headerBytes int) ([]byte, error) {
+@@ -223 +236,4 @@
+-	frameHeader := append(make([]byte, 0), sample[:unencrypted_audio_bytes]...) // first unencrypted bytes are "frameHeader" and used for authentication later
++	if headerBytes < 0 || len(sample) < headerBytes {
++		return nil, ErrIncorrectIVLength
++	}
++	frameHeader := append(make([]byte, 0), sample[:headerBytes]...) // first unencrypted bytes are "frameHeader" and used for authentication later
+--- /dev/null
++++ b/encryption_vp8.go
+@@ -0,0 +1,50 @@
++// Copyright 2026 Sytue.
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++package lksdk
++
++import (
++	"crypto/cipher"
++	"errors"
++)
++
++// VP8 follows client-sdk-js v2.22.3 FrameCryptor and RFC 6386 section 9.1:
++// the frame tag (3 bytes), and additionally the keyframe header (7 bytes),
++// remain authenticated cleartext. RTP payload descriptors are outside the frame.
++func vp8HeaderBytes(sample []byte) (int, error) {
++	if len(sample) < 3 || (sample[0]>>1)&7 > 3 {
++		return 0, errors.New("invalid VP8 frame tag")
++	}
++	if sample[0]&1 != 0 {
++		return 3, nil
++	}
++	if len(sample) < 10 || sample[3] != 0x9d || sample[4] != 0x01 || sample[5] != 0x2a {
++		return 0, errors.New("invalid VP8 keyframe header")
++	}
++	return 10, nil
++}
++
++func EncryptGCMVP8SampleCustomCipher(sample []byte, kid uint8, block cipher.Block) ([]byte, error) {
++	header, err := vp8HeaderBytes(sample)
++	if err != nil {
++		return nil, err
++	}
++	if len(sample) <= header {
++		return nil, errors.New("VP8 frame has no encoded payload")
++	}
++	return encryptGCMSample(sample, kid, block, header)
++}
++func DecryptGCMVP8SampleCustomCipher(sample, sifTrailer []byte, block cipher.Block) ([]byte, error) {
++	header, err := vp8HeaderBytes(sample)
++	if err != nil {
++		return nil, err
++	}
++	return decryptGCMSample(sample, sifTrailer, block, header)
++}
+--- /dev/null
++++ b/encryption_vp8_test.go
+@@ -0,0 +1,79 @@
++// Copyright 2026 Sytue.
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++package lksdk
++
++import (
++	"bytes"
++	"testing"
++
++	"github.com/livekit/server-sdk-go/v2/e2ee"
++)
++
++func TestVP8AuthenticatedHeaderRoundTrip(t *testing.T) {
++	kp := e2ee.NewExternalKeyProvider()
++	if err := kp.SetKeyFromPassphrase("artificial-test-only-key-material", 0); err != nil {
++		t.Fatal(err)
++	}
++	enc, err := NewFrameEncryptor(kp, CodecVP8)
++	if err != nil {
++		t.Fatal(err)
++	}
++	dec, err := NewFrameDecryptor(kp, CodecVP8, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	for _, frame := range [][]byte{
++		{0x10, 0, 0, 0x9d, 0x01, 0x2a, 0x40, 0, 0x40, 0, 1, 2, 3, 4, 5},
++		{0x11, 0, 0, 6, 7, 8, 9},
++	} {
++		wire, err := enc.EncryptFrame(frame)
++		if err != nil {
++			t.Fatal(err)
++		}
++		actual, err := dec.DecryptFrame(wire)
++		if err != nil || !bytes.Equal(actual, frame) {
++			t.Fatal("round trip", err)
++		}
++		header, err := vp8HeaderBytes(frame)
++		if err != nil {
++			t.Fatal(err)
++		}
++		for offset := range header {
++			modified := bytes.Clone(wire)
++			modified[offset] ^= 1
++			if _, err := dec.DecryptFrame(modified); err == nil {
++				t.Fatal("accepted manipulated authenticated header byte", offset)
++			}
++		}
++	}
++}
++func TestVP8RejectsMalformedFramesWithoutPanic(t *testing.T) {
++	kp := e2ee.NewExternalKeyProvider()
++	if err := kp.SetKeyFromPassphrase("artificial-test-only-key-material", 0); err != nil {
++		t.Fatal(err)
++	}
++	enc, err := NewFrameEncryptor(kp, CodecVP8)
++	if err != nil {
++		t.Fatal(err)
++	}
++	dec, err := NewFrameDecryptor(kp, CodecVP8, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	for _, frame := range [][]byte{nil, {}, {0}, {0x11, 0}, {0x10, 0, 0}, {0x10, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0x1f, 0, 0, 0}, {0x11, 0, 0}} {
++		if _, err := enc.EncryptFrame(frame); err == nil {
++			t.Fatal("accepted malformed source")
++		}
++		if _, err := dec.DecryptFrame(frame); err == nil {
++			t.Fatal("accepted malformed encrypted frame")
++		}
++	}
++}
+--- a/engine.go
++++ b/engine.go
+@@ -762,0 +763,5 @@
++	// Sytue: never deliver plaintext packets while data E2EE is required.
++	if e.dataCryptor != nil && packet.GetEncryptedPacket() == nil {
++		return
++	}
++
+--- a/e2ee/datacryptor.go
++++ b/e2ee/datacryptor.go
+@@ -104,0 +105,4 @@
++	// Sytue: encrypted calls reject downgrade/unknown envelopes before decryption.
++	if ep == nil || ep.EncryptionType != livekit.Encryption_GCM {
++		return nil, fmt.Errorf("unsupported data encryption type")
++	}
+--- /dev/null
++++ b/data_encryption_policy_test.go
+@@ -0,0 +1,73 @@
++// Copyright 2026 Sytue.
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++package lksdk
++
++import (
++	"bytes"
++	"github.com/livekit/protocol/livekit"
++	"github.com/livekit/server-sdk-go/v2/e2ee"
++	"github.com/pion/webrtc/v4"
++	"google.golang.org/protobuf/proto"
++	"testing"
++)
++
++type dataPolicyHandler struct {
++	engineHandler
++	received int
++	payload  []byte
++}
++
++func (h *dataPolicyHandler) OnDataPacket(_ string, packet DataPacket) {
++	h.received++
++	h.payload = packet.(*UserDataPacket).Payload
++}
++func TestDataEncryptionPolicyBeforeHandler(t *testing.T) {
++	kp := e2ee.NewExternalKeyProvider()
++	if err := kp.SetKeyFromPassphrase("artificial-test-only-key-material", 0); err != nil {
++		t.Fatal(err)
++	}
++	dc := e2ee.NewDataCryptor(kp)
++	handler := &dataPolicyHandler{}
++	engine := &RTCEngine{dataCryptor: dc, engineHandler: handler, log: logger}
++	plaintext := []byte(`{"t":"mano","alzada":true}`)
++	packet := &livekit.DataPacket{ParticipantIdentity: "artificial-user", Value: &livekit.DataPacket_User{User: &livekit.UserPacket{Payload: plaintext}}}
++	deliver := func(packet *livekit.DataPacket) {
++		wire, err := proto.Marshal(packet)
++		if err != nil {
++			t.Fatal(err)
++		}
++		engine.handleDataPacket(webrtc.DataChannelMessage{Data: wire})
++	}
++	deliver(packet)
++	if handler.received != 0 {
++		t.Fatal("plaintext reached encrypted handler")
++	}
++	cipher, err := dc.Encrypt(packet)
++	if err != nil {
++		t.Fatal(err)
++	}
++	none := proto.Clone(cipher).(*livekit.DataPacket)
++	none.GetEncryptedPacket().EncryptionType = livekit.Encryption_NONE
++	deliver(none)
++	if handler.received != 0 {
++		t.Fatal("NONE downgrade reached encrypted handler")
++	}
++	tampered := proto.Clone(cipher).(*livekit.DataPacket)
++	tampered.GetEncryptedPacket().EncryptedValue[0] ^= 1
++	deliver(tampered)
++	if handler.received != 0 {
++		t.Fatal("tampered data reached encrypted handler")
++	}
++	deliver(cipher)
++	if handler.received != 1 || !bytes.Equal(handler.payload, plaintext) {
++		t.Fatal("GCM packet did not reach handler")
++	}
++}

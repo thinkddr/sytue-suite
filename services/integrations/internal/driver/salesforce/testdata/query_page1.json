@@ -1,0 +1,19 @@
+{
+  "totalSize": 3,
+  "done": false,
+  "nextRecordsUrl": "/services/data/v61.0/query/01g5e00000AbCdEfGHI-2000",
+  "records": [
+    {
+      "attributes": { "type": "Account", "url": "/services/data/v61.0/sobjects/Account/0015e00000AAA111" },
+      "Id": "0015e00000AAA111",
+      "Name": "Acme Corporation",
+      "AnnualRevenue": 1250000
+    },
+    {
+      "attributes": { "type": "Account", "url": "/services/data/v61.0/sobjects/Account/0015e00000BBB222" },
+      "Id": "0015e00000BBB222",
+      "Name": "Globex",
+      "AnnualRevenue": 480000
+    }
+  ]
+}

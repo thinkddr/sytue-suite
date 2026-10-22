@@ -1,0 +1,19 @@
+Zasebna, evropska e-pošta prek JMAP — brez sledilnikov in brez oglasov.
+
+• Hiter nabiralnik z nitmi, oznakami, filtri in iskanjem.
+• Pripenjanje datotek neposredno iz Sytue Drive.
+• E-poštno sporočilo kot dogodek v Calendar.
+• Šifrirano med prenosom (TLS 1.3). Infrastruktura Sytue je v EU. Lokacija zunanjih storitev je odvisna od njihovega ponudnika.
+• Niti pogovorov z branjem, odgovorom in posredovanjem z enim klikom.
+• Mape, barvne oznake in iskanje z operatorji (from:, has:attachment, is:unread…).
+• Samodejna pravila, ki pošto ob prejemu arhivirajo, označijo ali premaknejo.
+• Načrtovano pošiljanje in »Razveljavi pošiljanje«.
+• Podpisi, vzdevki naslovov in samodejni odgovor v odsotnosti.
+• Nabiralniki v skupni rabi in pooblaščeni nabiralniki z dovoljenji za branje in pošiljanje.
+• Urejevalnik oblikovanega besedila s prilogami iz Sytue Drive brez podvajanja datotek.
+• Oddaljena vsebina je privzeto blokirana: nihče ne izve, kdaj odprete e-poštno sporočilo.
+• Podpisana pošta (PGP in S/MIME) je prepoznana in označena; TLS med prenosom.
+• Dostop tudi iz Thunderbirda, Outlooka, Apple Mail ali telefona, z gesli za aplikacije.
+• Naslovi kot oznake z imenikom Contacts na en klik in opozorilo, če napišete »v prilogi«, a ničesar ne pripnete.
+
+Šifrirano med prenosom (TLS 1.3). Infrastruktura Sytue je v EU. Lokacija zunanjih storitev je odvisna od njihovega ponudnika.

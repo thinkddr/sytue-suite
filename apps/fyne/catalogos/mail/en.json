@@ -225,6 +225,7 @@
   "error.undoSendGone": "It is too late to undo; the message has already gone out",
   "externalMail.account": "Account",
   "externalMail.add": "Add email account",
+  "externalMail.advanced": "Advanced options",
   "externalMail.attach": "Attach files",
   "externalMail.authError": "Sign-in was not accepted. Reconnect the account or check the username and app password.",
   "externalMail.authorize": "Continue to provider",

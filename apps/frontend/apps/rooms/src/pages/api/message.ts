@@ -31,7 +31,7 @@ export const POST: APIRoute = async (ctx) => {
     try {
       await client.deleteMessage(messageId);
       return json({ ok: true });
-    } catch (err) {
+    } catch {
       return json({ error: 'chat_error' }, 502);
     }
   }
@@ -44,7 +44,7 @@ export const POST: APIRoute = async (ctx) => {
   try {
     const message = await client.editMessage(messageId, body, matrixEvent);
     return json({ message });
-  } catch (err) {
+  } catch {
     return json({ error: 'chat_error' }, 502);
   }
 };

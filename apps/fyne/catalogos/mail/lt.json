@@ -231,6 +231,7 @@
   "error.undoSendGone": "Atšaukti jau per vėlu; laiškas jau išsiųstas",
   "externalMail.account": "Paskyra",
   "externalMail.add": "Pridėti el. pašto paskyrą",
+  "externalMail.advanced": "Išplėstinės parinktys",
   "externalMail.attach": "Pridėti failų",
   "externalMail.authError": "Prisijungimas atmestas. Prijunkite paskyrą iš naujo arba patikrinkite naudotojo vardą ir programėlės slaptažodį.",
   "externalMail.authorize": "Tęsti pas teikėją",

@@ -20,7 +20,7 @@ export const GET: APIRoute = async (ctx) => {
   try {
     const client = chatClient({ accessToken: session.accessToken, userId: session.user.id });
     return json({ emoji: await client.listCustomEmoji(ctx.request.signal) });
-  } catch (err) {
+  } catch {
     return json({ error: 'chat_error' }, 502);
   }
 };
@@ -47,7 +47,7 @@ export const POST: APIRoute = async (ctx) => {
     const fileId = payload.fileId?.trim();
     if (!fileId) return json({ error: 'missing_fileId' }, 400);
     return json({ emoji: await client.createCustomEmoji(name, fileId, ctx.request.signal) }, 201);
-  } catch (err) {
+  } catch {
     return json({ error: 'chat_error' }, 502);
   }
 };

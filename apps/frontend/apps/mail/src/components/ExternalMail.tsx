@@ -365,31 +365,41 @@ export function ExternalMail({ onClose, t }: { onClose: () => void; t: T }): JSX
                     onInput={(event) => field('host', event.currentTarget.value)}
                   />
                 </FieldGroup>
-                <FieldGroup label={t('externalMail.port')} htmlFor="external-mail-incoming_port">
-                  <Input
-                    id="external-mail-incoming_port"
-                    name="incoming_port"
-                    type="number"
-                    min={1}
-                    max={65535}
-                    required
-                    value={form.port}
-                    onInput={(event) => field('port', event.currentTarget.value)}
-                  />
-                </FieldGroup>
-                <FieldGroup
-                  label={t('externalMail.username')}
-                  htmlFor="external-mail-incoming_user"
+                <details
+                  class="space-y-3"
+                  onInvalidCapture={(event) => {
+                    event.currentTarget.open = true;
+                  }}
                 >
-                  <Input
-                    id="external-mail-incoming_user"
-                    name="incoming_user"
-                    value={form.username}
-                    autoCapitalize="none"
-                    spellcheck={false}
-                    onInput={(event) => field('username', event.currentTarget.value)}
-                  />
-                </FieldGroup>
+                  <summary class="text-text cursor-pointer text-sm font-medium">
+                    {t('externalMail.advanced')}
+                  </summary>
+                  <FieldGroup label={t('externalMail.port')} htmlFor="external-mail-incoming_port">
+                    <Input
+                      id="external-mail-incoming_port"
+                      name="incoming_port"
+                      type="number"
+                      min={1}
+                      max={65535}
+                      required
+                      value={form.port}
+                      onInput={(event) => field('port', event.currentTarget.value)}
+                    />
+                  </FieldGroup>
+                  <FieldGroup
+                    label={t('externalMail.username')}
+                    htmlFor="external-mail-incoming_user"
+                  >
+                    <Input
+                      id="external-mail-incoming_user"
+                      name="incoming_user"
+                      value={form.username}
+                      autoCapitalize="none"
+                      spellcheck={false}
+                      onInput={(event) => field('username', event.currentTarget.value)}
+                    />
+                  </FieldGroup>
+                </details>
                 <FieldGroup
                   label={t('externalMail.password')}
                   htmlFor="external-mail-incoming_password"
@@ -420,59 +430,69 @@ export function ExternalMail({ onClose, t }: { onClose: () => void; t: T }): JSX
                     onInput={(event) => field('smtpHost', event.currentTarget.value)}
                   />
                 </FieldGroup>
-                <FieldGroup label={t('externalMail.port')} htmlFor="external-mail-smtp_port">
-                  <Input
-                    id="external-mail-smtp_port"
-                    name="smtp_port"
-                    type="number"
-                    min={1}
-                    max={65535}
-                    required
-                    value={form.smtpPort}
-                    onInput={(event) => field('smtpPort', event.currentTarget.value)}
-                  />
-                </FieldGroup>
-                <FieldGroup
-                  label={t('externalMail.security')}
-                  htmlFor="external-mail-smtp_security"
+                <details
+                  class="space-y-3"
+                  onInvalidCapture={(event) => {
+                    event.currentTarget.open = true;
+                  }}
                 >
-                  <Select
-                    id="external-mail-smtp_security"
-                    name="smtp_security"
-                    value={form.smtpSecurity}
-                    onChange={(event) => {
-                      const value = event.currentTarget.value === 'starttls' ? 'starttls' : 'tls';
-                      field('smtpSecurity', value);
-                      field('smtpPort', value === 'tls' ? '465' : '587');
-                    }}
+                  <summary class="text-text cursor-pointer text-sm font-medium">
+                    {t('externalMail.advanced')}
+                  </summary>
+                  <FieldGroup label={t('externalMail.port')} htmlFor="external-mail-smtp_port">
+                    <Input
+                      id="external-mail-smtp_port"
+                      name="smtp_port"
+                      type="number"
+                      min={1}
+                      max={65535}
+                      required
+                      value={form.smtpPort}
+                      onInput={(event) => field('smtpPort', event.currentTarget.value)}
+                    />
+                  </FieldGroup>
+                  <FieldGroup
+                    label={t('externalMail.security')}
+                    htmlFor="external-mail-smtp_security"
                   >
-                    <option value="tls">TLS</option>
-                    <option value="starttls">STARTTLS</option>
-                  </Select>
-                </FieldGroup>
-                <FieldGroup label={t('externalMail.username')} htmlFor="external-mail-smtp_user">
-                  <Input
-                    id="external-mail-smtp_user"
-                    name="smtp_user"
-                    value={form.smtpUser}
-                    autoCapitalize="none"
-                    spellcheck={false}
-                    onInput={(event) => field('smtpUser', event.currentTarget.value)}
-                  />
-                </FieldGroup>
-                <FieldGroup
-                  label={t('externalMail.smtpPassword')}
-                  htmlFor="external-mail-smtp_password"
-                >
-                  <Input
-                    id="external-mail-smtp_password"
-                    name="smtp_password"
-                    type="password"
-                    autoComplete="current-password"
-                    value={form.smtpPassword}
-                    onInput={(event) => field('smtpPassword', event.currentTarget.value)}
-                  />
-                </FieldGroup>
+                    <Select
+                      id="external-mail-smtp_security"
+                      name="smtp_security"
+                      value={form.smtpSecurity}
+                      onChange={(event) => {
+                        const value = event.currentTarget.value === 'starttls' ? 'starttls' : 'tls';
+                        field('smtpSecurity', value);
+                        field('smtpPort', value === 'tls' ? '465' : '587');
+                      }}
+                    >
+                      <option value="tls">TLS</option>
+                      <option value="starttls">STARTTLS</option>
+                    </Select>
+                  </FieldGroup>
+                  <FieldGroup label={t('externalMail.username')} htmlFor="external-mail-smtp_user">
+                    <Input
+                      id="external-mail-smtp_user"
+                      name="smtp_user"
+                      value={form.smtpUser}
+                      autoCapitalize="none"
+                      spellcheck={false}
+                      onInput={(event) => field('smtpUser', event.currentTarget.value)}
+                    />
+                  </FieldGroup>
+                  <FieldGroup
+                    label={t('externalMail.smtpPassword')}
+                    htmlFor="external-mail-smtp_password"
+                  >
+                    <Input
+                      id="external-mail-smtp_password"
+                      name="smtp_password"
+                      type="password"
+                      autoComplete="current-password"
+                      value={form.smtpPassword}
+                      onInput={(event) => field('smtpPassword', event.currentTarget.value)}
+                    />
+                  </FieldGroup>
+                </details>
               </fieldset>
               <button hidden aria-hidden="true" tabIndex={-1} type="submit">
                 {t('externalMail.review')}

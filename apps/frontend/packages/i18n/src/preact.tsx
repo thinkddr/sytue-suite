@@ -10,7 +10,7 @@ import {
   applyDocumentLocale,
   detectLocale,
   persistLocale,
-  readLocaleCookie,
+  readLocalePreference,
   type Locale,
 } from './locale.js';
 import { createTranslate, type Translate } from './translate.js';
@@ -49,8 +49,7 @@ function buildValue(
     preference,
     t: createTranslate(locale),
     setLocale: (next) => {
-      if (next === (typeof document === 'undefined' ? null : readLocaleCookie(document.cookie)))
-        return;
+      if (next === readLocalePreference()) return;
       persistLocale(next);
       if (next !== null) {
         applyDocumentLocale(next);
@@ -74,7 +73,7 @@ export function I18nProvider({ locale, children }: I18nProviderProps): JSX.Eleme
   // no conserve el «Sistema» del HTML inicial al haber una preferencia explícita.
   const [preference, setPreference] = useState<Locale | null>(null);
   useEffect(() => {
-    setPreference(readLocaleCookie(document.cookie));
+    setPreference(readLocalePreference());
   }, []);
   const value = useMemo<I18nValue>(
     () => buildValue(current, preference, setCurrent),
@@ -102,10 +101,7 @@ let orphanLang: string | null = null;
 function valorHuerfano(lang: string): I18nValue {
   if (orphan === null || lang !== orphanLang) {
     orphanLang = lang;
-    orphan = buildValue(
-      detectLocale(),
-      typeof document === 'undefined' ? null : readLocaleCookie(document.cookie),
-    );
+    orphan = buildValue(detectLocale(), readLocalePreference());
   }
   return orphan;
 }
@@ -116,7 +112,7 @@ export function useI18n(): I18nValue {
   return valorHuerfano(
     typeof document === 'undefined'
       ? ''
-      : `${document.documentElement.lang}\0${readLocaleCookie(document.cookie) ?? ''}`,
+      : `${document.documentElement.lang}\0${readLocalePreference() ?? ''}`,
   );
 }
 

@@ -29,7 +29,7 @@ export const GET: APIRoute = async (ctx) => {
   try {
     const meetings = await meetClient({ accessToken: session.accessToken }).listMeetings(status);
     return json({ meetings });
-  } catch (err) {
+  } catch {
     return json({ error: 'meet_error' }, 502);
   }
 };
@@ -58,7 +58,7 @@ export const POST: APIRoute = async (ctx) => {
       device,
     );
     return json(call, 201);
-  } catch (err) {
+  } catch {
     return json({ error: 'meet_error' }, 502);
   }
 };

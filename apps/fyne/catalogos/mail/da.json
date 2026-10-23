@@ -225,6 +225,7 @@
   "error.undoSendGone": "Det er for sent at fortryde; beskeden er allerede sendt",
   "externalMail.account": "Konto",
   "externalMail.add": "Tilføj mailkonto",
+  "externalMail.advanced": "Avancerede indstillinger",
   "externalMail.attach": "Vedhæft filer",
   "externalMail.authError": "Login blev afvist. Forbind kontoen igen, eller kontrollér brugernavn og appadgangskode.",
   "externalMail.authorize": "Fortsæt til udbyder",

@@ -749,6 +749,7 @@ export const lt: AppCatalog<typeof en> = {
   'externalMail.username': 'Naudotojo vardas (el. pašto adresas, jei tuščia)',
   'externalMail.password': 'Slaptažodis arba programėlės slaptažodis',
   'externalMail.smtpPassword': 'SMTP slaptažodis (gaunamojo pašto slaptažodis, jei tuščia)',
+  'externalMail.advanced': 'Išplėstinės parinktys',
   'externalMail.security': 'SMTP ryšio sauga',
   'externalMail.review': 'Peržiūrėti',
   'externalMail.testBody':

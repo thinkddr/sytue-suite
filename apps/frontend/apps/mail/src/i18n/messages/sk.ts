@@ -741,6 +741,7 @@ export const sk: AppCatalog<typeof en> = {
   'externalMail.password': 'Heslo alebo heslo aplikácie',
   'externalMail.smtpPassword':
     'Heslo SMTP (ak je pole prázdne, rovnaké ako pre prichádzajúcu poštu)',
+  'externalMail.advanced': 'Rozšírené možnosti',
   'externalMail.security': 'Zabezpečenie pripojenia SMTP',
   'externalMail.review': 'Skontrolovať',
   'externalMail.testBody':

@@ -33,7 +33,7 @@ export const GET: APIRoute = async (ctx) => {
       // cacheada mandaría a la gente a un enlace muerto.
       headers: { location: url, 'cache-control': 'no-store' },
     });
-  } catch (err) {
+  } catch {
     return json({ error: 'meet_error' }, 502);
   }
 };

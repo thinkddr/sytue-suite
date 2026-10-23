@@ -225,6 +225,7 @@
   "error.undoSendGone": "Troppo tardi per annullare: il messaggio è già partito",
   "externalMail.account": "Account",
   "externalMail.add": "Aggiungi account email",
+  "externalMail.advanced": "Opzioni avanzate",
   "externalMail.attach": "Allega file",
   "externalMail.authError": "L’accesso è stato rifiutato. Ricollega l’account o controlla il nome utente e la password per l’app.",
   "externalMail.authorize": "Continua al provider",

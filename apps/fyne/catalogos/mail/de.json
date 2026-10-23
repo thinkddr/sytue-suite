@@ -225,6 +225,7 @@
   "error.undoSendGone": "Zu spät zum Rückgängigmachen: Die Nachricht ist bereits raus",
   "externalMail.account": "Konto",
   "externalMail.add": "E-Mail-Konto hinzufügen",
+  "externalMail.advanced": "Erweiterte Optionen",
   "externalMail.attach": "Dateien anhängen",
   "externalMail.authError": "Die Anmeldung wurde abgelehnt. Verbinde das Konto erneut oder prüfe Benutzername und App-Passwort.",
   "externalMail.authorize": "Weiter zum Anbieter",

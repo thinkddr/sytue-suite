@@ -687,6 +687,7 @@ export const et: AppCatalog<typeof en> = {
   'externalMail.username': 'Kasutajanimi (tühjaks jätmisel e-posti aadress)',
   'externalMail.password': 'Parool või rakenduse parool',
   'externalMail.smtpPassword': 'SMTP-parool (tühjaks jätmisel saabuva posti parool)',
+  'externalMail.advanced': 'Täpsemad valikud',
   'externalMail.security': 'SMTP-ühenduse turvalisus',
   'externalMail.review': 'Vaata üle',
   'externalMail.testBody':

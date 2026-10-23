@@ -732,6 +732,7 @@ export const lv: AppCatalog<typeof en> = {
   'externalMail.username': 'Lietotājvārds (e-pasta adrese, ja tukšs)',
   'externalMail.password': 'Parole vai lietotnes parole',
   'externalMail.smtpPassword': 'SMTP parole (ienākošā pasta parole, ja tukšs)',
+  'externalMail.advanced': 'Papildu opcijas',
   'externalMail.security': 'SMTP savienojuma drošība',
   'externalMail.review': 'Pārskatīt',
   'externalMail.testBody':

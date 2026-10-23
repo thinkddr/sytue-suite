@@ -9,7 +9,7 @@
  * que vuelve a validarlo: aquí solo se evita mandar lo que ya se sabe inválido.
  */
 import type { JSX } from 'preact';
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { Button, Checkbox, Icon, Input, Select } from '@sytue/ui';
 import type { BasesField, BasesRecord, BasesValue } from '@sytue/api-clients/bases';
 import type { T } from '../i18n/index.js';
@@ -73,13 +73,16 @@ export function Rejilla(p: RejillaProps): JSX.Element {
     }));
   }, [registros.length, campos.length]);
 
-  // Al abrir el editor de una celda, el foco va a él (Preact no honra `autofocus` en
-  // elementos que se montan después de la carga).
-  useEffect(() => {
+  // El editor recibe foco y cursor al montarse, antes de que llegue otra tecla.
+  // Un efecto pasivo puede mover el cursor después de Ctrl+A o de empezar a escribir.
+  useLayoutEffect(() => {
     if (!editando) return;
     const el = document.getElementById(`ed-${editando.fila}-${editando.col}`);
     el?.focus();
-    if (el instanceof HTMLInputElement) el.setSelectionRange(el.value.length, el.value.length);
+    // Los campos de fecha no admiten selección de texto; los números usan type=text.
+    if (el instanceof HTMLInputElement && el.type === 'text') {
+      el.setSelectionRange(el.value.length, el.value.length);
+    }
   }, [editando]);
 
   function enfocar(c: Celda): void {

@@ -47,7 +47,7 @@ export const GET: APIRoute = async (ctx) => {
       return extra ? { ...b, ...extra } : b;
     });
     return json({ addressBooks: conId });
-  } catch (err) {
+  } catch {
     return json({ error: 'carddav_error', message: 'CardDAV request failed' }, 502);
   }
 };

@@ -225,6 +225,7 @@
   "error.undoSendGone": "Of seint að hætta við; skilaboðin eru þegar farin",
   "externalMail.account": "Reikningur",
   "externalMail.add": "Bæta við tölvupóstreikningi",
+  "externalMail.advanced": "Ítarlegir valkostir",
   "externalMail.attach": "Hengja við skrár",
   "externalMail.authError": "Innskráningu var hafnað. Tengdu reikninginn aftur eða athugaðu notandanafn og forritsaðgangsorð.",
   "externalMail.authorize": "Halda áfram til þjónustuaðila",

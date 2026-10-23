@@ -741,6 +741,7 @@ export const cs: AppCatalog<typeof en> = {
   'externalMail.username': 'Uživatelské jméno (pokud je prázdné, e-mailová adresa)',
   'externalMail.password': 'Heslo nebo heslo aplikace',
   'externalMail.smtpPassword': 'Heslo SMTP (pokud je prázdné, stejné jako pro příchozí poštu)',
+  'externalMail.advanced': 'Pokročilé možnosti',
   'externalMail.security': 'Zabezpečení spojení SMTP',
   'externalMail.review': 'Zkontrolovat',
   'externalMail.testBody':

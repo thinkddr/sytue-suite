@@ -225,6 +225,7 @@
   "error.undoSendGone": "A visszavonáshoz már késő; az üzenet elment",
   "externalMail.account": "Fiók",
   "externalMail.add": "E-mail-fiók hozzáadása",
+  "externalMail.advanced": "Speciális beállítások",
   "externalMail.attach": "Fájlok csatolása",
   "externalMail.authError": "A bejelentkezést elutasították. Csatlakoztasd újra a fiókot, vagy ellenőrizd a felhasználónevet és az alkalmazásjelszót.",
   "externalMail.authorize": "Tovább a szolgáltatóhoz",

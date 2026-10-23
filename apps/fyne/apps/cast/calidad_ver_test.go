@@ -150,6 +150,91 @@ func TestAutomaticaEligePorElTamano(t *testing.T) {
 	a.Ir(RutaInicio)
 }
 
+// Sin redimensionar, el reloj también debe bajar la calidad si la red deja de
+// alcanzar. No cambia durante la pausa, el margen entre cambios ni una elección fija.
+func TestAutomaticaReevaluaLaRedSinRedimensionar(t *testing.T) {
+	a, _, vaciar, _ := verConEscalera(t)
+	a.elegirCalidad(1080)
+	vaciar("la calidad fija inicial", func() bool { return !a.ver.cambiando && a.ver.enUso == 1080 })
+	// Acabar los avisos de layout antes de probar sólo el reloj.
+	a.visor.AlMedir = nil
+	if a.ver.esperaAuto != nil {
+		a.ver.esperaAuto.Stop()
+	}
+	durante := func() {
+		hasta := time.Now().Add(650 * time.Millisecond)
+		vaciar("un pulso del reloj", func() bool { return !time.Now().Before(hasta) })
+	}
+	durante()
+	redLenta := func() {
+		m := a.ver.medida
+		m.mu.Lock()
+		m.bytes, m.esperado = 256<<10, 100*time.Hour
+		m.mu.Unlock()
+	}
+	redLenta()
+	a.ver.calidad = 0
+	a.ver.ultimoAuto = time.Now().Add(-2 * pausaAuto)
+	if q := a.objetivoAuto(); q != 360 {
+		t.Fatalf("la red de prueba debería exigir 360p, pide %d", q)
+	}
+	viejo := a.reproductor
+	durante()
+	if a.reproductor != viejo || a.ver.cambiando {
+		t.Fatal("el reloj cambió de calidad con el vídeo pausado")
+	}
+	a.ver.ultimoAuto = time.Now()
+	viejo.Reproducir()
+	durante()
+	if a.reproductor != viejo || a.ver.cambiando {
+		t.Fatal("el reloj no respetó el margen entre cambios automáticos")
+	}
+	a.ver.ultimoAuto = time.Now().Add(-2 * pausaAuto)
+	vaciar("la bajada automática sin redimensionar", func() bool {
+		return !a.ver.cambiando && a.ver.enUso == 360 && a.reproductor != viejo
+	})
+	if a.ver.calidad != 0 {
+		t.Fatal("el reloj sustituyó Automática por una elección fija")
+	}
+	a.elegirCalidad(1080)
+	vaciar("la elección manual", func() bool { return !a.ver.cambiando && a.ver.enUso == 1080 })
+	redLenta()
+	a.ver.ultimoAuto = time.Now().Add(-2 * pausaAuto)
+	manual := a.reproductor
+	durante()
+	if a.reproductor != manual || a.ver.cambiando || a.ver.calidad != 1080 {
+		t.Fatal("el reloj alteró la calidad elegida a mano")
+	}
+	a.Ir(RutaInicio)
+}
+
+func TestRelojCanceladoDescartaElPulsoEnCola(t *testing.T) {
+	a := &App{visor: NuevoVisor(vistaDePrueba(t, 0))}
+	a.visor.Mando = &mandoFalso{}
+	a.visor.Rehacer()
+	a.visor.tiempo.Text = "sin actualizar"
+	cola := make(chan func(), 1)
+	a.enLaInterfaz = func(f func()) { cola <- f }
+	parar, terminado := make(chan struct{}), make(chan struct{})
+	go func() {
+		a.reloj(a.gen, parar)
+		close(terminado)
+	}()
+	var pulso func()
+	select {
+	case pulso = <-cola:
+	case <-time.After(3 * time.Second):
+		close(parar)
+		t.Fatal("el reloj no envió el pulso a la interfaz")
+	}
+	close(parar)
+	<-terminado
+	pulso()
+	if a.visor.tiempo.Text != "sin actualizar" {
+		t.Fatal("un pulso pendiente actualizó la vista después de cancelarse")
+	}
+}
+
 // textosEnCapa junta los rótulos del menú abierto.
 func textosEnCapa(w fyne.Window) string {
 	var b strings.Builder

@@ -34,7 +34,7 @@ export const POST: APIRoute = async (ctx) => {
       userId: session.user.id,
     }).openDirect(subjects);
     return json({ channel });
-  } catch (err) {
+  } catch {
     return json({ error: 'chat_error' }, 502);
   }
 };

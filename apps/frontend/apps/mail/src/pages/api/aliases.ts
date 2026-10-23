@@ -33,7 +33,7 @@ export const GET: APIRoute = async (ctx) => {
     if (!res.ok) return json({ error: 'mail_error', status: res.status }, 502);
     const body = (await res.json()) as { aliases?: RawAlias[]; primary?: string };
     return json({ aliases: (body.aliases ?? []).map(mapAlias), primary: body.primary ?? '' });
-  } catch (err) {
+  } catch {
     return json({ error: 'mail_error', message: 'Mail service request failed' }, 502);
   }
 };
@@ -77,7 +77,7 @@ export const POST: APIRoute = async (ctx) => {
       return json({ alias: mapAlias((await res.json()) as RawAlias) }, 201);
     }
     return json({ error: 'invalid_payload' }, 400);
-  } catch (err) {
+  } catch {
     return json({ error: 'mail_error', message: 'Mail service request failed' }, 502);
   }
 };

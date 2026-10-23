@@ -225,6 +225,7 @@
   "error.undoSendGone": "Ya no se puede deshacer; el correo ha salido",
   "externalMail.account": "Cuenta",
   "externalMail.add": "Añadir cuenta de correo",
+  "externalMail.advanced": "Opciones avanzadas",
   "externalMail.attach": "Adjuntar archivos",
   "externalMail.authError": "No se aceptó el inicio de sesión. Vuelve a conectar la cuenta o revisa el usuario y la contraseña de aplicación.",
   "externalMail.authorize": "Continuar al proveedor",

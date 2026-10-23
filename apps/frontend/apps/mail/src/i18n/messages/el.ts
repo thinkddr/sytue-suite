@@ -704,6 +704,7 @@ export const el: AppCatalog<typeof en> = {
   'externalMail.username': 'Όνομα χρήστη (διεύθυνση email αν είναι κενό)',
   'externalMail.password': 'Κωδικός ή κωδικός εφαρμογής',
   'externalMail.smtpPassword': 'Κωδικός SMTP (όπως των εισερχομένων αν είναι κενό)',
+  'externalMail.advanced': 'Σύνθετες επιλογές',
   'externalMail.security': 'Ασφάλεια σύνδεσης SMTP',
   'externalMail.review': 'Έλεγχος',
   'externalMail.testBody':

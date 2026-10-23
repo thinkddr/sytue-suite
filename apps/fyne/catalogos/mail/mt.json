@@ -231,6 +231,7 @@
   "error.undoSendGone": "Tard wisq biex tħassar il-bgħit; il-messaġġ diġà ntbagħat",
   "externalMail.account": "Kont",
   "externalMail.add": "Żid kont tal-email",
+  "externalMail.advanced": "Għażliet avvanzati",
   "externalMail.attach": "Ehmeż fajls",
   "externalMail.authError": "Id-dħul ġie rrifjutat. Erġa’ qabbad il-kont jew iċċekkja l-isem tal-utent u l-password tal-app.",
   "externalMail.authorize": "Kompli għand il-fornitur",

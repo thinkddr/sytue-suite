@@ -225,6 +225,7 @@
   "error.undoSendGone": "Είναι αργά για αναίρεση· το μήνυμα έχει ήδη σταλεί",
   "externalMail.account": "Λογαριασμός",
   "externalMail.add": "Προσθήκη λογαριασμού email",
+  "externalMail.advanced": "Σύνθετες επιλογές",
   "externalMail.attach": "Επισύναψη αρχείων",
   "externalMail.authError": "Η σύνδεση απορρίφθηκε. Συνδέστε ξανά τον λογαριασμό ή ελέγξτε το όνομα χρήστη και τον κωδικό εφαρμογής.",
   "externalMail.authorize": "Συνέχεια στον πάροχο",

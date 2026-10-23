@@ -228,6 +228,7 @@
   "error.undoSendGone": "Prekasno je za poništavanje; poruka je već poslana",
   "externalMail.account": "Račun",
   "externalMail.add": "Dodaj račun e-pošte",
+  "externalMail.advanced": "Napredne opcije",
   "externalMail.attach": "Priloži datoteke",
   "externalMail.authError": "Prijava je odbijena. Ponovno povežite račun ili provjerite korisničko ime i lozinku za aplikaciju.",
   "externalMail.authorize": "Nastavi kod pružatelja",

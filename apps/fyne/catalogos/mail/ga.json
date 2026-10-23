@@ -234,6 +234,7 @@
   "error.undoSendGone": "Tá sé ródhéanach é a chealú; tá an teachtaireacht imithe cheana",
   "externalMail.account": "Cuntas",
   "externalMail.add": "Cuir cuntas ríomhphoist leis",
+  "externalMail.advanced": "Ardroghanna",
   "externalMail.attach": "Ceangail comhaid",
   "externalMail.authError": "Diúltaíodh don síniú isteach. Nasc an cuntas arís nó seiceáil an t-ainm úsáideora agus pasfhocal na haipe.",
   "externalMail.authorize": "Lean ar aghaidh chuig an soláthraí",

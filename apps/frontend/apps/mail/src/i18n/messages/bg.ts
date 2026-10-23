@@ -702,6 +702,7 @@ export const bg: AppCatalog<typeof en> = {
   'externalMail.username': 'Потребителско име (имейл адресът, ако е празно)',
   'externalMail.password': 'Парола или парола за приложение',
   'externalMail.smtpPassword': 'SMTP парола (като за входящата поща, ако е празно)',
+  'externalMail.advanced': 'Разширени опции',
   'externalMail.security': 'Защита на SMTP връзката',
   'externalMail.review': 'Преглед',
   'externalMail.testBody':

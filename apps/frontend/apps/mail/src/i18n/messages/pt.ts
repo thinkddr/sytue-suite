@@ -693,6 +693,7 @@ export const pt: AppCatalog<typeof en> = {
   'externalMail.username': 'Nome de utilizador (endereço de email se vazio)',
   'externalMail.password': 'Palavra-passe ou palavra-passe de aplicação',
   'externalMail.smtpPassword': 'Palavra-passe SMTP (a do correio recebido se vazio)',
+  'externalMail.advanced': 'Opções avançadas',
   'externalMail.security': 'Segurança da ligação SMTP',
   'externalMail.review': 'Rever',
   'externalMail.testBody':

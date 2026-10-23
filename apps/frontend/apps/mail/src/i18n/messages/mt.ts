@@ -747,6 +747,7 @@ export const mt: AppCatalog<typeof en> = {
   'externalMail.username': 'Isem tal-utent (l-indirizz tal-email jekk vojt)',
   'externalMail.password': 'Password jew password tal-app',
   'externalMail.smtpPassword': 'Password SMTP (bħal tal-posta dieħla jekk vojta)',
+  'externalMail.advanced': 'Għażliet avvanzati',
   'externalMail.security': 'Sigurtà tal-konnessjoni SMTP',
   'externalMail.review': 'Irrevedi',
   'externalMail.testBody':

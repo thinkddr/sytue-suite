@@ -225,6 +225,7 @@
   "error.undoSendGone": "Tagasivõtmiseks on liiga hilja; sõnum on juba teele läinud",
   "externalMail.account": "Konto",
   "externalMail.add": "Lisa e-posti konto",
+  "externalMail.advanced": "Täpsemad valikud",
   "externalMail.attach": "Lisa failid",
   "externalMail.authError": "Sisselogimine lükati tagasi. Ühenda konto uuesti või kontrolli kasutajanime ja rakenduse parooli.",
   "externalMail.authorize": "Jätka teenusepakkuja juurde",

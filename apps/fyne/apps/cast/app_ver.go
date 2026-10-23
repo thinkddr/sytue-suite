@@ -292,8 +292,8 @@ func (a *App) recogerPiP() bool {
 	return true
 }
 
-// reloj mueve la barra de tiempo dos veces por segundo hasta que se sale de la página
-// (salirDeVer cierra `parar`).
+// reloj mueve la barra y revisa la calidad automática mientras suena el vídeo.
+// salirDeVer cancela también los pulsos ya enviados al hilo de la interfaz.
 func (a *App) reloj(gen int, parar <-chan struct{}) {
 	t := time.NewTicker(500 * time.Millisecond)
 	defer t.Stop()
@@ -303,8 +303,16 @@ func (a *App) reloj(gen int, parar <-chan struct{}) {
 			return
 		case <-t.C:
 			a.hilo(gen, func() {
+				select {
+				case <-parar:
+					return
+				default:
+				}
 				if a.visor != nil {
 					a.visor.Avanzar()
+				}
+				if r := a.deVer(); r != nil && !r.Pausado() {
+					a.reevaluarAuto()
 				}
 			})
 		}

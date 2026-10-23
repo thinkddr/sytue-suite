@@ -695,6 +695,7 @@ export const sv: AppCatalog<typeof en> = {
   'externalMail.username': 'Användarnamn (e-postadress om fältet är tomt)',
   'externalMail.password': 'Lösenord eller applösenord',
   'externalMail.smtpPassword': 'SMTP-lösenord (samma som för inkommande e-post om fältet är tomt)',
+  'externalMail.advanced': 'Avancerade alternativ',
   'externalMail.security': 'Säkerhet för SMTP-anslutning',
   'externalMail.review': 'Granska',
   'externalMail.testBody':

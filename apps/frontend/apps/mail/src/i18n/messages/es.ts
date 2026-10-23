@@ -33,6 +33,7 @@ export const es: AppCatalog<typeof en> = {
   'externalMail.username': 'Usuario (tu dirección de correo si lo dejas vacío)',
   'externalMail.password': 'Contraseña o contraseña de aplicación',
   'externalMail.smtpPassword': 'Contraseña SMTP (la de entrada si lo dejas vacío)',
+  'externalMail.advanced': 'Opciones avanzadas',
   'externalMail.security': 'Seguridad de la conexión SMTP',
   'externalMail.review': 'Revisar',
   'externalMail.testBody':

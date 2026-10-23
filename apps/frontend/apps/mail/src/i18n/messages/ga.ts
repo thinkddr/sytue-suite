@@ -784,6 +784,7 @@ export const ga: AppCatalog<typeof en> = {
   'externalMail.password': 'Pasfhocal nó pasfhocal aipe',
   'externalMail.smtpPassword':
     'Pasfhocal SMTP (mar an gcéanna leis an bpost isteach má fhágtar folamh é)',
+  'externalMail.advanced': 'Ardroghanna',
   'externalMail.security': 'Slándáil an naisc SMTP',
   'externalMail.review': 'Athbhreithnigh',
   'externalMail.testBody':

@@ -250,6 +250,24 @@ export function negotiateLocale(
 
 // ---- Cliente (navegador) ----
 
+function isCookieSecurityError(error: unknown): boolean {
+  // El documento puede pertenecer a otro realm: no depender de instanceof.
+  return (
+    typeof error === 'object' && error !== null && 'name' in error && error.name === 'SecurityError'
+  );
+}
+
+/** Una preferencia inaccesible (origen opaco o cookies bloqueadas) no cambia el idioma. */
+export function readLocalePreference(): Locale | null {
+  if (typeof document === 'undefined') return null;
+  try {
+    return readLocaleCookie(document.cookie);
+  } catch (error) {
+    if (!isCookieSecurityError(error)) throw error;
+    return null;
+  }
+}
+
 /**
  * Idioma de una isla que no recibe el suyo del servidor. Mismo orden que
  * `negotiateLocale` —la elección explícita del usuario por delante de todo— y
@@ -264,7 +282,7 @@ export function detectLocale(): Locale {
   if (typeof document === 'undefined') return DEFAULT_LOCALE;
   const fromHtml = document.documentElement.lang;
   return (
-    readLocaleCookie(document.cookie) ??
+    readLocalePreference() ??
     (isLocale(fromHtml) ? fromHtml : null) ??
     parseAcceptLanguage(navigator.languages?.join(',') ?? navigator.language) ??
     DEFAULT_LOCALE
@@ -281,7 +299,12 @@ export function detectLocale(): Locale {
 export function persistLocale(locale: Locale | null): void {
   if (typeof document === 'undefined') return;
   const secure = location.protocol === 'https:' ? '; Secure' : '';
-  document.cookie = `${LOCALE_COOKIE}=${locale ?? ''}; path=/; max-age=${locale === null ? 0 : LOCALE_COOKIE_MAX_AGE}; SameSite=Lax${secure}`;
+  try {
+    document.cookie = `${LOCALE_COOKIE}=${locale ?? ''}; path=/; max-age=${locale === null ? 0 : LOCALE_COOKIE_MAX_AGE}; SameSite=Lax${secure}`;
+  } catch (error) {
+    if (!isCookieSecurityError(error)) throw error;
+    // La preferencia no se puede persistir, pero la interfaz sigue utilizable.
+  }
 }
 
 /** Refleja el idioma en el `<html>` (lang para lectores/hyphenation, dir para RTL). */

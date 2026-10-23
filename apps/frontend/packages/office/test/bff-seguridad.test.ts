@@ -57,6 +57,96 @@ const rename = await import('../src/pages/api/rename');
 const star = await import('../src/pages/api/star');
 const create = await import('../src/pages/api/create');
 const abrirDeDrive = await import('../src/pages/open-from-drive');
+const ai = await (async () => {
+  const anterior = process.env.SYTUE_AI_URL;
+  process.env.SYTUE_AI_URL = 'http://ai.test';
+  try {
+    return await import('../src/pages/api/ai');
+  } finally {
+    if (anterior === undefined) delete process.env.SYTUE_AI_URL;
+    else process.env.SYTUE_AI_URL = anterior;
+  }
+})();
+
+describe('POST /api/ai: errores del proveedor', () => {
+  const pedir = () =>
+    (ai.POST as Handler)(
+      ctxDe(
+        'POST',
+        '/api/ai',
+        JSON.stringify({
+          action: 'resumir',
+          instruction: 'Resume',
+          context: 'texto',
+          kind: 'document',
+        }),
+      ),
+    );
+
+  test('conserva sólo el código de proveedor no configurado, sin detalles internos', async () => {
+    respuesta = () =>
+      new Response(
+        JSON.stringify({
+          error: {
+            code: 'ai_not_configured',
+            message: 'detalle privado',
+            params: { key: 'privada' },
+          },
+          request_id: 'interno',
+        }),
+        { status: 503 },
+      );
+    const res = await pedir();
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ error: 'ai_not_configured' });
+    expect(res.headers.get('cache-control')).toBe('no-store');
+    expect(llamadas).toHaveLength(1);
+    expect(llamadas[0]!.url).toBe('http://ai.test/api/v1/assist');
+    expect(llamadas[0]!.headers.get('authorization')).toBe(`Bearer ${TOKEN}`);
+  });
+
+  test.each([
+    [500, '{"error":{"code":"ai_not_configured","message":"privado"}}'],
+    [503, '{"error":{"code":"otro_error","message":"privado"}}'],
+    [503, '<html>detalle privado</html>'],
+    [503, '{malformado'],
+    [503, '{"error":"ai_not_configured"}'],
+  ])('no propaga otros errores o cuerpos: %i %s', async (status, body) => {
+    respuesta = () => new Response(body, { status });
+    const res = await pedir();
+    expect(res.status).toBe(502);
+    expect(await res.json()).toEqual({ error: 'ai_failed' });
+  });
+
+  test('la falta de sesión no alcanza el proveedor', async () => {
+    sesion = null;
+    const res = await pedir();
+    expect(res.status).toBe(401);
+    expect(llamadas).toHaveLength(0);
+  });
+
+  test('un cuerpo 503 interrumpido mantiene el error genérico', async () => {
+    respuesta = () =>
+      new Response(
+        new ReadableStream({
+          start(controller) {
+            controller.error(new Error('detalle privado del transporte'));
+          },
+        }),
+        { status: 503 },
+      );
+    const res = await pedir();
+    expect(res.status).toBe(502);
+    expect(await res.json()).toEqual({ error: 'ai_failed' });
+  });
+
+  test('conserva la respuesta de asistencia correcta', async () => {
+    respuesta = () => new Response('{"text":"resultado"}');
+    const res = await pedir();
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ text: 'resultado' });
+  });
+});
 
 const ID = '3f2b6d1c-8a4e-4c1b-9d2e-5a6b7c8d9e0f';
 const OTRO = '9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d';

@@ -225,6 +225,7 @@
   "error.undoSendGone": "Твърде късно е за отмяна; съобщението вече е изпратено",
   "externalMail.account": "Акаунт",
   "externalMail.add": "Добавяне на имейл акаунт",
+  "externalMail.advanced": "Разширени опции",
   "externalMail.attach": "Прикачване на файлове",
   "externalMail.authError": "Влизането е отказано. Свържете акаунта отново или проверете потребителското име и паролата за приложение.",
   "externalMail.authorize": "Продължаване към доставчика",

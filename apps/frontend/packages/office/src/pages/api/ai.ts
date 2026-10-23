@@ -19,6 +19,7 @@
 import type { APIRoute } from 'astro';
 import { bff, toBffContext } from '../../lib/auth';
 import { serverEnv } from '@sytue/auth/server';
+import { cuerpoDeError } from '@sytue/api-clients';
 
 export const prerender = false;
 
@@ -122,9 +123,20 @@ export const POST: APIRoute = async (ctx) => {
     return json({ error: timedOut ? 'ai_timeout' : 'upstream_unreachable' }, timedOut ? 504 : 502);
   }
 
-  // El servicio responde 200 { text }: se reenvía verbatim. Cualquier error del
-  // servicio se normaliza a `ai_failed` (el panel ya tiene el mensaje legible).
-  if (!upstream.ok) return json({ error: 'ai_failed' }, 502);
+  // Sólo se conserva este motivo público; mensajes, parámetros y otros fallos
+  // internos del proveedor nunca salen del BFF.
+  if (!upstream.ok) {
+    if (upstream.status === 503) {
+      try {
+        if (cuerpoDeError(await upstream.text()).code === 'ai_not_configured') {
+          return json({ error: 'ai_not_configured' }, 503);
+        }
+      } catch {
+        // Un cuerpo interrumpido sigue siendo un fallo genérico del proveedor.
+      }
+    }
+    return json({ error: 'ai_failed' }, 502);
+  }
   const text = await upstream.text();
   return new Response(text, {
     status: 200,

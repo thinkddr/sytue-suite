@@ -64,14 +64,18 @@ func TestUnAvisoCreadoLlegaAlFlujoYBajaAlLeerlo(t *testing.T) {
 		api.Post("/notifications/{id}/read", hs.MarkRead)
 		api.Get("/notifications/stream", hs.Stream)
 	})
-	const plazo = 200 * time.Millisecond
-	srv := httptest.NewUnstartedServer(r)
-	srv.Config.ReadTimeout, srv.Config.WriteTimeout = plazo, plazo
-	srv.Start()
+	// El plazo corto comprueba el flujo, no la latencia de las escrituras a
+	// PostgreSQL: con carga en CI, un POST puede necesitar más de 200 ms.
+	srv := httptest.NewServer(r)
 	defer srv.Close()
+	const plazo = 200 * time.Millisecond
+	flujo := httptest.NewUnstartedServer(r)
+	flujo.Config.ReadTimeout, flujo.Config.WriteTimeout = plazo, plazo
+	flujo.Start()
+	defer flujo.Close()
 
-	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, srv.URL+"/api/v1/notifications/stream", http.NoBody)
-	res, err := srv.Client().Do(req)
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, flujo.URL+"/api/v1/notifications/stream", http.NoBody)
+	res, err := flujo.Client().Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}

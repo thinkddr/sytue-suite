@@ -33,7 +33,7 @@ export const POST: APIRoute = async (ctx) => {
     }
     const message = await client.pinMessage(messageId);
     return json({ message });
-  } catch (err) {
+  } catch {
     return json({ error: 'chat_error' }, 502);
   }
 };

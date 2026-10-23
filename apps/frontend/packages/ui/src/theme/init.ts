@@ -125,7 +125,7 @@ const SCRIPT_CHAR_ESCAPES: Record<string, string> = {
   '\u2029': '\\u2029',
 };
 const scriptValue = (value: unknown): string =>
-  JSON.stringify(value)!.replace(/[<>&\u2028\u2029]/g, (char) => SCRIPT_CHAR_ESCAPES[char]!);
+  JSON.stringify(value).replace(/[<>&\u2028\u2029]/g, (char) => SCRIPT_CHAR_ESCAPES[char]!);
 const colors = scriptValue(THEME_COLORS);
 const formas = scriptValue(THEME_FORMAS);
 export const themeInitScript = `(function(read,mode,color,forma,app){mode(read('light',${scriptValue(STORAGE_KEY)}));color(read(read(${scriptValue(DEFAULT_COLOR)},${scriptValue(ORG_COLOR_KEY)},${colors}),${scriptValue(COLOR_KEY)},${colors}));forma(read(read(${scriptValue(DEFAULT_FORMA)},${scriptValue(ORG_FORMA_KEY)},${formas}),${scriptValue(FORMA_KEY)},${formas}));app();})(${readThemePreference.toString()},${applyThemeMode.toString()},${applyThemeColor.toString()},${applyThemeForma.toString()},${applyThemeApp.toString()});`;

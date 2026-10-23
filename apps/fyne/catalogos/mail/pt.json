@@ -225,6 +225,7 @@
   "error.undoSendGone": "Já é tarde para anular; a mensagem já saiu",
   "externalMail.account": "Conta",
   "externalMail.add": "Adicionar conta de email",
+  "externalMail.advanced": "Opções avançadas",
   "externalMail.attach": "Anexar ficheiros",
   "externalMail.authError": "O início de sessão foi recusado. Volte a ligar a conta ou verifique o nome de utilizador e a palavra-passe de aplicação.",
   "externalMail.authorize": "Continuar no fornecedor",

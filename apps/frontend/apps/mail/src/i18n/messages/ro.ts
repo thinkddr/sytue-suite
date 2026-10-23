@@ -740,6 +740,7 @@ export const ro: AppCatalog<typeof en> = {
   'externalMail.username': 'Nume de utilizator (adresa de e-mail dacă este gol)',
   'externalMail.password': 'Parolă sau parolă de aplicație',
   'externalMail.smtpPassword': 'Parolă SMTP (cea pentru poșta primită dacă este gol)',
+  'externalMail.advanced': 'Opțiuni avansate',
   'externalMail.security': 'Securitatea conexiunii SMTP',
   'externalMail.review': 'Revizuiește',
   'externalMail.testBody':

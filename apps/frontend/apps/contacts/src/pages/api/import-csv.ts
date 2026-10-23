@@ -58,7 +58,7 @@ export const POST: APIRoute = async (ctx) => {
     }
     // { imported, skipped }
     return json(await res.json());
-  } catch (err) {
+  } catch {
     return json({ error: 'contacts_error', message: 'Contacts service request failed' }, 502);
   }
 };

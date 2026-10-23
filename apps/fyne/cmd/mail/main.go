@@ -85,10 +85,12 @@ func main() {
 			pendiente = nil
 		}
 		if actual != "" && hiloPendiente != "" {
+			//nolint:contextcheck // AbrirHilo usa b.ctx, recién adoptado por CambiarSesion; el ctx exterior pertenece a la app.
 			b.AbrirHilo(hiloPendiente)
 			hiloPendiente = ""
 		}
 		if actual != "" && buzonPendiente != "" {
+			//nolint:contextcheck // AtenderBuzon usa la vida de cuenta b.ctx y descarta sus respuestas al cancelarla.
 			b.AtenderBuzon(buzonPendiente)
 			buzonPendiente = ""
 		}

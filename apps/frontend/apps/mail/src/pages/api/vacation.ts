@@ -36,7 +36,7 @@ export const GET: APIRoute = async (ctx) => {
     const res = await mailGet(session.accessToken, '/api/v1/vacation');
     if (!res.ok) return json({ error: 'mail_error', status: res.status }, 502);
     return json(mapVacation((await res.json()) as RawVacation));
-  } catch (err) {
+  } catch {
     return json({ error: 'mail_error' }, 502);
   }
 };
@@ -73,7 +73,7 @@ export const POST: APIRoute = async (ctx) => {
     if (!res.ok)
       return json({ error: 'mail_error', status: res.status }, res.status === 400 ? 400 : 502);
     return json({ ok: true });
-  } catch (err) {
+  } catch {
     return json({ error: 'mail_error' }, 502);
   }
 };

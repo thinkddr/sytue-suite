@@ -26,7 +26,7 @@ const buscar: APIRoute = async (ctx) => {
       userId: session.user.id,
     }).searchAll(q, 30);
     return json({ messages });
-  } catch (err) {
+  } catch {
     return json({ error: 'chat_error' }, 502);
   }
 };

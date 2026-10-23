@@ -63,7 +63,7 @@ export async function driveFetch(
   headers.set('authorization', `Bearer ${session.tokens.accessToken}`);
   try {
     return await fetch(`${driveBaseUrl()}${path}`, { ...init, headers });
-  } catch (e) {
+  } catch {
     // UN FALLO DE RED NO ES UN FALLO DE LA RUTA. Sin esto, `fetch` LANZA —DNS
     // que no resuelve, conexión rechazada, timeout— y la excepción sube hasta
     // Astro, que responde 500. Y un 500 aquí miente dos veces: dice que el fallo

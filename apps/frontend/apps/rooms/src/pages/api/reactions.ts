@@ -31,7 +31,7 @@ export const POST: APIRoute = async (ctx) => {
     if (payload.add === false) await client.removeReaction(messageId, emoji);
     else await client.addReaction(messageId, emoji);
     return json({ ok: true });
-  } catch (err) {
+  } catch {
     return json({ error: 'chat_error' }, 502);
   }
 };

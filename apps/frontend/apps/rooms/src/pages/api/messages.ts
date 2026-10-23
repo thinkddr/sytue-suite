@@ -29,7 +29,7 @@ export const GET: APIRoute = async (ctx) => {
     // Marcar el canal como leido al cargar (best-effort; no bloquea la respuesta).
     void client.markRead(channelId).catch(() => undefined);
     return json({ messages });
-  } catch (err) {
+  } catch {
     return json({ error: 'chat_error' }, 502);
   }
 };

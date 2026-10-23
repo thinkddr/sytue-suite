@@ -29,7 +29,7 @@ export const POST: APIRoute = async (ctx) => {
       messageId,
     );
     return json({ ok: true });
-  } catch (err) {
+  } catch {
     return json({ error: 'chat_error' }, 502);
   }
 };

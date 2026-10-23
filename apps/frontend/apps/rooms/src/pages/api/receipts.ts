@@ -20,7 +20,7 @@ export const GET: APIRoute = async (ctx) => {
     const client = chatClient({ accessToken: session.accessToken, userId: session.user.id });
     const receipts = await client.dmReceipts(channelId);
     return json({ receipts });
-  } catch (err) {
+  } catch {
     return json({ error: 'chat_error' }, 502);
   }
 };

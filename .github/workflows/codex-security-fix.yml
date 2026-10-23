@@ -37,13 +37,13 @@ concurrency:
 
 jobs:
   select:
-    # Solo código de la rama predeterminada; nunca usar artefactos ni checkouts
-    # del workflow que disparó workflow_run, especialmente los de una PR/fork.
+    # Read existing alerts after any trusted default-branch CodeQL completion,
+    # including failures/cancellations. Never consume the triggering run's
+    # artifacts or checkout; PR/fork events remain excluded.
     if: >-
       github.ref == format('refs/heads/{0}', github.event.repository.default_branch) &&
       (github.event_name != 'workflow_run' ||
-        (github.event.workflow_run.conclusion == 'success' &&
-         github.event.workflow_run.head_branch == github.event.repository.default_branch &&
+        (github.event.workflow_run.head_branch == github.event.repository.default_branch &&
          github.event.workflow_run.head_repository.full_name == github.repository &&
          contains(fromJSON('["push", "schedule", "workflow_dispatch"]'), github.event.workflow_run.event)))
     runs-on: ubuntu-24.04
@@ -88,10 +88,20 @@ jobs:
           FINDING_TYPE: ${{ steps.queue.outputs.finding_type }}
           ALERT_NUMBER: ${{ steps.queue.outputs.alert_number }}
           QUEUE_REASON: ${{ steps.queue.outputs.reason }}
+          UPSTREAM_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
         run: |
           printf 'Cola automática de seguridad: %s\n' "$QUEUE_REASON" >> "$GITHUB_STEP_SUMMARY"
+          if [ -n "$UPSTREAM_CONCLUSION" ]; then
+            printf 'CodeQL terminó con estado %s; se consultan las alertas abiertas ya publicadas.\n' "$UPSTREAM_CONCLUSION" >> "$GITHUB_STEP_SUMMARY"
+          fi
           if [ "$HAS_FINDING" = true ]; then
             printf 'Encargo seleccionado: %s #%s\n' "$FINDING_TYPE" "$ALERT_NUMBER" >> "$GITHUB_STEP_SUMMARY"
+          else
+            case "$QUEUE_REASON" in
+              capacity-reached) echo 'Ya hay dos PR de seguridad abiertas. Revísalas para liberar un hueco; no se crearán duplicados.' >> "$GITHUB_STEP_SUMMARY" ;;
+              manual-already-open|already-assigned) echo 'Las alertas seleccionadas ya tienen un encargo; no se crearán duplicados.' >> "$GITHUB_STEP_SUMMARY" ;;
+              no-open-alerts) echo 'No hay alertas abiertas que asignar.' >> "$GITHUB_STEP_SUMMARY" ;;
+            esac
           fi
 
   prepare:

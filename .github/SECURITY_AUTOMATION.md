@@ -1,132 +1,134 @@
-# GitHub Security → Codex con ChatGPT Pro
+# GitHub Security → Codex with ChatGPT Pro
 
-`codeql.yml` analiza Go, JavaScript/TypeScript, Python, GitHub Actions, C/C++,
-Java y Swift y publica en **Security → Code scanning**. Se ejecuta en PR, pushes
-a `main`, los viernes a las 06:38 UTC y manualmente. `security.yml` ejecuta
-Dependency review en las PR, rechazando vulnerabilidades nuevas altas o críticas,
-y comprueba los helpers de esta automatización. La CI ejecuta Gitleaks y govulncheck.
+`codeql.yml` analyzes Go, JavaScript/TypeScript, Python, GitHub Actions, C/C++,
+Java, and Swift and publishes results in **Security → Code scanning**. It runs on
+PRs, pushes to `main`, Fridays at 06:38 UTC, and manual dispatch.
+`security.yml` runs Dependency review on PRs, rejecting new high or critical
+vulnerabilities, and checks the helpers used by this automation. CI runs Gitleaks and govulncheck.
 
-`codex-security-fix.yml` busca automáticamente alertas abiertas de Code scanning
-en la rama predeterminada y de Dependabot, prepara un PR borrador con el contexto
-de una de ellas y publica un comentario `@codex` con la cuenta conectada a ChatGPT.
-Con un entorno Legacy compatible, el conector nativo recibe el encargo,
-investiga la alerta, hace el arreglo y ejecuta comprobaciones en su entorno.
-La automatización local de Codex descrita abajo retoma los encargos cuando
-ese conector no puede ejecutarlos. El PR inicial contiene una solicitud,
-**todavía no una corrección**; Codex debe sustituirla por el arreglo.
+`codex-security-fix.yml` automatically looks for open Code scanning alerts on
+the default branch and Dependabot alerts, prepares a draft PR with the context
+for one alert, and posts an `@codex` comment using the account connected to ChatGPT.
+With a compatible Legacy environment, the native connector receives the task,
+investigates the alert, implements the fix, and runs checks in its environment.
+The local Codex automation described below picks up tasks when that connector
+cannot execute them. The initial PR contains a request,
+**not a fix yet**; Codex must replace it with the fix.
 
-Este flujo no llama a OpenAI API, no instala Codex en Actions y no necesita
-`OPENAI_API_KEY`. Utiliza el acceso a Codex de la cuenta ChatGPT Pro conectada,
-sujeto a sus límites de uso. No compra créditos ni configura recargas. Al agotar
-la cuota incluida, espera a su renovación en lugar de comprar uso adicional.
+This workflow does not call the OpenAI API, install Codex in Actions, or require
+`OPENAI_API_KEY`. It uses the Codex access included in the connected ChatGPT Pro
+account, subject to its usage limits. It does not buy credits or configure top-ups.
+When the included allowance runs out, it waits for the allowance to reset instead
+of purchasing additional usage.
 
-## Activación
+## Activation
 
-1. Activa Dependency graph y Dependabot alerts. Para CodeQL utiliza **Advanced
-   setup** con `codeql.yml`; desactiva Default setup para evitar incompatibilidades.
-   Publica los workflows en la rama predeterminada.
-2. Inicia sesión en Codex con **ChatGPT Pro** y conecta `thinkddr/sytue-suite`
-   mediante la integración de GitHub. Comprueba el repositorio en
-   [Codex settings](https://chatgpt.com/settings/code-review). Las tareas iniciadas
-   mediante `@codex` necesitan un entorno **Codex Cloud (Legacy)** para este
-   repositorio, disponible desde
-   [sus ajustes de entornos](https://chatgpt.com/codex/cloud/settings/environments).
-   Un entorno publicado en el Codex Cloud actual no sustituye ese requisito.
-   La integración debe poder leer el repositorio y publicar cambios en la rama del PR.
-3. Configura estos **repository secrets** en **Settings → Secrets and variables →
-   Actions**. No guardes valores en archivos del repositorio.
+1. Enable Dependency graph and Dependabot alerts. For CodeQL, use **Advanced
+   setup** with `codeql.yml`; disable Default setup to avoid incompatibilities.
+   Publish the workflows on the default branch.
+2. Sign in to Codex with **ChatGPT Pro** and connect `thinkddr/sytue-suite`
+   through the GitHub integration. Check the repository in
+   [Codex settings](https://chatgpt.com/settings/code-review). Tasks started
+   through `@codex` require a **Codex Cloud (Legacy)** environment for this
+   repository, available from
+   [its environment settings](https://chatgpt.com/codex/cloud/settings/environments).
+   An environment published in the current Codex Cloud does not fulfill that requirement.
+   The integration must be able to read the repository and publish changes to the PR branch.
+3. Configure these **repository secrets** in **Settings → Secrets and variables →
+   Actions**. Do not store values in repository files.
 
-| Secret | Permisos y propósito |
+| Secret | Permissions and purpose |
 | --- | --- |
-| `CODEX_PR_TOKEN` | Token fine-grained del mismo usuario GitHub conectado a tu cuenta Pro, limitado a este repositorio, con **Contents: Read and write** y **Pull requests: Read and write**. Publica el PR y la mención con tu identidad. |
-| `SECURITY_ALERTS_TOKEN` | Token fine-grained limitado a este repositorio con **Dependabot alerts: Read**. Solo se utiliza para Dependabot. Code scanning usa `GITHUB_TOKEN` con `security-events: read`. |
+| `CODEX_PR_TOKEN` | A fine-grained token from the same GitHub user connected to your Pro account, restricted to this repository, with **Contents: Read and write** and **Pull requests: Read and write**. It publishes the PR and mention under your identity. |
+| `SECURITY_ALERTS_TOKEN` | A fine-grained token restricted to this repository with **Dependabot alerts: Read**. Used only for Dependabot. Code scanning uses `GITHUB_TOKEN` with `security-events: read`. |
 
-No requieren administración, permisos de workflows ni escritura de alertas.
-Utiliza una caducidad limitada y renueva los secrets antes de que venza. La cuenta
-propietaria debe poder consultar las alertas seleccionadas. No copies sesiones
-de ChatGPT ni `~/.codex/auth.json` a GitHub: el conector gestiona el acceso de Codex.
+These tokens do not require administration, workflow permissions, or alert write access.
+Set a limited expiration period and renew the secrets before they expire. The owning
+account must be able to view the selected alerts. Do not copy ChatGPT sessions or
+`~/.codex/auth.json` to GitHub: the connector manages Codex access.
 
-## Asignación automática
+## Automatic assignment
 
-No hace falta pulsar **Run workflow**. La cola se revisa:
+There is no need to click **Run workflow**. The queue is checked:
 
-- Al terminar correctamente **CodeQL Advanced** en `main`, para ejecuciones
-  iniciadas por push, horario o ejecución manual; ignora análisis de PR y forks.
-- Cada seis horas, a las 00:37, 06:37, 12:37 y 18:37 UTC, para recoger también
-  alertas nuevas de Dependabot. GitHub puede retrasar ejecuciones programadas.
-- Al publicar cambios del workflow o de sus scripts en `main`, para comprobar
-  la configuración y arrancar la cola.
+- After **CodeQL Advanced** completes on `main`, for runs triggered by a push,
+  schedule, or manual dispatch, including failed or cancelled runs. The queue
+  reads alerts already published in GitHub and does not depend on the overall
+  analysis result; PR and fork analyses are ignored.
+- Every six hours, at 00:37, 06:37, 12:37, and 18:37 UTC, to pick up new Dependabot
+  alerts as well. GitHub may delay scheduled runs.
+- When changes to the workflow or its scripts are published on `main`, to check
+  the configuration and start processing the queue.
 
-Cada ejecución selecciona **una** alerta y mantiene como máximo **dos PR de
-encargo abiertas**. Ordena por gravedad (crítica, alta, media, baja y otras) y
-después por número de alerta. Lee ambas listas completas con paginación acotada;
-si falla el acceso, la configuración o se supera el límite, falla sin publicar
-una selección parcial. Las ejecuciones se serializan para evitar carreras.
+Each run selects **one** alert and keeps at most **two open task PRs**.
+Alerts are sorted by severity (critical, high, medium, low, and other), then by
+alert number. Both complete lists are read with bounded pagination; if access or
+configuration fails, or the limit is exceeded, the run fails without publishing
+a partial selection. Runs are serialized to avoid races.
 
-El historial de PR guarda qué alertas ya se encargaron, mediante la rama y un
-marcador en el cuerpo. No repite automáticamente encargos ya cerrados o fusionados;
-cerrar una PR de encargo sin fusionarla deja esa alerta fuera de la cola. También
-excluye alertas referenciadas en otras PR abiertas cuya rama pertenece a este
-repositorio, con su URL canónica o con un título explícito
-`code scanning alerts #N to #M`. Las PR de forks no reservan alertas. No elimina
-ramas ni fusiona PR.
-Cuando revises y fusiones o cierres un encargo, la siguiente ejecución podrá
-utilizar ese hueco. El resumen de Actions indica la selección o el motivo de espera.
+PR history records which alerts have already been assigned, using the branch
+and a marker in the body. Previously closed or merged tasks are not automatically
+repeated; closing a task PR without merging it leaves that alert out of the queue.
+The queue also excludes alerts referenced in other open PRs whose branches belong
+to this repository, through their canonical URL or an explicit title such as
+`code scanning alerts #N to #M`. Fork PRs do not reserve alerts. The workflow does
+not delete branches or merge PRs.
+When you review and merge or close a task, the next run can use that slot.
+The Actions summary shows the selection or the reason for waiting.
 
-Si la PR se publica pero falla el comentario, la siguiente ejecución retoma esa
-misma PR antes de abrir otra. Comprueba si el comentario ya existe para evitar
-una segunda mención y solo marca el envío como completado después de confirmarlo.
+If the PR is published but the comment fails, the next run resumes that same PR
+before opening another. It checks whether the comment already exists to avoid
+a second mention and marks submission complete only after confirming it.
 
-Un workflow correcto confirma el envío. Comprueba la reacción del conector en la
-PR y el encargo en tu cuenta para confirmar que Codex lo aceptó. La cuota del plan
-Pro sigue aplicándose; esta cola no consulta ni amplía tu saldo o tus límites.
-Si Codex no acepta el encargo por falta de cuota, el PR abierto conserva la tarea
-sin generar solicitudes nuevas para la misma alerta. Se puede retomar desde esa
-PR cuando se renueve la cuota.
+A successful workflow confirms submission. Check the connector's reaction in the
+PR and the task in your account to confirm that Codex accepted it. The Pro plan's
+allowance still applies; this queue does not check or increase your balance or limits.
+If Codex does not accept the task because the allowance is exhausted, the open PR
+preserves the task without generating new requests for the same alert. Work can
+resume from that PR when the allowance resets.
 
-## Ejecutor local con ChatGPT Pro
+## Local executor with ChatGPT Pro
 
-En esta cuenta está activa la automatización **Resolver findings de sytue-suite
-con Pro**, asociada a este chat de Codex. Revisa la cola cada seis horas y corrige
-como máximo un encargo pendiente por ejecución, con las credenciales GitHub ya
-conectadas. **La app de Codex debe estar abierta**. Si está cerrada, GitHub sigue
-preparando los encargos, pero el ejecutor local no trabaja hasta estar disponible.
+The automation named **Resolver findings de sytue-suite con Pro** is active in
+this account and attached to this Codex chat. It checks the queue every six hours
+and fixes at most one pending task per run, using the GitHub credentials already
+connected. **The Codex app must be open**. While it is closed, GitHub continues
+preparing tasks, but the local executor cannot work until it becomes available.
 
-Antes de corregir, comprueba los límites de uso incluidos. Se detiene si no hay
-cuota ordinaria disponible; no usa API keys ni compra créditos o recargas. Usa
-un worktree aislado, verifica que la alerta siga abierta, ejecuta las pruebas
-pertinentes y hace commit y push a la misma rama del PR. Conserva los marcadores
-de deduplicación y deja el arreglo para revisión humana, sin fusionarlo.
+Before implementing a fix, it checks the included usage limits. It stops if no
+ordinary allowance is available; it does not use API keys or buy credits or top-ups.
+It uses an isolated worktree, verifies that the alert is still open, runs the
+relevant tests, and commits and pushes to the same PR branch. It preserves the
+deduplication markers and leaves the fix for human review without merging it.
 
-No interviene si otro Codex ya está corrigiendo la PR ni repite arreglos que
-esperan revisión. Permanece en silencio cuando no cambia el estado o no hay
-trabajo accionable; avisa de correcciones terminadas, fallos nuevos y acciones
-necesarias. Esta programación vive en la app; el horario de selección de alertas
-vive en GitHub Actions. Si se recupera el entorno Legacy, evita mantener dos
-ejecutores trabajando en el mismo encargo.
+It does not intervene while another Codex is already fixing the PR or repeat fixes
+awaiting review. It stays silent when the state is unchanged or no actionable work
+exists; it reports completed fixes, new failures, and required user actions.
+This schedule lives in the app; the alert selection schedule lives in GitHub Actions.
+If the Legacy environment becomes available, avoid keeping two executors working
+on the same task.
 
-## Selección manual opcional y revisión
+## Optional manual selection and review
 
-1. Abre una alerta en **Security → Code scanning** o **Security → Dependabot** y
-   copia su número, el último segmento de la URL.
-2. Para priorizar una alerta concreta o reintentar un encargo cerrado, en
-   **Actions → Codex security fix → Run workflow**, selecciona la rama
-   predeterminada y rellena `finding_type` (`code-scanning` o `dependabot`) y
-   `alert_number`.
-3. La selección manual también respeta el límite de dos encargos y evita repetir
-   una PR abierta. Abre el PR enlazado en el resumen. Comprueba que Codex reaccione al comentario
-   y aparezca el encargo en tu cuenta. El éxito del workflow confirma el envío,
-   no la aceptación ni la finalización del trabajo por Codex.
-4. Revisa el arreglo y la CI antes de aprobarlo. Codex debe retirar el archivo
-   temporal `docs/security-findings/<tipo>-<número>.md` al terminar. GitHub vuelve
-   a evaluar la alerta después del merge.
+1. Open an alert in **Security → Code scanning** or **Security → Dependabot** and
+   copy its number, the final segment of the URL.
+2. To prioritize a specific alert or retry a closed task, go to
+   **Actions → Codex security fix → Run workflow**, select the default branch,
+   and fill in `finding_type` (`code-scanning` or `dependabot`) and `alert_number`.
+3. Manual selection also respects the two-task limit and avoids duplicating an
+   open PR. Open the PR linked in the summary. Check that Codex reacts to the
+   comment and that the task appears in your account. Workflow success confirms
+   submission, not Codex's acceptance or completion of the work.
+4. Review the fix and CI before approving it. Codex must remove the temporary
+   `docs/security-findings/<type>-<number>.md` request file when finished. GitHub
+   evaluates the alert again after the merge.
 
-Si el conector no reacciona, comprueba la conexión, la identidad del token, el
-entorno y la cuota. Si responde **create an environment for this repo**, no ha
-aceptado el arreglo: falta el entorno Legacy compatible. Si ese panel redirige
-al inicio, crear otro entorno en el Codex Cloud actual no resuelve el bloqueo.
-El PR conserva el encargo para que lo retome un Codex disponible con la cuenta
-vinculada. No uses una API key como alternativa.
+If the connector does not react, check the connection, token identity, environment,
+and allowance. If it responds **create an environment for this repo**, it has not
+accepted the fix: a compatible Legacy environment is missing. If that panel
+redirects to the home page, creating another environment in the current Codex Cloud
+does not resolve the blocker. The PR preserves the task for an available Codex
+using the linked account to pick up. Do not use an API key as a fallback.
 
 ```sh
 gh workflow run codex-security-fix.yml --ref main \
@@ -136,36 +138,37 @@ gh workflow run codex-security-fix.yml --ref main \
   -f finding_type=dependabot -f alert_number=45
 ```
 
-Los números son ejemplos. Cada ejecución que selecciona una alerta crea una rama
-`codex/security/<tipo>-<número>-<run>-<intento>` y un PR nuevo. Comprueba que no
-exista otro encargo cerrado que quieras retomar antes de reintentarlo.
+The numbers are examples. Each run that selects an alert creates a branch named
+`codex/security/<type>-<number>-<run>-<attempt>` and a new PR. Before retrying, check
+whether there is a closed task you would prefer to resume.
 
-## Alcance y comprobaciones
+## Scope and checks
 
-- Lectura y publicación se ejecutan en jobs separados. El token de escritura
-  solo se entrega al paso que publica la solicitud. Actions no ejecuta código
-  generado por modelos.
-- El tipo, número y estado se validan; solo se transfieren metadatos seleccionados,
-  tratados como evidencia no confiable. El contexto temporal caduca al día.
-- Go analiza el módulo raíz; los módulos independientes necesitan builds propios.
-  Swift compila `drive-archivos`, `notes-widgets` y `SytueWidgetBridge` sin firma ni
-  empaquetado Go/Fyne. Dependency review usa el grafo de GitHub y no garantiza
-  todos los transitivos de `bun.lock`; conserva Renovate y los análisis del gestor.
-- No se importan alertas de Secret scanning: las credenciales expuestas requieren
-  revocación o rotación. El PR y su contexto heredan la visibilidad del repositorio;
-  utiliza un proceso privado para vulnerabilidades bajo embargo.
-- Codex debe confirmar la aplicabilidad, hacer un cambio mínimo, añadir pruebas
-  relevantes y explicar qué comprobaciones ejecutó. No debe descartar alertas ni
-  desactivar análisis para aparentar una corrección.
+- Reading and publishing run in separate jobs. The write token is provided only
+  to the step that publishes the request. Actions does not execute model-generated
+  code.
+- The type, number, and state are validated; only selected metadata is transferred
+  and treated as untrusted evidence. The temporary context expires after one day.
+- Go analyzes the root module; independent modules need their own builds.
+  Swift builds `drive-archivos`, `notes-widgets`, and `SytueWidgetBridge` without
+  signing or Go/Fyne packaging. Dependency review uses GitHub's graph and does not
+  guarantee coverage of every transitive dependency in `bun.lock`; retain Renovate
+  and package manager scans.
+- Secret scanning alerts are not imported: exposed credentials require revocation
+  or rotation. The PR and its context inherit the repository's visibility; use
+  a private process for vulnerabilities under embargo.
+- Codex must confirm applicability, make a minimal change, add relevant tests,
+  and explain which checks it ran. It must not dismiss alerts or disable scans
+  to make a fix appear successful.
 
 ```sh
 actionlint .github/workflows/codeql.yml .github/workflows/security.yml .github/workflows/codex-security-fix.yml
 node --test .github/scripts/security-*.test.mjs
 ```
 
-Referencias oficiales: [tareas con @codex en GitHub](https://learn.chatgpt.com/docs/third-party/github),
-[autenticación ChatGPT o API](https://learn.chatgpt.com/docs/auth),
-[entornos del conector Legacy](https://learn.chatgpt.com/docs/environments/cloud-environment),
-[REST de Code scanning](https://docs.github.com/en/rest/code-scanning/code-scanning),
-[REST de Dependabot](https://docs.github.com/en/rest/dependabot/alerts),
-[eventos de GitHub Actions](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows).
+Official references: [tasks with @codex in GitHub](https://learn.chatgpt.com/docs/third-party/github),
+[ChatGPT or API authentication](https://learn.chatgpt.com/docs/auth),
+[Legacy connector environments](https://learn.chatgpt.com/docs/environments/cloud-environment),
+[Code scanning REST API](https://docs.github.com/en/rest/code-scanning/code-scanning),
+[Dependabot REST API](https://docs.github.com/en/rest/dependabot/alerts),
+[GitHub Actions events](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows).

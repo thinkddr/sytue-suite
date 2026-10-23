@@ -28,7 +28,7 @@ export const GET: APIRoute = async (ctx) => {
       userId: session.user.id,
     }).messageReaders(messageId);
     return json(data);
-  } catch (err) {
+  } catch {
     return json({ error: 'chat_error' }, 502);
   }
 };

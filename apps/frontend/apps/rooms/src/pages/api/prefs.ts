@@ -49,7 +49,7 @@ export const POST: APIRoute = async (ctx) => {
       ...(notifyLevel !== undefined ? { notifyLevel } : {}),
     });
     return json({ channel });
-  } catch (err) {
+  } catch {
     return json({ error: 'chat_error' }, 502);
   }
 };

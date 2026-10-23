@@ -26,7 +26,7 @@ export const GET: APIRoute = async (ctx) => {
     const { messages, threadRootId } = await client.messagesAround(channelId, message, limit);
     // `threadRootId` solo viene si el objetivo era una respuesta de hilo.
     return json(threadRootId ? { messages, threadRootId } : { messages });
-  } catch (err) {
+  } catch {
     return json({ error: 'chat_error' }, 502);
   }
 };

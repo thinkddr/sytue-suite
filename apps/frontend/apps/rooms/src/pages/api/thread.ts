@@ -21,7 +21,7 @@ export const GET: APIRoute = async (ctx) => {
       userId: session.user.id,
     }).getThread(messageId);
     return json(thread);
-  } catch (err) {
+  } catch {
     return json({ error: 'chat_error' }, 502);
   }
 };

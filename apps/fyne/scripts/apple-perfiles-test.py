@@ -31,6 +31,17 @@ REQUISITO = {"app": "rooms", "id": "eu.sytue.rooms", "widget": False, "group": G
                               "keychain-access-groups": ["VHC5QW7BZ3.eu.sytue.rooms", LLAVERO]}}
 
 
+def exportado(der, selector="a" * 40):
+    return ("SHA-256 hash: " + hashlib.sha256(der).hexdigest().upper() +
+            "\nSHA-1 hash: " + selector.upper() + "\n-----BEGIN CERTIFICATE-----\n" +
+            base64.b64encode(der).decode() + "\n-----END CERTIFICATE-----\n")
+
+
+def certificado_api(nombre, der, **attrs):
+    return {"id": nombre, "attributes": {"certificateType": "DISTRIBUTION", "expirationDate": CADUCA,
+            "certificateContent": base64.b64encode(der).decode(), **attrs}}
+
+
 def perfil(identificador="perfil", certificado="cert-importado", autorizado=True):
     return {"type": "profiles", "id": identificador, "certificate": certificado,
             "attributes": {"profileType": "IOS_APP_STORE", "profileState": "ACTIVE",
@@ -91,6 +102,24 @@ class Perfiles(unittest.TestCase):
         self.assertFalse(dato["certificate_verified"])
         self.assertFalse(asc.escritos)
 
+    def test_preparar_usa_el_der_importado_para_seleccionar_el_certificado_api(self):
+        asc, der = API(), b"certificado publico importado"
+        asc.perfiles, asc.certs = [perfil()], [certificado_api("cert-importado", der)]
+        gen = types.SimpleNamespace(EQUIPO="VHC5QW7BZ3", apps=lambda: [{"clave": "rooms"}])
+        def importar(nombre, ruta):
+            return gen if str(ruta).endswith("generar.py") else types.SimpleNamespace(Apple=lambda: asc)
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(p.REGISTRO, {"importar": importar}), \
+                mock.patch.object(p, "requisitos", return_value=REQUISITO), \
+                mock.patch.object(p, "validar_perfil", side_effect=self.validar_falso), \
+                mock.patch.object(p, "identidad_importada", return_value=der) as identidad, \
+                mock.patch("sys.argv", ["apple-perfiles.py", "--plataforma", "ios", "--preparar", "--salida", tmp,
+                                        "--certificado-sha1", "a" * 40, "rooms"]), contextlib.redirect_stdout(io.StringIO()) as salida:
+            self.assertFalse(p.main())
+            self.assertEqual(pathlib.Path(tmp, "eu.sytue.rooms.mobileprovision").read_bytes(), b"perfil publico")
+        identidad.assert_called_once_with("ios", "VHC5QW7BZ3", "a" * 40)
+        self.assertTrue(json.loads(salida.getvalue())["certificate_verified"])
+        self.assertFalse(asc.escritos)
+
     def test_perfil_de_otro_certificado_no_se_reutiliza_y_siguiente_ejecucion_no_duplica(self):
         asc = API()
         asc.perfiles = [perfil("ajeno", "otra-clave")]
@@ -141,11 +170,17 @@ class Perfiles(unittest.TestCase):
 
     def test_identidad_solo_valida_en_llavero_efimero_y_equipo_canonico(self):
         buena, otra = "a" * 40, "b" * 40
+        der = b"certificado publico importado"
         respuestas = ["/tmp/ephemeral.keychain-db\n",
-                      ' 1) ' + buena + ' "Apple Distribution: Sytue (VHC5QW7BZ3)"\n 2) ' + otra + ' "Apple Distribution: Otro (ABCDE12345)"']
+                      ' 1) ' + buena + ' "Apple Distribution: Sytue (VHC5QW7BZ3)"\n 2) ' + otra + ' "Apple Distribution: Otro (ABCDE12345)"',
+                      exportado(b"otro equipo", otra) + exportado(der, buena)]
         with mock.patch.object(p, "capturar", side_effect=respuestas) as capturar:
-            self.assertEqual(p.identidad_importada("ios", "VHC5QW7BZ3"), buena)
+            self.assertEqual(p.identidad_importada("ios", "VHC5QW7BZ3"), der)
             self.assertEqual(capturar.call_args_list[1].args[0][-1], "/tmp/ephemeral.keychain-db")
+            self.assertEqual(capturar.call_args_list[2].args[0],
+                             ["security", "find-certificate", "-a", "-Z", "-p", "/tmp/ephemeral.keychain-db"])
+        with mock.patch.object(p, "capturar", side_effect=respuestas):
+            self.assertEqual(p.identidad_importada("ios", "VHC5QW7BZ3", ":".join(["AA"] * 20)), der)
         with mock.patch.object(p, "capturar", side_effect=respuestas):
             with self.assertRaises(ValueError):
                 p.identidad_importada("ios", "VHC5QW7BZ3", otra)
@@ -154,19 +189,70 @@ class Perfiles(unittest.TestCase):
             with self.assertRaises(ValueError):
                 p.identidad_importada("ios", "VHC5QW7BZ3")
 
+    def test_selector_ambiguo_no_autentica_certificados_con_sha1_coincidente(self):
+        selector = "a" * 40
+        identidad = ' 1) ' + selector + ' "Apple Distribution: Sytue (VHC5QW7BZ3)"'
+        # Simula dos DER con el mismo selector SHA-1, cada uno con su SHA-256 real.
+        salida = exportado(b"certificado original", selector) + exportado(b"certificado colisionado", selector)
+        with mock.patch.object(p, "capturar", side_effect=["/tmp/ephemeral.keychain-db", identidad, salida]):
+            with self.assertRaisesRegex(ValueError, "certificado único"):
+                p.identidad_importada("ios", "VHC5QW7BZ3", selector)
+
+    def test_exportacion_invalida_o_sin_certificado_no_se_acepta(self):
+        identidad = ' 1) ' + "a" * 40 + ' "Apple Distribution: Sytue (VHC5QW7BZ3)"'
+        certificado = exportado(b"certificado original")
+        alterado = certificado.replace(hashlib.sha256(b"certificado original").hexdigest().upper(), "0" * 64)
+        for salida in ("", exportado(b"otro", "b" * 40), alterado, certificado.replace("SHA-1 hash:", "hash:"),
+                       "error de exportación\n" + certificado, certificado.replace("b3JpZ2luYWw=", "@@@")):
+            with self.subTest(salida=salida), mock.patch.object(p, "capturar", side_effect=["/tmp/ephemeral.keychain-db", identidad, salida]):
+                with self.assertRaises(ValueError):
+                    p.identidad_importada("ios", "VHC5QW7BZ3")
+
+    def test_selector_sigue_siendo_sha1_no_sha256(self):
+        identidad = ' 1) ' + "a" * 40 + ' "Apple Distribution: Sytue (VHC5QW7BZ3)"'
+        for selector in ("a" * 39, "a" * 41, "a" * 64, "g" * 40):
+            with self.subTest(selector=selector), mock.patch.object(p, "capturar", side_effect=["/tmp/ephemeral.keychain-db", identidad]):
+                with self.assertRaises(ValueError):
+                    p.identidad_importada("ios", "VHC5QW7BZ3", selector)
+
     def test_certificado_api_se_elige_por_der_no_por_nombre_ni_orden(self):
         asc = API()
         der = b"certificado publico importado"
-        def certificado(nombre, contenido, tipo="DISTRIBUTION"):
-            return {"id": nombre, "attributes": {"certificateType": tipo, "expirationDate": CADUCA,
-                    "certificateContent": base64.b64encode(contenido).decode()}}
-        asc.certs = [certificado("otra-clave", b"otra clave"), certificado("correcto", der)]
-        huella = hashlib.sha1(der, usedforsecurity=False).hexdigest()
-        self.assertEqual(p.certificado_de_identidad(asc, "ios", huella), "correcto")
+        asc.certs = [certificado_api("otra-clave", b"otra clave"), certificado_api("correcto", der)]
+        with mock.patch.object(p.hashlib, "sha1", side_effect=AssertionError("SHA-1 no autentica certificados remotos")):
+            self.assertEqual(p.certificado_de_identidad(asc, "ios", der), "correcto")
         asc.certs[1]["attributes"]["expirationDate"] = "2020-01-01T00:00:00Z"
         with self.assertRaises(ValueError):
-            p.certificado_de_identidad(asc, "ios", huella)
+            p.certificado_de_identidad(asc, "ios", der)
         self.assertFalse(asc.escritos)
+
+    def test_certificado_remoto_distinto_no_se_acepta_aunque_sha1_colisionara(self):
+        asc = API()
+        asc.certs = [certificado_api("colisionado", b"certificado colisionado")]
+        with mock.patch.object(p.hashlib, "sha1", return_value=types.SimpleNamespace(hexdigest=lambda: "a" * 40)):
+            with self.assertRaisesRegex(ValueError, "vigente único"):
+                p.certificado_de_identidad(asc, "ios", b"certificado original")
+        self.assertFalse(asc.escritos)
+
+    def test_certificados_api_inactivos_incorrectos_invalidos_o_duplicados_no_se_aceptan(self):
+        der = b"certificado original"
+        opciones = ([certificado_api("inactivo", der, activated=False)],
+                    [certificado_api("otro-tipo", der, certificateType="DEVELOPER_ID_APPLICATION")],
+                    [certificado_api("invalido", der, certificateContent="@@@")],
+                    [certificado_api("duplicado-1", der), certificado_api("duplicado-2", der)])
+        for certificados in opciones:
+            with self.subTest(certificados=certificados):
+                asc = API()
+                asc.certs = certificados
+                with self.assertRaises(ValueError):
+                    p.certificado_de_identidad(asc, "ios", der)
+                self.assertFalse(asc.escritos)
+        for identidad in (b"", "a" * 40, None):
+            with self.subTest(identidad=identidad):
+                asc = API()
+                with self.assertRaises(ValueError):
+                    p.certificado_de_identidad(asc, "ios", identidad)
+                self.assertFalse(asc.gets)
 
     def test_validador_compartido_comprueba_todos_los_derechos_reales(self):
         contenido = {"Platform": ["iOS"], "TeamIdentifier": ["VHC5QW7BZ3"],

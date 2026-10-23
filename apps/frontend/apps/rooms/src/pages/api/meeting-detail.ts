@@ -30,7 +30,7 @@ export const GET: APIRoute = async (ctx) => {
       meet.meetingRecordings(id),
     ]);
     return json({ participants, recordings });
-  } catch (err) {
+  } catch {
     return json({ error: 'meet_error' }, 502);
   }
 };

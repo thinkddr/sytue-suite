@@ -27,7 +27,7 @@ export const POST: APIRoute = async (ctx) => {
     const client = chatClient({ accessToken: session.accessToken, userId: session.user.id });
     await client.addTeamMember(subject, payload.name?.trim() ?? '');
     return json({ ok: true });
-  } catch (err) {
+  } catch {
     return json({ error: 'chat_error' }, 502);
   }
 };

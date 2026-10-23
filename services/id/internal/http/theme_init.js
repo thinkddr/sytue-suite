@@ -1,4 +1,4 @@
-(function(read,mode,color,forma,app){mode(read('light','sytue-theme'));color(read(read('app','sytue-color-org',["petroleo","cobalto","app"]),'sytue-color',["petroleo","cobalto","app"]));forma(read(read('marco','sytue-forma-org',["marco","carril"]),'sytue-forma',["marco","carril"]));app();})(function readThemePreference(fallback, key, allowed = ["light", "dark", "translucent", "system"]) {
+(function(read,mode,color,forma,app){mode(read('light',"sytue-theme"));color(read(read("app","sytue-color-org",["petroleo","cobalto","app"]),"sytue-color",["petroleo","cobalto","app"]));forma(read(read("marco","sytue-forma-org",["marco","carril"]),"sytue-forma",["marco","carril"]));app();})(function readThemePreference(fallback, key, allowed = ["light", "dark", "translucent", "system"]) {
   const valid = (value) => typeof value === "string" && allowed.includes(value);
   try {
     const shared = (typeof document > "u" ? void 0 : document.cookie?.split(";").map((value) => value.trim()).find((value) => value.startsWith(`${key}=`)))?.slice(key.length + 1);

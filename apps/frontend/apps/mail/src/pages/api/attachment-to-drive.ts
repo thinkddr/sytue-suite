@@ -99,7 +99,7 @@ export const POST: APIRoute = async (ctx) => {
     let existing: Awaited<ReturnType<typeof drive.list>> = [];
     try {
       existing = await drive.list(FOLDER);
-    } catch {
+    } catch (err) {
       if (err instanceof HttpError && err.status === 404) {
         await drive.createFolder(FOLDER);
       } else {

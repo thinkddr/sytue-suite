@@ -17,7 +17,7 @@ export const GET: APIRoute = async (ctx) => {
   try {
     const client = chatClient({ accessToken: session.accessToken, userId: session.user.id });
     return json({ invitations: await client.invitations() });
-  } catch (err) {
+  } catch {
     return json({ error: 'chat_error' }, 502);
   }
 };

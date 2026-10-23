@@ -14,6 +14,7 @@ import (
 	"strings"
 	"sync"
 
+	"git.sytue.eu/sytue/one/apps/nucleo/ajustes"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/offline"
 )
@@ -77,11 +78,13 @@ func ponerSoloLectura() {
 func (s *Suite) Conexion(producto string, privadas ...string) (*offline.Monitor, *http.Client) {
 	red := &offline.Monitor{}
 	t := &offline.Transport{
-		Base:    api.Transporte, // con plazo (FYS-11)
-		Owner:   s.dueñoCache,
-		Product: producto,
-		Monitor: red,
-		Private: privadas,
+		Base:          api.Transporte, // con plazo (FYS-11)
+		Owner:         s.dueñoCache,
+		Product:       producto,
+		Monitor:       red,
+		Private:       privadas,
+		CacheProducts: api.Productos(),
+		Scope:         s.scopeCache,
 	}
 	var err error
 	t.Store, err = Almacen()
@@ -94,14 +97,16 @@ func (s *Suite) Conexion(producto string, privadas ...string) (*offline.Monitor,
 	return red, &http.Client{Transport: t}
 }
 
-// dueñoCache es persona Y organización: el `sub` es el mismo en todas, y sin la
-// organización, sin red se leerían en una los listados guardados en otra.
-func (s *Suite) dueñoCache() string {
-	sub := s.Sesion.Subject()
-	if sub == "" {
+// scopeCache rejects the previous session before the cross-app watcher adopts it.
+// It contains no token and is checked only around fallback/persistence, not per byte.
+func (s *Suite) scopeCache() string {
+	s.mu.Lock()
+	generation := s.generacionSesion
+	s.mu.Unlock()
+	if generation == "" || ajustes.Leer().Sesion != generation {
 		return ""
 	}
-	return sub + "/" + s.Sesion.Organizacion()
+	return generation
 }
 
 // Almacen abre el almacén local de la suite, en la caché del sistema: el mismo que

@@ -38,7 +38,7 @@ func (s *Suite) SubirNotepads(ctx context.Context) int {
 	if err != nil {
 		return 0
 	}
-	if dueño := s.dueñoCache(); dueño != "" {
+	if dueño := s.dueñoNotas(); dueño != "" {
 		n := api.NewNotes(s.URL("notes"), s.Sesion, nil)
 		notas.Subir(ctx, alm, dueño, notas.EnvioDe(n, time.Now().Format(time.DateOnly)), rand.Text)
 	}

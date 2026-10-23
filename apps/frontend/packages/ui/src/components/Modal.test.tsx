@@ -15,9 +15,81 @@ import { Modal } from './Modal.js';
 import { Dropdown, MenuItem } from './Dropdown.js';
 import { Popover } from './Popover.js';
 import { catalogs } from '@sytue/i18n';
+import { ToastProvider, useToast } from './Toast.js';
 
 // Idempotente: otro fichero de test puede haber registrado ya happy-dom.
 if (typeof document === 'undefined') GlobalRegistrator.register();
+
+test('persistent feedback follows nested dialogs without floating over their actions', async () => {
+  const host = document.body.appendChild(document.createElement('div'));
+  function Content({ outer, inner }: { outer: boolean; inner: boolean }) {
+    const { notify } = useToast();
+    return (
+      <>
+        <button
+          id="raise-toast"
+          onClick={() =>
+            notify({ tone: 'danger', title: 'A previous request failed', duration: 0 })
+          }
+        >
+          Raise error
+        </button>
+        <ToastProvider>
+          <Modal open={outer} title="Outer" onClose={() => {}}>
+            <input id="toast-focus" />
+          </Modal>
+          <Modal open={inner} title="Inner" onClose={() => {}}>
+            <p>Confirmation</p>
+          </Modal>
+        </ToastProvider>
+      </>
+    );
+  }
+  const ui = (outer: boolean, inner: boolean) => (
+    <ToastProvider>
+      <Content outer={outer} inner={inner} />
+    </ToastProvider>
+  );
+  const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+  try {
+    render(ui(false, false), host);
+    document.getElementById('raise-toast')!.click();
+    await flush();
+    expect(document.querySelector('[role="alert"]')?.closest('[role="dialog"]')).toBeNull();
+    render(ui(true, false), host);
+    await flush();
+    expect(
+      document
+        .querySelector('[role="alert"]')
+        ?.closest('[role="dialog"]')
+        ?.getAttribute('aria-label'),
+    ).toBe('Outer');
+    expect(document.activeElement?.id).toBe('toast-focus');
+    render(ui(true, true), host);
+    await flush();
+    expect(
+      document
+        .querySelector('[role="alert"]')
+        ?.closest('[role="dialog"]')
+        ?.getAttribute('aria-label'),
+    ).toBe('Inner');
+    render(ui(true, false), host);
+    await flush();
+    expect(
+      document
+        .querySelector('[role="alert"]')
+        ?.closest('[role="dialog"]')
+        ?.getAttribute('aria-label'),
+    ).toBe('Outer');
+    render(ui(false, false), host);
+    await flush();
+    expect(document.querySelectorAll('[role="alert"]').length).toBe(1);
+    expect(document.querySelector('[role="alert"]')?.closest('[role="dialog"]')).toBeNull();
+  } finally {
+    render(null, host);
+    host.remove();
+  }
+});
 
 test('al abrir, el foco entra al dialogo de forma sincrona (sin ventana de carrera)', () => {
   const host = document.createElement('div');
@@ -221,7 +293,7 @@ test('los filetes de cabecera y pie solo aparecen cuando el cuerpo se desplaza',
     await vuelta();
     for (const c of bandas()) expect(c).toContain('border-transparent');
     // Un cuerpo de 900 en un hueco de 300: se desplaza.
-    const cuerpo = dialogo().querySelector('h2')!.parentElement!.nextElementSibling!;
+    const cuerpo = dialogo().querySelector('[data-sytue-dialog-body]')!;
     Object.defineProperty(cuerpo, 'scrollHeight', { configurable: true, get: () => 900 });
     Object.defineProperty(cuerpo, 'clientHeight', { configurable: true, get: () => 300 });
     render(ui(), host);

@@ -6,10 +6,12 @@ package matrix
 import (
 	"context"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"maunium.net/go/mautrix/event"
 	"maunium.net/go/mautrix/id"
@@ -94,5 +96,73 @@ func TestForgetInvalidatesInFlightDescriptorAndOnlyDraftCleanup(t *testing.T) {
 	}
 	if len(r.files) != 0 || len(r.messages) != 0 {
 		t.Fatal("identity reset retained decrypted state")
+	}
+}
+
+func TestForgetChannelInvalidatesPendingWritesAndPreservesOtherChannels(t *testing.T) {
+	c := &Client{}
+	r := NewRoomsService(nil, func(context.Context) (*Client, error) { return c, nil })
+	removed, retained := attachmentKey{c, "!room", "file"}, attachmentKey{c, "!other", "other"}
+	r.files[removed] = cachedAttachment{channel: "channel"}
+	r.files[retained] = cachedAttachment{channel: "other"}
+	r.messages["removed"] = cachedMessage{value: api.RoomsMessage{ChannelID: "channel", Body: "private"}}
+	r.messages["retained"] = cachedMessage{value: api.RoomsMessage{ChannelID: "other", Body: "keep"}}
+	pending := r.revision()
+	r.ForgetChannel("channel")
+	if len(r.files) != 1 || len(r.messages) != 1 || r.messages["retained"].value.Body != "keep" {
+		t.Fatal("withdrawal retained private data or removed another channel")
+	}
+	if _, ok := r.files[retained]; !ok {
+		t.Fatal("other channel attachment key lost")
+	}
+	if _, err := r.content("", api.RoomsSend{}, c, "!room", pending); !errors.Is(err, ErrIdentity) {
+		t.Fatalf("pending write survived withdrawal: %v", err)
+	}
+}
+
+func TestMetadataReadStartedBeforeWithdrawalCannotHydrateAfterwards(t *testing.T) {
+	r := NewRoomsService(nil, nil)
+	pending := r.revision() // captured before requesting metadata from the API
+	r.ForgetChannel("channel")
+	for _, encrypted := range []bool{false, true} {
+		m := api.RoomsMessage{ChannelID: "channel", Body: "old clear text", Encryption: "legacy"}
+		if encrypted {
+			m.MatrixEvent = &EventRef{RoomID: "!room", EventID: "$event"}
+		}
+		if out, err := r.hydrateMany(t.Context(), []api.RoomsMessage{m}, pending); !errors.Is(err, ErrIdentity) || len(out) != 0 {
+			t.Fatalf("stale metadata hydrated: %+v %v", out, err)
+		}
+	}
+	if len(r.files) != 0 || len(r.messages) != 0 {
+		t.Fatal("stale read repopulated decrypted cache")
+	}
+}
+
+func TestInFlightMetadataHTTPResponseIsDiscardedAfterChannelWithdrawal(t *testing.T) {
+	requested, release := make(chan struct{}), make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/channels/channel/messages" {
+			t.Errorf("unexpected request: %s", r.URL.Path)
+		}
+		close(requested)
+		<-release
+		_, _ = io.WriteString(w, `{"messages":[{"id":"old","channel_id":"channel","body":"old private content","encryption":"legacy"}]}`)
+	}))
+	defer server.Close()
+	r := NewRoomsService(api.NewRooms(server.URL, nil, server.Client()), nil)
+	result := make(chan error, 1)
+	go func() {
+		messages, err := r.Messages(t.Context(), "channel", time.Time{}, 50)
+		if len(messages) != 0 {
+			result <- errors.New("old metadata HTTP response returned private messages")
+			return
+		}
+		result <- err
+	}()
+	<-requested
+	r.ForgetChannel("channel")
+	close(release)
+	if err := <-result; !errors.Is(err, ErrIdentity) {
+		t.Fatalf("metadata response survived channel withdrawal: %v", err)
 	}
 }

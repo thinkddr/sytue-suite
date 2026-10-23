@@ -123,7 +123,7 @@ func (s *servicioFalso) cuantos() int {
 
 // appDePrueba monta la App contra el servicio falso, con las cargas en línea: sin
 // gorutinas, lo que el test lee es lo que ya ha pasado.
-func appDePrueba(t *testing.T, s *servicioFalso) *App {
+func appDePrueba(t *testing.T, s http.Handler) *App {
 	t.Helper()
 	srv := httptest.NewServer(s)
 	t.Cleanup(srv.Close)

@@ -60,26 +60,40 @@ func main() {
 		ConLibreta(contactos, s.URL("contacts"))
 	b.Abridor = a
 	b.Widget = s.CapturarWidget
+	s.AlFondo(b.EnSegundoPlano)
+	s.AlVolver(b.EnPrimerPlano)
 	ctx := context.Background()
-	arrancado := false
+	identidad := ""
 	// «Adjuntar a un correo» de Drive, y el correo que deja escrito el ERP, llegan por
 	// el esquema con `action=compose` (`api.LeerRedactar`). Si llegan antes de que haya
 	// alguien dentro —se abrió la app pulsando el enlace—, esperan a que lo haya.
 	var pendiente *api.Redactar
-	arrancar := func() {
-		arrancado = true
-		b.Arrancar(ctx)
-		if pendiente != nil {
+	var hiloPendiente, buzonPendiente string
+	arrancar := func(e sesion.Estado) {
+		actual := ""
+		if e.Dentro() {
+			actual = s.URL("id") + "\x00" + e.Sujeto + "\x00" + s.Sesion.Organizacion()
+		}
+		if actual == identidad {
+			return
+		}
+		identidad = actual
+		b.CambiarSesion(ctx, actual)
+		if actual != "" && pendiente != nil {
 			//nolint:contextcheck // RedactarDesde usa el contexto de vida del buzón.
 			b.RedactarDesde(*pendiente)
 			pendiente = nil
 		}
-	}
-	s.AlCambiar(func(e sesion.Estado) {
-		if e.Dentro() && !arrancado {
-			arrancar()
+		if actual != "" && hiloPendiente != "" {
+			b.AbrirHilo(hiloPendiente)
+			hiloPendiente = ""
 		}
-	})
+		if actual != "" && buzonPendiente != "" {
+			b.AtenderBuzon(buzonPendiente)
+			buzonPendiente = ""
+		}
+	}
+	s.AlCambiar(arrancar)
 	// El título de la ventana es el NOMBRE DEL PRODUCTO y sale de `FyneApp.toml`, no
 	// del catálogo: una marca no se traduce y no tiene clave en la web.
 	nombre := "Sytue Mail"
@@ -118,17 +132,25 @@ func main() {
 	s.AlAbrirURL(func(u *url.URL) {
 		// El aviso de un correo nuevo abre su conversación (`hubnotify.EnlaceHilo`).
 		if h, ok := api.LeerHilo(u); ok {
-			fyne.Do(func() { b.AbrirHilo(h) })
+			if identidad == "" {
+				hiloPendiente = h
+			} else {
+				fyne.Do(func() { b.AbrirHilo(h) })
+			}
 			return
 		}
 		// El de una petición de acceso abre el buzón compartido (`hubnotify.EnlaceBuzon`).
 		if c, ok := api.LeerBuzon(u); ok {
-			fyne.Do(func() { b.AtenderBuzon(c) })
+			if identidad == "" {
+				buzonPendiente = c
+			} else {
+				fyne.Do(func() { b.AtenderBuzon(c) })
+			}
 			return
 		}
 		r, ok := api.LeerRedactar(u)
 		switch {
-		case ok && arrancado:
+		case ok && identidad != "":
 			b.RedactarDesde(r)
 		case ok:
 			pendiente = &r
@@ -141,7 +163,7 @@ func main() {
 	w.Resize(fyne.NewSize(1280, 744))
 	s.Arrancar(ctx)
 	if s.Estado().Dentro() {
-		arrancar()
+		arrancar(s.Estado())
 	} else {
 		go func() { _ = s.Entrar(ctx) }() // BLOQUEA hasta volver del navegador
 	}

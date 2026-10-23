@@ -11,6 +11,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -21,6 +22,8 @@ import (
 
 	"maunium.net/go/mautrix/event"
 	"maunium.net/go/mautrix/id"
+
+	"git.sytue.eu/sytue/one/apps/nucleo/api"
 )
 
 // This uses real maintained Go Olm and SQLite, with a transport double that records
@@ -33,6 +36,11 @@ func TestEncryptedSendAndAttachmentSurviveRestart(t *testing.T) {
 	var uploaded []byte
 	var contentName string
 	var beforeUploadReceipt func()
+	var encryptionReads, eventReads int
+	var readDelay time.Duration
+	var unsupportedEncryption bool
+	var cancelRead context.CancelFunc
+	readEvents := map[string]json.RawMessage{}
 	accountData := map[string]json.RawMessage{}
 	var backupVersion json.RawMessage
 	var keyBackup json.RawMessage
@@ -43,7 +51,7 @@ func TestEncryptedSendAndAttachmentSurviveRestart(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		switch {
 		case strings.HasSuffix(r.URL.Path, "/account/whoami"):
-			_, _ = io.WriteString(w, `{"user_id":"@person:matrix.test","device_id":"DEVICE"}`)
+			_, _ = io.WriteString(w, `{"user_id":"@sytue_person:matrix.test","device_id":"DEVICE"}`)
 		case strings.Contains(r.URL.Path, "/account_data/"):
 			key := strings.SplitN(r.URL.Path, "/account_data/", 2)[1]
 			if r.Method == http.MethodPut {
@@ -86,9 +94,9 @@ func TestEncryptedSendAndAttachmentSurviveRestart(t *testing.T) {
 			if len(deviceKeys) == 0 {
 				_, _ = io.WriteString(w, `{"device_keys":{}}`)
 			} else {
-				response := map[string]any{"device_keys": map[string]any{"@person:matrix.test": map[string]any{"DEVICE": deviceKeys}}}
+				response := map[string]any{"device_keys": map[string]any{"@sytue_person:matrix.test": map[string]any{"DEVICE": deviceKeys}}}
 				for name, keys := range crossSigning {
-					response[name+"s"] = map[string]any{"@person:matrix.test": keys}
+					response[name+"s"] = map[string]any{"@sytue_person:matrix.test": keys}
 				}
 				_ = json.NewEncoder(w).Encode(response)
 			}
@@ -102,13 +110,30 @@ func TestEncryptedSendAndAttachmentSurviveRestart(t *testing.T) {
 			}
 			_, _ = io.WriteString(w, `{"one_time_key_counts":{"signed_curve25519":50}}`)
 		case strings.Contains(r.URL.Path, "/state/m.room.encryption"):
-			_, _ = io.WriteString(w, `{"algorithm":"m.megolm.v1.aes-sha2"}`)
+			encryptionReads++
+			time.Sleep(readDelay)
+			if unsupportedEncryption {
+				_, _ = io.WriteString(w, `{"algorithm":"unsupported"}`)
+			} else {
+				_, _ = io.WriteString(w, `{"algorithm":"m.megolm.v1.aes-sha2"}`)
+			}
+		case strings.Contains(r.URL.Path, "/event/"):
+			eventReads++
+			time.Sleep(readDelay)
+			if data, ok := readEvents[r.URL.Path[strings.LastIndex(r.URL.Path, "/")+1:]]; ok {
+				_, _ = w.Write(data)
+			} else {
+				http.Error(w, `{"errcode":"M_NOT_FOUND"}`, http.StatusNotFound)
+			}
+			if cancelRead != nil {
+				cancelRead()
+			}
 		case strings.Contains(r.URL.Path, "/state/m.room.history_visibility"):
 			_, _ = io.WriteString(w, `{"history_visibility":"joined"}`)
 		case strings.Contains(r.URL.Path, "/sendToDevice/m.room.encrypted/"):
 			_, _ = io.WriteString(w, `{}`)
 		case strings.HasSuffix(r.URL.Path, "/messages"):
-			_ = json.NewEncoder(w).Encode(map[string]any{"chunk": []any{map[string]any{"event_id": "$draft", "room_id": "!room:matrix.test", "sender": "@person:matrix.test", "type": "m.room.encrypted", "content": json.RawMessage(sent)}}})
+			_ = json.NewEncoder(w).Encode(map[string]any{"chunk": []any{map[string]any{"event_id": "$draft", "room_id": "!room:matrix.test", "sender": "@sytue_person:matrix.test", "type": "m.room.encrypted", "content": json.RawMessage(sent)}}})
 		case strings.Contains(r.URL.Path, "/send/m.room.encrypted/"):
 			sendPaths = append(sendPaths, r.URL.Path)
 			sent, _ = io.ReadAll(r.Body)
@@ -127,6 +152,7 @@ func TestEncryptedSendAndAttachmentSurviveRestart(t *testing.T) {
 	}))
 	defer server.Close()
 	cfg := configFor(t, server)
+	cfg.Bootstrap.MatrixUserID = "@sytue_person:matrix.test"
 	c, err := newClient(cfg)
 	if err != nil {
 		t.Fatal(err)
@@ -179,6 +205,146 @@ func TestEncryptedSendAndAttachmentSurviveRestart(t *testing.T) {
 	if len(paths) != 3 || !strings.HasSuffix(paths[1], "/"+meetingTxn) || paths[1] != paths[2] || bytes.Contains(meetingCiphertext, []byte(meetingURL)) {
 		t.Fatalf("retry lost its encrypted transaction: %v", paths)
 	}
+	// A real page of independent Megolm messages, not repeated decryption of a
+	// single receipt. The controlled wire delay isolates redundant round trips.
+	references := make([]EventRef, 50)
+	for i := range references {
+		reference := EventRef{RoomID: "!room:matrix.test", EventID: fmt.Sprintf("$page-%d", i)}
+		payload, encryptErr := c.crypto.Encrypt(t.Context(), id.RoomID(reference.RoomID), event.EventMessage, event.MessageEventContent{MsgType: event.MsgText, Body: fmt.Sprintf("page message %d", i)})
+		if encryptErr != nil {
+			t.Fatal(encryptErr)
+		}
+		wire, marshalErr := json.Marshal(map[string]any{"event_id": reference.EventID, "room_id": reference.RoomID, "sender": "@sytue_person:matrix.test", "origin_server_ts": i + 1, "type": "m.room.encrypted", "content": payload})
+		if marshalErr != nil {
+			t.Fatal(marshalErr)
+		}
+		mu.Lock()
+		readEvents[reference.EventID] = wire
+		mu.Unlock()
+		references[i] = reference
+	}
+	mu.Lock()
+	encryptionReads, eventReads, readDelay = 0, 0, 5*time.Millisecond
+	mu.Unlock()
+	readStart := time.Now()
+	for i, reference := range references {
+		value, readErr := c.Read(t.Context(), reference)
+		if readErr != nil {
+			t.Fatal(readErr)
+		}
+		content, decodeErr := DecodeMessage(value)
+		if decodeErr != nil || content.Body != fmt.Sprintf("page message %d", i) {
+			t.Fatalf("page receipt %d: %v", i, decodeErr)
+		}
+	}
+	mu.Lock()
+	t.Logf("50 encrypted receipts: encryption state=%d event=%d elapsed=%s (5ms/request)", encryptionReads, eventReads, time.Since(readStart))
+	if encryptionReads != 50 || eventReads != 50 {
+		t.Fatalf("single receipt reference path changed: state=%d event=%d", encryptionReads, eventReads)
+	}
+	encryptionReads, eventReads = 0, 0
+	mu.Unlock()
+	readStart = time.Now()
+	results, readErr := c.ReadMany(t.Context(), "!room:matrix.test", references)
+	if readErr != nil || len(results) != len(references) {
+		t.Fatalf("encrypted receipt page: %v", readErr)
+	}
+	for i, result := range results {
+		content, decodeErr := DecodeMessage(result.Event)
+		if result.Err != nil || decodeErr != nil || content.Body != fmt.Sprintf("page message %d", i) || result.Event.Trust < id.TrustStateCrossSignedVerified {
+			t.Fatalf("page receipt %d lost verified content: read=%v decode=%v", i, result.Err, decodeErr)
+		}
+	}
+	mu.Lock()
+	t.Logf("50 batched encrypted receipts: encryption state=%d event=%d elapsed=%s (5ms/request)", encryptionReads, eventReads, time.Since(readStart))
+	if encryptionReads != 1 || eventReads != 50 {
+		t.Fatalf("page repeated state or skipped authenticating receipts: state=%d event=%d", encryptionReads, eventReads)
+	}
+	encryptionReads, eventReads = 0, 0
+	mu.Unlock()
+	service := NewRoomsService(nil, func(context.Context) (*Client, error) { return c, nil })
+	metadata := make([]api.RoomsMessage, len(references))
+	for i := range metadata {
+		metadata[i] = api.RoomsMessage{ID: fmt.Sprintf("message-%d", i), ChannelID: "channel", AuthorSub: "person", MatrixEvent: &references[i]}
+	}
+	hydrated, hydrateErr := service.hydrateMany(t.Context(), metadata, service.revision())
+	if hydrateErr != nil || len(hydrated) != len(references) {
+		t.Fatalf("product page hydration: %v", hydrateErr)
+	}
+	for i, message := range hydrated {
+		if message.Body != fmt.Sprintf("page message %d", i) || message.EncryptionError || !message.IdentityVerified || !message.AuthenticityVerified {
+			t.Fatalf("product receipt %d did not retain its authenticated content", i)
+		}
+	}
+	mu.Lock()
+	if encryptionReads != 1 || eventReads != 50 {
+		t.Fatalf("product adapter did not use the bounded page: state=%d event=%d", encryptionReads, eventReads)
+	}
+	readDelay = 0
+	readEvents["$plaintext"] = json.RawMessage(`{"event_id":"$plaintext","room_id":"!room:matrix.test","sender":"@sytue_person:matrix.test","type":"m.room.message","content":{"body":"never display this"}}`)
+	readEvents["$wrong-room"] = json.RawMessage(`{"event_id":"$wrong-room","room_id":"!other:matrix.test","type":"m.room.encrypted","content":{}}`)
+	readEvents["$wrong-receipt"] = json.RawMessage(`{"event_id":"$different","room_id":"!room:matrix.test","type":"m.room.encrypted","content":{}}`)
+	mu.Unlock()
+	invalidReferences := []EventRef{references[0], {RoomID: "!foreign:matrix.test", EventID: "$page-1"}, {RoomID: "!room:matrix.test", EventID: ""}, {RoomID: "!room:matrix.test", EventID: "$plaintext"}, {RoomID: "!room:matrix.test", EventID: "$wrong-room"}, {RoomID: "!room:matrix.test", EventID: "$wrong-receipt"}, references[1]}
+	results, readErr = c.ReadMany(t.Context(), "!room:matrix.test", invalidReferences)
+	if readErr != nil {
+		t.Fatal(readErr)
+	}
+	for i, result := range results {
+		if i == 0 || i == len(results)-1 {
+			if result.Err != nil {
+				t.Fatalf("one bad receipt prevented a valid neighbor: %v", result.Err)
+			}
+		} else if !errors.Is(result.Err, ErrIdentity) || len(result.Event.Content) != 0 {
+			t.Fatalf("unbound, plaintext or substituted receipt %d returned content: %v", i, result.Err)
+		}
+	}
+	badMetadata := append([]api.RoomsMessage(nil), metadata...)
+	badMetadata[5].AuthorSub = "another-person"
+	badMetadata[6].MatrixEvent = &EventRef{RoomID: "!foreign:matrix.test", EventID: "$page-6"}
+	hydrated, hydrateErr = service.hydrateMany(t.Context(), badMetadata, service.revision())
+	if hydrateErr != nil {
+		t.Fatalf("one invalid metadata receipt discarded the whole page: %v", hydrateErr)
+	}
+	for i, message := range hydrated {
+		if i == 5 || i == 6 {
+			if !message.EncryptionError || message.Body != "" || message.IdentityVerified || message.AuthenticityVerified {
+				t.Fatalf("forged author or room displayed receipt %d", i)
+			}
+		} else if message.EncryptionError || message.Body != fmt.Sprintf("page message %d", i) {
+			t.Fatalf("invalid neighbor hid valid receipt %d", i)
+		}
+	}
+	mu.Lock()
+	unsupportedEncryption, encryptionReads, eventReads = true, 0, 0
+	mu.Unlock()
+	if values, err := c.ReadMany(t.Context(), "!room:matrix.test", references); !errors.Is(err, ErrNotEncrypted) || len(values) != 0 {
+		t.Fatalf("page reused a stale encryption decision: %v", err)
+	}
+	mu.Lock()
+	if encryptionReads != 1 || eventReads != 0 {
+		t.Fatalf("unsupported encryption fetched message content: state=%d event=%d", encryptionReads, eventReads)
+	}
+	unsupportedEncryption = false
+	readCtx, stopRead := context.WithCancel(t.Context())
+	defer stopRead()
+	cancelRead, encryptionReads, eventReads = stopRead, 0, 0
+	mu.Unlock()
+	results, readErr = c.ReadMany(readCtx, "!room:matrix.test", references)
+	if readErr != nil {
+		t.Fatal(readErr)
+	}
+	for _, result := range results {
+		if !errors.Is(result.Err, context.Canceled) || len(result.Event.Content) != 0 {
+			t.Fatalf("canceled page returned content: %v", result.Err)
+		}
+	}
+	mu.Lock()
+	if eventReads != 1 {
+		t.Fatalf("cancellation fetched the rest of the page: %d", eventReads)
+	}
+	cancelRead = nil
+	mu.Unlock()
 	if err = c.Backup(context.Background()); err != nil {
 		t.Fatalf("backup: %v", err)
 	}
@@ -211,7 +377,7 @@ func TestEncryptedSendAndAttachmentSurviveRestart(t *testing.T) {
 	if err = c.Recover(context.Background(), "invalid recovery key"); err == nil {
 		t.Fatal("invalid recovery key accepted")
 	}
-	encrypted := &event.Event{ID: "$event", RoomID: "!room:matrix.test", Sender: "@person:matrix.test", Type: event.EventEncrypted, Content: event.Content{VeryRaw: ciphertext}}
+	encrypted := &event.Event{ID: "$event", RoomID: "!room:matrix.test", Sender: "@sytue_person:matrix.test", Type: event.EventEncrypted, Content: event.Content{VeryRaw: ciphertext}}
 	if err = encrypted.Content.ParseRaw(encrypted.Type); err != nil {
 		t.Fatal(err)
 	}

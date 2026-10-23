@@ -29,8 +29,14 @@ interface Props {
    *  caducidad del estado; null = no caduca; ausente = conserva la caducidad vigente
    *  (p. ej. al solo cambiar de presencia). Ver ChatApp.changeMyPresence. */
   onChange: (state: PresenceState, status: string, expiresAt?: number | null) => void;
-  /** Ajuste: ¿notificar mensajes directos con la ventana sin foco? */
+  /** Regla compartida de la cuenta; no solicita permiso de navegador. */
   dmNotify: boolean;
+  dmLoading?: boolean;
+  dmSaving?: boolean;
+  dmError?: boolean;
+  dmLegacy?: boolean;
+  onRefreshDmNotify?: () => void;
+  onDiscardLegacyDmNotify?: () => void;
   onToggleDmNotify: () => void;
   /** Abre el modal de preferencias de notificación (palabras clave + No molestar). */
   onOpenNotifySettings: () => void;
@@ -52,6 +58,12 @@ export function StatusMenu({
   status,
   onChange,
   dmNotify,
+  dmLoading = false,
+  dmSaving = false,
+  dmError = false,
+  dmLegacy = false,
+  onRefreshDmNotify,
+  onDiscardLegacyDmNotify,
   onToggleDmNotify,
   onOpenNotifySettings,
   onOpenIntegrations,
@@ -74,6 +86,7 @@ export function StatusMenu({
           onClick={() => {
             setDraft(status); // reabre con el estado guardado vigente
             setExpiry('never');
+            onRefreshDmNotify?.();
             onClick();
           }}
           {...aria}
@@ -173,7 +186,7 @@ export function StatusMenu({
 
       <MenuSeparator />
 
-      {/* Ajuste de avisos de DM (persistido en localStorage por el padre). La acción
+      {/* Ajuste de avisos de DM compartido por la cuenta en el Hub. La acción
           va en el texto (activar/desactivar): el nombre accesible describe el efecto,
           sin depender de aria-checked (el Dropdown navega por [role=menuitem]). */}
       {/* Todo leído de un golpe (Shift+Esc en Slack): va aquí y no en la cabecera de
@@ -182,9 +195,39 @@ export function StatusMenu({
         {t('status.markAllRead')}
       </MenuItem>
 
-      <MenuItem onClick={onToggleDmNotify} icon={<Icon name="bell" size={16} />}>
-        {dmNotify ? t('status.dmAlertsOff') : t('status.dmAlertsOn')}
+      <MenuItem
+        disabled={dmLoading || dmSaving || dmError}
+        onClick={onToggleDmNotify}
+        icon={<Icon name="bell" size={16} />}
+      >
+        {dmLoading || dmSaving
+          ? t('state.loading')
+          : dmNotify
+            ? t('status.dmAlertsOff')
+            : t('status.dmAlertsOn')}
       </MenuItem>
+      <p class="text-text-muted px-3 py-1 text-xs">{t('status.dmAccountHelp')}</p>
+      {dmError ? (
+        <div class="px-3 py-1" role="alert">
+          <p class="text-danger-text text-xs">{t('error.checkConnection')}</p>
+          <Button size="sm" variant="ghost" onClick={onRefreshDmNotify}>
+            {t('action.retry')}
+          </Button>
+        </div>
+      ) : null}
+      {dmLegacy ? (
+        <div class="px-3 py-1">
+          <p class="text-text-muted text-xs">{t('status.dmLegacyHelp')}</p>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={onDiscardLegacyDmNotify}
+            disabled={dmLoading || dmSaving || dmError}
+          >
+            {t('status.dmUseAccount')}
+          </Button>
+        </div>
+      ) : null}
 
       {/* Preferencias de notificación: palabras clave + No molestar (Ola 13). */}
       <MenuItem onClick={onOpenNotifySettings} icon={<Icon name="settings" size={16} />}>

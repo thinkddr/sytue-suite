@@ -113,6 +113,11 @@ export const da: AppCatalog<typeof en> = {
   'status.expiry.week': 'Denne uge',
   'status.dmAlertsOn': 'Slå notifikationer for direkte beskeder til',
   'status.dmAlertsOff': 'Slå notifikationer for direkte beskeder fra',
+  'status.dmAccountHelp':
+    'Gælder denne konto og organisation i alle Sytue-apps. Browserens tilladelse er separat.',
+  'status.dmLegacyHelp':
+    'Denne browser har stadig et lokalt filter. Fjern det for at bruge kontoindstillingen; kontoen ændres ikke.',
+  'status.dmUseAccount': 'Brug kontoindstillingen',
   'connection.online': 'Forbundet',
   'connection.connecting': 'Forbinder…',
   'connection.offline': 'Ingen forbindelse',

@@ -775,8 +775,12 @@ func (v *Vista) cargarAgenda() {
 
 	desde, hasta := LimitesDelDia(v.ahora)
 	view := v.Widget.View()
+	var sinLeer int
+	var errCorreo error
+	var lecturas sync.WaitGroup
+	lecturas.Go(func() { sinLeer, errCorreo = v.agenda.SinLeer(ctx) })
 	eventos, errEventos := v.agenda.Hoy(ctx, desde, hasta)
-	sinLeer, errCorreo := v.agenda.SinLeer(ctx)
+	lecturas.Wait()
 	if errCorreo == nil {
 		_ = view.Publicar(ctx, widgets.Counter{Kind: "unread", Value: int64(sinLeer)})
 	}

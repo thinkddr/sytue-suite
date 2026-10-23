@@ -106,6 +106,9 @@ func sincronizarOrganizacion(ctx context.Context, svc *api.Contacts, dir *api.Di
 		}
 		if _, err := svc.Create(ctx, libreta.ID, in); err == nil {
 			creados++
+			for _, correo := range correos {
+				ya[strings.ToLower(correo)] = true
+			}
 		}
 	}
 	return creados, nil

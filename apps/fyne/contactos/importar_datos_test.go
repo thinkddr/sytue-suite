@@ -15,6 +15,7 @@ import (
 
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 
+	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 )
 
@@ -56,5 +57,41 @@ func TestTraeTusContactosVaEnElPie(t *testing.T) {
 	// ROJO con el rectángulo transparente de antes.
 	if o := pie(`{"instances":[]}`); o != nil {
 		t.Fatalf("sin ningún origen hay pie, y con él un filete sin nada debajo: %T", o)
+	}
+}
+
+func TestImportadorContactsTerminaConSuSesion(t *testing.T) {
+	for _, cerrar := range []bool{false, true} {
+		t.Run(map[bool]string{false: "salir", true: "cerrar"}[cerrar], func(t *testing.T) {
+			entrada, cancelada := make(chan struct{}), make(chan struct{})
+			var peticiones atomic.Int32
+			gw := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if peticiones.Add(1) != 1 {
+					_, _ = io.WriteString(w, `{}`)
+					return
+				}
+				close(entrada)
+				<-r.Context().Done()
+				close(cancelada)
+			}))
+			defer gw.Close()
+			a := appDePrueba(t, &servicioFalso{})
+			a.ConImportar(api.NewIntegraciones(gw.URL, nil, nil))
+			a.Cargar()
+			<-entrada
+			if cerrar {
+				a.Cerrar()
+			} else {
+				a.Vaciar()
+			}
+			select {
+			case <-cancelada:
+			case <-time.After(2 * time.Second):
+				t.Fatal("el importador conservó su petición tras salir")
+			}
+			if a.Pantalla.Importar.Objeto(ui.AnchoUtilMenu, tema.Claro) != nil || peticiones.Load() != 1 {
+				t.Fatal("el importador publicó datos o hizo otra consulta tras salir")
+			}
+		})
 	}
 }

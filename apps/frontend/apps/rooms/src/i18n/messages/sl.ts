@@ -114,6 +114,11 @@ export const sl: AppCatalog<typeof en> = {
   'status.expiry.week': 'Ta teden',
   'status.dmAlertsOn': 'Vklopi opozorila za neposredna sporočila',
   'status.dmAlertsOff': 'Izklopi opozorila za neposredna sporočila',
+  'status.dmAccountHelp':
+    'Velja za ta račun in organizacijo v vseh aplikacijah Sytue. Dovoljenje brskalnika je ločeno.',
+  'status.dmLegacyHelp':
+    'Ta brskalnik še vedno ima lokalni filter. Odstranite ga za uporabo nastavitve računa; račun se ne bo spremenil.',
+  'status.dmUseAccount': 'Uporabi nastavitev računa',
   'connection.online': 'Povezano',
   'connection.connecting': 'Povezovanje…',
   'connection.offline': 'Ni povezave',

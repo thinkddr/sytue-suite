@@ -142,6 +142,9 @@ func main() {
 	soltar.AlArrastrar(w, p.Arrastrando)
 
 	w.SetContent(ui.NuevaBarraSuite(tr, s, iconos.Photos).Montar(p.Objeto()))
+	s.AlFondo(p.AlFondo)
+	s.AlVolver(p.AlVolver)
+	w.SetOnClosed(p.AlFondo)
 	p.Arrancar()
 	s.Arrancar(context.Background())
 	w.ShowAndRun()

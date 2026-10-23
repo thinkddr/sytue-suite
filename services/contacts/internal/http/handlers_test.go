@@ -104,6 +104,15 @@ func (f *fakeStore) ListContacts(context.Context, string, uuid.UUID, int) ([]dom
 	return f.contacts, f.contactErr
 }
 
+func (f *fakeStore) ListContactsPage(_ context.Context, _ string, _ uuid.UUID, after *store.ContactCursor, limit int) (store.ContactPage, error) {
+	page := store.ContactPage{Contacts: f.contacts}
+	if len(page.Contacts) > limit {
+		page.Contacts = page.Contacts[:limit]
+		page.Next = &store.ContactCursor{ID: page.Contacts[limit-1].ID}
+	}
+	return page, f.contactErr
+}
+
 func (f *fakeStore) CreateContact(_ context.Context, _ string, in store.UpsertContact) (domain.Contact, error) {
 	f.gotUpsert = in
 	f.created = append(f.created, in)

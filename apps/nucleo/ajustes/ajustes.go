@@ -263,7 +263,7 @@ func Cerrojo(ctx context.Context) (soltar func(), err error) {
 	if err != nil {
 		return nil, err
 	}
-	return esperarCerrojo(ctx, f)
+	return CerrojoFichero(ctx, f)
 }
 
 // CerrojoSesion usa el mismo bloqueo del sistema que Cerrojo. En Android obtiene
@@ -276,10 +276,13 @@ func CerrojoSesion(ctx context.Context) (soltar func(), err error) {
 	if !compartido {
 		return Cerrojo(ctx)
 	}
-	return esperarCerrojo(ctx, f)
+	return CerrojoFichero(ctx, f)
 }
 
-func esperarCerrojo(ctx context.Context, f *os.File) (soltar func(), err error) {
+// CerrojoFichero excludes processes on a caller-selected file using the same OS
+// mechanism as the suite locks. It takes ownership of f: release or any error closes
+// it. A separate file avoids coupling cache writes to OIDC/preferences locks.
+func CerrojoFichero(ctx context.Context, f *os.File) (soltar func(), err error) {
 	for {
 		if err := ctx.Err(); err != nil {
 			_ = f.Close()

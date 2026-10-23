@@ -45,6 +45,35 @@ func TestElSelectorDeCuentaGuardaLasTresAparienciasYElSistema(t *testing.T) {
 	}
 }
 
+func TestElIdiomaDeCuentaPuedeVolverAlSistema(t *testing.T) {
+	suite := suiteConSesion(t)
+	c := nuevaCuentaBarra(traductorPrueba(t), suite)
+	selector := func() *Selector {
+		grupo := c.idioma(suite.Estado()).(*fyne.Container)
+		return grupo.Objects[0].(*fyne.Container).Objects[1].(*Selector)
+	}
+	for _, i := range []int{1, len(i18n.Locales), 0} {
+		s := selector()
+		if len(s.Opciones) != 1+len(i18n.Locales) || s.Opciones[0] != c.t.T("account.appearance.system", nil) {
+			t.Fatalf("falta la opción traducida de seguir al sistema: %+v", s.Opciones)
+		}
+		antes := ajustes.Leer()
+		s.elegir(i)
+		quiero := ""
+		if i > 0 {
+			quiero = string(i18n.Locales[i-1])
+		}
+		despues := ajustes.Leer()
+		if despues.Idioma != quiero || selector().Elegida != i {
+			t.Fatalf("elegir %d guarda %q y marca %d; quiero %q", i, despues.Idioma, selector().Elegida, quiero)
+		}
+		despues.Idioma = antes.Idioma
+		if despues != antes {
+			t.Fatal("elegir idioma ha cambiado otro ajuste")
+		}
+	}
+}
+
 func TestLasAparienciasTraducidasCabenEnElMenuDeCuenta(t *testing.T) {
 	for _, locale := range i18n.Locales {
 		t.Run(string(locale), func(t *testing.T) {

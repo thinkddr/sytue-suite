@@ -221,18 +221,62 @@ func (c *Contacts) borrar(ctx context.Context, ruta string) error {
 	return resp.Body.Close()
 }
 
-// InBook lista los contactos de UNA libreta, que es lo que enseña la lista: cambiar de
-// libreta en el menú cambia lo que se ve. All() es otra cosa —toda la agenda, paginada,
-// para llevársela— y no sabe de qué libreta viene cada uno.
+// ContactPage is a bounded inventory of one address book.
+type ContactPage struct {
+	Contacts   []Contact `json:"contacts"`
+	NextCursor string    `json:"next_cursor"`
+}
+
+// InBookPage reads a single page; it never substitutes an owner's other books.
+func (c *Contacts) InBookPage(ctx context.Context, libreta, cursor string) (ContactPage, error) {
+	q := url.Values{"limit": {"100"}}
+	if cursor != "" {
+		q.Set("cursor", cursor)
+	}
+	return JSON[ContactPage](ctx, c.c, Request{Path: "/address-books/" + url.PathEscape(libreta) + "/contacts/page", Query: q})
+}
+
+// InBook returns the complete book or an error. No partial successful inventory is
+// returned after a malformed cursor, canceled request or failed later page.
 func (c *Contacts) InBook(ctx context.Context, libreta string) ([]Contact, error) {
-	r, err := JSON[struct {
-		Contacts []Contact `json:"contacts"`
-	}](ctx, c.c, Request{
-		// Sin `limit` el servicio da 100, y una libreta más larga se veía cortada sin
-		// avisar. 500 es su tope.
-		Path: "/address-books/" + url.PathEscape(libreta) + "/contacts", Query: url.Values{"limit": {"500"}},
-	})
-	return r.Contacts, err
+	var contacts []Contact
+	cursor := ""
+	seen := map[string]bool{}
+	ids := map[string]bool{}
+	for {
+		page, err := c.InBookPage(ctx, libreta, cursor)
+		if err != nil {
+			var response *Error
+			if cursor == "" && errors.As(err, &response) && response.Status == http.StatusNotFound {
+				legacy, legacyErr := JSON[ContactPage](ctx, c.c, Request{Path: "/address-books/" + url.PathEscape(libreta) + "/contacts", Query: url.Values{"limit": {"500"}}})
+				if legacyErr != nil {
+					return nil, legacyErr
+				}
+				// An old backend has no continuation contract. At its cap completeness
+				// cannot be established, so require an update instead of losing contacts.
+				if len(legacy.Contacts) >= 500 || legacy.NextCursor != "" {
+					return nil, errors.New("api: contacts pagination unavailable")
+				}
+				return legacy.Contacts, nil
+			}
+			return nil, err
+		}
+		if page.NextCursor != "" && (seen[page.NextCursor] || len(page.Contacts) == 0) {
+			return nil, errors.New("api: invalid contact cursor")
+		}
+		for _, contact := range page.Contacts {
+			if contact.ID == "" || ids[contact.ID] {
+				return nil, errors.New("api: duplicate contact page")
+			}
+			ids[contact.ID] = true
+			contacts = append(contacts, contact)
+		}
+		if page.NextCursor == "" {
+			return contacts, nil
+		}
+		seen[page.NextCursor] = true
+		cursor = page.NextCursor
+	}
 }
 
 // VCard es la vCard 4.0 de un contacto, tal y como la sirve el servicio

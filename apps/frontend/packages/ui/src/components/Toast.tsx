@@ -28,9 +28,24 @@ interface ToastEntry extends ToastInput {
 interface ToastContextValue {
   notify: (toast: ToastInput) => string;
   dismiss: (id: string) => void;
+  registerDialog?: (outlet: HTMLElement) => () => void;
 }
 
 const ToastContext = createContext<ToastContextValue | null>(null);
+
+/** Keep feedback in the modal's layout, so it cannot cover its fields or actions. */
+export function useDialogToasts(): (outlet: HTMLDivElement | null) => void {
+  const register = useContext(ToastContext)?.registerDialog;
+  // A portal can commit after its parent's layout effects. Register when its
+  // actual DOM node attaches, and release it when that node detaches.
+  return useMemo(() => {
+    let cleanup: (() => void) | undefined;
+    return (outlet: HTMLDivElement | null) => {
+      cleanup?.();
+      cleanup = outlet && register ? register(outlet) : undefined;
+    };
+  }, [register]);
+}
 
 const toneConfig: Record<
   ToastTone,
@@ -43,10 +58,39 @@ const toneConfig: Record<
 };
 
 export function ToastProvider({ children }: { children: ComponentChildren }): JSX.Element {
+  const parent = useContext(ToastContext);
+  // App controllers can live above the shell. A nested shell must keep their
+  // notifications and dialog outlets in the same queue.
+  return parent ? <>{children}</> : <RootToastProvider>{children}</RootToastProvider>;
+}
+
+function RootToastProvider({ children }: { children: ComponentChildren }): JSX.Element {
   // `t` ya nombra cada toast en el map de abajo: la traducción va como `tr`.
   const tr = useT();
   const [toasts, setToasts] = useState<ToastEntry[]>([]);
   const timers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  const outlets = useRef<HTMLElement[]>([]);
+  const [outlet, setOutlet] = useState<HTMLElement | null>(null);
+  const registerDialog = useCallback((target: HTMLElement) => {
+    const update = () => {
+      // Portals share the same z-layer: the last dialog in document order is
+      // uppermost, regardless of parent/child layout-effect registration order.
+      const top = outlets.current.reduce<HTMLElement | null>(
+        (last, next) =>
+          !last || last.compareDocumentPosition(next) & Node.DOCUMENT_POSITION_FOLLOWING
+            ? next
+            : last,
+        null,
+      );
+      setOutlet(top);
+    };
+    outlets.current.push(target);
+    update();
+    return () => {
+      outlets.current = outlets.current.filter((entry) => entry !== target);
+      update();
+    };
+  }, []);
 
   const dismiss = useCallback((id: string) => {
     setToasts((list) => list.filter((t) => t.id !== id));
@@ -76,16 +120,24 @@ export function ToastProvider({ children }: { children: ComponentChildren }): JS
     [dismiss],
   );
 
-  const value = useMemo<ToastContextValue>(() => ({ notify, dismiss }), [notify, dismiss]);
+  const value = useMemo<ToastContextValue>(
+    () => ({ notify, dismiss, registerDialog }),
+    [notify, dismiss, registerDialog],
+  );
 
   return (
     <ToastContext.Provider value={value}>
       {children}
-      {typeof document !== 'undefined'
+      {typeof document !== 'undefined' && toasts.length > 0
         ? createPortal(
             <div
-              class="pointer-events-none fixed right-[max(1rem,var(--sytue-safe-right,0px))] bottom-[max(1rem,var(--sytue-safe-bottom,0px))] flex w-[calc(100%_-_max(1rem,var(--sytue-safe-left,0px))_-_max(1rem,var(--sytue-safe-right,0px)))] max-w-sm flex-col gap-2"
-              style={{ zIndex: 'var(--z-toast)' }}
+              class={cx(
+                'pointer-events-none flex flex-col gap-2',
+                outlet
+                  ? 'px-5 pb-3'
+                  : 'fixed right-[max(1rem,var(--sytue-safe-right,0px))] bottom-[max(1rem,var(--sytue-safe-bottom,0px))] w-[calc(100%_-_max(1rem,var(--sytue-safe-left,0px))_-_max(1rem,var(--sytue-safe-right,0px)))] max-w-sm',
+              )}
+              style={outlet ? undefined : { zIndex: 'var(--z-toast)' }}
             >
               {toasts.map((t) => {
                 const cfg = toneConfig[t.tone ?? 'info'];
@@ -133,7 +185,7 @@ export function ToastProvider({ children }: { children: ComponentChildren }): JS
                 );
               })}
             </div>,
-            document.body,
+            outlet ?? document.body,
           )
         : null}
     </ToastContext.Provider>

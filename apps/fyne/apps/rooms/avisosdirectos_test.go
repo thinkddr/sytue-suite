@@ -49,3 +49,23 @@ func TestLosAvisosDeDirectosSonUnaReglaDelHub(t *testing.T) {
 		t.Error("con el Hub caído el ajuste no vuelve")
 	}
 }
+
+func TestDirectAlertRuleHasTheSameSpecificityAsHub(t *testing.T) {
+	for _, test := range []struct {
+		name  string
+		prefs []api.HubNotificationPref
+		muted bool
+	}{
+		{"default", nil, false},
+		{"source mute", []api.HubNotificationPref{{Source: "rooms", Muted: true}}, true},
+		{"exact enable overrides source", []api.HubNotificationPref{{Source: "rooms", Muted: true}, {Source: "rooms", Kind: "rooms.message"}}, false},
+		{"exact mute first", []api.HubNotificationPref{{Source: "rooms", Kind: "rooms.message", Muted: true}, {Source: "rooms"}}, true},
+		{"other kinds unchanged", []api.HubNotificationPref{{Source: "mail", Muted: true}, {Source: "rooms", Kind: "rooms.mention", Muted: true}}, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if got := directosCalladosEn(test.prefs); got != test.muted {
+				t.Fatalf("direct-message rule=%v, Hub specificity requires %v", got, test.muted)
+			}
+		})
+	}
+}

@@ -482,13 +482,15 @@ func (s *Store) RevokeCallMember(ctx context.Context, id uuid.UUID, subject stri
 }
 
 func (s *Store) CloseCallEncryption(ctx context.Context, id uuid.UUID) error {
-	return s.changeCall(ctx, id, func(ctx context.Context, tx pgx.Tx, st callState) error {
-		if _, err := tx.Exec(ctx, `UPDATE rooms SET status='ended',ended_at=COALESCE(ended_at,now()),updated_at=now() WHERE tenant=$1 AND id=$2`, st.Tenant, id); err != nil {
-			return err
-		}
-		_, err := tx.Exec(ctx, `UPDATE matrix_call_members SET removed=true,ready_generation=0 WHERE tenant=$1 AND call_id=$2`, st.Tenant, id)
+	return s.changeCall(ctx, id, closeCallTx)
+}
+
+func closeCallTx(ctx context.Context, tx pgx.Tx, st callState) error {
+	if _, err := tx.Exec(ctx, `UPDATE rooms SET status='ended',ended_at=COALESCE(ended_at,now()),updated_at=now() WHERE tenant=$1 AND id=$2`, st.Tenant, st.ID); err != nil {
 		return err
-	})
+	}
+	_, err := tx.Exec(ctx, `UPDATE matrix_call_members SET removed=true,ready_generation=0 WHERE tenant=$1 AND call_id=$2`, st.Tenant, st.ID)
+	return err
 }
 
 func (s *Store) changeCall(ctx context.Context, id uuid.UUID, change func(context.Context, pgx.Tx, callState) error) error {
@@ -528,7 +530,7 @@ func (s *Store) SetCallPublication(ctx context.Context, id uuid.UUID, actor stri
 	})
 }
 
-func (s *Store) revokeChannelCallsTx(ctx context.Context, tx pgx.Tx, tenant string, channel uuid.UUID) error {
+func (s *Store) reconcileChannelCallsTx(ctx context.Context, tx pgx.Tx, tenant string, channel uuid.UUID, closed bool) error {
 	t, err := tenancy.New(tenant)
 	if err != nil {
 		return err
@@ -557,13 +559,20 @@ func (s *Store) revokeChannelCallsTx(ctx context.Context, tx pgx.Tx, tenant stri
 		if err != nil {
 			return err
 		}
-		if err := s.pruneCallTx(ctx, tx, &st); err != nil {
+		if closed {
+			if err := closeCallTx(ctx, tx, st); err != nil {
+				return err
+			}
+			if err := callMembersTx(ctx, tx, &st); err != nil {
+				return err
+			}
+		} else if err := s.pruneCallTx(ctx, tx, &st); err != nil {
 			return err
 		}
-		if len(st.Members) == 0 {
+		if len(st.Members) == 0 && !closed {
 			continue
 		}
-		if _, err := s.rotateCallTx(ctx, tx, st, false); err != nil {
+		if _, err := s.rotateCallTx(ctx, tx, st, closed); err != nil {
 			return err
 		}
 	}

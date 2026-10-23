@@ -96,7 +96,29 @@ func main() {
 	p.Entrar = func() error { return s.Entrar(context.Background()) }
 	montarSelector(w, p)
 	enSistema := driveEnSistema(api.NewAccount(s.URL("id"), s.Sesion, nil), s.URL("drive")+"/dav/")
+	identidadImportador := ""
+	var pararImportador context.CancelFunc
+	actualizarImportador := func(e sesion.Estado) {
+		actual := ""
+		if e.Dentro() {
+			actual = s.URL("id") + "\x00" + e.Sujeto + "\x00" + s.Sesion.Organizacion()
+		}
+		if actual == identidadImportador {
+			return
+		}
+		identidadImportador = actual
+		if pararImportador != nil {
+			pararImportador()
+		}
+		p.PararImportador()
+		if actual != "" {
+			vida, parar := context.WithCancel(context.Background())
+			pararImportador = parar
+			p.IniciarImportador(vida)
+		}
+	}
 	s.AlCambiar(func(e sesion.Estado) {
+		actualizarImportador(e)
 		p.Sesion(e.Dentro())
 		enSistema(e.Dentro())
 	})
@@ -114,6 +136,13 @@ func main() {
 
 	w.SetContent(ui.NuevaBarraSuite(tr, s, iconos.Drive).Montar(p.Objeto()))
 	w.Resize(fyne.NewSize(anchoInicial, altoInicial))
+	actualizarImportador(s.Estado())
+	w.SetOnClosed(func() {
+		if pararImportador != nil {
+			pararImportador()
+		}
+		p.PararImportador()
+	})
 	p.Arrancar(s.Estado().Dentro())
 	enSistema(s.Estado().Dentro())
 	s.RutaPropia(func(u *url.URL) bool {

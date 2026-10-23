@@ -28,3 +28,58 @@ describe('currentConnectivity', () => {
     }
   });
 });
+
+describe('native scope hand-off', () => {
+  test('a disposed mount cannot initialise a worker after its registration finishes', async () => {
+    const originals = new Map(
+      ['window', 'navigator', 'document', 'location', 'performance'].map((name) => [
+        name,
+        Object.getOwnPropertyDescriptor(globalThis, name),
+      ]),
+    );
+    const messages: unknown[] = [];
+    let ready!: (value: unknown) => void;
+    const worker = { postMessage: (value: unknown) => messages.push(value) };
+    const serviceWorker = {
+      register: async () => ({ active: worker }),
+      ready: new Promise((resolve) => {
+        ready = resolve;
+      }),
+      controller: worker,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    };
+    const replace = (name: string, value: unknown): void => {
+      Object.defineProperty(globalThis, name, { value, configurable: true });
+    };
+    try {
+      replace('window', {
+        Capacitor: {},
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined,
+      });
+      replace('navigator', { serviceWorker });
+      replace('document', { querySelectorAll: () => [] });
+      replace('location', { href: 'https://suite.invalid/mail' });
+      replace('performance', { getEntriesByType: () => [] });
+      const { activateNativeOffline } = await import('./native.js');
+      const stop = activateNativeOffline({
+        ownerId: 'ada',
+        tenantId: 'acme',
+        product: 'mail',
+        scopeId: 'old-mount',
+      });
+      stop();
+      ready({ active: worker });
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(messages).toEqual([{ type: 'INVALIDATE', scopeId: 'old-mount' }]);
+    } finally {
+      for (const [name, descriptor] of originals) {
+        if (descriptor) Object.defineProperty(globalThis, name, descriptor);
+        else Reflect.deleteProperty(globalThis, name);
+      }
+    }
+  });
+});

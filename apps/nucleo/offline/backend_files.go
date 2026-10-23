@@ -45,6 +45,7 @@ func (f ficheros) put(clave string, datos []byte) error {
 	}
 	tmp := clave + ".tmp-" + rand.Text()
 	if err := f.raiz.WriteFile(tmp, datos, 0o600); err != nil {
+		_ = f.raiz.Remove(tmp)
 		return err
 	}
 	if err := f.raiz.Rename(tmp, clave+".json"); err != nil {
@@ -118,6 +119,9 @@ func (f ficheros) clear() error {
 		return err
 	}
 	for _, e := range entradas {
+		if e.Name() == ".http-cache-lock" {
+			continue // stable inode, also while another app is waiting for the lock
+		}
 		if err := f.raiz.RemoveAll(e.Name()); err != nil {
 			return err
 		}

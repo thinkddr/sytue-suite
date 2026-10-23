@@ -456,7 +456,11 @@ func (c *capa) avisos() *PilaAvisos {
 	if lienzo == nil || lienzo.Overlays().Top() != fyne.CanvasObject(c) {
 		return nil
 	}
-	return pilaDe(lienzo)
+	p := pilaDe(lienzo)
+	if p != nil && p.dialogoEncima() != nil {
+		return nil
+	}
+	return p
 }
 
 func (r *capaRenderer) Destroy() {}

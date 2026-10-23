@@ -113,6 +113,11 @@ export const is: AppCatalog<typeof en> = {
   'status.expiry.week': 'Þessa viku',
   'status.dmAlertsOn': 'Kveikja á tilkynningum um bein skilaboð',
   'status.dmAlertsOff': 'Slökkva á tilkynningum um bein skilaboð',
+  'status.dmAccountHelp':
+    'Gildir fyrir þennan reikning og þessa stofnun í öllum Sytue-öppum. Heimild vafrans er aðskilin.',
+  'status.dmLegacyHelp':
+    'Þessi vafri er enn með staðbundna síu. Fjarlægðu hana til að nota reikningsstillinguna; reikningurinn breytist ekki.',
+  'status.dmUseAccount': 'Nota reikningsstillingu',
   'connection.online': 'Tengt',
   'connection.connecting': 'Tengist…',
   'connection.offline': 'Engin tenging',

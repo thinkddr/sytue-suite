@@ -1,5 +1,5 @@
 /*
- * El service worker del SHELL NATIVO (Wails/Capacitor), no el de las PWA web.
+ * El service worker del SHELL NATIVO de Capacitor, no el de las PWA web.
  *
  * ⚠️ NO ES LA FUENTE ÚNICA DE TODO, aunque lo dijera hasta el 2026-08-16 («cada
  * app expone /sw.js mediante un endpoint Astro… no hay cinco copias que puedan
@@ -50,7 +50,7 @@
 export const RE_BASE_DE_APP = /^\/[a-z-]+(?=\/(?:auth|api|_astro)\/)/;
 
 const SOURCE = String.raw`
-const VERSION = 'sytue-native-v1';
+const VERSION = 'sytue-native-v2';
 const STATIC_CACHE = VERSION + '-static';
 const META_CACHE = VERSION + '-meta';
 const CONTEXT_URL = '/__sytue_offline_context__';
@@ -67,89 +67,88 @@ const PRIVATE_PREFIXES = [
   '/api/ai',
 ];
 const EXPLICIT_FILE_PREFIXES = [
-  '/api/content',
-  '/api/shared-content',
-  '/api/version-content',
-  '/api/zip',
-  '/api/attachment',
+  '/api/content', '/api/shared-content', '/api/version-content', '/api/zip', '/api/attachment',
 ];
 const MAX_CACHE_BYTES = 50 * 1024 * 1024;
-
+// CacheStorage is per origin. This is one shared body budget for its pages/API/assets,
+// not a separate allowance for every cache/account; browser metadata is additional.
+const MAX_ORIGIN_BYTES = 64 * 1024 * 1024;
+const MAX_ORIGIN_ENTRIES = 1000;
+const SIZE_HEADER = 'x-sytue-cache-bytes';
+const TIME_HEADER = 'x-sytue-cache-written';
+let epoch = 0;
+let contextPromise;
+let writes = Promise.resolve();
+function serialWrite(work) {
+  const result = writes.then(work);
+  writes = result.catch(() => undefined);
+  return result;
+}
+function background(event, work) { event.waitUntil(work.catch(() => undefined)); }
+function lifetime(event) {
+  let finish;
+  event.waitUntil(new Promise((resolve) => { finish = resolve; }));
+  return finish;
+}
 self.addEventListener('install', () => self.skipWaiting());
-
 self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys()
-      .then((keys) => Promise.all(
-        keys.filter((key) =>
-          key === STATIC_CACHE ||
-          (key.startsWith('sytue-native-') && !key.startsWith(VERSION)),
-        )
-          .map((key) => caches.delete(key)),
-      ))
-      .then(() => self.clients.claim()),
-  );
+  event.waitUntil(caches.keys().then((keys) => Promise.all(keys
+    .filter((key) => key.startsWith('sytue-native-') && !key.startsWith(VERSION + '-'))
+    .map((key) => caches.delete(key))))
+    .then(() => self.clients.claim()));
 });
-
 async function readContext() {
-  const cache = await caches.open(META_CACHE);
-  const response = await cache.match(CONTEXT_URL);
-  if (!response) return null;
-  try { return await response.json(); } catch { return null; }
+  if (!contextPromise) contextPromise = (async () => {
+    const response = await (await caches.open(META_CACHE)).match(CONTEXT_URL);
+    if (!response) return null;
+    try {
+      const value = await response.json();
+      return value.origin === self.location.origin && value.ownerId && typeof value.tenantId === 'string' && value.scopeId && value.clientId ? value : null;
+    } catch { return null; }
+  })();
+  return contextPromise;
 }
-
-async function writeContext(context) {
+async function captureScope(clientId) {
+  const revision = epoch;
+  const context = await readContext();
+  return context && revision === epoch && (clientId === null || clientId && clientId === context.clientId) ? { context, revision } : null;
+}
+function current(scope) { return Boolean(scope && scope.revision === epoch); }
+async function writeContext(context, revision) {
+  if (revision !== epoch) return;
   const cache = await caches.open(META_CACHE);
-  await cache.put(
-    CONTEXT_URL,
-    new Response(JSON.stringify(context), { headers: { 'content-type': 'application/json' } }),
-  );
+  await cache.put(CONTEXT_URL, new Response(JSON.stringify(context), {
+    headers: { 'content-type': 'application/json' },
+  }));
   const keep = new Set([ownerCache('pages', context), ownerCache('api', context)]);
-  const keys = await caches.keys();
-  await Promise.all(keys
-    .filter((key) =>
-      (key.startsWith(VERSION + '-pages-') || key.startsWith(VERSION + '-api-')) &&
-      !keep.has(key),
-    )
-    .map((key) => caches.delete(key)));
+  for (const key of await caches.keys()) {
+    if ((key.startsWith(VERSION + '-pages-') || key.startsWith(VERSION + '-api-')) && !keep.has(key)) {
+      await caches.delete(key);
+    }
+  }
 }
-
 function ownerCache(kind, context) {
-  const owner = encodeURIComponent(String(context.ownerId || 'anonymous'));
-  const product = encodeURIComponent(String(context.product || 'suite'));
-  return VERSION + '-' + kind + '-' + product + '-' + owner;
+  const owner = encodeURIComponent(JSON.stringify([context.origin, context.ownerId, context.tenantId]));
+  return VERSION + '-' + kind + '-' + encodeURIComponent(context.product) + '-' + owner;
 }
-
-// La ruta SIN el prefijo de base de la app (ver RE_BASE_DE_APP). El literal sale
-// de la constante exportada para que el test pueda comprobar la MISMA expresión
-// que corre aquí dentro, y no una copia que diverja.
 const RE_BASE = ${RE_BASE_DE_APP.toString()};
-function sinBase(pathname) {
-  return pathname.replace(RE_BASE, '');
-}
-
+function sinBase(pathname) { return pathname.replace(RE_BASE, ''); }
 function isPrivate(pathname) {
-  const ruta = sinBase(pathname);
-  return PRIVATE_PREFIXES.some((prefix) => ruta.startsWith(prefix));
+  return PRIVATE_PREFIXES.some((prefix) => sinBase(pathname).startsWith(prefix));
 }
-
 async function cacheable(response, request, allowPrivateNoStore = false) {
-  if (!response.ok || response.status !== 200 || request.headers.has('range')) return false;
+  if (!response.ok || response.status !== 200 || request.headers.has('range') || response.headers.has('set-cookie')) return false;
   const url = new URL(request.url);
   const control = response.headers.get('cache-control') || '';
   const explicitlyOffline = url.searchParams.get('offline') === '1';
-  const isExplicitFile =
-    EXPLICIT_FILE_PREFIXES.some((prefix) => sinBase(url.pathname).startsWith(prefix)) ||
+  const isExplicitFile = EXPLICIT_FILE_PREFIXES.some((prefix) => sinBase(url.pathname).startsWith(prefix)) ||
     (sinBase(url.pathname) === '/api/attachments' && url.searchParams.has('index'));
   if (isExplicitFile && !explicitlyOffline) return false;
   if (/no-store/i.test(control) && !explicitlyOffline && !allowPrivateNoStore) return false;
   const length = Number(response.headers.get('content-length') || '0');
-  // Un fichero marcado para uso offline sin tamaño declarado no se cachea: permitirlo
-  // haría ficticio el límite y una respuesta chunked podría llenar el dispositivo.
   if (explicitlyOffline && (!Number.isFinite(length) || length <= 0)) return false;
   return !Number.isFinite(length) || length === 0 || length <= MAX_CACHE_BYTES;
 }
-
 function safeUrls(values, includeApi = false) {
   if (!Array.isArray(values)) return [];
   return values.filter((raw) => {
@@ -159,141 +158,214 @@ function safeUrls(values, includeApi = false) {
     } catch { return false; }
   });
 }
-
-async function precachePrivate(raw, context) {
-  const request = new Request(raw, { credentials: 'include' });
-  const response = await fetch(request);
-  if (!(await cacheable(response, request, true))) return;
-  const url = new URL(request.url);
-  const kind = sinBase(url.pathname).startsWith('/api/') ? 'api' : 'pages';
-  const cache = await caches.open(ownerCache(kind, context));
-  await cache.put(request, response);
-}
-
-self.addEventListener('message', (event) => {
-  const data = event.data || {};
-  if (data.type !== 'INITIALISE' || !data.ownerId || !data.product) return;
-  const context = { ownerId: data.ownerId, product: data.product };
-  const assetUrls = safeUrls(data.assetUrls);
-  const privateUrls = safeUrls(data.privateUrls, true);
-  event.waitUntil(
-    (async () => {
-      await writeContext(context);
-      const assets = await caches.open(STATIC_CACHE);
-      await Promise.all([
-        Promise.allSettled(assetUrls.map((url) => assets.add(url))),
-        Promise.allSettled(privateUrls.map((url) => precachePrivate(url, context))),
-      ]);
-    })(),
-  );
-});
-
-function isPublicAsset(request, url) {
-  return (
-    request.destination === 'script' ||
-    request.destination === 'style' ||
-    request.destination === 'font' ||
-    sinBase(url.pathname).startsWith('/_astro/')
-  );
-}
-
-async function networkFirst(request, cacheName) {
-  const cache = await caches.open(cacheName);
-  try {
-    const response = await fetch(request);
-    const clients = await self.clients.matchAll({ type: 'window' });
-    clients.forEach((client) => client.postMessage({ type: 'SYTUE_NETWORK_STATE', state: 'online' }));
-    if (await cacheable(response, request, true)) await cache.put(request, response.clone());
-    return response;
-  } catch (error) {
-    const cached = await cache.match(request);
-    if (cached) {
-      const clients = await self.clients.matchAll({ type: 'window' });
-      clients.forEach((client) => client.postMessage({ type: 'SYTUE_NETWORK_STATE', state: 'offline' }));
-      const headers = new Headers(cached.headers);
-      headers.set('x-sytue-offline', 'cache');
-      return new Response(cached.body, {
-        status: cached.status,
-        statusText: cached.statusText,
-        headers,
-      });
+async function budget(cacheName, request, size) {
+  const entries = [];
+  let bytes = size;
+  for (const name of await caches.keys()) {
+    if (!name.startsWith(VERSION + '-') || name === META_CACHE) continue;
+    const cache = await caches.open(name);
+    for (const key of await cache.keys()) {
+      if (name === cacheName && key.url === request.url) continue;
+      const response = await cache.match(key);
+      const raw = response?.headers.get(SIZE_HEADER);
+      const length = Number(raw);
+      if (raw === null || !Number.isFinite(length) || length < 0) {
+        await cache.delete(key); // v1/unmetered entries cannot bypass the body budget.
+        continue;
+      }
+      bytes += length;
+      entries.push({ name, key, length, time: Number(response.headers.get(TIME_HEADER) || '0') });
     }
-    throw error;
+  }
+  entries.sort((a, b) => a.time - b.time || a.key.url.localeCompare(b.key.url));
+  let count = entries.length + 1;
+  for (const entry of entries) {
+    if (bytes <= MAX_ORIGIN_BYTES && count <= MAX_ORIGIN_ENTRIES) break;
+    await (await caches.open(entry.name)).delete(entry.key);
+    bytes -= entry.length;
+    count--;
   }
 }
-
+async function persist(cacheName, request, response, chunks, size, scope, revision) {
+  await serialWrite(async () => {
+    if (revision !== epoch || (scope && !current(scope)) || request.signal.aborted) return;
+    await budget(cacheName, request, size);
+    if (revision !== epoch || (scope && !current(scope)) || request.signal.aborted) return;
+    const headers = new Headers(response.headers);
+    headers.set(SIZE_HEADER, String(size));
+    headers.set(TIME_HEADER, String(Date.now()));
+    // fetch exposes decoded bytes. Cache metadata must describe those bytes too.
+    headers.delete('content-encoding');
+    headers.set('content-length', String(size));
+    const cache = await caches.open(cacheName);
+    await cache.put(request, new Response(new Blob(chunks), {
+      status: response.status, statusText: response.statusText, headers,
+    }));
+    // Logout can invalidate a pending Cache.put even while it is writing.
+    if (revision !== epoch || (scope && !current(scope)) || request.signal.aborted) await cache.delete(request);
+  });
+}
+async function streamToCache(response, request, cacheName, scope, event, allowPrivateNoStore = false) {
+  if (!(await cacheable(response, request, allowPrivateNoStore)) || !response.body) return response;
+  const finish = lifetime(event);
+  const revision = epoch;
+  const reader = response.body.getReader();
+  let chunks = [];
+  let size = 0;
+  let collecting = true;
+  const declared = response.headers.get('content-length');
+  const expected = declared !== null && !response.headers.has('content-encoding') ? Number(declared) : null;
+  const body = new ReadableStream({
+    async pull(controller) {
+      try {
+        const part = await reader.read();
+        if (part.done) {
+          reader.releaseLock();
+          controller.close();
+          const complete = expected === null || Number.isFinite(expected) && expected === size;
+          if (collecting && complete && !request.signal.aborted && revision === epoch && (!scope || current(scope))) {
+            const saved = chunks;
+            chunks = [];
+            void persist(cacheName, request, response, saved, size, scope, revision).catch(() => undefined).finally(finish);
+          } else { chunks = []; finish(); }
+          return;
+        }
+        size += part.value.byteLength;
+        if (collecting && (size > MAX_CACHE_BYTES || request.signal.aborted || revision !== epoch || scope && !current(scope))) {
+          collecting = false;
+          chunks = [];
+        }
+        if (collecting) chunks.push(part.value.slice());
+        controller.enqueue(part.value);
+      } catch (error) {
+        chunks = [];
+        reader.releaseLock();
+        controller.error(error);
+        finish();
+      }
+    },
+    async cancel(reason) {
+      chunks = [];
+      try { await reader.cancel(reason); } finally { reader.releaseLock(); finish(); }
+    },
+  });
+  return new Response(body, { status: response.status, statusText: response.statusText, headers: response.headers });
+}
+async function precachePrivate(raw, scope, event) {
+  if (!current(scope)) return;
+  const request = new Request(raw, { credentials: 'include' });
+  const response = await fetch(request);
+  const kind = sinBase(new URL(request.url).pathname).startsWith('/api/') ? 'api' : 'pages';
+  const streamed = await streamToCache(response, request, ownerCache(kind, scope.context), scope, event, true);
+  // Precache has no page consumer. Drain bounded chunks, never tee/clone the network stream.
+  if (streamed.body) {
+    const reader = streamed.body.getReader();
+    try { while (!(await reader.read()).done) { /* drain */ } } finally { reader.releaseLock(); }
+  }
+}
+self.addEventListener('message', (event) => {
+  const data = event.data || {};
+  if (data.type === 'INVALIDATE') {
+    background(event, (async () => {
+      const context = await readContext();
+      if (context?.scopeId !== data.scopeId) return;
+      epoch++;
+      contextPromise = Promise.resolve(null);
+      await serialWrite(async () => { await (await caches.open(META_CACHE)).delete(CONTEXT_URL); });
+    })());
+    return;
+  }
+  if (data.type !== 'INITIALISE') return;
+  if (!data.ownerId || typeof data.tenantId !== 'string' || !data.scopeId || !data.product || !event.source?.id) {
+    epoch++;
+    contextPromise = Promise.resolve(null);
+    background(event, serialWrite(async () => { await (await caches.open(META_CACHE)).delete(CONTEXT_URL); }));
+    return;
+  }
+  const revision = ++epoch;
+  const context = { clientId: event.source.id, origin: self.location.origin, ownerId: data.ownerId, tenantId: data.tenantId, scopeId: data.scopeId, product: data.product };
+  contextPromise = Promise.resolve(context);
+  const scope = { context, revision };
+  event.waitUntil((async () => {
+    await serialWrite(() => writeContext(context, revision));
+    await Promise.allSettled([
+      ...safeUrls(data.assetUrls).map(async (url) => {
+        const request = new Request(url);
+        const response = await streamToCache(await fetch(request), request, STATIC_CACHE, null, event);
+        if (response.body) await response.body.pipeTo(new WritableStream());
+      }),
+      ...safeUrls(data.privateUrls, true).map((url) => precachePrivate(url, scope, event)),
+    ]);
+  })());
+});
+function isPublicAsset(request, url) {
+  return request.destination === 'script' || request.destination === 'style' || request.destination === 'font' || sinBase(url.pathname).startsWith('/_astro/');
+}
+async function notify(state) {
+  const clients = await self.clients.matchAll({ type: 'window' });
+  clients.forEach((client) => client.postMessage({ type: 'SYTUE_NETWORK_STATE', state }));
+}
+async function networkFirst(request, kind, scope, event) {
+  const name = ownerCache(kind, scope.context);
+  let response;
+  try { response = await fetch(request); }
+  catch (error) {
+    if (!current(scope) || request.signal.aborted) throw error;
+    const cached = await (await caches.open(name)).match(request);
+    if (!cached || !current(scope) || request.signal.aborted) throw error;
+    background(event, notify('offline'));
+    const headers = new Headers(cached.headers);
+    headers.set('x-sytue-offline', 'cache');
+    return new Response(cached.body, { status: cached.status, statusText: cached.statusText, headers });
+  }
+  background(event, notify('online'));
+  return streamToCache(response, request, name, scope, event, true);
+}
 self.addEventListener('fetch', (event) => {
   const request = event.request;
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
-
   if (sinBase(url.pathname).startsWith('/auth/logout')) {
+    epoch++;
+    contextPromise = Promise.resolve(null);
     event.respondWith(fetch(request));
-    event.waitUntil(
-      (async () => {
-        const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-        windows.forEach((client) => client.postMessage({ type: 'SYTUE_CLEAR_OFFLINE' }));
-        await Promise.all([
-          caches.keys().then((keys) => Promise.all(
-            keys.filter((key) => key.startsWith(VERSION + '-')).map((key) => caches.delete(key)),
-          )),
-          // Las ventanas cierran primero su conexión. El timeout evita retener
-          // indefinidamente el worker si una pestaña congelada no responde.
-          new Promise((resolve) => {
-            const deletion = indexedDB.deleteDatabase('sytue-offline');
-            const timeout = setTimeout(() => resolve(undefined), 2000);
-            deletion.onsuccess = () => { clearTimeout(timeout); resolve(undefined); };
-            deletion.onerror = () => { clearTimeout(timeout); resolve(undefined); };
-            deletion.onblocked = () => undefined;
-          }),
-        ]);
-      })(),
-    );
-    return;
-  }
-  if (request.method !== 'GET' || isPrivate(url.pathname)) return;
-
-  if (request.mode === 'navigate') {
-    event.respondWith((async () => {
-      const context = await readContext();
-      if (!context) return fetch(request);
-      try {
-        return await networkFirst(request, ownerCache('pages', context));
-      } catch {
-        const cache = await caches.open(ownerCache('pages', context));
-        return (await cache.match('/')) || Response.error();
-      }
+    event.waitUntil((async () => {
+      const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      windows.forEach((client) => client.postMessage({ type: 'SYTUE_CLEAR_OFFLINE' }));
+      await Promise.all([
+        serialWrite(async () => {
+          for (const key of await caches.keys()) if (key.startsWith(VERSION + '-')) await caches.delete(key);
+        }),
+        new Promise((resolve) => {
+          const deletion = indexedDB.deleteDatabase('sytue-offline');
+          const timeout = setTimeout(() => resolve(undefined), 2000);
+          deletion.onsuccess = () => { clearTimeout(timeout); resolve(undefined); };
+          deletion.onerror = () => { clearTimeout(timeout); resolve(undefined); };
+          deletion.onblocked = () => undefined;
+        }),
+      ]);
     })());
     return;
   }
-
-  if (sinBase(url.pathname).startsWith('/api/')) {
-    event.respondWith((async () => {
-      const context = await readContext();
-      if (!context) return fetch(request);
-      return networkFirst(request, ownerCache('api', context));
-    })());
-    return;
-  }
-
-  if (isPublicAsset(request, url)) {
-    event.respondWith(
-      caches.open(STATIC_CACHE).then((cache) =>
-        cache.match(request).then((cached) => cached || fetch(request).then(async (response) => {
-          if (await cacheable(response, request)) await cache.put(request, response.clone());
-          return response;
-        })),
-      ),
-    );
-    return;
-  }
-
+  if (request.method !== 'GET' || request.headers.has('range') || isPrivate(url.pathname)) return;
   event.respondWith((async () => {
-    const context = await readContext();
-    if (!context) return fetch(request);
-    return networkFirst(request, ownerCache('pages', context));
+    if (isPublicAsset(request, url)) {
+      const cache = await caches.open(STATIC_CACHE);
+      const hit = await cache.match(request);
+      return hit || streamToCache(await fetch(request), request, STATIC_CACHE, null, event);
+    }
+    const scope = await captureScope(request.mode === 'navigate' ? null : event.clientId);
+    if (!scope) return fetch(request);
+    const kind = sinBase(url.pathname).startsWith('/api/') ? 'api' : 'pages';
+    try { return await networkFirst(request, kind, scope, event); }
+    catch (error) {
+      if (request.mode !== 'navigate' || !current(scope) || request.signal.aborted) throw error;
+      const cached = await (await caches.open(ownerCache('pages', scope.context))).match('/');
+      return current(scope) ? cached || Response.error() : Response.error();
+    }
   })());
 });
+
 `;
 
 export function nativeWorkerResponse(): Response {

@@ -117,6 +117,11 @@ export const ga: AppCatalog<typeof en> = {
   'status.expiry.week': 'An tseachtain seo',
   'status.dmAlertsOn': 'Cas air foláirimh teachtaireachtaí díreacha',
   'status.dmAlertsOff': 'Cas as foláirimh teachtaireachtaí díreacha',
+  'status.dmAccountHelp':
+    'Baineann sé leis an gcuntas agus leis an eagraíocht seo i ngach aip Sytue. Tá cead an bhrabhsálaí ar leithligh.',
+  'status.dmLegacyHelp':
+    'Tá scagaire áitiúil sa bhrabhsálaí seo fós. Bain é chun socrú an chuntais a úsáid; ní athrófar an cuntas.',
+  'status.dmUseAccount': 'Úsáid socrú an chuntais',
   'connection.online': 'Ceangailte',
   'connection.connecting': 'Ag ceangal…',
   'connection.offline': 'Gan cheangal',

@@ -397,7 +397,12 @@ func (b *Buzon) aspaRedactor(rd *redaccion) {
 		cuerpo, func() { d.Cerrar() }, func() {
 			d.Cerrar()
 			if id := rd.r.B.ID; id != "" {
-				b.Lanzar(func() { _ = b.S.Delete(b.ctx, id) })
+				ctx := b.ctx
+				b.Lanzar(func() {
+					if ctx.Err() == nil {
+						_ = b.S.Delete(ctx, id)
+					}
+				})
 			}
 			b.cerrar(rd)
 		})
@@ -564,7 +569,12 @@ func (b *Buzon) enviar(rd *redaccion, sinAdjuntoConfirmado bool) {
 			return
 		}
 		if id := br.ID; id != "" { // el borrador reabierto ya no hace falta
-			b.Lanzar(func() { _ = b.S.Delete(b.ctx, id) })
+			ctx := b.ctx
+			b.Lanzar(func() {
+				if ctx.Err() == nil {
+					_ = b.S.Delete(ctx, id)
+				}
+			})
 		}
 		b.cerrar(rd)
 		b.alGuardarBorrador()

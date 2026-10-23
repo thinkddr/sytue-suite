@@ -113,6 +113,11 @@ export const bg: AppCatalog<typeof en> = {
   'status.expiry.week': 'Тази седмица',
   'status.dmAlertsOn': 'Включване на известията за директни съобщения',
   'status.dmAlertsOff': 'Изключване на известията за директни съобщения',
+  'status.dmAccountHelp':
+    'Важи за този профил и организация във всички приложения на Sytue. Разрешението на браузъра е отделно.',
+  'status.dmLegacyHelp':
+    'Този браузър все още има локален филтър. Премахнете го, за да използвате настройката на профила; профилът няма да се промени.',
+  'status.dmUseAccount': 'Използване на настройката на профила',
   'connection.online': 'Свързано',
   'connection.connecting': 'Свързване…',
   'connection.offline': 'Няма връзка',

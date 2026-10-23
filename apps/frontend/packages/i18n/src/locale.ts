@@ -276,11 +276,12 @@ export function detectLocale(): Locale {
  * bajo el mismo apex, por lo que una cookie de dominio filtraría la preferencia
  * y permitiría que un sitio de usuario la sobrescribiera. En una app nueva se
  * negocia de nuevo desde `Accept-Language`; la elección posterior queda local.
+ * null retira sólo esta cookie para volver a la negociación, con el mismo path.
  */
-export function persistLocale(locale: Locale): void {
+export function persistLocale(locale: Locale | null): void {
   if (typeof document === 'undefined') return;
   const secure = location.protocol === 'https:' ? '; Secure' : '';
-  document.cookie = `${LOCALE_COOKIE}=${locale}; path=/; max-age=${LOCALE_COOKIE_MAX_AGE}; SameSite=Lax${secure}`;
+  document.cookie = `${LOCALE_COOKIE}=${locale ?? ''}; path=/; max-age=${locale === null ? 0 : LOCALE_COOKIE_MAX_AGE}; SameSite=Lax${secure}`;
 }
 
 /** Refleja el idioma en el `<html>` (lang para lectores/hyphenation, dir para RTL). */

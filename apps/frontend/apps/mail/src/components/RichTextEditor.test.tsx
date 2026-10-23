@@ -6,41 +6,43 @@
  * en que se eligen, y una imagen `data:` pegada entra como parte del mensaje (`cid:`) en
  * vez de perderse en el saneado. Ejecutar: `bun test`.
  *
- * `execCommand` no existe en happy-dom: se anota lo que el editor le pide, que es lo que
+ * `execCommand` no existe en jsdom: se anota lo que el editor le pide, que es lo que
  * hay que fijar aquí (el navegador ya sabe insertar HTML).
  */
-import { GlobalRegistrator } from '@happy-dom/global-registrator';
-import { expect, test } from 'bun:test';
+import { setupJsdom } from '../../test/dom.js';
+import { beforeAll, expect, test } from 'bun:test';
 import { render } from 'preact';
 import { act } from 'preact/test-utils';
 
-if (typeof document === 'undefined') GlobalRegistrator.register();
+setupJsdom();
 
 const { RichTextEditor } = await import('./RichTextEditor.js');
 
 let pedidos: [string, string | undefined][] = [];
 // Como el navegador: `insertHTML` escribe donde está la selección y deja el cursor detrás,
 // en un rango NUEVO (el que se hubiera guardado antes no se mueve con él).
-(document as unknown as { execCommand: unknown }).execCommand = (
-  c: string,
-  _: boolean,
-  v?: string,
-) => {
-  pedidos.push([c, v]);
-  const sel = window.getSelection();
-  if (c !== 'insertHTML' || !sel || sel.rangeCount === 0 || !v) return true;
-  const r = sel.getRangeAt(0).cloneRange();
-  r.deleteContents();
-  const trozo = r.createContextualFragment(v);
-  const ultimo = trozo.lastChild;
-  r.insertNode(trozo);
-  const cursor = document.createRange();
-  if (ultimo) cursor.setStartAfter(ultimo);
-  cursor.collapse(true);
-  sel.removeAllRanges();
-  sel.addRange(cursor);
-  return true;
-};
+beforeAll(() => {
+  (document as unknown as { execCommand: unknown }).execCommand = (
+    c: string,
+    _: boolean,
+    v?: string,
+  ) => {
+    pedidos.push([c, v]);
+    const sel = window.getSelection();
+    if (c !== 'insertHTML' || !sel || sel.rangeCount === 0 || !v) return true;
+    const r = sel.getRangeAt(0).cloneRange();
+    r.deleteContents();
+    const trozo = r.createContextualFragment(v);
+    const ultimo = trozo.lastChild;
+    r.insertNode(trozo);
+    const cursor = document.createRange();
+    if (ultimo) cursor.setStartAfter(ultimo);
+    cursor.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(cursor);
+    return true;
+  };
+});
 
 async function montar(incrustados: string[]): Promise<HTMLElement> {
   document.body.innerHTML = '';

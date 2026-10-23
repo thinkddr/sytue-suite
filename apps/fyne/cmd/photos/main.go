@@ -94,13 +94,14 @@ func main() {
 
 	// Entrar o salir en esta app o en otra de las doce vuelve a pedir la pantalla: la
 	// que había era de otra sesión (o de ninguna).
-	dentro := s.Estado().Dentro()
-	s.AlCambiar(func(e sesion.Estado) {
-		if e.Dentro() != dentro {
-			dentro = e.Dentro()
-			p.Ir(p.Ruta())
+	identidad := func(e sesion.Estado) string {
+		if !e.Dentro() {
+			return ""
 		}
-	})
+		return s.URL("id") + "\x00" + e.Sujeto + "\x00" + s.Sesion.Organizacion()
+	}
+	p.CambiarSesion(identidad(s.Estado()))
+	s.AlCambiar(func(e sesion.Estado) { p.CambiarSesion(identidad(e)) })
 
 	// Un álbum compartido llega como `sytue-photos:/p/{token}` (o su dirección web, si el
 	// sistema se la da a la app): se enseña aquí, sin sesión, como la página `/p/` de la
@@ -130,11 +131,16 @@ func main() {
 	// que no está, a la página «no encontrada».
 	//nolint:contextcheck // el editor vive más que la petición que lo abrió
 	s.AlAbrirFichero("photos", func(ctx context.Context, ap api.Apertura) error {
+		cuenta := identidad(s.Estado())
 		f, err := cli.Indexar(ctx, ap.Ref.ID)
 		if err != nil {
 			return err
 		}
-		fyne.Do(func() { p.AbrirEditor(f, ap.Volver) })
+		fyne.Do(func() {
+			if cuenta == identidad(s.Estado()) {
+				p.AbrirEditor(f, ap.Volver)
+			}
+		})
 		return nil
 	})
 

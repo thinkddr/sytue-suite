@@ -24,10 +24,11 @@ func pedir[T any](a *App, llamada func(context.Context, *api.Photos) (T, error),
 		return
 	}
 	gen := a.gen
-	a.lanzar(func() {
-		c, fin := ctx()
+	a.enSesion(func(vida context.Context) {
+		c, fin := ctx(vida)
 		defer fin()
 		r, err := llamada(c, a.cli)
+		//nolint:contextcheck // Sólo reconstruye UI; los eventos futuros capturan la vida de cuenta en enSesion.
 		a.hilo(gen, func() {
 			listo(r, err)
 			a.pintar()

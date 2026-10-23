@@ -24,8 +24,8 @@ import (
 const TopeDescribir = 50
 
 // ctxIA es el de una llamada de visión: los 70 s de la web más la miniatura.
-func ctxIA() (context.Context, context.CancelFunc) {
-	return context.WithTimeout(context.Background(), 75*time.Second)
+func ctxIA(vida context.Context) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(vida, 75*time.Second)
 }
 
 // idioma es la lengua de la sesión, en la que Sytue AI contesta.
@@ -79,8 +79,9 @@ func (a *App) describirFoto() {
 	e.describiendo, e.aviso = true, a.v.Traduce("viewer.describing")
 	a.pintarVisor()
 	gen := a.gen
-	a.lanzar(func() {
-		d, et, err := a.describirYGuardar(f.ID)
+	a.enSesion(func(vida context.Context) {
+		d, et, err := a.describirYGuardar(vida, f.ID)
+		//nolint:contextcheck // Sólo reconstruye UI; los eventos futuros capturan la vida de cuenta en enSesion.
 		a.hilo(gen, func() {
 			if a.vis != e {
 				return
@@ -100,11 +101,11 @@ func (a *App) describirFoto() {
 
 // describirYGuardar le pide a Sytue AI lo que ve en la foto y lo guarda. Corre FUERA del
 // hilo de la interfaz.
-func (a *App) describirYGuardar(id string) (string, []string, error) {
+func (a *App) describirYGuardar(vida context.Context, id string) (string, []string, error) {
 	if a.IA == nil {
 		return "", nil, api.ErrIAIlegible // falloIA lo dice como «no configurada»
 	}
-	c, fin := ctxIA()
+	c, fin := ctxIA(vida)
 	defer fin()
 	d, et, err := a.cli.Describir(c, a.IA, id, a.idioma())
 	if err == nil {
@@ -132,10 +133,11 @@ func (a *App) preguntarFoto(pregunta string) {
 	e.pensando, e.respuesta = true, ""
 	a.pintarVisor()
 	gen := a.gen
-	a.lanzar(func() {
-		c, fin := ctxIA()
+	a.enSesion(func(vida context.Context) {
+		c, fin := ctxIA(vida)
 		defer fin()
 		r, err := a.cli.Preguntar(c, a.IA, f.ID, pregunta, a.idioma())
+		//nolint:contextcheck // Sólo reconstruye UI; los eventos futuros capturan la vida de cuenta en enSesion.
 		a.hilo(gen, func() {
 			if a.vis != e {
 				return
@@ -177,10 +179,11 @@ func (a *App) guardarDescripcion() {
 	e.guardandoDesc = true
 	a.pintarVisor()
 	gen := a.gen
-	a.lanzar(func() {
-		c, fin := ctx()
+	a.enSesion(func(vida context.Context) {
+		c, fin := ctx(vida)
 		defer fin()
 		err := a.cli.SetDescription(c, f.ID, nueva, f.Tags)
+		//nolint:contextcheck // Sólo reconstruye UI; los eventos futuros capturan la vida de cuenta en enSesion.
 		a.hilo(gen, func() {
 			if a.vis != e {
 				return
@@ -239,8 +242,9 @@ func (a *App) describirLote(gen int, lote []api.Photo, i, hechas int, topado boo
 		return
 	}
 	f := lote[i]
-	a.lanzar(func() {
-		d, et, err := a.describirYGuardar(f.ID)
+	a.enSesion(func(vida context.Context) {
+		d, et, err := a.describirYGuardar(vida, f.ID)
+		//nolint:contextcheck // Sólo reconstruye UI; los eventos futuros capturan la vida de cuenta en enSesion.
 		a.hilo(gen, func() {
 			if a.g.lote == nil {
 				return
@@ -275,10 +279,11 @@ func (a *App) ampliarBusqueda() {
 	a.g.ampliando = true
 	a.pintar()
 	gen := a.gen
-	a.lanzar(func() {
-		c, fin := ctx()
+	a.enSesion(func(vida context.Context) {
+		c, fin := ctx(vida)
 		defer fin()
 		terminos, err := api.TerminosRelacionados(c, a.IA, texto, a.idioma())
+		//nolint:contextcheck // Sólo reconstruye UI; los eventos futuros capturan la vida de cuenta en enSesion.
 		a.hilo(gen, func() {
 			a.g.ampliando = false
 			if err != nil || len(terminos) == 0 {

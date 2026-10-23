@@ -744,6 +744,7 @@ export const sl: AppCatalog<typeof en> = {
   'externalMail.username': 'Uporabniško ime (e-poštni naslov, če je prazno)',
   'externalMail.password': 'Geslo ali geslo za aplikacijo',
   'externalMail.smtpPassword': 'Geslo SMTP (kot za dohodno pošto, če je prazno)',
+  'externalMail.advanced': 'Napredne možnosti',
   'externalMail.security': 'Varnost povezave SMTP',
   'externalMail.review': 'Preglej',
   'externalMail.testBody':

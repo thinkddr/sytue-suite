@@ -691,6 +691,7 @@ export const is: AppCatalog<typeof en> = {
   'externalMail.password': 'Aðgangsorð eða forritsaðgangsorð',
   'externalMail.smtpPassword':
     'SMTP-aðgangsorð (sama og fyrir innkomandi póst ef reiturinn er auður)',
+  'externalMail.advanced': 'Ítarlegir valkostir',
   'externalMail.security': 'Öryggi SMTP-tengingar',
   'externalMail.review': 'Yfirfara',
   'externalMail.testBody':

@@ -29,9 +29,16 @@ async function abrir(hoja, tema, forma, color, app = 'cast') {
   const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
   const errores = [];
   page.on('pageerror', (error) => errores.push(error.message));
-  await page.setContent(
-    `<html lang="es" data-theme="${tema}" data-forma="${forma}" data-color="${color}" data-app="${app}"><head></head><body></body></html>`,
+  // El bundle lee las cookies reales de idioma: about:blank tiene origen opaco.
+  // La navegación se resuelve en memoria, sin servidor ni tráfico externo.
+  const url = 'http://menus.sytue.test/';
+  await page.route(url, (route) =>
+    route.fulfill({
+      contentType: 'text/html',
+      body: `<!doctype html><html lang="es" data-theme="${tema}" data-forma="${forma}" data-color="${color}" data-app="${app}"><head></head><body></body></html>`,
+    }),
   );
+  await page.goto(url);
   await page.addStyleTag({ content: hoja });
   await page.addScriptTag({ content: js, type: 'module' });
   try {

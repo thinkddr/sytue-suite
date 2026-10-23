@@ -18,6 +18,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 
+	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
@@ -62,6 +63,7 @@ type correoExterno struct {
 	texto                                               *ui.AreaTexto
 	adjuntos                                            []api.ExternalMailAttachment
 	servicios                                           []string
+	avanzado                                            bool
 }
 
 var proveedoresCorreo = []string{"gmail", "microsoft", "yahoo", "imap", "pop3"}
@@ -619,6 +621,7 @@ func (c *correoExterno) pintar() {
 			c.limpiarClaves()
 			c.instancia = ""
 			c.servicios = []string{"mail"}
+			c.avanzado = false
 			c.asistente = true
 			c.paso = 0
 			c.errorClave = ""
@@ -662,6 +665,7 @@ func (c *correoExterno) pintarProveedor() {
 			return
 		}
 		c.proveedor = proveedoresCorreo[index]
+		c.avanzado = false
 		c.instancia = ""
 		c.servicios = []string{"mail"}
 		c.limpiarClaves()
@@ -695,8 +699,18 @@ func (c *correoExterno) pintarConfiguracion(oauth bool) {
 		for _, f := range []struct {
 			k, label string
 			required bool
-		}{{"name", "common.name", false}, {"address", "common.address", true}, {"host", "externalMail.incomingHost", true}, {"port", "externalMail.port", true}, {"username", "externalMail.username", false}, {"password", "externalMail.password", true}, {"smtpHost", "externalMail.outgoingHost", true}, {"smtpPort", "externalMail.port", true}, {"smtpUser", "externalMail.username", false}, {"smtpPassword", "externalMail.smtpPassword", false}} {
+		}{{"name", "common.name", false}, {"address", "common.address", true}, {"host", "externalMail.incomingHost", true}, {"password", "externalMail.password", true}, {"smtpHost", "externalMail.outgoingHost", true}} {
 			c.cuerpo.Add(c.campo(f.k, f.label, f.required))
+		}
+		detalles := container.New(ui.Columna{Hueco: tema.Espacio(3)})
+		for i, f := range []struct{ k, label string }{{"port", "externalMail.port"}, {"username", "externalMail.username"}, {"smtpPort", "externalMail.port"}, {"smtpUser", "externalMail.username"}, {"smtpPassword", "externalMail.smtpPassword"}} {
+			switch i {
+			case 0:
+				detalles.Add(c.parrafo(c.t("externalMail.incoming")))
+			case 2:
+				detalles.Add(c.parrafo(c.t("externalMail.outgoing")))
+			}
+			detalles.Add(c.campo(f.k, f.label, f.k == "port" || f.k == "smtpPort"))
 		}
 		selector := ui.NuevoSelector([]string{"TLS", "STARTTLS"}, func(index int) {
 			port := "465"
@@ -712,7 +726,30 @@ func (c *correoExterno) pintarConfiguracion(oauth bool) {
 		}
 		selector.Rotulo = c.t("externalMail.security")
 		selector.Inerte(c.ocupado)
-		c.cuerpo.Add(selector)
+		detalles.Add(selector)
+		var opciones *ui.Boton
+		opciones = c.boton("externalMail.advanced", func() {
+			c.avanzado = !c.avanzado
+			opciones.Icono = iconos.ChevronDerecha
+			if c.avanzado {
+				detalles.Show()
+				opciones.Icono = iconos.ChevronAbajo
+			} else {
+				detalles.Hide()
+			}
+			opciones.Refresh()
+			c.cuerpo.Refresh()
+			c.d.Refresh()
+			c.d.Recolocar()
+		}).Con(ui.Fantasma, ui.TallaMD)
+		opciones.Icono = iconos.ChevronDerecha
+		if c.avanzado {
+			opciones.Icono = iconos.ChevronAbajo
+		} else {
+			detalles.Hide()
+		}
+		c.cuerpo.Add(opciones)
+		c.cuerpo.Add(detalles)
 	}
 }
 
@@ -794,6 +831,7 @@ func (c *correoExterno) avanzarAsistente(oauth bool) {
 	case c.paso == 1:
 		if _, err := c.configuracion(); err != nil {
 			c.errorClave = "externalMail.invalidConfiguration"
+			c.avanzado = true
 		} else {
 			c.errorClave = ""
 			c.paso = 2

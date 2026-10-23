@@ -225,6 +225,7 @@
   "error.undoSendGone": "Det er for sent å angre; meldingen er allerede sendt",
   "externalMail.account": "Konto",
   "externalMail.add": "Legg til e-postkonto",
+  "externalMail.advanced": "Avanserte alternativer",
   "externalMail.attach": "Legg ved filer",
   "externalMail.authError": "Påloggingen ble avvist. Koble til kontoen på nytt, eller kontroller brukernavn og app-passord.",
   "externalMail.authorize": "Fortsett til leverandøren",

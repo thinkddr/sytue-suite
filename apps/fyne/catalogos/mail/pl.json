@@ -231,6 +231,7 @@
   "error.undoSendGone": "Za późno na cofnięcie: wiadomość została już wysłana",
   "externalMail.account": "Konto",
   "externalMail.add": "Dodaj konto e-mail",
+  "externalMail.advanced": "Opcje zaawansowane",
   "externalMail.attach": "Dołącz pliki",
   "externalMail.authError": "Logowanie zostało odrzucone. Połącz konto ponownie lub sprawdź nazwę użytkownika i hasło aplikacji.",
   "externalMail.authorize": "Przejdź do dostawcy",

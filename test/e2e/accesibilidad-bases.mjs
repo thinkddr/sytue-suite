@@ -174,6 +174,35 @@ const enfocada = (page) =>
     return e?.dataset?.fila !== undefined ? [Number(e.dataset.fila), Number(e.dataset.col)] : null;
   });
 
+// No espera a que llegue el foco: si sólo esperamos que exista el input, un efecto
+// tardío puede recolocar el cursor después de Ctrl+A o de las primeras letras.
+async function comprobarEditor(page, ctx, fila, col) {
+  const estado = await page.evaluate((id) => {
+    const el = document.getElementById(id);
+    return {
+      existe: !!el,
+      foco: el === document.activeElement,
+      texto: el instanceof HTMLInputElement && el.type === 'text',
+      inicio: el?.selectionStart,
+      fin: el?.selectionEnd,
+      longitud: el?.value?.length,
+    };
+  }, `ed-${fila}-${col}`);
+  if (!estado.existe) falla('teclado', ctx, `no se abrió el editor [${fila},${col}]`);
+  else {
+    if (!estado.foco) falla('teclado', ctx, `el editor [${fila},${col}] existe pero no recibe el teclado`);
+    if (estado.texto && (estado.inicio !== estado.longitud || estado.fin !== estado.longitud)) {
+      falla('teclado', ctx, `el cursor del editor [${fila},${col}] no está listo antes de escribir`);
+    }
+  }
+  return estado.existe;
+}
+
+async function esperarFocoEditor(page, fila, col) {
+  // Tras comprobar el contrato inmediato, continuar sólo con el editor enfocado.
+  await page.waitForFunction((id) => document.activeElement?.id === id, `ed-${fila}-${col}`);
+}
+
 async function pasarAxe(page, ctx) {
   const res = await new AxeBuilder({ page }).withTags(ETIQUETAS_AXE).analyze();
   const graves = res.violations.filter((v) => GRAVES.has(v.impact));
@@ -185,6 +214,9 @@ async function pasarAxe(page, ctx) {
 }
 
 async function teclado(page, ctx) {
+  const errores = [];
+  const alError = (e) => errores.push(e.message);
+  page.on('pageerror', alError);
   // La rejilla es una sola parada de Tab: solo una celda tiene tabindex 0.
   const paradas = await page.locator('td[data-fila][tabindex="0"]').count();
   if (paradas !== 1) falla('teclado', ctx, `debe haber 1 celda en el orden de tabulación, hay ${paradas}`);
@@ -211,11 +243,12 @@ async function teclado(page, ctx) {
   await celda(page, 0, 0).focus();
   await page.keyboard.press('Enter');
   const editor = page.locator('#ed-0-0');
-  if ((await editor.count()) !== 1) falla('teclado', ctx, 'Intro no abre el editor de la celda');
-  else {
+  if (await comprobarEditor(page, ctx, 0, 0)) {
     if ((await editor.getAttribute('aria-label')) !== 'Nombre' && IDIOMA === 'es') falla('lector', ctx, 'el editor no tiene nombre accesible');
-    await page.keyboard.press('Control+A');
+    await esperarFocoEditor(page, 0, 0);
+    await page.keyboard.press('ControlOrMeta+A');
     await page.keyboard.type('Nuevo nombre');
+    if ((await editor.inputValue()) !== 'Nuevo nombre') falla('teclado', ctx, 'la escritura rápida perdió letras o la selección de Ctrl+A');
     await page.keyboard.press('Enter');
     await page.waitForTimeout(150);
     const texto = (await celda(page, 0, 0).innerText()).trim();
@@ -226,16 +259,36 @@ async function teclado(page, ctx) {
   // Escape cancela y devuelve el foco a la celda.
   await celda(page, 1, 0).focus();
   await page.keyboard.press('F2');
+  await comprobarEditor(page, ctx, 1, 0);
+  await esperarFocoEditor(page, 1, 0);
   await page.keyboard.type('xx');
   await page.keyboard.press('Escape');
   const tras = (await celda(page, 1, 0).innerText()).trim();
   const pe = await enfocada(page);
   if (tras.includes('xx')) falla('teclado', ctx, 'Escape no cancela la edición');
   if (!pe || pe[0] !== 1 || pe[1] !== 0) falla('teclado', ctx, `Escape no devuelve el foco: ${JSON.stringify(pe)}`);
+  // Escribir desde la celda abre el editor con esa tecla, sin perder las siguientes.
+  await celda(page, 2, 0).focus();
+  await page.keyboard.press('X');
+  await comprobarEditor(page, ctx, 2, 0);
+  await page.keyboard.type('yz');
+  await page.keyboard.press('Enter');
+  if ((await celda(page, 2, 0).innerText()).trim() !== 'Xyz') falla('teclado', ctx, 'escribir desde la celda perdió las primeras letras');
+  // Fecha y selección reciben foco, aunque no admiten la API de selección de texto.
+  for (const col of [2, 4]) {
+    await celda(page, 0, col).focus();
+    await page.keyboard.press('F2');
+    await comprobarEditor(page, ctx, 0, col);
+    await page.keyboard.press('Escape');
+    const vuelta = await enfocada(page);
+    if (!vuelta || vuelta[0] !== 0 || vuelta[1] !== col) falla('teclado', ctx, `Escape no devuelve el foco desde la columna ${col}`);
+  }
   // Un valor que no encaja en el campo no se guarda y se anuncia.
   await celda(page, 0, 1).focus();
   await page.keyboard.press('Enter');
-  await page.keyboard.press('Control+A');
+  await comprobarEditor(page, ctx, 0, 1);
+  await esperarFocoEditor(page, 0, 1);
+  await page.keyboard.press('ControlOrMeta+A');
   await page.keyboard.type('no es un número');
   await page.keyboard.press('Enter');
   await page.waitForTimeout(150);
@@ -249,6 +302,8 @@ async function teclado(page, ctx) {
   await page.waitForTimeout(150);
   const despues = await celda(page, 1, 3).locator('input[type=checkbox]').isChecked();
   if (antes === despues) falla('teclado', ctx, 'Espacio no marca la casilla');
+  page.off('pageerror', alError);
+  if (errores.length) falla('teclado', ctx, `el editor produjo errores: ${errores.slice(0, 2).join(' | ')}`);
   ok(ctx, 'teclado: foco itinerante, flechas, edición, Escape, validación y casilla');
 }
 

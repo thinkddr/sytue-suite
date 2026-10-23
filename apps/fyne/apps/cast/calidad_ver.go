@@ -187,7 +187,7 @@ func (a *App) objetivoAuto() int {
 	if a.ver.medida != nil {
 		red = a.ver.medida.Kbps()
 		if r := a.deVer(); r != nil {
-			tasa = tasaFichero(a.ver.medida, r.Duracion())
+			tasa = tasaFichero(a.ver.medida.Fuente, r.Duracion())
 		}
 	}
 	return DecidirAuto(alto, qs, red, a.ver.enUso, tasa)

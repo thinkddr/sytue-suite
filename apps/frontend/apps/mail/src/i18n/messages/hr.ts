@@ -721,6 +721,7 @@ export const hr: AppCatalog<typeof en> = {
   'externalMail.username': 'Korisničko ime (adresa e-pošte ako je prazno)',
   'externalMail.password': 'Lozinka ili lozinka za aplikaciju',
   'externalMail.smtpPassword': 'SMTP lozinka (ista kao za dolaznu poštu ako je prazno)',
+  'externalMail.advanced': 'Napredne opcije',
   'externalMail.security': 'Sigurnost SMTP veze',
   'externalMail.review': 'Pregledaj',
   'externalMail.testBody':

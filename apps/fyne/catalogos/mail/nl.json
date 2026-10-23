@@ -225,6 +225,7 @@
   "error.undoSendGone": "Het is te laat om het ongedaan te maken; het bericht is al verzonden",
   "externalMail.account": "Account",
   "externalMail.add": "E-mailaccount toevoegen",
+  "externalMail.advanced": "Geavanceerde opties",
   "externalMail.attach": "Bestanden bijvoegen",
   "externalMail.authError": "De aanmelding is geweigerd. Verbind het account opnieuw of controleer je gebruikersnaam en app-wachtwoord.",
   "externalMail.authorize": "Doorgaan naar provider",

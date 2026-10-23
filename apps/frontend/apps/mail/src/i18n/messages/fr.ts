@@ -758,6 +758,7 @@ export const fr: AppCatalog<typeof en> = {
   'externalMail.username': 'Identifiant (adresse e-mail si vide)',
   'externalMail.password': 'Mot de passe ou mot de passe d’application',
   'externalMail.smtpPassword': 'Mot de passe SMTP (celui du courrier entrant si vide)',
+  'externalMail.advanced': 'Options avancées',
   'externalMail.security': 'Sécurité de la connexion SMTP',
   'externalMail.review': 'Vérifier',
   'externalMail.testBody':

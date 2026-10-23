@@ -686,6 +686,7 @@ export const da: AppCatalog<typeof en> = {
   'externalMail.username': 'Brugernavn (mailadresse, hvis feltet er tomt)',
   'externalMail.password': 'Adgangskode eller appadgangskode',
   'externalMail.smtpPassword': 'SMTP-adgangskode (som til indgående mail, hvis feltet er tomt)',
+  'externalMail.advanced': 'Avancerede indstillinger',
   'externalMail.security': 'Sikkerhed for SMTP-forbindelse',
   'externalMail.review': 'Gennemgå',
   'externalMail.testBody':

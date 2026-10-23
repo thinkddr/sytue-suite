@@ -225,6 +225,7 @@
   "error.undoSendGone": "Det är för sent att ångra; meddelandet har redan skickats",
   "externalMail.account": "Konto",
   "externalMail.add": "Lägg till e-postkonto",
+  "externalMail.advanced": "Avancerade alternativ",
   "externalMail.attach": "Bifoga filer",
   "externalMail.authError": "Inloggningen avvisades. Anslut kontot igen eller kontrollera användarnamnet och applösenordet.",
   "externalMail.authorize": "Fortsätt till leverantör",

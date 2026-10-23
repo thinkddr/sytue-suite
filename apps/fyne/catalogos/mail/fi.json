@@ -225,6 +225,7 @@
   "error.undoSendGone": "Perumiseen on liian myöhäistä; viesti on jo lähtenyt",
   "externalMail.account": "Tili",
   "externalMail.add": "Lisää sähköpostitili",
+  "externalMail.advanced": "Lisäasetukset",
   "externalMail.attach": "Liitä tiedostoja",
   "externalMail.authError": "Kirjautuminen hylättiin. Yhdistä tili uudelleen tai tarkista käyttäjätunnus ja sovellussalasana.",
   "externalMail.authorize": "Jatka palveluntarjoajalle",

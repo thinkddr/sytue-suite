@@ -76,7 +76,7 @@ export function coerceNumber(v: CellValue): number | FormulaError {
     pct = true;
     s = s.slice(0, -1).trim();
   }
-  if (!/^[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?$/.test(s)) return ERR.VALUE;
+  if (!/^[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?$/.test(s)) return ERR.VALUE;
   const n = Number(s);
   return pct ? n / 100 : n;
 }

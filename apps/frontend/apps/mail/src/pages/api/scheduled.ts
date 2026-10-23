@@ -46,8 +46,8 @@ export const GET: APIRoute = async (ctx) => {
       })),
       nextCursor: data.next_cursor ?? '',
     });
-  } catch (err) {
-    return json({ error: 'mail_error', message: String(err) }, 502);
+  } catch {
+    return json({ error: 'mail_error' }, 502);
   }
 };
 
@@ -82,8 +82,8 @@ export const POST: APIRoute = async (ctx) => {
       return json({ id: data.id, releaseAt: data.release_at });
     }
     return json({ error: 'bad_action' }, 400);
-  } catch (err) {
-    return json({ error: 'mail_error', message: String(err) }, 502);
+  } catch {
+    return json({ error: 'mail_error' }, 502);
   }
 };
 

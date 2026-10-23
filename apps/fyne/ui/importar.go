@@ -43,11 +43,18 @@ type ImportarDatos struct {
 	// Sondeo es cada cuánto se vuelve a preguntar mientras hay trabajo: los 5 s de la web.
 	Sondeo time.Duration
 
-	origenes []api.OrigenImportacion
-	trabajos []api.TrabajoImportacion
-	cargada  bool
-	enviando bool
-	fallo    bool
+	origenes    []api.OrigenImportacion
+	trabajos    []api.TrabajoImportacion
+	cargada     bool
+	enviando    bool
+	fallo       bool
+	ctx         context.Context
+	cancelar    context.CancelFunc
+	ciclo       uint64
+	cargando    bool
+	pararSondeo func()
+	reloj       uint64
+	esperar     func(time.Duration, func()) func()
 	// aparte lanza el trabajo de red; nil es `go f()`. El guardián lo hace en el sitio.
 	aparte func(func())
 }
@@ -87,15 +94,61 @@ func enCurso(ts []api.TrabajoImportacion) bool {
 // la pasarela no hay nada que ofrecer, y un error aquí solo alarmaría sobre algo que no
 // se pidió.
 func (d *ImportarDatos) Cargar() {
+	if d.ctx == nil || d.ctx.Err() != nil {
+		d.CargarCon(context.Background())
+		return
+	}
+	d.cargar(d.ctx, d.ciclo)
+}
+
+// CargarCon liga las lecturas, importaciones explícitas y el sondeo a una vida de
+// sesión. Una nueva vida retira el contenido anterior y descarta respuestas tardías.
+func (d *ImportarDatos) CargarCon(ctx context.Context) {
+	d.Parar()
+	vida, cancelar := context.WithCancel(ctx)
+	d.ctx, d.cancelar = vida, cancelar
+	d.cargar(vida, d.ciclo)
+}
+
+// Parar retira el estado de la cuenta y detiene el sondeo. No deshace una
+// importación que el servidor haya aceptado ni vuelve a enviarla automáticamente.
+func (d *ImportarDatos) Parar() {
+	d.ciclo++
+	if d.cancelar != nil {
+		d.cancelar()
+	}
+	d.pararReloj()
+	d.origenes, d.trabajos = nil, nil
+	d.cargada, d.enviando, d.fallo, d.cargando = false, false, false, false
+	d.cambiar()
+}
+
+func (d *ImportarDatos) vigente(ctx context.Context, ciclo uint64) bool {
+	return ctx.Err() == nil && ciclo == d.ciclo
+}
+
+func (d *ImportarDatos) cargar(parent context.Context, ciclo uint64) {
 	if d.svc == nil {
 		return
 	}
+	if parent == nil || !d.vigente(parent, ciclo) || d.cargando {
+		return
+	}
+	d.pararReloj()
+	d.cargando = true
 	d.lanzar(func() {
-		ctx, cancelar := context.WithTimeout(context.Background(), 30*time.Second)
+		if parent.Err() != nil {
+			return
+		}
+		ctx, cancelar := context.WithTimeout(parent, 30*time.Second)
 		defer cancelar()
 		origenes, err1 := d.svc.OrigenesImportacion(ctx)
 		ts, err2 := d.svc.MisImportaciones(ctx, d.dominios)
 		fyne.Do(func() {
+			if !d.vigente(parent, ciclo) {
+				return
+			}
+			d.cargando = false
 			antes := enCurso(d.trabajos)
 			if err1 != nil || err2 != nil {
 				origenes, ts = nil, nil
@@ -104,31 +157,62 @@ func (d *ImportarDatos) Cargar() {
 			if antes && !enCurso(ts) && d.AlTerminar != nil {
 				d.AlTerminar()
 			}
-			d.seguir()
+			d.seguir(parent, ciclo)
 			d.cambiar()
 		})
 	})
 }
 
 // seguir programa la siguiente pregunta si hay trabajo en curso.
-func (d *ImportarDatos) seguir() {
+func (d *ImportarDatos) seguir(ctx context.Context, ciclo uint64) {
+	d.pararReloj()
 	if enCurso(d.trabajos) && d.Sondeo > 0 {
-		time.AfterFunc(d.Sondeo, d.Cargar)
+		reloj := d.reloj
+		if ctx == nil || !d.vigente(ctx, ciclo) {
+			return
+		}
+		esperar := d.esperar
+		if esperar == nil {
+			esperar = func(plazo time.Duration, f func()) func() {
+				t := time.AfterFunc(plazo, func() { fyne.Do(f) })
+				return func() { t.Stop() }
+			}
+		}
+		d.pararSondeo = esperar(d.Sondeo, func() {
+			if d.vigente(ctx, ciclo) && reloj == d.reloj {
+				d.cargar(ctx, ciclo)
+			}
+		})
+	}
+}
+
+func (d *ImportarDatos) pararReloj() {
+	d.reloj++
+	if d.pararSondeo != nil {
+		d.pararSondeo()
+		d.pararSondeo = nil
 	}
 }
 
 // traer lanza la importación desde un origen.
 func (d *ImportarDatos) traer(o api.OrigenImportacion) {
-	if d.enviando || d.svc == nil {
+	parent, ciclo := d.ctx, d.ciclo
+	if d.enviando || d.svc == nil || parent == nil || !d.vigente(parent, ciclo) {
 		return
 	}
 	d.enviando, d.fallo = true, false
 	d.cambiar()
 	d.lanzar(func() {
-		ctx, cancelar := context.WithTimeout(context.Background(), 30*time.Second)
+		if parent.Err() != nil {
+			return
+		}
+		ctx, cancelar := context.WithTimeout(parent, 30*time.Second)
 		defer cancelar()
 		nuevos, err := d.svc.Importar(ctx, o, d.dominios)
 		fyne.Do(func() {
+			if !d.vigente(parent, ciclo) {
+				return
+			}
 			d.enviando = false
 			if err != nil {
 				d.fallo = true
@@ -136,7 +220,7 @@ func (d *ImportarDatos) traer(o api.OrigenImportacion) {
 				d.trabajos = append(nuevos, d.trabajos...)
 				// La web no vuelve a preguntar tras lanzarla y se queda en «trayendo»
 				// hasta que se recarga la página; aquí se sigue el progreso.
-				d.seguir()
+				d.seguir(parent, ciclo)
 			}
 			d.cambiar()
 		})
@@ -150,7 +234,7 @@ func (d *ImportarDatos) traer(o api.OrigenImportacion) {
 // un botón por origen (`flex flex-wrap gap-2`). Debajo, el recuento de lo traído —SIEMPRE,
 // también lo que se quedó fuera— y los fallos en `danger-text`.
 func (d *ImportarDatos) Objeto(ancho float32, v tema.Variante) fyne.CanvasObject {
-	if !d.cargada || (len(d.origenes) == 0 && len(d.trabajos) == 0) {
+	if !d.cargada || d.ctx == nil || d.ctx.Err() != nil || (len(d.origenes) == 0 && len(d.trabajos) == 0) {
 		return nil
 	}
 	t := func(k string, vars ...i18n.Vars) string {

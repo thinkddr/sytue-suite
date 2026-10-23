@@ -114,6 +114,11 @@ export const hu: AppCatalog<typeof en> = {
   'status.expiry.week': 'Ezen a héten',
   'status.dmAlertsOn': 'Közvetlen üzenetek értesítéseinek bekapcsolása',
   'status.dmAlertsOff': 'Közvetlen üzenetek értesítéseinek kikapcsolása',
+  'status.dmAccountHelp':
+    'Erre a fiókra és szervezetre érvényes minden Sytue-alkalmazásban. A böngésző engedélye ettől független.',
+  'status.dmLegacyHelp':
+    'Ebben a böngészőben még van helyi szűrő. Távolítsa el a fiókbeállítás használatához; a fiók nem változik.',
+  'status.dmUseAccount': 'Fiókbeállítás használata',
   'connection.online': 'Csatlakozva',
   'connection.connecting': 'Csatlakozás…',
   'connection.offline': 'Nincs kapcsolat',

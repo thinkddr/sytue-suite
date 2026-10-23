@@ -179,6 +179,7 @@ import {
   type LocalDraft,
 } from '../lib/drafts.js';
 import { loadCustomStatus, saveCustomStatus, storedExpiry } from '../lib/status.js';
+import { useDmNotifications } from '../lib/useDmNotifications.js';
 import { MessageView } from './MessageView.js';
 import { Composer, type ComposeOptions } from './Composer.js';
 import { ThreadPanel } from './ThreadPanel.js';
@@ -313,18 +314,6 @@ const sidebarItemState = (on: boolean): string =>
   on
     ? 'bg-sidebar-active text-sidebar-active-fg [font-weight:var(--sytue-nav-active-weight)]'
     : 'font-medium text-sidebar-fg hover:bg-sidebar-hover';
-
-/** Clave de localStorage del ajuste «notificar mensajes directos» (por defecto on). */
-const DM_NOTIFY_KEY = 'sytue-rooms-dm-notify';
-
-/** Lee el ajuste de notificación de DMs (activado salvo que se guarde '0'). */
-function readDmNotify(): boolean {
-  try {
-    return localStorage.getItem(DM_NOTIFY_KEY) !== '0';
-  } catch {
-    return true; // almacenamiento no disponible (SSR/privado): por defecto activado
-  }
-}
 
 /** Clave de localStorage del colapso de las secciones POR DEFECTO del sidebar
  *  (Favoritos/Canales/DMs). Las categorías personalizadas lo persisten en el backend. */
@@ -690,24 +679,9 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
   // Temporizadores de expiración de "escribiendo…" por (canal:sub).
   const typingTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
-  // Ajuste «notificar mensajes directos» (persistido en localStorage). El handler de
-  // WebSocket (montado una vez) lo lee por ref para no re-suscribirse al cambiarlo.
-  const [dmNotify, setDmNotify] = useState(readDmNotify);
-  const dmNotifyRef = useRef(dmNotify);
-  dmNotifyRef.current = dmNotify;
-
-  /** Activa/desactiva la notificación de DMs y lo persiste. */
-  function toggleDmNotify(): void {
-    setDmNotify((prev) => {
-      const next = !prev;
-      try {
-        localStorage.setItem(DM_NOTIFY_KEY, next ? '1' : '0');
-      } catch {
-        // almacenamiento no disponible: el ajuste vale solo para esta sesión.
-      }
-      return next;
-    });
-  }
+  // The Hub account rule is shared with Fyne; browser permission stays separate.
+  const dmAlerts = useDmNotifications({ id: user.id, tenant: user.tenant ?? '' });
+  const dmNotifyRef = useUltimo(dmAlerts.browserEnabled);
 
   // Preferencias de notificación (Ola 13): palabras clave + ventana «No molestar». Se
   // cargan una vez y viven en una ref para que el handler de WebSocket (montado una vez)
@@ -865,7 +839,7 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
     if (
       !shouldNotifyNewMessage(msg, channel, {
         windowFocused: focused,
-        enabled: dmNotifyRef.current,
+        enabled: channel?.kind === 'direct' ? dmNotifyRef.current : true,
       })
     )
       return;
@@ -2639,6 +2613,17 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
    * <h1> inerte, así que funciones ya construidas parecían no existir.
    */
   function channelHeaderMenuItems(c: Channel): MenuEntry[] {
+    if (c.kind === 'direct') {
+      return [
+        {
+          key: 'delete-dm',
+          label: t('dm.delete'),
+          icon: <TrashGlyph size={16} />,
+          danger: true,
+          onSelect: () => void pedirBorrar(c),
+        },
+      ];
+    }
     const items: MenuEntry[] = [
       {
         key: 'members',
@@ -2703,7 +2688,7 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
         onSelect: () => setIntegrationsOpen(true),
       });
     }
-    if (isTeamAdmin && c.kind !== 'direct' && !c.external) {
+    if (isTeamAdmin && !c.external) {
       items.push('separator', {
         key: 'topic',
         label: t('channel.editTopic'),
@@ -2712,21 +2697,19 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
     }
     // Salir y borrar, también aquí: en un teléfono el nombre del canal es el camino
     // a todo lo del canal (la fila del sidebar queda detrás del cajón).
-    if (c.kind !== 'direct') {
-      items.push('separator', {
-        key: 'leave',
-        label: t('channel.leave'),
-        onSelect: () => void pedirSalir(c),
+    items.push('separator', {
+      key: 'leave',
+      label: t('channel.leave'),
+      onSelect: () => void pedirSalir(c),
+    });
+    if (puedeBorrar(c)) {
+      items.push({
+        key: 'delete',
+        label: t('channel.delete'),
+        icon: <TrashGlyph size={16} />,
+        danger: true,
+        onSelect: () => void pedirBorrar(c),
       });
-      if (puedeBorrar(c)) {
-        items.push({
-          key: 'delete',
-          label: t('channel.delete'),
-          icon: <TrashGlyph size={16} />,
-          danger: true,
-          onSelect: () => void pedirBorrar(c),
-        });
-      }
     }
     return items;
   }
@@ -3593,8 +3576,14 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
             state={status === 'open' ? myState : 'offline'}
             status={myStatus}
             onChange={changeMyPresence}
-            dmNotify={dmNotify}
-            onToggleDmNotify={toggleDmNotify}
+            dmNotify={dmAlerts.enabled}
+            dmLoading={dmAlerts.loading}
+            dmSaving={dmAlerts.saving}
+            dmError={dmAlerts.error}
+            dmLegacy={dmAlerts.hasLegacy}
+            onRefreshDmNotify={dmAlerts.refresh}
+            onDiscardLegacyDmNotify={dmAlerts.discardLegacy}
+            onToggleDmNotify={dmAlerts.toggle}
             onOpenNotifySettings={() => setNotifySettingsOpen(true)}
             onOpenIntegrations={() => setIntegrationsOpen(true)}
             onMarkAllRead={marcarTodoLeido}
@@ -3931,38 +3920,29 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
           <div class="flex min-w-0 items-center gap-2">
             {/* El nombre del canal ES el disparador de su menú (Slack, Teams y
                 Mattermost lo hacen así). Sigue siendo el <h1> de la vista para los
-                lectores de pantalla: el botón va dentro, no en su lugar. En un DM no
-                hay menú que abrir, así que se queda como texto. */}
+                lectores de pantalla: el botón va dentro, no en su lugar. También
+                permite borrar un chat privado desde la conversación abierta. */}
             {/* El margen negativo que alinea el nombre con el borde va en el h1 y
                 NO en el botón: un margen negativo dentro resta de la anchura que
                 el h1 calcula para sí, y el botón —con `max-w-full`— quedaba 12px
                 más estrecho que su texto: «Aleat…» con media cabecera libre. */}
-            <h1 class={cx('min-w-0 truncate', active.kind !== 'direct' && '-mx-1.5')}>
-              {active.kind === 'direct' ? (
-                <span
-                  class="text-md text-header-fg truncate leading-tight font-semibold"
-                  title={active.name}
-                >
-                  {active.name}
-                </span>
-              ) : (
-                <MessageMenu
-                  label={t('channel.menuAria', { name: active.name })}
-                  items={channelHeaderMenuItems(active)}
-                  // `min-h-[24px]`: con `py-0.5` el disparador medía 21px de
-                  // alto, por debajo del mínimo de WCAG 2.5.8 (AA) para lo que
-                  // se toca. Y `min-h-6` no lo arreglaba: son 1,5 rem, que con la
-                  // raíz a 14 vuelven a ser 21 (medido en producción, 2026-09-21). Es el nombre del canal, que en un teléfono es el
-                  // camino a ajustes, miembros y salir del canal.
-                  triggerClass="text-md text-header-fg hover:bg-chrome-hover active:bg-chrome-active inline-flex min-h-[24px] max-w-full items-center gap-1 truncate rounded-control px-1.5 py-0.5 leading-tight font-semibold transition-colors duration-150 sytue-focus-ring"
-                  trigger={
-                    <>
-                      <span class="truncate">{active.name}</span>
-                      <Icon name="chevronDown" size={14} />
-                    </>
-                  }
-                />
-              )}
+            <h1 class="-mx-1.5 min-w-0 truncate">
+              <MessageMenu
+                label={t('channel.menuAria', { name: active.name })}
+                items={channelHeaderMenuItems(active)}
+                // `min-h-[24px]`: con `py-0.5` el disparador medía 21px de
+                // alto, por debajo del mínimo de WCAG 2.5.8 (AA) para lo que
+                // se toca. Y `min-h-6` no lo arreglaba: son 1,5 rem, que con la
+                // raíz a 14 vuelven a ser 21 (medido en producción, 2026-09-21). Es el nombre del canal, que en un teléfono es el
+                // camino a ajustes, miembros y salir del canal.
+                triggerClass="text-md text-header-fg hover:bg-chrome-hover active:bg-chrome-active inline-flex min-h-[24px] max-w-full items-center gap-1 truncate rounded-control px-1.5 py-0.5 leading-tight font-semibold transition-colors duration-150 sytue-focus-ring"
+                trigger={
+                  <>
+                    <span class="truncate">{active.name}</span>
+                    <Icon name="chevronDown" size={14} />
+                  </>
+                }
+              />
             </h1>
             {active.kind === 'private' ? (
               <span class="rounded-pill border-chrome-border text-header-fg shrink-0 border px-2 py-0.5 text-xs font-medium">

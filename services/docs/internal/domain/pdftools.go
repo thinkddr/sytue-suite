@@ -475,6 +475,9 @@ func (l *lienzo) imagenDeMuestras(st *pdfStream, datos []byte) (image.Image, boo
 	}
 	bpc := 8
 	if v, ok := comoEntero(l.d.resolver(primeroDe(st.Dict, "BitsPerComponent", "BPC"))); ok {
+		if v <= 0 || v > 16 {
+			return nil, false
+		}
 		bpc = int(v)
 	}
 	ec := l.espacioDeImagen(st.Dict, nil)

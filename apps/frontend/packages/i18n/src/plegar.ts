@@ -82,7 +82,13 @@ export function terminos(consulta: string): string[] {
   return consulta
     .split(/\s+/)
     .filter((p) => p && !p.startsWith('-') && p.toLowerCase() !== 'or')
-    .map((p) => p.replace(/^"+|"+$/g, ''))
+    .map((p) => {
+      let inicio = 0;
+      let fin = p.length;
+      while (p.charCodeAt(inicio) === 34) inicio++;
+      while (fin > inicio && p.charCodeAt(fin - 1) === 34) fin--;
+      return p.slice(inicio, fin);
+    })
     .filter(Boolean);
 }
 

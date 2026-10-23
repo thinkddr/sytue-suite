@@ -266,6 +266,7 @@ func (a *App) datosCompartidos() Compartidos {
 
 // AbrirCompartido abre un álbum compartido conmigo (`/shared?album=`).
 func (a *App) AbrirCompartido(id string) {
+	a.cancelarFotos()
 	teca, grande := NuevaFototeca(), NuevaFototeca()
 	grande.Variante = VarianteGrande
 	if a.cli != nil {

@@ -90,7 +90,13 @@ func (s *Store) leer(k string) (*Record, error) {
 
 // Write guarda v.
 func (s *Store) Write(owner, namespace, id string, v any) error {
-	return s.Mutate(owner, namespace, id, func(json.RawMessage) (any, error) { return v, nil })
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	record, err := encodeRecord(id, v)
+	if err != nil {
+		return err
+	}
+	return s.b.put(clave(owner, namespace, id), record)
 }
 
 // Delete borra el valor; que no estuviera no es un error.
@@ -120,15 +126,19 @@ func (s *Store) Mutate(owner, namespace, id string, cambiar func(anterior json.R
 	if nuevo == nil {
 		return s.b.del(k)
 	}
-	valor, err := json.Marshal(nuevo)
-	if err != nil {
-		return err
-	}
-	crudo, err := json.Marshal(Record{ID: id, Value: valor, UpdatedAt: time.Now()})
+	crudo, err := encodeRecord(id, nuevo)
 	if err != nil {
 		return err
 	}
 	return s.b.put(k, crudo)
+}
+
+func encodeRecord(id string, v any) ([]byte, error) {
+	value, err := json.Marshal(v)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(Record{ID: id, Value: value, UpdatedAt: time.Now()})
 }
 
 // List devuelve lo guardado en un espacio, lo más reciente primero.
@@ -174,6 +184,16 @@ func (s *Store) Count(espacios ...string) (int, error) {
 // Clear lo borra TODO, de todos los dueños. Es lo que hace la web al cerrar sesión
 // (`indexedDB.deleteDatabase`), y se lleva también la caché de respuestas.
 func (s *Store) Clear() error {
+	// The file backend shares the HTTP-write lock across app processes. Acquire it
+	// before mu, in the same order as writeHTTP, so logout cannot remove its inode
+	// or race a cache commit that was already in progress.
+	if locker, ok := s.b.(interface{ lockClear() (func(), error) }); ok {
+		unlock, err := locker.lockClear()
+		if err != nil {
+			return err
+		}
+		defer unlock()
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.b.clear()

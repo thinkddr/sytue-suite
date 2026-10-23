@@ -34,7 +34,7 @@ export const GET: APIRoute = async (ctx) => {
       headers: { location: url, 'cache-control': 'no-store' },
     });
   } catch (err) {
-    return json({ error: 'meet_error', message: String(err) }, 502);
+    return json({ error: 'meet_error' }, 502);
   }
 };
 

@@ -51,13 +51,15 @@ export const POST: APIRoute = async (ctx) => {
       },
     );
     if (!res.ok) {
-      const text = await res.text().catch(() => '');
-      return json({ error: 'import_failed', message: text }, res.status >= 500 ? 502 : res.status);
+      return json(
+        { error: 'import_failed', message: 'Contacts import failed' },
+        res.status >= 500 ? 502 : res.status,
+      );
     }
     // { imported, skipped }
     return json(await res.json());
   } catch (err) {
-    return json({ error: 'contacts_error', message: String(err) }, 502);
+    return json({ error: 'contacts_error', message: 'Contacts service request failed' }, 502);
   }
 };
 

@@ -518,7 +518,7 @@ func (s *Store) DeleteChannel(ctx context.Context, id uuid.UUID, actor string) e
 		if err := requireChannelAdmin(ctx, tx, t.Slug, cur, actor); err != nil {
 			return err
 		}
-		if err := s.revokeMatrixTx(ctx, tx, t.Slug, id); err != nil {
+		if err := s.closeMatrixChannelTx(ctx, tx, t.Slug, id); err != nil {
 			return err
 		}
 		tag, err := tx.Exec(ctx,

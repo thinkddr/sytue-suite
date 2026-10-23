@@ -129,6 +129,11 @@ export const fr: AppCatalog<typeof en> = {
   'status.expiry.week': 'Cette semaine',
   'status.dmAlertsOn': 'Activer les alertes de messages privés',
   'status.dmAlertsOff': 'Désactiver les alertes de messages privés',
+  'status.dmAccountHelp':
+    'S’applique à ce compte et à cette organisation dans toutes les apps Sytue. L’autorisation du navigateur est distincte.',
+  'status.dmLegacyHelp':
+    'Ce navigateur conserve un filtre local. Supprimez-le pour utiliser le réglage du compte ; le compte ne changera pas.',
+  'status.dmUseAccount': 'Utiliser le réglage du compte',
 
   // --- Conexión en tiempo real --------------------------------------------
   'connection.online': 'Connecté',

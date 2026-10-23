@@ -116,6 +116,11 @@ export const lt: AppCatalog<typeof en> = {
   'status.expiry.week': 'Šią savaitę',
   'status.dmAlertsOn': 'Įjungti tiesioginių žinučių pranešimus',
   'status.dmAlertsOff': 'Išjungti tiesioginių žinučių pranešimus',
+  'status.dmAccountHelp':
+    'Taikoma šiai paskyrai ir organizacijai visose „Sytue“ programose. Naršyklės leidimas yra atskiras.',
+  'status.dmLegacyHelp':
+    'Šioje naršyklėje tebėra vietinis filtras. Pašalinkite jį, kad naudotumėte paskyros nuostatą; paskyra nebus pakeista.',
+  'status.dmUseAccount': 'Naudoti paskyros nuostatą',
   'connection.online': 'Prisijungta',
   'connection.connecting': 'Jungiamasi…',
   'connection.offline': 'Nėra ryšio',

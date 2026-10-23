@@ -76,7 +76,13 @@ func (r *RoomsService) connection(ctx context.Context, channel string) (*Client,
 }
 
 func (r *RoomsService) hydrate(ctx context.Context, m api.RoomsMessage) (api.RoomsMessage, error) {
-	epoch := r.revision()
+	return r.hydrateAt(ctx, m, r.revision())
+}
+
+func (r *RoomsService) hydrateAt(ctx context.Context, m api.RoomsMessage, epoch uint64) (api.RoomsMessage, error) {
+	if r.revision() != epoch || ctx.Err() != nil {
+		return api.RoomsMessage{}, ErrIdentity
+	}
 	if m.MatrixEvent == nil {
 		if m.Encryption != "legacy" && m.Type != "call" {
 			return m, ErrNotEncrypted
@@ -94,6 +100,10 @@ func (r *RoomsService) hydrate(ctx context.Context, m api.RoomsMessage) (api.Roo
 	if err != nil {
 		return m, err
 	}
+	return r.hydrateDecryptedAt(ctx, m, c, room, value, epoch)
+}
+
+func (r *RoomsService) hydrateDecryptedAt(ctx context.Context, m api.RoomsMessage, c *Client, room string, value DecryptedEvent, epoch uint64) (api.RoomsMessage, error) {
 	ownID, _ := c.Identity()
 	host := strings.SplitN(ownID, ":", 2)
 	if len(host) != 2 || value.Sender != "@sytue_"+m.AuthorSub+":"+host[1] {
@@ -121,28 +131,86 @@ func (r *RoomsService) hydrate(ctx context.Context, m api.RoomsMessage) (api.Roo
 	return m, nil
 }
 
-func (r *RoomsService) hydrateMany(ctx context.Context, messages []api.RoomsMessage) ([]api.RoomsMessage, error) {
+func (r *RoomsService) hydrateMany(ctx context.Context, messages []api.RoomsMessage, epoch uint64) ([]api.RoomsMessage, error) {
+	if r.revision() != epoch || ctx.Err() != nil {
+		return nil, ErrIdentity
+	}
+	groups := map[string][]int{}
 	for i, m := range messages {
-		value, err := r.hydrate(ctx, m)
+		if m.MatrixEvent != nil {
+			groups[m.ChannelID] = append(groups[m.ChannelID], i)
+			continue
+		}
+		value, err := r.hydrateAt(ctx, m, epoch)
+		if r.revision() != epoch || ctx.Err() != nil {
+			return nil, ErrIdentity
+		}
 		if err != nil {
-			value = m
-			value.Body = ""
-			value.Attachments = nil
-			value.Mentions = nil
-			value.Card = nil
-			value.EncryptionError = true
+			value = unreadableMessage(m)
 		}
 		messages[i] = value
+	}
+	for channel, indexes := range groups {
+		if err := r.hydrateReceiptPages(ctx, messages, channel, indexes, epoch); err != nil {
+			return nil, err
+		}
+	}
+	if r.revision() != epoch || ctx.Err() != nil {
+		return nil, ErrIdentity
 	}
 	return messages, nil
 }
 
+func (r *RoomsService) hydrateReceiptPages(ctx context.Context, messages []api.RoomsMessage, channel string, indexes []int, epoch uint64) error {
+	c, room, connectErr := r.connection(ctx, channel)
+	for start := 0; start < len(indexes); start += 100 {
+		if r.revision() != epoch || ctx.Err() != nil {
+			return ErrIdentity
+		}
+		page := indexes[start:min(start+100, len(indexes))]
+		refs := make([]EventRef, len(page))
+		for i, index := range page {
+			refs[i] = *messages[index].MatrixEvent
+		}
+		results, pageErr := []ReadResult(nil), connectErr
+		if pageErr == nil {
+			results, pageErr = c.ReadMany(ctx, room, refs)
+		}
+		for i, index := range page {
+			m, err := messages[index], pageErr
+			var value api.RoomsMessage
+			if err == nil {
+				err = results[i].Err
+				if err == nil {
+					value, err = r.hydrateDecryptedAt(ctx, m, c, room, results[i].Event, epoch)
+				}
+			}
+			if r.revision() != epoch || ctx.Err() != nil {
+				return ErrIdentity
+			}
+			if err != nil {
+				value = unreadableMessage(m)
+			}
+			messages[index] = value
+		}
+	}
+	return nil
+}
+
+func unreadableMessage(m api.RoomsMessage) api.RoomsMessage {
+	m.Body, m.Priority, m.RequiresAck = "", "", false
+	m.Attachments, m.Mentions, m.Card = nil, nil, nil
+	m.AuthenticityVerified, m.IdentityVerified, m.EncryptionError = false, false, true
+	return m
+}
+
 func (r *RoomsService) Messages(ctx context.Context, channel string, before time.Time, limit int) ([]api.RoomsMessage, error) {
+	epoch := r.revision()
 	messages, err := r.Rooms.Messages(ctx, channel, before, limit)
 	if err != nil {
 		return nil, err
 	}
-	return r.hydrateMany(ctx, messages)
+	return r.hydrateMany(ctx, messages, epoch)
 }
 
 func (r *RoomsService) Post(ctx context.Context, channel, text string) (api.RoomsMessage, error) {
@@ -197,7 +265,7 @@ func (r *RoomsService) postWith(ctx context.Context, channel, text string, optio
 	if err != nil {
 		return m, err
 	}
-	return r.hydrate(ctx, m)
+	return r.hydrateAt(ctx, m, epoch)
 }
 
 func (r *RoomsService) ReplyWith(ctx context.Context, parent, text string, options api.RoomsSend) (api.RoomsMessage, error) {
@@ -225,7 +293,7 @@ func (r *RoomsService) ReplyWith(ctx context.Context, parent, text string, optio
 	if err != nil {
 		return m, err
 	}
-	return r.hydrate(ctx, m)
+	return r.hydrateAt(ctx, m, epoch)
 }
 
 func (r *RoomsService) Edit(ctx context.Context, message, text string) (api.RoomsMessage, error) {
@@ -278,45 +346,49 @@ func (r *RoomsService) Edit(ctx context.Context, message, text string) (api.Room
 	if err != nil {
 		return m, err
 	}
-	return r.hydrate(ctx, m)
+	return r.hydrateAt(ctx, m, epoch)
 }
 
 func (r *RoomsService) Thread(ctx context.Context, parent string) (api.RoomsThread, error) {
+	epoch := r.revision()
 	thread, err := r.Rooms.Thread(ctx, parent)
 	if err != nil {
 		return thread, err
 	}
-	thread.Root, err = r.hydrate(ctx, thread.Root)
+	thread.Root, err = r.hydrateAt(ctx, thread.Root, epoch)
 	if err != nil {
 		return thread, err
 	}
-	thread.Replies, err = r.hydrateMany(ctx, thread.Replies)
+	thread.Replies, err = r.hydrateMany(ctx, thread.Replies, epoch)
 	return thread, err
 }
 
 func (r *RoomsService) Around(ctx context.Context, channel, message string, limit int) ([]api.RoomsMessage, string, error) {
+	epoch := r.revision()
 	messages, parent, err := r.Rooms.Around(ctx, channel, message, limit)
 	if err != nil {
 		return nil, parent, err
 	}
-	messages, err = r.hydrateMany(ctx, messages)
+	messages, err = r.hydrateMany(ctx, messages, epoch)
 	return messages, parent, err
 }
 
 func (r *RoomsService) Pins(ctx context.Context, channel string) ([]api.RoomsMessage, error) {
+	epoch := r.revision()
 	messages, err := r.Rooms.Pins(ctx, channel)
 	if err != nil {
 		return nil, err
 	}
-	return r.hydrateMany(ctx, messages)
+	return r.hydrateMany(ctx, messages, epoch)
 }
 
 func (r *RoomsService) Saved(ctx context.Context) ([]api.RoomsMessage, error) {
+	epoch := r.revision()
 	messages, err := r.Rooms.Saved(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return r.hydrateMany(ctx, messages)
+	return r.hydrateMany(ctx, messages, epoch)
 }
 
 // Fyne's existing attachment interface now transports ciphertext, retaining the
@@ -421,17 +493,37 @@ func (r *RoomsService) Reply(ctx context.Context, parent, text string) (api.Room
 }
 
 func (r *RoomsService) MyThreads(ctx context.Context, before string) ([]api.RoomsThreadSummary, string, error) {
+	epoch := r.revision()
 	threads, next, err := r.Rooms.MyThreads(ctx, before)
 	if err != nil {
 		return nil, next, err
 	}
 	for i := range threads {
-		threads[i].Root, err = r.hydrate(ctx, threads[i].Root)
+		threads[i].Root, err = r.hydrateAt(ctx, threads[i].Root, epoch)
 		if err != nil {
 			return nil, next, err
 		}
 	}
 	return threads, next, nil
+}
+
+// ForgetChannel discards one conversation's decrypted cache without touching
+// device keys or other conversations. Advancing epoch rejects reads/uploads that
+// started before this withdrawal when they try to populate the cache again.
+func (r *RoomsService) ForgetChannel(channel string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.epoch++
+	for key, file := range r.files {
+		if file.channel == channel {
+			delete(r.files, key)
+		}
+	}
+	for key, message := range r.messages {
+		if message.value.ChannelID == channel {
+			delete(r.messages, key)
+		}
+	}
 }
 
 // Forget drops all plaintext descriptors when this identity/tenant is closed.

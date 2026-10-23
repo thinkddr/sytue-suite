@@ -130,6 +130,7 @@ type Pantalla struct {
 	// Integraciones es la pasarela, para «Traer mis datos». Lo pone el `main` con
 	// `ConIntegraciones`; nil, el bloque no se pinta.
 	integraciones *api.Integraciones
+	importarVida  context.Context
 	// AutorizarApp abre consentimiento en el navegador y valida la vuelta con la sesión.
 	AutorizarApp func(context.Context, string, string) (string, error)
 	// AutorizarAppNueva añade otra cuenta sin sustituir credenciales ya conectadas.
@@ -148,6 +149,23 @@ func (p *Pantalla) ConIntegraciones(i *api.Integraciones) {
 	imp.AlTerminar = p.Recargar
 	imp.AlPolitica = p.abrirPolitica
 	p.lateral.Importar = imp
+}
+
+// IniciarImportador liga las consultas y el progreso a la sesión que adoptó el binario.
+// No cambia el contexto de las transferencias iniciadas por la persona.
+func (p *Pantalla) IniciarImportador(ctx context.Context) {
+	p.importarVida = ctx
+	if d := p.lateral.Importar; d != nil {
+		d.CargarCon(ctx)
+	}
+}
+
+// PararImportador impide que una recarga del pie reactive el importador tras salir.
+func (p *Pantalla) PararImportador() {
+	p.importarVida = nil
+	if d := p.lateral.Importar; d != nil {
+		d.Parar()
+	}
 }
 
 // NuevaPantalla monta la aplicación. `svc` puede ser nil: la pantalla se pinta igual y
@@ -405,7 +423,7 @@ func (p *Pantalla) Arrancar(dentro bool) {
 func (p *Pantalla) cargarPie() {
 	go p.cargarExterno()
 	go p.cargarNubes()
-	if p.lateral.Importar != nil {
+	if p.lateral.Importar != nil && p.importarVida != nil && p.importarVida.Err() == nil {
 		p.lateral.Importar.Cargar()
 	}
 }

@@ -304,11 +304,11 @@ func actividadDelCanalTx(ctx context.Context, tx pgx.Tx, tenant string, ch domai
 
 // filtroVaciado es la condición de las búsquedas que esconde lo que el llamante
 // (subj, su placeholder) borró para sí en un directo: lo anterior a su
-// cleared_before. Va correlacionada con `msg`.
-func filtroVaciado(subj string) string {
+// cleared_before. alias y subj son identificadores/posiciones internos, nunca entrada de usuario.
+func filtroVaciado(alias, subj string) string {
 	return ` AND NOT EXISTS (SELECT 1 FROM channel_members cb
-	        WHERE cb.tenant=msg.tenant AND cb.channel_id=msg.channel_id AND cb.subject=` + subj + `
-	          AND cb.cleared_before IS NOT NULL AND msg.created_at <= cb.cleared_before)`
+	        WHERE cb.tenant=` + alias + `.tenant AND cb.channel_id=` + alias + `.channel_id AND cb.subject=` + subj + `
+	          AND cb.cleared_before IS NOT NULL AND ` + alias + `.created_at <= cb.cleared_before)`
 }
 
 // MessagePage son los parámetros de paginación keyset de un feed.
@@ -810,7 +810,7 @@ func (s *Store) SearchAll(ctx context.Context, subject, query string, limit int)
 	lim := qb.add(limit)
 	sql := `SELECT ` + prefixed("msg", messageCols) + ` FROM messages msg
 		 JOIN channels c ON c.tenant=msg.tenant AND c.id=msg.channel_id
-		 WHERE msg.tenant=` + tenant + ` AND msg.deleted_at IS NULL AND c.deleted_at IS NULL` + filters + filtroVaciado(subj) + `
+		 WHERE msg.tenant=` + tenant + ` AND msg.deleted_at IS NULL AND c.deleted_at IS NULL` + filters + filtroVaciado("msg", subj) + `
 		   AND (
 		        EXISTS (SELECT 1 FROM channel_members m
 		                WHERE m.tenant=c.tenant AND m.channel_id=c.id AND m.subject=` + subj + `)
@@ -847,7 +847,7 @@ func (s *Store) SearchMessages(ctx context.Context, teamID uuid.UUID, subject, q
 	sql := `SELECT ` + prefixed("msg", messageCols) + ` FROM messages msg
 		 JOIN channels c ON c.tenant=msg.tenant AND c.id=msg.channel_id
 		 WHERE msg.tenant=` + tenant + ` AND c.team_id=` + team + ` AND msg.deleted_at IS NULL
-		   AND c.deleted_at IS NULL` + filters + filtroVaciado(subj) + `
+		   AND c.deleted_at IS NULL` + filters + filtroVaciado("msg", subj) + `
 		   AND (
 		        c.kind='public'
 		        OR EXISTS (SELECT 1 FROM channel_members m

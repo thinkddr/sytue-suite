@@ -193,15 +193,14 @@ func (sa *Sala) SalirDe(id string) {
 	if id == "" {
 		return
 	}
-	antes := sa.quitarCanal(id)
+	deshacer := sa.quitarCanal(id)
 	pedir(sa, func(ctx context.Context) (struct{}, error) { return struct{}{}, sa.S.LeaveChannel(ctx, id) },
 		func(_ struct{}, err error) {
 			if err == nil {
+				sa.olvidarCanal(id)
 				return
 			}
-			sa.canales = antes
-			sa.pintarCanales()
-			sa.P.Refrescar()
+			deshacer()
 			clave := "command.leaveFailed"
 			if e := (*api.Error)(nil); errors.As(err, &e) && e.Status == 409 {
 				clave = "channel.lastAdmin"
@@ -210,22 +209,89 @@ func (sa *Sala) SalirDe(id string) {
 		})
 }
 
-// quitarCanal saca un canal del carril y, si era el abierto, abre el primero que
-// quede (o ninguno). Devuelve el carril de antes, para deshacerlo.
-func (sa *Sala) quitarCanal(id string) []api.RoomsChannel {
-	antes := slices.Clone(sa.canales)
-	sa.canales = slices.DeleteFunc(sa.canales, func(c api.RoomsChannel) bool { return c.ID == id })
+// quitarCanal retira una fila y devuelve un deshacer por ID, sin sustituir listas
+// que hayan cambiado entre tanto. Una baja posterior invalida ese deshacer.
+func (sa *Sala) quitarCanal(id string) func() {
+	if sa.retiradas == nil {
+		sa.retiradas = map[string]uint64{}
+	}
+	sa.retiradas[id]++
+	revision := sa.retiradas[id]
+	i := slices.IndexFunc(sa.canales, func(c api.RoomsChannel) bool { return c.ID == id })
+	if i < 0 {
+		return func() {}
+	}
+	antes, eraAbierto := sa.canales[i], sa.abierto == id
+	sa.canales = slices.Delete(sa.canales, i, i+1)
 	sa.pintarCanales()
-	if id == sa.abierto {
+	if eraAbierto {
+		sa.vista++ // una lectura en curso del canal retirado ya no puede repintarlo
+		sa.mensajes, sa.roster = nil, nil
+		sa.P.Canal.Historial.Mensajes = nil
+		sa.cancelarAdjuntos()
+		sa.restaurando = true
+		sa.P.Canal.Compositor.Vaciar()
+		sa.restaurando = false
+		sa.cerrarDerecho()
+		sa.abierto = ""
 		if len(sa.P.Lateral.Canales) > 0 {
 			sa.Elegir(sa.P.Lateral.Canales[0])
 		} else {
-			sa.abierto = ""
 			sa.P.SinCanal()
 		}
 	}
+	vista := sa.vista
 	sa.P.Refrescar()
-	return antes
+	return func() {
+		if sa.retiradas[id] != revision {
+			return
+		}
+		if !slices.ContainsFunc(sa.canales, func(c api.RoomsChannel) bool { return c.ID == id }) {
+			sa.canales = slices.Insert(sa.canales, min(i, len(sa.canales)), antes)
+		}
+		sa.pintarCanales()
+		if eraAbierto && sa.vista == vista {
+			sa.Elegir(sa.canalDe(antes))
+		}
+		sa.P.Refrescar()
+	}
+}
+
+// olvidarCanal elimina las copias descifradas y borradores de una conversación
+// confirmada como retirada. No revoca claves ya recibidas ni purga Matrix.
+func (sa *Sala) olvidarCanal(id string) {
+	if cache, ok := sa.S.(interface{ ForgetChannel(string) }); ok {
+		cache.ForgetChannel(id)
+	}
+	for key, stop := range sa.subidas {
+		if key.canal == id {
+			stop()
+			delete(sa.subidas, key)
+		}
+	}
+	for key := range sa.borradores {
+		if key.canal == id {
+			delete(sa.borradores, key)
+		}
+	}
+	if sa.canalHilo == id && sa.hilo != nil {
+		sa.hilo.Raiz, sa.hilo.Respuestas = Mensaje{}, nil
+		sa.restaurando = true
+		sa.hilo.Compositor.Vaciar()
+		sa.restaurando = false
+		sa.hilo = nil
+		sa.canalHilo = ""
+		sa.CerrarHilo()
+	}
+	// Las listas globales pueden contener mensajes de este canal. Una respuesta
+	// tardía de una acción anterior no debe cerrar el hilo de otro canal.
+	if sa.panel == PanelGuardados || sa.panel == PanelHilos || sa.panel == PanelBusqueda || sa.panel == PanelBorradores {
+		sa.cerrarDerecho()
+	}
+	sa.seguidos = slices.DeleteFunc(sa.seguidos, func(h api.RoomsThreadSummary) bool { return h.Root.ChannelID == id })
+	sa.pintarSeguidos()
+	delete(sa.pend, id)
+	delete(sa.escribiendo, id)
 }
 
 // errNadie es que no hay nadie en el equipo con ese nombre.

@@ -246,7 +246,7 @@ func TestImportarLaTarjetaEnteraYLaOrganizacion(t *testing.T) {
 		cuerpo, _ := io.ReadAll(r.Body)
 		vistas = append(vistas, r.Method+" "+r.URL.RequestURI()+" "+r.Header.Get("Content-Type")+" "+strings.TrimSpace(string(cuerpo)))
 		switch r.URL.Path {
-		case "/api/v1/address-books/l1/contacts":
+		case "/api/v1/address-books/l1/contacts", "/api/v1/address-books/l1/contacts/page":
 			if r.Method == http.MethodGet {
 				_, _ = io.WriteString(w, `{"contacts":[{"id":"a","uid":"u-a","formatted_name":"Ana","has_photo":true},{"id":"b","formatted_name":"Bea"}]}`)
 				return
@@ -277,7 +277,7 @@ func TestImportarLaTarjetaEnteraYLaOrganizacion(t *testing.T) {
 	}
 	quiero := []string{
 		"POST /api/v1/address-books/l1/contacts text/vcard; charset=utf-8 " + tarjeta,
-		"GET /api/v1/address-books/l1/contacts?limit=500  ",
+		"GET /api/v1/address-books/l1/contacts/page?limit=100  ",
 		`POST /api/v1/address-books application/json {"color":"#8A6A2F","display_name":"Organización","name":"organizacion"}`,
 		"GET /api/v1/directory?limit=500  ",
 	}

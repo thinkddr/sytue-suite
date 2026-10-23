@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"sort"
+	"sync"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -100,7 +101,8 @@ type App struct {
 	// Cal es el cliente del servicio. nil: sin servicio (la pantalla se queda en carga).
 	Cal *api.Calendars
 	// Widget captura la sesión adoptada antes de cargar los calendarios completos.
-	Widget widgets.Source
+	Widget       widgets.Source
+	importarVida context.Context
 
 	// Correo es el de quien ha entrado: decide si un evento es una invitación que
 	// contestar (`meHanInvitado`). Vacío, nunca lo es.
@@ -211,11 +213,28 @@ func (a *App) Objeto() fyne.CanvasObject { return a.raiz }
 
 // Arrancar pide los calendarios y el número de invitaciones pendientes.
 func (a *App) Arrancar() {
-	if d := a.P.Importar; d != nil {
+	if d := a.P.Importar; d != nil && a.importarVida != nil && a.importarVida.Err() == nil {
 		d.Cargar()
 	}
 	a.cargarCalendarios()
 	a.contarInvitaciones()
+}
+
+// IniciarImportador liga sólo el importador a la identidad que adoptó el binario.
+// Las operaciones de eventos y los formularios conservan su ciclo actual.
+func (a *App) IniciarImportador(ctx context.Context) {
+	a.importarVida = ctx
+	if d := a.P.Importar; d != nil {
+		d.CargarCon(ctx)
+	}
+}
+
+// PararImportador retira su contenido y evita que Arrancar reactive una vida cerrada.
+func (a *App) PararImportador() {
+	a.importarVida = nil
+	if d := a.P.Importar; d != nil {
+		d.Parar()
+	}
 }
 
 // Atajo son las teclas de CalendarApp.tsx, las mismas que Apple Calendar y Google
@@ -294,8 +313,8 @@ func (a *App) todos() []api.Calendar {
 // cargarCalendarios es `loadCalendars`: propios y compartidos, y que fallen los
 // compartidos no tumba la vista (se quedan en lista vacía).
 //
-// ponytail: las dos peticiones van una detrás de otra, donde la web las lanza a la vez.
-// Son dos GET pequeños al mismo servicio; si el arranque se nota lento, en paralelo.
+// Las dos lecturas independientes arrancan juntas, como en la web. Cada una conserva
+// su error; no se comparte un primer fallo que cancele el resultado de la otra.
 func (a *App) cargarCalendarios() {
 	if a.Cal == nil {
 		return
@@ -309,8 +328,12 @@ func (a *App) cargarCalendarios() {
 	a.lanzar(func() {
 		ctx, parar := context.WithTimeout(context.Background(), 20*time.Second)
 		defer parar()
+		var compartidos []api.Calendar
+		var errC error
+		var lecturas sync.WaitGroup
+		lecturas.Go(func() { compartidos, errC = a.Cal.SharedWithMe(ctx) })
 		propios, err := a.Cal.List(ctx)
-		compartidos, errC := a.Cal.SharedWithMe(ctx)
+		lecturas.Wait()
 		if err == nil && errC == nil && !sinConexion {
 			// Las ocurrencias sólo cubren la ventana visible; estas dos listas sí
 			// contienen todos los calendarios accesibles, incluidos los compartidos.

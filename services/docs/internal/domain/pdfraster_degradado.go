@@ -41,9 +41,12 @@ func (l *lienzo) degradadoDe(sh pdfObj, m matriz, conFondo bool) *degradadoRaste
 	if dict == nil {
 		return nil
 	}
-	tipo, _ := comoEntero(l.d.resolver(dict["ShadingType"]))
+	tipo, ok := comoInt(l.d.resolver(dict["ShadingType"]))
+	if !ok {
+		return nil
+	}
 	coords := l.reales(dict["Coords"])
-	if !sombreadoValido(int(tipo), coords) {
+	if !sombreadoValido(tipo, coords) {
 		return nil
 	}
 	inv, ok := m.inversa()
@@ -61,7 +64,7 @@ func (l *lienzo) degradadoDe(sh pdfObj, m matriz, conFondo bool) *degradadoRaste
 	}
 	g := &degradadoRaster{
 		inv: inv, invMatriz: identidad, escala: escala, alfa: 1,
-		tipo: int(tipo), c: coords, ec: ec, fn: fn,
+		tipo: tipo, c: coords, ec: ec, fn: fn,
 	}
 	if bbox, ok := l.rectangulo(dict["BBox"]); ok {
 		g.bbox, g.tieneBBox = bbox, true

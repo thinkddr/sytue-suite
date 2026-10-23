@@ -47,8 +47,8 @@ export const POST: APIRoute = async (ctx) => {
         });
     if (!res.ok) return json({ error: 'mail_error', status: res.status }, 502);
     return json(await res.json());
-  } catch (err) {
-    return json({ error: 'mail_error', message: String(err) }, 502);
+  } catch {
+    return json({ error: 'mail_error' }, 502);
   }
 };
 

@@ -756,6 +756,11 @@ export const FUNCIONES_PARIDAD: FuncionParidad[] = [
     nombre: 'Mensajes en tiempo real (WebSocket)',
     producto: 'rooms',
     web: true,
+    // 2026-10-23: web y Fyne comparten la regla Hub rooms/rooms.message para los
+    // avisos de directos. Web usa el SDK mediante BFF ligado a sub+tenant; permisos
+    // del navegador y filtro local legado siguen separados y nunca se importan
+    // automáticamente. Pruebas remotas de contrato/identidad/carreras, sin dar por
+    // verificado un SO o dispositivo: ambos estados de esta fila se conservan.
     escritorio: 'planificado',
     movil: 'planificado',
     deuda: DEUDA_AMBAS,

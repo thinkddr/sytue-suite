@@ -22,7 +22,7 @@ export const GET: APIRoute = async (ctx) => {
     }).getThread(messageId);
     return json(thread);
   } catch (err) {
-    return json({ error: 'chat_error', message: String(err) }, 502);
+    return json({ error: 'chat_error' }, 502);
   }
 };
 

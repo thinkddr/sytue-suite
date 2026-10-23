@@ -120,6 +120,10 @@ describe('lectores', () => {
     expect(
       textoPlano('<p>Hola <b>mundo</b></p><script>alert(1)</script><p>a &amp; b &lt;c&gt;</p>'),
     ).toBe('Hola mundo\na & b <c>');
+    expect(textoPlano('<scrip<script>is removed</script>t>alert(123)</script>')).toBe('');
+    expect(
+      textoPlano('&lt;scrip&lt;script&gt;is removed&lt;/script&gt;t&gt;alert(123)&lt;/script&gt;'),
+    ).toBe('');
   });
   test('diapositivas a texto; contenido roto, null', () => {
     const c = JSON.stringify({

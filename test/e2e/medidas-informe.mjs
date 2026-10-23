@@ -17,7 +17,7 @@ import { readdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 const DIR = process.argv[2] || `${process.env.HOME}/medidas`;
 const lee = (f) => JSON.parse(readFileSync(f, "utf8"));
 const n2 = (v) => (v == null ? "—" : typeof v === "number" ? String(Math.round(v * 100) / 100) : String(v));
-const esc = (s) => String(s ?? "—").replace(/\|/g, "\\|").replace(/\n/g, " ");
+const esc = (s) => String(s ?? "—").replace(/\\/g, "\\\\").replace(/\|/g, "\\|").replace(/\n/g, " ");
 const tabla = (cabeceras, filas) =>
   filas.length
     ? [`| ${cabeceras.join(" | ")} |`, `|${cabeceras.map(() => "---").join("|")}|`, ...filas.map((f) => `| ${f.map(esc).join(" | ")} |`)].join("\n")

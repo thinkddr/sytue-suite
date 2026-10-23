@@ -221,3 +221,67 @@ func TestHideDirect(t *testing.T) {
 		t.Fatal("quien había salido de un directo debe poder reabrirlo")
 	}
 }
+
+// Borrar un chat también retira sus mensajes de las vistas globales; el otro
+// participante conserva los suyos. Los mensajes nuevos siguen siendo guardables.
+func TestHideDirectClearsSavedAndFollowedHistoryForActorOnly(t *testing.T) {
+	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
+	st := store.New(h.Pool, nil)
+	ctx := tenantCtx("acme")
+	tm, _ := seedTeamChannel(t, ctx, st, "alice", domain.ChannelPublic)
+	if err := st.AddTeamMember(ctx, tm.ID, "alice", "bob", "Bob", domain.RoleMember); err != nil {
+		t.Fatal(err)
+	}
+	dm, err := st.OpenDirect(ctx, tm.ID, "alice", "bob")
+	if err != nil {
+		t.Fatal(err)
+	}
+	post := func(body string) domain.Message {
+		t.Helper()
+		m, err := st.CreateMessage(ctx, store.NewMessageRecord{ChannelID: dm.ID, AuthorSub: "bob", AuthorName: "Bob", Body: body})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, sub := range []string{"alice", "bob"} {
+			if err := st.SaveMessage(ctx, m.ID, sub); err != nil {
+				t.Fatal(err)
+			}
+			if err := st.FollowThread(ctx, m.ID, sub); err != nil {
+				t.Fatal(err)
+			}
+		}
+		return m
+	}
+	old := post("old")
+	if err := st.HideDirect(ctx, dm.ID, "alice"); err != nil {
+		t.Fatal(err)
+	}
+	assertViews := func(sub string, want int, absent bool) {
+		t.Helper()
+		saved, _, err := st.ListSaved(ctx, sub, nil, 50)
+		if err != nil || len(saved) != want {
+			t.Fatalf("%s saved=%d want=%d err=%v", sub, len(saved), want, err)
+		}
+		threads, _, err := st.ListFollowedThreads(ctx, sub, nil, 50)
+		if err != nil || len(threads) != want {
+			t.Fatalf("%s threads=%d want=%d err=%v", sub, len(threads), want, err)
+		}
+		if absent {
+			for _, m := range saved {
+				if m.ID == old.ID {
+					t.Fatal("cleared message returned through saved")
+				}
+			}
+			for _, th := range threads {
+				if th.Root.ID == old.ID {
+					t.Fatal("cleared message returned through threads")
+				}
+			}
+		}
+	}
+	assertViews("alice", 0, true)
+	assertViews("bob", 1, false)
+	post("new")
+	assertViews("alice", 1, true)
+	assertViews("bob", 2, false)
+}

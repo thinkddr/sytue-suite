@@ -30,8 +30,8 @@ const buscar: APIRoute = async (ctx) => {
       ...(mailboxId ? { mailboxId } : {}),
     });
     return json({ emails });
-  } catch (err) {
-    return json({ error: 'jmap_error', message: String(err) }, 502);
+  } catch {
+    return json({ error: 'jmap_error' }, 502);
   }
 };
 

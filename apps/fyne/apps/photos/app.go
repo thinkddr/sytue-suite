@@ -125,7 +125,11 @@ type App struct {
 
 	// lanzar ejecuta una llamada al servicio. En la app va a una goroutine; los
 	// guardianes la ponen en línea para leer el estado sin carreras.
-	lanzar func(func())
+	lanzar            func(func())
+	vida              context.Context
+	cancelarVida      context.CancelFunc
+	identidad         string
+	identidadAdoptada bool
 	// espera es el retardo de la búsqueda; cero en los guardianes.
 	espera time.Duration
 
@@ -241,6 +245,7 @@ func Nueva(cli *api.Photos, v Vista, w fyne.Window) *App {
 		cli: cli, w: w, v: v, espera: EsperaBusqueda,
 		lanzar: func(f func()) { go f() },
 	}
+	a.vida, a.cancelarVida = context.WithCancel(context.Background())
 	a.buscador = nuevoBuscador(v, "")
 	a.buscador.AlCambiar(a.buscar)
 	// Albums.tsx usa el `Input` de la casa en su talla `md`, del alto de su botón. Era un
@@ -303,6 +308,7 @@ func (a *App) Arrancar() {
 
 // Ir cambia de pantalla y pide lo que esa pantalla necesita, como un `href` de la web.
 func (a *App) Ir(r Ruta) {
+	a.cancelarFotos()
 	a.cerrarVisor()
 	a.cerrarEditor()
 	a.cerrarPublica()
@@ -348,6 +354,31 @@ func (a *App) Ir(r Ruta) {
 	}
 }
 
+// cancelarFotos retira las colas de la pantalla anterior, sin vaciar las cachés.
+func (a *App) cancelarFotos() {
+	vistas := map[*Fototeca]bool{}
+	for _, f := range []*Fototeca{a.v.Teca, a.v.TecaGrande, a.pub.teca, a.pub.grande, a.cmp.teca} {
+		if f != nil && !vistas[f] {
+			vistas[f] = true
+			f.Cancelar()
+		}
+	}
+}
+
+// AlFondo cancela descargas y preparaciones que ya no se ven, también al cerrar.
+func (a *App) AlFondo() { a.cancelarFotos() }
+
+// AlVolver reconstruye los rasters retirados al salir de primer plano.
+func (a *App) AlVolver() {
+	a.pintar()
+	if a.vis != nil {
+		a.pintarVisor()
+	}
+	if a.pub.abierta != nil {
+		a.pintarPublica()
+	}
+}
+
 // irSeccion es lo que hace una pestaña de la nav.
 func (a *App) irSeccion(s Seccion) { a.Ir(Ruta(s)) }
 
@@ -363,8 +394,8 @@ func (a *App) hilo(gen int, f func()) {
 
 // ctx es el de una llamada al servicio: con tope, para que una red colgada no deje la
 // rueda girando para siempre.
-func ctx() (context.Context, context.CancelFunc) {
-	return context.WithTimeout(context.Background(), 60*time.Second)
+func ctx(vida context.Context) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(vida, 60*time.Second)
 }
 
 // ---- Pintar ----
@@ -537,10 +568,11 @@ func (a *App) cargarMas() {
 	a.g.cargando = true
 	a.pintar()
 	gen, cursor, texto, solo, tambien := a.gen, a.g.cursor, a.g.texto, a.soloFavoritas(), a.g.tambien
-	a.lanzar(func() {
-		c, fin := ctx()
+	a.enSesion(func(vida context.Context) {
+		c, fin := ctx(vida)
 		defer fin()
 		fotos, siguiente, err := a.cli.Timeline(c, cursor, PaginaLinea, solo, texto, tambien...)
+		//nolint:contextcheck // Sólo reconstruye UI; los eventos futuros capturan la vida de cuenta en enSesion.
 		a.hilo(gen, func() {
 			a.g.cargando = false
 			if err != nil {
@@ -584,6 +616,7 @@ func (a *App) buscar(texto string) {
 	if texto == a.g.texto {
 		return
 	}
+	a.cancelarFotos()
 	a.gen++
 	gen := a.gen
 	a.g = estadoGaleria{texto: texto}
@@ -606,10 +639,11 @@ func (a *App) cambiarFavorita(f api.Photo, valor bool) {
 		return
 	}
 	gen := a.gen
-	a.lanzar(func() {
-		c, fin := ctx()
+	a.enSesion(func(vida context.Context) {
+		c, fin := ctx(vida)
 		defer fin()
 		err := a.cli.SetFavorite(c, f.ID, valor)
+		//nolint:contextcheck // Sólo reconstruye UI; los eventos futuros capturan la vida de cuenta en enSesion.
 		a.hilo(gen, func() {
 			if err != nil {
 				a.g.error = a.textoDeFallo(err)

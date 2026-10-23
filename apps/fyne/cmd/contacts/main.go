@@ -92,21 +92,30 @@ func main() {
 	// La libreta se carga al entrar, y otra vez si se vuelve a entrar desde otra de
 	// las trece apps. Sin sesión se abre Sytue ID, que es lo que hace la web: su
 	// página redirige al login antes de pintar nada.
-	dentro := s.Estado().Dentro()
-	s.AlCambiar(func(e sesion.Estado) {
-		switch {
-		case e.Dentro() && !dentro:
-			go c.Cargar()
-		case !e.Dentro() && dentro:
-			c.Vaciar() // AlCambiar ya llega en el hilo de la interfaz
+	identidad := func(e sesion.Estado) string {
+		if !e.Dentro() {
+			return ""
 		}
-		dentro = e.Dentro()
+		return s.URL("id") + "\x00" + e.Sujeto + "\x00" + s.Sesion.Organizacion()
+	}
+	actual := identidad(s.Estado())
+	s.AlCambiar(func(e sesion.Estado) {
+		siguiente := identidad(e)
+		if siguiente == actual {
+			return
+		}
+		actual = siguiente
+		c.Vaciar()
+		if siguiente != "" {
+			go c.Cargar()
+		}
 	})
-	if dentro {
+	if actual != "" {
 		go c.Cargar()
 	} else {
 		go func() { _ = s.Entrar(context.Background()) }()
 	}
+	w.SetOnClosed(c.Cerrar)
 	s.Arrancar(context.Background())
 	w.ShowAndRun()
 }

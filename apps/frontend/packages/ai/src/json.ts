@@ -29,10 +29,13 @@
  * camino para «el asistente no supo».
  */
 export function objetoDe(texto: string): unknown {
-  const limpio = texto
-    .replace(/^\s*```(?:json)?\s*/i, '')
-    .replace(/\s*```\s*$/, '')
-    .trim();
+  let limpio = texto.trim();
+  if (limpio.startsWith('```')) {
+    limpio = limpio.slice(3);
+    if (limpio.slice(0, 4).toLowerCase() === 'json') limpio = limpio.slice(4);
+    limpio = limpio.trimStart();
+  }
+  if (limpio.endsWith('```')) limpio = limpio.slice(0, -3).trimEnd();
 
   const intentos = [limpio];
   // Si venía con prosa alrededor, se prueba con el tramo entre la primera llave

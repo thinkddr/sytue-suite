@@ -288,6 +288,10 @@ func mailHeaders(b *strings.Builder, from, to, subject string) {
 	b.WriteString("\r\n")
 }
 
+func textoCorreo(s string) string {
+	return strings.NewReplacer("\r", " ", "\n", " ", "\x00", " ").Replace(s)
+}
+
 // messageIDDomain toma el dominio del remitente, que es el que avala la firma
 // DKIM: poner otro convertiría el identificador en una incoherencia más que
 // sumar al filtro antispam. Un From sin arroba es configuración rota y no algo
@@ -306,7 +310,7 @@ func buildResetEmail(from, to, link string) []byte {
 	mailHeaders(&b, from, to, "Restablece tu contrasena de Sytue")
 	b.WriteString("Has solicitado restablecer tu contrasena de Sytue.\r\n\r\n")
 	b.WriteString("Abre este enlace para elegir una nueva (caduca en breve y es de un solo uso):\r\n\r\n")
-	fmt.Fprintf(&b, "%s\r\n\r\n", link)
+	fmt.Fprintf(&b, "%s\r\n\r\n", textoCorreo(link))
 	b.WriteString("Si no fuiste tu, ignora este mensaje: tu contrasena no cambia.\r\n")
 	return []byte(b.String())
 }
@@ -316,10 +320,10 @@ func buildResetEmail(from, to, link string) []byte {
 func buildInviteEmail(from, to, org, link string) []byte {
 	var b strings.Builder
 	mailHeaders(&b, from, to, "Te han invitado a Sytue")
-	fmt.Fprintf(&b, "Te han invitado a unirte a %s en Sytue.\r\n\r\n", org)
+	fmt.Fprintf(&b, "Te han invitado a unirte a %s en Sytue.\r\n\r\n", textoCorreo(org))
 	b.WriteString("Abre este enlace para aceptar la invitacion y elegir tu contrasena ")
 	b.WriteString("(caduca en breve y es de un solo uso):\r\n\r\n")
-	fmt.Fprintf(&b, "%s\r\n\r\n", link)
+	fmt.Fprintf(&b, "%s\r\n\r\n", textoCorreo(link))
 	b.WriteString("Si no esperabas esta invitacion, puedes ignorar este mensaje.\r\n")
 	return []byte(b.String())
 }
@@ -331,7 +335,7 @@ func buildVerifyEmail(from, to, link string) []byte {
 	mailHeaders(&b, from, to, "Verifica tu correo en Sytue")
 	b.WriteString("Confirma que esta direccion es tuya para completar tu cuenta de Sytue.\r\n\r\n")
 	b.WriteString("Abre este enlace para verificarla (caduca en breve y es de un solo uso):\r\n\r\n")
-	fmt.Fprintf(&b, "%s\r\n\r\n", link)
+	fmt.Fprintf(&b, "%s\r\n\r\n", textoCorreo(link))
 	b.WriteString("Si no esperabas este mensaje, puedes ignorarlo.\r\n")
 	return []byte(b.String())
 }
@@ -353,13 +357,13 @@ func buildPlatformScopeEmail(from, to, sujeto, actor, motivo string, concedido b
 	}
 	mailHeaders(&b, from, to, asunto)
 	if concedido {
-		fmt.Fprintf(&b, "%s puede administrar la plataforma de Sytue: todas las organizaciones.\r\n", sujeto)
+		fmt.Fprintf(&b, "%s puede administrar la plataforma de Sytue: todas las organizaciones.\r\n", textoCorreo(sujeto))
 	} else {
-		fmt.Fprintf(&b, "%s ya no puede administrar la plataforma de Sytue.\r\n", sujeto)
+		fmt.Fprintf(&b, "%s ya no puede administrar la plataforma de Sytue.\r\n", textoCorreo(sujeto))
 	}
-	fmt.Fprintf(&b, "Lo ha hecho %s.\r\n", actor)
+	fmt.Fprintf(&b, "Lo ha hecho %s.\r\n", textoCorreo(actor))
 	if motivo != "" {
-		fmt.Fprintf(&b, "Motivo: %s\r\n", motivo)
+		fmt.Fprintf(&b, "Motivo: %s\r\n", textoCorreo(motivo))
 	}
 	b.WriteString("\r\n")
 	b.WriteString("Poder administrar la plataforma no es estar administrandola: hace falta\r\n")

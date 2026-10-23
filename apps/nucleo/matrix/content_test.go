@@ -69,3 +69,23 @@ func TestRoomVersion12OpaqueBindingHasNoDomainRequirement(t *testing.T) {
 		t.Fatal("foreign tenant changed opaque room binding")
 	}
 }
+
+func TestReceiptPageBoundsAndReadinessFailBeforeNetwork(t *testing.T) {
+	c := &Client{}
+	if c.allowedRoom("") {
+		t.Fatal("an absent draft room authorized the empty room")
+	}
+	for _, n := range []int{0, 101} {
+		if values, err := c.ReadMany(t.Context(), "!room:matrix.test", make([]EventRef, n)); err == nil || len(values) != 0 {
+			t.Fatalf("unbounded receipt page of %d was allowed", n)
+		}
+	}
+	refs := []EventRef{{RoomID: "!room:matrix.test", EventID: "$one"}}
+	if _, err := c.ReadMany(t.Context(), "!room:matrix.test", refs); !errors.Is(err, ErrNotReady) {
+		t.Fatalf("read before encrypted sync: %v", err)
+	}
+	c.closed.Store(true)
+	if _, err := c.ReadMany(t.Context(), "!room:matrix.test", refs); !errors.Is(err, ErrClosed) {
+		t.Fatalf("read after close: %v", err)
+	}
+}

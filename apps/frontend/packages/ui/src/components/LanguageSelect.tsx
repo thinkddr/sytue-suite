@@ -25,7 +25,7 @@ export interface LanguageSelectProps {
 }
 
 export function LanguageSelect({ class: cls }: LanguageSelectProps): JSX.Element {
-  const { locale, t, setLocale } = useI18n();
+  const { preference, t, setLocale } = useI18n();
   const id = useId();
 
   // EN UNA LÍNEA, rótulo a la izquierda y control a la derecha, como las filas de
@@ -39,12 +39,14 @@ export function LanguageSelect({ class: cls }: LanguageSelectProps): JSX.Element
       <div class="w-40 max-w-[60%]">
         <Select
           id={id}
-          value={locale}
+          value={preference ?? 'system'}
           onChange={(e) => {
             const next = e.currentTarget.value;
-            if (isLocale(next)) setLocale(next);
+            if (next === 'system') setLocale(null);
+            else if (isLocale(next)) setLocale(next);
           }}
         >
+          <option value="system">{t('account.appearance.system')}</option>
           {LOCALES.map((code) => (
             <option key={code} value={code}>
               {LOCALE_NAMES[code]}

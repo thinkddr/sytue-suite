@@ -797,7 +797,7 @@ func (d *PDFDoc) objetosRedefinidosTras(fin int) []int {
 		if e.enFlujo {
 			off = d.xref[e.flujoNum].offset
 		}
-		if int(off) >= fin {
+		if off >= int64(fin) {
 			out = append(out, num)
 		}
 	}

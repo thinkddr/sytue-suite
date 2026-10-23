@@ -309,7 +309,7 @@ func (in *Inbound) deliverTo(ctx context.Context, rcpt string, raw []byte, guard
 	if token, ok := in.channels.Token(rcpt); ok {
 		if esAutomatico(raw) {
 			// Una autorespuesta publicada en el canal sería la mitad de un bucle.
-			in.logger.Debug("correo a canal: descartado por automático", "rcpt", rcpt)
+			in.logger.Debug("correo a canal: descartado por automático")
 			return nil
 		}
 		return in.channels.Publish(ctx, token, raw)

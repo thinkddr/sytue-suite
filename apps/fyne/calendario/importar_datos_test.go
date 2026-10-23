@@ -4,6 +4,7 @@
 package calendario
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -15,6 +16,7 @@ import (
 
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 
+	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 )
 
@@ -38,6 +40,8 @@ func TestTraeTusCalendariosVaEnElPie(t *testing.T) {
 		t.Cleanup(gw.Close)
 		a := appDePrueba(t, &servicioFalso{})
 		a.ConImportar(api.NewIntegraciones(gw.URL, nil, nil))
+		a.IniciarImportador(context.Background())
+		t.Cleanup(a.PararImportador)
 		a.Arrancar()
 		for i := 0; i < 200 && pedidas.Load() < 2; i++ {
 			time.Sleep(10 * time.Millisecond)
@@ -54,5 +58,44 @@ func TestTraeTusCalendariosVaEnElPie(t *testing.T) {
 	// Un trabajo de OTRO dominio (mail) no cuenta: sin origen, nada que ofrecer.
 	if o := pie(`{"instances":[]}`); o != nil {
 		t.Fatalf("sin ningún origen hay pie, y con él un filete sin nada debajo: %T", o)
+	}
+}
+
+func TestImportadorCalendarNoSeReabreTrasSalir(t *testing.T) {
+	entrada, cancelada := make(chan struct{}), make(chan struct{})
+	inesperada := make(chan struct{}, 1)
+	var pedidas atomic.Int32
+	gw := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if pedidas.Add(1) != 1 {
+			select {
+			case inesperada <- struct{}{}:
+			default:
+			}
+			_, _ = io.WriteString(w, `{}`)
+			return
+		}
+		close(entrada)
+		<-r.Context().Done()
+		close(cancelada)
+	}))
+	defer gw.Close()
+	a := appDePrueba(t, &servicioFalso{})
+	a.ConImportar(api.NewIntegraciones(gw.URL, nil, nil))
+	a.IniciarImportador(context.Background())
+	<-entrada
+	a.PararImportador()
+	select {
+	case <-cancelada:
+	case <-time.After(2 * time.Second):
+		t.Fatal("la sesión no canceló el importador")
+	}
+	a.Arrancar() // Una recarga de calendario no debe revivir la sesión del importador.
+	select {
+	case <-inesperada:
+		t.Fatal("otra consulta del importador tras salir")
+	case <-time.After(150 * time.Millisecond):
+	}
+	if a.P.Importar.Objeto(ui.AnchoUtilMenu, tema.Claro) != nil {
+		t.Fatal("contenido del importador tras salir")
 	}
 }

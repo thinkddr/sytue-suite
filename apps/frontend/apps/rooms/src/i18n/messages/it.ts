@@ -127,6 +127,11 @@ export const it: AppCatalog<typeof en> = {
   'status.expiry.week': 'Questa settimana',
   'status.dmAlertsOn': 'Attiva gli avvisi dei messaggi diretti',
   'status.dmAlertsOff': 'Disattiva gli avvisi dei messaggi diretti',
+  'status.dmAccountHelp':
+    'Si applica a questo account e organizzazione in tutte le app Sytue. Il permesso del browser è separato.',
+  'status.dmLegacyHelp':
+    'Questo browser conserva un filtro locale. Rimuovilo per usare l’impostazione dell’account; l’account non cambierà.',
+  'status.dmUseAccount': 'Usa l’impostazione dell’account',
 
   // --- Conexión en tiempo real --------------------------------------------
   'connection.online': 'Connesso',

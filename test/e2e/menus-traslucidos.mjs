@@ -126,6 +126,7 @@ try {
   // La guarda se prueba en ROJO sin cambiar el árbol ni publicar un commit roto.
   const guarda = ':not(.sytue-tooltip-surface)';
   const reglaDeshabilitadas = /select option:disabled,\s*select optgroup:disabled\s*\{[^}]+\}/g;
+  const panelOpaco = /--sytue-panel-surface:\s*var\(--sytue-surface-raised\)/g;
   exigir(
     css.split(guarda).length === 2,
     'la guarda del tooltip debe existir UNA vez en el CSS generado',
@@ -138,8 +139,12 @@ try {
     [...css.matchAll(reglaDeshabilitadas)].length === 1,
     'la regla de opciones deshabilitadas debe existir UNA vez en el CSS generado',
   );
+  exigir([...css.matchAll(panelOpaco)].length === 1, 'no se encontró el panel opaco traslúcido');
   const mutada = await abrir(
-    css.replace(guarda, '').replace(reglaDeshabilitadas, ''),
+    css
+      .replace(guarda, '')
+      .replace(reglaDeshabilitadas, '')
+      .replace(panelOpaco, '--sytue-panel-surface:rgba(255,255,255,0.8)'),
     'translucent',
     'marco',
     'petroleo',
@@ -160,7 +165,41 @@ try {
   exigir(roto.razon < 4.5, `la mutación NO fue detectada: ${roto.razon.toFixed(2)}:1`);
   await mutada.screenshot({ path: join(out, 'mutacion-tooltip.png') });
   console.log(`✓ Mutación detectada: tooltip con ${roto.razon.toFixed(2)}:1`);
+  await mutada.getByRole('button', { name: 'Abrir formulario', exact: true }).click();
+  const modalRoto = mutada.getByRole('dialog', { name: 'Formulario de prueba' });
+  await modalRoto.waitFor();
+  exigir((await medir(modalRoto)).alfa < 1, 'la mutación NO detectó el panel modal transparente');
+  await mutada.screenshot({ path: join(out, 'mutacion-modal.png') });
+  console.log('✓ Mutación detectada: panel modal transparente');
   await mutada.close();
+
+  const feedback = await abrir(css, 'translucent', 'marco', 'petroleo');
+  for (const width of [320, 1280]) {
+    await feedback.setViewportSize({ width, height: 900 });
+    await feedback.getByRole('button', { name: 'Mostrar error persistente', exact: true }).click();
+    await feedback.getByRole('button', { name: 'Abrir formulario', exact: true }).click();
+    const dialog = feedback.getByRole('dialog', { name: 'Formulario de prueba' });
+    await dialog.getByRole('alert').first().waitFor();
+    exigir(
+      await dialog
+        .getByRole('alert')
+        .first()
+        .evaluate(
+          (element) =>
+            element.closest('[data-sytue-dialog-toasts]') !== null &&
+            getComputedStyle(element.parentElement).position !== 'fixed',
+        ),
+      `${width}: el aviso sigue flotando sobre el diálogo`,
+    );
+    await dialog.getByRole('textbox', { name: 'Nombre' }).fill('Cuenta sin bloquear');
+    await dialog.getByRole('button', { name: 'Guardar formulario', exact: true }).click();
+    await dialog.waitFor({ state: 'hidden' });
+    exigir(
+      (await feedback.getByRole('alert').count()) > 0,
+      'cerrar el formulario perdió el error persistente',
+    );
+  }
+  await feedback.close();
 
   for (const tema of ['light', 'dark', 'translucent']) {
     for (const forma of ['marco', 'carril']) {
@@ -168,6 +207,22 @@ try {
         const nombre = `${tema}/${forma}/${color}/${app}`;
         const page = await abrir(css, tema, forma, color, app);
         await paneles(page, nombre);
+        // El panel REAL de Modal (no un menú con role=dialog) debe tapar lo de
+        // detrás también cuando se convierte en hoja táctil.
+        for (const width of [1280, 390]) {
+          await page.setViewportSize({ width, height: 900 });
+          await page.getByRole('button', { name: 'Abrir formulario', exact: true }).click();
+          const modal = page.getByRole('dialog', { name: 'Formulario de prueba' });
+          await modal.waitFor();
+          await legible(modal, `${nombre}/${width}, modal`, true);
+          for (const texto of await modal.locator('.text-text, .text-text-muted').all()) {
+            await legible(texto, `${nombre}/${width}, texto de modal`);
+          }
+          await modal.getByRole('textbox', { name: 'Nombre' }).fill('Cuenta personal');
+          await page.keyboard.press('Escape');
+          await modal.waitFor({ state: 'hidden' });
+        }
+        await page.setViewportSize({ width: 1280, height: 900 });
         for (const opcion of await page.locator('select option, select optgroup').all()) {
           await legible(opcion, `${nombre}, opción nativa`, true);
         }

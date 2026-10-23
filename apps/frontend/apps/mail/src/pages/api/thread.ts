@@ -41,7 +41,7 @@ export const GET: APIRoute = async (ctx) => {
     }));
     return json({ emails });
   } catch (err) {
-    return json({ error: 'mail_error', message: String(err) }, 502);
+    return json({ error: 'mail_error' }, 502);
   }
 };
 

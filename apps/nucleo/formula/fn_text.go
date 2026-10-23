@@ -1077,7 +1077,7 @@ var funcionesTexto = map[string]fn{
 				t, err := CoerceText(v)
 				switch s, esTexto := v.(string); {
 				case est && esTexto:
-					t = `"` + s + `"`
+					t = textoEstricto(s)
 				case est && err != "":
 					t = "#ERR"
 				case err != "":
@@ -1104,7 +1104,7 @@ var funcionesTexto = map[string]fn{
 			return err
 		}
 		if s, ok := v.(string); ok && est {
-			return `"` + s + `"`
+			return textoEstricto(s)
 		}
 		return Display(v)
 	},
@@ -1160,6 +1160,10 @@ var funcionesTexto = map[string]fn{
 	},
 	"REGEXEXTRACT": regexExtract,
 	"REGEXREPLACE": regexReplace,
+}
+
+func textoEstricto(s string) string {
+	return `"` + strings.ReplaceAll(s, `"`, `""`) + `"`
 }
 
 func init() { registrar(funcionesTexto) }

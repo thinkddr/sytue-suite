@@ -115,6 +115,11 @@ export const mt: AppCatalog<typeof en> = {
   'status.expiry.week': 'Din il-ġimgħa',
   'status.dmAlertsOn': 'Ixgħel l-avviżi tal-messaġġi diretti',
   'status.dmAlertsOff': 'Itfi l-avviżi tal-messaġġi diretti',
+  'status.dmAccountHelp':
+    'Japplika għal dan il-kont u organizzazzjoni fl-apps kollha ta’ Sytue. Il-permess tal-browser huwa separat.',
+  'status.dmLegacyHelp':
+    'Dan il-browser għad għandu filtru lokali. Neħħih biex tuża l-issettjar tal-kont; il-kont mhux se jinbidel.',
+  'status.dmUseAccount': 'Uża l-issettjar tal-kont',
   'connection.online': 'Hemm konnessjoni',
   'connection.connecting': 'Qed tiġi stabbilita l-konnessjoni…',
   'connection.offline': 'Ebda konnessjoni',

@@ -178,19 +178,56 @@ arg_val() { awk -F= -v k="ARG $1" '$1 == k { print $2; exit }' deploy/sytue-git/
 # CI sin que cambie el repositorio, que es la misma regla que las imágenes por
 # digest. Una acción que no esté prevista aquí se añade con su variable, no se
 # cuela con una etiqueta.
-while IFS= read -r linea; do
-  accion="$(sed -E 's/^.*uses:[[:space:]]*//; s/[[:space:]]+#.*$//; s/["'"'"']//g' <<<"$linea")"
-  case "$accion" in
-    actions/checkout@*) var=ACTION_CHECKOUT_SHA ;;
-    actions/upload-artifact@*) var=ACTION_UPLOAD_ARTIFACT_SHA ;;
-    actions/cache/restore@*|actions/cache/save@*) var=ACTION_CACHE_SHA ;;
-    *) fail "acción no prevista en los workflows: $accion (fíjala en versions.env y aquí)" ;;
-  esac
-  sha="${accion##*@}"
-  [[ "$sha" =~ ^[0-9a-f]{40}$ ]] || fail "$accion no va fijada por SHA de commit"
-  [ "$sha" = "$(env_val "$var")" ] || \
-    fail "$accion no coincide con $var=$(env_val "$var") de versions.env"
-done < <(grep -hE '^[[:space:]]*(- )?uses:' .github/workflows/*.yml)
+comprobar_usos_workflows() {
+  local directorio="$1" flujo linea accion var sha destino
+  for flujo in "$directorio"/.github/workflows/*.yml "$directorio"/.github/workflows/*.yaml; do
+    [ -f "$flujo" ] || continue
+    while IFS= read -r linea; do
+      # La clave es la inicial: un «uses:» dentro del comentario no puede
+      # convertir una acción remota en una llamada local aparentemente válida.
+      accion="$(sed -E 's/[[:space:]]+#.*$//; s/^[[:space:]]*(- )?uses:[[:space:]]*//; s/[[:space:]]+$//' <<<"$linea")"
+      case "$accion" in
+        \"*\"|\'*\') accion="${accion:1:${#accion}-2}" ;;
+      esac
+      if [[ "$accion" == ./* ]]; then
+        # Un workflow local usa el mismo commit que su padre, sin @ref. No es
+        # una acción remota ni una excepción a los SHA fijados en versions.env.
+        [[ "$accion" =~ ^\./\.github/workflows/[A-Za-z0-9][A-Za-z0-9._-]*\.ya?ml$ ]] || \
+          fail "ruta de workflow local no permitida: $accion"
+        destino="$directorio/${accion#./}"
+        [ -f "$destino" ] && [ ! -L "$destino" ] && \
+          [ ! -L "$directorio/.github" ] && [ ! -L "$directorio/.github/workflows" ] || \
+          fail "el workflow local no existe o es un enlace simbólico: $accion"
+        git -C "$directorio" ls-files --error-unmatch -- "${accion#./}" >/dev/null 2>&1 || \
+          fail "el workflow local no está versionado en este commit: $accion"
+        # yamlq es el parser compartido: rechaza YAML inválido y claves dobles.
+        # GitHub acepta workflow_call como evento escalar, lista o mapa.
+        if ! go run "$ROOT/tools/yamlq" "$destino" | jq -se '
+          length == 1 and (.[0].on |
+            if type == "object" then has("workflow_call") and
+              (.workflow_call | type == "null" or type == "object")
+            elif type == "array" then all(.[]; type == "string") and
+              index("workflow_call") != null
+            else . == "workflow_call" end)
+        ' >/dev/null; then
+          fail "el workflow local debe declarar un workflow_call válido: $accion"
+        fi
+        continue
+      fi
+      case "$accion" in
+        actions/checkout@*) var=ACTION_CHECKOUT_SHA ;;
+        actions/upload-artifact@*) var=ACTION_UPLOAD_ARTIFACT_SHA ;;
+        actions/cache/restore@*|actions/cache/save@*) var=ACTION_CACHE_SHA ;;
+        *) fail "acción no prevista en los workflows: $accion (fíjala en versions.env y aquí)" ;;
+      esac
+      sha="${accion##*@}"
+      [[ "$sha" =~ ^[0-9a-f]{40}$ ]] || fail "$accion no va fijada por SHA de commit"
+      [ "$sha" = "$(env_val "$var")" ] || \
+        fail "$accion no coincide con $var=$(env_val "$var") de versions.env"
+    done < <(grep -hE '^[[:space:]]*(- )?uses:' "$flujo")
+  done
+}
+comprobar_usos_workflows "$ROOT"
 
 [ "$(env_val GO_VERSION)" = "$GO_VERSION" ] || \
   fail "versions.env fija Go $(env_val GO_VERSION) y go.mod pide ${GO_VERSION}"

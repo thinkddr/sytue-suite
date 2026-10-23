@@ -63,7 +63,7 @@ export const POST: APIRoute = async (ctx) => {
     await cardDavClient(session.accessToken, session.user.id).putContact(href, vcard, body.etag);
     return json({ ok: true, href, uid });
   } catch (err) {
-    return json({ error: 'carddav_error', message: String(err) }, 502);
+    return json({ error: 'carddav_error', message: 'CardDAV request failed' }, 502);
   }
 };
 
@@ -79,7 +79,7 @@ export const DELETE: APIRoute = async (ctx) => {
     await cardDavClient(session.accessToken, session.user.id).deleteContact(href);
     return json({ ok: true });
   } catch (err) {
-    return json({ error: 'carddav_error', message: String(err) }, 502);
+    return json({ error: 'carddav_error', message: 'CardDAV request failed' }, 502);
   }
 };
 

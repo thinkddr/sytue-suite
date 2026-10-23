@@ -8,6 +8,7 @@ import { describe, expect, test } from 'bun:test';
 import {
   buildAlarm,
   buildVevent,
+  newUid,
   parseAlarms,
   parseColor,
   parseExdates,
@@ -32,6 +33,10 @@ const EXTERNAL_VEVENT =
     'END:VEVENT',
     'END:VCALENDAR',
   ].join('\r\n') + '\r\n';
+
+test('newUid genera un identificador aleatorio UUID', () => {
+  expect(newUid()).toMatch(/^[0-9a-f-]{36}@sytue\.eu$/i);
+});
 
 describe('color por evento', () => {
   test('buildVevent emite X-APPLE-CALENDAR-COLOR y parseColor lo recupera (round-trip)', () => {

@@ -109,7 +109,8 @@ func main() {
 	// Al ENTRAR —aquí o en otra de las trece apps— se vuelve a pedir todo. Solo cuando
 	// cambia quién ha entrado: `AlCambiar` avisa también del tema, del idioma y de la
 	// presencia, y recargar el calendario por cambiar a oscuro no tiene sentido.
-	quien := s.Estado().Sujeto
+	quien := ""
+	var pararImportador context.CancelFunc
 	// El correo de quien ha entrado dice qué eventos son invitaciones que contestar.
 	cuenta := api.NewAccount(s.URL("id"), s.Sesion, nil)
 	pedirCorreo := func() {
@@ -126,17 +127,35 @@ func main() {
 			}
 		}()
 	}
-	s.AlCambiar(func(e sesion.Estado) {
-		if e.Sujeto != quien {
-			quien = e.Sujeto
-			if e.Dentro() {
-				c.Arrancar()
-				pedirCorreo()
-			}
+	cambiar := func(e sesion.Estado) {
+		actual := ""
+		if e.Dentro() {
+			actual = s.URL("id") + "\x00" + e.Sujeto + "\x00" + s.Sesion.Organizacion()
 		}
+		if actual == quien {
+			return
+		}
+		quien = actual
+		if pararImportador != nil {
+			pararImportador()
+		}
+		c.PararImportador()
+		if actual != "" {
+			vida, parar := context.WithCancel(context.Background())
+			pararImportador = parar
+			c.IniciarImportador(vida)
+			c.Arrancar()
+			pedirCorreo()
+		}
+	}
+	s.AlCambiar(cambiar)
+	cambiar(s.Estado())
+	w.SetOnClosed(func() {
+		if pararImportador != nil {
+			pararImportador()
+		}
+		c.PararImportador()
 	})
-	c.Arrancar()
-	pedirCorreo()
 	c.Reloj()
 	s.Arrancar(context.Background())
 	w.ShowAndRun()

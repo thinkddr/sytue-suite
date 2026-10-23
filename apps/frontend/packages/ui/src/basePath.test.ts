@@ -56,6 +56,11 @@ describe('el prefijo que publica el servidor', () => {
     inyectar('/admin/');
     expect(publicado()).toBe('/admin');
   });
+
+  test('todas las barras finales se eliminan del prefijo', () => {
+    inyectar('/admin////');
+    expect(publicado()).toBe('/admin');
+  });
 });
 
 describe('withBase', () => {

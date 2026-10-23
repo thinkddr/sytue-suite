@@ -374,6 +374,9 @@ func (b *Buzon) cerrar(rd *redaccion) {
 // borrador se escribe detrás. Y si falla, SE DICE —la web calla en este camino—,
 // porque cerrar dando por guardado lo que no está en ningún sitio es perderlo.
 func (b *Buzon) cerrarGuardando(rd *redaccion) {
+	if !b.redaccionVigente(rd) {
+		return
+	}
 	if !rd.enviando && !rd.guardando && rd.r.B.ConContenido() {
 		b.guardarBorrador(rd, false, false)
 	}
@@ -383,6 +386,9 @@ func (b *Buzon) cerrarGuardando(rd *redaccion) {
 // aspaRedactor es `handleCloseButtonClick`: lo único que ofrece NO guardar, así que
 // pregunta. Descartar borra también el borrador que el autoguardado ya había dejado.
 func (b *Buzon) aspaRedactor(rd *redaccion) {
+	if !b.redaccionVigente(rd) {
+		return
+	}
 	if rd.enviando || rd.guardando || !rd.r.B.ConContenido() {
 		b.cerrar(rd)
 		return
@@ -396,8 +402,16 @@ func (b *Buzon) aspaRedactor(rd *redaccion) {
 	d = ui.Confirmacion(t.T("compose.discardTitle", nil), t.T("common.cancel", nil), t.T("compose.discardConfirm", nil), true,
 		cuerpo, func() { d.Cerrar() }, func() {
 			d.Cerrar()
+			if !b.redaccionVigente(rd) {
+				return
+			}
 			if id := rd.r.B.ID; id != "" {
-				b.Lanzar(func() { _ = b.S.Delete(b.ctx, id) })
+				ctx := b.ctx
+				b.Lanzar(func() {
+					if ctx.Err() == nil {
+						_ = b.S.Delete(ctx, id)
+					}
+				})
 			}
 			b.cerrar(rd)
 		})
@@ -416,10 +430,23 @@ func (b *Buzon) programarAutoguardado(rd *redaccion) {
 		rd.pararAuto()
 		rd.pararAuto = nil
 	}
-	if rd.enviando || rd.guardando || !rd.r.B.ConContenido() {
+	if !b.redaccionVigente(rd) || rd.enviando || rd.guardando || !rd.r.B.ConContenido() {
 		return
 	}
-	rd.pararAuto = b.Esperar(EsperaAutoguardado, func() { b.guardarBorrador(rd, true, false) })
+	ctx, ciclo := b.ctx, b.ciclo
+	rd.pararAuto = b.Esperar(EsperaAutoguardado, func() {
+		// Stop no retira un callback que el reloj ya entregó al hilo de la interfaz.
+		if ctx.Err() == nil && ciclo == b.ciclo && b.redaccionVigente(rd) && !rd.enviando {
+			//nolint:contextcheck // La vida capturada ya está validada; guardarBorrador adopta ese mismo b.ctx mediante pedir.
+			b.guardarBorrador(rd, true, false)
+		}
+	})
+}
+
+// redaccionVigente descarta eventos ya encolados de un diálogo retirado, incluso
+// cuando otro redactor se abrió en la misma cuenta.
+func (b *Buzon) redaccionVigente(rd *redaccion) bool {
+	return rd != nil && b.redaccion == rd && b.ctx != nil && b.ctx.Err() == nil
 }
 
 // direccionesLaxas lee lo escrito sin exigir que sea válido: un borrador puede estar a
@@ -471,7 +498,7 @@ var errDireccion = errors.New("redactor: dirección no válida")
 // aviso por cada tecla, ya lo intentará el siguiente. Con `yCerrar`, es el botón
 // «Guardar borrador»: avisa y cierra, y si falla se queda abierto.
 func (b *Buzon) guardarBorrador(rd *redaccion, silencioso, yCerrar bool) {
-	if rd.guardando {
+	if !b.redaccionVigente(rd) || rd.guardando || rd.enviando {
 		return
 	}
 	br := rd.r.B
@@ -526,7 +553,7 @@ func (b *Buzon) pintarBotonesRedactor(rd *redaccion) {
 // enviar es `handleSend`: valida «Para» en línea, pregunta si se menciona un adjunto
 // que no va, y envía con la ventana de deshacer.
 func (b *Buzon) enviar(rd *redaccion, sinAdjuntoConfirmado bool) {
-	if rd.enviando || rd.guardando {
+	if !b.redaccionVigente(rd) || rd.enviando || rd.guardando {
 		return
 	}
 	t := b.P.T
@@ -564,7 +591,12 @@ func (b *Buzon) enviar(rd *redaccion, sinAdjuntoConfirmado bool) {
 			return
 		}
 		if id := br.ID; id != "" { // el borrador reabierto ya no hace falta
-			b.Lanzar(func() { _ = b.S.Delete(b.ctx, id) })
+			ctx := b.ctx
+			b.Lanzar(func() {
+				if ctx.Err() == nil {
+					_ = b.S.Delete(ctx, id)
+				}
+			})
 		}
 		b.cerrar(rd)
 		b.alGuardarBorrador()

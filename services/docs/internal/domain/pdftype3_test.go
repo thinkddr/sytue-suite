@@ -43,6 +43,27 @@ func TestType3DibujaSusGlifos(t *testing.T) {
 	}
 }
 
+func TestType3DifferencesRechazaIndicesFueraDeRango(t *testing.T) {
+	for _, inicio := range []string{"4294967361", "4294967361.0"} {
+		t.Run(inicio, func(t *testing.T) {
+			datos := pdfConContenido(t,
+				"BT /F3 20 Tf 10 40 Td (A) Tj ET",
+				`/Resources << /Font << /F3 5 0 R >> >>`,
+				`<< /Type /Font /Subtype /Type3 /FontBBox [0 0 750 750] `+
+					`/FontMatrix [0.001 0 0 0.001 0 0] /CharProcs 6 0 R `+
+					`/Encoding << /Differences [`+inicio+` /cuadro] >> `+
+					`/FirstChar 65 /LastChar 65 /Widths [1000] >>`,
+				`<< /cuadro 7 0 R >>`,
+				fmt.Sprintf("<< /Length %d >>\nstream\n%s\nendstream",
+					len("1000 0 d0 0 0 700 700 re f"), "1000 0 d0 0 0 700 700 re f"))
+			svg := renderizar(t, datos)
+			if strings.Contains(svg, "h700v700h-700Z") {
+				t.Fatalf("un índice fuera de rango se interpretó como el código 65: %s", primerasLineas(svg))
+			}
+		})
+	}
+}
+
 // TestType3AplicaSuFontMatrix comprueba que la matriz del documento MANDA. Es lo
 // que separa un glifo del tamaño correcto de uno mil veces más grande o más
 // pequeño: en tipo 3 el espacio del glifo no es 1/1000, es lo que diga el

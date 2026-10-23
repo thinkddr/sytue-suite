@@ -115,6 +115,11 @@ export const ro: AppCatalog<typeof en> = {
   'status.expiry.week': 'Săptămâna aceasta',
   'status.dmAlertsOn': 'Activează alertele pentru mesaje directe',
   'status.dmAlertsOff': 'Dezactivează alertele pentru mesaje directe',
+  'status.dmAccountHelp':
+    'Se aplică acestui cont și acestei organizații în toate aplicațiile Sytue. Permisiunea browserului este separată.',
+  'status.dmLegacyHelp':
+    'Acest browser păstrează un filtru local. Elimină-l pentru a folosi setarea contului; contul nu se va modifica.',
+  'status.dmUseAccount': 'Folosește setarea contului',
   'connection.online': 'Conexiune activă',
   'connection.connecting': 'Se conectează…',
   'connection.offline': 'Fără conexiune',

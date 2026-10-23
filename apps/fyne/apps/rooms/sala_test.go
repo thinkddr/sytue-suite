@@ -1405,8 +1405,8 @@ func TestLosMiembrosDelCanal(t *testing.T) {
 
 // TestElNombreDelCanalAbreSuMenu: en un canal el nombre es un botón de 24 de alto con
 // el chevron, que abre el menú con Miembros, Fijados, Guardados, Programados y los ajustes de
-// notificación; en un directo es
-// texto. El texto del nombre no se mueve por ser botón (`-mx-1.5`).
+// notificación. En un directo abre las acciones del chat, incluido borrarlo para ti.
+// El texto del nombre no se mueve por ser botón (`-mx-1.5`).
 //
 // VISTO EN ROJO (2026-09-23, en el frontal): sin el `-mx-1.5`, el disparador corre el
 // nombre de 52,5 a 57,75. Deshecho.
@@ -1432,8 +1432,25 @@ func TestElNombreDelCanalAbreSuMenu(t *testing.T) {
 		t.Error("«Miembros» del menú no abre el panel")
 	}
 	sa.Elegir(sa.P.Lateral.Canales[1])
-	if cab.disparador != nil {
-		t.Error("en un directo el nombre sigue siendo un disparador")
+	if cab.disparador == nil {
+		t.Fatal("el directo no ofrece acciones desde su cabecera")
+	}
+	test.Tap(cab.disparador)
+	if sa.menuFila == nil {
+		t.Fatal("la cabecera del directo no abre su menú")
+	}
+	var borrar *ui.ElementoMenu
+	for _, item := range sa.menuFila.Elementos {
+		if action, ok := item.(*ui.ElementoMenu); ok && action.Texto == "Borrar chat" {
+			borrar = action
+		}
+	}
+	if borrar == nil {
+		t.Fatal("el menú de cabecera no contiene Borrar chat")
+	}
+	test.Tap(borrar)
+	if sa.pregunta == nil || s.pidio("HideDirect(d1)") {
+		t.Fatal("Borrar chat no pide confirmación antes de cambiar el servicio")
 	}
 }
 
@@ -2071,5 +2088,64 @@ func TestLaBarraApagadaNoDejaSuSombra(t *testing.T) {
 	b.MouseIn(&desktop.MouseEvent{})
 	if !b.sombra.Objeto().Visible() {
 		t.Error("con el puntero encima la barra sale sin su sombra")
+	}
+}
+
+// Un fallo tardío solo restaura su fila; no reemplaza cambios concurrentes ni
+// resucita una conversación cuya baja definitiva llegó por otra sesión.
+func TestRetirarCanalReconcilesConcurrentChangesAndSelection(t *testing.T) {
+	s := servicioConDos()
+	sa, _ := salaDePrueba(t, s)
+	sa.Arrancar(t.Context())
+	restore := sa.quitarCanal("c1")
+	sa.canales = append(sa.canales, api.RoomsChannel{ID: "new", Name: "New", Kind: "public"})
+	restore()
+	if len(sa.canales) != 3 || sa.abierto != "c1" {
+		t.Fatalf("rollback lost new row or original selection: %+v active=%s", sa.canales, sa.abierto)
+	}
+	restore = sa.quitarCanal("c1")
+	sa.Elegir(sa.canalDe(sa.canales[1])) // the person chose another conversation
+	restore()
+	if sa.abierto != "new" {
+		t.Fatalf("rollback stole a newer selection: %s", sa.abierto)
+	}
+	sa.hilo = NuevoPanelHilo(sa.P.T, sa.P.Locale)
+	sa.canalHilo, sa.raizHilo = "new", "new-thread"
+	sa.olvidarCanal("c1")
+	if sa.hilo == nil || sa.raizHilo != "new-thread" {
+		t.Fatal("late action completion closed another conversation's thread")
+	}
+	restore = sa.quitarCanal("c1")
+	sa.alLlegar(api.RoomsEvent{Type: "channel_deleted", ChannelID: "c1"})
+	restore()
+	if slices.ContainsFunc(sa.canales, func(c api.RoomsChannel) bool { return c.ID == "c1" }) {
+		t.Fatal("failed mutation resurrected a channel deleted by another session")
+	}
+}
+
+type cacheAwareRooms struct {
+	*servicioFalso
+	forgotten []string
+}
+
+func (s *cacheAwareRooms) ForgetChannel(id string) { s.forgotten = append(s.forgotten, id) }
+
+func TestOwnChannelMembershipRemovalDropsDecryptedViewsAndLateReads(t *testing.T) {
+	s := &cacheAwareRooms{servicioFalso: servicioConDos()}
+	sa, _ := salaDePrueba(t, s.servicioFalso)
+	sa.S = s
+	s.canales = s.canales[:1] // la baja del último canal también debe vaciar el texto
+	sa.Arrancar(t.Context())
+	sa.mensajes = []api.RoomsMessage{{ID: "old", ChannelID: "c1", Body: "private"}}
+	sa.P.Canal.Historial.Mensajes = []Mensaje{{ID: "old", Cuerpo: "private"}}
+	sa.borradores[ambito{canal: "c1"}] = "private draft"
+	sa.P.Canal.Compositor.PonerTexto("private draft")
+	vista := sa.vista
+	sa.alLlegar(api.RoomsEvent{Type: "channel_member_removed", ChannelID: "c1", Payload: []byte(`{"channel_id":"c1","subject":"yo"}`)})
+	if sa.abierto == "c1" || sa.vista <= vista || len(sa.mensajes) != 0 || sa.borradores[ambito{canal: "c1"}] != "" || !slices.Contains(s.forgotten, "c1") {
+		t.Fatalf("removed channel retained decrypted state: active=%s messages=%+v forgotten=%v", sa.abierto, sa.mensajes, s.forgotten)
+	}
+	if slices.ContainsFunc(sa.canales, func(c api.RoomsChannel) bool { return c.ID == "c1" }) {
+		t.Fatal("removed channel remained in sidebar")
 	}
 }

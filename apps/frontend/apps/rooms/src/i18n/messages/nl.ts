@@ -114,6 +114,11 @@ export const nl: AppCatalog<typeof en> = {
   'status.expiry.week': 'Deze week',
   'status.dmAlertsOn': 'Meldingen voor directe berichten aanzetten',
   'status.dmAlertsOff': 'Meldingen voor directe berichten uitzetten',
+  'status.dmAccountHelp':
+    'Geldt voor dit account en deze organisatie in alle Sytue-apps. Browsertoestemming staat hier los van.',
+  'status.dmLegacyHelp':
+    'Deze browser heeft nog een lokaal filter. Verwijder dit om de accountinstelling te gebruiken; het account verandert niet.',
+  'status.dmUseAccount': 'Accountinstelling gebruiken',
   'connection.online': 'Verbonden',
   'connection.connecting': 'Verbinden…',
   'connection.offline': 'Geen verbinding',

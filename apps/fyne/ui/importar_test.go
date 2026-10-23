@@ -4,12 +4,14 @@
 package ui
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -19,6 +21,89 @@ import (
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 )
+
+func TestImportarCancelaLecturasYNoPublicaOtraCuenta(t *testing.T) {
+	tr := traductorPrueba(t)
+	var d *ImportarDatos
+	leidas, cambiar := 0, true
+	cliente := &http.Client{Transport: transporteFunc(func(r *http.Request) (*http.Response, error) {
+		leidas++
+		body := `{"instances":[{"id":"anterior","template_key":"google","status":"active"}]}`
+		if strings.Contains(r.URL.Path, "migrations") {
+			body = `{"migrations":[]}`
+			if cambiar {
+				cambiar = false
+				d.CargarCon(context.Background())
+			}
+		}
+		return &http.Response{StatusCode: http.StatusOK, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(body))}, nil
+	})}
+	d = NuevoImportarDatos(tr, api.NewIntegraciones("https://fixture.example.invalid", nil, cliente), "drive")
+	d.Sondeo = 0
+	var trabajo []func()
+	d.aparte = func(f func()) { trabajo = append(trabajo, f) }
+	d.CargarCon(context.Background())
+	trabajo[0]() // El transporte antiguo devuelve datos incluso tras la cancelación.
+	if d.cargada || len(d.origenes) != 0 || len(trabajo) != 2 {
+		t.Fatal("la respuesta anterior se publicó en la siguiente vida")
+	}
+	d.Parar()
+	antes := leidas
+	trabajo[1]()
+	if leidas != antes || d.Objeto(231, tema.Claro) != nil {
+		t.Fatal("una lectura encolada sobrevivió al cierre de sesión")
+	}
+}
+
+func TestImportarNoReenviaUnaOrdenTrasCambiarSesion(t *testing.T) {
+	g := &pasarelaDoble{instancias: `{"instances":[{"id":"g","template_key":"google","status":"active"}]}`, migraciones: `{"migrations":[]}`}
+	srv := g.servidor(t)
+	d := NuevoImportarDatos(traductorPrueba(t), api.NewIntegraciones(srv.URL, nil, nil), "drive")
+	d.Sondeo = 0
+	d.aparte = func(f func()) { f() }
+	d.CargarCon(context.Background())
+	origen := d.origenes[0]
+	var pendiente func()
+	d.aparte = func(f func()) { pendiente = f }
+	d.traer(origen)
+	d.Parar()
+	pendiente()
+	if g.cuantas() != 0 || d.enviando || len(d.trabajos) != 0 {
+		t.Fatal("una orden encolada llegó a la nueva sesión")
+	}
+	d.aparte = func(f func()) { f() }
+	d.CargarCon(context.Background())
+	if g.cuantas() != 0 || len(d.trabajos) != 0 {
+		t.Fatal("volver a abrir reenvió la importación")
+	}
+}
+
+func TestImportarMantieneUnSoloSondeoYLoDetiene(t *testing.T) {
+	g := &pasarelaDoble{instancias: `{"instances":[]}`, migraciones: `{"migrations":[{"id":"n","domain":"drive","status":"running"}]}`}
+	srv := g.servidor(t)
+	d := NuevoImportarDatos(traductorPrueba(t), api.NewIntegraciones(srv.URL, nil, nil), "drive")
+	d.aparte = func(f func()) { f() }
+	var relojes []func()
+	paradas := 0
+	d.esperar = func(_ time.Duration, f func()) func() {
+		relojes = append(relojes, f)
+		return func() { paradas++ }
+	}
+	d.CargarCon(context.Background())
+	d.Cargar()
+	if len(relojes) != 2 || paradas != 1 {
+		t.Fatal("el refresco no sustituyó el temporizador anterior")
+	}
+	relojes[0]() // La parada no puede retirar un callback que el SO ya encoló.
+	if len(relojes) != 2 {
+		t.Fatal("el temporizador viejo abrió otra cadena de sondeo")
+	}
+	d.Parar()
+	relojes[1]()
+	if len(relojes) != 2 || paradas != 2 || d.Objeto(231, tema.Claro) != nil {
+		t.Fatal("cerrar la vida dejó sondeos o datos antiguos")
+	}
+}
 
 // pasarelaDoble hace de pasarela de integraciones con los orígenes y trabajos que se le
 // pongan, y cuenta cuántas veces se le ha preguntado.

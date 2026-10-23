@@ -548,32 +548,34 @@ func (c *cuentaBarra) apariencia(e sesion.Estado) *Segmentado {
 	return s
 }
 
-// idioma es el selector de los veintiséis, EN UNA LÍNEA con su rótulo a la izquierda,
+// idioma ofrece seguir al sistema o elegir uno de los veintiséis, EN UNA LÍNEA con su rótulo a la izquierda,
 // como las filas de encima (`LanguageSelect.tsx`: `flex items-center justify-between
 // gap-3`, y el control en `w-40 max-w-[60%]`). Con el rótulo arriba eran 24 px más en un
 // menú que no cabía a 1280×800.
 func (c *cuentaBarra) idioma(e sesion.Estado) fyne.CanvasObject {
-	rotulos := make([]string, 0, len(i18n.Locales))
+	rotulos := make([]string, 0, 1+len(i18n.Locales))
+	rotulos = append(rotulos, c.t.T("account.appearance.system", nil))
 	for _, l := range i18n.Locales {
 		rotulos = append(rotulos, i18n.Names[l])
 	}
 	s := NuevoSelector(rotulos, nil)
 	s.Rotulo = c.t.T("account.language", nil)
-	s.Elegida = slices.Index(i18n.Locales, i18n.Locale(e.Idioma))
-	if s.Elegida < 0 {
-		s.Elegida = slices.Index(i18n.Locales, c.t.Locale()) // sin elegir: el que se usa
-	}
+	// Vacío (o desconocido) ya significa negociar con el SO al abrir la app.
+	s.Elegida = 1 + slices.Index(i18n.Locales, i18n.Locale(e.Idioma))
 	s.Ancho = min(AnchoIdiomaCuenta, TopeIdiomaCuenta*anchoPreferenciasCuenta)
 	s.AlElegir = func(i int) {
-		if c.s == nil || i < 0 || i >= len(i18n.Locales) {
+		if c.s == nil || i < 0 || i > len(i18n.Locales) {
 			return
 		}
-		etiqueta := string(i18n.Locales[i])
+		etiqueta := ""
+		if i > 0 {
+			etiqueta = string(i18n.Locales[i-1])
+		}
 		_ = c.s.Poner(func(a *ajustes.Ajustes) { a.Idioma = etiqueta })
 	}
 	fila := container.New(filaPreferencia{},
 		NuevoRotulo(c.t.T("account.language", nil), tema.TextoSM, Normal, "text"), s)
-	// El aviso es de aquí y no de la web, que cambia de idioma en el acto: una app
+	// El aviso es de aquí; la web recarga al cambiar de idioma y una app
 	// nativa lo aplica al volver a abrirse. Pegado a su fila: es su ayuda, no otro ajuste.
 	aviso := NuevoParrafo(c.t.T("account.languageRestart", nil), tema.TextoXS, Normal, "text-subtle",
 		tema.De(fyne.CurrentApp().Settings().ThemeVariant())).A(anchoPreferenciasCuenta)

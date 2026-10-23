@@ -27,6 +27,7 @@ import {
   type AppCatalog,
   type Locale,
 } from './index.js';
+import { plantillasDinamicas } from './claves-usadas.js';
 
 describe('negociación de Accept-Language', () => {
   test('elige el primer idioma soportado respetando la región', () => {
@@ -43,6 +44,10 @@ describe('negociación de Accept-Language', () => {
 
   test('a igual `q` gana el que aparece antes', () => {
     expect(negotiateLocale('it;q=0.8,de;q=0.8')).toBe('it');
+  });
+
+  test('acepta espacios en el parámetro `q`', () => {
+    expect(parseAcceptLanguage('de; q \t= \t0.3, fr;q=0.8')).toBe('fr');
   });
 
   test('un idioma que no hablamos deja paso al siguiente candidato', () => {
@@ -77,6 +82,10 @@ describe('negociación de Accept-Language', () => {
     expect(parseAcceptLanguage('no')).toBe('nb');
     expect(parseAcceptLanguage('nn-NO,en;q=0.5')).toBe('nb');
   });
+});
+
+test('plantillas dinámicas conservan las interpolaciones', () => {
+  expect(plantillasDinamicas('t(`literal`) t(`dynamic ${value}`)')).toEqual(['dynamic ${value}']);
 });
 
 describe('cookie de preferencia', () => {

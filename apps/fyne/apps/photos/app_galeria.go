@@ -125,14 +125,18 @@ func (a *App) descargarSeleccion() {
 	a.g.aviso = a.v.T.T("gallery.downloading", i18n.Vars{"count": len(fotos)})
 	a.pintar()
 	gen := a.gen
-	a.lanzar(func() {
+	a.enSesion(func(vida context.Context) {
 		fallidas := 0
 		for _, f := range fotos {
-			if a.bajar(f, "jpeg") != nil {
+			if vida.Err() != nil {
+				return
+			}
+			if a.bajar(vida, f, "jpeg") != nil {
 				fallidas++
 			}
 		}
 		if fallidas > 0 {
+			//nolint:contextcheck // Sólo reconstruye UI; los eventos futuros capturan la vida de cuenta en enSesion.
 			a.hilo(gen, func() {
 				a.g.error = a.v.Traduce("error.connection")
 				a.pintar()
@@ -257,18 +261,23 @@ func (a *App) subir(rutas []string) {
 	a.g.aviso, a.g.subida = "", &[2]int{0, len(fotos)}
 	a.pintar()
 	gen := a.gen
-	a.lanzar(func() {
-		carpeta, err := a.carpetaFotos()
+	a.enSesion(func(vida context.Context) {
+		carpeta, err := a.carpetaFotos(vida)
 		var fallos []string
 		for i, r := range fotos {
-			if err != nil || a.subirUna(carpeta, r) != nil {
+			if vida.Err() != nil {
+				return
+			}
+			if err != nil || a.subirUna(vida, carpeta, r) != nil {
 				fallos = append(fallos, filepath.Base(r))
 			}
+			//nolint:contextcheck // Sólo reconstruye UI; los eventos futuros capturan la vida de cuenta en enSesion.
 			a.hilo(gen, func() {
 				a.g.subida = &[2]int{i + 1, len(fotos)}
 				a.pintar()
 			})
 		}
+		//nolint:contextcheck // Sólo reconstruye UI; los eventos futuros capturan la vida de cuenta en enSesion.
 		a.hilo(gen, func() {
 			a.g.subida = nil
 			hechas := len(fotos) - len(fallos)
@@ -293,8 +302,8 @@ func (a *App) subir(rutas []string) {
 }
 
 // carpetaFotos es el id de «/Fotos» en la raíz del Drive, creándola si no está.
-func (a *App) carpetaFotos() (string, error) {
-	c, fin := ctx()
+func (a *App) carpetaFotos(vida context.Context) (string, error) {
+	c, fin := ctx(vida)
 	defer fin()
 	raiz, err := a.Drive.Root(c)
 	if err != nil {
@@ -318,7 +327,7 @@ func (a *App) carpetaFotos() (string, error) {
 	return f.ID, err
 }
 
-func (a *App) subirUna(carpeta, ruta string) error {
+func (a *App) subirUna(vida context.Context, carpeta, ruta string) error {
 	f, err := os.Open(ruta) //nolint:gosec // es la ruta que la persona ha elegido o soltado
 	if err != nil {
 		return err
@@ -328,7 +337,7 @@ func (a *App) subirUna(carpeta, ruta string) error {
 	if err != nil {
 		return err
 	}
-	c, fin := context.WithTimeout(context.Background(), 10*time.Minute)
+	c, fin := context.WithTimeout(vida, 10*time.Minute)
 	defer fin()
 	fichero, err := a.Drive.Upload(c, carpeta, filepath.Base(ruta), tipoDe(ruta), f, info.Size())
 	if err != nil {
@@ -355,16 +364,17 @@ func (a *App) pedirRecuerdos() {
 	}
 	a.rec.pedidos = true
 	gen := a.gen
-	a.lanzar(func() {
-		c, fin := ctx()
+	a.enSesion(func(vida context.Context) {
+		c, fin := ctx(vida)
 		defer fin()
 		lista, err := a.cli.Memories(c)
 		fyne.Do(func() {
-			if err != nil {
+			if err != nil || vida.Err() != nil {
 				return
 			}
 			a.rec.lista = lista
 			if gen == a.gen {
+				//nolint:contextcheck // Sólo reconstruye UI; los eventos futuros capturan la vida de cuenta en enSesion.
 				a.pintar()
 			}
 		})

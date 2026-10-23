@@ -28,7 +28,7 @@ export const GET: APIRoute = async (ctx) => {
     const data = (await res.json()) as { one_click?: boolean; mailto?: boolean };
     return json({ oneClick: Boolean(data.one_click), mailto: Boolean(data.mailto) });
   } catch (err) {
-    return json({ error: 'mail_error', message: String(err) }, 502);
+    return json({ error: 'mail_error' }, 502);
   }
 };
 
@@ -49,7 +49,7 @@ export const POST: APIRoute = async (ctx) => {
     const data = (await res.json()) as { status?: string };
     return json({ status: data.status ?? 'failed' });
   } catch (err) {
-    return json({ error: 'mail_error', message: String(err) }, 502);
+    return json({ error: 'mail_error' }, 502);
   }
 };
 

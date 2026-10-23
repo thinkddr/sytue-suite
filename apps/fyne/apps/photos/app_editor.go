@@ -7,6 +7,7 @@ package photos
 
 import (
 	"bytes"
+	"context"
 	"image"
 	"io"
 	"net/url"
@@ -126,8 +127,8 @@ func (a *App) cargarEditor(e *estadoEditor) {
 		return
 	}
 	gen := a.gen
-	a.lanzar(func() {
-		c, fin := ctx()
+	a.enSesion(func(vida context.Context) {
+		c, fin := ctx(vida)
 		defer fin()
 		var receta api.Receta
 		var original image.Image
@@ -149,6 +150,7 @@ func (a *App) cargarEditor(e *estadoEditor) {
 		if e2 := <-errReceta; err == nil {
 			err = e2
 		}
+		//nolint:contextcheck // Sólo reconstruye UI; los eventos futuros capturan la vida de cuenta en enSesion.
 		a.hilo(gen, func() {
 			if a.ed != e {
 				return
@@ -336,10 +338,11 @@ func (a *App) guardarEdicion() {
 	e.guardando = true
 	a.pintarEditor()
 	receta, gen := e.receta.Clonar(), a.gen
-	a.lanzar(func() {
-		c, fin := ctx()
+	a.enSesion(func(vida context.Context) {
+		c, fin := ctx(vida)
 		defer fin()
 		huella, err := a.cli.GuardarReceta(c, e.foto.ID, receta)
+		//nolint:contextcheck // Sólo reconstruye UI; los eventos futuros capturan la vida de cuenta en enSesion.
 		a.hilo(gen, func() {
 			if a.ed != e {
 				return
@@ -382,10 +385,11 @@ func (a *App) editarConIA(accion string) {
 	e.iaCargando, e.iaError = true, ""
 	a.pintarEditor()
 	gen := a.gen
-	a.lanzar(func() {
-		c, fin := ctxIA()
+	a.enSesion(func(vida context.Context) {
+		c, fin := ctxIA(vida)
 		defer fin()
 		r, err := a.cli.EditarConIA(c, a.IA, e.foto.ID, accion, peticion, a.idioma())
+		//nolint:contextcheck // Sólo reconstruye UI; los eventos futuros capturan la vida de cuenta en enSesion.
 		a.hilo(gen, func() {
 			if a.ed != e {
 				return

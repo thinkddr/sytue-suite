@@ -24,7 +24,7 @@ export const GET: APIRoute = async (ctx) => {
     }).getNotifyPrefs();
     return json({ prefs });
   } catch (err) {
-    return json({ error: 'chat_error', message: String(err) }, 502);
+    return json({ error: 'chat_error' }, 502);
   }
 };
 
@@ -53,7 +53,7 @@ export const POST: APIRoute = async (ctx) => {
     }).putNotifyPrefs({ keywords, dndStart, dndEnd });
     return json({ prefs });
   } catch (err) {
-    return json({ error: 'chat_error', message: String(err) }, 502);
+    return json({ error: 'chat_error' }, 502);
   }
 };
 

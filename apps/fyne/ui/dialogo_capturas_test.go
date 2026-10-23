@@ -18,7 +18,7 @@ import (
 
 // TestCapturasDeLosDialogos deja en SYTUE_CAPTURA_DIALOGOS las cuatro muestras de la
 // familia —confirmación, formulario, uno grande con desplazamiento y el panel lateral—
-// en escritorio (1440×900) y teléfono (390×844), claro y oscuro: las mismas vistas que
+// en escritorio (1440×900) y teléfono (390×844), claro, oscuro y traslúcido: las mismas vistas que
 // el arnés de la web, para mirarlas lado a lado. Sin la variable no hace nada: no es un
 // guardián, es la cámara.
 func TestCapturasDeLosDialogos(t *testing.T) {
@@ -35,7 +35,7 @@ func TestCapturasDeLosDialogos(t *testing.T) {
 		{"escritorio", fyne.NewSize(1440, 900), false},
 		{"movil", fyne.NewSize(390, 844), true},
 	} {
-		for _, tono := range []string{"claro", "oscuro"} {
+		for _, tono := range []string{"claro", "oscuro", "traslucido"} {
 			for _, m := range []string{"confirmar", "formulario", "largo", "lateral"} {
 				tema.Elegir(tono)
 				tactil := tam.tactil

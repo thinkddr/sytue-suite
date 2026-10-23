@@ -132,6 +132,11 @@ export const de: AppCatalog<typeof en> = {
   'status.expiry.week': 'Diese Woche',
   'status.dmAlertsOn': 'Hinweise zu Direktnachrichten einschalten',
   'status.dmAlertsOff': 'Hinweise zu Direktnachrichten ausschalten',
+  'status.dmAccountHelp':
+    'Gilt für dieses Konto und diese Organisation in allen Sytue-Apps. Die Browserberechtigung ist davon unabhängig.',
+  'status.dmLegacyHelp':
+    'Dieser Browser hat noch einen lokalen Filter. Verwerfen Sie ihn, um die Kontoeinstellung zu verwenden. Das Konto bleibt unverändert.',
+  'status.dmUseAccount': 'Kontoeinstellung verwenden',
 
   // --- Conexión en tiempo real --------------------------------------------
   'connection.online': 'Verbunden',

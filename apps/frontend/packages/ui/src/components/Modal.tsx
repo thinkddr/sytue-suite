@@ -28,6 +28,7 @@ import { useMobileBack } from '../lib/useMobileBack.js';
 import { tecladoEnOtraSuperposicion } from '../lib/atajos.js';
 import { Button } from './Button.js';
 import { Icon } from './Icon.js';
+import { useDialogToasts } from './Toast.js';
 
 export type ModalSize = 'sm' | 'md' | 'lg' | 'xl';
 
@@ -139,6 +140,7 @@ export function Modal({
   const t = useT();
   const panelRef = useRef<HTMLDivElement>(null);
   const cuerpoRef = useRef<HTMLDivElement>(null);
+  const avisosRef = useDialogToasts();
   const previouslyFocusedRef = useRef<HTMLElement | null>(null);
   const arrastreRef = useRef<{ y: number; dy: number; t: number } | null>(null);
   // Si el cuerpo se desplaza: es lo único que enciende los filetes de cabecera y pie.
@@ -397,7 +399,13 @@ export function Modal({
           </Button>
         </div>
         <div
+          ref={avisosRef}
+          data-sytue-dialog-toasts
+          class="max-h-[min(25dvh,10rem)] shrink-0 overflow-y-auto overscroll-contain empty:hidden"
+        />
+        <div
           ref={cuerpoRef}
+          data-sytue-dialog-body
           class={cx(
             'text-text min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pt-3 text-base max-md:min-h-11',
             footer ? 'pb-3' : ['pb-5', bandaFinal],

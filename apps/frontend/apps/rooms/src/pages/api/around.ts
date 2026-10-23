@@ -27,7 +27,7 @@ export const GET: APIRoute = async (ctx) => {
     // `threadRootId` solo viene si el objetivo era una respuesta de hilo.
     return json(threadRootId ? { messages, threadRootId } : { messages });
   } catch (err) {
-    return json({ error: 'chat_error', message: String(err) }, 502);
+    return json({ error: 'chat_error' }, 502);
   }
 };
 

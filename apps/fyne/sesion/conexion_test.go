@@ -13,6 +13,8 @@ import (
 
 	"fyne.io/fyne/v2/test"
 
+	"git.sytue.eu/sytue/one/apps/nucleo/ajustes"
+	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/offline"
 )
 
@@ -33,6 +35,9 @@ func TestLaConexionEsDeLaSesion(t *testing.T) {
 	}
 	if tr.Product != "mail" || !slices.Equal(tr.Private, []string{"/api/v1/adjuntos/"}) {
 		t.Errorf("el transporte es de %q con privadas %v", tr.Product, tr.Private)
+	}
+	if !slices.Equal(tr.CacheProducts, api.Productos()) || tr.Scope == nil {
+		t.Fatal("global budget/session revision not wired")
 	}
 	if tr.Monitor != red {
 		t.Error("el monitor devuelto no es el que alimenta el transporte: la pantalla no se enteraría")
@@ -83,5 +88,23 @@ func TestSoloLecturaNoDejaEscribir(t *testing.T) {
 	}
 	if len(red.vistas) != 2 {
 		t.Errorf("a la red han llegado %v; quiero solo la lectura y el canje del token", red.vistas)
+	}
+}
+
+func TestOfflineScopeRejectsOtherAppSessionBeforeWatcherAdoptsIt(t *testing.T) {
+	aparte(t)
+	ajustes.MarcarSesion()
+	generation := ajustes.Leer().Sesion
+	s := &Suite{generacionSesion: generation}
+	if s.scopeCache() != generation {
+		t.Fatal("adopted session rejected")
+	}
+	ajustes.MarcarSesion()
+	if s.scopeCache() != "" {
+		t.Fatal("old session accepted before shared watcher")
+	}
+	s.generacionSesion = ajustes.Leer().Sesion
+	if s.scopeCache() != s.generacionSesion {
+		t.Fatal("new adopted session rejected")
 	}
 }

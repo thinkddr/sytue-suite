@@ -207,3 +207,7 @@ test('la cookie del color de organización se llama igual donde se escribe y don
   expect(ORG_COLOR_KEY).toBe(ORG_COLOR_COOKIE);
   expect(ORG_FORMA_KEY).toBe(ORG_FORMA_COOKIE);
 });
+
+test('el script de primer pintado escapa caracteres con significado en HTML y JavaScript', () => {
+  expect(themeInitScript).not.toMatch(/[<>&\u2028\u2029]/);
+});

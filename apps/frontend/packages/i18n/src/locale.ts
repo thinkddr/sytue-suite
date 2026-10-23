@@ -205,8 +205,16 @@ export function parseAcceptLanguage(header?: string | null): Locale | null {
       // Se busca el parámetro `q` por nombre: otros parámetros no alteran el peso,
       // y un `q` presente pero ilegible (`q=abc`) NO puede colar el idioma como
       // preferido — cuenta como 0, es decir, se descarta.
-      const q = params.map((p) => /^\s*q\s*=\s*(.*?)\s*$/i.exec(p)).find((m) => m !== null);
-      const quality = q === undefined ? 1 : Number(q[1]);
+      const q = params
+        .map((p) => {
+          const param = p.trim();
+          const equals = param.indexOf('=');
+          return equals >= 0 && param.slice(0, equals).trim().toLowerCase() === 'q'
+            ? param.slice(equals + 1).trim()
+            : null;
+        })
+        .find((value) => value !== null);
+      const quality = q === undefined ? 1 : Number(q);
       const base = (tag.trim().toLowerCase().split('-')[0] ?? '').trim();
       // Ordenar por q y, a igualdad, por orden de aparición (el sort ya es
       // estable, pero el desempate explícito documenta la intención).
@@ -268,11 +276,12 @@ export function detectLocale(): Locale {
  * bajo el mismo apex, por lo que una cookie de dominio filtraría la preferencia
  * y permitiría que un sitio de usuario la sobrescribiera. En una app nueva se
  * negocia de nuevo desde `Accept-Language`; la elección posterior queda local.
+ * null retira sólo esta cookie para volver a la negociación, con el mismo path.
  */
-export function persistLocale(locale: Locale): void {
+export function persistLocale(locale: Locale | null): void {
   if (typeof document === 'undefined') return;
   const secure = location.protocol === 'https:' ? '; Secure' : '';
-  document.cookie = `${LOCALE_COOKIE}=${locale}; path=/; max-age=${LOCALE_COOKIE_MAX_AGE}; SameSite=Lax${secure}`;
+  document.cookie = `${LOCALE_COOKIE}=${locale ?? ''}; path=/; max-age=${locale === null ? 0 : LOCALE_COOKIE_MAX_AGE}; SameSite=Lax${secure}`;
 }
 
 /** Refleja el idioma en el `<html>` (lang para lectores/hyphenation, dir para RTL). */

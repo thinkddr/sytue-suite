@@ -947,7 +947,7 @@ const DIR_A_APP = {
 /** Página que hoy no se puede visitar, y por qué. Sin motivo escrito no entra. */
 const NO_VISITABLES = [
   [
-    /^(docus\/dev\/(cinta|superficies|editor|inicio|pdf|superposiciones)|bases\/dev\/(app|vistas|rejilla)|calendar\/dev\/servicios-vinculados|drive\/dev\/almacenamiento|mail\/dev\/correo-externo|rooms\/dev\/conexiones|console\/dev\/conectar-app)$/,
+    /^(docus\/dev\/(cinta|superficies|editor|inicio|pdf|superposiciones)|bases\/dev\/(app|vistas|rejilla)|calendar\/dev\/servicios-vinculados|drive\/dev\/almacenamiento|mail\/dev\/correo-externo|rooms\/dev\/(conexiones|avisos-directos|idioma-sistema)|console\/dev\/conectar-app)$/,
     'bancos de prueba exclusivos de desarrollo: import.meta.env.DEV exige 404 en producción',
   ],
   [/\[/, 'ruta dinámica: depende de un dato, se alcanza con { desde, enlace } o { resolver }'],

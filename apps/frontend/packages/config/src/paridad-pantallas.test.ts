@@ -112,6 +112,10 @@ const SOLO_WEB: Record<string, string> = {
     'Banco de pruebas de DESARROLLO del wizard real de almacenamiento externo para Playwright: en producción es un 404 y nada lo enlaza. No es una pantalla del producto ni necesita ruta nativa.',
   'apps/frontend/apps/rooms/src/pages/dev/conexiones.astro':
     'Banco de pruebas de DESARROLLO del wizard real de consentimiento y canales de Rooms para Playwright: en producción es un 404 y nada lo enlaza. No es una pantalla del producto ni necesita ruta nativa.',
+  'apps/frontend/apps/rooms/src/pages/dev/avisos-directos.astro':
+    'Banco de pruebas de DESARROLLO de los avisos de mensajes directos de Rooms para Playwright: en producción es un 404. Los avisos también funcionan en Fyne; la fixture no es una pantalla del producto ni necesita ruta nativa.',
+  'apps/frontend/apps/rooms/src/pages/dev/idioma-sistema.astro':
+    'Banco de pruebas de DESARROLLO de la preferencia de idioma del sistema para Playwright: en producción es un 404. La preferencia también funciona en Fyne; la fixture no es una pantalla del producto ni necesita ruta nativa.',
   'apps/frontend/apps/docus/src/pages/dev/cinta.astro':
     'Banco de pruebas de DESARROLLO de la cinta, para la prueba visual de Playwright (test/e2e/cinta.mjs): en producción es un 404 y nada lo enlaza. No es una pantalla del producto, así que no hay nada que portar.',
   'apps/frontend/apps/docus/src/pages/dev/editor.astro':
@@ -385,6 +389,8 @@ test('la auditoría móvil excluye bancos de desarrollo sin ocultar pantallas re
     'calendar/src/pages/dev/servicios-vinculados.astro',
     'drive/src/pages/dev/almacenamiento.astro',
     'rooms/src/pages/dev/conexiones.astro',
+    'rooms/src/pages/dev/avisos-directos.astro',
+    'rooms/src/pages/dev/idioma-sistema.astro',
     'console/src/pages/dev/conectar-app.astro',
   ]) {
     const banco = await Bun.file(new URL(`apps/frontend/apps/${ruta}`, RAIZ)).text();
@@ -396,6 +402,12 @@ test('la auditoría móvil excluye bancos de desarrollo sin ocultar pantallas re
     expect(esSoloWeb(`apps/frontend/apps/docus/src/pages/dev/${nombre}.astro`)).toBe(true);
   }
   expect(esSoloWeb('apps/frontend/apps/docus/src/pages/dev/pantalla-nueva.astro')).toBe(false);
+  for (const nombre of ['avisos-directos', 'idioma-sistema']) {
+    expect(esSoloWeb(`apps/frontend/apps/rooms/src/pages/dev/${nombre}.astro`)).toBe(true);
+    expect(esSoloWeb(`apps/frontend/apps/rooms/src/pages/dev/${nombre}-nuevo.astro`)).toBe(false);
+    expect(esSoloWeb(`apps/frontend/apps/rooms/src/pages/dev/${nombre}/otra.astro`)).toBe(false);
+  }
+  expect(esSoloWeb('apps/frontend/apps/rooms/src/pages/dev/pantalla-nueva.astro')).toBe(false);
   const fuente = await Bun.file(new URL('test/e2e/mobile-audit.mjs', RAIZ)).text();
   // Leer el matcher que usa el barrido, sin ejecutar navegador, sesión ni su inventario.
   const literal = /const NO_VISITABLES = \[\s*\[\s*\/([^\n]+)\/,/.exec(fuente)?.[1];
@@ -415,6 +427,8 @@ test('la auditoría móvil excluye bancos de desarrollo sin ocultar pantallas re
       'calendar/dev/servicios-vinculados',
       'drive/dev/almacenamiento',
       'rooms/dev/conexiones',
+      'rooms/dev/avisos-directos',
+      'rooms/dev/idioma-sistema',
       'console/dev/conectar-app',
     ].every((ruta) => re.test(ruta)) &&
     [
@@ -432,6 +446,11 @@ test('la auditoría móvil excluye bancos de desarrollo sin ocultar pantallas re
       'drive/dev/almacenamiento/otra',
       'rooms/dev/conexiones-nueva',
       'rooms/dev/conexiones/otra',
+      'rooms/dev/avisos-directos-nuevo',
+      'rooms/dev/avisos-directos/otra',
+      'rooms/dev/idioma-sistema-nuevo',
+      'rooms/dev/idioma-sistema/otra',
+      'rooms/dev/pantalla-nueva',
       'console/dev/conectar-app-nueva',
       'console/dev/conectar-app/otra',
     ].every((ruta) => !re.test(ruta));
@@ -439,6 +458,8 @@ test('la auditoría móvil excluye bancos de desarrollo sin ocultar pantallas re
   // Los dos modos de fallo reales: olvidar esta fixture o excluir todo dev/.
   expect(comprobar(new RegExp(matcher.source.replace('superposiciones', 'quitada')))).toBe(false);
   expect(comprobar(new RegExp(matcher.source.replace('inicio', 'quitada')))).toBe(false);
+  expect(comprobar(new RegExp(matcher.source.replace('avisos-directos', 'quitada')))).toBe(false);
+  expect(comprobar(new RegExp(matcher.source.replace('idioma-sistema', 'quitada')))).toBe(false);
   expect(comprobar(new RegExp(matcher.source.replace('superposiciones', '.*')))).toBe(false);
 });
 

@@ -48,4 +48,4 @@ jobs:
         with:
           persist-credentials: false
       - name: Validate alert handling and native Codex task preparation
-        run: node --test .github/scripts/security-alert.test.mjs .github/scripts/security-request.test.mjs
+        run: node --test .github/scripts/security-*.test.mjs

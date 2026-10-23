@@ -1,9 +1,20 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (c) 2026 Daniel Delgado Ramos (thinkddr)
 name: Codex security fix
-run-name: Codex · ${{ inputs.finding_type }} · alerta ${{ inputs.alert_number }}
+run-name: Codex · seguridad · ${{ github.event_name }}
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/codex-security-fix.yml
+      - .github/scripts/security-*.mjs
+  workflow_run:
+    workflows: [CodeQL Advanced]
+    branches: [main]
+    types: [completed]
+  schedule:
+    - cron: '37 */6 * * *'
   workflow_dispatch:
     inputs:
       finding_type:
@@ -20,13 +31,72 @@ permissions:
   contents: read
 
 concurrency:
-  group: codex-security-${{ inputs.finding_type }}-${{ inputs.alert_number }}
+  # Serializar selección y publicación para no asignar dos veces una alerta.
+  group: codex-security-queue
   cancel-in-progress: false
 
 jobs:
+  select:
+    # Solo código de la rama predeterminada; nunca usar artefactos ni checkouts
+    # del workflow que disparó workflow_run, especialmente los de una PR/fork.
+    if: >-
+      github.ref == format('refs/heads/{0}', github.event.repository.default_branch) &&
+      (github.event_name != 'workflow_run' ||
+        (github.event.workflow_run.conclusion == 'success' &&
+         github.event.workflow_run.head_branch == github.event.repository.default_branch &&
+         github.event.workflow_run.head_repository.full_name == github.repository &&
+         contains(fromJSON('["push", "schedule", "workflow_dispatch"]'), github.event.workflow_run.event)))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      security-events: read
+      pull-requests: read
+    outputs:
+      has_finding: ${{ steps.queue.outputs.has_finding }}
+      finding_type: ${{ steps.queue.outputs.finding_type }}
+      alert_number: ${{ steps.queue.outputs.alert_number }}
+      existing_pr_number: ${{ steps.queue.outputs.existing_pr_number }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Check connector configuration
+        env:
+          PR_TOKEN_CONFIGURED: ${{ secrets.CODEX_PR_TOKEN != '' }}
+          ALERT_TOKEN_CONFIGURED: ${{ secrets.SECURITY_ALERTS_TOKEN != '' }}
+        run: |
+          test "$PR_TOKEN_CONFIGURED" = true || { echo 'Configure CODEX_PR_TOKEN (Contents y Pull requests: write).' >&2; exit 1; }
+          test "$ALERT_TOKEN_CONFIGURED" = true || { echo 'Configure SECURITY_ALERTS_TOKEN (Dependabot alerts: read).' >&2; exit 1; }
+
+      - name: Select one unassigned open finding
+        id: queue
+        env:
+          FINDING_TYPE: ${{ inputs.finding_type }}
+          ALERT_NUMBER: ${{ inputs.alert_number }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          CODE_SCANNING_TOKEN: ${{ github.token }}
+          SECURITY_ALERTS_TOKEN: ${{ secrets.SECURITY_ALERTS_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+        run: node .github/scripts/security-queue.mjs
+
+      - name: Summarize queue decision
+        env:
+          HAS_FINDING: ${{ steps.queue.outputs.has_finding }}
+          FINDING_TYPE: ${{ steps.queue.outputs.finding_type }}
+          ALERT_NUMBER: ${{ steps.queue.outputs.alert_number }}
+          QUEUE_REASON: ${{ steps.queue.outputs.reason }}
+        run: |
+          printf 'Cola automática de seguridad: %s\n' "$QUEUE_REASON" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$HAS_FINDING" = true ]; then
+            printf 'Encargo seleccionado: %s #%s\n' "$FINDING_TYPE" "$ALERT_NUMBER" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
   prepare:
-    # Nunca cargar código ni secretos desde una rama elegida en Run workflow.
-    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    needs: select
+    if: needs.select.outputs.has_finding == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
@@ -41,27 +111,17 @@ jobs:
           ref: ${{ github.sha }}
           persist-credentials: false
 
-      - name: Check configuration and fix base
+      - name: Fix the trusted base commit
         id: base
-        env:
-          PR_TOKEN_CONFIGURED: ${{ secrets.CODEX_PR_TOKEN != '' }}
-          ALERT_TOKEN_CONFIGURED: ${{ secrets.SECURITY_ALERTS_TOKEN != '' }}
-          FINDING_TYPE: ${{ inputs.finding_type }}
-        run: |
-          test "$PR_TOKEN_CONFIGURED" = true || { echo 'Configure CODEX_PR_TOKEN (Contents y Pull requests: write).' >&2; exit 1; }
-          if [ "$FINDING_TYPE" = dependabot ] && [ "$ALERT_TOKEN_CONFIGURED" != true ]; then
-            echo 'Configure SECURITY_ALERTS_TOKEN con Dependabot alerts: read.' >&2
-            exit 1
-          fi
-          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Read the selected open alert
         id: alert
         env:
-          FINDING_TYPE: ${{ inputs.finding_type }}
-          ALERT_NUMBER: ${{ inputs.alert_number }}
+          FINDING_TYPE: ${{ needs.select.outputs.finding_type }}
+          ALERT_NUMBER: ${{ needs.select.outputs.alert_number }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
-          SECURITY_ALERTS_TOKEN: ${{ inputs.finding_type == 'dependabot' && secrets.SECURITY_ALERTS_TOKEN || github.token }}
+          SECURITY_ALERTS_TOKEN: ${{ needs.select.outputs.finding_type == 'dependabot' && secrets.SECURITY_ALERTS_TOKEN || github.token }}
           ALERT_CONTEXT_PATH: ${{ runner.temp }}/alert-context/alert.json
         run: |
           mkdir -p "$RUNNER_TEMP/alert-context"
@@ -76,7 +136,7 @@ jobs:
           retention-days: 1
 
   request:
-    needs: prepare
+    needs: [select, prepare]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     # El token es del usuario conectado a Codex; @codex se ejecuta mediante
@@ -106,22 +166,14 @@ jobs:
           node .github/scripts/security-request.mjs
 
       - name: Open a request PR and mention the native Codex connector
+        id: publish
         env:
           GH_TOKEN: ${{ secrets.CODEX_PR_TOKEN }}
-          FINDING_TYPE: ${{ inputs.finding_type }}
-          ALERT_NUMBER: ${{ inputs.alert_number }}
+          FINDING_TYPE: ${{ needs.select.outputs.finding_type }}
+          ALERT_NUMBER: ${{ needs.select.outputs.alert_number }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           REQUEST_PATH: ${{ steps.task.outputs.request_path }}
           PR_TITLE: ${{ steps.task.outputs.request_title }}
-        run: |
-          fix_branch="codex/security/${FINDING_TYPE}-${ALERT_NUMBER}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          mkdir -p "$(dirname "$REQUEST_PATH")"
-          cp "$RUNNER_TEMP/security-request/request.md" "$REQUEST_PATH"
-          git add -- "$REQUEST_PATH"
-          git -c core.hooksPath=/dev/null -c user.name='codex-security[bot]' -c user.email='codex-security[bot]@users.noreply.github.com' commit -m "$PR_TITLE"
-          gh auth setup-git
-          git -c core.hooksPath=/dev/null push origin "HEAD:refs/heads/$fix_branch"
-          pr_url="$(gh pr create --draft --base "$DEFAULT_BRANCH" --head "$fix_branch" --title "$PR_TITLE" --body-file "$RUNNER_TEMP/security-request/pr-body.md")"
-          printf 'PR de encargo creado: %s\n' "$pr_url" >> "$GITHUB_STEP_SUMMARY"
-          gh pr comment "$pr_url" --body-file "$RUNNER_TEMP/security-request/codex-comment.md"
-          printf 'Mención @codex enviada con la cuenta del token. Comprueba la reacción del conector en el PR.\n' >> "$GITHUB_STEP_SUMMARY"
+          SECURITY_REQUEST_DIR: ${{ runner.temp }}/security-request
+          EXISTING_PR_NUMBER: ${{ needs.select.outputs.existing_pr_number }}
+        run: node .github/scripts/security-publish.mjs

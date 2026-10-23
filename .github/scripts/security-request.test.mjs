@@ -36,6 +36,7 @@ test('renders canonical selected finding path and native Codex handoff for both 
     assert.match(result.requestBody, new RegExp(baseSha));
     assert.match(result.requestBody, /"defaultBranch": "main"/);
     assert.match(result.prBody, /it does not yet correct the finding/);
+    assert.ok(result.prBody.startsWith(`<!-- codex-security-finding: example/repo ${type} 42 -->\n`));
     assert.match(result.prBody, /authorized human must repost/);
     assert.match(result.codexComment, /^@codex Fix /);
     assert.match(result.codexComment, /Remove the request file/);

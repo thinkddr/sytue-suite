@@ -8,7 +8,7 @@ info:
     carpetas, ficheros, compartición, búsqueda y cuotas por tenant. Los blobs
     viven en Object Storage S3; los metadatos en PostgreSQL. WebDAV (RFC 4918)
     se expone bajo /dav (no documentado aquí; usa el mismo Bearer JWT).
-    Clean-room © Sytue; sin motores AGPL.
+    Clean-room, © 2026 Daniel Delgado Ramos (thinkddr); sin motores AGPL.
   version: "1.0.0"
   license:
     name: MIT

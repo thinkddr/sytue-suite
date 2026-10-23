@@ -24,7 +24,6 @@ codesigning.azure.net	deploy/sytue-git/bin/firmar-windows.sh
 dl.google.com	deploy/sytue-git/runner/Containerfile
 download.docker.com	deploy/hybrid-production/bin/install-b430.sh
 download.docker.com	deploy/helm/bin/install-host.sh
-download.docker.com	deploy/production/tests/helm-so-test.sh
 get.k3s.io	deploy/hybrid-production/bin/install-b430.sh
 get.k3s.io	deploy/hybrid-production/bin/join-b430.sh
 get.k3s.io	deploy/helm/bin/install-host.sh
@@ -92,7 +91,6 @@ sum.golang.org	services/cloud/terraform-provider-sytuecloud/go.sum
 sum.golang.org	tools/astro-fyne/native/go.mod
 sum.golang.org	tools/astro-fyne/native/go.sum
 timestamp.acs.microsoft.com	deploy/sytue-git/bin/firmar-windows.sh
-www.microsoft.com	deploy/production/tests/firmar-windows-test.sh
 commons.wikimedia.org	services/rooms/internal/gifcatalog/catalog.go
 upload.wikimedia.org	services/rooms/internal/gifcatalog/catalog.go
 

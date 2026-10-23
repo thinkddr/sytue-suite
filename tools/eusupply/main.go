@@ -85,7 +85,7 @@ var (
 	urlHost              = regexp.MustCompile(`(?i)https?://([a-z0-9][a-z0-9.-]*\.[a-z]{2,})`)
 	// El prefijo NO capturante evita el falso positivo de una ruta con punto:
 	// en `github.com/thinkddr/sytue-one`, `\b` dejaba casar otra vez a partir
-	// de la barra y «daniel.delgado» entraba como si fuera un host más, pidiendo
+	// de la barra y «thinkddr» entraba como si fuera un host más, pidiendo
 	// que se inventariara el nombre del propietario del repositorio.
 	hostPath       = regexp.MustCompile(`(?i)(?:^|[^a-z0-9./@-])([a-z0-9][a-z0-9.-]*\.[a-z]{2,})/[a-z0-9_./@+%-]+`)
 	fromImage      = regexp.MustCompile(`(?im)^\s*FROM(?:\s+--platform=\S+)?\s+(\S+)`)
@@ -485,8 +485,8 @@ var reservados = []string{".localhost", ".test", ".internal", ".invalid", ".exam
 // ¿Es «host» un nombre de máquina de verdad?
 //
 // El regex de host/ruta también casa con un `owner/repo` escrito a pelo —el
-// valor por defecto de SYTUE_GIT_REPO es `daniel.delgado/sytue-one`—, y de ahí
-// salía «daniel.delgado» pidiendo sitio en el inventario de proveedores. Se
+// valor por defecto de SYTUE_GIT_REPO es `thinkddr/sytue-suite`—, y de ahí
+// salía «thinkddr» pidiendo sitio en el inventario de proveedores. Se
 // pregunta a la lista de sufijos públicos en vez de mantener una lista de TLD a
 // mano: `gay` es un TLD real y `delgado` no, y eso no es algo que debamos
 // decidir nosotros cada vez que alguien tenga un apellido con punto delante.

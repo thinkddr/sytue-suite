@@ -5,7 +5,7 @@ Superficie de **administracion** de Sytue One (`admin.sytue.eu`): organizaciones
 administracion de Sytue ID** (identidad/SCIM) y **Sytue Hub**. **Astro 7 + Preact
 10**, SSR sobre **Bun**, **Tailwind v4** y tokens de marca. Monta la **Sytue
 Shell** y usa **solo** `@sytue/ui`. Soberanía **100 % UE**. Código **propietario
-© Sytue** (SPDX `MIT`).
+© 2026 Daniel Delgado Ramos (thinkddr)** (Apache-2.0).
 
 > Contrato: [`docs/CONVENTIONS.md`](../../../../docs/CONVENTIONS.md) §8, §9, §11.
 > Puerto dev: **4322**. Client OIDC: **`sytue-console`**. Acceso: rol `admin`/`owner`.

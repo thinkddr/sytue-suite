@@ -370,7 +370,7 @@ func TestRedirectUrisDeSytueComCubrenElCompose(t *testing.T) {
 
 	compose, err := os.ReadFile(filepath.Join(raiz, "deploy", "sytue-com", "docker-compose.yml"))
 	if err != nil {
-		t.Fatalf("leer el compose de sytue.com: %v", err)
+		t.Skipf("perfil sytue.com no incluido en la distribución pública: %v", err)
 	}
 	// Del compose se leen los `redirect_uri` tal cual están escritos: es
 	// EXACTAMENTE la cadena que el contenedor le manda al IdP.
@@ -556,7 +556,7 @@ func TestCadaFrenteDeSytueComTieneSuPropioClientSecret(t *testing.T) {
 	raiz := filepath.Join("..", "..", "..")
 	b, err := os.ReadFile(filepath.Join(raiz, "deploy", "sytue-com", "docker-compose.yml"))
 	if err != nil {
-		t.Fatalf("leer el compose de sytue.com: %v", err)
+		t.Skipf("perfil sytue.com no incluido en la distribución pública: %v", err)
 	}
 
 	// Un servicio necesita secreto si y solo si anuncia un `client_id`: `www` es

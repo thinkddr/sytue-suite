@@ -21,7 +21,7 @@ Reimplementación original sobre **OIDC Core 1.0**, **OAuth2** (RFC 6749/6750/76
 **OIDC Discovery** (RFC 8414), **JOSE** (RFC 7515/7517/7519), **SCIM 2.0**
 (RFC 7643/7644) y **WebAuthn L2**, con librerías **permisivas** (jwx — MIT;
 pgx — MIT; chi — MIT; x/crypto — BSD). **No** deriva de Keycloak ni de ningún
-motor AGPL (`docs/CONVENTIONS.md` §3, §12). Cabecera SPDX propietaria © Sytue.
+motor AGPL (`docs/CONVENTIONS.md` §3, §12). Cabecera SPDX Apache-2.0 © 2026 Daniel Delgado Ramos (thinkddr).
 
 ### Funcionalidad
 

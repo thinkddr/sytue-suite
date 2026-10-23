@@ -450,7 +450,7 @@ const CHAT = [
 
 let clave = {
   rtmp_url: 'rtmp://cast-ingest.sytue.eu/live',
-  stream_key: 'sk_7Fq2mW9xLp4TzR8cVb3N',
+  stream_key: 'stream_cast_demo_key',
   ingress_id: 'IN_a1b2c3',
 };
 const PERSONAS_CON_ACCESO: Record<string, unknown[]> = {
@@ -603,7 +603,7 @@ async function conSesion(req: Request, ruta: string, url: URL): Promise<Response
     });
   if (ruta === '/studio/stream-key') return json(clave);
   if (ruta === '/studio/stream-key:rotate' && metodo === 'POST') {
-    clave = { ...clave, stream_key: `sk_${crypto.randomUUID().replace(/-/g, '').slice(0, 20)}` };
+    clave = { ...clave, stream_key: `stream_${crypto.randomUUID().replace(/-/g, '').slice(0, 20)}` };
     return json(clave);
   }
   if (ruta === '/lives' && metodo === 'POST') {

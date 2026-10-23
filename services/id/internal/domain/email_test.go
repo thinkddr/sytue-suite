@@ -11,13 +11,13 @@ import "testing"
 // —con la contraseña correcta— y manda a buscar el problema donde no está.
 func TestNormalizeEmail(t *testing.T) {
 	casos := map[string]string{
-		"admin@sytue.eu admin@sytue.eu": "admin@sytue.eu",
-		"  admin@sytue.eu  ":                      "admin@sytue.eu",
-		"a@b.com\ta@b.com":                                  "a@b.com",
-		"a@b.com\na@b.com":                                  "a@b.com",
-		"a@b.com":                                           "a@b.com",
-		"   ":                                               "",
-		"":                                                  "",
+		"ana.garcia@example.com":     "ana.garcia@example.com",
+		"  Ana.Garcia@Example.com  ": "ana.garcia@example.com",
+		"a@b.com\ta@b.com":           "a@b.com",
+		"a@b.com\na@b.com":           "a@b.com",
+		"a@b.com":                    "a@b.com",
+		"   ":                        "",
+		"":                           "",
 	}
 	for in, want := range casos {
 		if got := NormalizeEmail(in); got != want {

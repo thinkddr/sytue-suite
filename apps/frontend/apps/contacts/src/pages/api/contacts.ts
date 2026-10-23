@@ -20,7 +20,7 @@ export const GET: APIRoute = async (ctx) => {
       addressBookUrl,
     );
     return json({ contacts });
-  } catch (err) {
+  } catch {
     return json({ error: 'carddav_error', message: 'CardDAV request failed' }, 502);
   }
 };

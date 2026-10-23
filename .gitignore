@@ -147,6 +147,13 @@ deploy/helm/**/charts/*.tgz
 # `deploy/helm/upstream/` (ese SÍ va versionado: es fuente de terceros con su
 # sha256 fijado, no una salida de compilación) más los parches propios.
 deploy/helm/.vendor/
+deploy/helm/values-custom.yaml
+deploy/helm/apply-secrets.sh
+# Generados por `./sytue-deploy --integrations`: llevan client secrets de terceros.
+deploy/helm/apply-integrations.sh
+deploy/helm/values-integrations.yaml
+deploy/helm/integrations-oauth.tsv
+deploy/helm/integrations-oauth-clients.json
 deploy/helm/**/Chart.lock
 # El umbrella fija exactamente la versión/digest del único chart remoto.
 !deploy/helm/sytue-one/Chart.lock

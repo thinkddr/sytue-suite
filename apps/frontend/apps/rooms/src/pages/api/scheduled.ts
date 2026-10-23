@@ -27,7 +27,7 @@ export const GET: APIRoute = async (ctx) => {
       userId: session.user.id,
     }).listScheduled(channelId || undefined);
     return json({ scheduled });
-  } catch (err) {
+  } catch {
     return json({ error: 'chat_error' }, 502);
   }
 };
@@ -86,7 +86,7 @@ export const POST: APIRoute = async (ctx) => {
       ...(fileIds.length ? { fileIds } : {}),
     });
     return json({ scheduled }, 201);
-  } catch (err) {
+  } catch {
     return json({ error: 'chat_error' }, 502);
   }
 };

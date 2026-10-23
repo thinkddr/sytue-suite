@@ -25,7 +25,7 @@ export const GET: APIRoute = async (ctx) => {
       userId: session.user.id,
     }).listCategories();
     return json({ categories });
-  } catch (err) {
+  } catch {
     return json({ error: 'chat_error' }, 502);
   }
 };
@@ -66,7 +66,7 @@ export const POST: APIRoute = async (ctx) => {
     if (!name) return json({ error: 'missing_name' }, 400);
     const category = await client.createCategory(name);
     return json({ category }, 201);
-  } catch (err) {
+  } catch {
     return json({ error: 'chat_error' }, 502);
   }
 };

@@ -34,7 +34,7 @@ o reversibles sin coste no necesitan entrada.
 | 0015 | [Licenciamiento AGPL-3.0 del código propio](#0015)                                                                                                           | superseded → 0018                                                                    |
 | 0016 | [Stack único: Go + Astro/Preact + PostgreSQL](#0016)                                                                                                         | accepted                                                                             |
 | 0017 | [Reimplementación nativa clean-room](#0017)                                                                                                                  | accepted                                                                             |
-| 0018 | [Licenciamiento propietario (© Sytue)](#0018)                                                                                                                | accepted                                                                             |
+| 0018 | [Licenciamiento Apache-2.0 (© 2026 Daniel Delgado Ramos (thinkddr))](#0018)                                                                                                                | accepted                                                                             |
 | 0019 | [PostgreSQL como datastore único](#0019)                                                                                                                     | accepted                                                                             |
 | 0020 | [Sytue ID como IdP nativo en Go](#0020)                                                                                                                      | accepted                                                                             |
 | 0021 | [LiveKit como SFU de medios de Meet](#0021)                                                                                                                  | accepted                                                                             |
@@ -539,7 +539,7 @@ probadas y suites de interoperabilidad por protocolo.
 
 `accepted` · 2026-07-01 · supersede 0015
 
-**Decisión.** El código de producto de Sytue es **PROPIETARIO (© Sytue)**, sin copyleft ni
+**Decisión.** El código de producto de Sytue es **Apache-2.0 (© 2026 Daniel Delgado Ramos (thinkddr))**, sin copyleft ni
 obligación de publicar fuente: cubre `services/*`, `platform/pkg/*`, las superficies
 Astro+Preact y los paquetes `@sytue/*`.
 
@@ -4593,7 +4593,7 @@ vigilan.
 
 ## 0068 — Sytue Bases: tablas relacionales colaborativas como producto propio, con ACL por base y conector de solo lectura
 
-`accepted` · 2026-10-04 · Bases, permisos, interoperabilidad · decisión del dueño (2026-10-01: «lanzarlo tras los P0») · fila P1 «Tablas relacionales» de `ROADMAP-OFFICE.md` · código en `services/bases/` (API Go, :8102) y, en las piezas siguientes, `apps/frontend/apps/bases/` (web, :4337)
+`accepted` · 2026-10-04 · Bases, permisos, interoperabilidad · decisión del dueño (2026-10-01: «lanzarlo tras los P0») · fila P1 «Tablas relacionales» de el roadmap de office · código en `services/bases/` (API Go, :8102) y, en las piezas siguientes, `apps/frontend/apps/bases/` (web, :4337)
 
 - **Por qué un producto y no una hoja de Calcus.** Una tabla relacional necesita lo que una hoja no tiene: esquema con tipos que
   el servidor hace cumplir, relaciones con integridad referencial, permisos y auditoría propios y vistas que no son una

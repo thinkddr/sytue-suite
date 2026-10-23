@@ -33,7 +33,7 @@ export const GET: APIRoute = async (ctx) => {
       userId: session.user.id,
     }).listDrafts();
     return json({ drafts });
-  } catch (err) {
+  } catch {
     return json({ error: 'chat_error' }, 502);
   }
 };
@@ -58,7 +58,7 @@ export const POST: APIRoute = async (ctx) => {
       payload.body ?? '',
     );
     return json({ ok: true });
-  } catch (err) {
+  } catch {
     return json({ error: 'chat_error' }, 502);
   }
 };

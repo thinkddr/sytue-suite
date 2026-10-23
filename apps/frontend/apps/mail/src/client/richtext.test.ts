@@ -5,20 +5,10 @@
 // Excel, una página web— y lo que sobreviva a `sanitizeHtml` se inserta en el
 // DOM del propio compositor y luego se envía. Cada caso de aquí es un vector que
 // se probó a mano contra la lista blanca.
-import { GlobalRegistrator } from '@happy-dom/global-registrator';
 import { expect, test } from 'bun:test';
+import { setupJsdom } from '../../test/dom.js';
 
-// `sanitizeHtml` parsea con `DOMParser`, y el runtime de bun no trae DOM. Se
-// registra el que YA está en el repo para los tests de @sytue/ui en vez de
-// traer otro: es la misma pieza y no añade nada a la cadena de suministro.
-//
-// La guarda no es defensiva: `bun test` corre TODOS los ficheros del paquete en
-// el mismo proceso, y registrar dos veces lanza «Happy DOM has already been
-// globally registered». Aquí no se veía porque el fallo depende del ORDEN de los
-// ficheros, que es el del sistema de ficheros: en macOS este iba primero y en el
-// runner de Linux va detrás de `tabla.test.ts` —que sí guardaba—, así que el CI
-// se puso rojo con el mismo código que en local pasaba.
-if (!globalThis.document) GlobalRegistrator.register();
+setupJsdom();
 import {
   sanitizeHtml,
   htmlToText,
@@ -99,11 +89,6 @@ test('script e iframe se van CON su contenido, sin llevarse el resto', () => {
 });
 
 test('un svg no sobrevive, ni con un script dentro', () => {
-  // Aparte del anterior a propósito: el parser de happy-dom se come TODO lo que
-  // sigue a un `<svg>` —comprobado: `<svg><script>x</script></svg><p>y</p>` le
-  // sale como `<svg></svg>`—, cosa que un navegador de verdad no hace. Meter
-  // aquí un «y lo de después se conserva» sería una aserción que no mide lo que
-  // dice: pasaría por una peculiaridad del entorno de pruebas, no por el código.
   const html = sanitizeHtml('<svg><script>alert(2)</script></svg>');
   expect(html).not.toContain('<svg');
   expect(html).not.toContain('alert');
@@ -164,4 +149,40 @@ test('pegar: las data: pasan a cid:, y lo demás se queda para el saneado', asyn
   expect(limpio).not.toContain('data:');
   const igual = '<p>sin imágenes en línea</p>';
   expect(await incrustarImagenesPegadas(igual, async () => 'x')).toBe(igual);
+});
+
+test('clipboard image conversion never returns active markup, even without inline images', async () => {
+  for (const inline of ['', '<img src="data:image/png;base64,iVBORw0K" onerror="alert(1)">']) {
+    const html = await incrustarImagenesPegadas(
+      '<p onclick="alert(1)">safe</p><script>alert(1)</script>' +
+        '<img src="https://x/a.png" onerror="alert(1)">' +
+        inline,
+      async () => 'embedded',
+    );
+    expect(html).toContain('safe');
+    expect(html).not.toContain('onclick');
+    expect(html).not.toContain('onerror');
+    expect(html).not.toContain('<script');
+    if (inline) expect(html).toContain('cid:embedded');
+  }
+});
+
+test('sanitizing hostile clipboard markup remains safe after reparsing', () => {
+  const html = sanitizeHtml(
+    '<math><mtext><table><mglyph><style><!--</style>' +
+      '<img title="--><img src=x onerror=alert(1)>">' +
+      '<svg><g onload="alert(1)"></g></svg><a href="javascript:alert(1)">link</a>',
+  );
+  const host = document.createElement('div');
+  host.innerHTML = html;
+  expect(host.querySelector('script, math, svg, style, [onerror], [onload]')).toBeNull();
+  expect(host.querySelector('[href^="javascript:"]')).toBeNull();
+});
+
+test('failed inline attachment conversion drops the data image safely', async () => {
+  const html = await incrustarImagenesPegadas(
+    '<p>text</p><img src="data:image/png;base64,iVBORw0K" onerror="alert(1)">',
+    async () => null,
+  );
+  expect(html).toBe('<p>text</p>');
 });

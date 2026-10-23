@@ -1138,10 +1138,6 @@ var funcionesTexto = map[string]fn{
 				patron = "0"
 			}
 		}
-
-		func textoEstricto(s string) string {
-			return `"` + strings.ReplaceAll(s, `"`, `""`) + `"`
-		}
 		return formatWithPattern(valor, patron+cuerpo)
 	},
 	"REGEXTEST": func(_ *FnCtx, args []*Arg) any {
@@ -1164,6 +1160,10 @@ var funcionesTexto = map[string]fn{
 	},
 	"REGEXEXTRACT": regexExtract,
 	"REGEXREPLACE": regexReplace,
+}
+
+func textoEstricto(s string) string {
+	return `"` + strings.ReplaceAll(s, `"`, `""`) + `"`
 }
 
 func init() { registrar(funcionesTexto) }

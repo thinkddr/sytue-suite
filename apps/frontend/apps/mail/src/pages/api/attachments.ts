@@ -29,7 +29,7 @@ export const GET: APIRoute = async (ctx) => {
   let attachments;
   try {
     attachments = await jmapClient(session.accessToken).getAttachments(emailId);
-  } catch (err) {
+  } catch {
     return json({ error: 'jmap_error', message: 'Mail request failed' }, 502);
   }
 

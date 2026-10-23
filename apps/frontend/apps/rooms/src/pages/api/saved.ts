@@ -23,7 +23,7 @@ export const GET: APIRoute = async (ctx) => {
       userId: session.user.id,
     }).listSaved(opts);
     return json(data);
-  } catch (err) {
+  } catch {
     return json({ error: 'chat_error' }, 502);
   }
 };

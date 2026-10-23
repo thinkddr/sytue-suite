@@ -76,10 +76,37 @@ def identidad_importada(plataforma, equipo, elegida=""):
         elegida = elegida.replace(":", "").lower()
         if not re.fullmatch(r"[0-9a-f]{40}", elegida) or elegida not in validas:
             raise ValueError("la huella no corresponde a una identidad válida importada en el llavero efímero")
-        return elegida
-    if len(validas) != 1:
-        raise ValueError("se necesita una identidad válida única; selecciona su huella pública con --certificado-sha1")
-    return next(iter(validas))
+    else:
+        if len(validas) != 1:
+            raise ValueError("se necesita una identidad válida única; selecciona su huella pública con --certificado-sha1")
+        elegida = next(iter(validas))
+    # SHA-1 sólo selecciona la identidad de codesign en este llavero. Conservamos
+    # el DER local para autenticar por igualdad el certificado que devuelve Apple.
+    # -Z incluye ambos identificadores junto a cada PEM; no consultamos el llavero
+    # personal ni aceptamos dos certificados distintos con el mismo selector.
+    salida = capturar(["security", "find-certificate", "-a", "-Z", "-p", llavero])
+    certificados = []
+    bloques = salida.split("SHA-256 hash: ")
+    if bloques[0].strip():
+        raise ValueError("no se puede verificar la exportación de certificados del llavero efímero")
+    for bloque in bloques[1:]:
+        registro = re.fullmatch(r"([0-9A-Fa-f]{64})\s+SHA-1 hash: ([0-9A-Fa-f]{40})\s+"
+                                r"-----BEGIN CERTIFICATE-----\s+([A-Za-z0-9+/=\s]+?)"
+                                r"-----END CERTIFICATE-----\s*", bloque)
+        if registro is None:
+            raise ValueError("no se puede verificar la exportación de certificados del llavero efímero")
+        sha256, selector, contenido = registro.groups()
+        try:
+            der = base64.b64decode("".join(contenido.split()), validate=True)
+        except ValueError as error:
+            raise ValueError("el llavero efímero no devuelve un certificado válido") from error
+        if not der or hashlib.sha256(der).hexdigest() != sha256.lower():
+            raise ValueError("el certificado exportado no coincide con su huella SHA-256")
+        if selector.lower() == elegida:
+            certificados.append(der)
+    if len(certificados) != 1:
+        raise ValueError("la identidad importada no tiene un certificado único en el llavero efímero")
+    return certificados[0]
 
 
 def vigente(fecha):
@@ -90,7 +117,9 @@ def vigente(fecha):
         return False
 
 
-def certificado_de_identidad(asc, plataforma, huella):
+def certificado_de_identidad(asc, plataforma, identidad):
+    if not isinstance(identidad, bytes) or not identidad:
+        raise ValueError("se necesita el certificado DER de la identidad importada")
     consulta = urllib.parse.urlencode({"filter[certificateType]": ",".join(CERTIFICADOS[plataforma]), "limit": 200})
     candidatos = []
     for certificado in asc.lista("/v1/certificates?" + consulta):
@@ -101,9 +130,9 @@ def certificado_de_identidad(asc, plataforma, huella):
             der = base64.b64decode(attrs["certificateContent"], validate=True)
         except (KeyError, TypeError, ValueError):
             continue
-        # SHA-1 es aquí el identificador público de codesign, no una decisión de
-        # confianza criptográfica: security ya confirmó la identidad importada.
-        if hashlib.sha1(der, usedforsecurity=False).hexdigest() == huella:
+        # El selector SHA-1 de codesign no autentica datos remotos: exigimos
+        # exactamente el certificado DER exportado del llavero efímero.
+        if der == identidad:
             candidatos.append(certificado["id"])
     if len(candidatos) != 1:
         raise ValueError("Apple no devuelve un certificado vigente único para la identidad importada")
@@ -231,8 +260,8 @@ def main():
     asc = api.Apple()
     certificado = ""
     if args.preparar:
-        huella = identidad_importada(args.plataforma, gen.EQUIPO, args.certificado_sha1)
-        certificado = certificado_de_identidad(asc, args.plataforma, huella)
+        identidad = identidad_importada(args.plataforma, gen.EQUIPO, args.certificado_sha1)
+        certificado = certificado_de_identidad(asc, args.plataforma, identidad)
     fallos = 0
     for requisito in pendientes:
         try:

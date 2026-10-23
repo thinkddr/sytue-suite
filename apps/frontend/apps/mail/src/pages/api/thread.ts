@@ -40,7 +40,7 @@ export const GET: APIRoute = async (ctx) => {
       mailboxId: (m as { mailbox_id?: string }).mailbox_id ?? '',
     }));
     return json({ emails });
-  } catch (err) {
+  } catch {
     return json({ error: 'mail_error' }, 502);
   }
 };

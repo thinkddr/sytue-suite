@@ -5,7 +5,7 @@ Levanta **toda la suite Sytue One** en tu máquina con un solo comando, bajo
 
 **Stack único:** Go (backend) + Astro 7 / Preact 10.29 con Bun (frontend) + **PostgreSQL**
 (estado, colas y caché) + **S3** (blobs; MinIO en dev). Cada producto es un
-**servicio Go propio** (clean-room, © Sytue) en `services/<svc>`.
+**servicio Go propio** (clean-room, Apache-2.0 © 2026 Daniel Delgado Ramos (thinkddr)) en `services/<svc>`.
 
 **Sin motores AGPL** (Keycloak/Nextcloud/OnlyOffice/Mattermost/Stalwart quedan
 **fuera**). **Sin Redis/Valkey.** Única app de terceros: **LiveKit** (Apache-2.0)

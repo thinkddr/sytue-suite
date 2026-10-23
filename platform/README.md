@@ -15,7 +15,7 @@ acceso a datos, identidad, eventos y almacenamiento.
 > colas y caché sobre Postgres; **Valkey** solo opcional donde mida §0.1; **nunca
 > Redis**), blobs en **Object Storage S3** (MinIO dev / Scaleway prod), identidad
 > vía **Sytue ID** (OIDC). Dependencias de terceros **solo permisivas**
-> (MIT/BSD/Apache). Código de producto **propietario © Sytue** (cabecera SPDX por archivo).
+> (MIT/BSD/Apache). Código de producto **Apache-2.0 © 2026 Daniel Delgado Ramos (thinkddr)** (cabecera SPDX por archivo).
 >
 > **Seguridad y privacidad por defecto y reforzadas** (CONVENTIONS §0.7): estas
 > librerías materializan deny-by-default, mínimo privilegio, RLS multi-tenant,

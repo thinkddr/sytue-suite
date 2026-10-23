@@ -53,7 +53,7 @@ export const POST: APIRoute = async (ctx) => {
       ...(fileIds.length ? { fileIds } : {}),
     });
     return json({ message });
-  } catch (err) {
+  } catch {
     return json({ error: 'chat_error' }, 502);
   }
 };

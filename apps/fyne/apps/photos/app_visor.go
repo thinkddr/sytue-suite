@@ -117,6 +117,11 @@ func (e *estadoVisor) haySiguiente() bool {
 // nuevaFoto olvida lo que es de UNA foto: la confirmación de borrar, el tamaño real y
 // la pregunta. La ficha, el pase y el aviso se quedan, como en la web.
 func (e *estadoVisor) nuevaFoto() {
+	if e.a != nil {
+		if g := e.a.v.TecaGrande; g != nil && g != e.a.v.Teca {
+			g.Cancelar()
+		}
+	}
 	e.borrando, e.tamanyoReal, e.respuesta, e.pensando = false, false, "", false
 	e.desplazamiento = fyne.Position{}
 	e.original, e.pidiendo = nil, "" // una foto de 48 Mpx son 72 MB decodificada
@@ -170,6 +175,9 @@ func (a *App) cerrarVisor() {
 		return
 	}
 	a.pararPase()
+	if g := a.v.TecaGrande; g != nil && g != a.v.Teca {
+		g.Cancelar()
+	}
 	a.vis = nil
 	if a.w != nil {
 		a.w.Canvas().Overlays().Remove(e.capa)

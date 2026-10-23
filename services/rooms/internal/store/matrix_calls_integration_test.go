@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"testing"
 
 	"github.com/google/uuid"
@@ -29,7 +30,7 @@ func (f *callMatrixFake) EnsureCallRoom(_ context.Context, _ string, id uuid.UUI
 	return fmt.Sprintf("!%s-%d:matrix.sytue.eu", id, generation), f.err
 }
 
-func (f *callMatrixFake) Reconcile(_ context.Context, room string, _ []string, _ bool, _ bool) error {
+func (f *callMatrixFake) Reconcile(_ context.Context, room string, _ []string, _, _ bool) error {
 	f.retired = append(f.retired, room)
 	return f.err
 }
@@ -42,7 +43,7 @@ type callTransportFake struct {
 	removed []string
 }
 
-func (f *callTransportFake) PauseCall(_ context.Context, _ string, _ []string, removed []string) error {
+func (f *callTransportFake) PauseCall(_ context.Context, _ string, _, removed []string) error {
 	f.removed = append(f.removed, removed...)
 	return f.err
 }
@@ -246,5 +247,74 @@ func TestCallPendingJoinExpiresAndLifecycleRevokesStandalone(t *testing.T) {
 	}
 	if _, err := st.CallEncryption(ctx, room.ID, "alice", "A", join); !errors.Is(err, mediadomain.ErrPermission) {
 		t.Fatalf("suspended user received standalone epoch: %v", err)
+	}
+}
+
+func TestDeletingChannelEndsCallsBeforeAcknowledgingDeletion(t *testing.T) {
+	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
+	st := store.New(h.Pool, nil)
+	ctx := tenantCtx("acme")
+	_, ch := seedTeamChannel(t, ctx, st, "alice", domain.ChannelPrivate)
+	bindMatrix(t, st, ctx, ch.ID, "alice")
+	gate := &matrixGate{}
+	st.SetMatrixGate(gate)
+	room, matrix, transport := seedCall(t, h, ctx, st, ch.ID)
+	join := uuid.New()
+	binding, err := st.PrepareCallEncryption(ctx, room.ID, "alice", "A", join, mediadomain.RoleHost)
+	if err != nil {
+		t.Fatal(err)
+	}
+	transport.err = mediadomain.ErrEncryptionUnavailable
+	if err := st.DeleteChannel(ctx, ch.ID, "alice"); !errors.Is(err, transport.err) {
+		t.Fatalf("failed media teardown acknowledged: %v", err)
+	}
+	if _, err := st.GetChannel(ctx, ch.ID, "alice"); err != nil {
+		t.Fatalf("channel deleted after failed media teardown: %v", err)
+	}
+	if len(gate.rooms) != 0 {
+		t.Fatal("chat closed before call teardown completed")
+	}
+	transport.err = nil
+	gate.err = domain.ErrMatrixUnavailable
+	if err := st.DeleteChannel(ctx, ch.ID, "alice"); !errors.Is(err, gate.err) {
+		t.Fatalf("failed Matrix closure acknowledged after media teardown: %v", err)
+	}
+	if _, err := st.GetChannel(ctx, ch.ID, "alice"); err != nil {
+		t.Fatalf("channel deletion survived Matrix failure: %v", err)
+	}
+	if err := h.Pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+		var ended bool
+		if err := tx.QueryRow(ctx, `SELECT status='ended' FROM rooms WHERE tenant='acme' AND id=$1`, room.ID).Scan(&ended); err != nil {
+			return err
+		}
+		if ended {
+			t.Fatal("local call closure did not roll back with failed Matrix closure")
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	gate.err = nil
+	if err := st.DeleteChannel(ctx, ch.ID, "alice"); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(transport.removed, "alice") || !slices.Contains(matrix.retired, binding.MatrixRoomID) || transport.created[len(transport.created)-1] != "" {
+		t.Fatalf("call transport survived channel deletion: %+v %+v", transport, matrix)
+	}
+	err = h.Pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+		var ended, removed bool
+		if err := tx.QueryRow(ctx, `SELECT status='ended' FROM rooms WHERE tenant='acme' AND id=$1`, room.ID).Scan(&ended); err != nil {
+			return err
+		}
+		if err := tx.QueryRow(ctx, `SELECT removed FROM matrix_call_members WHERE tenant='acme' AND call_id=$1 AND subject='alice'`, room.ID).Scan(&removed); err != nil {
+			return err
+		}
+		if !ended || !removed {
+			t.Fatalf("call not retired: ended=%v removed=%v", ended, removed)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 }

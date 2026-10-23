@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 
@@ -35,6 +36,15 @@ import (
 // Todo el estado vive aquí y la Pantalla se DERIVA de él en `volcar`: así los
 // guardianes de píxel siguen pintando una Pantalla a mano, sin red.
 type App struct {
+	vidaMu              sync.Mutex
+	vida                context.Context
+	cancelarVida        context.CancelFunc
+	generacion          uint64
+	cerrada             bool
+	organizacionEnCurso bool
+	cargaLibretas       uint64
+	cargaContactos      uint64
+
 	Pantalla *Pantalla
 	// Widget captura la sesión adoptada antes de consultar las libretas completas.
 	Widget widgets.Source
@@ -88,8 +98,9 @@ type App struct {
 	// red es el monitor de conexión (Conexion); nil, siempre hay red. escrituras son
 	// los flujos que escriben que están abiertos, uno por clase, como los estados
 	// `modal`, `labelModal`… de la web: sin red se cierran.
-	red        *offline.Monitor
-	escrituras map[string]*ui.Dialogo
+	red               *offline.Monitor
+	escrituras        map[string]*ui.Dialogo
+	importadorCargado bool
 }
 
 // NuevaApp monta Contacts. `svc` nil deja la pantalla sin datos, que es lo que se ve
@@ -159,7 +170,7 @@ func (a *App) repintar() {
 }
 
 func (a *App) ctx() (context.Context, context.CancelFunc) {
-	return context.WithTimeout(context.Background(), a.Plazo)
+	return context.WithTimeout(a.capturar().ctx, a.Plazo)
 }
 
 func (a *App) abridor() api.Abridor {
@@ -182,7 +193,10 @@ func (a *App) enganchar() {
 	p := a.Pantalla
 	p.AlElegirContacto = a.elegir
 	p.AlBuscar = func(s string) { p.Busqueda = s; a.repintar() }
-	p.AlElegirLibreta = func(b api.AddressBook) { a.enFondo(func() { a.abrirLibreta(b) }) }
+	p.AlElegirLibreta = func(b api.AddressBook) {
+		scope := a.capturar()
+		a.enFondo(func() { a.abrirLibretaEn(scope, b) })
+	}
 	p.AlElegirEtiqueta = func(id string) {
 		// Pulsar la etiqueta activa quita el filtro.
 		if p.EtiquetaActiva == id {
@@ -473,84 +487,183 @@ func (a *App) Cargar() {
 	if a.svc == nil {
 		return
 	}
+	scope := a.capturar()
+	if !a.vigente(scope) {
+		return
+	}
 	widget := a.Widget.View()
 	conRed := !a.sinRed()
-	fyne.Do(func() {
-		a.Pantalla.CargandoLibretas, a.Pantalla.ErrorLibretas = true, false
-		a.Pantalla.Estado = agenda.Cargando
-		a.repintar()
-	})
-	a.enFondo(a.cargarFavoritos)
-
-	if d := a.Pantalla.Importar; d != nil {
-		d.Cargar()
-	}
-	// «Organización» se pone al día ANTES de listar, para que quien acaba de entrar en
-	// la empresa aparezca sin que nadie haga nada.
-	a.sincronizarOrganizacion()
-	ctx, fin := a.ctx()
-	libretas, err := a.svc.AddressBooks(ctx)
-	if err == nil && conRed && !a.sinRed() {
-		ids := make(map[string]struct{}, len(libretas))
-		for _, b := range libretas {
-			ids[b.ID] = struct{}{}
-		}
-		// Los contactos están paginados; la lista de libretas es completa.
-		_ = widget.Publicar(ctx, widgets.Counter{Kind: "address_books", Value: int64(len(ids))})
-	}
-	fin()
-	if err != nil {
-		slog.Warn("contactos: no se pudieron listar las libretas", "error", err)
-		fyne.Do(func() {
-			a.Pantalla.CargandoLibretas, a.Pantalla.ErrorLibretas = false, true
-			a.Pantalla.Estado = a.estadoDeFallo()
-			a.repintar()
-		})
-		return
-	}
-	primera := libretaInicial(libretas)
-	// Con un contacto pedido por enlace se abre SU libreta, no la primera.
+	var sec uint64
 	fyne.DoAndWait(func() {
-		for i := range libretas {
-			if a.libretaPedida != "" && libretas[i].ID == a.libretaPedida {
-				primera = &libretas[i]
+		if !a.vigente(scope) {
+			return
+		}
+		a.cargaLibretas++
+		sec = a.cargaLibretas
+		a.Pantalla.CargandoLibretas, a.Pantalla.ErrorLibretas = true, false
+		// A refresh of the same account keeps its current contact and form.
+		if a.Pantalla.Activa == nil {
+			a.Pantalla.Estado = agenda.Cargando
+		}
+		if d := a.Pantalla.Importar; d != nil {
+			if a.importadorCargado {
+				d.Cargar()
+			} else {
+				a.importadorCargado = true
+				d.CargarCon(scope.ctx)
 			}
 		}
-		a.libretaPedida = ""
-	})
-	fyne.Do(func() {
-		a.Pantalla.CargandoLibretas, a.Pantalla.Libretas = false, libretas
-		if primera == nil {
-			a.Pantalla.Estado = agenda.Exito
-		}
 		a.repintar()
 	})
-	if primera != nil {
-		a.abrirLibreta(*primera)
+	a.enFondo(func() { a.cargarFavoritosEn(scope) })
+	ctx, fin := context.WithTimeout(scope.ctx, a.Plazo)
+	libretas, err := a.svc.AddressBooks(ctx)
+	if err == nil && conRed && !a.sinRed() {
+		publicarLibretas(ctx, widget, libretas)
 	}
-}
-
-// sincronizarOrganizacion pone al día la libreta «Organización». Si falla —el directorio
-// caído, sin permiso—, no se dice nada y se sigue: la agenda propia tiene que abrirse
-// igual. Bloquea: en segundo plano.
-func (a *App) sincronizarOrganizacion() {
-	if a.Directorio == nil || a.sinRed() {
+	fin()
+	var abrir, refrescar *api.AddressBook
+	adoptada := false
+	fyne.DoAndWait(func() {
+		if !a.vigente(scope) || sec != a.cargaLibretas {
+			return
+		}
+		adoptada = true
+		abrir = a.recibirLibretas(scope, sec, libretas, err)
+		if err == nil && abrir == nil && a.Pantalla.Activa != nil {
+			b := *a.Pantalla.Activa
+			refrescar = &b
+		}
+	})
+	if !adoptada || !a.vigente(scope) || err != nil {
 		return
 	}
+	if abrir != nil {
+		a.abrirLibretaEn(scope, *abrir)
+	} else if refrescar != nil {
+		a.enFondo(func() { a.cargarEtiquetasEn(scope) })
+		a.cargarContactosEn(scope, *refrescar)
+	}
+	// Personal contacts are useful before the optional organization import starts.
+	a.enFondo(func() { a.sincronizarOrganizacionEn(scope) })
+}
+
+// recibirLibretas runs on the UI and preserves a selection on same-identity refresh.
+func (a *App) recibirLibretas(scope cargaContacts, sec uint64, libretas []api.AddressBook, err error) *api.AddressBook {
+	if !a.vigente(scope) || sec != a.cargaLibretas {
+		return nil
+	}
+	p := a.Pantalla
+	p.CargandoLibretas, p.ErrorLibretas = false, err != nil
+	defer a.repintar()
+	if err != nil {
+		if p.Activa == nil {
+			p.Estado = a.estadoDeFallo()
+		}
+		return nil
+	}
+	p.Libretas = libretas
+	requested := a.libretaPedida
+	a.libretaPedida = ""
+	for i := range libretas {
+		if requested != "" && libretas[i].ID == requested {
+			return &libretas[i]
+		}
+	}
+	if p.Activa != nil {
+		for i := range libretas {
+			if libretas[i].ID == p.Activa.ID {
+				p.Activa = &libretas[i]
+				return nil
+			}
+		}
+	}
+	if p.Activa != nil {
+		p.Activa, p.Seleccionado = nil, nil
+		a.todos = nil
+	}
+	first := libretaInicial(libretas)
+	if first == nil {
+		p.Estado = agenda.Exito
+	}
+	return first
+}
+
+func publicarLibretas(ctx context.Context, view widgets.View, libretas []api.AddressBook) {
+	ids := make(map[string]struct{}, len(libretas))
+	for _, book := range libretas {
+		ids[book.ID] = struct{}{}
+	}
+	_ = view.Publicar(ctx, widgets.Counter{Kind: "address_books", Value: int64(len(ids))})
+}
+
+func (a *App) sincronizarOrganizacionEn(scope cargaContacts) {
+	if a.Directorio == nil || a.sinRed() || !a.vigente(scope) {
+		return
+	}
+	a.vidaMu.Lock()
+	if a.organizacionEnCurso || scope.generacion != a.generacion {
+		a.vidaMu.Unlock()
+		return
+	}
+	a.organizacionEnCurso = true
+	a.vidaMu.Unlock()
+	defer func() {
+		a.vidaMu.Lock()
+		if scope.generacion == a.generacion {
+			a.organizacionEnCurso = false
+		}
+		a.vidaMu.Unlock()
+	}()
 	yo := ""
 	if a.Yo != nil {
 		yo = a.Yo()
 	}
-	ctx, fin := context.WithTimeout(context.Background(), 4*a.Plazo)
+	widget := a.Widget.View()
+	ctx, fin := context.WithTimeout(scope.ctx, 4*a.Plazo)
 	defer fin()
 	if _, err := sincronizarOrganizacion(ctx, a.svc, a.Directorio, yo, string(a.Pantalla.locale())); err != nil {
-		slog.Info("contactos: la libreta «Organización» no se ha puesto al día", "error", err)
+		if ctx.Err() == nil {
+			slog.Info("contactos: la libreta Organización no se ha puesto al día", "error", err)
+		}
+		return
+	}
+	libretas, err := a.svc.AddressBooks(ctx)
+	if err != nil {
+		return
+	}
+	if a.vigente(scope) && !a.sinRed() {
+		publicarLibretas(ctx, widget, libretas)
+	}
+	var refrescar *api.AddressBook
+	fyne.DoAndWait(func() {
+		if !a.vigente(scope) {
+			return
+		}
+		p := a.Pantalla
+		p.Libretas = libretas
+		// A late organization result never navigates away from the user's selection.
+		if p.Activa != nil && p.Activa.Name == libretaOrganizacion {
+			b := *p.Activa
+			refrescar = &b
+		}
+		a.repintar()
+	})
+	if refrescar != nil && a.vigente(scope) {
+		a.cargarContactosEn(scope, *refrescar)
 	}
 }
 
 // Vaciar suelta todo lo cargado: al cerrar sesión, lo de otra persona no puede
 // quedarse en pantalla hasta la siguiente carga.
 func (a *App) Vaciar() {
+	a.invalidar(false)
+	a.pararImportador()
+	for key, d := range a.escrituras {
+		d.Cerrar()
+		delete(a.escrituras, key)
+	}
+	a.pedido, a.libretaPedida = "", ""
 	p := a.Pantalla
 	a.todos = nil
 	clear(a.favoritos)
@@ -580,8 +693,13 @@ func libretaInicial(libretas []api.AddressBook) *api.AddressBook {
 // abrirLibreta la activa y trae sus contactos y sus etiquetas. Cambiar de libreta
 // suelta la ficha, el filtro de etiqueta (las etiquetas son de cada libreta) y la
 // selección.
-func (a *App) abrirLibreta(b api.AddressBook) {
-	fyne.Do(func() {
+func (a *App) abrirLibreta(b api.AddressBook) { a.abrirLibretaEn(a.capturar(), b) }
+
+func (a *App) abrirLibretaEn(scope cargaContacts, b api.AddressBook) {
+	fyne.DoAndWait(func() {
+		if !a.vigente(scope) {
+			return
+		}
 		p := a.Pantalla
 		p.Activa, p.Seleccionado, p.EtiquetaActiva = &b, nil, ""
 		p.DetalleAbierto = false
@@ -589,20 +707,30 @@ func (a *App) abrirLibreta(b api.AddressBook) {
 		p.Estado = agenda.Cargando
 		a.repintar()
 	})
-	a.enFondo(a.cargarEtiquetas)
-	a.cargarContactos(b)
+	if !a.vigente(scope) {
+		return
+	}
+	a.enFondo(func() { a.cargarEtiquetasEn(scope) })
+	a.cargarContactosEn(scope, b)
 }
 
-// cargarContactos trae los de una libreta y los ordena con las reglas del idioma: la
-// «ñ» va después de la «n» y «Ángela» junto a «Ana», no al final.
-func (a *App) cargarContactos(b api.AddressBook) {
-	ctx, fin := a.ctx()
+func (a *App) cargarContactos(b api.AddressBook) { a.cargarContactosEn(a.capturar(), b) }
+
+func (a *App) cargarContactosEn(scope cargaContacts, b api.AddressBook) {
+	var sec uint64
+	fyne.DoAndWait(func() {
+		if a.vigente(scope) {
+			a.cargaContactos++
+			sec = a.cargaContactos
+		}
+	})
+	ctx, fin := context.WithTimeout(scope.ctx, a.Plazo)
 	lista, err := a.svc.InBook(ctx, b.ID)
 	fin()
 	fyne.Do(func() {
 		p := a.Pantalla
-		if p.Activa == nil || p.Activa.ID != b.ID {
-			return // mientras cargaba se ha cambiado de libreta
+		if !a.vigente(scope) || sec != a.cargaContactos || p.Activa == nil || p.Activa.ID != b.ID {
+			return
 		}
 		if err != nil {
 			slog.Warn("contactos: no se pudo listar la libreta", "error", err)
@@ -610,9 +738,8 @@ func (a *App) cargarContactos(b api.AddressBook) {
 			a.repintar()
 			return
 		}
-		ordenar(lista, a.Pantalla.locale())
+		ordenar(lista, p.locale())
 		a.todos, p.Estado = lista, agenda.Exito
-		// La ficha sigue al dato fresco; si el contacto ya no está, se suelta.
 		if p.Seleccionado != nil {
 			p.Seleccionado = buscarPorID(lista, p.Seleccionado.ID)
 		}
@@ -621,11 +748,13 @@ func (a *App) cargarContactos(b api.AddressBook) {
 	})
 }
 
-func (a *App) cargarEtiquetas() {
+func (a *App) cargarEtiquetas() { a.cargarEtiquetasEn(a.capturar()) }
+
+func (a *App) cargarEtiquetasEn(scope cargaContacts) {
 	var libreta string
 	// DoAndWait y no Do: lo que se lee aquí hace falta para la petición de abajo.
 	fyne.DoAndWait(func() {
-		if a.Pantalla.Activa != nil {
+		if a.vigente(scope) && a.Pantalla.Activa != nil {
 			libreta = a.Pantalla.Activa.ID
 			a.Pantalla.CargandoEtiquetas, a.Pantalla.ErrorEtiquetas = true, false
 			a.repintar()
@@ -634,12 +763,12 @@ func (a *App) cargarEtiquetas() {
 	if libreta == "" {
 		return
 	}
-	ctx, fin := a.ctx()
+	ctx, fin := context.WithTimeout(scope.ctx, a.Plazo)
 	grupos, err := a.svc.Groups(ctx, libreta)
 	fin()
 	fyne.Do(func() {
 		p := a.Pantalla
-		if p.Activa == nil || p.Activa.ID != libreta {
+		if !a.vigente(scope) || p.Activa == nil || p.Activa.ID != libreta {
 			return
 		}
 		p.CargandoEtiquetas, p.ErrorEtiquetas, p.Etiquetas = false, err != nil, grupos
@@ -653,11 +782,16 @@ func (a *App) cargarEtiquetas() {
 
 // cargarFavoritos trae los destacados. Si falla, se sigue sin ellos: la web tampoco
 // dice nada, porque la agenda sin estrellas sigue sirviendo.
-func (a *App) cargarFavoritos() {
-	ctx, fin := a.ctx()
+func (a *App) cargarFavoritos() { a.cargarFavoritosEn(a.capturar()) }
+
+func (a *App) cargarFavoritosEn(scope cargaContacts) {
+	ctx, fin := context.WithTimeout(scope.ctx, a.Plazo)
 	uids, err := a.svc.Favorites(ctx)
 	fin()
 	fyne.Do(func() {
+		if !a.vigente(scope) {
+			return
+		}
 		clear(a.favoritos)
 		if err == nil {
 			for _, u := range uids {

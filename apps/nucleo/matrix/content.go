@@ -120,8 +120,53 @@ func (c *Client) Read(ctx context.Context, reference EventRef) (DecryptedEvent, 
 	if err := c.requireEncrypted(ctx, reference.RoomID); err != nil {
 		return DecryptedEvent{}, err
 	}
+	return c.readEncryptedEvent(ctx, reference)
+}
+
+// ReadResult preserves the receipt order and isolates an unavailable or invalid
+// event from the rest of a page. An error never carries decrypted content.
+type ReadResult struct {
+	Event DecryptedEvent
+	Err   error
+}
+
+// ReadMany authenticates one bounded page in the same room. Like History, the
+// room's encryption state is fetched once while sync/binding changes are locked;
+// every receipt is still fetched, decrypted and device-verified independently.
+// No encryption state or trust decision is retained between calls.
+func (c *Client) ReadMany(ctx context.Context, roomID string, references []EventRef) ([]ReadResult, error) {
+	if len(references) < 1 || len(references) > 100 {
+		return nil, errors.New("matrix: invalid receipt page size")
+	}
+	c.stateMu.RLock()
+	defer c.stateMu.RUnlock()
+	if err := c.requireEncrypted(ctx, roomID); err != nil {
+		return nil, err
+	}
+	results := make([]ReadResult, len(references))
+	for i, reference := range references {
+		if reference.RoomID != roomID {
+			results[i].Err = ErrIdentity
+			continue
+		}
+		results[i].Event, results[i].Err = c.readEncryptedEvent(ctx, reference)
+	}
+	return results, nil
+}
+
+// The caller holds stateMu and has authenticated this room's encryption state.
+func (c *Client) readEncryptedEvent(ctx context.Context, reference EventRef) (DecryptedEvent, error) {
+	if reference.EventID == "" {
+		return DecryptedEvent{}, ErrIdentity
+	}
+	if err := c.readReady(ctx); err != nil {
+		return DecryptedEvent{}, err
+	}
 	encrypted, err := c.cli.GetEvent(ctx, id.RoomID(reference.RoomID), id.EventID(reference.EventID))
 	if err != nil {
+		return DecryptedEvent{}, err
+	}
+	if err := c.readReady(ctx); err != nil {
 		return DecryptedEvent{}, err
 	}
 	if encrypted.Type != event.EventEncrypted || encrypted.ID.String() != reference.EventID || encrypted.RoomID != "" && encrypted.RoomID.String() != reference.RoomID {
@@ -136,4 +181,17 @@ func (c *Client) Read(ctx context.Context, reference EventRef) (DecryptedEvent, 
 		return DecryptedEvent{}, err
 	}
 	return c.decryptedEvent(ctx, clearEvent)
+}
+
+func (c *Client) readReady(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if c.closed.Load() {
+		return ErrClosed
+	}
+	if !c.ready.Load() {
+		return ErrNotReady
+	}
+	return nil
 }

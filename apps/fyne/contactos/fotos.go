@@ -5,6 +5,7 @@ package contactos
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"errors"
 	"image"
@@ -112,8 +113,9 @@ func (a *App) pedirFoto(c api.Contact, lanzar func(func())) {
 		return
 	}
 	a.fotosPedidas[uid] = c.ETag
+	scope := a.capturar()
 	lanzar(func() {
-		ctx, fin := a.ctx()
+		ctx, fin := context.WithTimeout(scope.ctx, a.Plazo)
 		datos, err := a.svc.Photo(ctx, uid)
 		fin()
 		var img image.Image
@@ -126,6 +128,9 @@ func (a *App) pedirFoto(c api.Contact, lanzar func(func())) {
 			slog.Info("contactos: la foto no ha llegado", "error", err)
 		}
 		fyne.Do(func() {
+			if !a.vigente(scope) {
+				return
+			}
 			switch {
 			case img != nil:
 				a.fotos[uid] = img

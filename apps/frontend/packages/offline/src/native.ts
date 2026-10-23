@@ -4,6 +4,9 @@ export type Connectivity = 'online' | 'offline';
 
 export interface NativeOfflineOptions {
   ownerId: string;
+  tenantId: string;
+  /** Marca efímera sin tokens: invalida respuestas del montaje anterior. */
+  scopeId?: string;
   product: string;
   workerUrl?: string;
 }
@@ -92,18 +95,21 @@ function loadedPrivateUrls(): string[] {
  * Instala el shell offline solo dentro de Capacitor. Un navegador web
  * compartido no conserva automáticamente páginas/API autenticadas.
  */
-export async function installNativeOffline({
-  ownerId,
-  product,
-  workerUrl = '/sw.js',
-}: NativeOfflineOptions): Promise<void> {
+export async function installNativeOffline(
+  { ownerId, tenantId, scopeId, product, workerUrl = '/sw.js' }: NativeOfflineOptions,
+  current: () => boolean = () => true,
+): Promise<void> {
   if (!isNativeShell() || !('serviceWorker' in navigator)) return;
+  const revision = scopeId ?? crypto.randomUUID();
   const registration = await navigator.serviceWorker.register(workerUrl);
   const ready = await navigator.serviceWorker.ready;
   const worker = ready.active ?? registration.active ?? registration.waiting;
+  if (!current()) return;
   worker?.postMessage({
     type: 'INITIALISE',
     ownerId,
+    tenantId,
+    scopeId: revision,
     product,
     assetUrls: loadedAssetUrls(),
     privateUrls: loadedPrivateUrls(),
@@ -116,10 +122,15 @@ export async function installNativeOffline({
  * segundos era para el puente de Wails, que llegaba después de hidratar.
  */
 export function activateNativeOffline(options: NativeOfflineOptions): () => void {
-  if (typeof window === 'undefined') return () => undefined;
-  if (isNativeShell()) void installNativeOffline(options).catch(() => undefined);
+  if (typeof window === 'undefined' || !isNativeShell()) return () => undefined;
+  let active = true;
+  const scoped = { ...options, scopeId: options.scopeId ?? crypto.randomUUID() };
+  const initialise = (): void => {
+    if (isNativeShell()) void installNativeOffline(scoped, () => active).catch(() => undefined);
+  };
+  initialise();
   const onOnline = (): void => {
-    if (isNativeShell()) void installNativeOffline(options).catch(() => undefined);
+    initialise();
   };
   const onWorkerMessage = (event: MessageEvent): void => {
     const data = event.data as { type?: string } | null;
@@ -130,6 +141,11 @@ export function activateNativeOffline(options: NativeOfflineOptions): () => void
   window.addEventListener('online', onOnline);
   navigator.serviceWorker?.addEventListener('message', onWorkerMessage);
   return () => {
+    active = false;
+    navigator.serviceWorker?.controller?.postMessage({
+      type: 'INVALIDATE',
+      scopeId: scoped.scopeId,
+    });
     window.removeEventListener('online', onOnline);
     navigator.serviceWorker?.removeEventListener('message', onWorkerMessage);
   };

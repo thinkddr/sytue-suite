@@ -112,6 +112,11 @@ export const fi: AppCatalog<typeof en> = {
   'status.expiry.week': 'Tällä viikolla',
   'status.dmAlertsOn': 'Ota yksityisviestien ilmoitukset käyttöön',
   'status.dmAlertsOff': 'Poista yksityisviestien ilmoitukset käytöstä',
+  'status.dmAccountHelp':
+    'Koskee tätä tiliä ja organisaatiota kaikissa Sytue-sovelluksissa. Selaimen lupa on erillinen.',
+  'status.dmLegacyHelp':
+    'Tässä selaimessa on yhä paikallinen suodatin. Poista se käyttääksesi tilin asetusta; tili ei muutu.',
+  'status.dmUseAccount': 'Käytä tilin asetusta',
   'connection.online': 'Yhdistetty',
   'connection.connecting': 'Yhdistetään…',
   'connection.offline': 'Ei yhteyttä',

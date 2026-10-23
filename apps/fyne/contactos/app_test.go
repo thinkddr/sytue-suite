@@ -131,13 +131,13 @@ func (s *servicioFalso) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		responder(map[string]any{"address_books": libretas})
 	case "POST /api/v1/address-books":
 		responder(api.AddressBook{ID: "l2", Name: "organizacion"})
-	case "GET /api/v1/address-books/l2/contacts":
+	case "GET /api/v1/address-books/l2/contacts", "GET /api/v1/address-books/l2/contacts/page":
 		responder(map[string]any{"contacts": s.organizacion})
 	case "GET /api/v1/directory":
 		responder(map[string]any{"items": s.directorio})
 	case "POST /api/v1/assist":
 		responder(map[string]string{"text": s.ia})
-	case "GET /api/v1/address-books/l1/contacts":
+	case "GET /api/v1/address-books/l1/contacts", "GET /api/v1/address-books/l1/contacts/page":
 		responder(map[string]any{"contacts": s.contactos})
 	case "GET /api/v1/address-books/l1/groups":
 		responder(map[string]any{"groups": []api.ContactGroup{{ID: "g1", Name: "Amigos", Members: []string{"u-bruno"}}}})

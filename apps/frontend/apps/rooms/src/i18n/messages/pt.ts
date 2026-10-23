@@ -115,6 +115,11 @@ export const pt: AppCatalog<typeof en> = {
   'status.expiry.week': 'Esta semana',
   'status.dmAlertsOn': 'Ativar alertas de mensagens diretas',
   'status.dmAlertsOff': 'Desativar alertas de mensagens diretas',
+  'status.dmAccountHelp':
+    'Aplica-se a esta conta e organização em todas as apps Sytue. A permissão do navegador é independente.',
+  'status.dmLegacyHelp':
+    'Este navegador mantém um filtro local. Elimine-o para usar a definição da conta; a conta não será alterada.',
+  'status.dmUseAccount': 'Usar a definição da conta',
   'connection.online': 'Ligação ativa',
   'connection.connecting': 'A ligar…',
   'connection.offline': 'Sem ligação',

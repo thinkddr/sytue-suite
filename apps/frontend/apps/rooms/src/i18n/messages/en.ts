@@ -131,6 +131,11 @@ export const en = {
   'status.expiry.week': 'This week',
   'status.dmAlertsOn': 'Turn on direct message alerts',
   'status.dmAlertsOff': 'Turn off direct message alerts',
+  'status.dmAccountHelp':
+    'Applies across Sytue apps for this account and organization. Browser permission is separate.',
+  'status.dmLegacyHelp':
+    'This browser still has a local filter. Discard it to use the account setting; the account will not change.',
+  'status.dmUseAccount': 'Use account setting',
 
   // --- Conexión en tiempo real --------------------------------------------
   'connection.online': 'Connected',

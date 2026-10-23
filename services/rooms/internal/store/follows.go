@@ -164,7 +164,7 @@ func (s *Store) ListFollowedThreads(ctx context.Context, subject string, before 
 			        c.kind='public'
 			        OR EXISTS (SELECT 1 FROM channel_members cm
 			                   WHERE cm.tenant=c.tenant AND cm.channel_id=c.id AND cm.subject=$2)
-			   )
+			   )`+filtroVaciado("m", "$2")+`
 			 ORDER BY f.last_activity DESC, f.root_id DESC
 			 LIMIT $4`,
 			t.Slug, subject, beforeTs, limit)

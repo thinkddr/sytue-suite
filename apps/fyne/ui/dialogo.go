@@ -404,7 +404,7 @@ func MedidaDialogo(d *Dialogo, lienzo fyne.Size) fyne.Size {
 	marcarPie(d.Pie, hoja)
 	_, abajo := bordesDialogo(lienzo)
 	util := anchoUtilEn(ancho, lienzo)
-	alto := tema.Borde + abajo + altoCabecera(d, ancho, lienzo) + altoPieDialogo(d.Pie, util, hoja) + d.altoCuerpo(util)
+	alto := tema.Borde + abajo + altoCabecera(d, ancho, lienzo) + altoPieDialogo(d.Pie, util, hoja) + d.altoCuerpo(util) + d.altoAvisos(util, lienzo)
 	switch {
 	case lienzo.Height <= 0:
 	case hoja:
@@ -984,6 +984,9 @@ func (d *Dialogo) CreateRenderer() fyne.WidgetRenderer {
 	// `overflow-y-auto` a secas (petición de Sytue Calendar).
 	r.envoltorio = container.NewThemeOverride(r.cuerpo, tema.SinSombras{})
 	r.filete = canvas.NewRectangle(fileteDialogo(v))
+	r.bloqueAvisos = nuevoAvisosDialogo(d)
+	r.desplazaAvisos = container.NewVScroll(r.bloqueAvisos)
+	r.avisos = container.New(Margen{Izq: margenXAvisosDialogo, Der: margenXAvisosDialogo, Abj: margenYCuerpo}, container.NewThemeOverride(r.desplazaAvisos, tema.SinSombras{}))
 	d.r = r
 	r.rehacer()
 	return r
@@ -1004,10 +1007,13 @@ type dialogoRenderer struct {
 	titulo         *Parrafo
 	filete         *canvas.Rectangle
 	// asa es la píldora de la hoja (`h-1 w-9 bg-border-strong`); fuera de la hoja no está.
-	asa        *canvas.Rectangle
-	cuerpo     *container.Scroll
-	envoltorio *container.ThemeOverride // el cuerpo sin sombras de borde
-	objetos    []fyne.CanvasObject
+	asa            *canvas.Rectangle
+	cuerpo         *container.Scroll
+	envoltorio     *container.ThemeOverride // el cuerpo sin sombras de borde
+	objetos        []fyne.CanvasObject
+	bloqueAvisos   *avisosDialogo
+	desplazaAvisos *container.Scroll
+	avisos         *fyne.Container
 	// Con muy poca altura, cabecera y acciones tampoco caben juntas: entonces
 	// se desplaza el panel entero en lugar de solaparlas y perder botones.
 	partes          *fyne.Container
@@ -1027,6 +1033,9 @@ func (r *dialogoRenderer) rehacer() {
 	partes := []fyne.CanvasObject{r.fileteCabecera, r.titulo, d.aspa}
 	if d.conAsa(d.lienzo) {
 		partes = append(partes, r.asa)
+	}
+	if d.altoAvisos(d.anchoUtil(d.Size().Width), d.lienzo) > 0 {
+		partes = append(partes, r.avisos)
 	}
 	if d.Cuerpo != nil {
 		if r.desbordando {
@@ -1122,7 +1131,7 @@ func (r *dialogoRenderer) Layout(t fyne.Size) {
 	cab := altoCabecera(d, t.Width, d.lienzo)
 	pie := altoPieDialogo(d.Pie, util, hoja)
 	cuerpo := d.altoCuerpo(util)
-	fijo := tema.Borde + bordeAbajo + cab + pie
+	fijo := tema.Borde + bordeAbajo + cab + pie + d.altoAvisos(util, d.lienzo)
 	r.altoContenido = fijo + cuerpo
 	// Si queda al menos un blanco táctil para el cuerpo, cabecera y acciones
 	// permanecen fijas. Si ni eso cabe, se desplazan juntas, sin superponerse.
@@ -1179,13 +1188,20 @@ func (r *dialogoRenderer) disponer(t fyne.Size) {
 
 	hoja := enHoja(d.lienzo)
 	pie := altoPieDialogo(d.Pie, util, hoja)
+	avisos := d.altoAvisos(util, d.lienzo)
+	if avisos > 0 {
+		r.bloqueAvisos.ancho = util + 2*(margenXDialogo-margenXAvisosDialogo)
+		r.avisos.Move(fyne.NewPos(lado, b+cab))
+		r.avisos.Resize(fyne.NewSize(interior, avisos))
+		r.desplazaAvisos.Refresh()
+	}
 	if d.Cuerpo != nil {
-		hueco := fyne.NewSize(interior, max(t.Height-b-abajo-cab-pie, 0))
+		hueco := fyne.NewSize(interior, max(t.Height-b-abajo-cab-pie-avisos, 0))
 		if r.desbordando {
-			d.margen.Move(fyne.NewPos(lado, b+cab))
+			d.margen.Move(fyne.NewPos(lado, b+cab+avisos))
 			d.margen.Resize(hueco)
 		} else {
-			r.envoltorio.Move(fyne.NewPos(lado, b+cab))
+			r.envoltorio.Move(fyne.NewPos(lado, b+cab+avisos))
 			r.envoltorio.Resize(hueco)
 			r.cuerpo.Refresh()
 		}

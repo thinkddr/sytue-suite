@@ -8,21 +8,26 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+
 	"git.sytue.eu/sytue/one/platform/pkg/pgtest"
 	"git.sytue.eu/sytue/one/services/rooms/db"
 	"git.sytue.eu/sytue/one/services/rooms/internal/domain"
 	"git.sytue.eu/sytue/one/services/rooms/internal/store"
-	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 )
 
 type matrixGate struct {
-	err     error
-	rooms   []string
-	members [][]string
+	err      error
+	rooms    []string
+	members  [][]string
+	readOnly []bool
+	invite   []bool
 }
 
-func (g *matrixGate) Reconcile(_ context.Context, room string, subjects []string, _ bool, _ bool) error {
+func (g *matrixGate) Reconcile(_ context.Context, room string, subjects []string, readOnly, invite bool) error {
+	g.readOnly = append(g.readOnly, readOnly)
+	g.invite = append(g.invite, invite)
 	g.rooms = append(g.rooms, room)
 	g.members = append(g.members, subjects)
 	return g.err
@@ -184,5 +189,45 @@ func TestMatrixMergeIntoSameTenantPreservesRevocationsAndSignins(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestDeleteChannelClosesBoundMatrixAndRollsBackRemoteFailure(t *testing.T) {
+	for _, kind := range []domain.ChannelKind{domain.ChannelPublic, domain.ChannelPrivate} {
+		t.Run(string(kind), func(t *testing.T) {
+			h := pgtest.New(t, db.Migrations, db.MigrationsDir)
+			st := store.New(h.Pool, nil)
+			ctx := tenantCtx("acme")
+			tm, ch := seedTeamChannel(t, ctx, st, "alice", kind)
+			if err := st.AddTeamMember(ctx, tm.ID, "alice", "bob", "Bob", domain.RoleMember); err != nil {
+				t.Fatal(err)
+			}
+			room := bindMatrix(t, st, ctx, ch.ID, "alice")
+			gate := &matrixGate{err: domain.ErrMatrixUnavailable}
+			st.SetMatrixGate(gate)
+			if err := st.DeleteChannel(ctx, ch.ID, "bob"); !errors.Is(err, domain.ErrForbidden) {
+				t.Fatalf("non-admin deletion: %v", err)
+			}
+			if len(gate.rooms) != 0 {
+				t.Fatal("unauthorized deletion reached Matrix")
+			}
+			if err := st.DeleteChannel(ctx, ch.ID, "alice"); !errors.Is(err, domain.ErrMatrixUnavailable) {
+				t.Fatalf("acknowledged remote failure: %v", err)
+			}
+			if _, err := st.GetChannel(ctx, ch.ID, "alice"); err != nil {
+				t.Fatalf("local deletion survived remote failure: %v", err)
+			}
+			gate.err = nil
+			if err := st.DeleteChannel(ctx, ch.ID, "alice"); err != nil {
+				t.Fatal(err)
+			}
+			last := len(gate.rooms) - 1
+			if gate.rooms[last] != room || len(gate.members[last]) != 0 || !gate.readOnly[last] || gate.invite[last] {
+				t.Fatalf("deleted channel retained Matrix access: %+v", gate)
+			}
+			if _, err := st.GetChannel(ctx, ch.ID, "alice"); !errors.Is(err, domain.ErrNotFound) {
+				t.Fatalf("deleted channel still accessible: %v", err)
+			}
+		})
 	}
 }

@@ -113,6 +113,11 @@ export const nb: AppCatalog<typeof en> = {
   'status.expiry.week': 'Denne uken',
   'status.dmAlertsOn': 'Slå på varsler for direktemeldinger',
   'status.dmAlertsOff': 'Slå av varsler for direktemeldinger',
+  'status.dmAccountHelp':
+    'Gjelder denne kontoen og organisasjonen i alle Sytue-apper. Nettlesertillatelsen er separat.',
+  'status.dmLegacyHelp':
+    'Denne nettleseren har fortsatt et lokalt filter. Fjern det for å bruke kontoinnstillingen; kontoen endres ikke.',
+  'status.dmUseAccount': 'Bruk kontoinnstillingen',
   'connection.online': 'Tilkoblet',
   'connection.connecting': 'Kobler til…',
   'connection.offline': 'Ingen tilkobling',

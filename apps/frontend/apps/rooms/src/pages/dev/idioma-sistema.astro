@@ -1,0 +1,23 @@
+---
+/* SPDX-License-Identifier: Apache-2.0 */
+import '../../styles/app.css';
+import { basePathScript } from '@sytue/ui';
+import { LanguagePreferenceDemo } from '../../components/dev/LanguagePreferenceDemo';
+export const prerender = false;
+if (!import.meta.env.DEV) return new Response(null, { status: 404 });
+const locale = Astro.locals.locale ?? 'en';
+---
+
+<!doctype html>
+<html lang={locale}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>System language QA</title>
+    <script is:inline set:html={basePathScript('/rooms')}></script>
+  </head>
+  <body>
+    <LanguagePreferenceDemo locale={locale} client:load />
+  </body>
+</html>

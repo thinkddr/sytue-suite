@@ -71,6 +71,7 @@ func NewRouter(d Deps) http.Handler {
 
 		// Contactos dentro de una libreta.
 		api.Get("/address-books/{id}/contacts", h.ListContacts)
+		api.Get("/address-books/{id}/contacts/page", h.ListContactsPage)
 		api.Post("/address-books/{id}/contacts", h.CreateContact)
 		// Importación CSV (Google Contacts / Outlook) a una libreta.
 		api.Post("/address-books/{id}/import-csv", h.ImportCSV)

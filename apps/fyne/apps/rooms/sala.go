@@ -207,8 +207,10 @@ type Sala struct {
 	ctx     context.Context
 	equipo  string
 	canales []api.RoomsChannel
-	pend    map[string]api.RoomsUnread
-	abierto string
+	// retiradas invalida el deshacer de una acción cuando llega una baja más reciente.
+	retiradas map[string]uint64
+	pend      map[string]api.RoomsUnread
+	abierto   string
 	// enlace es el canal (y el mensaje) de un aviso que llegó antes que la lista.
 	enlace   [2]string
 	mensajes []api.RoomsMessage
@@ -344,6 +346,7 @@ func NuevaSala(p *Pantalla, s Servicio, yo string) *Sala {
 		Esperar:     esperar,
 		ctx:         context.Background(),
 		pend:        map[string]api.RoomsUnread{},
+		retiradas:   map[string]uint64{},
 		escribiendo: map[string]map[string]string{},
 		caducan:     map[string]func(){},
 		fijados:     map[string]bool{},
@@ -1082,7 +1085,7 @@ func (sa *Sala) PedirBorrarCanal(c Canal) {
 // ya y vuelve, con su aviso, si el servicio dice que no.
 func (sa *Sala) BorrarCanal(c Canal) {
 	directo := c.Clase == Directo
-	antes := sa.quitarCanal(c.ID)
+	deshacer := sa.quitarCanal(c.ID)
 	pedir(sa, func(ctx context.Context) (struct{}, error) {
 		if directo {
 			return struct{}{}, sa.S.HideDirect(ctx, c.ID)
@@ -1090,11 +1093,10 @@ func (sa *Sala) BorrarCanal(c Canal) {
 		return struct{}{}, sa.S.DeleteChannel(ctx, c.ID)
 	}, func(_ struct{}, err error) {
 		if err == nil {
+			sa.olvidarCanal(c.ID)
 			return
 		}
-		sa.canales = antes
-		sa.pintarCanales()
-		sa.P.Refrescar()
+		deshacer()
 		clave := "channel.deleteFailed"
 		if directo {
 			clave = "dm.deleteFailed"
@@ -1633,9 +1635,12 @@ func (sa *Sala) alLlegar(ev api.RoomsEvent) {
 		if ev.Type == "message" {
 			sa.refrescarPendientes()
 		}
+	case "channel_member_removed":
+		sa.alQuitarMiembro(ev)
 	case "channel_deleted":
-		// Lo ha borrado quien lo administra: fuera del carril, y cerrado si estaba abierto.
+		// Lo ha borrado quien lo administra: fuera del carril y sin texto descifrado.
 		sa.quitarCanal(ev.ChannelID)
+		sa.olvidarCanal(ev.ChannelID)
 	case "typing":
 		if ev.Subject == "" || ev.Subject == sa.Yo {
 			return
@@ -1655,6 +1660,31 @@ func (sa *Sala) alLlegar(ev api.RoomsEvent) {
 		canal, sub := ev.ChannelID, ev.Subject
 		sa.caducan[clave] = sa.Esperar(VidaEscribiendo, func() { sa.borrarEscribiendo(canal, sub) })
 		sa.pintarEscribiendo()
+	}
+}
+
+// alQuitarMiembro cierra la conversación si la baja afecta a esta persona.
+func (sa *Sala) alQuitarMiembro(ev api.RoomsEvent) {
+	var member struct {
+		Subject string `json:"subject"`
+		Channel string `json:"channel_id"`
+	}
+	if json.Unmarshal(ev.Payload, &member) != nil || member.Subject == "" {
+		return
+	}
+	if member.Subject == sa.Yo {
+		channel := ev.ChannelID
+		if member.Channel != "" {
+			channel = member.Channel
+		}
+		if channel != "" {
+			sa.quitarCanal(channel)
+			sa.olvidarCanal(channel)
+		}
+	} else if ev.ChannelID == sa.abierto {
+		sa.roster = slices.DeleteFunc(sa.roster, func(m Miembro) bool { return m.ID == member.Subject })
+		sa.P.Canal.Cabecera.Miembros = len(sa.roster)
+		sa.P.Canal.Cabecera.Refresh()
 	}
 }
 
@@ -2404,6 +2434,9 @@ func (sa *Sala) cargarSeguidos() {
 		hs, sig, err := sa.S.MyThreads(ctx, "")
 		return paginaHilos{hs, sig}, err
 	}, func(pg paginaHilos, err error) {
+		if vista != sa.vistaLista {
+			return
+		}
 		if err != nil {
 			if l := sa.panelHilos(); l != nil && vista == sa.vistaLista {
 				l.Estado = Error
@@ -3107,6 +3140,11 @@ func (sa *Sala) abrirMiembros() {
 // Tras los paneles van «Ajustes de notificación» y, para quien administra el equipo
 // en un canal de la casa, «Editar el tema» tras un separador. Cada entrada con su glifo.
 func (sa *Sala) MenuCanal(disparador fyne.CanvasObject) {
+	if c := sa.P.Canal.Cabecera.Canal; c.Clase == Directo && c.ID != "" {
+		// El menú de fila ya contiene «Borrar chat», solo para esta persona.
+		sa.MenuFila(c, disparador)
+		return
+	}
 	t := sa.P.T
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	con := func(rotulo, cuerpo string, al func()) *ui.ElementoMenu {
@@ -3139,7 +3177,7 @@ func (sa *Sala) MenuCanal(disparador fyne.CanvasObject) {
 	}
 	// Salir y borrar también aquí, como en la web: en un teléfono el nombre del canal
 	// es el camino a todo lo del canal.
-	if c := sa.P.Canal.Cabecera.Canal; c.ID != "" && c.Clase != Directo {
+	if c := sa.P.Canal.Cabecera.Canal; c.ID != "" {
 		m.Elementos = append(m.Elementos, ui.NuevoSeparadorMenu(),
 			ui.NuevoElementoMenu(t.T("channel.leave", nil), iconos.Ninguno, func() { sa.PedirSalir(c) }))
 		if sa.puedeBorrar(c) {
@@ -3172,6 +3210,7 @@ func (sa *Sala) Olvidar() {
 	sa.mensajes = nil
 	sa.borradores = map[ambito]string{}
 	sa.canales = nil
+	clear(sa.retiradas)
 	sa.roster = nil
 	sa.equipo = ""
 	sa.abierto = ""

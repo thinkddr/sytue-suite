@@ -514,6 +514,9 @@ func (c *Client) sendEventWithTxn(ctx context.Context, roomID string, kind event
 var _ mxcrypto.Store = (*mxcrypto.SQLCryptoStore)(nil)
 
 func (c *Client) allowedRoom(roomID string) bool {
+	if roomID == "" {
+		return false
+	}
 	if c.cfg.Bootstrap.DraftRoomID == roomID {
 		return true
 	}

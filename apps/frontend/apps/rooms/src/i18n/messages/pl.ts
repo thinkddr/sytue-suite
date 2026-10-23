@@ -116,6 +116,11 @@ export const pl: AppCatalog<typeof en> = {
   'status.expiry.week': 'W tym tygodniu',
   'status.dmAlertsOn': 'Włącz powiadomienia o wiadomościach bezpośrednich',
   'status.dmAlertsOff': 'Wyłącz powiadomienia o wiadomościach bezpośrednich',
+  'status.dmAccountHelp':
+    'Dotyczy tego konta i organizacji we wszystkich aplikacjach Sytue. Uprawnienie przeglądarki jest osobne.',
+  'status.dmLegacyHelp':
+    'Ta przeglądarka nadal ma lokalny filtr. Usuń go, aby używać ustawienia konta; konto nie zostanie zmienione.',
+  'status.dmUseAccount': 'Użyj ustawienia konta',
   'connection.online': 'Połączono',
   'connection.connecting': 'Łączenie…',
   'connection.offline': 'Brak połączenia',

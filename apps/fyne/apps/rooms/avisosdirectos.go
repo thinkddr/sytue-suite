@@ -5,16 +5,13 @@ package rooms
 
 import (
 	"context"
-	"slices"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 )
 
-// «Activar/desactivar avisos de mensajes directos» (`toggleDmNotify`). En la web es un
-// ajuste de `localStorage` que decide si un directo sale como aviso del NAVEGADOR; en
-// nativo los avisos los reparte el Hub a todas las apps y dispositivos, así que el
-// ajuste es SUYO: una regla de silencio (`/notifications/prefs`) sobre el aviso que
-// Rooms le manda por un directo.
+// «Activar/desactivar avisos de mensajes directos» es una regla de cuenta en Hub
+// (`/notifications/prefs`), compartida con la web y las otras apps/dispositivos.
+// El permiso de avisos del navegador o del SO se configura por separado.
 //
 // Rooms publica `rooms.message` SOLO a los miembros de un directo que no han sido
 // mencionados (`destinatariosCTE` de services/rooms/internal/store/push.go) y
@@ -26,9 +23,19 @@ var PrefAvisoDirectos = api.HubNotificationPref{Source: "rooms", Kind: "rooms.me
 
 // directosCalladosEn dice si esas reglas callan los directos.
 func directosCalladosEn(ps []api.HubNotificationPref) bool {
-	return slices.ContainsFunc(ps, func(p api.HubNotificationPref) bool {
-		return p.Source == PrefAvisoDirectos.Source && p.Kind == PrefAvisoDirectos.Kind && p.Muted
-	})
+	callarOrigen := false
+	for _, p := range ps {
+		if p.Source != PrefAvisoDirectos.Source {
+			continue
+		}
+		if p.Kind == PrefAvisoDirectos.Kind {
+			return p.Muted
+		}
+		if p.Kind == "" {
+			callarOrigen = p.Muted
+		}
+	}
+	return callarOrigen
 }
 
 // cargarAvisosDirectos lee la regla al arrancar; sin Hub, los avisos siguen activos.

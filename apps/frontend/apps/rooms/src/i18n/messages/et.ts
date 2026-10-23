@@ -110,6 +110,11 @@ export const et: AppCatalog<typeof en> = {
   'status.expiry.week': 'See nädal',
   'status.dmAlertsOn': 'Lülita otsesõnumite teavitused sisse',
   'status.dmAlertsOff': 'Lülita otsesõnumite teavitused välja',
+  'status.dmAccountHelp':
+    'Kehtib sellele kontole ja organisatsioonile kõigis Sytue rakendustes. Brauseri luba on eraldi.',
+  'status.dmLegacyHelp':
+    'Selles brauseris on endiselt kohalik filter. Eemalda see konto seadistuse kasutamiseks; konto ei muutu.',
+  'status.dmUseAccount': 'Kasuta konto seadistust',
   'connection.online': 'Ühendatud',
   'connection.connecting': 'Ühendamine…',
   'connection.offline': 'Ühendus puudub',

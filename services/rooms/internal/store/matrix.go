@@ -198,11 +198,21 @@ func (s *Store) EnsureMatrixChannel(ctx context.Context, id uuid.UUID, actor str
 // revokeMatrixTx runs after the local change but before its transaction commits.
 // A remote error rolls the local change back. No invitations happen here.
 func (s *Store) revokeMatrixTx(ctx context.Context, tx pgx.Tx, tenant string, id uuid.UUID) error {
+	return s.reconcileMatrixChannelTx(ctx, tx, tenant, id, false)
+}
+
+// closeMatrixChannelTx retires the transport before acknowledging channel deletion.
+// It preserves ciphertext/history, but no participant may send or receive new events.
+func (s *Store) closeMatrixChannelTx(ctx context.Context, tx pgx.Tx, tenant string, id uuid.UUID) error {
+	return s.reconcileMatrixChannelTx(ctx, tx, tenant, id, true)
+}
+
+func (s *Store) reconcileMatrixChannelTx(ctx context.Context, tx pgx.Tx, tenant string, id uuid.UUID, closed bool) error {
 	state, err := matrixChannelTx(ctx, tx, tenant, id)
 	if err != nil {
 		return err
 	}
-	if err := s.revokeChannelCallsTx(ctx, tx, tenant, id); err != nil {
+	if err := s.reconcileChannelCallsTx(ctx, tx, tenant, id, closed); err != nil {
 		return err
 	}
 	if state.RoomID == "" {
@@ -210,6 +220,9 @@ func (s *Store) revokeMatrixTx(ctx context.Context, tx pgx.Tx, tenant string, id
 	}
 	if s.matrixGate == nil {
 		return domain.ErrMatrixUnavailable
+	}
+	if closed {
+		state.Subjects, state.ReadOnly = nil, true
 	}
 	return s.matrixGate.Reconcile(ctx, state.RoomID, state.Subjects, state.ReadOnly, false)
 }

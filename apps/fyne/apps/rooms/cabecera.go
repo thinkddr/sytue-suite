@@ -169,10 +169,10 @@ func (c *Cabecera) montar(v tema.Variante) {
 	c.marca = c.marcaCanal(v)
 
 	// El nombre del canal ES el disparador de su menú (Slack, Teams y Mattermost lo
-	// hacen así). En un directo no hay menú que abrir y se queda como texto.
+	// hacen así). Los directos también ofrecen su acción «Borrar chat».
 	c.nombre = ui.Texto(c.Canal.Nombre, escalonNombre, ui.SemiNegrita, tema.Color("header-fg", v))
 	c.disparador = nil
-	if c.Canal.Clase != Directo {
+	if c.Canal.ID != "" {
 		// El nombre del canal ES el disparador de su menú: `min-h-[24px] px-1.5 py-0.5
 		// gap-1 rounded-md`, el chevron de 14 y `hover:bg-chrome-hover`.
 		c.disparador = NuevoDisparadorNombre(t.T("channel.menuAria", i18n.Vars{"name": c.Canal.Nombre}), nil)

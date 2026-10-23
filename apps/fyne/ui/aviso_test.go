@@ -27,7 +27,7 @@ func TestElContratoDelAvisoEsElDeToastTsx(t *testing.T) {
 	fuente := webref.Read(t, "apps/frontend/packages/ui/src/components/Toast.tsx")
 	for _, c := range []struct{ trozo, porque string }{
 		{"fixed right-[max(1rem,var(--sytue-safe-right,0px))] bottom-[max(1rem,var(--sytue-safe-bottom,0px))]", "la esquina con un mínimo de 1rem y respetando el área segura"},
-		{"flex w-[calc(100%_-_max(1rem,var(--sytue-safe-left,0px))_-_max(1rem,var(--sytue-safe-right,0px)))] max-w-sm flex-col gap-2", "el ancho disponible entre ambos márgenes, su tope y la separación"},
+		{"w-[calc(100%_-_max(1rem,var(--sytue-safe-left,0px))_-_max(1rem,var(--sytue-safe-right,0px)))] max-w-sm", "el ancho disponible entre ambos márgenes, su tope y la separación"},
 		{"pointer-events-none", "que la pila no se coma el puntero de lo de debajo"},
 		{"flex items-start gap-3 overflow-hidden rounded-lg border", "la tarjeta"},
 		{"bg-surface-raised pr-3 shadow-[var(--shadow-lg)]", "su superficie, su margen derecho y su elevación"},
@@ -235,38 +235,31 @@ func TestElAvisoLargoPasaDeLineaYSuAccionSePulsa(t *testing.T) {
 	}
 }
 
-// TestElAvisoVaEncimaDelDialogo: en la web un aviso va por encima de un diálogo abierto
-// (`--z-toast` sobre `--z-modal`). Con una capa puesta la pila se la presta: la capa
-// pinta el aviso encima de su panel, en la esquina de la VENTANA, y sigue pulsable; al
-// cerrar la capa vuelve a la pila. VISTO EN ROJO antes: el aviso quedaba debajo del velo.
-func TestElAvisoVaEncimaDelDialogo(t *testing.T) {
+// El aviso entra en el flujo del diálogo y vuelve a la esquina al cerrarlo.
+func TestElAvisoSeInsertaEnElDialogo(t *testing.T) {
 	pila := pilaQueSeVacia(t)
 	w := test.NewTempWindow(t, container.NewStack(canvas.NewRectangle(tema.Color("bg", tema.Claro)), pila))
+	w.SetPadded(false)
 	w.Resize(fyne.NewSize(1280, 800))
 	d := NuevoDialogo("Reglas de correo", cuerpoDe(60))
 	d.Mostrar(w.Canvas())
 	t.Cleanup(d.Cerrar)
-
 	a := NuevoAviso(AvisoPeligro, "No se ha podido guardar", "")
 	pila.Notificar(a)
+	if !slices.Contains(test.WidgetRenderer(d.r.bloqueAvisos).Objects(), fyne.CanvasObject(a)) {
+		t.Fatal("el aviso no se inserta dentro del diálogo")
+	}
 	cp, _ := w.Canvas().Overlays().Top().(*capa)
-	if cp == nil || !slices.Contains(test.WidgetRenderer(cp).Objects(), fyne.CanvasObject(a)) {
-		t.Fatal("con el diálogo abierto, el aviso no va en la capa de arriba")
+	if slices.Contains(test.WidgetRenderer(cp).Objects(), fyne.CanvasObject(a)) {
+		t.Error("el aviso sigue superpuesto al panel")
 	}
 	if slices.Contains(test.WidgetRenderer(pila).Objects(), fyne.CanvasObject(a)) {
-		t.Error("el aviso se pinta a la vez en la pila, debajo del velo")
-	}
-	if a.fundido != nil {
-		t.Fatal("tras la entrada sigue la imagen del fundido en lugar del aviso")
-	}
-	alto := MedidaAviso(a, AnchoPilaAvisos).Height
-	if p, quiero := a.Position(), fyne.NewPos(1280-16-AnchoPilaAvisos, 800-16-alto); p != quiero {
-		t.Errorf("el aviso está en %v y va a `right-4 bottom-4` de la ventana: %v", p, quiero)
+		t.Error("el aviso se pinta también en la esquina")
 	}
 	test.WidgetRenderer(a)
 	test.Tap(a.aspa)
 	if len(pila.Avisos()) != 0 {
-		t.Error("el aspa del aviso no responde encima del diálogo")
+		t.Error("el aspa no cierra el aviso dentro del diálogo")
 	}
 	b := NuevoAviso(AvisoPeligro, "Otra vez", "")
 	pila.Notificar(b)
@@ -274,13 +267,14 @@ func TestElAvisoVaEncimaDelDialogo(t *testing.T) {
 	if !slices.Contains(test.WidgetRenderer(pila).Objects(), fyne.CanvasObject(b)) {
 		t.Error("al cerrar el diálogo el aviso no vuelve a la pila")
 	}
+	alto := MedidaAviso(b, AnchoPilaAvisos).Height
+	if pos, quiero := b.Position(), fyne.NewPos(1280-16-AnchoPilaAvisos, 800-16-alto); pos != quiero {
+		t.Errorf("al cerrar vuelve a %v, esperaba %v", pos, quiero)
+	}
 }
 
-// TestElAspaDelAvisoNoEsParadaDelDialogo: con el diálogo abierto, el aviso se pinta en su
-// capa y la capa recorre todo lo que pinta. En la web el Tab no sale del diálogo, así que
-// ni el aspa ni la acción del aviso pueden ser paradas mientras están prestados; sin
-// diálogo, las dos lo son.
-func TestElAspaDelAvisoNoEsParadaDelDialogo(t *testing.T) {
+// El aviso en el flujo del diálogo es accesible también con Tab, sin salir de él.
+func TestElAvisoParticipaEnElFocoDelDialogo(t *testing.T) {
 	pila := pilaQueSeVacia(t)
 	w := test.NewTempWindow(t, container.NewStack(canvas.NewRectangle(tema.Color("bg", tema.Claro)), pila))
 	w.Resize(fyne.NewSize(1280, 800))
@@ -306,11 +300,15 @@ func TestElAspaDelAvisoNoEsParadaDelDialogo(t *testing.T) {
 	d := NuevoDialogo("Reglas", container.New(Columna{}, NuevoBoton("Uno", nil), NuevoBoton("Dos", nil)))
 	d.Mostrar(w.Canvas())
 	t.Cleanup(d.Cerrar)
-	for range 8 {
+	vistos = 0
+	for range 12 {
 		w.Canvas().FocusNext()
-		if f := w.Canvas().Focused(); delAviso(f) {
-			t.Fatalf("con el diálogo abierto el Tab ha caído en %T del aviso: se sale del diálogo", f)
+		if delAviso(w.Canvas().Focused()) {
+			vistos++
 		}
+	}
+	if vistos == 0 {
+		t.Fatal("el aviso insertado en el diálogo no se puede recorrer con Tab")
 	}
 	test.Tap(a.aspa)
 	if len(pila.Avisos()) != 0 {

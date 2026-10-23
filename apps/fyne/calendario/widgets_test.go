@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -24,11 +25,11 @@ func TestWidgetCalendariosCompletosSinPublicarListaParcial(t *testing.T) {
 		t.Run(caso, func(t *testing.T) {
 			t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 			ajustes.MarcarSesion()
-			listados := 0
+			var listados atomic.Int32
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				switch r.URL.Path {
 				case "/api/v1/calendars":
-					listados++
+					listados.Add(1)
 					if caso == "cambia sesión" {
 						ajustes.MarcarSesion()
 					}
@@ -38,7 +39,7 @@ func TestWidgetCalendariosCompletosSinPublicarListaParcial(t *testing.T) {
 					}
 					_, _ = io.WriteString(w, `{"calendars":[{"id":"own","display_name":"Private title"},{"id":"same"}]}`)
 				case "/api/v1/calendars/shared-with-me":
-					listados++
+					listados.Add(1)
 					if caso == "compartidos fallan" {
 						http.Error(w, "unavailable", http.StatusServiceUnavailable)
 						return
@@ -57,8 +58,8 @@ func TestWidgetCalendariosCompletosSinPublicarListaParcial(t *testing.T) {
 				return widgets.NewView("eu.sytue.calendar", "calendar", widgets.Capture(ajustes.Leer().Sesion))
 			}
 			a.cargarCalendarios()
-			if listados != 2 {
-				t.Fatalf("el widget añadió lecturas: %d", listados)
+			if got := listados.Load(); got != 2 {
+				t.Fatalf("el widget añadió lecturas: %d", got)
 			}
 			snapshot, err := widgets.Read("eu.sytue.calendar")
 			if caso != "completos" {

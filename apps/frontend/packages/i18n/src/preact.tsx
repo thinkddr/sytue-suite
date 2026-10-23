@@ -5,17 +5,25 @@
  * de Astro, BFF, correos transaccionales.
  */
 import { createContext, type ComponentChildren, type JSX } from 'preact';
-import { useContext, useMemo, useState } from 'preact/hooks';
-import { applyDocumentLocale, detectLocale, persistLocale, type Locale } from './locale.js';
+import { useContext, useEffect, useMemo, useState } from 'preact/hooks';
+import {
+  applyDocumentLocale,
+  detectLocale,
+  persistLocale,
+  readLocaleCookie,
+  type Locale,
+} from './locale.js';
 import { createTranslate, type Translate } from './translate.js';
 
 export interface I18nValue {
   /** Idioma activo. */
   locale: Locale;
+  /** Elección explícita del navegador; null sigue la negociación del servidor. */
+  preference: Locale | null;
   /** Traduce una clave del catálogo. */
   t: Translate;
   /** Cambia el idioma del usuario (persiste la preferencia y recarga). */
-  setLocale: (next: Locale) => void;
+  setLocale: (next: Locale | null) => void;
 }
 
 const I18nContext = createContext<I18nValue | null>(null);
@@ -31,15 +39,25 @@ export interface I18nProviderProps {
   children?: ComponentChildren;
 }
 
-function buildValue(locale: Locale, onChange?: (next: Locale) => void): I18nValue {
+function buildValue(
+  locale: Locale,
+  preference: Locale | null,
+  onChange?: (next: Locale) => void,
+): I18nValue {
   return {
     locale,
+    preference,
     t: createTranslate(locale),
     setLocale: (next) => {
-      if (next === locale) return;
+      if (next === (typeof document === 'undefined' ? null : readLocaleCookie(document.cookie)))
+        return;
       persistLocale(next);
-      applyDocumentLocale(next);
-      onChange?.(next);
+      if (next !== null) {
+        applyDocumentLocale(next);
+        onChange?.(next);
+      }
+      // «Sistema» sólo borra la preferencia. El SSR vuelve a negociar con
+      // Accept-Language; no se adivina desde navigator ni se cambia la ruta.
       // El HTML que pintó el servidor sigue en el idioma anterior: solo las islas
       // se re-renderizarían. Recargar es lo único honesto mientras haya contenido
       // estático fuera del catálogo.
@@ -52,7 +70,16 @@ export function I18nProvider({ locale, children }: I18nProviderProps): JSX.Eleme
   // El idioma del servidor no cambia en vida de la página: se lee una vez y a
   // partir de ahí manda lo que el usuario elija en el selector.
   const [current, setCurrent] = useState<Locale>(() => locale ?? detectLocale());
-  const value = useMemo<I18nValue>(() => buildValue(current, setCurrent), [current]);
+  // La cookie no existe en SSR. Se adopta después de hidratar para que el control
+  // no conserve el «Sistema» del HTML inicial al haber una preferencia explícita.
+  const [preference, setPreference] = useState<Locale | null>(null);
+  useEffect(() => {
+    setPreference(readLocaleCookie(document.cookie));
+  }, []);
+  const value = useMemo<I18nValue>(
+    () => buildValue(current, preference, setCurrent),
+    [current, preference],
+  );
 
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
 }
@@ -63,7 +90,7 @@ export function I18nProvider({ locale, children }: I18nProviderProps): JSX.Eleme
 //
 // Se cachea, porque en una página real ese idioma solo cambia recargando y el
 // valor debe mantener su identidad entre renders (memos aguas abajo). Pero el
-// caché se ata al `lang` que lo generó: era un singleton de por vida y en la
+// caché se ata al `lang` y a la preferencia que lo generaron: era un singleton de por vida y en la
 // batería de tests —un único proceso— el primer fichero que montaba un
 // componente del DS le fijaba el idioma a todos los demás.
 let orphan: I18nValue | null = null;
@@ -75,7 +102,10 @@ let orphanLang: string | null = null;
 function valorHuerfano(lang: string): I18nValue {
   if (orphan === null || lang !== orphanLang) {
     orphanLang = lang;
-    orphan = buildValue(detectLocale());
+    orphan = buildValue(
+      detectLocale(),
+      typeof document === 'undefined' ? null : readLocaleCookie(document.cookie),
+    );
   }
   return orphan;
 }
@@ -83,7 +113,11 @@ function valorHuerfano(lang: string): I18nValue {
 export function useI18n(): I18nValue {
   const ctx = useContext(I18nContext);
   if (ctx !== null) return ctx;
-  return valorHuerfano(typeof document === 'undefined' ? '' : document.documentElement.lang);
+  return valorHuerfano(
+    typeof document === 'undefined'
+      ? ''
+      : `${document.documentElement.lang}\0${readLocaleCookie(document.cookie) ?? ''}`,
+  );
 }
 
 /** Atajo para el caso normal: solo traducir. */

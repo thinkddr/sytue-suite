@@ -114,6 +114,11 @@ export const sk: AppCatalog<typeof en> = {
   'status.expiry.week': 'Tento týždeň',
   'status.dmAlertsOn': 'Zapnúť upozornenia na priame správy',
   'status.dmAlertsOff': 'Vypnúť upozornenia na priame správy',
+  'status.dmAccountHelp':
+    'Platí pre tento účet a organizáciu vo všetkých aplikáciách Sytue. Povolenie prehliadača je samostatné.',
+  'status.dmLegacyHelp':
+    'Tento prehliadač stále má miestny filter. Odstráňte ho a použite nastavenie účtu; účet sa nezmení.',
+  'status.dmUseAccount': 'Použiť nastavenie účtu',
   'connection.online': 'Pripojené',
   'connection.connecting': 'Pripája sa…',
   'connection.offline': 'Bez pripojenia',

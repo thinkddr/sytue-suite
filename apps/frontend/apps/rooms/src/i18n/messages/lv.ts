@@ -114,6 +114,11 @@ export const lv: AppCatalog<typeof en> = {
   'status.expiry.week': 'Šonedēļ',
   'status.dmAlertsOn': 'Ieslēgt tiešo ziņu paziņojumus',
   'status.dmAlertsOff': 'Izslēgt tiešo ziņu paziņojumus',
+  'status.dmAccountHelp':
+    'Attiecas uz šo kontu un organizāciju visās Sytue lietotnēs. Pārlūkprogrammas atļauja ir atsevišķa.',
+  'status.dmLegacyHelp':
+    'Šajā pārlūkprogrammā joprojām ir lokāls filtrs. Noņemiet to, lai izmantotu konta iestatījumu; konts netiks mainīts.',
+  'status.dmUseAccount': 'Izmantot konta iestatījumu',
   'connection.online': 'Savienojums izveidots',
   'connection.connecting': 'Notiek savienošana…',
   'connection.offline': 'Nav savienojuma',

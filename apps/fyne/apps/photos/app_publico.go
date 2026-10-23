@@ -35,6 +35,7 @@ func TokenDeEnlace(u *url.URL) string {
 
 // AbrirPublico enseña el álbum compartido de ese token.
 func (a *App) AbrirPublico(token string) {
+	a.cancelarFotos()
 	teca, grande := NuevaFototeca(), NuevaFototeca()
 	grande.Variante = VarianteGrande
 	if a.cli != nil {
@@ -86,6 +87,9 @@ func (a *App) pantallaPublica() *fyne.Container {
 // verPublica abre una foto del álbum sola, como el navegador al seguir el enlace de la
 // tesela. Es una capa sobre la ventana entera, igual que el visor.
 func (a *App) verPublica(f api.Photo) {
+	if a.pub.grande != nil && (a.pub.abierta == nil || a.pub.abierta.ID != f.ID) {
+		a.pub.grande.Cancelar()
+	}
 	a.pub.abierta, a.pub.real = &f, false
 	if a.pub.capa == nil {
 		a.pub.capa = nuevaCapaVisor(a.cerrarPublica)
@@ -144,6 +148,9 @@ func (a *App) vecinaCompartida(paso int) func() {
 }
 
 func (a *App) cerrarPublica() {
+	if a.pub.grande != nil {
+		a.pub.grande.Cancelar()
+	}
 	c := a.pub.capa
 	if c == nil {
 		return

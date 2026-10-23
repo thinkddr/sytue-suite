@@ -1,0 +1,23 @@
+---
+/** Production returns 404; remote browser checks exercise the real hook/menu. */
+import '../../styles/app.css';
+import { basePathScript } from '@sytue/ui';
+import { DmNotificationsDemo } from '../../components/dev/DmNotificationsDemo';
+export const prerender = false;
+if (!import.meta.env.DEV) return new Response(null, { status: 404 });
+const locale = Astro.url.searchParams.get('lang') === 'es' ? 'es' : 'en';
+---
+
+<!doctype html>
+<html lang={locale}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Sytue Rooms</title>
+    <script is:inline set:html={basePathScript('/rooms')}></script>
+  </head>
+  <body>
+    <DmNotificationsDemo client:only="preact" locale={locale} />
+  </body>
+</html>

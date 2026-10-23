@@ -20,6 +20,7 @@ type correoFalso struct {
 	sent    api.ExternalMailSent
 	sendErr error
 	sends   int
+	reads   int
 	out     api.ExternalMailOutgoing
 }
 
@@ -35,7 +36,8 @@ func (*correoFalso) MailFolders(context.Context, string, string) ([]api.External
 	return []api.ExternalMailFolder{{ID: "INBOX", Role: "inbox"}}, nil
 }
 
-func (*correoFalso) MailMessages(context.Context, string, string, string, string) (api.ExternalMailPage, error) {
+func (s *correoFalso) MailMessages(context.Context, string, string, string, string) (api.ExternalMailPage, error) {
+	s.reads++
 	return api.ExternalMailPage{}, nil
 }
 

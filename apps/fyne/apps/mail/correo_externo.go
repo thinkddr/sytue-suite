@@ -94,6 +94,7 @@ func (b *Buzon) abrirCorreoExterno() {
 	c.d.RotuloCerrar = c.t("common.close")
 	c.d.AlCerrar = c.pedirCerrar
 	b.cerrarCorreoExterno = c.cerrar
+	b.correoAbierto = c
 	c.d.Mostrar(b.P.Lienzo())
 	c.cargarCuentas("")
 }
@@ -161,6 +162,9 @@ func (c *correoExterno) cerrar() {
 	clear(c.mensajes)
 	c.mensaje = nil
 	c.b.cerrarCorreoExterno = nil
+	if c.b.correoAbierto == c {
+		c.b.correoAbierto = nil
+	}
 	c.cuerpo.RemoveAll()
 	c.d.Cerrar()
 }
@@ -339,19 +343,31 @@ func (c *correoExterno) cargarMensajes(mas bool) {
 }
 
 func (c *correoExterno) programar() {
-	if c.parar != nil {
-		c.parar()
+	c.pausarLista()
+	if c.cerrado || c.b.segundoPlano || c.ctx.Err() != nil {
+		return
 	}
 	c.parar = c.b.Esperar(30*time.Second, func() {
-		if c.cerrado {
+		if c.cerrado || c.b.segundoPlano || c.ctx.Err() != nil {
 			return
 		}
-		if !c.ocupado && !c.redactando && c.mensaje == nil && !c.masLeidos && c.cuenta != nil {
+		if c.puedeActualizarLista() {
 			c.cargarMensajes(false)
 		} else {
 			c.programar()
 		}
 	})
+}
+
+func (c *correoExterno) pausarLista() {
+	if c.parar != nil {
+		c.parar()
+		c.parar = nil
+	}
+}
+
+func (c *correoExterno) puedeActualizarLista() bool {
+	return !c.ocupado && !c.redactando && c.mensaje == nil && !c.masLeidos && c.cuenta != nil
 }
 
 func (c *correoExterno) leer(m api.ExternalMailMessage) {

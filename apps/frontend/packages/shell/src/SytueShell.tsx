@@ -180,11 +180,15 @@ export function SytueShell({
   useEffect(() => publicarViewportVisual(), []);
 
   // Un solo punto de activación para todas las apps capaces de trabajar sin
-  // conexión. El service worker y su caché quedan aislados por usuario/producto.
+  // conexión. El service worker y su caché quedan aislados por origen, usuario, organización y producto.
   useEffect(() => {
     if (!OFFLINE_PRODUCTS.has(currentApp)) return;
-    return activateNativeOffline({ ownerId: user.id, product: currentApp });
-  }, [currentApp, user.id]);
+    return activateNativeOffline({
+      ownerId: user.id,
+      tenantId: user.tenant ?? '',
+      product: currentApp,
+    });
+  }, [currentApp, user.id, user.tenant]);
 
   // Aquí vivía una rampa de color POR APP: un objeto de 20 custom properties que
   // derivaba topbar, cabecera, menú lateral, selección, primario y anillo de foco de

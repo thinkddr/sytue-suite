@@ -154,8 +154,13 @@ type Buzon struct {
 	CorreoExterno       CorreoExterno
 	AutorizarCorreo     func(context.Context, string, string, ...string) (string, error)
 	cerrarCorreoExterno func()
+	correoAbierto       *correoExterno
 
-	ctx context.Context
+	ctx         context.Context
+	cancelar    context.CancelFunc
+	ciclo       uint64
+	identidad   string
+	redacciones map[string]redaccionSuspendida
 
 	carpetas   []api.Mailbox
 	etiquetas  []api.MailLabel
@@ -212,6 +217,7 @@ type Buzon struct {
 	// deltaEnCurso dice que hay un delta en camino, y otraVuelta, que llegó correo
 	// mientras tanto: al volver se pregunta otra vez sin esperar.
 	deltaEnCurso, otraVuelta bool
+	segundoPlano             bool
 }
 
 // Cuerpo es lo que se enseña de un mensaje abierto.
@@ -316,33 +322,54 @@ func esperar(d time.Duration, f func()) func() {
 // pedir hace una llamada fuera del hilo de la interfaz y vuelve a él con el
 // resultado. Es la única puerta al servicio: todo lo que tarda pasa por aquí.
 func pedir[T any](b *Buzon, llamada func(context.Context) (T, error), luego func(T, error)) {
+	ctx, ciclo := b.ctx, b.ciclo
 	b.Lanzar(func() {
-		v, err := llamada(b.ctx)
-		fyne.Do(func() { luego(v, err) })
+		if ctx.Err() != nil {
+			return
+		}
+		v, err := llamada(ctx)
+		fyne.Do(func() {
+			if ctx.Err() == nil && ciclo == b.ciclo {
+				luego(v, err)
+			}
+		})
 	})
 }
 
 // Arrancar pide lo que la pantalla necesita para empezar: carpetas —que eligen
 // Recibidos y cargan su lista—, etiquetas y espacio.
 func (b *Buzon) Arrancar(ctx context.Context) {
+	if b.cancelar != nil {
+		b.cancelar()
+	}
+	ctx, b.cancelar = context.WithCancel(ctx)
 	b.ctx = ctx
+	ciclo := b.ciclo + 1
+	b.ciclo = ciclo
 	//nolint:contextcheck // Estas cargas toman el contexto de vida guardado en b.ctx.
 	b.cargarCarpetas()
 	//nolint:contextcheck // Estas cargas toman el contexto de vida guardado en b.ctx.
 	b.cargarEtiquetas()
 	//nolint:contextcheck // Estas cargas toman el contexto de vida guardado en b.ctx.
 	b.cargarCuota()
+	//nolint:contextcheck // La firma y los alias usan la misma vida guardada en b.ctx mediante pedir.
 	b.cargarIdentidad()
 	//nolint:contextcheck // Estas cargas toman el contexto de vida guardado en b.ctx.
 	b.cargarCompartidos()
 	b.sondear()
 	if d := b.P.Menu.Importar; d != nil {
-		//nolint:contextcheck // El importador no realiza operaciones cancelables.
-		d.Cargar()
+		d.CargarCon(ctx)
 	}
 	b.Fondo(func() {
 		api.Escuchar(ctx, TopeLlegadas, func(ctx context.Context) error {
-			return b.S.Llegadas(ctx, func() { fyne.Do(b.llegada) })
+			return b.S.Llegadas(ctx, func() {
+				fyne.Do(func() {
+					if ctx.Err() == nil && ciclo == b.ciclo {
+						//nolint:contextcheck // El evento usa la vida del buzón guardada en b.ctx, ya contrastada con este SSE.
+						b.llegada()
+					}
+				})
+			})
 		})
 	})
 }
@@ -968,6 +995,9 @@ func (b *Buzon) cuerpo(id string) (Cuerpo, bool) {
 // dos minutos, y con una página cortada (`has_more`) vuelve a preguntar ya. El aviso
 // de llegada (llegada) lo adelanta: el sondeo queda de respaldo si el flujo se cae.
 func (b *Buzon) sondear() {
+	if b.segundoPlano || b.ctx.Err() != nil {
+		return
+	}
 	if b.esperaSondeo == 0 {
 		b.esperaSondeo = SondeoBase
 	}
@@ -978,6 +1008,9 @@ func (b *Buzon) sondear() {
 // del sondeo. Si ya hay uno en camino no se lanza otro —serían dos cadenas de
 // sondeo—: se pide otra vuelta en cuanto acabe.
 func (b *Buzon) llegada() {
+	if b.segundoPlano || b.ctx.Err() != nil {
+		return
+	}
 	if b.deltaEnCurso {
 		b.otraVuelta = true
 		return
@@ -989,6 +1022,9 @@ func (b *Buzon) llegada() {
 }
 
 func (b *Buzon) vueltaDelta() {
+	if b.segundoPlano || b.ctx.Err() != nil {
+		return
+	}
 	if b.consulta != "" || (b.carpetaID == "" && b.etiquetaID == "") {
 		b.sondear() // en búsqueda no aplica: es una vista de paso
 		return
@@ -999,7 +1035,7 @@ func (b *Buzon) vueltaDelta() {
 		return b.S.Changes(ctx, desde)
 	}, func(c api.MailCambios, err error) {
 		b.deltaEnCurso = false
-		if b.otraVuelta {
+		if b.otraVuelta && !b.segundoPlano {
 			b.otraVuelta = false
 			defer func() { b.pararSondeo(); b.vueltaDelta() }()
 		}
@@ -1072,6 +1108,13 @@ func AplicarDelta(ms []api.MailMessage, c api.MailCambios, carpeta, etiqueta str
 
 // Parar suelta los temporizadores: la ventana se cierra.
 func (b *Buzon) Parar() {
+	b.ciclo++
+	if b.cancelar != nil {
+		b.cancelar()
+	}
+	if d := b.P.Menu.Importar; d != nil {
+		d.Parar()
+	}
 	if b.cerrarCorreoExterno != nil {
 		b.cerrarCorreoExterno()
 	}
@@ -1079,6 +1122,9 @@ func (b *Buzon) Parar() {
 		if f != nil {
 			f()
 		}
+	}
+	if b.redaccion != nil && b.redaccion.pararAuto != nil {
+		b.redaccion.pararAuto()
 	}
 }
 

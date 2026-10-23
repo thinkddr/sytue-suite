@@ -62,7 +62,29 @@ const (
 	TopeBytes    = 32 << 20
 	TopePixeles  = 8 << 20
 	bytesPorPixe = 4
+	// Una página de200 fotos llegó a abrir200 descargas y201 goroutines.
+	// Dos preparaciones bajan el pico medido de670MiB a115MiB; el visor usa
+	// su propia fototeca y TeselaYa conserva el acceso inmediato a una foto.
+	descargasSimultaneas     = 6
+	preparacionesSimultaneas = 2
 )
+
+type trabajoFoto struct {
+	epoca   uint64
+	version uint64
+	ctx     context.Context
+}
+
+type descargaFoto struct {
+	id string
+	trabajoFoto
+}
+
+type preparacionFoto struct {
+	clave clavePintada
+	radio float32
+	trabajoFoto
+}
 
 type clavePintada struct {
 	id   string
@@ -82,17 +104,24 @@ type Fototeca struct {
 	// Variante es cuál se pide (`miniatura` por defecto, `grande` en la del visor).
 	Variante string
 
-	mu         sync.Mutex
-	libre      *sync.Cond
-	crudas     map[string][]byte
-	ordenC     []string
-	pesoC      int
-	pintadas   map[clavePintada]*image.RGBA
-	ordenP     []clavePintada
-	pixeles    int
-	enVuelo    map[string]bool
-	preparando map[clavePintada]bool
-	fallidas   map[string]bool
+	mu                           sync.Mutex
+	libre                        *sync.Cond
+	crudas                       map[string][]byte
+	ordenC                       []string
+	pesoC                        int
+	pintadas                     map[clavePintada]*image.RGBA
+	ordenP                       []clavePintada
+	pixeles                      int
+	enVuelo                      map[string]bool
+	preparando                   map[clavePintada]bool
+	fallidas                     map[string]bool
+	epoca                        uint64
+	versiones                    map[string]uint64
+	ctx                          context.Context
+	cancelar                     context.CancelFunc
+	descargas                    []descargaFoto
+	preparaciones                []preparacionFoto
+	descargando, preparandoAhora int
 
 	// vivas son los repintados de lo que ENSEÑA cada foto ahora mismo: las teselas y
 	// el lienzo del visor se apuntan al nacer, y la app las olvida todas cada vez que
@@ -111,7 +140,9 @@ func NuevaFototeca() *Fototeca {
 		preparando: map[clavePintada]bool{},
 		fallidas:   map[string]bool{},
 		vivas:      map[string][]func(){},
+		versiones:  map[string]uint64{},
 	}
+	f.ctx, f.cancelar = context.WithCancel(context.Background())
 	f.libre = sync.NewCond(&f.mu)
 	return f
 }
@@ -132,6 +163,29 @@ func (f *Fototeca) Olvidar() {
 	f.muVivas.Lock()
 	defer f.muVivas.Unlock()
 	clear(f.vivas)
+}
+
+// Cancelar retira el trabajo de la pantalla anterior y conserva las fotos ya listas.
+// Olvidar sólo retira repintados: también se llama al reconstruir la misma pantalla.
+func (f *Fototeca) Cancelar() {
+	f.mu.Lock()
+	f.cancelar()
+	f.epoca++
+	f.ctx, f.cancelar = context.WithCancel(context.Background())
+	f.descargas, f.preparaciones = nil, nil
+	clear(f.enVuelo)
+	clear(f.preparando)
+	f.libre.Broadcast()
+	f.mu.Unlock()
+	f.Olvidar()
+}
+
+func (f *Fototeca) trabajo(id string) trabajoFoto {
+	return trabajoFoto{epoca: f.epoca, version: f.versiones[id], ctx: f.ctx}
+}
+
+func (f *Fototeca) vigente(id string, t trabajoFoto) bool {
+	return t.epoca == f.epoca && t.version == f.versiones[id] && t.ctx.Err() == nil
 }
 
 // enLaInterfaz es `fyne.Do`. Es una variable por los tests: el driver de pruebas de
@@ -163,6 +217,13 @@ func (f *Fototeca) avisar(id string) {
 func (f *Fototeca) Tirar(id string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	f.versiones[id]++
+	delete(f.enVuelo, id)
+	for k := range f.preparando {
+		if k.id == id {
+			delete(f.preparando, k)
+		}
+	}
 	if datos, ok := f.crudas[id]; ok {
 		f.pesoC -= len(datos)
 		delete(f.crudas, id)
@@ -224,14 +285,16 @@ func (f *Fototeca) Tesela(id string, w, h int, radio float32) *image.RGBA {
 	enCola := f.preparando[k]
 	if hay && !enCola {
 		f.preparando[k] = true
+		f.preparaciones = append(f.preparaciones, preparacionFoto{k, radio, f.trabajo(id)})
+		if f.preparandoAhora < preparacionesSimultaneas {
+			f.preparandoAhora++
+			go f.prepararCola()
+		}
 	}
 	f.mu.Unlock()
 	if !hay {
 		f.pedir(id)
 		return nil
-	}
-	if !enCola {
-		go f.preparar(k, radio)
 	}
 	return nil
 }
@@ -251,22 +314,56 @@ func (f *Fototeca) Pintada(id string) *image.RGBA {
 
 // preparar decodifica, recorta y remuestrea FUERA del hilo que pinta, y guarda el
 // resultado.
+func (f *Fototeca) prepararCola() {
+	for {
+		f.mu.Lock()
+		if len(f.preparaciones) == 0 {
+			f.preparaciones = nil
+			f.preparandoAhora--
+			f.libre.Broadcast()
+			f.mu.Unlock()
+			return
+		}
+		p := f.preparaciones[0]
+		f.preparaciones[0] = preparacionFoto{}
+		f.preparaciones = f.preparaciones[1:]
+		f.mu.Unlock()
+		f.prepararTrabajo(p)
+	}
+}
+
 func (f *Fototeca) preparar(k clavePintada, radio float32) {
 	f.mu.Lock()
-	crudas := f.crudas[k.id]
+	p := preparacionFoto{k, radio, f.trabajo(k.id)}
 	f.mu.Unlock()
-	m := recortarYEscalar(crudas, k.w, k.h, radio)
+	f.prepararTrabajo(p)
+}
 
+func (f *Fototeca) prepararTrabajo(p preparacionFoto) {
+	k := p.clave
 	f.mu.Lock()
-	delete(f.preparando, k)
-	defer f.libre.Broadcast()
-	if m == nil {
-		f.fallidas[k.id] = true
+	if !f.vigente(k.id, p.trabajoFoto) {
 		f.mu.Unlock()
 		return
 	}
-	// Idempotente: TeselaYa y el segundo plano pueden coincidir en la misma clave, y
-	// contarla dos veces descuadraría el tope.
+	crudas := f.crudas[k.id]
+	f.mu.Unlock()
+	m := recortarYEscalar(crudas, k.w, k.h, p.radio)
+	f.mu.Lock()
+	defer f.libre.Broadcast()
+	if !f.vigente(k.id, p.trabajoFoto) {
+		f.mu.Unlock()
+		return
+	}
+	delete(f.preparando, k)
+	if m == nil {
+		// Los bytes pueden haber salido de la caché mientras esperaba su turno.
+		if len(crudas) > 0 {
+			f.fallidas[k.id] = true
+		}
+		f.mu.Unlock()
+		return
+	}
 	if _, ya := f.pintadas[k]; !ya {
 		f.pintadas[k], f.ordenP = m, append(f.ordenP, k)
 		f.pixeles += k.w * k.h
@@ -327,33 +424,61 @@ func (f *Fototeca) pedir(id string) {
 		return
 	}
 	f.mu.Lock()
+	defer f.mu.Unlock()
 	if f.enVuelo[id] || f.fallidas[id] {
-		f.mu.Unlock()
 		return
 	}
 	f.enVuelo[id] = true
-	f.mu.Unlock()
-	go func() {
-		variante := f.Variante
-		if variante == "" {
-			variante = VarianteMiniatura
-		}
-		datos, err := f.Pedir(context.Background(), id, variante)
+	f.descargas = append(f.descargas, descargaFoto{id, f.trabajo(id)})
+	if f.descargando < descargasSimultaneas {
+		f.descargando++
+		go f.descargarCola()
+	}
+}
+
+func (f *Fototeca) descargarCola() {
+	for {
 		f.mu.Lock()
-		delete(f.enVuelo, id)
-		defer f.libre.Broadcast()
-		if err != nil || len(datos) == 0 {
-			// Una miniatura que no llega deja la tesela con su fondo y NO se
-			// reintenta sola: en una galería, reintentar en cada repintado una
-			// foto que da 404 es un bucle de red que nadie ve.
-			f.fallidas[id] = true
+		if len(f.descargas) == 0 {
+			f.descargas = nil
+			f.descargando--
+			f.libre.Broadcast()
 			f.mu.Unlock()
 			return
 		}
-		f.guardarCrudas(id, datos)
+		d := f.descargas[0]
+		f.descargas[0] = descargaFoto{}
+		f.descargas = f.descargas[1:]
+		vigente := f.vigente(d.id, d.trabajoFoto)
 		f.mu.Unlock()
-		f.avisar(id)
-	}()
+		if vigente {
+			f.descargar(d)
+		}
+	}
+}
+
+func (f *Fototeca) descargar(d descargaFoto) {
+	variante := f.Variante
+	if variante == "" {
+		variante = VarianteMiniatura
+	}
+	datos, err := f.Pedir(d.ctx, d.id, variante)
+	f.mu.Lock()
+	defer f.libre.Broadcast()
+	if !f.vigente(d.id, d.trabajoFoto) {
+		f.mu.Unlock()
+		return
+	}
+	delete(f.enVuelo, d.id)
+	if err != nil || len(datos) == 0 {
+		// Un error real no se reintenta en cada repintado. Cancelar no marca fallida.
+		f.fallidas[d.id] = true
+		f.mu.Unlock()
+		return
+	}
+	f.guardarCrudas(d.id, datos)
+	f.mu.Unlock()
+	f.avisar(d.id)
 }
 
 // Esperar bloquea hasta que no quede nada por descargar ni por preparar.
@@ -365,7 +490,7 @@ func (f *Fototeca) pedir(id string) {
 func (f *Fototeca) Esperar() {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	for len(f.enVuelo) > 0 || len(f.preparando) > 0 {
+	for len(f.enVuelo) > 0 || len(f.preparando) > 0 || f.descargando > 0 || f.preparandoAhora > 0 {
 		f.libre.Wait()
 	}
 }

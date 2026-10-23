@@ -114,6 +114,11 @@ export const hr: AppCatalog<typeof en> = {
   'status.expiry.week': 'Ovaj tjedan',
   'status.dmAlertsOn': 'Uključi obavijesti o izravnim porukama',
   'status.dmAlertsOff': 'Isključi obavijesti o izravnim porukama',
+  'status.dmAccountHelp':
+    'Primjenjuje se na ovaj račun i organizaciju u svim aplikacijama Sytue. Dopuštenje preglednika je zasebno.',
+  'status.dmLegacyHelp':
+    'Ovaj preglednik još ima lokalni filtar. Uklonite ga za upotrebu postavke računa; račun se neće promijeniti.',
+  'status.dmUseAccount': 'Upotrijebi postavku računa',
   'connection.online': 'Povezano',
   'connection.connecting': 'Povezivanje…',
   'connection.offline': 'Nema veze',

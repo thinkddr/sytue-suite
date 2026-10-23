@@ -42,16 +42,10 @@ import (
 // El diálogo y el menú SÍ son capas, y ahí bloquear es lo correcto: un diálogo modal
 // tiene que dejar inerte lo de debajo.
 //
-// Pero en la web un aviso va ENCIMA de un diálogo (`--z-toast` 1090 sobre `--z-modal`
-// 1080). Así que mientras hay una capa puesta, la pila se la PRESTA: la capa de arriba
-// pinta los avisos después de su panel, en coordenadas de la ventana —que es lo mismo
-// que la pila `fixed` de la web—, y la pila deja de pintarlos. Siguen
-// pulsables, porque con capa el puntero solo visita la capa y ahí están.
-//
-// Lo que NO se prestan es el Tab. La capa tiene su propio gestor de foco y recorre
-// todo lo que pinta, avisos incluidos; en la web el Tab no sale del diálogo, y el aspa
-// de un aviso no es del diálogo. Así que mientras están prestados, su aspa y su acción
-// se declaran fuera del recorrido (`Aviso.prestado`) y se siguen pulsando con el ratón.
+// Con un diálogo abierto, los avisos van en una banda desplazable de SU contenido,
+// entre la cabecera y el cuerpo: no pueden cubrir campos ni botones. Los menús sin
+// diálogo conservan el préstamo a la capa. Al cerrar el último diálogo los avisos
+// persistentes vuelven a su esquina.
 
 // TonoAviso son los cuatro tonos de Toast.tsx. El valor cero es `info`, como el
 // `toneConfig[t.tone ?? 'info']` de allí.
@@ -234,9 +228,11 @@ func (a *Aviso) CreateRenderer() fyne.WidgetRenderer {
 	return r
 }
 
-// prestado dice si el aviso va dentro de una capa (un diálogo, un menú): entonces sus
-// controles no son paradas del Tab, que en la web no sale del diálogo.
-func (a *Aviso) prestado() bool { return a.pila != nil && a.pila.capaEncima() != nil }
+// prestado excluye del Tab los avisos sobre un menú sin diálogo. En el flujo de un
+// diálogo, sus controles sí participan en el recorrido del propio diálogo.
+func (a *Aviso) prestado() bool {
+	return a.pila != nil && a.pila.capaEncima() != nil && a.pila.dialogoEncima() == nil
+}
 
 // Cerrar quita el aviso de su pila.
 func (a *Aviso) Cerrar() {
@@ -465,7 +461,11 @@ func (p *PilaAvisos) refrescar() {
 	p.muPintar.Lock()
 	defer p.muPintar.Unlock()
 	p.Refresh()
-	if cp := p.capaEncima(); cp != nil {
+	d := p.dialogoEncima()
+	if d != nil {
+		d.Refresh()
+	}
+	if cp := p.capaEncima(); cp != nil && cp.panel != fyne.CanvasObject(d) {
 		cp.Refresh()
 	}
 }
@@ -528,17 +528,21 @@ func (p *PilaAvisos) colocar(t fyne.Size) {
 	defer p.mu.Unlock()
 	for i := len(p.avisos) - 1; i >= 0; i-- {
 		a := p.avisos[i]
-		a.ancho = ancho
 		tam := MedidaAviso(a, ancho)
 		y -= tam.Height
-		a.Resize(tam)
-		pos := fyne.NewPos(x, y)
-		a.Move(pos)
-		if a.fundido.objeto() == nil { // mientras se funde, la sombra la mueve el fundido
-			a.sombra.Ajustar(pos, tam, v)
-		}
+		colocarAviso(a, ancho, fyne.NewPos(x, y), v)
 		y -= HuecoPilaAvisos
 	}
 }
 
 func (r *pilaRenderer) Refresh() { r.Layout(r.p.Size()) }
+
+func colocarAviso(a *Aviso, ancho float32, pos fyne.Position, v tema.Variante) {
+	a.ancho = ancho
+	tam := MedidaAviso(a, ancho)
+	a.Resize(tam)
+	a.Move(pos)
+	if a.fundido.objeto() == nil {
+		a.sombra.Ajustar(pos, tam, v)
+	}
+}

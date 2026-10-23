@@ -37,6 +37,7 @@ type contactStore interface {
 	DeleteAddressBook(ctx context.Context, ownerSub string, id uuid.UUID) error
 
 	ListContacts(ctx context.Context, subject string, bookID uuid.UUID, limit int) ([]domain.Contact, error)
+	ListContactsPage(ctx context.Context, subject string, bookID uuid.UUID, after *store.ContactCursor, limit int) (store.ContactPage, error)
 	CreateContact(ctx context.Context, subject string, in store.UpsertContact) (domain.Contact, error)
 	GetContact(ctx context.Context, subject string, id uuid.UUID) (domain.Contact, error)
 	UpdateContact(ctx context.Context, subject string, id uuid.UUID, in store.UpsertContact, ifMatch *uuid.UUID) (domain.Contact, error)

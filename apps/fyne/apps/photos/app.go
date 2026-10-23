@@ -303,6 +303,7 @@ func (a *App) Arrancar() {
 
 // Ir cambia de pantalla y pide lo que esa pantalla necesita, como un `href` de la web.
 func (a *App) Ir(r Ruta) {
+	a.cancelarFotos()
 	a.cerrarVisor()
 	a.cerrarEditor()
 	a.cerrarPublica()
@@ -345,6 +346,31 @@ func (a *App) Ir(r Ruta) {
 		a.pintar()
 	case RutaPublica:
 		a.pedirPublico()
+	}
+}
+
+// cancelarFotos retira las colas de la pantalla anterior, sin vaciar las cachés.
+func (a *App) cancelarFotos() {
+	vistas := map[*Fototeca]bool{}
+	for _, f := range []*Fototeca{a.v.Teca, a.v.TecaGrande, a.pub.teca, a.pub.grande, a.cmp.teca} {
+		if f != nil && !vistas[f] {
+			vistas[f] = true
+			f.Cancelar()
+		}
+	}
+}
+
+// AlFondo cancela descargas y preparaciones que ya no se ven, también al cerrar.
+func (a *App) AlFondo() { a.cancelarFotos() }
+
+// AlVolver reconstruye los rasters retirados al salir de primer plano.
+func (a *App) AlVolver() {
+	a.pintar()
+	if a.vis != nil {
+		a.pintarVisor()
+	}
+	if a.pub.abierta != nil {
+		a.pintarPublica()
 	}
 }
 
@@ -584,6 +610,7 @@ func (a *App) buscar(texto string) {
 	if texto == a.g.texto {
 		return
 	}
+	a.cancelarFotos()
 	a.gen++
 	gen := a.gen
 	a.g = estadoGaleria{texto: texto}

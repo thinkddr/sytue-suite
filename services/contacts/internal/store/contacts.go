@@ -150,39 +150,8 @@ func (s *Store) UpdateContact(ctx context.Context, subject string, id uuid.UUID,
 // estable (family/given/FN/id). limit acota el tamano de pagina (1..500, por
 // defecto 100). Los correos y telefonos se adjuntan en lote (sin N+1).
 func (s *Store) ListContacts(ctx context.Context, subject string, bookID uuid.UUID, limit int) ([]domain.Contact, error) {
-	t := tenancy.MustFrom(ctx)
-	if limit <= 0 || limit > 500 {
-		limit = 100
-	}
-	var out []domain.Contact
-	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
-		if err := assertOwnedBook(ctx, tx, t.Slug, subject, bookID); err != nil {
-			return err
-		}
-		rows, err := tx.Query(ctx,
-			`SELECT `+contactCols+`
-			 FROM contacts c JOIN card_objects o ON o.id = c.object_id AND o.tenant = c.tenant
-			 WHERE c.tenant=$1 AND c.address_book_id=$2 AND c.deleted_at IS NULL
-			 ORDER BY lower(c.family_name), lower(c.given_name), lower(c.formatted_name), c.id
-			 LIMIT $3`,
-			t.Slug, bookID, limit)
-		if err != nil {
-			return fmt.Errorf("store: listar contactos: %w", err)
-		}
-		defer rows.Close()
-		for rows.Next() {
-			c, err := scanContact(rows, t.Slug)
-			if err != nil {
-				return err
-			}
-			out = append(out, c)
-		}
-		if err := rows.Err(); err != nil {
-			return err
-		}
-		return attachChannels(ctx, tx, t.Slug, out)
-	})
-	return out, err
+	page, err := s.ListContactsPage(ctx, subject, bookID, nil, limit)
+	return page.Contacts, err
 }
 
 // ListOwnerContactsPage lista una PAGINA de los contactos vivos del subject en

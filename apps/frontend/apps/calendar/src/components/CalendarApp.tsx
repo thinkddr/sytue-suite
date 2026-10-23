@@ -29,6 +29,7 @@ import {
   Illustration,
   esAtajoDeApp,
   useToast,
+  ToastProvider,
   cx,
   useScrollRestante,
   MobileFab,
@@ -86,6 +87,7 @@ import { ReminderCenter } from './ReminderCenter.js';
 import { SearchPanel } from './SearchPanel.js';
 import { fechaDelEnlace } from '../lib/search.js';
 import { useT } from '../i18n/index.js';
+import { I18nProvider } from '@sytue/i18n/preact';
 
 interface Props {
   /** Idioma ya negociado en el servidor (middleware): baja a las vistas. */
@@ -177,7 +179,17 @@ function readCreateIntent(search: string): EditingEvent | null {
   };
 }
 
-export function CalendarApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
+export function CalendarApp(props: Props): JSX.Element {
+  return (
+    <I18nProvider locale={props.locale}>
+      <ToastProvider key={JSON.stringify([props.user.id, props.user.tenant])}>
+        <CalendarView {...props} />
+      </ToastProvider>
+    </I18nProvider>
+  );
+}
+
+function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
   const t = useT(locale);
   const offline = useConnectivity() === 'offline';
   const [calendars, setCalendars] = useState<Calendar[]>([]);

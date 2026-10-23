@@ -773,6 +773,9 @@ func TestLaLlegadaAdelantaElDelta(t *testing.T) {
 	if s.pidio("Llegadas") != 1 || s.pidio("Changes") != 1 {
 		t.Fatalf("la llegada no ha preguntado por el delta: %v", s.llamadas)
 	}
+	// La fase anterior canceló su vida para cerrar el SSE. Esta fase comprueba la
+	// agrupación en una vida activa; una vida cancelada ya no debe hacer lecturas.
+	b.ctx = context.Background()
 
 	b.deltaEnCurso = true
 	b.llegada()

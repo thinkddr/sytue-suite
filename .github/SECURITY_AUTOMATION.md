@@ -9,8 +9,10 @@ y comprueba los helpers de esta automatización. La CI ejecuta Gitleaks y govuln
 `codex-security-fix.yml` busca automáticamente alertas abiertas de Code scanning
 en la rama predeterminada y de Dependabot, prepara un PR borrador con el contexto
 de una de ellas y publica un comentario `@codex` con la cuenta conectada a ChatGPT.
-El conector nativo recibe el encargo, investiga la alerta, hace el arreglo y
-ejecuta comprobaciones en su entorno. El PR inicial contiene una solicitud,
+Con un entorno Legacy compatible, el conector nativo recibe el encargo,
+investiga la alerta, hace el arreglo y ejecuta comprobaciones en su entorno.
+La automatización local de Codex descrita abajo retoma los encargos cuando
+ese conector no puede ejecutarlos. El PR inicial contiene una solicitud,
 **todavía no una corrección**; Codex debe sustituirla por el arreglo.
 
 Este flujo no llama a OpenAI API, no instala Codex en Actions y no necesita
@@ -25,9 +27,12 @@ la cuota incluida, espera a su renovación en lugar de comprar uso adicional.
    Publica los workflows en la rama predeterminada.
 2. Inicia sesión en Codex con **ChatGPT Pro** y conecta `thinkddr/sytue-suite`
    mediante la integración de GitHub. Comprueba el repositorio en
-   [Codex settings](https://chatgpt.com/settings/code-review). Si pide un entorno
-   cloud, selecciona o crea uno para este repositorio. La integración debe poder
-   leer el repositorio y publicar cambios en la rama del PR.
+   [Codex settings](https://chatgpt.com/settings/code-review). Las tareas iniciadas
+   mediante `@codex` necesitan un entorno **Codex Cloud (Legacy)** para este
+   repositorio, disponible desde
+   [sus ajustes de entornos](https://chatgpt.com/codex/cloud/settings/environments).
+   Un entorno publicado en el Codex Cloud actual no sustituye ese requisito.
+   La integración debe poder leer el repositorio y publicar cambios en la rama del PR.
 3. Configura estos **repository secrets** en **Settings → Secrets and variables →
    Actions**. No guardes valores en archivos del repositorio.
 
@@ -79,6 +84,27 @@ Si Codex no acepta el encargo por falta de cuota, el PR abierto conserva la tare
 sin generar solicitudes nuevas para la misma alerta. Se puede retomar desde esa
 PR cuando se renueve la cuota.
 
+## Ejecutor local con ChatGPT Pro
+
+En esta cuenta está activa la automatización **Resolver findings de sytue-suite
+con Pro**, asociada a este chat de Codex. Revisa la cola cada seis horas y corrige
+como máximo un encargo pendiente por ejecución, con las credenciales GitHub ya
+conectadas. **La app de Codex debe estar abierta**. Si está cerrada, GitHub sigue
+preparando los encargos, pero el ejecutor local no trabaja hasta estar disponible.
+
+Antes de corregir, comprueba los límites de uso incluidos. Se detiene si no hay
+cuota ordinaria disponible; no usa API keys ni compra créditos o recargas. Usa
+un worktree aislado, verifica que la alerta siga abierta, ejecuta las pruebas
+pertinentes y hace commit y push a la misma rama del PR. Conserva los marcadores
+de deduplicación y deja el arreglo para revisión humana, sin fusionarlo.
+
+No interviene si otro Codex ya está corrigiendo la PR ni repite arreglos que
+esperan revisión. Permanece en silencio cuando no cambia el estado o no hay
+trabajo accionable; avisa de correcciones terminadas, fallos nuevos y acciones
+necesarias. Esta programación vive en la app; el horario de selección de alertas
+vive en GitHub Actions. Si se recupera el entorno Legacy, evita mantener dos
+ejecutores trabajando en el mismo encargo.
+
 ## Selección manual opcional y revisión
 
 1. Abre una alerta en **Security → Code scanning** o **Security → Dependabot** y
@@ -96,9 +122,11 @@ PR cuando se renueve la cuota.
    a evaluar la alerta después del merge.
 
 Si el conector no reacciona, comprueba la conexión, la identidad del token, el
-entorno y la cuota. Puedes publicar tú mismo el comentario desde la cuenta
-vinculada o abrir el PR en Codex y pedirle resolverlo. No uses una API key como
-alternativa.
+entorno y la cuota. Si responde **create an environment for this repo**, no ha
+aceptado el arreglo: falta el entorno Legacy compatible. Si ese panel redirige
+al inicio, crear otro entorno en el Codex Cloud actual no resuelve el bloqueo.
+El PR conserva el encargo para que lo retome un Codex disponible con la cuenta
+vinculada. No uses una API key como alternativa.
 
 ```sh
 gh workflow run codex-security-fix.yml --ref main \
@@ -137,6 +165,7 @@ node --test .github/scripts/security-*.test.mjs
 
 Referencias oficiales: [tareas con @codex en GitHub](https://learn.chatgpt.com/docs/third-party/github),
 [autenticación ChatGPT o API](https://learn.chatgpt.com/docs/auth),
+[entornos del conector Legacy](https://learn.chatgpt.com/docs/environments/cloud-environment),
 [REST de Code scanning](https://docs.github.com/en/rest/code-scanning/code-scanning),
 [REST de Dependabot](https://docs.github.com/en/rest/dependabot/alerts),
 [eventos de GitHub Actions](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows).

@@ -38,6 +38,7 @@ test('renders canonical selected finding path and native Codex handoff for both 
     assert.match(result.prBody, /it does not yet correct the finding/);
     assert.ok(result.prBody.startsWith(`<!-- codex-security-finding: example/repo ${type} 42 -->\n`));
     assert.match(result.prBody, /authorized human must repost/);
+    assert.doesNotMatch(result.prBody, /@codex/);
     assert.match(result.codexComment, /^@codex Fix /);
     assert.match(result.codexComment, /Remove the request file/);
     assert.match(result.codexComment, /without OpenAI API calls/);

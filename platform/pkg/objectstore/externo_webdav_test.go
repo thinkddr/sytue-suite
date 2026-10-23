@@ -132,12 +132,19 @@ func TestWebDAVNoEmitePeticionesParaClavesOTenantsInvalidos(t *testing.T) {
 		}},
 	}
 	cases := []struct{ slug, key string }{
-		{"acme", ""}, {"acme", "///"}, {"acme", "../beta/blob"},
-		{"acme", "files/../../beta/blob"}, {"acme", "files/./blob"},
-		{"acme", "files//blob"}, {"acme", "files\\..\\beta\\blob"},
-		{"acme", "files/\x00blob"}, {"acme", "files/\r\nblob"},
-		{"acme", "files/\x7fblob"}, {"acme", "files/\u0085blob"},
-		{"", "files/blob"}, {"../beta", "files/blob"},
+		{"acme", ""},
+		{"acme", "///"},
+		{"acme", "../beta/blob"},
+		{"acme", "files/../../beta/blob"},
+		{"acme", "files/./blob"},
+		{"acme", "files//blob"},
+		{"acme", "files\\..\\beta\\blob"},
+		{"acme", "files/\x00blob"},
+		{"acme", "files/\r\nblob"},
+		{"acme", "files/\x7fblob"},
+		{"acme", "files/\u0085blob"},
+		{"", "files/blob"},
+		{"../beta", "files/blob"},
 		{"acme/../../beta", "files/blob"},
 	}
 	for _, op := range ops {

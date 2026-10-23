@@ -199,7 +199,12 @@ test('docChartData interpreta la rejilla como un rango de sheets (cabecera + ró
   expect(data.series).toHaveLength(1);
   expect(data.series[0]!.name).toBe('Ventas');
   expect(data.series[0]!.values).toEqual([10, 15.5]); // coma decimal es-ES
-  expect(docChartData([['', 'Ventas'], ['Ene', '2%5%']]).series[0]!.values).toEqual([25]);
+  expect(
+    docChartData([
+      ['', 'Ventas'],
+      ['Ene', '2%5%'],
+    ]).series[0]!.values,
+  ).toEqual([25]);
 });
 
 /* ---------- Gráficos: horneado figure/SVG ---------- */

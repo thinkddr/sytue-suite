@@ -9,6 +9,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -826,13 +827,22 @@ func configInt32(s string, def, lo, hi int32) int32 {
 			n = v
 		}
 	}
-	if n < int64(lo) {
+	// Handle values outside int32 before narrowing. The policy bounds are
+	// themselves int32 and may be stricter than these machine limits.
+	if n < math.MinInt32 {
 		return lo
 	}
-	if n > int64(hi) {
+	if n > math.MaxInt32 {
 		return hi
 	}
-	return int32(n)
+	value := int32(n)
+	if value < lo {
+		return lo
+	}
+	if value > hi {
+		return hi
+	}
+	return value
 }
 
 // configInt64 lee un entero positivo de config con default, acotado a [1, hi]; 0

@@ -816,22 +816,22 @@ func shellCommand(cmd string) []string {
 	return []string{"sh", "-c", cmd}
 }
 
-// configInt32 lee un entero de config con default y lo acota a [lo, hi]; el clamp
-// hace segura la conversión a int32 (sin overflow, gosec G115).
-func configInt32(s string, def, lo, hi int) int32 {
-	n := def
+// configInt32 parses a configuration integer with a default and clamps it to
+// [lo, hi]. Typed bounds guarantee that the result fits in int32. Parse in 64
+// bits so large values clamp consistently on both 32- and 64-bit hosts.
+func configInt32(s string, def, lo, hi int32) int32 {
+	n := int64(def)
 	if s != "" {
-		if v, err := strconv.Atoi(s); err == nil {
+		if v, err := strconv.ParseInt(s, 10, 64); err == nil {
 			n = v
 		}
 	}
-	if n < lo {
-		n = lo
+	if n < int64(lo) {
+		return lo
 	}
-	if n > hi {
-		n = hi
+	if n > int64(hi) {
+		return hi
 	}
-	//nolint:gosec // G115: n viene clampado a [lo, hi] justo arriba; los llamantes pasan hi <= MaxInt32.
 	return int32(n)
 }
 

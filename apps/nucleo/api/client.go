@@ -97,6 +97,28 @@ func (c *Client) token(ctx context.Context, destino string) (string, error) {
 	return t, err
 }
 
+func (c *Client) authorize(req *http.Request) (*http.Request, string, error) {
+	ctx := req.Context()
+	var token string
+	var err error
+	if scoped, ok := c.session.(interface {
+		AccessTokenScoped(context.Context) (string, *auth.AuthorizationScope, error)
+	}); ok {
+		var scope *auth.AuthorizationScope
+		token, scope, err = scoped.AccessTokenScoped(ctx)
+		req = req.WithContext(auth.WithAuthorizationScope(ctx, scope))
+		if errors.Is(err, auth.ErrLoginRequired) {
+			err = &Error{Status: http.StatusUnauthorized, URL: req.URL.String(), causa: err}
+		}
+	} else {
+		token, err = c.token(ctx, req.URL.String())
+	}
+	if err == nil {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	return req, token, err
+}
+
 func (e *Error) Error() string {
 	return fmt.Sprintf("HTTP %d %s en %s", e.Status, http.StatusText(e.Status), e.URL)
 }
@@ -219,10 +241,9 @@ func (c *Client) una(ctx context.Context, r Request) (*http.Response, string, er
 	}
 	var token string
 	if !r.Anonymous && c.session != nil {
-		if token, err = c.token(ctx, req.URL.String()); err != nil {
+		if req, token, err = c.authorize(req); err != nil {
 			return nil, "", err
 		}
-		req.Header.Set("Authorization", "Bearer "+token)
 	}
 	resp, err := c.http.Do(req)
 	return resp, token, err
@@ -241,11 +262,11 @@ func (c *Client) Stream(ctx context.Context, metodo, path string, query url.Valu
 		req.Header[k] = v
 	}
 	if c.session != nil {
-		token, err := c.token(ctx, req.URL.String())
+		var err error
+		req, _, err = c.authorize(req)
 		if err != nil {
 			return nil, err
 		}
-		req.Header.Set("Authorization", "Bearer "+token)
 	}
 	resp, err := c.http.Do(req)
 	if err != nil {

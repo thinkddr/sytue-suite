@@ -13,6 +13,8 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+
+	"git.sytue.eu/sytue/one/apps/nucleo/auth"
 )
 
 // En GOOS=js este fichero no existe a propósito: ahí net/http es fetch(), y fetch ya
@@ -94,7 +96,7 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	ruta := sinBase(req.URL.Path)
 	// `Cache-Control: no-store` en la petición: es una descarga (una exportación) que
 	// quien llama no quiere en la caché del sistema ni servida vieja sin red.
-	if req.Method != http.MethodGet || req.Header.Get("Range") != "" || owner == "" || t.Scope != nil && scope == "" || req.Header.Get("Cache-Control") == "no-store" ||
+	if req.Method != http.MethodGet || req.Header.Get("Range") != "" || owner == "" || !valid() || req.Header.Get("Cache-Control") == "no-store" ||
 		tienePrefijo(ruta, prefijosPrivados) || tienePrefijo(ruta, t.Private) {
 		return base.RoundTrip(req)
 	}
@@ -134,7 +136,15 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 }
 
 func (t *Transport) validScope(req *http.Request, owner, scope string) bool {
-	return req.Context().Err() == nil && t.Owner != nil && t.Owner() == owner && (t.Scope == nil || scope != "" && t.Scope() == scope)
+	if req.Context().Err() != nil || t.Owner == nil || t.Owner() != owner || (t.Scope != nil && (scope == "" || t.Scope() != scope)) {
+		return false
+	}
+	// Authenticated responses must belong to the authorization actually acquired
+	// by the API client, not just to whoever is current when RoundTrip starts.
+	if bound := auth.RequestAuthorizationScope(req.Context()); bound != nil {
+		return bound.Current(req.Header.Get("Authorization"))
+	}
+	return req.Header.Get("Authorization") == ""
 }
 
 func (t *Transport) informar(s State) {

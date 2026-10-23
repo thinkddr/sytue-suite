@@ -22,8 +22,8 @@ export const GET: APIRoute = async (ctx) => {
   try {
     const body = await jmapClient(session.accessToken).getMessageBody(emailId);
     return json(body);
-  } catch (err) {
-    return json({ error: 'jmap_error', message: String(err) }, 502);
+  } catch {
+    return json({ error: 'jmap_error' }, 502);
   }
 };
 

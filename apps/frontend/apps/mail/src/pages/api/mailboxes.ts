@@ -55,8 +55,8 @@ export const GET: APIRoute = async (ctx) => {
   try {
     const mailboxes = await jmapClient(session.accessToken).listMailboxes();
     return json({ mailboxes });
-  } catch (err) {
-    return json({ error: 'jmap_error', message: String(err) }, 502);
+  } catch {
+    return json({ error: 'jmap_error' }, 502);
   }
 };
 
@@ -76,8 +76,8 @@ export const POST: APIRoute = async (ctx) => {
           ? await client.renameMailbox(body.id, name)
           : 'invalidProperties';
       return setErrorResponse(failed) ?? json({ ok: true });
-    } catch (err) {
-      return json({ error: 'jmap_error', message: String(err) }, 502);
+    } catch {
+      return json({ error: 'jmap_error' }, 502);
     }
   }
 
@@ -91,8 +91,8 @@ export const POST: APIRoute = async (ctx) => {
     if (!res.ok)
       return json({ error: 'mail_error', status: res.status }, res.status === 400 ? 400 : 502);
     return json(await res.json(), 201);
-  } catch (err) {
-    return json({ error: 'mail_error', message: String(err) }, 502);
+  } catch {
+    return json({ error: 'mail_error' }, 502);
   }
 };
 

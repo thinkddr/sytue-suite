@@ -24,7 +24,7 @@ export const GET: APIRoute = async (ctx) => {
     }).getPushKey();
     return json({ key });
   } catch (err) {
-    return json({ error: 'chat_error', message: String(err) }, 502);
+    return json({ error: 'chat_error' }, 502);
   }
 };
 
@@ -58,7 +58,7 @@ export const POST: APIRoute = async (ctx) => {
     await client.subscribePush({ endpoint, keys: { p256dh, auth } });
     return json({ ok: true });
   } catch (err) {
-    return json({ error: 'chat_error', message: String(err) }, 502);
+    return json({ error: 'chat_error' }, 502);
   }
 };
 

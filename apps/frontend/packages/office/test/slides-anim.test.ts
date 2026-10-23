@@ -452,6 +452,7 @@ test('parseChartCell: número es-ES o texto', () => {
   expect(parseChartCell('1.000,5')).toBe(1000.5); // punto de millar + coma decimal
   expect(parseChartCell('10.5')).toBe(10.5); // sin coma: punto decimal
   expect(parseChartCell('25%')).toBe(25);
+  expect(parseChartCell('2%5%')).toBe(25);
   expect(parseChartCell('Ene')).toBe('Ene');
   expect(parseChartCell('')).toBe('');
 });

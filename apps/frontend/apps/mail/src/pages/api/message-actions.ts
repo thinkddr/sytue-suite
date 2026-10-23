@@ -33,8 +33,8 @@ export const POST: APIRoute = async (ctx) => {
     if (isFlag) await client.setFlagged(body.emailId, body.flagged as boolean);
     else await client.moveMessage(body.emailId, body.moveTo as string);
     return json({ ok: true });
-  } catch (err) {
-    return json({ error: 'jmap_error', message: String(err) }, 502);
+  } catch {
+    return json({ error: 'jmap_error' }, 502);
   }
 };
 

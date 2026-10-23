@@ -31,6 +31,7 @@
 import type { APIContext, MiddlewareHandler } from 'astro';
 import { negotiateLocale } from '@sytue/i18n';
 import { applySecurityHeaders, SYTUE_SECURITY_HEADERS } from './astro-security.js';
+import { stripTrailingSlashes } from './path.js';
 import { origenesDeLaShell } from './tokens.js';
 
 /**
@@ -176,7 +177,7 @@ export interface OpcionesOrganizacion {
 }
 
 export function middlewareDeOrganizacion(opciones: OpcionesOrganizacion): MiddlewareHandler {
-  const base = opciones.base.replace(/\/+$/, '');
+  const base = stripTrailingSlashes(opciones.base);
   const sinOrg = new Set([...SIN_ORG_SIEMPRE, ...(opciones.sinOrg ?? [])]);
   return async (context, next) => {
     // Válvula operativa: sin apagar el navegador ni el despliegue.

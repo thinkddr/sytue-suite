@@ -29,8 +29,8 @@ export const GET: APIRoute = async (ctx) => {
   let res: Response;
   try {
     res = await mailGet(session.accessToken, '/api/v1/smime/anchor');
-  } catch (err) {
-    return json({ error: 'mail_error', message: String(err) }, 502);
+  } catch {
+    return json({ error: 'mail_error' }, 502);
   }
   // El 404 del servicio es «esta organización aún no tiene autoridad», que se
   // crea con el primer correo firmado. Se propaga tal cual: no es una avería.

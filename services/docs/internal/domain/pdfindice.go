@@ -167,8 +167,8 @@ func (d *PDFDoc) paginaDeDestino(dest pdfObj, porObjeto map[int]int, salto int) 
 				return n
 			}
 		default:
-			if n, ok := comoEntero(v[0]); ok && int(n) >= 0 && int(n) < d.NumPaginas() {
-				return int(n)
+			if n, ok := comoInt(v[0]); ok && n >= 0 && n < d.NumPaginas() {
+				return n
 			}
 		}
 		return -1

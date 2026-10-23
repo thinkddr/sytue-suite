@@ -72,9 +72,17 @@ func (l *lienzo) leerType3(fd pdfDict) *type3 {
 			for _, e := range difs {
 				switch v := l.d.resolver(e).(type) {
 				case int64:
-					codigo = int(v)
+					if v < 0 || v >= 256 {
+						codigo = 256
+					} else {
+						codigo = int(v)
+					}
 				case float64:
-					codigo = int(v)
+					if v >= 0 && v < 256 {
+						codigo = int(v)
+					} else {
+						codigo = 256
+					}
 				case pdfName:
 					if codigo >= 0 && codigo < 256 {
 						t.codificacion[byte(codigo)] = v

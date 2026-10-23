@@ -44,8 +44,8 @@ export const GET: APIRoute = async (ctx) => {
     if (!res.ok) return json({ error: 'mail_error', status: res.status }, 502);
     const body = (await res.json()) as { mailboxes?: RawMailbox[] };
     return json({ mailboxes: (body.mailboxes ?? []).map(mapMailbox) });
-  } catch (err) {
-    return json({ error: 'mail_error', message: String(err) }, 502);
+  } catch {
+    return json({ error: 'mail_error' }, 502);
   }
 };
 

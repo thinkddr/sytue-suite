@@ -182,8 +182,8 @@ func (d *PDFDoc) recorrerCampos(ref pdfObj, prefijo string, heredado pdfDict,
 	if tu, ok := d.resolver(dict["TU"]).(pdfString); ok {
 		c.Etiqueta = decodificarTextoPDF(tu)
 	}
-	if v, ok := comoEntero(d.resolver(efectivo["MaxLen"])); ok {
-		c.MaxLongitud = int(v)
+	if v, ok := comoInt(d.resolver(efectivo["MaxLen"])); ok {
+		c.MaxLongitud = v
 	}
 	c.Valor = d.valorDeCampo(efectivo["V"])
 	c.Opciones = d.opcionesDeCampo(efectivo["Opt"])

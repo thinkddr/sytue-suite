@@ -48,7 +48,7 @@ export const GET: APIRoute = async (ctx) => {
     });
     return json({ addressBooks: conId });
   } catch (err) {
-    return json({ error: 'carddav_error', message: String(err) }, 502);
+    return json({ error: 'carddav_error', message: 'CardDAV request failed' }, 502);
   }
 };
 
@@ -64,7 +64,10 @@ export const POST: APIRoute = async (ctx) => {
     );
     return json({ addressBook }, 201);
   } catch (err) {
-    return json({ error: 'contacts_error', message: String(err) }, upstreamStatus(err));
+    return json(
+      { error: 'contacts_error', message: 'Contacts service request failed' },
+      upstreamStatus(err),
+    );
   }
 };
 
@@ -85,7 +88,10 @@ export const PATCH: APIRoute = async (ctx) => {
     );
     return json({ addressBook });
   } catch (err) {
-    return json({ error: 'contacts_error', message: String(err) }, upstreamStatus(err));
+    return json(
+      { error: 'contacts_error', message: 'Contacts service request failed' },
+      upstreamStatus(err),
+    );
   }
 };
 
@@ -98,7 +104,10 @@ export const DELETE: APIRoute = async (ctx) => {
     await contactsRestClient(session.accessToken).deleteAddressBook(id);
     return json({ ok: true });
   } catch (err) {
-    return json({ error: 'contacts_error', message: String(err) }, upstreamStatus(err));
+    return json(
+      { error: 'contacts_error', message: 'Contacts service request failed' },
+      upstreamStatus(err),
+    );
   }
 };
 

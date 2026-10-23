@@ -355,6 +355,6 @@ export function parseAttendees(ical: string): string[] {
 
 /** Genera un UID estable para un evento nuevo. */
 export function newUid(): string {
-  const rand = globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2);
+  const rand = globalThis.crypto.randomUUID();
   return `${rand}@sytue.eu`;
 }

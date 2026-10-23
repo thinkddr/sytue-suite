@@ -53,8 +53,8 @@ export const POST: APIRoute = async (ctx) => {
     try {
       await jmapClient(session.accessToken).deleteDraft(body.id);
       return json({ ok: true });
-    } catch (err) {
-      return json({ error: 'jmap_error', message: String(err) }, 502);
+    } catch {
+      return json({ error: 'jmap_error' }, 502);
     }
   }
 
@@ -83,8 +83,8 @@ export const POST: APIRoute = async (ctx) => {
     const client = jmapClient(session.accessToken);
     const res = body.id ? await client.updateDraft(body.id, email) : await client.saveDraft(email);
     return json({ id: res.id });
-  } catch (err) {
-    return json({ error: 'jmap_error', message: String(err) }, 502);
+  } catch {
+    return json({ error: 'jmap_error' }, 502);
   }
 };
 
@@ -114,8 +114,8 @@ export const GET: APIRoute = async (ctx) => {
         ...(a.cid ? { contentId: a.cid } : {}),
       })),
     });
-  } catch (err) {
-    return json({ error: 'jmap_error', message: String(err) }, 502);
+  } catch {
+    return json({ error: 'jmap_error' }, 502);
   }
 };
 
@@ -129,8 +129,8 @@ export const DELETE: APIRoute = async (ctx) => {
   try {
     await jmapClient(session.accessToken).deleteDraft(id);
     return json({ ok: true });
-  } catch (err) {
-    return json({ error: 'jmap_error', message: String(err) }, 502);
+  } catch {
+    return json({ error: 'jmap_error' }, 502);
   }
 };
 

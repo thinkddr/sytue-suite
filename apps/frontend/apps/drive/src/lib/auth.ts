@@ -78,10 +78,13 @@ export async function driveFetch(
     // Se devuelve una respuesta 502 en vez de propagar: las veintidós rutas que
     // llaman aquí ya saben tratar un `!res.ok`, así que arreglarlo en el sitio
     // compartido las cubre todas sin tocar ninguna.
-    return new Response(JSON.stringify({ error: 'drive_unreachable', detail: String(e) }), {
-      status: 502,
-      headers: { 'content-type': 'application/json; charset=utf-8' },
-    });
+    return new Response(
+      JSON.stringify({ error: 'drive_unreachable', detail: 'Drive service unavailable' }),
+      {
+        status: 502,
+        headers: { 'content-type': 'application/json; charset=utf-8' },
+      },
+    );
   }
 }
 

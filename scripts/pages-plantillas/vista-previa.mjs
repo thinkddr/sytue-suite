@@ -214,7 +214,7 @@ function pinta(n, ir, padre) {
     }
     case 'frame': {
       const inner = `<${n.tag} ${cl()}>${hijos()}</${n.tag}>`;
-      return n.link ? `<a href="${esc(enlace(n.link, ir))}" style="display:contents">${inner}</a>`.replace('<a ', '<a ') : inner;
+      return n.link ? `<a href="${esc(enlace(n.link, ir))}" style="display:contents">${inner}</a>` : inner;
     }
     case 'text': {
       const preset = n.style?.text?.preset ?? PRESET_TAG[n.tag];

@@ -14,6 +14,14 @@ test('se le quita la valla de código', () => {
   expect(objetoDe('```json\n{"a":1}\n```')).toEqual({ a: 1 });
 });
 
+test('quita las vallas aunque el texto tenga espacios de relleno largos', () => {
+  expect(
+    objetoDe(`${'\t'.repeat(10_000)}\`\`\`json\n{"a":1}\n\`\`\`${'\t'.repeat(10_000)}`),
+  ).toEqual({
+    a: 1,
+  });
+});
+
 test('sobrevive a la prosa de alrededor', () => {
   expect(objetoDe('Aquí tienes el evento:\n{"a":1}\nEspero que sirva.')).toEqual({ a: 1 });
 });

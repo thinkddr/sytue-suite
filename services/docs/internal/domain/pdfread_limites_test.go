@@ -15,7 +15,9 @@ import (
 	"compress/zlib"
 	"errors"
 	"io"
+	"math"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -38,6 +40,57 @@ func TestLectorNoSeCaeConArraysAnidadosSinFin(t *testing.T) {
 	}
 }
 
+func TestIntDesdeInt64RespetaLimitesDeInt(t *testing.T) {
+	for _, v := range []int64{int64(math.MinInt), int64(math.MaxInt)} {
+		got, ok := intDesdeInt64(v)
+		if !ok || int64(got) != v {
+			t.Errorf("intDesdeInt64(%d) = %d, %t", v, got, ok)
+		}
+	}
+	if math.MaxInt < math.MaxInt64 {
+		maxInt, minInt := int64(math.MaxInt), int64(math.MinInt)
+		if _, ok := intDesdeInt64(maxInt + 1); ok {
+			t.Error("se aceptó un valor por encima de MaxInt")
+		}
+		if _, ok := intDesdeInt64(minInt - 1); ok {
+			t.Error("se aceptó un valor por debajo de MinInt")
+		}
+	}
+}
+
+func TestCargarSeccionXrefRechazaOffsetsFueraDelFichero(t *testing.T) {
+	d := &PDFDoc{buf: []byte("%PDF-")}
+	for _, off := range []int64{-1, math.MaxInt64} {
+		if _, err := d.cargarSeccionXref(off); !errors.Is(err, ErrPDFCorrupto) {
+			t.Errorf("offset %d: se esperaba ErrPDFCorrupto, recibido %v", off, err)
+		}
+	}
+}
+
+func TestAnchosDeXrefRechazaValoresInvalidos(t *testing.T) {
+	for _, n := range []int64{-1, 9, math.MaxInt64} {
+		_, err := anchosDeXref(pdfDict{"W": pdfArray{int64(1), n, int64(1)}})
+		if !errors.Is(err, ErrPDFCorrupto) {
+			t.Errorf("ancho %d: se esperaba ErrPDFCorrupto, recibido %v", n, err)
+		}
+	}
+	if got, err := anchosDeXref(pdfDict{"W": pdfArray{int64(1), int64(2), int64(1)}}); err != nil || got != [3]int{1, 2, 1} {
+		t.Errorf("anchosDeXref válidos = %v, %v", got, err)
+	}
+}
+
+func TestImagenDentroDelLimiteNoDesbordaElProducto(t *testing.T) {
+	if imagenDentroDelLimite(maxPixelesImagen/2+1, 2) {
+		t.Error("se aceptó una imagen que supera el límite")
+	}
+	if !imagenDentroDelLimite(maxPixelesImagen/2, 2) {
+		t.Error("se rechazó una imagen justo dentro del límite")
+	}
+	if imagenDentroDelLimite(math.MaxInt, 2) {
+		t.Error("se aceptó una dimensión cuyo producto desborda")
+	}
+}
+
 // El límite de seguridad debe salir hasta el llamador, también al saltar una
 // clave inválida; tratarlo como truncado reiniciaba el análisis del PDF hostil.
 func TestElLimiteDeAnidadoNoSeTrataComoTruncado(t *testing.T) {
@@ -51,6 +104,32 @@ func TestElLimiteDeAnidadoNoSeTrataComoTruncado(t *testing.T) {
 			_, err := d.parsearObjeto(&pdfLexer{buf: []byte(cuerpo)})
 			if !errors.Is(err, errAnidadoDemasiado) {
 				t.Fatalf("el límite de seguridad debe propagarse: %v", err)
+			}
+		})
+	}
+}
+
+func TestEnterosPDFSeAjustanAlRangoDeInt(t *testing.T) {
+	casos := []struct {
+		texto string
+		ok    bool
+	}{
+		{"2147483647", true},
+		{"-2147483648", true},
+		{"2147483648", strconv.IntSize == 64},
+		{"-2147483649", strconv.IntSize == 64},
+		{"9223372036854775807", strconv.IntSize == 64},
+		{"-9223372036854775808", strconv.IntSize == 64},
+	}
+	for _, caso := range casos {
+		t.Run(caso.texto, func(t *testing.T) {
+			entero, ok := (&pdfLexer{buf: []byte(caso.texto)}).entero()
+			if ok != caso.ok {
+				t.Errorf("entero(): valor=%d ok=%t; quería ok=%t", entero, ok, caso.ok)
+			}
+			numero, _, ok := (&pdfLexer{buf: []byte(caso.texto)}).numero()
+			if ok != caso.ok {
+				t.Errorf("numero(): valor=%v ok=%t; quería ok=%t", numero, ok, caso.ok)
 			}
 		})
 	}

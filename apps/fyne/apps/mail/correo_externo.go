@@ -86,8 +86,7 @@ func (b *Buzon) abrirCorreoExterno() {
 	}
 	c.campos["password"].Contrasena(true)
 	c.campos["smtpPassword"].Contrasena(true)
-	c.campos["port"].PonerTexto("993")
-	c.campos["smtpPort"].PonerTexto("465")
+	c.limpiarConfiguracion()
 	c.texto = ui.NuevaAreaTexto("")
 	c.texto.Filas = 8
 	c.cuerpo = container.New(ui.Columna{Hueco: tema.Espacio(3)})
@@ -122,6 +121,15 @@ func (c *correoExterno) campo(key, label string, required bool) fyne.CanvasObjec
 func (c *correoExterno) limpiarClaves() {
 	c.campos["password"].PonerTexto("")
 	c.campos["smtpPassword"].PonerTexto("")
+}
+
+func (c *correoExterno) limpiarConfiguracion() {
+	for _, key := range []string{"name", "address", "host", "username", "password", "smtpHost", "smtpUser", "smtpPassword"} {
+		c.campos[key].PonerTexto("")
+	}
+	c.campos["port"].PonerTexto("993")
+	c.campos["smtpPort"].PonerTexto("465")
+	c.smtpSecurity = "tls"
 }
 
 func (c *correoExterno) limpiarBorrador() {
@@ -618,7 +626,8 @@ func (c *correoExterno) pintar() {
 			c.cuerpo.Add(c.boton("externalMail.disconnect", func() { c.desconectar(a) }))
 		}
 		c.pie.Add(c.boton("externalMail.add", func() {
-			c.limpiarClaves()
+			c.limpiarConfiguracion()
+			c.proveedor = "gmail"
 			c.instancia = ""
 			c.servicios = []string{"mail"}
 			c.avanzado = false

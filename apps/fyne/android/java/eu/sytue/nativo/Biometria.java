@@ -9,6 +9,15 @@ import android.hardware.biometrics.BiometricPrompt;
 import android.os.Build;
 import android.os.CancellationSignal;
 import android.os.Handler;
+import android.security.keystore.KeyGenParameterSpec;
+import android.security.keystore.KeyProperties;
+import java.nio.charset.StandardCharsets;
+import java.security.KeyPairGenerator;
+import java.security.KeyStore;
+import java.security.PrivateKey;
+import java.security.Signature;
+import java.security.spec.ECGenParameterSpec;
+import java.util.UUID;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
@@ -18,7 +27,8 @@ import java.util.concurrent.TimeUnit;
  * {@link #verificar} ESPERA la respuesta, como Certificados: Go la llama desde un hilo
  * suyo, nunca desde el principal, y nada llama a Go desde aquí.
  */
-public final class Biometria extends BiometricPrompt.AuthenticationCallback {
+public final class Biometria {
+    private static final String CLAVE_LOCAL = "eu.sytue.one.biometria.local.v1";
     private final ArrayBlockingQueue<Integer> respuesta = new ArrayBlockingQueue<>(1);
 
     private Biometria() {}
@@ -70,9 +80,35 @@ public final class Biometria extends BiometricPrompt.AuthenticationCallback {
             @Override
             public void run() {
                 try {
-                    prompt(ctx, ctx.getApplicationInfo().loadLabel(ctx.getPackageManager()), motivo)
-                            .authenticate(cancelar, ctx.getMainExecutor(), b);
-                } catch (RuntimeException e) {
+                    BiometricPrompt dialog = prompt(ctx,
+                            ctx.getApplicationInfo().loadLabel(ctx.getPackageManager()), motivo);
+                    final Signature firma = firmaLocal();
+                    dialog.authenticate(new BiometricPrompt.CryptoObject(firma), cancelar, ctx.getMainExecutor(),
+                            new BiometricPrompt.AuthenticationCallback() {
+                                @Override
+                                public void onAuthenticationSucceeded(BiometricPrompt.AuthenticationResult r) {
+                                    try {
+                                        BiometricPrompt.CryptoObject crypto = r.getCryptoObject();
+                                        Signature firmaAutorizada = crypto == null ? null : crypto.getSignature();
+                                        if (firmaAutorizada == null || firmaAutorizada != firma) {
+                                            throw new SecurityException("Biometric proof lost its CryptoObject");
+                                        }
+                                        firmaAutorizada.update(UUID.randomUUID().toString().getBytes(StandardCharsets.UTF_8));
+                                        if (firmaAutorizada.sign().length == 0) {
+                                            throw new SecurityException("Biometric proof was empty");
+                                        }
+                                        b.respuesta.offer(0);
+                                    } catch (Exception e) {
+                                        b.respuesta.offer(-1);
+                                    }
+                                }
+
+                                @Override
+                                public void onAuthenticationError(int codigo, CharSequence texto) {
+                                    b.respuesta.offer(codigo == 0 ? -1 : codigo);
+                                }
+                            });
+                } catch (Exception e) {
                     b.respuesta.offer(-1);
                 }
             }
@@ -95,13 +131,22 @@ public final class Biometria extends BiometricPrompt.AuthenticationCallback {
                         | BiometricManager.Authenticators.DEVICE_CREDENTIAL).build();
     }
 
-    @Override
-    public void onAuthenticationSucceeded(BiometricPrompt.AuthenticationResult r) {
-        respuesta.offer(0);
+    private static synchronized Signature firmaLocal() throws Exception {
+        KeyStore almacen = KeyStore.getInstance("AndroidKeyStore");
+        almacen.load(null);
+        if (!almacen.containsAlias(CLAVE_LOCAL)) {
+            KeyPairGenerator generador = KeyPairGenerator.getInstance(KeyProperties.KEY_ALGORITHM_EC, "AndroidKeyStore");
+            generador.initialize(new KeyGenParameterSpec.Builder(CLAVE_LOCAL, KeyProperties.PURPOSE_SIGN)
+                    .setAlgorithmParameterSpec(new ECGenParameterSpec("secp256r1"))
+                    .setDigests(KeyProperties.DIGEST_SHA256).setUserAuthenticationRequired(true)
+                    .setUserAuthenticationParameters(0,
+                            KeyProperties.AUTH_BIOMETRIC_STRONG | KeyProperties.AUTH_DEVICE_CREDENTIAL).build());
+            generador.generateKeyPair();
+            almacen.load(null);
+        }
+        Signature firma = Signature.getInstance("SHA256withECDSA");
+        firma.initSign((PrivateKey) almacen.getKey(CLAVE_LOCAL, null));
+        return firma;
     }
 
-    @Override
-    public void onAuthenticationError(int codigo, CharSequence texto) {
-        respuesta.offer(codigo == 0 ? -1 : codigo);
-    }
 }

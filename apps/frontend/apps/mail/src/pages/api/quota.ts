@@ -24,8 +24,8 @@ export const GET: APIRoute = async (ctx) => {
     if (!res.ok) return json({ error: 'mail_error', status: res.status }, 502);
     const q = (await res.json()) as RawQuota;
     return json({ usedBytes: q.used_bytes ?? 0, quotaBytes: q.quota_bytes ?? 0 });
-  } catch (err) {
-    return json({ error: 'mail_error', message: String(err) }, 502);
+  } catch {
+    return json({ error: 'mail_error' }, 502);
   }
 };
 

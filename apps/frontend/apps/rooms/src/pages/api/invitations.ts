@@ -18,7 +18,7 @@ export const GET: APIRoute = async (ctx) => {
     const client = chatClient({ accessToken: session.accessToken, userId: session.user.id });
     return json({ invitations: await client.invitations() });
   } catch (err) {
-    return json({ error: 'chat_error', message: String(err) }, 502);
+    return json({ error: 'chat_error' }, 502);
   }
 };
 
@@ -41,7 +41,7 @@ export const POST: APIRoute = async (ctx) => {
     return json({ ok: true });
   } catch (err) {
     if (err instanceof ChatHttpError) return json({ error: 'chat_error' }, err.status);
-    return json({ error: 'chat_error', message: String(err) }, 502);
+    return json({ error: 'chat_error' }, 502);
   }
 };
 

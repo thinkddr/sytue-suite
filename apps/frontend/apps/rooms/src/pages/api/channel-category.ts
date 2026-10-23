@@ -32,7 +32,7 @@ export const POST: APIRoute = async (ctx) => {
     }).setChannelCategory(channelId, categoryId, payload.sortOrder);
     return json({ channel });
   } catch (err) {
-    return json({ error: 'chat_error', message: String(err) }, 502);
+    return json({ error: 'chat_error' }, 502);
   }
 };
 

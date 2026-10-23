@@ -99,8 +99,8 @@ export const POST: APIRoute = async (ctx) => {
       ...(card ? { card } : {}),
     });
     return json({ message });
-  } catch (err) {
-    return json({ error: 'chat_error', message: String(err) }, 502);
+  } catch {
+    return json({ error: 'chat_error' }, 502);
   }
 };
 

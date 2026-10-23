@@ -30,7 +30,7 @@ export const GET: APIRoute = async (ctx) => {
     const meetings = await meetClient({ accessToken: session.accessToken }).listMeetings(status);
     return json({ meetings });
   } catch (err) {
-    return json({ error: 'meet_error', message: String(err) }, 502);
+    return json({ error: 'meet_error' }, 502);
   }
 };
 
@@ -59,7 +59,7 @@ export const POST: APIRoute = async (ctx) => {
     );
     return json(call, 201);
   } catch (err) {
-    return json({ error: 'meet_error', message: String(err) }, 502);
+    return json({ error: 'meet_error' }, 502);
   }
 };
 

@@ -21,7 +21,7 @@ export const GET: APIRoute = async (ctx) => {
     const receipts = await client.dmReceipts(channelId);
     return json({ receipts });
   } catch (err) {
-    return json({ error: 'chat_error', message: String(err) }, 502);
+    return json({ error: 'chat_error' }, 502);
   }
 };
 

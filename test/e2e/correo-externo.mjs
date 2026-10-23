@@ -9,6 +9,7 @@ import {
   openWizardFixture,
   describeWizardState,
 } from "./lib/wizard-checks.mjs";
+import { comprobarCuentaNueva } from "./lib/correo-cuenta-nueva.mjs";
 const expect = baseExpect.configure({ timeout: 15000 });
 const BASE =
   process.env.MAIL_EXTERNAL_URL ||
@@ -190,6 +191,7 @@ try {
       .locator('input[name="incoming_password"]')
       .fill("synthetic-app-password");
     await dialog.locator('input[name="smtp_host"]').fill("smtp.example.eu");
+    await dialog.locator("details").nth(1).locator("summary").click();
     await dialog
       .locator('select[name="smtp_security"]')
       .selectOption("starttls");
@@ -265,6 +267,11 @@ try {
       sentCopyWarning: "passed",
     });
     await fixture.context.close();
+    const nueva = await browser.newContext({ viewport });
+    const nuevaPage = await nueva.newPage();
+    await openWizardFixture(nuevaPage, BASE);
+    await comprobarCuentaNueva(nuevaPage);
+    await nueva.close();
   }
   const oauthContext = await browser.newContext({
     viewport: { width: 390, height: 844 },
@@ -286,6 +293,7 @@ try {
     expect(request.postDataJSON()).toEqual({
       provider: "gmail",
       return_to: "mail",
+      services: ["mail"],
     });
     await route.fulfill({
       json: {

@@ -30,7 +30,7 @@ export const GET: APIRoute = async (ctx) => {
     void client.markRead(channelId).catch(() => undefined);
     return json({ messages });
   } catch (err) {
-    return json({ error: 'chat_error', message: String(err) }, 502);
+    return json({ error: 'chat_error' }, 502);
   }
 };
 

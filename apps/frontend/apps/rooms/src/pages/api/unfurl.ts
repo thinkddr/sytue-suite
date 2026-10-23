@@ -21,8 +21,8 @@ export const GET: APIRoute = async (ctx) => {
     const client = chatClient({ accessToken: session.accessToken, userId: session.user.id });
     const unfurl = await client.unfurl(url);
     return json({ unfurl }, 200, 'private, max-age=300');
-  } catch (err) {
-    return json({ error: 'chat_error', message: String(err) }, 502);
+  } catch {
+    return json({ error: 'chat_error' }, 502);
   }
 };
 

@@ -79,6 +79,16 @@ test("missing scalar props keep undefined semantics in emitted Go", async () => 
   );
 });
 
+test("Go string literals escape Unicode line separators", async () => {
+  const separator = "\u2028\u2029";
+  const source = await program(
+    `export function Page() { return <p>{"${separator}"}</p>; }`,
+  );
+  const go = emitGo(source, options);
+  expect(go).toContain(String.raw`\u2028\u2029`);
+  expect(go).not.toContain(separator);
+});
+
 test("the generated constructor reports invalid native trees before returning a widget", async () => {
   const source = await program(
     `export function Page() { return <p>Hola</p>; }`,

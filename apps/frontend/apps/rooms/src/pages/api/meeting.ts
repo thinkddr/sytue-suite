@@ -106,7 +106,7 @@ export const POST: APIRoute = async (ctx) => {
     if (err instanceof MeetError && err.code) {
       return json({ error: err.code }, err.status);
     }
-    return json({ error: 'meet_error', message: String(err) }, 502);
+    return json({ error: 'meet_error' }, 502);
   }
 };
 

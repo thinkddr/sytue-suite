@@ -154,7 +154,7 @@ function fromError(err: unknown): Response {
   const m = msg.match(/-> (\d{3})$/);
   const status = m ? Number(m[1]) : 0;
   if (status >= 400 && status < 500) return json({ error: 'chat_error', status }, status);
-  return json({ error: 'chat_error', message: msg }, 502);
+  return json({ error: 'chat_error' }, 502);
 }
 
 function json(body: unknown, status = 200): Response {

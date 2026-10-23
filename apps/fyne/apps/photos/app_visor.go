@@ -367,8 +367,8 @@ func (a *App) pedirOriginal(f api.Photo) {
 		formato = "png"
 	}
 	gen := a.gen
-	a.lanzar(func() {
-		c, fin := context.WithTimeout(context.Background(), 2*time.Minute)
+	a.enSesion(func(vida context.Context) {
+		c, fin := context.WithTimeout(vida, 2*time.Minute)
 		defer fin()
 		var img image.Image
 		r, err := a.cli.Export(c, f.ID, formato)
@@ -376,6 +376,7 @@ func (a *App) pedirOriginal(f api.Photo) {
 			img, _, err = image.Decode(r)
 			_ = r.Close()
 		}
+		//nolint:contextcheck // Sólo reconstruye UI; los eventos futuros capturan la vida de cuenta en enSesion.
 		a.hilo(gen, func() {
 			if a.vis != e || e.pidiendo != f.ID {
 				return
@@ -432,10 +433,11 @@ func (a *App) tirarDelVisor(f api.Photo) {
 		return
 	}
 	gen := a.gen
-	a.lanzar(func() {
-		c, fin := ctx()
+	a.enSesion(func(vida context.Context) {
+		c, fin := ctx(vida)
 		defer fin()
 		err := a.cli.Trash(c, f.ID)
+		//nolint:contextcheck // Sólo reconstruye UI; los eventos futuros capturan la vida de cuenta en enSesion.
 		a.hilo(gen, func() {
 			if err != nil {
 				a.g.error = a.textoDeFallo(err)
@@ -459,10 +461,11 @@ func (a *App) girar() {
 	e.girando = true
 	a.pintarVisor()
 	gen := a.gen
-	a.lanzar(func() {
-		c, fin := ctx()
+	a.enSesion(func(vida context.Context) {
+		c, fin := ctx(vida)
 		defer fin()
 		huella, err := a.cli.Rotar(c, f.ID)
+		//nolint:contextcheck // Sólo reconstruye UI; los eventos futuros capturan la vida de cuenta en enSesion.
 		a.hilo(gen, func() {
 			if a.vis != e {
 				return
@@ -500,17 +503,18 @@ func (a *App) descargar(f api.Photo, formato string) {
 	}
 	gen := a.gen
 	a.avisarVisor(a.v.T.T("gallery.downloading", i18n.Vars{"count": 1}))
-	a.lanzar(func() {
-		err := a.bajar(f, formato)
+	a.enSesion(func(vida context.Context) {
+		err := a.bajar(vida, f, formato)
 		if err != nil {
+			//nolint:contextcheck // Sólo reconstruye UI; los eventos futuros capturan la vida de cuenta en enSesion.
 			a.hilo(gen, func() { a.avisarVisor(a.textoDeFallo(err)) })
 		}
 	})
 }
 
 // bajar trae una exportación y la guarda. Corre FUERA del hilo de la interfaz.
-func (a *App) bajar(f api.Photo, formato string) error {
-	c, fin := ctx()
+func (a *App) bajar(vida context.Context, f api.Photo, formato string) error {
+	c, fin := ctx(vida)
 	defer fin()
 	r, err := a.cli.Export(c, f.ID, formato)
 	if err != nil {
@@ -519,6 +523,9 @@ func (a *App) bajar(f api.Photo, formato string) error {
 	defer func() { _ = r.Close() }()
 	datos, err := io.ReadAll(r)
 	if err != nil {
+		return err
+	}
+	if err := vida.Err(); err != nil {
 		return err
 	}
 	_, err = a.Guardar(nombreDescarga(f.Name, formato), datos)
@@ -553,8 +560,8 @@ func (a *App) conAlbumes(mostrar func([]api.Album)) {
 		return
 	}
 	gen, dir := a.gen, a.Directorio
-	a.lanzar(func() {
-		c, fin := ctx()
+	a.enSesion(func(vida context.Context) {
+		c, fin := ctx(vida)
 		defer fin()
 		lista, err := a.cli.Albums(c)
 		if err != nil {
@@ -596,10 +603,11 @@ func editablesConmigo(c context.Context, cli *api.Photos, dir *api.Directorio) [
 // anyadirFotoA mete la foto del visor en un álbum.
 func (a *App) anyadirFotoA(f api.Photo, al api.Album) {
 	gen := a.gen
-	a.lanzar(func() {
-		c, fin := ctx()
+	a.enSesion(func(vida context.Context) {
+		c, fin := ctx(vida)
 		defer fin()
 		_, err := a.cli.AddToAlbum(c, al.ID, []string{f.ID})
+		//nolint:contextcheck // Sólo reconstruye UI; los eventos futuros capturan la vida de cuenta en enSesion.
 		a.hilo(gen, func() {
 			if err != nil {
 				a.avisarVisor(a.textoDeFallo(err))
@@ -613,10 +621,11 @@ func (a *App) anyadirFotoA(f api.Photo, al api.Album) {
 // quitarDelAlbum es el mando extra del visor de un álbum.
 func (a *App) quitarDelAlbum(f api.Photo) {
 	gen, album := a.gen, a.uno.id
-	a.lanzar(func() {
-		c, fin := ctx()
+	a.enSesion(func(vida context.Context) {
+		c, fin := ctx(vida)
 		defer fin()
 		err := a.cli.RemoveFromAlbum(c, album, f.ID)
+		//nolint:contextcheck // Sólo reconstruye UI; los eventos futuros capturan la vida de cuenta en enSesion.
 		a.hilo(gen, func() {
 			if err != nil {
 				a.uno.error = a.textoDeFallo(err)

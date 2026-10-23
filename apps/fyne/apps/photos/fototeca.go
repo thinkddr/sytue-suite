@@ -167,7 +167,12 @@ func (f *Fototeca) Olvidar() {
 
 // Cancelar retira el trabajo de la pantalla anterior y conserva las fotos ya listas.
 // Olvidar sólo retira repintados: también se llama al reconstruir la misma pantalla.
-func (f *Fototeca) Cancelar() {
+func (f *Fototeca) Cancelar() { f.cancelarTrabajo(false) }
+
+// Vaciar retira el trabajo y los bytes de la cuenta anterior.
+func (f *Fototeca) Vaciar() { f.cancelarTrabajo(true) }
+
+func (f *Fototeca) cancelarTrabajo(vaciar bool) {
 	f.mu.Lock()
 	f.cancelar()
 	f.epoca++
@@ -175,6 +180,14 @@ func (f *Fototeca) Cancelar() {
 	f.descargas, f.preparaciones = nil, nil
 	clear(f.enVuelo)
 	clear(f.preparando)
+	if vaciar {
+		clear(f.crudas)
+		clear(f.pintadas)
+		clear(f.fallidas)
+		clear(f.versiones)
+		f.ordenC, f.ordenP = nil, nil
+		f.pesoC, f.pixeles = 0, 0
+	}
 	f.libre.Broadcast()
 	f.mu.Unlock()
 	f.Olvidar()

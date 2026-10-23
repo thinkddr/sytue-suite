@@ -62,7 +62,7 @@ func (c *campoCuando) leer() (time.Time, bool) {
 // programar es `handleSchedule`: la hora tiene que ser futura, el mensaje tiene que
 // poder enviarse, y al programarse se cierra el redactor diciendo cuándo saldrá.
 func (b *Buzon) programar(rd *redaccion, cuando time.Time, ok bool) {
-	if rd.enviando || rd.guardando {
+	if !b.redaccionVigente(rd) || rd.enviando || rd.guardando {
 		return
 	}
 	if !ok || !cuando.After(time.Now()) {
@@ -98,7 +98,12 @@ func (b *Buzon) programar(rd *redaccion, cuando time.Time, ok bool) {
 			return
 		}
 		if id := br.ID; id != "" {
-			b.Lanzar(func() { _ = b.S.Delete(b.ctx, id) })
+			ctx := b.ctx
+			b.Lanzar(func() {
+				if ctx.Err() == nil {
+					_ = b.S.Delete(ctx, id)
+				}
+			})
 		}
 		b.cerrar(rd)
 		b.alGuardarBorrador()

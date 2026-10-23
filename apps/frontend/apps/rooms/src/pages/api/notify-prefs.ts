@@ -23,7 +23,7 @@ export const GET: APIRoute = async (ctx) => {
       userId: session.user.id,
     }).getNotifyPrefs();
     return json({ prefs });
-  } catch (err) {
+  } catch {
     return json({ error: 'chat_error' }, 502);
   }
 };
@@ -52,7 +52,7 @@ export const POST: APIRoute = async (ctx) => {
       userId: session.user.id,
     }).putNotifyPrefs({ keywords, dndStart, dndEnd });
     return json({ prefs });
-  } catch (err) {
+  } catch {
     return json({ error: 'chat_error' }, 502);
   }
 };

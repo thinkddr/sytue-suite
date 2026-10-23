@@ -45,7 +45,7 @@ export const PUT: APIRoute = async (ctx) => {
   let res: Response;
   try {
     res = await mailPutText(session.accessToken, '/api/v1/smime/identity', pem);
-  } catch (err) {
+  } catch {
     return json({ error: 'mail_error' }, 502);
   }
   if (!res.ok) {

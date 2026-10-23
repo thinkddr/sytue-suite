@@ -22,7 +22,7 @@ export const GET: APIRoute = async (ctx) => {
       userId: session.user.id,
     }).listPins(channelId);
     return json({ pins });
-  } catch (err) {
+  } catch {
     return json({ error: 'chat_error' }, 502);
   }
 };

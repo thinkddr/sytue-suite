@@ -29,7 +29,7 @@ export const POST: APIRoute = async (ctx) => {
       userId: session.user.id,
     }).ackMessage(messageId);
     return json({ count });
-  } catch (err) {
+  } catch {
     return json({ error: 'chat_error' }, 502);
   }
 };

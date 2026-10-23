@@ -25,7 +25,7 @@ export const GET: APIRoute = async (ctx) => {
       m.sub === session.user.id && selfName ? { ...m, name: selfName } : m,
     );
     return json({ members: withSelf });
-  } catch (err) {
+  } catch {
     return json({ error: 'chat_error' }, 502);
   }
 };

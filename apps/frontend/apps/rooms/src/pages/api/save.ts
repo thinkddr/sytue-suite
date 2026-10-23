@@ -29,7 +29,7 @@ export const POST: APIRoute = async (ctx) => {
     if (payload.delete === true) await client.unsaveMessage(messageId);
     else await client.saveMessage(messageId);
     return json({ ok: true });
-  } catch (err) {
+  } catch {
     return json({ error: 'chat_error' }, 502);
   }
 };

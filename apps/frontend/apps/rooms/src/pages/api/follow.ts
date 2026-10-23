@@ -30,7 +30,7 @@ export const POST: APIRoute = async (ctx) => {
     if (payload.delete === true) await client.unfollowThread(messageId);
     else await client.followThread(messageId);
     return json({ ok: true });
-  } catch (err) {
+  } catch {
     return json({ error: 'chat_error' }, 502);
   }
 };

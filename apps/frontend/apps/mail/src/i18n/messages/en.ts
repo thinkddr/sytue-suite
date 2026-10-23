@@ -40,6 +40,7 @@ export const en = {
   'externalMail.username': 'Username (email address if blank)',
   'externalMail.password': 'Password or app password',
   'externalMail.smtpPassword': 'SMTP password (same as incoming if blank)',
+  'externalMail.advanced': 'Advanced options',
   'externalMail.security': 'SMTP connection security',
   'externalMail.review': 'Review',
   'externalMail.testBody':

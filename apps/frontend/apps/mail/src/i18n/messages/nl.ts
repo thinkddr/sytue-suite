@@ -702,6 +702,7 @@ export const nl: AppCatalog<typeof en> = {
   'externalMail.username': 'Gebruikersnaam (e-mailadres als dit leeg is)',
   'externalMail.password': 'Wachtwoord of app-wachtwoord',
   'externalMail.smtpPassword': 'SMTP-wachtwoord (dat voor inkomende e-mail als dit leeg is)',
+  'externalMail.advanced': 'Geavanceerde opties',
   'externalMail.security': 'Beveiliging van SMTP-verbinding',
   'externalMail.review': 'Controleren',
   'externalMail.testBody':

@@ -19,6 +19,7 @@ export {
   localeDir,
   htmlLangAttrs,
   readLocaleCookie,
+  readLocalePreference,
   parseAcceptLanguage,
   negotiateLocale,
   detectLocale,

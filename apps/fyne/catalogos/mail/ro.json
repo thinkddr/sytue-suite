@@ -228,6 +228,7 @@
   "error.undoSendGone": "E prea târziu pentru anulare; mesajul a plecat deja",
   "externalMail.account": "Cont",
   "externalMail.add": "Adaugă un cont de e-mail",
+  "externalMail.advanced": "Opțiuni avansate",
   "externalMail.attach": "Atașează fișiere",
   "externalMail.authError": "Autentificarea a fost refuzată. Reconectează contul sau verifică numele de utilizator și parola de aplicație.",
   "externalMail.authorize": "Continuă la furnizor",

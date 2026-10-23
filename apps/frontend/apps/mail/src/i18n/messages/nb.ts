@@ -688,6 +688,7 @@ export const nb: AppCatalog<typeof en> = {
   'externalMail.password': 'Passord eller app-passord',
   'externalMail.smtpPassword':
     'SMTP-passord (samme som for innkommende e-post hvis feltet er tomt)',
+  'externalMail.advanced': 'Avanserte alternativer',
   'externalMail.security': 'Sikkerhet for SMTP-tilkobling',
   'externalMail.review': 'Se gjennom',
   'externalMail.testBody':

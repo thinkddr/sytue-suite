@@ -231,6 +231,7 @@
   "error.undoSendGone": "Za razveljavitev je prepozno; sporočilo je že odšlo",
   "externalMail.account": "Račun",
   "externalMail.add": "Dodaj e-poštni račun",
+  "externalMail.advanced": "Napredne možnosti",
   "externalMail.attach": "Priloži datoteke",
   "externalMail.authError": "Prijava je bila zavrnjena. Znova povežite račun ali preverite uporabniško ime in geslo za aplikacijo.",
   "externalMail.authorize": "Nadaljuj k ponudniku",

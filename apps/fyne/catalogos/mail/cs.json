@@ -231,6 +231,7 @@
   "error.undoSendGone": "Na vrácení je pozdě; zpráva už byla odeslána",
   "externalMail.account": "Účet",
   "externalMail.add": "Přidat e-mailový účet",
+  "externalMail.advanced": "Pokročilé možnosti",
   "externalMail.attach": "Přiložit soubory",
   "externalMail.authError": "Přihlášení bylo odmítnuto. Znovu připojte účet nebo zkontrolujte uživatelské jméno a heslo aplikace.",
   "externalMail.authorize": "Pokračovat k poskytovateli",

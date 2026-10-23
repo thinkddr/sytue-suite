@@ -228,6 +228,7 @@
   "error.undoSendGone": "Atsaukt vairs nevar; ziņojums jau ir nosūtīts",
   "externalMail.account": "Konts",
   "externalMail.add": "Pievienot e-pasta kontu",
+  "externalMail.advanced": "Papildu opcijas",
   "externalMail.attach": "Pievienot failus",
   "externalMail.authError": "Pieteikšanās noraidīta. Pieslēdziet kontu vēlreiz vai pārbaudiet lietotājvārdu un lietotnes paroli.",
   "externalMail.authorize": "Turpināt pie pakalpojuma sniedzēja",

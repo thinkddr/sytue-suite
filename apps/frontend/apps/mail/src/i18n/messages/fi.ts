@@ -691,6 +691,7 @@ export const fi: AppCatalog<typeof en> = {
   'externalMail.username': 'Käyttäjätunnus (tyhjänä sähköpostiosoite)',
   'externalMail.password': 'Salasana tai sovellussalasana',
   'externalMail.smtpPassword': 'SMTP-salasana (tyhjänä saapuvan postin salasana)',
+  'externalMail.advanced': 'Lisäasetukset',
   'externalMail.security': 'SMTP-yhteyden suojaus',
   'externalMail.review': 'Tarkista',
   'externalMail.testBody':

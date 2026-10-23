@@ -693,6 +693,7 @@ export const hu: AppCatalog<typeof en> = {
   'externalMail.username': 'Felhasználónév (üresen hagyva az e-mail-cím)',
   'externalMail.password': 'Jelszó vagy alkalmazásjelszó',
   'externalMail.smtpPassword': 'SMTP-jelszó (üresen hagyva a bejövő levelek jelszava)',
+  'externalMail.advanced': 'Speciális beállítások',
   'externalMail.security': 'SMTP-kapcsolat biztonsága',
   'externalMail.review': 'Áttekintés',
   'externalMail.testBody':

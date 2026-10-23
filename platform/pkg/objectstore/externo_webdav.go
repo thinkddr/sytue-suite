@@ -15,6 +15,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 )
@@ -45,36 +46,64 @@ type WebDAV struct {
 // NewWebDAV abre un destino HTTPS; cada conexión aplica la barrera SSRF.
 func NewWebDAV(rawBase, basePath, user, password string) (*WebDAV, error) {
 	u, err := url.Parse(strings.TrimSpace(rawBase))
-	if err != nil || u.Scheme != "https" || u.Host == "" {
-		return nil, fmt.Errorf("service: la URL del WebDAV tiene que ser https://host/ruta: %q", rawBase)
+	if err != nil || u.Scheme != "https" || u.Hostname() == "" || u.User != nil || u.Opaque != "" {
+		return nil, errors.New("service: la URL del WebDAV tiene que ser https://host/ruta sin credenciales")
 	}
-	u.Path = strings.TrimRight(u.Path, "/") + "/"
-	if bp := strings.Trim(basePath, "/"); bp != "" {
-		u.Path += bp + "/"
+	base, carpeta := strings.Trim(u.Path, "/"), strings.Trim(basePath, "/")
+	if !rutaWebDAVValida(base) || !rutaWebDAVValida(carpeta) {
+		return nil, errors.New("service: la carpeta base del WebDAV contiene segmentos inválidos")
 	}
-	u.RawQuery, u.Fragment = "", ""
+	u.Path = "/"
+	for _, parte := range []string{base, carpeta} {
+		if parte != "" {
+			u.Path += parte + "/"
+		}
+	}
+	u.RawPath, u.RawQuery, u.Fragment, u.RawFragment = "", "", "", ""
+	u.ForceQuery = false
+	cliente := clienteDeTerceros(30 * time.Second)
+	// Un WebDAV configurado es un único destino: no reenviar sus credenciales
+	// ni un cuerpo de subida a otro host, subdominio, puerto o ruta por redirect.
+	cliente.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 	return &WebDAV{
 		base: u, user: user, password: password,
-		http:   clienteDeTerceros(30 * time.Second),
+		http:   cliente,
 		creado: map[string]bool{},
 	}, nil
 }
 
-func (w *WebDAV) ruta(t tenancy.Tenant, key string) string {
-	// El prefijo del tenant, como en S3: un mismo NAS puede servir a varios.
-	key = strings.TrimLeft(key, "/")
-	partes := strings.Split(t.StoragePrefix()+key, "/")
-	for i, p := range partes {
-		partes[i] = url.PathEscape(p)
+// rutaWebDAVValida rechaza recorridos antes de que el servidor o su proxy
+// normalice la ruta. PathEscape no escapa los segmentos "." y "..".
+func rutaWebDAVValida(ruta string) bool {
+	if ruta == "" {
+		return true
 	}
-	return w.base.String() + strings.Join(partes, "/")
+	for _, parte := range strings.Split(ruta, "/") {
+		if parte == "" || parte == "." || parte == ".." || strings.ContainsRune(parte, '\\') || strings.ContainsFunc(parte, unicode.IsControl) {
+			return false
+		}
+	}
+	return true
 }
 
-func (w *WebDAV) hacer(ctx context.Context, metodo, u string, body io.Reader, size int64, cab map[string]string) (*http.Response, error) {
-	req, err := http.NewRequestWithContext(ctx, metodo, u, body)
+func (w *WebDAV) ruta(t tenancy.Tenant, key string) (string, error) {
+	// Solo la ruta puede depender del blob; esquema y autoridad son la base
+	// configurada. El tenant se valida incluso si se construyó sin tenancy.New.
+	key = strings.TrimLeft(key, "/")
+	if !tenancy.ValidSlug(t.Slug) || key == "" || !rutaWebDAVValida(key) {
+		return "", errors.New("webdav: tenant o clave de blob inválidos")
+	}
+	return w.base.Path + t.StoragePrefix() + key, nil
+}
+
+func (w *WebDAV) hacer(ctx context.Context, metodo, ruta string, body io.Reader, size int64, cab map[string]string) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(ctx, metodo, w.base.String(), body)
 	if err != nil {
 		return nil, err
 	}
+	// No parsear una URL procedente de la clave: Path trata ?, # y % como
+	// datos y no puede sustituir el host ni las credenciales del destino.
+	req.URL.Path, req.URL.RawPath = ruta, ""
 	if size >= 0 {
 		req.ContentLength = size
 	}
@@ -87,18 +116,18 @@ func (w *WebDAV) hacer(ctx context.Context, metodo, u string, body io.Reader, si
 
 // asegurarCarpetas crea las colecciones padre de una ruta, de fuera hacia
 // dentro. 405 significa «ya existe» en WebDAV.
-func (w *WebDAV) asegurarCarpetas(ctx context.Context, t tenancy.Tenant, key string) error {
-	partes := strings.Split(strings.TrimLeft(t.StoragePrefix()+strings.TrimLeft(key, "/"), "/"), "/")
-	acum := ""
+func (w *WebDAV) asegurarCarpetas(ctx context.Context, ruta string) error {
+	partes := strings.Split(strings.TrimPrefix(ruta, w.base.Path), "/")
+	acum := w.base.Path
 	for _, p := range partes[:len(partes)-1] {
-		acum += url.PathEscape(p) + "/"
+		acum += p + "/"
 		w.mu.Lock()
 		hecho := w.creado[acum]
 		w.mu.Unlock()
 		if hecho {
 			continue
 		}
-		res, err := w.hacer(ctx, "MKCOL", w.base.String()+acum, http.NoBody, 0, nil)
+		res, err := w.hacer(ctx, "MKCOL", acum, http.NoBody, 0, nil)
 		if err != nil {
 			return fmt.Errorf("webdav: MKCOL %s: %w", acum, err)
 		}
@@ -114,7 +143,11 @@ func (w *WebDAV) asegurarCarpetas(ctx context.Context, t tenancy.Tenant, key str
 }
 
 func (w *WebDAV) Put(ctx context.Context, t tenancy.Tenant, key string, r io.Reader, size int64, opts PutOptions) error {
-	if err := w.asegurarCarpetas(ctx, t, key); err != nil {
+	ruta, err := w.ruta(t, key)
+	if err != nil {
+		return err
+	}
+	if err := w.asegurarCarpetas(ctx, ruta); err != nil {
 		return err
 	}
 	body := r
@@ -137,7 +170,7 @@ func (w *WebDAV) Put(ctx context.Context, t tenancy.Tenant, key string, r io.Rea
 	if opts.ContentType != "" {
 		cab["Content-Type"] = opts.ContentType
 	}
-	res, err := w.hacer(ctx, http.MethodPut, w.ruta(t, key), body, size, cab)
+	res, err := w.hacer(ctx, http.MethodPut, ruta, body, size, cab)
 	if err != nil {
 		return fmt.Errorf("webdav: put %q: %w", key, err)
 	}
@@ -149,7 +182,11 @@ func (w *WebDAV) Put(ctx context.Context, t tenancy.Tenant, key string, r io.Rea
 }
 
 func (w *WebDAV) Get(ctx context.Context, t tenancy.Tenant, key string) (io.ReadCloser, error) {
-	res, err := w.hacer(ctx, http.MethodGet, w.ruta(t, key), http.NoBody, 0, nil)
+	ruta, err := w.ruta(t, key)
+	if err != nil {
+		return nil, err
+	}
+	res, err := w.hacer(ctx, http.MethodGet, ruta, http.NoBody, 0, nil)
 	if err != nil {
 		return nil, fmt.Errorf("webdav: get %q: %w", key, err)
 	}
@@ -165,7 +202,11 @@ func (w *WebDAV) Get(ctx context.Context, t tenancy.Tenant, key string) (io.Read
 }
 
 func (w *WebDAV) Delete(ctx context.Context, t tenancy.Tenant, key string) error {
-	res, err := w.hacer(ctx, http.MethodDelete, w.ruta(t, key), http.NoBody, 0, nil)
+	ruta, err := w.ruta(t, key)
+	if err != nil {
+		return err
+	}
+	res, err := w.hacer(ctx, http.MethodDelete, ruta, http.NoBody, 0, nil)
 	if err != nil {
 		return fmt.Errorf("webdav: delete %q: %w", key, err)
 	}
@@ -177,7 +218,11 @@ func (w *WebDAV) Delete(ctx context.Context, t tenancy.Tenant, key string) error
 }
 
 func (w *WebDAV) Stat(ctx context.Context, t tenancy.Tenant, key string) (int64, error) {
-	res, err := w.hacer(ctx, http.MethodHead, w.ruta(t, key), http.NoBody, 0, nil)
+	ruta, err := w.ruta(t, key)
+	if err != nil {
+		return 0, err
+	}
+	res, err := w.hacer(ctx, http.MethodHead, ruta, http.NoBody, 0, nil)
 	if err != nil {
 		return 0, fmt.Errorf("webdav: head %q: %w", key, err)
 	}
@@ -201,10 +246,20 @@ func (w *WebDAV) Existe(ctx context.Context, t tenancy.Tenant, key string) (bool
 }
 
 func (w *WebDAV) Copiar(ctx context.Context, t tenancy.Tenant, origen, destino string) error {
-	if err := w.asegurarCarpetas(ctx, t, destino); err != nil {
+	rutaOrigen, err := w.ruta(t, origen)
+	if err != nil {
 		return err
 	}
-	res, err := w.hacer(ctx, "COPY", w.ruta(t, origen), http.NoBody, 0, map[string]string{"Destination": w.ruta(t, destino), "Overwrite": "T"})
+	rutaDestino, err := w.ruta(t, destino)
+	if err != nil {
+		return err
+	}
+	if err := w.asegurarCarpetas(ctx, rutaDestino); err != nil {
+		return err
+	}
+	destinoURL := *w.base
+	destinoURL.Path, destinoURL.RawPath = rutaDestino, ""
+	res, err := w.hacer(ctx, "COPY", rutaOrigen, http.NoBody, 0, map[string]string{"Destination": destinoURL.String(), "Overwrite": "T"})
 	if err != nil {
 		return fmt.Errorf("webdav: copy %q: %w", origen, err)
 	}
@@ -231,7 +286,7 @@ func (w *WebDAV) PresignPut(context.Context, tenancy.Tenant, string, time.Durati
 
 // Probar comprueba que la carpeta base responde con esas credenciales.
 func (w *WebDAV) Probar(ctx context.Context) error {
-	res, err := w.hacer(ctx, "PROPFIND", w.base.String(), http.NoBody, 0, map[string]string{"Depth": "0"})
+	res, err := w.hacer(ctx, "PROPFIND", w.base.Path, http.NoBody, 0, map[string]string{"Depth": "0"})
 	if err != nil {
 		return err
 	}

@@ -20,6 +20,8 @@ import { formatDate, type Locale } from '@sytue/i18n';
 import type { T } from '../i18n/index.js';
 import { construirArbol, type Nodo } from '../client/arbol.js';
 import { terminada } from '../client/diario.js';
+import { extracto } from '../client/extracto.js';
+export { extracto } from '../client/extracto.js';
 import type { ClaroPorNota } from './NoteCanvas.js';
 import { Glyph, type GlyphName } from './glyphs.js';
 import { RecordatorioEnFila } from './NoteCard.js';
@@ -298,18 +300,4 @@ function Rama({ nodo, nivel, ...p }: Props & { nodo: Nodo; nivel: number }): JSX
       ) : null}
     </li>
   );
-}
-
-/** La primera línea de texto de una nota en HTML, sin etiquetas y recortada. */
-export function extracto(html: string, max = 72): string {
-  const texto = html
-    .replace(/<(br|\/p|\/div|\/li|\/h[1-6])[^>]*>/gi, ' ')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&amp;/g, '&')
-    .replace(/\s+/g, ' ')
-    .trim();
-  return texto.length > max ? `${texto.slice(0, max - 1)}…` : texto;
 }

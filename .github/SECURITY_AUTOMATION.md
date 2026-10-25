@@ -206,3 +206,19 @@ No hay reintentos con otra credencial ante errores de red, redirecciones, límit
 de uso o errores del servidor. Si ninguna tiene permiso, el workflow falla con el
 permiso requerido; no informa que no haya alertas. La selección manual de Code
 Scanning sigue usando el token del job y no depende del acceso a Dependabot.
+
+### Inventario de otros repositorios de la cuenta
+
+`security-account-inventory.yml` es un despacho manual de solo lectura. Descubre
+repositorios del mismo propietario y comprueba Code Scanning, Dependabot y Secret
+Scanning. La cifra esperada de repositorios impide confundir una credencial con
+visibilidad parcial con una cuenta sin alertas. Los permisos denegados y funciones
+no habilitadas aparecen como estados distintos, nunca como inventarios vacíos.
+
+Este repositorio es público: los metadatos de repositorios privados no se escriben
+en logs ni en artefactos legibles. El destinatario aporta únicamente su clave RSA
+pública. El informe se cifra con AES-256-GCM y la clave de sesión se protege con
+RSA-OAEP-SHA256 antes de subir el artefacto, que dura un día. La clave privada
+permanece fuera de GitHub Actions. Los valores de secretos detectados se excluyen
+del informe antes de cifrarlo. Una cobertura incompleta hace fallar el job pero
+conserva el informe cifrado para diagnosticar los permisos que faltan.

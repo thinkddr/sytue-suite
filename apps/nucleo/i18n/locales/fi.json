@@ -23,6 +23,7 @@
   "account.presenceFailed": "Läsnäoloasi ei voitu muuttaa",
   "account.signIn": "Kirjaudu sisään",
   "account.signOut": "Kirjaudu ulos",
+  "account.signOutFailed": "Uloskirjautuminen ei onnistunut tällä laitteella. Drive voi olla yhä yhdistettynä. Yritä uudelleen.",
   "account.signOutPending.body": "Notepadsissa on tällä laitteella muistiinpanoja, joita ei ole vielä ladattu ({count}). Uloskirjautuminen poistaa ne siltä.",
   "account.signOutPending.discard": "Hylkää ja kirjaudu ulos",
   "account.signOutPending.title": "Lataamattomat muistiinpanot",
@@ -334,5 +335,6 @@
   "widgets.open": "Avaa",
   "widgets.pending": "Odottaa",
   "widgets.photos": "Kuvat",
-  "widgets.rows": "Rivit"
+  "widgets.rows": "Rivit",
+  "widgets.storage": "Tallennustila"
 }

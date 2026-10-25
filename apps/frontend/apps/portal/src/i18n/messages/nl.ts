@@ -150,6 +150,12 @@ export const nl: AppCatalog<typeof en> = {
     'Wil je alles rechtstreeks naar Google Workspace of Microsoft 365 overzetten zonder iets te downloaden? Heb je een persoonlijk account of beheer je je organisatie, start het dan zelf vanuit Sytue Admin, bij Migraties. Zo niet, vraag het dan aan wie je organisatie beheert.',
   'data.move.action': 'Naar Migraties',
 
+  'devices.native.body':
+    'Gebruik de bestandsbeheerder van je apparaat of verbind een account met toestemming.',
+  'devices.native.driveBody':
+    'Sytue Drive wordt na het aanmelden automatisch toegevoegd. Sta de locatie toe als het systeem daarom vraagt.',
+  'devices.native.openDrive': 'Openen in bestandsbeheer',
+  'devices.native.failed': 'De apparaatintegratie kon niet worden bijgewerkt.',
   'devices.title': 'Je apparaten koppelen',
   'devices.lead':
     'Neem je Sytue-mail, -agenda, -contacten en -bestanden mee naar je telefoon of computer. We begeleiden je stap voor stap.',

@@ -11,7 +11,9 @@ import (
 	"fyne.io/fyne/v2/test"
 
 	"git.sytue.eu/sytue/one/apps/fyne/catalogos"
+	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/ui/recorrido"
+	"git.sytue.eu/sytue/one/apps/fyne/ui/recorrido/montaje"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 )
 
@@ -36,6 +38,11 @@ func TestRecorridoConSesion(t *testing.T) {
 		if doc != "" {
 			a.AbrirID(doc, "")
 		}
+		nombre := "portada"
+		if doc != "" {
+			nombre = "hoja"
+		}
+		montaje.ComprobarRotacion(t, w, "calcus/"+nombre, iconos.Sheets, doc != "")
 		recorrido.Comprobar(t, w, 400)
 	}
 }

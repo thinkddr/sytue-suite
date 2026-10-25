@@ -4,9 +4,11 @@
 package ui
 
 import (
+	"image/color"
 	"testing"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/test"
 
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
@@ -123,5 +125,46 @@ func TestLaTiraRevelaIconosYConservaSusAvisosDeFoco(t *testing.T) {
 	tira.Dragged(&fyne.DragEvent{Dragged: fyne.NewDelta(-1000, 0)})
 	if tira.Desplazamiento() != 52 {
 		t.Fatal("el arrastre no alcanza el final con huecos de grupo")
+	}
+}
+
+func TestLaTiraDeAnchoPropioConservaElSueloTactilSinEnsancharSeparadores(t *testing.T) {
+	for _, tactil := range []bool{false, true} {
+		t.Run(map[bool]string{false: "escritorio", true: "tactil"}[tactil], func(t *testing.T) {
+			t.Cleanup(TactilDePrueba(tactil))
+			uno := NuevoBotonIcono(iconos.Mas, "Añadir", nil)
+			dos := NuevoBotonIcono(iconos.Texto, "Formato", nil)
+			uno.Lado, dos.Lado = 32, 32
+			separador := canvas.NewRectangle(color.NRGBA{})
+			separador.SetMinSize(fyne.NewSize(1, 8))
+			tira := NuevaTiraDeslizable(32, 4, uno, separador, dos)
+			tira.AnchoPropio = true
+			lado := float32(32)
+			if tactil {
+				lado = 44
+			}
+			if tira.MinSize().Height != lado {
+				t.Fatalf("la tira debe declarar el alto de sus mandos: %v, quiero %g", tira.MinSize(), lado)
+			}
+			tira.Resize(fyne.NewSize(50, lado))
+			test.WidgetRenderer(tira).Layout(tira.Size())
+			for _, b := range []*BotonIcono{uno, dos} {
+				if b.Size() != fyne.NewSize(lado, lado) {
+					t.Fatalf("el icono perdió el suelo táctil: %v, quiero %gx%g", b.Size(), lado, lado)
+				}
+			}
+			if separador.Size() != fyne.NewSize(1, 8) {
+				t.Fatalf("el suelo táctil ha ensanchado la decoración: %v", separador.Size())
+			}
+			fin := tira.AnchoContenido() - tira.Size().Width
+			dos.FocusGained()
+			if tira.Desplazamiento() != fin || dos.Position().X+dos.Size().Width != tira.Size().Width {
+				t.Fatal("el foco no deja accesible el último mando con su tamaño real")
+			}
+			tira.Dragged(&fyne.DragEvent{Dragged: fyne.NewDelta(1e6, 0)})
+			if tira.Desplazamiento() != 0 {
+				t.Fatal("el gesto no permite volver al primer mando")
+			}
+		})
 	}
 }

@@ -80,6 +80,10 @@ func Recorrer(w fyne.Window, tope int) Informe {
 // cierra con Escape. `testing.Verbose()` saca además lo pulsado, para ver qué se cubrió.
 func Comprobar(t testing.TB, w fyne.Window, tope int) Informe {
 	t.Helper()
+	if os.Getenv("SYTUE_SOLO_ROTACION") == "1" {
+		t.Log("solo rotación: el recorrido de pulsaciones se ejecuta en la validación completa")
+		return Informe{}
+	}
 	if dir := os.Getenv("SYTUE_CAPTURAS_PLAY"); dir != "" {
 		return Retratar(t, w, dir, tope)
 	}

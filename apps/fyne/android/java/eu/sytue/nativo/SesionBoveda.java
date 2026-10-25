@@ -58,6 +58,17 @@ final class SesionBoveda {
     synchronized String generacion() { return estado.optString("generacion"); }
     synchronized String epoca() { return estado.optString("epoca"); }
     synchronized boolean bloqueo() { return estado.optBoolean("bloqueo", true); }
+    synchronized boolean driveDesactivado() throws JSONException {
+        return DrivePreferencia.almacen(estado.has(DrivePreferencia.CLAVE) ? estado.get(DrivePreferencia.CLAVE) : null);
+    }
+    synchronized void driveDesactivado(boolean desactivado)
+            throws IOException, GeneralSecurityException, JSONException {
+        if (driveDesactivado() == desactivado) { return; }
+        JSONObject siguiente = new JSONObject(estado.toString());
+        siguiente.put(DrivePreferencia.CLAVE, desactivado);
+        persistir(siguiente);
+        estado = siguiente;
+    }
 
     synchronized void migrarGuardia(String origen, boolean puesta)
             throws IOException, GeneralSecurityException, JSONException {

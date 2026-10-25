@@ -55,7 +55,7 @@ export const lv: AppCatalog<typeof en> = {
   'security.mfa.title': 'Divpakāpju pārbaude',
   'security.mfa.off': 'Nav iestatīta. Kontu atver tikai parole.',
   'security.mfa.required':
-    'Jūsu organizācija pieprasa divpakāpju pārbaudi. Ieslēdziet to zemāk un pierakstieties vēlreiz.',
+    'Šai darbībai nepieciešama divpakāpju verifikācija. Iestatiet to tālāk un pēc tam piesakieties vēlreiz.',
   'security.mfa.on': 'Ieslēgta. Pierakstoties tiek prasīts kods.',
   'security.mfa.enable': 'Iestatīt',
   'security.mfa.scan': 'Skenējiet to ar autentifikācijas lietotni.',
@@ -113,6 +113,10 @@ export const lv: AppCatalog<typeof en> = {
   'plan.pro': 'Pro plāns · 200 GB',
   'plan.enterprise': 'Enterprise plāns · 1 TB · Premium atbalsts',
   'plan.storage': 'Izmantotā krātuve',
+  'plan.externalNote': 'Pievienotā krātuve palielina tavu Sytue ietilpību.',
+  'plan.externalCapacity': 'Pievienotā krātuve nodrošina papildu {capacity}.',
+  'plan.externalUnknown': 'Pakalpojuma sniedzējs nenorāda krātuves ietilpību.',
+  'plan.baseUsage': 'Sytue: {used} no {total}',
   'plan.paidUntil': 'Apmaksāts līdz',
   'plan.upgrade': 'Iegūt vairāk vietas',
   'plan.upgrade.hint':

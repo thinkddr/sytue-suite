@@ -63,7 +63,7 @@ export const it: AppCatalog<typeof en> = {
   'security.mfa.title': 'Verifica in due passaggi',
   'security.mfa.off': 'Non configurata. La sola password apre l’account.',
   'security.mfa.required':
-    'La tua organizzazione richiede la verifica in due passaggi. Attivala qui sotto e accedi di nuovo.',
+    'Questa operazione richiede la verifica in due passaggi. Configurala qui sotto, poi accedi di nuovo.',
   'security.mfa.on': 'Attiva. All’accesso ti viene chiesto un codice.',
   'security.mfa.enable': 'Configura',
   'security.mfa.scan': 'Inquadra questo con la tua app di autenticazione.',
@@ -132,6 +132,10 @@ export const it: AppCatalog<typeof en> = {
   'plan.pro': 'Piano Pro · 200 GB',
   'plan.enterprise': 'Piano Enterprise · 1 TB · Supporto Premium',
   'plan.storage': 'Spazio usato',
+  'plan.externalNote': 'Lo spazio di archiviazione collegato aumenta la tua capacità Sytue.',
+  'plan.externalCapacity': 'Lo spazio di archiviazione collegato aggiunge {capacity}.',
+  'plan.externalUnknown': 'Il fornitore non comunica la sua capacità.',
+  'plan.baseUsage': 'Sytue: {used} di {total}',
   'plan.paidUntil': 'Pagato fino al',
   'plan.upgrade': 'Più spazio',
   'plan.upgrade.hint':

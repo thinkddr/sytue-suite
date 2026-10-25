@@ -22,6 +22,7 @@ import (
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/fyne/video"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
+	"git.sytue.eu/sytue/one/apps/nucleo/widgets"
 )
 
 // # La app viva
@@ -69,6 +70,8 @@ type App struct {
 	cli *api.Cast
 	w   fyne.Window
 	v   Vista
+	// Widget publica la cuota ya pedida para subir, sin otra lectura de la red.
+	Widget widgets.Source
 
 	// ConSesion dice si hay alguien dentro. nil: nadie.
 	ConSesion func() bool
@@ -546,7 +549,13 @@ func (a *App) pintar() {
 	}
 	a.scroll.Content = container.New(&a.movil.hueco, o)
 	a.scroll.Refresh()
-	arm := ui.NuevoArmazon(container.New(&medirVentana{a: a}, a.scroll))
+	refresco := ui.RefrescarAlTirar(a.scroll, &ui.RefrescoLista{
+		Arriba:     func() bool { return a.scroll.Offset.Y <= 0.5 },
+		Puede:      a.puedeRefrescarLista,
+		Revision:   func() uint64 { return ui.RevisionLista(a.gen) },
+		Actualizar: a.refrescarLista,
+	})
+	arm := ui.NuevoArmazon(container.New(&medirVentana{a: a}, refresco))
 	arm.Menu = Lateral(a.v, activa, a.irSeccion)
 	arm.Titulo = a.v.Traduce("app.title")
 	a.raiz.Objects = []fyne.CanvasObject{arm}

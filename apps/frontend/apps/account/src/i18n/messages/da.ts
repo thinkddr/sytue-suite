@@ -55,7 +55,7 @@ export const da: AppCatalog<typeof en> = {
   'security.mfa.title': 'Totrinsbekræftelse',
   'security.mfa.off': 'Ikke sat op. Adgangskoden alene åbner kontoen.',
   'security.mfa.required':
-    'Din organisation kræver totrinsbekræftelse. Slå den til nedenfor, og log ind igen.',
+    'Denne handling kræver totrinsbekræftelse. Konfigurer den nedenfor, og log derefter ind igen.',
   'security.mfa.on': 'Til. Du bliver bedt om en kode, når du logger ind.',
   'security.mfa.enable': 'Sæt op',
   'security.mfa.scan': 'Scan dette med din godkendelsesapp.',
@@ -113,6 +113,10 @@ export const da: AppCatalog<typeof en> = {
   'plan.pro': 'Pro-abonnement · 200 GB',
   'plan.enterprise': 'Enterprise-abonnement · 1 TB · Premium-support',
   'plan.storage': 'Brugt lagerplads',
+  'plan.externalNote': 'Det tilsluttede lager udvider din lagerplads i Sytue.',
+  'plan.externalCapacity': 'Det tilsluttede lager tilføjer {capacity}.',
+  'plan.externalUnknown': 'Udbyderen oplyser ikke lagerets kapacitet.',
+  'plan.baseUsage': 'Sytue: {used} af {total}',
   'plan.paidUntil': 'Betalt indtil',
   'plan.upgrade': 'Få mere plads',
   'plan.upgrade.hint':

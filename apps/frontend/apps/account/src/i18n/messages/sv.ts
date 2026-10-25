@@ -55,7 +55,7 @@ export const sv: AppCatalog<typeof en> = {
   'security.mfa.title': 'Tvåstegsverifiering',
   'security.mfa.off': 'Inte inställd. Enbart lösenordet öppnar kontot.',
   'security.mfa.required':
-    'Din organisation kräver tvåstegsverifiering. Aktivera den nedan och logga in igen.',
+    'Den här åtgärden kräver tvåstegsverifiering. Konfigurera den nedan och logga sedan in igen.',
   'security.mfa.on': 'På. Du ombeds ange en kod när du loggar in.',
   'security.mfa.enable': 'Ställ in',
   'security.mfa.scan': 'Skanna det här med din autentiseringsapp.',
@@ -113,6 +113,10 @@ export const sv: AppCatalog<typeof en> = {
   'plan.pro': 'Pro-plan · 200 GB',
   'plan.enterprise': 'Enterprise-plan · 1 TB · Premiumsupport',
   'plan.storage': 'Använd lagring',
+  'plan.externalNote': 'Ansluten lagring utökar din lagringskapacitet i Sytue.',
+  'plan.externalCapacity': 'Ansluten lagring lägger till {capacity}.',
+  'plan.externalUnknown': 'Leverantören uppger inte lagringens kapacitet.',
+  'plan.baseUsage': 'Sytue: {used} av {total}',
   'plan.paidUntil': 'Betald till',
   'plan.upgrade': 'Få mer utrymme',
   'plan.upgrade.hint':

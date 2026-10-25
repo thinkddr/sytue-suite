@@ -243,6 +243,7 @@ func (p *Pantalla) conectarNube(proveedor string) {
 		return
 	}
 	p.cargarNubes()
+	p.cargarCuota()
 	enHilo(func() {
 		if p.lateral.Nubes == nil {
 			return
@@ -384,4 +385,5 @@ func (p *Pantalla) desconectarNube() {
 		return
 	}
 	p.cargarNubes()
+	p.cargarCuota()
 }

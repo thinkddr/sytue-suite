@@ -35,7 +35,7 @@
   },
   "devDependencies": {
     "@astrojs/check": "catalog:",
-    "@happy-dom/global-registrator": "20.14.5",
+    "@happy-dom/global-registrator": "21.0.4",
     "@types/node": "catalog:",
     "tailwindcss": "4.3.3",
     "typescript": "6.0.3"

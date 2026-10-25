@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"slices"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/auth"
@@ -34,10 +35,12 @@ const CuentaSecreto = "drive-sistema"
 // (el correo, que Sytue ID contrasta) y la contraseña. ID es el de Sytue ID, para
 // revocarla; sin Clave es una que queda por revocar.
 type Credencial struct {
-	ID      string `json:"id"`
-	URL     string `json:"url,omitempty"`
-	Usuario string `json:"usuario,omitempty"`
-	Clave   string `json:"clave,omitempty"`
+	ID         string      `json:"id"`
+	URL        string      `json:"url,omitempty"`
+	Usuario    string      `json:"usuario,omitempty"`
+	Clave      string      `json:"clave,omitempty"`
+	Dueno      Identidad   `json:"owner,omitempty"`
+	Pendientes []Pendiente `json:"pending,omitempty"`
 }
 
 // Cuenta es lo que hace falta de Sytue ID; la da `*api.Account`, y el guardián, un doble.
@@ -80,70 +83,166 @@ func guardarCredencial(c Credencial) error {
 // es de esta `url`, o una nueva con `etiqueta`. Si quedaba una por revocar, la revoca
 // antes. Sin proveedor en este sistema, ErrNoDisponible y no crea nada.
 func Asegurar(ctx context.Context, c Cuenta, url, etiqueta string) error {
+	return asegurar(ctx, c, url, etiqueta, Identidad{})
+}
+
+func asegurar(ctx context.Context, c Cuenta, url, etiqueta string, identidad Identidad) error {
 	if !hayProveedor {
 		return ErrNoDisponible
 	}
+	soltar, err := excluir(ctx)
+	if err != nil {
+		return err
+	}
+	defer soltar()
 	vieja, err := cargarCredencial()
 	if err != nil {
 		return err
 	}
-	if vieja.Clave != "" && vieja.URL == url {
-		return conectar(vieja)
+	if vieja.Clave != "" && vieja.URL == url && vieja.Dueno == identidad {
+		return conectar(ctx, vieja)
 	}
+	// Retirar la contraseña ANTES de conectar otra cuenta, incluso si revocar
+	// falla. Conservar sólo los identificadores permite recuperarlo sin exponerla.
+	pendientes := vieja.Pendientes
 	if vieja.ID != "" {
-		if err := revocar(ctx, c, vieja.ID); err != nil {
-			return err // se intenta en el siguiente: no se apilan contraseñas vivas
-		}
+		pendientes = append(pendientes, Pendiente{ID: vieja.ID, Dueno: vieja.Dueno})
+	}
+	base := Credencial{Pendientes: pendientes}
+	if err := guardarCredencial(base); err != nil {
+		return err
+	}
+	if vieja.Clave != "" {
 		desconectar(vieja)
+	}
+	base, err = revocarPendientes(ctx, c, base, identidad)
+	if err != nil {
+		return err
 	}
 	yo, err := c.Me(ctx)
 	if err != nil {
 		return err
 	}
+	if identidad.Sujeto != "" && yo.ID != identidad.Sujeto {
+		return errors.New("documentos: la cuenta ha cambiado durante la conexión")
+	}
 	nueva, err := c.CreateAppPassword(ctx, etiqueta)
 	if err != nil {
 		return err
 	}
-	cred := Credencial{ID: nueva.ID, URL: url, Usuario: yo.Email, Clave: nueva.Password}
-	if err := guardarCredencial(cred); err != nil {
-		// Sin dónde guardarla (un Linux sin llavero), no se deja viva una que nadie
-		// podrá revocar desde aquí.
-		return errors.Join(err, revocar(ctx, c, nueva.ID), borrar(CuentaSecreto))
+	if identidad.completa() && (nueva.OrgID == "" || nueva.Tenant != identidad.Organizacion) {
+		base.Pendientes = append(base.Pendientes, Pendiente{ID: nueva.ID, Dueno: identidad})
+		return errors.Join(errors.New("documentos: el servidor no ha fijado la organización de la credencial"), guardarCredencial(base))
 	}
-	return conectar(cred)
+	cred := Credencial{ID: nueva.ID, URL: url, Usuario: yo.Email, Clave: nueva.Password, Dueno: identidad, Pendientes: base.Pendientes}
+	if err := ctx.Err(); err != nil {
+		base.Pendientes = append(base.Pendientes, Pendiente{ID: nueva.ID, Dueno: identidad})
+		return errors.Join(err, guardarCredencial(base))
+	}
+	if err := guardarCredencial(cred); err != nil {
+		// Una contraseña sin almacén se revoca; los identificadores anteriores
+		// siguen guardados y no se borran al fallar esta nueva escritura.
+		return errors.Join(err, revocar(ctx, c, nueva.ID))
+	}
+	return conectar(ctx, cred)
+}
+
+func revocarPendientes(ctx context.Context, c Cuenta, cred Credencial, identidad Identidad) (Credencial, error) {
+	for i := 0; i < len(cred.Pendientes); {
+		p := cred.Pendientes[i]
+		if p.Dueno != identidad {
+			i++
+			continue
+		}
+		if err := revocar(ctx, c, p.ID); err != nil {
+			return cred, err
+		}
+		cred.Pendientes = slices.Delete(cred.Pendientes, i, i+1)
+		if err := guardarCredencial(cred); err != nil {
+			return cred, err
+		}
+	}
+	return cred, nil
 }
 
 // Guardada dice si este equipo tiene credencial de Drive en el sistema, viva o por
 // revocar. Solo lee el almacén.
 func Guardada() bool {
 	c, err := cargarCredencial()
-	return err == nil && c.ID != ""
+	return err == nil && (c.ID != "" || len(c.Pendientes) != 0)
 }
 
 // Retirar quita Drive del sistema y revoca la contraseña. Va ANTES de cerrar la
 // sesión, con el token vivo. Si la revocación falla, deja el identificador para el
 // siguiente [Asegurar].
-func Retirar(ctx context.Context, c Cuenta) error {
-	cred, err := cargarCredencial()
-	if err != nil || cred.ID == "" {
+func Retirar(ctx context.Context, c Cuenta) error { return retirar(ctx, c, nil) }
+
+func retirar(ctx context.Context, c Cuenta, identidad *Identidad) error {
+	soltar, err := excluir(ctx)
+	if err != nil {
 		return err
 	}
-	desconectar(cred)
-	if err := revocar(ctx, c, cred.ID); err != nil {
-		return errors.Join(err, guardarCredencial(Credencial{ID: cred.ID}))
+	defer soltar()
+	cred, err := cargarCredencial()
+	if err != nil {
+		return err
 	}
-	return borrar(CuentaSecreto)
+	// La API antigua retira al dueño de la credencial activa, nunca las de
+	// terceros que estén pendientes. La suite pasa su identidad explícita.
+	dueno := cred.Dueno
+	if identidad != nil {
+		dueno = *identidad
+		if cred.Dueno != dueno {
+			// Una retirada que esperaba el cerrojo puede llegar después del alta
+			// de otra cuenta. Revoca sus pendientes sin tocar la conexión nueva.
+			cred, err = revocarPendientes(ctx, c, cred, dueno)
+			if err == nil && cred.ID == "" && cred.Clave == "" && len(cred.Pendientes) == 0 {
+				return borrar(CuentaSecreto)
+			}
+			return err
+		}
+	}
+	if cred.ID != "" {
+		cred.Pendientes = append(cred.Pendientes, Pendiente{ID: cred.ID, Dueno: cred.Dueno})
+	}
+	vieja := cred
+	cred = Credencial{Pendientes: cred.Pendientes}
+	if err := guardarCredencial(cred); err != nil {
+		return err
+	}
+	desconectar(vieja)
+	cred, err = revocarPendientes(ctx, c, cred, dueno)
+	if err != nil {
+		return err
+	}
+	if len(cred.Pendientes) == 0 {
+		return borrar(CuentaSecreto)
+	}
+	return nil
 }
 
 // Olvidar quita Drive del sistema cuando la sesión ya no está y no hay token con el que
 // revocar: borra la contraseña y deja el identificador.
-func Olvidar() error {
+func Olvidar() error { return OlvidarCon(context.Background()) }
+
+// OlvidarCon retira la credencial atendiendo al plazo del ciclo de sesión.
+func OlvidarCon(ctx context.Context) error {
+	soltar, err := excluir(ctx)
+	if err != nil {
+		return err
+	}
+	defer soltar()
 	cred, err := cargarCredencial()
 	if err != nil || cred.Clave == "" {
 		return err
 	}
-	desconectar(cred)
-	return guardarCredencial(Credencial{ID: cred.ID})
+	vieja := cred
+	cred.URL, cred.Usuario, cred.Clave = "", "", ""
+	if err := guardarCredencial(cred); err != nil {
+		return err
+	}
+	desconectar(vieja)
+	return nil
 }
 
 // revocar no cuenta como fallo una que ya no existe (revocada en «Mi cuenta»).

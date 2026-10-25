@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"git.sytue.eu/sytue/one/platform/pkg/objectstore"
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 )
 
@@ -99,6 +100,19 @@ func (c *integrationsClient) Instances(ctx context.Context, t tenancy.Tenant) (E
 		return out, err
 	}
 	return out, nil
+}
+
+type personalStorageCapacity struct {
+	Connected bool `json:"connected"`
+	objectstore.Capacity
+}
+
+// PersonalCapacity nunca usa la caché de tokens por instancia: el resumen es
+// privado del actor y se vuelve a autorizar en cada lectura de cuota.
+func (c *integrationsClient) PersonalCapacity(ctx context.Context, t tenancy.Tenant, actor string) (personalStorageCapacity, error) {
+	var out personalStorageCapacity
+	err := c.get(ctx, "/internal/v1/storage/personal-capacity", url.Values{"tenant": {t.Slug}, "actor": {actor}}, &out)
+	return out, err
 }
 
 // Token devuelve un access token vigente de la instancia, de la caché mientras

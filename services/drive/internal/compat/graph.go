@@ -148,12 +148,13 @@ func NewGraphDrive(root domain.Folder, subject, displayName string, quota *domai
 
 // quotaState traduce el uso al vocabulario de Graph (normal|nearing|critical|exceeded).
 func quotaState(q domain.Quota) string {
+	remaining := q.Available()
 	switch {
-	case q.UsedBytes >= q.LimitBytes:
+	case remaining == 0:
 		return "exceeded"
-	case q.UsedBytes*10 >= q.LimitBytes*9:
+	case remaining <= q.LimitBytes/10:
 		return "critical"
-	case q.UsedBytes*10 >= q.LimitBytes*8:
+	case remaining <= q.LimitBytes/5:
 		return "nearing"
 	default:
 		return "normal"

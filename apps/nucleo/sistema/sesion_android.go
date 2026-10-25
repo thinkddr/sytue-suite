@@ -116,3 +116,23 @@ func MigrarSesionAndroid(cuenta, emisor, cliente string, historica bool) error {
 			jni.Value(jni.JavaString(env, cliente)), valor)
 	})
 }
+
+// PonerDriveSistemaAndroid changes only the broker's typed Drive preference.
+func PonerDriveSistemaAndroid(habilitado bool) error {
+	activa, err := SesionAndroidHabilitada()
+	if err != nil || !activa {
+		return err
+	}
+	return Java(func(env jni.Env, ctx jni.Object) error {
+		clase, err := CargarClase(env, ctx, claseSesionCompartida)
+		if err != nil {
+			return err
+		}
+		valor := jni.Value(0)
+		if habilitado {
+			valor = 1
+		}
+		return jni.CallStaticVoidMethod(env, clase,
+			jni.GetStaticMethodID(env, clase, "drive", "(Landroid/content/Context;Z)V"), jni.Value(ctx), valor)
+	})
+}

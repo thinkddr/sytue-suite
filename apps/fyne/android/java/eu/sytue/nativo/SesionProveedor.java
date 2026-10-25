@@ -25,6 +25,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
+import java.util.Collections;
 import java.util.Map;
 import org.json.JSONObject;
 
@@ -162,10 +163,20 @@ public final class SesionProveedor extends ContentProvider {
             Bundle salida = new Bundle();
             salida.putString("broker", identidad);
             salida.putString("generacion", boveda.generacion());
+            salida.putBoolean(DrivePreferencia.CLAVE, boveda.driveDesactivado());
             KeyguardManager pantalla = getContext().getSystemService(KeyguardManager.class);
             salida.putBoolean("bloqueo", boveda.bloqueo() || pantallaCerrada
                     || pantalla == null || pantalla.isDeviceLocked());
             switch (metodo) {
+                case "drive":
+                    exigirDueno(p);
+                    Map<String, Object> camposDrive = new HashMap<>();
+                    for (String clave : entrada.keySet()) { camposDrive.put(clave, entrada.get(clave)); }
+                    boolean desactivado = DrivePreferencia.cambio(p.uid, p.paquete,
+                            Collections.singletonList(SesionAndroid.instalada(getContext(), p.paquete)), camposDrive);
+                    boveda.driveDesactivado(desactivado);
+                    salida.putBoolean(DrivePreferencia.CLAVE, desactivado);
+                    return salida;
                 case "estado":
                     salida.putBoolean("autorizado", autorizado(p));
                     if (argumento != null) {

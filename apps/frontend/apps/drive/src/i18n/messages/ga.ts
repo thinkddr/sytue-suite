@@ -644,8 +644,10 @@ export const ga: AppCatalog<typeof en> = {
   'share.group.failed': 'Níorbh fhéidir é a chomhroinnt.',
   'share.person.someone': 'Duine i d’eagraíocht',
   'pdf.openInPdf': 'Oscail in Sytue PDF',
-  'storage.externalNote':
-    'Úsáideann comhaid nua do stóras ceangailte agus ní ghlacann siad spás anseo.',
+  'storage.externalNote': 'Méadaíonn stóras ceangailte d’acmhainn stórála in Sytue.',
+  'storage.externalCapacity': 'Cuireann stóras ceangailte {capacity} leis.',
+  'storage.externalUnknown': 'Ní thugann an soláthraí eolas faoina acmhainn stórála.',
+  'storage.baseUsage': 'Sytue: {used} as {total}',
   'storage.add': 'Cuir stóras leis',
   'storage.external.forOrg': 'Stóráil comhaid nua na heagraíochta anseo',
   'storage.external.endpoint': 'Críochphointe',

@@ -218,6 +218,8 @@ export const ro: Catalog = {
   'account.signedOutDescription':
     'Conectați-vă cu contul Sytue One pentru a vedea aici datele dvs.',
   'account.signOut': 'Deconectare',
+  'account.signOutFailed':
+    'Deconectarea de pe acest dispozitiv nu a reușit. Drive poate fi încă conectat. Încercați din nou.',
   'account.signOutPending.title': 'Note neîncărcate',
   'account.signOutPending.body':
     'Notepads are pe acest dispozitiv note care nu au fost încă încărcate ({count}). La deconectare sunt șterse de pe el.',
@@ -363,6 +365,7 @@ export const ro: Catalog = {
   'widgets.episodes': 'Episoade',
   'widgets.apps': 'Aplicații',
   'widgets.compose': 'Compune',
+  'widgets.storage': 'Stocare',
   'widgets.create': 'Creează eveniment',
 
   'linkedServices.services': 'Servicii',

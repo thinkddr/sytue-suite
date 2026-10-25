@@ -10,7 +10,9 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/test"
 
+	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/ui/recorrido"
+	"git.sytue.eu/sytue/one/apps/fyne/ui/recorrido/montaje"
 )
 
 // TestRecorridoConSesion pulsa todo lo que se ve con los datos del servicio falso y
@@ -20,5 +22,6 @@ func TestRecorridoConSesion(t *testing.T) {
 	w := test.NewTempWindow(t, b.P.Objeto())
 	w.Resize(fyne.NewSize(1280, 800))
 	b.Arrancar(context.Background())
+	montaje.ComprobarRotacion(t, w, "mail/buzon", iconos.Mail, true)
 	recorrido.Comprobar(t, w, 400)
 }

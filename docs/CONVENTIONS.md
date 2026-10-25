@@ -155,6 +155,7 @@ Pisos vigentes (junio 2026; Renovate los sube al salir nuevas estables):
 | **Frontend**                                      | **Astro / Preact**                                                                         | **Astro 7.x / Preact 10.29.x** (Preact 11 ya es GA; se espera la ventana de maduración) |
 | Estilos                                           | Tailwind CSS                                                                               | **4.x** (última)                                                                        |
 | Runtime FE / build / bundler / gestor de paquetes | **Bun** (MIT) — runtime, `bun install`, workspaces y bundler; sustituye a Node.js + pnpm   | última estable                                                                          |
+| Interfaz nativa                                   | Fyne, con los parches de la suite fijados en `apps/fyne/go.mod`                            | **2.8.2**                                                                               |
 | **Datastore**                                     | **PostgreSQL**                                                                             | **18.x**                                                                                |
 | Colas/caché                                       | **PostgreSQL** por defecto (`riverqueue`/`pgmq`/LISTEN-NOTIFY); **Valkey** opcional (§0.1) | última estable                                                                          |
 | Blobs                                             | Object Storage S3 (Scaleway) / MinIO (dev)                                                 | última estable                                                                          |
@@ -343,7 +344,11 @@ sytueOne/
 - **Cada servicio Go valida los tokens de Sytue ID** (JWKS) y aplica autorización por roles/tenant.
 - **LiveKit (videollamada):** el BFF `sytue-rooms` mintea el **JWT de LiveKit** (API key/secret) tras validar OIDC.
 - **Grupos/roles:** `org/<tenant>`; roles `owner`, `admin`, `member`, `billing`. MFA/WebAuthn
-  obligatorio para `admin`/`owner`. Un alta en Sytue ID → acceso a toda la suite (tenancy en §9).
+  obligatorio para `admin`/`owner` al administrar la identidad de una organización, y para
+  la administración de plataforma. Entrar en las apps o en «Mi cuenta» no obliga a enrolar
+  MFA por tener esos roles: el alta de MFA es voluntaria, salvo política explícita de la
+  organización. Si la persona ya lo activó, el login exige su segundo factor. Un alta en
+  Sytue ID → acceso a toda la suite (tenancy en §9).
 
 <a id="9-multi-tenant"></a>
 
@@ -841,7 +846,7 @@ llega a su fase de roadmap se sube a 'si' en el mismo PR que lo implementa.
 
 ### 13.6 La interfaz nativa es Fyne, con TODO propio — NORMATIVO (2026-09-21)
 
-**Escritorio y móvil se construyen con [Fyne](https://fyne.io) v2.8.1 y widgets,
+**Escritorio y móvil se construyen con [Fyne](https://fyne.io), en la versión fijada en §3, y widgets,
 tema y layouts PROPIOS, hasta paridad 1:1 a nivel de píxel con las web apps.**
 La web no entra: `sytue.eu` sigue siendo Astro + Preact + Go (§4), y por tanto
 **no hay destino WebAssembly**. El porqué, lo medido y el techo real están en el

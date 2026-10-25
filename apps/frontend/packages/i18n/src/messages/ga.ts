@@ -213,6 +213,8 @@ export const ga: Catalog = {
   'account.signedOutDescription':
     'Logáil isteach le do chuntas Sytue One chun do shonraí a fheiceáil anseo.',
   'account.signOut': 'Logáil amach',
+  'account.signOutFailed':
+    'Níorbh fhéidir síniú amach ar an ngléas seo. Seans go bhfuil Drive fós nasctha. Bain triail eile as.',
   'account.signOutPending.title': 'Nótaí nár uaslódáladh',
   'account.signOutPending.body':
     'Tá nótaí ag Notepads ar an ngléas seo nár uaslódáladh fós ({count}). Scriostar iad uaidh nuair a logálann tú amach.',
@@ -365,6 +367,7 @@ export const ga: Catalog = {
   'widgets.episodes': 'Eipeasóid',
   'widgets.apps': 'Aipeanna',
   'widgets.compose': 'Cum',
+  'widgets.storage': 'Stóras',
   'widgets.create': 'Cruthaigh imeacht',
 
   'linkedServices.services': 'Seirbhísí',

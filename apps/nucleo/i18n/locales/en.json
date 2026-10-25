@@ -23,6 +23,7 @@
   "account.presenceFailed": "Your presence could not be changed",
   "account.signIn": "Sign in",
   "account.signOut": "Sign out",
+  "account.signOutFailed": "Could not sign out on this device. Drive may still be connected. Try again.",
   "account.signOutPending.body": "Notepads has notes on this device that have not been uploaded yet ({count}). Signing out deletes them from it.",
   "account.signOutPending.discard": "Discard and sign out",
   "account.signOutPending.title": "Notes not uploaded",
@@ -334,5 +335,6 @@
   "widgets.open": "Open",
   "widgets.pending": "Pending",
   "widgets.photos": "Photos",
-  "widgets.rows": "Rows"
+  "widgets.rows": "Rows",
+  "widgets.storage": "Storage"
 }

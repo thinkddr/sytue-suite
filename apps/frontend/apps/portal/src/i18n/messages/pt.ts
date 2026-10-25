@@ -163,6 +163,12 @@ export const pt: AppCatalog<typeof en> = {
     'Para enviar tudo diretamente para o Google Workspace ou o Microsoft 365, sem descarregar nada: se a sua conta for pessoal ou se administrar a sua organização, inicie o processo no Sytue Admin, em Migrações; caso contrário, peça a quem a administra.',
   'data.move.action': 'Ir para Migrações',
 
+  'devices.native.body':
+    'Usa o gestor de ficheiros do dispositivo ou liga uma conta com o seu consentimento.',
+  'devices.native.driveBody':
+    'O Sytue Drive é adicionado automaticamente ao iniciar sessão. Permite a sua localização se o sistema o pedir.',
+  'devices.native.openDrive': 'Abrir no gestor de ficheiros',
+  'devices.native.failed': 'Não foi possível atualizar a integração do dispositivo.',
   'devices.title': 'Ligar os seus dispositivos',
   'devices.lead':
     'Leve o correio, o calendário, os contactos e os ficheiros do Sytue para o telemóvel ou o computador. Vamos passo a passo.',

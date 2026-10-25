@@ -14,6 +14,59 @@ import (
 	"time"
 )
 
+// El rol elevado puede ir después de un rol ordinario. La frontera conserva su
+// reto RFC9470, mientras Mi cuenta, los delegados y quien ya trae MFA siguen pasando.
+func TestMFAAdministrativoConRolesMixtos(t *testing.T) {
+	t.Parallel()
+	for _, caso := range []struct {
+		nombre    string
+		ruta      string
+		roles     []string
+		amr       []string
+		sinClaims bool
+		status    int
+		reto      bool
+	}{
+		{nombre: "owner", roles: []string{"owner"}, status: http.StatusUnauthorized, reto: true},
+		{nombre: "admin tras miembro", roles: []string{"member", "admin"}, status: http.StatusUnauthorized, reto: true},
+		{nombre: "owner tras facturación", roles: []string{"billing", "owner"}, status: http.StatusUnauthorized, reto: true},
+		{nombre: "owner antes de miembro", roles: []string{"owner", "member"}, status: http.StatusUnauthorized, reto: true},
+		{nombre: "miembro y facturación", roles: []string{"member", "billing"}, status: http.StatusNoContent},
+		{nombre: "delegado", roles: []string{"users-reader"}, status: http.StatusNoContent},
+		{nombre: "sin roles ni tenant", status: http.StatusNoContent},
+		{nombre: "admin con MFA anterior", roles: []string{"member", "admin"}, amr: []string{"webauthn"}, status: http.StatusNoContent},
+		{nombre: "Mi cuenta", ruta: "/api/v1/me", roles: []string{"admin"}, status: http.StatusNoContent},
+		{nombre: "sin claims", sinClaims: true, status: http.StatusUnauthorized},
+	} {
+		t.Run(caso.nombre, func(t *testing.T) {
+			s := &Server{log: slog.New(slog.NewTextHandler(io.Discard, nil))}
+			pasa := false
+			h := s.mfaParaAdministracion(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				pasa = true
+				w.WriteHeader(http.StatusNoContent)
+			}))
+			ruta := caso.ruta
+			if ruta == "" {
+				ruta = "/api/v1/admin/users"
+			}
+			r := httptest.NewRequest(http.MethodGet, ruta, http.NoBody)
+			if !caso.sinClaims {
+				c := tokenClaims{Subject: "u1", Roles: caso.roles, AMR: caso.amr, AuthTime: time.Now().Add(-24 * time.Hour)}
+				r = r.WithContext(context.WithValue(r.Context(), ctxKeyClaims{}, c))
+			}
+			w := httptest.NewRecorder()
+			h.ServeHTTP(w, r)
+			if w.Code != caso.status || pasa != (caso.status == http.StatusNoContent) {
+				t.Fatalf("status=%d, siguiente=%v; quiero status=%d", w.Code, pasa, caso.status)
+			}
+			reto := w.Header().Get("WWW-Authenticate")
+			if caso.reto && (!strings.Contains(reto, "insufficient_user_authentication") || !strings.Contains(reto, "max_age=")) {
+				t.Fatalf("falta el reto RFC9470: %q", reto)
+			}
+		})
+	}
+}
+
 // TestRequireStepUp vigila las dos condiciones y que hagan falta LAS DOS. El
 // caso que de verdad importa es el tercero: segundo factor sí, pero de una
 // sesión de hace días —que es exactamente lo que pasa con refresh, donde el

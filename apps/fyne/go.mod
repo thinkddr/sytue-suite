@@ -14,28 +14,28 @@ module git.sytue.eu/sytue/one/apps/fyne
 go 1.27.3
 
 require (
-	fyne.io/fyne/v2 v2.8.1
+	fyne.io/fyne/v2 v2.8.2
 	git.sytue.eu/sytue/one/apps/nucleo v0.0.0
 	git.wow.st/gmp/jni v0.0.0-20210610011705-34026c7e22d0
 	github.com/coder/websocket v1.8.15
-	github.com/fyne-io/oksvg v0.2.0
+	github.com/fyne-io/oksvg v0.2.1-0.20260918172519-a9af55fa95d9
 	github.com/gen2brain/avif v0.6.0
 	github.com/gen2brain/malgo v0.11.26
-	github.com/go-gl/glfw/v3.4/glfw v0.1.0-pre.1.0.20260707082822-2a407d02d01a
-	github.com/go-text/typesetting v0.3.4
-	github.com/godbus/dbus/v5 v5.2.2
+	github.com/go-gl/glfw/v3.4/glfw v0.1.0-pre.2
+	github.com/go-text/typesetting v0.3.5
+	github.com/godbus/dbus/v5 v5.2.4
 	github.com/google/uuid v1.6.0
-	github.com/livekit/protocol v1.52.1
+	github.com/livekit/protocol v1.53.0
 	github.com/livekit/server-sdk-go/v2 v2.19.0
-	github.com/pion/rtcp v1.2.18
-	github.com/pion/rtp v1.10.5
-	github.com/pion/webrtc/v4 v4.2.21
+	github.com/pion/rtcp v1.2.20
+	github.com/pion/rtp v1.10.6
+	github.com/pion/webrtc/v4 v4.2.25
 	github.com/srwiley/rasterx v0.0.0-20220730225603-2ab79fcdd4ef
 	github.com/thesyncim/govpx v0.0.0-20260716224042-691cd0512c48
 	github.com/thinkddr/astro-fyne/native v0.0.0
-	github.com/tphakala/go-opus v1.1.0
+	github.com/tphakala/go-opus v1.3.0
 	github.com/zalando/go-keyring v0.2.8
-	golang.org/x/image v0.46.0
+	golang.org/x/image v0.47.0
 	golang.org/x/net v0.61.0
 	golang.org/x/sys v0.49.0
 	golang.org/x/text v0.43.0
@@ -88,7 +88,7 @@ require (
 	github.com/lithammer/shortuuid/v4 v4.3.0 // indirect
 	github.com/livekit/mageutil v0.0.0-20250511045019-0f1ff63f7731 // indirect
 	github.com/livekit/mediatransportutil v0.0.0-20260821083140-f234b534b095 // indirect
-	github.com/livekit/psrpc v0.8.0 // indirect
+	github.com/livekit/psrpc v0.8.2 // indirect
 	github.com/magefile/mage v1.17.2 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
@@ -99,15 +99,15 @@ require (
 	github.com/nicksnyder/go-i18n/v2 v2.5.1 // indirect
 	github.com/petermattis/goid v0.0.0-20260918085751-abfca077860b // indirect
 	github.com/pion/datachannel v1.6.3 // indirect
-	github.com/pion/dtls/v3 v3.1.9 // indirect
-	github.com/pion/ice/v4 v4.4.4 // indirect
+	github.com/pion/dtls/v3 v3.1.15 // indirect
+	github.com/pion/ice/v4 v4.4.8 // indirect
 	github.com/pion/interceptor v0.1.49 // indirect
 	github.com/pion/logging v0.2.4 // indirect
-	github.com/pion/mdns/v2 v2.2.1 // indirect
+	github.com/pion/mdns/v2 v2.2.2 // indirect
 	github.com/pion/randutil v0.1.0 // indirect
-	github.com/pion/sctp v1.11.3 // indirect
+	github.com/pion/sctp v1.12.0 // indirect
 	github.com/pion/sdp/v3 v3.0.20 // indirect
-	github.com/pion/srtp/v3 v3.1.0 // indirect
+	github.com/pion/srtp/v3 v3.1.3 // indirect
 	github.com/pion/stun/v4 v4.0.1 // indirect
 	github.com/pion/transport/v5 v5.1.1 // indirect
 	github.com/pion/turn/v5 v5.1.2 // indirect
@@ -125,7 +125,7 @@ require (
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
 	github.com/tidwall/sjson v1.2.5 // indirect
-	github.com/tphakala/simd v1.8.0 // indirect
+	github.com/tphakala/simd v1.14.0 // indirect
 	github.com/twitchtv/twirp v8.1.3+incompatible // indirect
 	github.com/wlynxg/anet v0.0.5 // indirect
 	github.com/yuin/goldmark v1.8.6 // indirect
@@ -142,26 +142,27 @@ require (
 	golang.org/x/sync v0.24.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260803160001-6ac0973c030d // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20260803160001-6ac0973c030d // indirect
-	google.golang.org/grpc v1.83.2 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20261005182115-fad411399dd8 // indirect
+	google.golang.org/grpc v1.84.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
 // El núcleo compartido de los clientes vive en el mismo repositorio.
 replace git.sytue.eu/sytue/one/apps/nucleo => ../nucleo
 
-// Fyne v2.8.1 no entrega al programa las URL entrantes de Android, iOS ni macOS.
-// El fork público BSD-3-Clause añade ese puente y conserva la API pública de v2;
+// Fyne no entrega al programa las URL entrantes de Android, iOS ni macOS.
+// El fork público conserva BSD-3-Clause de upstream y publica sus cambios bajo
+// Apache-2.0. Añade ese puente y conserva la API pública de v2;
 // se borra este replace cuando upstream acepte el parche.
-replace fyne.io/fyne/v2 => github.com/thinkddr/fyne/v2 v2.8.1-sytue.16
+replace fyne.io/fyne/v2 => github.com/thinkddr/fyne/v2 v2.8.2-sytue.1
 
 // GLFW solo acepta FICHEROS soltados: su XDnD de X11 y su wl_data_device de Wayland
 // piden `text/uri-list` y nada más. El fork —el mismo commit que requiere Fyne, con un
 // parche en su C y `SetDropTextCallback` en Go— deja que una ventana acepte también
-// texto y URL; lo usa `apps/fyne/soltar`. Es PRIVADO por lo mismo que typesetting (ver
-// abajo), y el CI lo lee con `forks.sh`. Parche, versión y cómo quitarlo:
+// texto y URL; lo usa `apps/fyne/soltar`. El CI lo descarga directamente con
+// `forks.sh` (ver abajo). Parche, versión y cómo quitarlo:
 // `apps/fyne/upstream/README.md`.
-replace github.com/go-gl/glfw/v3.4/glfw => github.com/thinkddr/glfw/v3.4/glfw v0.1.0-sytue.3
+replace github.com/go-gl/glfw/v3.4/glfw => github.com/thinkddr/glfw/v3.4/glfw v0.1.0-sytue.4
 
 // # El conformador de texto va PARCHEADO. Medido el 2026-09-21
 //
@@ -175,16 +176,16 @@ replace github.com/go-gl/glfw/v3.4/glfw => github.com/thinkddr/glfw/v3.4/glfw v0
 // por la escala del lienzo (`internal/painter/font.go`), así que el error es el mismo a
 // ×1 que a ×2.
 //
-// El fork es el v0.3.4 de upstream con UN cambio de una línea y el `module` renombrado
-// —un `replace` exige que el destino declare la ruta por la que se le requiere—. La
-// política de rebase y quién la comprueba, en el ADR 0048.
+// El fork conserva la base de upstream, el parche fraccionario y su prueba.
+// Declara el module canónico para que sus imports internos resuelvan el mismo
+// módulo; replace selecciona el repositorio del fork sin renombrar ese contrato.
+// La política de actualización y quién la comprueba, en el ADR 0048.
 //
-// El repositorio es PRIVADO a propósito: publicarlo mandaría su nombre a
-// proxy.golang.org y a sum.golang.org, que es justo la fuga que
-// `compliance/supply-chain/README.md` §A da por cerrada. Por eso quien compile esto
-// necesita `GOPRIVATE=github.com/thinkddr/*` (y un token de GitHub que lea los forks: el CI lo
-// tiene en SYTUE_GIT_FORKS_TOKEN). Sin GOPRIVATE el `go mod download` falla en el proxy, no en silencio.
-replace github.com/go-text/typesetting => github.com/thinkddr/typesetting v0.3.4-sytue.2
+// La descarga de nuestros forks sigue siendo directa, sin consultar sus rutas en
+// proxy.golang.org ni sum.golang.org: `GOPRIVATE=github.com/thinkddr/*`.
+// Esta opción no determina su visibilidad en GitHub. El preflight del CI sigue
+// exigiendo acceso mediante SYTUE_GIT_FORKS_TOKEN, sin exponer su valor.
+replace github.com/go-text/typesetting => github.com/thinkddr/typesetting v0.3.5-sytue.1
 
 // Verified upstream source plus patches/livekit-server-sdk-go-v2.19.0-vp8.patch.
 replace github.com/livekit/server-sdk-go/v2 => ../../.deps/livekit-server-sdk-go

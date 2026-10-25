@@ -30,7 +30,7 @@
   },
   "devDependencies": {
     "@astrojs/check": "catalog:",
-    "@happy-dom/global-registrator": "20.14.5",
+    "@happy-dom/global-registrator": "21.0.4",
     "@tailwindcss/vite": "4.3.3",
     "@types/jsdom": "30.0.0",
     "@types/node": "catalog:",

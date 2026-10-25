@@ -211,6 +211,8 @@ export const el: Catalog = {
   'account.signedOutDescription':
     'Συνδεθείτε με τον λογαριασμό σας Sytue One για να δείτε εδώ τα δεδομένα σας.',
   'account.signOut': 'Αποσύνδεση',
+  'account.signOutFailed':
+    'Η αποσύνδεση από αυτή τη συσκευή απέτυχε. Το Drive μπορεί να είναι ακόμη συνδεδεμένο. Δοκιμάστε ξανά.',
   'account.signOutPending.title': 'Σημειώσεις που δεν ανέβηκαν',
   'account.signOutPending.body':
     'Το Notepads έχει σημειώσεις σε αυτή τη συσκευή που δεν έχουν ανέβει ακόμη ({count}). Με την αποσύνδεση διαγράφονται από αυτήν.',
@@ -362,6 +364,7 @@ export const el: Catalog = {
   'widgets.episodes': 'Επεισόδια',
   'widgets.apps': 'Εφαρμογές',
   'widgets.compose': 'Σύνταξη',
+  'widgets.storage': 'Αποθηκευτικός χώρος',
   'widgets.create': 'Δημιουργία συμβάντος',
 
   'linkedServices.services': 'Υπηρεσίες',

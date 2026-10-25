@@ -150,6 +150,12 @@ export const hr: AppCatalog<typeof en> = {
     'Da biste sve prenijeli izravno u Google Workspace ili Microsoft 365 bez preuzimanja: ako imate osobni račun ili upravljate svojom organizacijom, pokrenite to sami u Sytue Adminu, u odjeljku Migracije; ako ne, zamolite osobu koja njome upravlja.',
   'data.move.action': 'Idi na Migracije',
 
+  'devices.native.body':
+    'Pregledaj datoteke na uređaju ili poveži račun uz suglasnost osobe kojoj pripada.',
+  'devices.native.driveBody':
+    'Sytue Drive dodaje se automatski nakon prijave. Dopusti njegovu lokaciju ako sustav to zatraži.',
+  'devices.native.openDrive': 'Otvori mapu Drive',
+  'devices.native.failed': 'Nije moguće ažurirati integraciju uređaja.',
   'devices.title': 'Povežite svoje uređaje',
   'devices.lead':
     'Ponesite e-poštu, kalendar, kontakte i datoteke iz Sytuea na mobitel ili računalo. Vodimo vas korak po korak.',

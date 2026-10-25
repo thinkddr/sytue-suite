@@ -4,9 +4,11 @@
 package widgets
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"math"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -151,7 +153,7 @@ func TestSnapshotBoundsAndPrivateFilePermissions(t *testing.T) {
 			t.Fatalf("bad bundle accepted: %s %v", bundle, err)
 		}
 	}
-	for _, counters := range [][]Counter{{{Kind: "subject", Value: 1}}, {{Kind: "unread", Value: -1}}, {{Kind: "unread", Value: 1}, {Kind: "unread", Value: 2}}} {
+	for _, counters := range [][]Counter{{{Kind: "subject", Value: 1}}, {{Kind: "unread", Value: -1}}, {{Kind: "unread", Value: 1}, {Kind: "unread", Value: 2}}, {{Kind: "storage_percent", Value: 101}}} {
 		if err := Publish(ctx, "eu.sytue.mail", "mail", scope, counters, time.Minute); !errors.Is(err, ErrInvalid) {
 			t.Fatalf("bad counters: %+v %v", counters, err)
 		}
@@ -179,6 +181,97 @@ func TestSnapshotBoundsAndPrivateFilePermissions(t *testing.T) {
 	}
 	if _, err := Read("eu.sytue.mail"); !errors.Is(err, ErrInvalid) {
 		t.Fatalf("unbounded input: %v", err)
+	}
+}
+
+func TestStoragePercentUsesCompleteValidQuotaWithoutOverflow(t *testing.T) {
+	for _, tc := range []struct {
+		used, capacity int64
+		percent        int64
+		valid          bool
+	}{
+		{0, 100, 0, true},
+		{13, 40, 32, true},
+		{99, 100, 99, true},
+		{100, 100, 100, true},
+		{101, 100, 100, true},
+		{math.MaxInt64 - 1, math.MaxInt64, 99, true},
+		{math.MaxInt64 / 2, math.MaxInt64, 49, true},
+		{-1, 100, 0, false},
+		{1, 0, 0, false},
+		{1, -1, 0, false},
+	} {
+		counter, valid := StoragePercent(tc.used, tc.capacity)
+		if valid != tc.valid || valid && counter != (Counter{Kind: "storage_percent", Value: tc.percent}) {
+			t.Fatalf("quota %d/%d: %+v, %t", tc.used, tc.capacity, counter, valid)
+		}
+	}
+}
+
+func TestUnchangedRefreshKeepsObservationAndCoalescesReloads(t *testing.T) {
+	scope := fixture(t)
+	ctx := context.Background()
+	previousNotify := notifyPlatform
+	t.Cleanup(func() { notifyPlatform = previousNotify })
+	reloads := 0
+	notifyPlatform = func(string) { reloads++ }
+	publish := func(value int64) {
+		t.Helper()
+		if err := Publish(ctx, "eu.sytue.mail", "mail", scope, []Counter{{Kind: "unread", Value: value}}, 15*time.Minute); err != nil {
+			t.Fatal(err)
+		}
+	}
+	publish(7)
+	filename, _ := path("eu.sytue.mail")
+	before, err := os.ReadFile(filename)
+	if err != nil {
+		t.Fatal(err)
+	}
+	publish(7)
+	after, err := os.ReadFile(filename)
+	if err != nil || !bytes.Equal(before, after) || reloads != 1 {
+		t.Fatalf("identical refresh renewed or reloaded: %q %q %d %v", before, after, reloads, err)
+	}
+	publish(8)
+	current, err := Read("eu.sytue.mail")
+	if err != nil || current.Counters[0].Value != 8 || reloads != 2 {
+		t.Fatalf("changed data delayed: %+v %d %v", current, reloads, err)
+	}
+	// An identical authenticated response near expiry must still renew. This also
+	// proves coalescing cannot turn a valid fresh fetch into an expired widget.
+	current.UpdatedAt = time.Now().Add(-12 * time.Minute).Unix()
+	current.ExpiresAt = current.UpdatedAt + int64(15*time.Minute/time.Second)
+	data, err := json.Marshal(current)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filename, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	publish(8)
+	current, err = Read("eu.sytue.mail")
+	if err != nil || current.ExpiresAt < time.Now().Add(14*time.Minute).Unix() || reloads != 3 {
+		t.Fatalf("fresh observation did not renew: %+v %d %v", current, reloads, err)
+	}
+}
+
+func TestShorterLifetimeCannotPreserveLongerCachedExpiry(t *testing.T) {
+	scope := fixture(t)
+	ctx := context.Background()
+	counters := []Counter{{Kind: "unread", Value: 7}}
+	if err := Publish(ctx, "eu.sytue.mail", "mail", scope, counters, MaxAge); err != nil {
+		t.Fatal(err)
+	}
+	before, err := Read("eu.sytue.mail")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := Publish(ctx, "eu.sytue.mail", "mail", scope, counters, time.Minute); err != nil {
+		t.Fatal(err)
+	}
+	after, err := Read("eu.sytue.mail")
+	if err != nil || after.ExpiresAt >= before.ExpiresAt || after.ExpiresAt > time.Now().Add(time.Minute).Unix() {
+		t.Fatalf("shorter lifetime retained a longer expiry: before=%+v after=%+v %v", before, after, err)
 	}
 }
 

@@ -82,6 +82,30 @@ func TestPasoDosOfreceLaPasskey(t *testing.T) {
 	}
 }
 
+// El desafío tiene que ser una página utilizable incluso sin JavaScript y
+// conservar el destino que pidió la reautenticación.
+func TestDesafioMFASirveHTMLConFormularioYViaje(t *testing.T) {
+	const viaje = "/oauth2/authorize?client_id=sytue-console&scope=openid&max_age=300"
+	rec := httptest.NewRecorder()
+	(&Server{}).handleLoginForm(rec, httptest.NewRequest(http.MethodGet,
+		"/login/?"+url.Values{"step_up": {"1"}, "return_to": {viaje}}.Encode(), http.NoBody))
+	if rec.Code != http.StatusOK || !strings.HasPrefix(rec.Header().Get("Content-Type"), "text/html") {
+		t.Fatalf("desafío: status=%d Content-Type=%q", rec.Code, rec.Header().Get("Content-Type"))
+	}
+	for _, parte := range []string{
+		`<form method="post" action="/login/mfa">`,
+		`name="code" autocomplete="one-time-code"`,
+		`<button type="submit">`,
+		`id="passkey-btn"`,
+		`<input type="hidden" name="return_to" value="` + html.EscapeString(viaje) + `">`,
+		`href="/login/?return_to=` + url.QueryEscape(viaje) + `"`,
+	} {
+		if !strings.Contains(rec.Body.String(), parte) {
+			t.Errorf("el desafío MFA no contiene %s", parte)
+		}
+	}
+}
+
 // El viaje (return_to) tiene que sobrevivir al desvío por «olvidé mi contraseña».
 //
 // El enlace se pintaba SIN return_to mientras el de SSO, justo debajo, y el paso

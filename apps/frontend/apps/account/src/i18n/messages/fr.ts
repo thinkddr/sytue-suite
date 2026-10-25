@@ -63,7 +63,7 @@ export const fr: AppCatalog<typeof en> = {
   'security.mfa.title': 'Validation en deux étapes',
   'security.mfa.off': 'Non configurée. Votre mot de passe seul ouvre le compte.',
   'security.mfa.required':
-    'Votre organisation exige la validation en deux étapes. Activez-la ci-dessous puis reconnectez-vous.',
+    'Cette opération nécessite la validation en deux étapes. Configurez-la ci-dessous, puis reconnectez-vous.',
   'security.mfa.on': 'Activée. Un code vous est demandé à la connexion.',
   'security.mfa.enable': 'Configurer',
   'security.mfa.scan': "Scannez ceci avec votre application d'authentification.",
@@ -135,6 +135,10 @@ export const fr: AppCatalog<typeof en> = {
   'plan.pro': 'Forfait Pro · 200 Go',
   'plan.enterprise': 'Forfait Enterprise · 1 To · Support Premium',
   'plan.storage': 'Espace utilisé',
+  'plan.externalNote': 'Le stockage connecté augmente votre capacité Sytue.',
+  'plan.externalCapacity': 'Le stockage connecté ajoute {capacity}.',
+  'plan.externalUnknown': 'Le fournisseur ne communique pas sa capacité.',
+  'plan.baseUsage': 'Sytue: {used} sur {total}',
   'plan.paidUntil': 'Payé jusqu’au',
   'plan.upgrade': 'Plus d’espace',
   'plan.upgrade.hint':

@@ -344,6 +344,11 @@ func (s *Store) RemoveMembership(ctx context.Context, q pg.Querier, orgID, userI
 	if _, err := q.Exec(ctx, `DELETE FROM memberships WHERE org_id=$1 AND user_id=$2`, orgID, userID); err != nil {
 		return errf("RemoveMembership", err)
 	}
+	// Una reinvitación no revive las contraseñas de la membresía retirada.
+	if _, err := q.Exec(ctx, `UPDATE app_passwords SET revoked_at = now()
+		WHERE org_id = $1 AND user_id = $2 AND revoked_at IS NULL`, orgID, userID); err != nil {
+		return errf("RemoveMembership.appPasswords", err)
+	}
 	// La baja ARRASTRA las credenciales de esa org: sin esto quedaba un refresh token
 	// válido con su `org_id`, y grantRefresh seguía mintando access tokens con el claim
 	// `tenant` de la organización (el rol salía vacío, pero el tenant NO, porque se

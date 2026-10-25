@@ -23,6 +23,7 @@
   "account.presenceFailed": "Níorbh fhéidir do láithreacht a athrú",
   "account.signIn": "Logáil isteach",
   "account.signOut": "Logáil amach",
+  "account.signOutFailed": "Níorbh fhéidir síniú amach ar an ngléas seo. Seans go bhfuil Drive fós nasctha. Bain triail eile as.",
   "account.signOutPending.body": "Tá nótaí ag Notepads ar an ngléas seo nár uaslódáladh fós ({count}). Scriostar iad uaidh nuair a logálann tú amach.",
   "account.signOutPending.discard": "Caith uait agus logáil amach",
   "account.signOutPending.title": "Nótaí nár uaslódáladh",
@@ -337,5 +338,6 @@
   "widgets.open": "Oscail",
   "widgets.pending": "Ar feitheamh",
   "widgets.photos": "Grianghraif",
-  "widgets.rows": "Rónna"
+  "widgets.rows": "Rónna",
+  "widgets.storage": "Stóras"
 }

@@ -95,7 +95,8 @@ type Pantalla struct {
 	CumpleanosPronto int
 
 	// Estado son los seis del encargo, aplicados a la LISTA (que es lo que carga).
-	Estado Estado
+	Estado   Estado
+	Refresco ui.RefrescoLista
 	// CargandoLibretas y ErrorLibretas son los de la sección «Libretas» del menú, que
 	// carga por su cuenta; CargandoEtiquetas y ErrorEtiquetas, los de «Etiquetas».
 	CargandoLibretas, ErrorLibretas   bool

@@ -3,9 +3,9 @@
 
 //go:build paridad_astro_fyne
 
-// La etiqueta lo saca del módulo raíz: este fichero importa Fyne, que solo declara
-// apps/fyne, y run.ts lo copia allí para compilarlo. Sin ella, `./...` en la raíz
-// falla y tumba govulncheck, go-licenses y la integración (v3.12.1).
+// La extensión .tmpl lo saca del módulo raíz, también para go mod tidy, que ignora
+// etiquetas de compilación ordinarias. run.ts lo copia a apps/fyne para compilarlo
+// con las dependencias reales de la app y la etiqueta paridad_astro_fyne.
 
 package main
 

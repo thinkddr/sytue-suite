@@ -85,9 +85,20 @@ func (t *TiraDeslizable) Desplazamiento() float32 { return t.desX }
 // ancho es lo que ocupa un hijo en la fila.
 func (t *TiraDeslizable) ancho(o fyne.CanvasObject) float32 {
 	if t.AnchoPropio {
-		return o.MinSize().Width
+		return medidaPropiaEnTira(o).Width
 	}
 	return SueloTactil(t.Lado)
+}
+
+// Los controles conservan su ancho propio y el suelo táctil de la tira. Los
+// separadores y otras piezas decorativas mantienen sus medidas naturales.
+func medidaPropiaEnTira(o fyne.CanvasObject) fyne.Size {
+	m := o.MinSize()
+	switch o.(type) {
+	case interface{ boton() *Boton }, *BotonIcono:
+		m.Width, m.Height = SueloTactil(m.Width), SueloTactil(m.Height)
+	}
+	return m
 }
 
 func (t *TiraDeslizable) alto() float32 {
@@ -97,7 +108,7 @@ func (t *TiraDeslizable) alto() float32 {
 	alto := t.Lado
 	for _, o := range t.Objetos {
 		if o.Visible() {
-			alto = max(alto, o.MinSize().Height)
+			alto = max(alto, medidaPropiaEnTira(o).Height)
 		}
 	}
 	return alto
@@ -209,7 +220,7 @@ func (r *tiraDeslizableRenderer) Layout(tam fyne.Size) {
 		}
 		w, h := t.ancho(o), alto
 		if t.AnchoPropio {
-			m := o.MinSize()
+			m := medidaPropiaEnTira(o)
 			w, h = m.Width, m.Height
 		}
 		x += t.hueco(anterior, o)

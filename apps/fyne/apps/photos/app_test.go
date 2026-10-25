@@ -173,7 +173,7 @@ func appDePrueba(t *testing.T, s *servicioFalso) (*App, fyne.Window) {
 	w.Resize(fyne.NewSize(ventanaAncho, ventanaAlto))
 	teca := NuevaFototeca()
 	if escenasPlay {
-		teca.Pedir = func(_ context.Context, id, _ string) ([]byte, error) { return pngDe(escena(id, 512, 384)), nil }
+		teca.Pedir = pedirEscena
 	}
 	a := Nueva(api.NewPhotos(srv.URL, nil, nil), vistaDePrueba(t, teca), w)
 	a.IA = api.NewIA(srv.URL, nil, nil)

@@ -67,7 +67,7 @@ func (a *App) cambiarExclusionLote(excluir bool) {
 func (a *App) datosAlbumes() Albumes {
 	return Albumes{
 		Lista: a.alb.lista, Titulo: a.campoAlbum, Montones: a.alb.montones,
-		Buscando: a.alb.buscando, Error: a.alb.error,
+		Buscando: a.alb.buscando, Creando: a.alb.creando, Error: a.alb.error,
 		ExcluidaLoteIA: a.aj.ExcludeAIBatch, PuedeGestionarLoteIA: a.aj.CanManageAIBatch,
 		AlExcluirLoteIA: a.cambiarExclusionLote,
 		AlAbrir:         func(al api.Album) { a.AbrirAlbum(al.ID) },
@@ -96,10 +96,13 @@ func (a *App) pedirAlbumes() {
 // crearAlbum es el `<form onSubmit>` de «Crear».
 func (a *App) crearAlbum(titulo string) {
 	titulo = strings.TrimSpace(titulo)
-	if titulo == "" {
+	if titulo == "" || a.alb.creando || a.cli == nil || a.vida == nil || a.vida.Err() != nil {
 		return
 	}
+	a.alb.creando = true
+	a.pintar()
 	pedir(a, func(x context.Context, c *api.Photos) (api.Album, error) { return c.CreateAlbum(x, titulo) }, func(al api.Album, err error) {
+		a.alb.creando = false
 		if err != nil {
 			a.alb.error = a.textoDeFallo(err)
 			return

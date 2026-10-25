@@ -358,7 +358,12 @@ paths:
               schema: { $ref: "#/components/schemas/Quota" }
     put:
       tags: [quota]
-      summary: Fijar límite de cuota (admin/owner)
+      summary: Fijar límite base de Sytue (admin/owner)
+      description: >-
+        `limit_bytes` en esta petición es únicamente la cuota base de Sytue.
+        No incluye la capacidad del almacén conectado: para editar un valor
+        leído de GET se toma `base_limit_bytes`, no el total combinado.
+        La respuesta vuelve a incluir la capacidad conectada como ampliación.
       requestBody:
         required: true
         content:
@@ -458,14 +463,33 @@ components:
     Quota:
       type: object
       description: >-
-        Cuota del plan, que es una para toda la suite. `used_bytes` incluye lo que
-        las otras apps han declarado (`external_usage`, por clave de app: «cast»);
-        `available_bytes` es el hueco que queda contando todo.
+        Capacidad de la cuenta: cuota de Sytue más el almacén conectado cuando el
+        proveedor informa total, uso y espacio libre. `base_limit_bytes` y
+        `base_used_bytes` conservan la cuota de Sytue, compartida entre la suite;
+        el uso de otras apps está desglosado en `external_usage`. El espacio libre
+        del proveedor se respeta aunque no equivalga a total menos uso.
+        Se suman las fuentes conectadas del tenant y del usuario autenticado que
+        informan las tres cifras. `external_capacity.partial` indica que otras
+        fuentes conectadas no informan de su capacidad. Si ninguna la informa,
+        las cifras principales describen Sytue y los tres bytes externos son null;
+        null no significa cero. Esta vista personal no modifica el plan ni se cachea.
       properties:
         tenant: { type: string }
         limit_bytes: { type: integer, format: int64 }
         used_bytes: { type: integer, format: int64 }
         available_bytes: { type: integer, format: int64 }
+        base_limit_bytes: { type: integer, format: int64 }
+        base_used_bytes: { type: integer, format: int64 }
+        external_storage: { type: boolean }
+        external_capacity:
+          type: [object, "null"]
+          properties:
+            total_bytes: { type: [integer, "null"], format: int64, minimum: 0 }
+            used_bytes: { type: [integer, "null"], format: int64, minimum: 0 }
+            available_bytes: { type: [integer, "null"], format: int64, minimum: 0 }
+            partial:
+              type: boolean
+              description: Hay fuentes conectadas cuya capacidad no se ha podido conocer.
         external_usage:
           type: object
           additionalProperties: { type: integer, format: int64 }

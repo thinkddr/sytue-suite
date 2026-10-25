@@ -26,7 +26,7 @@ import (
 // el reparto en líneas depende del texto, y con él todo lo que va debajo.
 func castellano(t *testing.T) *i18n.Translator {
 	t.Helper()
-	tr, err := i18n.New("es", i18n.Common(), catalogos.Portal())
+	tr, err := i18n.New("es", i18n.Common(), catalogos.Console(), catalogos.Portal())
 	if err != nil {
 		t.Fatal(err)
 	}

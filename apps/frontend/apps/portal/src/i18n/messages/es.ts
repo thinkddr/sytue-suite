@@ -170,6 +170,12 @@ export const es: AppCatalog<typeof en> = {
   'data.move.action': 'Ir a Migraciones',
 
   // --- Conectar tus dispositivos ----------------------------------------
+  'devices.native.body':
+    'Usa el gestor de archivos del dispositivo o conecta una cuenta con su consentimiento.',
+  'devices.native.driveBody':
+    'Sytue Drive se añade automáticamente al iniciar sesión. Permite su ubicación si el sistema lo pide.',
+  'devices.native.openDrive': 'Abrir en el gestor de archivos',
+  'devices.native.failed': 'No se pudo actualizar la integración del dispositivo.',
   'devices.title': 'Conecta tus dispositivos',
   'devices.lead':
     'Llévate el correo, el calendario, los contactos y los archivos de Sytue al móvil o al ordenador. Te guiamos paso a paso.',

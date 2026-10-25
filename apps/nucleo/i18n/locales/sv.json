@@ -23,6 +23,7 @@
   "account.presenceFailed": "Din närvaro kunde inte ändras",
   "account.signIn": "Logga in",
   "account.signOut": "Logga ut",
+  "account.signOutFailed": "Det gick inte att logga ut på den här enheten. Drive kan fortfarande vara ansluten. Försök igen.",
   "account.signOutPending.body": "Notepads har anteckningar på den här enheten som inte har laddats upp än ({count}). När du loggar ut raderas de från den.",
   "account.signOutPending.discard": "Släng och logga ut",
   "account.signOutPending.title": "Anteckningar som inte laddats upp",
@@ -334,5 +335,6 @@
   "widgets.open": "Öppna",
   "widgets.pending": "Väntande",
   "widgets.photos": "Foton",
-  "widgets.rows": "Rader"
+  "widgets.rows": "Rader",
+  "widgets.storage": "Lagring"
 }

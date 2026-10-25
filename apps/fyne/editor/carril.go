@@ -6,6 +6,7 @@ package editor
 import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
+	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
 
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
@@ -31,8 +32,9 @@ var itemsCarril = []carrilItem{
 type Carril struct {
 	widget.BaseWidget
 
-	ctx     *Contexto
-	botones []*BotonCinta
+	ctx      *Contexto
+	botones  []*BotonCinta
+	desplaza *container.Scroll
 }
 
 var _ fyne.Widget = (*Carril)(nil)
@@ -46,7 +48,53 @@ func NuevoCarril(ctx *Contexto) *Carril {
 		b.Activo = ctx.Panel == it.p
 		c.botones = append(c.botones, b)
 	}
+	objetos := make([]fyne.CanvasObject, len(c.botones))
+	for i, b := range c.botones {
+		objetos[i] = b
+		b.AlEnfocar = func() { c.mostrar(b) }
+	}
+	c.desplaza = container.NewVScroll(container.New(botonesCarril{}, objetos...))
 	return c
+}
+
+// anchoCarril conserva el carril de escritorio y deja caber el blanco
+// táctil de los botones, también al girar el dispositivo.
+func anchoCarril() float32 {
+	return AnchoCarril + ui.SueloTactil(LadoBotonCarril) - LadoBotonCarril
+}
+
+func (c *Carril) mostrar(b *BotonCinta) {
+	if c.desplaza == nil {
+		return
+	}
+	y := c.desplaza.Offset.Y
+	if b.Position().Y < y {
+		y = b.Position().Y
+	} else if fin := b.Position().Y + b.Size().Height; fin > y+c.desplaza.Size().Height {
+		y = fin - c.desplaza.Size().Height
+	}
+	c.desplaza.ScrollToOffset(fyne.NewPos(0, y))
+}
+
+// botonesCarril mantiene la geometría del carril dentro de su desplazador.
+// El alto natural queda separado del alto disponible en horizontal.
+type botonesCarril struct{}
+
+func (botonesCarril) MinSize(objetos []fyne.CanvasObject) fyne.Size {
+	lado := ui.SueloTactil(LadoBotonCarril)
+	alto := 2*RellenoCarril + float32(len(objetos))*lado
+	if len(objetos) > 0 {
+		alto += float32(len(objetos)-1) * HuecoCarril
+	}
+	return fyne.NewSize(lado, alto)
+}
+
+func (botonesCarril) Layout(objetos []fyne.CanvasObject, t fyne.Size) {
+	lado := ui.SueloTactil(LadoBotonCarril)
+	for i, b := range objetos {
+		b.Move(fyne.NewPos((t.Width-lado)/2, RellenoCarril+float32(i)*(lado+HuecoCarril)))
+		b.Resize(fyne.NewSize(lado, lado))
+	}
 }
 
 // AccessibilityRole lo anuncia como contenedor con nombre.
@@ -58,7 +106,7 @@ func (c *Carril) AccessibilityLabel() string { return c.ctx.Traducir("rail.label
 // MinSize es el ancho declarado; el alto lo pone el marco.
 func (c *Carril) MinSize() fyne.Size {
 	c.ExtendBaseWidget(c)
-	return fyne.NewSize(AnchoCarril, 0)
+	return fyne.NewSize(anchoCarril(), 0)
 }
 
 // CreateRenderer compone el fondo, la línea y los botones.
@@ -80,12 +128,7 @@ type carrilRenderer struct {
 func (r *carrilRenderer) MinSize() fyne.Size { return r.c.MinSize() }
 
 func (r *carrilRenderer) Objects() []fyne.CanvasObject {
-	objs := make([]fyne.CanvasObject, 0, 2+len(r.c.botones))
-	objs = append(objs, r.fondo, r.linea)
-	for _, b := range r.c.botones {
-		objs = append(objs, b)
-	}
-	return objs
+	return []fyne.CanvasObject{r.fondo, r.linea, r.c.desplaza}
 }
 
 func (r *carrilRenderer) Destroy() {}
@@ -96,13 +139,8 @@ func (r *carrilRenderer) Layout(t fyne.Size) {
 	r.linea.Move(fyne.NewPos(t.Width-tema.Borde, 0))
 	r.linea.Resize(fyne.NewSize(tema.Borde, t.Height))
 
-	contenido := t.Width - tema.Borde
-	y := RellenoCarril
-	for _, b := range r.c.botones {
-		b.Move(fyne.NewPos((contenido-LadoBotonCarril)/2, y))
-		b.Resize(fyne.NewSize(LadoBotonCarril, LadoBotonCarril))
-		y += LadoBotonCarril + HuecoCarril
-	}
+	r.c.desplaza.Move(fyne.NewPos(0, 0))
+	r.c.desplaza.Resize(fyne.NewSize(max(t.Width-tema.Borde, 0), t.Height))
 }
 
 func (r *carrilRenderer) Refresh() {
@@ -111,6 +149,7 @@ func (r *carrilRenderer) Refresh() {
 	r.linea.FillColor = tema.Color("border", v)
 	r.fondo.Refresh()
 	r.linea.Refresh()
+	r.c.desplaza.Refresh()
 	for i, b := range r.c.botones {
 		b.Activo = r.c.ctx.Panel == itemsCarril[i].p
 		b.Refresh()
@@ -127,10 +166,12 @@ func (r *carrilRenderer) Refresh() {
 type PanelLateral struct {
 	widget.BaseWidget
 
-	ctx    *Contexto
-	titulo string
-	cuerpo fyne.CanvasObject
-	cerrar *ui.BotonIcono
+	ctx       *Contexto
+	titulo    string
+	cuerpo    fyne.CanvasObject
+	cerrar    *ui.BotonIcono
+	desplaza  *container.Scroll
+	envoltura *fyne.Container
 	// Lado es "izq" o "der": el de ajustes lleva la línea al otro lado.
 	derecha bool
 }
@@ -141,6 +182,13 @@ var _ fyne.Widget = (*PanelLateral)(nil)
 func NuevoPanelLateral(ctx *Contexto, titulo string, cuerpo fyne.CanvasObject, derecha bool) *PanelLateral {
 	p := &PanelLateral{ctx: ctx, titulo: titulo, cuerpo: cuerpo, derecha: derecha}
 	p.ExtendBaseWidget(p)
+	// Un desplazador directo ya adapta su cuerpo. Los formularios y los paneles
+	// con bandas fijas necesitan además desplazar el conjunto si esas bandas no
+	// caben: el scroll de la lista interna no permite alcanzar su formulario al pie.
+	if _, desplaza := cuerpo.(*container.Scroll); cuerpo != nil && !desplaza {
+		p.envoltura = ui.AlAnchoFluido(AnchoPanel-tema.Borde, cuerpo)
+		p.desplaza = container.NewVScroll(p.envoltura)
+	}
 	// CLOSE_BTN de LeftRail.tsx: `h-7 w-7 rounded-sm text-header-fg hover:bg-chrome-hover
 	// active:bg-chrome-active`, el aspa `md` (16) y el anillo en `header-fg`.
 	p.cerrar = ui.NuevoBotonIcono(iconos.Cerrar, ctx.Traducir("rail.close"), func() {
@@ -153,6 +201,12 @@ func NuevoPanelLateral(ctx *Contexto, titulo string, cuerpo fyne.CanvasObject, d
 	}).SobreBanda()
 	p.cerrar.Radio, p.cerrar.TamIcono, p.cerrar.TokenAro = tema.RadioSM, IconoCerrarPanel, "header-fg"
 	return p
+}
+
+func (p *PanelLateral) conservarDesplazamiento(anterior *PanelLateral) {
+	if anterior != nil && anterior.titulo == p.titulo && anterior.desplaza != nil && p.desplaza != nil {
+		p.desplaza.Offset = anterior.desplaza.Offset
+	}
 }
 
 // IconoCerrarPanel es el `size="md"` de EditorIcon: 16.
@@ -203,7 +257,11 @@ func (r *panelRenderer) MinSize() fyne.Size { return r.p.MinSize() }
 func (r *panelRenderer) Objects() []fyne.CanvasObject {
 	objs := []fyne.CanvasObject{r.fondo, r.linea, r.banda, r.titulo, r.p.cerrar}
 	if r.p.cuerpo != nil {
-		objs = append(objs, r.p.cuerpo)
+		if r.p.desplaza != nil {
+			objs = append(objs, r.p.desplaza)
+		} else {
+			objs = append(objs, r.p.cuerpo)
+		}
 	}
 	return objs
 }
@@ -237,8 +295,14 @@ func (r *panelRenderer) Layout(t fyne.Size) {
 	// El cuerpo ocupa el panel entero: cada cuerpo lleva su propio relleno, que no es
 	// el mismo en todos (el esquema es `px-1 py-3`, buscar `p-3`).
 	if r.p.cuerpo != nil {
-		r.p.cuerpo.Move(fyne.NewPos(izq, AltoCabeceraPanel))
-		r.p.cuerpo.Resize(fyne.NewSize(ancho, max(t.Height-AltoCabeceraPanel, 0)))
+		cuerpo := r.p.cuerpo
+		if r.p.desplaza != nil {
+			r.p.envoltura.Layout = ui.AlAnchoFluido(ancho, r.p.cuerpo).Layout
+			r.p.envoltura.Refresh()
+			cuerpo = r.p.desplaza
+		}
+		cuerpo.Move(fyne.NewPos(izq, AltoCabeceraPanel))
+		cuerpo.Resize(fyne.NewSize(ancho, max(t.Height-AltoCabeceraPanel, 0)))
 	}
 }
 

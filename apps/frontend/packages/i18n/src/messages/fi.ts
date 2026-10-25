@@ -209,6 +209,8 @@ export const fi: Catalog = {
   'account.signedOutTitle': 'Et ole kirjautunut sisään',
   'account.signedOutDescription': 'Kirjaudu sisään Sytue One -tililläsi nähdäksesi tietosi täällä.',
   'account.signOut': 'Kirjaudu ulos',
+  'account.signOutFailed':
+    'Uloskirjautuminen ei onnistunut tällä laitteella. Drive voi olla yhä yhdistettynä. Yritä uudelleen.',
   'account.signOutPending.title': 'Lataamattomat muistiinpanot',
   'account.signOutPending.body':
     'Notepadsissa on tällä laitteella muistiinpanoja, joita ei ole vielä ladattu ({count}). Uloskirjautuminen poistaa ne siltä.',
@@ -360,6 +362,7 @@ export const fi: Catalog = {
   'widgets.episodes': 'Jaksot',
   'widgets.apps': 'Sovellukset',
   'widgets.compose': 'Kirjoita',
+  'widgets.storage': 'Tallennustila',
   'widgets.create': 'Luo tapahtuma',
 
   'linkedServices.services': 'Palvelut',

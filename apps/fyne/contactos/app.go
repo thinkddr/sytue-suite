@@ -221,6 +221,12 @@ func (a *App) enganchar() {
 		a.repintar()
 	}
 	p.AlReintentar = func() { a.enFondo(a.Cargar) }
+	p.Refresco.Actualizar = a.recargarActiva
+	p.Refresco.Puede = func() bool {
+		return a.svc != nil && p.Activa != nil && !a.cerrada && a.vida != nil && a.vida.Err() == nil && !p.SinConexion &&
+			(p.Estado == agenda.Exito || p.Estado == agenda.Vacia) && len(p.Lote) == 0 && !p.DetalleAbierto
+	}
+	p.Refresco.Revision = func() uint64 { return a.cargaContactos }
 	p.AlReintentarLibretas = func() { a.enFondo(a.Cargar) }
 	p.AlReintentarEtiquetas = func() { a.enFondo(a.cargarEtiquetas) }
 	p.AlEnviarCorreo = a.enviarCorreo

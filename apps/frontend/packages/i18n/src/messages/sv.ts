@@ -204,6 +204,8 @@ export const sv: Catalog = {
   'account.signedOutTitle': 'Du är inte inloggad',
   'account.signedOutDescription': 'Logga in med ditt Sytue One-konto för att se dina data här.',
   'account.signOut': 'Logga ut',
+  'account.signOutFailed':
+    'Det gick inte att logga ut på den här enheten. Drive kan fortfarande vara ansluten. Försök igen.',
   'account.signOutPending.title': 'Anteckningar som inte laddats upp',
   'account.signOutPending.body':
     'Notepads har anteckningar på den här enheten som inte har laddats upp än ({count}). När du loggar ut raderas de från den.',
@@ -349,6 +351,7 @@ export const sv: Catalog = {
   'widgets.episodes': 'Avsnitt',
   'widgets.apps': 'Appar',
   'widgets.compose': 'Skriv',
+  'widgets.storage': 'Lagring',
   'widgets.create': 'Skapa händelse',
 
   'linkedServices.services': 'Tjänster',

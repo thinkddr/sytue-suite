@@ -39,7 +39,7 @@ func TestAccount(t *testing.T) {
 			cuerpo, _ := io.ReadAll(r.Body)
 			etiqueta = string(cuerpo)
 			w.WriteHeader(http.StatusCreated)
-			_, _ = io.WriteString(w, `{"id":"p2","label":"Archivos · Mac","created_at":"2026-10-19T10:00:00Z","password":"abcd-efgh"}`)
+			_, _ = io.WriteString(w, `{"id":"p2","label":"Archivos · Mac","created_at":"2026-10-19T10:00:00Z","password":"abcd-efgh","org_id":"org-ada","tenant":"ada"}`)
 		default:
 			t.Errorf("petición inesperada: %s %s", r.Method, r.URL.Path)
 			w.WriteHeader(http.StatusNotFound)
@@ -77,7 +77,7 @@ func TestAccount(t *testing.T) {
 	if p, err := a.AppPasswords(ctx); err != nil || len(p) != 1 || p[0].Label != "Correo del portátil" || p[0].LastUsedAt != nil {
 		t.Fatalf("contraseñas de aplicación: %+v, %v", p, err)
 	}
-	if c, err := a.CreateAppPassword(ctx, "Archivos · Mac"); err != nil || c.ID != "p2" || c.Password != "abcd-efgh" || etiqueta != `{"label":"Archivos · Mac"}` {
+	if c, err := a.CreateAppPassword(ctx, "Archivos · Mac"); err != nil || c.ID != "p2" || c.Password != "abcd-efgh" || c.OrgID != "org-ada" || c.Tenant != "ada" || etiqueta != `{"label":"Archivos · Mac"}` {
 		t.Fatalf("crear contraseña: %+v, %v; ha viajado %s", c, err, etiqueta)
 	}
 }

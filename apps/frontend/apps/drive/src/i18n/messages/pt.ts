@@ -563,8 +563,10 @@ export const pt: AppCatalog<typeof en> = {
   'share.group.failed': 'Não foi possível partilhar.',
   'share.person.someone': 'Alguém da sua organização',
   'pdf.openInPdf': 'Abrir no Sytue PDF',
-  'storage.externalNote':
-    'Os novos ficheiros usam o armazenamento ligado e não ocupam este espaço.',
+  'storage.externalNote': 'O armazenamento ligado aumenta a sua capacidade no Sytue.',
+  'storage.externalCapacity': 'O armazenamento ligado acrescenta {capacity}.',
+  'storage.externalUnknown': 'O fornecedor não informa a sua capacidade.',
+  'storage.baseUsage': 'Sytue: {used} de {total}',
   'storage.add': 'Adicionar armazenamento',
   'storage.external.forOrg': 'Guardar aqui os novos ficheiros da organização',
   'storage.external.endpoint': 'Endpoint',

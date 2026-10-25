@@ -149,7 +149,11 @@ func comprobarBarraCompositor(t *testing.T, c *Compositor, tactil bool) {
 
 func capturarCompositor(t *testing.T, w fyne.Window, nombre string) {
 	t.Helper()
-	dir := os.Getenv("SYTUE_CAPTURAS")
+	capturarCompositorEn(t, w, os.Getenv("SYTUE_CAPTURAS"), nombre)
+}
+
+func capturarCompositorEn(t *testing.T, w fyne.Window, dir, nombre string) {
+	t.Helper()
 	if dir == "" {
 		return
 	}

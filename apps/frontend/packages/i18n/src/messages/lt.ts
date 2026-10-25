@@ -224,6 +224,8 @@ export const lt: Catalog = {
   'account.signedOutDescription':
     'Prisijunkite su savo Sytue One paskyra, kad matytumėte čia savo duomenis.',
   'account.signOut': 'Atsijungti',
+  'account.signOutFailed':
+    'Nepavyko atsijungti šiame įrenginyje. Drive gali būti vis dar prijungtas. Bandykite dar kartą.',
   'account.signOutPending.title': 'Neįkelti užrašai',
   'account.signOutPending.body':
     'Notepads šiame įrenginyje turi dar neįkeltų užrašų ({count}). Atsijungus jie iš jo ištrinami.',
@@ -370,6 +372,7 @@ export const lt: Catalog = {
   'widgets.episodes': 'Epizodai',
   'widgets.apps': 'Programėlės',
   'widgets.compose': 'Rašyti',
+  'widgets.storage': 'Saugykla',
   'widgets.create': 'Kurti įvykį',
 
   'linkedServices.services': 'Paslaugos',

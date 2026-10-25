@@ -55,7 +55,7 @@ export const hu: AppCatalog<typeof en> = {
   'security.mfa.title': 'Kétlépcsős ellenőrzés',
   'security.mfa.off': 'Nincs beállítva. A jelszó önmagában nyitja a fiókot.',
   'security.mfa.required':
-    'A szervezete kétlépcsős ellenőrzést ír elő. Kapcsolja be lent, és jelentkezzen be újra.',
+    'Ehhez a művelethez kétlépcsős azonosítás szükséges. Állítsd be alább, majd jelentkezz be újra.',
   'security.mfa.on': 'Bekapcsolva. Bejelentkezéskor kódot kérünk.',
   'security.mfa.enable': 'Beállítás',
   'security.mfa.scan': 'Olvassa be ezt a hitelesítő alkalmazással.',
@@ -114,6 +114,10 @@ export const hu: AppCatalog<typeof en> = {
   'plan.pro': 'Pro csomag · 200 GB',
   'plan.enterprise': 'Enterprise csomag · 1 TB · Prémium támogatás',
   'plan.storage': 'Felhasznált tárhely',
+  'plan.externalNote': 'A csatlakoztatott tárhely növeli a Sytue-tárhelyed kapacitását.',
+  'plan.externalCapacity': 'A csatlakoztatott tárhely {capacity} többletkapacitást biztosít.',
+  'plan.externalUnknown': 'A szolgáltató nem adja meg a tárhely kapacitását.',
+  'plan.baseUsage': 'Sytue: {used} / {total}',
   'plan.paidUntil': 'Kifizetve eddig',
   'plan.upgrade': 'Több tárhely',
   'plan.upgrade.hint':

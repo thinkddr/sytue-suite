@@ -23,6 +23,7 @@
   "account.presenceFailed": "Teie kohalolekut ei õnnestunud muuta",
   "account.signIn": "Logi sisse",
   "account.signOut": "Logi välja",
+  "account.signOutFailed": "Sellest seadmest väljalogimine ebaõnnestus. Drive võib olla endiselt ühendatud. Proovi uuesti.",
   "account.signOutPending.body": "Notepadsil on selles seadmes märkmeid, mida pole veel üles laaditud ({count}). Välja logides need kustutatakse sellest.",
   "account.signOutPending.discard": "Loobu ja logi välja",
   "account.signOutPending.title": "Üles laadimata märkmed",
@@ -334,5 +335,6 @@
   "widgets.open": "Ava",
   "widgets.pending": "Ootel",
   "widgets.photos": "Fotod",
-  "widgets.rows": "Read"
+  "widgets.rows": "Read",
+  "widgets.storage": "Salvestusruum"
 }

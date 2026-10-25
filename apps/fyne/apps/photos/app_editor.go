@@ -101,8 +101,7 @@ func (a *App) AbrirEditor(f api.Photo, volver string) {
 	a.pintarEditor()
 	if a.w != nil {
 		c := a.w.Canvas()
-		c.Overlays().Add(e.capa)
-		e.capa.Resize(c.Size())
+		e.capa.mostrar(c)
 		c.Unfocus()
 		// Los atajos con modificador: deshacer y guardar (Ctrl o Cmd, según el sistema).
 		e.deshacerAt = &desktop.CustomShortcut{KeyName: fyne.KeyZ, Modifier: fyne.KeyModifierShortcutDefault}

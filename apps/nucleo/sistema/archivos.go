@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/url"
+	"regexp"
 )
 
 // # Sytue Drive en el Finder y en Archivos de iOS
@@ -21,7 +22,7 @@ import (
 // extensión (un grupo de acceso propio, no el de la sesión de la suite: la extensión no
 // tiene por qué poder leer el refresh token) y dar de alta o de baja el dominio en
 // `NSFileProviderManager`. Solo existe en las compilaciones de Apple que llevan la
-// extensión —iOS y la de la Mac App Store (`tienda`)—; en las demás, ErrArchivosNoDisponible.
+// extensión —iOS y macOS—; en las demás, ErrArchivosNoDisponible.
 
 // Lo que la extensión lee del llavero. Los mismos nombres en Proveedor.swift.
 const (
@@ -35,6 +36,7 @@ const (
 
 // CredencialArchivos es lo que la extensión necesita para hablar con Drive.
 type CredencialArchivos struct {
+	Identidad string `json:"identidad"`
 	// URL es la raíz WebDAV de Drive (Coordenadas.WebDAVURL), https.
 	URL string `json:"url"`
 	// Usuario es el correo de quien entra; Sytue ID lo contrasta con el dueño de la clave.
@@ -56,7 +58,7 @@ func ArchivosDisponible() bool { return archivosDisponible() }
 // sustituyendo la que hubiera.
 func GuardarCredencialArchivos(c CredencialArchivos) error {
 	u, err := url.Parse(c.URL)
-	if err != nil || u.Scheme != "https" || u.Host == "" || c.Usuario == "" || c.Clave == "" {
+	if err != nil || u.Scheme != "https" || u.Host == "" || c.Usuario == "" || c.Clave == "" || !regexp.MustCompile(`^[0-9a-f]{64}$`).MatchString(c.Identidad) {
 		return errCredencialArchivos
 	}
 	crudo, err := json.Marshal(c)
@@ -76,3 +78,6 @@ func RegistrarArchivos(nombre string) error { return registrarArchivos(nombre) }
 // OlvidarArchivos da de baja el dominio —el sistema borra su copia local— y la
 // credencial. Lo que no había, no es un error.
 func OlvidarArchivos() error { return olvidarArchivos() }
+
+// AbrirArchivos abre el dominio de Drive en Finder o en el selector nativo de Archivos.
+func AbrirArchivos() error { return abrirArchivos() }

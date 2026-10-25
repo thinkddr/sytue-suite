@@ -1285,7 +1285,7 @@ func colocarEnvuelto(objs []fyne.CanvasObject, x0, y0, cabe, hueco float32, move
 	var lineas [][]fyne.CanvasObject
 	x := float32(0)
 	for _, o := range objs {
-		w := o.MinSize().Width
+		w := medidaEnFila(o, cabe).Width
 		if len(lineas) == 0 || (x > 0 && x+w > cabe) {
 			lineas, x = append(lineas, nil), 0
 		}
@@ -1296,12 +1296,12 @@ func colocarEnvuelto(objs []fyne.CanvasObject, x0, y0, cabe, hueco float32, move
 	for i, l := range lineas {
 		alto := float32(0)
 		for _, o := range l {
-			alto = max(alto, o.MinSize().Height)
+			alto = max(alto, medidaEnFila(o, cabe).Height)
 		}
 		if mover {
 			x := x0
 			for _, o := range l {
-				m := o.MinSize()
+				m := medidaEnFila(o, cabe)
 				o.Move(fyne.NewPos(x, y+(alto-m.Height)/2))
 				o.Resize(m)
 				x += m.Width + hueco
@@ -1313,6 +1313,13 @@ func colocarEnvuelto(objs []fyne.CanvasObject, x0, y0, cabe, hueco float32, move
 		}
 	}
 	return y - y0
+}
+
+func medidaEnFila(o fyne.CanvasObject, ancho float32) fyne.Size {
+	if fluido, ok := o.(interface{ medidaEnFila(float32) fyne.Size }); ok {
+		return fluido.medidaEnFila(ancho)
+	}
+	return o.MinSize()
 }
 
 // MedidaFilaProgramado es lo que ocupa a ese ancho. Es la única cuenta.

@@ -178,10 +178,26 @@ func AltoSemana(alto float32) float32 {
 	return max(alto-AltoDiasSemana-tema.Borde, 0) / 6
 }
 
-// MinSize: la rejilla se estira a lo que le den. Su mínimo es la fila de días más seis
-// semanas capaces de enseñar el número del día y un carril de barras.
+// MinSize conserva las seis semanas y los carriles que se van a pintar. El scroll
+// de la vista se encarga de la altura que no quepa al girar un teléfono.
 func (m *Mes) MinSize() fyne.Size {
-	return fyne.NewSize(0, AltoDiasSemana+tema.Borde+6*(CarrilBarras+PasoBarra))
+	alto := float32(CarrilBarras + PasoBarra)
+	d := m.disponer()
+	for w, tramos := range d.semanas {
+		_, ocultas := Limitar(tramos, MaxFilasBarra, 7)
+		filas := min(Filas(tramos), MaxFilasBarra)
+		for c := range 7 {
+			chips := len(d.chips[w*7+c])
+			visibles := min(chips, max(1, MaxCarriles-filas))
+			h := CarrilBarras + float32(filas)*PasoBarra + espacio0p5 + float32(visibles)*(AltoPildora+espacio0p5)
+			if m.MasRotulo != nil && ocultas[c]+chips-visibles > 0 {
+				h += tema.TextoXS.Linea
+			}
+			h += RellenoCelda
+			alto = max(alto, h)
+		}
+	}
+	return fyne.NewSize(0, AltoDiasSemana+tema.Borde+6*alto)
 }
 
 // CreateRenderer construye la fila de nombres, las 42 celdas y las barras.

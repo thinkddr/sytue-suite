@@ -302,10 +302,7 @@ func (l *Lista) anchoMain() float32 {
 	if l.Ventana == 0 {
 		return AnchoContenidoLista
 	}
-	m := l.Ventana - l.Ocupado
-	if !l.esMovil() {
-		m -= ocupaCarcasa()
-	}
+	m := l.Ventana - l.Ocupado - ocupaCarcasa(l.Ventana)
 	return max(m, 0)
 }
 

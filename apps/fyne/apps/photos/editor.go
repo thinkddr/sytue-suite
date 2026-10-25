@@ -110,7 +110,7 @@ func PantallaEditor(v Vista, d Editor) *fyne.Container {
 	if movil {
 		anchoPanel = v.Ventana
 	}
-	panel := container.NewVScroll(ui.AlAncho(anchoPanel, panelEditor(v, d)))
+	panel := container.NewVScroll(ui.AlAnchoFluido(anchoPanel, panelEditor(v, d)))
 	// El hueco del lienzo va el ÚLTIMO: el velo del recorte se sale de él y tiene que
 	// quedar encima de la cabecera y del panel (ver lienzoEditorRenderer.Layout).
 	return container.New(&editorLayout{movil: movil, panel: panel},
@@ -157,7 +157,15 @@ func cabeceraEditor(v Vista, d Editor) fyne.CanvasObject {
 		}
 		ui.Truncar(nombre, d.Foto.Name, tema.TextoSM, ui.Medio, max(libre, 0))
 	}
-	return container.New(ui.FilaAuto{Hueco: tema.Espacio(2), Derecha: 2}, volver, nombre, textoEstado, comparar, deshacer, guardar)
+	fila := container.New(ui.FilaAuto{Hueco: tema.Espacio(2), Derecha: 2}, volver, nombre, textoEstado, comparar, deshacer, guardar)
+	// En retrato los mandos de texto pueden pedir más que el ancho disponible.
+	// La tira compartida los alcanza con el gesto y al enfocarlos con el teclado.
+	if v.Ventana > 0 && fila.MinSize().Width > max(v.Ventana-2*RellenoVisorX, 0) {
+		tira := ui.NuevaTiraDeslizable(LadoMandoVisor, tema.Espacio(2), fila.Objects...)
+		tira.AnchoPropio = true
+		return tira
+	}
+	return fila
 }
 
 // conAjusteDeColor dice si la receta lleva algún ajuste de color: sin él no hay nada que
@@ -782,7 +790,7 @@ func (l *editorLayout) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 	objs[0].Resize(t)
 	alto := AltoCabeceraVisor()
 	objs[1].Move(fyne.NewPos(RellenoVisorX, RellenoVisorY))
-	objs[1].Resize(fyne.NewSize(max(t.Width-2*RellenoVisorX, 0), LadoMandoVisor))
+	objs[1].Resize(fyne.NewSize(max(t.Width-2*RellenoVisorX, 0), ui.SueloTactil(LadoMandoVisor)))
 	objs[2].Move(fyne.NewPos(0, alto-tema.Borde))
 	objs[2].Resize(fyne.NewSize(t.Width, tema.Borde))
 

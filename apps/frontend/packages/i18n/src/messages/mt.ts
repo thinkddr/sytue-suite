@@ -207,6 +207,8 @@ export const mt: Catalog = {
   'account.signedOutTitle': "M'intix dħalt",
   'account.signedOutDescription': 'Idħol bil-kont Sytue One tiegħek biex tara d-data tiegħek hawn.',
   'account.signOut': 'Oħroġ',
+  'account.signOutFailed':
+    'Ma setax isir il-ħruġ mill-kont fuq dan l-apparat. Drive jista’ jkun għadu konness. Erġa’ pprova.',
   'account.signOutPending.title': 'Noti mhux imtella’',
   'account.signOutPending.body':
     'Notepads għandu noti fuq dan l-apparat li għadhom ma tellgħux ({count}). Meta toħroġ jitħassru minnu.',
@@ -354,6 +356,7 @@ export const mt: Catalog = {
   'widgets.episodes': 'Episodji',
   'widgets.apps': 'Apps',
   'widgets.compose': 'Ikteb',
+  'widgets.storage': 'Ħażna',
   'widgets.create': 'Oħloq avveniment',
 
   'linkedServices.services': 'Servizzi',

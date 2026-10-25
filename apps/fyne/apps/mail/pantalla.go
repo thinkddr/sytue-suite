@@ -48,6 +48,7 @@ type Pantalla struct {
 
 	armazon *ui.Armazon
 	raiz    *fyne.Container
+	bandeja fyne.CanvasObject
 }
 
 // NuevaPantalla monta las tres columnas con su traductor.
@@ -62,8 +63,12 @@ func NuevaPantalla(t *i18n.Translator, l i18n.Locale) *Pantalla {
 		Avisos:   ui.NuevaPilaAvisos(),
 	}
 	p.Bandeja.Acciones, p.Lector.Acciones = p.Acciones, p.Acciones
+	p.Bandeja.Refresco.Arriba = func() bool {
+		return p.Bandeja.Estado != Listo || p.Bandeja.r == nil || p.Bandeja.r.lista.GetScrollOffset() <= 0.5
+	}
+	p.bandeja = ui.RefrescarAlTirar(p.Bandeja, &p.Bandeja.Refresco)
 	p.armazon = ui.NuevoArmazon(p.Lector)
-	p.armazon.Panel = p.Bandeja
+	p.armazon.Panel = p.bandeja
 	p.armazon.ClavePreferenciaPanel = "sytue.mail.panel-width"
 	p.armazon.Menu = p.Menu.Construir()
 	p.Movil = ui.NuevaBarraMovil()
@@ -162,9 +167,9 @@ func (p *Pantalla) Refrescar() {
 	p.Menu.CargandoLista = p.Bandeja.Estado == Cargando
 	// La franja del buzón compartido va sobre la lista, como en `MessageList.tsx`.
 	if p.Franja != nil {
-		p.armazon.Panel = container.New(ui.Pila{Elastico: 1}, p.Franja, p.Bandeja)
+		p.armazon.Panel = container.New(ui.Pila{Elastico: 1}, p.Franja, p.bandeja)
 	} else {
-		p.armazon.Panel = p.Bandeja
+		p.armazon.Panel = p.bandeja
 	}
 	p.armazon.Menu = p.Menu.Construir()
 	p.armazon.Refresh()

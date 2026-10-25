@@ -160,6 +160,12 @@ export const sl: AppCatalog<typeof en> = {
     'Če želite vse prenesti neposredno v Google Workspace ali Microsoft 365 brez prenosa datotek na računalnik: če imate osebni račun ali upravljate svojo organizacijo, to zaženite sami v Sytue Admin v razdelku Selitve; če ne, prosite osebo, ki jo upravlja.',
   'data.move.action': 'Pojdi na Selitve',
 
+  'devices.native.body':
+    'Brskaj po datotekah v napravi ali poveži račun s soglasjem osebe, ki ji pripada.',
+  'devices.native.driveBody':
+    'Sytue Drive se samodejno doda po prijavi. Dovoli njegovo lokacijo, če te sistem pozove.',
+  'devices.native.openDrive': 'Odpri mapo Drive',
+  'devices.native.failed': 'Integracije naprave ni bilo mogoče posodobiti.',
   'devices.title': 'Povezovanje naprav',
   'devices.lead':
     'Imejte pošto, koledar, stike in datoteke iz Sytue v telefonu ali računalniku. Vodimo vas korak za korakom.',

@@ -23,6 +23,7 @@
   "account.presenceFailed": "Tilstedeværelsen din kunne ikke endres",
   "account.signIn": "Logg inn",
   "account.signOut": "Logg ut",
+  "account.signOutFailed": "Kunne ikke logge ut på denne enheten. Drive kan fortsatt være tilkoblet. Prøv igjen.",
   "account.signOutPending.body": "Notepads har notater på denne enheten som ikke er lastet opp ennå ({count}). Når du logger ut, slettes de fra den.",
   "account.signOutPending.discard": "Forkast og logg ut",
   "account.signOutPending.title": "Notater som ikke er lastet opp",
@@ -334,5 +335,6 @@
   "widgets.open": "Åpne",
   "widgets.pending": "Ventende",
   "widgets.photos": "Bilder",
-  "widgets.rows": "Rader"
+  "widgets.rows": "Rader",
+  "widgets.storage": "Lagring"
 }

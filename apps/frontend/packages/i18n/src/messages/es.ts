@@ -217,6 +217,8 @@ export const es: Catalog = {
   'account.signedOutDescription':
     'Inicia sesión con tu cuenta de Sytue One para ver aquí tus datos.',
   'account.signOut': 'Cerrar sesión',
+  'account.signOutFailed':
+    'No se pudo cerrar la sesión en este dispositivo. Drive puede seguir conectado. Vuelve a intentarlo.',
   'account.signOutPending.title': 'Notas sin subir',
   'account.signOutPending.body':
     'Notepads tiene notas que aún no se han subido en este equipo ({count}). Al cerrar sesión se borran de él.',
@@ -363,6 +365,7 @@ export const es: Catalog = {
   'widgets.episodes': 'Episodios',
   'widgets.apps': 'Apps',
   'widgets.compose': 'Redactar',
+  'widgets.storage': 'Almacenamiento',
   'widgets.create': 'Crear evento',
 
   'linkedServices.services': 'Servicios',

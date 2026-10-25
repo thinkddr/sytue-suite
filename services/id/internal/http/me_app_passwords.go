@@ -12,8 +12,10 @@
 package http
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -26,6 +28,31 @@ import (
 
 type createAppPasswordRequest struct {
 	Label string `json:"label"`
+}
+
+// appPasswordOrg resuelve únicamente la organización activa autenticada. No
+// acepta un destino distinto en el cuerpo ni deduce una organización por orden.
+func (s *Server) appPasswordOrg(ctx context.Context, userID, tenant string) (domain.Organization, error) {
+	if tenant == "" {
+		return domain.Organization{}, httpx.ErrNoActiveOrg
+	}
+	org, err := s.store.GetOrgBySlug(ctx, tenant)
+	if errors.Is(err, domain.ErrNotFound) {
+		return org, httpx.ErrForbidden
+	}
+	if err != nil {
+		return org, httpx.ErrInternal.Wrap(err)
+	}
+	if org.Status != domain.StatusActive {
+		return org, httpx.ErrForbidden
+	}
+	if _, err := s.store.GetMembership(ctx, org.ID, userID); err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			return org, httpx.ErrForbidden
+		}
+		return org, httpx.ErrInternal.Wrap(err)
+	}
+	return org, nil
 }
 
 // handleMeAppPasswords — GET /api/v1/me/app-passwords — las vivas del usuario del
@@ -65,12 +92,17 @@ func (s *Server) handleMeAppPasswordCreate(w http.ResponseWriter, r *http.Reques
 	if len(etiqueta) > 60 {
 		etiqueta = etiqueta[:60]
 	}
+	org, err := s.appPasswordOrg(r.Context(), c.Subject, c.Tenant)
+	if err != nil {
+		httpx.Fail(w, r, err)
+		return
+	}
 	claro, err := generarAppPassword()
 	if err != nil {
 		httpx.Fail(w, r, httpx.ErrInternal.Wrap(err))
 		return
 	}
-	fila, err := s.store.CreateAppPassword(r.Context(), c.Subject,
+	fila, err := s.store.CreateAppPassword(r.Context(), c.Subject, org.ID,
 		domain.HashToken(NormalizeAppPassword(claro)), etiqueta)
 	if err != nil {
 		httpx.Fail(w, r, httpx.ErrInternal.Wrap(err))
@@ -79,6 +111,8 @@ func (s *Server) handleMeAppPasswordCreate(w http.ResponseWriter, r *http.Reques
 	_ = s.store.Audit(r.Context(), nil, auditEntry(c.Subject, c.Tenant, "app_password.created", fila.ID, r))
 	httpx.JSON(w, r, http.StatusCreated, map[string]any{
 		"id":         fila.ID,
+		"org_id":     fila.OrgID,
+		"tenant":     fila.Tenant,
 		"label":      fila.Label,
 		"created_at": fila.CreatedAt,
 		// La única vez que viaja. El cliente la enseña y no vuelve a pedirla.
@@ -130,7 +164,7 @@ func (s *Server) handleMeAppleProfile(w http.ResponseWriter, r *http.Request) {
 	}
 	perfil, err := s.perfilConClave(r, c.Subject, c.Tenant, req.Label)
 	if err != nil {
-		httpx.Fail(w, r, httpx.ErrInternal.Wrap(err))
+		httpx.Fail(w, r, err)
 		return
 	}
 	servirPerfil(w, http.StatusCreated, perfil)
@@ -150,6 +184,10 @@ func (s *Server) handleMeAppleProfileLink(w http.ResponseWriter, r *http.Request
 	}
 	var req createAppPasswordRequest
 	if err := httpx.DecodeJSON(w, r, &req); err != nil {
+		httpx.Fail(w, r, err)
+		return
+	}
+	if _, err := s.appPasswordOrg(r.Context(), c.Subject, c.Tenant); err != nil {
 		httpx.Fail(w, r, err)
 		return
 	}
@@ -217,15 +255,15 @@ func (s *Server) perfilConClave(r *http.Request, userID, tenant, etiqueta string
 	if err != nil {
 		return nil, err
 	}
-	orgID := ""
-	if org, err := s.store.GetOrgBySlug(r.Context(), tenant); err == nil {
-		orgID = org.ID
-	}
-	perfil, err := buildAppleProfile(s.cfg, user, s.anclaSMIMEDeLaOrg(r, orgID), claro)
+	org, err := s.appPasswordOrg(r.Context(), userID, tenant)
 	if err != nil {
 		return nil, err
 	}
-	fila, err := s.store.CreateAppPassword(r.Context(), userID,
+	perfil, err := buildAppleProfile(s.cfg, user, s.anclaSMIMEDeLaOrg(r, org.ID), claro)
+	if err != nil {
+		return nil, err
+	}
+	fila, err := s.store.CreateAppPassword(r.Context(), userID, org.ID,
 		domain.HashToken(NormalizeAppPassword(claro)), etiquetaPerfil(etiqueta))
 	if err != nil {
 		return nil, err

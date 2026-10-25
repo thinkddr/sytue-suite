@@ -63,6 +63,7 @@ func main() {
 	movil := a.Driver().Device().IsMobile()
 	v := cast.Vista{T: tr, Ventana: anchoInicial, Variante: tema.De(a.Settings().ThemeVariant()), Teca: teca, Movil: movil}
 	p := cast.Nueva(cli, v, w)
+	p.Widget = s.CapturarWidget
 	p.Movil = movil
 	p.SoltarCopia = sesion.SoltarElegido
 	teca.Pedir = p.PedirPoster

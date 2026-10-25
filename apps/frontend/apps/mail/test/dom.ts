@@ -10,6 +10,8 @@ export function setupJsdom(): void {
     DOMParser: dom.window.DOMParser,
     Event: dom.window.Event,
     HTMLInputElement: dom.window.HTMLInputElement,
+    HTMLTableCellElement: dom.window.HTMLTableCellElement,
+    HTMLTableElement: dom.window.HTMLTableElement,
   };
   const previous = new Map<string, PropertyDescriptor | undefined>();
   beforeAll(() => {

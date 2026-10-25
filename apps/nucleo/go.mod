@@ -24,11 +24,11 @@ go 1.27.3
 require (
 	git.wow.st/gmp/jni v0.0.0-20210610011705-34026c7e22d0
 	github.com/coder/websocket v1.8.15
-	github.com/godbus/dbus/v5 v5.2.2
+	github.com/godbus/dbus/v5 v5.2.4
 	github.com/mattn/go-sqlite3 v1.14.52
 	github.com/rs/zerolog v1.35.1
 	github.com/zalando/go-keyring v0.2.8
-	golang.org/x/image v0.45.0
+	golang.org/x/image v0.47.0
 	golang.org/x/sys v0.49.0
 	golang.org/x/text v0.43.0
 	maunium.net/go/mautrix v0.32.0

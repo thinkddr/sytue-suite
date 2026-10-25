@@ -184,7 +184,6 @@ func TestTodoElPortalEsNativo(t *testing.T) {
 	v.abrir = a
 	// Sin cargas en segundo plano que sobrevivan a la prueba: pintarían a la vez que la
 	// siguiente, y el conformador de texto no es de dos gorutinas.
-	v.disp.Estado = Listo
 	for d := AInicio; d <= ABienvenida; d++ {
 		v.Ir(d)
 		if v.Destino() != d {

@@ -48,6 +48,7 @@ func (v *Vista) cargarAccesosConexiones(ctx context.Context, r auth.Reclamos) {
 	v.enUI(func() {
 		v.lanzador.PuedeConectarAlmacen = externo
 		v.lanzador.PuedeConectarApps = permitido && v.cuentasApps != nil && v.autorizarApp != nil
+		v.disp.PuedeConectarApps = v.lanzador.PuedeConectarApps
 	})
 }
 

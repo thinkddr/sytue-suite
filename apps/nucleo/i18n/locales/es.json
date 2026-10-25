@@ -23,6 +23,7 @@
   "account.presenceFailed": "No se pudo cambiar la presencia",
   "account.signIn": "Iniciar sesión",
   "account.signOut": "Cerrar sesión",
+  "account.signOutFailed": "No se pudo cerrar la sesión en este dispositivo. Drive puede seguir conectado. Vuelve a intentarlo.",
   "account.signOutPending.body": "Notepads tiene notas que aún no se han subido en este equipo ({count}). Al cerrar sesión se borran de él.",
   "account.signOutPending.discard": "Descartar y cerrar sesión",
   "account.signOutPending.title": "Notas sin subir",
@@ -334,5 +335,6 @@
   "widgets.open": "Abrir",
   "widgets.pending": "Pendientes",
   "widgets.photos": "Fotos",
-  "widgets.rows": "Filas"
+  "widgets.rows": "Filas",
+  "widgets.storage": "Almacenamiento"
 }

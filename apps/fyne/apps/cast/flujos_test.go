@@ -4,6 +4,7 @@
 package cast
 
 import (
+	"fmt"
 	"image"
 	"image/color"
 	"net/url"
@@ -17,10 +18,12 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/test"
 
+	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/llamada"
 	"git.sytue.eu/sytue/one/apps/fyne/llamada/camara"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/fyne/ui/recorrido"
+	"git.sytue.eu/sytue/one/apps/fyne/ui/recorrido/montaje"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 )
 
@@ -514,6 +517,8 @@ func TestRecorridoConSesion(t *testing.T) {
 		default:
 			a.Ir(r)
 		}
+		montaje.ComprobarRotacion(t, w, fmt.Sprintf("cast/ruta-%d", r), iconos.Cast, r == RutaVer,
+			func() { prepararPosters(w, a) })
 		// Sin el carril: si no, lo primero que se pulsa es la navegación y todas las
 		// rutas acaban recorriendo lo mismo. La página entera a la vista. Para Play no:
 		// sin el armazón la app no se entera de que la ventana es de teléfono
@@ -522,6 +527,7 @@ func TestRecorridoConSesion(t *testing.T) {
 			w.SetContent(a.scroll)
 			w.Resize(fyne.NewSize(ventanaAncho, 2400))
 		} else {
+			recorrido.AMedida(w)
 			prepararPosters(w, a)
 		}
 		recorrido.Comprobar(t, w, 120)
@@ -529,19 +535,10 @@ func TestRecorridoConSesion(t *testing.T) {
 	}
 }
 
-// prepararPosters deja los pósters de la pantalla ya pintados antes de la primera
-// captura para Play: el póster se pide la primera vez que se pinta la tarjeta y se
-// prepara en segundo plano para su tamaño, así que se pinta a la medida de la captura
-// (`recorrido.AMedida`, la misma de `recorrido.Retratar`), se espera a la caché y se
-// repinta, dos veces: una para la descarga y otra para la tesela de ese tamaño.
+// prepararPosters deja los pósters preparados para el tamaño actual, sin cambiarlo.
+// Lo usan tanto las rotaciones como Play, que aplica AMedida antes de llamarlo.
 func prepararPosters(w fyne.Window, a *App) {
-	recorrido.AMedida(w)
-	for range 2 {
-		fyne.DoAndWait(func() {})
-		w.Canvas().Capture()
-		a.v.Teca.Esperar()
-		a.Repintar()
-	}
+	recorrido.PrepararCaptura(w, a.v.Teca.Esperar, a.Repintar)
 }
 
 // TestRecorridoSinSesion: sin sesión todo se deja pulsar y lo que la necesita pide
@@ -552,6 +549,7 @@ func TestRecorridoSinSesion(t *testing.T) {
 	entrar := 0
 	a.AlEntrar = func() { entrar++ }
 	a.Arrancar()
+	montaje.ComprobarRotacion(t, w, "cast/sin-sesion", iconos.Cast, false)
 	recorrido.Comprobar(t, w, 120)
 	a.Ir(RutaSubir)
 	test.Tap(buscarBoton(t, w, "Iniciar sesión"))

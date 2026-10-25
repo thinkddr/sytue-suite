@@ -82,7 +82,11 @@ func degradado(w, h int) *image.RGBA {
 // dice si un número cuadra; en una galería, mirarla es la otra mitad del trabajo.
 func guardar(t *testing.T, nombre string, img image.Image) {
 	t.Helper()
-	dir := os.Getenv("SYTUE_CAPTURA")
+	guardarEn(t, os.Getenv("SYTUE_CAPTURA"), nombre, img)
+}
+
+func guardarEn(t *testing.T, dir, nombre string, img image.Image) {
+	t.Helper()
 	if dir == "" {
 		return
 	}

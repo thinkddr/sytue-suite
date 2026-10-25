@@ -616,8 +616,10 @@ export const mt: AppCatalog<typeof en> = {
   'share.group.failed': 'Ma setax jinqasam.',
   'share.person.someone': 'Xi ħadd mill-organizzazzjoni tiegħek',
   'pdf.openInPdf': "Iftaħ f'Sytue PDF",
-  'storage.externalNote':
-    'Il-fajls il-ġodda jużaw il-ħażna konnessa tiegħek u ma jeħdux spazju hawn.',
+  'storage.externalNote': "Il-ħażna konnessa żżid il-kapaċità tiegħek f'Sytue.",
+  'storage.externalCapacity': 'Il-ħażna konnessa żżid {capacity}.',
+  'storage.externalUnknown': 'Il-fornitur ma jirrapportax il-kapaċità tiegħu.',
+  'storage.baseUsage': 'Sytue: {used} minn {total}',
   'storage.add': 'Żid ħażna',
   'storage.external.forOrg': 'Aħżen hawn il-fajls ġodda tal-organizzazzjoni',
   'storage.external.endpoint': 'Endpoint',

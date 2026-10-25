@@ -166,6 +166,12 @@ export const mt: AppCatalog<typeof en> = {
     "Biex tibgħat kollox direttament lil Google Workspace jew Microsoft 365 mingħajr ma tniżżel xejn: jekk il-kont tiegħek huwa personali jew tamministra l-organizzazzjoni tiegħek, ibdih int stess minn Sytue Admin, f'Migrazzjonijiet; jekk le, staqsi lil min jamministraha.",
   'data.move.action': 'Mur għal Migrazzjonijiet',
 
+  'devices.native.body':
+    'Uża l-maniġer tal-fajls tat-tagħmir jew qabbad kont bil-kunsens ta’ sidu.',
+  'devices.native.driveBody':
+    'Sytue Drive jiżdied awtomatikament wara li tidħol. Ħalli l-post tiegħu jekk is-sistema titlobek.',
+  'devices.native.openDrive': 'Iftaħ fil-maniġer tal-fajls',
+  'devices.native.failed': 'Ma setgħetx tiġi aġġornata l-integrazzjoni tat-tagħmir.',
   'devices.title': 'Qabbad it-tagħmir tiegħek',
   'devices.lead':
     "Ħu l-email, il-kalendarju, il-kuntatti u l-fajls ta' Sytue fuq il-mowbajl jew il-kompjuter tiegħek. Niggwidawk pass pass.",

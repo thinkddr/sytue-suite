@@ -192,6 +192,7 @@ type estadoAlbumes struct {
 	lista    []api.Album
 	montones [][]api.Photo
 	buscando bool
+	creando  bool
 }
 
 type estadoAlbum struct {
@@ -261,7 +262,13 @@ func Nueva(cli *api.Photos, v Vista, w fyne.Window) *App {
 	a.scroll = container.NewVScroll(container.NewStack())
 	a.scroll.OnScrolled = func(fyne.Position) { a.quizaMas(); a.pegar() }
 	a.peg.capa = container.NewWithoutLayout()
-	a.raiz = container.New(&raizLayout{a: a}, a.scroll, a.peg.capa)
+	refresco := ui.RefrescarAlTirar(a.scroll, &ui.RefrescoLista{
+		Arriba:     func() bool { return a.scroll.Offset.Y <= 0.5 },
+		Puede:      a.puedeRefrescarLista,
+		Revision:   func() uint64 { return ui.RevisionLista(a.gen) },
+		Actualizar: a.refrescarLista,
+	})
+	a.raiz = container.New(&raizLayout{a: a}, refresco, a.peg.capa)
 	a.corte = claseVentana(v.Ventana)
 	// El tema se cambia en caliente desde el menú de cuenta (o desde otra app de la
 	// suite): las pantallas de Photos se arman con colores ya resueltos, así que hay que
@@ -441,6 +448,9 @@ func (a *App) pintar() {
 	a.pegar()
 	if a.vis != nil {
 		a.pintarVisor()
+	}
+	if a.ed != nil {
+		a.pintarEditor()
 	}
 }
 
@@ -787,5 +797,13 @@ func (r *raizLayout) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 	go fyne.Do(func() {
 		a.scroll.Refresh()
 		a.quizaMas()
+		// Las capas fijan el ancho al que medir sus párrafos y mandos. También se
+		// actualizan entre dos anchos del mismo corte (320 ↔ 568, por ejemplo).
+		if a.vis != nil {
+			a.pintarVisor()
+		}
+		if a.ed != nil {
+			a.pintarEditor()
+		}
 	})
 }

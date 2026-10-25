@@ -91,7 +91,7 @@ func (s *Server) handleAccountAppPasswordCreate(w http.ResponseWriter, r *http.R
 		httpFailHTML(w, r, http.StatusInternalServerError, i18n.T(i18n.From(r), "app_passwords.create_failed"))
 		return
 	}
-	if _, err := s.store.CreateAppPassword(r.Context(), sess.UserID,
+	if _, err := s.store.CreateAppPassword(r.Context(), sess.UserID, sess.OrgID,
 		domain.HashToken(NormalizeAppPassword(claro)), etiqueta); err != nil {
 		httpFailHTML(w, r, http.StatusInternalServerError, i18n.T(i18n.From(r), "app_passwords.create_failed"))
 		return

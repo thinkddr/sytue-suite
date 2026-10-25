@@ -23,6 +23,7 @@
   "account.presenceFailed": "Prezența dvs. nu a putut fi schimbată",
   "account.signIn": "Conectare",
   "account.signOut": "Deconectare",
+  "account.signOutFailed": "Deconectarea de pe acest dispozitiv nu a reușit. Drive poate fi încă conectat. Încercați din nou.",
   "account.signOutPending.body": "Notepads are pe acest dispozitiv note care nu au fost încă încărcate ({count}). La deconectare sunt șterse de pe el.",
   "account.signOutPending.discard": "Renunță și deconectează-te",
   "account.signOutPending.title": "Note neîncărcate",
@@ -338,5 +339,6 @@
   "widgets.open": "Deschide",
   "widgets.pending": "În așteptare",
   "widgets.photos": "Fotografii",
-  "widgets.rows": "Rânduri"
+  "widgets.rows": "Rânduri",
+  "widgets.storage": "Stocare"
 }

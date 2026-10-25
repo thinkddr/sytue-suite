@@ -296,18 +296,16 @@ func TestLaPapeleraSeDesplaza(t *testing.T) {
 	}
 }
 
-// TestConectarDispositivosAbreElAsistenteDelHub: el pie del carril no era un botón
-// muerto; abre `/dispositivos` del portal, que es otra app (§13.6).
-func TestConectarDispositivosAbreElAsistenteDelHub(t *testing.T) {
+// La app nativa controla su integración local y no envía a perfiles manuales del Hub.
+func TestConectarDispositivosUsaLaIntegracionNativa(t *testing.T) {
 	a := &abridorDoble{}
 	p := NuevaPantalla(traductor(t), nil, nil, nil)
 	p.App, p.Apex = a, "sytue.eu"
-	if p.lateral.AlAbrirDispositivos == nil {
-		t.Fatal("«Conectar tus dispositivos» no tiene qué hacer")
-	}
+	llamadas := 0
+	p.ConfigurarSistema = func() { llamadas++ }
 	p.lateral.AlAbrirDispositivos()
-	if len(a.urls) != 1 || a.urls[0] != "sytue-one:/dispositivos" {
-		t.Errorf("abre %v", a.urls)
+	if llamadas != 1 || len(a.urls) != 0 {
+		t.Fatalf("control nativo %d; URLs %v", llamadas, a.urls)
 	}
 }
 

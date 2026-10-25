@@ -613,8 +613,10 @@ export const sl: AppCatalog<typeof en> = {
   'share.group.failed': 'Deljenje ni uspelo.',
   'share.person.someone': 'Oseba iz vaše organizacije',
   'pdf.openInPdf': 'Odpri v Sytue PDF',
-  'storage.externalNote':
-    'Nove datoteke uporabljajo povezano shrambo in tukaj ne zasedajo prostora.',
+  'storage.externalNote': 'Povezana shramba poveča vašo zmogljivost shranjevanja v Sytue.',
+  'storage.externalCapacity': 'Povezana shramba doda {capacity}.',
+  'storage.externalUnknown': 'Ponudnik ne sporoča zmogljivosti shrambe.',
+  'storage.baseUsage': 'Sytue: {used} od {total}',
   'storage.add': 'Dodaj shrambo',
   'storage.external.forOrg': 'Nove datoteke organizacije shranjuj tukaj',
   'storage.external.endpoint': 'Končna točka',

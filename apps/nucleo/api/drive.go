@@ -291,12 +291,31 @@ func (d *Drive) Folder(ctx context.Context, id string) (Folder, error) {
 	return JSON[Folder](ctx, d.c, Request{Path: elemento(DriveFolder, id, "")})
 }
 
-// DriveQuota es el espacio de la organización.
+// DriveExternalCapacity conserva los valores desconocidos del proveedor como nil.
+type DriveExternalCapacity struct {
+	TotalBytes     *int64 `json:"total_bytes"`
+	UsedBytes      *int64 `json:"used_bytes"`
+	AvailableBytes *int64 `json:"available_bytes"`
+	Partial        bool   `json:"partial,omitempty"`
+}
+
+// Complete dice si se puede mostrar una cifra de ampliación, también si vale cero.
+func (c *DriveExternalCapacity) Complete() bool {
+	return c != nil && c.TotalBytes != nil && *c.TotalBytes >= 0 &&
+		c.UsedBytes != nil && *c.UsedBytes >= 0 &&
+		c.AvailableBytes != nil && *c.AvailableBytes >= 0
+}
+
+// DriveQuota trae los totales del servicio, ampliados con las fuentes externas
+// que informan su capacidad completa. La cuota base de Sytue se conserva aparte.
 type DriveQuota struct {
-	LimitBytes int64 `json:"limit_bytes"`
-	UsedBytes  int64 `json:"used_bytes"`
-	// ExternalStorage: lo nuevo va al almacén propio de la organización y no gasta este.
-	ExternalStorage bool `json:"external_storage"`
+	LimitBytes       int64                  `json:"limit_bytes"`
+	UsedBytes        int64                  `json:"used_bytes"`
+	AvailableBytes   int64                  `json:"available_bytes"`
+	BaseLimitBytes   *int64                 `json:"base_limit_bytes,omitempty"`
+	BaseUsedBytes    *int64                 `json:"base_used_bytes,omitempty"`
+	ExternalStorage  bool                   `json:"external_storage"`
+	ExternalCapacity *DriveExternalCapacity `json:"external_capacity,omitempty"`
 }
 
 // Quota dice cuánto espacio hay y cuánto se ha gastado.

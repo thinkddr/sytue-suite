@@ -4,6 +4,7 @@
 package photos
 
 import (
+	"context"
 	"hash/fnv"
 	"image"
 	"image/color"
@@ -11,15 +12,31 @@ import (
 	"os"
 	"testing"
 
+	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/ui/recorrido"
+	"git.sytue.eu/sytue/one/apps/fyne/ui/recorrido/montaje"
 )
 
 // TestRecorridoConSesion pulsa todo lo que se ve con los datos del servicio falso y
 // cierra con Escape cada modal que se abre (ver `ui/recorrido`).
 func TestRecorridoConSesion(t *testing.T) {
 	a, w := appDePrueba(t, &servicioFalso{fotos: fotosDelServicio(30), porPagina: 10})
+	a.v.Teca.Pedir = pedirEscena
 	a.Arrancar()
+	if len(a.g.fotos) == 0 {
+		t.Fatal("la galería debe estar cargada antes de girar")
+	}
+	montaje.ComprobarRotacion(t, w, "photos/galeria", iconos.Photos, true, func() {
+		recorrido.PrepararCaptura(w, a.v.Teca.Esperar, a.pintar)
+		if a.v.Teca.Pintada(a.g.fotos[0].ID) == nil {
+			t.Fatal("la primera miniatura debe estar decodificada antes de retratar")
+		}
+	})
 	recorrido.Comprobar(t, w, 400)
+}
+
+func pedirEscena(_ context.Context, id, _ string) ([]byte, error) {
+	return pngDe(escena(id, 512, 384)), nil
 }
 
 // escenasPlay: con SYTUE_CAPTURAS_PLAY las miniaturas son paisajes pintados en vez de

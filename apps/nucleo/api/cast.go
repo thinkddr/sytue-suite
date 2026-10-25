@@ -220,6 +220,8 @@ type CastQuota struct {
 	UsedBytes      int64 `json:"used_bytes"`
 	AvailableBytes int64 `json:"available_bytes"`
 	CastBytes      int64 `json:"cast_bytes"`
+	// nil is unknown on an older backend; widgets must never interpret it as false.
+	ExternalStorage *bool `json:"external_storage"`
 }
 
 // CastStreamKey es la clave de OBS de quien pregunta: solo se la dan a su dueño.

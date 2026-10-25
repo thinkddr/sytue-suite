@@ -5,10 +5,12 @@
 
 package documentos
 
+import "context"
+
 // Fuera de Android y Linux no hay dónde enseñar Drive con esta credencial: macOS y iOS
 // tienen su File Provider, y Windows el botón de montar de «Conectar tus dispositivos».
 var (
 	hayProveedor = false
-	conectar     = func(Credencial) error { return ErrNoDisponible }
+	conectar     = func(context.Context, Credencial) error { return ErrNoDisponible }
 	desconectar  = func(Credencial) {}
 )

@@ -30,7 +30,7 @@ func servir(_ context.Context, _ Fuente, t Textos) error {
 
 // conectar avisa a «Archivos» de que la raíz ha cambiado: el proveedor vuelve a leer la
 // credencial del almacén.
-var conectar, desconectar = avisarCambio, func(c Credencial) {
+var conectar, desconectar = func(_ context.Context, c Credencial) error { return avisarCambio(c) }, func(c Credencial) {
 	avisar("el proveedor de documentos no se ha enterado", avisarCambio(c))
 }
 

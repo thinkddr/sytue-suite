@@ -562,8 +562,10 @@ export const hu: AppCatalog<typeof en> = {
   'share.group.failed': 'A megosztás nem sikerült.',
   'share.person.someone': 'Valaki a szervezetéből',
   'pdf.openInPdf': 'Megnyitás a Sytue PDF-ben',
-  'storage.externalNote':
-    'Az új fájlok a csatlakoztatott tárhelyet használják, és itt nem foglalnak helyet.',
+  'storage.externalNote': 'A csatlakoztatott tárhely növeli a Sytue-tárhelyed kapacitását.',
+  'storage.externalCapacity': 'A csatlakoztatott tárhely {capacity} többletkapacitást biztosít.',
+  'storage.externalUnknown': 'A szolgáltató nem adja meg a tárhely kapacitását.',
+  'storage.baseUsage': 'Sytue: {used} / {total}',
   'storage.add': 'Tárhely hozzáadása',
   'storage.external.forOrg': 'A szervezet új fájljainak tárolása itt',
   'storage.external.endpoint': 'Végpont',

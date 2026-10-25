@@ -806,11 +806,19 @@ func (f *FichaPendiente) pesoEstado() ui.Peso {
 // estado y el aspa, con `gap-2`, por `py-1.5` y el aspa de 24.
 func MedidaFichaPendiente(f *FichaPendiente) fyne.Size {
 	ancho := 2*tema.Espacio(2) + 2*tema.Borde + tema.Espacio(6) + tema.Espacio(2) +
-		min(ui.Medir(f.Pendiente.Nombre, tema.TextoXS, ui.Medio).Width, 10*tema.Rem) + tema.Espacio(2) + 24
+		min(ui.Medir(f.Pendiente.Nombre, tema.TextoXS, ui.Medio).Width, 10*tema.Rem) + tema.Espacio(2) + ui.SueloTactil(24)
 	if e := f.estado(); e != "" {
 		ancho += ui.Medir(e, tema.TextoXS, f.pesoEstado()).Width + tema.Espacio(2)
 	}
-	return fyne.NewSize(ancho, 2*tema.Espacio(1.5)+24+2*tema.Borde)
+	return fyne.NewSize(ancho, 2*tema.Espacio(1.5)+ui.SueloTactil(24)+2*tema.Borde)
+}
+
+// medidaEnFila deja que el nombre ceda al estrecharse el canal entre dos paneles.
+// La misma medida se usa para envolver y colocar, sin reducir el botón Quitar.
+func (f *FichaPendiente) medidaEnFila(ancho float32) fyne.Size {
+	m := f.MinSize()
+	m.Width = min(m.Width, max(ancho, 0))
+	return m
 }
 
 func (f *FichaPendiente) CreateRenderer() fyne.WidgetRenderer { return &fichaPendienteRenderer{f: f} }
@@ -844,21 +852,31 @@ func (r *fichaPendienteRenderer) Layout(t fyne.Size) {
 	g.Resize(fyne.NewSize(iconos.TallaXXS, iconos.TallaXXS))
 	f.objs = append(f.objs, g)
 	x += tema.Espacio(6) + tema.Espacio(2)
+	ladoQuitar := ui.SueloTactil(24)
+	quitarX := max(t.Width-tema.Borde-tema.Espacio(2)-ladoQuitar+tema.Espacio(1), 0)
+	libre := max(quitarX-tema.Espacio(2)-x, 0)
+	estado := f.estado()
+	anchoEstado := min(ui.Medir(estado, tema.TextoXS, f.pesoEstado()).Width, libre)
+	anchoNombre := max(libre-anchoEstado, 0)
+	if estado != "" {
+		anchoNombre = max(anchoNombre-tema.Espacio(2), 0)
+	}
 	nombre := ui.Texto("", tema.TextoXS, ui.Medio, tema.Color("text", v))
-	x += ui.Truncar(nombre, f.Pendiente.Nombre, tema.TextoXS, ui.Medio, 10*tema.Rem) + tema.Espacio(2)
+	x += ui.Truncar(nombre, f.Pendiente.Nombre, tema.TextoXS, ui.Medio, min(10*tema.Rem, anchoNombre)) + tema.Espacio(2)
 	ui.ColocarTexto(nombre, tema.TextoXS, x-tema.Espacio(2)-ui.Medir(nombre.Text, tema.TextoXS, ui.Medio).Width, (t.Height-tema.TextoXS.Linea)/2)
 	f.objs = append(f.objs, nombre)
-	if e := f.estado(); e != "" {
+	if estado != "" {
 		token := "text-subtle"
 		if f.Pendiente.Fallido {
 			token = "danger-text"
 		}
-		tx := ui.Texto(e, tema.TextoXS, f.pesoEstado(), tema.Color(token, v))
+		tx := ui.Texto("", tema.TextoXS, f.pesoEstado(), tema.Color(token, v))
+		ui.Truncar(tx, estado, tema.TextoXS, f.pesoEstado(), anchoEstado)
 		ui.ColocarTexto(tx, tema.TextoXS, x, (t.Height-tema.TextoXS.Linea)/2)
 		f.objs = append(f.objs, tx)
 	}
-	f.quitar.Move(fyne.NewPos(t.Width-tema.Borde-tema.Espacio(2)-24+tema.Espacio(1), (t.Height-24)/2))
-	f.quitar.Resize(fyne.NewSize(24, 24))
+	f.quitar.Move(fyne.NewPos(quitarX, (t.Height-ladoQuitar)/2))
+	f.quitar.Resize(fyne.NewSize(ladoQuitar, ladoQuitar))
 	f.objs = append(f.objs, f.quitar)
 }
 

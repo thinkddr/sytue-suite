@@ -117,10 +117,11 @@ func (p *Pantalla) anchoTarjeta() float32 {
 	if ventana == 0 {
 		ventana = ui.CorteXL
 	}
-	hueco := ventana - ui.AnchoMenu(false) - ui.AnchoPanel(ventana) - 2*RellenoFicha(p.Ventana)
-	if ventana < ui.Estrecho {
-		hueco = ventana - 2*RellenoFicha(p.Ventana) // en el teléfono la ficha es la pantalla
+	hueco := ui.AnchoHoja(ventana, ui.AnchoMenu(false), 0)
+	if ventana >= ui.Estrecho {
+		hueco -= ui.AcotarAnchoPanel(ui.AnchoPanel(ventana), hueco)
 	}
+	hueco -= 2 * RellenoFicha(p.Ventana)
 	return max(min(hueco, AnchoFicha), 0)
 }
 

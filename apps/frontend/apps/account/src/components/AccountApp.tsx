@@ -34,6 +34,8 @@ interface Props {
   nombreInicial: string;
   /** Correo verificado de la cuenta. Solo lectura: se cambia en otro flujo. */
   email: string;
+  /** Una operación protegida ha solicitado configurar el segundo factor. */
+  mfaRequired?: boolean;
 }
 
 export function AccountApp({
@@ -43,6 +45,7 @@ export function AccountApp({
   locale,
   nombreInicial,
   email,
+  mfaRequired = false,
 }: Props): JSX.Element {
   const t = useT(locale);
   return (
@@ -94,7 +97,7 @@ export function AccountApp({
             <SesionesCard t={t} />
           </div>
           <div>
-            <SeguridadCard t={t} />
+            <SeguridadCard t={t} mfaRequired={mfaRequired} />
             <RecuperacionCard t={t} />
             <DispositivosCard t={t} locale={locale} />
             <AppPasswordsCard t={t} locale={locale} />

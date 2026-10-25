@@ -146,6 +146,11 @@ export const da: AppCatalog<typeof en> = {
     'For at overføre det hele direkte til Google Workspace eller Microsoft 365 uden at downloade noget: Har du en personlig konto, eller administrerer du din organisation, kan du selv starte det fra Sytue Admin under Migreringer. Ellers kan du bede den, der administrerer den.',
   'data.move.action': 'Gå til Migreringer',
 
+  'devices.native.body': 'Brug enhedens filhåndtering, eller tilslut en konto med samtykke.',
+  'devices.native.driveBody':
+    'Sytue Drive tilføjes automatisk, når du logger ind. Tillad placeringen, hvis systemet beder om det.',
+  'devices.native.openDrive': 'Åbn i filhåndtering',
+  'devices.native.failed': 'Enhedens integration kunne ikke opdateres.',
   'devices.title': 'Forbind dine enheder',
   'devices.lead':
     'Tag din mail, kalender, dine kontakter og filer fra Sytue med på telefonen eller computeren. Vi guider dig trin for trin.',

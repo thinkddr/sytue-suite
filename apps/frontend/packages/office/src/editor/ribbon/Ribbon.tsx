@@ -9,7 +9,7 @@
  * 2 px en latón de marca (Graphite & Brass) en la activa.
  *
  * La fila de grupos es UNA línea que se desplaza en horizontal (la banda). Si no cabe,
- * aparece «Más» al final: despliega la banda en varias líneas sobre el lienzo, con todos
+ * en escritorio aparece «Más» al final: despliega la banda sobre el lienzo, con todos
  * los grupos a la vista, y se cierra con Escape, con un clic fuera o al pulsar una acción.
  * La banda es una barra de herramientas (`Toolbar` de @sytue/ui: una parada de
  * tabulación, flechas, Inicio/Fin), F6 salta entre la cinta y el lienzo, y sus popovers
@@ -92,8 +92,6 @@ type Cuerpo = (props: { ctx: EditorContext }) => JSX.Element;
 
 export function Ribbon({ ctx }: { ctx: EditorContext }): JSX.Element {
   const [activeId, setActiveId] = useState<RibbonTabId>('inicio');
-  // Solo manda en <768px: ahí la fila de grupos empieza plegada (ver abajo).
-  const [toolsOpen, setToolsOpen] = useState(false);
   const tabRefs = useRef(new Map<RibbonTabId, HTMLButtonElement>());
   // El desvanecido del borde derecho avisa de que la tira sigue: a 360 px se ven
   // 248 px de los 439 que miden las seis pestañas de un documento.
@@ -232,7 +230,6 @@ export function Ribbon({ ctx }: { ctx: EditorContext }): JSX.Element {
                 }
                 onClick={() => {
                   setActiveId(t.id);
-                  setToolsOpen(true); // no-op en ≥768px (la fila está siempre)
                 }}
               >
                 {ctx.t(t.labelKey)}
@@ -248,27 +245,11 @@ export function Ribbon({ ctx }: { ctx: EditorContext }): JSX.Element {
             );
           })}
         </div>
-        {/* Solo en <768px: despliega la fila de grupos. Al elegir pestaña con la
-            fila plegada se abre sola — si no, tocar «Insertar» no haría nada
-            visible y parecería que la pestaña está rota. */}
-        <button
-          type="button"
-          onClick={() => setToolsOpen((v) => !v)}
-          aria-expanded={toolsOpen}
-          aria-controls="ribbon-tabpanel"
-          aria-label={toolsOpen ? ctx.t('ribbon.hideTools') : ctx.t('ribbon.showTools')}
-          title={toolsOpen ? ctx.t('ribbon.hideTools') : ctx.t('ribbon.showTools')}
-          class={
-            'text-text-muted hover:text-text ml-auto inline-flex h-full shrink-0 items-center px-2 md:hidden ' +
-            FOCUS_RING
-          }
-        >
-          <EditorIcon name={toolsOpen ? 'chevronUp' : 'chevronDown'} size="sm" />
-        </button>
       </div>
 
       {/* La banda de grupos (68 px) de la pestaña activa: UNA línea que se desplaza en
-       * horizontal cuando no cabe, con «Más» para verla entera.
+       * horizontal cuando no cabe. En móvil siempre está visible, sin expansión;
+       * en escritorio, «Más» permite verla entera sobre el lienzo.
        *
        * ⚠️ Esta fila era `flex-wrap` y sin `overflow-x`, porque con `overflow-x:auto` el
        * navegador computa `overflow-y:auto` y recorta los popovers que cuelgan de ella.
@@ -300,7 +281,6 @@ export function Ribbon({ ctx }: { ctx: EditorContext }): JSX.Element {
           // El de siempre como mínimo: con la banda desplegada (fuera de flujo) es lo
           // que mantiene el hueco, y con ella plegada es su altura natural.
           'min-h-[var(--editor-groups-h)]',
-          !toolsOpen && 'max-md:hidden',
         )}
       >
         {/* Los manejadores van en un envoltorio sin semántica (`contents`: no cambia la
@@ -335,7 +315,7 @@ export function Ribbon({ ctx }: { ctx: EditorContext }): JSX.Element {
               que dice que lo que hay a su izquierda sigue y él no. Desplegada, se queda en
               el mismo sitio, sobre su esquina. */}
           {desborda || expandida ? (
-            <div class="relative z-[calc(var(--z-dropdown)+1)] ml-auto flex shrink-0 items-start pt-1.5 pr-2 max-md:pt-1">
+            <div class="relative z-[calc(var(--z-dropdown)+1)] ml-auto hidden shrink-0 items-start pt-1.5 pr-2 md:pointer-fine:flex">
               <div aria-hidden="true" class="bg-border mx-1.5 mt-1.5 h-8 w-px" />
               <div class="flex min-h-11 items-center">
                 <button

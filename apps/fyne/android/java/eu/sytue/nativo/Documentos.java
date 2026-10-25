@@ -4,10 +4,12 @@
 package eu.sytue.nativo;
 
 import android.content.Context;
+import android.content.Intent;
 import android.database.Cursor;
 import android.database.MatrixCursor;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Binder;
 import android.os.CancellationSignal;
 import android.os.Handler;
 import android.os.Looper;
@@ -62,39 +64,92 @@ public final class Documentos extends DocumentsProvider {
     /** La credencial ha cambiado: «Archivos» vuelve a pedir la raíz y lo que hay en ella. */
     public static void cambio(Context ctx) {
         ctx.getContentResolver().notifyChange(DocumentsContract.buildRootsUri(autoridad(ctx)), null);
-        ctx.getContentResolver().notifyChange(DocumentsContract.buildChildDocumentsUri(autoridad(ctx), RAIZ), null);
+        Acceso a = acceso(ctx);
+        if (a != null) {
+            ctx.getContentResolver().notifyChange(DocumentsContract.buildChildDocumentsUri(autoridad(ctx), a.espacio + ":/"), null);
+        }
+    }
+
+    public static void habilitar(Context ctx, boolean habilitada) {
+        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean("desactivado", !habilitada).commit();
+        cambio(ctx);
     }
 
     // --- La credencial ---------------------------------------------------------------
 
-    /** Lee la credencial del almacén; null si no hay, o si es una que queda por revocar. */
-    private static WebDAV dav(Context ctx) {
-        File f = new File(ctx.getFilesDir(), "secreto-drive-sistema.bin");
-        if (!f.isFile()) {
-            return null;
+    private static final class Acceso {
+        final WebDAV dav;
+        final String espacio;
+        final String credencial;
+        Acceso(WebDAV dav, String espacio, String credencial) {
+            this.dav = dav;
+            this.espacio = espacio;
+            this.credencial = credencial;
         }
-        try {
-            JSONObject j = new JSONObject(new String(SesionPrivada.leer(ctx, "secreto-drive-sistema.bin"),
-                    StandardCharsets.UTF_8));
-            String url = j.optString("url"), usuario = j.optString("usuario"), clave = j.optString("clave");
-            if (url.isEmpty() || clave.isEmpty()) {
-                return null;
-            }
-            String basic = Base64.encodeToString((usuario + ":" + clave).getBytes(StandardCharsets.UTF_8),
-                    Base64.NO_WRAP);
-            return new WebDAV(url, "Basic " + basic);
-        } catch (Exception e) {
-            Log.w(ETIQUETA, "la credencial de Drive no se deja leer", e);
-            return null;
+        String id(String ruta) throws FileNotFoundException { return DocumentosIdentidad.documento(espacio, ruta); }
+        String ruta(String id) throws FileNotFoundException { return DocumentosIdentidad.ruta(espacio, id); }
+        boolean misma(Acceso otra) {
+            return otra != null && espacio.equals(otra.espacio) && credencial.equals(otra.credencial);
         }
     }
 
-    private WebDAV dav() throws FileNotFoundException {
-        WebDAV d = dav(getContext());
-        if (d == null) {
-            throw new FileNotFoundException(texto("sinApp", "Sytue Drive"));
+    private static String[] identidad(JSONObject j) {
+        return new String[]{j.optString("issuer"), j.optString("client"), j.optString("subject"), j.optString("org")};
+    }
+
+    /** Reads through the existing authenticated session facade; never caches a bearer or refresh token. */
+    private static boolean vigente(Context ctx, JSONObject dueno) throws Exception {
+        String cuenta = dueno.optString("account");
+        if (!cuenta.matches("sesion-[a-f0-9]{32}")) { return false; }
+        String crudo;
+        if (SesionCompartida.habilitada()) {
+            crudo = SesionCompartida.cargarDrive(ctx, cuenta, dueno.optString("issuer"), dueno.optString("client"));
+        } else {
+            if (SesionCompartida.estadoBloqueo(ctx)) { return false; }
+            File cerrada = new File(ctx.getFilesDir(), ".config/sytue/" + cuenta + ".cerrada");
+            if (cerrada.exists()) { return false; }
+            crudo = new String(SesionPrivada.leer(ctx, cuenta + ".bin"), StandardCharsets.UTF_8);
         }
-        return d;
+        JSONObject actual = new JSONObject(crudo);
+        return DocumentosIdentidad.permite(identidad(dueno), identidad(actual), false,
+                !actual.optString("refresh").isEmpty());
+    }
+
+    /** No account, failed broker, logout or another tenant all fail closed, even with Drive closed. */
+    private static Acceso acceso(Context ctx) {
+        long llamante = Binder.clearCallingIdentity();
+        try {
+            if (!SesionCompartida.habilitada() && ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("desactivado", false)) { return null; }
+            JSONObject j = new JSONObject(new String(SesionPrivada.leer(ctx, "secreto-drive-sistema.bin"), StandardCharsets.UTF_8));
+            JSONObject dueno = j.optJSONObject("owner");
+            String url = j.optString("url"), usuario = j.optString("usuario"), clave = j.optString("clave");
+            if (dueno == null || url.isEmpty() || clave.isEmpty() || !vigente(ctx, dueno)) { return null; }
+            String basic = Base64.encodeToString((usuario + ":" + clave).getBytes(StandardCharsets.UTF_8), Base64.NO_WRAP);
+            String espacio = SesionAndroid.sha256(String.join("\0", identidad(dueno)).getBytes(StandardCharsets.UTF_8)).substring(0, 32);
+            return new Acceso(new WebDAV(url, "Basic " + basic), espacio, j.optString("id"));
+        } catch (Exception e) {
+            // Authentication failures contain no path, URI, token or credential in the log.
+            Log.w(ETIQUETA, "Drive session is not available");
+            return null;
+        } finally {
+            Binder.restoreCallingIdentity(llamante);
+        }
+    }
+
+    private Acceso acceso() throws FileNotFoundException {
+        Acceso a = acceso(getContext());
+        if (a == null) { throw new FileNotFoundException(texto("sinApp", "Sytue Drive")); }
+        return a;
+    }
+
+    /** Opens the already registered root, rather than a manual WebDAV setup dialog. */
+    public static void abrir(Context ctx) {
+        Acceso a = acceso(ctx);
+        if (a == null) { throw new IllegalStateException("Drive session is not available"); }
+        Intent intent = new Intent(Intent.ACTION_VIEW).setDataAndType(
+                DocumentsContract.buildRootUri(autoridad(ctx), a.espacio), Root.MIME_TYPE_ITEM)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        ctx.startActivity(intent);
     }
 
     // --- El proveedor ----------------------------------------------------------------
@@ -129,13 +184,13 @@ public final class Documentos extends DocumentsProvider {
         return t != null ? t : "application/octet-stream";
     }
 
-    private void fila(MatrixCursor c, WebDAV.Entrada e) {
+    private void fila(MatrixCursor c, WebDAV.Entrada e, Acceso a) throws FileNotFoundException {
         MatrixCursor.RowBuilder f = c.newRow();
         boolean raiz = RAIZ.equals(e.ruta);
         int banderas = e.carpeta
                 ? Document.FLAG_DIR_SUPPORTS_CREATE | (raiz ? 0 : Document.FLAG_SUPPORTS_DELETE | Document.FLAG_SUPPORTS_RENAME)
                 : Document.FLAG_SUPPORTS_WRITE | Document.FLAG_SUPPORTS_DELETE | Document.FLAG_SUPPORTS_RENAME;
-        f.add(Document.COLUMN_DOCUMENT_ID, e.ruta);
+        f.add(Document.COLUMN_DOCUMENT_ID, a.id(e.ruta));
         f.add(Document.COLUMN_DISPLAY_NAME, raiz ? titulo() : e.nombre());
         f.add(Document.COLUMN_MIME_TYPE, tipoDe(e));
         f.add(Document.COLUMN_SIZE, e.carpeta || e.tamano < 0 ? null : e.tamano);
@@ -164,13 +219,14 @@ public final class Documentos extends DocumentsProvider {
 
     @Override
     public Cursor queryRoots(String[] proyeccion) {
-        boolean hay = dav(getContext()) != null;
+        Acceso a = acceso(getContext());
+        boolean hay = a != null;
         MatrixCursor c = new MatrixCursor(proyeccion != null ? proyeccion : COLUMNAS_RAIZ);
         MatrixCursor.RowBuilder f = c.newRow();
-        f.add(Root.COLUMN_ROOT_ID, "drive");
+        f.add(Root.COLUMN_ROOT_ID, hay ? a.espacio : "sin-sesion");
         f.add(Root.COLUMN_TITLE, titulo());
         f.add(Root.COLUMN_SUMMARY, hay ? null : texto("sinApp", null));
-        f.add(Root.COLUMN_DOCUMENT_ID, RAIZ);
+        f.add(Root.COLUMN_DOCUMENT_ID, hay ? a.espacio + ":/" : "sin-sesion");
         f.add(Root.COLUMN_FLAGS, hay ? Root.FLAG_SUPPORTS_CREATE | Root.FLAG_SUPPORTS_IS_CHILD : 0);
         f.add(Root.COLUMN_ICON, getContext().getApplicationInfo().icon);
         f.add(Root.COLUMN_MIME_TYPES, "*/*");
@@ -181,13 +237,10 @@ public final class Documentos extends DocumentsProvider {
     @Override
     public Cursor queryDocument(String id, String[] proyeccion) throws FileNotFoundException {
         MatrixCursor c = new MatrixCursor(proyeccion != null ? proyeccion : COLUMNAS);
-        if (RAIZ.equals(id)) {
-            // La raíz se enseña siempre, para que «Archivos» la abra y diga qué hacer.
-            fila(c, new WebDAV.Entrada(RAIZ, true, -1, 0, null));
-            return c;
-        }
+        Acceso a = acceso();
+        String ruta = a.ruta(id);
         try {
-            fila(c, dav().uno(id));
+            fila(c, RAIZ.equals(ruta) ? new WebDAV.Entrada(RAIZ, true, -1, 0, null) : a.dav.uno(ruta), a);
         } catch (IOException e) {
             throw fallo(e);
         }
@@ -199,16 +252,16 @@ public final class Documentos extends DocumentsProvider {
         MatrixCursor c = new MatrixCursor(proyeccion != null ? proyeccion : COLUMNAS);
         c.setNotificationUri(getContext().getContentResolver(),
                 DocumentsContract.buildChildDocumentsUri(autoridad(getContext()), padre));
-        WebDAV d = dav(getContext());
-        if (d == null) {
+        Acceso a = acceso(getContext());
+        if (a == null) {
             Bundle extra = new Bundle();
             extra.putString(DocumentsContract.EXTRA_INFO, texto("sinApp", ""));
             c.setExtras(extra);
             return c;
         }
         try {
-            for (WebDAV.Entrada e : d.hijos(padre)) {
-                fila(c, e);
+            for (WebDAV.Entrada e : a.dav.hijos(a.ruta(padre))) {
+                fila(c, e, a);
             }
         } catch (IOException e) {
             throw fallo(e);
@@ -218,14 +271,19 @@ public final class Documentos extends DocumentsProvider {
 
     @Override
     public boolean isChildDocument(String padre, String id) {
-        return RAIZ.equals(padre) ? id.startsWith("/") : id.startsWith(padre + "/");
+        try {
+            Acceso a = acceso();
+            String p = a.ruta(padre), r = a.ruta(id);
+            return !p.equals(r) && (RAIZ.equals(p) ? r.startsWith("/") : r.startsWith(p + "/"));
+        } catch (FileNotFoundException noDisponible) { return false; }
     }
 
     @Override
     public ParcelFileDescriptor openDocument(final String id, String modo, CancellationSignal cancelar)
             throws FileNotFoundException {
-        final WebDAV d = dav();
-        File dir = new File(getContext().getCacheDir(), "sytue-documentos");
+        final Acceso a = acceso();
+        final String ruta = a.ruta(id);
+        File dir = new File(getContext().getCacheDir(), "sytue-documentos/" + a.espacio);
         if (!dir.isDirectory() && !dir.mkdirs()) {
             throw new FileNotFoundException("sin caché");
         }
@@ -236,7 +294,7 @@ public final class Documentos extends DocumentsProvider {
         try {
             // Escribir sobre lo que hay (`rw`) necesita lo de ahora; un `wt` lo trunca al abrir.
             if (!escribe || (m & ParcelFileDescriptor.MODE_TRUNCATE) == 0) {
-                d.bajar(id, f);
+                a.dav.bajar(ruta, f);
             }
             if (!escribe) {
                 return ParcelFileDescriptor.open(f, m);
@@ -253,7 +311,7 @@ public final class Documentos extends DocumentsProvider {
                             new Thread(new Runnable() {
                                 @Override
                                 public void run() {
-                                    subirAlCerrar(ctx, d, id, f);
+                                    subirAlCerrar(ctx, a, id, ruta, f);
                                 }
                             }).start();
                         }
@@ -267,13 +325,14 @@ public final class Documentos extends DocumentsProvider {
      * Sube lo escrito, con unos pocos reintentos. ponytail: sin red durante todos ellos el
      * cambio se queda en la caché y no se sube; una cola persistente lo arreglaría.
      */
-    private static void subirAlCerrar(Context ctx, WebDAV d, String id, File f) {
+    private static void subirAlCerrar(Context ctx, Acceso a, String id, String ruta, File f) {
         for (int i = 0; i < INTENTOS; i++) {
             try {
-                d.subir(id, f, tipoPorNombre(f.getName()));
+                if (!a.misma(acceso(ctx))) { return; }
+                a.dav.subir(ruta, f, tipoPorNombre(f.getName()));
                 ctx.getContentResolver().notifyChange(DocumentsContract.buildDocumentUri(autoridad(ctx), id), null);
                 ctx.getContentResolver().notifyChange(
-                        DocumentsContract.buildChildDocumentsUri(autoridad(ctx), WebDAV.padre(id)), null);
+                        DocumentsContract.buildChildDocumentsUri(autoridad(ctx), a.id(WebDAV.padre(ruta))), null);
                 return;
             } catch (IOException e) {
                 Log.w(ETIQUETA, "no se ha podido subir lo escrito (intento " + (i + 1) + ")", e);
@@ -303,9 +362,10 @@ public final class Documentos extends DocumentsProvider {
 
     @Override
     public String createDocument(String padre, String tipo, String nombre) throws FileNotFoundException {
-        WebDAV d = dav();
+        Acceso a = acceso();
+        WebDAV d = a.dav;
         try {
-            String ruta = libre(d, padre, nombre);
+            String ruta = libre(d, a.ruta(padre), nombre);
             if (Document.MIME_TYPE_DIR.equals(tipo)) {
                 d.crearCarpeta(ruta);
             } else {
@@ -318,7 +378,7 @@ public final class Documentos extends DocumentsProvider {
                 }
             }
             cambioEn(padre);
-            return ruta;
+            return a.id(ruta);
         } catch (IOException e) {
             throw fallo(e);
         }
@@ -326,27 +386,25 @@ public final class Documentos extends DocumentsProvider {
 
     @Override
     public String renameDocument(String id, String nombre) throws FileNotFoundException {
-        String padre = WebDAV.padre(id);
+        Acceso a = acceso();
+        String ruta = a.ruta(id);
+        String padre = WebDAV.padre(ruta);
         String nueva = WebDAV.dentro(padre, nombre);
-        if (nueva.equals(id)) {
-            return null;
-        }
-        try {
-            dav().mover(id, nueva);
-        } catch (IOException e) {
-            throw fallo(e);
-        }
-        cambioEn(padre);
-        return nueva;
+        if (nueva.equals(ruta)) { return null; }
+        try { a.dav.mover(ruta, nueva); } catch (IOException e) { throw fallo(e); }
+        cambioEn(a.id(padre));
+        return a.id(nueva);
     }
 
     @Override
     public void deleteDocument(String id) throws FileNotFoundException {
+        Acceso a = acceso();
+        String ruta = a.ruta(id);
         try {
-            dav().borrar(id);
+            a.dav.borrar(ruta);
         } catch (IOException e) {
             throw fallo(e);
         }
-        cambioEn(WebDAV.padre(id));
+        cambioEn(a.id(WebDAV.padre(ruta)));
     }
 }

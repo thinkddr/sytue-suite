@@ -1,9 +1,58 @@
 # El parche de URL entrantes, listo para enviar a Fyne
 
-`apps/fyne/go.mod` reemplaza Fyne por `github.com/thinkddr/fyne/v2 v2.8.1-sytue.16`
+`apps/fyne/go.mod` reemplaza Fyne por `github.com/thinkddr/fyne/v2 v2.8.2-sytue.1`
 (alojado en GitHub desde el 2026-09-27; antes en git.gay, con las mismas ramas y tags)
 (ADR «URL entrante» en `docs/decisions.md`). Un fork es deuda: esta carpeta tiene lo que
 hace falta para quitarlo, que es que el parche entre aguas arriba.
+
+## Actualización a Fyne 2.8.2 (2026-10-23)
+
+El fork integra la versión estable de upstream conservando las URL entrantes,
+los gestos móviles y los pintores opcionales de la suite. Incluye las correcciones
+del teclado y el ciclo de dibujo de iOS, los permisos de lectura del selector de
+Android y las coordenadas al soltar archivos en escritorio. La prueba del selector
+ejecuta el Java real y su callback JNI, con selección múltiple y proveedores que
+rechazan el permiso persistente.
+
+También se actualizan las bases reales de los reemplazos: typesetting
+`v0.3.5-sytue.1` conserva las medidas fraccionarias y declara el módulo canónico;
+GLFW `v0.1.0-sytue.4` incorpora la base `v0.1.0-pre.2` y mantiene los callbacks de
+texto, enlaces y arrastre de archivos. Sus tags anteriores siguen intactos. La
+suite descarga estos dos forks directamente; la visibilidad pública de un
+repositorio y `GOPRIVATE` son propiedades distintas.
+
+La referencia visual del submenú se actualiza por el ajuste a la altura del
+lienzo de upstream. La comparación de píxeles conserva las etiquetas de la raíz;
+no motivó ningún cambio adicional de layout ni de conformado de texto. Los
+contratos de gestos y renderizado mantienen sus comprobaciones y umbrales.
+
+## Gestos móviles y mantenimiento del fork (2026-10-23)
+
+El tag `v2.8.1-sytue.21` añade `mobile.TouchFilterCanvas`, una interfaz opcional que
+permite decidir un gesto antes de entregar el toque a las filas o a los editores.
+Reproduce los eventos rechazados con sus tiempos originales, conserva el multitáctil
+y cancela al cambiar la raíz, una capa, la geometría o el filtro. iOS entrega
+`touchesCancelled` y mantiene el identificador de cada dedo; Android distingue
+`ACTION_CANCEL` de una pulsación terminada. `fyne.Canvas` conserva su contrato.
+
+Incluye los cambios anteriores del pintor de imágenes, la sincronización de la
+caducidad de caché y los contratos opcionales de texto y rectángulos del pintor de
+software. [La comparación con `.16`](https://github.com/thinkddr/fyne/compare/v2.8.1-sytue.16...v2.8.1-sytue.21)
+contiene el cambio completo. La versión de rectángulos documentada como `.20` no
+se ha vuelto a etiquetar.
+
+La fuente `bf85664117f0a3acc2cf3388e07fd7dee32a3d38` pasó las cinco matrices del
+fork: carrera, análisis, plataformas, web y móvil. Su descarga se verificó en
+Scaleway mediante `proxy.golang.org` y `sum.golang.org`, sin excluir el módulo de la
+verificación pública. La suite fija el tag y las dos sumas junto a sus guardianes
+de empaquetado. Las pruebas del driver no acreditan la interacción física con los
+gestos reservados por cada sistema operativo.
+
+El código original conserva BSD-3-Clause. Las modificaciones actuales del fork
+se publican bajo Apache-2.0; el aviso de licencias del fork conserva la atribución
+de upstream. El parche histórico de URL de esta carpeta mantiene su licencia.
+
+## Parche histórico de URL entrantes
 
 - **`0001-receive-incoming-urls.patch`** — el parche, exportado del commit `2430cc176a`
   de la rama `sytue` del fork. 13 ficheros, **235 líneas añadidas y ninguna borrada**:
@@ -89,11 +138,12 @@ Pasos, cuando se abra:
 # El parche de texto soltado, en el fork de GLFW
 
 `apps/fyne/go.mod` reemplaza también `github.com/go-gl/glfw/v3.4/glfw` por
-`github.com/thinkddr/glfw/v3.4/glfw v0.1.0-sytue.3` (rama `sytue-3`, commit
+`github.com/thinkddr/glfw/v3.4/glfw`, con la versión indicada arriba. El tag
+`v0.1.0-sytue.3` (rama `sytue-3`, commit
 `a55430400fa2b9bdefa234806fe15dbd6b87d037`, encima de `2a407d02d01a`, que es justo el
-que requiere Fyne v2.8.1). Antes: `v0.1.0-sytue.2` (`3ac371eb6815`) sin el aviso de
-arrastre, y `v0.1.0-sytue.1` (`0806cc00ff97`), solo X11 y Wayland. El repositorio es
-privado y el CI lo lee con `.github/actions/toolchain/forks.sh`, como los otros dos.
+que requería Fyne v2.8.1) es su base histórica. Antes: `v0.1.0-sytue.2` (`3ac371eb6815`) sin el aviso de
+arrastre, y `v0.1.0-sytue.1` (`0806cc00ff97`), solo X11 y Wayland. El CI descarga el
+repositorio con `.github/actions/toolchain/forks.sh`, como los otros dos.
 
 **Por qué.** GLFW solo acepta FICHEROS soltados, y la web acepta también texto y enlaces
 (el cuaderno de Notepads crea con ellos una nota). En X11 y en Wayland el protocolo lo

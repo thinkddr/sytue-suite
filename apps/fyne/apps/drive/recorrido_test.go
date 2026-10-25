@@ -9,7 +9,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/ui/recorrido"
+	"git.sytue.eu/sytue/one/apps/fyne/ui/recorrido/montaje"
 )
 
 // TestRecorridoConSesion pulsa todo lo que se ve con los datos del servicio falso y
@@ -38,5 +40,6 @@ func TestRecorridoConSesion(t *testing.T) {
 	p := pantallaDePrueba(t, srv)
 	p.win.SetContent(p.Objeto())
 	p.Arrancar(true)
+	montaje.ComprobarRotacion(t, p.win, "drive", iconos.Drive, true)
 	recorrido.Comprobar(t, p.win, 400)
 }

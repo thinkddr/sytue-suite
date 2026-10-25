@@ -29,11 +29,13 @@ package http
 
 import (
 	"net/http"
+	"slices"
 	"strconv"
 	"time"
 
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/platform/pkg/logsafe"
+	"git.sytue.eu/sytue/one/services/id/internal/domain"
 )
 
 // frescuraStepUp es cuánto vale una identificación para las acciones
@@ -47,6 +49,64 @@ const frescuraStepUp = 5 * time.Minute
 // arregla identificándose otra vez, la otra pidiéndole el permiso a alguien—.
 var errStepUp = httpx.NewError(http.StatusUnauthorized, "insufficient_user_authentication",
 	"This action needs you to confirm your identity again.")
+
+// mfaParaAdministracion mantiene el segundo factor de owner/admin en la API de
+// administración, aunque el token se haya obtenido entrando en una app ordinaria.
+// Mi cuenta y el alta/onboarding siguen siendo accesibles para poder activar MFA.
+// Las acciones sensibles conservan además su comprobación de frescura propia.
+func (s *Server) mfaParaAdministracion(next http.Handler) http.Handler {
+	stepUp := s.requireStepUp(next)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !rutaDeAdministracion(r.URL.Path) {
+			next.ServeHTTP(w, r)
+			return
+		}
+		c, ok := claimsFrom(r.Context())
+		if !ok {
+			httpx.Fail(w, r, httpx.ErrUnauthorized)
+			return
+		}
+		if hasMFA(c.AMR) {
+			next.ServeHTTP(w, r)
+			return
+		}
+		roles := c.Roles
+		var org *domain.Organization
+		// El emisor puede omitir roles si su consulta falla, conservando los
+		// permisos delegados de otra consulta. No convertir esa omisión en una
+		// excepción a MFA para un owner/admin real. Solo este caso ambiguo lee
+		// los roles de nuevo; un miembro delegado conserva su acceso habitual.
+		if len(roles) == 0 && c.Tenant != "" {
+			found, err := s.store.GetOrgBySlug(r.Context(), c.Tenant)
+			if err != nil {
+				stepUp.ServeHTTP(w, r)
+				return
+			}
+			org = &found
+			roles, err = s.store.RolesForUserInOrg(r.Context(), org.ID, c.Subject)
+			if err != nil {
+				stepUp.ServeHTTP(w, r)
+				return
+			}
+		}
+		if !slices.ContainsFunc(roles, func(role string) bool { return domain.Role(role).RequiresMFA() }) {
+			next.ServeHTTP(w, r)
+			return
+		}
+		// La cuenta personal no administra una empresa. Mantiene la excepción
+		// que ya tenía /authorize para sus integraciones self-service.
+		if org == nil && c.Tenant != "" {
+			if found, err := s.store.GetOrgBySlug(r.Context(), c.Tenant); err == nil {
+				org = &found
+			}
+		}
+		if org != nil && org.Kind == domain.OrgKindPersonal {
+			next.ServeHTTP(w, r)
+			return
+		}
+		stepUp.ServeHTTP(w, r)
+	})
+}
 
 // requireStepUp exige segundo factor y una identificación reciente.
 //

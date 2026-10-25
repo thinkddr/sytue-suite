@@ -109,6 +109,7 @@ type Lateral struct {
 	AlNuevoDirecto   func()
 	AlNuevaCategoria func()
 	AlReintentar     func()
+	Refresco         ui.RefrescoLista
 	// AlSoltarCanal mueve un canal arrastrado a la sección donde se suelta
 	// (`dropChannelOnGroup`); nil, las filas no se arrastran.
 	AlSoltarCanal func(Canal, Seccion)
@@ -190,7 +191,9 @@ func (l *Lateral) Construir() *ui.Lateral {
 	// no empuja al pie, que es el `overflow-y-auto` de la web; lo decide quien monta
 	// el carril, como dice `ui.Lateral`.
 	c := container.NewVScroll(container.New(ui.Columna{}, cuerpo...))
-	lat := ui.NuevoLateral(l.T.T("ui.mainNav", nil), c)
+	refresco := l.Refresco
+	refresco.Arriba = func() bool { return c.Offset.Y <= 0.5 }
+	lat := ui.NuevoLateral(l.T.T("ui.mainNav", nil), ui.RefrescarAlTirar(c, &refresco))
 	lat.Cabecera = l.cabecera()
 	return lat
 }

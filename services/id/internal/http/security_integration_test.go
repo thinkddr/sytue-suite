@@ -41,11 +41,12 @@ const (
 )
 
 type liveServer struct {
-	srv *Server
-	st  *store.Store
-	iss *oidc.Issuer
-	ctx context.Context
-	mux http.Handler
+	dbOwnerDSN string // Solo migraciones de pruebas; el store sigue usando el rol sin BYPASSRLS.
+	srv        *Server
+	st         *store.Store
+	iss        *oidc.Issuer
+	ctx        context.Context
+	mux        http.Handler
 }
 
 func newLiveServer(t *testing.T) *liveServer {
@@ -91,7 +92,7 @@ func newLiveServer(t *testing.T) *liveServer {
 		SignupEnabled:   true,
 	}
 	srv := NewServer(cfg, slog.New(slog.NewTextHandler(io.Discard, nil)), st, km, iss)
-	return &liveServer{srv: srv, st: st, iss: iss, ctx: ctx, mux: srv.Router()}
+	return &liveServer{srv: srv, st: st, iss: iss, ctx: ctx, mux: srv.Router(), dbOwnerDSN: h.DSN}
 }
 
 // token emite un access token de quien ACABA de identificarse con segundo

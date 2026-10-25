@@ -33,12 +33,15 @@ class Herramientas:
         self.hojas = {}
         self.verificar = self.extraer = self.firmar = self.exportar = self.identidades = 0
         self.sin_hoja = False
+        self.firmas = 0
+        self.firmas_fallidas = set()
 
     def __call__(self, argv):
         self.comandos.append(argv)
         status, output = 0, ""
         if argv[:2] == ["codesign", "-f"]:
-            status = self.firmar
+            self.firmas += 1
+            status = self.firmar or int(self.firmas in self.firmas_fallidas)
         elif argv[:2] == ["codesign", "--verify"]:
             status = self.verificar
         elif argv[:2] == ["codesign", "-d"]:
@@ -116,6 +119,13 @@ class Sonda(unittest.TestCase):
                             for f in resultado["signatures"]))
         self.assertEqual(len(resultado["policies"]), 4)
         self.assertTrue(all(p["sha256"] == s.huella(DER) for p in resultado["policies"]))
+        self.assertEqual({p["policy"] for p in resultado["policies"]}, {"basic", "codeSign"})
+        politicas = [i for i, c in enumerate(herramientas.comandos) if c[:2] == ["security", "verify-cert"]]
+        firmas = [i for i, c in enumerate(herramientas.comandos) if c[:2] == ["codesign", "-f"]]
+        self.assertLess(max(firmas), min(politicas))
+        self.assertTrue(all("-L" in herramientas.comandos[i] for i in politicas))
+        extracciones = [c for c in herramientas.comandos if c[:2] == ["codesign", "-d"]]
+        self.assertTrue(all(len(c) == 4 and c[2].startswith("--extract-certificates=") for c in extracciones))
 
     def test_another_leaf_is_rejected_even_when_codesign_verifies(self):
         herramientas = Herramientas()
@@ -138,6 +148,22 @@ class Sonda(unittest.TestCase):
                 setattr(herramientas, opcion, 1)
                 resultado = s.sondear(LLAVERO, NOMBRE, herramientas)
                 self.assertFalse(resultado["production_ok"])
+
+    def test_cold_failure_is_not_hidden_by_later_valid_signatures(self):
+        herramientas = Herramientas()
+        herramientas.firmas_fallidas = {1}
+        resultado = s.sondear(LLAVERO, NOMBRE, herramientas)
+        self.assertFalse(resultado["production_ok"])
+        self.assertEqual([f["ok"] for f in resultado["signatures"]],
+                         [False, True, True, True, True])
+
+    def test_name_failure_is_not_hidden_by_valid_hash_selectors(self):
+        herramientas = Herramientas()
+        herramientas.firmas_fallidas = {1, 2, 3}
+        resultado = s.sondear(LLAVERO, NOMBRE, herramientas)
+        self.assertFalse(resultado["production_ok"])
+        self.assertEqual([f["ok"] for f in resultado["signatures"]],
+                         [False, False, False, True, True])
 
     def test_global_name_search_uses_exported_certificate_but_keychain_stays_local(self):
         herramientas = Herramientas()

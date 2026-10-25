@@ -12,6 +12,7 @@ import (
 	_ "image/gif"  // los cuatro formatos que Sytue ID acepta de avatar
 	_ "image/jpeg" // (validation.RasterImageDataURI)
 	_ "image/png"  //
+	"log/slog"
 	"slices"
 	"sync"
 	"time"
@@ -92,9 +93,10 @@ type cuentaBarra struct {
 	boton *botonAvatar
 	menu  *Menu
 
-	mu     sync.Mutex
-	estado sesion.Estado
-	ficha  api.Profile // el nombre y el correo, que el estado transversal no lleva
+	mu       sync.Mutex
+	cerrando bool // protege una sola retirada compartida y su resultado de UI
+	estado   sesion.Estado
+	ficha    api.Profile // el nombre y el correo, que el estado transversal no lleva
 	// foto es el avatar elegido en Sytue ID, ya decodificado, y versionFoto su
 	// `avatar_version`, que es el ETag de los bytes: con la misma no se vuelve a bajar.
 	// nil, las iniciales.
@@ -642,18 +644,18 @@ func (c *cuentaBarra) entrarOSalir(e sesion.Estado) fyne.CanvasObject {
 // que quede.
 func (c *cuentaBarra) salir(pendientes int) {
 	if pendientes == 0 {
-		c.s.Salir()
+		c.cerrarSesion()
 		return
 	}
 	lienzo := fyne.CurrentApp().Driver().CanvasForObject(c.boton)
 	if lienzo == nil {
-		c.s.Salir() // sin ventana no hay a quién avisar; la web tampoco pregunta
+		c.cerrarSesion() // sin ventana no hay a quién avisar; la web tampoco pregunta
 		return
 	}
 	var d *Dialogo
 	descartar := NuevoBoton(c.t.T("account.signOutPending.discard", nil), func() {
 		d.Cerrar()
-		c.s.Salir()
+		c.cerrarSesion()
 	}).Con(Peligro, TallaMD)
 	subir := NuevoBoton(c.t.T("account.signOutPending.upload", nil), func() {
 		d.Ocupado(true)
@@ -674,6 +676,48 @@ func (c *cuentaBarra) salir(pendientes int) {
 	d = NuevoDialogo(c.t.T("account.signOutPending.title", nil), cuerpo).
 		Con(DialogoSM, container.New(Fila{Hueco: HuecoPieDialogo}, cancelar, descartar, subir))
 	d.cancelar, d.confirmar = cancelar, subir // para Ocupado
+	d.RotuloCerrar = c.t.T("ui.close", nil)
+	cuerpo.A(AnchoCuerpoDialogo(d, lienzo.Size()))
+	d.Mostrar(lienzo)
+}
+
+// cerrarSesion conserva el aviso hasta que la persona lo cierre o reintente. No
+// muestra rutas ni errores del llavero: el motivo operativo queda en el registro.
+func (c *cuentaBarra) cerrarSesion() {
+	c.mu.Lock()
+	if c.cerrando {
+		c.mu.Unlock()
+		return
+	}
+	c.cerrando = true
+	c.mu.Unlock()
+	go func() {
+		err := c.s.SalirConError()
+		if err != nil {
+			slog.Warn("ui: cierre de sesión compartida incompleto", "error", err)
+		}
+		fyne.Do(func() {
+			defer func() { c.mu.Lock(); c.cerrando = false; c.mu.Unlock() }()
+			if err != nil {
+				c.mostrarFalloCierre()
+			}
+		})
+	}()
+}
+
+func (c *cuentaBarra) mostrarFalloCierre() {
+	lienzo := fyne.CurrentApp().Driver().CanvasForObject(c.boton)
+	if lienzo == nil {
+		return
+	}
+	var d *Dialogo
+	cerrar := NuevoBoton(c.t.T("ui.close", nil), func() { d.Cerrar() }).Con(Fantasma, TallaMD)
+	reintentar := NuevoBoton(c.t.T("action.retry", nil), func() { d.Cerrar(); c.cerrarSesion() }).Con(Primario, TallaMD)
+	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
+	escalon := tema.Escalon{Tam: tema.TextoSM.Tam, Linea: 1.625 * tema.TextoSM.Tam}
+	cuerpo := NuevoParrafo(c.t.T("account.signOutFailed", nil), escalon, Normal, "text", v)
+	d = NuevoDialogo(c.t.T("account.signOut", nil), cuerpo).
+		Con(DialogoSM, container.New(Fila{Hueco: HuecoPieDialogo}, cerrar, reintentar))
 	d.RotuloCerrar = c.t.T("ui.close", nil)
 	cuerpo.A(AnchoCuerpoDialogo(d, lienzo.Size()))
 	d.Mostrar(lienzo)

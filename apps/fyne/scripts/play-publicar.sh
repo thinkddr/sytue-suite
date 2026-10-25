@@ -14,7 +14,7 @@
 #   play-publicar.sh --interno --tag vX.Y.Z --estado sondear|completed [app...]
 #                                           consulta o completa internal sin subir otro AAB
 #   play-publicar.sh [--aab DIR] [app...]     ficha + imágenes + seguridad de los datos [+ AAB]
-#   play-publicar.sh --produccion --tag vX.Y.Z --estado draft|completed
+#   play-publicar.sh --produccion --tag vX.Y.Z --estado draft|completed [--borrador-anterior vA.B.C]
 #                                           internal → production de las quince apps
 #
 # Credenciales: PLAY_CREDENCIALES es la RUTA de la clave JSON de la cuenta de servicio
@@ -39,7 +39,7 @@ IDIOMA_BASE=es-ES
 # on draft app»); el dueño la lanza desde la consola.
 PLAY_ESTADO="${PLAY_ESTADO:-draft}"
 
-modo=publicar aab="" tag="" estado=""
+modo=publicar aab="" tag="" estado="" borrador_anterior="" version_anterior=""
 while [ $# -gt 0 ]; do
   case "$1" in
   --seco) modo=seco ;;
@@ -50,7 +50,10 @@ while [ $# -gt 0 ]; do
   --aab) aab="$2"; shift ;;
   --tag) tag="${2:?--tag necesita vX.Y.Z}"; shift ;;
   --estado) estado="${2:?--estado necesita un valor explícito}"; shift ;;
-  -*) echo "uso: $0 [--seco|--sondear|--huellas --tag vX.Y.Z|--interno --tag vX.Y.Z --estado sondear|completed|--produccion --tag vX.Y.Z --estado draft|completed] [--aab DIR] [app...]" >&2; exit 2 ;;
+  --borrador-anterior)
+    [ -z "$borrador_anterior" ] || { echo 'play-publicar: --borrador-anterior no se puede repetir' >&2; exit 2; }
+    borrador_anterior="${2:?--borrador-anterior necesita vX.Y.Z}"; shift ;;
+  -*) echo "uso: $0 [--seco|--sondear|--huellas --tag vX.Y.Z|--interno --tag vX.Y.Z --estado sondear|completed|--produccion --tag vX.Y.Z --estado draft|completed [--borrador-anterior vA.B.C]] [--aab DIR] [app...]" >&2; exit 2 ;;
   *) break ;;
   esac
   shift
@@ -60,6 +63,9 @@ apps=("$@")
 [ ${#apps[@]} -gt 0 ] || mapfile -t apps < <(cd "$AQUI/../cmd" && for d in */; do [ "$d" != demo/ ] && echo "${d%/}"; done)
 # El paquete es el ID de FyneApp.toml, el mismo que firma release-mobile.yml.
 paquete_de() { sed -n 's/^[[:space:]]*ID[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "$AQUI/../cmd/$1/FyneApp.toml" | head -1; }
+[ -z "$borrador_anterior" ] || [ "$modo" = produccion ] || {
+  echo 'play-publicar: --borrador-anterior sólo se admite con --produccion' >&2; exit 2;
+}
 
 # Producción no admite atajos ni una publicación parcial: solo la llamada manual del
 # workflow, con la frase de confirmación exacta, puede promover las quince apps. Los AAB
@@ -79,6 +85,13 @@ if [ "$modo" = produccion ]; then
   [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "play-publicar: producción requiere --tag vX.Y.Z" >&2; exit 2; }
   # La misma fórmula que firma el manifiesto Android; no elegimos «el último» de otra sesión.
   version_esperada="$(bash "$AQUI/empaquetar.sh" version-code "$tag")" || exit 2
+  if [ -n "$borrador_anterior" ]; then
+    [[ "$borrador_anterior" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo 'play-publicar: --borrador-anterior necesita vX.Y.Z' >&2; exit 2; }
+    version_anterior="$(bash "$AQUI/empaquetar.sh" version-code "$borrador_anterior")" || exit 2
+    [ "$version_anterior" -lt "$version_esperada" ] || {
+      echo 'play-publicar: el borrador anterior debe tener un versionCode menor al tag solicitado' >&2; exit 2;
+    }
+  fi
 elif [ "$modo" = huellas ] || [ "$modo" = interno ]; then
   [ -z "$aab" ] || { echo "play-publicar: --$modo no acepta --aab" >&2; exit 2; }
   if [ "$modo" = huellas ]; then
@@ -332,11 +345,58 @@ preparar_produccion() {
     return 1
   }
   api GET "$e/tracks/production" >"$TMP/$app-production.json" || return 1
-  jq -e --arg v "$version_esperada" '
-    .track == "production" and ((.releases // []) | length == 0 or
-      (length == 1 and .[0].status == "draft" and (.[0].versionCodes | map(tostring) | unique) == [$v]))
+  jq -e --arg v "$version_esperada" --arg anterior "$version_anterior" --arg estado "$estado" '
+    .track == "production" and (keys - ["track","releases"] | length == 0) and
+    ((has("releases") | not) or (.releases | type == "array")) and
+    ((.releases // []) | type == "array" and (length == 0 or (length == 1 and
+      (.[0] | type == "object" and
+        (keys - ["name","versionCodes","status","releaseNotes","inAppUpdatePriority"] | length == 0) and
+        ((.status == "draft" and
+          (.versionCodes == [$v] or ($anterior != "" and .versionCodes == [$anterior]))) or
+          (.status == "completed" and $estado == "completed" and .versionCodes == [$v])) and
+        ((has("name") | not) or (.name | type == "string")) and
+        ((has("releaseNotes") | not) or (.releaseNotes | type == "array")) and
+        all(.releaseNotes[]?; type == "object" and
+          (keys - ["language","text"] | length == 0) and
+          (.language | type == "string") and (.text | type == "string")) and
+        ((has("inAppUpdatePriority") | not) or
+          (.inAppUpdatePriority | type == "number" and floor == . and . >= 0 and . <= 5))
+      ))))
   ' "$TMP/$app-production.json" >/dev/null || {
-    echo "✗ $app ($paquete): production ya contiene otra release o una publicación; no se sobrescribe" >&2
+    jq -c --arg a "$app" '{app:$a, production:[(.releases // [])[] | {versionCodes,status}]}' \
+      "$TMP/$app-production.json" >&2
+    echo "✗ $app ($paquete): production no coincide con el borrador autorizado ni con el tag ya enviado; no se sobrescribe" >&2
+    return 1
+  }
+  # El estado de tracks no distingue una revisión de un borrador. La consulta
+  # pública de ciclo de vida debe corroborar el mismo artefacto antes de escribir.
+  api GET "$API/$paquete/tracks/production/releases" >"$TMP/$app-lifecycle.json" || return 1
+  jq -e --slurpfile track "$TMP/$app-production.json" '
+    (.releases // []) as $summaries | ($track[0].releases // []) as $planned |
+    type == "object" and (keys - ["releases"] | length == 0) and
+    ((has("releases") | not) or (.releases | type == "array")) and
+    ($summaries | type == "array") and
+    (if ($planned | length) == 0 then ($summaries | length) == 0 else
+      ($summaries | length) == 1 and ($summaries[0] |
+        (keys - ["releaseName","track","activeArtifacts","releaseLifecycleState"] | length == 0) and
+        ((has("releaseName") | not) or (.releaseName | type == "string")) and
+        .track == "production" and
+        (if $planned[0].status == "draft" then
+          .releaseLifecycleState == "RELEASE_LIFECYCLE_STATE_DRAFT"
+        else
+          (.releaseLifecycleState == "RELEASE_LIFECYCLE_STATE_IN_REVIEW" or
+            .releaseLifecycleState == "RELEASE_LIFECYCLE_STATE_APPROVED_NOT_PUBLISHED" or
+            .releaseLifecycleState == "RELEASE_LIFECYCLE_STATE_PUBLISHED")
+        end) and
+        (.activeArtifacts | type == "array" and length == 1) and
+        all(.activeArtifacts[]; (keys - ["versionCode"] | length == 0) and
+          (.versionCode | type == "number" and floor == .)) and
+        ([.activeArtifacts[].versionCode | tostring] == $planned[0].versionCodes))
+    end)
+  ' "$TMP/$app-lifecycle.json" >/dev/null || {
+    jq -c --arg a "$app" '{app:$a, releases:[(.releases // [])[] | {track,activeArtifacts:[.activeArtifacts[]? | {versionCode}],releaseLifecycleState}]}' \
+      "$TMP/$app-lifecycle.json" >&2 || true
+    echo "✗ $app ($paquete): ciclo de publicación ausente, distinto o no editable; no se modifica production" >&2
     return 1
   }
   echo "· $app ($paquete): comprobados internal $version_esperada y production"
@@ -350,14 +410,21 @@ produccion() {
   [ "$estado" != draft ] || consulta="$consulta&changesNotSentForReview=true"
   for i in "${!apps[@]}"; do
     app="${apps[$i]}" e="${ediciones[$i]}"
-    if [ "$estado" = draft ] && jq -e '(.releases // []) | length == 1' "$TMP/$app-production.json" >/dev/null; then
+    if jq -e --arg v "$version_esperada" '(.releases // []) | length == 1 and
+      .[0].status == "completed" and .[0].versionCodes == [$v]' "$TMP/$app-production.json" >/dev/null; then
+      echo "✓ $app: production $tag ($version_esperada) ya enviada; ciclo $(jq -r '.releases[0].releaseLifecycleState' "$TMP/$app-lifecycle.json"); sin cambios"
+      continue
+    fi
+    if [ "$estado" = draft ] && jq -e --arg v "$version_esperada" '(.releases // []) | length == 1 and .[0].versionCodes == [$v]' "$TMP/$app-production.json" >/dev/null; then
       echo "✓ $app: borrador production $tag ($version_esperada) ya preparado; sin envío a revisión"
       continue
     fi
-    # Al completar el mismo borrador, conserva nombre, notas y targeting ya revisados.
+    # Sólo cambia la versión del borrador anterior expresamente autorizado. Al
+    # completar el mismo tag conserva su nombre; nunca toca los países de la pista.
     jq --arg v "$version_esperada" --arg t "$tag" --arg s "$estado" '
       .releases = (if (.releases // [] | length) == 0 then [{name:$t, versionCodes:[$v], status:$s}]
-        else [.releases[0] | .status = $s] end)
+        else [.releases[0] | if .versionCodes == [$v] then .status = $s
+          else .name = $t | .versionCodes = [$v] | .status = $s end] end)
     ' "$TMP/$app-production.json" | json PUT "$e/tracks/production" --data @- >/dev/null || return 1
     if ! json POST "$e:commit?$consulta" --data '{}' >/dev/null; then
       if [ "$estado" = draft ] && grep -q 'changesNotSentForReview must not be set' "$TMP/r"; then

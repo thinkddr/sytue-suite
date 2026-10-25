@@ -502,6 +502,7 @@ func mostrar(c fyne.Canvas, cp *capa) fyne.Focusable {
 	previo := c.Focused()
 	asegurarTeclas(c)
 	c.Overlays().Add(cp)
+	sincronizarExclusionMenuMovil(c)
 	// El driver móvil descuenta el notch, el indicador de inicio y, en iOS, el
 	// teclado de InteractiveArea. Al abrir no hay necesariamente otro resize:
 	// usar Size aquí volvía a poner la capa bajo esas zonas hasta girar la pantalla.
@@ -526,6 +527,7 @@ func ocultar(c fyne.Canvas, cp *capa, previo fyne.Focusable) {
 	}
 	c.Overlays().Remove(cp)
 	enfocar(c, previo)
+	sincronizarExclusionMenuMovil(c)
 	if p := pilaDe(c); p != nil {
 		p.refrescar() // los avisos vuelven a la pila, o a la capa de debajo
 	}

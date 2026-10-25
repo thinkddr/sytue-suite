@@ -145,6 +145,11 @@ export const sv: AppCatalog<typeof en> = {
     'För att föra över allt direkt till Google Workspace eller Microsoft 365 utan att ladda ner något: har du ett personligt konto eller administrerar du din organisation kan du starta det själv i Sytue Admin, under Migreringar. Annars kan du be den som administrerar den.',
   'data.move.action': 'Gå till Migreringar',
 
+  'devices.native.body': 'Använd enhetens filhanterare eller anslut ett konto med samtycke.',
+  'devices.native.driveBody':
+    'Sytue Drive läggs till automatiskt när du loggar in. Tillåt platsen om systemet frågar.',
+  'devices.native.openDrive': 'Öppna i filhanteraren',
+  'devices.native.failed': 'Det gick inte att uppdatera enhetens integration.',
   'devices.title': 'Anslut dina enheter',
   'devices.lead':
     'Ta med e-post, kalender, kontakter och filer från Sytue till telefonen eller datorn. Vi guidar dig steg för steg.',

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (c) 2026 Daniel Delgado Ramos
-"""Compila WidgetKit con el SDK real y prepara su firma anidada al empaquetar.
+"""Compila las extensiones Apple con el SDK real y prepara su firma anidada.
 
 El catálogo y sus validaciones son los del generador de Xcode, no otra tabla.
 Sin --insertar no firma. Nunca publica ni modifica capacidades o perfiles.
@@ -45,8 +45,8 @@ def plist_del_host(app, plataforma):
         return plistlib.load(archivo)
 
 
-def insertar(productos, host, destino, identidad, app, generador):
-    """Firma sólo el contenido anidado. El empaquetador firma el host al final."""
+def insertar(productos, host, destino, identidad, app, generador, incluir_widgets=True):
+    """Firma sólo el contenido anidado. File Provider no depende de WidgetKit."""
     plataforma = "ios" if destino == "ios" else "macos"
     info = plist_del_host(host, plataforma)
     if info.get("CFBundleIdentifier") != app["id"]:
@@ -55,38 +55,54 @@ def insertar(productos, host, destino, identidad, app, generador):
         raise ValueError("el host iOS debe estar dentro del Payload real del IPA")
     raiz = host if plataforma == "ios" else host / "Contents"
     ejecutable = raiz / ("" if plataforma == "ios" else "MacOS") / info["CFBundleExecutable"]
-    enlace = capturar(["xcrun", "otool", "-L", ejecutable])
-    puente_cargado = (r"^\s*@rpath/" + re.escape(generador.PUENTE_WIDGETS)
-                      + r"\.framework/(?:Versions/A/)?" + re.escape(generador.PUENTE_WIDGETS) + r" \(")
-    if not re.search(puente_cargado, enlace, re.M):
-        raise ValueError("el host no carga el puente WidgetKit; no se incorpora un widget sin actualización")
-    rpath = "@executable_path/Frameworks" if plataforma == "ios" else "@executable_path/../Frameworks"
-    if not re.search(r"^\s*path " + re.escape(rpath) + r" \(offset \d+\)$",
-                     capturar(["xcrun", "otool", "-l", ejecutable]), re.M):
-        raise ValueError("el host no puede resolver su framework WidgetKit")
-    identificador = app["id"] + ".widgets"
-    perfil = pathlib.Path(capturar(["bash", AQUI / "apple-firma.sh", "perfil-ruta", identificador, destino]).strip())
-    derechos = PROYECTOS / app["clave"] / "widgets" / ("ios.entitlements" if plataforma == "ios" else "macos.entitlements")
-    ejecutar(["bash", AQUI / "apple-firma.sh", "verificar-perfil-grupo", perfil,
-              identificador, destino, generador.grupo_widgets(),
-              "NSFileProtectionComplete" if plataforma == "ios" else "", "", derechos])
+    if incluir_widgets:
+        enlace = capturar(["xcrun", "otool", "-L", ejecutable])
+        puente_cargado = (r"^\s*@rpath/" + re.escape(generador.PUENTE_WIDGETS)
+                          + r"\.framework/(?:Versions/A/)?" + re.escape(generador.PUENTE_WIDGETS) + r" \(")
+        if not re.search(puente_cargado, enlace, re.M):
+            raise ValueError("el host no carga el puente WidgetKit; no se incorpora un widget sin actualización")
+        rpath = "@executable_path/Frameworks" if plataforma == "ios" else "@executable_path/../Frameworks"
+        if not re.search(r"^\s*path " + re.escape(rpath) + r" \(offset \d+\)$",
+                         capturar(["xcrun", "otool", "-l", ejecutable]), re.M):
+            raise ValueError("el host no puede resolver su framework WidgetKit")
     extensiones, frameworks = raiz / "PlugIns", raiz / "Frameworks"
     for carpeta in (extensiones, frameworks):
         if carpeta.is_symlink() or not carpeta.resolve().is_relative_to(host.resolve()):
             raise ValueError("el contenido anidado debe quedar dentro del host")
         carpeta.mkdir(parents=True, exist_ok=True)
-    nombre = "Sytue-" + app["clave"] + "-Widgets.appex"
-    widget = extensiones / nombre
-    puente = frameworks / (generador.PUENTE_WIDGETS + ".framework")
-    for origen, destino_bundle in ((productos / nombre, widget), (productos / puente.name, puente)):
-        if destino_bundle.is_symlink():
+    planes = []
+    if incluir_widgets:
+        planes.append(("Sytue-" + app["clave"] + "-Widgets.appex", app["id"] + ".widgets", "widgets",
+                       generador.grupo_widgets(), "NSFileProtectionComplete" if plataforma == "ios" else "", ""))
+    if app.get("archivos"):
+        planes.append(("Archivos.appex", app["id"] + ".archivos", "archivos", "group." + app["id"],
+                       "NSFileProtectionComplete" if plataforma == "ios" else "", generador.EQUIPO + "." + app["id"] + ".shared"))
+    if not planes:
+        raise ValueError("la app no declara ninguna extensión seleccionada")
+    anidadas = []
+    for nombre, identificador, carpeta, grupo, proteccion, llavero in planes:
+        perfil = pathlib.Path(capturar(["bash", AQUI / "apple-firma.sh", "perfil-ruta", identificador, destino]).strip())
+        derechos = PROYECTOS / app["clave"] / carpeta / ("ios.entitlements" if plataforma == "ios" else "macos.entitlements")
+        ejecutar(["bash", AQUI / "apple-firma.sh", "verificar-perfil-grupo", perfil,
+                  identificador, destino, grupo, proteccion, llavero, derechos])
+        bundle = extensiones / nombre
+        if bundle.is_symlink():
             raise ValueError("no se sustituye contenido anidado enlazado fuera del bundle")
-        if destino_bundle.exists():
-            shutil.rmtree(destino_bundle)
-        shutil.copytree(origen, destino_bundle, symlinks=True)
-    perfil_destino = widget / ("embedded.mobileprovision" if plataforma == "ios" else "Contents/embedded.provisionprofile")
-    shutil.copyfile(perfil, perfil_destino)
-    os.chmod(perfil_destino, 0o600)
+        if bundle.exists():
+            shutil.rmtree(bundle)
+        shutil.copytree(productos / nombre, bundle, symlinks=True)
+        perfil_destino = bundle / ("embedded.mobileprovision" if plataforma == "ios" else "Contents/embedded.provisionprofile")
+        shutil.copyfile(perfil, perfil_destino)
+        os.chmod(perfil_destino, 0o600)
+        anidadas.append((bundle, derechos))
+    puente = None
+    if incluir_widgets:
+        puente = frameworks / (generador.PUENTE_WIDGETS + ".framework")
+        if puente.is_symlink():
+            raise ValueError("no se sustituye contenido anidado enlazado fuera del bundle")
+        if puente.exists():
+            shutil.rmtree(puente)
+        shutil.copytree(productos / puente.name, puente, symlinks=True)
     bibliotecas = ["xcrun", "swift-stdlib-tool", "--copy", "--platform", "iphoneos" if plataforma == "ios" else "macosx",
                    "--scan-executable", ejecutable, "--scan-folder", extensiones,
                    "--scan-folder", frameworks, "--destination", frameworks, "--sign", identidad]
@@ -98,11 +114,13 @@ def insertar(productos, host, destino, identidad, app, generador):
     firma = ["codesign", "-f", "-s", identidad]
     if plataforma == "macos":
         firma += ["--options", "runtime", "--timestamp"]
-    ejecutar(firma + [puente])
-    ejecutar(firma + ["--entitlements", derechos, widget])
-    for bundle in (puente, widget):
+    if puente:
+        ejecutar(firma + [puente])
+    for bundle, derechos in anidadas:
+        ejecutar(firma + ["--entitlements", derechos, bundle])
+    for bundle in ([puente] if puente else []) + [b for b, _ in anidadas]:
         ejecutar(["codesign", "--verify", "--strict", bundle])
-    print(json.dumps({"host": app["id"], "widget": identificador, "distribution": destino,
+    print(json.dumps({"host": app["id"], "extensions": [p[1] for p in planes], "distribution": destino,
                       "profileVerified": True, "nestedSignaturesVerified": True}))
 
 
@@ -115,11 +133,15 @@ def minimo_apple(plataforma):
     return tuple(int(n) for n in valores[0].split("."))
 
 
-def verificar(productos, plataforma, apps, puente, version=None, build=None):
+def verificar(productos, plataforma, apps, puente, version=None, build=None, incluir_widgets=True):
     """Comprueba los productos reales, no sólo los ajustes declarados de Xcode."""
-    for nombre, identificador, extension in [
-        ("Sytue-" + a["clave"] + "-Widgets.appex", a["id"] + ".widgets", True) for a in apps
-    ] + [(puente + ".framework", "eu.sytue.widgetbridge", False)]:
+    productos_esperados = [("Archivos.appex", a["id"] + ".archivos", "com.apple.fileprovider-nonui")
+                           for a in apps if a.get("archivos")]
+    if incluir_widgets:
+        productos_esperados += [("Sytue-" + a["clave"] + "-Widgets.appex", a["id"] + ".widgets", "com.apple.widgetkit-extension") for a in apps]
+        productos_esperados += [(puente + ".framework", "eu.sytue.widgetbridge", "")]
+    for nombre, identificador, punto in productos_esperados:
+        extension = bool(punto)
         bundle = productos / nombre
         info = bundle / ("Contents/Info.plist" if plataforma == "macos" and extension else "Info.plist")
         # macOS frameworks use the versioned standard bundle layout.
@@ -134,8 +156,8 @@ def verificar(productos, plataforma, apps, puente, version=None, build=None):
         if build and str(metadata.get("CFBundleVersion")) != build:
             raise ValueError(nombre + ": build distinto al del host")
         ejecutable = bundle / ("Contents/MacOS" if plataforma == "macos" and extension else "") / metadata["CFBundleExecutable"]
-        if extension and metadata.get("NSExtension", {}).get("NSExtensionPointIdentifier") != "com.apple.widgetkit-extension":
-            raise ValueError(nombre + ": no es una extensión WidgetKit")
+        if extension and metadata.get("NSExtension", {}).get("NSExtensionPointIdentifier") != punto:
+            raise ValueError(nombre + ": tipo de extensión incorrecto")
         cabecera = capturar(["xcrun", "otool", "-hv", ejecutable])
         lineas = cabecera.splitlines()
         tipos = []
@@ -152,7 +174,7 @@ def verificar(productos, plataforma, apps, puente, version=None, build=None):
         if set(arquitecturas) != esperadas:
             raise ValueError(nombre + ": arquitecturas incorrectas " + " ".join(arquitecturas))
         compilacion = capturar(["xcrun", "vtool", "-show-build", ejecutable])
-        esperado = minimo_apple(plataforma)
+        esperado = (16, 0) if plataforma == "ios" and punto == "com.apple.fileprovider-nonui" else minimo_apple(plataforma)
         # LC_VERSION_MIN_* uses 'version'; TOOL entries also have a version,
         # so read only the deployment command blocks below.
         bloques = re.split(r"(?=^Load command \d+)", compilacion, flags=re.M)
@@ -177,6 +199,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--salida", required=True, type=pathlib.Path)
     parser.add_argument("--plataforma", required=True, choices=("ios", "macos"))
+    parser.add_argument("--sin-widgets", action="store_true", help="sólo File Provider; independiente del interruptor WidgetKit")
     parser.add_argument("--version")
     parser.add_argument("--build")
     parser.add_argument("--insertar", type=pathlib.Path, help="incorporar y firmar el widget antes de la firma del host")
@@ -185,7 +208,7 @@ def main():
     parser.add_argument("apps", nargs="*")
     opciones = parser.parse_args()
     fuente = generador()
-    catalogo = {a["clave"]: a for a in fuente.apps() if a["widget_acciones"]}
+    catalogo = {a["clave"]: a for a in fuente.apps() if a.get("archivos") or (not opciones.sin_widgets and a["widget_acciones"])}
     nombres = opciones.apps or list(catalogo)
     if len(set(nombres)) != len(nombres) or any(a not in catalogo for a in nombres):
         parser.error("las apps deben pertenecer al catálogo WidgetKit y no repetirse")
@@ -193,7 +216,7 @@ def main():
     if opciones.insertar:
         # Compilar se puede siempre (el CI lo hace); meterlo en un host firmado, solo con
         # el interruptor SYTUE_WIDGETS_APPLE encendido (Sytue.xcconfig).
-        if not fuente.widgets_apple():
+        if not opciones.sin_widgets and not fuente.widgets_apple():
             parser.error("SYTUE_WIDGETS_APPLE está apagado: ningún host lleva WidgetKit")
         if len(apps) != 1 or not opciones.destino or not opciones.identidad:
             parser.error("insertar requiere una app, --destino y --identidad")
@@ -215,9 +238,14 @@ def main():
     objetos = opciones.salida.resolve() / opciones.plataforma / "objetos"
     argumentos = ["xcodebuild", "-project", PROYECTOS / fuente.PROYECTO,
                   "-configuration", "Release", "-sdk", "iphoneos" if opciones.plataforma == "ios" else "macosx",
-                  "-jobs", "2", "-target", fuente.PUENTE_WIDGETS]
+                  "-jobs", "2"]
+    if not opciones.sin_widgets:
+        argumentos += ["-target", fuente.PUENTE_WIDGETS]
     for app in apps:
-        argumentos += ["-target", app["clave"] + "-widgets"]
+        if not opciones.sin_widgets:
+            argumentos += ["-target", app["clave"] + "-widgets"]
+        if app.get("archivos"):
+            argumentos += ["-target", app["clave"] + "-archivos"]
     argumentos += ["build", "SYMROOT=" + str(productos.parent), "OBJROOT=" + str(objetos),
                    "CONFIGURATION_BUILD_DIR=" + str(productos), "ARCHS=" + ("arm64" if opciones.plataforma == "ios" else "arm64 x86_64"),
                    "ONLY_ACTIVE_ARCH=NO", "CODE_SIGN_STYLE=Manual", "CODE_SIGNING_ALLOWED=NO",
@@ -227,9 +255,9 @@ def main():
     if opciones.build:
         argumentos += ["CURRENT_PROJECT_VERSION=" + opciones.build]
     ejecutar(argumentos)
-    verificar(productos, opciones.plataforma, apps, fuente.PUENTE_WIDGETS, opciones.version, opciones.build)
+    verificar(productos, opciones.plataforma, apps, fuente.PUENTE_WIDGETS, opciones.version, opciones.build, not opciones.sin_widgets)
     if opciones.insertar:
-        insertar(productos, opciones.insertar.resolve(), opciones.destino, opciones.identidad, apps[0], fuente)
+        insertar(productos, opciones.insertar.resolve(), opciones.destino, opciones.identidad, apps[0], fuente, not opciones.sin_widgets)
 
 
 if __name__ == "__main__":

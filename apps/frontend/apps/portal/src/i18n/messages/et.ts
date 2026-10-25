@@ -147,6 +147,11 @@ export const et: AppCatalog<typeof en> = {
     'Kui soovite kõik otse teenusesse Google Workspace või Microsoft 365 viia ilma midagi alla laadimata: kui teil on isiklik konto või haldate oma organisatsiooni, käivitage see ise teenuse Sytue Admin jaotises „Migratsioonid“; muul juhul paluge seda organisatsiooni haldajalt.',
   'data.move.action': 'Ava „Migratsioonid“',
 
+  'devices.native.body': 'Kasuta seadme failihaldurit või ühenda konto selle omaniku nõusolekul.',
+  'devices.native.driveBody':
+    'Sytue Drive lisatakse pärast sisselogimist automaatselt. Luba selle asukoht, kui süsteem seda küsib.',
+  'devices.native.openDrive': 'Ava failihalduris',
+  'devices.native.failed': 'Seadme integratsiooni ei saanud uuendada.',
   'devices.title': 'Ühendage oma seadmed',
   'devices.lead':
     'Võtke Sytue e-post, kalender, kontaktid ja failid kaasa oma telefoni või arvutisse. Juhendame teid samm-sammult.',

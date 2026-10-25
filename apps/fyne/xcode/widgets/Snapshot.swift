@@ -6,6 +6,21 @@ import Foundation
 // Only declared, local actions are allowed. Neither a snapshot nor its counters
 // can supply a URL, a query, an account or a destination outside the host app.
 enum SytueWidgetActions {
+    static let order = ["open", "compose", "create", "search"]
+
+    static func label(for action: String) -> String {
+        action == "search" ? "search.label" : "widgets." + action
+    }
+
+    static func symbol(for action: String) -> String {
+        switch action {
+        case "search": return "magnifyingglass"
+        case "compose": return "square.and.pencil"
+        case "create": return "calendar.badge.plus"
+        default: return "arrow.up.right"
+        }
+    }
+
     static func routes(product: String, scheme: String, declared: [String]) -> [String: URL] {
         guard !product.isEmpty, scheme == "sytue-" + product else { return [:] }
         var routes = [String: URL]()
@@ -26,6 +41,15 @@ enum SytueWidgetActions {
 struct SytueWidgetCounter: Decodable {
     let kind: String
     let value: Int64
+
+    var localizationKey: String {
+        switch kind {
+        case "files", "events", "documents", "contacts": return "dataflow.item." + kind
+        case "unread": return "notifications.unread"
+        case "storage_percent": return "widgets.storage"
+        default: return "widgets." + kind
+        }
+    }
 }
 
 struct SytueWidgetSnapshot: Decodable {
@@ -40,6 +64,7 @@ struct SytueWidgetSnapshot: Decodable {
     static let kinds: Set<String> = [
         "unread", "files", "events", "documents", "contacts", "notes", "rows",
         "pending", "channels", "photos", "episodes", "apps", "calendars", "address_books",
+        "storage_percent",
     ]
 
     func isVisible(product expectedProduct: String, generation expectedGeneration: String, now: Int64) -> Bool {
@@ -52,9 +77,18 @@ struct SytueWidgetSnapshot: Decodable {
         for counter in counters {
             guard Self.kinds.contains(counter.kind), counter.value >= 0,
                   counter.value <= 1_000_000_000_000,
+                  (counter.kind != "storage_percent" || counter.value <= 100),
                   seen.insert(counter.kind).inserted else { return false }
         }
         return true
+    }
+}
+
+enum SytueWidgetTimeline {
+    static func expiry(snapshot: SytueWidgetSnapshot?, now: Date) -> Date? {
+        guard let snapshot else { return nil }
+        let date = Date(timeIntervalSince1970: TimeInterval(snapshot.expires_at))
+        return date > now ? date : nil
     }
 }
 

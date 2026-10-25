@@ -6,6 +6,7 @@ package eu.sytue.nativo;
 import android.app.ActivityOptions;
 import android.app.PendingIntent;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.Binder;
 import android.os.Build;
@@ -26,6 +27,7 @@ import org.json.JSONObject;
 public final class SesionCompartida {
     private static final Binder PROCESO = new Binder();
     private static final Map<String, String> REVISIONES = new HashMap<>();
+    private static long ultimaDrive = -1;
 
     private SesionCompartida() {}
 
@@ -111,9 +113,10 @@ public final class SesionCompartida {
         try {
             Bundle estado = llamar(ctx, "estado", null, new Bundle());
             return new JSONObject().put("generacion", estado.getString("generacion", ""))
-                    .put("bloqueo", estado.getBoolean("bloqueo", true)).toString();
+                    .put("bloqueo", estado.getBoolean("bloqueo", true))
+                    .put(DrivePreferencia.CLAVE, preferenciaDrive(ctx, estado)).toString();
         } catch (Exception fallo) {
-            return "{\"generacion\":\"\",\"bloqueo\":true}";
+            return "{\"generacion\":\"\",\"bloqueo\":true,\"drive_sistema_desactivado\":true}";
         }
     }
 
@@ -164,6 +167,40 @@ public final class SesionCompartida {
         Bundle salida = llamar(ctx, "leer", nombre, cuenta(emisor, cliente));
         REVISIONES.put(nombre, salida.getString("revision"));
         return salida.getString("datos", "");
+    }
+
+    private static synchronized boolean preferenciaDrive(Context ctx, Bundle respuesta) {
+        SharedPreferences cache = ctx.getSharedPreferences("sytue-drive-sistema", Context.MODE_PRIVATE);
+        boolean presente = respuesta.containsKey(DrivePreferencia.CLAVE);
+        Object valor = presente ? respuesta.get(DrivePreferencia.CLAVE) : null;
+        long ahora = SystemClock.elapsedRealtime();
+        boolean conocida = cache.contains("desactivado"), anterior = cache.getBoolean("desactivado", false);
+        boolean desactivado = DrivePreferencia.respuesta(presente, valor, conocida, anterior,
+                ahora - (ultimaDrive >= 0 ? ultimaDrive : cache.getLong("instante", 0)));
+        if (presente) {
+            if ((!conocida || anterior != desactivado) && !cache.edit().putBoolean("desactivado", desactivado)
+                    .putLong("instante", ahora).commit()) {
+                throw new SecurityException("Cannot record the shared Drive preference");
+            }
+            ultimaDrive = ahora;
+        }
+        return desactivado;
+    }
+
+    /** Provider access uses the same authenticated read, with the latest shared opt-out. */
+    public static synchronized String cargarDrive(Context ctx, String nombre, String emisor, String cliente) throws IOException {
+        Bundle salida = llamar(ctx, "leer", nombre, cuenta(emisor, cliente));
+        return DrivePreferencia.datosParaDrive(preferenciaDrive(ctx, salida), salida.getString("datos", ""));
+    }
+
+    public static void drive(Context ctx, boolean habilitado) throws IOException {
+        Bundle entrada = new Bundle();
+        entrada.putBoolean(DrivePreferencia.CLAVE, !habilitado);
+        Bundle salida = llamar(ctx, "drive", null, entrada);
+        if (!salida.containsKey(DrivePreferencia.CLAVE)
+                || preferenciaDrive(ctx, salida) != !habilitado) {
+            throw new SecurityException("The session broker did not apply the Drive preference");
+        }
     }
 
     public static synchronized void migrar(Context ctx, String nombre, String emisor, String cliente, boolean historica) throws IOException {

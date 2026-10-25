@@ -14,6 +14,13 @@
  * WebDAV base:  /dav
  */
 import { HttpClient, HttpError, type AuthProvider } from '../core/http.js';
+export {
+  driveQuotaFromResponse,
+  hasCompleteExternalCapacity,
+  type DriveQuota,
+  type DriveQuotaResponse,
+  type ExternalStorageCapacity,
+} from './quota.js';
 
 export interface DriveOptions {
   /** URL base, p.ej. https://drive.sytue.eu */

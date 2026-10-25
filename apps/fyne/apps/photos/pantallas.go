@@ -537,6 +537,7 @@ type Albumes struct {
 	// Montones son las sugerencias de Sytue AI; nil es «todavía no se han pedido».
 	Montones [][]api.Photo
 	Buscando bool
+	Creando  bool
 	Error    string
 
 	// ExcluidaLoteIA y PuedeGestionarLoteIA reflejan el ajuste de organización en
@@ -561,14 +562,13 @@ func PantallaAlbumes(v Vista, d Albumes) *fyne.Container {
 	if campo == nil {
 		campo = ui.NuevaEntrada(v.Traduce("albums.title"))
 	}
-	crear := container.New(filaConCampoElastico{Hueco: tema.Espacio(2), MaxCampo: tema.Espacio(64)},
-		campo,
-		ui.NuevoBoton(v.Traduce("albums.create"), func() {
-			if d.AlCrear != nil {
-				d.AlCrear(campo.Texto())
-			}
-		}).Con(ui.Primario, ui.TallaMD).ConIcono(iconos.Mas, 0),
-	)
+	alta := ui.NuevoBoton(v.Traduce("albums.create"), func() {
+		if d.AlCrear != nil {
+			d.AlCrear(campo.Texto())
+		}
+	}).Con(ui.Primario, ui.TallaMD).ConIcono(iconos.Mas, 0)
+	alta.Cargando, alta.Inerte = d.Creando, d.Creando
+	crear := container.New(filaConCampoElastico{Hueco: tema.Espacio(2), MaxCampo: tema.Espacio(64)}, campo, alta)
 	claveBoton := "albums.suggestionsFind"
 	if d.Buscando {
 		claveBoton = "albums.suggestionsLoading"

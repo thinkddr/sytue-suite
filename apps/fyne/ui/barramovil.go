@@ -42,13 +42,21 @@ type BarraMovil struct {
 	RotuloAbrir, RotuloCerrar, RotuloVolver string
 	AlMenu, AlVolver                        func()
 
-	boton *BotonIcono // el de menú o volver: adonde vuelve el foco al cerrar el cajón
+	boton      *BotonIcono // el de menú o volver: adonde vuelve el foco al cerrar el cajón
+	enCarril   bool
+	anchoMarco float32
+	// listaVisible conserva EnDetalle y su callback al girar, pero ofrece el menú
+	// cuando lista y detalle ya se ven juntos.
+	listaVisible bool
 }
 
 var _ fyne.Widget = (*BarraMovil)(nil)
 
 // AltoBarraMovil es el `h-11`: 38,5 con el rem de 14.
 var AltoBarraMovil = tema.Espacio(11)
+
+// AnchoCarrilMovil reserva el mando de navegación junto a la cabecera de la app.
+var AnchoCarrilMovil = tema.Espacio(12)
 
 var (
 	canalonBarraMovil = tema.Espacio(4)   // px-4
@@ -78,6 +86,7 @@ func (b *BarraMovil) CreateRenderer() fyne.WidgetRenderer {
 		filete: canvas.NewRectangle(tema.Color("border", v)),
 		boton:  boton,
 		titulo: Texto("", tema.TextoSM, SemiNegrita, tema.Color("text", v)),
+		marco:  nuevoFondoMarco(),
 	}
 	r.Refresh()
 	return r
@@ -88,11 +97,12 @@ type barraMovilRenderer struct {
 	fondo, filete *canvas.Rectangle
 	boton         *BotonIcono
 	titulo        *canvas.Text
+	marco         *fondoMarco
 }
 
 func (r *barraMovilRenderer) MinSize() fyne.Size { return MedidaBarraMovil() }
 func (r *barraMovilRenderer) Objects() []fyne.CanvasObject {
-	return []fyne.CanvasObject{r.fondo, r.filete, r.boton, r.titulo}
+	return append(r.marco.objetos(), r.fondo, r.filete, r.boton, r.titulo)
 }
 func (r *barraMovilRenderer) Destroy() {}
 
@@ -101,10 +111,18 @@ func (r *barraMovilRenderer) Layout(t fyne.Size) {
 	r.filete.Move(fyne.NewPos(0, t.Height-tema.Borde))
 	r.filete.Resize(fyne.NewSize(t.Width, tema.Borde))
 	linea := t.Height - tema.Borde
+	if r.b.enCarril {
+		linea = MinCabeceraApp
+		r.marco.colocar(fyne.NewPos(0, 0), t)
+	}
 	x := canalonBarraMovil
 	if r.boton.Visible() {
 		lado := r.boton.MinSize()
-		r.boton.Move(fyne.NewPos(canalonBarraMovil, (linea-lado.Height)/2))
+		izquierda := canalonBarraMovil
+		if r.b.enCarril {
+			izquierda = (t.Width - lado.Width) / 2
+		}
+		r.boton.Move(fyne.NewPos(izquierda, (linea-lado.Height)/2))
 		r.boton.Resize(lado)
 		x += lado.Width + huecoBarraMovil
 	}
@@ -131,15 +149,23 @@ func (r *barraMovilRenderer) Refresh() {
 	r.boton.Trazo, r.boton.TrazoEncima = "primary-text", "primary-text"
 	r.boton.FondoEncima, r.boton.FondoActivo, r.boton.TokenAro = "selected", "selected", "focus-ring"
 	r.fondo.Show()
+	r.marco.esconder()
+	r.titulo.Show()
 	if tema.EsMarco() {
 		r.fondo.Hide()
 		r.titulo.Color = tema.Color("sidebar-fg", v)
 		r.boton.Trazo, r.boton.TrazoEncima = "sidebar-fg", "sidebar-fg"
 		r.boton.FondoEncima, r.boton.FondoActivo, r.boton.TokenAro = "sidebar-active-bg", "sidebar-active-bg", "sidebar-focus"
 	}
+	if b.enCarril {
+		r.titulo.Hide()
+		r.marco.pintar(v)
+		r.marco.degradado.EndColor = r.marco.colorEn(AnchoCarrilMovil, b.anchoMarco)
+		r.marco.degradado.Refresh()
+	}
 	r.boton.Show()
 	switch {
-	case b.EnDetalle:
+	case b.EnDetalle && !b.listaVisible:
 		r.boton.Icono, r.boton.Rotulo, r.boton.AlPulsar = iconos.ChevronIzquierda, b.RotuloVolver, b.AlVolver
 	case b.AlMenu == nil:
 		r.boton.Hide() // ni menú ni detalle: AppShell no pinta botón

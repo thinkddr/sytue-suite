@@ -1,0 +1,13 @@
+---
+/** Development fixture for the real PlanCard, authenticated layout and CSP. */
+import AppLayout from '../../layouts/AppLayout.astro';
+import { StorageCapacityDemo } from '../../components/dev/StorageCapacityDemo';
+
+export const prerender = false;
+
+if (!import.meta.env.DEV) return new Response(null, { status: 404 });
+---
+
+<AppLayout title="Sytue Account">
+  <StorageCapacityDemo slot="app" client:only="preact" locale={Astro.locals.locale} />
+</AppLayout>

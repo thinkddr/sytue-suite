@@ -16,7 +16,13 @@
  */
 import type { JSX } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
-import { Button, Card, formatBytes } from '@sytue/ui';
+import { Button, Card, Meter, formatBytes } from '@sytue/ui';
+import {
+  driveQuotaFromResponse,
+  hasCompleteExternalCapacity,
+  type DriveQuota,
+  type DriveQuotaResponse,
+} from '@sytue/api-clients/drive';
 import type { Locale } from '@sytue/i18n';
 import { appDomains } from '@sytue/config';
 import { getAccessToken } from '@sytue/auth/client';
@@ -35,16 +41,11 @@ interface Contrato {
   storage_bytes: number;
 }
 
-interface Cuota {
-  limit_bytes: number;
-  used_bytes: number;
-}
-
 type Estado = 'cargando' | 'listo' | 'error' | 'pagando' | 'no-disponible';
 
 export function PlanCard({ t, locale }: Props): JSX.Element {
   const [contrato, setContrato] = useState<Contrato | null>(null);
-  const [cuota, setCuota] = useState<Cuota | null>(null);
+  const [cuota, setCuota] = useState<DriveQuota | null>(null);
   const [estado, setEstado] = useState<Estado>('cargando');
 
   useEffect(() => {
@@ -59,7 +60,9 @@ export function PlanCard({ t, locale }: Props): JSX.Element {
                 headers: { authorization: `Bearer ${tok}` },
               }),
             )
-            .then((r) => (r.ok ? (r.json() as Promise<Cuota>) : null))
+            .then(async (r) =>
+              r.ok ? driveQuotaFromResponse((await r.json()) as DriveQuotaResponse) : null,
+            )
             .catch(() => null),
         ]);
         if (!viva) return;
@@ -130,25 +133,37 @@ export function PlanCard({ t, locale }: Props): JSX.Element {
 
             {cuota ? (
               <div>
-                <div
-                  class="bg-bg-subtle h-2 w-full overflow-hidden rounded-full"
-                  role="progressbar"
-                  aria-valuemin={0}
-                  aria-valuemax={cuota.limit_bytes}
-                  aria-valuenow={cuota.used_bytes}
-                  aria-label={t('plan.storage')}
-                >
-                  <div
-                    class="bg-primary h-full rounded-full"
-                    style={{
-                      width: `${Math.min(100, cuota.limit_bytes > 0 ? (100 * cuota.used_bytes) / cuota.limit_bytes : 0)}%`,
-                    }}
-                  />
-                </div>
-                <p class="text-text-muted mt-1.5 text-sm">
-                  {formatBytes(locale as Locale, cuota.used_bytes)} /{' '}
-                  {formatBytes(locale as Locale, cuota.limit_bytes)}
-                </p>
+                <Meter
+                  value={cuota.usedBytes}
+                  max={cuota.limitBytes}
+                  label={t('plan.storage')}
+                  valueText={`${formatBytes(locale as Locale, cuota.usedBytes)} / ${formatBytes(locale as Locale, cuota.limitBytes)}`}
+                />
+                {cuota.externalStorage ? (
+                  <div class="text-text-muted mt-2 space-y-1 text-sm">
+                    <p>{t('plan.externalNote')}</p>
+                    <p>
+                      {hasCompleteExternalCapacity(cuota.externalCapacity)
+                        ? t('plan.externalCapacity', {
+                            capacity: formatBytes(
+                              locale as Locale,
+                              cuota.externalCapacity.totalBytes,
+                            ),
+                          })
+                        : t('plan.externalUnknown')}
+                    </p>
+                    {hasCompleteExternalCapacity(cuota.externalCapacity) &&
+                    cuota.externalCapacity.partial ? (
+                      <p>{t('plan.externalUnknown')}</p>
+                    ) : null}
+                    <p>
+                      {t('plan.baseUsage', {
+                        used: formatBytes(locale as Locale, cuota.baseUsedBytes),
+                        total: formatBytes(locale as Locale, cuota.baseLimitBytes),
+                      })}
+                    </p>
+                  </div>
+                ) : null}
               </div>
             ) : null}
 

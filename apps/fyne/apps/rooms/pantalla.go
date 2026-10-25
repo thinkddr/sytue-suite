@@ -284,20 +284,41 @@ func (c *VistaCanal) CreateRenderer() fyne.WidgetRenderer {
 	})
 	c.objetos = []fyne.CanvasObject{c.fondo, c.Cabecera, c.Historial, c.escribiendo, c.Compositor, c.Vacio}
 	r := &canalRenderer{c: c}
+	r.flujo = columnaConversacion{minimo: r.altoMinimo, colocar: r.colocarContenido}
 	r.Refresh()
 	return r
 }
 
-type canalRenderer struct{ c *VistaCanal }
-
-// MinSize es la cabecera, una fila, la línea de «escribiendo» y la caja de escribir.
-func (r *canalRenderer) MinSize() fyne.Size {
-	return fyne.NewSize(0, AltoCabecera+AltoFilaMensaje(false)+AltoEscribiendo+
-		r.c.Compositor.Medida().Height)
+type canalRenderer struct {
+	c     *VistaCanal
+	flujo columnaConversacion
 }
 
-func (r *canalRenderer) Objects() []fyne.CanvasObject { return r.c.objetos }
-func (r *canalRenderer) Destroy()                     {}
+// MinSize permite reducir el viewport: las franjas conservan su altura dentro del
+// scroll cuando hace falta, en lugar de imponerla a la ventana móvil.
+func (r *canalRenderer) MinSize() fyne.Size {
+	return fyne.NewSize(0, AltoCabecera)
+}
+
+func (r *canalRenderer) Objects() []fyne.CanvasObject {
+	if !r.flujo.desbordando {
+		return r.c.objetos
+	}
+	objetos := []fyne.CanvasObject{r.c.fondo, r.flujo.desborde}
+	if r.c.Derecho != nil {
+		objetos = append(objetos, r.c.Derecho)
+	}
+	return objetos
+}
+func (r *canalRenderer) Destroy() {}
+
+func (r *canalRenderer) altoMinimo(ancho float32) float32 {
+	alto := AltoCabecera + AltoFilaMensaje(false) + AltoEscribiendo + r.c.Compositor.medidaPara(ancho).Height
+	if r.c.ViendoHistorial {
+		alto += MedidaBarraRecientes().Height
+	}
+	return alto
+}
 
 // Layout reparte la columna: la cabecera arriba, la caja de escribir abajo y el
 // historial con lo que sobre (`min-h-0 flex-1`). Con un panel a la derecha, el canal
@@ -327,24 +348,31 @@ func (r *canalRenderer) Layout(t fyne.Size) {
 		o.Show()
 	}
 	if tapado {
+		r.flujo.desbordando = false
 		c.Vacio.Hide()
 		return
 	}
 	if c.sinCanal {
+		r.flujo.desbordando = false
 		c.Vacio.Show()
 		c.Vacio.Move(fyne.NewPos(0, 0))
 		c.Vacio.Resize(t)
 		return
 	}
 	c.Vacio.Hide()
-	if estrecha := c.estrecha(); estrecha != c.Cabecera.Estrecha {
+	if estrecha, menuVisible := t.Width < ui.Estrecho, !c.estrecha(); estrecha != c.Cabecera.Estrecha || menuVisible != c.Cabecera.menuYaVisible {
 		c.Cabecera.Estrecha = estrecha
+		c.Cabecera.menuYaVisible = menuVisible
 		c.Cabecera.Refresh()
 	}
+	r.flujo.repartir(t, []fyne.CanvasObject{c.Cabecera, c.Historial, c.alFinal, c.escribiendo, c.Compositor})
+}
 
+func (r *canalRenderer) colocarContenido(t fyne.Size) {
+	c := r.c
 	c.Cabecera.Move(fyne.NewPos(0, 0))
 	c.Cabecera.Resize(fyne.NewSize(t.Width, AltoCabecera))
-	alto := c.Compositor.Medida().Height
+	alto := c.Compositor.medidaPara(t.Width).Height
 	yCaja := max(t.Height-alto, AltoCabecera+AltoEscribiendo)
 	c.Compositor.Move(fyne.NewPos(0, yCaja))
 	c.Compositor.Resize(fyne.NewSize(t.Width, alto))

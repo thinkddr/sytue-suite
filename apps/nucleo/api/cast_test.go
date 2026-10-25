@@ -36,6 +36,32 @@ const directoCast = `{"id":"v2","tenant":"acme","owner":{"sub":"u1","name":"Ana"
 "created_at":"2026-09-28T07:00:00Z","updated_at":"2026-09-28T08:00:00Z",
 "can":{"edit":false,"delete":false,"moderate":false}}`
 
+func TestCastQuotaKeepsUnknownStorageOriginDistinctFromInternal(t *testing.T) {
+	for _, tc := range []struct {
+		name, field     string
+		known, external bool
+	}{
+		{name: "internal", field: `,"external_storage":false`, known: true},
+		{name: "external", field: `,"external_storage":true`, known: true, external: true},
+		{name: "older backend"},
+		{name: "unknown", field: `,"external_storage":null`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path != "/api/v1/quota" {
+					t.Errorf("unexpected widget request: %s", r.URL.Path)
+				}
+				_, _ = io.WriteString(w, `{"limit_bytes":40,"used_bytes":13,"cast_bytes":7`+tc.field+`}`)
+			}))
+			defer server.Close()
+			q, err := NewCast(server.URL, nil, nil).Quota(context.Background())
+			if err != nil || (q.ExternalStorage != nil) != tc.known || tc.known && *q.ExternalStorage != tc.external || q.LimitBytes != 40 || q.UsedBytes != 13 {
+				t.Fatalf("storage origin lost in SDK: %+v %v", q, err)
+			}
+		})
+	}
+}
+
 // TestCastHablaElCableDelServicio recorre las rutas del cliente contra un doble que
 // contesta lo que contesta services/cast/internal/http, y comprueba método, ruta,
 // consulta y cuerpo de cada una.

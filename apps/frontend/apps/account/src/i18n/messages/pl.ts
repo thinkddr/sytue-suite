@@ -55,7 +55,7 @@ export const pl: AppCatalog<typeof en> = {
   'security.mfa.title': 'Weryfikacja dwuetapowa',
   'security.mfa.off': 'Nieskonfigurowana. Samo hasło otwiera konto.',
   'security.mfa.required':
-    'Twoja organizacja wymaga weryfikacji dwuetapowej. Włącz ją poniżej i zaloguj się ponownie.',
+    'Ta czynność wymaga weryfikacji dwuetapowej. Skonfiguruj ją poniżej, a następnie zaloguj się ponownie.',
   'security.mfa.on': 'Włączona. Przy logowaniu prosimy o kod.',
   'security.mfa.enable': 'Skonfiguruj',
   'security.mfa.scan': 'Zeskanuj to aplikacją uwierzytelniającą.',
@@ -114,6 +114,10 @@ export const pl: AppCatalog<typeof en> = {
   'plan.pro': 'Plan Pro · 200 GB',
   'plan.enterprise': 'Plan Enterprise · 1 TB · Wsparcie Premium',
   'plan.storage': 'Wykorzystane miejsce',
+  'plan.externalNote': 'Podłączona przestrzeń dyskowa zwiększa pojemność Twojego konta Sytue.',
+  'plan.externalCapacity': 'Podłączona przestrzeń dyskowa dodaje {capacity}.',
+  'plan.externalUnknown': 'Dostawca nie podaje pojemności przestrzeni dyskowej.',
+  'plan.baseUsage': 'Sytue: {used} z {total}',
   'plan.paidUntil': 'Opłacony do',
   'plan.upgrade': 'Zdobądź więcej miejsca',
   'plan.upgrade.hint':

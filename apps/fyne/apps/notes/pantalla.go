@@ -281,8 +281,10 @@ func (p *Pantalla) armazon(v tema.Variante) *ui.Armazon {
 	conPanel := p.vista == VistaCuaderno && p.activo.Vista == VistaArbol
 	if conPanel {
 		// `border-border bg-surface border-r`: el panel es papel blanco con su filete.
+		refresco := p.refrescoNotas()
+		refresco.Arriba = func() bool { return p.arbol.desplazado == nil || p.arbol.desplazado.Offset.Y <= 0.5 }
 		a.Panel = container.New(&conFondo{}, canvas.NewRectangle(tema.Color("surface", v)),
-			canvas.NewRectangle(tema.Color("border", v)), p.arbol.Objeto(v))
+			canvas.NewRectangle(tema.Color("border", v)), ui.RefrescarAlTirar(p.arbol.Objeto(v), &refresco))
 		a.ClavePreferenciaPanel = "sytue.notes.panel-width"
 		a.DetalleAbierto = p.lienzo.Seleccionada != ""
 	}
@@ -417,7 +419,9 @@ func (p *Pantalla) desplazar(o fyne.CanvasObject, libre bool) fyne.CanvasObject 
 		p.desplazador.Direction = container.ScrollBoth
 	}
 	p.desplazador.Refresh()
-	return p.desplazador
+	refresco := p.refrescoNotas()
+	refresco.Arriba = func() bool { return p.desplazador.Offset.Y <= 0.5 }
+	return ui.RefrescarAlTirar(p.desplazador, &refresco)
 }
 
 // notaAbierta es la seleccionada, si la hay.

@@ -162,8 +162,9 @@ def derechos_widgets(a, plataforma):
 def idiomas_widgets():
     """Las mismas traducciones del cliente Go; ninguna segunda tabla por idioma."""
     carpeta = os.path.join(RAIZ, "apps", "nucleo", "i18n", "locales")
-    claves = (["widgets." + c for c in ("open", "compose", "create", "notes", "rows", "pending", "channels", "photos", "episodes", "apps", "calendars", "address_books")]
+    claves = (["widgets." + c for c in ("open", "compose", "create", "notes", "rows", "pending", "channels", "photos", "episodes", "apps", "calendars", "address_books", "storage")]
               + ["search.label"]
+              + ["app." + a["marca"] + ".description" for a in apps() if a["widget_acciones"]]
               + ["dataflow.item." + c for c in ("files", "events", "documents", "contacts")])
     for nombre in sorted(os.listdir(carpeta)):
         if not nombre.endswith(".json"):
@@ -304,7 +305,7 @@ def pbxproj(lista):
                    # El NSExtensionFileProviderDocumentGroup del Info.plist: el grupo de apps
                    # de los derechos de cada plataforma (empaquetar.sh derechos-archivos).
                    "SYTUE_GRUPO_ARCHIVOS": "group." + a["id"],
-                   "SYTUE_GRUPO_ARCHIVOS[sdk=macosx*]": EQUIPO + "." + a["id"],
+                   "SYTUE_GRUPO_ARCHIVOS[sdk=macosx*]": "group." + a["id"],
                    "IPHONEOS_DEPLOYMENT_TARGET": IOS_ARCHIVOS, "SWIFT_VERSION": "5.0",
                    "APPLICATION_EXTENSION_API_ONLY": "YES", "SKIP_INSTALL": "YES",
                    "LD_RUNPATH_SEARCH_PATHS": "$(inherited) @executable_path/../Frameworks @executable_path/../../Frameworks",
@@ -365,6 +366,8 @@ def pbxproj(lista):
                    "CODE_SIGN_ENTITLEMENTS[sdk=macosx*]": c + "/widgets/macos.entitlements",
                    "CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]": c + "/widgets/ios.entitlements",
                    "SWIFT_VERSION": "5.0", "APPLICATION_EXTENSION_API_ONLY": "YES", "SKIP_INSTALL": "YES",
+                   "SWIFT_ACTIVE_COMPILATION_CONDITIONS": "$(inherited) " + " ".join(
+                       "SYTUE_WIDGET_ACTION_" + accion.upper() for accion in a["widget_acciones"] if accion != "open"),
                    "ASSETCATALOG_COMPILER_APPICON_NAME": "",
                    "LD_RUNPATH_SEARCH_PATHS": "$(inherited) @executable_path/../../Frameworks /usr/lib/swift",
                    "LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]": "$(inherited) @executable_path/../../../../Frameworks /usr/lib/swift"}
@@ -431,7 +434,8 @@ def pbxproj(lista):
         fases, dependencias = [ident("recursos", c), ident("fase", c)], []
         if a["archivos"]:
             e = extension(a, hijos)
-            incluir(c, e, fases, dependencias, c, 13, "Embed Foundation Extensions")
+            ajustes["ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES"] = "YES"
+            incluir(c, e, fases, dependencias, c, 13, "Embed Foundation Extensions", True)
         if a["widget_acciones"]:
             e = widgets(a, hijos)
             # El target existe siempre; el host lo lleva dentro solo con el interruptor.

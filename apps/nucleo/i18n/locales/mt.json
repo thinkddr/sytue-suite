@@ -23,6 +23,7 @@
   "account.presenceFailed": "Il-preżenza tiegħek ma setgħetx tinbidel",
   "account.signIn": "Idħol",
   "account.signOut": "Oħroġ",
+  "account.signOutFailed": "Ma setax isir il-ħruġ mill-kont fuq dan l-apparat. Drive jista’ jkun għadu konness. Erġa’ pprova.",
   "account.signOutPending.body": "Notepads għandu noti fuq dan l-apparat li għadhom ma tellgħux ({count}). Meta toħroġ jitħassru minnu.",
   "account.signOutPending.discard": "Armi u oħroġ",
   "account.signOutPending.title": "Noti mhux imtella’",
@@ -336,5 +337,6 @@
   "widgets.open": "Iftaħ",
   "widgets.pending": "Pendenti",
   "widgets.photos": "Ritratti",
-  "widgets.rows": "Ringieli"
+  "widgets.rows": "Ringieli",
+  "widgets.storage": "Ħażna"
 }

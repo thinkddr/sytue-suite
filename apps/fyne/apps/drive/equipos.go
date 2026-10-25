@@ -333,7 +333,7 @@ func (p *paginaAjustes) altoSeccion(util float32) float32 {
 }
 
 func (p *paginaAjustes) MinSize([]fyne.CanvasObject) fyne.Size {
-	_, util := p.reparto(max(p.ventana-tema.AnchoLateral, 1))
+	_, util := p.reparto(max(ui.AnchoHoja(p.ventana, ui.AnchoMenu(false), 0), 1))
 	_, alto := p.cabecera(util)
 	return fyne.NewSize(0, 2*RellenoYPagina+alto+SeparaSecciones+p.altoSeccion(util))
 }

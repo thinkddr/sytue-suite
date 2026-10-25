@@ -55,7 +55,7 @@ export const fi: AppCatalog<typeof en> = {
   'security.mfa.title': 'Kaksivaiheinen vahvistus',
   'security.mfa.off': 'Ei käytössä. Pelkkä salasana avaa tilin.',
   'security.mfa.required':
-    'Organisaatiosi vaatii kaksivaiheisen vahvistuksen. Ota se käyttöön alla ja kirjaudu uudelleen.',
+    'Tämä toiminto vaatii kaksivaiheisen vahvistuksen. Määritä se alla ja kirjaudu sitten uudelleen sisään.',
   'security.mfa.on': 'Käytössä. Kirjautuessa pyydetään koodi.',
   'security.mfa.enable': 'Ota käyttöön',
   'security.mfa.scan': 'Skannaa tämä todennussovelluksellasi.',
@@ -114,6 +114,10 @@ export const fi: AppCatalog<typeof en> = {
   'plan.pro': 'Pro-paketti · 200 Gt',
   'plan.enterprise': 'Enterprise-paketti · 1 Tt · Premium-tuki',
   'plan.storage': 'Käytetty tallennustila',
+  'plan.externalNote': 'Yhdistetty tallennustila kasvattaa Sytue-tallennuskapasiteettiasi.',
+  'plan.externalCapacity': 'Yhdistetty tallennustila lisää kapasiteettia {capacity}.',
+  'plan.externalUnknown': 'Palveluntarjoaja ei ilmoita tallennuskapasiteettiaan.',
+  'plan.baseUsage': 'Sytue: {used} / {total}',
   'plan.paidUntil': 'Maksettu asti',
   'plan.upgrade': 'Hanki lisää tilaa',
   'plan.upgrade.hint':

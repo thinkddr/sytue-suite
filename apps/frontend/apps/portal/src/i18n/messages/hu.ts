@@ -148,6 +148,12 @@ export const hu: AppCatalog<typeof en> = {
     'Ha mindent közvetlenül a Google Workspace vagy a Microsoft 365 szolgáltatásba szeretne átvinni letöltés nélkül: ha személyes fiókja van, vagy Ön adminisztrálja a szervezetét, indítsa el saját maga a Sytue Admin szolgáltatás Migrációk részében; ha nem, kérje meg a szervezet adminisztrátorát.',
   'data.move.action': 'Ugrás a Migrációkhoz',
 
+  'devices.native.body':
+    'Használd az eszköz fájlkezelőjét, vagy csatlakoztass egy fiókot a tulajdonos hozzájárulásával.',
+  'devices.native.driveBody':
+    'A Sytue Drive bejelentkezés után automatikusan hozzáadódik. Ha a rendszer kéri, engedélyezd a helyét.',
+  'devices.native.openDrive': 'Megnyitás a fájlkezelőben',
+  'devices.native.failed': 'Az eszköz integrációját nem sikerült frissíteni.',
   'devices.title': 'Eszközök csatlakoztatása',
   'devices.lead':
     'Vigye magával a Sytue leveleit, naptárát, névjegyeit és fájljait a telefonjára vagy a számítógépére. Lépésről lépésre végigvezetjük.',

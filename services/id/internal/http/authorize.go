@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
+	"git.sytue.eu/sytue/one/platform/pkg/operador"
 	"git.sytue.eu/sytue/one/services/id/internal/domain"
 )
 
@@ -139,10 +140,11 @@ func (s *Server) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// MFA obligatorio para roles owner/admin y para la administración de plataforma
-	// (docs/CONVENTIONS.md §8): si la sesión no fue autenticada con MFA, exigirlo
-	// ahora sin volver a pedir la contraseña (ya hay sesión: falta el 2º factor).
-	if s.requiresStepUp(r, sess) {
+	// El MFA por rol protege las consolas de administración. Entrar en un producto
+	// o en Mi cuenta no obliga a enrolarlo: Mi cuenta es precisamente donde se
+	// activa. El login sigue exigiendo el factor ya habilitado por la persona y el
+	// Acceso Condicional que haya establecido su organización.
+	if s.requiresStepUp(r, sess, client) {
 		if err := s.desviarAStepUp(w, r, sess, client.ID); err != nil {
 			redirectErr("server_error", "")
 		}
@@ -266,8 +268,13 @@ func (s *Server) desviarAStepUp(w http.ResponseWriter, r *http.Request, sess dom
 	return nil
 }
 
-// requiresStepUp indica si la sesión necesita reautenticarse con MFA por rol.
-func (s *Server) requiresStepUp(r *http.Request, sess domain.Session) bool {
+// requiresStepUp indica si la sesión necesita MFA por su rol al entrar en una
+// consola. El client ya fue leído y validado antes de llegar aquí: no se confía en
+// un client_id sin validar de la query.
+func (s *Server) requiresStepUp(r *http.Request, sess domain.Session, client domain.Client) bool {
+	if client.ID != "sytue-console" && client.ID != operador.Audiencia {
+		return false
+	}
 	// Si la sesión ya incluye MFA/WebAuthn en AMR, no hace falta step-up.
 	for _, m := range sess.AMR {
 		if m == "mfa" || m == "webauthn" || m == "otp" {

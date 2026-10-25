@@ -182,7 +182,7 @@ func extension(img image.Image, c color.NRGBA) (ancho, alto int) {
 func TestLaCintaPintaSusDosLineas(t *testing.T) {
 	ctx := &Contexto{Tipo: Documento, Zoom: 100}
 	c := NuevaCinta(ctx, Genericas())
-	// En escritorio: por debajo de `md` la banda empieza plegada (TestLaCintaSePliegaEnUnMovil).
+	// En escritorio conserva la altura habitual; móvil usa una banda compacta.
 	c.Resize(fyne.NewSize(800, AltoCinta()))
 	img := pinta(t, 820, AltoCinta()+10, c)
 
@@ -501,56 +501,36 @@ func abs32(x float32) float32 {
 	return x
 }
 
-// TestLaCintaSePliegaEnUnMovil: por debajo de `md` la banda empieza plegada (el folio
-// recupera la pantalla) y el chevrón de la derecha de la tira la despliega en UNA fila de
-// 53 px —sin rótulos de grupo, como la web desde el 2026-10-16— que se desplaza de lado;
-// elegir una pestaña con la banda plegada la despliega, y la pestaña elegida se ve entera
-// aunque la tira no quepa. En escritorio no cambia nada. VISTO EN ROJO sin `Alto`: a 360
-// la banda de 1.242 px se salía de la pantalla y el marco no dejaba sitio.
-func TestLaCintaSePliegaEnUnMovil(t *testing.T) {
+// TestLaCintaMovilMantieneUnaFilaVisible: como CertiPDF, la banda móvil
+// permanece visible y usa todo el ancho para desplazar sus controles, sin Más.
+func TestLaCintaMovilMantieneUnaFilaVisible(t *testing.T) {
 	ctx := &Contexto{Tipo: Documento, Zoom: 100, Estado: Listo, T: func(k string, _ i18n.Vars) string { return k }}
 	m := NuevoMarco(ctx, Genericas(), nil)
 	w := test.NewTempWindow(t, m)
+	w.SetPadded(false)
 	w.Resize(fyne.NewSize(360, 740))
 	c := m.cinta
-	if c.Alto(360) != AltoTira || c.banda.Visible() || !c.plegar.Visible() {
-		t.Fatalf("a 360 la banda tendría que empezar plegada: alto %.1f", c.Alto(360))
+	if c.Alto(360) != AltoDeTira()+AltoBandaEstrecha || !c.banda.Visible() || c.mas.Visible() {
+		t.Fatalf("la banda móvil debe estar visible sin expansión: alto %.1f", c.Alto(360))
 	}
-	if c.plegar.Rotulo != "ribbon.showTools" {
-		t.Errorf("el chevrón dice %q", c.plegar.Rotulo)
+	if m.cinta.Size().Height != c.Alto(360) || c.banda.Size().Width != 360 {
+		t.Errorf("la banda no conserva su ancho y alto: %v", c.banda.Size())
 	}
-	c.plegar.Tapped(nil)
-	c = m.cinta
-	if !c.Abierta || c.Alto(360) != AltoTira+AltoBandaEstrecha || !c.banda.Visible() || c.plegar.Rotulo != "ribbon.hideTools" {
-		t.Fatalf("desplegada a 360: alto %.1f, visible %v", c.Alto(360), c.banda.Visible())
-	}
-	if m.cinta.Size().Height != c.Alto(360) {
-		t.Errorf("el marco le da a la cinta %.1f y pide %.1f", m.cinta.Size().Height, c.Alto(360))
-	}
-	// Una fila: ningún grupo baja, ninguno lleva rótulo, y lo que no cabe espera de lado
-	// con «Más» a la vista.
 	for _, o := range objetosDeBanda(c.cuerpo) {
 		if g, ok := o.(*Grupo); ok && (g.Position().Y != 0 || g.conRotulo()) {
 			t.Errorf("el grupo %q está en y=%.1f con rótulo %v", g.Rotulo, g.Position().Y, g.conRotulo())
 		}
 	}
-	if !c.mas.Visible() || c.banda.Size().Width >= 360 {
-		t.Errorf("la banda de Inicio no cabe a 360 y no hay «Más» (banda de %.1f)", c.banda.Size().Width)
-	}
-	c.PonerAbierta(false)
 	c.Elegir(len(c.tiras) - 1)
-	if !c.Abierta {
-		t.Error("elegir una pestaña con la banda plegada no la despliega")
-	}
 	ultima := c.tiras[len(c.tiras)-1]
 	d := fyne.CurrentApp().Driver()
 	ini := d.AbsolutePositionForObject(ultima).X
-	chevron := d.AbsolutePositionForObject(c.plegar).X
-	if fin := ini + ultima.Size().Width; fin > chevron+0.5 || ini < d.AbsolutePositionForObject(c.tira).X-0.5 {
-		t.Errorf("la pestaña elegida va de %.1f a %.1f y el chevrón empieza en %.1f", ini, fin, chevron)
+	finTira := d.AbsolutePositionForObject(c.tira).X + c.tira.Size().Width
+	if fin := ini + ultima.Size().Width; fin > finTira+0.5 || ini < d.AbsolutePositionForObject(c.tira).X-0.5 {
+		t.Errorf("la pestaña elegida va de %.1f a %.1f fuera de la tira", ini, fin)
 	}
 	w.Resize(fyne.NewSize(1280, 800))
-	if c.Alto(1280) != AltoCinta() || c.plegar.Visible() {
-		t.Error("en escritorio la cinta es la de siempre, sin chevrón")
+	if c.Alto(1280) != AltoCinta() {
+		t.Error("en escritorio se conserva la altura de la cinta")
 	}
 }

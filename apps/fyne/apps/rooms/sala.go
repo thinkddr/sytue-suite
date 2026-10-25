@@ -29,6 +29,7 @@ import (
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 	mx "git.sytue.eu/sytue/one/apps/nucleo/matrix"
+	"git.sytue.eu/sytue/one/apps/nucleo/widgets"
 )
 
 // Sala es Sytue Rooms CON DATOS: habla con el servicio y rellena la Pantalla. Es el
@@ -128,6 +129,9 @@ type Sala struct {
 	P       *Pantalla
 	S       Servicio
 	Cifrado *Cifrado
+	// Widget sólo recibe contadores del inventario completo ya pedido por Rooms.
+	Widget       widgets.Source
+	cargaCanales uint64
 	// Yo es el `sub` de quien ha entrado: decide qué reacciones y qué mensajes son
 	// suyos.
 	Yo string
@@ -208,9 +212,12 @@ type Sala struct {
 	equipo  string
 	canales []api.RoomsChannel
 	// retiradas invalida el deshacer de una acción cuando llega una baja más reciente.
-	retiradas map[string]uint64
-	pend      map[string]api.RoomsUnread
-	abierto   string
+	retiradas                 map[string]uint64
+	pend                      map[string]api.RoomsUnread
+	widgetVista               widgets.View
+	widgetCanalesCompletos    bool
+	widgetPendientesCompletos bool
+	abierto                   string
 	// enlace es el canal (y el mensaje) de un aviso que llegó antes que la lista.
 	enlace   [2]string
 	mensajes []api.RoomsMessage
@@ -374,6 +381,11 @@ func NuevaSala(p *Pantalla, s Servicio, yo string) *Sala {
 	l := p.Lateral
 	l.AlElegirCanal = sa.Elegir
 	l.AlReintentar = sa.cargarCanales
+	l.Refresco.Actualizar = sa.cargarCanales
+	l.Refresco.Puede = func() bool {
+		return sa.S != nil && sa.ctx != nil && sa.ctx.Err() == nil && l.EstadoCanales != Cargando
+	}
+	l.Refresco.Revision = func() uint64 { return sa.cargaCanales }
 	l.AlFavorito = sa.Favorito
 	l.AlMenuCanal = sa.MenuFila
 	l.AlPlegarSeccion = sa.PlegarSeccion
@@ -533,11 +545,12 @@ func estadoDe(err error) Estado {
 // lo pendiente de todos. Los contadores y las categorías degradan a vacío si su
 // llamada falla, como en la web: los canales cargan igual.
 type lista struct {
-	equipo      string
-	adminEquipo bool
-	canales     []api.RoomsChannel
-	pend        []api.RoomsUnread
-	categorias  []api.RoomsCategory
+	equipo                                string
+	adminEquipo                           bool
+	canales                               []api.RoomsChannel
+	pend                                  []api.RoomsUnread
+	categorias                            []api.RoomsCategory
+	canalesCompletos, pendientesCompletos bool
 }
 
 func (sa *Sala) pedirLista(ctx context.Context) (lista, error) {
@@ -547,7 +560,7 @@ func (sa *Sala) pedirLista(ctx context.Context) (lista, error) {
 	}
 	if len(equipos) == 0 {
 		if fuera, pf, errExt := sa.S.ExternalChannels(ctx); errExt == nil && len(fuera) > 0 {
-			out := lista{canales: fuera, pend: pf}
+			out := lista{canales: fuera, pend: pf, canalesCompletos: true, pendientesCompletos: true}
 			out.categorias, _ = sa.S.Categories(ctx)
 			return out, nil
 		}
@@ -560,8 +573,10 @@ func (sa *Sala) pedirLista(ctx context.Context) (lista, error) {
 	if out.canales, err = sa.S.Channels(ctx, out.equipo); err != nil {
 		return lista{}, err
 	}
-	out.pend, _ = sa.S.Unread(ctx, out.equipo)
+	out.pend, err = sa.S.Unread(ctx, out.equipo)
+	out.pendientesCompletos = err == nil
 	if fuera, pf, err := sa.S.ExternalChannels(ctx); err == nil {
+		out.canalesCompletos = true
 		out.canales = append(out.canales, fuera...)
 		out.pend = append(out.pend, pf...)
 	}
@@ -570,9 +585,11 @@ func (sa *Sala) pedirLista(ctx context.Context) (lista, error) {
 }
 
 func (sa *Sala) cargarCanales() {
+	sa.cargaCanales++
 	l := sa.P.Lateral
 	l.EstadoCanales = Cargando
 	sa.P.Refrescar()
+	view := sa.Widget.View()
 	pedir(sa, sa.pedirLista, func(r lista, err error) {
 		if err != nil {
 			l.EstadoCanales = Error
@@ -583,6 +600,9 @@ func (sa *Sala) cargarCanales() {
 		sa.adminEquipo = r.adminEquipo
 		l.PuedeGestionarApps = r.adminEquipo // `canManageIntegrations`: admin de algún equipo
 		sa.ponerPendientes(r.pend)
+		sa.widgetVista = view
+		sa.widgetCanalesCompletos, sa.widgetPendientesCompletos = r.canalesCompletos, r.pendientesCompletos
+		sa.publicarWidget(view)
 		l.Categorias = l.Categorias[:0]
 		for _, c := range r.categorias {
 			l.Categorias = append(l.Categorias, Categoria{ID: c.ID, Nombre: c.Name, Orden: c.SortOrder, Plegada: c.Collapsed})
@@ -655,20 +675,28 @@ func (sa *Sala) refrescarPendientes() {
 	if sa.equipo == "" {
 		return
 	}
-	pedir(sa, func(ctx context.Context) ([]api.RoomsUnread, error) {
+	view := sa.widgetVista
+	type resultado struct {
+		pend     []api.RoomsUnread
+		completo bool
+	}
+	pedir(sa, func(ctx context.Context) (resultado, error) {
 		ps, err := sa.S.Unread(ctx, sa.equipo)
 		if err != nil {
-			return nil, err
+			return resultado{}, err
 		}
-		if _, pf, err := sa.S.ExternalChannels(ctx); err == nil {
+		_, pf, err := sa.S.ExternalChannels(ctx)
+		if err == nil {
 			ps = append(ps, pf...)
 		}
-		return ps, nil
-	}, func(ps []api.RoomsUnread, err error) {
+		return resultado{pend: ps, completo: err == nil}, nil
+	}, func(r resultado, err error) {
 		if err != nil {
 			return
 		}
-		sa.ponerPendientes(ps)
+		sa.ponerPendientes(r.pend)
+		sa.widgetPendientesCompletos = r.completo
+		sa.publicarWidget(view)
 		sa.pintarCanales()
 		sa.P.Refrescar()
 	})
@@ -1149,9 +1177,14 @@ func (sa *Sala) abrir(c Canal) {
 }
 
 func (sa *Sala) darPorLeido(canal string) {
+	view := sa.widgetVista
 	pedir(sa, func(ctx context.Context) (struct{}, error) {
 		return struct{}{}, sa.S.MarkRead(ctx, canal)
-	}, func(struct{}, error) {})
+	}, func(_ struct{}, err error) {
+		if err == nil {
+			sa.publicarWidget(view)
+		}
+	})
 }
 
 func (sa *Sala) cargarMensajes(canal string, noLeidos int) {
@@ -3210,6 +3243,8 @@ func (sa *Sala) Olvidar() {
 	sa.mensajes = nil
 	sa.borradores = map[ambito]string{}
 	sa.canales = nil
+	sa.widgetVista = widgets.View{}
+	sa.widgetCanalesCompletos, sa.widgetPendientesCompletos = false, false
 	clear(sa.retiradas)
 	sa.roster = nil
 	sa.equipo = ""

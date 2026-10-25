@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/ajustes"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
@@ -29,13 +30,14 @@ import (
 // escribe el Hub, que es uno por sesión del sistema.
 
 // Cuenta es de quién es una carpeta: la persona (su `sub`) y su organización (`tenant`).
-type Cuenta struct{ Sub, Org string }
+type Cuenta struct{ Emisor, Sub, Org string }
 
 // vinculo es una carpeta apuntada a su cuenta.
 type vinculo struct {
-	Sub  string `json:"sub"`
-	Org  string `json:"org"`
-	Ruta string `json:"ruta"`
+	Emisor string `json:"issuer,omitempty"`
+	Sub    string `json:"sub"`
+	Org    string `json:"org"`
+	Ruta   string `json:"ruta"`
 }
 
 // carpetaVieja es la carpeta de antes de atarlas, sin cuenta: `%USERPROFILE%\Sytue Drive`.
@@ -51,7 +53,30 @@ var errSinCuenta = errors.New("nube: sin sesión no hay carpeta de Drive")
 // pida, con su nombre y con todo lo que tiene dentro. Renombrarla pide darla de baja en
 // Windows y volverla a registrar, y lo que eso hace con los marcadores no se ha podido ver
 // en un Windows: mejor un nombre de antes que un fichero que suba vacío.
-func Carpeta(c Cuenta) (string, error) { return carpeta(c, registrada) }
+func Carpeta(c Cuenta) (string, error) {
+	ctx, parar := context.WithTimeout(context.Background(), time.Minute)
+	defer parar()
+	return CarpetaCon(ctx, c)
+}
+
+// CarpetaCon serializa el vínculo entre procesos, también cuando se abre desde
+// una app distinta de la que ya está atendiendo CFAPI.
+func CarpetaCon(ctx context.Context, c Cuenta) (string, error) {
+	fichero, err := ficheroVinculos()
+	if err != nil {
+		return "", err
+	}
+	f, err := os.OpenFile(fichero+".cerrojo", os.O_CREATE|os.O_RDWR, 0o600)
+	if err != nil {
+		return "", err
+	}
+	soltar, err := ajustes.CerrojoFichero(ctx, f)
+	if err != nil {
+		return "", err
+	}
+	defer soltar()
+	return carpeta(c, registrada)
+}
 
 // Conectada es la carpeta de `c` si ya estaba conectada en este equipo, también la de
 // antes de atarlas: el Hub la vuelve a atender al arrancar o al volver a esa cuenta, sin
@@ -63,10 +88,10 @@ func conectada(c Cuenta, registrada func(string) bool) (string, bool) {
 	if err != nil || c.Sub == "" || c.Org == "" {
 		return "", false
 	}
-	if i := slices.IndexFunc(vs, func(v vinculo) bool { return v.Sub == c.Sub && v.Org == c.Org }); i >= 0 {
+	if i := slices.IndexFunc(vs, func(v vinculo) bool { return v.Emisor == c.Emisor && v.Sub == c.Sub && v.Org == c.Org }); i >= 0 {
 		return vs[i].Ruta, registrada(vs[i].Ruta)
 	}
-	if vieja := filepath.Join(casa, carpetaVieja); registrada(vieja) && !atada(vs, vieja) {
+	if vieja := filepath.Join(casa, carpetaVieja); c.Emisor == "" && registrada(vieja) && !atada(vs, vieja) {
 		ruta, err := carpeta(c, registrada)
 		return ruta, err == nil
 	}
@@ -81,11 +106,11 @@ func carpeta(c Cuenta, registrada func(string) bool) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if i := slices.IndexFunc(vs, func(v vinculo) bool { return v.Sub == c.Sub && v.Org == c.Org }); i >= 0 {
+	if i := slices.IndexFunc(vs, func(v vinculo) bool { return v.Emisor == c.Emisor && v.Sub == c.Sub && v.Org == c.Org }); i >= 0 {
 		return vs[i].Ruta, nil
 	}
 	ruta := filepath.Join(casa, carpetaVieja)
-	if !registrada(ruta) || atada(vs, ruta) {
+	if c.Emisor != "" || !registrada(ruta) || atada(vs, ruta) {
 		etiqueta := c.Org
 		if (auth.Reclamos{Tenant: c.Org}).EsCuentaPersonal() {
 			etiqueta = "Personal"
@@ -105,7 +130,7 @@ func carpeta(c Cuenta, registrada func(string) bool) (string, error) {
 		}
 		ruta = filepath.Join(casa, nombre)
 	}
-	return ruta, guardarVinculos(append(vs, vinculo{Sub: c.Sub, Org: c.Org, Ruta: ruta}))
+	return ruta, guardarVinculos(append(vs, vinculo{Emisor: c.Emisor, Sub: c.Sub, Org: c.Org, Ruta: ruta}))
 }
 
 // atada dice si `ruta` ya es la carpeta de alguna cuenta.

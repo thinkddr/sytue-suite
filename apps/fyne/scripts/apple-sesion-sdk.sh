@@ -15,8 +15,11 @@ package main
 
 import "C"
 import (
+    "runtime"
+
     "git.sytue.eu/sytue/one/apps/nucleo/ajustes"
     "git.sytue.eu/sytue/one/apps/nucleo/auth"
+    "git.sytue.eu/sytue/one/apps/nucleo/sistema"
     "git.sytue.eu/sytue/one/apps/nucleo/widgets"
 )
 
@@ -29,6 +32,16 @@ func main() {
     _, _ = ajustes.Carpeta()
     _ = ajustes.Leer()
     widgets.Notify("")
+    // Referencias enlazadas: no se consulta el llavero ni se registra un dominio.
+    // Este programa nunca se ejecuta, tampoco en el gate del SDK real.
+    runtime.KeepAlive([]any{
+        sistema.ArchivosDisponible,
+        sistema.GuardarCredencialArchivos,
+        sistema.HayCredencialArchivos,
+        sistema.RegistrarArchivos,
+        sistema.AbrirArchivos,
+        sistema.OlvidarArchivos,
+    })
 }
 GO
 

@@ -7,7 +7,9 @@ import (
 	"context"
 	"testing"
 
+	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/ui/recorrido"
+	"git.sytue.eu/sytue/one/apps/fyne/ui/recorrido/montaje"
 )
 
 // TestRecorridoConSesion pulsa todo lo que se ve con los datos del servicio falso y
@@ -15,5 +17,6 @@ import (
 func TestRecorridoConSesion(t *testing.T) {
 	sa, _, w := salaEn(t, servicioConDos(), 1280)
 	sa.Arrancar(context.Background())
+	montaje.ComprobarRotacion(t, w, "rooms/canal", iconos.Rooms, true)
 	recorrido.Comprobar(t, w, 400)
 }

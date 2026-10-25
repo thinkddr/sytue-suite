@@ -23,6 +23,7 @@
   "account.presenceFailed": "Impossible de modifier votre présence",
   "account.signIn": "Se connecter",
   "account.signOut": "Se déconnecter",
+  "account.signOutFailed": "Impossible de se déconnecter sur cet appareil. Drive peut rester connecté. Réessayez.",
   "account.signOutPending.body": "Notepads contient sur cet appareil des notes qui n’ont pas encore été envoyées ({count}). La déconnexion les supprime de celui-ci.",
   "account.signOutPending.discard": "Abandonner et se déconnecter",
   "account.signOutPending.title": "Notes non envoyées",
@@ -334,5 +335,6 @@
   "widgets.open": "Ouvrir",
   "widgets.pending": "En attente",
   "widgets.photos": "Photos",
-  "widgets.rows": "Lignes"
+  "widgets.rows": "Lignes",
+  "widgets.storage": "Stockage"
 }

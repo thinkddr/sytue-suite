@@ -295,7 +295,7 @@ if (appid.split(".", 1)[-1] == sys.argv[1]
 # hosts de SSO y extensiones de widgets, que no reciben el grupo del Keychain.
 verificar_perfil_grupo() { # <ruta> <App ID> <ios|macappstore|developerid> <grupo> [protección] [llavero] [derechos.plist]
   python3 - "$(dirname "${BASH_SOURCE[0]}")/../../nucleo/ajustes/grupo_apple.go" "$@" <<'PY'
-import datetime, fnmatch, pathlib, plistlib, re, subprocess, sys
+import datetime, fnmatch, pathlib, plistlib, re, subprocess, sys, tomllib
 def mal(motivo):
     sys.exit('::error::perfil de grupo: ' + motivo)
 if len(sys.argv) not in (6, 7, 8, 9):
@@ -314,7 +314,18 @@ try:
     grupos_llavero = re.findall(r'^const GrupoSuite = "([A-Z0-9]{10}\.[a-z0-9.]+)"$', pathlib.Path(fuente).read_text(), re.M)
     if len(grupos_llavero) != 1:
         mal('no hay un equipo canónico en ajustes/grupo_apple.go')
-    if llavero and llavero != grupos_llavero[0]:
+    equipo = grupos_llavero[0].split('.', 1)[0]
+    llavero_proveedor = ""
+    if appid.endswith('.archivos'):
+        host = appid.removesuffix('.archivos')
+        catalogo = pathlib.Path(fuente).resolve().parents[2] / 'fyne/cmd'
+        declarados = [tomllib.loads(p.read_text()) for p in catalogo.glob('*/FyneApp.toml')]
+        if not any(a.get('Details', {}).get('ID') == host and a.get('Development', {}).get('archivos') == 'si' for a in declarados):
+            mal('el catálogo no declara este proveedor de archivos')
+        llavero_proveedor = equipo + '.' + host + '.shared'
+        if grupo != 'group.' + host or llavero != llavero_proveedor:
+            mal('el proveedor exige su propio AppGroup y Keychain')
+    elif llavero and llavero != grupos_llavero[0]:
         mal('el grupo de Keychain no es el canónico de la suite')
     r = subprocess.run(['security', 'cms', '-D', '-i', ruta], capture_output=True, check=False)
     if r.returncode:
@@ -359,6 +370,8 @@ try:
             mal('los derechos del host omiten el Keychain de la suite')
         if appid.endswith('.widgets') and claves_pedidas:
             mal('los widgets no pueden solicitar acceso al Keychain')
+        if llavero_proveedor and claves_pedidas != [llavero_proveedor]:
+            mal('File Provider no puede leer el Keychain de la sesión ni de otra app')
         for pedido in grupos_pedidos:
             # macOS autoriza también grupos <TeamID>.* mediante la firma del
             # mismo equipo. El grupo legado se conserva sólo para migrar MAS.

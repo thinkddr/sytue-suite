@@ -219,6 +219,8 @@ export const lv: Catalog = {
   'account.signedOutDescription':
     'Pierakstieties ar savu Sytue One kontu, lai šeit redzētu savus datus.',
   'account.signOut': 'Izrakstīties',
+  'account.signOutFailed':
+    'Neizdevās izrakstīties šajā ierīcē. Drive var būt joprojām savienots. Mēģiniet vēlreiz.',
   'account.signOutPending.title': 'Neaugšupielādētas piezīmes',
   'account.signOutPending.body':
     'Notepads šajā ierīcē ir piezīmes, kas vēl nav augšupielādētas ({count}). Izrakstoties tās tiek no tās izdzēstas.',
@@ -366,6 +368,7 @@ export const lv: Catalog = {
   'widgets.episodes': 'Epizodes',
   'widgets.apps': 'Lietotnes',
   'widgets.compose': 'Rakstīt',
+  'widgets.storage': 'Krātuve',
   'widgets.create': 'Izveidot notikumu',
 
   'linkedServices.services': 'Pakalpojumi',

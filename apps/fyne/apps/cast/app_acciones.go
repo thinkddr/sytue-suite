@@ -23,6 +23,7 @@ import (
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
+	"git.sytue.eu/sytue/one/apps/nucleo/widgets"
 )
 
 // iconoBuscar es la lupa del buscador de Explorar.
@@ -35,10 +36,20 @@ func (a *App) pedirCuota() {
 		return
 	}
 	gen := a.gen
+	view := a.Widget.View()
 	a.lanzar(func() {
 		c, fin := ctx()
 		defer fin()
 		q, err := a.cli.Quota(c)
+		if err == nil {
+			if counter, valid := widgets.StoragePercent(q.UsedBytes, q.LimitBytes); valid && q.ExternalStorage != nil && !*q.ExternalStorage {
+				_ = view.Publicar(c, counter)
+			} else {
+				// An older backend cannot distinguish plan usage from an external
+				// store. Unknown/unlimited capacity also retires the previous percent.
+				_ = view.Publicar(c)
+			}
+		}
 		a.hilo(gen, func() {
 			if err == nil {
 				a.sub.cuota, a.sub.errorCuota = &q, false

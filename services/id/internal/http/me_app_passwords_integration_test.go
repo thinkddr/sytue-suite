@@ -5,6 +5,8 @@ package http
 import (
 	"net/http"
 	"testing"
+
+	"git.sytue.eu/sytue/one/services/id/internal/domain"
 )
 
 // TestMeAppPasswordsJSON — el ciclo entero por API: crear, listar, revocar.
@@ -15,9 +17,13 @@ import (
 // revocada desaparece de la lista y que un identificador ajeno no revoca nada.
 func TestMeAppPasswordsJSON(t *testing.T) {
 	l := newLiveServer(t)
-	u := l.mkUser(t, "ap@id.test", "")
+	org, err := l.st.CreateOrg(l.ctx, nil, domain.Organization{Slug: "app-passwords", Name: "Passwords"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	u := l.addMember(t, org, "ap@id.test", domain.RoleMember)
 	otro := l.mkUser(t, "ap-otro@id.test", "")
-	tok := l.token(t, u.ID, "", nil)
+	tok := l.token(t, u.ID, org.Slug, nil)
 	tokOtro := l.token(t, otro.ID, "", nil)
 
 	// Lista vacía al principio.
@@ -37,6 +43,9 @@ func TestMeAppPasswordsJSON(t *testing.T) {
 	}
 	clara, _ := out["password"].(string)
 	id, _ := out["id"].(string)
+	if out["org_id"] != org.ID || out["tenant"] != org.Slug {
+		t.Fatalf("binding: %v", out)
+	}
 	if clara == "" || id == "" {
 		t.Fatalf("el alta debe devolver id y contraseña: %v", out)
 	}

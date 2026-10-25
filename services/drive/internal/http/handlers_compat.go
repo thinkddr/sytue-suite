@@ -242,6 +242,7 @@ func compatPageSize(raw string) int {
 // `fields` se IGNORA a propósito: siempre se devuelve el recurso completo, que es
 // un superconjunto de lo que el cliente pide.
 func (h *compatHandlers) googleAbout(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
 	c, _ := authn.FromContext(r.Context())
 	var quota *domain.Quota
 	if q, err := h.svc.Quota(r.Context()); err == nil {
@@ -663,6 +664,7 @@ func (h *compatHandlers) serveNodeContent(w http.ResponseWriter, r *http.Request
 // graphDrive responde GET /v1.0/me/drive: el drive del usuario con su raíz y su
 // cuota real (omitida si el servicio no la conoce).
 func (h *compatHandlers) graphDrive(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
 	root, err := h.svc.Root(r.Context())
 	if err != nil {
 		failGraph(w, r, err)

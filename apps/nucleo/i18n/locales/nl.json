@@ -23,6 +23,7 @@
   "account.presenceFailed": "Je aanwezigheid kon niet worden gewijzigd",
   "account.signIn": "Aanmelden",
   "account.signOut": "Afmelden",
+  "account.signOutFailed": "Afmelden op dit apparaat is mislukt. Drive kan nog verbonden zijn. Probeer het opnieuw.",
   "account.signOutPending.body": "Notepads heeft op dit apparaat notities die nog niet zijn geüpload ({count}). Bij het afmelden worden ze ervan verwijderd.",
   "account.signOutPending.discard": "Weggooien en afmelden",
   "account.signOutPending.title": "Niet-geüploade notities",
@@ -334,5 +335,6 @@
   "widgets.open": "Openen",
   "widgets.pending": "In behandeling",
   "widgets.photos": "Foto’s",
-  "widgets.rows": "Rijen"
+  "widgets.rows": "Rijen",
+  "widgets.storage": "Opslag"
 }

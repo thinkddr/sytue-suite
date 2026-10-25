@@ -34,6 +34,7 @@ async function mount(options = {}) {
     // null: quien mira no administra y Drive contesta 403.
     storage: options.storage === undefined ? { connected: false, available: true } : options.storage,
     accounts: options.accounts || [],
+    personalAccounts: options.personalAccounts || [],
     saveFailure: Boolean(options.saveFailure),
     deleteConflict: Boolean(options.deleteConflict),
     nasReady: false,
@@ -41,18 +42,44 @@ async function mount(options = {}) {
     personalConnects: [],
     providers: options.providers ?? { gdrive: true, onedrive: true, dropbox: true },
     personal: options.personal ?? ['google-drive', 'onedrive', 'dropbox'],
+    quotaReads: 0,
   };
   const json = (route, value, status = 200) => route.fulfill({
     status, contentType: 'application/json', body: JSON.stringify(value),
   });
+  await context.route('**/api/quota', (route) => {
+    state.quotaReads++;
+    const connected = state.storage?.connected === true || state.personalAccounts.some((account) => account.connected);
+    const known = connected && options.knownCapacity === true;
+    return json(route, {
+      usedBytes: known ? 220 : 20, limitBytes: known ? 1124 : 100,
+      availableBytes: known ? 904 : 80,
+      baseUsedBytes: 20, baseLimitBytes: 100, externalStorage: connected,
+      externalCapacity: connected ? {
+        totalBytes: known ? 1024 : null,
+        usedBytes: known ? 200 : null,
+        availableBytes: known ? 824 : null,
+        ...(options.partialCapacity ? { partial: true } : {}),
+      } : null,
+    });
+  });
   await context.route('**/api/personal-storage/**', async (route) => {
     const request = route.request();
+    const path = new URL(request.url()).pathname;
+    if (request.method() === 'DELETE') {
+      state.personalAccounts = state.personalAccounts.filter((account) => !path.endsWith(`/${account.instance_id}`));
+      return route.fulfill({ status: 204 });
+    }
+    if (path.endsWith('/items')) return json(route, { items: [] });
+    if (path.endsWith('/accounts') && options.failAccountsAfterDisconnect && state.personalAccounts.length === 0) {
+      return json(route, { error: 'inventory_unavailable' }, 503);
+    }
     if (request.url().endsWith('/connect')) {
       const body = request.postDataJSON();
       state.personalConnects.push(body);
       return json(route, { authorize_url: `https://${PROVIDERS.gdrive.host}/sytue-test-personal?provider=${body.provider}` });
     }
-    return json(route, { items: [], providers: Object.values(PROVIDERS).map((p) => ({ provider: p.cloud, available: state.personal.includes(p.cloud) })) });
+    return json(route, { items: state.personalAccounts, providers: Object.values(PROVIDERS).map((p) => ({ provider: p.cloud, available: state.personal.includes(p.cloud) })) });
   });
   await context.route('**/drive/api/storage-external*', async (route) => {
     const request = route.request();
@@ -128,6 +155,7 @@ async function screenshot(ui, name) {
   await ui.page.screenshot({ path: `${OUT}/${name}.png`, animations: 'disabled' });
 }
 async function scenario(name, run, options = {}) {
+  if (process.env.STORAGE_SCENARIO && process.env.STORAGE_SCENARIO !== name) return;
   let ui;
   try {
     ui = await mount(options);
@@ -146,6 +174,59 @@ async function scenario(name, run, options = {}) {
 }
 
 try {
+  for (const capacity of ['known', 'partial', 'unknown']) {
+    const knownCapacity = capacity !== 'unknown';
+    await scenario(`capacity-refresh-${capacity}`, async (ui) => {
+      await expect(ui.page.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '20');
+      const initialReads = ui.state.quotaReads;
+      await ui.page.getByRole('button', { name: 'Add storage', exact: true }).click();
+      await expect(ui.dialog).toBeVisible();
+      await option(ui, 's3').click();
+      await fillServer(ui, 's3');
+      await ui.dialog.locator('input[name="accept_terms"]').check();
+      await ui.page.getByRole('button', { name: 'Connect', exact: true }).click();
+      await expect(ui.dialog).toHaveCount(0);
+      await expect(ui.page.getByText('Connected storage extends your Sytue capacity.', { exact: true })).toBeVisible();
+      expect(ui.state.quotaReads).toBeGreaterThan(initialReads);
+      if (knownCapacity) {
+        await expect(ui.page.getByText('Connected storage adds 1.0 KB.', { exact: true })).toBeVisible();
+        await expect(ui.page.getByText('220 B of 1.1 KB', { exact: true })).toBeVisible();
+        await expect(ui.page.getByText('Sytue: 20 B of 100 B', { exact: true })).toBeVisible();
+        await expect(ui.page.getByText('The provider does not report its capacity.', { exact: true })).toHaveCount(capacity === 'partial' ? 1 : 0);
+        if (capacity === 'known') await ui.page.screenshot({ path: `${OUT}/capacity-known.png`, animations: 'disabled' });
+      } else {
+        await expect(ui.page.getByText('The provider does not report its capacity.', { exact: true })).toBeVisible();
+        await expect(ui.page.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '20');
+        await expect(ui.page.getByText(/Connected storage adds/)).toHaveCount(0);
+      }
+      await ui.page.getByRole('button', { name: 'documents', exact: true }).click();
+      await ui.page.getByRole('button', { name: 'Disconnect', exact: true }).click();
+      await expect(ui.dialog).toHaveCount(0);
+      await expect(ui.page.getByText('Connected storage extends your Sytue capacity.', { exact: true })).toHaveCount(0);
+      await expect(ui.page.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '20');
+      expect(ui.state.quotaReads).toBeGreaterThan(initialReads + 1);
+    }, { knownCapacity, partialCapacity: capacity === 'partial', autoOpen: false });
+  }
+  for (const failAccountsAfterDisconnect of [false, true]) {
+    await scenario(`personal-disconnect-refreshes-capacity${failAccountsAfterDisconnect ? '-inventory-fails' : ''}`, async (ui) => {
+      await expect(ui.page.getByText('Connected storage adds 1.0 KB.', { exact: true })).toBeVisible();
+      const initialReads = ui.state.quotaReads;
+      await ui.page.getByRole('button', { name: 'Google Drive', exact: true }).click();
+      await expect(ui.page.getByRole('button', { name: 'Disconnect', exact: true })).toBeVisible();
+      await expect.poll(() => ui.state.quotaReads).toBeGreaterThan(initialReads);
+      const beforeDisconnect = ui.state.quotaReads;
+      await ui.page.getByRole('button', { name: 'Disconnect', exact: true }).click();
+      await expect(ui.page.getByText('Connected storage extends your Sytue capacity.', { exact: true })).toHaveCount(0);
+      await expect(ui.page.getByText('20 B of 100 B', { exact: true })).toBeVisible();
+      await expect(ui.page.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '20');
+      await expect.poll(() => ui.state.quotaReads).toBeGreaterThan(beforeDisconnect);
+      expect(ui.state.personalAccounts).toEqual([]);
+    }, {
+      storage: null, autoOpen: false, knownCapacity: true,
+      personalAccounts: [{ instance_id: 'personal-google', provider: 'google-drive', connected: true }],
+      failAccountsAfterDisconnect,
+    });
+  }
   await scenario('personal-cloud-is-one-click', async (ui) => {
     await expect(ui.dialog.locator('input[name="for_org"]')).toHaveCount(0);
     await expect(option(ui, 'webdav')).toHaveCount(0);

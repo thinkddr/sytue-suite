@@ -1019,12 +1019,20 @@ type recentWire struct {
 
 // Quota devuelve la cuota del tenant (inicializándola si hace falta).
 func (s *Service) Quota(ctx context.Context) (domain.Quota, error) {
-	return s.store.EnsureQuota(ctx, s.cfg.DefaultQuotaBytes)
+	q, err := s.store.EnsureQuota(ctx, s.cfg.DefaultQuotaBytes)
+	if err != nil {
+		return domain.Quota{}, err
+	}
+	return s.quotaWithStorage(ctx, q), nil
 }
 
 // SetQuotaLimit fija el límite de cuota (acción de admin).
 func (s *Service) SetQuotaLimit(ctx context.Context, limit int64) (domain.Quota, error) {
-	return s.store.SetQuotaLimit(ctx, limit)
+	q, err := s.store.SetQuotaLimit(ctx, limit)
+	if err != nil {
+		return domain.Quota{}, err
+	}
+	return s.quotaWithStorage(ctx, q), nil
 }
 
 // CreateShareInput son los datos de entrada para compartir.

@@ -164,6 +164,12 @@ export const pl: AppCatalog<typeof en> = {
     'Aby przenieść wszystko bezpośrednio do Google Workspace lub Microsoft 365 bez pobierania: jeśli masz konto osobiste lub administrujesz swoją organizacją, uruchom to samodzielnie w Sytue Admin, w sekcji Migracje; jeśli nie, poproś osobę, która nią administruje.',
   'data.move.action': 'Przejdź do Migracji',
 
+  'devices.native.body':
+    'Użyj menedżera plików urządzenia lub połącz konto za zgodą jego właściciela.',
+  'devices.native.driveBody':
+    'Sytue Drive jest dodawany automatycznie po zalogowaniu. Zezwól na jego lokalizację, jeśli system o to poprosi.',
+  'devices.native.openDrive': 'Otwórz w menedżerze plików',
+  'devices.native.failed': 'Nie udało się zaktualizować integracji urządzenia.',
   'devices.title': 'Połącz swoje urządzenia',
   'devices.lead':
     'Miej pocztę, kalendarz, kontakty i pliki z Sytue w telefonie lub na komputerze. Poprowadzimy Cię krok po kroku.',

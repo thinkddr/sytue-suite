@@ -23,6 +23,7 @@
   "account.presenceFailed": "Δεν ήταν δυνατή η αλλαγή της παρουσίας σας",
   "account.signIn": "Σύνδεση",
   "account.signOut": "Αποσύνδεση",
+  "account.signOutFailed": "Η αποσύνδεση από αυτή τη συσκευή απέτυχε. Το Drive μπορεί να είναι ακόμη συνδεδεμένο. Δοκιμάστε ξανά.",
   "account.signOutPending.body": "Το Notepads έχει σημειώσεις σε αυτή τη συσκευή που δεν έχουν ανέβει ακόμη ({count}). Με την αποσύνδεση διαγράφονται από αυτήν.",
   "account.signOutPending.discard": "Απόρριψη και αποσύνδεση",
   "account.signOutPending.title": "Σημειώσεις που δεν ανέβηκαν",
@@ -334,5 +335,6 @@
   "widgets.open": "Άνοιγμα",
   "widgets.pending": "Σε αναμονή",
   "widgets.photos": "Φωτογραφίες",
-  "widgets.rows": "Γραμμές"
+  "widgets.rows": "Γραμμές",
+  "widgets.storage": "Αποθηκευτικός χώρος"
 }

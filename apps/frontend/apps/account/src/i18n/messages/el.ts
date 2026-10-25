@@ -55,7 +55,7 @@ export const el: AppCatalog<typeof en> = {
   'security.mfa.title': 'Επαλήθευση σε δύο βήματα',
   'security.mfa.off': 'Δεν έχει ρυθμιστεί. Ο κωδικός μόνος του ανοίγει τον λογαριασμό.',
   'security.mfa.required':
-    'Ο οργανισμός σας απαιτεί επαλήθευση σε δύο βήματα. Ενεργοποιήστε την παρακάτω και συνδεθείτε ξανά.',
+    'Αυτή η ενέργεια απαιτεί επαλήθευση σε δύο βήματα. Ρυθμίστε την παρακάτω και συνδεθείτε ξανά.',
   'security.mfa.on': 'Ενεργή. Σας ζητείται κωδικός κατά τη σύνδεση.',
   'security.mfa.enable': 'Ρύθμιση',
   'security.mfa.scan': 'Σαρώστε το με την εφαρμογή ελέγχου ταυτότητας.',
@@ -116,6 +116,10 @@ export const el: AppCatalog<typeof en> = {
   'plan.pro': 'Πρόγραμμα Pro · 200 GB',
   'plan.enterprise': 'Πρόγραμμα Enterprise · 1 TB · Υποστήριξη Premium',
   'plan.storage': 'Χώρος σε χρήση',
+  'plan.externalNote': 'Ο συνδεδεμένος αποθηκευτικός χώρος αυξάνει τη χωρητικότητά σας στο Sytue.',
+  'plan.externalCapacity': 'Ο συνδεδεμένος αποθηκευτικός χώρος προσθέτει {capacity}.',
+  'plan.externalUnknown': 'Ο πάροχος δεν αναφέρει τη χωρητικότητά του.',
+  'plan.baseUsage': 'Sytue: {used} από {total}',
   'plan.paidUntil': 'Πληρωμένο έως',
   'plan.upgrade': 'Περισσότερος χώρος',
   'plan.upgrade.hint':

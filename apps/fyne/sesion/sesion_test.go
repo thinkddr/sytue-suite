@@ -771,3 +771,67 @@ func TestGeneracionCompartidaPerteneceALaIdentidadAdoptada(t *testing.T) {
 		t.Fatal("una app volvió a publicar el cierre compartido")
 	}
 }
+
+func TestCerrarSesionNoReadoptaAlmacenQueNoPudoBorrar(t *testing.T) {
+	aparte(t)
+	a := test.NewApp()
+	defer a.Quit()
+	s := Abrir(a, "sytue.eu")
+	tokens := auth.Tokens{Refresh: "sintetico", Subject: "ana", Organizacion: "acme"}
+	if err := s.almacen.Guardar(tokens); err != nil {
+		t.Fatal(err)
+	}
+	s.Sesion = auth.NewSession(tokens, nil, func(auth.Tokens) error { return errors.New("almacen no escribible") })
+	if err := s.SalirConError(); err == nil {
+		t.Fatal("ocultó el fallo de cierre compartido")
+	}
+	if s.Estado().Dentro() {
+		t.Fatal("el cierre fallido volvió a adoptar el refresh que no pudo borrar")
+	}
+	s.aplicar(ajustes.Leer())
+	if s.Estado().Dentro() {
+		t.Fatal("la vigilancia readoptó una copia no borrada")
+	}
+}
+
+func TestHabilitarDriveNoAutorizaSesionObsoletaEnMemoria(t *testing.T) {
+	aparte(t)
+	a := test.NewApp()
+	defer a.Quit()
+	s := Abrir(a, "sytue.eu")
+	// Representa otra app que aún conserva la cuenta anterior tras el cierre
+	// compartido. No ha recibido una nueva notificación de ajustes.
+	s.Sesion.Sincronizar(auth.Tokens{Refresh: "copia-obsoleta", Subject: "ana", Organizacion: "acme", Issuer: "https://id.sytue.eu", Cliente: auth.ClientID})
+	if err := s.PonerDriveEnSistema(true); err != nil {
+		t.Fatal(err)
+	}
+	acceso, _ := ajustes.LeerAccesoDrive()
+	if acceso.Activo {
+		t.Fatal("un ajuste publicó autorización desde memoria obsoleta")
+	}
+}
+
+func TestHabilitarDriveRespetaBloqueoYFaltaDeSesionLocal(t *testing.T) {
+	for _, caso := range []string{"sin_sesion_local", "reidentificacion"} {
+		t.Run(caso, func(t *testing.T) {
+			aparte(t)
+			a := test.NewApp()
+			defer a.Quit()
+			s := Abrir(a, "sytue.eu")
+			s.Sesion.Adoptar(auth.Tokens{Refresh: "sintetico", Subject: "ana", Organizacion: "acme"})
+			s.aplicar(ajustes.Leer()) // la app ya recibió la generación guardada
+			if caso == "reidentificacion" {
+				s.reidentificando.Store(true)
+			} else {
+				s.Sesion.Sincronizar(auth.Tokens{})
+			}
+			if err := s.PonerDriveEnSistema(true); err != nil {
+				t.Fatal(err)
+			}
+			acceso, _ := ajustes.LeerAccesoDrive()
+			if acceso.Activo {
+				t.Fatal("habilitar Drive eludió la sesión local o su bloqueo")
+			}
+		})
+	}
+}

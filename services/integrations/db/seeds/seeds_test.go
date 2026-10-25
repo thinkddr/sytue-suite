@@ -281,7 +281,7 @@ func TestLoad_laCredencialDePlataformaNoSaleDelProveedor(t *testing.T) {
 	}
 }
 
-// El almacenamiento usa consentimiento de archivos con renovación, sin sustituir
+// El almacenamiento usa consentimiento de archivos y cuota con renovación, sin sustituir
 // la plantilla SAML de Dropbox Business que ya pueden tener otras organizaciones.
 func TestDropboxStoragePideConsentimientoRenovable(t *testing.T) {
 	list, err := seeds.Load()
@@ -298,8 +298,8 @@ func TestDropboxStoragePideConsentimientoRenovable(t *testing.T) {
 		}
 		if m.OAuth == nil || m.OAuth.AuthorizeParams["token_access_type"] != "offline" ||
 			m.OAuth.TokenURL != "https://api.dropboxapi.com/oauth2/token" ||
-			strings.Join(m.OAuth.Scopes, " ") != "files.metadata.read files.content.read files.content.write" {
-			t.Fatalf("Dropbox debe pedir solo acceso a archivos y un refresh token: %+v", m.OAuth)
+			strings.Join(m.OAuth.Scopes, " ") != "account_info.read files.metadata.read files.content.read files.content.write" {
+			t.Fatalf("Dropbox debe pedir archivos, capacidad y un refresh token: %+v", m.OAuth)
 		}
 		return
 	}

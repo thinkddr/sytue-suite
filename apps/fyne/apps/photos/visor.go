@@ -57,14 +57,16 @@ const (
 )
 
 // AltoCabeceraVisor es lo que ocupa la barra de mandos del visor, filete incluido.
-func AltoCabeceraVisor() float32 { return LadoMandoVisor + 2*RellenoVisorY + tema.Borde }
+func AltoCabeceraVisor() float32 {
+	return ui.SueloTactil(LadoMandoVisor) + 2*RellenoVisorY + tema.Borde
+}
 
 // altoCabeceraVisor es la del visor a ese ancho de ventana: por debajo de `lg:` se parte
 // en dos filas (el nombre y «Cerrar» arriba, los mandos debajo) con el `gap-2` entre
 // ellas.
 func altoCabeceraVisor(ventana float32) float32 {
 	if ventana < ui.CorteLG {
-		return AltoCabeceraVisor() + HuecoVisor + LadoMandoVisor
+		return AltoCabeceraVisor() + HuecoVisor + ui.SueloTactil(LadoMandoVisor)
 	}
 	return AltoCabeceraVisor()
 }
@@ -284,28 +286,29 @@ type cabeceraPartida struct {
 }
 
 func (cabeceraPartida) MinSize([]fyne.CanvasObject) fyne.Size {
-	return fyne.NewSize(0, 2*LadoMandoVisor+HuecoVisor)
+	return fyne.NewSize(0, 2*ui.SueloTactil(LadoMandoVisor)+HuecoVisor)
 }
 
 func (c cabeceraPartida) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 	nombre, aviso := c.nombre, c.aviso
 	cerrar, desliza, mascara := objs[2], objs[3], objs[4]
+	lado := ui.SueloTactil(LadoMandoVisor)
 	mc := cerrar.MinSize()
-	cerrar.Move(fyne.NewPos(max(t.Width-mc.Width, 0), (LadoMandoVisor-mc.Height)/2))
+	cerrar.Move(fyne.NewPos(max(t.Width-mc.Width, 0), (lado-mc.Height)/2))
 	cerrar.Resize(mc)
 	libre := max(t.Width-mc.Width-2*HuecoVisor, 0)
 	anchoAviso := min(ui.Medir(c.textoAviso, tema.TextoXS, ui.Normal).Width, libre)
 	anchoNombre := ui.Truncar(nombre, c.textoNombre, tema.TextoSM, ui.Medio, libre-anchoAviso)
-	ui.ColocarTexto(nombre, tema.TextoSM, 0, (LadoMandoVisor-tema.TextoSM.Linea)/2)
+	ui.ColocarTexto(nombre, tema.TextoSM, 0, (lado-tema.TextoSM.Linea)/2)
 	ui.Truncar(aviso, c.textoAviso, tema.TextoXS, ui.Normal, anchoAviso)
 	ui.ColocarTexto(aviso, tema.TextoXS, max(t.Width-mc.Width-HuecoVisor-anchoAviso, anchoNombre+HuecoVisor),
-		(LadoMandoVisor-tema.TextoXS.Linea)/2)
-	y := float32(LadoMandoVisor + HuecoVisor)
+		(lado-tema.TextoXS.Linea)/2)
+	y := lado + HuecoVisor
 	desliza.Move(fyne.NewPos(0, y))
-	desliza.Resize(fyne.NewSize(t.Width, LadoMandoVisor))
+	desliza.Resize(fyne.NewSize(t.Width, lado))
 	const fundido = 28
 	mascara.Move(fyne.NewPos(max(t.Width-fundido, 0), y))
-	mascara.Resize(fyne.NewSize(min(fundido, t.Width), LadoMandoVisor))
+	mascara.Resize(fyne.NewSize(min(fundido, t.Width), lado))
 }
 
 // mandosVisor son los mandos de la cabecera: UNA sola talla (el `IconButton size="lg"`,
@@ -498,14 +501,14 @@ func (l visorLayout) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 	switch {
 	case l.d.ConFicha && len(objs) > i+1 && movil(l.ventana):
 		// `max-md:flex-col`: el asa y la ficha DEBAJO de la foto, a todo el ancho.
-		alto := min(max(l.d.AltoFicha, AltoFichaMin), AltoFichaMax)
+		alto := medidaFichaVisible(l.d.AltoFicha, AltoFichaMin, AltoFichaMax, t.Height-y)
 		altoFicha = alto + AnchoAsaFicha
 		objs[i].Move(fyne.NewPos(0, t.Height-altoFicha))
 		objs[i].Resize(fyne.NewSize(t.Width, AnchoAsaFicha))
 		objs[i+1].Move(fyne.NewPos(0, t.Height-alto))
 		objs[i+1].Resize(fyne.NewSize(t.Width, alto))
 	case l.d.ConFicha && len(objs) > i+1:
-		ancho := min(max(l.d.AnchoFicha, AnchoFichaMin), AnchoFichaMax)
+		ancho := medidaFichaVisible(l.d.AnchoFicha, AnchoFichaMin, AnchoFichaMax, t.Width)
 		anchoFicha = ancho + AnchoAsaFicha
 		objs[i].Move(fyne.NewPos(t.Width-anchoFicha, y))
 		objs[i].Resize(fyne.NewSize(AnchoAsaFicha, max(t.Height-y, 0)))
@@ -514,6 +517,13 @@ func (l visorLayout) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 	}
 	objs[3].Move(fyne.NewPos(0, y))
 	objs[3].Resize(fyne.NewSize(max(t.Width-anchoFicha, 0), max(t.Height-y-altoFicha, 0)))
+}
+
+// medidaFichaVisible conserva la preferencia, pero deja al menos el 40 % del
+// cuerpo para la foto, como el panel inferior del editor. Al girar puede ceder
+// por debajo del mínimo de arrastre: el resto de la ficha sigue en su scroll.
+func medidaFichaVisible(pedido, minimo, maximo, disponible float32) float32 {
+	return min(max(pedido, minimo), maximo, max(0.6*disponible-AnchoAsaFicha, 0))
 }
 
 // bandaBorrar es la confirmación que va DENTRO del visor: `border-border bg-surface
@@ -767,12 +777,12 @@ func FichaDelVisor(v Vista, d Visor) fyne.CanvasObject {
 	// El `p-4` va DENTRO del desplazamiento, como el `overflow-y-auto` del aside, y el
 	// alto se cuenta al ancho de verdad de la ficha: sin él, el desplazamiento mediría
 	// los párrafos partidos a su ancho mínimo y dejaría un hueco al final.
-	ancho := min(max(d.AnchoFicha, AnchoFichaMin), AnchoFichaMax) - tema.Borde - 2*RellenoFicha
+	ancho := max(medidaFichaVisible(d.AnchoFicha, AnchoFichaMin, AnchoFichaMax, v.Ventana)-tema.Borde-2*RellenoFicha, 0)
 	if movil(v.Ventana) {
 		ancho = max(v.Ventana-2*RellenoFicha, 0) // `max-md:border-t max-md:border-l-0`
 	}
 	cuerpo := container.New(ui.Margen{Izq: RellenoFicha, Der: RellenoFicha, Arr: RellenoFicha, Abj: RellenoFicha},
-		ui.AlAncho(ancho, ui.PilaBloques(bloques...)))
+		ui.AlAnchoFluido(ancho, ui.PilaBloques(bloques...)))
 	return container.New(fichaLayout{arriba: movil(v.Ventana)}, canvas.NewRectangle(tema.Color("border", v.Variante)), container.NewVScroll(cuerpo))
 }
 

@@ -43,7 +43,7 @@ STRIP_INSTALLED_PRODUCT = NO
 // Apple» en docs/operations.md. Lo leen empaquetar.sh (`widgets-apple`), generar.py,
 // widgetkit-apple.py y release-desktop.yml, y viaja con el tag: uno anterior sale apagado.
 // Cambiarlo pide regenerar el proyecto (`python3 generar.py`) en el mismo commit.
-SYTUE_WIDGETS_APPLE = NO
+SYTUE_WIDGETS_APPLE = YES
 
 // La versión del tag y el número de build de Xcode Cloud los escribe
 // ci_scripts/ci_post_clone.sh en version.xcconfig (no versionado). Sin él, en un Mac de

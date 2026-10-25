@@ -61,9 +61,13 @@ func New(baseURL, secretoInterno string) *Drive {
 
 // Resumen es la cuota tal como la cuenta Drive.
 type Resumen struct {
-	LimitBytes     int64 `json:"limit_bytes"`
-	UsedBytes      int64 `json:"used_bytes"`
-	AvailableBytes int64 `json:"available_bytes"`
+	LimitBytes     int64  `json:"limit_bytes"`
+	UsedBytes      int64  `json:"used_bytes"`
+	AvailableBytes int64  `json:"available_bytes"`
+	BaseLimitBytes *int64 `json:"base_limit_bytes"`
+	BaseUsedBytes  *int64 `json:"base_used_bytes"`
+	// nil conserva que una versión anterior de Drive no declaraba el origen.
+	ExternalStorage *bool `json:"external_storage"`
 }
 
 // Consultar pregunta a Drive, con el token de la persona, la cuota de su
@@ -97,9 +101,20 @@ func (d *Drive) Consultar(ctx context.Context, bearer string) (Resumen, error) {
 	return out, nil
 }
 
-// Disponible dice cuántos bytes le quedan a la organización de quien llama.
+// Disponible devuelve el espacio de Sytue donde Cast guarda sus originales.
+// La vista de la cuenta incluye también nubes que Cast no usa como destino:
+// esa ampliación no debe convertirse en crédito para sus blobs locales.
 func (d *Drive) Disponible(ctx context.Context, bearer string) (int64, error) {
 	r, err := d.Consultar(ctx, bearer)
+	if err != nil {
+		return 0, err
+	}
+	if r.BaseLimitBytes != nil || r.BaseUsedBytes != nil {
+		if r.BaseLimitBytes == nil || r.BaseUsedBytes == nil || *r.BaseUsedBytes < 0 || *r.BaseLimitBytes <= *r.BaseUsedBytes {
+			return 0, nil
+		}
+		return *r.BaseLimitBytes - *r.BaseUsedBytes, nil
+	}
 	return r.AvailableBytes, err
 }
 

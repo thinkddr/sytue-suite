@@ -55,12 +55,9 @@ type Libro struct {
 
 // anchoUtilDe es el `max-w-*` centrado en `main` menos su `px-6`.
 func anchoUtilDe(ventana, maximo float32) float32 {
-	main := ventana - ocupaCarcasa()
+	main := ventana - ocupaCarcasa(ventana)
 	if ventana == 0 {
 		main = maximo
-	}
-	if ventana > 0 && ventana < ui.Estrecho {
-		main = ventana
 	}
 	return max(min(main, maximo)-2*MargenLista, 0)
 }

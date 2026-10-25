@@ -151,8 +151,7 @@ func (a *App) abrirVisor(origen origenVisor, i int, suelta ...api.Photo) {
 	a.pintarVisor()
 	if a.w != nil {
 		c := a.w.Canvas()
-		c.Overlays().Add(e.capa)
-		e.capa.Resize(c.Size())
+		e.capa.mostrar(c)
 		// Sin nada enfocado: así las flechas, Espacio, «i» y «z» llegan al visor.
 		c.Unfocus()
 	}
@@ -720,6 +719,15 @@ func (c *capaVisor) poner(o fyne.CanvasObject) {
 	c.Refresh()
 }
 
+// mostrar respeta desde la apertura el área que el driver usa al recolocar las
+// capas: en horizontal deja fuera el notch y en iOS también el teclado visible.
+func (c *capaVisor) mostrar(lienzo fyne.Canvas) {
+	lienzo.Overlays().Add(c)
+	pos, tam := lienzo.InteractiveArea()
+	c.Resize(tam)
+	c.Move(pos)
+}
+
 func (c *capaVisor) CreateRenderer() fyne.WidgetRenderer { return &capaVisorRenderer{c: c} }
 
 type capaVisorRenderer struct{ c *capaVisor }
@@ -753,13 +761,13 @@ func (a *App) huecoVisor() fyne.Size {
 	if a.w == nil || a.vis == nil {
 		return fyne.NewSize(0, 0)
 	}
-	t := a.w.Canvas().Size()
+	_, t := a.w.Canvas().InteractiveArea()
 	w, h := t.Width, t.Height-altoCabeceraVisor(a.v.Ventana)
 	if a.vis.conFicha {
 		if movil(a.v.Ventana) {
-			h -= a.medidaFicha(prefAltoFicha, AltoFicha, AltoFichaMin, AltoFichaMax) + AnchoAsaFicha
+			h -= medidaFichaVisible(a.medidaFicha(prefAltoFicha, AltoFicha, AltoFichaMin, AltoFichaMax), AltoFichaMin, AltoFichaMax, h) + AnchoAsaFicha
 		} else {
-			w -= a.medidaFicha(prefAnchoFicha, AnchoFicha, AnchoFichaMin, AnchoFichaMax) + AnchoAsaFicha
+			w -= medidaFichaVisible(a.medidaFicha(prefAnchoFicha, AnchoFicha, AnchoFichaMin, AnchoFichaMax), AnchoFichaMin, AnchoFichaMax, w) + AnchoAsaFicha
 		}
 	}
 	return fyne.NewSize(max(w, 0), max(h, 0))

@@ -10,9 +10,11 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"math/bits"
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -72,6 +74,21 @@ func Notify(bundle string) {
 type Counter struct {
 	Kind  string `json:"kind"`
 	Value int64  `json:"value"`
+}
+
+// StoragePercent describes a complete quota already fetched by the app. It never
+// exposes capacity or identifiers. Saturation also covers an exceeded quota;
+// multiplication uses 128 bits so a valid large capacity cannot wrap around.
+func StoragePercent(used, capacity int64) (Counter, bool) {
+	if used < 0 || capacity <= 0 {
+		return Counter{}, false
+	}
+	percent := uint64(100)
+	if used < capacity {
+		hi, lo := bits.Mul64(uint64(used), 100)
+		percent, _ = bits.Div64(hi, lo, uint64(capacity))
+	}
+	return Counter{Kind: "storage_percent", Value: int64(percent)}, true
 }
 
 // Snapshot is a disposable view of counters fetched by an authenticated app.
@@ -138,6 +155,10 @@ func validCounters(counters []Counter) bool {
 	for _, c := range counters {
 		switch c.Kind {
 		case "unread", "files", "events", "documents", "contacts", "notes", "rows", "pending", "channels", "photos", "episodes", "apps", "calendars", "address_books":
+		case "storage_percent":
+			if c.Value > 100 {
+				return false
+			}
 		default:
 			return false
 		}
@@ -182,9 +203,10 @@ func Publish(ctx context.Context, bundle, product string, scope Scope, counters 
 	if err != nil {
 		return err
 	}
+	changed := false
 	defer func() {
 		release()
-		if result == nil {
+		if result == nil && changed {
 			Notify(bundle)
 		}
 	}()
@@ -193,12 +215,31 @@ func Publish(ctx context.Context, bundle, product string, scope Scope, counters 
 		return ErrPrivate
 	}
 	now := time.Now()
+	// Real-time deltas and repeated list refreshes can return the same counters.
+	// Keep the original observation/expiry and avoid exhausting WidgetKit's reload
+	// budget. A fresh authenticated fetch still renews the snapshot before the last
+	// third of its lifetime, and changed data is published immediately.
+	if previous, err := readFile(destination); err == nil && previous.reusable(product, state.Sesion, counters, now, age) {
+		return nil
+	}
 	s := Snapshot{Version: Version, Product: product, Generation: scope.generation, UpdatedAt: now.Unix(), ExpiresAt: now.Add(age).Unix(), Active: true, Counters: append([]Counter{}, counters...)}
 	data, err := json.Marshal(s)
 	if err != nil {
 		return err
 	}
-	return ajustes.EscribirEntero(destination, data)
+	if err := ajustes.EscribirEntero(destination, data); err != nil {
+		return err
+	}
+	changed = true
+	return nil
+}
+
+// reusable is called after validating the current session lock under the suite
+// lock. It cannot preserve another identity, stale data or an excessive lifetime.
+func (s Snapshot) reusable(product, generation string, counters []Counter, now time.Time, age time.Duration) bool {
+	return s.Product == product && s.Visible(generation, false, now) &&
+		slices.Equal(s.Counters, counters) && s.ExpiresAt <= now.Add(age).Unix() &&
+		s.UpdatedAt > now.Add(-age*2/3).Unix() && s.ExpiresAt >= now.Add(age/3).Unix()
 }
 
 // Visible is also the contract implemented by native providers. Counters are
@@ -214,6 +255,18 @@ func Read(bundle string) (Snapshot, error) {
 	if err != nil {
 		return Snapshot{}, err
 	}
+	s, err := readFile(filename)
+	if err != nil {
+		return Snapshot{}, err
+	}
+	state := ajustes.Leer()
+	if !s.Visible(state.Sesion, state.Bloqueo, time.Now()) {
+		return Snapshot{}, ErrPrivate
+	}
+	return s, nil
+}
+
+func readFile(filename string) (Snapshot, error) {
 	f, err := os.Open(filename)
 	if err != nil {
 		return Snapshot{}, err
@@ -232,10 +285,6 @@ func Read(bundle string) (Snapshot, error) {
 	var trailing any
 	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
 		return Snapshot{}, ErrInvalid
-	}
-	state := ajustes.Leer()
-	if !s.Visible(state.Sesion, state.Bloqueo, time.Now()) {
-		return Snapshot{}, ErrPrivate
 	}
 	return s, nil
 }

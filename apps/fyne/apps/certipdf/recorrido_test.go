@@ -15,7 +15,9 @@ import (
 
 	"fyne.io/fyne/v2"
 
+	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/ui/recorrido"
+	"git.sytue.eu/sytue/one/apps/fyne/ui/recorrido/montaje"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 )
 
@@ -79,5 +81,6 @@ func TestRecorridoConSesion(t *testing.T) {
 			t.Fatalf("la página %d sigue cargando o falló antes de retratar: %d", h.Numero(), h.estado)
 		}
 	}
+	montaje.ComprobarRotacion(t, w, "certipdf/documento", iconos.PDF, true)
 	recorrido.Comprobar(t, w, 400)
 }

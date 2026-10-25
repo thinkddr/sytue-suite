@@ -75,6 +75,7 @@ jobs:
         if: inputs.finding_type != 'code-scanning'
         env:
           ALERT_PRIMARY_TOKEN: ${{ secrets.SECURITY_ALERTS_TOKEN }}
+          ALERT_JOB_TOKEN: ${{ github.token }}
           ALERT_CONNECTOR_TOKEN: ${{ secrets.CODEX_PR_TOKEN }}
         run: node .github/scripts/security-auth.mjs
 
@@ -85,7 +86,7 @@ jobs:
           ALERT_NUMBER: ${{ inputs.alert_number }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           CODE_SCANNING_TOKEN: ${{ github.token }}
-          SECURITY_ALERTS_TOKEN: ${{ steps.alert_auth.outputs.credential == 'connector' && secrets.CODEX_PR_TOKEN || secrets.SECURITY_ALERTS_TOKEN }}
+          SECURITY_ALERTS_TOKEN: ${{ steps.alert_auth.outputs.credential == 'job' && github.token || (steps.alert_auth.outputs.credential == 'connector' && secrets.CODEX_PR_TOKEN || secrets.SECURITY_ALERTS_TOKEN) }}
           GH_TOKEN: ${{ github.token }}
         run: node .github/scripts/security-queue.mjs
 
@@ -138,7 +139,7 @@ jobs:
           FINDING_TYPE: ${{ needs.select.outputs.finding_type }}
           ALERT_NUMBER: ${{ needs.select.outputs.alert_number }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
-          SECURITY_ALERTS_TOKEN: ${{ needs.select.outputs.finding_type == 'dependabot' && (needs.select.outputs.dependabot_credential == 'connector' && secrets.CODEX_PR_TOKEN || secrets.SECURITY_ALERTS_TOKEN) || github.token }}
+          SECURITY_ALERTS_TOKEN: ${{ needs.select.outputs.finding_type == 'dependabot' && (needs.select.outputs.dependabot_credential == 'job' && github.token || (needs.select.outputs.dependabot_credential == 'connector' && secrets.CODEX_PR_TOKEN || secrets.SECURITY_ALERTS_TOKEN)) || github.token }}
           ALERT_CONTEXT_PATH: ${{ runner.temp }}/alert-context/alert.json
         run: |
           mkdir -p "$RUNNER_TEMP/alert-context"

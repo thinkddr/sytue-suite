@@ -782,6 +782,19 @@ func (f *funcionPDF) evaluarPS(entradas []float64) []float64 {
 	return out
 }
 
+// psSmallInteger checks both conversion steps: a finite float to int64, then a
+// signed integer to the native index width. The interpreter stack has 1024 slots.
+func psSmallInteger(raw float64) (int, bool) {
+	if math.IsNaN(raw) || raw < -1024 || raw > 1024 {
+		return 0, false
+	}
+	value := int64(raw)
+	if value < -1024 || value > 1024 {
+		return 0, false
+	}
+	return int(value), true
+}
+
 //nolint:gocognit,gocyclo // Conjunto fijo de operadores de la tabla 42 de PDF (§7.10.5).
 func ejecutarPS(tokens []tokenPS, pila []valorPS, pasos *int) []valorPS {
 	pop := func() valorPS {
@@ -981,29 +994,25 @@ func ejecutarPS(tokens []tokenPS, pila []valorPS, pasos *int) []valorPS {
 				pila = append(pila, pila[len(pila)-1])
 			}
 		case "copy":
-			raw := pop().num
-			if raw >= 1 && raw <= 1024 && raw <= float64(len(pila)) {
-				n := int(raw)
-				if len(pila)+n <= 1024 {
-					pila = append(pila, pila[len(pila)-n:]...)
-				}
+			n, ok := psSmallInteger(pop().num)
+			if ok && n > 0 && n <= len(pila) && len(pila)+n <= 1024 {
+				pila = append(pila, pila[len(pila)-n:]...)
 			}
 		case "index":
-			raw := pop().num
-			if raw >= 0 && raw < 1024 && raw < float64(len(pila)) && len(pila) < 1024 {
-				n := int(raw)
+			n, ok := psSmallInteger(pop().num)
+			if ok && n >= 0 && n < len(pila) && len(pila) < 1024 {
 				pila = append(pila, pila[len(pila)-1-n])
 			}
 		case "roll":
 			rawJ, rawN := pop().num, pop().num
-			if rawN >= 1 && rawN <= 1024 && rawN <= float64(len(pila)) && !math.IsNaN(rawJ) && !math.IsInf(rawJ, 0) {
-				n := int(rawN)
+			n, ok := psSmallInteger(rawN)
+			if ok && n > 0 && n <= len(pila) && !math.IsNaN(rawJ) && !math.IsInf(rawJ, 0) {
 				// Reduce before conversion and subtraction: k-MinInt can overflow.
 				rotation := math.Mod(rawJ, float64(n))
-				if rotation < -1024 || rotation > 1024 {
+				j, ok := psSmallInteger(rotation)
+				if !ok {
 					continue
 				}
-				j := int(rotation)
 				ini := len(pila) - n
 				viejo := append([]valorPS(nil), pila[ini:]...)
 				for k := 0; k < n; k++ {

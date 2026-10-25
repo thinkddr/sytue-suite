@@ -20,7 +20,8 @@ describe('nativeWorkerResponse', () => {
     expect(source).toContain("indexedDB.deleteDatabase('sytue-offline')");
     expect(source).toContain('SYTUE_CLEAR_OFFLINE');
     expect(source).toContain('includeUncontrolled: true');
-    expect(source).toContain("sinBase(url.pathname).startsWith('/auth/logout')");
+    expect(source).toContain('const path = sinBase(url.pathname)');
+    expect(source).toContain("path.startsWith('/auth/logout')");
     expect(source).toContain('SYTUE_NETWORK_STATE');
   });
 

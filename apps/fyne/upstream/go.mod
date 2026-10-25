@@ -5,6 +5,7 @@
 // un aviso contra Fyne, GLFW o typesetting pone `security` en rojo (FYP-04).
 // empaquetar-test.sh comprueba que cada `replace … => github.com/thinkddr/` tenga aquí
 // su original y en la misma versión que pide apps/fyne/go.mod.
+// No ejecutar go mod tidy: al no haber fuentes, borraría este inventario deliberado.
 module git.sytue.eu/sytue/one/apps/fyne/upstream
 
 go 1.27.3

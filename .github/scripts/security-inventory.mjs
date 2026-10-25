@@ -56,6 +56,7 @@ export async function securityInventory({ env = process.env, fetchImpl = globalT
         location: instance?.location ? {
           path: text(instance.location.path, 2048),
           startLine: instance.location.start_line, endLine: instance.location.end_line,
+          startColumn: instance.location.start_column, endColumn: instance.location.end_column,
         } : null,
         message: text(instance?.message?.text),
       });

@@ -119,6 +119,16 @@ it expires after one day. This workflow does not change alert states or dismiss
 findings. Treat artifact contents as untrusted evidence. An alert is fixed only
 when GitHub reports it fixed after analysis of the default branch.
 
+**Reviewed security dispositions** is a separate, manual workflow for explicitly
+reviewed false positives. Its default run only prepares a plan with read access.
+Applying the plan requires the `apply` input and uses a separate job with
+`security-events: write`. Only the exact alert numbers, rules and files listed in
+`.github/security-reviewed-alerts.json` may be classified. Source/test Git blob IDs
+and the current default-branch revision are checked before changes; stale evidence
+or changed alert metadata fails the run. The justification is saved in the alert.
+These dispositions are **dismissed as false positives**, not reported as fixed.
+Queries remain enabled and actual vulnerabilities must be fixed and reanalyzed.
+
 1. Open an alert in **Security → Code scanning** or **Security → Dependabot** and
    copy its number, the final segment of the URL.
 2. To prioritize a specific alert or retry a closed task, go to

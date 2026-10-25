@@ -51,6 +51,8 @@ export async function securityInventory({ env = process.env, fetchImpl = globalT
         url: `https://github.com/${repository}/security/code-scanning/${alert.number}`,
         rule: { id: text(alert.rule.id, 300), severity: text(alert.rule.security_severity_level, 100), description: text(alert.rule.description) },
         tool: text(alert.tool?.name, 300),
+        analyzedCommit: text(instance?.commit_sha, 64),
+        ref: text(instance?.ref, 1024),
         location: instance?.location ? {
           path: text(instance.location.path, 2048),
           startLine: instance.location.start_line, endLine: instance.location.end_line,

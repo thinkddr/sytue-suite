@@ -10,6 +10,7 @@ import (
 
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/platform/pkg/log"
+	"git.sytue.eu/sytue/one/platform/pkg/logsafe"
 	"git.sytue.eu/sytue/one/services/integrations/internal/connector"
 	"git.sytue.eu/sytue/one/services/integrations/internal/manifest"
 )
@@ -68,7 +69,7 @@ func (h *Handlers) EmbedToken(w http.ResponseWriter, r *http.Request) {
 
 	// Runtime: único cliente de egress. El Bearer del service principal sale del vault
 	// y lo inyecta la pasarela como cabecera; el driver no lo ve.
-	rt := h.egressRuntime(inst, log.From(ctx).With("instance", inst.ID, "org", inst.OrgID))
+	rt := h.egressRuntime(inst, log.From(ctx).With("instance", logsafe.Text(inst.ID), "org", inst.OrgID))
 
 	// El driver recibe la instancia SIN el "bearer" (inyectado en el Runtime); los
 	// demás secretos sí (mismo criterio que QueryData).

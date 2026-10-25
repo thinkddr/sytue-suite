@@ -28,6 +28,7 @@ import (
 	"git.sytue.eu/sytue/one/platform/pkg/events"
 	"git.sytue.eu/sytue/one/platform/pkg/livekit"
 	"git.sytue.eu/sytue/one/platform/pkg/log"
+	"git.sytue.eu/sytue/one/platform/pkg/logsafe"
 	"git.sytue.eu/sytue/one/platform/pkg/pg"
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 	"git.sytue.eu/sytue/one/services/rooms/internal/media/config"
@@ -590,7 +591,7 @@ func (s *Service) SetCanPublish(ctx context.Context, roomID uuid.UUID, identity 
 	if !canPublish {
 		if _, err := s.silenciar(ctx, room.Name, identity); err != nil {
 			log.From(ctx).Warn("meet: retirada la palabra, pero la pista seguía viva",
-				"room", room.Name, "identity", identity, "error", err)
+				"room", room.Name, "identity", logsafe.Text(identity), "error", err)
 		}
 	}
 	evento := "meet.participant.speech_granted"
@@ -1157,12 +1158,12 @@ func (s *Service) HandleWebhookEvent(ctx context.Context, ev livekit.WebhookEven
 	if slug == "" {
 		// Sin tenant identificable no podemos aplicar RLS; ignoramos el evento
 		// (p. ej. rooms creadas fuera de Sytue Rooms). No es un error reintentar.
-		log.From(ctx).Warn("meet: webhook sin tenant en metadata; ignorado", "event", ev.Event)
+		log.From(ctx).Warn("meet: webhook sin tenant en metadata; ignorado", "event", logsafe.Text(ev.Event))
 		return nil
 	}
 	t, err := tenancy.New(slug)
 	if err != nil {
-		log.From(ctx).Warn("meet: tenant inválido en metadata de webhook", "slug", slug, "error", err)
+		log.From(ctx).Warn("meet: tenant inválido en metadata de webhook", "slug", logsafe.Text(slug), "error", logsafe.Text(err))
 		return nil
 	}
 	return s.HandleWebhook(tenancy.Into(ctx, t), ev)

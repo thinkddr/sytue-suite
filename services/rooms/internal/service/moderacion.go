@@ -10,6 +10,7 @@ import (
 
 	"git.sytue.eu/sytue/one/platform/pkg/hubnotify"
 	"git.sytue.eu/sytue/one/platform/pkg/log"
+	"git.sytue.eu/sytue/one/platform/pkg/logsafe"
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 	"git.sytue.eu/sytue/one/services/rooms/internal/domain"
 	"git.sytue.eu/sytue/one/services/rooms/internal/store"
@@ -35,7 +36,7 @@ func (s *Service) Report(ctx context.Context, rec store.NewReport) (uuid.UUID, e
 	}
 	t, _ := tenancy.From(ctx)
 	log.From(ctx).Info("rooms: denuncia registrada",
-		"report", r.ID, "tenant", t.Slug, "reporter", rec.Reporter, "reason", rec.Reason,
+		"report", r.ID, "tenant", t.Slug, "reporter", rec.Reporter, "reason", logsafe.Text(rec.Reason),
 		"channel", rec.ChannelID, "message", rec.MessageID, "moderadores", len(r.Moderadores))
 	if s.hubNotifier != nil {
 		for _, sub := range r.Moderadores {
@@ -90,7 +91,7 @@ func (s *Service) ResolveReportOperador(ctx context.Context, org string, id uuid
 func (s *Service) trasResolver(ctx context.Context, r domain.Report, actor, action string) domain.Report {
 	t, _ := tenancy.From(ctx)
 	log.From(ctx).Info("rooms: denuncia resuelta",
-		"report", r.ID, "tenant", t.Slug, "actor", actor, "action", action, "channel", r.ChannelID, "from", r.ResolvedFrom)
+		"report", r.ID, "tenant", t.Slug, "actor", actor, "action", logsafe.Text(action), "channel", r.ChannelID, "from", r.ResolvedFrom)
 	switch action {
 	case domain.ReportMessageDeleted:
 		s.publish(ctx, EventMessageDeleted, r.ChannelID, map[string]any{"id": r.MessageID, "channel_id": r.ChannelID})

@@ -13,6 +13,7 @@ import (
 	"git.sytue.eu/sytue/one/platform/pkg/authn"
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/platform/pkg/log"
+	"git.sytue.eu/sytue/one/platform/pkg/logsafe"
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 	"git.sytue.eu/sytue/one/services/integrations/internal/connector"
 	"git.sytue.eu/sytue/one/services/integrations/internal/directory"
@@ -271,7 +272,7 @@ func (h *Handlers) rememberDiscovery(ctx context.Context, inst connector.Instanc
 	}
 	if _, err := h.store.UpdateInstance(ctx, inst.ID, current.Name, raw, current.Status, current.LevelEnabled); err != nil {
 		log.From(ctx).Warn("integrations: no se pudo anotar lo descubierto del origen",
-			"instance", inst.ID, "error", err)
+			"instance", logsafe.Text(inst.ID), "error", err)
 	}
 }
 

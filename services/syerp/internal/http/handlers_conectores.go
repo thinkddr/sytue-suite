@@ -14,6 +14,7 @@ import (
 
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/platform/pkg/log"
+	"git.sytue.eu/sytue/one/platform/pkg/logsafe"
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 	"git.sytue.eu/sytue/one/services/syerp/internal/conectores"
 	"git.sytue.eu/sytue/one/services/syerp/internal/store"
@@ -235,7 +236,7 @@ func (h *Handlers) WebhookStripe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ctx := tenancy.Into(r.Context(), tenant)
-	registro := log.From(ctx).With("proveedor", "stripe", "org", slug)
+	registro := log.From(ctx).With("proveedor", "stripe", "org", logsafe.Text(slug))
 
 	// El cuerpo CRUDO, byte a byte: la firma se calcula sobre él y reserializar
 	// el JSON la invalida.
@@ -280,7 +281,7 @@ func (h *Handlers) WebhookStripe(w http.ResponseWriter, r *http.Request) {
 			httpx.Fail(w, r, err)
 			return
 		}
-		registro.Warn(motivo, "evento", cobro.EventoID, "externo", cobro.ExternoID, "ref", cobro.RefDocumento)
+		registro.Warn(motivo, "evento", logsafe.Text(cobro.EventoID), "externo", logsafe.Text(cobro.ExternoID), "ref", logsafe.Text(cobro.RefDocumento))
 		httpx.NoContent(w)
 	}
 
@@ -300,7 +301,7 @@ func (h *Handlers) WebhookStripe(w http.ResponseWriter, r *http.Request) {
 		diario, "Cobro "+factura.Ref+" · Stripe", cobro.Centimos, time.Now().UTC(), "stripe")
 	switch {
 	case errors.Is(err, store.ErrEventoRepetido):
-		registro.Info("evento de Stripe repetido, ignorado", "evento", cobro.EventoID)
+		registro.Info("evento de Stripe repetido, ignorado", "evento", logsafe.Text(cobro.EventoID))
 		httpx.NoContent(w)
 		return
 	case errors.Is(err, store.ErrFacturaNoAbierta):

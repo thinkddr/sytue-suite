@@ -34,6 +34,7 @@ import (
 
 	"git.sytue.eu/sytue/one/platform/pkg/hubnotify"
 	"git.sytue.eu/sytue/one/platform/pkg/livekit"
+	"git.sytue.eu/sytue/one/platform/pkg/logsafe"
 	"git.sytue.eu/sytue/one/platform/pkg/pg"
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 	"git.sytue.eu/sytue/one/services/cast/internal/domain"
@@ -594,7 +595,7 @@ func (s *Servicio) grabacionTerminada(ctx context.Context, tenant string, eg liv
 		return err
 	}
 	if eg.Status != "EGRESS_COMPLETE" || len(eg.SegmentResults) == 0 {
-		s.logger.Warn("cast: la grabación del directo no terminó bien", "video", id, "status", eg.Status, "error", eg.Error)
+		s.logger.Warn("cast: la grabación del directo no terminó bien", "video", id, "status", logsafe.Text(eg.Status), "error", logsafe.Text(eg.Error))
 		return s.propio.fallarGrabacion(ctx, tenant, id, "grabación "+eg.Status+": "+eg.Error)
 	}
 	v, err := s.st.EnOrganizacion(ctx, tenant, id)
@@ -644,6 +645,6 @@ func (s *Servicio) directoDeIngress(ctx context.Context, c Clave, room string) (
 	if err != nil {
 		return domain.Video{}, err
 	}
-	s.logger.Info("cast: OBS emite sin directo programado; se crea uno", "tenant", v.Tenant, "video", v.ID, "room", room)
+	s.logger.Info("cast: OBS emite sin directo programado; se crea uno", "tenant", v.Tenant, "video", v.ID, "room", logsafe.Text(room))
 	return v, nil
 }

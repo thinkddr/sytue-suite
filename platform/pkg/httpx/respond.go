@@ -11,6 +11,7 @@ import (
 	"net/http"
 
 	"git.sytue.eu/sytue/one/platform/pkg/log"
+	"git.sytue.eu/sytue/one/platform/pkg/logsafe"
 )
 
 // maxBodyBytes limita por defecto el tamaño del cuerpo JSON a decodificar (1 MiB).
@@ -92,7 +93,7 @@ func Fail(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case apiErr.Status >= http.StatusInternalServerError:
 		log.From(r.Context()).Error("httpx: error de servidor",
-			"code", apiErr.Code, "error", apiErr.Error(), "request_id", reqID)
+			"code", logsafe.Text(apiErr.Code), "error", logsafe.Text(apiErr.Error()), "request_id", reqID)
 
 	case apiErr.Status >= http.StatusBadRequest:
 		// UN 4xx NO DEJABA NADA. La línea de `http_request` guarda el status
@@ -107,7 +108,7 @@ func Fail(w http.ResponseWriter, r *http.Request, err error) {
 		// causa, mientras que el mensaje se compone con Params que pueden llevar
 		// dentro lo que escribió el usuario. Un registro no es sitio para eso.
 		log.From(r.Context()).Info("httpx: petición rechazada",
-			"status", apiErr.Status, "code", apiErr.Code, "request_id", reqID)
+			"status", apiErr.Status, "code", logsafe.Text(apiErr.Code), "request_id", reqID)
 	}
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")

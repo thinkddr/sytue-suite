@@ -21,6 +21,7 @@ import (
 
 	"git.sytue.eu/sytue/one/platform/pkg/authn"
 	"git.sytue.eu/sytue/one/platform/pkg/log"
+	"git.sytue.eu/sytue/one/platform/pkg/logsafe"
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 	"git.sytue.eu/sytue/one/services/drive/internal/service"
 	"git.sytue.eu/sytue/one/services/drive/internal/store"
@@ -37,7 +38,7 @@ func manejador(prefix string, fs *FileSystem) http.Handler {
 	logger := func(r *http.Request, err error) {
 		if err != nil {
 			log.From(r.Context()).Warn("webdav",
-				"method", r.Method, "path", r.URL.Path, "error", err)
+				"method", r.Method, "path", logsafe.Text(r.URL.Path), "error", err)
 		}
 	}
 	// Un Handler por petición: es una estructura de cuatro campos, y es la forma de que

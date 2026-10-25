@@ -33,6 +33,7 @@ import (
 	"github.com/minio/minio-go/v7"
 
 	"git.sytue.eu/sytue/one/platform/pkg/log"
+	"git.sytue.eu/sytue/one/platform/pkg/logsafe"
 	"git.sytue.eu/sytue/one/platform/pkg/objectstore"
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 	"git.sytue.eu/sytue/one/services/drive/internal/domain"
@@ -337,13 +338,13 @@ func (s *Service) asegurarSubidaDirecta(ctx context.Context, t tenancy.Tenant, h
 			_ = s.blobs.Delete(ctx, t, h.StorageKey)
 			return 0, ErrPresignHandleInvalid
 		}
-		log.From(ctx).Warn("drive: marcar la subida directa como finalizada", "key", h.StorageKey, "error", err)
+		log.From(ctx).Warn("drive: marcar la subida directa como finalizada", "key", logsafe.Text(h.StorageKey), "error", err)
 	}
 	if err := s.blobs.Copiar(ctx, t, h.StorageKey, firme); err != nil {
 		return 0, fmt.Errorf("service: poner a salvo la subida directa: %w", err)
 	}
 	if err := s.blobs.Delete(ctx, t, h.StorageKey); err != nil {
-		log.From(ctx).Warn("drive: borrar la subida directa tras ponerla a salvo", "key", h.StorageKey, "error", err)
+		log.From(ctx).Warn("drive: borrar la subida directa tras ponerla a salvo", "key", logsafe.Text(h.StorageKey), "error", logsafe.Text(err))
 	}
 	actual, err = s.blobs.Stat(ctx, t, firme)
 	if err != nil {
@@ -361,6 +362,6 @@ func (s *Service) asegurarSubidaDirecta(ctx context.Context, t tenancy.Tenant, h
 // contando como pendiente hasta que caduque la URL.
 func (s *Service) cerrarReserva(ctx context.Context, clave string) {
 	if err := s.store.SubidaFinalizada(ctx, clave); err != nil && !errors.Is(err, store.ErrSubidaYaFinalizada) {
-		log.From(ctx).Warn("drive: marcar la subida directa como finalizada", "key", clave, "error", err)
+		log.From(ctx).Warn("drive: marcar la subida directa como finalizada", "key", logsafe.Text(clave), "error", err)
 	}
 }

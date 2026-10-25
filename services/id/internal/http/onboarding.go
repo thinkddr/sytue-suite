@@ -39,6 +39,7 @@ import (
 	"time"
 
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
+	"git.sytue.eu/sytue/one/platform/pkg/logsafe"
 	"git.sytue.eu/sytue/one/platform/pkg/pg"
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 	"git.sytue.eu/sytue/one/services/id/internal/dns"
@@ -757,7 +758,7 @@ func (s *Server) handleOnboardingDomainAvailability(w http.ResponseWriter, r *ht
 	defer cancel()
 	av, err := s.cf.CheckDomain(ctx, host)
 	if err != nil {
-		s.log.ErrorContext(ctx, "consultar disponibilidad del dominio falló", "error", err, "domain", host)
+		s.log.ErrorContext(ctx, "consultar disponibilidad del dominio falló", "error", err, "domain", logsafe.Text(host))
 		reply("unknown")
 		return
 	}

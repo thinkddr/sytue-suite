@@ -15,6 +15,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"git.sytue.eu/sytue/one/platform/pkg/logsafe"
 	"git.sytue.eu/sytue/one/services/id/internal/oidc"
 )
 
@@ -131,19 +132,19 @@ func (m logMailer) SendPasswordReset(ctx context.Context, to, link string) error
 
 func (m logMailer) SendInvitation(ctx context.Context, to, org, link string) error {
 	m.log.WarnContext(ctx, "SMTP no configurado: enlace de invitación SOLO en el log (dev)",
-		"to", to, "org", org, "invite_link", link)
+		"to", logsafe.Text(to), "org", org, "invite_link", link)
 	return nil
 }
 
 func (m logMailer) SendEmailVerification(ctx context.Context, to, link string) error {
 	m.log.WarnContext(ctx, "SMTP no configurado: enlace de verificación SOLO en el log (dev)",
-		"to", to, "verify_link", link)
+		"to", logsafe.Text(to), "verify_link", link)
 	return nil
 }
 
 func (m logMailer) SendPlatformScopeChange(ctx context.Context, to, sujeto, actor, motivo string, concedido bool) error {
 	m.log.WarnContext(ctx, "SMTP no configurado: aviso de alcance de plataforma SOLO en el log (dev)",
-		"to", to, "sujeto", sujeto, "actor", actor, "concedido", concedido, "motivo", motivo)
+		"to", to, "sujeto", sujeto, "actor", actor, "concedido", concedido, "motivo", logsafe.Text(motivo))
 	return nil
 }
 

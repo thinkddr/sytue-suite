@@ -17,6 +17,7 @@ import (
 
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/platform/pkg/log"
+	"git.sytue.eu/sytue/one/platform/pkg/logsafe"
 	"git.sytue.eu/sytue/one/platform/pkg/objectstore"
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 	"git.sytue.eu/sytue/one/services/syphotos/internal/domain"
@@ -155,7 +156,7 @@ func (h *Handlers) Derivada(w http.ResponseWriter, r *http.Request) {
 		// La cabecera ya salió: no se puede convertir esto en un error HTTP.
 		// Queda en el log, que es donde se ve si pasa a menudo.
 		log.From(r.Context()).Warn("derivada cortada a mitad de envío",
-			"asset", a.ID, "variante", variante, "error", err)
+			"asset", a.ID, "variante", logsafe.Text(variante), "error", err)
 	}
 }
 

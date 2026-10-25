@@ -33,6 +33,7 @@ import (
 	"github.com/google/uuid"
 
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
+	"git.sytue.eu/sytue/one/platform/pkg/logsafe"
 	"git.sytue.eu/sytue/one/platform/pkg/pg"
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 	"git.sytue.eu/sytue/one/services/id/internal/domain"
@@ -74,13 +75,13 @@ func (s *Server) requirePlatformAdmin(next http.Handler) http.Handler {
 		// en rojo obliga a adivinar cuál de los dos es.
 		if !esAdmin {
 			s.log.WarnContext(r.Context(), "platform: denegado, el usuario no está en platform_admins",
-				"user_id", c.Subject, "path", r.URL.Path)
+				"user_id", c.Subject, "path", logsafe.Text(r.URL.Path))
 			httpx.Fail(w, r, httpx.ErrForbidden)
 			return
 		}
 		if !hasMFA(c.AMR) {
 			s.log.WarnContext(r.Context(), "platform: denegado, la sesión no acredita segundo factor",
-				"user_id", c.Subject, "amr", c.AMR, "path", r.URL.Path)
+				"user_id", c.Subject, "amr", c.AMR, "path", logsafe.Text(r.URL.Path))
 			httpx.Fail(w, r, errPlatformMFA)
 			return
 		}
@@ -101,7 +102,7 @@ func (s *Server) requirePlatformAdmin(next http.Handler) http.Handler {
 		}
 		if !vivo {
 			s.log.WarnContext(r.Context(), "platform: denegado, sin activación viva",
-				"user_id", c.Subject, "path", r.URL.Path)
+				"user_id", c.Subject, "path", logsafe.Text(r.URL.Path))
 			httpx.Fail(w, r, errPlatformNoActivo)
 			return
 		}

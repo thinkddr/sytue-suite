@@ -19,7 +19,7 @@ test('missing primary can use an authorized connector', async () => {
 test('denied credentials fail explicitly and do not become an empty inventory', async () => {
   const api=fixture([403,403]); await assert.rejects(selectDependabotCredential({env,...api}), /Grant Dependabot alerts: read/); assert.equal(api.calls.length,2);
 });
-for (const status of [404,429,500]) test(`does not retry unrelated failures (${status}) with a broader credential`, async () => {
+for (const status of [404,500]) test(`does not retry unrelated failures (${status}) with a broader credential`, async () => {
   const api=fixture([status]); await assert.rejects(selectDependabotCredential({env,...api}), /credentials were not retried/); assert.equal(api.calls.length,1);
 });
 test('rejects untrusted origins, invalid repositories and malformed tokens before any request', async () => {
@@ -32,4 +32,14 @@ test('network failures and redirects never expose the alternate credential', asy
 });
 test('identical configured tokens are attempted only once', async () => {
   const api=fixture([403]); await assert.rejects(selectDependabotCredential({env:{...env,ALERT_CONNECTOR_TOKEN:env.ALERT_PRIMARY_TOKEN},...api}),/cannot read/); assert.equal(api.calls.length,1);
+});
+
+test('uses a permitted job token before trying the connector credential', async () => {
+  const api=fixture([403,200]); assert.equal(await selectDependabotCredential({env:{...env,ALERT_JOB_TOKEN:'job-test-only'},...api}), 'job'); assert.equal(api.calls[1].headers.Authorization, 'Bearer job-test-only');
+});
+test('a denied job token may fall back to the authorized connector', async () => {
+  const api=fixture([403,403,200]); assert.equal(await selectDependabotCredential({env:{...env,ALERT_JOB_TOKEN:'job-test-only'},...api}), 'connector'); assert.equal(api.calls.length,3);
+});
+for (const [status, headers] of [[429, {}], [403, {'x-ratelimit-remaining':'0'}], [403, {'retry-after':'60'}]]) test(`does not switch credentials on rate limits ${JSON.stringify(headers)}`, async () => {
+  let calls=0; await assert.rejects(selectDependabotCredential({env,fetchImpl:async()=>{calls++;return Response.json({}, {status,headers});}}), /rate limit reached/); assert.equal(calls,1);
 });

@@ -103,10 +103,10 @@ test('selection and preparation use the same verified Dependabot credential', ()
   const expressions = [...workflow.matchAll(/^\s+SECURITY_ALERTS_TOKEN: \$\{\{ (.+) \}\}$/gm)].map(m => m[1]);
   assert.equal(expressions.length, 2);
   const secrets = { SECURITY_ALERTS_TOKEN: 'dedicated-test-token', CODEX_PR_TOKEN: 'connector-test-token' };
-  for (const credential of ['primary', 'connector']) {
-    const selected = new Function('steps', 'secrets', `return ${expressions[0]}`)({ alert_auth: { outputs: { credential } } }, secrets);
+  for (const credential of ['primary', 'job', 'connector']) {
+    const selected = new Function('steps', 'secrets', 'github', `return ${expressions[0]}`)({ alert_auth: { outputs: { credential } } }, secrets, { token: 'job-test-token' });
     const prepared = new Function('needs', 'secrets', 'github', `return ${expressions[1]}`)({ select: { outputs: { finding_type: 'dependabot', dependabot_credential: credential } } }, secrets, { token: 'job-test-token' });
-    assert.equal(selected, credential === 'connector' ? secrets.CODEX_PR_TOKEN : secrets.SECURITY_ALERTS_TOKEN);
+    assert.equal(selected, credential === 'job' ? 'job-test-token' : credential === 'connector' ? secrets.CODEX_PR_TOKEN : secrets.SECURITY_ALERTS_TOKEN);
     assert.equal(prepared, selected);
   }
   const codeScanning = new Function('needs', 'secrets', 'github', `return ${expressions[1]}`)({ select: { outputs: { finding_type: 'code-scanning', dependabot_credential: '' } } }, {}, { token: 'job-test-token' });

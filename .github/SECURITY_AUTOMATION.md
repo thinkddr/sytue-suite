@@ -197,10 +197,11 @@ Official references: [tasks with @codex in GitHub](https://learn.chatgpt.com/doc
 La presencia de un secreto no demuestra que pueda leer alertas. Antes de una
 selección automática o manual de Dependabot, el workflow prueba únicamente lectura
 en la API de este repositorio. Prefiere `SECURITY_ALERTS_TOKEN`; si falta o la API
-rechaza su autorización con 401/403, prueba el `CODEX_PR_TOKEN` ya configurado.
+rechaza su autorización con 401/403, prueba primero el token de lectura del job y
+después el `CODEX_PR_TOKEN` ya configurado.
 Este último necesita también **Dependabot alerts: read** para servir de alternativa.
 La selección y preparación usan la misma credencial comprobada. Los outputs solo
-contienen `primary` o `connector`, nunca el token ni el cuerpo de las alertas.
+contienen `primary`, `job` o `connector`, nunca el token ni el cuerpo de las alertas.
 No hay reintentos con otra credencial ante errores de red, redirecciones, límites
 de uso o errores del servidor. Si ninguna tiene permiso, el workflow falla con el
 permiso requerido; no informa que no haya alertas. La selección manual de Code

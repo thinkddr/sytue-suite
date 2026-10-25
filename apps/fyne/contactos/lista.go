@@ -101,9 +101,9 @@ func (p *Pantalla) anchoLista() float32 {
 		ventana = ui.CorteXL
 	}
 	if ventana < ui.Estrecho {
-		return ventana - tema.Borde
+		return ui.AnchoHoja(ventana, ui.AnchoMenu(false), 0) - tema.Borde
 	}
-	return ui.AnchoPanel(ventana) - tema.Borde
+	return ui.AcotarAnchoPanel(ui.AnchoPanel(ventana), ui.AnchoHoja(ventana, ui.AnchoMenu(false), 0)) - tema.Borde
 }
 
 // barraLote es `BatchBar`: destacar o quitar el destacado, añadir o quitar de una
@@ -296,7 +296,9 @@ func (p *Pantalla) recuentoConEtiqueta() string {
 func (p *Pantalla) cuerpoLista() fyne.CanvasObject {
 	switch {
 	case p.Estado == agenda.Vacia || p.Estado == agenda.Exito && len(p.Contactos) == 0:
-		return agenda.Panel(agenda.Vacia, p.textosDeVacio(), nil)
+		refresco := p.Refresco
+		refresco.Arriba = func() bool { return true }
+		return ui.RefrescarAlTirar(agenda.Panel(agenda.Vacia, p.textosDeVacio(), nil), &refresco)
 	case p.Estado != agenda.Exito:
 		return agenda.Panel(p.Estado, p.textosDeEstado(), p.esqueletoLista())
 	}
@@ -318,7 +320,8 @@ func (p *Pantalla) listaViva() fyne.CanvasObject {
 				}
 			},
 		)
-		p.cuerpo = ui.EnvolverLista(p.virtual)
+		p.Refresco.Arriba = func() bool { return p.virtual.GetScrollOffset() <= 0.5 }
+		p.cuerpo = ui.RefrescarAlTirar(ui.EnvolverLista(p.virtual), &p.Refresco)
 	}
 	// El alto de cada fila: 49 con correo u organización, 46 sin ninguno.
 	for i, c := range p.Contactos {

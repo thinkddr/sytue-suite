@@ -107,8 +107,8 @@ func (m *marco) esconderHoja() {
 // colocar pinta el marco en el rectángulo (`origen`, `total`) y la hoja en (`pos`,
 // `tam`), los dos en coordenadas de quien lo lleva. `total` es de lado a lado de la
 // ventana: de ahí sale el degradado del traslúcido, que tiene que casar con el de la
-// barra. Con `aSangre` la hoja solo redondea arriba y no lleva sombra: es como va en los
-// editores y por debajo de 768 px.
+// barra. Con `aSangre` la hoja llega al borde sin sombra y conserva las cuatro
+// esquinas: es como va en los editores y por debajo de 768 px.
 func (m *marco) colocar(origen fyne.Position, total fyne.Size, pos fyne.Position, tam fyne.Size, aSangre bool, v tema.Variante) {
 	m.fondo.pintar(v)
 	m.fondo.colocar(origen, total)
@@ -117,9 +117,6 @@ func (m *marco) colocar(origen fyne.Position, total fyne.Size, pos fyne.Position
 	m.hoja.FillColor = tema.Color("sheet-bg", v)
 	m.hoja.TopLeftCornerRadius, m.hoja.TopRightCornerRadius = radio, radio
 	m.hoja.BottomLeftCornerRadius, m.hoja.BottomRightCornerRadius = radio, radio
-	if aSangre {
-		m.hoja.BottomLeftCornerRadius, m.hoja.BottomRightCornerRadius = 0, 0
-	}
 	m.hoja.Move(pos)
 	m.hoja.Resize(tam)
 	m.hoja.Show()
@@ -138,7 +135,7 @@ func (m *marco) colocar(origen fyne.Position, total fyne.Size, pos fyne.Position
 		m.xs[i] = p.X - origen.X
 		e.Move(p)
 		e.Resize(lado)
-		esconder(e, radio <= 0 || (aSangre && i >= 2))
+		esconder(e, radio <= 0)
 		e.Refresh()
 	}
 	m.sombra.colocar(pos, tam, radio, !aSangre, v)
@@ -346,9 +343,16 @@ func (s *sombraHoja) colocar(pos fyne.Position, tam fyne.Size, radio float32, ve
 // propio. Las nueve apps con armazón lo cuelgan de un contenedor de la raíz; si una lo
 // escondiera dentro de un widget, saldrían dos hojas y se vería a la primera captura.
 func armazonEn(o fyne.CanvasObject) *Armazon {
+	if o == nil || !o.Visible() {
+		return nil
+	}
 	switch v := o.(type) {
 	case *Armazon:
 		return v
+	case *raizGestos:
+		return armazonEn(v.content)
+	case *listaActualizable:
+		return armazonEn(v.content)
 	case *fyne.Container:
 		for _, h := range v.Objects {
 			if a := armazonEn(h); a != nil {

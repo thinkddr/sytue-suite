@@ -1402,10 +1402,7 @@ func (p *Pantalla) cargarVerifactu() {
 
 // conTarjetaVF pone la tarjeta de VERI*FACTU encima de la lista, en su columna.
 func (p *Pantalla) conTarjetaVF(v tema.Variante, lista fyne.CanvasObject) fyne.CanvasObject {
-	ancho := p.Ventana.Width - p.lista.Ocupado
-	if !p.esMovil() {
-		ancho -= ocupaCarcasa()
-	}
+	ancho := p.Ventana.Width - p.lista.Ocupado - ocupaCarcasa(p.Ventana.Width)
 	mx := MargenTarjetaVF(p.Ventana.Width)
 	t := &TarjetaVF{
 		tr: p.tr, loc: p.tr.Locale(), Estado: p.verifactu, Activando: p.vfActivando,

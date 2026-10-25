@@ -174,6 +174,12 @@ export const fr: AppCatalog<typeof en> = {
   'data.move.action': 'Aller à Migrations',
 
   // --- Conectar tus dispositivos ----------------------------------------
+  'devices.native.body':
+    'Utilisez le gestionnaire de fichiers de votre appareil ou connectez un compte avec son consentement.',
+  'devices.native.driveBody':
+    'Sytue Drive est ajouté automatiquement à la connexion. Autorisez son emplacement si le système le demande.',
+  'devices.native.openDrive': 'Ouvrir dans le gestionnaire de fichiers',
+  'devices.native.failed': 'Impossible de mettre à jour l’intégration de l’appareil.',
   'devices.title': 'Connectez vos appareils',
   'devices.lead':
     'Emportez votre messagerie, votre agenda, vos contacts et vos fichiers Sytue sur votre téléphone ou votre ordinateur. Nous vous guidons étape par étape.',

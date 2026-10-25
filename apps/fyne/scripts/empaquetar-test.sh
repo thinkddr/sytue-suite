@@ -31,8 +31,8 @@ mal() {
   fallos=1
 }
 
-if ! grep -qx 'replace fyne.io/fyne/v2 => github.com/thinkddr/fyne/v2 v2.8.1-sytue.16' "$FYNE/go.mod"; then
-  mal "apps/fyne debe usar el fork público BSD-3-Clause que recibe URL entrantes de Fyne v2.8.1"
+if ! grep -qx 'replace fyne.io/fyne/v2 => github.com/thinkddr/fyne/v2 v2.8.2-sytue.1' "$FYNE/go.mod"; then
+  mal "apps/fyne debe usar el fork público BSD-3-Clause/Apache-2.0 que recibe URL entrantes de Fyne v2.8.2"
 fi
 
 command -v go >/dev/null 2>&1 || {
@@ -792,7 +792,50 @@ while [ $# -gt 0 ]; do
 done
 mkdir -p "$raiz/tracks" "$raiz/pendientes" "$raiz/internos"
 paquete="${url#*/applications/}"; paquete="${paquete%%/*}"
-[ "${url#*oauth2}" != "$url" ] || printf '%s %s\n' "$metodo" "$url" >>"$raiz/peticiones"
+if [ "${url#*oauth2}" != "$url" ]; then
+  echo OAuth >>"$raiz/autenticaciones"
+else
+  printf '%s %s\n' "$metodo" "$url" >>"$raiz/peticiones"
+fi
+# Una sola fuente para el track editable y el resumen fuera de la edición. Los
+# escenarios pin-* reproducen el borrador real anterior, no el tag que se sube.
+produccion_actual() {
+  if [ -f "$raiz/tracks/$paquete.json" ]; then
+    cat "$raiz/tracks/$paquete.json"
+    return
+  fi
+  case "${PLAY_ESCENARIO:-}:$paquete" in
+  estable:eu.sytue.rooms) echo '{"track":"production","releases":[{"versionCodes":["3012004"],"status":"completed"}]}' ;;
+  otro-borrador:eu.sytue.rooms) echo '{"track":"production","releases":[{"versionCodes":["3012005"],"status":"draft"}]}' ;;
+  mismo:*) echo '{"track":"production","releases":[{"name":"Conservar","versionCodes":["3012004"],"status":"draft","releaseNotes":[{"language":"es-ES","text":"Notas revisadas"}]}]}' ;;
+  pin-*:*)
+    base='{"track":"production","releases":[{"name":"v3.12.24","versionCodes":["3012024"],"status":"draft","releaseNotes":[{"language":"es-ES","text":"Notas revisadas"},{"language":"en-US","text":"Reviewed notes"}],"inAppUpdatePriority":3}]}'
+    case "${PLAY_ESCENARIO:-}:$paquete" in
+    pin-parcial:eu.sytue.bases|pin-parcial:eu.sytue.calcus|pin-parcial:eu.sytue.calendar|pin-parcial:eu.sytue.cast|pin-parcial:eu.sytue.certipdf|pin-parcial:eu.sytue.contacts|pin-ya-completed-*:*)
+      jq '.releases[0] |= (.name="v3.14.0" | .versionCodes=["3014000"] | .status="completed")' <<<"$base"
+      return
+      ;;
+    esac
+    if [ "$paquete" != eu.sytue.rooms ]; then echo "$base"; return; fi
+    case "$PLAY_ESCENARIO" in
+    pin-otro) jq '.releases[0].versionCodes=["3012023"]' <<<"$base" ;;
+    pin-mezclado) jq '.releases[0].versionCodes=["3012024","3014000"]' <<<"$base" ;;
+    pin-futuro) jq '.releases[0].versionCodes=["3014001"]' <<<"$base" ;;
+    pin-completed) jq '.releases[0].status="completed"' <<<"$base" ;;
+    pin-inProgress) jq '.releases[0].status="inProgress"' <<<"$base" ;;
+    pin-halted) jq '.releases[0].status="halted"' <<<"$base" ;;
+    pin-dos) jq '.releases += [.releases[0]]' <<<"$base" ;;
+    pin-campo-desconocido) jq '.releases[0].futuro="no adivinar"' <<<"$base" ;;
+    pin-countryTargeting) jq '.releases[0].countryTargeting={countries:["ES"]}' <<<"$base" ;;
+    pin-userFraction) jq '.releases[0].userFraction=0.1' <<<"$base" ;;
+    pin-notas-invalidas) jq '.releases[0].releaseNotes=[{language:"es-ES",text:42}]' <<<"$base" ;;
+    pin-prioridad-invalida) jq '.releases[0].inAppUpdatePriority=6' <<<"$base" ;;
+    *) echo "$base" ;;
+    esac
+    ;;
+  *) echo '{"track":"production","releases":[]}' ;;
+  esac
+}
 respuesta='{}'
 case "$url" in
 *oauth2*) respuesta='{"access_token":"TOKEN-QUE-NO-SE-VE"}' ;;
@@ -836,22 +879,46 @@ case "$url" in
   nuevo:eu.sytue.rooms) respuesta='{"track":"internal","releases":[{"versionCodes":["3012005"],"status":"draft"}]}' ;;
   mezclado:eu.sytue.rooms) respuesta='{"track":"internal","releases":[{"versionCodes":["3012004","3012005"],"status":"draft"}]}' ;;
   objetivo-v5:*) respuesta='{"track":"internal","releases":[{"versionCodes":["3012005"],"status":"draft"}]}' ;;
+  pin-interno-mal:eu.sytue.rooms) respuesta='{"track":"internal","releases":[{"versionCodes":["3012024"],"status":"draft"}]}' ;;
+  pin-*:*) respuesta='{"track":"internal","releases":[{"versionCodes":["3014000"],"status":"draft"}]}' ;;
   *) respuesta='{"track":"internal","releases":[{"versionCodes":["3012004"],"status":"draft"}]}' ;;
   esac
+  fi
+  ;;
+*/tracks/production/releases)
+  respuesta="$(produccion_actual | jq '{releases:[.releases[]? | {track:"production",activeArtifacts:[.versionCodes[] | {versionCode:tonumber}],releaseLifecycleState:(if .status == "draft" then "RELEASE_LIFECYCLE_STATE_DRAFT" else "RELEASE_LIFECYCLE_STATE_PUBLISHED" end)}]}')"
+  case "${PLAY_ESCENARIO:-}" in
+  pin-ya-completed-in-review) respuesta="$(jq '.releases[0].releaseLifecycleState="RELEASE_LIFECYCLE_STATE_IN_REVIEW"' <<<"$respuesta")" ;;
+  pin-ya-completed-approved) respuesta="$(jq '.releases[0].releaseLifecycleState="RELEASE_LIFECYCLE_STATE_APPROVED_NOT_PUBLISHED"' <<<"$respuesta")" ;;
+  esac
+  if [ "$paquete" = eu.sytue.rooms ]; then
+    case "${PLAY_ESCENARIO:-}" in
+    pin-ciclo-in-review) respuesta="$(jq '.releases[0].releaseLifecycleState="RELEASE_LIFECYCLE_STATE_IN_REVIEW"' <<<"$respuesta")" ;;
+    pin-ciclo-approved) respuesta="$(jq '.releases[0].releaseLifecycleState="RELEASE_LIFECYCLE_STATE_APPROVED_NOT_PUBLISHED"' <<<"$respuesta")" ;;
+    pin-ciclo-desconocido) respuesta="$(jq '.releases[0].releaseLifecycleState="RELEASE_LIFECYCLE_STATE_FUTURE"' <<<"$respuesta")" ;;
+    pin-ciclo-ausente) respuesta="$(jq 'del(.releases[0].releaseLifecycleState)' <<<"$respuesta")" ;;
+    pin-ciclo-vacio) respuesta='{"releases":[]}' ;;
+    pin-ciclo-doble) respuesta="$(jq '.releases += [.releases[0]]' <<<"$respuesta")" ;;
+    pin-ciclo-track) respuesta="$(jq '.releases[0].track="internal"' <<<"$respuesta")" ;;
+    pin-ciclo-version) respuesta="$(jq '.releases[0].activeArtifacts=[{versionCode:3012023}]' <<<"$respuesta")" ;;
+    pin-ciclo-mixto) respuesta="$(jq '.releases[0].activeArtifacts += [{versionCode:3014000}]' <<<"$respuesta")" ;;
+    pin-ciclo-texto) respuesta="$(jq '.releases[0].activeArtifacts[0].versionCode |= tostring' <<<"$respuesta")" ;;
+    pin-ciclo-campo) respuesta="$(jq '.releases[0].futuro="no adivinar"' <<<"$respuesta")" ;;
+    pin-ciclo-error) codigo=503; respuesta='{"error":{"code":503,"message":"Consulta de revisión no disponible"}}' ;;
+    pin-ya-completed-draft) respuesta="$(jq '.releases[0].releaseLifecycleState="RELEASE_LIFECYCLE_STATE_DRAFT"' <<<"$respuesta")" ;;
+    pin-ya-completed-not-approved) respuesta="$(jq '.releases[0].releaseLifecycleState="RELEASE_LIFECYCLE_STATE_NOT_APPROVED"' <<<"$respuesta")" ;;
+    pin-ya-completed-not-sent) respuesta="$(jq '.releases[0].releaseLifecycleState="RELEASE_LIFECYCLE_STATE_NOT_SENT_FOR_REVIEW"' <<<"$respuesta")" ;;
+    pin-ya-completed-unknown) respuesta="$(jq '.releases[0].releaseLifecycleState="RELEASE_LIFECYCLE_STATE_UNSPECIFIED"' <<<"$respuesta")" ;;
+    pin-ya-completed-version) respuesta="$(jq '.releases[0].activeArtifacts=[{versionCode:3012024}]' <<<"$respuesta")" ;;
+    vacio-con-resumen) respuesta='{"releases":[{"track":"production","activeArtifacts":[{"versionCode":3012004}],"releaseLifecycleState":"RELEASE_LIFECYCLE_STATE_DRAFT"}]}' ;;
+    esac
   fi
   ;;
 */tracks/production)
   if [ "$metodo" = PUT ]; then
     printf '%s' "$cuerpo" >"$raiz/pendientes/$paquete.json"
-  elif [ -f "$raiz/tracks/$paquete.json" ]; then
-    respuesta="$(cat "$raiz/tracks/$paquete.json")"
   else
-    case "${PLAY_ESCENARIO:-}:$paquete" in
-    estable:eu.sytue.rooms) respuesta='{"track":"production","releases":[{"versionCodes":["3012004"],"status":"completed"}]}' ;;
-    otro-borrador:eu.sytue.rooms) respuesta='{"track":"production","releases":[{"versionCodes":["3012005"],"status":"draft"}]}' ;;
-    mismo:*) respuesta='{"track":"production","releases":[{"name":"Conservar","versionCodes":["3012004"],"status":"draft","releaseNotes":[{"language":"es-ES","text":"Notas revisadas"}]}]}' ;;
-    *) respuesta='{"track":"production","releases":[]}' ;;
-    esac
+    respuesta="$(produccion_actual)"
   fi
   ;;
 *:commit*)
@@ -950,19 +1017,26 @@ SH
   reiniciar_play() {
     rm -rf "$falso/tracks" "$falso/pendientes"
     : >"$falso/peticiones"
+    : >"$falso/autenticaciones"
   }
   produccion_falsa() {
-    local guion="$1" escenario="$2" estado="$3" tag="${4:-v3.12.4}"
+    local guion="$1" escenario="$2" estado="$3" tag="${4:-v3.12.4}" anterior="${5:-}"
+    local args=(--produccion --tag "$tag" --estado "$estado")
+    [ -z "$anterior" ] || args+=(--borrador-anterior "$anterior")
     PATH="$falso/bin:$PATH" PLAY_CREDENCIALES="$falso/cuenta.json" RUNNER_TEMP="$falso" \
       PLAY_CONFIRMAR_PRODUCCION=PUBLICAR_15_APPS PLAY_ESCENARIO="$escenario" \
-      "$guion" --produccion --tag "$tag" --estado "$estado" >"$falso/produccion" 2>&1
+      "$guion" "${args[@]}" >"$falso/produccion" 2>&1
   }
   rechaza_sin_promover() {
     reiniciar_play
-    produccion_falsa "$1" "$2" draft "${3:-v3.12.4}" && return 1
+    produccion_falsa "$1" "$2" draft "${3:-v3.12.4}" "${4:-}" && return 1
     ! grep -Eq '^PUT |^POST .*:commit' "$falso/peticiones"
   }
-  for escenario in vacio nuevo mezclado estable otro-borrador; do
+  payload_anterior_correcto() {
+    jq -e --arg s "$1" '. == {track:"production",releases:[{name:"v3.14.0",versionCodes:["3014000"],status:$s,
+      releaseNotes:[{language:"es-ES",text:"Notas revisadas"},{language:"en-US",text:"Reviewed notes"}],inAppUpdatePriority:3}]}' "$2" >/dev/null
+  }
+  for escenario in vacio nuevo mezclado estable otro-borrador vacio-con-resumen; do
     rechaza_sin_promover "$PLAY_GUION" "$escenario" ||
       mal "producción modifica releases pese a preflight $escenario en la última app"
     [ "$(grep -c '^GET .*/tracks/production' "$falso/peticiones")" -ge 14 ] ||
@@ -986,8 +1060,10 @@ SH
   [ "$(grep -c '^POST .*:commit?' "$falso/peticiones")" -eq 15 ] || mal "draft no confirma quince ediciones"
   [ "$(grep -c '^POST .*:commit?changesInReviewBehavior=ERROR_IF_IN_REVIEW&changesNotSentForReview=true$' "$falso/peticiones")" -eq 15 ] ||
     mal "draft puede enviar cambios a revisión o cancelar una revisión existente"
-  awk '/^PUT / {exit} /^GET .*\/tracks\/production/ {n++} END {exit n != 15}' "$falso/peticiones" ||
+  awk '/^PUT / {exit} /^GET .*\/tracks\/production$/ {n++} END {exit n != 15}' "$falso/peticiones" ||
     mal "el primer PUT de producción precede a los quince preflights"
+  awk '/^PUT / {exit} /^GET .*\/applications\/eu\.sytue\.[a-z]+\/tracks\/production\/releases$/ {n++} END {exit n != 15}' "$falso/peticiones" ||
+    mal "el primer PUT de producción precede a los quince controles de revisión fuera de la edición"
   for track in "$falso"/tracks/*.json; do
     jq -e '.track == "production" and .releases == [{name:"v3.12.4",versionCodes:["3012004"],status:"draft"}]' "$track" >/dev/null ||
       mal "draft usa otro versionCode/estado en ${track##*/}"
@@ -1021,6 +1097,115 @@ SH
   [ "$(grep -c '^PUT ' "$falso/peticiones")" -eq 1 ] || mal "el rechazo draft provoca otro intento/estado o continúa escribiendo"
   ! grep -q 'status.*completed' "$falso"/pendientes/*.json 2>/dev/null || mal "un rechazo draft cae automáticamente a completed"
 
+  # El borrador anterior sólo puede sustituirse con su tag explícito. Reproduce
+  # v3.12.24 -> v3.14.0: el éxito HTTP por sí solo no demuestra que el payload haya
+  # dejado de apuntar al AAB anterior, ni que el rerun no lo omita como idempotente.
+  rechaza_sin_promover "$PLAY_GUION" pin-normal v3.14.0 ||
+    mal "producción sustituye v3.12.24 sin --borrador-anterior"
+  rechaza_sin_promover "$PLAY_GUION" pin-normal v3.14.0 v3.12.23 ||
+    mal "producción sustituye un borrador distinto del pin explícito"
+  for escenario in pin-otro pin-mezclado pin-futuro pin-completed pin-inProgress pin-halted pin-dos \
+    pin-campo-desconocido pin-countryTargeting pin-userFraction pin-notas-invalidas pin-prioridad-invalida pin-interno-mal; do
+    rechaza_sin_promover "$PLAY_GUION" "$escenario" v3.14.0 v3.12.24 ||
+      mal "el pin de borrador anterior permite modificar releases con $escenario"
+    [ "$(grep -c '^POST .*/edits$' "$falso/peticiones")" -eq 15 ] ||
+      mal "$escenario no comprobó la última app antes de rechazar todas las escrituras"
+  done
+  # El estado de revisión no aparece en tracks.get. Incluso un draft editable
+  # debe coincidir con exactamente un resumen DRAFT y su artefacto numérico.
+  for escenario in pin-ciclo-in-review pin-ciclo-approved pin-ciclo-desconocido pin-ciclo-ausente pin-ciclo-vacio \
+    pin-ciclo-doble pin-ciclo-track pin-ciclo-version pin-ciclo-mixto pin-ciclo-texto pin-ciclo-campo pin-ciclo-error; do
+    rechaza_sin_promover "$PLAY_GUION" "$escenario" v3.14.0 v3.12.24 ||
+      mal "producción modifica releases con revisión desconocida o bloqueada: $escenario"
+    [ "$(grep -c '^GET .*/applications/eu\.sytue\.[a-z]*/tracks/production/releases$' "$falso/peticiones")" -eq 15 ] ||
+      mal "$escenario no consultó los quince estados de revisión antes de rechazar"
+  done
+
+  # Las opciones se validan antes de firmar/solicitar OAuth, no después de abrir
+  # una edición. Ni otra modalidad ni un pin igual/futuro admite esta excepción.
+  for args in '--produccion --tag v3.14.0 --estado draft --borrador-anterior v3.14.0' \
+    '--produccion --tag v3.14.0 --estado draft --borrador-anterior v3.14.1' \
+    '--produccion --tag v3.14.0 --estado draft --borrador-anterior anterior' \
+    '--produccion --tag v3.14.0 --estado draft --borrador-anterior' \
+    '--interno --tag v3.14.0 --estado completed --borrador-anterior v3.12.24' \
+    '--huellas --tag v3.14.0 --borrador-anterior v3.12.24' \
+    '--sondear --borrador-anterior v3.12.24' '--seco --borrador-anterior v3.12.24'; do
+    reiniciar_play
+    # shellcheck disable=SC2086
+    PATH="$falso/bin:$PATH" PLAY_CREDENCIALES="$falso/cuenta.json" RUNNER_TEMP="$falso" \
+      PLAY_CONFIRMAR_PRODUCCION=PUBLICAR_15_APPS "$PLAY_GUION" $args >"$falso/produccion" 2>&1 &&
+      mal "se acepta un pin inválido o fuera de producción: $args"
+    if [ -s "$falso/peticiones" ] || [ -s "$falso/autenticaciones" ]; then
+      mal "un pin inválido inicia OAuth o abre una edición: $args"
+    fi
+  done
+
+  for estado_pin in draft completed; do
+    reiniciar_play
+    produccion_falsa "$PLAY_GUION" pin-normal "$estado_pin" v3.14.0 v3.12.24 ||
+      mal "no se sustituye el borrador fijado v3.12.24 por v3.14.0/$estado_pin: $(tail -1 "$falso/produccion")"
+    [ "$(grep -c '^PUT .*tracks/production$' "$falso/peticiones")" -eq 15 ] ||
+      mal "sustituir el borrador anterior no escribe exactamente las quince apps"
+    [ "$(grep -c '^POST .*:commit?' "$falso/peticiones")" -eq 15 ] ||
+      mal "sustituir el borrador anterior no confirma exactamente las quince ediciones"
+    awk '/^PUT / {exit} /^GET .*\/applications\/eu\.sytue\.[a-z]+\/tracks\/production\/releases$/ {n++} END {exit n != 15}' "$falso/peticiones" ||
+      mal "se sustituye un borrador antes de conocer la revisión de las quince apps"
+    for track in "$falso"/tracks/*.json; do
+      payload_anterior_correcto "$estado_pin" "$track" ||
+        mal "la sustitución $estado_pin conserva otro AAB/metadata o pierde notas/prioridad en ${track##*/}"
+    done
+    if [ "$estado_pin" = draft ]; then
+      : >"$falso/peticiones"
+      produccion_falsa "$PLAY_GUION" pin-normal draft v3.14.0 v3.12.24 ||
+        mal "repetir el borrador sustituido deja de ser idempotente"
+      ! grep -Eq '^PUT |^POST .*:commit' "$falso/peticiones" ||
+        mal "repetir el mismo target con pin anterior vuelve a modificar producción"
+      [ "$(grep -c '^DELETE ' "$falso/peticiones")" -eq 15 ] || mal "el rerun del borrador sustituido deja ediciones abiertas"
+    else
+      : >"$falso/peticiones"
+      produccion_falsa "$PLAY_GUION" pin-normal completed v3.14.0 v3.12.24 ||
+        mal "repetir completed del target ya publicado no permite reanudar el lote"
+      ! grep -Eq '^PUT |^POST .*:commit' "$falso/peticiones" || mal "repetir completed del target vuelve a publicar"
+      : >"$falso/peticiones"
+      produccion_falsa "$PLAY_GUION" pin-normal draft v3.14.0 v3.12.24 &&
+        mal "producción completed admite un downgrade a draft"
+      ! grep -Eq '^PUT |^POST .*:commit' "$falso/peticiones" || mal "se modifica una release production ya completed"
+    fi
+  done
+  # Reanudar no reenvía las apps ya entregadas a Google. Su lifecycle debe ser
+  # inequívoco y corresponder al target; el resto conserva el pin del borrador.
+  for escenario in pin-ya-completed-in-review pin-ya-completed-approved pin-ya-completed-published; do
+    reiniciar_play
+    produccion_falsa "$PLAY_GUION" "$escenario" completed v3.14.0 v3.12.24 ||
+      mal "el rerun completed no reconoce el target ya entregado: $escenario"
+    ! grep -Eq '^PUT |^POST .*:commit' "$falso/peticiones" || mal "$escenario vuelve a enviar una release ya completed"
+    [ "$(grep -c '^DELETE ' "$falso/peticiones")" -eq 15 ] || mal "$escenario deja ediciones de consulta abiertas"
+    [ "$(grep -c 'ya enviada; ciclo RELEASE_LIFECYCLE_STATE_.*; sin cambios' "$falso/produccion")" -eq 15 ] ||
+      mal "$escenario no explica el estado de las quince apps ya enviadas"
+  done
+  for escenario in pin-ya-completed-draft pin-ya-completed-not-approved pin-ya-completed-not-sent pin-ya-completed-unknown pin-ya-completed-version; do
+    reiniciar_play
+    produccion_falsa "$PLAY_GUION" "$escenario" completed v3.14.0 v3.12.24 &&
+      mal "el rerun da por entregada una release con lifecycle contradictorio: $escenario"
+    ! grep -Eq '^PUT |^POST .*:commit' "$falso/peticiones" || mal "$escenario modifica una release antes de aclarar su estado"
+  done
+  reiniciar_play
+  produccion_falsa "$PLAY_GUION" pin-parcial completed v3.14.0 v3.12.24 ||
+    mal "no se reanuda un lote con seis apps ya completed y nueve borradores anteriores"
+  if [ "$(grep -c '^PUT .*tracks/production$' "$falso/peticiones")" -ne 9 ] ||
+    [ "$(grep -c '^POST .*:commit?' "$falso/peticiones")" -ne 9 ]; then
+    mal "el rerun parcial no publica exactamente las nueve apps pendientes"
+  fi
+  [ "$(grep -c '^DELETE ' "$falso/peticiones")" -eq 6 ] || mal "el rerun parcial deja abiertas las seis ediciones ya completed"
+  [ "$(grep -c 'ya enviada; ciclo RELEASE_LIFECYCLE_STATE_PUBLISHED; sin cambios' "$falso/produccion")" -eq 6 ] ||
+    mal "el rerun parcial no distingue las seis apps ya entregadas"
+  grep -Eq '^PUT .*applications/eu\.sytue\.(bases|calcus|calendar|cast|certipdf|contacts)/' "$falso/peticiones" &&
+    mal "el rerun parcial vuelve a publicar una de las seis apps ya entregadas"
+  for track in "$falso"/tracks/*.json; do
+    payload_anterior_correcto completed "$track" || mal "el rerun parcial no fija el target o pierde metadata en ${track##*/}"
+  done
+  echo 'ok - production sustituye sólo el borrador anterior fijado y bloquea revisión/rollout antes de escribir'
+
   # Control negativo: al quitar el pin, el mismo guardián debe rechazar la mutación.
   mutacion="$falso/mutacion"
   mkdir -p "$mutacion/scripts"
@@ -1051,6 +1236,53 @@ PY
     echo 'ok - el guardián internal ve en rojo la mutación que acepta un bundle ausente'
   else
     mal "el control negativo internal no quitó la comprobación del bundle"
+  fi
+  if python3 - "$PLAY_GUION" "$mutacion/scripts" <<'PY'
+import sys
+from pathlib import Path
+source = Path(sys.argv[1]).read_text()
+mutations = {
+    'production-sin-pin-anterior.sh': ('.versionCodes == [$anterior]', 'true'),
+    'production-sin-ciclo.sh': ('.releaseLifecycleState == "RELEASE_LIFECYCLE_STATE_DRAFT"', 'true'),
+    'production-sin-cambiar-version.sh': (
+        'else .name = $t | .versionCodes = [$v] | .status = $s end] end)',
+        'else .name = $t | .status = $s end] end)'),
+}
+for name, (needle, replacement) in mutations.items():
+    assert source.count(needle) == 1, name
+    Path(sys.argv[2], name).write_text(source.replace(needle, replacement))
+PY
+  then
+    chmod +x "$mutacion/scripts/production-"*.sh
+    if rechaza_sin_promover "$mutacion/scripts/production-sin-pin-anterior.sh" pin-otro v3.14.0 v3.12.24; then
+      mal "el guardián no ve en rojo la mutación que ignora el borrador anterior autorizado"
+    elif [ "$(grep -c '^PUT .*tracks/production$' "$falso/peticiones")" -eq 15 ]; then
+      echo 'ok - el guardián production detecta la mutación que ignora el pin del borrador anterior'
+    else
+      mal "la mutación sin pin anterior no llegó a escribir el borrador incorrecto"
+    fi
+    if rechaza_sin_promover "$mutacion/scripts/production-sin-ciclo.sh" pin-ciclo-in-review v3.14.0 v3.12.24; then
+      mal "el guardián no ve en rojo la mutación que acepta un borrador en revisión"
+    elif [ "$(grep -c '^PUT .*tracks/production$' "$falso/peticiones")" -eq 15 ]; then
+      echo 'ok - el guardián production detecta la mutación sin protección del ciclo de revisión'
+    else
+      mal "la mutación sin protección de revisión no llegó a escribir las quince releases"
+    fi
+    reiniciar_play
+    if produccion_falsa "$mutacion/scripts/production-sin-cambiar-version.sh" pin-normal draft v3.14.0 v3.12.24; then
+      [ "$(grep -c '^PUT .*tracks/production$' "$falso/peticiones")" -eq 15 ] || mal "la mutación del payload no llegó a escribir las quince releases"
+      if payload_anterior_correcto draft "$falso/tracks/eu.sytue.mail.json"; then
+        mal "el guardián no ve en rojo un payload que conserva el versionCode anterior"
+      elif jq -e '.releases[0].versionCodes == ["3012024"]' "$falso/tracks/eu.sytue.mail.json" >/dev/null; then
+        echo 'ok - el guardián production detecta la mutación que no sustituye el versionCode anterior'
+      else
+        mal "la mutación del payload no reprodujo la conservación del versionCode anterior"
+      fi
+    else
+      mal "el control negativo no quitó la sustitución del versionCode del payload"
+    fi
+  else
+    mal "no se pudieron generar las tres mutaciones del guardián production"
   fi
   if grep -qF -e "$clave" -e TOKEN-QUE-NO-SE-VE "$falso/argv" "$falso/produccion"; then
     mal "producción deja la clave privada o el token en argv o en el log"
@@ -1214,16 +1446,13 @@ for activo in ('0', '1'):
         custom = datos.get('Development', {})
         for modo in ('ios', 'developerid'):
             p = plistlib.loads(subprocess.check_output(['bash', guion, 'derechos-sesion', str(toml.parent), equipo, modo], env=entorno))
-            if activo == '1':
-                grupos = [contenedor] + (['group.' + appid] if modo == 'ios' and custom.get('archivos') == 'si' else [])
-                assert p['com.apple.security.application-groups'] == grupos, (appid, modo, p)
-            else:
-                assert 'com.apple.security.application-groups' not in p, (appid, modo, p)
+            grupos = [contenedor] + (['group.' + appid] if custom.get('archivos') == 'si' else [])
+            assert p['com.apple.security.application-groups'] == grupos, (appid, modo, p)
             claves = [equipo + '.' + appid, llavero] + ([equipo + '.' + appid + '.shared'] if custom.get('archivos') == 'si' else [])
             assert p['keychain-access-groups'] == claves, (appid, modo, p)
             assert ('com.apple.security.device.camera' in p) == (modo == 'developerid' and custom.get('llamadas') == 'si')
         tienda = plistlib.loads(subprocess.check_output(['bash', guion, 'derechos-tienda', str(toml.parent), equipo], env=entorno))
-        assert tienda['com.apple.security.application-groups'] == ([contenedor, llavero] if activo == '1' else [llavero]), (appid, activo)
+        assert tienda['com.apple.security.application-groups'] == [contenedor, llavero] + (['group.' + appid] if custom.get('archivos') == 'si' else []), (appid, activo)
 assert subprocess.run(['bash', guion, 'widgets-apple'], env=dict(os.environ, SYTUE_WIDGETS_APPLE='1'), capture_output=True, text=True).stdout == 'si\n'
 assert subprocess.run(['bash', guion, 'widgets-apple'], env=dict(os.environ, SYTUE_WIDGETS_APPLE='0'), capture_output=True, text=True).stdout == 'no\n'
 assert subprocess.run(['bash', guion, 'widgets-apple'], env=dict(os.environ, SYTUE_WIDGETS_APPLE='quizá'), capture_output=True).returncode != 0
@@ -1268,8 +1497,8 @@ for p in macos ios app-ios; do
   grep -qF "<string>$grupo_archivos</string>" <<<"$plist" || mal "los derechos de archivos ($p) no llevan el llavero «$grupo_archivos»"
   tiene="$(grep -o '<key>[^<]*</key>' <<<"$plist" | sed 's/<[^>]*>//g' | sort | tr '\n' ' ')"
   case "$p" in
-  macos) quiero='com.apple.security.app-sandbox com.apple.security.application-groups com.apple.security.network.client keychain-access-groups ' ;;
-  ios) quiero='com.apple.security.application-groups keychain-access-groups ' ;;
+  macos) quiero='com.apple.application-identifier com.apple.developer.team-identifier com.apple.security.app-sandbox com.apple.security.application-groups com.apple.security.network.client keychain-access-groups ' ;;
+  ios) quiero='application-identifier com.apple.developer.default-data-protection com.apple.developer.team-identifier com.apple.security.application-groups keychain-access-groups ' ;;
   app-ios) quiero='keychain-access-groups ' ;;
   esac
   [ "$tiene" = "$quiero" ] || mal "la extensión de archivos ($p) se firmaría con «$tiene» y lo decidido es «$quiero»"

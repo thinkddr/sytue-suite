@@ -23,6 +23,7 @@
   "account.presenceFailed": "Jūsu klātbūtni neizdevās mainīt",
   "account.signIn": "Pierakstīties",
   "account.signOut": "Izrakstīties",
+  "account.signOutFailed": "Neizdevās izrakstīties šajā ierīcē. Drive var būt joprojām savienots. Mēģiniet vēlreiz.",
   "account.signOutPending.body": "Notepads šajā ierīcē ir piezīmes, kas vēl nav augšupielādētas ({count}). Izrakstoties tās tiek no tās izdzēstas.",
   "account.signOutPending.discard": "Atmest un izrakstīties",
   "account.signOutPending.title": "Neaugšupielādētas piezīmes",
@@ -338,5 +339,6 @@
   "widgets.open": "Atvērt",
   "widgets.pending": "Gaida",
   "widgets.photos": "Fotoattēli",
-  "widgets.rows": "Rindas"
+  "widgets.rows": "Rindas",
+  "widgets.storage": "Krātuve"
 }

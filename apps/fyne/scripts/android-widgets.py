@@ -30,6 +30,7 @@ LABELS = {
     "pending": "widgets.pending", "channels": "widgets.channels", "photos": "widgets.photos",
     "episodes": "widgets.episodes", "apps": "widgets.apps",
     "calendars": "widgets.calendars", "address_books": "widgets.address_books",
+    "storage_percent": "widgets.storage",
 }
 
 

@@ -149,6 +149,7 @@ type Pantalla struct {
 	AlSuscribirse       func()
 	AlGestionarRecursos func()
 	AlReintentar        func()
+	Refresco            ui.RefrescoLista
 	// AlConmutarCajon abre o cierra el menú en ventana estrecha.
 	AlConmutarCajon func()
 }
@@ -321,7 +322,10 @@ func (p *Pantalla) vista() fyne.CanvasObject {
 	m.DesdeAntes = p.t("cal.fromEarlier", nil)
 	m.AlCrear = p.AlCrearEvento
 	m.AlAbrir = p.AlAbrirEvento
-	return m
+	// El mes conserva seis semanas legibles en horizontal: si no cabe su mínimo,
+	// se recorre entero en vez de apretar los números y eventos unos sobre otros.
+	_, vista := desplazable(m)
+	return vista
 }
 
 // textosDeEstado es la copia de cada uno de los seis, con las claves del catálogo de

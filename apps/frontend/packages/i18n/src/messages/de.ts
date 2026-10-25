@@ -222,6 +222,8 @@ export const de: Catalog = {
   'account.signedOutDescription':
     'Melden Sie sich mit Ihrem Sytue One-Konto an, um Ihre Daten hier zu sehen.',
   'account.signOut': 'Abmelden',
+  'account.signOutFailed':
+    'Die Abmeldung auf diesem Gerät ist fehlgeschlagen. Drive ist möglicherweise noch verbunden. Versuche es erneut.',
   'account.signOutPending.title': 'Nicht hochgeladene Notizen',
   'account.signOutPending.body':
     'Notepads hat Notizen auf diesem Gerät, die noch nicht hochgeladen wurden ({count}). Beim Abmelden werden sie davon gelöscht.',
@@ -375,6 +377,7 @@ export const de: Catalog = {
   'widgets.episodes': 'Folgen',
   'widgets.apps': 'Apps',
   'widgets.compose': 'Verfassen',
+  'widgets.storage': 'Speicher',
   'widgets.create': 'Termin erstellen',
 
   'linkedServices.services': 'Dienste',

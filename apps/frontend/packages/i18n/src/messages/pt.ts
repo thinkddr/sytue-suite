@@ -202,6 +202,8 @@ export const pt: Catalog = {
   'account.signedOutDescription':
     'Inicie sessão com a sua conta Sytue One para ver aqui os seus dados.',
   'account.signOut': 'Terminar sessão',
+  'account.signOutFailed':
+    'Não foi possível terminar a sessão neste dispositivo. O Drive pode continuar ligado. Tente novamente.',
   'account.signOutPending.title': 'Notas por enviar',
   'account.signOutPending.body':
     'O Notepads tem neste dispositivo notas que ainda não foram enviadas ({count}). Ao terminar sessão são eliminadas dele.',
@@ -347,6 +349,7 @@ export const pt: Catalog = {
   'widgets.episodes': 'Episódios',
   'widgets.apps': 'Aplicações',
   'widgets.compose': 'Escrever',
+  'widgets.storage': 'Armazenamento',
   'widgets.create': 'Criar evento',
 
   'linkedServices.services': 'Serviços',

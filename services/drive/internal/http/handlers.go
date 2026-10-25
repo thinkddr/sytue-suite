@@ -1427,21 +1427,41 @@ func (h *Handlers) GetQuota(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, r, toAPIError(err))
 		return
 	}
-	httpx.JSON(w, r, http.StatusOK, map[string]any{
-		"tenant":          q.Tenant,
-		"limit_bytes":     q.LimitBytes,
-		"used_bytes":      q.UsedBytes,
-		"available_bytes": q.Available(),
-		"updated_at":      q.UpdatedAt,
-		// Si los ficheros nuevos van al bucket propio de la organización (y no
-		// gastan esta cuota): la UI lo dice junto al medidor.
-		"external_storage": h.svc.ExternalStorageEnabled(r.Context()),
+	w.Header().Set("Cache-Control", "no-store")
+	httpx.JSON(w, r, http.StatusOK, quotaPayload(q, h.svc.ExternalStorageEnabled(r.Context())))
+}
+
+func quotaPayload(q domain.Quota, externalStorage bool) map[string]any {
+	baseLimit, baseUsed := q.LimitBytes, q.UsedBytes
+	if q.ConnectedStorage {
+		baseLimit, baseUsed = q.BaseLimitBytes, q.BaseUsedBytes
+		externalStorage = true
+	}
+	out := map[string]any{
+		"tenant":            q.Tenant,
+		"limit_bytes":       q.LimitBytes,
+		"used_bytes":        q.UsedBytes,
+		"available_bytes":   q.Available(),
+		"updated_at":        q.UpdatedAt,
+		"base_limit_bytes":  baseLimit,
+		"base_used_bytes":   baseUsed,
+		"external_storage":  externalStorage,
+		"external_capacity": nil,
 		// Lo que ocupan las OTRAS apps de la suite en esta misma cuota, por app
 		// («cast», mig 0026). used_bytes ya lo incluye: es el desglose del medidor,
 		// y va siempre —vacío es `{}`, no ausente— para que el cliente no tenga
 		// que distinguir «nadie ha declarado» de «este Drive es antiguo».
 		"external_usage": externalUsageDe(q),
-	})
+	}
+	if externalStorage {
+		out["external_capacity"] = map[string]any{
+			"total_bytes":     q.StorageTotalBytes,
+			"used_bytes":      q.StorageUsedBytes,
+			"available_bytes": q.StorageAvailableBytes,
+			"partial":         q.StorageCapacityPartial,
+		}
+	}
+	return out
 }
 
 // externalUsageDe devuelve el desglose externo de la cuota, nunca nil.
@@ -1472,7 +1492,8 @@ func (h *Handlers) SetQuota(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, r, toAPIError(err))
 		return
 	}
-	httpx.JSON(w, r, http.StatusOK, q)
+	w.Header().Set("Cache-Control", "no-store")
+	httpx.JSON(w, r, http.StatusOK, quotaPayload(q, h.svc.ExternalStorageEnabled(r.Context())))
 }
 
 // ---------------------------------------------------------------------------

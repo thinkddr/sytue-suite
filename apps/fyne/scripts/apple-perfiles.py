@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (c) 2026 Daniel Delgado Ramos
-"""Consulta o prepara perfiles Apple para los hosts y widgets de la suite.
+"""Consulta o prepara perfiles Apple para los hosts y extensiones nativas de la suite.
 
 Por defecto sólo consulta la API. --preparar reutiliza una identidad válida del
 llavero efímero y crea perfiles, nunca certificados, App IDs ni capacidades.
@@ -38,14 +38,21 @@ def capturar(argv):
                                    env=dict(os.environ, SYTUE_WIDGETS_APPLE="1"))
 
 
-def requisitos(generador, app, plataforma, widget=False):
+def requisitos(generador, app, plataforma, widget=False, archivos=False):
     """Los derechos del empaquetador/generador son también los del perfil."""
     firma = AQUI / "empaquetar.sh"
     host = AQUI.parent / "cmd" / app["clave"]
     comunes = plistlib.loads(capturar(["bash", firma, "derechos-sesion", host, generador.EQUIPO, "ios"]).encode())
     grupo = comunes["com.apple.security.application-groups"][0]
     llavero = comunes["keychain-access-groups"][1]
-    if widget:
+    if archivos:
+        if not app.get("archivos"):
+            raise ValueError(app["clave"] + ": el catálogo no declara File Provider")
+        derechos = plistlib.loads(generador.derechos_archivos(app["clave"], "ios" if plataforma == "ios" else "macos").encode())
+        identificador = app["id"] + ".archivos"
+        grupo = "group." + app["id"]
+        llavero = generador.EQUIPO + "." + app["id"] + ".shared"
+    elif widget:
         if not hasattr(generador, "derechos_widgets") or not app.get("widget_acciones"):
             raise ValueError(app["clave"] + ": el catálogo no declara un target WidgetKit")
         derechos = plistlib.loads(generador.derechos_widgets(app, "ios" if plataforma == "ios" else "macos").encode())
@@ -58,7 +65,7 @@ def requisitos(generador, app, plataforma, widget=False):
             argv = ["bash", firma, "derechos-sesion", host, generador.EQUIPO, plataforma]
         derechos = plistlib.loads(capturar(argv).encode())
         identificador = app["id"]
-    if not re.fullmatch(r"eu\.sytue\.[a-z]+(?:\.widgets)?", identificador):
+    if not re.fullmatch(r"eu\.sytue\.[a-z]+(?:\.(?:widgets|archivos))?", identificador):
         raise ValueError("el catálogo no declara un App ID de la suite")
     return {"app": app["clave"], "id": identificador, "widget": widget, "group": grupo,
             "keychain": llavero, "entitlements": derechos,
@@ -157,16 +164,26 @@ def validar_perfil(perfil, requisito, plataforma):
         return datos if r.returncode == 0 else None
 
 
+def perfil_compatible(asc, perfil, plataforma, certificado):
+    """La misma guarda para un perfil existente y para la respuesta de creación."""
+    attrs = perfil.get("attributes", {})
+    if attrs.get("profileType") != TIPOS[plataforma] or attrs.get("profileState") != "ACTIVE" or not vigente(attrs.get("expirationDate")):
+        return False
+    if certificado:
+        certificados = asc.lista("/v1/profiles/" + perfil["id"] + "/certificates?limit=200")
+        if certificado not in {c["id"] for c in certificados}:
+            return False
+    return True
+
+
 def perfiles_validos(asc, bundle, requisito, plataforma, certificado):
     perfiles = asc.lista("/v1/bundleIds/" + bundle["id"] + "/profiles?limit=200")
-    for perfil in sorted(perfiles, key=lambda p: p.get("attributes", {}).get("createdDate", ""), reverse=True):
-        attrs = perfil.get("attributes", {})
-        if attrs.get("profileType") != TIPOS[plataforma] or attrs.get("profileState") != "ACTIVE" or not vigente(attrs.get("expirationDate")):
+    def fecha_creacion(perfil):
+        fecha = perfil.get("attributes", {}).get("createdDate")
+        return fecha if isinstance(fecha, str) else ""
+    for perfil in sorted(perfiles, key=fecha_creacion, reverse=True):
+        if not perfil_compatible(asc, perfil, plataforma, certificado):
             continue
-        if certificado:
-            certificados = asc.lista("/v1/profiles/" + perfil["id"] + "/certificates?limit=200")
-            if certificado not in {c["id"] for c in certificados}:
-                continue
         datos = validar_perfil(perfil, requisito, plataforma)
         if datos is not None:
             return perfil, datos
@@ -202,8 +219,7 @@ def preparar(asc, requisito, plataforma, certificado="", salida=None):
     esperado = "IOS" if plataforma == "ios" else "MAC_OS"
     if not bundle or bundle.get("attributes", {}).get("platform") not in (esperado, "UNIVERSAL"):
         return {**resultado, "reason": "bundle_missing_or_wrong_platform"}
-    capacidades = asc.lista("/v1/bundleIds/" + bundle["id"] + "/bundleIdCapabilities")
-    por_tipo = {c.get("attributes", {}).get("capabilityType"): c for c in capacidades}
+    por_tipo = REGISTRO["leer_capacidades"](asc, bundle, identificador)
     if "APP_GROUPS" not in por_tipo:
         return {**resultado, "reason": "app_group_capability_missing"}
     if requisito["protection"] and not REGISTRO["completa"](por_tipo.get("DATA_PROTECTION", {})):
@@ -221,8 +237,10 @@ def preparar(asc, requisito, plataforma, certificado="", salida=None):
         perfil = creado["data"]
         if "profileContent" not in perfil.get("attributes", {}):
             perfil = asc.pedir("GET", "/v1/profiles/" + perfil["id"])["data"]
-        datos = validar_perfil(perfil, requisito, plataforma)
         resultado["created"] = True
+        if not perfil_compatible(asc, perfil, plataforma, certificado):
+            return {**resultado, "reason": "created_profile_invalid_or_wrong_certificate"}
+        datos = validar_perfil(perfil, requisito, plataforma)
     if datos is None:
         return {**resultado, "reason": "profile_does_not_authorize_requested_rights"}
     resultado["profile_ready"] = True
@@ -231,26 +249,75 @@ def preparar(asc, requisito, plataforma, certificado="", salida=None):
     return resultado
 
 
+def destinos_app(app):
+    """Una sola lista de App IDs declarados; no presume extensiones inexistentes."""
+    yield "", False, False
+    if app.get("widget_acciones"):
+        yield ".widgets", True, False
+    if app.get("archivos"):
+        yield ".archivos", False, True
+
+
+def comprobar_recibo(ruta, catalogo, plataforma):
+    """Recibo completo del preparador: sólo catálogo y JSONL, sin API ni llavero."""
+    esperados = {app["id"] + sufijo: app["clave"]
+                 for app in catalogo.values() for sufijo, _, _ in destinos_app(app)}
+    if not esperados or len(esperados) != sum(1 for app in catalogo.values() for _ in destinos_app(app)):
+        raise ValueError("el catálogo de destinos está vacío o repite App IDs")
+    recibos = {}
+    with ruta.open(encoding="utf-8") as archivo:
+        for linea in archivo:
+            try:
+                dato = json.loads(linea)
+            except ValueError as error:
+                raise ValueError("el recibo no contiene JSONL válido") from error
+            if not isinstance(dato, dict):
+                raise ValueError("el recibo contiene una entrada inválida")
+            identificador = dato.get("app_id")
+            if not isinstance(identificador, str) or identificador not in esperados or identificador in recibos:
+                raise ValueError("el recibo contiene una identidad ajena o repetida")
+            if (dato.get("app") != esperados[identificador] or dato.get("platform") != plataforma or
+                    dato.get("profile_type") != TIPOS[plataforma] or dato.get("profile_ready") is not True or
+                    dato.get("certificate_verified") is not True or not isinstance(dato.get("created"), bool)):
+                raise ValueError("el recibo no acredita el tipo, certificado y perfil de cada destino")
+            recibos[identificador] = {campo: dato[campo] for campo in
+                                      ("app", "app_id", "platform", "profile_type", "profile_ready", "certificate_verified", "created")}
+    if set(recibos) != set(esperados):
+        raise ValueError("el recibo está incompleto: se exige un perfil válido por destino declarado")
+    for dato in recibos.values():
+        print(json.dumps(dato, ensure_ascii=False))
+    print(json.dumps({"platform": plataforma, "profile_count": len(recibos), "ready_count": len(recibos),
+                      "created_count": sum(dato["created"] for dato in recibos.values())}))
+    return 0
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--plataforma", choices=TIPOS, required=True)
-    parser.add_argument("--destinos", choices=("hosts", "widgets", "todos"), default="hosts")
+    parser.add_argument("--destinos", choices=("hosts", "widgets", "archivos", "nativos", "todos"), default="hosts")
     parser.add_argument("--preparar", action="store_true")
     parser.add_argument("--salida", type=pathlib.Path)
     parser.add_argument("--certificado-sha1", default="")
+    parser.add_argument("--comprobar-recibo", type=pathlib.Path, help="validar los recibos de todos los destinos del catálogo sin API ni llavero")
     parser.add_argument("--seco", action="store_true", help="mostrar el plan sin API ni llavero")
     parser.add_argument("apps", nargs="*")
     args = parser.parse_args()
+    if args.comprobar_recibo and (args.preparar or args.salida or args.seco or args.certificado_sha1 or args.apps or args.destinos != "hosts"):
+        parser.error("--comprobar-recibo sólo admite --plataforma")
     if args.preparar != (args.salida is not None) or (args.seco and args.preparar) or (args.certificado_sha1 and not args.preparar):
         parser.error("--preparar requiere --salida; --seco no prepara; la huella sólo selecciona una identidad al preparar")
     gen = REGISTRO["importar"]("sytue_xcode_perfiles", AQUI.parent / "xcode/generar.py")
     catalogo = {a["clave"]: a for a in gen.apps()}
+    if args.comprobar_recibo:
+        return comprobar_recibo(args.comprobar_recibo, catalogo, args.plataforma)
     seleccion = args.apps or list(catalogo)
     if len(set(seleccion)) != len(seleccion) or any(a not in catalogo for a in seleccion):
         parser.error("selecciona apps del catálogo sin repetirlas")
-    pendientes = [requisitos(gen, catalogo[a], args.plataforma, widget)
-                  for a in seleccion for widget in (False, True)
-                  if (args.destinos != "widgets" or widget) and (args.destinos != "hosts" or not widget)]
+    pendientes = [requisitos(gen, catalogo[a], args.plataforma, widget, archivos)
+                  for a in seleccion for _, widget, archivos in destinos_app(catalogo[a])
+                  if args.destinos == "todos" or (args.destinos == "nativos" and not widget) or
+                  (args.destinos == "widgets" and widget) or (args.destinos == "archivos" and archivos) or
+                  (args.destinos == "hosts" and not widget and not archivos)]
     if args.seco:
         for requisito in pendientes:
             print(json.dumps({"platform": args.plataforma, "profile_type": TIPOS[args.plataforma],

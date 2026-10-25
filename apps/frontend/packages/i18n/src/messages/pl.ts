@@ -221,6 +221,8 @@ export const pl: Catalog = {
   'account.signedOutTitle': 'Nie jesteś zalogowany',
   'account.signedOutDescription': 'Zaloguj się kontem Sytue One, aby zobaczyć tutaj swoje dane.',
   'account.signOut': 'Wyloguj się',
+  'account.signOutFailed':
+    'Nie udało się wylogować na tym urządzeniu. Drive może być nadal połączony. Spróbuj ponownie.',
   'account.signOutPending.title': 'Niewysłane notatki',
   'account.signOutPending.body':
     'Notepads ma na tym urządzeniu notatki, które nie zostały jeszcze wysłane ({count}). Wylogowanie usuwa je z niego.',
@@ -367,6 +369,7 @@ export const pl: Catalog = {
   'widgets.episodes': 'Odcinki',
   'widgets.apps': 'Aplikacje',
   'widgets.compose': 'Napisz',
+  'widgets.storage': 'Miejsce',
   'widgets.create': 'Utwórz wydarzenie',
 
   'linkedServices.services': 'Usługi',

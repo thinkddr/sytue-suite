@@ -680,6 +680,14 @@ func (s *Suite) cargarSesion() (auth.Tokens, error) {
 // este equipo seguía valiendo para quien tuviera una copia— y la caché de respuestas de
 // trabajar sin conexión se vacía, que es lo que hace la web al salir.
 func (s *Suite) Salir() {
+	if err := s.SalirConError(); err != nil {
+		slog.Warn("sesion: no se ha podido completar el cierre compartido", "error", err)
+	}
+}
+
+// SalirConError permite avisar y reintentar si el dispositivo no dejó retirar
+// la sesión compartida. El estado local nunca readopta los tokens no borrados.
+func (s *Suite) SalirConError() error {
 	// La contraseña del proveedor de archivos de Drive, que sigue valiendo sin sesión. La
 	// primera: su token puede necesitar el refresh que se revoca justo debajo.
 	s.revocarArchivos()
@@ -696,7 +704,12 @@ func (s *Suite) Salir() {
 		}()
 	}
 	s.retirarDriveDelSistema()
-	s.Sesion.Logout()
+	errCierre := s.Sesion.Logout()
+	if errCierre != nil {
+		// Hasta un login completado, ni la vigilancia ni un cambio de ajustes
+		// pueden readoptar una copia que el almacén no dejó retirar.
+		s.reidentificando.Store(true)
+	}
 	s.vaciarAlmacen()
 	// Las claves recordadas de los cuadernos cifrados son de esta sesión (FYS-09).
 	if err := errors.Join(auth.OlvidarSecretos("notes-"), auth.OlvidarSecretos("rooms-matrix-")); err != nil {
@@ -714,6 +727,7 @@ func (s *Suite) Salir() {
 	s.mu.Unlock()
 	s.repintar(visto) // sin sesión no hay organización que diga color ni forma
 	s.avisar()
+	return errCierre
 }
 
 // retirarDriveDelSistema quita Drive del gestor de ficheros y de «Archivos» y revoca su
@@ -723,6 +737,11 @@ func (s *Suite) retirarDriveDelSistema() {
 	if !documentos.Guardada() {
 		return
 	}
+	cuentaSesion := ""
+	if s.almacen != nil {
+		cuentaSesion = s.almacen.Identificador()
+	}
+	identidad := identidadDocumentos(s.Sesion.SnapshotIdentity(), cuentaSesion)
 	ctx, parar := context.WithTimeout(context.Background(), 2*time.Second)
 	tok, err := s.Sesion.AccessToken(ctx)
 	parar()
@@ -733,7 +752,7 @@ func (s *Suite) retirarDriveDelSistema() {
 	go func() {
 		ctx, parar := context.WithTimeout(context.Background(), 10*time.Second)
 		defer parar()
-		if err := documentos.Retirar(ctx, cuenta); err != nil {
+		if err := documentos.RetirarIdentidad(ctx, cuenta, identidad); err != nil {
 			slog.Warn("sesion: la contraseña de Drive en el sistema no se ha podido revocar; se revocará al volver a entrar", "error", err)
 		}
 	}()
@@ -784,6 +803,7 @@ func (s *Suite) PonerPresencia(ctx context.Context, e api.EstadoPresencia, mensa
 // ha cambiado algo, y la que mantiene viva la presencia. Mueren con ctx.
 func (s *Suite) Arrancar(ctx context.Context) {
 	s.iniciarWidgets(ctx)
+	s.iniciarDriveSistemaNoApple(ctx)
 	s.mu.Lock()
 	desde := s.visto
 	s.mu.Unlock()

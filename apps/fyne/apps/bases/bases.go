@@ -151,10 +151,7 @@ func (p *Pantalla) contenido() fyne.CanvasObject {
 
 // anchoContenido es el ancho que le queda a una pantalla dentro de su `p-6`.
 func (p *Pantalla) anchoContenido() float32 {
-	ancho := p.tam.Width - 2*tema.Espacio(6)
-	if p.tam.Width >= ui.Estrecho {
-		ancho -= ui.AnchoMenu(false)
-	}
+	ancho := ui.AnchoHoja(p.tam.Width, ui.AnchoMenu(false), 0) - 2*tema.Espacio(6)
 	return max(ancho, 0)
 }
 
@@ -163,7 +160,14 @@ func (p *Pantalla) marco() fyne.CanvasObject {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	p.enLista = p.abierta == nil
 	p.scroll = container.NewVScroll(p.contenido())
-	arm := ui.NuevoArmazon(p.scroll)
+	refresco := ui.RefrescarAlTirar(p.scroll, &ui.RefrescoLista{
+		Arriba: func() bool { return p.scroll.Offset.Y <= 0.5 },
+		Puede: func() bool {
+			return p.svc != nil && p.abierta == nil && !p.Cargando && !p.creando && p.nombre.Texto() == ""
+		},
+		Actualizar: p.cargarLista,
+	})
+	arm := ui.NuevoArmazon(refresco)
 	arm.Titulo = p.t("nav.title")
 	tinta := "sidebar-fg-muted"
 	if p.enLista {

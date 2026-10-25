@@ -32,7 +32,13 @@ interface Enrolamiento {
   qr_png?: string;
 }
 
-export function SeguridadCard({ t }: { t: T }): JSX.Element {
+export function SeguridadCard({
+  t,
+  mfaRequired = false,
+}: {
+  t: T;
+  mfaRequired?: boolean;
+}): JSX.Element {
   const [mfa, setMfa] = useState<boolean | null>(null);
   const [error, setError] = useState('');
   // Separado de `error` para que `cargar` no dependa de `t`: con la traducción
@@ -59,11 +65,8 @@ export function SeguridadCard({ t }: { t: T }): JSX.Element {
   // El soporte se resuelve tras hidratar: en el servidor no hay `navigator`, y
   // pintar el botón para luego quitarlo es peor que enseñarlo un instante tarde.
   const [hayWebAuthn, setHayWebAuthn] = useState(false);
-  // `?mfa=required`: Sytue ID manda aquí a quien intentó abrir algo que exige el
-  // segundo factor sin tenerlo (authorize.go, `desviarAStepUp`). Sin el aviso, la
-  // vuelta a la cuenta parecía un rebote sin motivo. Se lee al hidratar: en el
-  // servidor no hay `location`.
-  const [exigida, setExigida] = useState(false);
+  // La página resuelve `?mfa=required` en SSR. El aviso ya aparece en el HTML,
+  // incluso mientras /api/me carga o si falla, sin esperar a la hidratación.
 
   async function cargar(): Promise<void> {
     try {
@@ -93,7 +96,6 @@ export function SeguridadCard({ t }: { t: T }): JSX.Element {
     void cargar();
     void cargarLlaves();
     setHayWebAuthn(soportaPasskeys());
-    setExigida(new URLSearchParams(window.location.search).get('mfa') === 'required');
   }, []);
 
   /** Lee el mensaje del servicio: dice por qué falló mejor que un texto genérico. */
@@ -288,7 +290,7 @@ export function SeguridadCard({ t }: { t: T }): JSX.Element {
 
           {mfa === null && <p class="text-text-muted text-sm">{t('common.loading')}</p>}
 
-          {mfa === false && exigida && (
+          {mfaRequired && mfa !== true && (
             <p role="alert" class="bg-warning-bg text-warning-text rounded-md p-3 text-sm">
               {t('security.mfa.required')}
             </p>

@@ -203,6 +203,8 @@ export const da: Catalog = {
   'account.signedOutTitle': 'Du er ikke logget ind',
   'account.signedOutDescription': 'Log ind med din Sytue One-konto for at se dine data her.',
   'account.signOut': 'Log ud',
+  'account.signOutFailed':
+    'Kunne ikke logge ud på denne enhed. Drive kan stadig være tilsluttet. Prøv igen.',
   'account.signOutPending.title': 'Noter ikke uploadet',
   'account.signOutPending.body':
     'Notepads har noter på denne enhed, som endnu ikke er uploadet ({count}). Når du logger ud, slettes de fra den.',
@@ -348,6 +350,7 @@ export const da: Catalog = {
   'widgets.episodes': 'Episoder',
   'widgets.apps': 'Apps',
   'widgets.compose': 'Skriv',
+  'widgets.storage': 'Lagerplads',
   'widgets.create': 'Opret begivenhed',
 
   'linkedServices.services': 'Tjenester',

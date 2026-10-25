@@ -133,11 +133,13 @@ func (m *Marco) recomponer() {
 		}
 	}
 
+	anteriorPanel, anteriorAjustes := m.panel, m.ajustes
 	m.panel = nil
 	if c.Panel != SinPanel {
 		for _, it := range itemsCarril {
 			if it.p == c.Panel {
 				m.panel = NuevoPanelLateral(c, c.Traducir(it.rotulo), cuerpoPanel(c, it.p), false)
+				m.panel.conservarDesplazamiento(anteriorPanel)
 			}
 		}
 	}
@@ -147,6 +149,7 @@ func (m *Marco) recomponer() {
 	m.ajustes = nil
 	if c.Ajustes {
 		m.ajustes = NuevoPanelLateral(c, c.Traducir("view.settingsPanel"), cuerpoAjustes(c), true)
+		m.ajustes.conservarDesplazamiento(anteriorAjustes)
 	}
 
 	// El centro es el lienzo cuando el documento está listo, y el estado que toque en
@@ -175,7 +178,7 @@ func (m *Marco) MinSize() fyne.Size {
 	if m.franja != nil {
 		alto += m.franja.MinSize().Height
 	}
-	return fyne.NewSize(AnchoCarril+AnchoPanel, alto+AltoCabeceraPanel)
+	return fyne.NewSize(anchoCarril()+AnchoPanel, alto+AltoCabeceraPanel)
 }
 
 // CreateRenderer compone el fondo y las zonas.
@@ -249,8 +252,11 @@ func (r *marcoRenderer) Layout(t fyne.Size) {
 
 	x := float32(0)
 	m.carril.Move(fyne.NewPos(x, y))
-	m.carril.Resize(fyne.NewSize(AnchoCarril, altoCentro))
-	x += AnchoCarril
+	m.carril.Resize(fyne.NewSize(anchoCarril(), altoCentro))
+	x += anchoCarril()
+	if r.colocarPanelesCompactos(t, x, y, altoCentro) {
+		return
+	}
 	if m.panel != nil {
 		m.panel.Move(fyne.NewPos(x, y))
 		m.panel.Resize(fyne.NewSize(AnchoPanel, altoCentro))
@@ -266,6 +272,42 @@ func (r *marcoRenderer) Layout(t fyne.Size) {
 		m.centro.Move(fyne.NewPos(x, y))
 		m.centro.Resize(fyne.NewSize(max(der-x, 0), altoCentro))
 	}
+}
+
+func (r *marcoRenderer) colocarPanelesCompactos(t fyne.Size, x, y, alto float32) bool {
+	m := r.m
+	// En una ventana estrecha los paneles sustituyen al lienzo. Al girar, el
+	// mismo documento y sus controles vuelven al reparto de columnas si caben.
+	paneles := float32(0)
+	for _, p := range []*PanelLateral{m.panel, m.ajustes} {
+		if p != nil {
+			paneles += AnchoPanel
+		}
+	}
+	compacto := paneles > 0 && (t.Width < ui.CorteMD || (ui.EsTactil() && t.Width-x-paneles < ui.AnchoContenidoMinimo))
+	if m.centro != nil {
+		if compacto {
+			m.centro.Hide()
+		} else {
+			m.centro.Show()
+		}
+	}
+	for _, p := range []*PanelLateral{m.panel, m.ajustes} {
+		if p != nil {
+			if compacto && p == m.panel && m.ajustes != nil {
+				// No deja controles enfocables detrás del panel visible. Cerrar
+				// ajustes devuelve el anterior sin borrar lo que estaba escrito.
+				p.Hide()
+			} else {
+				p.Show()
+			}
+			if compacto {
+				p.Move(fyne.NewPos(x, y))
+				p.Resize(fyne.NewSize(max(t.Width-x, 0), alto))
+			}
+		}
+	}
+	return compacto
 }
 
 func (r *marcoRenderer) Refresh() {

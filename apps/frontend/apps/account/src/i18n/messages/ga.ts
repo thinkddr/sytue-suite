@@ -56,7 +56,7 @@ export const ga: AppCatalog<typeof en> = {
   'security.mfa.title': 'Fíorú dhá chéim',
   'security.mfa.off': 'Níl sé socraithe. Osclaíonn do phasfhocal amháin an cuntas.',
   'security.mfa.required':
-    "Éilíonn d'eagraíocht fíorú dhá chéim. Cuir ar siúl thíos é agus logáil isteach arís.",
+    'Teastaíonn fíorú dhá chéim don ghníomh seo. Socraigh é thíos, ansin sínigh isteach arís.',
   'security.mfa.on': 'Ar siúl. Iarrtar cód ort agus tú ag logáil isteach.',
   'security.mfa.enable': 'Socraigh',
   'security.mfa.scan': "Scan é seo le d'aip fhíordheimhnithe.",
@@ -115,6 +115,10 @@ export const ga: AppCatalog<typeof en> = {
   'plan.pro': 'Plean Pro · 200 GB',
   'plan.enterprise': 'Plean Enterprise · 1 TB · Tacaíocht Premium',
   'plan.storage': 'Stóráil in úsáid',
+  'plan.externalNote': 'Méadaíonn stóras ceangailte d’acmhainn stórála in Sytue.',
+  'plan.externalCapacity': 'Cuireann stóras ceangailte {capacity} leis.',
+  'plan.externalUnknown': 'Ní thugann an soláthraí eolas faoina acmhainn stórála.',
+  'plan.baseUsage': 'Sytue: {used} as {total}',
   'plan.paidUntil': 'Íoctha go dtí',
   'plan.upgrade': 'Faigh níos mó spáis',
   'plan.upgrade.hint':

@@ -84,6 +84,7 @@ type Explorador struct {
 	// AlCargarMas pide la página siguiente. Lo llama la lista al pintar una de sus
 	// últimas filas y el botón «Cargar más» de la rejilla.
 	AlCargarMas func()
+	Refresco    ui.RefrescoLista
 	// AlMoverA mueve lo arrastrado a una carpeta soltándolo encima; nil, no se arrastra.
 	AlMoverA func(origenes []Elemento, destino Elemento)
 	// AlMenu abre el menú de acciones de un elemento —el «⋯» de la fila o de la
@@ -640,7 +641,8 @@ func (e *Explorador) lista(v tema.Variante) fyne.CanvasObject {
 		// El `widget.List` separa sus filas con el relleno del TEMA —7 px con el de la
 		// suite, y también con HideSeparators—: 35.000 px de desvío en 5.000 filas.
 		// Con esto van pegadas, que es lo que hace la web.
-		e.filasObj = container.NewThemeOverride(e.filas, SinRelleno{})
+		e.Refresco.Arriba = func() bool { return e.filas.GetScrollOffset() <= 0.5 }
+		e.filasObj = ui.RefrescarAlTirar(container.NewThemeOverride(e.filas, SinRelleno{}), &e.Refresco)
 		e.filasCasilla, e.filasLineas = conCasilla, lineas
 	} else {
 		e.filas.Refresh()
@@ -845,7 +847,9 @@ func (e *Explorador) franja(carpetas []Elemento) (fyne.CanvasObject, func(ancho 
 		e.franjaScroll.Refresh()
 	}
 	n := len(carpetas)
-	return e.franjaScroll, func(ancho float32) float32 {
+	refresco := e.Refresco
+	refresco.Arriba = func() bool { return e.franjaScroll.Offset.Y <= 0.5 }
+	return ui.RefrescarAlTirar(e.franjaScroll, &refresco), func(ancho float32) float32 {
 		cols := rej.Columnas(max(ancho-2*CanalonFranja, 0))
 		filas := float32((n + cols - 1) / cols)
 		return RellenoFranja + filas*AltoTeselaFranja + (filas-1)*HuecoFranja + RellenoFranjaAbajo
@@ -1012,7 +1016,10 @@ func (e *Explorador) rejilla(v tema.Variante) fyne.CanvasObject {
 		e.arriba = false
 	}
 	fondo := canvas.NewRectangle(tema.Color("bg", v))
-	return container.New(&marcoRejilla{hijo: e.desplazable}, fondo, e.desplazable)
+	refresco := e.Refresco
+	refresco.Arriba = func() bool { return e.desplazable.Offset.Y <= 0.5 }
+	cuerpo := ui.RefrescarAlTirar(e.desplazable, &refresco)
+	return container.New(&marcoRejilla{hijo: cuerpo}, fondo, cuerpo)
 }
 
 // nuevaTarjeta crea la tarjeta de un elemento con sus datos puestos, y lo que va al

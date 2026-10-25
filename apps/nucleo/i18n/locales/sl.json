@@ -23,6 +23,7 @@
   "account.presenceFailed": "Vaše prisotnosti ni bilo mogoče spremeniti",
   "account.signIn": "Prijava",
   "account.signOut": "Odjava",
+  "account.signOutFailed": "Odjava v tej napravi ni uspela. Drive je morda še povezan. Poskusite znova.",
   "account.signOutPending.body": "Notepads ima v tej napravi beležke, ki še niso naložene ({count}). Ob odjavi se z nje izbrišejo.",
   "account.signOutPending.discard": "Zavrzi in se odjavi",
   "account.signOutPending.title": "Nenaložene beležke",
@@ -342,5 +343,6 @@
   "widgets.open": "Odpri",
   "widgets.pending": "Na čakanju",
   "widgets.photos": "Fotografije",
-  "widgets.rows": "Vrstice"
+  "widgets.rows": "Vrstice",
+  "widgets.storage": "Shramba"
 }

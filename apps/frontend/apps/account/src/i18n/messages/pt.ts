@@ -56,7 +56,7 @@ export const pt: AppCatalog<typeof en> = {
   'security.mfa.title': 'Verificação em dois passos',
   'security.mfa.off': 'Não configurada. Só a palavra-passe abre a conta.',
   'security.mfa.required':
-    'A sua organização exige verificação em dois passos. Ative-a abaixo e inicie sessão de novo.',
+    'Esta operação requer verificação em dois passos. Configure-a abaixo e volte a iniciar sessão.',
   'security.mfa.on': 'Ativa. Pedimos-lhe um código ao iniciar sessão.',
   'security.mfa.enable': 'Configurar',
   'security.mfa.scan': 'Leia isto com a sua aplicação de autenticação.',
@@ -115,6 +115,10 @@ export const pt: AppCatalog<typeof en> = {
   'plan.pro': 'Plano Pro · 200 GB',
   'plan.enterprise': 'Plano Enterprise · 1 TB · Suporte Premium',
   'plan.storage': 'Armazenamento usado',
+  'plan.externalNote': 'O armazenamento ligado aumenta a sua capacidade no Sytue.',
+  'plan.externalCapacity': 'O armazenamento ligado acrescenta {capacity}.',
+  'plan.externalUnknown': 'O fornecedor não informa a sua capacidade.',
+  'plan.baseUsage': 'Sytue: {used} de {total}',
   'plan.paidUntil': 'Pago até',
   'plan.upgrade': 'Obter mais espaço',
   'plan.upgrade.hint':

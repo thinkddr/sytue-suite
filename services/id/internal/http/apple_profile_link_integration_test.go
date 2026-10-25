@@ -10,6 +10,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"git.sytue.eu/sytue/one/services/id/internal/domain"
 )
 
 // TestElEnlaceDelPerfilValeUnaVez — el enlace que la app del iPhone abre en Safari da el
@@ -19,8 +21,12 @@ func TestElEnlaceDelPerfilValeUnaVez(t *testing.T) {
 	l := newLiveServer(t)
 	l.srv.cfg.MailIMAPAddr, l.srv.cfg.MailSMTPAddr = "imap.id.test:993", "smtp.id.test:465"
 	l.srv.cfg.CalDAVURL, l.srv.cfg.CardDAVURL = "https://calendar.id.test/dav", "https://contacts.id.test/dav"
-	u := l.mkUser(t, "perfil@id.test", "")
-	tok := l.token(t, u.ID, "", nil)
+	org, err := l.st.CreateOrg(l.ctx, nil, domain.Organization{Slug: "apple-profile", Name: "Apple"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	u := l.addMember(t, org, "perfil@id.test", domain.RoleMember)
+	tok := l.token(t, u.ID, org.Slug, nil)
 
 	rr, out := l.do(t, http.MethodPost, "/api/v1/me/apple-profile/link", tok, map[string]string{"label": "iPhone de Ada"})
 	if rr.Code != http.StatusCreated {

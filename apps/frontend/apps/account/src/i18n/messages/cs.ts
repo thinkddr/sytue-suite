@@ -55,7 +55,7 @@ export const cs: AppCatalog<typeof en> = {
   'security.mfa.title': 'Dvoufázové ověření',
   'security.mfa.off': 'Nenastaveno. Účet otevře samotné heslo.',
   'security.mfa.required':
-    'Vaše organizace vyžaduje dvoufázové ověření. Zapněte ho níže a přihlaste se znovu.',
+    'Tato akce vyžaduje dvoufázové ověření. Nastavte ho níže a poté se znovu přihlaste.',
   'security.mfa.on': 'Zapnuto. Při přihlášení jste požádáni o kód.',
   'security.mfa.enable': 'Nastavit',
   'security.mfa.scan': 'Naskenujte to ověřovací aplikací.',
@@ -114,6 +114,10 @@ export const cs: AppCatalog<typeof en> = {
   'plan.pro': 'Tarif Pro · 200 GB',
   'plan.enterprise': 'Tarif Enterprise · 1 TB · Prémiová podpora',
   'plan.storage': 'Využité úložiště',
+  'plan.externalNote': 'Připojené úložiště rozšiřuje vaši kapacitu v Sytue.',
+  'plan.externalCapacity': 'Připojené úložiště přidává {capacity}.',
+  'plan.externalUnknown': 'Poskytovatel neuvádí kapacitu úložiště.',
+  'plan.baseUsage': 'Sytue: {used} z {total}',
   'plan.paidUntil': 'Zaplaceno do',
   'plan.upgrade': 'Získat více místa',
   'plan.upgrade.hint':

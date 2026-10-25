@@ -219,6 +219,8 @@ export const cs: Catalog = {
   'account.signedOutTitle': 'Nejste přihlášeni',
   'account.signedOutDescription': 'Přihlaste se účtem Sytue One a uvidíte zde svá data.',
   'account.signOut': 'Odhlásit se',
+  'account.signOutFailed':
+    'Na tomto zařízení se nepodařilo odhlásit. Drive může být stále připojený. Zkuste to znovu.',
   'account.signOutPending.title': 'Nenahrané poznámky',
   'account.signOutPending.body':
     'Notepads má na tomto zařízení poznámky, které ještě nebyly nahrány ({count}). Odhlášením se z něj smažou.',
@@ -365,6 +367,7 @@ export const cs: Catalog = {
   'widgets.episodes': 'Epizody',
   'widgets.apps': 'Aplikace',
   'widgets.compose': 'Napsat',
+  'widgets.storage': 'Úložiště',
   'widgets.create': 'Vytvořit událost',
 
   'linkedServices.services': 'Služby',

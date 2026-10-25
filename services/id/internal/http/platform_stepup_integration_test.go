@@ -29,9 +29,14 @@ const platformClient = "sytue-platform"
 // que se comprueba aquí es justo el desvío previo).
 func (l *liveServer) authorizeLoc(t *testing.T, sess *http.Cookie) (string, []*http.Cookie) {
 	t.Helper()
+	return l.authorizeLocForClient(t, sess, platformClient, "https://platform.sytue.eu/auth/callback")
+}
+
+func (l *liveServer) authorizeLocForClient(t *testing.T, sess *http.Cookie, clientID, redirectURI string) (string, []*http.Cookie) {
+	t.Helper()
 	authz := "/oauth2/authorize?" + url.Values{
-		"client_id":             {platformClient},
-		"redirect_uri":          {"https://platform.sytue.eu/auth/callback"},
+		"client_id":             {clientID},
+		"redirect_uri":          {redirectURI},
 		"response_type":         {"code"},
 		"scope":                 {"openid profile email offline_access"},
 		"state":                 {"st-1"},

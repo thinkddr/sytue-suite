@@ -129,6 +129,13 @@ func ElegirApp(clave string) bool {
 	return ponerEnVigor()
 }
 
+// AppElegida devuelve el producto elegido, también cuando el color actual es fijo.
+func AppElegida() string {
+	eleccion.Lock()
+	defer eleccion.Unlock()
+	return eleccion.app
+}
+
 // ElegirForma fija la forma de la suite: "carril", o cualquier otra cosa —"" y "marco"
 // incluidos— para Marco, la de la casa. Devuelve si ha cambiado algo, como ElegirColor.
 func ElegirForma(nombre string) bool {

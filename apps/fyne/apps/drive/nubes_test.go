@@ -4,11 +4,62 @@
 package drive
 
 import (
+	"context"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"sync/atomic"
 	"testing"
+
+	"fyne.io/fyne/v2"
 
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 )
+
+func TestConectarYDesconectarNubeActualizaLaCuota(t *testing.T) {
+	var conectada atomic.Bool
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method + " " + r.URL.Path {
+		case "GET /api/v1/quota":
+			if conectada.Load() {
+				_, _ = io.WriteString(w, `{"limit_bytes":1124,"used_bytes":220,"external_storage":true}`)
+			} else {
+				_, _ = io.WriteString(w, `{"limit_bytes":100,"used_bytes":20,"external_storage":false}`)
+			}
+		case "GET /api/v1/personal-storage/accounts":
+			if conectada.Load() {
+				_, _ = io.WriteString(w, `{"items":[{"instance_id":"personal-google","provider":"google-drive","connected":true}]}`)
+			} else {
+				_, _ = io.WriteString(w, `{"items":[]}`)
+			}
+		case "DELETE /api/v1/personal-storage/personal-google":
+			conectada.Store(false)
+			w.WriteHeader(http.StatusNoContent)
+		default:
+			_, _ = io.WriteString(w, `{}`)
+		}
+	}))
+	defer srv.Close()
+	p := pantallaDePrueba(t, srv)
+	p.ConIntegraciones(api.NewIntegraciones(srv.URL, sesionDoble{}, nil))
+	p.AutorizarNube = func(context.Context, string) (string, error) {
+		conectada.Store(true)
+		return "personal-google", nil
+	}
+	p.conectarNube("google-drive")
+	fyne.DoAndWait(func() {
+		if p.lateral.Cuota == nil || p.lateral.Cuota.Tope != 1124 || !p.lateral.Cuota.Externo {
+			t.Errorf("no se recargó la cuota ampliada: %+v", p.lateral.Cuota)
+		}
+	})
+	p.desconectarNube()
+	fyne.DoAndWait(func() {
+		if p.lateral.Cuota == nil || p.lateral.Cuota.Tope != 100 || p.lateral.Cuota.Externo {
+			t.Errorf("no se restauró la cuota base al desconectar: %+v", p.lateral.Cuota)
+		}
+	})
+}
 
 func TestLasNubesSeEligenDesdeElMenuYAtrasSubeCarpeta(t *testing.T) {
 	p := NuevaPantalla(traductor(t), nil, nil, nil)

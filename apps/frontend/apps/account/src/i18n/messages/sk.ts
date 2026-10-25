@@ -55,7 +55,7 @@ export const sk: AppCatalog<typeof en> = {
   'security.mfa.title': 'Dvojkrokové overenie',
   'security.mfa.off': 'Nenastavené. Účet otvorí samotné heslo.',
   'security.mfa.required':
-    'Vaša organizácia vyžaduje dvojkrokové overenie. Zapnite ho nižšie a prihláste sa znova.',
+    'Táto akcia vyžaduje dvojstupňové overenie. Nastavte ho nižšie a potom sa znova prihláste.',
   'security.mfa.on': 'Zapnuté. Pri prihlásení sa od vás žiada kód.',
   'security.mfa.enable': 'Nastaviť',
   'security.mfa.scan': 'Naskenujte to overovacou aplikáciou.',
@@ -113,6 +113,10 @@ export const sk: AppCatalog<typeof en> = {
   'plan.pro': 'Plán Pro · 200 GB',
   'plan.enterprise': 'Plán Enterprise · 1 TB · Prémiová podpora',
   'plan.storage': 'Využité úložisko',
+  'plan.externalNote': 'Pripojené úložisko rozširuje vašu kapacitu v Sytue.',
+  'plan.externalCapacity': 'Pripojené úložisko pridáva {capacity}.',
+  'plan.externalUnknown': 'Poskytovateľ neuvádza kapacitu úložiska.',
+  'plan.baseUsage': 'Sytue: {used} z {total}',
   'plan.paidUntil': 'Zaplatené do',
   'plan.upgrade': 'Získať viac miesta',
   'plan.upgrade.hint':

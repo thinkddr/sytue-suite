@@ -12,7 +12,6 @@ import (
 
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/services/id/internal/domain"
-	"git.sytue.eu/sytue/one/services/id/internal/store"
 )
 
 // Endpoint INTERNO service-to-service: POST /api/v1/internal/app-passwords/verify
@@ -40,6 +39,7 @@ type verifyAppPasswordReq struct {
 
 type verifyAppPasswordResp struct {
 	Subject string `json:"subject"`
+	OrgID   string `json:"org_id"`
 	Tenant  string `json:"tenant"`
 	Email   string `json:"email"`
 	Mailbox string `json:"mailbox,omitempty"`
@@ -62,6 +62,7 @@ func (s *Server) handleInternalVerifyAppPassword(w http.ResponseWriter, r *http.
 	}
 	httpx.JSON(w, r, http.StatusOK, verifyAppPasswordResp{
 		Subject: d.user.ID,
+		OrgID:   d.org.ID,
 		Tenant:  d.org.Slug,
 		Email:   d.user.Email,
 		Mailbox: d.buzon,
@@ -71,7 +72,7 @@ func (s *Server) handleInternalVerifyAppPassword(w http.ResponseWriter, r *http.
 // dueno es a quién pertenece una contraseña de aplicación y en qué organización entra.
 type dueno struct {
 	user  domain.User
-	org   store.OrgMembership
+	org   domain.Organization
 	buzon string
 }
 
@@ -90,7 +91,7 @@ func (s *Server) duenoDeAppPassword(w http.ResponseWriter, r *http.Request) (due
 
 	// La búsqueda es por el HASH, que es único: la contraseña identifica por sí
 	// sola a su dueño. La identidad presentada solo se contrasta después.
-	user, err := s.store.UserByAppPassword(r.Context(), domain.HashToken(pass))
+	user, org, err := s.store.UserByAppPassword(r.Context(), domain.HashToken(pass))
 	if err != nil {
 		if !errors.Is(err, domain.ErrNotFound) {
 			return dueno{}, err
@@ -104,26 +105,14 @@ func (s *Server) duenoDeAppPassword(w http.ResponseWriter, r *http.Request) (due
 		return dueno{}, invalida
 	}
 
-	// La organización: la PRIMERA membresía por antigüedad, que es el mismo orden
-	// con el que se pinta el selector. Una contraseña de aplicación no tiene dónde
-	// elegir organización —un cliente de correo no sabe qué es eso— así que se le
-	// abre el buzón de la suya de siempre. Quien pertenezca a varias y quiera el
-	// de otra, crea otra contraseña cuando exista esa opción.
-	mems, err := s.store.ListOrgMembershipsForUser(r.Context(), user.ID)
-	if err != nil {
-		return dueno{}, err
-	}
-	if len(mems) == 0 {
-		// Sin organización no hay buzón que abrir: el correo vive en un tenant.
-		return dueno{}, invalida
-	}
-	org := mems[0]
+	// La credencial ya viene ligada a su organización. El store ha comprobado la
+	// membresía actual; nunca se elige otra aunque la original desaparezca.
 
 	// El buzón de la organización, con la MISMA llamada que usa la emisión del
 	// token (`userClaims`): idempotente y, en el caso normal, una lectura por
 	// índice. Si falla, se sigue con el correo de registro en vez de tumbar la
 	// autenticación — igual que allí, donde es best-effort.
-	buzon, _ := s.store.EnsureOrgMailbox(r.Context(), nil, org.OrgID, user.ID, "")
+	buzon, _ := s.store.EnsureOrgMailbox(r.Context(), nil, org.ID, user.ID, "")
 
 	// Anti-spoofing: quien escribe una dirección en Thunderbird tiene que ser el
 	// dueño de la contraseña. Sin esto, una contraseña válida serviría para
@@ -156,7 +145,7 @@ func (s *Server) handleInternalAppPasswordToken(w http.ResponseWriter, r *http.R
 		return
 	}
 	now := time.Now()
-	claims := s.userClaims(r.Context(), domain.Client{ID: audienciaAppPasswordToken}, d.user, d.org.OrgID, "openid drive", now)
+	claims := s.userClaims(r.Context(), domain.Client{ID: audienciaAppPasswordToken}, d.user, d.org.ID, "openid drive", now)
 	at, err := s.issuer.IssueAccessToken(claims, now)
 	if err != nil {
 		httpx.Fail(w, r, httpx.ErrInternal.Wrap(err))

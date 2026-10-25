@@ -213,6 +213,8 @@ export const it: Catalog = {
   'account.signedOutTitle': "Non hai effettuato l'accesso",
   'account.signedOutDescription': 'Accedi con il tuo account Sytue One per vedere qui i tuoi dati.',
   'account.signOut': 'Esci',
+  'account.signOutFailed':
+    'Impossibile disconnettersi su questo dispositivo. Drive potrebbe essere ancora connesso. Riprova.',
   'account.signOutPending.title': 'Note non caricate',
   'account.signOutPending.body':
     'Notepads ha su questo dispositivo note non ancora caricate ({count}). Uscendo vengono eliminate da esso.',
@@ -363,6 +365,7 @@ export const it: Catalog = {
   'widgets.episodes': 'Episodi',
   'widgets.apps': 'App',
   'widgets.compose': 'Scrivi',
+  'widgets.storage': 'Spazio di archiviazione',
   'widgets.create': 'Crea evento',
 
   'linkedServices.services': 'Servizi',

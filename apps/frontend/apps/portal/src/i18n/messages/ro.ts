@@ -161,6 +161,12 @@ export const ro: AppCatalog<typeof en> = {
     'Pentru a transfera totul direct în Google Workspace sau Microsoft 365, fără să descărcați nimic: dacă aveți un cont personal sau administrați organizația, porniți transferul chiar dvs. din Sytue Admin, la Migrări; dacă nu, rugați persoana care o administrează.',
   'data.move.action': 'Mergeți la Migrări',
 
+  'devices.native.body':
+    'Folosește managerul de fișiere al dispozitivului sau conectează un cont cu acordul titularului.',
+  'devices.native.driveBody':
+    'Sytue Drive este adăugat automat după conectare. Permite locația sa dacă sistemul o solicită.',
+  'devices.native.openDrive': 'Deschide în managerul de fișiere',
+  'devices.native.failed': 'Integrarea dispozitivului nu a putut fi actualizată.',
   'devices.title': 'Conectați-vă dispozitivele',
   'devices.lead':
     'Aveți e-mailul, calendarul, contactele și fișierele din Sytue pe telefon sau pe computer. Vă ghidăm pas cu pas.',

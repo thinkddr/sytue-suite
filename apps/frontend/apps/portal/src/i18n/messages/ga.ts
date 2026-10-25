@@ -171,6 +171,12 @@ export const ga: AppCatalog<typeof en> = {
     'Chun gach rud a sheoladh go díreach chuig Google Workspace nó Microsoft 365 gan aon rud a íoslódáil: más cuntas pearsanta atá agat nó má riarann tú d’eagraíocht, tosaigh é tú féin ó Sytue Admin, faoi Imirce; mura ndéanann, iarr ar an duine a riarann í.',
   'data.move.action': 'Téigh go hImirce',
 
+  'devices.native.body':
+    'Úsáid bainisteoir comhad do ghléis nó ceangail cuntas le toiliú a úinéara.',
+  'devices.native.driveBody':
+    'Cuirtear Sytue Drive leis go huathoibríoch tar éis síniú isteach. Ceadaigh a shuíomh má iarrann an córas ort é.',
+  'devices.native.openDrive': 'Oscail sa bhainisteoir comhad',
+  'devices.native.failed': 'Níorbh fhéidir comhtháthú an ghléis a nuashonrú.',
   'devices.title': 'Ceangail do ghléasanna',
   'devices.lead':
     'Tabhair ríomhphost, féilire, teagmhálaithe agus comhaid Sytue leat ar do ghuthán nó ar do ríomhaire. Treoróidh muid thú céim ar chéim.',

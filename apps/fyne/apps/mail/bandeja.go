@@ -110,6 +110,8 @@ type Bandeja struct {
 	// (`fyne.Do`): repintar la bandeja desde dentro de su propio `UpdateItem` es
 	// reentrar en el layout que la está pintando.
 	AlFinal func()
+	// Refresco shares the mailbox request lifecycle with pull-to-refresh.
+	Refresco ui.RefrescoLista
 }
 
 var _ fyne.Widget = (*Bandeja)(nil)

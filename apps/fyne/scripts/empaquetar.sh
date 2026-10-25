@@ -280,28 +280,18 @@ derechos_tienda() { # <dir de la app> <equipo de Apple (Team ID)>
     echo "::error::derechos de tienda: $1 no declara ID o «$equipo» no es un Team ID de Apple" >&2
     return 1
   }
-  if widgets_apple_activos; then
-    grupos_sesion_apple "$equipo" || return 1
-  elif [ -f "$RAIZ/apps/nucleo/ajustes/grupo_apple.go" ]; then
-    grupos_sesion_apple "$equipo" || return 1
-    GRUPO_CONTENEDOR_SUITE=""
-  else
-    # Un tag anterior a grupo_apple.go: el grupo de siempre, sin leer nada más.
-    GRUPO_LLAVERO_SUITE="$equipo.eu.sytue.suite" GRUPO_CONTENEDOR_SUITE=""
-  fi
+  grupos_sesion_apple "$equipo" || return 1
   printf '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0"><dict>\n'
   printf '\t<key>com.apple.application-identifier</key><string>%s.%s</string>\n' "$equipo" "$appid"
   printf '\t<key>com.apple.developer.team-identifier</key><string>%s</string>\n' "$equipo"
   for clave in app-sandbox network.client network.server files.downloads.read-write; do
     printf '\t<key>com.apple.security.%s</key><true/>\n' "$clave"
   done
-  # Con los widgets, el grupo antiguo se conserva durante la migración de preferencias de
-  # MAS. Sin ellos, solo el antiguo: `<equipo>.…` lo acepta macOS sin registrarlo.
-  if [ -n "$GRUPO_CONTENEDOR_SUITE" ]; then
-    printf '\t<key>com.apple.security.application-groups</key><array><string>%s</string><string>%s</string></array>\n' "$GRUPO_CONTENEDOR_SUITE" "$GRUPO_LLAVERO_SUITE"
-  else
-    printf '\t<key>com.apple.security.application-groups</key><array><string>%s</string></array>\n' "$GRUPO_LLAVERO_SUITE"
-  fi
+  # Preferencias y estado de acceso de Drive son de la suite, también sin widgets.
+  # Se conserva el grupo legado únicamente para migrar las preferencias de MAS.
+  printf '\t<key>com.apple.security.application-groups</key><array><string>%s</string><string>%s</string>' "$GRUPO_CONTENEDOR_SUITE" "$GRUPO_LLAVERO_SUITE"
+  [ "$(metadato "$1" archivos)" != si ] || printf '<string>group.%s</string>' "$appid"
+  printf '</array>\n'
   if [ "$(metadato "$1" archivos)" = si ]; then
     printf '\t<key>keychain-access-groups</key><array><string>%s</string><string>%s.%s.shared</string></array>\n' "$GRUPO_LLAVERO_SUITE" "$equipo" "$appid"
   else
@@ -334,16 +324,10 @@ derechos_sesion() { # <dir> <equipo> <ios|developerid>
     printf '\t<key>com.apple.developer.team-identifier</key><string>%s</string>\n' "$equipo"
     [ "$(metadato "$1" llamadas)" != si ] || printf '\t<key>com.apple.security.device.audio-input</key><true/>\n\t<key>com.apple.security.device.camera</key><true/>\n'
   fi
-  # El App Group solo con el interruptor encendido: sin registrarlo en Developer Portal,
-  # iOS y Developer ID rechazan la firma. El Keychain de la suite no lo necesita (los
-  # perfiles de iOS autorizan `<equipo>.*`), así que la sesión compartida va siempre.
-  if widgets_apple_activos; then
-    printf '\t<key>com.apple.security.application-groups</key><array><string>%s</string>' "$GRUPO_CONTENEDOR_SUITE"
-    if [ "$modo" = ios ] && [ "$(metadato "$1" archivos)" = si ]; then
-      printf '<string>group.%s</string>' "$appid"
-    fi
-    printf '</array>\n'
-  fi
+  # La marca compartida de acceso al proveedor existe independientemente de WidgetKit.
+  printf '\t<key>com.apple.security.application-groups</key><array><string>%s</string>' "$GRUPO_CONTENEDOR_SUITE"
+  [ "$(metadato "$1" archivos)" != si ] || printf '<string>group.%s</string>' "$appid"
+  printf '</array>\n'
   printf '\t<key>keychain-access-groups</key><array><string>%s.%s</string><string>%s</string>' "$equipo" "$appid" "$GRUPO_LLAVERO_SUITE"
   [ "$(metadato "$1" archivos)" != si ] || printf '<string>%s.%s.shared</string>' "$equipo" "$appid"
   printf '</array>\n</dict></plist>\n'
@@ -358,8 +342,8 @@ fi
 # --- LOS DERECHOS DE LA EXTENSIÓN FILE PROVIDER (apps/fyne/xcode/proveedor-archivos) ---
 # Sytue Drive en el Finder y en Archivos. La extensión solo necesita la red y el grupo de
 # llavero `<equipo>.<App ID>.shared`, donde la app le deja la credencial WebDAV; el grupo
-# de apps (`group.<App ID>` en iOS, `<equipo>.<App ID>` en macOS, que es la forma que el
-# sandbox del Mac acepta sin perfil) es el de NSExtensionFileProviderDocumentGroup.
+# de apps registrado (`group.<App ID>`) es el de NSExtensionFileProviderDocumentGroup
+# en ambos sistemas; el perfil de la extensión debe autorizarlo.
 #   - macos: la extensión del Mac, con App Sandbox (la tienda lo exige) y network.client.
 #   - ios: la extensión de iOS.
 #   - app-ios: la APP en iOS. El primer grupo es su propio App ID, que es donde iOS guarda
@@ -374,12 +358,17 @@ derechos_archivos() { # <dir de la app> <equipo> <ios|macos|app-ios>
   printf '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0"><dict>\n'
   case "$3" in
   macos)
+    printf '\t<key>com.apple.application-identifier</key><string>%s.%s.archivos</string>\n\t<key>com.apple.developer.team-identifier</key><string>%s</string>\n' "$equipo" "$appid" "$equipo"
     printf '\t<key>com.apple.security.app-sandbox</key><true/>\n\t<key>com.apple.security.network.client</key><true/>\n'
-    printf '\t<key>com.apple.security.application-groups</key><array><string>%s.%s</string></array>\n' "$equipo" "$appid"
+    grupos_sesion_apple "$equipo" || return 1
+    printf '\t<key>com.apple.security.application-groups</key><array><string>group.%s</string><string>%s</string></array>\n' "$appid" "$GRUPO_CONTENEDOR_SUITE"
     printf '\t<key>keychain-access-groups</key><array><string>%s.%s.shared</string></array>\n' "$equipo" "$appid"
     ;;
   ios)
-    printf '\t<key>com.apple.security.application-groups</key><array><string>group.%s</string></array>\n' "$appid"
+    printf '\t<key>application-identifier</key><string>%s.%s.archivos</string>\n\t<key>com.apple.developer.team-identifier</key><string>%s</string>\n' "$equipo" "$appid" "$equipo"
+    printf '\t<key>com.apple.developer.default-data-protection</key><string>NSFileProtectionComplete</string>\n'
+    grupos_sesion_apple "$equipo" || return 1
+    printf '\t<key>com.apple.security.application-groups</key><array><string>group.%s</string><string>%s</string></array>\n' "$appid" "$GRUPO_CONTENEDOR_SUITE"
     printf '\t<key>keychain-access-groups</key><array><string>%s.%s.shared</string></array>\n' "$equipo" "$appid"
     ;;
   app-ios)
@@ -892,8 +881,9 @@ firmar_ipa() { # <dir del ipa abierto> <.app> <ipa de salida> <app id> <host o v
     equipo="${GRUPO_LLAVERO_SUITE%%.*}"
     sesion="$dir/sesion.plist"
     derechos_sesion "$6" "$equipo" ios >"$sesion" || return 1
-    if widgets_apple_activos; then
-      bash "$AQUI/apple-firma.sh" verificar-perfil-grupo "$app/embedded.mobileprovision" "$4" ios "$GRUPO_CONTENEDOR_SUITE" "" "$GRUPO_LLAVERO_SUITE" "$sesion" || return 1
+    if [ "$(basename "$6")" != demo ]; then
+      local grupo_perfil="$GRUPO_CONTENEDOR_SUITE"
+      bash "$AQUI/apple-firma.sh" verificar-perfil-grupo "$app/embedded.mobileprovision" "$4" ios "$grupo_perfil" "" "$GRUPO_LLAVERO_SUITE" "$sesion" || return 1
     fi
     python3 - "$ent" "$sesion" <<'PY' || return 1
 import pathlib, plistlib, sys
@@ -967,9 +957,10 @@ firmar_tienda() { # <.app> <dir de la app> <app id>
     exit 1
   }
   derechos_tienda "$dir" "$equipo" >"$ent" || exit 1
-  if widgets_apple_activos; then
+  if [ "$(basename "$dir")" != demo ]; then
     grupos_sesion_apple "$equipo" || return 1
-    bash "$AQUI/apple-firma.sh" verificar-perfil-grupo "$perfil" "$appid" macappstore "$GRUPO_CONTENEDOR_SUITE" "" "$GRUPO_LLAVERO_SUITE" "$ent" || return 1
+    local grupo_perfil="$GRUPO_CONTENEDOR_SUITE"
+    bash "$AQUI/apple-firma.sh" verificar-perfil-grupo "$perfil" "$appid" macappstore "$grupo_perfil" "" "$GRUPO_LLAVERO_SUITE" "$ent" || return 1
   fi
   # El perfil del almacén privado es 0600. Dentro del instalador pertenece a
   # root y debe poder leerlo quien ejecuta la app (Apple rechaza 90255 si no).
@@ -1461,12 +1452,19 @@ minimo_ios() {
 }
 
 preparar_widgets_apple() { # <fuentes> <ios|macos> <versión> <build>
-  unset SYTUE_WIDGET_PRODUCTOS
-  widgets_apple_activos || return 0
-  [ -n "$(metadato "$1" widget_acciones)" ] || return 0
+  unset SYTUE_WIDGET_PRODUCTOS SYTUE_EXTENSION_PRODUCTOS
+  local opciones=() con_widgets=no
+  if widgets_apple_activos && [ -n "$(metadato "$1" widget_acciones)" ]; then
+    con_widgets=si
+  elif [ "$(metadato "$1" archivos)" = si ]; then
+    opciones=(--sin-widgets)
+  else
+    return 0
+  fi
   python3 "$AQUI/widgetkit-apple.py" --salida "$ESCENARIO/widgets" --plataforma "$2" \
-    --version "$3" --build "$4" "$(basename "$1")" || return 1
-  export SYTUE_WIDGET_PRODUCTOS="$ESCENARIO/widgets/$2/productos"
+    --version "$3" --build "$4" ${opciones[@]+"${opciones[@]}"} "$(basename "$1")" || return 1
+  export SYTUE_EXTENSION_PRODUCTOS="$ESCENARIO/widgets/$2/productos"
+  [ "$con_widgets" != si ] || export SYTUE_WIDGET_PRODUCTOS="$SYTUE_EXTENSION_PRODUCTOS"
 }
 
 enlace_widgets_apple() { # <rpath del host>
@@ -1492,16 +1490,21 @@ permiso_enlace_widgets_apple() {
 }
 
 incorporar_widgets_apple() { # <host .app> <fuentes> <ios|macappstore|developerid> <identidad>
-  widgets_apple_activos || return 0
-  [ -n "$(metadato "$2" widget_acciones)" ] || return 0
-  [ -n "${SYTUE_WIDGET_PRODUCTOS:-}" ] || {
-    echo "::error::no se preparó WidgetKit antes de compilar el host." >&2
+  local opciones=() plataforma_widget=macos
+  if widgets_apple_activos && [ -n "$(metadato "$2" widget_acciones)" ]; then
+    :
+  elif [ "$(metadato "$2" archivos)" = si ]; then
+    opciones=(--sin-widgets)
+  else
+    return 0
+  fi
+  [ -n "${SYTUE_EXTENSION_PRODUCTOS:-}" ] || {
+    echo "::error::no se prepararon las extensiones Apple antes de compilar el host." >&2
     return 1
   }
-  local plataforma_widget=macos
   [ "$3" != ios ] || plataforma_widget=ios
   python3 "$AQUI/widgetkit-apple.py" --salida "$ESCENARIO/widgets" --plataforma "$plataforma_widget" \
-    --insertar "$1" --destino "$3" --identidad "$4" "$(basename "$2")"
+    --insertar "$1" --destino "$3" --identidad "$4" ${opciones[@]+"${opciones[@]}"} "$(basename "$2")"
 }
 
 compilar_ios() { # <iphoneos|iphonesimulator> <salida> [opciones de fyne build]
@@ -1964,8 +1967,18 @@ android)
     "$FYNE/android/java/eu/sytue/nativo/WebDAV.java" "$FYNE/android/prueba/eu/sytue/nativo/WebDAVPrueba.java" >/dev/null
   "$(command -v java || echo "$JAVA_HOME/bin/java")" -cp "$dex_tmp/prueba" eu.sytue.nativo.WebDAVPrueba
   "$(command -v javac || echo "$JAVA_HOME/bin/javac")" --release 17 -encoding UTF-8 -nowarn -d "$dex_tmp/prueba" \
+    "$FYNE/android/java/eu/sytue/nativo/DocumentosIdentidad.java" "$FYNE/android/prueba/eu/sytue/nativo/DocumentosIdentidadPrueba.java"
+  "$(command -v java || echo "$JAVA_HOME/bin/java")" -cp "$dex_tmp/prueba" eu.sytue.nativo.DocumentosIdentidadPrueba
+  "$(command -v javac || echo "$JAVA_HOME/bin/javac")" --release 17 -encoding UTF-8 -nowarn -d "$dex_tmp/prueba" \
+    "$FYNE/android/java/eu/sytue/nativo/DrivePreferencia.java" "$FYNE/android/java/eu/sytue/nativo/SesionConfianza.java" \
+    "$dex_tmp/generated/eu/sytue/nativo/SesionFirmas.java" "$FYNE/android/prueba/eu/sytue/nativo/DrivePreferenciaPrueba.java"
+  "$(command -v java || echo "$JAVA_HOME/bin/java")" -cp "$dex_tmp/prueba" eu.sytue.nativo.DrivePreferenciaPrueba
+  "$(command -v javac || echo "$JAVA_HOME/bin/javac")" --release 17 -encoding UTF-8 -nowarn -d "$dex_tmp/prueba" \
     "$FYNE/android/java/eu/sytue/nativo/WidgetSnapshot.java" "$FYNE/android/prueba/eu/sytue/nativo/WidgetSnapshotPrueba.java"
   "$(command -v java || echo "$JAVA_HOME/bin/java")" -cp "$dex_tmp/prueba" eu.sytue.nativo.WidgetSnapshotPrueba
+  "$(command -v javac || echo "$JAVA_HOME/bin/javac")" --release 17 -encoding UTF-8 -nowarn -d "$dex_tmp/prueba" \
+    "$FYNE/android/java/eu/sytue/nativo/GestosRegion.java" "$FYNE/android/prueba/eu/sytue/nativo/GestosRegionPrueba.java"
+  "$(command -v java || echo "$JAVA_HOME/bin/java")" -cp "$dex_tmp/prueba" eu.sytue.nativo.GestosRegionPrueba
   SYTUE_AAPT2="$AAPT2" SYTUE_ANDROID_JAR="$ANDROID_JAR" python3 "$AQUI/android-widgets-test.py"
   clases=()
   while IFS= read -r fuente; do clases+=("$fuente"); done < <(find "$dex_tmp/cls" -name '*.class')
@@ -2130,7 +2143,7 @@ for app in "${apps[@]}"; do
   # (data.go:51-55) y el esquema se perdería → sesion.go fallaría al entrar.
   comunes=(--target "$objetivo" --app-version "$version" --app-build "$build" --metadata "esquema=$esquema")
 
-  unset SYTUE_WIDGET_PRODUCTOS
+  unset SYTUE_WIDGET_PRODUCTOS SYTUE_EXTENSION_PRODUCTOS
   if [ "$plataforma" = ios ] || { [ "$plataforma" = macos ] && { [ -n "$tienda" ] || [ -n "${SYTUE_MACOS_IDENTIDAD:-}" ]; }; }; then
     preparar_widgets_apple "$dir" "$plataforma" "$version" "$build" || exit 1
   fi
@@ -2456,14 +2469,15 @@ XML
         firmar_tienda "$destino" "$dir" "$appid"
       elif [ "$plataforma" = macos ] && [ -n "${SYTUE_MACOS_IDENTIDAD:-}" ]; then
         derechos="$(mktemp)"
-        if widgets_apple_activos; then
+        if [ "$app" != demo ]; then
           # App Group y Keychain de la suite son derechos restringidos fuera de la tienda:
           # piden un perfil Developer ID (MAC_APP_DIRECT) que los autorice, dentro del .app.
           perfil="$(bash "$AQUI/apple-firma.sh" perfil-ruta "$appid" developerid)" || exit 1
           grupos_sesion_apple || exit 1
           equipo="${GRUPO_LLAVERO_SUITE%%.*}"
           derechos_sesion "$dir" "$equipo" developerid >"$derechos" || exit 1
-          bash "$AQUI/apple-firma.sh" verificar-perfil-grupo "$perfil" "$appid" developerid "$GRUPO_CONTENEDOR_SUITE" "" "$GRUPO_LLAVERO_SUITE" "$derechos" || exit 1
+          grupo_perfil="$GRUPO_CONTENEDOR_SUITE"
+          bash "$AQUI/apple-firma.sh" verificar-perfil-grupo "$perfil" "$appid" developerid "$grupo_perfil" "" "$GRUPO_LLAVERO_SUITE" "$derechos" || exit 1
           install -m 0644 "$perfil" "$destino/Contents/embedded.provisionprofile"
           incorporar_widgets_apple "$destino" "$dir" developerid "$SYTUE_MACOS_IDENTIDAD" || exit 1
         else

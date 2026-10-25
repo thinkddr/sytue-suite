@@ -123,10 +123,18 @@ func (r *botonTemaRenderer) Refresh() {
 // montarTema pone la pieza de la línea del tema que toque: el campo si se está
 // editando, el botón si se puede editar, o nada (se queda el rótulo de siempre).
 func (c *Cabecera) montarTema(v tema.Variante) {
+	anterior := c.editorTema
 	c.editorTema, c.botonTema, c.lineaTema = nil, nil, nil
 	t := c.T
 	switch {
 	case c.EditandoTema:
+		if anterior != nil {
+			c.editorTema = anterior
+			anterior.Tinta(tema.Color("header-fg", v), tema.Color("header-fg", v))
+			c.lineaTema = canvas.NewRectangle(atenuado("header-fg", v, 0.4))
+			c.objetos = append(c.objetos, anterior.Objeto(), c.lineaTema)
+			break
+		}
 		var ed *ui.EditorPlano
 		ed = ui.NuevoEditorPlano(tema.TextoXS, func(foco bool) {
 			// Solo el campo VIGENTE: uno ya retirado que pierde el foco al enfocar el

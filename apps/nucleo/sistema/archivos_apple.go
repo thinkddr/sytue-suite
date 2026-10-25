@@ -1,17 +1,26 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 Daniel Delgado Ramos
 
-//go:build (ios || (darwin && tienda)) && cgo
+//go:build (ios || darwin) && cgo
 
 package sistema
 
 /*
 #cgo CFLAGS: -x objective-c -fobjc-arc
 #cgo LDFLAGS: -framework Foundation -framework Security -framework FileProvider
+#cgo darwin,!ios LDFLAGS: -framework AppKit
+#cgo ios LDFLAGS: -framework UIKit -framework UniformTypeIdentifiers
 #include <stdlib.h>
 #import <Foundation/Foundation.h>
 #import <FileProvider/FileProvider.h>
 #import <Security/Security.h>
+#import <TargetConditionals.h>
+#if TARGET_OS_IPHONE
+#import <UIKit/UIKit.h>
+#import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
+#else
+#import <AppKit/AppKit.h>
+#endif
 
 // La consulta de la entrada de la extensión: «generic password» con su servicio, su
 // cuenta y el grupo compartido EXPLÍCITO —sin él, SecItem guarda en el primer grupo de la
@@ -55,19 +64,28 @@ static int sytueArchivosGuardar(const char *grupo, const char *servicio, const c
 static int sytueArchivosHay(const char *grupo, const char *servicio, const char *cuenta) {
 	@autoreleasepool {
 		NSMutableDictionary *q = sytueArchivosConsulta(grupo, servicio, cuenta);
-		q[(__bridge id)kSecMatchLimit] = (__bridge id)kSecMatchLimitOne;
-		OSStatus st = SecItemCopyMatching((__bridge CFDictionaryRef)q, NULL);
-		if (st == errSecItemNotFound) {
-			return 0;
-		}
-		return st == errSecSuccess ? 1 : (int)st;
+        q[(__bridge id)kSecMatchLimit] = (__bridge id)kSecMatchLimitOne;
+        q[(__bridge id)kSecReturnData] = @YES;
+        CFTypeRef salida = NULL;
+        OSStatus st = SecItemCopyMatching((__bridge CFDictionaryRef)q, &salida);
+        if (st == errSecItemNotFound) { return 0; }
+        if (st != errSecSuccess) { return (int)st; }
+        NSData *datos = CFBridgingRelease(salida);
+        NSDictionary *credencial = [NSJSONSerialization JSONObjectWithData:datos options:0 error:nil];
+        NSString *identidad = [credencial isKindOfClass:NSDictionary.class] ? credencial[@"identidad"] : nil;
+        NSCharacterSet *otros = [[NSCharacterSet characterSetWithCharactersInString:@"0123456789abcdef"] invertedSet];
+        return [identidad isKindOfClass:NSString.class] && identidad.length == 64 && [identidad rangeOfCharacterFromSet:otros].location == NSNotFound ? 1 : 0;
 	}
 }
 
 // La extensión es NSFileProviderReplicatedExtension: macOS 13 e iOS 16.
 static int sytueArchivosDisponible(void) {
 	if (@available(macOS 13.0, iOS 16.0, *)) {
-		return 1;
+        @autoreleasepool {
+            NSURL *plugins = NSBundle.mainBundle.builtInPlugInsURL;
+            NSBundle *extension = plugins ? [NSBundle bundleWithURL:[plugins URLByAppendingPathComponent:@"Archivos.appex"]] : nil;
+            return [extension.bundleIdentifier isEqualToString:@"eu.sytue.drive.archivos"] ? 1 : 0;
+        }
 	}
 	return 0;
 }
@@ -77,20 +95,49 @@ static int sytueArchivosDisponible(void) {
 static int sytueArchivosDominio(const char *identificador, const char *nombre, int alta) {
 	if (@available(macOS 13.0, iOS 16.0, *)) {
 		@autoreleasepool {
-			NSFileProviderDomain *d = [[NSFileProviderDomain alloc]
+			NSFileProviderDomain *d = alta ? [[NSFileProviderDomain alloc]
 				initWithIdentifier:[NSString stringWithUTF8String:identificador]
-				displayName:[NSString stringWithUTF8String:nombre]];
+				displayName:[NSString stringWithUTF8String:nombre]] : nil;
 			dispatch_semaphore_t listo = dispatch_semaphore_create(0);
 			__block NSInteger codigo = 0;
 			void (^fin)(NSError *) = ^(NSError *e) {
 				codigo = e ? (e.code ? e.code : -2) : 0;
 				dispatch_semaphore_signal(listo);
 			};
-			if (alta) {
-				[NSFileProviderManager addDomain:d completionHandler:fin];
-			} else {
-				[NSFileProviderManager removeDomain:d completionHandler:fin];
-			}
+            [NSFileProviderManager getDomainsWithCompletionHandler:^(NSArray<NSFileProviderDomain *> *domains, NSError *error) {
+                if (error) { fin(error); return; }
+                // El dominio representa cuenta Y autorización. Retirar los anteriores
+                // evita que una URI/caché del SO de A se pueda resolver con la clave de B.
+                dispatch_group_t retirados = dispatch_group_create();
+                __block NSError *falloRetirada = nil;
+                BOOL existing = NO;
+                for (NSFileProviderDomain *candidate in domains) {
+                    if (alta && [candidate.identifier isEqualToString:d.identifier]) { existing = YES; continue; }
+                    if (![candidate.identifier isEqualToString:@"sytue-drive"] && ![candidate.identifier hasPrefix:@"sytue-drive."]) { continue; }
+                    dispatch_group_enter(retirados);
+                    void (^retirado)(NSError *) = ^(NSError *fallo) {
+                        if (fallo) { @synchronized (retirados) { falloRetirada = fallo; } }
+                        dispatch_group_leave(retirados);
+                    };
+#if TARGET_OS_IPHONE
+                    // iOS no ofrece PreserveDirtyUserData. Su baja elimina la caché;
+                    // nunca se reactiva A para subir contenido tras cerrar la sesión.
+                    [NSFileProviderManager removeDomain:candidate completionHandler:retirado];
+#else
+                    // El SO conserva las ediciones pendientes en una carpeta recuperada.
+                    // No se importa ni se vuelve a subir al dominio nuevo, de otra cuenta.
+                    [NSFileProviderManager removeDomain:candidate mode:NSFileProviderDomainRemovalModePreserveDirtyUserData completionHandler:^(NSURL *preservados, NSError *fallo) {
+                        (void)preservados;
+                        retirado(fallo);
+                    }];
+#endif
+                }
+                dispatch_group_notify(retirados, dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+                    if (falloRetirada) { fin(falloRetirada); }
+                    else if (alta && !existing) { [NSFileProviderManager addDomain:d completionHandler:fin]; }
+                    else { fin(nil); }
+                });
+            }];
 			if (dispatch_semaphore_wait(listo, dispatch_time(DISPATCH_TIME_NOW, 60 * NSEC_PER_SEC)) != 0) {
 				return -3;
 			}
@@ -99,6 +146,57 @@ static int sytueArchivosDominio(const char *identificador, const char *nombre, i
 	}
 	return -1;
 }
+// Se pide al File Provider su URL; nunca se deduce ~/Library/CloudStorage ni se usa
+// un esquema privado de Archivos. Se llama fuera del hilo principal.
+static int sytueArchivosAbrir(const char *identificador) {
+    if (@available(macOS 13.0, iOS 16.0, *)) {
+        @autoreleasepool {
+            NSFileProviderDomain *domain = [[NSFileProviderDomain alloc]
+                initWithIdentifier:[NSString stringWithUTF8String:identificador] displayName:@"Sytue Drive"];
+            NSFileProviderManager *manager = [NSFileProviderManager managerForDomain:domain];
+            if (!manager) { return -1; }
+            dispatch_semaphore_t listo = dispatch_semaphore_create(0);
+            __block NSInteger codigo = 0;
+            [manager getUserVisibleURLForItemIdentifier:NSFileProviderRootContainerItemIdentifier completionHandler:^(NSURL *url, NSError *error) {
+#if !TARGET_OS_IPHONE
+                if (error || !url) {
+                    codigo = error.code ?: -2;
+                    dispatch_semaphore_signal(listo);
+                    return;
+                }
+#endif
+                // iOS puede mantener el dominio desactivado hasta que la persona lo
+                // habilite en Ubicaciones. El selector nativo sigue disponible sin URL.
+                dispatch_async(dispatch_get_main_queue(), ^{
+#if TARGET_OS_IPHONE
+                    UIViewController *root = nil;
+                    for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
+                        if (![scene isKindOfClass:UIWindowScene.class] || scene.activationState != UISceneActivationStateForegroundActive) { continue; }
+                        for (UIWindow *window in ((UIWindowScene *)scene).windows) {
+                            if (window.isKeyWindow) { root = window.rootViewController; break; }
+                        }
+                        if (root) { break; }
+                    }
+                    while (root.presentedViewController && !root.presentedViewController.isBeingDismissed) { root = root.presentedViewController; }
+                    if (!root) { codigo = -4; }
+                    else {
+                        UIDocumentPickerViewController *picker = [[UIDocumentPickerViewController alloc] initForOpeningContentTypes:@[UTTypeFolder] asCopy:NO];
+                        if (url && !error) { picker.directoryURL = url; }
+                        [root presentViewController:picker animated:YES completion:nil];
+                    }
+#else
+                    if (![NSWorkspace.sharedWorkspace openURL:url]) { codigo = -4; }
+#endif
+                    dispatch_semaphore_signal(listo);
+                });
+            }];
+            if (dispatch_semaphore_wait(listo, dispatch_time(DISPATCH_TIME_NOW, 30 * NSEC_PER_SEC)) != 0) { return -3; }
+            return (int)codigo;
+        }
+    }
+    return -1;
+}
+
 */
 import "C"
 
@@ -106,10 +204,22 @@ import (
 	"errors"
 	"fmt"
 	"unsafe"
+
+	"git.sytue.eu/sytue/one/apps/nucleo/ajustes"
 )
 
-// dominioArchivos es el identificador del NSFileProviderDomain: uno por app.
-const dominioArchivos = "sytue-drive"
+// Una autorización tiene su propio dominio y caché del SO. La revisión es estable
+// al renovar, pero cambia al salir o cambiar de cuenta, incluso A→B→A.
+func dominioActualArchivos() (string, error) {
+	a, err := ajustes.LeerAccesoDrive()
+	if err != nil {
+		return "", err
+	}
+	if !a.Activo {
+		return "", errors.New("sistema: el acceso a archivos de Drive no está activo")
+	}
+	return identificadorDominioArchivos(a.Identidad, a.Revision)
+}
 
 // cadenas convierte a C los tres nombres de la entrada; quien llama suelta con `soltar`.
 func cadenas() (grupo, servicio, cuenta *C.char, soltar func()) {
@@ -143,8 +253,8 @@ func hayCredencialArchivos() (bool, error) {
 	}
 }
 
-func dominio(nombre string, alta bool) error {
-	id, n := C.CString(dominioArchivos), C.CString(nombre)
+func dominio(identificador, nombre string, alta bool) error {
+	id, n := C.CString(identificador), C.CString(nombre)
 	defer C.free(unsafe.Pointer(id))
 	defer C.free(unsafe.Pointer(n))
 	a, que := C.int(0), "dar de baja"
@@ -161,11 +271,17 @@ func dominio(nombre string, alta bool) error {
 	}
 }
 
-func registrarArchivos(nombre string) error { return dominio(nombre, true) }
+func registrarArchivos(nombre string) error {
+	id, err := dominioActualArchivos()
+	if err != nil {
+		return err
+	}
+	return dominio(id, nombre, true)
+}
 
 func olvidarArchivos() error {
-	// El nombre no cuenta para la baja: el dominio se reconoce por su identificador.
-	errDominio := dominio("Sytue Drive", false)
+	// Retira también dominios anteriores, aunque el marcador ya esté cerrado.
+	errDominio := dominio("", "Sytue Drive", false)
 	if errors.Is(errDominio, ErrArchivosNoDisponible) {
 		errDominio = nil
 	}
@@ -176,4 +292,20 @@ func olvidarArchivos() error {
 		errLlavero = fmt.Errorf("sistema: el llavero no deja borrar la credencial de archivos (OSStatus %d)", int(st))
 	}
 	return errors.Join(errDominio, errLlavero)
+}
+
+func abrirArchivos() error {
+	if !archivosDisponible() {
+		return ErrArchivosNoDisponible
+	}
+	dominio, err := dominioActualArchivos()
+	if err != nil {
+		return err
+	}
+	id := C.CString(dominio)
+	defer C.free(unsafe.Pointer(id))
+	if st := C.sytueArchivosAbrir(id); st != 0 {
+		return fmt.Errorf("sistema: no se pudo abrir el dominio de Drive (código %d)", int(st))
+	}
+	return nil
 }

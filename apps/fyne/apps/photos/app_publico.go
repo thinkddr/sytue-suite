@@ -95,8 +95,7 @@ func (a *App) verPublica(f api.Photo) {
 		a.pub.capa = nuevaCapaVisor(a.cerrarPublica)
 		if a.w != nil {
 			c := a.w.Canvas()
-			c.Overlays().Add(a.pub.capa)
-			a.pub.capa.Resize(c.Size())
+			a.pub.capa.mostrar(c)
 			c.Unfocus()
 		}
 	}

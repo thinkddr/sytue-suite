@@ -55,7 +55,7 @@ export const bg: AppCatalog<typeof en> = {
   'security.mfa.title': 'Двустъпкова проверка',
   'security.mfa.off': 'Не е настроена. Само паролата отваря профила.',
   'security.mfa.required':
-    'Вашата организация изисква двустъпкова проверка. Включете я по-долу и влезте отново.',
+    'Това действие изисква потвърждаване в две стъпки. Настройте го по-долу, след което влезте отново.',
   'security.mfa.on': 'Включена. При вход се иска код.',
   'security.mfa.enable': 'Настройване',
   'security.mfa.scan': 'Сканирайте това с приложението си за удостоверяване.',
@@ -114,6 +114,10 @@ export const bg: AppCatalog<typeof en> = {
   'plan.pro': 'План Pro · 200 GB',
   'plan.enterprise': 'План Enterprise · 1 TB · Премиум поддръжка',
   'plan.storage': 'Използвано пространство',
+  'plan.externalNote': 'Свързаното хранилище увеличава капацитета ви в Sytue.',
+  'plan.externalCapacity': 'Свързаното хранилище добавя {capacity}.',
+  'plan.externalUnknown': 'Доставчикът не съобщава капацитета на хранилището.',
+  'plan.baseUsage': 'Sytue: {used} от {total}',
   'plan.paidUntil': 'Платено до',
   'plan.upgrade': 'Още пространство',
   'plan.upgrade.hint':

@@ -10,6 +10,7 @@ import (
 	"fyne.io/fyne/v2/container"
 
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
+	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/office"
 )
 
@@ -121,6 +122,9 @@ func cuerpoVista(c *Contexto) fyne.CanvasObject {
 	}
 	ajustes := NuevoBotonCinta(iconos.EdPanelDerecho, c.Traducir("view.settingsPanel"), func() {
 		c.Ajustes = !c.Ajustes
+		if c.Ajustes && ui.EsTactil() {
+			c.Panel = SinPanel
+		}
 		c.refrescar()
 	})
 	ajustes.Activo = c.Ajustes
@@ -212,10 +216,13 @@ func (c *Contexto) bloqueado(cmd Comando) bool {
 
 // AbrirPanel alterna el panel del carril, como hace el clic en la web.
 func (c *Contexto) AbrirPanel(p Panel) {
-	if c.Panel == p {
+	if c.Panel == p && (!ui.EsTactil() || !c.Ajustes) {
 		c.Panel = SinPanel
 	} else {
 		c.Panel = p
+	}
+	if ui.EsTactil() {
+		c.Ajustes = false
 	}
 	c.refrescar()
 }

@@ -566,6 +566,7 @@ func (s *Server) Router() http.Handler {
 			// terceros a la que alguien dio a «permitir». Va aquí arriba, y no en
 			// cada grupo, para que una ruta admin nueva nazca cubierta.
 			r.Use(s.soloClientsDeLaSuite)
+			r.Use(s.mfaParaAdministracion)
 			r.Get("/me", s.handleMe)
 			r.Patch("/me", s.handleMeUpdate) // edición de perfil self-service (solo name)
 			// Avatar propio: predefinido o foto (ver me_avatar.go). Se propaga, mejor

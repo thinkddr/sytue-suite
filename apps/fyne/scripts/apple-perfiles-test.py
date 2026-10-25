@@ -16,6 +16,7 @@ import stat
 import tempfile
 import types
 import unittest
+import urllib.parse
 from unittest import mock
 
 
@@ -60,7 +61,7 @@ class API:
         self.gets.append(ruta)
         if ruta.startswith("/v1/bundleIds?"):
             return [{"id": "bundle", "attributes": {"identifier": self.identificador, "platform": "UNIVERSAL"}}]
-        if ruta.endswith("/bundleIdCapabilities"):
+        if urllib.parse.urlsplit(ruta).path.endswith("/bundleIdCapabilities"):
             return self.capacidades
         if ruta.startswith("/v1/certificates?"):
             return self.certs
@@ -84,6 +85,79 @@ class Perfiles(unittest.TestCase):
         self.assertEqual(requisito, REQUISITO)
         self.assertEqual(plataforma, "ios")
         return b"perfil publico" if item["attributes"]["authorized"] else None
+
+    def recibos(self, plataforma):
+        catalogo = {"hub": {"clave": "hub", "id": "eu.sytue.one", "widget_acciones": "open"}}
+        catalogo.update({nombre: {"clave": nombre, "id": "eu.sytue." + nombre, "widget_acciones": "open", "archivos": nombre == "drive"}
+                         for nombre in ("bases", "calcus", "calendar", "cast", "certipdf", "contacts", "docs",
+                                        "drive", "erp", "mail", "notes", "photos", "rooms", "sheets")})
+        datos = [{"app": app["clave"], "app_id": app["id"] + sufijo, "platform": plataforma,
+                  "profile_type": p.TIPOS[plataforma], "profile_ready": True, "certificate_verified": True,
+                  "created": bool(sufijo), "path": "no-publicar-perfil-cms", "otro": "no-publicar"}
+                 for app in catalogo.values() for sufijo, _, _ in p.destinos_app(app)]
+        return catalogo, datos
+
+    def test_recibo_coteja_todos_los_destinos_declarados_y_solo_emite_campos_seguros_sin_api(self):
+        for plataforma in p.TIPOS:
+            catalogo, datos = self.recibos(plataforma)
+            gen = types.SimpleNamespace(apps=lambda: catalogo.values())
+            with self.subTest(plataforma=plataforma), tempfile.TemporaryDirectory() as tmp:
+                ruta = pathlib.Path(tmp, "recibo.jsonl")
+                ruta.write_text("".join(json.dumps(dato) + "\n" for dato in datos))
+                with mock.patch.dict(p.REGISTRO, {"importar": mock.Mock(return_value=gen)}) as registro, \
+                        mock.patch.object(p, "requisitos", side_effect=AssertionError("consultó derechos")), \
+                        mock.patch.object(p, "identidad_importada", side_effect=AssertionError("consultó llavero")), \
+                        mock.patch("sys.argv", ["apple-perfiles.py", "--plataforma", plataforma,
+                                                "--comprobar-recibo", str(ruta)]), \
+                        contextlib.redirect_stdout(io.StringIO()) as salida:
+                    self.assertFalse(p.main())
+                    registro["importar"].assert_called_once()
+                lineas = [json.loads(linea) for linea in salida.getvalue().splitlines()]
+                self.assertEqual(len(lineas), 32)
+                self.assertEqual(lineas[-1], {"platform": plataforma, "profile_count": 31, "ready_count": 31,
+                                              "created_count": 16})
+                self.assertEqual(set(lineas[0]), {"app", "app_id", "platform", "profile_type", "profile_ready",
+                                                 "certificate_verified", "created"})
+                self.assertNotIn("no-publicar", salida.getvalue())
+
+    def test_recibo_rechaza_ausencias_duplicados_identidad_tipo_certificado_y_booleanos_ambiguos(self):
+        catalogo, originales = self.recibos("ios")
+        casos = [("incompleto", originales[:-1]), ("duplicado", originales[:-1] + [originales[0]])]
+        for campo, valores in {"profile_ready": (False, None, 1, "true"),
+                               "certificate_verified": (False, None, 1, "true"),
+                               "created": (None, 0, "false"), "app": ("drive",),
+                               "app_id": ("ajeno",), "platform": ("developerid",),
+                               "profile_type": ("MAC_APP_DIRECT",)}.items():
+            for valor in valores:
+                casos.append((campo + repr(valor), [{**originales[0], campo: valor}, *originales[1:]]))
+        casos.extend((("demasiados", originales + [originales[0]]), ("objeto", [None, *originales[1:]])))
+        for nombre, datos in casos:
+            with self.subTest(nombre=nombre), tempfile.TemporaryDirectory() as tmp:
+                ruta = pathlib.Path(tmp, "recibo.jsonl")
+                ruta.write_text("".join(json.dumps(dato) + "\n" for dato in datos))
+                with self.assertRaises(ValueError), contextlib.redirect_stdout(io.StringIO()) as salida:
+                    p.comprobar_recibo(ruta, catalogo, "ios")
+                self.assertEqual(salida.getvalue(), "")
+
+    def test_fileprovider_es_obligatorio_solo_en_apps_que_lo_declaran(self):
+        catalogo, datos = self.recibos("ios")
+        self.assertEqual([d["app_id"] for d in datos if d["app_id"].endswith(".archivos")], ["eu.sytue.drive.archivos"])
+        with tempfile.TemporaryDirectory() as tmp:
+            ruta = pathlib.Path(tmp, "recibo.jsonl")
+            ruta.write_text("".join(json.dumps(d) + "\n" for d in datos if not d["app_id"].endswith(".archivos")))
+            with self.assertRaisesRegex(ValueError, "incompleto"):
+                p.comprobar_recibo(ruta, catalogo, "ios")
+
+    def test_modo_recibo_rechaza_inputs_mezclados_antes_de_importar(self):
+        for extra in (["--preparar", "--salida", "tmp"], ["--salida", "tmp"], ["--seco"],
+                      ["--certificado-sha1", "a" * 40], ["--destinos", "todos"], ["rooms"]):
+            importar = mock.Mock()
+            with self.subTest(extra=extra), mock.patch.dict(p.REGISTRO, {"importar": importar}), \
+                    mock.patch("sys.argv", ["apple-perfiles.py", "--plataforma", "ios", "--comprobar-recibo", "recibo", *extra]), \
+                    contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit) as error:
+                p.main()
+            self.assertEqual(error.exception.code, 2)
+            importar.assert_not_called()
 
     def test_sondeo_default_solo_get_no_inspecciona_llaveros(self):
         asc = API()
@@ -134,6 +208,39 @@ class Perfiles(unittest.TestCase):
             self.assertEqual(pathlib.Path(primera["path"]).read_bytes(), b"perfil publico")
             self.assertEqual(stat.S_IMODE(pathlib.Path(primera["path"]).stat().st_mode), 0o600)
 
+    def test_created_date_opcional_no_impide_validar_y_reutilizar_perfiles(self):
+        for fechas in ((None, None), (None, CADUCA), ("ausente", CADUCA), (42, CADUCA),
+                       ({"fecha": CADUCA}, None), (False, CADUCA)):
+            with self.subTest(fechas=fechas):
+                asc = API()
+                asc.perfiles = [perfil("primero", "otro-certificado"), perfil("cms-invalido", autorizado=False),
+                                perfil("vigente")]
+                for item, fecha in zip(asc.perfiles, (*fechas, fechas[-1]), strict=True):
+                    if fecha == "ausente":
+                        item["attributes"].pop("createdDate")
+                    else:
+                        item["attributes"]["createdDate"] = fecha
+                with tempfile.TemporaryDirectory() as tmp, \
+                        mock.patch.object(p, "validar_perfil", side_effect=self.validar_falso) as cms:
+                    resultado = p.preparar(asc, REQUISITO, "ios", "cert-importado", pathlib.Path(tmp))
+                    self.assertTrue(resultado["profile_ready"])
+                    self.assertFalse(resultado["created"])
+                    self.assertFalse(asc.escritos)
+                    self.assertEqual(pathlib.Path(resultado["path"]).read_bytes(), b"perfil publico")
+                    self.assertEqual([llamada.args[0]["id"] for llamada in cms.call_args_list],
+                                     ["cms-invalido", "vigente"])
+
+    def test_perfiles_piden_los_settings_y_rechazan_capacidades_duplicadas(self):
+        asc = API()
+        p.preparar(asc, REQUISITO, "ios")
+        ruta = next(r for r in asc.gets if "bundleIdCapabilities" in r)
+        self.assertEqual(urllib.parse.parse_qs(urllib.parse.urlsplit(ruta).query),
+                         {"fields[bundleIdCapabilities]": ["capabilityType,settings"]})
+        asc.capacidades *= 2
+        with self.assertRaisesRegex(RuntimeError, "capacidad repetida"):
+            p.preparar(asc, REQUISITO, "ios")
+        self.assertFalse(asc.escritos)
+
     def test_capacidad_faltante_no_crea_perfiles(self):
         asc = API()
         asc.capacidades = []
@@ -146,12 +253,35 @@ class Perfiles(unittest.TestCase):
     def test_cms_que_no_autoriza_grupo_no_se_guarda(self):
         asc = API()
         def crear(*args, **kwargs):
-            return {"data": perfil("creado", autorizado=False)}
+            nuevo = perfil("creado", autorizado=False)
+            asc.perfiles.append(nuevo)
+            return {"data": nuevo}
         with tempfile.TemporaryDirectory() as tmp, mock.patch.object(asc, "escribir", side_effect=crear), \
                 mock.patch.object(p, "validar_perfil", side_effect=self.validar_falso):
             resultado = p.preparar(asc, REQUISITO, "ios", "cert-importado", pathlib.Path(tmp))
             self.assertFalse(resultado["profile_ready"])
             self.assertFalse(list(pathlib.Path(tmp).iterdir()))
+
+    def test_perfil_nuevo_exige_tipo_activo_vigente_y_certificado_importado(self):
+        casos = (("profileType", "IOS_APP_DEVELOPMENT"), ("profileState", "INVALID"),
+                 ("expirationDate", "2020-01-01T00:00:00Z"), ("certificate", "otra-clave"))
+        for campo, valor in casos:
+            with self.subTest(campo=campo):
+                asc = API()
+                crear_original = asc.escribir
+                def crear(*args, **kwargs):
+                    respuesta = crear_original(*args, **kwargs)
+                    nuevo = respuesta["data"]
+                    (nuevo if campo == "certificate" else nuevo["attributes"])[campo] = valor
+                    return respuesta
+                with tempfile.TemporaryDirectory() as tmp, mock.patch.object(asc, "escribir", side_effect=crear), \
+                        mock.patch.object(p, "validar_perfil", side_effect=self.validar_falso) as cms:
+                    resultado = p.preparar(asc, REQUISITO, "ios", "cert-importado", pathlib.Path(tmp))
+                    self.assertTrue(resultado["created"])
+                    self.assertFalse(resultado["profile_ready"])
+                    self.assertEqual(resultado["reason"], "created_profile_invalid_or_wrong_certificate")
+                    self.assertFalse(list(pathlib.Path(tmp).iterdir()))
+                    cms.assert_not_called()
 
     def test_widgets_exigen_proteccion_completa_sin_crear_perfiles_incompletos(self):
         asc = API()
@@ -167,6 +297,26 @@ class Perfiles(unittest.TestCase):
             dato = p.preparar(asc, requisito, "ios", "cert-importado", pathlib.Path(tmp))
             self.assertTrue(dato["profile_ready"])
             self.assertTrue(dato["path"].endswith("eu.sytue.rooms.widgets.mobileprovision"))
+
+    def test_proyeccion_seleccionada_no_suple_el_cms_de_proteccion_completa(self):
+        asc = API()
+        asc.identificador = "eu.sytue.rooms.widgets"
+        asc.capacidades.append({"attributes": {"capabilityType": "DATA_PROTECTION", "settings": [
+            {"key": "DATA_PROTECTION_PERMISSION_LEVEL", "options": [{"key": "COMPLETE_PROTECTION"}]}]}})
+        asc.perfiles = [perfil()]
+        requisito = {**REQUISITO, "id": asc.identificador, "widget": True, "keychain": "",
+                     "protection": "NSFileProtectionComplete"}
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(p, "validar_perfil", return_value=None) as cms:
+            resultado = p.preparar(asc, requisito, "ios", "cert-importado", pathlib.Path(tmp))
+            self.assertTrue(cms.called)
+            self.assertFalse(resultado["profile_ready"])
+            self.assertFalse(list(pathlib.Path(tmp).iterdir()))
+        asc.escritos.clear()
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(p, "validar_perfil", return_value=b"perfil publico") as cms:
+            resultado = p.preparar(asc, requisito, "ios", "cert-importado", pathlib.Path(tmp))
+            self.assertTrue(cms.called)
+            self.assertTrue(resultado["profile_ready"])
+            self.assertFalse(asc.escritos, "reutilizar el perfil que sí autoriza los derechos")
 
     def test_identidad_solo_valida_en_llavero_efimero_y_equipo_canonico(self):
         buena, otra = "a" * 40, "b" * 40

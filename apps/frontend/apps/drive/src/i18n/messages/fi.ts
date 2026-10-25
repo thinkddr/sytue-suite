@@ -561,8 +561,10 @@ export const fi: AppCatalog<typeof en> = {
   'share.group.failed': 'Jakaminen ei onnistunut.',
   'share.person.someone': 'Joku organisaatiostasi',
   'pdf.openInPdf': 'Avaa Sytue PDF:ssä',
-  'storage.externalNote':
-    'Uudet tiedostot käyttävät yhdistettyä tallennustilaa eivätkä vie tilaa täältä.',
+  'storage.externalNote': 'Yhdistetty tallennustila kasvattaa Sytue-tallennuskapasiteettiasi.',
+  'storage.externalCapacity': 'Yhdistetty tallennustila lisää kapasiteettia {capacity}.',
+  'storage.externalUnknown': 'Palveluntarjoaja ei ilmoita tallennuskapasiteettiaan.',
+  'storage.baseUsage': 'Sytue: {used} / {total}',
   'storage.add': 'Lisää tallennustila',
   'storage.external.forOrg': 'Tallenna organisaation uudet tiedostot tänne',
   'storage.external.endpoint': 'Päätepiste',

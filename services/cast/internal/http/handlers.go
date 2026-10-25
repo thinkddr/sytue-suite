@@ -715,10 +715,12 @@ func (h *Handlers) Cuota(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, r, traducir(err))
 		return
 	}
+	w.Header().Set("Cache-Control", "no-store")
 	httpx.JSON(w, r, http.StatusOK, map[string]any{
-		"limit_bytes":     q.LimitBytes,
-		"used_bytes":      q.UsedBytes,
-		"available_bytes": q.AvailableBytes,
-		"cast_bytes":      q.CastBytes,
+		"limit_bytes":      q.LimitBytes,
+		"used_bytes":       q.UsedBytes,
+		"available_bytes":  q.AvailableBytes,
+		"cast_bytes":       q.CastBytes,
+		"external_storage": q.ExternalStorage,
 	})
 }

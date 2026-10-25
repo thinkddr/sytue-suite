@@ -23,6 +23,7 @@
   "account.presenceFailed": "Присъствието ви не можа да бъде променено",
   "account.signIn": "Вход",
   "account.signOut": "Изход",
+  "account.signOutFailed": "Неуспешно излизане от профила на това устройство. Drive може още да е свързан. Опитайте отново.",
   "account.signOutPending.body": "Notepads има бележки на това устройство, които още не са качени ({count}). При изход те се изтриват от него.",
   "account.signOutPending.discard": "Отхвърли и излез",
   "account.signOutPending.title": "Неизпратени бележки",
@@ -334,5 +335,6 @@
   "widgets.open": "Отваряне",
   "widgets.pending": "Чакащи",
   "widgets.photos": "Снимки",
-  "widgets.rows": "Редове"
+  "widgets.rows": "Редове",
+  "widgets.storage": "Хранилище"
 }

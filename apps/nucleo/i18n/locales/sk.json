@@ -23,6 +23,7 @@
   "account.presenceFailed": "Váš stav sa nepodarilo zmeniť",
   "account.signIn": "Prihlásiť sa",
   "account.signOut": "Odhlásiť sa",
+  "account.signOutFailed": "Na tomto zariadení sa nepodarilo odhlásiť. Drive môže byť stále pripojený. Skúste to znova.",
   "account.signOutPending.body": "Notepads má v tomto zariadení poznámky, ktoré ešte neboli nahraté ({count}). Odhlásením sa z neho vymažú.",
   "account.signOutPending.discard": "Zahodiť a odhlásiť sa",
   "account.signOutPending.title": "Nenahraté poznámky",
@@ -342,5 +343,6 @@
   "widgets.open": "Otvoriť",
   "widgets.pending": "Čakajúce",
   "widgets.photos": "Fotky",
-  "widgets.rows": "Riadky"
+  "widgets.rows": "Riadky",
+  "widgets.storage": "Úložisko"
 }

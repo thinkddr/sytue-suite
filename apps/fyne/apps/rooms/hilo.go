@@ -105,6 +105,7 @@ func (p *PanelHilo) CreateRenderer() fyne.WidgetRenderer {
 	p.fondo = canvas.NewRectangle(tema.Color("surface", v))
 	p.filete = canvas.NewRectangle(tema.Color("border", v))
 	r := &panelHiloRenderer{p: p}
+	r.flujo = columnaConversacion{minimo: r.altoMinimo, colocar: r.colocarContenido}
 	r.Refresh()
 	return r
 }
@@ -162,13 +163,26 @@ func (p *PanelHilo) construirCuerpo(v tema.Variante) fyne.CanvasObject {
 	return container.NewVScroll(container.New(ui.Columna{}, cosas...))
 }
 
-type panelHiloRenderer struct{ p *PanelHilo }
+type panelHiloRenderer struct {
+	p     *PanelHilo
+	flujo columnaConversacion
+}
 
 func (r *panelHiloRenderer) MinSize() fyne.Size {
-	return fyne.NewSize(0, AltoCabecera+r.p.Compositor.Medida().Height)
+	return fyne.NewSize(0, AltoCabecera)
 }
-func (r *panelHiloRenderer) Objects() []fyne.CanvasObject { return r.p.objetos }
-func (r *panelHiloRenderer) Destroy()                     {}
+
+func (r *panelHiloRenderer) Objects() []fyne.CanvasObject {
+	if r.flujo.desbordando {
+		return []fyne.CanvasObject{r.p.fondo, r.p.filete, r.flujo.desborde}
+	}
+	return r.p.objetos
+}
+func (r *panelHiloRenderer) Destroy() {}
+
+func (r *panelHiloRenderer) altoMinimo(ancho float32) float32 {
+	return AltoCabecera + AltoFilaMensaje(false) + r.p.Compositor.medidaPara(max(ancho-tema.Borde, 0)).Height
+}
 
 // Layout: el filete a la izquierda (`border-l`), la cabecera arriba, la caja de
 // contestar abajo y el cuerpo con lo que sobra.
@@ -177,10 +191,15 @@ func (r *panelHiloRenderer) Layout(t fyne.Size) {
 	p.fondo.Resize(t)
 	p.filete.Move(fyne.NewPos(0, 0))
 	p.filete.Resize(fyne.NewSize(tema.Borde, t.Height))
+	r.flujo.repartir(t, []fyne.CanvasObject{p.cabecera, p.cuerpo, p.Compositor})
+}
+
+func (r *panelHiloRenderer) colocarContenido(t fyne.Size) {
+	p := r.p
 	x, ancho := tema.Borde, max(t.Width-tema.Borde, 0)
 	p.cabecera.Move(fyne.NewPos(x, 0))
 	p.cabecera.Resize(fyne.NewSize(ancho, AltoCabecera))
-	alto := p.Compositor.Medida().Height
+	alto := p.Compositor.medidaPara(ancho).Height
 	p.Compositor.Move(fyne.NewPos(x, max(t.Height-alto, AltoCabecera)))
 	p.Compositor.Resize(fyne.NewSize(ancho, alto))
 	p.cuerpo.Move(fyne.NewPos(x, AltoCabecera))

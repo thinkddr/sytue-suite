@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/sistema"
@@ -120,5 +121,99 @@ func TestArchivosReintenta(t *testing.T) {
 	b.seguir(true)
 	if !slices.Equal(d.hechos, []string{"registrar Sytue Drive"}) {
 		t.Fatalf("con la credencial puesta: %q", d.hechos)
+	}
+}
+
+// Desactivar retira el dominio y revoca la credencial; no la recrea al cambiar tema.
+func TestArchivosDesactivadosNoSeRecrean(t *testing.T) {
+	d := &doble{sujeto: "ana"}
+	a := d.archivos()
+	habilitado := true
+	a.habilitado = func() bool { return habilitado }
+	a.seguir(true)
+	d.hechos = nil
+	habilitado = false
+	a.seguir(true)
+	if !slices.Equal(d.hechos, []string{"olvidar", "revocar p1"}) || d.credencial != nil {
+		t.Fatalf("desactivar: %q", d.hechos)
+	}
+	d.hechos = nil
+	a.seguir(true)
+	if len(d.hechos) != 0 {
+		t.Fatalf("recreó estando desactivado: %q", d.hechos)
+	}
+	habilitado = true
+	a.seguir(true)
+	if d.creadas != 2 || d.credencial == nil {
+		t.Fatalf("reactivar: %q", d.hechos)
+	}
+}
+
+func TestArchivosAvisoAntiguoNoReabreSesionCerrada(t *testing.T) {
+	d := &doble{sujeto: "ana"}
+	a := d.archivos()
+	a.dentro = func() bool { return false }
+	a.seguir(true)
+	if d.creadas != 0 || d.credencial != nil {
+		t.Fatalf("reabrió: %q", d.hechos)
+	}
+}
+
+func TestArchivosNoPublicaClaveSinOrganizacionVerificada(t *testing.T) {
+	for _, tenant := range []string{"", "otra"} {
+		d := &doble{sujeto: "ana"}
+		a := d.archivos()
+		a.organizacion = func() string { return "acme" }
+		crear := a.crear
+		a.crear = func(ctx context.Context, etiqueta string) (api.AppPasswordNueva, error) {
+			clave, err := crear(ctx, etiqueta)
+			clave.OrgID, clave.Tenant = "org-1", tenant
+			return clave, err
+		}
+		a.seguir(true)
+		if d.credencial != nil || slices.Contains(d.hechos, "registrar Sytue Drive") || d.id != "" {
+			t.Fatalf("tenant %q publicó credencial: %q", tenant, d.hechos)
+		}
+	}
+}
+
+func TestAbrirArchivosEsperaElAltaEnVuelo(t *testing.T) {
+	d := &doble{sujeto: "ana"}
+	a := d.archivos()
+	registrado, continuar, abierto := make(chan struct{}), make(chan struct{}), make(chan struct{}, 1)
+	a.registrar = func(string) error { close(registrado); <-continuar; return nil }
+	alta := make(chan error, 1)
+	go func() { alta <- a.seguir(true) }()
+	<-registrado
+	resultado := make(chan error, 1)
+	go func() { resultado <- a.abrir(func() error { abierto <- struct{}{}; return nil }) }()
+	select {
+	case <-abierto:
+		t.Fatal("se abrió Finder/Archivos antes de terminar el alta")
+	case <-time.After(30 * time.Millisecond):
+	}
+	close(continuar)
+	if err := <-alta; err != nil {
+		t.Fatal(err)
+	}
+	if err := <-resultado; err != nil {
+		t.Fatal(err)
+	}
+	if d.creadas != 1 {
+		t.Fatalf("el enlace duplicó credenciales: %d", d.creadas)
+	}
+	select {
+	case <-abierto:
+	default:
+		t.Fatal("no se abrió tras el alta")
+	}
+}
+
+func TestAbrirArchivosNoOcultaUnFalloDelAlta(t *testing.T) {
+	d := &doble{sujeto: "ana", fallaCrear: true}
+	abierto := false
+	err := d.archivos().abrir(func() error { abierto = true; return nil })
+	if err == nil || abierto {
+		t.Fatal("un alta fallida abrió una ubicación que no existe")
 	}
 }

@@ -4,7 +4,11 @@
 package editor
 
 import (
+	"fmt"
 	"image/color"
+	"image/png"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"fyne.io/fyne/v2"
@@ -70,6 +74,73 @@ func TestLaBandaQueNoCabeSeDesplazaYTieneMas(t *testing.T) {
 	x := d.AbsolutePositionForObject(ultimo).X
 	if fin := x + ultimo.Size().Width; x < 0 || fin > c.mas.Position().X+0.5 {
 		t.Errorf("desplazada hasta el fondo, el último grupo va de %.1f a %.1f y «Más» empieza en %.1f", x, fin, c.mas.Position().X)
+	}
+}
+
+func TestLaBandaMovilAlcanzaLosExtremosYAbreSusPaneles(t *testing.T) {
+	defer ui.TactilDePrueba(true)()
+	for _, ancho := range []float32{320, 390, 1024} {
+		t.Run(fmt.Sprint(ancho), func(t *testing.T) {
+			ctx := &Contexto{Tipo: Documento, Zoom: 100, Estado: Listo, T: func(k string, _ i18n.Vars) string { return k }}
+			r := Genericas()
+			var muestra *MuestraCinta
+			r.Sustituir("inicio", func(c *Contexto) fyne.CanvasObject {
+				grupos := objetosDeBanda(bandaAncha(c))
+				muestra = NuevaMuestraCinta(c, iconos.EdColorTexto, "Color", PaletaContenido[0], nil, nil)
+				return Grupos(append(grupos, SeparadorGrupos(), NuevoGrupo("Color", muestra))...)
+			})
+			m := NuevoMarco(ctx, r, nil)
+			w := test.NewTempWindow(t, m)
+			w.SetPadded(false)
+			w.Resize(fyne.NewSize(ancho, 740))
+			c := m.cinta
+			alto := c.Size().Height
+			if !c.banda.Visible() || c.mas.Visible() || c.banda.Size().Width != ancho {
+				t.Fatalf("móvil pierde la fila visible o reserva una expansión: %v", c.banda.Size())
+			}
+			capturar := func(nombre string) {
+				t.Helper()
+				if dir := os.Getenv("SYTUE_CINTA_CAPTURAS"); dir != "" {
+					if err := os.MkdirAll(dir, 0o755); err != nil {
+						t.Fatal(err)
+					}
+					f, err := os.Create(filepath.Join(dir, fmt.Sprintf("native-%g-%s.png", ancho, nombre)))
+					if err != nil {
+						t.Fatal(err)
+					}
+					defer f.Close()
+					if err := png.Encode(f, w.Canvas().Capture()); err != nil {
+						t.Fatal(err)
+					}
+				}
+			}
+			capturar("inicio")
+			c.banda.Scrolled(&fyne.ScrollEvent{Scrolled: fyne.NewDelta(-10000, 0)})
+			d := fyne.CurrentApp().Driver()
+			pos := d.AbsolutePositionForObject(muestra)
+			if pos.X < 0 || pos.X+muestra.Size().Width > ancho+0.5 || c.banda.X() == 0 {
+				t.Fatalf("el gesto no alcanza el último control: %v", pos)
+			}
+			capturar("derecha")
+			c.banda.Scrolled(&fyne.ScrollEvent{Scrolled: fyne.NewDelta(10000, 0)})
+			w.Canvas().Focus(muestra)
+			if c.banda.X() == 0 {
+				t.Fatal("el foco no lleva el último control a la vista")
+			}
+			test.Tap(muestra)
+			if len(w.Canvas().Overlays().List()) == 0 {
+				t.Fatal("la paleta queda encerrada en la banda")
+			}
+			p := d.AbsolutePositionForObject(muestra.paleta)
+			if p.X < 0 || p.Y < 0 || p.X+muestra.paleta.Size().Width > ancho+0.5 || p.Y+muestra.paleta.Size().Height > 740 {
+				t.Fatalf("la paleta sale del viewport: %v %v", p, muestra.paleta.Size())
+			}
+			capturar("paleta")
+			test.Tap(muestra.paleta.celdas[1].(*celdaPaleta))
+			if muestra.Color != PaletaContenido[1] || c.Size().Height != alto || c.desplegada != nil {
+				t.Fatal("usar el panel cambió el alto o expandió la cinta")
+			}
+		})
 	}
 }
 

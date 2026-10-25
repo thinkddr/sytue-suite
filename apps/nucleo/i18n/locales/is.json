@@ -23,6 +23,7 @@
   "account.presenceFailed": "Ekki tókst að breyta viðveru þinni",
   "account.signIn": "Skrá inn",
   "account.signOut": "Skrá út",
+  "account.signOutFailed": "Ekki tókst að skrá út á þessu tæki. Drive gæti enn verið tengt. Reyndu aftur.",
   "account.signOutPending.body": "Notepads er með glósur á þessu tæki sem hefur ekki enn verið hlaðið upp ({count}). Þeim er eytt af því við útskráningu.",
   "account.signOutPending.discard": "Henda og skrá út",
   "account.signOutPending.title": "Glósur sem ekki hefur verið hlaðið upp",
@@ -334,5 +335,6 @@
   "widgets.open": "Opna",
   "widgets.pending": "Í bið",
   "widgets.photos": "Myndir",
-  "widgets.rows": "Raðir"
+  "widgets.rows": "Raðir",
+  "widgets.storage": "Geymslurými"
 }

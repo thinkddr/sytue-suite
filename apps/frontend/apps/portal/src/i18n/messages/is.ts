@@ -146,6 +146,11 @@ export const is: AppCatalog<typeof en> = {
     'Til að flytja allt beint yfir í Google Workspace eða Microsoft 365 án þess að sækja neitt: ef þú ert með persónulegan reikning eða stjórnar stofnuninni þinni geturðu hafið flutninginn í Sytue Admin, undir Flutningar; annars skaltu biðja umsjón hennar um það.',
   'data.move.action': 'Opna Flutninga',
 
+  'devices.native.body': 'Notaðu skráastjóra tækisins eða tengdu reikning með samþykki.',
+  'devices.native.driveBody':
+    'Sytue Drive bætist sjálfkrafa við eftir innskráningu. Leyfðu staðsetninguna ef kerfið biður um það.',
+  'devices.native.openDrive': 'Opna í skráastjóra',
+  'devices.native.failed': 'Ekki tókst að uppfæra samþættingu tækisins.',
   'devices.title': 'Tengdu tækin þín',
   'devices.lead':
     'Taktu póstinn, dagatalið, tengiliðina og skrárnar í Sytue með þér í símann eða tölvuna. Við leiðum þig skref fyrir skref.',

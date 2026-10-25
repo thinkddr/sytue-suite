@@ -17,6 +17,16 @@
 			fileRef = 99BCFFFD4C49393862661B4C;
 			isa = PBXBuildFile;
 		};
+		0B6A252A5DF6121587F4D279 = {
+			fileRef = A873764A21CC15F2E644F221;
+			isa = PBXBuildFile;
+			settings = {
+				ATTRIBUTES = (
+					RemoveHeadersOnCopy,
+					CodeSignOnCopy,
+				);
+			};
+		};
 		0C4B3796702FCC6CA94C7716 = {
 			fileRef = 39DD8A0CB33503AE9CA4B825;
 			isa = PBXBuildFile;
@@ -24,6 +34,16 @@
 		0D9A6E84817EC9DB9DE9F209 = {
 			fileRef = 0329DE900086071AF357FB72;
 			isa = PBXBuildFile;
+		};
+		132BF23A7B343F1EF12F6249 = {
+			fileRef = DE44BA8126A12179BF31B1E2;
+			isa = PBXBuildFile;
+			settings = {
+				ATTRIBUTES = (
+					RemoveHeadersOnCopy,
+					CodeSignOnCopy,
+				);
+			};
 		};
 		1639FB8BAEAEA8D1D84A4863 = {
 			fileRef = C5C45E2AD7B62CDBAEEB36B2;
@@ -33,9 +53,29 @@
 			fileRef = 99BCFFFD4C49393862661B4C;
 			isa = PBXBuildFile;
 		};
+		1A24BDF49EB8A8B2006A91B6 = {
+			fileRef = BBBD34C73DFAA5B36EC4C16C;
+			isa = PBXBuildFile;
+			settings = {
+				ATTRIBUTES = (
+					RemoveHeadersOnCopy,
+					CodeSignOnCopy,
+				);
+			};
+		};
 		1A9D2D4BD9ACA5E17ABBDCC3 = {
 			fileRef = 0C9C4195AE9C25B255FD18C5;
 			isa = PBXBuildFile;
+		};
+		1AECC2BABAF735192790DE54 = {
+			fileRef = DE44BA8126A12179BF31B1E2;
+			isa = PBXBuildFile;
+			settings = {
+				ATTRIBUTES = (
+					RemoveHeadersOnCopy,
+					CodeSignOnCopy,
+				);
+			};
 		};
 		2246F892302014F4C91E36BB = {
 			fileRef = C5C45E2AD7B62CDBAEEB36B2;
@@ -89,6 +129,16 @@
 			fileRef = 99BCFFFD4C49393862661B4C;
 			isa = PBXBuildFile;
 		};
+		3A5732FB3B78A517B3AED013 = {
+			fileRef = DE44BA8126A12179BF31B1E2;
+			isa = PBXBuildFile;
+			settings = {
+				ATTRIBUTES = (
+					RemoveHeadersOnCopy,
+					CodeSignOnCopy,
+				);
+			};
+		};
 		3B55B4FA89E31F5EC15E3D1A = {
 			fileRef = 8380A44D092F260A3C780F53;
 			isa = PBXBuildFile;
@@ -120,6 +170,16 @@
 		4325B3E60F8E5D9C8858CF48 = {
 			fileRef = 1ADE6C21131CFD2496E90E32;
 			isa = PBXBuildFile;
+		};
+		43D9A48C02107F1034789B5F = {
+			fileRef = 4582BF030622666F41AF0C74;
+			isa = PBXBuildFile;
+			settings = {
+				ATTRIBUTES = (
+					RemoveHeadersOnCopy,
+					CodeSignOnCopy,
+				);
+			};
 		};
 		4456EF280BCB5A481E672DA1 = {
 			fileRef = C5C45E2AD7B62CDBAEEB36B2;
@@ -153,9 +213,29 @@
 			fileRef = 537260548F1E03C736D62990;
 			isa = PBXBuildFile;
 		};
+		5A7570F8D52050F201E1FF11 = {
+			fileRef = DE44BA8126A12179BF31B1E2;
+			isa = PBXBuildFile;
+			settings = {
+				ATTRIBUTES = (
+					RemoveHeadersOnCopy,
+					CodeSignOnCopy,
+				);
+			};
+		};
 		5BA6FB7DA3B8EE8F40F4A968 = {
 			fileRef = 99BCFFFD4C49393862661B4C;
 			isa = PBXBuildFile;
+		};
+		5C827F43B4201938BB8D18C5 = {
+			fileRef = DE44BA8126A12179BF31B1E2;
+			isa = PBXBuildFile;
+			settings = {
+				ATTRIBUTES = (
+					RemoveHeadersOnCopy,
+					CodeSignOnCopy,
+				);
+			};
 		};
 		5D6E451B87E9B3E171BEC024 = {
 			fileRef = 0C9C4195AE9C25B255FD18C5;
@@ -209,6 +289,16 @@
 			fileRef = 0C9C4195AE9C25B255FD18C5;
 			isa = PBXBuildFile;
 		};
+		733503C2703526DC4B2B8160 = {
+			fileRef = DE44BA8126A12179BF31B1E2;
+			isa = PBXBuildFile;
+			settings = {
+				ATTRIBUTES = (
+					RemoveHeadersOnCopy,
+					CodeSignOnCopy,
+				);
+			};
+		};
 		74C08AA6CA2DDB589742EC6C = {
 			fileRef = 0C9C4195AE9C25B255FD18C5;
 			isa = PBXBuildFile;
@@ -224,6 +314,16 @@
 		79C29928707B8C485CD0190C = {
 			fileRef = 537260548F1E03C736D62990;
 			isa = PBXBuildFile;
+		};
+		832DABD14EAEB49C29737139 = {
+			fileRef = 3C5829931C3C1A881B36055F;
+			isa = PBXBuildFile;
+			settings = {
+				ATTRIBUTES = (
+					RemoveHeadersOnCopy,
+					CodeSignOnCopy,
+				);
+			};
 		};
 		85DE1B3B9A0F8DF2AAC04643 = {
 			fileRef = 6D343627CDA7A2C504FDE333;
@@ -241,6 +341,16 @@
 			fileRef = 99BCFFFD4C49393862661B4C;
 			isa = PBXBuildFile;
 		};
+		8B23FA665CAB476B563CEAD0 = {
+			fileRef = DE44BA8126A12179BF31B1E2;
+			isa = PBXBuildFile;
+			settings = {
+				ATTRIBUTES = (
+					RemoveHeadersOnCopy,
+					CodeSignOnCopy,
+				);
+			};
+		};
 		8E5DF73CB4D77800284B6049 = {
 			fileRef = 1015BB1CE3A1E75A8B5270C6;
 			isa = PBXBuildFile;
@@ -248,6 +358,26 @@
 		8EE3ADCDF7E98CCA5B06E67D = {
 			fileRef = 33363A2F782AC752DA011D03;
 			isa = PBXBuildFile;
+		};
+		8F237C27AB6990B7D6A898CC = {
+			fileRef = D7014C2B343D9ED08C32753E;
+			isa = PBXBuildFile;
+			settings = {
+				ATTRIBUTES = (
+					RemoveHeadersOnCopy,
+					CodeSignOnCopy,
+				);
+			};
+		};
+		93F7FF44955E50499AE3B0E4 = {
+			fileRef = DE44BA8126A12179BF31B1E2;
+			isa = PBXBuildFile;
+			settings = {
+				ATTRIBUTES = (
+					RemoveHeadersOnCopy,
+					CodeSignOnCopy,
+				);
+			};
 		};
 		942FAD2BCBE37A395880AE43 = {
 			fileRef = 99BCFFFD4C49393862661B4C;
@@ -261,6 +391,26 @@
 			fileRef = B7AB8BF9FAF3106CA75C66E3;
 			isa = PBXBuildFile;
 		};
+		988F698264BF32FDE1E089D4 = {
+			fileRef = 33E9A64412996F717A19E03C;
+			isa = PBXBuildFile;
+			settings = {
+				ATTRIBUTES = (
+					RemoveHeadersOnCopy,
+					CodeSignOnCopy,
+				);
+			};
+		};
+		992BD23104E66DC74B3377A6 = {
+			fileRef = 93D9A4FB1917D41D8B8A420F;
+			isa = PBXBuildFile;
+			settings = {
+				ATTRIBUTES = (
+					RemoveHeadersOnCopy,
+					CodeSignOnCopy,
+				);
+			};
+		};
 		9A144A23C03089DC59945D95 = {
 			fileRef = 537260548F1E03C736D62990;
 			isa = PBXBuildFile;
@@ -268,6 +418,16 @@
 		9D6DBEEAC5CD0C0B79EE9912 = {
 			fileRef = 0C9C4195AE9C25B255FD18C5;
 			isa = PBXBuildFile;
+		};
+		A0F47798F064230533B562B1 = {
+			fileRef = DE44BA8126A12179BF31B1E2;
+			isa = PBXBuildFile;
+			settings = {
+				ATTRIBUTES = (
+					RemoveHeadersOnCopy,
+					CodeSignOnCopy,
+				);
+			};
 		};
 		A2A8D8B38CDB20A2E7D92471 = {
 			fileRef = C5C45E2AD7B62CDBAEEB36B2;
@@ -297,12 +457,33 @@
 			fileRef = B7AB8BF9FAF3106CA75C66E3;
 			isa = PBXBuildFile;
 		};
+		AEAE071C3D60407B9D078001 = {
+			fileRef = 0554D14727D930DA1F946A43;
+			isa = PBXBuildFile;
+			settings = {
+				ATTRIBUTES = (
+					RemoveHeadersOnCopy,
+					CodeSignOnCopy,
+				);
+			};
+		};
 		AEBEA251AABA070683AF2620 = {
 			fileRef = C5F346890E8660EE77B4194F;
 			isa = PBXBuildFile;
 			settings = {
 				ATTRIBUTES = (
 					RemoveHeadersOnCopy,
+					CodeSignOnCopy,
+				);
+			};
+		};
+		B08D8BF7E870A47703957204 = {
+			fileRef = 7A7402F59BB0A891EF9AF3A7;
+			isa = PBXBuildFile;
+			settings = {
+				ATTRIBUTES = (
+					RemoveHeadersOnCopy,
+					CodeSignOnCopy,
 				);
 			};
 		};
@@ -322,6 +503,16 @@
 			fileRef = C5C45E2AD7B62CDBAEEB36B2;
 			isa = PBXBuildFile;
 		};
+		B6408D5392F98D5360BC6198 = {
+			fileRef = 4E33C91F80929A9A02CC6ABE;
+			isa = PBXBuildFile;
+			settings = {
+				ATTRIBUTES = (
+					RemoveHeadersOnCopy,
+					CodeSignOnCopy,
+				);
+			};
+		};
 		B6CB1A062D057760F1B1A761 = {
 			fileRef = C5C45E2AD7B62CDBAEEB36B2;
 			isa = PBXBuildFile;
@@ -338,6 +529,16 @@
 			fileRef = C5C45E2AD7B62CDBAEEB36B2;
 			isa = PBXBuildFile;
 		};
+		C5E585076B66AFDF62FEEF2F = {
+			fileRef = DE44BA8126A12179BF31B1E2;
+			isa = PBXBuildFile;
+			settings = {
+				ATTRIBUTES = (
+					RemoveHeadersOnCopy,
+					CodeSignOnCopy,
+				);
+			};
+		};
 		C74C7E98436E173D4D4E2DD6 = {
 			fileRef = 0C9C4195AE9C25B255FD18C5;
 			isa = PBXBuildFile;
@@ -345,6 +546,16 @@
 		C7DB7D0EA7FA86654B6134A0 = {
 			fileRef = 6590C48B333D98558B31F777;
 			isa = PBXBuildFile;
+		};
+		CA5641172A361F7ED7AF059D = {
+			fileRef = DE44BA8126A12179BF31B1E2;
+			isa = PBXBuildFile;
+			settings = {
+				ATTRIBUTES = (
+					RemoveHeadersOnCopy,
+					CodeSignOnCopy,
+				);
+			};
 		};
 		CACE6499D150266DE2650120 = {
 			fileRef = 537260548F1E03C736D62990;
@@ -374,9 +585,49 @@
 			fileRef = B7AB8BF9FAF3106CA75C66E3;
 			isa = PBXBuildFile;
 		};
+		D03CDBCCAB8014D61580E7CD = {
+			fileRef = 33828DAFCA36F745AC73AA09;
+			isa = PBXBuildFile;
+			settings = {
+				ATTRIBUTES = (
+					RemoveHeadersOnCopy,
+					CodeSignOnCopy,
+				);
+			};
+		};
 		D36E1F5ABCBE00318E52B9FB = {
 			fileRef = 21EF2BBA9464FB203F2E4EE1;
 			isa = PBXBuildFile;
+		};
+		D3823747018FC42FF99D5A5A = {
+			fileRef = 7843A6CFB0C39758711E3423;
+			isa = PBXBuildFile;
+			settings = {
+				ATTRIBUTES = (
+					RemoveHeadersOnCopy,
+					CodeSignOnCopy,
+				);
+			};
+		};
+		D52DE199C1D3B253CE68A016 = {
+			fileRef = DE44BA8126A12179BF31B1E2;
+			isa = PBXBuildFile;
+			settings = {
+				ATTRIBUTES = (
+					RemoveHeadersOnCopy,
+					CodeSignOnCopy,
+				);
+			};
+		};
+		D8042BCE7C884EE9E75E13B7 = {
+			fileRef = AF37333825D9088295EB9C8B;
+			isa = PBXBuildFile;
+			settings = {
+				ATTRIBUTES = (
+					RemoveHeadersOnCopy,
+					CodeSignOnCopy,
+				);
+			};
 		};
 		D942158D2A1187C28E0CC351 = {
 			fileRef = 99BCFFFD4C49393862661B4C;
@@ -386,6 +637,16 @@
 			fileRef = C5C45E2AD7B62CDBAEEB36B2;
 			isa = PBXBuildFile;
 		};
+		DC2ADFD795F4070907610878 = {
+			fileRef = DE44BA8126A12179BF31B1E2;
+			isa = PBXBuildFile;
+			settings = {
+				ATTRIBUTES = (
+					RemoveHeadersOnCopy,
+					CodeSignOnCopy,
+				);
+			};
+		};
 		DC9004D31C76468C5B0DDCF5 = {
 			fileRef = B7AB8BF9FAF3106CA75C66E3;
 			isa = PBXBuildFile;
@@ -393,6 +654,16 @@
 		DD40DDE6526474C414C7D202 = {
 			fileRef = 0C9C4195AE9C25B255FD18C5;
 			isa = PBXBuildFile;
+		};
+		DEE00B56214B1DDFAB996E0C = {
+			fileRef = 02F6BE639529171C5FF425D2;
+			isa = PBXBuildFile;
+			settings = {
+				ATTRIBUTES = (
+					RemoveHeadersOnCopy,
+					CodeSignOnCopy,
+				);
+			};
 		};
 		DFB0A00AB33F8891BD77B5E0 = {
 			fileRef = 06D440E1FCA6EDC85C85909A;
@@ -414,9 +685,29 @@
 			fileRef = C91B5759BECBE23E89501059;
 			isa = PBXBuildFile;
 		};
+		F4AC282E414992F33EA0BA39 = {
+			fileRef = DE44BA8126A12179BF31B1E2;
+			isa = PBXBuildFile;
+			settings = {
+				ATTRIBUTES = (
+					RemoveHeadersOnCopy,
+					CodeSignOnCopy,
+				);
+			};
+		};
 		F67BD8EE77EE430707E807FA = {
 			fileRef = 537260548F1E03C736D62990;
 			isa = PBXBuildFile;
+		};
+		F766DFE9EE7DFB6FE78EAAAD = {
+			fileRef = DE44BA8126A12179BF31B1E2;
+			isa = PBXBuildFile;
+			settings = {
+				ATTRIBUTES = (
+					RemoveHeadersOnCopy,
+					CodeSignOnCopy,
+				);
+			};
 		};
 		F88583C3E2627A67BF11A2F3 = {
 			fileRef = 96CA1EACAA25AE4C70F80889;
@@ -438,9 +729,117 @@
 			fileRef = 0C9C4195AE9C25B255FD18C5;
 			isa = PBXBuildFile;
 		};
+		FFB905D90F1F2435F043E5C6 = {
+			fileRef = 6C4DDEBC0D806ADAC4DF0EEA;
+			isa = PBXBuildFile;
+			settings = {
+				ATTRIBUTES = (
+					RemoveHeadersOnCopy,
+					CodeSignOnCopy,
+				);
+			};
+		};
 		FFE208335C65466B5E12AF8F = {
 			fileRef = 537260548F1E03C736D62990;
 			isa = PBXBuildFile;
+		};
+		2A66037EFD87E0C92CD20285 = {
+			containerPortal = 7B6581EE30595C57D6133265;
+			isa = PBXContainerItemProxy;
+			proxyType = 1;
+			remoteGlobalIDString = E9D3FD74FD589738B0619DDD;
+			remoteInfo = "contacts-widgets";
+		};
+		39E4C40578A8EF6B5AD4B524 = {
+			containerPortal = 7B6581EE30595C57D6133265;
+			isa = PBXContainerItemProxy;
+			proxyType = 1;
+			remoteGlobalIDString = ED2A2375524E3E93BD249B5A;
+			remoteInfo = "hub-widgets";
+		};
+		3A848BE91BF9F14971517367 = {
+			containerPortal = 7B6581EE30595C57D6133265;
+			isa = PBXContainerItemProxy;
+			proxyType = 1;
+			remoteGlobalIDString = 5023BB233ACF9D561845E566;
+			remoteInfo = "notes-widgets";
+		};
+		3F7FE6C313F14EB4384EA793 = {
+			containerPortal = 7B6581EE30595C57D6133265;
+			isa = PBXContainerItemProxy;
+			proxyType = 1;
+			remoteGlobalIDString = BF01097A37B388FFFAD8C7BB;
+			remoteInfo = "docus-widgets";
+		};
+		49DF22A260B92D722F98ED47 = {
+			containerPortal = 7B6581EE30595C57D6133265;
+			isa = PBXContainerItemProxy;
+			proxyType = 1;
+			remoteGlobalIDString = 194FABC42E3073C4235CAF12;
+			remoteInfo = SytueWidgetBridge;
+		};
+		5BCCD29ABBE5F948A6506348 = {
+			containerPortal = 7B6581EE30595C57D6133265;
+			isa = PBXContainerItemProxy;
+			proxyType = 1;
+			remoteGlobalIDString = 4771506CF7ED207168121EEE;
+			remoteInfo = "bases-widgets";
+		};
+		5DF4BB687CF0A666E4FA2B64 = {
+			containerPortal = 7B6581EE30595C57D6133265;
+			isa = PBXContainerItemProxy;
+			proxyType = 1;
+			remoteGlobalIDString = BA74C91E95366EEBF0315EB6;
+			remoteInfo = "certipdf-widgets";
+		};
+		6CE81780B4012F81F26F8C09 = {
+			containerPortal = 7B6581EE30595C57D6133265;
+			isa = PBXContainerItemProxy;
+			proxyType = 1;
+			remoteGlobalIDString = CBCC48BD7DE7AAD51536A6B4;
+			remoteInfo = "erp-widgets";
+		};
+		76B2176C1FB6BCBE42F99485 = {
+			containerPortal = 7B6581EE30595C57D6133265;
+			isa = PBXContainerItemProxy;
+			proxyType = 1;
+			remoteGlobalIDString = 42B3B6338F0ACEAD1C97DBA1;
+			remoteInfo = "calcus-widgets";
+		};
+		7AE551105BE4E787686B0EF5 = {
+			containerPortal = 7B6581EE30595C57D6133265;
+			isa = PBXContainerItemProxy;
+			proxyType = 1;
+			remoteGlobalIDString = 2FD8068A1966674483EA9E0C;
+			remoteInfo = "mail-widgets";
+		};
+		7F0A488AC5A8279CEC27D63F = {
+			containerPortal = 7B6581EE30595C57D6133265;
+			isa = PBXContainerItemProxy;
+			proxyType = 1;
+			remoteGlobalIDString = 70ED7EBB1E2FB088EF662800;
+			remoteInfo = "calendar-widgets";
+		};
+		9AA3D09E6D86BB8A4D29C808 = {
+			containerPortal = 7B6581EE30595C57D6133265;
+			isa = PBXContainerItemProxy;
+			proxyType = 1;
+			remoteGlobalIDString = 781BAF139D02B448B51AC782;
+			remoteInfo = "drive-widgets";
+		};
+		AF5B535FC39B381D08901E54 = {
+			containerPortal = 7B6581EE30595C57D6133265;
+			isa = PBXContainerItemProxy;
+			proxyType = 1;
+			remoteGlobalIDString = 6E68C3BDC31C78623E6BA080;
+			remoteInfo = "rooms-widgets";
+		};
+		D386BAC960627A4F6C977EDE = {
+			containerPortal = 7B6581EE30595C57D6133265;
+			isa = PBXContainerItemProxy;
+			proxyType = 1;
+			remoteGlobalIDString = 6C3C618A2C4F872614A934C1;
+			remoteInfo = "cast-widgets";
 		};
 		DB841A544DC75D3966AE1710 = {
 			containerPortal = 7B6581EE30595C57D6133265;
@@ -448,6 +847,20 @@
 			proxyType = 1;
 			remoteGlobalIDString = 26FA2B47A8C639F4FA71C9B5;
 			remoteInfo = "drive-archivos";
+		};
+		DC19FFFA1F8D800CC7DB031A = {
+			containerPortal = 7B6581EE30595C57D6133265;
+			isa = PBXContainerItemProxy;
+			proxyType = 1;
+			remoteGlobalIDString = CB3879BC27B337D96B96E90E;
+			remoteInfo = "diapos-widgets";
+		};
+		F243A4FF85F66A93DAC661E1 = {
+			containerPortal = 7B6581EE30595C57D6133265;
+			isa = PBXContainerItemProxy;
+			proxyType = 1;
+			remoteGlobalIDString = 8FA4D4F6E1F27FD94CEAEA6A;
+			remoteInfo = "photos-widgets";
 		};
 		03BDC5E738827D3588B7B9C2 = {
 			buildActionMask = 2147483647;
@@ -458,6 +871,336 @@
 			);
 			isa = PBXCopyFilesBuildPhase;
 			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		06A816FEC8CC7D616F514D70 = {
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				CA5641172A361F7ED7AF059D,
+			);
+			isa = PBXCopyFilesBuildPhase;
+			name = "Embed WidgetKit Bridge";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		0BEF7C359403847E2D991782 = {
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				93F7FF44955E50499AE3B0E4,
+			);
+			isa = PBXCopyFilesBuildPhase;
+			name = "Embed WidgetKit Bridge";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		13378E68B732EF3098EEE199 = {
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				FFB905D90F1F2435F043E5C6,
+			);
+			isa = PBXCopyFilesBuildPhase;
+			name = "Embed WidgetKit";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		157DE4D8E048C81E00155E7C = {
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				DC2ADFD795F4070907610878,
+			);
+			isa = PBXCopyFilesBuildPhase;
+			name = "Embed WidgetKit Bridge";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		222283EBF90D985C4FEB374D = {
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				C5E585076B66AFDF62FEEF2F,
+			);
+			isa = PBXCopyFilesBuildPhase;
+			name = "Embed WidgetKit Bridge";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		27A7F5F6FAAFC876534617FF = {
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				D3823747018FC42FF99D5A5A,
+			);
+			isa = PBXCopyFilesBuildPhase;
+			name = "Embed WidgetKit";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		31FC99FF96D6A1BF529087BD = {
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				8B23FA665CAB476B563CEAD0,
+			);
+			isa = PBXCopyFilesBuildPhase;
+			name = "Embed WidgetKit Bridge";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		34DBAD5F25C76CFF04E8D906 = {
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				B6408D5392F98D5360BC6198,
+			);
+			isa = PBXCopyFilesBuildPhase;
+			name = "Embed WidgetKit";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		38521B728E839088742A09AD = {
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				D52DE199C1D3B253CE68A016,
+			);
+			isa = PBXCopyFilesBuildPhase;
+			name = "Embed WidgetKit Bridge";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		3954729CE432D1A7BF6C5948 = {
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				A0F47798F064230533B562B1,
+			);
+			isa = PBXCopyFilesBuildPhase;
+			name = "Embed WidgetKit Bridge";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4F3BC735845964DDF13B2B5F = {
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				AEAE071C3D60407B9D078001,
+			);
+			isa = PBXCopyFilesBuildPhase;
+			name = "Embed WidgetKit";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5362337C747A4FFC410F335A = {
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				F4AC282E414992F33EA0BA39,
+			);
+			isa = PBXCopyFilesBuildPhase;
+			name = "Embed WidgetKit Bridge";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		65F5448AD153CFD6146E9F65 = {
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				F766DFE9EE7DFB6FE78EAAAD,
+			);
+			isa = PBXCopyFilesBuildPhase;
+			name = "Embed WidgetKit Bridge";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		6C9ABA16914E0A08638602D3 = {
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				733503C2703526DC4B2B8160,
+			);
+			isa = PBXCopyFilesBuildPhase;
+			name = "Embed WidgetKit Bridge";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		7AFDD484533D5F7BE3159D07 = {
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				DEE00B56214B1DDFAB996E0C,
+			);
+			isa = PBXCopyFilesBuildPhase;
+			name = "Embed WidgetKit";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		7ED4C0F4E3FFE8395AA023C8 = {
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				1AECC2BABAF735192790DE54,
+			);
+			isa = PBXCopyFilesBuildPhase;
+			name = "Embed WidgetKit Bridge";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8347B64DD3D0945FD2FA27FB = {
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				D8042BCE7C884EE9E75E13B7,
+			);
+			isa = PBXCopyFilesBuildPhase;
+			name = "Embed WidgetKit";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		85AE12FE28C7DCDDEB4413EA = {
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				1A24BDF49EB8A8B2006A91B6,
+			);
+			isa = PBXCopyFilesBuildPhase;
+			name = "Embed WidgetKit";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9347F911A79F623422ED0289 = {
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				992BD23104E66DC74B3377A6,
+			);
+			isa = PBXCopyFilesBuildPhase;
+			name = "Embed WidgetKit";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		99A5D737CDEF56FC90679ADC = {
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				B08D8BF7E870A47703957204,
+			);
+			isa = PBXCopyFilesBuildPhase;
+			name = "Embed WidgetKit";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A715220105F2EA018906BC11 = {
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				5C827F43B4201938BB8D18C5,
+			);
+			isa = PBXCopyFilesBuildPhase;
+			name = "Embed WidgetKit Bridge";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B9E61B67A578E32EF4DE2DF4 = {
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				0B6A252A5DF6121587F4D279,
+			);
+			isa = PBXCopyFilesBuildPhase;
+			name = "Embed WidgetKit";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C046F7AEC024AC287E09D14A = {
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				832DABD14EAEB49C29737139,
+			);
+			isa = PBXCopyFilesBuildPhase;
+			name = "Embed WidgetKit";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C91D6B1043355B52FC96E348 = {
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				D03CDBCCAB8014D61580E7CD,
+			);
+			isa = PBXCopyFilesBuildPhase;
+			name = "Embed WidgetKit";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C9D93F3B40A6AB78A9E52070 = {
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				43D9A48C02107F1034789B5F,
+			);
+			isa = PBXCopyFilesBuildPhase;
+			name = "Embed WidgetKit";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D7224E11B156EA34ACBB7668 = {
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				988F698264BF32FDE1E089D4,
+			);
+			isa = PBXCopyFilesBuildPhase;
+			name = "Embed WidgetKit";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D8684A710A65E3B5ECB0A06D = {
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				8F237C27AB6990B7D6A898CC,
+			);
+			isa = PBXCopyFilesBuildPhase;
+			name = "Embed WidgetKit";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E122A2805216AC972D58DBEF = {
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				5A7570F8D52050F201E1FF11,
+			);
+			isa = PBXCopyFilesBuildPhase;
+			name = "Embed WidgetKit Bridge";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		ED911A9F777908DFE2068D14 = {
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				132BF23A7B343F1EF12F6249,
+			);
+			isa = PBXCopyFilesBuildPhase;
+			name = "Embed WidgetKit Bridge";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F4AE467A67B33698D153D087 = {
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				3A5732FB3B78A517B3AED013,
+			);
+			isa = PBXCopyFilesBuildPhase;
+			name = "Embed WidgetKit Bridge";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		0134CD68D29C4085CE1DB6CA = {
@@ -2056,10 +2799,14 @@
 			buildPhases = (
 				901F5B206A8C0FF49288E7C6,
 				9A4CFC7FF89AB8810CBB9998,
+				27A7F5F6FAAFC876534617FF,
+				E122A2805216AC972D58DBEF,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				5F950DD1A83BB347BA155011,
+				40F5EB1BF98426102D2BD753,
 			);
 			isa = PBXNativeTarget;
 			name = mail;
@@ -2102,10 +2849,14 @@
 			buildPhases = (
 				338ACF6A7A3312952AF18F47,
 				199888C968A797370702D79A,
+				8347B64DD3D0945FD2FA27FB,
+				222283EBF90D985C4FEB374D,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				A9E59FEFE2A75B5A61C4EE03,
+				40F5EB1BF98426102D2BD753,
 			);
 			isa = PBXNativeTarget;
 			name = docus;
@@ -2166,10 +2917,14 @@
 			buildPhases = (
 				59EB5CFAD45C17D8D465C5D0,
 				35D95616CA23CA47ED6596B5,
+				7AFDD484533D5F7BE3159D07,
+				A715220105F2EA018906BC11,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				81E76E3D669BC2E28D1D1C6E,
+				40F5EB1BF98426102D2BD753,
 			);
 			isa = PBXNativeTarget;
 			name = erp;
@@ -2198,10 +2953,14 @@
 			buildPhases = (
 				8748B183CF3B00E4603790B7,
 				CE30D9A44F74E837EC27E599,
+				34DBAD5F25C76CFF04E8D906,
+				3954729CE432D1A7BF6C5948,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				8A6EDEE5038B217EC4636CAB,
+				40F5EB1BF98426102D2BD753,
 			);
 			isa = PBXNativeTarget;
 			name = certipdf;
@@ -2215,11 +2974,15 @@
 				A63C59ABC7E970A5C6A7DBAF,
 				67C3B55D8E64379A0C877BCD,
 				03BDC5E738827D3588B7B9C2,
+				4F3BC735845964DDF13B2B5F,
+				157DE4D8E048C81E00155E7C,
 			);
 			buildRules = (
 			);
 			dependencies = (
 				36FF1361793A4861B44AE0E5,
+				CFB25F1F63644F47F6767DFE,
+				40F5EB1BF98426102D2BD753,
 			);
 			isa = PBXNativeTarget;
 			name = drive;
@@ -2232,10 +2995,14 @@
 			buildPhases = (
 				2DA03321C0069AC81F0508E3,
 				DFAADB5182BCFE92C9958C99,
+				85AE12FE28C7DCDDEB4413EA,
+				7ED4C0F4E3FFE8395AA023C8,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				50A0DA786A0B13A55FFD978C,
+				40F5EB1BF98426102D2BD753,
 			);
 			isa = PBXNativeTarget;
 			name = photos;
@@ -2312,10 +3079,14 @@
 			buildPhases = (
 				3774E1E177D68046713D75B9,
 				E1F395F7365B46B783F3AB81,
+				B9E61B67A578E32EF4DE2DF4,
+				38521B728E839088742A09AD,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				BB1F6F4465E09CEEEB5C9635,
+				40F5EB1BF98426102D2BD753,
 			);
 			isa = PBXNativeTarget;
 			name = bases;
@@ -2344,10 +3115,14 @@
 			buildPhases = (
 				F8032A5E306F39DD01DDC652,
 				BAEF8322870C058D1825AC6B,
+				99A5D737CDEF56FC90679ADC,
+				0BEF7C359403847E2D991782,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				268A58AAD5E58CB60C5A7DB2,
+				40F5EB1BF98426102D2BD753,
 			);
 			isa = PBXNativeTarget;
 			name = diapos;
@@ -2360,10 +3135,14 @@
 			buildPhases = (
 				9E52ABDCE66211FDB182F47F,
 				BDBF1D7A5A17FCAD493BBB19,
+				D7224E11B156EA34ACBB7668,
+				6C9ABA16914E0A08638602D3,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				316642996ADA41AF61A4E0D9,
+				40F5EB1BF98426102D2BD753,
 			);
 			isa = PBXNativeTarget;
 			name = calcus;
@@ -2376,10 +3155,14 @@
 			buildPhases = (
 				60FC340B740F905E5F6C6CED,
 				B3B337497CF4C504AB11DCB2,
+				C046F7AEC024AC287E09D14A,
+				F4AE467A67B33698D153D087,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				265F15ED161B2B5E7D1ACC10,
+				40F5EB1BF98426102D2BD753,
 			);
 			isa = PBXNativeTarget;
 			name = calendar;
@@ -2392,10 +3175,14 @@
 			buildPhases = (
 				7E4AF7B180649792BF6BA306,
 				101C0DF6A6A723DA5A8A9055,
+				C9D93F3B40A6AB78A9E52070,
+				5362337C747A4FFC410F335A,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				C54B6BC3A3370E5A8607FEDF,
+				40F5EB1BF98426102D2BD753,
 			);
 			isa = PBXNativeTarget;
 			name = notes;
@@ -2408,10 +3195,14 @@
 			buildPhases = (
 				3417054A02821EAD8014014B,
 				BECF58A5F3F7BF931F122500,
+				13378E68B732EF3098EEE199,
+				06A816FEC8CC7D616F514D70,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				3D656D4BCB89C37E10955CD4,
+				40F5EB1BF98426102D2BD753,
 			);
 			isa = PBXNativeTarget;
 			name = rooms;
@@ -2456,10 +3247,14 @@
 			buildPhases = (
 				1EAC114D5CE62EBC25AC4D62,
 				5BED49F0B86AA83445F9E7B6,
+				C91D6B1043355B52FC96E348,
+				ED911A9F777908DFE2068D14,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				4DD0E73ECCA2A381CEB20CA2,
+				40F5EB1BF98426102D2BD753,
 			);
 			isa = PBXNativeTarget;
 			name = cast;
@@ -2520,10 +3315,14 @@
 			buildPhases = (
 				BF80335050422CAB2AB8112A,
 				C101F9321C449A7BBBE69B46,
+				D8684A710A65E3B5ECB0A06D,
+				65F5448AD153CFD6146E9F65,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				64F7535D1BF1C9468FBC05A8,
+				40F5EB1BF98426102D2BD753,
 			);
 			isa = PBXNativeTarget;
 			name = hub;
@@ -2536,10 +3335,14 @@
 			buildPhases = (
 				0C5D006D1AD84E9F4F6AE2BA,
 				726C3FA21EDA74923844A569,
+				9347F911A79F623422ED0289,
+				31FC99FF96D6A1BF529087BD,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				2A8749D64B2EE342CC616881,
+				40F5EB1BF98426102D2BD753,
 			);
 			isa = PBXNativeTarget;
 			name = contacts;
@@ -3392,10 +4195,90 @@
 			isa = PBXSourcesBuildPhase;
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		265F15ED161B2B5E7D1ACC10 = {
+			isa = PBXTargetDependency;
+			target = 70ED7EBB1E2FB088EF662800;
+			targetProxy = 7F0A488AC5A8279CEC27D63F;
+		};
+		268A58AAD5E58CB60C5A7DB2 = {
+			isa = PBXTargetDependency;
+			target = CB3879BC27B337D96B96E90E;
+			targetProxy = DC19FFFA1F8D800CC7DB031A;
+		};
+		2A8749D64B2EE342CC616881 = {
+			isa = PBXTargetDependency;
+			target = E9D3FD74FD589738B0619DDD;
+			targetProxy = 2A66037EFD87E0C92CD20285;
+		};
+		316642996ADA41AF61A4E0D9 = {
+			isa = PBXTargetDependency;
+			target = 42B3B6338F0ACEAD1C97DBA1;
+			targetProxy = 76B2176C1FB6BCBE42F99485;
+		};
 		36FF1361793A4861B44AE0E5 = {
 			isa = PBXTargetDependency;
 			target = 26FA2B47A8C639F4FA71C9B5;
 			targetProxy = DB841A544DC75D3966AE1710;
+		};
+		3D656D4BCB89C37E10955CD4 = {
+			isa = PBXTargetDependency;
+			target = 6E68C3BDC31C78623E6BA080;
+			targetProxy = AF5B535FC39B381D08901E54;
+		};
+		40F5EB1BF98426102D2BD753 = {
+			isa = PBXTargetDependency;
+			target = 194FABC42E3073C4235CAF12;
+			targetProxy = 49DF22A260B92D722F98ED47;
+		};
+		4DD0E73ECCA2A381CEB20CA2 = {
+			isa = PBXTargetDependency;
+			target = 6C3C618A2C4F872614A934C1;
+			targetProxy = D386BAC960627A4F6C977EDE;
+		};
+		50A0DA786A0B13A55FFD978C = {
+			isa = PBXTargetDependency;
+			target = 8FA4D4F6E1F27FD94CEAEA6A;
+			targetProxy = F243A4FF85F66A93DAC661E1;
+		};
+		5F950DD1A83BB347BA155011 = {
+			isa = PBXTargetDependency;
+			target = 2FD8068A1966674483EA9E0C;
+			targetProxy = 7AE551105BE4E787686B0EF5;
+		};
+		64F7535D1BF1C9468FBC05A8 = {
+			isa = PBXTargetDependency;
+			target = ED2A2375524E3E93BD249B5A;
+			targetProxy = 39E4C40578A8EF6B5AD4B524;
+		};
+		81E76E3D669BC2E28D1D1C6E = {
+			isa = PBXTargetDependency;
+			target = CBCC48BD7DE7AAD51536A6B4;
+			targetProxy = 6CE81780B4012F81F26F8C09;
+		};
+		8A6EDEE5038B217EC4636CAB = {
+			isa = PBXTargetDependency;
+			target = BA74C91E95366EEBF0315EB6;
+			targetProxy = 5DF4BB687CF0A666E4FA2B64;
+		};
+		A9E59FEFE2A75B5A61C4EE03 = {
+			isa = PBXTargetDependency;
+			target = BF01097A37B388FFFAD8C7BB;
+			targetProxy = 3F7FE6C313F14EB4384EA793;
+		};
+		BB1F6F4465E09CEEEB5C9635 = {
+			isa = PBXTargetDependency;
+			target = 4771506CF7ED207168121EEE;
+			targetProxy = 5BCCD29ABBE5F948A6506348;
+		};
+		C54B6BC3A3370E5A8607FEDF = {
+			isa = PBXTargetDependency;
+			target = 5023BB233ACF9D561845E566;
+			targetProxy = 3A848BE91BF9F14971517367;
+		};
+		CFB25F1F63644F47F6767DFE = {
+			isa = PBXTargetDependency;
+			target = 781BAF139D02B448B51AC782;
+			targetProxy = 9AA3D09E6D86BB8A4D29C808;
 		};
 		B7AB8BF9FAF3106CA75C66E3 = {
 			children = (
@@ -3465,6 +4348,7 @@
 		};
 		02F154C2513F88DDCA5510FF = {
 			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = photos/ios.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = photos/tienda.entitlements;
 				EXECUTABLE_NAME = "sytue-photos";
@@ -3477,6 +4361,7 @@
 		};
 		0316095A4D756F5A4F948560 = {
 			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = cast/ios.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = cast/tienda.entitlements;
 				EXECUTABLE_NAME = "sytue-cast";
@@ -3489,6 +4374,7 @@
 		};
 		098515EA4C06E4A1B24A4159 = {
 			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = bases/ios.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = bases/tienda.entitlements;
 				EXECUTABLE_NAME = "sytue-bases";
@@ -3501,6 +4387,7 @@
 		};
 		09CC2915C2E51AA2A9D1BF1E = {
 			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = rooms/ios.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = rooms/tienda.entitlements;
 				EXECUTABLE_NAME = "sytue-rooms";
@@ -3513,6 +4400,7 @@
 		};
 		0A3A2273A432579BD01A16AC = {
 			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = hub/ios.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = hub/tienda.entitlements;
 				EXECUTABLE_NAME = "sytue-hub";
@@ -3536,6 +4424,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.erp.widgets;
 				PRODUCT_NAME = "Sytue-erp-Widgets";
 				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_SEARCH";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -3556,7 +4445,7 @@
 				SKIP_INSTALL = YES;
 				SWIFT_VERSION = 5.0;
 				SYTUE_GRUPO_ARCHIVOS = group.eu.sytue.drive;
-				"SYTUE_GRUPO_ARCHIVOS[sdk=macosx*]" = VHC5QW7BZ3.eu.sytue.drive;
+				"SYTUE_GRUPO_ARCHIVOS[sdk=macosx*]" = group.eu.sytue.drive;
 			};
 			isa = XCBuildConfiguration;
 			name = Release;
@@ -3574,6 +4463,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.notes.widgets;
 				PRODUCT_NAME = "Sytue-notes-Widgets";
 				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_SEARCH";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -3581,6 +4471,7 @@
 		};
 		232C1D0FAF176D8594FC46F9 = {
 			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = diapos/ios.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = diapos/tienda.entitlements;
 				EXECUTABLE_NAME = "sytue-diapos";
@@ -3593,6 +4484,7 @@
 		};
 		234185362D3355E34F5B291C = {
 			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = certipdf/ios.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = certipdf/tienda.entitlements;
 				EXECUTABLE_NAME = "sytue-certipdf";
@@ -3616,6 +4508,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.calcus.widgets;
 				PRODUCT_NAME = "Sytue-calcus-Widgets";
 				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_SEARCH";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -3634,6 +4527,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.contacts.widgets;
 				PRODUCT_NAME = "Sytue-contacts-Widgets";
 				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_SEARCH";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -3641,6 +4535,7 @@
 		};
 		392B784C0566141965108771 = {
 			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = contacts/ios.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = contacts/tienda.entitlements;
 				EXECUTABLE_NAME = "sytue-contacts";
@@ -3664,6 +4559,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.certipdf.widgets;
 				PRODUCT_NAME = "Sytue-certipdf-Widgets";
 				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_SEARCH";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -3682,6 +4578,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.certipdf.widgets;
 				PRODUCT_NAME = "Sytue-certipdf-Widgets";
 				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_SEARCH";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -3725,6 +4622,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.bases.widgets;
 				PRODUCT_NAME = "Sytue-bases-Widgets";
 				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_SEARCH";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -3739,6 +4637,7 @@
 		};
 		511ADADEA4F29D87677E2296 = {
 			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = diapos/ios.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = diapos/tienda.entitlements;
 				EXECUTABLE_NAME = "sytue-diapos";
@@ -3762,6 +4661,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.cast.widgets;
 				PRODUCT_NAME = "Sytue-cast-Widgets";
 				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_SEARCH";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -3769,6 +4669,7 @@
 		};
 		571661C385D2DC3CD1E8EE47 = {
 			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = mail/ios.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = mail/tienda.entitlements;
 				EXECUTABLE_NAME = "sytue-mail";
@@ -3792,6 +4693,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.erp.widgets;
 				PRODUCT_NAME = "Sytue-erp-Widgets";
 				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_SEARCH";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -3810,6 +4712,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.bases.widgets;
 				PRODUCT_NAME = "Sytue-bases-Widgets";
 				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_SEARCH";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -3817,6 +4720,7 @@
 		};
 		5C7BF91A500BD1F56014B95D = {
 			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = contacts/ios.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = contacts/tienda.entitlements;
 				EXECUTABLE_NAME = "sytue-contacts";
@@ -3840,6 +4744,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.one.widgets;
 				PRODUCT_NAME = "Sytue-hub-Widgets";
 				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_SEARCH";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -3847,6 +4752,7 @@
 		};
 		616186F594F47C54A45CCF96 = {
 			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = calcus/ios.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = calcus/tienda.entitlements;
 				EXECUTABLE_NAME = "sytue-calcus";
@@ -3859,6 +4765,7 @@
 		};
 		6701521DFCAE57E079152E43 = {
 			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = bases/ios.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = bases/tienda.entitlements;
 				EXECUTABLE_NAME = "sytue-bases";
@@ -3871,6 +4778,7 @@
 		};
 		6BAE6D1B1A6F5A97E2C37DA7 = {
 			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = rooms/ios.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = rooms/tienda.entitlements;
 				EXECUTABLE_NAME = "sytue-rooms";
@@ -3883,6 +4791,7 @@
 		};
 		6D7E48CF0ADA64E9528B7B77 = {
 			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = drive/ios.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = drive/tienda.entitlements;
 				EXECUTABLE_NAME = "sytue-drive";
@@ -3895,6 +4804,7 @@
 		};
 		72B897394A861677CED0DC97 = {
 			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = notes/ios.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = notes/tienda.entitlements;
 				EXECUTABLE_NAME = "sytue-notes";
@@ -3907,6 +4817,7 @@
 		};
 		7D68EE83D6C00B8E3ACDF362 = {
 			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = certipdf/ios.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = certipdf/tienda.entitlements;
 				EXECUTABLE_NAME = "sytue-certipdf";
@@ -3930,6 +4841,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.photos.widgets;
 				PRODUCT_NAME = "Sytue-photos-Widgets";
 				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_SEARCH";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -3937,6 +4849,7 @@
 		};
 		820CC83C6CA3AC04FF95ACE7 = {
 			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = calendar/ios.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = calendar/tienda.entitlements;
 				EXECUTABLE_NAME = "sytue-calendar";
@@ -3949,6 +4862,7 @@
 		};
 		82C32FDCB333DDD9EC5D1FE4 = {
 			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = erp/ios.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = erp/tienda.entitlements;
 				EXECUTABLE_NAME = "sytue-erp";
@@ -3961,6 +4875,7 @@
 		};
 		834A1B7C8E1AB59A5033CC0F = {
 			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = notes/ios.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = notes/tienda.entitlements;
 				EXECUTABLE_NAME = "sytue-notes";
@@ -3984,6 +4899,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.diapos.widgets;
 				PRODUCT_NAME = "Sytue-diapos-Widgets";
 				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_SEARCH";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -4002,6 +4918,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.calendar.widgets;
 				PRODUCT_NAME = "Sytue-calendar-Widgets";
 				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_CREATE SYTUE_WIDGET_ACTION_SEARCH";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -4009,6 +4926,7 @@
 		};
 		8C3B44CC4708428A7A87DC50 = {
 			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = calendar/ios.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = calendar/tienda.entitlements;
 				EXECUTABLE_NAME = "sytue-calendar";
@@ -4032,6 +4950,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.rooms.widgets;
 				PRODUCT_NAME = "Sytue-rooms-Widgets";
 				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_SEARCH";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -4039,6 +4958,7 @@
 		};
 		9854852E60263B2DA538C935 = {
 			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = docus/ios.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = docus/tienda.entitlements;
 				EXECUTABLE_NAME = "sytue-docus";
@@ -4079,6 +4999,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.mail.widgets;
 				PRODUCT_NAME = "Sytue-mail-Widgets";
 				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_COMPOSE SYTUE_WIDGET_ACTION_SEARCH";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -4086,6 +5007,7 @@
 		};
 		B3EE295687EF2498748A6361 = {
 			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = calcus/ios.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = calcus/tienda.entitlements;
 				EXECUTABLE_NAME = "sytue-calcus";
@@ -4098,6 +5020,7 @@
 		};
 		B61CD205A9A5CBD7C64BC609 = {
 			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = drive/ios.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = drive/tienda.entitlements;
 				EXECUTABLE_NAME = "sytue-drive";
@@ -4110,6 +5033,7 @@
 		};
 		B7913A2659DAE0003B945905 = {
 			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = docus/ios.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = docus/tienda.entitlements;
 				EXECUTABLE_NAME = "sytue-docus";
@@ -4133,6 +5057,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.mail.widgets;
 				PRODUCT_NAME = "Sytue-mail-Widgets";
 				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_COMPOSE SYTUE_WIDGET_ACTION_SEARCH";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -4151,6 +5076,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.calendar.widgets;
 				PRODUCT_NAME = "Sytue-calendar-Widgets";
 				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_CREATE SYTUE_WIDGET_ACTION_SEARCH";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -4169,6 +5095,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.diapos.widgets;
 				PRODUCT_NAME = "Sytue-diapos-Widgets";
 				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_SEARCH";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -4176,6 +5103,7 @@
 		};
 		C906C7F53465F50338937AD6 = {
 			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = hub/ios.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = hub/tienda.entitlements;
 				EXECUTABLE_NAME = "sytue-hub";
@@ -4199,6 +5127,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.drive.widgets;
 				PRODUCT_NAME = "Sytue-drive-Widgets";
 				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_SEARCH";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -4217,6 +5146,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.rooms.widgets;
 				PRODUCT_NAME = "Sytue-rooms-Widgets";
 				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_SEARCH";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -4235,6 +5165,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.cast.widgets;
 				PRODUCT_NAME = "Sytue-cast-Widgets";
 				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_SEARCH";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -4253,6 +5184,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.notes.widgets;
 				PRODUCT_NAME = "Sytue-notes-Widgets";
 				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_SEARCH";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -4271,6 +5203,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.drive.widgets;
 				PRODUCT_NAME = "Sytue-drive-Widgets";
 				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_SEARCH";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -4289,6 +5222,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.contacts.widgets;
 				PRODUCT_NAME = "Sytue-contacts-Widgets";
 				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_SEARCH";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -4309,13 +5243,14 @@
 				SKIP_INSTALL = YES;
 				SWIFT_VERSION = 5.0;
 				SYTUE_GRUPO_ARCHIVOS = group.eu.sytue.drive;
-				"SYTUE_GRUPO_ARCHIVOS[sdk=macosx*]" = VHC5QW7BZ3.eu.sytue.drive;
+				"SYTUE_GRUPO_ARCHIVOS[sdk=macosx*]" = group.eu.sytue.drive;
 			};
 			isa = XCBuildConfiguration;
 			name = Debug;
 		};
 		F0463B3049A44D176DEC246B = {
 			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = photos/ios.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = photos/tienda.entitlements;
 				EXECUTABLE_NAME = "sytue-photos";
@@ -4339,6 +5274,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.docus.widgets;
 				PRODUCT_NAME = "Sytue-docus-Widgets";
 				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_SEARCH";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -4346,6 +5282,7 @@
 		};
 		F32F245754267D2D1093B3BF = {
 			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = mail/ios.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = mail/tienda.entitlements;
 				EXECUTABLE_NAME = "sytue-mail";
@@ -4358,6 +5295,7 @@
 		};
 		F42D03441417F77362F6CE2E = {
 			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = erp/ios.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = erp/tienda.entitlements;
 				EXECUTABLE_NAME = "sytue-erp";
@@ -4381,6 +5319,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.docus.widgets;
 				PRODUCT_NAME = "Sytue-docus-Widgets";
 				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_SEARCH";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -4388,6 +5327,7 @@
 		};
 		F5D8D9E8652EA6EE5E5DB2D6 = {
 			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = cast/ios.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = cast/tienda.entitlements;
 				EXECUTABLE_NAME = "sytue-cast";
@@ -4411,6 +5351,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.photos.widgets;
 				PRODUCT_NAME = "Sytue-photos-Widgets";
 				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_SEARCH";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -4429,6 +5370,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.one.widgets;
 				PRODUCT_NAME = "Sytue-hub-Widgets";
 				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_SEARCH";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;
@@ -4447,6 +5389,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = eu.sytue.calcus.widgets;
 				PRODUCT_NAME = "Sytue-calcus-Widgets";
 				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SYTUE_WIDGET_ACTION_SEARCH";
 				SWIFT_VERSION = 5.0;
 			};
 			isa = XCBuildConfiguration;

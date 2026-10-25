@@ -55,7 +55,7 @@ export const nb: AppCatalog<typeof en> = {
   'security.mfa.title': 'Totrinnsbekreftelse',
   'security.mfa.off': 'Ikke satt opp. Passordet alene åpner kontoen.',
   'security.mfa.required':
-    'Organisasjonen din krever totrinnsbekreftelse. Slå den på nedenfor og logg inn på nytt.',
+    'Denne handlingen krever totrinnsbekreftelse. Konfigurer den nedenfor, og logg deretter inn igjen.',
   'security.mfa.on': 'På. Du blir bedt om en kode når du logger inn.',
   'security.mfa.enable': 'Sett opp',
   'security.mfa.scan': 'Skann dette med autentiseringsappen din.',
@@ -112,6 +112,10 @@ export const nb: AppCatalog<typeof en> = {
   'plan.pro': 'Pro-abonnement · 200 GB',
   'plan.enterprise': 'Enterprise-abonnement · 1 TB · Premium-støtte',
   'plan.storage': 'Brukt lagring',
+  'plan.externalNote': 'Tilkoblet lagring utvider lagringskapasiteten din i Sytue.',
+  'plan.externalCapacity': 'Tilkoblet lagring legger til {capacity}.',
+  'plan.externalUnknown': 'Leverandøren oppgir ikke lagringskapasiteten.',
+  'plan.baseUsage': 'Sytue: {used} av {total}',
   'plan.paidUntil': 'Betalt til',
   'plan.upgrade': 'Få mer plass',
   'plan.upgrade.hint':

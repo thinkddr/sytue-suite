@@ -23,6 +23,7 @@
   "account.presenceFailed": "Din tilstedeværelse kunne ikke ændres",
   "account.signIn": "Log ind",
   "account.signOut": "Log ud",
+  "account.signOutFailed": "Kunne ikke logge ud på denne enhed. Drive kan stadig være tilsluttet. Prøv igen.",
   "account.signOutPending.body": "Notepads har noter på denne enhed, som endnu ikke er uploadet ({count}). Når du logger ud, slettes de fra den.",
   "account.signOutPending.discard": "Kassér og log ud",
   "account.signOutPending.title": "Noter ikke uploadet",
@@ -334,5 +335,6 @@
   "widgets.open": "Åbn",
   "widgets.pending": "Afventende",
   "widgets.photos": "Billeder",
-  "widgets.rows": "Rækker"
+  "widgets.rows": "Rækker",
+  "widgets.storage": "Lagerplads"
 }

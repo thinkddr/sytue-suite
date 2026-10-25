@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"fmt"
+	"image"
 	"image/png"
 	"os"
 	"path/filepath"
@@ -51,11 +52,11 @@ func Retratar(t testing.TB, w fyne.Window, dir string, tope int) Informe {
 	c := w.Canvas()
 	vistas := map[[32]byte]bool{}
 	guardar := func(que string) {
-		var b bytes.Buffer
-		if err := png.Encode(&b, c.Capture()); err != nil {
+		b, err := imagenPNG(c.Capture())
+		if err != nil {
 			t.Fatal(err)
 		}
-		h := sha256.Sum256(b.Bytes())
+		h := sha256.Sum256(b)
 		if vistas[h] {
 			return
 		}
@@ -63,7 +64,7 @@ func Retratar(t testing.TB, w fyne.Window, dir string, tope int) Informe {
 		numeroPlay++
 		ruta := filepath.Join(dir, fmt.Sprintf("%03d-%s.png", numeroPlay, limpiar(que)))
 		// La ruta es la de SYTUE_CAPTURAS_PLAY, que pone quien lanza el test.
-		if err := os.WriteFile(ruta, b.Bytes(), 0o600); err != nil { //nolint:gosec // G703: ver arriba
+		if err := os.WriteFile(ruta, b, 0o600); err != nil { //nolint:gosec // G703: ver arriba
 			t.Fatal(err)
 		}
 		// Y al lado, lo que se ha pintado y de qué color: para medir el color por pieza.
@@ -113,6 +114,14 @@ func Retratar(t testing.TB, w fyne.Window, dir string, tope int) Informe {
 		}
 	}
 	return inf
+}
+
+func imagenPNG(img image.Image) ([]byte, error) {
+	var b bytes.Buffer
+	if err := png.Encode(&b, img); err != nil {
+		return nil, err
+	}
+	return b.Bytes(), nil
 }
 
 // AMedida pone la ventana al tamaño y la escala de las capturas: el teléfono de Google

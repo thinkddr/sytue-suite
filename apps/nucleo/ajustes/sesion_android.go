@@ -19,15 +19,16 @@ func estadoPlataforma(e Estado) Estado {
 		return e
 	}
 	var estado struct {
-		Generacion string `json:"generacion"`
-		Bloqueo    bool   `json:"bloqueo"`
+		Generacion       string `json:"generacion"`
+		Bloqueo          bool   `json:"bloqueo"`
+		DriveDesactivado bool   `json:"drive_sistema_desactivado"`
 	}
 	texto, errEstado := sistema.EstadoSesionAndroid()
 	if err != nil || errEstado != nil || json.Unmarshal([]byte(texto), &estado) != nil {
-		e.Sesion, e.Bloqueo = "", true
+		e.Sesion, e.Bloqueo, e.DriveSistemaDesactivado = "", true, true
 		return e
 	}
-	e.Sesion, e.Bloqueo = estado.Generacion, estado.Bloqueo
+	e.Sesion, e.Bloqueo, e.DriveSistemaDesactivado = estado.Generacion, estado.Bloqueo, estado.DriveDesactivado
 	return e
 }
 

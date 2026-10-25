@@ -29,6 +29,39 @@ func casaDePrueba(t *testing.T) string {
 
 func sinRegistrar(string) bool { return false }
 
+func TestCarpetasConcurrentesNoPierdenElVinculoDeOtraCuenta(t *testing.T) {
+	casaDePrueba(t)
+	const n = 8
+	type resultado struct {
+		cuenta Cuenta
+		ruta   string
+		err    error
+	}
+	resultados := make(chan resultado, n)
+	inicio := make(chan struct{})
+	for indice := range n {
+		cuenta := Cuenta{Emisor: "https://id.ejemplo.eu", Sub: string(rune('a' + indice)), Org: "acme"}
+		go func() {
+			<-inicio
+			ruta, err := CarpetaCon(t.Context(), cuenta)
+			resultados <- resultado{cuenta, ruta, err}
+		}()
+	}
+	close(inicio)
+	rutas := map[string]bool{}
+	for range n {
+		r := <-resultados
+		if r.err != nil || rutas[r.ruta] {
+			t.Fatalf("carpeta repetida o fallida: %q, %v", r.ruta, r.err)
+		}
+		rutas[r.ruta] = true
+		otra, err := CarpetaCon(t.Context(), r.cuenta)
+		if err != nil || otra != r.ruta {
+			t.Fatalf("se perdió el vínculo de %+v: %q → %q, %v", r.cuenta, r.ruta, otra, err)
+		}
+	}
+}
+
 // TestUnaCarpetaPorCuentaYOrganizacion (FYS-04, decidido por el dueño: «Una carpeta por
 // organización»): «Sytue Drive – <organización>», la misma cada vez para la misma
 // persona y organización, otra para otra organización y otra para otra persona.
@@ -41,20 +74,20 @@ func TestUnaCarpetaPorCuentaYOrganizacion(t *testing.T) {
 		c      Cuenta
 		quiero string
 	}{
-		{Cuenta{"ana", "acme"}, "Sytue Drive – acme"},
-		{Cuenta{"ana", "beta"}, "Sytue Drive – beta"},
-		{Cuenta{"ana", "acme"}, "Sytue Drive – acme"}, // la apuntada
-		{Cuenta{"luis", "acme"}, "Sytue Drive – acme (2)"},
-		{Cuenta{"ana", "p-0123456789abcdef"}, "Sytue Drive – Personal"},
+		{Cuenta{Sub: "ana", Org: "acme"}, "Sytue Drive – acme"},
+		{Cuenta{Sub: "ana", Org: "beta"}, "Sytue Drive – beta"},
+		{Cuenta{Sub: "ana", Org: "acme"}, "Sytue Drive – acme"}, // la apuntada
+		{Cuenta{Sub: "luis", Org: "acme"}, "Sytue Drive – acme (2)"},
+		{Cuenta{Sub: "ana", Org: "p-0123456789abcdef"}, "Sytue Drive – Personal"},
 		// Lo que ya hay en el disco y no es de nadie no se hace de Drive: subiría.
-		{Cuenta{"ana", "gamma"}, "Sytue Drive – gamma (2)"},
+		{Cuenta{Sub: "ana", Org: "gamma"}, "Sytue Drive – gamma (2)"},
 	} {
 		got, err := carpeta(c.c, sinRegistrar)
 		if err != nil || got != filepath.Join(casa, c.quiero) {
 			t.Errorf("%+v: %q, %v; quiero %q", c.c, got, err, c.quiero)
 		}
 	}
-	for _, c := range []Cuenta{{"ana", "../fuera"}, {"ana", `a\b`}, {"ana", ""}, {"", "acme"}} {
+	for _, c := range []Cuenta{{Sub: "ana", Org: "../fuera"}, {Sub: "ana", Org: `a\b`}, {Sub: "ana"}, {Org: "acme"}} {
 		if got, err := carpeta(c, sinRegistrar); err == nil {
 			t.Errorf("%+v da carpeta: %q", c, got)
 		}
@@ -67,7 +100,7 @@ func TestUnaCarpetaPorCuentaYOrganizacion(t *testing.T) {
 	if err := os.WriteFile(fichero, []byte("{roto"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if got, err := carpeta(Cuenta{"eva", "acme"}, sinRegistrar); err == nil {
+	if got, err := carpeta(Cuenta{Sub: "eva", Org: "acme"}, sinRegistrar); err == nil {
 		t.Errorf("con lo apuntado ilegible da %q", got)
 	}
 }
@@ -80,7 +113,7 @@ func TestLaCarpetaDeAntesEsDeLaPrimeraCuenta(t *testing.T) {
 	vieja := filepath.Join(casa, "Sytue Drive")
 	registradas := map[string]bool{vieja: true}
 	registrada := func(r string) bool { return registradas[r] }
-	a, b := Cuenta{"ana", "acme"}, Cuenta{"ana", "beta"}
+	a, b := Cuenta{Sub: "ana", Org: "acme"}, Cuenta{Sub: "ana", Org: "beta"}
 	if dir, ok := conectada(a, registrada); !ok || dir != vieja {
 		t.Fatalf("al arrancar: %q, %v; quiero la de antes", dir, ok)
 	}
@@ -126,7 +159,7 @@ func TestConLaSesionDeOtraCuentaLaCarpetaNoHablaConDrive(t *testing.T) {
 	}))
 	defer srv.Close()
 	s := &sesionFija{}
-	d := api.NewDrive(srv.URL, Atada(s, Cuenta{"ana", "acme"}), srv.Client())
+	d := api.NewDrive(srv.URL, Atada(s, Cuenta{Sub: "ana", Org: "acme"}), srv.Client())
 	ctx := t.Context()
 	for _, otro := range []string{jwtDe("ana", "beta"), jwtDe("luis", "acme"), "opaco"} {
 		s.token = otro
@@ -146,5 +179,27 @@ func TestConLaSesionDeOtraCuentaLaCarpetaNoHablaConDrive(t *testing.T) {
 	s.token = jwtDe("ana", "acme")
 	if _, _, err := listar(ctx, d, "c:c1"); errors.Is(err, ErrOtraCuenta) || peticiones.Load() == 0 {
 		t.Errorf("con la suya no habla con Drive: %v", err)
+	}
+}
+
+func TestLaCarpetaNoCruzaEmisores(t *testing.T) {
+	casaDePrueba(t)
+	a := Cuenta{Emisor: "https://id.a.eu", Sub: "ana", Org: "acme"}
+	b := a
+	b.Emisor = "https://id.b.eu"
+	pa, err := carpeta(a, func(string) bool { return false })
+	if err != nil {
+		t.Fatal(err)
+	}
+	pb, err := carpeta(b, func(string) bool { return false })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pa == pb {
+		t.Fatal("dos emisores adoptaron la misma carpeta")
+	}
+	otra, err := carpeta(a, func(string) bool { return false })
+	if err != nil || otra != pa {
+		t.Fatalf("perdió su carpeta: %q, %v", otra, err)
 	}
 }

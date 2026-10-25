@@ -172,6 +172,11 @@ func NuevaApp(p *Pantalla, cal *api.Calendars) *App {
 	p.AlCambiarVista = func(v Vista) { a.cambiar(func() { p.Vista = v }) }
 	p.AlConmutarCalendario = a.conmutar
 	p.AlReintentar = a.reintentar
+	p.Refresco.Actualizar = a.Recargar
+	p.Refresco.Puede = func() bool {
+		return a.Cal != nil && !p.SinConexion && !a.cargandoCal && !a.cargandoEv && p.Vista == VistaAgenda
+	}
+	p.Refresco.Revision = func() uint64 { return ui.RevisionLista(a.secEv) }
 	p.AlAbrirEvento = a.abrirVistaRapida
 	p.AlCrearEvento = a.crearEn
 	p.AlCrearRango = a.crearRango

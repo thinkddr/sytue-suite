@@ -4,6 +4,7 @@
 package ui
 
 import (
+	"fmt"
 	"image"
 	"image/color"
 	"math"
@@ -101,7 +102,7 @@ func TestLaHojaFlotaEnElMarco(t *testing.T) {
 		t.Error("en Marco el menú tiene que dejar ver el marco, que ya es de su color")
 	}
 
-	// En estrecho va a sangre: sin separación y solo con las esquinas de arriba. Y el
+	// En estrecho va a sangre: sin separación y con las cuatro esquinas. Y el
 	// menú, que es un cajón, conserva su fondo.
 	a.Resize(fyne.NewSize(600, alto))
 	a.Refresh()
@@ -109,10 +110,10 @@ func TestLaHojaFlotaEnElMarco(t *testing.T) {
 	// Bajo la barra móvil, que prolonga el marco y deja la hoja debajo.
 	mira(t, img, "a sangre, el borde derecho es contenido", 598, 300, magenta)
 	mira(t, img, "a sangre, el borde de abajo es contenido", 300, alto-2, magenta)
-	mira(t, img, "a sangre, abajo no hay esquina", 1, alto-2, magenta)
+	mira(t, img, "a sangre, la esquina de abajo es del marco", AnchoCarrilMovil+1, alto-2, marco)
 	mira(t, img, "a sangre, arriba sí", 1, 1, marco)
-	if l := lateralEn(a.Menu); l.SinFondo {
-		t.Error("el cajón del teléfono tiene que conservar su fondo")
+	if l := lateralEn(a.Menu); !l.SinFondo {
+		t.Error("el menú móvil desplazado tiene que prolongar el color del marco")
 	}
 
 	// En Carril no hay nada de esto: el contenido llega a la esquina.
@@ -122,6 +123,7 @@ func TestLaHojaFlotaEnElMarco(t *testing.T) {
 	img = pinta(t, ancho, alto, a)
 	mira(t, img, "en Carril el contenido llega a su esquina", x0+1, 1, magenta)
 	mira(t, img, "en Carril el contenido llega al borde derecho", ancho-2, 300, magenta)
+	mira(t, img, "en Carril la esquina inferior sigue siendo contenido", x0+1, alto-2, magenta)
 }
 
 // La navegación móvil pertenece al marco de color. Se mira la unión real entre
@@ -148,7 +150,7 @@ func TestElMarcoMovilProlongaLaBarraHastaLaHoja(t *testing.T) {
 			montado.Resize(fyne.NewSize(390, 360))
 			r := test.WidgetRenderer(a).(*armazonRenderer)
 			nav := test.WidgetRenderer(a.barra).(*barraMovilRenderer)
-			if r.marco.hoja.Position().Y != AltoBarraMovil || nav.fondo.Visible() {
+			if r.marco.hoja.Position() != fyne.NewPos(AnchoCarrilMovil, 0) || nav.fondo.Visible() {
 				t.Fatalf("%s/%s: la hoja empieza en %v y el fondo opaco de navegación es visible=%v",
 					variante, colorSuite, r.marco.hoja.Position(), nav.fondo.Visible())
 			}
@@ -159,19 +161,19 @@ func TestElMarcoMovilProlongaLaBarraHastaLaHoja(t *testing.T) {
 			}
 			for _, esc := range []float32{1, 2, 3} {
 				img := pintaA(t, esc, 390, 360, montado)
-				for _, x := range []float32{2, 195, 387} {
+				for _, x := range []float32{2, AnchoCarrilMovil / 2, AnchoCarrilMovil - 2} {
 					quiero := r.marco.fondo.colorEn(x, 390)
-					for _, y := range []float32{AltoBarraSuite() - 1, AltoBarraSuite(), AltoBarraSuite() + 1, AltoBarraSuite() + AltoBarraMovil - 1} {
+					for _, y := range []float32{AltoBarraSuite() - 1, AltoBarraSuite(), AltoBarraSuite() + 1, AltoBarraSuite() + MinCabeceraApp + 20, 300} {
 						got := px(img, int(x*esc), int(y*esc))
 						if !cercaDe(got, quiero, 3) {
 							t.Errorf("%s/%s ×%g: banda en (%g,%g): %v, quiero marco %v", variante, colorSuite, esc, x, y, got, quiero)
 						}
 					}
 				}
-				// Las esquinas de papel empiezan al acabar la navegación.
-				y := AltoBarraSuite() + AltoBarraMovil
-				if got := px(img, int(2*esc), int((y+1)*esc)); !cercaDe(got, r.marco.fondo.colorEn(2, 390), 3) {
-					t.Errorf("la esquina de la hoja no empieza debajo de la navegación: %v", got)
+				// La hoja empieza junto al mando, a la altura de la cabecera.
+				x, y := AnchoCarrilMovil+1, AltoBarraSuite()+1
+				if got := px(img, int(x*esc), int(y*esc)); !cercaDe(got, r.marco.fondo.colorEn(x, 390), 3) {
+					t.Errorf("la esquina de la hoja no está junto al carril: %v", got)
 				}
 			}
 			b.Parar()
@@ -307,8 +309,8 @@ func TestElArmazonConCarrilDeIconos(t *testing.T) {
 
 	a.Resize(fyne.NewSize(360, alto))
 	a.Refresh()
-	if carril.Visible() || contenido.Position() != fyne.NewPos(0, 0) || contenido.Size() != fyne.NewSize(360, alto) {
-		t.Errorf("a 360 el carril se ve (%v) y la hoja está en %v con %v; no hay carril y va a sangre", carril.Visible(), contenido.Position(), contenido.Size())
+	if carril.Visible() || contenido.Position() != fyne.NewPos(AnchoCarrilMovil, 0) || contenido.Size() != fyne.NewSize(360-AnchoCarrilMovil, alto) {
+		t.Errorf("a 360 el carril de escritorio se ve (%v) y la hoja está en %v con %v; debe dejar sitio al mando móvil", carril.Visible(), contenido.Position(), contenido.Size())
 	}
 }
 
@@ -345,7 +347,7 @@ func TestMontarPintaLaHojaDeLoQueNoTraeArmazon(t *testing.T) {
 	mira(t, img, "la esquina de la hoja es del marco", 11, barra+1, marco)
 	mira(t, img, "dentro, el contenido", 500, 300, magenta)
 
-	// A sangre, como los editores: todo el sitio y solo las esquinas de arriba.
+	// A sangre, como los editores: todo el sitio, con las cuatro esquinas.
 	sangre := contenidoDePrueba()
 	m, barra = monta(NuevaBarraSuite(traductorPrueba(t), nil, iconos.Docs).ConHojaASangre(), sangre)
 	img = pinta(t, ancho, alto, m)
@@ -353,7 +355,7 @@ func TestMontarPintaLaHojaDeLoQueNoTraeArmazon(t *testing.T) {
 		t.Errorf("a sangre la hoja ocupa %v %v y quiero todo lo de debajo de la barra", got, sangre.Size())
 	}
 	mira(t, img, "a sangre, la esquina de arriba es del marco", 1, barra+1, marco)
-	mira(t, img, "a sangre, abajo no hay esquina", 1, alto-2, magenta)
+	mira(t, img, "a sangre, la esquina de abajo es del marco", 1, alto-2, marco)
 
 	// Con armazón, la hoja es suya: Montar le da todo el sitio y no pinta nada.
 	arm := NuevoArmazon(contenidoDePrueba())
@@ -773,5 +775,72 @@ func TestElMarcoDelTraslucidoEsUnDegradado(t *testing.T) {
 	}
 	if tokens.EsCarril() {
 		t.Fatal("el test no está en Marco")
+	}
+}
+
+// La hoja móvil conserva sus cuatro arcos aunque el contenido opaco llegue al borde.
+// A sangre sigue ocupando todo el ancho y el pie, sin añadir huecos ni sombras.
+// SYTUE_CAPTURA_DIR guarda los seis retratos de 390 px, a ×2, con el helper común.
+func TestLasEsquinasInferioresDeMarcoMovil(t *testing.T) {
+	enMarco(t)
+	tactilAntes, tactil := tactilDePrueba, true
+	tactilDePrueba = &tactil
+	t.Cleanup(func() {
+		tactilDePrueba = tactilAntes
+		tema.Elegir("")
+		tema.ElegirColor("")
+		tema.ElegirApp("")
+	})
+	const alto float32 = 420
+	for _, variante := range []string{"claro", "oscuro", "traslucido"} {
+		for _, ancho := range []float32{320, 390} {
+			for _, tipo := range []string{"armazon", "editor"} {
+				t.Run(fmt.Sprintf("%s-%s-%g", variante, tipo, ancho), func(t *testing.T) {
+					tema.Elegir(variante)
+					tema.ElegirColor("petroleo")
+					var contenido fyne.CanvasObject = contenidoDePrueba()
+					var a *Armazon
+					if tipo == "armazon" {
+						a = NuevoArmazon(contenido)
+						a.Menu = NuevoLateral("Menú", nil)
+						contenido = a
+					}
+					b := NuevaBarraSuite(traductorPrueba(t), nil, iconos.Mail)
+					t.Cleanup(b.Parar)
+					if tipo == "editor" {
+						b.ConHojaASangre()
+					}
+					montado := b.Montar(contenido).(*fyne.Container)
+					montado.Resize(fyne.NewSize(ancho, alto))
+					m := montado.Layout.(*montaje).marco
+					if a != nil {
+						m = test.WidgetRenderer(a).(*armazonRenderer).marco
+					}
+					for _, sombra := range m.sombra.teselas {
+						if sombra.Visible() {
+							t.Error("a sangre no añade sombra al pie")
+						}
+					}
+					for _, esc := range []float32{1, 2, 3} {
+						img := pintaA(t, esc, ancho, alto, montado)
+						izquierda := m.hoja.Position().X
+						for _, x := range []float32{izquierda + 1, ancho - 2} {
+							if got, quiero := px(img, int(x*esc), int((alto-2)*esc)), m.fondo.colorEn(x, ancho); !cercaDe(got, quiero, 3) {
+								t.Errorf("×%g esquina inferior x=%g: %v, quiero marco %v", esc, x, got, quiero)
+							}
+						}
+						// El centro del pie y el borde tras el arco siguen siendo contenido.
+						for _, p := range []fyne.Position{{X: ancho / 2, Y: alto - 2}, {X: izquierda + 16, Y: alto - 2}, {X: izquierda + 1, Y: alto - 17}} {
+							if got := px(img, int(p.X*esc), int(p.Y*esc)); !cercaDe(got, magenta, 3) {
+								t.Errorf("×%g se perdió contenido tras el arco en %v: %v", esc, p, got)
+							}
+						}
+						if ancho == 390 && esc == 2 {
+							guardar(t, fmt.Sprintf("marco-inferior-%s-%s.png", tipo, variante), img)
+						}
+					}
+				})
+			}
+		}
 	}
 }

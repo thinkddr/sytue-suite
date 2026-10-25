@@ -56,7 +56,7 @@ export const ro: AppCatalog<typeof en> = {
   'security.mfa.title': 'Verificare în doi pași',
   'security.mfa.off': 'Neconfigurată. Doar parola deschide contul.',
   'security.mfa.required':
-    'Organizația dumneavoastră impune verificarea în doi pași. Activați-o mai jos și autentificați-vă din nou.',
+    'Această acțiune necesită verificare în doi pași. Configureaz-o mai jos, apoi autentifică-te din nou.',
   'security.mfa.on': 'Activată. Vi se cere un cod la autentificare.',
   'security.mfa.enable': 'Configurează',
   'security.mfa.scan': 'Scanați acest cod cu aplicația de autentificare.',
@@ -115,6 +115,10 @@ export const ro: AppCatalog<typeof en> = {
   'plan.pro': 'Plan Pro · 200 GB',
   'plan.enterprise': 'Plan Enterprise · 1 TB · Asistență Premium',
   'plan.storage': 'Spațiu folosit',
+  'plan.externalNote': 'Stocarea conectată îți mărește capacitatea în Sytue.',
+  'plan.externalCapacity': 'Stocarea conectată adaugă {capacity}.',
+  'plan.externalUnknown': 'Furnizorul nu raportează capacitatea de stocare.',
+  'plan.baseUsage': 'Sytue: {used} din {total}',
   'plan.paidUntil': 'Plătit până la',
   'plan.upgrade': 'Obțineți mai mult spațiu',
   'plan.upgrade.hint':

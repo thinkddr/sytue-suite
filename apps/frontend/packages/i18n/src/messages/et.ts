@@ -204,6 +204,8 @@ export const et: Catalog = {
   'account.signedOutTitle': 'Te pole sisse logitud',
   'account.signedOutDescription': "Logige sisse oma Sytue One'i kontoga, et näha siin oma andmeid.",
   'account.signOut': 'Logi välja',
+  'account.signOutFailed':
+    'Sellest seadmest väljalogimine ebaõnnestus. Drive võib olla endiselt ühendatud. Proovi uuesti.',
   'account.signOutPending.title': 'Üles laadimata märkmed',
   'account.signOutPending.body':
     'Notepadsil on selles seadmes märkmeid, mida pole veel üles laaditud ({count}). Välja logides need kustutatakse sellest.',
@@ -348,6 +350,7 @@ export const et: Catalog = {
   'widgets.episodes': 'Episoodid',
   'widgets.apps': 'Rakendused',
   'widgets.compose': 'Koosta kiri',
+  'widgets.storage': 'Salvestusruum',
   'widgets.create': 'Loo sündmus',
 
   'linkedServices.services': 'Teenused',

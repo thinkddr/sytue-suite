@@ -207,6 +207,8 @@ export const is: Catalog = {
   'account.signedOutDescription':
     'Skráðu þig inn með Sytue One-aðganginum þínum til að sjá gögnin þín hér.',
   'account.signOut': 'Skrá út',
+  'account.signOutFailed':
+    'Ekki tókst að skrá út á þessu tæki. Drive gæti enn verið tengt. Reyndu aftur.',
   'account.signOutPending.title': 'Glósur sem ekki hefur verið hlaðið upp',
   'account.signOutPending.body':
     'Notepads er með glósur á þessu tæki sem hefur ekki enn verið hlaðið upp ({count}). Þeim er eytt af því við útskráningu.',
@@ -354,6 +356,7 @@ export const is: Catalog = {
   'widgets.episodes': 'Þættir',
   'widgets.apps': 'Forrit',
   'widgets.compose': 'Skrifa',
+  'widgets.storage': 'Geymslurými',
   'widgets.create': 'Búa til viðburð',
 
   'linkedServices.services': 'Þjónustur',

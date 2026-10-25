@@ -23,6 +23,7 @@
   "account.presenceFailed": "A jelenlétét nem sikerült módosítani",
   "account.signIn": "Bejelentkezés",
   "account.signOut": "Kijelentkezés",
+  "account.signOutFailed": "Nem sikerült kijelentkezni ezen az eszközön. A Drive még csatlakoztatva lehet. Próbáld újra.",
   "account.signOutPending.body": "A Notepadsben vannak ezen az eszközön még fel nem töltött jegyzetek ({count}). Kijelentkezéskor törlődnek róla.",
   "account.signOutPending.discard": "Elvetés és kijelentkezés",
   "account.signOutPending.title": "Fel nem töltött jegyzetek",
@@ -334,5 +335,6 @@
   "widgets.open": "Megnyitás",
   "widgets.pending": "Függőben",
   "widgets.photos": "Fotók",
-  "widgets.rows": "Sorok"
+  "widgets.rows": "Sorok",
+  "widgets.storage": "Tárhely"
 }

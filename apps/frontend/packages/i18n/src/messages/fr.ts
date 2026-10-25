@@ -223,6 +223,8 @@ export const fr: Catalog = {
   'account.signedOutDescription':
     'Connectez-vous avec votre compte Sytue One pour voir vos données ici.',
   'account.signOut': 'Se déconnecter',
+  'account.signOutFailed':
+    'Impossible de se déconnecter sur cet appareil. Drive peut rester connecté. Réessayez.',
   'account.signOutPending.title': 'Notes non envoyées',
   'account.signOutPending.body':
     'Notepads contient sur cet appareil des notes qui n’ont pas encore été envoyées ({count}). La déconnexion les supprime de celui-ci.',
@@ -376,6 +378,7 @@ export const fr: Catalog = {
   'widgets.episodes': 'Épisodes',
   'widgets.apps': 'Applications',
   'widgets.compose': 'Rédiger',
+  'widgets.storage': 'Stockage',
   'widgets.create': 'Créer un événement',
 
   'linkedServices.services': 'Services',

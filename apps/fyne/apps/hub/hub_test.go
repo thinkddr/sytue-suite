@@ -32,7 +32,7 @@ func traductor(t *testing.T) *i18n.Translator {
 	if os.Getenv("SYTUE_CAPTURAS_PLAY") != "" {
 		idioma = "es" // las capturas de Play van en el idioma por defecto de la ficha
 	}
-	tr, err := i18n.New(idioma, i18n.Common(), catalogos.Portal())
+	tr, err := i18n.New(idioma, i18n.Common(), catalogos.Console(), catalogos.Portal())
 	if err != nil {
 		t.Fatal(err)
 	}

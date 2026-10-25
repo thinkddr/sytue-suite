@@ -211,6 +211,8 @@ export const nl: Catalog = {
   'account.signedOutDescription':
     'Meld u aan met uw Sytue One-account om hier uw gegevens te zien.',
   'account.signOut': 'Afmelden',
+  'account.signOutFailed':
+    'Afmelden op dit apparaat is mislukt. Drive kan nog verbonden zijn. Probeer het opnieuw.',
   'account.signOutPending.title': 'Niet-geüploade notities',
   'account.signOutPending.body':
     'Notepads heeft op dit apparaat notities die nog niet zijn geüpload ({count}). Bij het afmelden worden ze ervan verwijderd.',
@@ -361,6 +363,7 @@ export const nl: Catalog = {
   'widgets.episodes': 'Afleveringen',
   'widgets.apps': 'Apps',
   'widgets.compose': 'Opstellen',
+  'widgets.storage': 'Opslag',
   'widgets.create': 'Afspraak maken',
 
   'linkedServices.services': 'Diensten',

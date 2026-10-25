@@ -7,6 +7,7 @@ import { expect, test } from 'bun:test';
 import { resolveOidcConfig } from '../config.js';
 import { hostCookieName, seal, sessionCookieAttributes, unseal } from './cookies.js';
 import { conPrefijo, createBff, safeReturnTo } from './bff.js';
+import { returnToCanonico } from '@sytue/config';
 
 const BASE = 'https://mail.sytue.eu';
 
@@ -383,6 +384,47 @@ test('el login guarda el destino con el prefijo de la app aunque llegue sin él'
   const state = new URL(res.headers.get('location') ?? '').searchParams.get('state') ?? '';
   const externo = await unseal<{ r: string }>(state, 'x'.repeat(32));
   expect(externo?.r).toBe('/docs/?id=X');
+});
+
+test('Mi cuenta conserva el aviso MFA en la vuelta OIDC sellada', async () => {
+  const page = new URL('https://id.sytue.eu/account?mfa=required');
+  const returnTo = returnToCanonico(page, '/account');
+  const url = new URL(
+    `https://id.sytue.eu/account/auth/login?returnTo=${encodeURIComponent(returnTo)}`,
+  );
+  const bff = createBff({
+    config: resolveOidcConfig({
+      SYTUE_OIDC_ISSUER: 'https://id.sytue.eu',
+      SYTUE_OIDC_CLIENT_ID: 'sytue-account',
+      SYTUE_OIDC_CLIENT_SECRET: 'secret',
+      SYTUE_OIDC_REDIRECT_URI: 'https://id.sytue.eu/account/auth/callback',
+    }),
+    sessionSecret: 'x'.repeat(32),
+    basePath: '/account',
+  });
+  let sealedCookie = '';
+  const response = await conDiscovery(() =>
+    bff.login({
+      request: new Request(url),
+      url,
+      cookies: {
+        get: () => undefined,
+        set: (_name, value) => void (sealedCookie = value),
+        delete: () => {},
+      },
+    }),
+  );
+  expect(response.status).toBe(302);
+  const authorize = new URL(response.headers.get('location') ?? '');
+  expect(authorize.searchParams.get('client_id')).toBe('sytue-account');
+  const cookie = await unseal<{ returnTo: string }>(sealedCookie, 'x'.repeat(32));
+  const state = await unseal<{ r: string }>(
+    authorize.searchParams.get('state') ?? '',
+    'x'.repeat(32),
+  );
+  expect(cookie?.returnTo).toBe('/account?mfa=required');
+  expect(state?.r).toBe('/account?mfa=required');
+  expect(safeReturnTo(state?.r ?? '')).toBe('/account?mfa=required');
 });
 
 test('conPrefijo: idempotente, respeta el límite de segmento y no toca lo que no es ruta', () => {

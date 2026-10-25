@@ -23,6 +23,7 @@
   "account.presenceFailed": "Não foi possível alterar a sua presença",
   "account.signIn": "Iniciar sessão",
   "account.signOut": "Terminar sessão",
+  "account.signOutFailed": "Não foi possível terminar a sessão neste dispositivo. O Drive pode continuar ligado. Tente novamente.",
   "account.signOutPending.body": "O Notepads tem neste dispositivo notas que ainda não foram enviadas ({count}). Ao terminar sessão são eliminadas dele.",
   "account.signOutPending.discard": "Descartar e terminar sessão",
   "account.signOutPending.title": "Notas por enviar",
@@ -334,5 +335,6 @@
   "widgets.open": "Abrir",
   "widgets.pending": "Pendentes",
   "widgets.photos": "Fotografias",
-  "widgets.rows": "Linhas"
+  "widgets.rows": "Linhas",
+  "widgets.storage": "Armazenamento"
 }

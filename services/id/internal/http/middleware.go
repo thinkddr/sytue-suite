@@ -269,15 +269,15 @@ func clientDeAudiencia(aud []string, recurso string) string {
 // porque el middleware corre ANTES de resolver la ruta; ante la duda, incluir de
 // más solo hace el gate más estricto.
 func rutaDeAdministracion(path string) bool {
-	return strings.Contains(path, "/admin/") || strings.Contains(path, "/platform/")
+	return strings.Contains(path, "/admin/") || strings.Contains(path, "/platform/") ||
+		path == "/api/v1/orgs" || strings.HasPrefix(path, "/api/v1/orgs/")
 }
 
 // rutaSoloDeLaSuite indica si la petición solo se atiende con una credencial pedida
 // por un client de la suite. Además de la administración (rutaDeAdministracion):
 //
-//   - `/api/v1/orgs…` y `/api/v1/onboarding…`: crear una organización, añadirle
-//     miembros, su dominio, sus invitaciones. Es administración igual, pero su ruta
-//     no lleva `/admin/` y por eso el gate no la veía.
+//   - `/api/v1/onboarding…`: alta inicial, dominio e invitaciones. A diferencia
+//     de `/orgs…`, es accesible antes de tener organización o segundo factor.
 //   - `/api/v1/me/…` y `/api/v1/webauthn/…`: CÓMO SE ENTRA en la cuenta y qué
 //     sesiones tiene —contraseña, segundo factor, passkeys, contraseñas de
 //     aplicación, correo de recuperación, sesiones, dispositivos de confianza,
@@ -298,7 +298,7 @@ func rutaSoloDeLaSuite(method, path string) bool {
 	if resto == "me" {
 		return method != http.MethodGet
 	}
-	for _, p := range []string{"me", "webauthn", "orgs", "onboarding"} {
+	for _, p := range []string{"me", "webauthn", "onboarding"} {
 		if resto == p || strings.HasPrefix(resto, p+"/") {
 			return true
 		}

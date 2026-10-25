@@ -40,6 +40,17 @@ cat >"$temporal/bin/go" <<'SH'
 #!/usr/bin/env bash
 set -euo pipefail
 printf '%s|%s|%s|%s|%s|%s\n' "$GOOS" "$GOARCH" "$CGO_CFLAGS" "$CGO_LDFLAGS" "$*" "${CGO_LDFLAGS_ALLOW:-}" >>"$APPLE_SDK_CASOS"
+# Revisa la fuente que se entregaría a cada compilador, antes de que el trap la quite.
+for argumento in "$@"; do fuente="$argumento"; done
+python3 - "$fuente/main.go" <<'PYTHON'
+import pathlib, re, sys
+fuente = pathlib.Path(sys.argv[1]).read_text()
+assert '"git.sytue.eu/sytue/one/apps/nucleo/sistema"' in fuente, "el SDK no compilaría el puente Objective-C de FileProvider"
+assert "runtime.KeepAlive([]any{" in fuente, "las referencias de FileProvider deben llegar al enlace"
+for nombre in ("ArchivosDisponible", "GuardarCredencialArchivos", "HayCredencialArchivos", "RegistrarArchivos", "AbrirArchivos", "OlvidarArchivos"):
+    assert "sistema." + nombre + "," in fuente, "falta la referencia de FileProvider: " + nombre
+    assert not re.search(r"sistema\." + nombre + r"\s*\(", fuente), "el canario no debe invocar APIs de FileProvider"
+PYTHON
 while [ "$1" != -o ]; do shift; done
 shift
 # If the verifier ever runs the output, the canary records forbidden execution.

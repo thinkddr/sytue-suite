@@ -4,24 +4,24 @@
 package hub
 
 import (
-	"os"
 	"testing"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/test"
 
+	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/ui/recorrido"
+	"git.sytue.eu/sytue/one/apps/fyne/ui/recorrido/montaje"
 )
 
 // TestRecorridoConSesion pulsa todo lo que se ve con los datos del servicio falso y
 // cierra con Escape cada modal que se abre (ver `ui/recorrido`).
 func TestRecorridoConSesion(t *testing.T) {
-	var portada fyne.CanvasObject = lanzadorDePrueba(t)
-	if os.Getenv("SYTUE_CAPTURAS_PLAY") != "" {
-		portada = container.NewVScroll(portada) // en el teléfono la portada se desplaza
-	}
+	// cmd/hub también monta la portada dentro de un desplazador vertical.
+	var portada fyne.CanvasObject = container.NewVScroll(lanzadorDePrueba(t))
 	w := test.NewTempWindow(t, portada)
 	w.Resize(fyne.NewSize(1280, 800))
+	montaje.ComprobarRotacion(t, w, "hub", iconos.One, true)
 	recorrido.Comprobar(t, w, 400)
 }

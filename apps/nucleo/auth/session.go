@@ -367,15 +367,19 @@ func (s *Session) Sincronizar(t Tokens) {
 // bloqueos es el de AccessToken: primero esta Session, después el de los procesos.
 // Se espera al propietario vivo; salir con un plazo y escribir sin exclusión
 // permitiría que su renovación guardara después y resucitara la sesión.
-func (s *Session) Logout() {
+func (s *Session) Logout() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if soltar, err := ajustes.CerrojoSesion(context.Background()); err == nil {
-		defer soltar()
-	} else {
-		slog.Warn("auth: no se pudo bloquear el cierre de sesión", "error", err)
+	// La memoria queda vacía incluso si el broker o el disco no dejan cerrar.
+	s.replaceTokens(Tokens{})
+	soltar, err := ajustes.CerrojoSesion(context.Background())
+	if err != nil {
+		return errors.Join(err, ajustes.PonerAccesoDrive("", false))
 	}
-	_ = s.poner(Tokens{}) // La memoria queda vacía incluso si el broker no está disponible.
+	defer soltar()
+	// A diferencia de un guardado ordinario, un error aquí no es recuperable
+	// conservando la sesión: el llamador debe comunicar que no se pudo retirar.
+	return guardarTokens(Tokens{}, s.guardar)
 }
 
 func (s *Session) poner(t Tokens) error {

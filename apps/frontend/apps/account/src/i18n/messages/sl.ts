@@ -55,7 +55,7 @@ export const sl: AppCatalog<typeof en> = {
   'security.mfa.title': 'Preverjanje v dveh korakih',
   'security.mfa.off': 'Ni nastavljeno. Račun odpre samo geslo.',
   'security.mfa.required':
-    'Vaša organizacija zahteva preverjanje v dveh korakih. Vklopite ga spodaj in se znova prijavite.',
+    'To dejanje zahteva preverjanje v dveh korakih. Nastavite ga spodaj in se nato znova prijavite.',
   'security.mfa.on': 'Vklopljeno. Ob prijavi vas prosimo za kodo.',
   'security.mfa.enable': 'Nastavi',
   'security.mfa.scan': 'Skenirajte to z aplikacijo za preverjanje pristnosti.',
@@ -113,6 +113,10 @@ export const sl: AppCatalog<typeof en> = {
   'plan.pro': 'Paket Pro · 200 GB',
   'plan.enterprise': 'Paket Enterprise · 1 TB · Podpora Premium',
   'plan.storage': 'Porabljen prostor',
+  'plan.externalNote': 'Povezana shramba poveča vašo zmogljivost shranjevanja v Sytue.',
+  'plan.externalCapacity': 'Povezana shramba doda {capacity}.',
+  'plan.externalUnknown': 'Ponudnik ne sporoča zmogljivosti shrambe.',
+  'plan.baseUsage': 'Sytue: {used} od {total}',
   'plan.paidUntil': 'Plačano do',
   'plan.upgrade': 'Več prostora',
   'plan.upgrade.hint':

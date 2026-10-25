@@ -10,6 +10,7 @@ package domain
 
 import (
 	"errors"
+	"math"
 	"strings"
 	"time"
 
@@ -173,10 +174,66 @@ type Quota struct {
 	// pendiente. Vacío si ninguna ha declarado nada.
 	ExternalUsage map[string]int64 `json:"external_usage,omitempty"`
 	UpdatedAt     time.Time        `json:"updated_at"`
+	// La ampliación es una vista de lectura: nunca modifica la cuota facturada
+	// ni las reservas del almacén de Sytue en PostgreSQL.
+	BaseLimitBytes         int64  `json:"base_limit_bytes"`
+	BaseUsedBytes          int64  `json:"base_used_bytes"`
+	ConnectedStorage       bool   `json:"-"`
+	StorageTotalBytes      *int64 `json:"-"`
+	StorageUsedBytes       *int64 `json:"-"`
+	StorageAvailableBytes  *int64 `json:"-"`
+	StorageCapacityPartial bool   `json:"-"`
+	capacityCombined       bool
+}
+
+// WithStorageExtension suma la capacidad del almacén conectado sin convertir
+// un dato ausente en cero. Se conserva el libre que informa el proveedor: una
+// cuenta de equipo puede tener un límite individual menor que total-usado.
+func (q Quota) WithStorageExtension(total, used, available *int64) Quota {
+	if q.ConnectedStorage {
+		q.LimitBytes, q.UsedBytes = q.BaseLimitBytes, q.BaseUsedBytes
+	}
+	q.BaseLimitBytes, q.BaseUsedBytes = q.LimitBytes, q.UsedBytes
+	q.ConnectedStorage, q.capacityCombined = true, false
+	q.StorageCapacityPartial = false
+	q.StorageTotalBytes, q.StorageUsedBytes, q.StorageAvailableBytes = total, used, available
+	for _, n := range []*int64{total, used, available} {
+		if n != nil && *n < 0 {
+			q.StorageTotalBytes, q.StorageUsedBytes, q.StorageAvailableBytes = nil, nil, nil
+			q.StorageCapacityPartial = true
+			return q
+		}
+	}
+	if total != nil && available != nil && *available > *total {
+		q.StorageTotalBytes, q.StorageUsedBytes, q.StorageAvailableBytes = nil, nil, nil
+		q.StorageCapacityPartial = true
+		return q
+	}
+	if total == nil || used == nil || available == nil {
+		q.StorageCapacityPartial = true
+		return q
+	}
+	if q.LimitBytes < 0 || q.UsedBytes < 0 ||
+		*total > math.MaxInt64-q.LimitBytes || *used > math.MaxInt64-q.UsedBytes {
+		q.StorageTotalBytes, q.StorageUsedBytes, q.StorageAvailableBytes = nil, nil, nil
+		q.StorageCapacityPartial = true
+		return q
+	}
+	q.LimitBytes += *total
+	q.UsedBytes += *used
+	q.capacityCombined = true
+	return q
 }
 
 // Available devuelve los bytes libres (nunca negativo).
 func (q Quota) Available() int64 {
+	if q.capacityCombined {
+		base := q.BaseLimitBytes - q.BaseUsedBytes
+		if base < 0 {
+			base = 0
+		}
+		return base + *q.StorageAvailableBytes
+	}
 	if q.UsedBytes >= q.LimitBytes {
 		return 0
 	}
@@ -184,7 +241,7 @@ func (q Quota) Available() int64 {
 }
 
 // HasRoomFor indica si caben n bytes adicionales.
-func (q Quota) HasRoomFor(n int64) bool { return q.UsedBytes+n <= q.LimitBytes }
+func (q Quota) HasRoomFor(n int64) bool { return n >= 0 && n <= q.Available() }
 
 // ExternalBytes es la suma de lo declarado por las otras apps.
 func (q Quota) ExternalBytes() int64 {
@@ -198,7 +255,12 @@ func (q Quota) ExternalBytes() int64 {
 // DriveBytes es lo que ocupa Drive solo: UsedBytes sin lo externo. Es el
 // `usageInDrive` de la API de Google y el desglose del medidor.
 func (q Quota) DriveBytes() int64 {
-	if n := q.UsedBytes - q.ExternalBytes(); n > 0 {
+	used := q.UsedBytes
+	if q.ConnectedStorage {
+		// El uso total del proveedor puede incluir datos ajenos a Drive.
+		used = q.BaseUsedBytes
+	}
+	if n := used - q.ExternalBytes(); n > 0 {
 		return n
 	}
 	return 0

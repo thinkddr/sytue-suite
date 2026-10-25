@@ -13,6 +13,7 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
+	"fyne.io/fyne/v2/container"
 
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 )
@@ -83,8 +84,7 @@ type Armazon struct {
 	// DetalleAbierto solo cuenta con Panel y ventana estrecha: `true` enseña el
 	// detalle y `false` la lista. Sin él, en estrecho el detalle sería inalcanzable.
 	DetalleAbierto bool
-	// CajonAbierto saca el menú por encima del contenido en ventana estrecha, con su
-	// velo, que es lo que hace el `drawer` de la web.
+	// CajonAbierto abre el menú móvil: en Marco desplaza la hoja; en Carril la cubre.
 	CajonAbierto bool
 	// Titulo es el de la barra móvil que pone el propio armazón cuando la app no trae
 	// la suya (el `title` de AppShell.tsx).
@@ -96,7 +96,7 @@ type Armazon struct {
 	// AlVolver es el `onBack` de la barra móvil que pone el armazón: sin él, en
 	// estrecho y con el detalle abierto no hay botón de volver, como en la web.
 	AlVolver func()
-	// SinBarraMovil es para la app que lleva su propio botón del cajón dentro del
+	// SinBarraMovil es para la app que en Carril lleva su propio botón del cajón dentro del
 	// contenido, como el ERP (`#erp-cajon-boton`, «el único mando de navegación que hay
 	// por debajo de 768 px»): sin esto salían dos hamburguesas, la de la barra del
 	// armazón y la suya (visto en una ventana real el 2026-09-27).
@@ -118,7 +118,8 @@ type Armazon struct {
 	separador  *separadorPanel
 	// entrada es lo que le falta al cajón para llegar a su sitio: `sytue-drawer-in`, de
 	// `translateX(-100%)` a cero en 180 ms.
-	entrada float32
+	entrada    float32
+	focoCarril *fyne.Container
 }
 
 func (a *Armazon) anchoPanelActual() float32 {
@@ -139,16 +140,19 @@ func (a *Armazon) anchoPanelActual() float32 {
 	return AnchoPanel(a.Size().Width)
 }
 
-func (a *Armazon) anchoMaximoPanel() float32 {
-	t := a.Size()
-	separa := a.separacionHoja(t.Width < Estrecho)
-	disponible := t.Width - separa
-	if a.Menu != nil && (t.Width >= Estrecho && a.Carril == nil) {
-		disponible -= a.Menu.MinSize().Width
-	} else if a.Carril != nil && t.Width >= Estrecho {
-		disponible -= a.Carril.MinSize().Width
+func (a *Armazon) anchoHoja() float32 {
+	menu, carril := float32(0), float32(0)
+	if a.Menu != nil {
+		menu = a.Menu.MinSize().Width
 	}
-	return max(AnchoPanelMinimo, disponible-AnchoContenidoMinimo)
+	if a.Carril != nil {
+		carril = a.Carril.MinSize().Width
+	}
+	return AnchoHoja(a.Size().Width, menu, carril)
+}
+
+func (a *Armazon) anchoMaximoPanel() float32 {
+	return max(AnchoPanelMinimo, a.anchoHoja()-AnchoContenidoMinimo)
 }
 
 func (a *Armazon) fijarAnchoPanel(ancho float32) {
@@ -211,10 +215,17 @@ func (a *Armazon) entrarCajon() {
 		return
 	}
 	ancho := a.Menu.MinSize().Width
+	if a.menuEnCarril() {
+		ancho = min(ancho, max(a.Size().Width-AnchoCarrilMovil, 0))
+	}
 	anim := fyne.NewAnimation(DuracionCajon, func(p float32) {
 		a.entrada = -ancho * (1 - p)
 		if a.CajonAbierto {
-			a.Menu.Move(fyne.NewPos(a.entrada, 0))
+			if a.menuEnCarril() {
+				a.Refresh()
+			} else {
+				a.Menu.Move(fyne.NewPos(a.entrada, 0))
+			}
 		}
 	})
 	anim.Curve = CurvaEstandar
@@ -266,6 +277,14 @@ var cajones porLienzo[Armazon]
 // dice sus hijos—, y la barra de la suite sigue viva encima para el puntero.
 func (a *Armazon) FocusScope() fyne.CanvasObject {
 	if a.CajonAbierto && a.Menu != nil && a.Menu.Visible() {
+		if a.menuEnCarril() {
+			if a.focoCarril == nil {
+				a.focoCarril = container.NewWithoutLayout()
+			}
+			a.focoCarril.Objects = []fyne.CanvasObject{a.Menu, a.barraMovil()}
+			a.focoCarril.Resize(a.Size())
+			return a.focoCarril
+		}
 		return a.Menu
 	}
 	return nil
@@ -307,7 +326,7 @@ func (a *Armazon) barraMovil() fyne.CanvasObject {
 	if a.BarraMovil != nil {
 		return a.BarraMovil
 	}
-	if a.SinBarraMovil || (a.Menu == nil && a.Panel == nil) {
+	if (a.SinBarraMovil && !a.menuEnCarril()) || (a.Menu == nil && a.Panel == nil) {
 		return nil
 	}
 	if a.barra == nil {
@@ -331,6 +350,12 @@ func (a *Armazon) barraMovil() fyne.CanvasObject {
 		a.Refresh()
 	}
 	return b
+}
+
+// menuEnCarril deja el mando junto a la cabecera y conserva una franja del marco
+// cuando el menú está cerrado. El cajón desplaza la hoja sin estrecharla.
+func (a *Armazon) menuEnCarril() bool {
+	return tema.EsMarco() && (EsTactil() || a.Size().Width < Estrecho) && a.Menu != nil
 }
 
 // volverAlPanel usa la misma acción que el botón visible, también después de
@@ -407,12 +432,16 @@ type armazonRenderer struct {
 	objetos   []fyne.CanvasObject
 }
 
-// rehacer arma la lista de objetos en el orden en que se pintan: el menú va el ÚLTIMO
-// cuando es cajón, para que quede por encima del velo.
+// rehacer deja el menú sobre su velo y el mando lateral de Marco sobre la entrada
+// del menú, para que el botón siga visible durante el desplazamiento.
 func (r *armazonRenderer) rehacer() {
 	a := r.a
 	r.objetos = append([]fyne.CanvasObject{r.fondo}, r.marco.detras()...)
-	for _, o := range []fyne.CanvasObject{a.barraMovil(), a.Panel, a.Contenido} {
+	barra := a.barraMovil()
+	if barra != nil && !a.menuEnCarril() {
+		r.objetos = append(r.objetos, barra)
+	}
+	for _, o := range []fyne.CanvasObject{a.Panel, a.Contenido} {
 		if o != nil {
 			r.objetos = append(r.objetos, o)
 		}
@@ -432,6 +461,9 @@ func (r *armazonRenderer) rehacer() {
 	if a.Menu != nil {
 		r.objetos = append(r.objetos, r.velo, r.base, a.Menu)
 	}
+	if barra != nil && a.menuEnCarril() {
+		r.objetos = append(r.objetos, barra)
+	}
 }
 
 // separacionHoja es lo que la hoja de Marco se separa del borde de la ventana
@@ -449,7 +481,7 @@ func (a *Armazon) separacionHoja(estrecha bool) float32 {
 // en el cajón —el del teléfono y el de quien lleva carril de iconos— conserva su fondo.
 func (r *armazonRenderer) colocarMarco(t fyne.Size, x, arriba, separa float32, estrecha bool) {
 	enMarco := tema.EsMarco()
-	sinFondo := enMarco && !estrecha && r.a.Carril == nil
+	sinFondo := enMarco && ((!estrecha && r.a.Carril == nil) || r.a.menuEnCarril())
 	if l := lateralEn(r.a.Menu); l != nil && l.SinFondo != sinFondo {
 		l.SinFondo = sinFondo
 		l.Refresh()
@@ -462,6 +494,9 @@ func (r *armazonRenderer) colocarMarco(t fyne.Size, x, arriba, separa float32, e
 	r.fondo.Hide()
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	hoja := fyne.NewSize(max(t.Width-x-separa, 0), max(t.Height-arriba-separa, 0))
+	if r.a.menuEnCarril() {
+		hoja.Width = max(t.Width-AnchoCarrilMovil-separa, 0)
+	}
 	r.marco.colocar(fyne.NewPos(0, 0), t, fyne.NewPos(x, arriba), hoja, estrecha, v)
 }
 
@@ -479,20 +514,21 @@ func (r *armazonRenderer) MinSize() fyne.Size           { return MedidaArmazon(r
 func (r *armazonRenderer) Objects() []fyne.CanvasObject { return r.objetos }
 func (r *armazonRenderer) Destroy()                     {}
 
-// Layout reparte la ventana. Ancha: menú, panel y contenido en fila. Estrecha: el menú
-// es cajón sobre velo, y panel y contenido se turnan.
+// Layout reparte la ventana. Ancha: menú, panel y contenido en fila. Estrecha: panel
+// y contenido se turnan; el menú desplaza la hoja en Marco y la cubre en Carril.
 func (r *armazonRenderer) Layout(t fyne.Size) {
+	defer func() { sincronizarExclusionMenuMovil(lienzoDe(r.a)) }()
 	a := r.a
+	defer a.enlazarCajonMovil()
 	r.fondo.Resize(t)
 	estrecha := t.Width < Estrecho
 	// En Marco el panel y el contenido van en la HOJA, que se separa del borde derecho y
 	// del de abajo (el `margin` de `.sytue-sheet`) y, sin menú a su izquierda, también de ese.
-	// En estrecho va a sangre, como en la web: sin separación y solo con las esquinas
-	// de arriba.
+	// En estrecho llega al borde y conserva las cuatro esquinas.
 	separa := a.separacionHoja(estrecha)
 
-	// Con carril de iconos el menú es cajón a cualquier ancho.
-	esCajon := estrecha || a.Carril != nil
+	// En táctil el mando de Marco y el cajón siguen accesibles al girar.
+	esCajon := estrecha || a.Carril != nil || a.menuEnCarril()
 	// Al pasar a ancho el cajón se cierra solo, que es lo que hace `useNavDrawer`: si
 	// no, al volver a estrecho aparecía abierto sin que nadie lo hubiera pedido.
 	if !esCajon && a.CajonAbierto {
@@ -504,31 +540,48 @@ func (r *armazonRenderer) Layout(t fyne.Size) {
 	arriba := float32(0)
 	if bm := a.barraMovil(); bm != nil {
 		if b, es := bm.(*BarraMovil); es {
+			b.enCarril, b.anchoMarco = a.menuEnCarril(), t.Width
 			b.ConLista = a.Panel != nil
+			b.listaVisible = a.Panel != nil && !estrecha
 			b.CajonAbierto = a.CajonAbierto
 			b.Refresh()
 		}
 		h := bm.MinSize().Height
-		esconder(bm, !estrecha)
-		if estrecha {
+		visible := estrecha || a.menuEnCarril()
+		esconder(bm, !visible)
+		if visible {
 			bm.Move(fyne.NewPos(0, 0))
-			bm.Resize(fyne.NewSize(t.Width, h))
-			arriba = h
+			if a.menuEnCarril() {
+				bm.Resize(fyne.NewSize(AnchoCarrilMovil, t.Height))
+			} else {
+				bm.Resize(fyne.NewSize(t.Width, h))
+				arriba = h
+			}
 		}
 	}
 	alto := max(t.Height-arriba-separa, 0)
 
 	x := r.colocarNavegacion(t, separa, estrecha, esCajon)
+	inicioHoja := x
 
 	r.colocarMarco(t, x, arriba, separa, estrecha)
 
 	verDetalle := a.Panel == nil || !estrecha || a.DetalleAbierto
-	x = r.colocarPanel(t, x, arriba, alto, estrecha, verDetalle)
+	panelTam := t
+	if a.menuEnCarril() {
+		panelTam.Width = max(t.Width-AnchoCarrilMovil-separa, 0)
+	}
+	x = r.colocarPanel(panelTam, x, arriba, alto, estrecha, verDetalle)
 	if a.Contenido == nil {
 		return
 	}
 	esconder(a.Contenido, !verDetalle)
 	ancho := max(t.Width-x-separa, 0)
+	if a.menuEnCarril() {
+		// El desplazamiento del menú no consume ancho de la hoja. El panel sí:
+		// en tablet lista y detalle conservan sus medidas al abrir el cajón.
+		ancho = max(panelTam.Width-(x-inicioHoja), 0)
+	}
 	if !a.Restringido {
 		a.Contenido.Move(fyne.NewPos(x, arriba))
 		a.Contenido.Resize(fyne.NewSize(ancho, alto))
@@ -538,6 +591,21 @@ func (r *armazonRenderer) Layout(t fyne.Size) {
 	util := min(ancho-2*MargenContenido, tema.AnchoContenido)
 	a.Contenido.Move(fyne.NewPos(x+(ancho-util)/2, arriba+MargenContenido))
 	a.Contenido.Resize(fyne.NewSize(max(util, 0), max(alto-2*MargenContenido, 0)))
+}
+
+// Las barras que configura cada app también pueden cambiar CajonAbierto y
+// refrescar directamente. Comparten el mismo Escape, foco inicial y retorno.
+func (a *Armazon) enlazarCajonMovil() {
+	c := lienzoDe(a)
+	if c == nil {
+		return
+	}
+	registrado := cajones.de(c) == a
+	if a.menuEnCarril() && a.CajonAbierto && !registrado {
+		a.tecladoCajon(true)
+	} else if registrado && !a.CajonAbierto {
+		a.tecladoCajon(false)
+	}
 }
 
 // colocarPanel posiciona el panel de lista y su separador arrastrable, devolviendo
@@ -554,13 +622,7 @@ func (r *armazonRenderer) colocarPanel(t fyne.Size, x, arriba, alto float32, est
 	if estrecha {
 		ancho = t.Width
 	} else {
-		maximo := a.anchoMaximoPanel()
-		if ancho > maximo {
-			ancho = maximo
-		}
-		if ancho < AnchoPanelMinimo {
-			ancho = AnchoPanelMinimo
-		}
+		ancho = AcotarAnchoPanel(ancho, a.anchoHoja())
 	}
 	esconder(a.Panel, estrecha && verDetalle)
 	a.Panel.Move(fyne.NewPos(x, arriba))
@@ -585,6 +647,9 @@ func (r *armazonRenderer) colocarPanel(t fyne.Size, x, arriba, alto float32, est
 // su velo— y devuelve dónde empieza lo que va a su derecha.
 func (r *armazonRenderer) colocarNavegacion(t fyne.Size, separa float32, estrecha, esCajon bool) float32 {
 	a := r.a
+	if a.menuEnCarril() {
+		return r.colocarMenuEnCarril(t)
+	}
 	x := separa
 	if a.Carril != nil {
 		esconder(a.Carril, estrecha)
@@ -617,6 +682,27 @@ func (r *armazonRenderer) colocarNavegacion(t fyne.Size, separa float32, estrech
 	// cerrarlo no se recoloca nada.
 	r.velo.Move(fyne.NewPos(0, 0))
 	r.velo.Resize(t)
+	return x
+}
+
+func (r *armazonRenderer) colocarMenuEnCarril(t fyne.Size) float32 {
+	a := r.a
+	if a.Carril != nil {
+		a.Carril.Hide()
+	}
+	ancho := min(a.Menu.MinSize().Width, max(t.Width-AnchoCarrilMovil, 0))
+	desplaza := float32(0)
+	if a.CajonAbierto {
+		desplaza = min(max(ancho+a.entrada, 0), ancho)
+		a.Menu.Move(fyne.NewPos(AnchoCarrilMovil+desplaza-ancho, 0))
+		a.Menu.Resize(fyne.NewSize(ancho, t.Height))
+	}
+	esconder(a.Menu, !a.CajonAbierto)
+	r.base.Hide()
+	esconder(r.velo, !a.CajonAbierto)
+	x := AnchoCarrilMovil + desplaza
+	r.velo.Move(fyne.NewPos(x, 0))
+	r.velo.Resize(fyne.NewSize(max(t.Width-x, 0), t.Height))
 	return x
 }
 

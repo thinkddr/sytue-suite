@@ -20,8 +20,8 @@ import (
 // por la entrada estándar, que es como `gio mount` la pide; nunca en la línea de órdenes,
 // que ve cualquiera con `ps`.
 //
-// ponytail: sin `gio` (un KDE sin GVfs) no se monta nada y queda el botón de montar de
-// «Conectar tus dispositivos», con su diálogo de contraseña.
+// Sin `gio` (un KDE sin GVfs), la integración informa de que el proveedor no está
+// disponible. No instala componentes del sistema ni muestra contraseñas de aplicación.
 var hayProveedor = func() bool { _, err := exec.LookPath("gio"); return err == nil }()
 
 // plazoGio acota `gio mount`: con una contraseña que no vale vuelve a preguntar, y la
@@ -42,28 +42,28 @@ func ubicacion(c Credencial) (string, error) {
 	return u.String(), nil
 }
 
-func gio(entrada string, args ...string) error {
-	ctx, parar := context.WithTimeout(context.Background(), plazoGio)
+func gio(ctx context.Context, entrada string, args ...string) error {
+	ctx, parar := context.WithTimeout(ctx, plazoGio)
 	defer parar()
 	cmd := exec.CommandContext(ctx, "gio", args...)
 	cmd.Stdin = strings.NewReader(entrada)
 	cmd.Env = append(os.Environ(), "LC_ALL=C") // los mensajes, en inglés: se leen abajo
 	salida, err := cmd.CombinedOutput()
 	if err != nil {
-		return errors.Join(err, errors.New(strings.TrimSpace(string(salida))))
+		return errors.Join(ctx.Err(), err, errors.New(strings.TrimSpace(string(salida))))
 	}
 	return nil
 }
 
 var conectar, desconectar = montar, desmontar
 
-func montar(c Credencial) error {
+func montar(ctx context.Context, c Credencial) error {
 	u, err := ubicacion(c)
 	if err != nil {
 		return err
 	}
 	// Montar algo ya montado falla («already mounted»): cuenta como hecho.
-	if err := gio(c.Clave+"\n", "mount", u); err != nil && !strings.Contains(err.Error(), "already mounted") {
+	if err := gio(ctx, c.Clave+"\n", "mount", u); err != nil && !strings.Contains(err.Error(), "already mounted") {
 		return err
 	}
 	return nil
@@ -71,6 +71,6 @@ func montar(c Credencial) error {
 
 func desmontar(c Credencial) {
 	if u, err := ubicacion(c); err == nil {
-		avisar("Drive no se ha podido desmontar", gio("", "mount", "-u", u))
+		avisar("Drive no se ha podido desmontar", gio(context.Background(), "", "mount", "-u", u))
 	}
 }

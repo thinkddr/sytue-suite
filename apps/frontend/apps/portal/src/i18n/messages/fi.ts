@@ -147,6 +147,11 @@ export const fi: AppCatalog<typeof en> = {
     'Jos haluat siirtää kaiken suoraan palveluun Google Workspace tai Microsoft 365 lataamatta mitään: jos tilisi on henkilökohtainen tai ylläpidät organisaatiotasi, käynnistä siirto itse palvelun Sytue Admin kohdasta Siirrot. Muussa tapauksessa pyydä sitä organisaation ylläpitäjältä.',
   'data.move.action': 'Siirry kohtaan Siirrot',
 
+  'devices.native.body': 'Käytä laitteen tiedostonhallintaa tai yhdistä tili suostumuksella.',
+  'devices.native.driveBody':
+    'Sytue Drive lisätään automaattisesti kirjautumisen jälkeen. Salli sen sijainti, jos järjestelmä pyytää sitä.',
+  'devices.native.openDrive': 'Avaa tiedostonhallinnassa',
+  'devices.native.failed': 'Laitteen integraatiota ei voitu päivittää.',
   'devices.title': 'Yhdistä laitteesi',
   'devices.lead':
     'Vie Sytuen sähköposti, kalenteri, yhteystiedot ja tiedostot puhelimeesi tai tietokoneellesi. Opastamme vaihe vaiheelta.',

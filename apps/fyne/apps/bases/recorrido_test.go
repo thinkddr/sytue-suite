@@ -8,8 +8,10 @@ import (
 
 	"fyne.io/fyne/v2"
 
+	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/fyne/ui/recorrido"
+	"git.sytue.eu/sytue/one/apps/fyne/ui/recorrido/montaje"
 )
 
 // TestRecorridoConSesion pulsa todo lo que se ve con los datos del servicio falso y
@@ -21,9 +23,11 @@ import (
 // (apps/fyne/play/README.md).
 func TestRecorridoConSesion(t *testing.T) {
 	_, _, lista := montar(t, map[string]string{"GET /bases": "[" + baseClientes + "," + basePedidos + "]"})
+	montaje.ComprobarRotacion(t, lista, "bases/lista", iconos.Bases, false)
 	recorrido.Comprobar(t, lista, 100)
 
 	_, base := abrir(t, nuevoFalso(12))
+	montaje.ComprobarRotacion(t, base, "bases/base", iconos.Bases, true)
 	recorrido.Comprobar(t, base, 400)
 }
 

@@ -235,6 +235,8 @@ export const en = {
   'account.signedOutTitle': "You're not signed in",
   'account.signedOutDescription': 'Sign in with your Sytue One account to see your data here.',
   'account.signOut': 'Sign out',
+  'account.signOutFailed':
+    'Could not sign out on this device. Drive may still be connected. Try again.',
   'account.signOutPending.title': 'Notes not uploaded',
   'account.signOutPending.body':
     'Notepads has notes on this device that have not been uploaded yet ({count}). Signing out deletes them from it.',
@@ -384,6 +386,7 @@ export const en = {
   'widgets.episodes': 'Episodes',
   'widgets.apps': 'Apps',
   'widgets.compose': 'Compose',
+  'widgets.storage': 'Storage',
   'widgets.create': 'Create event',
 
   'linkedServices.services': 'Services',

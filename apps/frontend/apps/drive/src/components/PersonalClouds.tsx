@@ -79,10 +79,12 @@ export function CloudsSidebar({
   t,
   active,
   onSelect,
+  onStorageChange,
 }: {
   t: T;
   active: string | null;
   onSelect: (cloud: Cloud) => void;
+  onStorageChange?: () => void;
 }) {
   const toast = useToast();
   const [accounts, setAccounts] = useState<Accounts | null>(null);
@@ -99,6 +101,8 @@ export function CloudsSidebar({
   }, []);
   useEffect(loadOrg, [loadOrg]);
   useEffect(() => {
+    // La cuota se relee aunque el inventario falle tras conectar o desconectar.
+    onStorageChange?.();
     void fetch(`${BASE}/accounts`)
       .then((r) => (r.ok ? (r.json() as Promise<Accounts>) : null))
       .then((a) => {
@@ -122,7 +126,7 @@ export function CloudsSidebar({
       })
       .catch(() => setAccounts(null));
     // Se relee al cambiar de ubicación: así una nube desconectada sale de la lista.
-  }, [active, onSelect, t, notify]);
+  }, [active, onSelect, t, notify, onStorageChange]);
   // `?connect-storage=1` (portal, Hub nativo, vuelta del consentimiento de
   // organización) abre el selector cuando ya se sabe qué se puede ofrecer.
   useEffect(() => {
@@ -187,7 +191,10 @@ export function CloudsSidebar({
             onSelect(abierta);
           }}
           onClose={close}
-          onChange={loadOrg}
+          onChange={() => {
+            loadOrg();
+            onStorageChange?.();
+          }}
         />
       ) : null}
     </SidebarSection>

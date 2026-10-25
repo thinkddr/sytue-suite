@@ -577,7 +577,10 @@ export const el: AppCatalog<typeof en> = {
   'share.person.someone': 'Κάποιος από τον οργανισμό σας',
   'pdf.openInPdf': 'Άνοιγμα στο Sytue PDF',
   'storage.externalNote':
-    'Τα νέα αρχεία χρησιμοποιούν τον συνδεδεμένο χώρο αποθήκευσης και δεν καταλαμβάνουν χώρο εδώ.',
+    'Ο συνδεδεμένος αποθηκευτικός χώρος αυξάνει τη χωρητικότητά σας στο Sytue.',
+  'storage.externalCapacity': 'Ο συνδεδεμένος αποθηκευτικός χώρος προσθέτει {capacity}.',
+  'storage.externalUnknown': 'Ο πάροχος δεν αναφέρει τη χωρητικότητά του.',
+  'storage.baseUsage': 'Sytue: {used} από {total}',
   'storage.add': 'Προσθήκη αποθηκευτικού χώρου',
   'storage.external.forOrg': 'Αποθήκευση εδώ των νέων αρχείων του οργανισμού',
   'storage.external.endpoint': 'Endpoint',

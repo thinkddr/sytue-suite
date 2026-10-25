@@ -23,6 +23,7 @@
   "account.presenceFailed": "Non è stato possibile cambiare la presenza",
   "account.signIn": "Accedi",
   "account.signOut": "Esci",
+  "account.signOutFailed": "Impossibile disconnettersi su questo dispositivo. Drive potrebbe essere ancora connesso. Riprova.",
   "account.signOutPending.body": "Notepads ha su questo dispositivo note non ancora caricate ({count}). Uscendo vengono eliminate da esso.",
   "account.signOutPending.discard": "Scarta ed esci",
   "account.signOutPending.title": "Note non caricate",
@@ -334,5 +335,6 @@
   "widgets.open": "Apri",
   "widgets.pending": "In sospeso",
   "widgets.photos": "Foto",
-  "widgets.rows": "Righe"
+  "widgets.rows": "Righe",
+  "widgets.storage": "Spazio di archiviazione"
 }

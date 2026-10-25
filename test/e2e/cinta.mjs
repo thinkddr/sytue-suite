@@ -20,8 +20,8 @@
 //
 // Qué comprueba, por variante y ancho, en TODAS las pestañas:
 //   1. el documento no desborda en horizontal;
-//   2. la banda de grupos es una línea desplazable y, si no cabe, aparece «Más»;
-//   3. con «Más» desplegado todos los grupos caben en el ancho de la pantalla y Escape
+//   2. la banda es una fila visible y desplazable; «Más» sólo en escritorio;
+//   3. en escritorio, con «Más» todos los grupos caben y Escape
 //      lo pliega devolviendo el foco al botón;
 //   4. un popover abierto es `fixed`, queda dentro de la pantalla y NADIE lo recorta;
 //   5. la banda es UNA parada de tabulación (roving) y las flechas mueven el foco;
@@ -38,6 +38,8 @@ const ANCHOS = [
   { w: 1280, h: 800, movil: false },
   { w: 390, h: 844, movil: true },
   { w: 320, h: 640, movil: true },
+  { w: 844, h: 390, movil: true },
+  { w: 1024, h: 768, movil: true },
 ];
 // El idioma más ancho que tenemos (el alemán medía 1304 px en Datos a 1280) y el de base.
 const IDIOMAS = ["es", "de"];
@@ -78,13 +80,12 @@ for (const kind of VARIANTES) {
       await page.goto(`${BASE}/dev/cinta?kind=${kind}&lang=${lang}`);
       await page.waitForSelector('[role="tablist"]', { timeout: 30000 });
 
-      const abrirHerramientas = async () => {
-        // En <768 px la fila empieza plegada: el botón de herramientas la abre.
-        const b = page.locator('button[aria-controls="ribbon-tabpanel"][aria-expanded]');
-        if ((await b.count()) && (await b.first().isVisible())) {
-          if ((await b.first().getAttribute("aria-expanded")) === "false") await b.first().click();
+      const comprobarBandaVisible = async () => {
+        if (!(await page.locator('#ribbon-tabpanel').isVisible())) {
+          falla(id, "la banda no está visible desde el inicio");
         }
       };
+      await comprobarBandaVisible();
 
       const tabs = page.locator('[role="tab"]');
       const nTabs = await tabs.count();
@@ -92,7 +93,7 @@ for (const kind of VARIANTES) {
         const nombre = (await tabs.nth(i).innerText()).trim();
         const c = `${id}/${nombre}`;
         await tabs.nth(i).click();
-        await abrirHerramientas();
+        await comprobarBandaVisible();
         await page.waitForTimeout(150);
 
         // 1. El documento no desborda.
@@ -115,7 +116,7 @@ for (const kind of VARIANTES) {
             overflowX: cs.overflowX,
             lineas: tops.size,
             grupos: grupos.length,
-            mas: !!mas && getComputedStyle(mas).display !== "none",
+            mas: !!mas && mas.getClientRects().length > 0,
           };
         });
         if (!banda) {
@@ -123,7 +124,8 @@ for (const kind of VARIANTES) {
           continue;
         }
         if (banda.lineas > 1) falla(c, `la banda plegada ocupa ${banda.lineas} líneas`);
-        if (banda.desborda && !banda.mas) falla(c, "la banda no cabe y no hay botón «Más»");
+        if (movil && banda.mas) falla(c, "móvil ofrece expansión «Más» en vez de una fila desplazable");
+        if (!movil && banda.desborda && !banda.mas) falla(c, "la banda no cabe y no hay botón «Más»");
         if (!banda.desborda && banda.mas) falla(c, "hay «Más» y la banda cabe");
         if (banda.desborda && banda.overflowX !== "auto") {
           falla(c, `la banda no cabe y no se desplaza (overflow-x: ${banda.overflowX})`);
@@ -225,9 +227,51 @@ for (const kind of VARIANTES) {
         if (!enTab) falla(c, "F6 desde el lienzo no lleva a la pestaña activa");
       }
 
+      // El gesto horizontal llega al extremo y el foco lo alcanza sin expandir.
+      if (movil) {
+        await tabs.first().click();
+        const banda = page.locator('#ribbon-banda');
+        const caja = await banda.boundingBox();
+        const antes = await banda.evaluate((b) => ({
+          alto: b.getBoundingClientRect().height,
+          ancho: b.clientWidth,
+          total: b.scrollWidth,
+        }));
+        if (caja && antes.total > antes.ancho + 1) {
+          await page.mouse.move(caja.x + caja.width / 2, caja.y + caja.height / 2);
+          await page.mouse.wheel(10000, 0);
+          await page.waitForTimeout(150);
+          const tras = await banda.evaluate((b) => ({
+            x: b.scrollLeft,
+            alto: b.getBoundingClientRect().height,
+          }));
+          if (tras.x <= 0 || Math.abs(tras.alto - antes.alto) > 1)
+            falla(id, 'el pan horizontal no avanza en una fila estable');
+          await page.screenshot({ path: `${OUT}/${id}-derecha.png` });
+          const extremos = await banda.evaluate((b) => {
+            const ctl = [
+              ...b.querySelectorAll(
+                'button:not([disabled]),select:not([disabled]),input:not([disabled])',
+              ),
+            ].filter((e) => !e.closest('.ribbon-popover'));
+            const ultimo = ctl.at(-1);
+            b.scrollLeft = 0;
+            ultimo?.focus();
+            const r = ultimo?.getBoundingClientRect();
+            const zona = b.getBoundingClientRect();
+            return {
+              x: b.scrollLeft,
+              visible: !!r && r.left >= zona.left - 1 && r.right <= zona.right + 1,
+            };
+          });
+          if (!extremos.visible || extremos.x <= 0)
+            falla(id, 'el foco no alcanza el último control de la cinta');
+        }
+      }
+
       // Flechas dentro de la banda (una vez por combinación, en la última pestaña tocada).
       await tabs.first().click();
-      await abrirHerramientas();
+      await comprobarBandaVisible();
       const flechas = await page.evaluate(async () => {
         const b = document.getElementById("ribbon-banda");
         const sel = 'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled])';
@@ -243,6 +287,28 @@ for (const kind of VARIANTES) {
 
       await tabs.first().click();
       await page.screenshot({ path: `${OUT}/${id}.png` });
+      if (movil && w === 390) {
+        // La misma cinta atraviesa retrato, horizontal y tableta sin reconstruirse.
+        for (const viewport of [
+          { width: 844, height: 390 },
+          { width: 1024, height: 768 },
+          { width: w, height: h },
+        ]) {
+          await page.setViewportSize(viewport);
+          await page.waitForTimeout(80);
+          const estado = await page.locator('#ribbon-banda').evaluate((b) => {
+            const mas = document.querySelector('button[aria-controls="ribbon-banda"]');
+            const grupos = [...b.querySelectorAll(':scope > [role="group"]')];
+            return {
+              filas: new Set(grupos.map((g) => Math.round(g.getBoundingClientRect().top))).size,
+              expansion: !!mas && mas.getClientRects().length > 0,
+              overflow: getComputedStyle(b).overflowX,
+            };
+          });
+          if (estado.filas !== 1 || estado.expansion || estado.overflow !== 'auto')
+            falla(id, `girar a ${viewport.width} altera la cinta desplazable: ${JSON.stringify(estado)}`);
+        }
+      }
       if (errores.length) falla(id, `errores de página: ${errores.slice(0, 2).join(" | ")}`);
       await ctxB.close();
     }

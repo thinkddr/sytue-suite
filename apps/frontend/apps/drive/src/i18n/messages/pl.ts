@@ -612,8 +612,10 @@ export const pl: AppCatalog<typeof en> = {
   'share.group.failed': 'Nie udało się udostępnić.',
   'share.person.someone': 'Ktoś z Twojej organizacji',
   'pdf.openInPdf': 'Otwórz w Sytue PDF',
-  'storage.externalNote':
-    'Nowe pliki korzystają z połączonej przestrzeni i nie zajmują miejsca tutaj.',
+  'storage.externalNote': 'Podłączona przestrzeń dyskowa zwiększa pojemność Twojego konta Sytue.',
+  'storage.externalCapacity': 'Podłączona przestrzeń dyskowa dodaje {capacity}.',
+  'storage.externalUnknown': 'Dostawca nie podaje pojemności przestrzeni dyskowej.',
+  'storage.baseUsage': 'Sytue: {used} z {total}',
   'storage.add': 'Dodaj miejsce na dane',
   'storage.external.forOrg': 'Zapisuj tutaj nowe pliki organizacji',
   'storage.external.endpoint': 'Endpoint',

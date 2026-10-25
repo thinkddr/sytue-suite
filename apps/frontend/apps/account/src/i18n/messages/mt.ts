@@ -55,7 +55,7 @@ export const mt: AppCatalog<typeof en> = {
   'security.mfa.title': "Verifika f'żewġ passi",
   'security.mfa.off': 'Mhux issettjata. Il-password waħedha tiftaħ il-kont.',
   'security.mfa.required':
-    "L-organizzazzjoni tiegħek teħtieġ verifika f'żewġ passi. Attivaha hawn taħt u erġa' idħol.",
+    "Din l-azzjoni teħtieġ verifika f'żewġ passi. Issettjaha hawn taħt, imbagħad erġa' idħol.",
   'security.mfa.on': 'Attiva. Jintalab kodiċi meta tidħol.',
   'security.mfa.enable': 'Issettja',
   'security.mfa.scan': 'Skennja dan bl-app tal-awtentikazzjoni tiegħek.',
@@ -113,6 +113,10 @@ export const mt: AppCatalog<typeof en> = {
   'plan.pro': 'Pjan Pro · 200 GB',
   'plan.enterprise': 'Pjan Enterprise · 1 TB · Appoġġ Premium',
   'plan.storage': 'Ħażna użata',
+  'plan.externalNote': "Il-ħażna konnessa żżid il-kapaċità tiegħek f'Sytue.",
+  'plan.externalCapacity': 'Il-ħażna konnessa żżid {capacity}.',
+  'plan.externalUnknown': 'Il-fornitur ma jirrapportax il-kapaċità tiegħu.',
+  'plan.baseUsage': 'Sytue: {used} minn {total}',
   'plan.paidUntil': 'Imħallas sa',
   'plan.upgrade': 'Ikseb aktar spazju',
   'plan.upgrade.hint':

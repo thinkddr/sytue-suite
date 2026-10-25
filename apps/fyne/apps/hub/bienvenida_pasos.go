@@ -25,13 +25,17 @@ import (
 // clases: `max-w-2xl gap-3` en las opciones, `max-w-xl gap-5` en los formularios,
 // `gap-4` dentro de los paneles y `p-4 rounded-lg border bg-surface-raised` en ellos.
 const (
-	AnchoFormAlta    float32 = 36 * tema.Rem // `max-w-xl`
-	HuecoFormAlta    float32 = 5 * 0.25 * tema.Rem
-	HuecoPanelAlta   float32 = 4 * 0.25 * tema.Rem
-	RellenoPanelAlta float32 = 4 * 0.25 * tema.Rem
-	HuecoFilaAlta    float32 = 3 * 0.25 * tema.Rem
-	HuecoCasillas    float32 = 2 * 0.25 * tema.Rem
+	MargenPieAsistente     float32 = 4 * 0.25 * tema.Rem
+	HuecoOpcionesAsistente float32 = 3 * 0.25 * tema.Rem
+	AnchoFormAlta          float32 = 36 * tema.Rem // `max-w-xl`
+	HuecoFormAlta          float32 = 5 * 0.25 * tema.Rem
+	HuecoPanelAlta         float32 = 4 * 0.25 * tema.Rem
+	RellenoPanelAlta       float32 = 4 * 0.25 * tema.Rem
+	HuecoFilaAlta          float32 = 3 * 0.25 * tema.Rem
+	HuecoCasillas          float32 = 2 * 0.25 * tema.Rem
 )
+
+var xsAjustada = tema.Escalon{Tam: tema.TextoXS.Tam, Linea: 1.375 * tema.TextoXS.Tam}
 
 // controlesAlta son los controles que sobreviven a los cambios de estado.
 type controlesAlta struct {

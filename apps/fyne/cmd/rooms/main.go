@@ -62,6 +62,7 @@ func main() {
 	var secure *rooms.Cifrado
 	content := mx.NewRoomsService(base, func(ctx context.Context) (*mx.Client, error) { return secure.Cliente(ctx) })
 	sala := rooms.NuevaSala(p, content, "")
+	sala.Widget = s.CapturarWidget
 	store, storeErr := ajustes.Carpeta()
 	secure = &rooms.Cifrado{Sala: sala, API: base, Base: mx.Config{SytueApex: s.Apex(), StoreDir: filepath.Join(store, "rooms-matrix"), DeviceName: "Sytue Rooms · " + runtime.GOOS}, Abrir: func(target string) error { return api.AbrirFuera(a, target) }}
 	if storeErr != nil {

@@ -355,6 +355,24 @@ func TestQuotaState(t *testing.T) {
 	}
 }
 
+func TestGraphQuotaRespetaElLibreDelProveedor(t *testing.T) {
+	total, used, available := int64(1000), int64(100), int64(0)
+	q := (domain.Quota{LimitBytes: 500, UsedBytes: 500}).WithStorageExtension(&total, &used, &available)
+	drive := NewGraphDrive(domain.Folder{}, "u-1", "Ada", &q)
+	if drive.Quota == nil || drive.Quota.Total != 1500 || drive.Quota.Used != 600 ||
+		drive.Quota.Remaining != 0 || drive.Quota.State != "exceeded" {
+		t.Fatalf("Graph no puede anunciar espacio utilizable inexistente: %+v", drive.Quota)
+	}
+	// Valores admitidos por la API no pueden desbordar al calcular porcentajes.
+	large := int64(1<<63 - 1)
+	if got := quotaState(domain.Quota{LimitBytes: large, UsedBytes: large / 2}); got != "normal" {
+		t.Fatalf("cuota grande a la mitad: %q", got)
+	}
+	if got := quotaState(domain.Quota{LimitBytes: large, UsedBytes: large - 1}); got != "critical" {
+		t.Fatalf("cuota grande con un byte libre: %q", got)
+	}
+}
+
 func TestNextLink(t *testing.T) {
 	if got := NextLink("https://drive.sytue.eu/", "/compat/graph/v1.0/me/drive/root/children", 0, ""); got != "" {
 		t.Fatalf("sin token no hay nextLink: %q", got)

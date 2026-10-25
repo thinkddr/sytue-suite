@@ -62,7 +62,7 @@ export const de: AppCatalog<typeof en> = {
   'security.mfa.title': 'Bestätigung in zwei Schritten',
   'security.mfa.off': 'Nicht eingerichtet. Ihr Passwort allein öffnet das Konto.',
   'security.mfa.required':
-    'Deine Organisation verlangt die Bestätigung in zwei Schritten. Aktiviere sie unten und melde dich erneut an.',
+    'Für diese Aktion ist eine Bestätigung in zwei Schritten erforderlich. Richte sie unten ein und melde dich erneut an.',
   'security.mfa.on': 'Aktiv. Bei der Anmeldung wird ein Code abgefragt.',
   'security.mfa.enable': 'Einrichten',
   'security.mfa.scan': 'Scannen Sie dies mit Ihrer Authenticator-App.',
@@ -133,6 +133,10 @@ export const de: AppCatalog<typeof en> = {
   'plan.pro': 'Pro-Tarif · 200 GB',
   'plan.enterprise': 'Enterprise-Tarif · 1 TB · Premium-Support',
   'plan.storage': 'Belegter Speicher',
+  'plan.externalNote': 'Der verbundene Speicher erweitert deine Sytue-Kapazität.',
+  'plan.externalCapacity': 'Der verbundene Speicher fügt {capacity} hinzu.',
+  'plan.externalUnknown': 'Der Anbieter gibt seine Speicherkapazität nicht an.',
+  'plan.baseUsage': 'Sytue: {used} von {total}',
   'plan.paidUntil': 'Bezahlt bis',
   'plan.upgrade': 'Mehr Speicher',
   'plan.upgrade.hint':

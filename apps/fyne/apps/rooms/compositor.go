@@ -186,11 +186,9 @@ type Compositor struct {
 	consulta   string
 	insertando bool
 	// Pendientes son los adjuntos de la caja (`pending`): subiéndose, subidos o
-	// fallidos; objPendientes, sus fichas, y anchoPendientes el ancho con el que se
-	// parten en líneas.
-	Pendientes      []Pendiente
-	objPendientes   []fyne.CanvasObject
-	anchoPendientes float32
+	// fallidos; objPendientes son sus fichas, que se parten al ancho recibido.
+	Pendientes    []Pendiente
+	objPendientes []fyne.CanvasObject
 	// aviso es `cmdNotice`: el comando que no existe o no está disponible aquí.
 	aviso    string
 	objAviso []fyne.CanvasObject
@@ -310,10 +308,6 @@ func (c *Compositor) Someter() {
 func (c *Compositor) PonerPendientes(ps []Pendiente) {
 	antes := c.altoArriba()
 	c.Pendientes = ps
-	c.anchoPendientes = c.Size().Width - 2*MargenCompositor
-	if c.anchoPendientes <= 0 {
-		c.anchoPendientes = 1 << 20 // sin tamaño aún: una sola línea
-	}
 	c.objPendientes = c.objPendientes[:0]
 	for _, p := range ps {
 		c.objPendientes = append(c.objPendientes, NuevaFichaPendiente(c.T, p, func() {
@@ -533,8 +527,14 @@ func MedidaCompositor() fyne.Size {
 // Medida es la franja con lo que tenga ENCIMA de la caja: las fichas de las opciones
 // activas suman su fila y su `mb-2`.
 func (c *Compositor) Medida() fyne.Size {
+	return c.medidaPara(c.Size().Width)
+}
+
+// medidaPara permite reservar el alto al NUEVO ancho antes de colocar la caja.
+// Los adjuntos pueden pasar a varias filas al girar, sin reconstruir el editor.
+func (c *Compositor) medidaPara(ancho float32) fyne.Size {
 	m := MedidaCompositor()
-	m.Height += c.altoArriba() + c.altoBarra() - ladoBotonesCompositor()
+	m.Height += c.altoArribaPara(ancho) + c.altoBarra() - ladoBotonesCompositor()
 	return m
 }
 
@@ -554,14 +554,25 @@ func (c *Compositor) altoBarra() float32 {
 // altoArriba es lo que va ENTRE el filete y la caja: el aviso de un comando y las
 // fichas de las opciones, cada uno con su `mb-2`.
 func (c *Compositor) altoArriba() float32 {
+	return c.altoArribaPara(c.Size().Width)
+}
+
+func (c *Compositor) altoArribaPara(ancho float32) float32 {
 	alto := c.altoFichas()
 	if len(c.objPendientes) > 0 {
-		alto += colocarEnvuelto(c.objPendientes, 0, 0, c.anchoPendientes, HuecoFichas, false) + AireFichas
+		alto += colocarEnvuelto(c.objPendientes, 0, 0, anchoAdjuntos(ancho), HuecoFichas, false) + AireFichas
 	}
 	if c.aviso != "" {
 		alto += tema.TextoXS.Linea + AireFichas
 	}
 	return alto
+}
+
+func anchoAdjuntos(ancho float32) float32 {
+	if ancho <= 0 {
+		return 1 << 20 // sin tamaño aún: una sola línea
+	}
+	return max(ancho-2*MargenCompositor, 0)
 }
 
 // cambiaArriba rehace lo que se pinta y avisa si la franja cambió de alto.
@@ -801,7 +812,7 @@ func (r *compositorRenderer) Layout(t fyne.Size) {
 	}
 	// Los adjuntos, en su fila que parte línea (`mb-2 flex flex-wrap gap-2`).
 	if len(c.objPendientes) > 0 {
-		y0 += colocarEnvuelto(c.objPendientes, x0, y0, c.anchoPendientes, HuecoFichas, true) + AireFichas
+		y0 += colocarEnvuelto(c.objPendientes, x0, y0, anchoAdjuntos(t.Width), HuecoFichas, true) + AireFichas
 	}
 	// El aviso de un comando: `mb-2 flex items-center gap-1.5 text-xs`.
 	if len(c.objAviso) == 2 {

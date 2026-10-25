@@ -36,6 +36,9 @@ func (o *OIDC) Almacen() *AlmacenSesion {
 	return &AlmacenSesion{emisor: emisor, cliente: cliente, cuenta: fmt.Sprintf("sesion-%x", suma[:16])}
 }
 
+// Identificador es el nombre estable, no secreto, del almacén de esta sesión.
+func (a *AlmacenSesion) Identificador() string { return a.cuenta }
+
 func (a *AlmacenSesion) pertenece(t Tokens) bool {
 	return (t.Issuer == "" || strings.TrimRight(t.Issuer, "/") == a.emisor) &&
 		(t.Cliente == "" || t.Cliente == a.cliente)
@@ -43,7 +46,14 @@ func (a *AlmacenSesion) pertenece(t Tokens) bool {
 
 // Cargar no renueva ni abre un navegador. Los tokens sólo salen del almacén seguro
 // de la plataforma, y nunca se aceptan si pertenecen a otro emisor o cliente.
-func (a *AlmacenSesion) Cargar() (Tokens, error) {
+func (a *AlmacenSesion) Cargar() (t Tokens, err error) {
+	defer func() {
+		if err != nil || t.Refresh == "" {
+			if fallo := ajustes.PonerAccesoDrive("", false); fallo != nil {
+				err = errors.Join(err, ErrSesionNoDisponible, fallo)
+			}
+		}
+	}()
 	if t, compartida, err := cargarCompartida(a); compartida {
 		if err == nil && t.Refresh != "" && (t.Issuer != a.emisor || t.Cliente != a.cliente) {
 			return Tokens{}, errors.Join(ErrSesionNoDisponible, ErrSesionAjena)
@@ -59,7 +69,7 @@ func (a *AlmacenSesion) Cargar() (Tokens, error) {
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return Tokens{}, err
 	}
-	t, err := cargarCuenta(a.cuenta)
+	t, err = cargarCuenta(a.cuenta)
 	if err == nil && t.Refresh != "" && (t.Issuer != a.emisor || t.Cliente != a.cliente) {
 		return Tokens{}, ErrSesionAjena
 	}
@@ -88,32 +98,59 @@ func (a *AlmacenSesion) marcarMigracion() error {
 
 // Guardar es el callback de Session y Compartida. Los tokens y secretos permanecen
 // en el llavero/Keystore; la marca compartida sólo avisa a los demás procesos.
-func (a *AlmacenSesion) Guardar(t Tokens) error {
+func (a *AlmacenSesion) Guardar(t Tokens) (err error) {
+	var errAcceso error
+	defer func() {
+		err = errors.Join(err, errAcceso)
+		if err != nil {
+			err = errors.Join(err, ajustes.PonerAccesoDrive("", false))
+		}
+	}()
 	if !a.pertenece(t) {
 		return ErrSesionAjena
 	}
+	identidad := (IdentitySnapshot{a.emisor, a.cliente, t.Subject, organizacionDe(t)}).IdentidadDrive()
+	anterior, _ := ajustes.LeerAccesoDrive()
+	if t.Refresh == "" || anterior.Identidad != identidad {
+		if err := ajustes.PonerAccesoDrive("", false); err != nil {
+			if t.Refresh != "" {
+				return errors.Join(ErrSesionNoDisponible, err)
+			}
+			// Un fallo de la marca no impide retirar el refresh ni dejar el
+			// testigo de cierre. Se comunica después de intentar ambas cosas.
+			errAcceso = errors.Join(ErrSesionNoDisponible, err)
+		}
+	}
 	if compartida, err := guardarCompartida(a, t); compartida {
-		return err
+		if err != nil {
+			return err
+		}
+		return a.publicarAccesoDrive(t)
 	}
 	var errMarca error
 	rutaCierre, errCierre := a.marcaCierre()
-	if errCierre != nil {
+	if errCierre != nil && t.Refresh != "" {
 		return errCierre
 	}
 	if t.Refresh == "" {
 		// El cierre sigue siendo efectivo si el llavero no deja borrar. Una
 		// copia antigua del refresh no vuelve a abrir la sesión en otra app.
-		errCierre = ajustes.EscribirEntero(rutaCierre, []byte("1\n"))
+		if errCierre == nil {
+			errCierre = ajustes.EscribirEntero(rutaCierre, []byte("1\n"))
+		}
 		errMarca = a.marcarMigracion()
 	} else {
 		t.Issuer, t.Cliente = a.emisor, a.cliente
 	}
-	err := guardarCuenta(a.cuenta, t)
+	err = guardarCuenta(a.cuenta, t)
 	if t.Refresh != "" && err == nil {
 		errMarca = a.marcarMigracion()
 		if errQuitar := os.Remove(rutaCierre); errQuitar != nil && !errors.Is(errQuitar, os.ErrNotExist) {
 			errCierre = errQuitar
 		}
+	}
+	if err == nil && errCierre == nil {
+		errMarca = errors.Join(errMarca, a.publicarAccesoDrive(t))
 	}
 	ajustes.MarcarSesion()
 	return errors.Join(err, errMarca, errCierre)

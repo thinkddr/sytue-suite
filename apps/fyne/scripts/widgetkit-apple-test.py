@@ -43,7 +43,7 @@ class ProductoTests(unittest.TestCase):
         (contenido / "Info.plist").write_bytes(plistlib.dumps(info))
 
     def _comando(self, argumentos):
-        extension = "Widgets.appex" in str(argumentos[-1])
+        extension = ".appex" in str(argumentos[-1])
         if argumentos[1] == "lipo":
             return self.arquitecturas
         if argumentos[1] == "nm":
@@ -103,6 +103,25 @@ class ProductoTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "build distinto"):
                 widgetkit.verificar(self.productos, self.plataforma, self.apps, "SytueWidgetBridge", "3.14.0", "37")
 
+    def test_fileprovider_ios_requiere_minimo16_y_su_tipo_real(self):
+        self.apps = [{"clave": "drive", "id": "eu.sytue.drive", "archivos": True}]
+        self._bundle("Archivos.appex", "eu.sytue.drive.archivos", True)
+        ruta = self.productos / "Archivos.appex/Info.plist"
+        datos = plistlib.loads(ruta.read_bytes())
+        datos["NSExtension"]["NSExtensionPointIdentifier"] = "com.apple.fileprovider-nonui"
+        ruta.write_bytes(plistlib.dumps(datos))
+        with patch.object(widgetkit, "capturar", self._comando), contextlib.redirect_stdout(io.StringIO()):
+            self.minimo = "16.0"
+            widgetkit.verificar(self.productos, "ios", self.apps, "SytueWidgetBridge", incluir_widgets=False)
+            self.minimo = "15.0"
+            with self.assertRaisesRegex(ValueError, "mínimo real"):
+                widgetkit.verificar(self.productos, "ios", self.apps, "SytueWidgetBridge", incluir_widgets=False)
+            self.minimo = "16.0"
+            datos["NSExtension"]["NSExtensionPointIdentifier"] = "com.apple.widgetkit-extension"
+            ruta.write_bytes(plistlib.dumps(datos))
+            with self.assertRaisesRegex(ValueError, "tipo de extensión"):
+                widgetkit.verificar(self.productos, "ios", self.apps, "SytueWidgetBridge", incluir_widgets=False)
+
 
 class InsercionTests(unittest.TestCase):
     def setUp(self):
@@ -123,7 +142,7 @@ class InsercionTests(unittest.TestCase):
         self.perfil = self.raiz / "perfil.mobileprovision"
         self.perfil.write_bytes(b"fixture-perfil-sin-datos-reales")
         self.app = {"clave": "rooms", "id": "eu.sytue.rooms"}
-        self.generador = types.SimpleNamespace(PUENTE_WIDGETS="SytueWidgetBridge", grupo_widgets=lambda: "group.eu.sytue.suite")
+        self.generador = types.SimpleNamespace(EQUIPO="VHC5QW7BZ3", PUENTE_WIDGETS="SytueWidgetBridge", grupo_widgets=lambda: "group.eu.sytue.suite")
         self.comandos = []
         self.lecturas = []
         self.carga = "@rpath/SytueWidgetBridge.framework/SytueWidgetBridge"
@@ -157,6 +176,34 @@ class InsercionTests(unittest.TestCase):
         self.assertTrue(str(firmas[0][-1]).endswith("SytueWidgetBridge.framework"))
         self.assertTrue(str(firmas[1][-1]).endswith("Sytue-rooms-Widgets.appex"))
         self.assertNotIn(self.host, [c[-1] for c in firmas])
+
+    def test_drive_incorpora_fileprovider_con_su_perfil_y_sin_llavero_suite(self):
+        self.app["archivos"] = True
+        (self.productos / "Archivos.appex").mkdir()
+        (self.productos / "Archivos.appex/main").write_bytes(b"fixture-proveedor")
+        self.insertar()
+        proveedor = self.host / "PlugIns/Archivos.appex"
+        self.assertEqual((proveedor / "embedded.mobileprovision").read_bytes(), self.perfil.read_bytes())
+        guardas = [c for c in self.comandos if "verificar-perfil-grupo" in c]
+        self.assertEqual(len(guardas), 2)
+        self.assertEqual(guardas[1][4:8], ["eu.sytue.rooms.archivos", "ios", "group.eu.sytue.rooms", "NSFileProtectionComplete"])
+        self.assertEqual(guardas[1][8], "VHC5QW7BZ3.eu.sytue.rooms.shared")
+        firmas = [c for c in self.comandos if c[0] == "codesign" and "-s" in c]
+        self.assertEqual(firmas[-1][-1], proveedor)
+        self.assertNotIn(self.host, [c[-1] for c in firmas])
+
+    def test_fileprovider_sin_widget_no_necesita_puente_ni_su_perfil(self):
+        self.app["archivos"] = True
+        (self.productos / "Archivos.appex").mkdir()
+        (self.productos / "Archivos.appex/main").write_bytes(b"fixture-proveedor")
+        self.carga = "sin-puente"
+        with patch.object(widgetkit, "capturar", self.capturar), patch.object(widgetkit, "ejecutar", self.comandos.append):
+            with contextlib.redirect_stdout(io.StringIO()):
+                widgetkit.insertar(self.productos, self.host, "ios", "Distribución de pruebas", self.app, self.generador, False)
+        self.assertEqual(list((self.host / "PlugIns").iterdir()), [self.host / "PlugIns/Archivos.appex"])
+        self.assertFalse(any("otool" in c for c in self.lecturas))
+        self.assertFalse(any(".widgets" in str(c) for c in self.comandos))
+        self.assertEqual([c[-1] for c in self.comandos if c[0] == "codesign" and "-s" in c], [self.host / "PlugIns/Archivos.appex"])
 
     def test_host_fuera_de_payload_no_puede_escribir_swift_support(self):
         original = self.host

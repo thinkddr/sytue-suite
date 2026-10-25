@@ -55,7 +55,7 @@ export const et: AppCatalog<typeof en> = {
   'security.mfa.title': 'Kaheastmeline kinnitamine',
   'security.mfa.off': 'Pole seadistatud. Konto avab ainult parool.',
   'security.mfa.required':
-    'Teie organisatsioon nõuab kaheastmelist kinnitamist. Lülitage see allpool sisse ja logige uuesti sisse.',
+    'See toiming nõuab kaheastmelist kinnitamist. Seadista see allpool ja logi seejärel uuesti sisse.',
   'security.mfa.on': 'Sees. Sisselogimisel küsitakse koodi.',
   'security.mfa.enable': 'Seadista',
   'security.mfa.scan': 'Skannige see oma autentimisrakendusega.',
@@ -113,6 +113,10 @@ export const et: AppCatalog<typeof en> = {
   'plan.pro': 'Pro-pakett · 200 GB',
   'plan.enterprise': 'Enterprise-pakett · 1 TB · Premium-tugi',
   'plan.storage': 'Kasutatud salvestusruum',
+  'plan.externalNote': 'Ühendatud salvestusruum suurendab sinu Sytue salvestusmahtu.',
+  'plan.externalCapacity': 'Ühendatud salvestusruum lisab {capacity}.',
+  'plan.externalUnknown': 'Teenusepakkuja ei teata oma salvestusmahtu.',
+  'plan.baseUsage': 'Sytue: {used} / {total}',
   'plan.paidUntil': 'Makstud kuni',
   'plan.upgrade': 'Rohkem ruumi',
   'plan.upgrade.hint':

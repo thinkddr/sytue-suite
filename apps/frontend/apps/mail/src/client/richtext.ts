@@ -1,3 +1,5 @@
+import createDOMPurify from 'dompurify';
+
 /**
  * Utilidades de rich-text del compositor de Sytue Mail (solo navegador). El
  * cuerpo se edita en un contenteditable y se envía como text/html; aquí se
@@ -236,6 +238,26 @@ function cleanInto(src: Node, out: Node, doc: Document): void {
   }
 }
 
+/** Parse clipboard HTML through an XSS sanitizer before inspecting its DOM. */
+function sanitizedBody(html: string): HTMLElement {
+  const body = createDOMPurify(window).sanitize(html, {
+    RETURN_DOM: true,
+    ALLOWED_TAGS: [...ALLOWED_TAGS, '#text'],
+    ALLOWED_ATTR: [
+      'href',
+      'rel',
+      'style',
+      ...new Set(Object.values(ALLOWED_ATTRS).flatMap((attrs) => [...attrs])),
+    ],
+    FORBID_TAGS: [...DROP_WITH_CONTENT],
+    FORBID_CONTENTS: [...DROP_WITH_CONTENT],
+    ALLOW_DATA_ATTR: false,
+    ALLOW_ARIA_ATTR: false,
+  });
+  if (!(body instanceof window.HTMLElement)) throw new Error('HTML sanitizer returned no body');
+  return body;
+}
+
 /**
  * Tipos de imagen `data:` que entran al PEGAR, con la extensión de su fichero: los de
  * mapa de bits que pinta cualquier cliente. Un SVG no, que es por donde se cuela un
@@ -271,16 +293,16 @@ export function ficheroDeDatos(src: string, numero: number): File | null {
  * pasa a `cid:…`, que el saneado sí deja pasar. Es lo que copia un navegador de una
  * imagen suelta, o un editor de escritorio. La que no se incrusta se queda como estaba
  * (y el saneado la tira), igual que las de dentro de lo que se va con su contenido. Sin
- * ninguna, el HTML vuelve tal cual.
+ * ninguna, el HTML también vuelve saneado.
  */
 export async function incrustarImagenesPegadas(
   html: string,
   incrustar: (fichero: File) => Promise<string | null>,
 ): Promise<string> {
-  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const body = sanitizedBody(html);
   const fuera = [...DROP_WITH_CONTENT].join(',');
   let n = 0;
-  for (const img of Array.from(doc.querySelectorAll('img'))) {
+  for (const img of Array.from(body.querySelectorAll('img'))) {
     if (img.parentElement?.closest(fuera)) continue;
     const fichero = ficheroDeDatos(img.getAttribute('src') ?? '', n + 1);
     if (!fichero) continue;
@@ -288,14 +310,17 @@ export async function incrustarImagenesPegadas(
     const cid = await incrustar(fichero);
     if (cid) img.setAttribute('src', `cid:${cid}`);
   }
-  return n > 0 ? doc.body.innerHTML : html;
+  const out = body.ownerDocument.createElement('div');
+  cleanInto(body, out, body.ownerDocument);
+  return out.innerHTML;
 }
 
 /** Sanea un fragmento HTML a la lista blanca del compositor. */
 export function sanitizeHtml(input: string): string {
-  const doc = new DOMParser().parseFromString(input, 'text/html');
+  const body = sanitizedBody(input);
+  const doc = body.ownerDocument;
   const out = doc.createElement('div');
-  cleanInto(doc.body, out, doc);
+  cleanInto(body, out, doc);
   return out.innerHTML;
 }
 

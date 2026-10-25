@@ -9,7 +9,8 @@
  * El idioma llega por props desde la isla raiz (Shell), que a su vez lo recibe
  * del layout SSR: aqui no se detecta nada (docs/CONVENTIONS.md §13.1).
  */
-import { useEffect, useState } from 'preact/hooks';
+import { useCallback, useEffect, useState } from 'preact/hooks';
+import { hasCompleteExternalCapacity, type DriveQuota } from '@sytue/api-clients/drive';
 import { Sidebar, SidebarSection, SidebarItem, Meter, formatBytes } from '@sytue/ui';
 import { appUrl } from '@sytue/config';
 import type { Locale } from '@sytue/i18n';
@@ -42,29 +43,36 @@ export const UNIMPLEMENTED_SECTIONS: ReadonlySet<Section> = new Set<Section>();
  * sólido, sin degradado); la barra expone role=progressbar y el texto el valor.
  * Si la cuota no carga, el pie se muestra sin barra (no estorba).
  */
-function StorageMeter({ locale, t }: { locale: Locale; t: T }) {
-  const [quota, setQuota] = useState<{
-    usedBytes: number;
-    limitBytes: number;
-    externalStorage?: boolean;
-  } | null>(null);
+export function StorageMeter({
+  locale,
+  t,
+  revision = 0,
+}: {
+  locale: Locale;
+  t: T;
+  revision?: number;
+}) {
+  const [quota, setQuota] = useState<DriveQuota | null>(null);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let alive = true;
-    fetch('/api/quota', { credentials: 'include' })
+    const controller = new AbortController();
+    setQuota(null);
+    setFailed(false);
+    fetch('/api/quota', { credentials: 'include', signal: controller.signal })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error('quota'))))
       .then((data) => {
-        if (alive)
-          setQuota(data as { usedBytes: number; limitBytes: number; externalStorage?: boolean });
+        if (alive) setQuota(data as DriveQuota);
       })
       .catch(() => {
         if (alive) setFailed(true);
       });
     return () => {
       alive = false;
+      controller.abort();
     };
-  }, []);
+  }, [revision]);
 
   if (failed) return null;
   // EL MEDIDOR COMPARTIDO, y no una copia. El de aquí pintaba SIEMPRE del mismo
@@ -88,12 +96,26 @@ function StorageMeter({ locale, t }: { locale: Locale; t: T }) {
         }
         onChrome
       />
-      {/* Con bucket propio conectado, lo nuevo no gasta este espacio: se dice
-          junto al medidor, que es donde se mira cuando se acaba el sitio. */}
       {quota?.externalStorage ? (
-        <p class="text-sidebar-fg-muted mt-1 text-xs leading-relaxed">
-          {t('storage.externalNote')}
-        </p>
+        <div class="text-sidebar-fg-muted mt-1 space-y-1 text-xs leading-relaxed">
+          <p>{t('storage.externalNote')}</p>
+          <p>
+            {hasCompleteExternalCapacity(quota.externalCapacity)
+              ? t('storage.externalCapacity', {
+                  capacity: formatBytes(locale, quota.externalCapacity.totalBytes),
+                })
+              : t('storage.externalUnknown')}
+          </p>
+          {hasCompleteExternalCapacity(quota.externalCapacity) && quota.externalCapacity.partial ? (
+            <p>{t('storage.externalUnknown')}</p>
+          ) : null}
+          <p>
+            {t('storage.baseUsage', {
+              used: formatBytes(locale, quota.baseUsedBytes ?? quota.usedBytes),
+              total: formatBytes(locale, quota.baseLimitBytes ?? quota.limitBytes),
+            })}
+          </p>
+        </div>
       ) : null}
     </div>
   );
@@ -127,6 +149,8 @@ export function DriveSidebar({
   onCloud: (c: Cloud) => void;
 }) {
   const t = useT(locale);
+  const [quotaRevision, setQuotaRevision] = useState(0);
+  const refreshQuota = useCallback(() => setQuotaRevision((revision) => revision + 1), []);
   return (
     <Sidebar
       // En <768px la pinta el AdminShell como drawer: ocultarla a secas dejaba
@@ -154,7 +178,7 @@ export function DriveSidebar({
                 neerlandés ni portugués. */}
             <span class="line-clamp-2 min-w-0 break-words">{t('nav.connectDevices')}</span>
           </a>
-          <StorageMeter locale={locale} t={t} />
+          <StorageMeter locale={locale} t={t} revision={quotaRevision} />
           <p class="text-sidebar-fg-muted px-1.5 text-xs leading-relaxed">{t('storage.euNote')}</p>
         </div>
       }
@@ -175,7 +199,7 @@ export function DriveSidebar({
       </SidebarSection>
       {/* Nubes personales, almacén de la organización y la ÚNICA entrada «Añadir
           almacenamiento» (antes había además un enlace aparte en el pie). */}
-      <CloudsSidebar t={t} active={cloud} onSelect={onCloud} />
+      <CloudsSidebar t={t} active={cloud} onSelect={onCloud} onStorageChange={refreshQuota} />
     </Sidebar>
   );
 }

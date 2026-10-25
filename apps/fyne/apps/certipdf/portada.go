@@ -96,6 +96,7 @@ type Portada struct {
 	// el de fotos; AlAbrir abre un reciente.
 	AlCrear, AlElegir, AlEscanear func()
 	AlAbrir                       func(api.File)
+	Refresco                      ui.RefrescoLista
 
 	filtro   *ui.Entrada
 	consulta string
@@ -133,7 +134,8 @@ func NuevaPortada(t TraductorVars, loc i18n.Locale) *Portada {
 func (p *Portada) Objeto() fyne.CanvasObject {
 	p.recomponer()
 	p.fondo.FillColor = tema.Color("bg", tema.De(fyne.CurrentApp().Settings().ThemeVariant()))
-	return container.NewStack(p.fondo, container.NewThemeOverride(p.scroll, temaVisor{}))
+	p.Refresco.Arriba = func() bool { return p.scroll.Offset.Y <= 0.5 }
+	return container.NewStack(p.fondo, ui.RefrescarAlTirar(container.NewThemeOverride(p.scroll, temaVisor{}), &p.Refresco))
 }
 
 // PonerEncima es el `dragover`/`dragleave` de la zona de abrir: con un fichero encima,

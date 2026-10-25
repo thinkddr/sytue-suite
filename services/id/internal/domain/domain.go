@@ -111,7 +111,7 @@ func (r Role) Valid() bool {
 	}
 }
 
-// RequiresMFA indica si el rol obliga a MFA/WebAuthn (owner/admin, §8).
+// RequiresMFA indica si el rol exige MFA/WebAuthn al administrar identidad (§8).
 func (r Role) RequiresMFA() bool { return r == RoleOwner || r == RoleAdmin }
 
 // Errores de dominio reutilizables.

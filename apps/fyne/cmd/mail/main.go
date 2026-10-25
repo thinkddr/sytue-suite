@@ -22,7 +22,6 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 
-	"git.sytue.eu/sytue/one/apps/fyne/apps/hub"
 	"git.sytue.eu/sytue/one/apps/fyne/apps/mail"
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/sesion"
@@ -129,7 +128,7 @@ func main() {
 		return s.AutorizarCorreo(ctx, gateway, provider, instance, services...)
 	})
 	b.ConImportar(gateway, func() {
-		_ = api.AbrirFuera(a, hub.PoliticaDePrivacidad(s.Apex(), l))
+		_ = api.AbrirFuera(a, ui.PoliticaDePrivacidad(s.Apex(), l))
 	})
 	s.AlAbrirURL(func(u *url.URL) {
 		// El aviso de un correo nuevo abre su conversación (`hubnotify.EnlaceHilo`).

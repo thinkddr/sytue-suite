@@ -11,7 +11,9 @@ import (
 
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 
+	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/ui/recorrido"
+	"git.sytue.eu/sytue/one/apps/fyne/ui/recorrido/montaje"
 )
 
 // TestRecorridoConSesion pulsa todo lo que se ve con los datos del servicio falso y
@@ -22,10 +24,12 @@ func TestRecorridoConSesion(t *testing.T) {
 		s.contactos = pantallaDeMuestra(t).Contactos // la libreta con nombres de verdad
 	}
 	a := appDePrueba(t, s)
-	if os.Getenv("SYTUE_CAPTURAS_PLAY") != "" {
-		a.Cargar()
-		s.correrCola()
+	a.Cargar()
+	s.correrCola()
+	if len(a.Pantalla.Contactos) == 0 {
+		t.Fatal("la libreta debe estar cargada antes de girar")
 	}
 	ws := fyne.CurrentApp().Driver().AllWindows()
+	montaje.ComprobarRotacion(t, ws[len(ws)-1], "contacts", iconos.Contacts, true)
 	recorrido.Comprobar(t, ws[len(ws)-1], 400)
 }

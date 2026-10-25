@@ -188,6 +188,9 @@ func FormaDeLosGuardianes() {
 // que pinta el color «el de cada app». Lo dice la barra de la suite al montarse.
 func ElegirApp(clave string) bool { return tokens.ElegirApp(clave) }
 
+// AppElegida devuelve el producto en vigor para poder restaurar su apariencia.
+func AppElegida() string { return tokens.AppElegida() }
+
 // Color mapea el puñado de nombres que Fyne resuelve por su cuenta —el fondo del
 // lienzo, el color de un `canvas.Text` sin color, la selección— a los tokens de la
 // hoja. NO es la puerta por la que los widgets de la suite piden color: ver el

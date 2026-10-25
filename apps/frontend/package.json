@@ -66,11 +66,12 @@
     "yaml": "2.9.1"
   },
   "overrides": {
+    "body-parser": "1.20.9",
     "http-cache-semantics": "4.3.0",
     "basic-ftp": "6.2.1",
     "ip-address": "10.7.4",
     "devalue": "5.9.4",
-    "undici": "8.11.2",
+    "undici": "8.12.2",
     "yaml": "2.9.1",
     "js-yaml": "4.3.2",
     "brace-expansion": "5.0.12",
@@ -80,11 +81,13 @@
     "qs": "6.16.0",
     "svgo": "4.1.0",
     "sharp": "0.35.5",
-    "fast-uri": "3.1.8",
+    "fast-uri": "3.1.9",
     "tmp": "0.2.7",
     "uuid": "11.1.1",
-    "@puppeteer/browsers": "3.2.2",
-    "vite": "8.3.4"
+    "@puppeteer/browsers": "3.2.5",
+    "vite": "8.3.4",
+    "puppeteer-core": "25.14.0",
+    "zod": "4.6.7"
   },
   "patchedDependencies": {
     "astro@7.3.5": "patches/astro@7.3.5.patch",

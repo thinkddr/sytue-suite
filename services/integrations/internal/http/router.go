@@ -128,6 +128,7 @@ func NewRouter(d Deps) http.Handler {
 			in.Use(httpx.SinPasarPorElIngress, requireInternal(d.Cfg.InternalSecret))
 			in.Get("/internal/v1/storage/instances", h.InternalStorageInstances)
 			in.Get("/internal/v1/storage/token", h.InternalStorageToken)
+			in.Get("/internal/v1/storage/personal-capacity", h.InternalPersonalStorageCapacity)
 			in.Get("/internal/v1/rooms/destinations", h.InternalRoomsDestinations)
 			in.Post("/internal/v1/rooms/messages", h.InternalRoomsMessage)
 			in.Post("/internal/v1/rooms/meetings", h.InternalRoomsMeeting)

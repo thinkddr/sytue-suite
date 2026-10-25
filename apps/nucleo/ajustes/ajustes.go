@@ -59,6 +59,9 @@ var ErrSesionNoDisponible = errors.New("ajustes: el almacén de sesión comparti
 
 // Ajustes son las preferencias transversales de la persona.
 type Ajustes struct {
+	// DriveSistemaDesactivado retira Drive del explorador de archivos de este equipo.
+	// Sin elección explícita se integra al iniciar sesión, sin configuración manual.
+	DriveSistemaDesactivado bool `json:"drive_sistema_desactivado,omitempty"`
 	// Tema es "claro", "oscuro", "traslucido" o "" (el del sistema).
 	Tema string `json:"tema,omitempty"`
 	// Color es el color de la suite que eligió la persona: "petroleo" o uno de los que

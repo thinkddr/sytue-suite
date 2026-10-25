@@ -259,8 +259,14 @@ func (e *editor) FocusGained() {
 	e.Entry.FocusGained()
 	e.alEnfocar(true)
 	avisarEscritura(e)
+	sincronizarExclusionTrasFoco(lienzoDe(e))
 }
-func (e *editor) FocusLost() { e.Entry.FocusLost(); e.alEnfocar(false) }
+
+func (e *editor) FocusLost() {
+	e.Entry.FocusLost()
+	e.alEnfocar(false)
+	sincronizarExclusionTrasFoco(lienzoDe(e))
+}
 
 // TypedKey pasa la tecla por la Entrada que lo envuelve. Con el puntero DE VERDAD el
 // foco cae en el editor —es el objeto más profundo bajo el clic, y `Entrada.Tapped`

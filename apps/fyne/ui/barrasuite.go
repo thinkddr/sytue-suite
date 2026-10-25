@@ -195,6 +195,19 @@ func TactilDePrueba(si bool) (restaurar func()) {
 	return func() { tactilDePrueba = antes }
 }
 
+// BarraSuiteDePrueba monta el mismo cromo que la app sin una sesión de red real.
+// Devuelve con qué parar sus recursos y restaurar el catálogo común y el producto
+// de la prueba anterior. Solo pruebas, como TactilDePrueba.
+func BarraSuiteDePrueba(t *i18n.Translator, p iconos.Producto) (*BarraSuite, func()) {
+	previo, producto := comun.Load(), tema.AppElegida()
+	b := NuevaBarraSuite(t, nil, p)
+	return b, func() {
+		b.Parar()
+		comun.Store(previo)
+		tema.ElegirApp(producto)
+	}
+}
+
 // CanalonDeBarra es el relleno lateral para esa anchura de ventana (`px-4 lg:px-6`).
 func CanalonDeBarra(ancho float32) float32 {
 	if ancho >= CorteCanalonBarra {
@@ -218,7 +231,7 @@ type BarraSuite struct {
 	// ConSinSesionPropia) y Montar no pone la página «Iniciar sesión».
 	sinSesionPropia bool
 	// hojaASangre: en la forma Marco la hoja de esta app va sin separación del borde y
-	// solo con las esquinas de arriba (ver ConHojaASangre).
+	// conserva sus cuatro esquinas redondeadas (ver ConHojaASangre).
 	hojaASangre bool
 	// montado es lo que devolvió Montar: la barra le avisa cuando cambia la apariencia,
 	// que es cuando hay que volver a colocar el marco y la hoja.
@@ -321,7 +334,19 @@ func (b *BarraSuite) Montar(contenido fyne.CanvasObject) fyne.CanvasObject {
 			b.montarSinSesion(poner, contenido)
 		}
 	}
-	return c
+	raiz := conGestosMoviles(c)
+	if gestos, ok := raiz.(*raizGestos); ok && b.s != nil {
+		b.s.AlFondo(func() {
+			gestos.primerPlano = false
+			gestos.gestos.cancelar()
+			sincronizarExclusionMenuMovil(gestos.canvas)
+		})
+		b.s.AlVolver(func() {
+			gestos.primerPlano = true
+			sincronizarExclusionMenuMovil(gestos.canvas)
+		})
+	}
+	return raiz
 }
 
 // confirmarSubidaLocal pregunta antes de subir al servicio un fichero local abierto desde
@@ -393,8 +418,8 @@ func (b *BarraSuite) conMenuLateral() bool {
 }
 
 // ConHojaASangre es para los EDITORES (Docus, Calcus, Diapos y CertiPDF): en la forma
-// Marco su hoja va a sangre —sin separación del borde y con solo las esquinas de arriba
-// redondeadas—, como `sytue-sheet-bleed` en la carcasa de los editores de la web. Un
+// Marco su hoja va a sangre —sin separación del borde ni sombra, con las cuatro
+// esquinas redondeadas—. Un
 // folio o una rejilla que flotan dentro de otra hoja que flota pierden sitio y no ganan
 // nada.
 func (b *BarraSuite) ConHojaASangre() *BarraSuite {
@@ -690,7 +715,7 @@ func (m *montaje) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 	}
 	// Sin menú a su izquierda, la hoja se separa de los tres bordes (el de arriba es la
 	// barra, que es parte del marco). A sangre —los editores, y cualquiera por debajo
-	// de 768— ocupa todo y solo redondea arriba.
+	// de 768— ocupa todo y conserva las cuatro esquinas.
 	aSangre := m.aSangre || t.Width < Estrecho
 	hojaPos, hojaTam := pos, tam
 	if !aSangre {

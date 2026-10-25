@@ -27,6 +27,7 @@ import (
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 	"git.sytue.eu/sytue/one/apps/nucleo/offline"
+	"git.sytue.eu/sytue/one/apps/nucleo/widgets"
 )
 
 // SinGuardarSinConexion son las rutas de Drive que la caché «sin conexión» no guarda
@@ -49,6 +50,8 @@ type Pantalla struct {
 	tr  *i18n.Translator
 	red *offline.Monitor
 	win fyne.Window
+	// Widget sólo publica la cuota completa ya cargada para el medidor del carril.
+	Widget widgets.Source
 
 	seccion Seccion
 	// pedidoCompartido es lo compartido que abrir cuando llegue la lista (un aviso).
@@ -103,6 +106,9 @@ type Pantalla struct {
 	// pone el `main` con `sesion.Suite.Entrar`; nil en el guardián, que no tiene
 	// navegador.
 	Entrar func() error
+	// ConfigurarSistema abre el control nativo de integración de este dispositivo.
+	// No ofrece perfiles, URL WebDAV ni otra cuenta que configurar.
+	ConfigurarSistema func()
 	// ElegirFicheros abre el selector del sistema y le pasa a `listo` lo elegido: rutas
 	// del disco en escritorio, flujos del proveedor de contenido en el móvil. Lo pone el
 	// `main`, que es quien tiene la ventana; nil, «Subir» no hace nada.
@@ -278,23 +284,27 @@ func (p *Pantalla) variante() tema.Variante {
 
 // vista es la pantalla de la sección activa.
 func (p *Pantalla) vista(v tema.Variante) fyne.CanvasObject {
+	var o fyne.CanvasObject
 	switch p.seccion {
 	case Papelera:
-		return p.papelera.Objeto(v)
+		o = p.papelera.Objeto(v)
 	case MiUnidad:
-		return p.explor.Objeto(v)
+		o = p.explor.Objeto(v)
 	case Recientes:
-		return p.sec.recientes.Objeto(v)
+		o = p.sec.recientes.Objeto(v)
 	case Favoritos:
-		return p.sec.destacados.Objeto(v)
+		o = p.sec.destacados.Objeto(v)
 	case CompartidoConmigo:
-		return p.sec.compartido.Objeto(v)
+		o = p.sec.compartido.Objeto(v)
 	case Documentos:
-		return p.sec.documentos.Objeto(v)
+		o = p.sec.documentos.Objeto(v)
 	case UnidadesDeEquipo:
-		return p.sec.equipos.Objeto(v)
+		o = p.sec.equipos.Objeto(v)
 	case Nube:
-		return p.sec.nube.Objeto(v)
+		o = p.sec.nube.Objeto(v)
+	}
+	if o != nil {
+		return p.refrescoSeccion(o)
 	}
 	x := ui.NuevoVacio(p.tr.T("ui.loading", nil), "")
 	return centrar(x, v)
@@ -428,11 +438,12 @@ func (p *Pantalla) cargarPie() {
 	}
 }
 
-// abrirDispositivos es «Conectar tus dispositivos»: el asistente del portal, que ya trae
-// la dirección WebDAV y los pasos por sistema. Es OTRA aplicación —el Hub—, así que se
-// le pide al sistema por su esquema, con la web de respaldo (CONVENTIONS.md §13.6).
+// abrirDispositivos controla la integración local; el SO solicita su permiso cuando
+// lo exige. El cliente nativo no redirige a instrucciones de perfiles manuales.
 func (p *Pantalla) abrirDispositivos() {
-	_ = api.AbrirEn(p.abridor(), p.apex(), "one", p.org(), "/dispositivos")
+	if p.ConfigurarSistema != nil {
+		p.ConfigurarSistema()
+	}
 }
 
 // Sesion avisa de que la sesión ha cambiado —aquí o en otra de las apps de la suite,
@@ -562,12 +573,26 @@ func (p *Pantalla) cargarCuota() {
 	}
 	ctx, cancelar := p.ctx()
 	defer cancelar()
+	view := p.Widget.View()
 	q, err := p.svc.Quota(ctx)
 	if err != nil {
 		return
 	}
+	if p.hayRed() {
+		if counter, valid := widgets.StoragePercent(q.UsedBytes, q.LimitBytes); valid && !q.ExternalStorage {
+			_ = view.Publicar(ctx, counter)
+		} else {
+			// La cuota de Sytue no mide el almacén externo. Sin capacidad conocida
+			// tampoco existe un porcentaje: retira la observación anterior.
+			_ = view.Publicar(ctx)
+		}
+	}
 	enHilo(func() {
-		p.lateral.Cuota = &Cuota{Usado: q.UsedBytes, Tope: q.LimitBytes, Externo: q.ExternalStorage}
+		p.lateral.Cuota = &Cuota{
+			Usado: q.UsedBytes, Tope: q.LimitBytes,
+			BaseUsado: q.BaseUsedBytes, BaseTope: q.BaseLimitBytes,
+			Externo: q.ExternalStorage, CapacidadExterna: q.ExternalCapacity,
+		}
 		p.Repintar()
 	})
 }
@@ -596,6 +621,11 @@ func (p *Pantalla) enganchar() {
 	e.AlAbrir = p.abrir
 	e.AlNavegar = p.navegar
 	e.AlReintentar = p.reintentar
+	e.Refresco.Actualizar = p.reintentar
+	e.Refresco.Puede = func() bool {
+		return p.dentro && p.hayRed() && e.Fase != Cargando && !e.Ocupado && !e.CargandoMas && !e.AlgoMarcado()
+	}
+	e.Refresco.Revision = p.epoca.Load
 	e.AlCambiarVista = func(rejilla bool) { e.Rejilla = rejilla; p.Repintar() }
 	e.AlBuscar = p.buscar
 	e.AlSeleccionar = p.marcar

@@ -71,7 +71,7 @@ func TestBorrarMiCuenta(t *testing.T) {
 	if _, err := l.st.SetAvatar(l.ctx, u.ID, "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="); err != nil {
 		t.Fatalf("SetAvatar: %v", err)
 	}
-	if _, err := l.st.CreateAppPassword(l.ctx, u.ID, "hash-app", "Correo"); err != nil {
+	if _, err := l.st.CreateAppPassword(l.ctx, u.ID, org.ID, "hash-app", "Correo"); err != nil {
 		t.Fatalf("CreateAppPassword: %v", err)
 	}
 	if _, err := l.st.UpsertDevice(l.ctx, nil, domain.Device{OrgID: org.ID, UserID: u.ID, DeviceID: "disp-borrar", Name: "Portátil"}); err != nil {
@@ -249,7 +249,7 @@ func TestBorrarMiCuentaRevision(t *testing.T) {
 	a := l.addMember(t, org, "a-duena@id.test", domain.RoleOwner)
 	b := l.addMember(t, org, "b-duena@id.test", domain.RoleOwner)
 	tokA := l.token(t, a.ID, org.Slug, nil)
-	if _, err := l.st.CreateAppPassword(l.ctx, a.ID, domain.HashToken("appsecretoderevision"), "Correo"); err != nil {
+	if _, err := l.st.CreateAppPassword(l.ctx, a.ID, org.ID, domain.HashToken("appsecretoderevision"), "Correo"); err != nil {
 		t.Fatal(err)
 	}
 	cA := l.sesionBorrado(t, a.ID, org.ID, time.Minute, "pwd")

@@ -216,6 +216,8 @@ export const hr: Catalog = {
   'account.signedOutDescription':
     'Prijavite se računom Sytue One kako biste ovdje vidjeli svoje podatke.',
   'account.signOut': 'Odjava',
+  'account.signOutFailed':
+    'Odjava na ovom uređaju nije uspjela. Drive je možda još povezan. Pokušajte ponovno.',
   'account.signOutPending.title': 'Neprenesene bilješke',
   'account.signOutPending.body':
     'Notepads na ovom uređaju ima bilješke koje još nisu prenesene ({count}). Odjavom se brišu s njega.',
@@ -362,6 +364,7 @@ export const hr: Catalog = {
   'widgets.episodes': 'Epizode',
   'widgets.apps': 'Aplikacije',
   'widgets.compose': 'Napiši',
+  'widgets.storage': 'Pohrana',
   'widgets.create': 'Stvori događaj',
 
   'linkedServices.services': 'Usluge',

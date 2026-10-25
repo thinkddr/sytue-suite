@@ -8,6 +8,7 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
+	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
 
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
@@ -100,10 +101,12 @@ type Cabecera struct {
 	// AlMenu es la hamburguesa de la ventana estrecha, que saca el carril como cajón
 	// (`md:hidden` en la web, «equivale a atrás a la lista»); nil, no se pinta.
 	AlMenu func()
-	// Estrecha es la ventana por debajo de `md`: sale la hamburguesa y se esconden las
-	// acciones con `max-md:hidden` —el roster, fijados, archivos, guardados,
-	// programados y el filete—, que siguen en el menú del nombre.
+	// Estrecha compacta las acciones al ancho real del canal. El roster, fijados,
+	// archivos, guardados, programados y el filete siguen en el menú del nombre.
 	Estrecha bool
+	// menuYaVisible evita añadir una hamburguesa cuando sólo el canal es estrecho
+	// y el menú lateral sigue a la vista en una ventana ancha.
+	menuYaVisible bool
 
 	// Los widgets se construyen una vez y el renderer los coloca.
 	marca                        fyne.CanvasObject
@@ -117,9 +120,13 @@ type Cabecera struct {
 	objetos                      []fyne.CanvasObject
 	// editorTema, lineaTema y botonTema son la línea del tema cuando se edita o se
 	// puede editar.
-	editorTema *ui.EditorPlano
-	lineaTema  *canvas.Rectangle
-	botonTema  *BotonTema
+	editorTema      *ui.EditorPlano
+	lineaTema       *canvas.Rectangle
+	botonTema       *BotonTema
+	reducida        *ui.TiraDeslizable
+	tituloReducido  *ui.Boton
+	temaReducido    *fyne.Container
+	reducidaVisible bool
 }
 
 // Las claves de los paneles que abre la cabecera.
@@ -199,7 +206,7 @@ func (c *Cabecera) montar(v tema.Variante) {
 	c.llamar.Inerte = c.SinConexion
 
 	c.menu = nil
-	if c.Estrecha && c.AlMenu != nil {
+	if c.Estrecha && !c.menuYaVisible && c.AlMenu != nil && !tema.EsMarco() {
 		c.menu = ui.NuevoBotonIcono(iconos.Menu, t.T("sidebar.openChannels", nil), c.AlMenu).SobreBanda()
 		c.menu.Lado, c.menu.TamIcono = LadoAccionCabecera, GlifoCabecera
 	}
@@ -220,9 +227,47 @@ func (c *Cabecera) montar(v tema.Variante) {
 	c.objetos = append(c.objetos, c.rotuloTema)
 	if c.Canal.Clase != Directo {
 		c.montarTema(v)
+	} else {
+		c.editorTema, c.botonTema, c.lineaTema = nil, nil, nil
 	}
 	c.objetos = append(c.objetos, c.acciones...)
 	c.objetos = append(c.objetos, c.filete, c.llamar)
+	c.montarReducida()
+}
+
+func (c *Cabecera) montarReducida() {
+	var titulo *ui.Boton
+	titulo = ui.NuevoBoton(c.Canal.Nombre, func() {
+		if c.AlAbrirMenu != nil {
+			c.AlAbrirMenu(titulo)
+		}
+	}).Con(ui.Fantasma, ui.TallaSM)
+	titulo.SobreCromo = true
+	titulo.Rotulo = c.T.T("channel.menuAria", i18n.Vars{"name": c.Canal.Nombre})
+	if c.Canal.Clase == Privado {
+		titulo.Icono, titulo.TamIcono = iconos.Candado, GlifoCabecera
+		titulo.Rotulo += " (" + c.T.T("channel.privateBadge", nil) + ")"
+	}
+	c.tituloReducido = titulo
+	var controles []fyne.CanvasObject
+	if c.menu != nil {
+		controles = append(controles, c.menu)
+	}
+	controles = append(controles, titulo)
+	c.temaReducido = nil
+	if c.editorTema != nil {
+		c.temaReducido = container.NewGridWrap(fyne.NewSize(120, ui.SueloTactilBarra), c.editorTema.Objeto())
+		controles = append(controles, c.temaReducido)
+	} else if c.botonTema != nil {
+		b := ui.NuevoBotonIcono(iconos.Lapiz, c.T.T("channel.editTopic", nil), c.AlEditarTema).SobreBanda()
+		b.Lado, b.TamIcono = LadoAccionCabecera, GlifoCabecera
+		controles = append(controles, b)
+	}
+	controles = append(controles, c.acciones...)
+	controles = append(controles, c.llamar)
+	c.reducida = ui.NuevaTiraDeslizable(LadoAccionCabecera, HuecoAcciones, controles...)
+	c.reducida.AnchoPropio = true
+	c.reducida.Hide()
 }
 
 // marcaCanal es el «#» sobre `chrome-hover` de un canal, o el avatar de un directo.
@@ -304,23 +349,32 @@ func (c *Cabecera) pilaDeCaras(v tema.Variante) fyne.CanvasObject {
 
 type cabeceraRenderer struct{ c *Cabecera }
 
-func (r *cabeceraRenderer) MinSize() fyne.Size           { return MedidaCabecera() }
-func (r *cabeceraRenderer) Objects() []fyne.CanvasObject { return r.c.objetos }
-func (r *cabeceraRenderer) Destroy()                     {}
+func (r *cabeceraRenderer) MinSize() fyne.Size { return MedidaCabecera() }
+func (r *cabeceraRenderer) Objects() []fyne.CanvasObject {
+	if r.c.reducidaVisible {
+		return []fyne.CanvasObject{r.c.fondo, r.c.reducida}
+	}
+	return r.c.objetos
+}
+func (r *cabeceraRenderer) Destroy() {}
 
 // Layout reparte la banda: marca, bloque de texto que se estira, y acciones a la
 // derecha. El texto se recorta con puntos suspensivos, que es el `truncate` de la web.
 func (r *cabeceraRenderer) Layout(t fyne.Size) {
 	c := r.c
 	c.fondo.Resize(t)
+	if c.colocarReducida(t) {
+		return
+	}
 
 	x := CanalonCabecera
 	if c.menu != nil {
 		// `-ml-1 h-8 w-8` y el `gap-3` de la banda.
 		x -= tema.Espacio(1)
-		c.menu.Move(fyne.NewPos(x, (t.Height-LadoAccionCabecera)/2))
-		c.menu.Resize(fyne.NewSize(LadoAccionCabecera, LadoAccionCabecera))
-		x += LadoAccionCabecera + HuecoCabecera
+		m := c.menu.MinSize()
+		c.menu.Move(fyne.NewPos(x, (t.Height-m.Height)/2))
+		c.menu.Resize(m)
+		x += m.Width + HuecoCabecera
 	}
 	c.marca.Move(fyne.NewPos(x, (t.Height-LadoMarcaCanal)/2))
 	c.marca.Resize(fyne.NewSize(LadoMarcaCanal, LadoMarcaCanal))
@@ -387,6 +441,58 @@ func (r *cabeceraRenderer) Layout(t fyne.Size) {
 		ui.ColocarTexto(c.insignia, tema.TextoXS, px+tema.Borde+tema.Espacio(2), y+(fila-tema.TextoXS.Linea)/2)
 	}
 	c.colocarTema(x, y+fila, cabe)
+}
+
+func (c *Cabecera) colocarReducida(t fyne.Size) bool {
+	c.reducidaVisible = t.Width < c.anchoMinimo()
+	c.llamar.SoloIcono = c.reducidaVisible
+	c.llamar.Rotulo = c.T.T("call.call", nil)
+	c.llamar.Refresh()
+	if !c.reducidaVisible {
+		c.reducida.Hide()
+		return false
+	}
+	ancho := max(t.Width-2*CanalonCabecera, 0)
+	glifos := 0
+	relleno := ui.MedidaBoton("", ui.TallaSM, 0).Width
+	if c.tituloReducido.Icono != iconos.Ninguno {
+		glifos = 1
+		relleno += GlifoCabecera + tema.Espacio(2)
+	}
+	texto := canvas.NewText("", color.NRGBA{})
+	ui.Truncar(texto, c.Canal.Nombre, tema.TextoSM, ui.PesoRotulo,
+		max(ancho-relleno, 0))
+	c.tituloReducido.Texto = texto.Text
+	c.tituloReducido.Ancho = min(ancho, max(ui.SueloTactil(0), ui.MedidaBotonCon(texto.Text, ui.TallaSM, 0, glifos, false, GlifoCabecera).Width))
+	c.tituloReducido.Refresh()
+	c.reducida.Show()
+	c.reducida.Move(fyne.NewPos(CanalonCabecera, (t.Height-c.reducida.MinSize().Height)/2))
+	c.reducida.Resize(fyne.NewSize(ancho, c.reducida.MinSize().Height))
+	if c.temaReducido != nil {
+		c.reducida.Mostrar(c.temaReducido)
+	}
+	return true
+}
+
+func (c *Cabecera) anchoMinimo() float32 {
+	llamar := ui.MedidaBotonCon(c.llamar.Texto, c.llamar.Talla, 0, 1, false, GlifoCabecera)
+	ancho := 2*CanalonCabecera + LadoMarcaCanal + 2*HuecoCabecera + llamar.Width
+	if c.disparador != nil {
+		ancho += DisparadorSobra()
+	}
+	if c.insignia != nil {
+		ancho += MedidaPildoraPrivado(c.insignia.Text).Width + tema.Espacio(2)
+	}
+	if c.menu != nil {
+		ancho += c.menu.MinSize().Width + HuecoCabecera - tema.Espacio(1)
+	}
+	for _, b := range c.acciones {
+		ancho += b.MinSize().Width + HuecoAcciones
+	}
+	if !c.Estrecha {
+		ancho += 2*tema.Espacio(1) + tema.Borde + HuecoAcciones
+	}
+	return ancho
 }
 
 // MedidaPildoraPrivado es la píldora de «Privado»: el texto con `px-2 py-0.5` y borde.

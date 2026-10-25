@@ -4,9 +4,11 @@
 package ui
 
 import (
+	"errors"
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -16,6 +18,7 @@ import (
 
 	"git.sytue.eu/sytue/one/apps/fyne/sesion"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
+	"git.sytue.eu/sytue/one/apps/nucleo/auth"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 	"git.sytue.eu/sytue/one/apps/nucleo/notas"
 )
@@ -63,6 +66,7 @@ func TestCerrarSesionAvisaDeLoQueNotepadsNoHaSubido(t *testing.T) {
 		t.Fatal("el diálogo no ofrece cancelar, descartar y subir")
 	}
 	test.Tap(descartar)
+	esperarCierreCuenta(t, c)
 	if suite.Estado().Dentro() {
 		t.Error("descartar no ha cerrado la sesión")
 	}
@@ -160,6 +164,7 @@ func TestCerrarSesionSubeLoPendienteYApagaDescartarMientrasSube(t *testing.T) {
 	if suite.Estado().Dentro() {
 		t.Error("tras terminar de subir, la sesión sigue abierta")
 	}
+	esperarCierreCuenta(t, c)
 	if subidas.Load() != 1 {
 		t.Errorf("subidas = %d; quiero 1", subidas.Load())
 	}
@@ -181,5 +186,101 @@ func TestElAvisoDeSalirEstaTraducido(t *testing.T) {
 				t.Errorf("%s: falta %s (%q)", locale, clave, got)
 			}
 		}
+	}
+}
+
+func TestCerrarSesionMuestraFalloCompartidoYPermiteReintentar(t *testing.T) {
+	suite := suiteConSesion(t)
+	intentos := 0
+	almacen := (&auth.OIDC{Issuer: suite.URL("id")}).Almacen()
+	suite.Sesion = auth.NewSession(auth.Tokens{Refresh: "sintetico", Subject: "ana"}, nil, func(tokens auth.Tokens) error {
+		intentos++
+		if intentos == 1 {
+			return errors.New("ruta no escribible")
+		}
+		return almacen.Guardar(tokens)
+	})
+	c := nuevaCuentaBarra(traductorPrueba(t), suite)
+	w := test.NewTempWindow(t, c.boton)
+	w.Resize(fyne.NewSize(1280, 800))
+	c.salir(0)
+	esperarCierreCuenta(t, c)
+	cp, _ := w.Canvas().Overlays().Top().(*capa)
+	if cp == nil {
+		t.Fatal("el cierre fallido no avisa a la persona")
+	}
+	d, _ := cp.panel.(*Dialogo)
+	if d == nil || d.Titulo != c.t.T("account.signOut", nil) {
+		t.Fatal("no muestra el fallo de cierre")
+	}
+	p, ok := d.Cuerpo.(*Parrafo)
+	if !ok || p.Texto != c.t.T("account.signOutFailed", nil) {
+		t.Fatal("no explica el acceso compartido pendiente")
+	}
+	if suite.Estado().Dentro() {
+		t.Fatal("el error ha restaurado la sesión local")
+	}
+	var reintentar *Boton
+	for _, o := range d.Pie.(*fyne.Container).Objects {
+		if b, ok := o.(*Boton); ok && b.Texto == c.t.T("action.retry", nil) {
+			reintentar = b
+		}
+	}
+	if reintentar == nil {
+		t.Fatal("no ofrece reintentar")
+	}
+	test.Tap(reintentar)
+	esperarCierreCuenta(t, c)
+	if intentos != 2 || w.Canvas().Overlays().Top() != nil || suite.Estado().Dentro() {
+		t.Fatal("reintentar no completó el cierre")
+	}
+}
+
+func esperarCierreCuenta(t *testing.T, c *cuentaBarra) {
+	t.Helper()
+	terminado := func() bool { c.mu.Lock(); defer c.mu.Unlock(); return !c.cerrando }
+	esperar(t, terminado)
+	if !terminado() {
+		t.Fatal("el cierre compartido no terminó")
+	}
+}
+
+func TestCerrarSesionNoBloqueaUIYNoDuplicaRetirada(t *testing.T) {
+	suite := suiteConSesion(t)
+	llegada, soltar := make(chan struct{}), make(chan struct{})
+	var intentos atomic.Int32
+	var liberar sync.Once
+	t.Cleanup(func() { liberar.Do(func() { close(soltar) }) })
+	almacen := (&auth.OIDC{Issuer: suite.URL("id")}).Almacen()
+	suite.Sesion = auth.NewSession(auth.Tokens{Refresh: "sintetico", Subject: "ana"}, nil, func(tokens auth.Tokens) error {
+		if intentos.Add(1) == 1 {
+			close(llegada)
+		}
+		<-soltar
+		return almacen.Guardar(tokens)
+	})
+	c := nuevaCuentaBarra(traductorPrueba(t), suite)
+	w := test.NewTempWindow(t, c.boton)
+	w.Resize(fyne.NewSize(1280, 800))
+	vuelve := make(chan struct{})
+	go func() { c.cerrarSesion(); close(vuelve) }()
+	select {
+	case <-vuelve:
+	case <-time.After(5 * time.Second):
+		t.Fatal("cerrar sesión bloquea la interfaz esperando el almacén")
+	}
+	select {
+	case <-llegada:
+	case <-time.After(5 * time.Second):
+		t.Fatal("el cierre no llegó al almacén")
+	}
+	c.cerrarSesion()
+	if intentos.Load() != 1 {
+		t.Fatal("una segunda pulsación duplicó la retirada")
+	}
+	liberar.Do(func() { close(soltar) })
+	esperarCierreCuenta(t, c)
+	if suite.Estado().Dentro() || intentos.Load() != 1 {
+		t.Fatal("el cierre no terminó una sola vez")
 	}
 }

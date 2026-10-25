@@ -15,7 +15,7 @@ public final class WidgetSnapshot {
     public static final long MAX_AGE = 30 * 60;
     public static final int MAX_BYTES = 16 * 1024;
     private static final Set<String> KINDS = new HashSet<>(Arrays.asList("unread", "files", "events", "documents",
-            "contacts", "notes", "rows", "pending", "channels", "photos", "episodes", "apps", "calendars", "address_books"));
+            "contacts", "notes", "rows", "pending", "channels", "photos", "episodes", "apps", "calendars", "address_books", "storage_percent"));
 
     public static final class Counter {
         public final String kind;
@@ -57,7 +57,8 @@ public final class WidgetSnapshot {
         Set<String> seen = new HashSet<>();
         for (Counter c : counters) {
             if (c == null || !KINDS.contains(c.kind) || !seen.add(c.kind)
-                    || c.value < 0 || c.value > 1_000_000_000_000L) {
+                    || c.value < 0 || c.value > 1_000_000_000_000L
+                    || "storage_percent".equals(c.kind) && c.value > 100) {
                 return false;
             }
         }

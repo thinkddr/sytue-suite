@@ -5522,9 +5522,14 @@ El porqué está en el [ADR 0078](decisions.md#0078); aquí, las piezas y quién
   `X.Widget = s.CapturarWidget` (`apps/fyne/sesion/widgets.go`), que captura la generación de
   sesión adoptada **antes** de pedir los datos; al volver, `View.Publicar` escribe los
   contadores bajo el cerrojo de la suite (`ajustes.Cerrojo`) y avisa al sistema
-  (`widgets.Notify`). Hoy publican cinco: Hub y Mail (`unread`, el contador del servidor),
-  Notes (`notes`), Calendar (`calendars`) y Contacts (`address_books`). Las otras diez
-  muestran solo sus acciones (abrir, buscar y, donde toca, redactar o crear).
+  (`widgets.Notify`). Publican Hub y Mail (`unread`, el contador del servidor), Notes
+  (`notes`), Calendar (`calendars`), Contacts (`address_books`), Rooms (`channels` y
+  `unread` de un inventario completo) y Drive/Cast (`storage_percent` de una cuota ya
+  consultada). Una capacidad desconocida, sin límite o externa retira el porcentaje;
+  Cast conserva como desconocido el origen omitido por un backend anterior. Las otras
+  siete apps muestran sus acciones. No se añaden consultas para alimentar widgets.
+  Las respuestas idénticas agrupan la escritura y la recarga sin alargar una caducidad
+  más corta que solicite el consumidor.
 - **Quién borra.** `Suite.iniciarWidgets` escucha los cambios de sesión y de bloqueo:
   fuera de sesión o bloqueada, `widgets.ClearIf` borra los snapshots de esa generación (una
   llamada tardía no borra los de la cuenta nueva).
@@ -5535,6 +5540,15 @@ El porqué está en el [ADR 0078](decisions.md#0078); aquí, las piezas y quién
   `widget_acciones` de su `FyneApp.toml`, más el framework `SytueWidgetBridge`, que da al
   ejecutable de Go `sytue_widgets_reload` (WidgetCenter). Las dos implementan las mismas
   comprobaciones que `Snapshot.Visible` en Go.
+- **Galería de Apple.** Cada extensión declara un `WidgetBundle`: conserva el identificador
+  del resumen y añade Buscar; Mail añade Redactar y Calendar Crear evento. El generador
+  deriva sus condiciones de compilación del catálogo, por lo que esas acciones solo
+  aparecen en las apps que las aceptan. Los tamaños pequeño y mediano funcionan en iOS,
+  iPadOS y macOS; en iOS/iPadOS compatibles se añaden accesorios para la pantalla bloqueada.
+  Las acciones tienen una cronología estática, no abren el contenedor compartido y llevan
+  a la app mediante su esquema local. El resumen solo contiene recuentos y porcentaje de
+  almacenamiento, con `privacySensitive` y protección completa de datos. Sin snapshot
+  válido muestra una descripción de la app, nunca un cero inventado.
 - **Dónde, en Apple.** El App Group `group.eu.sytue.suite`, solo con
   `SYTUE_WIDGETS_APPLE = YES` en `Sytue.xcconfig`. Apagado, `ajustes` usa la carpeta de
   antes (`os.UserConfigDir` en iOS y Developer ID, `<equipo>.eu.sytue.suite` en la Mac App
@@ -5553,6 +5567,78 @@ El porqué está en el [ADR 0078](decisions.md#0078); aquí, las piezas y quién
   sin lector no se escribe), los `widgets_test.go` de cada app, `ProjectTests.swift` y
   `SnapshotTests.swift` (en el job `widgets-apple` de `ci-desktop`, en el Mac), y
   `empaquetar-test.sh` (los derechos con el interruptor en las dos posiciones).
+
+<a id="gestos-moviles-fyne"></a>
+
+## Gestos móviles de las apps de Fyne
+
+`apps/fyne/ui/gestosmoviles.go` comparte dos gestos en iOS, iPadOS y Android:
+tirar hacia abajo desde el inicio de una lista para actualizarla y deslizar desde el
+borde izquierdo hacia la derecha para abrir el cajón de navegación existente. La
+barra de la suite instala un único árbitro por lienzo. En escritorio devuelve los
+controles originales y conserva el ratón, la rueda y los atajos.
+
+El fork de Fyne expone `mobile.TouchFilterCanvas`: entrega inicio, movimiento,
+final y cancelación con coordenadas de lienzo y la ruta real de objetos pulsados.
+El filtro puede dejar pasar, aplazar o capturar una secuencia antes de modificar
+el foco o enviar `TouchDown`. Al declinar reproduce los eventos con sus tiempos
+originales; al capturar los consume hasta levantar el dedo. Un segundo dedo
+cancela el reconocimiento: conserva la entrada normal si todavía estaba aplazada
+y evita una pulsación accidental si ya estaba capturada. La cancelación del
+sistema nunca equivale a soltar.
+
+Las listas se marcan con `ui.RefrescarAlTirar` y `ui.RefrescoLista`. El marcador
+es un widget del árbol, sin métodos de pulsación ni arrastre; sus filas y su
+desplazador siguen recibiendo la entrada habitual. Cada app aporta el
+desplazamiento real, su condición de disponibilidad, una revisión cuando existe y
+la acción de recarga que ya utilizaba. No se crean sondeos ni endpoints para los
+gestos. El refresco conserva la carpeta, consulta, filtros y calendario activos y
+usa los mismos estados de carga y errores que la actualización explícita.
+
+Se decide la dirección tras 12 unidades lógicas y con predominio de un eje de
+1,5 a 1; la acción ocurre al soltar después de 72 unidades verticales o 64
+horizontales. El menú empieza en las primeras 24 unidades desde el borde seguro
+izquierdo. Un desplazamiento pequeño, el eje contrario o una diagonal indecisa se
+devuelven al control. El máximo de dos segundos deja pasar una pulsación larga
+todavía no capturada y descarta sin acción una secuencia capturada demasiado
+lenta. Al terminar se vuelve a comprobar el mismo marcador en la ruta visible,
+su revisión, el inicio de la lista y la disponibilidad. Una vista sustituida no
+recibe la reproducción del toque anterior.
+
+El foco en un editor de texto, un detalle con navegación de vuelta, los diálogos
+y las superposiciones conservan sus gestos. En Android se reserva únicamente una
+banda izquierda acotada junto al acceso del menú mediante
+`Window.setSystemGestureExclusionRects`; el resto del borde sigue disponible para
+Atrás. Se retira al abrir el cajón, un detalle o un modal, enfocar una entrada,
+mostrar el teclado o pasar a segundo plano. La disponibilidad se calcula desde
+el contenido vivo del lienzo; un armazón retirado no puede restaurarla.
+
+| Superficie             | Listas que actualiza el gesto                                                                                                           |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Mail y Contacts        | Bandeja y búsqueda, también vacías; libreta activa con sus filtros.                                                                     |
+| Drive                  | Mi unidad en lista o rejilla, carpetas, recientes, favoritos, documentos, papelera, compartidos, unidades de equipo y nubes personales. |
+| Docus, Calcus y Diapos | Portada y documentos recientes con la consulta aplicada.                                                                                |
+| Calendar               | Agenda, incluyendo el estado vacío.                                                                                                     |
+| Rooms                  | Inventario de canales del lateral.                                                                                                      |
+| Cast y Photos          | Inicio, explorar y canal de Cast; galerías, favoritas, álbumes, papelera, repetidas y compartidos de Photos.                            |
+| Notepads               | Cuaderno en lista, columnas y árbol, sin nota o editor abiertos, captura pendiente, cola ni migración.                                  |
+| ERP y Bases            | Listas de modelos de ERP sin ficha, alta ni selección en lote; Mis bases sin un nombre pendiente de crear.                              |
+| CertiPDF y Hub         | Portada de PDF y peticiones de firma; inicio, actividad, avisos, descargas y dispositivos del Hub.                                      |
+
+El historial de chat conserva su gesto de cargar mensajes anteriores. Los
+editores de documentos, celdas, PDF y notas, el lienzo libre de Notepads, los
+formularios, las cuadrículas de Calendar, el vídeo y estudio de Cast y el visor y
+editor de Photos mantienen sus controles específicos. El gesto de menú se
+aplica a las superficies que ya tienen un cajón de `ui.Armazon`; no crea uno en
+las portadas que se navegan por otros controles. Los botones y las rutas de
+teclado y accesibilidad existentes siguen disponibles.
+
+Las regresiones de `gestosmoviles_test.go` cubren dirección, umbrales, lista
+desplazada u ocupada, foco, modal, reemplazo de vista, revisión, timeout y
+cancelación; las pruebas de Mail y Contacts verifican que el callback real
+conserva los filtros. El fork comprueba además reproducción, multitáctil y
+cancelación nativa. Las pruebas y verificaciones de build se ejecutan en CI o en
+Scaleway, según las instrucciones del repositorio.
 
 <a id="astro-fyne"></a>
 

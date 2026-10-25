@@ -494,6 +494,15 @@ func (p *Pantalla) MostrarPortada(pdf *api.PDF, loc i18n.Locale) {
 		p.Portada = NuevaPortada(p.tv, loc)
 	}
 	po := p.Portada
+	po.Refresco.Puede = func() bool {
+		return pdf != nil && p.ctx != nil && p.ctx.Err() == nil && p.doc == nil && !po.Creando && !po.Abriendo &&
+			(po.Lista != nil || po.Fallo) && !p.Trabajando
+	}
+	po.Refresco.Actualizar = func() {
+		if po.Refresco.Puede() {
+			p.MostrarPortada(pdf, loc)
+		}
+	}
 	po.AlCrear, po.AlElegir, po.AlEscanear = p.AlCrear, p.AlElegir, p.AlEscanear
 	po.AlAbrir = func(f api.File) {
 		if p.AlAbrirRuta != nil {

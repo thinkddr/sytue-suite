@@ -9,6 +9,8 @@ SALIDA="${3:?artifact directory required}"
 PRUEBA="${4:?browser script required}"
 PREFIJO="${5:?environment prefix required}"
 BASE_RUTA="${6:-$APLICACION}"
+# Account is global: an explicitly empty seventh argument omits the tenant segment.
+ORGANIZACION="${7-prueba}"
 PUERTO="${PUERTO:-4343}"
 RAIZ="$(cd ../.. && pwd)"
 mkdir -p "$SALIDA"
@@ -26,7 +28,7 @@ export SYTUE_SESSION_SECRET="${SYTUE_SESSION_SECRET:-kkkkkkkkkkkkkkkkkkkkkkkkkkk
 (cd "$RAIZ/apps/frontend/apps/$APLICACION" && exec bun --bun astro dev --port "$PUERTO" --host 127.0.0.1) >"$LOG" 2>&1 &
 SERVIDOR=$!
 trap 'kill "$SERVIDOR" 2>/dev/null || true; wait "$SERVIDOR" 2>/dev/null || true' EXIT
-URL="http://127.0.0.1:$PUERTO/$BASE_RUTA/prueba/dev/$RUTA"
+URL="http://127.0.0.1:$PUERTO/$BASE_RUTA${ORGANIZACION:+/$ORGANIZACION}/dev/$RUTA"
 LISTO=0
 for _ in $(seq 1 120); do
   if curl -fsS -o /dev/null "$URL"; then LISTO=1; break; fi

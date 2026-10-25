@@ -160,6 +160,12 @@ export const sk: AppCatalog<typeof en> = {
     'Ak chcete všetko preniesť priamo do Google Workspace alebo Microsoft 365 bez sťahovania: ak máte osobný účet alebo spravujete svoju organizáciu, spustite to sami v Sytue Admin v časti Migrácie; ak nie, požiadajte osobu, ktorá ju spravuje.',
   'data.move.action': 'Prejsť na Migrácie',
 
+  'devices.native.body':
+    'Použi správcu súborov zariadenia alebo pripoj účet so súhlasom jeho vlastníka.',
+  'devices.native.driveBody':
+    'Sytue Drive sa pridá automaticky po prihlásení. Povoľ jeho umiestnenie, ak o to systém požiada.',
+  'devices.native.openDrive': 'Otvoriť v správcovi súborov',
+  'devices.native.failed': 'Integráciu zariadenia sa nepodarilo aktualizovať.',
   'devices.title': 'Pripojenie zariadení',
   'devices.lead':
     'Majte poštu, kalendár, kontakty a súbory zo Sytue v telefóne alebo v počítači. Prevedieme vás krok za krokom.',

@@ -20,6 +20,7 @@
 
 import FileProvider
 import Foundation
+import Security
 import UniformTypeIdentifiers
 
 // MARK: - La credencial
@@ -29,6 +30,55 @@ struct Credencial: Decodable {
     let url: String
     let usuario: String
     let clave: String
+    let identidad: String
+}
+
+/// Autoridad local no secreta. El llavero de la sesión NO está en esta extensión.
+/// Cada renovación conserva identity_hash/revision; logout o cambio de cuenta los invalida.
+enum AccesoDrive {
+    struct Estado: Decodable {
+        let version: Int
+        let identity_hash: String
+        let revision: String
+        let active: Bool
+    }
+    static func hexadecimal(_ valor: String, longitud: Int) -> Bool {
+        valor.utf8.count == longitud && valor.utf8.allSatisfy { (48...57).contains($0) || (97...102).contains($0) }
+    }
+    static func decodificar(_ datos: Data, identidad: String, revision: String? = nil) -> Estado? {
+        guard hexadecimal(identidad, longitud: 64), datos.count <= 1024,
+              let estado = try? JSONDecoder().decode(Estado.self, from: datos),
+              estado.version == 1, estado.active, estado.identity_hash == identidad,
+              hexadecimal(estado.revision, longitud: 32),
+              revision == nil || revision == estado.revision else { return nil }
+        return estado
+    }
+    static func estado(_ identidad: String, revision: String? = nil) -> Estado? {
+        guard let contenedor = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.eu.sytue.suite"),
+              let datos = try? Data(contentsOf: contenedor.appendingPathComponent("sytue/drive-acceso.json")) else { return nil }
+        return decodificar(datos, identidad: identidad, revision: revision)
+    }
+}
+
+
+/// El dominio y sus índices pertenecen a una autorización concreta, nunca a la
+/// credencial que casualmente esté en el llavero cuando llegue una petición.
+struct ContextoDrive {
+    let identidad: String
+    let revision: String
+    static let prefijo = "sytue-drive."
+
+    init?(dominio: String) {
+        guard dominio.hasPrefix(Self.prefijo) else { return nil }
+        let partes = dominio.dropFirst(Self.prefijo.count).split(separator: ".", omittingEmptySubsequences: false)
+        guard partes.count == 2,
+              AccesoDrive.hexadecimal(String(partes[0]), longitud: 64),
+              AccesoDrive.hexadecimal(String(partes[1]), longitud: 32) else { return nil }
+        identidad = String(partes[0])
+        revision = String(partes[1])
+    }
+
+    var dominio: String { Self.prefijo + identidad + "." + revision }
 }
 
 enum Llavero {
@@ -69,15 +119,47 @@ final class DAV {
     let base: String
     let autorizacion: String
     let sesion: URLSession
+    let identidad: String
+    let revision: String
+    private let leerAcceso: (String, String?) -> AccesoDrive.Estado?
+    private var vigilante: DispatchSourceTimer?
 
-    init(_ c: Credencial) throws {
-        guard let u = URL(string: c.url), u.scheme == "https" else {
+    init(_ c: Credencial, contexto: ContextoDrive,
+         acceso: @escaping (String, String?) -> AccesoDrive.Estado? = AccesoDrive.estado) throws {
+        guard let u = URL(string: c.url), u.scheme == "https", u.host != nil,
+              c.identidad == contexto.identidad,
+              acceso(contexto.identidad, contexto.revision) != nil else {
             throw NSFileProviderError(.notAuthenticated)
         }
         base = u.absoluteString.hasSuffix("/") ? String(u.absoluteString.dropLast()) : u.absoluteString
         autorizacion = "Basic " + Data("\(c.usuario):\(c.clave)".utf8).base64EncodedString()
+        identidad = contexto.identidad
+        revision = contexto.revision
+        leerAcceso = acceso
         // Sin cookies ni caché: cada petición va con su credencial y nada se queda en disco.
         sesion = URLSession(configuration: .ephemeral)
+        let reloj = DispatchSource.makeTimerSource(queue: DispatchQueue.global(qos: .utility))
+        reloj.schedule(deadline: .now() + .milliseconds(250), repeating: .milliseconds(250))
+        reloj.setEventHandler { [weak self] in
+            guard let self else { return }
+            do { try self.validar() } catch {
+                self.sesion.invalidateAndCancel()
+                self.vigilante?.cancel()
+            }
+        }
+        vigilante = reloj
+        reloj.resume()
+    }
+
+    deinit {
+        vigilante?.cancel()
+        sesion.invalidateAndCancel()
+    }
+
+    func validar() throws {
+        guard leerAcceso(identidad, revision) != nil else {
+            throw NSFileProviderError(.notAuthenticated)
+        }
     }
 
     /// La URL de `ruta`; las carpetas con barra final, que es como las nombra WebDAV.
@@ -121,7 +203,9 @@ final class DAV {
     }
 
     func hacer(_ r: URLRequest, admite: Set<Int> = []) async throws -> Data {
+        try validar()
         let (datos, respuesta) = try await sesion.data(for: r)
+        try validar()
         try DAV.comprobar(respuesta, admite: admite)
         return datos
     }
@@ -156,13 +240,17 @@ final class DAV {
     }
 
     func bajar(_ ruta: String, a destino: URL) async throws {
+        try validar()
         let (temporal, respuesta) = try await sesion.download(for: peticion("GET", ruta))
+        defer { try? FileManager.default.removeItem(at: temporal) }
+        try validar()
         try DAV.comprobar(respuesta)
         try? FileManager.default.removeItem(at: destino)
         try FileManager.default.moveItem(at: temporal, to: destino)
     }
 
     func subir(_ ruta: String, desde origen: URL?) async throws {
+        try validar()
         var r = peticion("PUT", ruta)
         r.setValue("application/octet-stream", forHTTPHeaderField: "Content-Type")
         let respuesta: URLResponse
@@ -171,6 +259,7 @@ final class DAV {
         } else {
             (_, respuesta) = try await sesion.upload(for: r, from: Data())
         }
+        try validar()
         try DAV.comprobar(respuesta)
     }
 
@@ -253,11 +342,13 @@ final class Indice {
     private let fichero: URL
     private let cerrojo = NSLock()
 
-    init(dominio: NSFileProviderDomain) {
-        let dir = (FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+    init(dominio: NSFileProviderDomain, directorio: URL? = nil) {
+        let dir = directorio ?? (FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        fichero = dir.appendingPathComponent("indice-\(dominio.identifier.rawValue).json")
+        // Un dominio antiguo sin identidad nunca adopta el índice de otra sesión.
+        let espacio = ContextoDrive(dominio: dominio.identifier.rawValue)?.dominio ?? UUID().uuidString
+        fichero = dir.appendingPathComponent("indice-\(espacio).json")
         if let datos = try? Data(contentsOf: fichero),
            let leido = try? JSONDecoder().decode([String: String].self, from: datos) {
             deRuta = leido
@@ -353,19 +444,31 @@ final class Item: NSObject, NSFileProviderItem {
 final class Proveedor: NSObject, NSFileProviderReplicatedExtension {
     let dominio: NSFileProviderDomain
     let indice: Indice
+    let contexto: ContextoDrive?
+    private let leerCredencial: () -> Credencial?
+    private let leerAcceso: (String, String?) -> AccesoDrive.Estado?
 
-    required init(domain: NSFileProviderDomain) {
+    required convenience init(domain: NSFileProviderDomain) {
+        self.init(domain: domain, credencial: Llavero.credencial, acceso: AccesoDrive.estado)
+    }
+
+    init(domain: NSFileProviderDomain, credencial: @escaping () -> Credencial?,
+         acceso: @escaping (String, String?) -> AccesoDrive.Estado?, directorio: URL? = nil) {
         dominio = domain
-        indice = Indice(dominio: domain)
+        contexto = ContextoDrive(dominio: domain.identifier.rawValue)
+        indice = Indice(dominio: domain, directorio: directorio)
+        leerCredencial = credencial
+        leerAcceso = acceso
         super.init()
     }
 
     func invalidate() { indice.guardar() }
 
-    /// La credencial se lee en cada operación: si la app la cambia o la borra, vale ya.
+    /// Se relee la credencial para detectar su retirada, pero jamás se adopta la de
+    /// otra cuenta o una sesión posterior del mismo usuario. El dominio fija ambas.
     func dav() throws -> DAV {
-        guard let c = Llavero.credencial() else { throw NSFileProviderError(.notAuthenticated) }
-        return try DAV(c)
+        guard let contexto, let c = leerCredencial() else { throw NSFileProviderError(.notAuthenticated) }
+        return try DAV(c, contexto: contexto, acceso: leerAcceso)
     }
 
     /// Corre `cuerpo` aparte y devuelve el Progress que pide el sistema. El fallo, traducido.
@@ -401,7 +504,10 @@ final class Proveedor: NSObject, NSFileProviderReplicatedExtension {
     func item(for identifier: NSFileProviderItemIdentifier, request: NSFileProviderRequest,
               completionHandler: @escaping (NSFileProviderItem?, Error?) -> Void) -> Progress {
         trabajo({
-            completionHandler(try await self.elemento(self.dav(), self.ruta(identifier)), nil)
+            let d = try self.dav()
+            let item = try await self.elemento(d, self.ruta(identifier))
+            try d.validar()
+            completionHandler(item, nil)
         }, fallo: { completionHandler(nil, $0) })
     }
 
@@ -417,6 +523,7 @@ final class Proveedor: NSObject, NSFileProviderReplicatedExtension {
             }
             let destino = dir.appendingPathComponent(UUID().uuidString)
             try await d.bajar(ruta, a: destino)
+            do { try d.validar() } catch { try? FileManager.default.removeItem(at: destino); throw error }
             completionHandler(destino, item, nil)
         }, fallo: { completionHandler(nil, nil, $0) })
     }
@@ -434,6 +541,7 @@ final class Proveedor: NSObject, NSFileProviderReplicatedExtension {
             if let ya = try await d.existe(ruta) {
                 // Al reimportar, el sistema vuelve a crear lo que ya estaba: es el mismo.
                 guard options.contains(.mayAlreadyExist) else { throw NSFileProviderError(.filenameCollision) }
+                try d.validar()
                 completionHandler(Item(ya, indice: self.indice), [], false, nil)
                 return
             }
@@ -442,7 +550,9 @@ final class Proveedor: NSObject, NSFileProviderReplicatedExtension {
             } else {
                 try await d.subir(ruta, desde: url)
             }
-            completionHandler(try await self.elemento(d, ruta), [], false, nil)
+            let resultado = try await self.elemento(d, ruta)
+            try d.validar()
+            completionHandler(resultado, [], false, nil)
         }, fallo: { completionHandler(nil, [], false, $0) })
     }
 
@@ -465,7 +575,9 @@ final class Proveedor: NSObject, NSFileProviderReplicatedExtension {
                 try await d.subir(ruta, desde: newContents)
             }
             // Lo demás (fechas, etiquetas, atributos) no lo guarda WebDAV: queda local.
-            completionHandler(try await self.elemento(d, ruta), [], false, nil)
+            let resultado = try await self.elemento(d, ruta)
+            try d.validar()
+            completionHandler(resultado, [], false, nil)
         }, fallo: { completionHandler(nil, [], false, $0) })
     }
 
@@ -479,6 +591,7 @@ final class Proveedor: NSObject, NSFileProviderReplicatedExtension {
             let carpeta = try await d.existe(ruta)?.carpeta ?? false
             try await d.borrar(ruta, carpeta: carpeta)
             self.indice.olvidar(ruta)
+            try d.validar()
             completionHandler(nil)
         }, fallo: { completionHandler($0) })
     }
@@ -496,10 +609,13 @@ final class Proveedor: NSObject, NSFileProviderReplicatedExtension {
 final class Carpeta: NSObject, NSFileProviderEnumerator {
     let proveedor: Proveedor
     let ruta: String
+    let abrirDAV: () throws -> DAV
 
     init(proveedor: Proveedor, ruta: String) {
         self.proveedor = proveedor
         self.ruta = ruta
+        // Retener un enumerador no permite adoptar una sesión nueva del proveedor.
+        abrirDAV = proveedor.dav
     }
 
     func invalidate() {}
@@ -507,7 +623,9 @@ final class Carpeta: NSObject, NSFileProviderEnumerator {
     func enumerateItems(for observer: NSFileProviderEnumerationObserver, startingAt page: NSFileProviderPage) {
         Task {
             do {
-                let hijos = try await proveedor.dav().listar(ruta, profundidad: "1").filter { $0.ruta != ruta }
+                let d = try abrirDAV()
+                let hijos = try await d.listar(ruta, profundidad: "1").filter { $0.ruta != ruta }
+                try d.validar()
                 observer.didEnumerate(hijos.map { Item($0, indice: proveedor.indice) })
                 proveedor.indice.guardar()
                 observer.finishEnumerating(upTo: nil)

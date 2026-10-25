@@ -618,8 +618,10 @@ export const it: AppCatalog<typeof en> = {
   'share.group.failed': 'Non è stato possibile condividere.',
   'share.person.someone': 'Qualcuno della tua organizzazione',
   'pdf.openInPdf': 'Apri in Sytue PDF',
-  'storage.externalNote':
-    'I nuovi file usano lo spazio di archiviazione collegato senza occupare spazio qui.',
+  'storage.externalNote': 'Lo spazio di archiviazione collegato aumenta la tua capacità Sytue.',
+  'storage.externalCapacity': 'Lo spazio di archiviazione collegato aggiunge {capacity}.',
+  'storage.externalUnknown': 'Il fornitore non comunica la sua capacità.',
+  'storage.baseUsage': 'Sytue: {used} di {total}',
   'storage.add': 'Aggiungi spazio di archiviazione',
   'storage.external.forOrg': 'Salva qui i nuovi file dell’organizzazione',
   'storage.external.endpoint': 'Endpoint',

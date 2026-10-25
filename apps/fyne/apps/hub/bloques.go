@@ -4,8 +4,6 @@
 package hub
 
 import (
-	"fmt"
-
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/widget"
@@ -19,10 +17,8 @@ import (
 // Los bloques de las pantallas de asistente del Hub: una columna de piezas cuyo alto
 // depende del ancho —párrafos que se reparten, filas que se parten en el móvil—.
 //
-// Existen porque «Conecta tus dispositivos» tiene siete juegos de instrucciones, cada
-// uno una columna distinta de las mismas piezas, y escribir siete `Layout` a mano es
-// escribir siete veces el mismo error. `fyne.Layout` no sirve: su `MinSize` no recibe
-// el ancho, y aquí el alto sale de él.
+// El alta y las pantallas del Hub reutilizan estas piezas. `fyne.Layout` no recibe
+// el ancho en su `MinSize`, y aquí el alto depende del texto repartido.
 type bloque interface {
 	alto(ancho float32) float32
 	// poner coloca el bloque con su esquina en (x, y) y ese ancho.
@@ -165,59 +161,8 @@ func (b *bSeccion) objetos() []fyne.CanvasObject {
 	return append(out, b.cuerpo.objetos()...)
 }
 
-// ---- El paso numerado de unas instrucciones ----
-
-// pasoNumerado es el `Step` de `ConnectDevices.tsx`: `flex gap-3`, un círculo de 21
-// en `bg-bg-subtle` con el número (`text-xs font-semibold text-text-muted`), el título
-// (`text-sm font-medium`) y el cuerpo (`mt-0.5 text-sm leading-snug text-text-muted`).
-type pasoNumerado struct {
-	circulo *canvas.Circle
-	numero  *canvas.Text
-	titulo  *ui.Parrafo
-	cuerpo  *ui.Parrafo
-}
-
-// Medidas del paso numerado.
-const (
-	HuecoPasoNumerado float32 = 3 * 0.25 * tema.Rem
-	MargenCuerpoPaso  float32 = 0.5 * 0.25 * tema.Rem
-)
-
 // smAjustada es el `text-sm leading-snug`: 1,375 del tamaño.
 var smAjustada = tema.Escalon{Tam: tema.TextoSM.Tam, Linea: 1.375 * tema.TextoSM.Tam}
-
-func nuevoPaso(n int, titulo, cuerpo string) *pasoNumerado {
-	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
-	return &pasoNumerado{
-		circulo: canvas.NewCircle(tema.Color("bg-subtle", v)),
-		numero:  ui.Texto(fmt.Sprint(n), tema.TextoXS, ui.SemiNegrita, tema.Color("text-muted", v)),
-		titulo:  ui.NuevoParrafo(titulo, tema.TextoSM, ui.Medio, "text", v),
-		cuerpo:  ui.NuevoParrafo(cuerpo, smAjustada, ui.Normal, "text-muted", v),
-	}
-}
-
-func (p *pasoNumerado) textos(ancho float32) float32 {
-	return max(ancho-ui.LadoCirculoPaso-HuecoPasoNumerado, 0)
-}
-
-func (p *pasoNumerado) alto(ancho float32) float32 {
-	w := p.textos(ancho)
-	return max(ui.LadoCirculoPaso, ui.AltoParrafo(p.titulo, w)+MargenCuerpoPaso+ui.AltoParrafo(p.cuerpo, w))
-}
-
-func (p *pasoNumerado) poner(x, y, ancho float32) {
-	p.circulo.Move(fyne.NewPos(x, y))
-	p.circulo.Resize(fyne.NewSize(ui.LadoCirculoPaso, ui.LadoCirculoPaso))
-	w := ui.Medir(p.numero.Text, tema.TextoXS, ui.SemiNegrita).Width
-	ui.ColocarTexto(p.numero, tema.TextoXS, x+(ui.LadoCirculoPaso-w)/2, y+(ui.LadoCirculoPaso-tema.TextoXS.Linea)/2)
-	tx, tw := x+ui.LadoCirculoPaso+HuecoPasoNumerado, p.textos(ancho)
-	ty := ponerParrafo(p.titulo, tx, y, tw, true) + MargenCuerpoPaso
-	ponerParrafo(p.cuerpo, tx, ty, tw, true)
-}
-
-func (p *pasoNumerado) objetos() []fyne.CanvasObject {
-	return []fyne.CanvasObject{p.circulo, p.numero, p.titulo, p.cuerpo}
-}
 
 // ---- El resumen del último paso ----
 

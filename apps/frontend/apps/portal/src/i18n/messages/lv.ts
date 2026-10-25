@@ -153,6 +153,12 @@ export const lv: AppCatalog<typeof en> = {
     'Lai visu pārsūtītu tieši uz Google Workspace vai Microsoft 365, neko nelejupielādējot: ja jums ir personīgais konts vai jūs administrējat savu organizāciju, sāciet to paši Sytue Admin sadaļā “Migrācijas”; ja nē, lūdziet to organizācijas administratoram.',
   'data.move.action': 'Uz “Migrācijas”',
 
+  'devices.native.body':
+    'Izmanto ierīces failu pārvaldnieku vai pievieno kontu ar tā īpašnieka piekrišanu.',
+  'devices.native.driveBody':
+    'Sytue Drive tiek pievienots automātiski pēc pieteikšanās. Atļauj tā atrašanās vietu, ja sistēma to pieprasa.',
+  'devices.native.openDrive': 'Atvērt failu pārvaldniekā',
+  'devices.native.failed': 'Neizdevās atjaunināt ierīces integrāciju.',
   'devices.title': 'Ierīču pievienošana',
   'devices.lead':
     'Izmantojiet Sytue pastu, kalendāru, kontaktus un failus savā tālrunī vai datorā. Mēs palīdzēsim soli pa solim.',

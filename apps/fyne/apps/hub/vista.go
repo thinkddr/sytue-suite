@@ -119,6 +119,9 @@ type Vista struct {
 
 	mu      sync.Mutex
 	destino Destino
+	// A destination index alone cannot detect leaving and returning to the same
+	// page, or a changed product filter/account while a touch is pending.
+	revisionRefresco uint64
 	// pararFlujo corta el flujo SSE de la bandeja; nil es que no está escuchando.
 	pararFlujo context.CancelFunc
 	// ctxBandeja vive lo que la bandeja abierta; generacion sube en cada carga y
@@ -143,8 +146,6 @@ type Vista struct {
 	// pilaAvisos son los avisos flotantes («Dirección copiada»): van por ENCIMA del
 	// desplazador, no dentro, o se irían con la página al bajar.
 	pilaAvisos *ui.PilaAvisos
-	// coordenadas pide a Sytue ID lo que enseña «Conecta tus dispositivos».
-	coordenadas func(context.Context) (api.Coordenadas, error)
 
 	// exportar pide la copia de «Tus datos», y carpeta es dónde se deja: la de
 	// descargas del sistema, o una temporal en los tests.
@@ -211,10 +212,7 @@ func NuevaVista(t *i18n.Translator, a fyne.App, ahora time.Time) *Vista {
 	v.portapapeles = portapapelesDeLaApp
 
 	v.disp = NuevosDispositivos(t)
-	v.disp.Apex = v.apex
-	v.disp.AlCopiar = v.copiar
-	v.disp.AlAbrirURL = v.AbrirURL
-	v.disp.AlReintentar = func() { go v.cargarCoordenadas() }
+	v.disp.AlConectarApps = v.conectarApp
 	v.pilaAvisos = ui.NuevaPilaAvisos()
 
 	v.bajadas = NuevasDescargas(t)
@@ -245,6 +243,7 @@ func Portadas() []Destino {
 // mostrar enseña una pantalla y esconde las demás. Un objeto invisible no se pinta y
 // tampoco recibe el puntero, que es lo que hace falta aquí.
 func (v *Vista) mostrar(d Destino) {
+	v.revisionRefresco++
 	v.destino = d
 	for i, o := range v.pila.Objects {
 		if i == indice(d) {
@@ -306,11 +305,6 @@ func (v *Vista) Ir(d Destino) {
 	if d == AActividad && v.hub != nil {
 		go v.cargarActividad(v.actividad.Origen)
 	}
-	// Las coordenadas se piden al entrar, como la página de la web, y no se repiten
-	// mientras sigan valiendo.
-	if d == ADispositivos && v.disp.Estado != Listo {
-		go v.cargarCoordenadas()
-	}
 	// «Tus datos» pide mis organizaciones al montarse, como `TusDatos.tsx`.
 	if d == ADatos {
 		go v.cargarOrganizaciones()
@@ -337,7 +331,7 @@ func (v *Vista) Ir(d Destino) {
 // Filtrar cambia el filtro por producto de la actividad y vuelve a pedirla al Hub,
 // que es lo que hace la web recargando con `?source=`.
 func (v *Vista) Filtrar(origen string) {
-	v.enUI(func() { v.actividad.Origen = origen })
+	v.enUI(func() { v.revisionRefresco++; v.actividad.Origen = origen })
 	if v.hub != nil {
 		go v.cargarActividad(origen)
 	}
@@ -372,85 +366,64 @@ func (v *Vista) ConAgenda(a Agendable) *Vista { v.agenda = a; return v }
 // ConExportador conecta «Tus datos» con el Hub.
 func (v *Vista) ConExportador(e Exportador) *Vista { v.exportar = e; return v }
 
-// ConMontaje da a Dispositivos el botón de conectar Drive como disco en este equipo. Solo
-// lo pide el escritorio (`escritorio.MontarWebDAV`); sin él, quedan los pasos a mano.
-func (v *Vista) ConMontaje(montar func(direccion string) error) *Vista {
-	v.disp.AlMontar = func(direccion string) {
-		if err := montar(direccion); err != nil {
-			// Los pasos a mano siguen en la misma pantalla, justo debajo.
-			slog.Warn("hub: el explorador de ficheros no ha montado Drive", "error", err)
+// ConDriveEnSistema connects only native OS controls; no server coordinates or
+// application passwords are exposed to the person using the app.
+func (v *Vista) ConDriveEnSistema(activo func() bool, poner func(bool) error, abrir func() error) *Vista {
+	if activo != nil {
+		v.disp.DriveEnSistema = activo()
+	}
+	fallar := func(err error) {
+		if err != nil {
+			slog.Warn("hub: no se ha podido actualizar Drive en el sistema", "error", err)
+			v.pilaAvisos.Notificar(ui.NuevoAviso(ui.AvisoPeligro, v.t.T("devices.native.failed", nil), ""))
 		}
 	}
-	return v
-}
-
-// ConPerfilApple da a Dispositivos el «un clic» de Apple en ESTE equipo (`este`: Mac o
-// IPhone): `configurar` trae el perfil con su contraseña de aplicación y se lo da al
-// sistema, que lo deja listo para «Instalar». Fuera del hilo de la interfaz.
-func (v *Vista) ConPerfilApple(este Plataforma, configurar func(context.Context) error) *Vista {
-	v.disp.EsteApple = este
-	v.disp.AlConfigurarApple = func() {
-		go func() {
-			ctx, cancelar := context.WithTimeout(context.Background(), 30*time.Second)
-			defer cancelar()
-			if err := configurar(ctx); err != nil {
-				// La descarga del perfil sigue en la misma pantalla, debajo.
-				slog.Warn("hub: no se ha podido configurar el perfil de Apple", "error", err)
+	if poner != nil {
+		v.disp.AlCambiarDrive = func(enabled bool) {
+			v.mu.Lock()
+			if v.disp.DriveOcupado {
+				v.mu.Unlock()
+				return
 			}
-		}()
-	}
-	return v
-}
-
-// ConClientes da a Dispositivos los botones de un clic de Thunderbird, Outlook y
-// Android: `crear` hace la contraseña de aplicación de ese cliente (con su etiqueta) y
-// `abrir` abre su programa en este equipo, o devuelve error y la pantalla dice «ábrelo
-// tú». Ninguno de los tres deja que otro programa le cree la cuenta: esto es lo más
-// cerca que se llega, y el orden lo fija `configurarCliente`.
-func (v *Vista) ConClientes(crear func(context.Context, Plataforma) (string, error), abrir func(Plataforma) error) *Vista {
-	v.disp.AlConfigurarCliente = func(p Plataforma) {
-		if v.disp.Cliente.Creando {
-			return
-		}
-		v.disp.Cliente = Cliente{Plataforma: p, Creando: true}
-		v.disp.Refresh()
-		go func() {
-			ctx, cancelar := context.WithTimeout(context.Background(), 30*time.Second)
-			defer cancelar()
-			copiar := func(clave string) { fyne.DoAndWait(func() { v.copiar(clave, "devices.copied.password") }) }
-			c := configurarCliente(ctx, p, crear, copiar, abrir)
-			v.enUI(func() { v.disp.Cliente = c })
-		}()
-	}
-	return v
-}
-
-// configurarCliente es el orden del botón de un clic: crear la contraseña, copiarla y
-// SOLO entonces abrir el programa, que se pone delante pidiéndola. Si no se ha podido
-// crear, ni se copia ni se abre nada.
-func configurarCliente(ctx context.Context, p Plataforma, crear func(context.Context, Plataforma) (string, error),
-	copiar func(string), abrir func(Plataforma) error,
-) Cliente {
-	clave, err := crear(ctx, p)
-	if err != nil || clave == "" {
-		slog.Warn("hub: no se ha podido crear la contraseña de aplicación", "cliente", p, "error", err)
-		return Cliente{Plataforma: p, Fallo: true}
-	}
-	copiar(clave)
-	return Cliente{Plataforma: p, Clave: clave, Abierto: abrir != nil && abrir(p) == nil}
-}
-
-// ConDAVx5 enseña, en Android, los botones que abren el alta de DAVx⁵ con la dirección y
-// el usuario ya puestos (`api.AbrirDAVx5`). La contraseña la pone la persona pegándola.
-func (v *Vista) ConDAVx5() *Vista {
-	v.disp.AlAbrirDAVx5 = func(base string, contactos bool) {
-		if v.abrir != nil {
-			if err := api.AbrirDAVx5(v.abrir, base, v.disp.Correo, contactos); err != nil {
-				slog.Warn("hub: no se ha podido abrir DAVx⁵", "error", err)
-			}
+			v.disp.DriveOcupado = true
+			v.disp.Refresh()
+			v.mu.Unlock()
+			// El almacén espera la exclusión con login/refresh/logout. Esa espera
+			// no puede detener el hilo que atiende los gestos y pinta la pantalla.
+			go func() {
+				err := poner(enabled)
+				actual := enabled
+				if activo != nil {
+					actual = activo()
+				}
+				v.enUI(func() {
+					v.disp.DriveOcupado = false
+					if err == nil || activo != nil {
+						v.disp.DriveEnSistema = actual
+					}
+					fallar(err)
+				})
+			}()
 		}
 	}
+	if abrir != nil {
+		v.disp.AlAbrirDrive = func() {
+			go func() {
+				err := abrir()
+				if err != nil {
+					v.enUI(func() { fallar(err) })
+				}
+			}()
+		}
+	}
+	v.disp.Refresh()
 	return v
+}
+
+// RefrescarDriveEnSistema mirrors a preference changed by another suite app.
+func (v *Vista) RefrescarDriveEnSistema(activo bool) {
+	v.disp.DriveEnSistema = activo
+	v.disp.Refresh()
 }
 
 // descargarDatos pide la copia y la deja en la carpeta de descargas. La pantalla dice
@@ -609,26 +582,6 @@ func (v *Vista) guardarInstalador(i api.Instalador) (string, error) {
 // ErrSumaInstalador es un instalador que no es el que dice el catálogo.
 var ErrSumaInstalador = errors.New("hub: el instalador no coincide con su suma")
 
-// ConCoordenadas conecta «Conecta tus dispositivos» con Sytue ID.
-func (v *Vista) ConCoordenadas(f func(context.Context) (api.Coordenadas, error)) *Vista {
-	v.coordenadas = f
-	return v
-}
-
-// cargarCoordenadas las pide y deja la pantalla en su estado. Sin fuente, «no podemos
-// enseñarte los datos»: la web tampoco se inventa servidores.
-func (v *Vista) cargarCoordenadas() {
-	if v.coordenadas == nil {
-		v.enUI(func() { v.disp.Estado = Fallo })
-		return
-	}
-	ctx, cancelar := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancelar()
-	v.enUI(func() { v.disp.Estado = Cargando })
-	c, err := v.coordenadas(ctx)
-	v.enUI(func() { v.disp.Coordenadas, v.disp.Estado = c, EstadoDe(err) })
-}
-
 // Avisos es la pila de avisos flotantes, que la ventana pone ENCIMA del desplazador.
 func (v *Vista) Avisos() fyne.CanvasObject { return v.pilaAvisos }
 
@@ -669,7 +622,11 @@ func (v *Vista) org() string {
 
 // Arrancar lanza las cargas de la pantalla inicial.
 func (v *Vista) Arrancar() {
-	v.enUI(func() { v.lanzador.PuedeConectarAlmacen = false; v.lanzador.PuedeConectarApps = false })
+	v.enUI(func() {
+		v.revisionRefresco++
+		v.lanzador.PuedeConectarAlmacen = false
+		v.lanzador.PuedeConectarApps = false
+	})
 	if v.hub != nil {
 		go v.cargarReciente()
 		go v.cargarDesplegadas()
@@ -741,7 +698,6 @@ func (v *Vista) cargarCuenta() {
 			apagados[clave] = r.EsCuentaPersonal()
 		}
 		v.lanzador.Apagados = apagados
-		v.disp.Correo = r.Email
 	})
 }
 

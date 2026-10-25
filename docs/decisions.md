@@ -3230,29 +3230,29 @@ otra app por su esquema o iniciar una aplicación cerrada. Eso hacía imposible
 terminar el login móvil RFC 8252 aunque `auth.OIDC.LoginEsquema` y `Vuelta` ya
 existieran: el callback no tenía dónde entrar.
 
-Se mantiene la dependencia pública `fyne.io/fyne/v2 v2.8.1`, pero se reemplaza por
-el tag público BSD-3-Clause `github.com/thinkddr/fyne/v2 v2.8.1-sytue.16` (hoy; la historia de cada versión está en `apps/fyne/upstream/README.md`). Añade la interfaz
+Se mantiene la dependencia pública `fyne.io/fyne/v2`, en la versión estable declarada en `apps/fyne/go.mod`, pero se reemplaza por
+el tag público de `github.com/thinkddr/fyne/v2` fijado en `apps/fyne/go.mod` (la historia está en `apps/fyne/upstream/README.md`). Conserva la licencia BSD-3-Clause de upstream y las modificaciones del fork se distribuyen bajo Apache-2.0. Añade la interfaz
 opcional `fyne.URLHandler`, sin ensanchar `fyne.App` ni romper implementaciones de
 terceros. La URL se encola hasta registrar el handler y se entrega en el hilo gráfico.
 Android cubre el intent inicial y `onNewIntent`; iOS, la URL de lanzamiento y
 `application:openURL:options:`; macOS, el Apple Event `kAEGetURL`; Linux y Windows,
 el argumento con que arranca el binario.
 
-La rama `main` del fork queda como espejo de upstream y `sytue` contiene el parche.
-Al actualizar Fyne: rebasar `sytue` sobre el tag estable nuevo, ejecutar los tests del
+Los tags originales de upstream se conservan; `main` del fork contiene las modificaciones de Sytue.
+Al actualizar Fyne: integrar el tag estable nuevo, ejecutar los tests del
 fork en CI, crear `vX.Y.Z-sytue.N` y cambiar el `replace` en el mismo cambio. Se
 propondrá el parche aguas arriba; cuando lo acepten, se elimina el fork y el
 `replace`, no se mantiene una API paralela.
 
 **Y un tercer fork, de GLFW (2026-09-23).** `apps/fyne/go.mod` reemplaza también
-`github.com/go-gl/glfw/v3.4/glfw` por `github.com/thinkddr/glfw/v3.4/glfw v0.1.0-sytue.3`
+`github.com/go-gl/glfw/v3.4/glfw` por el tag de `github.com/thinkddr/glfw/v3.4/glfw` fijado en `apps/fyne/go.mod`
 (privado, bajo las licencias de upstream: BSD-3-Clause el enlace de Go y zlib GLFW), sobre
-el mismo commit de go-gl que requiere Fyne v2.8.1. GLFW solo acepta ficheros soltados, y
+la base de go-gl que requiere la versión vigente de Fyne. GLFW solo acepta ficheros soltados, y
 su XDnD de X11 y su `wl_data_device` de Wayland no se ven desde fuera: el parche añade
 texto y enlaces soltados (`glfwSetDropTextCallback`, `apps/fyne/soltar.AlSoltar`) y,
 desde `.3`, el aviso de ficheros arrastrados por encima (`glfwSetDragCallback`,
-`soltar.AlArrastrar`). Las mismas reglas que el de Fyne: una rama con el parche (la viva
-es `sytue-3`), un tag por versión y el `replace` en el mismo cambio; lo que lleva cada
+`soltar.AlArrastrar`). Las mismas reglas que el de Fyne: una rama con el parche,
+un tag por versión y el `replace` en el mismo cambio; lo que lleva cada
 versión, cómo se probó y cómo quitarlo, en `apps/fyne/upstream/README.md`.
 
 **El envío aguas arriba está preparado (2026-09-22)**, en

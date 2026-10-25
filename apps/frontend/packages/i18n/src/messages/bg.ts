@@ -205,6 +205,8 @@ export const bg: Catalog = {
   'account.signedOutTitle': 'Не сте влезли',
   'account.signedOutDescription': 'Влезте с профила си в Sytue One, за да видите данните си тук.',
   'account.signOut': 'Изход',
+  'account.signOutFailed':
+    'Неуспешно излизане от профила на това устройство. Drive може още да е свързан. Опитайте отново.',
   'account.signOutPending.title': 'Неизпратени бележки',
   'account.signOutPending.body':
     'Notepads има бележки на това устройство, които още не са качени ({count}). При изход те се изтриват от него.',
@@ -350,6 +352,7 @@ export const bg: Catalog = {
   'widgets.episodes': 'Епизоди',
   'widgets.apps': 'Приложения',
   'widgets.compose': 'Писане',
+  'widgets.storage': 'Хранилище',
   'widgets.create': 'Създаване на събитие',
 
   'linkedServices.services': 'Услуги',

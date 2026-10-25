@@ -9,7 +9,6 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
 
-	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 )
@@ -19,7 +18,7 @@ import (
 //
 // La banda es lo de Ribbon.tsx: UNA línea que se desplaza de lado cuando no cabe —con la
 // rueda, el trackpad o el dedo, y con el tabulador, que la lleva hasta el control
-// enfocado— y, si algo no cabe, «Más» al final, que la despliega en varias líneas encima
+// enfocado— y, en escritorio, «Más» al final, que la despliega en varias líneas encima
 // del lienzo. Hasta el 2026-10-16 no se desplazaba ni tenía «Más»: a 1280 los grupos
 // «Ventana» y «Proteger» de Calcus caían fuera de la ventana sin forma de llegar a ellos,
 // y en un teléfono la banda se repartía en tres líneas que se llevaban 368 px.
@@ -43,12 +42,6 @@ type Cinta struct {
 	tira             *ui.DesplazaLado
 	cuerpo           fyne.CanvasObject
 	banda            *ui.DesplazaLado
-
-	// Abierta es el `toolsOpen` de la web: por debajo de `md` la banda de grupos
-	// empieza plegada, y el chevrón de la derecha de la tira la despliega. Por encima
-	// no cuenta: la banda está siempre.
-	Abierta bool
-	plegar  *BotonCinta
 
 	// «Más»: su botón, el separador que lo antecede y la banda desplegada, si lo está.
 	mas        *ChipCinta
@@ -83,8 +76,7 @@ func NuevaCinta(ctx *Contexto, r *Registro) *Cinta {
 // AccessibilityRole la anuncia como contenedor; las pestañas se anuncian solas.
 func (c *Cinta) AccessibilityRole() fyne.AccessibleRole { return fyne.AccessibleRoleContainer }
 
-// Elegir abre la pestaña de ese índice visible. Con la banda plegada, la despliega: si
-// no, tocar «Insertar» no haría nada visible y parecería que la pestaña está rota.
+// Elegir abre la pestaña de ese índice visible, manteniendo una sola fila.
 func (c *Cinta) Elegir(i int) {
 	vis := c.registro.Visibles(c.ctx.Tipo)
 	if len(vis) == 0 {
@@ -93,32 +85,17 @@ func (c *Cinta) Elegir(i int) {
 	c.activa = (i%len(vis) + len(vis)) % len(vis)
 	// Otra pestaña: la banda empieza por el principio, como al pintarla de nuevo en la web.
 	c.banda.Mostrar(0, 0)
-	if !c.Abierta {
-		c.PonerAbierta(true)
-		return
-	}
 	c.reconstruir()
 	c.Refresh()
 }
 
-// PonerAbierta pliega o despliega la banda. Cambia el alto de la cinta, así que el marco
-// tiene que recolocarse: por eso pide recomponer al contexto.
-func (c *Cinta) PonerAbierta(si bool) {
-	c.Abierta = si
-	if c.ctx.Refrescar != nil {
-		c.ctx.Refrescar()
-		return
-	}
-	c.Reconstruir()
-}
-
 // Alto es lo que ocupa la cinta a ese ancho: la tira y la banda y, por debajo de `md`,
-// solo la tira si está plegada, o la tira y la banda estrecha.
+// la tira y la banda estrecha, siempre visible y sin envolver.
 func (c *Cinta) Alto(ancho float32) float32 {
 	if ancho >= ui.CorteMD || ancho <= 0 {
 		return AltoCinta()
 	}
-	if !c.Abierta || c.cuerpo == nil {
+	if c.cuerpo == nil {
 		return AltoDeTira()
 	}
 	return AltoDeTira() + AltoBandaEstrecha
@@ -159,12 +136,6 @@ func (c *Cinta) reconstruir() {
 		pestanas[i] = t
 	}
 	c.tira.Contenido = container.New(ui.Fila{Hueco: HuecoTira}, pestanas...)
-	// El chevrón de plegar: hacia abajo para desplegar, hacia arriba para plegar.
-	icono, rotulo := iconos.EdChevronAbajo, "ribbon.showTools"
-	if c.Abierta {
-		icono, rotulo = iconos.EdChevronArriba, "ribbon.hideTools"
-	}
-	c.plegar = NuevoBotonCinta(icono, c.ctx.Traducir(rotulo), func() { c.PonerAbierta(!c.Abierta) })
 	c.cuerpo = nil
 	if len(vis) > 0 && vis[c.activa].Cuerpo != nil {
 		c.cuerpo = vis[c.activa].Cuerpo(c.ctx)
@@ -221,7 +192,7 @@ func (a *activable) pulsableDeCinta() *ui.Pulsable { return &a.Pulsable }
 // misma banda —el estado de sus controles no se duplica— y aquí cada cuerpo es una
 // función del contexto, así que dos copias no pueden decir cosas distintas.
 func (c *Cinta) alternarMas() {
-	if c.plegarMas() {
+	if c.plegarMas() || ui.EsTactil() || (c.Size().Width > 0 && c.Size().Width < ui.CorteMD) {
 		return
 	}
 	vis := c.registro.Visibles(c.ctx.Tipo)
@@ -325,7 +296,7 @@ func (r *cintaRenderer) MinSize() fyne.Size { return r.c.MinSize() }
 
 func (r *cintaRenderer) Objects() []fyne.CanvasObject {
 	return []fyne.CanvasObject{
-		r.fondo, r.lineaT, r.lineaB, r.c.envolturaArchivo, r.c.tira, r.c.plegar,
+		r.fondo, r.lineaT, r.lineaB, r.c.envolturaArchivo, r.c.tira,
 		r.c.banda, r.c.sepMas, r.c.mas,
 	}
 }
@@ -343,21 +314,12 @@ func (r *cintaRenderer) Layout(t fyne.Size) {
 	r.lineaT.Resize(fyne.NewSize(t.Width, tema.Borde))
 
 	estrecha := t.Width > 0 && t.Width < ui.CorteMD
-	if c.desplegada != nil && t.Width != c.anchoDesplegada {
+	if c.desplegada != nil && (t.Width != c.anchoDesplegada || ui.EsTactil()) {
 		c.plegarMas()
 	}
-	// «Archivo» fijo, las pestañas en su fila deslizante y, en un móvil, el chevrón al
-	// final: la tira acaba donde él empieza (`min-w-0 flex-1`).
+	// «Archivo» fijo y todas las pestañas en una tira deslizable. La banda
+	// móvil permanece visible; no reserva un botón para expandirla.
 	fin := t.Width - MargenTira
-	if estrecha {
-		c.plegar.Show()
-		m := c.plegar.MinSize()
-		fin = t.Width - m.Width
-		c.plegar.Move(fyne.NewPos(fin, (tira-tema.Borde-m.Height)/2))
-		c.plegar.Resize(m)
-	} else {
-		c.plegar.Hide()
-	}
 	ma := c.archivo.MinSize()
 	c.envolturaArchivo.Move(fyne.NewPos(MargenTira, 0))
 	c.envolturaArchivo.Resize(fyne.NewSize(ma.Width, tira-tema.Borde))
@@ -373,8 +335,8 @@ func (r *cintaRenderer) Layout(t fyne.Size) {
 
 	c.sepMas.Hide()
 	c.mas.Hide()
-	if c.cuerpo == nil || (estrecha && !c.Abierta) {
-		c.banda.Hide() // `max-md:hidden`
+	if c.cuerpo == nil {
+		c.banda.Hide()
 		r.lineaB.Hide()
 		return
 	}
@@ -390,12 +352,9 @@ func (r *cintaRenderer) Layout(t fyne.Size) {
 	ancho := t.Width
 	// «Más» solo si algo no cabe, y OCUPA SU SITIO en la fila: la banda acaba donde él
 	// empieza, a la altura de la fila de controles y con su separador delante.
-	if c.banda.Contenido.MinSize().Width > t.Width+1 || c.desplegada != nil {
+	if !estrecha && !ui.EsTactil() && (c.banda.Contenido.MinSize().Width > t.Width+1 || c.desplegada != nil) {
 		ancho = t.Width - c.anchoZonaMas()
 		arribaSep := ArribaSeparador
-		if estrecha {
-			arribaSep = ArribaSeparadorEstrecho
-		}
 		c.sepMas.Show()
 		c.sepMas.Move(fyne.NewPos(ancho+MargenSeparador, tira+arribaSep))
 		c.sepMas.Resize(fyne.NewSize(tema.Borde, AltoSeparadorGrupos))

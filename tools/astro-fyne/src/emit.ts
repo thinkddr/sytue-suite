@@ -69,7 +69,9 @@ export function sourceHash(program: Program): string {
 }
 
 const quote = (value: string): string =>
-  JSON.stringify(value).replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
+  JSON.stringify(value)
+    .replace(/\u2028/g, "\\u2028")
+    .replace(/\u2029/g, "\\u2029");
 const identifier = /^[A-Za-z][A-Za-z0-9_]*$/;
 const runtime = "github.com/thinkddr/astro-fyne/native";
 

@@ -115,6 +115,9 @@ type Passkey struct {
 // AppPassword son los METADATOS de una contraseña de aplicación: el secreto no se guarda
 // en el servicio y no viaja en el listado.
 type AppPassword struct {
+	// OrgID y Tenant son la organización fijada al crear la credencial.
+	OrgID      string     `json:"org_id,omitempty"`
+	Tenant     string     `json:"tenant,omitempty"`
 	ID         string     `json:"id"`
 	Label      string     `json:"label"`
 	CreatedAt  time.Time  `json:"created_at"`

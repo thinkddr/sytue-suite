@@ -160,6 +160,12 @@ export const lt: AppCatalog<typeof en> = {
     'Jei norite viską perkelti tiesiai į Google Workspace arba Microsoft 365 nieko neatsisiųsdami: jei jūsų paskyra asmeninė arba administruojate savo organizaciją, pradėkite tai patys Sytue Admin skiltyje „Migracijos“; jei ne, paprašykite jos administratoriaus.',
   'data.move.action': 'Eiti į „Migracijos“',
 
+  'devices.native.body':
+    'Naudok įrenginio failų tvarkyklę arba prijunk paskyrą su jos savininko sutikimu.',
+  'devices.native.driveBody':
+    'Sytue Drive pridedamas automatiškai prisijungus. Leisk jo vietą, jei sistema to paprašys.',
+  'devices.native.openDrive': 'Atverti failų tvarkyklėje',
+  'devices.native.failed': 'Nepavyko atnaujinti įrenginio integracijos.',
   'devices.title': 'Prijunkite savo įrenginius',
   'devices.lead':
     'Naudokite Sytue paštą, kalendorių, kontaktus ir failus savo telefone ar kompiuteryje. Padėsime žingsnis po žingsnio.',

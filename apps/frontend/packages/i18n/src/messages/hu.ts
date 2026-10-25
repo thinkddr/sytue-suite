@@ -209,6 +209,8 @@ export const hu: Catalog = {
   'account.signedOutTitle': 'Nincs bejelentkezve',
   'account.signedOutDescription': 'Jelentkezzen be Sytue One-fiókjával, hogy itt lássa az adatait.',
   'account.signOut': 'Kijelentkezés',
+  'account.signOutFailed':
+    'Nem sikerült kijelentkezni ezen az eszközön. A Drive még csatlakoztatva lehet. Próbáld újra.',
   'account.signOutPending.title': 'Fel nem töltött jegyzetek',
   'account.signOutPending.body':
     'A Notepadsben vannak ezen az eszközön még fel nem töltött jegyzetek ({count}). Kijelentkezéskor törlődnek róla.',
@@ -358,6 +360,7 @@ export const hu: Catalog = {
   'widgets.episodes': 'Epizódok',
   'widgets.apps': 'Alkalmazások',
   'widgets.compose': 'Levélírás',
+  'widgets.storage': 'Tárhely',
   'widgets.create': 'Esemény létrehozása',
 
   'linkedServices.services': 'Szolgáltatások',

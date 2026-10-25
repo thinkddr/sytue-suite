@@ -15,27 +15,36 @@ import (
 // está aquí, solo su hash; se enseña una vez al crearla.
 type AppPassword struct {
 	ID         string     `json:"id"`
+	OrgID      string     `json:"org_id,omitempty"`
+	Tenant     string     `json:"tenant,omitempty"`
 	Label      string     `json:"label"`
 	CreatedAt  time.Time  `json:"created_at"`
 	LastUsedAt *time.Time `json:"last_used_at"`
 }
 
-// CreateAppPassword guarda el hash de una contraseña nueva y devuelve la fila.
-func (s *Store) CreateAppPassword(ctx context.Context, userID, secretHash, label string) (AppPassword, error) {
-	const sql = `INSERT INTO app_passwords (user_id, secret_hash, label)
-		VALUES ($1::uuid, $2, $3)
-		RETURNING id, label, created_at, last_used_at`
+// CreateAppPassword liga la credencial a la organización elegida en la sesión.
+// El INSERT valida la membresía y los estados actuales en la misma consulta: ni
+// un token todavía vivo tras una baja ni un llamador interno pueden crearla fuera
+// de su organización. Las filas antiguas sin org quedan solo como metadatos.
+func (s *Store) CreateAppPassword(ctx context.Context, userID, orgID, secretHash, label string) (AppPassword, error) {
+	const sql = `INSERT INTO app_passwords (user_id, org_id, secret_hash, label)
+		SELECT m.user_id, m.org_id, $3, $4 FROM memberships m
+		JOIN organizations o ON o.id = m.org_id AND o.status = 'active'
+		JOIN users u ON u.id = m.user_id AND u.status = 'active'
+		WHERE m.user_id = $1::uuid AND m.org_id = $2::uuid
+		RETURNING id, org_id, (SELECT slug FROM organizations WHERE id = org_id), label, created_at, last_used_at`
 	var a AppPassword
-	err := s.DB().QueryRow(ctx, sql, userID, secretHash, label).
-		Scan(&a.ID, &a.Label, &a.CreatedAt, &a.LastUsedAt)
+	err := s.DB().QueryRow(ctx, sql, userID, orgID, secretHash, label).
+		Scan(&a.ID, &a.OrgID, &a.Tenant, &a.Label, &a.CreatedAt, &a.LastUsedAt)
 	return a, errf("CreateAppPassword", err)
 }
 
 // ListAppPasswords devuelve las VIVAS de una persona, la más reciente primero.
 func (s *Store) ListAppPasswords(ctx context.Context, userID string) ([]AppPassword, error) {
-	const sql = `SELECT id, label, created_at, last_used_at
-		FROM app_passwords WHERE user_id = $1::uuid AND revoked_at IS NULL
-		ORDER BY created_at DESC`
+	const sql = `SELECT a.id, coalesce(a.org_id::text, ''), coalesce(o.slug, ''), a.label, a.created_at, a.last_used_at
+		FROM app_passwords a LEFT JOIN organizations o ON o.id = a.org_id
+		WHERE a.user_id = $1::uuid AND a.revoked_at IS NULL
+		ORDER BY a.created_at DESC`
 	rows, err := s.DB().Query(ctx, sql, userID)
 	if err != nil {
 		return nil, errf("ListAppPasswords", err)
@@ -44,7 +53,7 @@ func (s *Store) ListAppPasswords(ctx context.Context, userID string) ([]AppPassw
 	out := []AppPassword{}
 	for rows.Next() {
 		var a AppPassword
-		if err := rows.Scan(&a.ID, &a.Label, &a.CreatedAt, &a.LastUsedAt); err != nil {
+		if err := rows.Scan(&a.ID, &a.OrgID, &a.Tenant, &a.Label, &a.CreatedAt, &a.LastUsedAt); err != nil {
 			return nil, errf("ListAppPasswords.scan", err)
 		}
 		out = append(out, a)
@@ -65,22 +74,24 @@ func (s *Store) RevokeAppPassword(ctx context.Context, userID, id string) (bool,
 	return tag.RowsAffected() > 0, nil
 }
 
-// UserByAppPassword resuelve la persona a la que pertenece una contraseña de
-// aplicación viva y ANOTA el uso, todo en la misma consulta: el camino de
-// autenticación de cada conexión IMAP/SMTP no puede costar dos viajes.
-//
-// La búsqueda es por el hash, que es único y está indexado por la restricción de
-// unicidad: no se recorre nada. Una revocada no casa (revoked_at IS NULL), así
-// que revocar corta en la siguiente conexión sin desplegar ni reiniciar nada.
-func (s *Store) UserByAppPassword(ctx context.Context, secretHash string) (domain.User, error) {
-	const sql = `UPDATE app_passwords SET last_used_at = now()
-		WHERE secret_hash = $1 AND revoked_at IS NULL
-		RETURNING user_id`
+// UserByAppPassword resuelve dueño y organización INMUTABLE de una contraseña
+// viva. Revalida membresía y estado al canjear; una fila antigua sin organización
+// nunca se asigna a la primera membresía que tenga hoy la persona.
+func (s *Store) UserByAppPassword(ctx context.Context, secretHash string) (domain.User, domain.Organization, error) {
+	const sql = `UPDATE app_passwords a SET last_used_at = now()
+		FROM memberships m JOIN organizations o ON o.id = m.org_id
+		JOIN users u ON u.id = m.user_id
+		WHERE a.secret_hash = $1 AND a.revoked_at IS NULL
+		AND a.org_id = m.org_id AND a.user_id = m.user_id
+		AND o.status = 'active' AND u.status = 'active'
+		RETURNING a.user_id, o.id, o.slug`
 	var userID string
-	if err := s.DB().QueryRow(ctx, sql, secretHash).Scan(&userID); err != nil {
-		return domain.User{}, errf("UserByAppPassword", err)
+	var org domain.Organization
+	if err := s.DB().QueryRow(ctx, sql, secretHash).Scan(&userID, &org.ID, &org.Slug); err != nil {
+		return domain.User{}, org, errf("UserByAppPassword", err)
 	}
-	return s.GetUserByID(ctx, userID)
+	user, err := s.GetUserByID(ctx, userID)
+	return user, org, err
 }
 
 // CreateAppleProfileLink guarda un enlace de un solo uso al perfil de Apple (mig 0118).

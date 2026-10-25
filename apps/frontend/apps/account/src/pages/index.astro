@@ -44,5 +44,6 @@ const idBaseUrl = (env.SYTUE_OIDC_ISSUER ?? 'https://id.sytue.eu').replace(/\/$/
     locale={Astro.locals.locale}
     nombreInicial={session.user.name ?? ''}
     email={session.user.email ?? ''}
+    mfaRequired={Astro.url.searchParams.get('mfa') === 'required'}
   />
 </AppLayout>

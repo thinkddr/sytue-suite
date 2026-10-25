@@ -23,6 +23,7 @@
   "account.presenceFailed": "Vašu prisutnost nije bilo moguće promijeniti",
   "account.signIn": "Prijava",
   "account.signOut": "Odjava",
+  "account.signOutFailed": "Odjava na ovom uređaju nije uspjela. Drive je možda još povezan. Pokušajte ponovno.",
   "account.signOutPending.body": "Notepads na ovom uređaju ima bilješke koje još nisu prenesene ({count}). Odjavom se brišu s njega.",
   "account.signOutPending.discard": "Odbaci i odjavi se",
   "account.signOutPending.title": "Neprenesene bilješke",
@@ -338,5 +339,6 @@
   "widgets.open": "Otvori",
   "widgets.pending": "Na čekanju",
   "widgets.photos": "Fotografije",
-  "widgets.rows": "Redci"
+  "widgets.rows": "Redci",
+  "widgets.storage": "Pohrana"
 }

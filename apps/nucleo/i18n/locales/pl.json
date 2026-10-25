@@ -23,6 +23,7 @@
   "account.presenceFailed": "Nie udało się zmienić Twojej obecności",
   "account.signIn": "Zaloguj się",
   "account.signOut": "Wyloguj się",
+  "account.signOutFailed": "Nie udało się wylogować na tym urządzeniu. Drive może być nadal połączony. Spróbuj ponownie.",
   "account.signOutPending.body": "Notepads ma na tym urządzeniu notatki, które nie zostały jeszcze wysłane ({count}). Wylogowanie usuwa je z niego.",
   "account.signOutPending.discard": "Odrzuć i wyloguj się",
   "account.signOutPending.title": "Niewysłane notatki",
@@ -342,5 +343,6 @@
   "widgets.open": "Otwórz",
   "widgets.pending": "Oczekujące",
   "widgets.photos": "Zdjęcia",
-  "widgets.rows": "Wiersze"
+  "widgets.rows": "Wiersze",
+  "widgets.storage": "Miejsce"
 }

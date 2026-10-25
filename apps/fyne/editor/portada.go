@@ -564,6 +564,7 @@ type vistaPortada struct {
 	insignia *ui.Insignia
 	cuerpo   fyne.CanvasObject
 	scroll   *container.Scroll
+	refresco fyne.CanvasObject
 	rejilla  *rejillaPortada
 	r        *vistaRenderer
 }
@@ -799,6 +800,18 @@ func (w *vistaPortada) CreateRenderer() fyne.WidgetRenderer {
 	// posiciones propias dentro del desplazador.
 	r.pagina = container.NewWithoutLayout()
 	w.scroll = container.NewVScroll(ui.AlAnchoFluido(0, r.pagina))
+	w.refresco = ui.RefrescarAlTirar(w.scroll, &ui.RefrescoLista{
+		Arriba: func() bool { return w.scroll.Offset.Y <= 0.5 },
+		Puede: func() bool {
+			return p.Svc != nil && p.hayRed() && p.Estado != Cargando && !p.CargandoMas && !p.Creando
+		},
+		Revision: func() uint64 {
+			p.mu.Lock()
+			defer p.mu.Unlock()
+			return ui.RevisionLista(p.seq)
+		},
+		Actualizar: p.Cargar,
+	})
 	w.scroll.OnScrolled = func(pos fyne.Position) {
 		if p.Estado == Listo && pos.Y+w.scroll.Size().Height >= w.scroll.Content.MinSize().Height-CercaDelFinal {
 			p.Mas()
@@ -852,7 +865,7 @@ func (r *vistaRenderer) MinSize() fyne.Size { return r.w.MinSize() }
 func (r *vistaRenderer) Destroy()           {}
 
 func (r *vistaRenderer) Objects() []fyne.CanvasObject {
-	return []fyne.CanvasObject{r.w.scroll}
+	return []fyne.CanvasObject{r.w.refresco}
 }
 
 func (r *vistaRenderer) piezas() []fyne.CanvasObject {
@@ -1013,7 +1026,7 @@ func (r *vistaRenderer) Layout(t fyne.Size) {
 	r.fondo.SetMinSize(fyne.NewSize(0, alto))
 	r.fondo.Resize(fyne.NewSize(t.Width, max(alto, t.Height)))
 	r.pagina.Objects = r.piezas()
-	w.scroll.Resize(t)
+	w.refresco.Resize(t)
 	w.scroll.Refresh()
 }
 

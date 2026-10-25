@@ -371,7 +371,7 @@ try {
 }
 // The original native control retains the product fork, theme and callbacks.
 await copyFile(
-  join(import.meta.dir, 'native.go'),
+  join(import.meta.dir, 'native.go.tmpl'),
   join(productProbe, 'main.go'),
 );
 const product = join(root, 'apps/fyne');

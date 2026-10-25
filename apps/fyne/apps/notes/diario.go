@@ -191,11 +191,10 @@ func (p *Pantalla) enviarCaptura() {
 // anchoContenido usa los cortes del armazón, sin inventar una segunda rejilla.
 
 func (p *Pantalla) anchoContenido() float32 {
-	ancho := p.anchoVentana()
-	if ancho >= ui.Estrecho {
-		ancho -= tema.AnchoLateral
+	ancho := ui.AnchoHoja(p.anchoVentana(), ui.AnchoMenu(false), 0)
+	if p.anchoVentana() >= ui.Estrecho {
 		if p.activo.Vista == VistaArbol {
-			ancho -= ui.AnchoPanel(p.anchoVentana())
+			ancho -= ui.AcotarAnchoPanel(ui.AnchoPanel(p.anchoVentana()), ancho)
 		}
 	}
 	return max(ancho, 1)

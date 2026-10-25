@@ -55,7 +55,7 @@ export const is: AppCatalog<typeof en> = {
   'security.mfa.title': 'Tveggja þrepa staðfesting',
   'security.mfa.off': 'Ekki sett upp. Lykilorðið eitt og sér opnar reikninginn.',
   'security.mfa.required':
-    'Fyrirtækið þitt krefst tveggja þrepa staðfestingar. Kveiktu á henni hér að neðan og skráðu þig inn aftur.',
+    'Þessi aðgerð krefst tveggja þrepa staðfestingar. Settu hana upp hér að neðan og skráðu þig svo inn aftur.',
   'security.mfa.on': 'Kveikt. Kóða er krafist við innskráningu.',
   'security.mfa.enable': 'Setja upp',
   'security.mfa.scan': 'Skannaðu þetta með auðkenningarforritinu þínu.',
@@ -114,6 +114,10 @@ export const is: AppCatalog<typeof en> = {
   'plan.pro': 'Pro-áskrift · 200 GB',
   'plan.enterprise': 'Enterprise-áskrift · 1 TB · Úrvalsþjónusta',
   'plan.storage': 'Notað geymslurými',
+  'plan.externalNote': 'Tengd geymsla eykur geymslurýmið þitt í Sytue.',
+  'plan.externalCapacity': 'Tengd geymsla bætir við {capacity}.',
+  'plan.externalUnknown': 'Þjónustuveitan gefur ekki upp geymslurýmið.',
+  'plan.baseUsage': 'Sytue: {used} af {total}',
   'plan.paidUntil': 'Greitt til',
   'plan.upgrade': 'Fá meira pláss',
   'plan.upgrade.hint':

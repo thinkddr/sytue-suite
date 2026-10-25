@@ -120,14 +120,18 @@ func (p *Pantalla) vistaAgenda() fyne.CanvasObject {
 func (p *Pantalla) listaAgenda() fyne.CanvasObject {
 	grupos := p.porDia(p.consultaAgenda)
 	if len(grupos) == 0 {
-		return p.agendaVacia(strings.TrimSpace(p.consultaAgenda) != "")
+		options := p.Refresco
+		options.Arriba = func() bool { return true }
+		return ui.RefrescarAlTirar(p.agendaVacia(strings.TrimSpace(p.consultaAgenda) != ""), &options)
 	}
 	filas := make([]fyne.CanvasObject, 0, len(grupos))
 	for i, g := range grupos {
 		filas = append(filas, p.nuevoGrupoAgenda(g, i > 0))
 	}
-	_, lista := desplazable(container.New(ui.Columna{}, filas...))
-	return lista
+	scroll, lista := desplazable(container.New(ui.Columna{}, filas...))
+	options := p.Refresco
+	options.Arriba = func() bool { return scroll.Offset.Y <= 0.5 }
+	return ui.RefrescarAlTirar(lista, &options)
 }
 
 // agendaVacia es el vacío de la agenda, que NO es `EmptyState`: un texto `text-sm

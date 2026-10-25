@@ -23,6 +23,7 @@
   "account.presenceFailed": "Nepavyko pakeisti jūsų būsenos",
   "account.signIn": "Prisijungti",
   "account.signOut": "Atsijungti",
+  "account.signOutFailed": "Nepavyko atsijungti šiame įrenginyje. Drive gali būti vis dar prijungtas. Bandykite dar kartą.",
   "account.signOutPending.body": "Notepads šiame įrenginyje turi dar neįkeltų užrašų ({count}). Atsijungus jie iš jo ištrinami.",
   "account.signOutPending.discard": "Atmesti ir atsijungti",
   "account.signOutPending.title": "Neįkelti užrašai",
@@ -342,5 +343,6 @@
   "widgets.open": "Atverti",
   "widgets.pending": "Laukiama",
   "widgets.photos": "Nuotraukos",
-  "widgets.rows": "Eilutės"
+  "widgets.rows": "Eilutės",
+  "widgets.storage": "Saugykla"
 }

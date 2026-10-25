@@ -37,6 +37,12 @@ public final class WidgetSnapshotPrueba {
             check(visible(make(1, "mail", "generation-one", NOW, NOW + 120, true,
                     new WidgetSnapshot.Counter(kind, 2))), "complete collection kind " + kind);
         }
+        for (long percent : new long[] {0, 32, 100}) {
+            check(visible(make(1, "mail", "generation-one", NOW, NOW + 120, true,
+                    new WidgetSnapshot.Counter("storage_percent", percent))), "valid storage percentage");
+        }
+        check(!visible(make(1, "mail", "generation-one", NOW, NOW + 120, true,
+                new WidgetSnapshot.Counter("storage_percent", 101))), "invalid storage percentage");
         check(!valid.visible("mail", "generation-two", false, NOW), "late old account response");
         check(!valid.visible("mail", "", false, NOW), "logout");
         check(!valid.visible("rooms", "generation-one", false, NOW), "different product");

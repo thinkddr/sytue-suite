@@ -23,9 +23,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"sync"
-	"sync/atomic"
-	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
@@ -76,6 +73,7 @@ func main() {
 	// Sin conexión, solo lectura: la caché «red primero» y su monitor son de la sesión.
 	red, cliente := s.Conexion("drive", drive.SinGuardarSinConexion...)
 	p := drive.NuevaPantalla(tr, api.NewDrive(s.URL("drive"), s.Sesion, cliente), red, w)
+	p.Widget = s.CapturarWidget
 	p.Docs = api.NewDocs(s.URL("docs"), s.Sesion, cliente)
 	p.Directorio = api.NewDirectorio(s.URL("id"), s.Sesion, cliente)
 	p.Grupos = s.Sesion.Grupos
@@ -94,8 +92,12 @@ func main() {
 	p.Apex = s.Apex()
 	p.Org = s.Sesion.Organizacion
 	p.Entrar = func() error { return s.Entrar(context.Background()) }
+	abrirSistema := s.AbrirDriveEnSistema
+	if archivos := conectarArchivos(s); archivos != nil {
+		abrirSistema = func() error { return archivos.abrir(s.AbrirDriveEnSistema) }
+	}
+	p.ConfigurarSistema = func() { configurarSistema(s, tr, w, abrirSistema) }
 	montarSelector(w, p)
-	enSistema := driveEnSistema(api.NewAccount(s.URL("id"), s.Sesion, nil), s.URL("drive")+"/dav/")
 	identidadImportador := ""
 	var pararImportador context.CancelFunc
 	actualizarImportador := func(e sesion.Estado) {
@@ -120,7 +122,6 @@ func main() {
 	s.AlCambiar(func(e sesion.Estado) {
 		actualizarImportador(e)
 		p.Sesion(e.Dentro())
-		enSistema(e.Dentro())
 	})
 
 	// Arrastrar ficheros del sistema a la ventana los sube a la carpeta abierta, como
@@ -144,12 +145,14 @@ func main() {
 		p.PararImportador()
 	})
 	p.Arrancar(s.Estado().Dentro())
-	enSistema(s.Estado().Dentro())
 	s.RutaPropia(func(u *url.URL) bool {
 		if u == nil {
 			return false
 		}
 		if u.Scheme == "file" || u.Scheme == "content" || (u.Scheme == "" && filepath.IsAbs(u.Path)) {
+			return true
+		}
+		if u.Query().Get("open-system") == "1" && strings.Trim(u.Path, "/") == "" && u.Host == "" {
 			return true
 		}
 		if u.Query().Get("connect-storage") == "1" && strings.Trim(u.Path, "/") == "" && u.Host == "" {
@@ -172,6 +175,14 @@ func main() {
 	// «Abrir en la aplicación» del explorador web: la carpeta y el fichero, por ruta.
 	s.AlAbrirURL(func(u *url.URL) {
 		if u == nil {
+			return
+		}
+		if u.Query().Get("open-system") == "1" && strings.Trim(u.Path, "/") == "" && u.Host == "" {
+			go func() {
+				if err := abrirSistema(); err != nil {
+					slog.Warn("drive: no se pudo abrir en el sistema", "error", err)
+				}
+			}()
 			return
 		}
 		if u.Query().Get("connect-storage") == "1" && strings.Trim(u.Path, "/") == "" && u.Host == "" {
@@ -223,9 +234,6 @@ func main() {
 		}
 	})
 	s.Arrancar(context.Background())
-	// Drive en el Finder y en Archivos de iOS, con su extensión File Provider, que sigue
-	// con la app cerrada (archivos.go).
-	conectarArchivos(s)
 	// Los textos del proveedor de documentos de Android y la carpeta sincronizada de iOS.
 	// Con el cliente EN LÍNEA: lo que otra app guarda aquí tiene que llegar a Drive, no a
 	// la caché sin conexión.
@@ -241,53 +249,7 @@ func main() {
 			slog.Warn("drive: el proveedor de documentos de Android no arranca", "error", err)
 		}
 	}()
-	w.ShowAndRun()
-}
-
-// driveEnSistema pone Drive en el sistema —«Archivos» de Android, el gestor de ficheros
-// de Linux— al entrar, y lo quita al ver que la sesión ya no está. Solo en los cambios:
-// la sesión avisa también de otras cosas (el tema, la presencia).
-func driveEnSistema(cuenta *api.Account, dav string) func(dentro bool) {
-	var antes atomic.Int32 // 0 sin saber, 1 dentro, 2 fuera
-	var uno sync.Mutex     // de uno en uno: salir no adelanta a un entrar a medias
-	return func(dentro bool) {
-		ahora := int32(2)
-		if dentro {
-			ahora = 1
-		}
-		if antes.Swap(ahora) == ahora {
-			return
-		}
-		go func() {
-			uno.Lock()
-			defer uno.Unlock()
-			var err error
-			if dentro {
-				ctx, parar := context.WithTimeout(context.Background(), time.Minute)
-				defer parar()
-				err = documentos.Asegurar(ctx, cuenta, dav, etiquetaEquipo())
-			} else {
-				err = documentos.Olvidar()
-			}
-			if err != nil && !errors.Is(err, documentos.ErrNoDisponible) {
-				slog.Warn("drive: no se ha podido poner Drive en el sistema", "error", err)
-			}
-		}()
-	}
-}
-
-// etiquetaEquipo es con qué nombre sale la contraseña de aplicación del sistema en «Mi
-// cuenta»: la de este equipo, para saber cuál revocar si se pierde. El nombre del
-// producto es una marca y no se traduce.
-func etiquetaEquipo() string {
-	if runtime.GOOS == "android" {
-		return "Sytue Drive · Android" // el nombre del teléfono no lo da el sistema a Go
-	}
-	nombre, err := os.Hostname()
-	if err != nil || nombre == "" {
-		return "Sytue Drive · Linux"
-	}
-	return "Sytue Drive · " + nombre
+	ejecutarDrive(a, w, s, tr)
 }
 
 // elegir abre el selector de ficheros DEL SISTEMA —el mismo que abre el navegador con

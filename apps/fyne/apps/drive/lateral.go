@@ -93,9 +93,10 @@ type Lateral struct {
 
 // Cuota es el espacio de la organización, ya en bytes.
 type Cuota struct {
-	Usado, Tope int64
-	// Externo: lo nuevo va al bucket propio de la organización y no gasta este espacio.
-	Externo bool
+	Usado, Tope         int64
+	BaseUsado, BaseTope *int64
+	Externo             bool
+	CapacidadExterna    *api.DriveExternalCapacity
 }
 
 // NuevoLateral crea el menú.
@@ -202,11 +203,10 @@ func (l *Lateral) pie(v tema.Variante) fyne.CanvasObject {
 	hijos = append(hijos, dispositivos)
 	if m := l.medidor(); m != nil {
 		hijos = append(hijos, m)
-		if l.Cuota.Externo {
-			// Con bucket propio, lo nuevo no gasta este espacio: se dice junto al
-			// medidor, que es donde se mira cuando se acaba el sitio. `mt-1 text-xs
-			// leading-relaxed`, dentro del `px-1.5` del medidor.
-			nota := ui.NuevoParrafo(l.t("storage.externalNote"), tema.Escalon{
+	}
+	if l.Cuota != nil && l.Cuota.Externo {
+		for _, texto := range l.notasCuota() {
+			nota := ui.NuevoParrafo(texto, tema.Escalon{
 				Tam: tema.TextoXS.Tam, Linea: 1.625 * tema.TextoXS.Tam,
 			}, ui.Normal, "sidebar-fg-muted", v).A(ui.AnchoUtilMenu - 2*1.5*0.25*tema.Rem)
 			hijos = append(hijos, nota)
@@ -215,6 +215,34 @@ func (l *Lateral) pie(v tema.Variante) fyne.CanvasObject {
 	nota := ui.Texto(l.t("storage.euNote"), tema.TextoXS, ui.Normal, tema.Color("sidebar-fg-muted", v))
 	hijos = append(hijos, nota)
 	return container.New(ui.Columna{Hueco: tema.Espacio(1)}, hijos...)
+}
+
+func (l *Lateral) notasCuota() []string {
+	if l.Cuota == nil || !l.Cuota.Externo {
+		return nil
+	}
+	q := l.Cuota
+	capacidad := l.t("storage.externalUnknown")
+	if q.CapacidadExterna.Complete() {
+		capacidad = l.t("storage.externalCapacity", i18n.Vars{
+			"capacity": i18n.FormatBytes(l.loc, float64(*q.CapacidadExterna.TotalBytes)),
+		})
+	}
+	usado, tope := q.Usado, q.Tope
+	if q.BaseUsado != nil {
+		usado = *q.BaseUsado
+	}
+	if q.BaseTope != nil {
+		tope = *q.BaseTope
+	}
+	notas := []string{l.t("storage.externalNote"), capacidad}
+	if q.CapacidadExterna.Complete() && q.CapacidadExterna.Partial {
+		notas = append(notas, l.t("storage.externalUnknown"))
+	}
+	return append(notas, l.t("storage.baseUsage", i18n.Vars{
+		"used":  i18n.FormatBytes(l.loc, float64(usado)),
+		"total": i18n.FormatBytes(l.loc, float64(tope)),
+	}))
 }
 
 // medidor es el `StorageMeter` de la web: el medidor COMPARTIDO y no una copia. El de

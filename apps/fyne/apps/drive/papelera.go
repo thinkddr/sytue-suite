@@ -51,6 +51,7 @@ type VistaPapelera struct {
 	AlRestaurar  func(Elemento)
 	AlEliminar   func(Elemento)
 	AlReintentar func()
+	desplazable  *container.Scroll
 }
 
 // NuevaVistaPapelera crea la pantalla en su estado inicial: cargando.
@@ -139,7 +140,7 @@ func (p *VistaPapelera) listado(v tema.Variante) fyne.CanvasObject {
 	}
 	// El ancho de verdad lo pone el layout; para repartir líneas se usa el de la
 	// ventana menos los canalones, que es lo que la pantalla va a tener.
-	ancho := max(p.Ventana-tema.AnchoLateral-4*CanalonLista, 20*tema.Rem)
+	ancho := max(ui.AnchoHoja(p.Ventana, ui.AnchoMenu(false), 0)-4*CanalonLista, 1)
 	ayuda := ui.NuevaAyudaEnLinea(texto)
 
 	hijos := make([]fyne.CanvasObject, 0, 2+len(p.Elementos))
@@ -153,7 +154,8 @@ func (p *VistaPapelera) listado(v tema.Variante) fyne.CanvasObject {
 	// `min-h-0 flex-1 overflow-y-auto`: la lista se desplaza dentro de su hueco. Sin
 	// esto, con más filas de las que caben las últimas quedaban fuera de la ventana y
 	// no había forma de restaurarlas.
-	return container.NewVScroll(container.New(l, hijos...))
+	p.desplazable = container.NewVScroll(container.New(l, hijos...))
+	return p.desplazable
 }
 
 // MedidaFilaPapelera es el alto de una fila: `py-2` a cada lado más la tesela de 36 y

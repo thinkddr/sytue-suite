@@ -20,6 +20,7 @@ func TestGuardarCredencialArchivosValida(t *testing.T) {
 		{URL: "https://drive.sytue.eu/dav", Clave: "x"},
 		{URL: "https://drive.sytue.eu/dav", Usuario: "ana@sytue.eu"},
 	} {
+		c.Identidad = strings.Repeat("a", 64)
 		if err := GuardarCredencialArchivos(c); !errors.Is(err, errCredencialArchivos) {
 			t.Errorf("%+v: %v", c, err)
 		}

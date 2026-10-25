@@ -108,6 +108,9 @@ type Pantalla struct {
 	// scrollMain es el desplazador de `main`: se lleva lo vertical de lo que se desplaza
 	// de lado dentro de él.
 	scrollMain *container.Scroll
+	// peticionesLista includes cached background refreshes, whose visible phase is
+	// already Listo. A pull must not duplicate any of those requests.
+	peticionesLista int
 
 	// cache es lo ya visto por (modelo, búsqueda, estado, orden, papelera). Volver a
 	// una lista la pinta AL INSTANTE con lo que había y la refresca por detrás, que es
@@ -216,6 +219,7 @@ func (p *Pantalla) marco() fyne.CanvasObject {
 		p.arm.AlPulsar = func() { p.cajon = false; p.Repintar() }
 	}
 	arm := p.arm
+	arm.DetalleAbierto = p.ficha != nil
 	// La carcasa de ErpApp.tsx: `sytue-frame` con el carril de iconos (`.erp-rail`) y el
 	// `main` dentro de `sytue-sheet`, la hoja que pinta el armazón. El menú de módulos
 	// (`#erp-cajon`) es un cajón a cualquier ancho; su `<nav>` desplaza lo suyo.
@@ -239,10 +243,7 @@ func (p *Pantalla) marco() fyne.CanvasObject {
 // derecha, la ficha abierta. En el móvil la ficha va ENCIMA y a pantalla completa.
 func (p *Pantalla) principal(v tema.Variante) fyne.CanvasObject {
 	movil := p.esMovil()
-	ancho := p.Ventana.Width
-	if !movil {
-		ancho -= ocupaCarcasa()
-	}
+	ancho := max(p.Ventana.Width-ocupaCarcasa(p.Ventana.Width), 0)
 	var ficha fyne.CanvasObject
 	anchoFicha := float32(0)
 	if p.ficha != nil && p.lista.Modelo.Clave != "" {
@@ -263,7 +264,7 @@ func (p *Pantalla) principal(v tema.Variante) fyne.CanvasObject {
 		contenido = container.New(ui.Columna{}, append(fs, contenido)...)
 	}
 	var cajon *BotonCajon
-	if movil {
+	if movil && !tema.EsMarco() {
 		cajon = NuevoBotonCajon(p.t("nav.menu"), p.abrirCajon)
 	}
 	m := &mainERP{cajon: cajon, contenido: contenido}
@@ -275,7 +276,11 @@ func (p *Pantalla) principal(v tema.Variante) fyne.CanvasObject {
 	// ERP usa el lienzo del armazón compartido: bg en claro/oscuro y el fondo
 	// canónico traslúcido, como .erp-main de app.css.
 	p.scrollMain = container.NewVScroll(container.New(m, hijos...))
-	desplaza := container.NewThemeOverride(p.scrollMain, temaSinSombra{})
+	desplaza := ui.RefrescarAlTirar(container.NewThemeOverride(p.scrollMain, temaSinSombra{}), &ui.RefrescoLista{
+		Arriba:     func() bool { return p.scrollMain.Offset.Y <= 0.5 },
+		Puede:      p.puedeRefrescarLista,
+		Actualizar: p.recargar,
+	})
 	return container.New(&conFicha{main: desplaza, ficha: ficha, ancho: anchoFicha, movil: movil},
 		quitarNil(desplaza, ficha)...)
 }
@@ -362,7 +367,9 @@ func (p *Pantalla) cerrarCajon() {
 
 // ocupaCarcasa es lo que `main` no tiene de la ventana en ancho: el carril de iconos a
 // su izquierda y, en Marco, lo que la hoja se separa del borde derecho.
-func ocupaCarcasa() float32 { return AnchoCarril + tema.Forma("sheet-gap") }
+func ocupaCarcasa(ventana float32) float32 {
+	return ventana - ui.AnchoHoja(ventana, ui.AnchoMenu(false), AnchoCarril)
+}
 
 // radioTarjeta es el `rounded-card` de las cajas del contenido: un token de forma.
 func radioTarjeta() float32 { return tema.Forma("radius-card") }
@@ -809,6 +816,7 @@ func (p *Pantalla) pedirLista() {
 		return
 	}
 	modelo, f := l.Modelo.Clave, l.filtro("")
+	p.peticionesLista++
 	p.fondo(func() { p.traerLista(modelo, clave, f, visto) })
 }
 
@@ -816,7 +824,16 @@ func (p *Pantalla) traerLista(modelo, clave string, f api.ERPFiltro, visto bool)
 	ctx, cancelar := p.ctx()
 	defer cancelar()
 	pag, err := p.svc.ListarCon(ctx, modelo, f)
-	enHilo(func() { p.ponerLista(clave, pag, err, visto) })
+	enHilo(func() {
+		p.peticionesLista--
+		p.ponerLista(clave, pag, err, visto)
+	})
+}
+
+func (p *Pantalla) puedeRefrescarLista() bool {
+	l := p.lista
+	return p.svc != nil && p.hayRed() && p.Vista == "" && p.ficha == nil && !p.abierta && len(p.altas) == 0 &&
+		l.Modelo.Clave != "" && l.Fase != Cargando && !l.CargandoMas && !l.EnLote && len(l.Marcadas) == 0 && p.peticionesLista == 0
 }
 
 // ponerLista pinta lo que contestó el servicio a la lista `clave`.

@@ -86,6 +86,8 @@ struct WidgetProjectTests {
         require(switches.count == 1 && ["SYTUE_WIDGETS_APPLE = YES", "SYTUE_WIDGETS_APPLE = NO"].contains(switches[0]),
                 "Sytue.xcconfig declares one SYTUE_WIDGETS_APPLE switch")
         let enabled = switches.first == "SYTUE_WIDGETS_APPLE = YES"
+        require(xcconfig.components(separatedBy: "\n").contains("TARGETED_DEVICE_FAMILY = 1,2"),
+                "widgets and hosts retain iPhone and iPad device families")
         func resources(_ target: [String: Any]) -> [String] {
             (target["buildPhases"] as! [String]).compactMap { objects[$0] }
                 .filter { $0["isa"] as? String == "PBXResourcesBuildPhase" }
@@ -103,6 +105,7 @@ struct WidgetProjectTests {
         require(settings(bridge).allSatisfy { $0["LD_DYLIB_INSTALL_NAME"] as? String == "@rpath/$(EXECUTABLE_PATH)" }, "bridge install name resolves inside the host bundle")
         var widgetApps = 0
         var products = Set<String>()
+        var widgetProducts = Set<String>()
         let commands = root.appendingPathComponent("apps/fyne/cmd")
         for directory in try FileManager.default.contentsOfDirectory(at: commands, includingPropertiesForKeys: nil) {
             if directory.lastPathComponent == "demo" { continue }
@@ -138,12 +141,20 @@ struct WidgetProjectTests {
             require(widget["productType"] as? String == "com.apple.product-type.app-extension", "widget product type " + app)
             require(settings(widget).allSatisfy { $0["PRODUCT_BUNDLE_IDENTIFIER"] as? String == bundle + ".widgets" }, "widget identifier from TOML " + app)
             require(settings(widget).allSatisfy { $0["APPLICATION_EXTENSION_API_ONLY"] as? String == "YES" }, "extension safe API mode " + app)
+            let expectedFlags = Set(actions.components(separatedBy: ",").filter { $0 != "open" }.map { "SYTUE_WIDGET_ACTION_" + $0.uppercased() })
+            require(settings(widget).allSatisfy {
+                let declared = ($0["SWIFT_ACTIVE_COMPILATION_CONDITIONS"] as? String ?? "").components(separatedBy: " ")
+                return declared.contains("$(inherited)") && Set(declared.filter { $0.hasPrefix("SYTUE_WIDGET_ACTION_") }) == expectedFlags
+            }, "bundle exports only action widgets declared by the containing app " + app)
             let dependencies = (host["dependencies"] as! [String]).compactMap { objects[$0]?["target"] as? String }
             require((dependencies.contains(widgetID) && dependencies.contains(bridgeID)) == enabled, "host builds widget and bridge only when enabled " + app)
             require(embeds(host, "Embed WidgetKit", product) == enabled, "host embeds signed widget only when enabled " + app)
             require(embeds(host, "Embed WidgetKit Bridge", bridge["productReference"] as! String) == enabled, "host embeds signed public bridge only when enabled " + app)
             require(resources(widget).contains("PrivacyInfo.xcprivacy"), "widget ships its privacy manifest " + app)
             let info = try plist(xcode.appendingPathComponent(app + "/widgets/Info.plist"))
+            let widgetProduct = info["SytueWidgetProduct"] as? String ?? ""
+            require(!widgetProduct.isEmpty && scheme == "sytue-" + widgetProduct, "widget product matches the host URL scheme " + app)
+            widgetProducts.insert(widgetProduct)
             require(info["SytueWidgetBundle"] as? String == bundle && info["SytueWidgetScheme"] as? String == scheme,
                     "widget metadata matches containing app " + app)
             require(info["SytueWidgetActions"] as? [String] == actions.components(separatedBy: ","), "actions come from TOML " + app)
@@ -164,6 +175,16 @@ struct WidgetProjectTests {
             }
         }
         require(widgetApps > 0, "widget catalogue is not empty")
+        for directory in try FileManager.default.contentsOfDirectory(at: xcode.appendingPathComponent("widgets/locales"), includingPropertiesForKeys: nil) {
+            guard directory.pathExtension == "lproj" else { continue }
+            let strings = try plist(directory.appendingPathComponent("Localizable.strings"))
+            require(strings["widgets.storage"] is String && strings["search.label"] is String,
+                    "storage and action labels translated in " + directory.lastPathComponent)
+            for app in widgetProducts {
+                require(strings["app." + app + ".description"] is String,
+                        "gallery and private-state description translated for " + app + " in " + directory.lastPathComponent)
+            }
+        }
         require(targets.filter { ($0.value["name"] as? String)?.hasSuffix("-widgets") == true }.count == widgetApps,
                 "one widget target per declaring TOML, no second application table")
         require(checks >= widgetApps * 20, "project contract executes every app")

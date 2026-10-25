@@ -55,7 +55,7 @@ export const nl: AppCatalog<typeof en> = {
   'security.mfa.title': 'Verificatie in twee stappen',
   'security.mfa.off': 'Niet ingesteld. Alleen je wachtwoord opent het account.',
   'security.mfa.required':
-    'Je organisatie vereist verificatie in twee stappen. Schakel die hieronder in en meld je opnieuw aan.',
+    'Voor deze actie is verificatie in twee stappen vereist. Stel deze hieronder in en meld je daarna opnieuw aan.',
   'security.mfa.on': 'Aan. Bij het aanmelden wordt om een code gevraagd.',
   'security.mfa.enable': 'Instellen',
   'security.mfa.scan': 'Scan dit met je authenticatie-app.',
@@ -115,6 +115,10 @@ export const nl: AppCatalog<typeof en> = {
   'plan.pro': 'Pro-abonnement · 200 GB',
   'plan.enterprise': 'Enterprise-abonnement · 1 TB · Premium Support',
   'plan.storage': 'Gebruikte opslag',
+  'plan.externalNote': 'Gekoppelde opslag vergroot je Sytue-capaciteit.',
+  'plan.externalCapacity': 'Gekoppelde opslag voegt {capacity} toe.',
+  'plan.externalUnknown': 'De aanbieder geeft de capaciteit niet door.',
+  'plan.baseUsage': 'Sytue: {used} van {total}',
   'plan.paidUntil': 'Betaald tot',
   'plan.upgrade': 'Meer ruimte',
   'plan.upgrade.hint':

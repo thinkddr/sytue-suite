@@ -40,7 +40,6 @@ import (
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
-	"git.sytue.eu/sytue/one/apps/nucleo/sistema"
 	"git.sytue.eu/sytue/one/apps/nucleo/sistema/escritorio"
 )
 
@@ -86,48 +85,13 @@ func main() {
 		ConOrganizaciones(s).
 		ConAltaGuiada(api.NewAlta(s.URL("id"), s.Sesion, nil), s.Entrar).
 		ConIntegraciones(api.NewIntegraciones(s.URL("integrations"), s.Sesion, nil)).
-		ConCoordenadas(func(ctx context.Context) (api.Coordenadas, error) {
-			return api.CoordenadasDe(ctx, s.URL("id"), nil)
-		}).
 		ConAgenda(hub.AgendaDeLaSuite{
 			Calendario: api.NewCalendars(s.URL("calendar"), s.Sesion, nil),
 			Correo:     api.NewMail(s.URL("mail"), s.Sesion, nil),
 		})
 	v.Widget = s.CapturarWidget
-	if !a.Driver().Device().IsMobile() {
-		v.ConMontaje(montajeDrive(s))
-	}
-	// El perfil de Apple con su propia contraseña de aplicación: correo, calendario y
-	// contactos sin escribir nada. En el Mac se le da al sistema aquí mismo; en el iPhone,
-	// que solo instala perfiles desde Safari, se abre allí un enlace de un solo uso.
-	cuenta := api.NewAccount(s.URL("id"), s.Sesion, nil)
-	switch runtime.GOOS {
-	case "darwin":
-		v.ConPerfilApple(hub.Mac, func(ctx context.Context) error {
-			perfil, err := cuenta.PerfilApple(ctx, sistema.EtiquetaEquipo())
-			if err != nil {
-				return err
-			}
-			return instalarPerfilApple(perfil) //nolint:contextcheck // dárselo al sistema no se cancela con la petición: ya está descargado
-		})
-	case "ios":
-		v.ConPerfilApple(hub.IPhone, func(ctx context.Context) error {
-			enlace, err := cuenta.EnlacePerfilApple(ctx, sistema.EtiquetaEquipo())
-			if err != nil {
-				return err
-			}
-			return abrirEnSafari(a, enlace)
-		})
-	}
-	// Thunderbird, Outlook y Android en un clic: la contraseña de aplicación del cliente,
-	// copiada y a la vista, y el programa abierto si está en este equipo.
-	v.ConClientes(func(ctx context.Context, p hub.Plataforma) (string, error) {
-		nueva, err := cuenta.CreateAppPassword(ctx, etiquetaCliente(p))
-		return nueva.Password, err
-	}, func(p hub.Plataforma) error { return escritorio.AbrirPrograma(string(p)) })
-	if runtime.GOOS == "android" {
-		v.ConDAVx5()
-	}
+	v.ConDriveEnSistema(s.DriveEnSistema, s.PonerDriveEnSistema, s.AbrirDriveEnSistema)
+	s.AlCambiar(func(sesion.Estado) { fyne.Do(func() { v.RefrescarDriveEnSistema(s.DriveEnSistema()) }) })
 	w := a.NewWindow(t.T(hub.AInicio.ClaveTitulo(), nil))
 	integraciones := api.NewIntegraciones(s.URL("integrations"), s.Sesion, nil)
 	v.ConConexiones(w, integraciones, func(ctx context.Context, plantilla, instancia string) (string, error) {
@@ -136,7 +100,7 @@ func main() {
 	v.AlMostrar = func(d hub.Destino) { w.SetTitle(t.T(d.ClaveTitulo(), nil)) }
 	w.SetPadded(false)
 	// Los avisos flotantes van por ENCIMA del desplazador: dentro se irían al bajar.
-	w.SetContent(ui.NuevaBarraSuite(t, s, iconos.One).Montar(container.NewStack(container.NewVScroll(v.Objeto()), v.Avisos())))
+	w.SetContent(ui.NuevaBarraSuite(t, s, iconos.One).Montar(container.NewStack(v.Desplazable(), v.Avisos())))
 	v.Atajos(w.Canvas())
 	ponerMenu(w, runtime.GOOS, menu(t, v.Ir))
 	// El Hub se queda en la bandeja al cerrar la ventana: es la bandeja de avisos de la
@@ -295,15 +259,4 @@ func etiquetaMenu(titulo string) string {
 		return titulo
 	}
 	return strings.Join(quedan, " — ")
-}
-
-// etiquetaCliente es el nombre con el que sale en Mi cuenta la contraseña de `p`:
-// «Thunderbird · <equipo>». La de Android es la de un teléfono, que casi nunca es este
-// equipo, así que va sin él.
-func etiquetaCliente(p hub.Plataforma) string {
-	nombre := strings.ToUpper(string(p)[:1]) + string(p)[1:]
-	if p == hub.Android {
-		return nombre
-	}
-	return sistema.EtiquetaCliente(nombre)
 }

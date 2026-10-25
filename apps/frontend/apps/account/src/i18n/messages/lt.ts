@@ -55,7 +55,7 @@ export const lt: AppCatalog<typeof en> = {
   'security.mfa.title': 'Dviejų žingsnių patvirtinimas',
   'security.mfa.off': 'Nenustatyta. Paskyrą atveria vien slaptažodis.',
   'security.mfa.required':
-    'Jūsų organizacija reikalauja dviejų žingsnių patvirtinimo. Įjunkite jį žemiau ir prisijunkite iš naujo.',
+    'Šiam veiksmui reikia patvirtinimo dviem veiksmais. Nustatykite jį toliau ir prisijunkite iš naujo.',
   'security.mfa.on': 'Įjungta. Prisijungiant prašoma kodo.',
   'security.mfa.enable': 'Nustatyti',
   'security.mfa.scan': 'Nuskaitykite tai autentifikavimo programėle.',
@@ -114,6 +114,10 @@ export const lt: AppCatalog<typeof en> = {
   'plan.pro': 'Pro planas · 200 GB',
   'plan.enterprise': 'Enterprise planas · 1 TB · Premium pagalba',
   'plan.storage': 'Panaudota vieta',
+  'plan.externalNote': 'Prijungta saugykla padidina jūsų „Sytue“ talpą.',
+  'plan.externalCapacity': 'Prijungta saugykla prideda {capacity}.',
+  'plan.externalUnknown': 'Teikėjas nenurodo saugyklos talpos.',
+  'plan.baseUsage': 'Sytue: {used} iš {total}',
   'plan.paidUntil': 'Apmokėta iki',
   'plan.upgrade': 'Gauti daugiau vietos',
   'plan.upgrade.hint':

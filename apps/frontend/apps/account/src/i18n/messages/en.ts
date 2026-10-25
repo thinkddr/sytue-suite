@@ -64,7 +64,7 @@ export const en = {
   'security.mfa.title': 'Two-step verification',
   'security.mfa.off': 'Not set up. Your password alone opens the account.',
   'security.mfa.required':
-    'Your organisation requires two-step verification. Turn it on below and sign in again.',
+    'This action requires two-step verification. Set it up below, then sign in again.',
   'security.mfa.on': 'On. You are asked for a code when you sign in.',
   'security.mfa.enable': 'Set up',
   'security.mfa.scan': 'Scan this with your authenticator app.',
@@ -133,6 +133,10 @@ export const en = {
   'plan.pro': 'Pro plan · 200 GB',
   'plan.enterprise': 'Enterprise plan · 1 TB · Premium Support',
   'plan.storage': 'Storage used',
+  'plan.externalNote': 'Connected storage extends your Sytue capacity.',
+  'plan.externalCapacity': 'Connected storage adds {capacity}.',
+  'plan.externalUnknown': 'The provider does not report its capacity.',
+  'plan.baseUsage': 'Sytue: {used} of {total}',
   'plan.paidUntil': 'Paid until',
   'plan.upgrade': 'Get more space',
   'plan.upgrade.hint':

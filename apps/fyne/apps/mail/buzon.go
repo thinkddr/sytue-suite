@@ -261,6 +261,13 @@ func NuevoBuzon(p *Pantalla, s Servicio) *Buzon {
 	p.Bandeja.AlElegir = b.Abrir
 	p.Bandeja.AlBuscar = b.Buscar
 	p.Bandeja.AlReintentar = b.Reintentar
+	p.Bandeja.Refresco.Actualizar = b.Reintentar
+	p.Bandeja.Refresco.Puede = func() bool {
+		return b.S != nil && b.ctx != nil && b.ctx.Err() == nil && !b.segundoPlano &&
+			p.Bandeja.Estado != Cargando && p.Bandeja.Estado != SinPermiso &&
+			!p.Bandeja.CargandoMas && p.Bandeja.CuantasMarcadas() == 0
+	}
+	p.Bandeja.Refresco.Revision = func() uint64 { return ui.RevisionLista(b.vista) }
 	p.Bandeja.AlFinal = b.MasPagina
 	p.Bandeja.AlMarcar = b.marcarFila
 	p.Bandeja.AlVaciar = b.pedirVaciado

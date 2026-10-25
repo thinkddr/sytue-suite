@@ -568,8 +568,10 @@ export const nl: AppCatalog<typeof en> = {
   'share.group.failed': 'Kon niet worden gedeeld.',
   'share.person.someone': 'Iemand in je organisatie',
   'pdf.openInPdf': 'Openen in Sytue PDF',
-  'storage.externalNote':
-    'Nieuwe bestanden gebruiken je verbonden opslag en nemen hier geen ruimte in.',
+  'storage.externalNote': 'Gekoppelde opslag vergroot je Sytue-capaciteit.',
+  'storage.externalCapacity': 'Gekoppelde opslag voegt {capacity} toe.',
+  'storage.externalUnknown': 'De aanbieder geeft de capaciteit niet door.',
+  'storage.baseUsage': 'Sytue: {used} van {total}',
   'storage.add': 'Opslag toevoegen',
   'storage.external.forOrg': 'Nieuwe bestanden van de organisatie hier opslaan',
   'storage.external.endpoint': 'Endpoint',

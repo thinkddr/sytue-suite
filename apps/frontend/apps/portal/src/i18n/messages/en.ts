@@ -168,6 +168,11 @@ export const en = {
   'data.move.action': 'Go to Migrations',
 
   // --- Conectar tus dispositivos ----------------------------------------
+  'devices.native.body': 'Use your device’s file manager or connect an account with its consent.',
+  'devices.native.driveBody':
+    'Sytue Drive is added automatically after sign-in. Allow its location if your system asks.',
+  'devices.native.openDrive': 'Open in file manager',
+  'devices.native.failed': 'Could not update the device integration.',
   'devices.title': 'Connect your devices',
   'devices.lead':
     'Take your Sytue mail, calendar, contacts and files to your phone or your computer. We guide you step by step.',

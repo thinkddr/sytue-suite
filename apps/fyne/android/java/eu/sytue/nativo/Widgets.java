@@ -146,6 +146,9 @@ public final class Widgets extends AppWidgetProvider {
                 String plural = PluralRules.forLocale(locale).select(c.value);
                 String pattern = forms.optString(plural, forms.getString("other"));
                 lines.add(pattern.replace("{count}", format.format(c.value)));
+            } else if ("storage_percent".equals(c.kind)) {
+                lines.add(NumberFormat.getPercentInstance(locale).format(c.value / 100.0)
+                        + " " + labels.getString(c.kind));
             } else {
                 lines.add(format.format(c.value) + " " + labels.getString(c.kind));
             }

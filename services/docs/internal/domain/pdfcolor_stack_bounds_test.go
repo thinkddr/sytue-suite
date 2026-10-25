@@ -21,6 +21,9 @@ func TestPostScriptStackOperandsBounded(t *testing.T) {
 		{"1 2 3 3 Inf roll", []float64{1, 2, 3}},
 		{"1 9223372036854775807 bitshift", []float64{0}},
 		{"8 -1 bitshift", []float64{4}},
+		{"-1 -63 bitshift", []float64{1}},
+		{"1 NaN bitshift", []float64{0}},
+		{"1 Inf bitshift", []float64{0}},
 		{"1 2 2 copy", []float64{1, 2, 1, 2}},
 		{"1 2 0 index", []float64{1, 2, 2}},
 	} {

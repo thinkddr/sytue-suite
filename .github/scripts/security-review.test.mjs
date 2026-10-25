@@ -75,7 +75,13 @@ test('invalid review manifests fail before API requests', () => {
     { ...manifest, reviews: [{ ...manifest.reviews[0], comment: 'no evidence' }] },
     { ...manifest, reviews: [{ ...manifest.reviews[0], path: 'services/other.go' }] },
     { ...manifest, reviews: [{ ...manifest.reviews[0], comment: 'a'.repeat(281) }] },
+    { ...manifest, files: [{ path: '.github/secrets.env', blob: 'b'.repeat(40) }] },
   ]) assert.throws(() => validateReview(invalid));
+});
+
+test('review evidence may pin a tracked automation source file', () => {
+  const source = '.github/scripts/security-review.mjs';
+  validateReview({ ...manifest, files: [{ path: source, blob: 'b'.repeat(40) }], reviews: [{ ...manifest.reviews[0], path: source }] });
 });
 
 test('does not claim a concurrent closure as an applied mutation', async () => {

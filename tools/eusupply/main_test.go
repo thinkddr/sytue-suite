@@ -304,8 +304,8 @@ func TestLosRegistrosFijadosLoEstanDeVerdad(t *testing.T) {
 // Lo que NO es una máquina no entra en el inventario.
 //
 // El regex de host/ruta casa también con un `owner/repo` escrito a pelo —el
-// valor por defecto de SYTUE_GIT_REPO es `daniel.delgado/sytue-one`— y pedía
-// inventariar «daniel.delgado» como proveedor. Se distingue por el TLD, y la
+// valor por defecto de SYTUE_GIT_REPO es `thinkddr/sytue-suite`— y pedía
+// inventariar «thinkddr» como proveedor. Se distingue por el TLD, y la
 // trampa está en preguntarlo bien: `githubusercontent.com` figura en la lista de
 // sufijos públicos como sufijo PRIVADO, así que preguntar por el host completo
 // descartaría `raw.githubusercontent.com`, que es una dependencia de verdad y
@@ -317,7 +317,7 @@ func TestSoloSeInventarianNombresDeMaquina(t *testing.T) {
 			t.Errorf("%s es un host real y se ha descartado", host)
 		}
 	}
-	for _, noEsHost := range []string{"daniel.delgado", "sytue-one", "algo.invalido"} {
+	for _, noEsHost := range []string{"thinkddr", "sytue-one", "algo.invalido"} {
 		if esNombreDeMaquina(noEsHost) {
 			t.Errorf("%s no es un host y se ha colado", noEsHost)
 		}

@@ -782,6 +782,19 @@ func (f *funcionPDF) evaluarPS(entradas []float64) []float64 {
 	return out
 }
 
+// psSmallInteger checks both conversion steps: a finite float to int64, then a
+// signed integer to the native index width. The interpreter stack has 1024 slots.
+func psSmallInteger(raw float64) (int, bool) {
+	if math.IsNaN(raw) || raw < -1024 || raw > 1024 {
+		return 0, false
+	}
+	value := int64(raw)
+	if value < -1024 || value > 1024 {
+		return 0, false
+	}
+	return int(value), true
+}
+
 //nolint:gocognit,gocyclo // Conjunto fijo de operadores de la tabla 42 de PDF (§7.10.5).
 func ejecutarPS(tokens []tokenPS, pila []valorPS, pasos *int) []valorPS {
 	pop := func() valorPS {
@@ -948,12 +961,17 @@ func ejecutarPS(tokens []tokenPS, pila []valorPS, pasos *int) []valorPS {
 				push(float64(^int64(a.num)))
 			}
 		case "bitshift":
-			sh, v := int(pop().num), int64(pop().num)
+			rawShift, v := pop().num, int64(pop().num)
+			sh, ok := psSmallInteger(rawShift)
+			if !ok {
+				push(0)
+				continue
+			}
 			switch {
 			case sh >= 0 && sh < 64:
-				push(float64(v << uint(sh)))
-			case sh < 0 && -sh < 64:
-				push(float64(uint64(v) >> uint(-sh))) //nolint:gosec // G115: desplazamiento lógico de PostScript
+				push(float64(v << sh))
+			case sh < 0 && sh > -64:
+				push(float64(uint64(v) >> -sh)) //nolint:gosec // G115: desplazamiento lógico de PostScript
 			default:
 				push(0)
 			}
@@ -981,18 +999,25 @@ func ejecutarPS(tokens []tokenPS, pila []valorPS, pasos *int) []valorPS {
 				pila = append(pila, pila[len(pila)-1])
 			}
 		case "copy":
-			n := int(pop().num)
-			if n > 0 && n <= len(pila) && len(pila)+n <= 1024 {
+			n, ok := psSmallInteger(pop().num)
+			if ok && n > 0 && n <= len(pila) && len(pila)+n <= 1024 {
 				pila = append(pila, pila[len(pila)-n:]...)
 			}
 		case "index":
-			n := int(pop().num)
-			if n >= 0 && n < len(pila) && len(pila) < 1024 {
+			n, ok := psSmallInteger(pop().num)
+			if ok && n >= 0 && n < len(pila) && len(pila) < 1024 {
 				pila = append(pila, pila[len(pila)-1-n])
 			}
 		case "roll":
-			j, n := int(pop().num), int(pop().num)
-			if n > 0 && n <= len(pila) {
+			rawJ, rawN := pop().num, pop().num
+			n, ok := psSmallInteger(rawN)
+			if ok && n > 0 && n <= len(pila) && !math.IsNaN(rawJ) && !math.IsInf(rawJ, 0) {
+				// Reduce before conversion and subtraction: k-MinInt can overflow.
+				rotation := math.Mod(rawJ, float64(n))
+				j, ok := psSmallInteger(rotation)
+				if !ok {
+					continue
+				}
 				ini := len(pila) - n
 				viejo := append([]valorPS(nil), pila[ini:]...)
 				for k := 0; k < n; k++ {

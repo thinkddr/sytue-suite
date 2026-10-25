@@ -23,13 +23,30 @@
  * organización `corporate`. Lo que se crea (subidas, directos, comentarios) vive en
  * memoria hasta que se para el proceso.
  */
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 const PUERTO = Number(process.env['PUERTO'] ?? 8099);
-const DIR = process.env['CAST_FALSA_DIR'] ?? join(tmpdir(), 'sytue-cast-api-falsa');
+const DIR = process.env['CAST_FALSA_DIR'] ?? mkdtempSync(join(tmpdir(), 'sytue-cast-api-falsa-'));
+mkdirSync(DIR, { recursive: true, mode: 0o700 });
+const infoDir = lstatSync(DIR);
+if (
+  !infoDir.isDirectory() ||
+  infoDir.isSymbolicLink() ||
+  (process.platform !== 'win32' &&
+    ((infoDir.mode & 0o077) !== 0 || infoDir.uid !== process.getuid?.()))
+) {
+  throw new Error('CAST_FALSA_DIR debe ser un directorio privado del usuario.');
+}
 mkdirSync(join(DIR, 'hls'), { recursive: true });
 
 // ── Pósteres: composiciones planas, sin degradados, una paleta por vídeo ──────
@@ -104,7 +121,14 @@ const hayFfmpeg = spawnSync('ffmpeg', ['-version']).status === 0;
 function prepararPoster(clave: string, motivo: Motivo, paleta: string): [string, string] {
   const svg = join(DIR, `${clave}.svg`);
   const jpg = join(DIR, `${clave}.jpg`);
-  if (!existsSync(svg)) writeFileSync(svg, poster(motivo, paleta));
+  try {
+    writeFileSync(svg, poster(motivo, paleta), { flag: 'wx', mode: 0o600 });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+    const info = lstatSync(svg);
+    if (!info.isFile() || info.isSymbolicLink())
+      throw new Error('El póster no es un archivo regular.');
+  }
   if (hayFfmpeg && !existsSync(jpg)) {
     spawnSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', svg, '-q:v', '4', jpg]);
   }
@@ -450,7 +474,7 @@ const CHAT = [
 
 let clave = {
   rtmp_url: 'rtmp://cast-ingest.sytue.eu/live',
-  stream_key: 'sk_7Fq2mW9xLp4TzR8cVb3N',
+  stream_key: 'stream_cast_demo_key',
   ingress_id: 'IN_a1b2c3',
 };
 const PERSONAS_CON_ACCESO: Record<string, unknown[]> = {
@@ -603,7 +627,10 @@ async function conSesion(req: Request, ruta: string, url: URL): Promise<Response
     });
   if (ruta === '/studio/stream-key') return json(clave);
   if (ruta === '/studio/stream-key:rotate' && metodo === 'POST') {
-    clave = { ...clave, stream_key: `sk_${crypto.randomUUID().replace(/-/g, '').slice(0, 20)}` };
+    clave = {
+      ...clave,
+      stream_key: `stream_${crypto.randomUUID().replace(/-/g, '').slice(0, 20)}`,
+    };
     return json(clave);
   }
   if (ruta === '/lives' && metodo === 'POST') {

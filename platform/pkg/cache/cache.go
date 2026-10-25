@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"git.sytue.eu/sytue/one/platform/pkg/log"
+	"git.sytue.eu/sytue/one/platform/pkg/logsafe"
 
 	"github.com/redis/go-redis/v9" //nolint:depguard // platform/pkg/cache es el único wrapper permitido para hablar con Dragonfly
 )
@@ -199,7 +200,7 @@ func (c *Client) SetTTL(ctx context.Context, key, val string, ttl time.Duration)
 		// Sin `key` entera en el log: puede llevar el identificador de una persona
 		// o el texto que alguien tecleó. Con el prefijo basta para saber quién es.
 		log.From(ctx).Warn("cache: entrada demasiado grande; no se guarda",
-			"prefijo", prefijoDe(key), "bytes", len(val), "tope", MaxValorBytes)
+			"prefijo", logsafe.Text(prefijoDe(key)), "bytes", len(val), "tope", MaxValorBytes)
 		return nil
 	}
 	return c.anotar(c.rdb.Set(ctx, key, val, ttl).Err())

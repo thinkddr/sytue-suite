@@ -519,7 +519,7 @@ let fallos = 0;
 const ok = (c, msg) => {
   if (!c) {
     fallos += 1;
-    console.log(`    FALLO: ${msg}`);
+    console.log("    FALLO:", JSON.stringify(String(msg)));
   }
 };
 

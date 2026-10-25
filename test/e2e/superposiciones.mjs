@@ -6,12 +6,12 @@
 // Comprueba que campos y acciones completos se alcanzan desplazando, no solo que
 // el panel tiene una caja dentro de la pantalla. Una autocomprobación reintroduce
 // el recorte para demostrar que el guardián lo detecta.
+import { createReportDirectory, writeReport } from './lib/report-output.mjs';
 import { chromium } from 'playwright';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync } from 'node:fs';
 
 const BASE = process.env.ACC_URL || 'http://127.0.0.1:4338/docus/prueba';
-const OUT = `${process.env.ACC_OUT || '/tmp/accesibilidad'}/superposiciones`;
-mkdirSync(OUT, { recursive: true });
+const OUT = createReportDirectory('superposiciones', process.env.ACC_OUT ? `${process.env.ACC_OUT}/superposiciones` : undefined);
 const fallos = [];
 const medidas = [];
 const compositores = [];
@@ -395,7 +395,7 @@ if (compositores.length !== 32 || !autocomprobacionCompositor)
     'compositor',
     `se esperaban 32 combinaciones y el control negativo; hay ${compositores.length}, control=${autocomprobacionCompositor}`,
   );
-writeFileSync(`${OUT}/informe.json`, JSON.stringify({ medidas, compositores, fallos }, null, 2));
+writeReport(`${OUT}/informe.json`, JSON.stringify({ medidas, compositores, fallos }, null, 2));
 console.log(
   `Superposiciones: ${medidas.length} combinaciones, ${compositores.length} compositores, ${fallos.length} fallos; autocomprobaciones modal=${autocomprobacionModal}, popover=${autocomprobacionPopover}, compositor=${autocomprobacionCompositor}`,
 );

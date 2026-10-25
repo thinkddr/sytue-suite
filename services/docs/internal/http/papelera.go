@@ -17,6 +17,7 @@ import (
 
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/platform/pkg/log"
+	"git.sytue.eu/sytue/one/platform/pkg/logsafe"
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 	"git.sytue.eu/sytue/one/services/docs/internal/domain"
 	"git.sytue.eu/sytue/one/services/docs/internal/drive"
@@ -351,7 +352,7 @@ func (h *Handler) desdeDrive(w http.ResponseWriter, r *http.Request) {
 		// Un fichero que falla no frena a los demás; al final se contesta 500 y Drive
 		// repite el lote, que para lo ya aplicado no cambia nada.
 		if err := h.papelera.SincronizarConDrive(ctx, f.ID, f.OwnerSub, kind, f.State); err != nil {
-			log.From(ctx).Error("papelera: aplicar el estado de Drive", "file_id", f.ID, "error", err.Error())
+			log.From(ctx).Error("papelera: aplicar el estado de Drive", "file_id", logsafe.Text(f.ID), "error", err.Error())
 			fallidos++
 		}
 	}

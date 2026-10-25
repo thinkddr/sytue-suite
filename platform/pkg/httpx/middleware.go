@@ -17,6 +17,7 @@ import (
 
 	"git.sytue.eu/sytue/one/platform/pkg/clientip"
 	"git.sytue.eu/sytue/one/platform/pkg/log"
+	"git.sytue.eu/sytue/one/platform/pkg/logsafe"
 )
 
 type ctxKeyRequestID struct{}
@@ -130,7 +131,7 @@ func RequestLogger(base *slog.Logger) func(http.Handler) http.Handler {
 				"status", rec.status,
 				"bytes", rec.bytes,
 				"duration_ms", time.Since(start).Milliseconds(),
-				"remote", clientIP(r),
+				"remote", logsafe.Text(clientIP(r)),
 			)
 		})
 	}

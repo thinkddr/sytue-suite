@@ -193,6 +193,23 @@ func TestFuenteMacintoshFormatoCeroConservaCaracteres(t *testing.T) {
 	}
 }
 
+func TestCIDToGIDDoesNotWrapAnOversizedCode(t *testing.T) {
+	face, err := sfnt.Parse(goregular.TTF)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var buffer sfnt.Buffer
+	font := &fuentePDF{dosBytes: true, cidAGid: []byte{0, 1}}
+	if gid, ok := font.indiceDeGlifo(face, &buffer, glifo{codigo: 0}); !ok || gid != 1 {
+		t.Fatal("valid glyph mapping changed")
+	}
+	for _, code := range []uint32{0x10000, 0x80000000, 0xffffffff} {
+		if _, ok := font.indiceDeGlifo(face, &buffer, glifo{codigo: code}); ok {
+			t.Fatalf("oversized CID %#x wrapped into the mapping", code)
+		}
+	}
+}
+
 func TestMetadatosSfntRechazanTablaFueraDelFichero(t *testing.T) {
 	for _, truncado := range []bool{false, true} {
 		datos := append([]byte(nil), goregular.TTF...)

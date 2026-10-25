@@ -6,7 +6,7 @@ el cliente web. Reimplementación **clean-room** sobre estándares abiertos
 (**RFC 5321/5322** SMTP/IMF, **RFC 3501/9051** IMAP, **RFC 8620/8621** JMAP,
 **RFC 7208** SPF, **RFC 6376** DKIM, **RFC 7489** DMARC) con librerías Go
 **permisivas** (MIT: `emersion/go-smtp`, `go-imap/v2`, `go-message`,
-`go-msgauth`). Código propietario © Sytue. **Sin motores de correo de terceros
+`go-msgauth`). Código Apache-2.0 © 2026 Daniel Delgado Ramos (thinkddr). **Sin motores de correo de terceros
 AGPL** (Stalwart, etc. quedan fuera).
 
 - **Puertos:** `8086` (HTTP/JMAP) · `25` (SMTP MX) · `465` (SMTPS) · `587`

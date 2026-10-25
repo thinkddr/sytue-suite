@@ -5,7 +5,7 @@ servicio; cada uno habla el estándar/protocolo abierto del servicio Go
 correspondiente. Sin motores AGPL de terceros (implementación _clean-room_).
 
 > Fuente de verdad: [`docs/CONVENTIONS.md`](../../../../docs/CONVENTIONS.md) (v4).
-> Código **propietario © Sytue**.
+> Código **Apache-2.0 © 2026 Daniel Delgado Ramos (thinkddr)**.
 
 ## Autorización
 

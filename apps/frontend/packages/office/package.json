@@ -30,6 +30,7 @@
     "@sytue/shell": "workspace:*",
     "@sytue/ui": "workspace:*",
     "astro": "catalog:",
+    "parse5": "8.0.1",
     "preact": "10.29.8"
   },
   "devDependencies": {

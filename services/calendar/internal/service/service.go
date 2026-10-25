@@ -24,6 +24,7 @@ import (
 	"git.sytue.eu/sytue/one/platform/pkg/events"
 	"git.sytue.eu/sytue/one/platform/pkg/hubnotify"
 	"git.sytue.eu/sytue/one/platform/pkg/log"
+	"git.sytue.eu/sytue/one/platform/pkg/logsafe"
 	"git.sytue.eu/sytue/one/platform/pkg/peticiones"
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 	"git.sytue.eu/sytue/one/services/calendar/internal/caldav"
@@ -778,7 +779,7 @@ func (s *Service) deliverInvitations(ctx context.Context, ev domain.Event, metho
 			SequenceNo: ev.SequenceNo,
 			Data:       data,
 		}); err != nil {
-			log.From(ctx).Warn("calendar: entregar invitacion", "recipient", email, "error", err)
+			log.From(ctx).Warn("calendar: entregar invitacion", "recipient", logsafe.Text(email), "error", err)
 		} else if method == domain.MethodRequest {
 			s.avisarInvitacion(ctx, ev, email)
 		}

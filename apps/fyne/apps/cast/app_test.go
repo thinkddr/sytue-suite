@@ -382,7 +382,7 @@ func (s *servicioFalso) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if strings.HasSuffix(ruta, ":rotate") {
 			s.clave++
 		}
-		escribir(api.CastStreamKey{RTMPURL: "rtmp://cast-ingest.sytue.eu/live", StreamKey: fmt.Sprintf("sk_live_7Qf2mX9kR4tB8wNz%d", s.clave), IngressID: "IN_1"})
+		escribir(api.CastStreamKey{RTMPURL: "rtmp://cast-ingest.sytue.eu/live", StreamKey: fmt.Sprintf("cast_stream_key_sample_%d", s.clave), IngressID: "IN_1"})
 	case ruta == "/api/v1/lives":
 		var n api.CastNew
 		_ = json.Unmarshal(cuerpo, &n)

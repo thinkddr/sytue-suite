@@ -5,6 +5,7 @@ package http
 
 import (
 	"context"
+	"git.sytue.eu/sytue/one/platform/pkg/logsafe"
 	"log/slog"
 	"net/http"
 
@@ -32,7 +33,7 @@ func auditar(r *http.Request, accion string, attrs ...any) {
 	t, _ := tenancy.From(r.Context())
 	campos := make([]any, 0, 6+len(attrs))
 	campos = append(campos, "auditoria", accion, "actor", c.Subject, "tenant", t.Slug)
-	slog.InfoContext(r.Context(), "docs: auditoría de enlaces", append(campos, attrs...)...)
+	slog.InfoContext(r.Context(), "docs: auditoría de enlaces", logsafe.Args(append(campos, attrs...))...)
 }
 
 // verPoliticaEnlaces — GET /api/v1/link-policy. La lee cualquier persona de la

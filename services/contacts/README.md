@@ -3,7 +3,7 @@
 Servidor de contactos **Sytue-native** de la suite **Sytue One**: libretas de
 direcciones, contactos y grupos. Reimplementación **clean-room** sobre estándares
 abiertos (**vCard 4.0 — RFC 6350** y **CardDAV — RFC 6352**) con una **API REST
-propia**. Código propietario © Sytue; dependencias de terceros solo permisivas
+propia**. Código Apache-2.0 © 2026 Daniel Delgado Ramos (thinkddr); dependencias de terceros solo permisivas
 (BSD/MIT/Apache): `emersion/go-webdav` (CardDAV) y `emersion/go-vcard` (MIT).
 
 - **Puerto:** `8088` (HTTP + CardDAV) · **Subdominio:** `contacts.sytue.eu`

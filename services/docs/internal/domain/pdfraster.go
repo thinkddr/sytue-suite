@@ -852,13 +852,16 @@ func (f *fuentePDF) indiceDeGlifo(cara *sfnt.Font, buf *sfnt.Buffer, g glifo) (s
 		// Identity-H: el código ES el índice de glifo, salvo que /CIDToGIDMap traiga
 		// una tabla que diga otra cosa.
 		gid := g.codigo
+		if gid > maxCID {
+			return 0, false
+		}
 		if len(f.cidAGid) > 0 {
 			if int(2*gid+1) >= len(f.cidAGid) {
 				return 0, false
 			}
 			gid = uint32(f.cidAGid[2*gid])<<8 | uint32(f.cidAGid[2*gid+1])
 		}
-		if int(gid) >= cara.NumGlyphs() {
+		if gid > math.MaxUint16 || int(gid) >= cara.NumGlyphs() {
 			return 0, false
 		}
 		return sfnt.GlyphIndex(gid), true //nolint:gosec // G115: acotado por NumGlyphs, que maxp guarda en 16 bits

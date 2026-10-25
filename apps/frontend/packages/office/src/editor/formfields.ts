@@ -12,6 +12,7 @@
  * data-value), así persiste con el autosave. Mismo patrón que mailmerge.ts.
  * Ejecutar el self-test: cd apps/frontend && bun test packages/office/test/formfields.test.ts
  */
+import { parseFragment, type DefaultTreeAdapterMap } from 'parse5';
 
 /** Los tres tipos de campo rellenable (elementos inline en el HTML del folio). */
 export type FormFieldType = 'text' | 'checkbox' | 'select';
@@ -48,20 +49,6 @@ const HTML_ESCAPES: Record<string, string> = {
 /** Escapa texto para inyectarlo como HTML (frontera de confianza, anti-XSS). */
 export function escapeHtml(text: string): string {
   return text.replace(/[&<>"']/g, (ch) => HTML_ESCAPES[ch] ?? ch);
-}
-
-const HTML_UNESCAPES: Record<string, string> = {
-  '&amp;': '&',
-  '&lt;': '<',
-  '&gt;': '>',
-  '&quot;': '"',
-  '&#39;': "'",
-  '&apos;': "'",
-};
-
-/** Revierte el escape de un valor leído del HTML (atributo o texto del campo). */
-function unescapeHtml(text: string): string {
-  return text.replace(/&(?:amp|lt|gt|quot|apos|#39);/g, (e) => HTML_UNESCAPES[e] ?? e);
 }
 
 /** «a | b | c» → ['a','b','c'] (recorta, descarta vacíos y duplicados; «|» separa). */
@@ -124,37 +111,48 @@ export function coerceFieldValue(
   return raw;
 }
 
-/** Ficha de campo: `<span data-formfield="tipo" …>…</span>`. Grupos: attrs antes,
- *  tipo, attrs después, contenido interior (el valor del campo de texto). */
-const FIELD_RE =
-  /<span\b([^>]*?)\bdata-formfield="(text|checkbox|select)"([^>]*?)>([\s\S]*?)<\/span>/gi;
+type HtmlNode = DefaultTreeAdapterMap['childNode'];
+const HIDDEN = new Set(['script', 'style', 'template', 'noscript', 'iframe', 'object', 'embed']);
 
-/** Lee el valor de un atributo `nombre="…"` (sin desescapar) de una cadena de atributos. */
-function attrOf(attrs: string, name: string): string {
-  const m = new RegExp(`\\b${name}="([^"]*)"`, 'i').exec(attrs);
-  return m ? (m[1] ?? '') : '';
+/** Texto plano, sin ejecutar HTML ni volver a interpretar entidades ya decodificadas. */
+function fieldText(nodes: HtmlNode[]): string {
+  const pending = [...nodes].reverse();
+  const parts: string[] = [];
+  while (pending.length) {
+    const node = pending.pop()!;
+    if ('value' in node) parts.push(node.value);
+    else if ('tagName' in node && !HIDDEN.has(node.tagName)) {
+      for (let i = node.childNodes.length - 1; i >= 0; i--) pending.push(node.childNodes[i]!);
+    }
+  }
+  return parts.join('').trim();
 }
 
 /**
  * Extrae {nombre, tipo, valor} de cada campo de un HTML, en orden de documento
- * (para revisar/exportar respuestas). Función pura: la cubre el self-test.
- * ponytail: cotejo por regex sobre NUESTRO markup de campo (fichas planas, sin
- * anidar otro campo dentro); si el markup llegara a anidarse, migrar a recorrer el DOM.
+ * (para revisar/exportar respuestas). El parser HTML funciona sin DOM también en
+ * SSR: atributos y texto se leen de nodos, nunca eliminando etiquetas con regex.
+ * Los valores devueltos son texto plano, no HTML saneado para insertar en el DOM.
  */
 export function extractFormAnswers(html: string): FormAnswer[] {
   const out: FormAnswer[] = [];
-  for (const m of html.matchAll(FIELD_RE)) {
-    const attrs = `${m[1] ?? ''} ${m[3] ?? ''}`;
-    const type = m[2] as FormFieldType;
-    const name = unescapeHtml(attrOf(attrs, 'data-name'));
+  const pending: HtmlNode[] = [...parseFragment(html).childNodes].reverse();
+  while (pending.length) {
+    const node = pending.pop()!;
+    if (!('tagName' in node) || HIDDEN.has(node.tagName)) continue;
+    for (let i = node.childNodes.length - 1; i >= 0; i--) pending.push(node.childNodes[i]!);
+    if (node.tagName !== 'span') continue;
+    const attrs = new Map(node.attrs.map(({ name, value }) => [name, value]));
+    const type = attrs.get('data-formfield')?.toLowerCase();
+    if (type !== 'text' && type !== 'checkbox' && type !== 'select') continue;
+    const name = attrs.get('data-name') ?? '';
     let value: string;
     if (type === 'checkbox') {
-      value = attrOf(attrs, 'data-checked') === '1' ? 'Sí' : 'No';
+      value = attrs.get('data-checked') === '1' ? 'Sí' : 'No';
     } else if (type === 'select') {
-      value = unescapeHtml(attrOf(attrs, 'data-value'));
+      value = attrs.get('data-value') ?? '';
     } else {
-      // texto: el valor es el contenido; se quitan etiquetas sueltas (<br>) y se desescapa.
-      value = unescapeHtml((m[4] ?? '').replace(/<[^>]*>/g, '')).trim();
+      value = fieldText(node.childNodes);
     }
     out.push({ name, type, value });
   }

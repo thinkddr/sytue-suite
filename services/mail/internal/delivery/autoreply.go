@@ -13,6 +13,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"git.sytue.eu/sytue/one/platform/pkg/logsafe"
 	"git.sytue.eu/sytue/one/services/mail/internal/domain"
 )
 
@@ -165,6 +166,6 @@ func (in *Inbound) maybeAutoReply(ctx context.Context, accountID uuid.UUID, rcpt
 	}
 	raw := buildAutoReply(rcpt, replyTo.String(), vac.Subject, vac.Body, origMessageID)
 	if err := in.autoSender.SubmitAuto(ctx, rcpt, []string{replyTo.String()}, raw); err != nil {
-		in.logger.Warn("autoreply: encolar respuesta", "error", err, "to", replyTo.String())
+		in.logger.Warn("autoreply: encolar respuesta", "error", logsafe.Text(err), "to", logsafe.Text(replyTo.String()))
 	}
 }

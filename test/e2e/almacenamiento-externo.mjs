@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 // Real Drive «Add storage» picker in astro dev. Network replies are synthetic; no provider account is used.
+import { createReportDirectory, writeReport } from './lib/report-output.mjs';
 import { chromium } from 'playwright';
 import { expect as baseExpect } from '@playwright/test';
 import { assertWizardLayout as layout, assertWizardAccessibility as accessible, describeWizardState, openWizardFixture } from './lib/wizard-checks.mjs';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync } from 'node:fs';
 
 const expect = baseExpect.configure({ timeout: 15000 });
 
 const BASE = process.env.STORAGE_URL || 'http://127.0.0.1:4343/drive/prueba/dev/almacenamiento';
-const OUT = process.env.STORAGE_OUT || '/tmp/almacenamiento-externo';
-mkdirSync(OUT, { recursive: true });
+const OUT = createReportDirectory('almacenamiento-externo', process.env.STORAGE_OUT);
 const browser = await chromium.launch();
 const results = [];
 const PROVIDERS = {
@@ -374,6 +374,6 @@ try {
   }
 } finally {
   await browser.close();
-  writeFileSync(`${OUT}/report.json`, JSON.stringify(results, null, 2));
+  writeReport(`${OUT}/report.json`, JSON.stringify(results, null, 2));
 }
 if (results.some((result) => !result.ok)) process.exitCode = 1;

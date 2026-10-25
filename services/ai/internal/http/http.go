@@ -26,6 +26,7 @@ import (
 	"git.sytue.eu/sytue/one/platform/pkg/authn"
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/platform/pkg/log"
+	"git.sytue.eu/sytue/one/platform/pkg/logsafe"
 	"git.sytue.eu/sytue/one/services/ai/internal/config"
 	"git.sytue.eu/sytue/one/services/ai/internal/presupuesto"
 	"git.sytue.eu/sytue/one/services/ai/internal/provider"
@@ -403,15 +404,15 @@ func (h *handlers) assist(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		// No se filtra la causa (podría venir del proveedor) más allá de logging server-side.
 		logger.Warn("assist falló", "provider", prov.Name(), "modelo", prov.Modelo(),
-			"modo", modoDe(modo), "degradado", degradado, "action", req.Action,
-			"kind", req.Kind, "ms", elapsed.Milliseconds(), "error", err)
+			"modo", logsafe.Text(modoDe(modo)), "degradado", degradado, "action", logsafe.Text(req.Action),
+			"kind", logsafe.Text(req.Kind), "ms", elapsed.Milliseconds(), "error", err)
 		httpx.Fail(w, r, mapProviderError(err))
 		return
 	}
 	// Sin PII ni contenido del documento (RGPD): solo metadatos y lo que cuesta.
 	logger.Info("assist", "provider", prov.Name(), "modelo", prov.Modelo(),
-		"modo", modoDe(modo), "degradado", degradado, "action", req.Action,
-		"kind", req.Kind, "ms", elapsed.Milliseconds(),
+		"modo", logsafe.Text(modoDe(modo)), "degradado", degradado, "action", logsafe.Text(req.Action),
+		"kind", logsafe.Text(req.Kind), "ms", elapsed.Milliseconds(),
 		"tokens_entrada", res.TokensEntrada, "tokens_salida", res.TokensSalida,
 		"gastado_mes_eur", gastado)
 
@@ -864,12 +865,12 @@ func (h *handlers) modelsPages(w http.ResponseWriter, r *http.Request) {
 	logger := log.From(r.Context())
 	if err != nil {
 		logger.Warn("models pages falló", "tenant", id.Tenant, "sub", id.Sub,
-			"proveedor", prov, "error", err)
+			"proveedor", logsafe.Text(prov), "error", logsafe.Text(err))
 		httpx.Fail(w, r, httpx.NewError(http.StatusBadGateway, "models_failed", "Failed to retrieve models from provider.").Wrap(err))
 		return
 	}
 
-	logger.Info("models pages", "tenant", id.Tenant, "sub", id.Sub, "proveedor", prov, "count", len(modelos))
+	logger.Info("models pages", "tenant", id.Tenant, "sub", id.Sub, "proveedor", logsafe.Text(prov), "count", len(modelos))
 	httpx.JSON(w, r, http.StatusOK, map[string]any{
 		"modelos": modelos,
 	})

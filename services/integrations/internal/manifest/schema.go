@@ -785,7 +785,7 @@ func IsSubstitutableProduct(product string) bool { return substitutableProducts[
 // indicados. Lo usa el handoff por documento: {document_id} lo pone el front al abrir un
 // fichero concreto, así que la URL se sirve a medio resolver a propósito.
 func RenderURLKeeping(tmpl string, values map[string]string, keep ...string) (string, error) {
-	vals := make(map[string]string, len(values)+len(keep))
+	vals := make(map[string]string, len(values))
 	for k, v := range values {
 		vals[k] = v
 	}

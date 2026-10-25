@@ -2,14 +2,13 @@
 // Real PlanCard, authenticated Account layout and CSP. No IdP or provider is contacted.
 import { chromium } from 'playwright';
 import { expect as baseExpect } from '@playwright/test';
-import { mkdirSync, writeFileSync } from 'node:fs';
 import { sealSession, hostCookieName, SESSION_COOKIE } from '../../apps/frontend/packages/auth/src/server/cookies.ts';
 import { assertWizardAccessibility as accessible, describeWizardState, openWizardFixture } from './lib/wizard-checks.mjs';
+import { createReportDirectory, writeReport } from './lib/report-output.mjs';
 
 const expect = baseExpect.configure({ timeout: 15000 });
 const BASE = process.env.ACCOUNT_CAPACITY_URL || 'http://127.0.0.1:4343/account/dev/almacenamiento';
-const OUT = process.env.ACCOUNT_CAPACITY_OUT || '/tmp/almacenamiento-externo/account';
-mkdirSync(OUT, { recursive: true });
+const OUT = createReportDirectory('account-capacity', process.env.ACCOUNT_CAPACITY_OUT);
 const secret = process.env.SYTUE_SESSION_SECRET;
 if (!secret) throw new Error('The fixture runner must provide its ephemeral session secret');
 const token = 'quota-fixture-token';
@@ -104,6 +103,6 @@ try {
   }
 } finally {
   await browser.close();
-  writeFileSync(`${OUT}/report.json`, JSON.stringify(results, null, 2));
+  writeReport(`${OUT}/report.json`, JSON.stringify(results, null, 2));
 }
 if (results.some((result) => !result.ok)) process.exitCode = 1;

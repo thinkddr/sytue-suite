@@ -27,6 +27,10 @@ test('refuses to overwrite a report or follow an attacker symlink', { skip: proc
     const victim = join(directory, 'victim');
     const path = join(directory, 'report.json');
     writeFileSync(victim, 'unchanged');
+    writeFileSync(path, 'existing');
+    assert.throws(() => writeReport(path, 'attack'), { code: 'EEXIST' });
+    assert.equal(readFileSync(path, 'utf8'), 'existing');
+    rmSync(path);
     symlinkSync(victim, path);
     assert.throws(() => writeReport(path, 'attack'), { code: 'EEXIST' });
     assert.equal(readFileSync(victim, 'utf8'), 'unchanged');

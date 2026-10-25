@@ -6,6 +6,7 @@ package logsafe
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 )
 
@@ -15,4 +16,20 @@ func Text(value any) string {
 	text := fmt.Sprint(value)
 	text = strings.ReplaceAll(text, "\r", "\\r")
 	return strings.ReplaceAll(text, "\n", "\\n")
+}
+
+// Args copies a structured argument list, escaping text/errors while retaining
+// numeric, boolean and other typed values for the logger's normal encoding.
+func Args(values []any) []any {
+	out := append([]any(nil), values...)
+	for i, value := range values {
+		if err, ok := value.(error); ok {
+			out[i] = Text(err)
+			continue
+		}
+		if value != nil && reflect.TypeOf(value).Kind() == reflect.String {
+			out[i] = Text(reflect.ValueOf(value).String())
+		}
+	}
+	return out
 }

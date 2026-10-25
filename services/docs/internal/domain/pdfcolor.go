@@ -961,12 +961,17 @@ func ejecutarPS(tokens []tokenPS, pila []valorPS, pasos *int) []valorPS {
 				push(float64(^int64(a.num)))
 			}
 		case "bitshift":
-			sh, v := pop().num, int64(pop().num)
+			rawShift, v := pop().num, int64(pop().num)
+			sh, ok := psSmallInteger(rawShift)
+			if !ok {
+				push(0)
+				continue
+			}
 			switch {
 			case sh >= 0 && sh < 64:
-				push(float64(v << uint(sh)))
+				push(float64(v << sh))
 			case sh < 0 && sh > -64:
-				push(float64(uint64(v) >> uint(-sh))) //nolint:gosec // G115: desplazamiento lógico de PostScript
+				push(float64(uint64(v) >> -sh)) //nolint:gosec // G115: desplazamiento lógico de PostScript
 			default:
 				push(0)
 			}

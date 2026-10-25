@@ -8,7 +8,7 @@ export function validateReview(manifest) {
   if (manifest?.version !== 1 || !Array.isArray(manifest.files) || !manifest.files.length || !Array.isArray(manifest.reviews) || manifest.reviews.length > 100) throw new Error('Invalid review manifest.');
   const paths = new Set();
   for (const file of manifest.files) {
-    if (!/^(?:services|platform)\/[A-Za-z0-9_./-]+\.go$/.test(file?.path || '') || file.path.split('/').includes('..') || !/^[0-9a-f]{40,64}$/.test(file.blob || '') || paths.has(file.path)) throw new Error('Invalid or duplicate evidence file.');
+    if (!/^(?:(?:services|platform)\/[A-Za-z0-9_./-]+\.go|\.github\/scripts\/[A-Za-z0-9_.-]+\.mjs)$/.test(file?.path || '') || file.path.split('/').includes('..') || !/^[0-9a-f]{40,64}$/.test(file.blob || '') || paths.has(file.path)) throw new Error('Invalid or duplicate evidence file.');
     paths.add(file.path);
   }
   const seen = new Set();

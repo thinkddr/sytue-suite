@@ -74,7 +74,21 @@ test('invalid review manifests fail before API requests', () => {
     { ...manifest, reviews: [...manifest.reviews, manifest.reviews[0]] },
     { ...manifest, reviews: [{ ...manifest.reviews[0], comment: 'no evidence' }] },
     { ...manifest, reviews: [{ ...manifest.reviews[0], path: 'services/other.go' }] },
+    { ...manifest, reviews: [{ ...manifest.reviews[0], comment: 'a'.repeat(281) }] },
   ]) assert.throws(() => validateReview(invalid));
+});
+
+test('does not claim a concurrent closure as an applied mutation', async () => {
+  let reads = 0;
+  let writes = 0;
+  const result = await reviewSecurityAlerts({ manifest, env: { ...env, APPLY_REVIEW: 'true' }, evidence: () => {}, fetchImpl: async (url, options) => {
+    if (url.includes('/git/ref/')) return Response.json({ object: { sha: head } });
+    if (options.method === 'PATCH') writes++;
+    return Response.json(alert(++reads === 1 ? 'open' : 'fixed'));
+  } });
+  assert.equal(writes, 0);
+  assert.equal(result.results[0].state, 'fixed');
+  assert.equal(result.results[0].applied, false);
 });
 
 test('the committed review list has specific evidence for every selected alert', () => {

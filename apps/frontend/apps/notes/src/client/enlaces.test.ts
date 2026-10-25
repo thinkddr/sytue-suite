@@ -42,6 +42,14 @@ test('sinEtiquetas no desescapa dos veces entidades anidadas', () => {
   expect(sinEtiquetas('&amp;lt;script&amp;gt;')).toBe('&lt;script&gt;');
 });
 
+test('sinEtiquetas parsea atributos y marcado incompleto sin reconstruir etiquetas', () => {
+  expect(sinEtiquetas('<b title="a > b">uno<span>dos</span></b>')).toBe('unodos');
+  expect(sinEtiquetas('<<script>script>alert(1)</script>')).toBe('<');
+  expect(sinEtiquetas('antes<script')).toBe('antes');
+  expect(sinEtiquetas('a<!--oculto--><template>no</template><style>no</style>b')).toBe('ab');
+  expect(sinEtiquetas('&#x1f600; &quot;x&quot;')).toBe('😀 "x"');
+});
+
 test('conAnclas pone el id sin tocar lo demás', () => {
   expect(conAnclas('<h2 style="color:#112233">Cocina</h2><p>a</p>')).toBe(
     '<h2 id="h-cocina" style="color:#112233">Cocina</h2><p>a</p>',

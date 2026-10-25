@@ -64,38 +64,46 @@ func (l *lienzo) leerType3(fd pdfDict) *type3 {
 		return nil // sin dibujos no hay nada que hacer
 	}
 
-	// Solo /Differences: en tipo 3 no hay codificación base que valga, porque los
-	// nombres de glifo los inventa el documento.
-	if enc, ok := l.d.resolver(fd["Encoding"]).(pdfDict); ok {
-		if difs, ok := l.d.resolver(enc["Differences"]).(pdfArray); ok {
-			codigo := 0
-			for _, e := range difs {
-				switch v := l.d.resolver(e).(type) {
-				case int64:
-					if v < 0 || v >= 256 {
-						codigo = 256
-					} else {
-						codigo = int(v)
-					}
-				case float64:
-					if v >= 0 && v < 256 {
-						codigo = int(v)
-					} else {
-						codigo = 256
-					}
-				case pdfName:
-					if codigo >= 0 && codigo < 256 {
-						t.codificacion[byte(codigo)] = v
-					}
-					codigo++
-				}
-			}
-		}
-	}
+	l.leerCodificacionType3(fd, t.codificacion)
 	if len(t.codificacion) == 0 {
 		return nil // no hay forma de saber qué dibujo va con qué código
 	}
 	return t
+}
+
+// leerCodificacionType3 usa solo /Differences: en tipo 3 no hay codificación
+// base que valga, porque los nombres de glifo los inventa el documento.
+func (l *lienzo) leerCodificacionType3(fd pdfDict, codificacion map[byte]pdfName) {
+	enc, ok := l.d.resolver(fd["Encoding"]).(pdfDict)
+	if !ok {
+		return
+	}
+	difs, ok := l.d.resolver(enc["Differences"]).(pdfArray)
+	if !ok {
+		return
+	}
+	codigo := 0
+	for _, e := range difs {
+		switch v := l.d.resolver(e).(type) {
+		case int64:
+			if v < 0 || v >= 256 {
+				codigo = 256
+			} else {
+				codigo = int(v)
+			}
+		case float64:
+			if v >= 0 && v < 256 {
+				codigo = int(v)
+			} else {
+				codigo = 256
+			}
+		case pdfName:
+			if codigo >= 0 && codigo < 256 {
+				codificacion[byte(codigo)] = v
+			}
+			codigo++
+		}
+	}
 }
 
 // dibujarGlifosType3 pinta uno a uno los glifos de la cadena y devuelve si pintó

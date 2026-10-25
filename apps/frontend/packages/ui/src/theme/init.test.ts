@@ -6,6 +6,7 @@ import {
   ORG_FORMA_KEY,
   THEME_COLORS,
   THEME_FORMAS,
+  readThemePreference,
   themeInitScript,
 } from './init.js';
 
@@ -208,6 +209,11 @@ test('la cookie del color de organización se llama igual donde se escribe y don
   expect(ORG_FORMA_KEY).toBe(ORG_FORMA_COOKIE);
 });
 
-test('el script de primer pintado escapa caracteres con significado en HTML y JavaScript', () => {
-  expect(themeInitScript).not.toMatch(/[<>&\u2028\u2029]/);
+test('los valores del primer pintado se escapan sin prohibir operadores del código', () => {
+  // Bun puede emitir `typeof document > "u"` al serializar las funciones. El
+  // operador es código válido; los valores interpolados van antes de sus cuerpos.
+  const end = themeInitScript.indexOf(readThemePreference.toString());
+  expect(end).toBeGreaterThan(0);
+  expect(themeInitScript.slice(0, end)).not.toMatch(/[<>&\u2028\u2029]/);
+  expect(themeInitScript).not.toMatch(/<\/script[\s/>]/i);
 });

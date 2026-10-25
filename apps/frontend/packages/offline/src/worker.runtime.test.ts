@@ -140,6 +140,12 @@ function privateCaches(caches: Map<string, MemoryCache>): MemoryCache[] {
 function cachedCount(caches: Map<string, MemoryCache>): number {
   return privateCaches(caches).reduce((sum, cache) => sum + cache.values.size, 0);
 }
+function navigation(path = '/'): Request {
+  const request = new Request(new URL(path, ORIGIN));
+  // Request's constructor cannot create a navigation; the browser supplies it.
+  Object.defineProperty(request, 'mode', { value: 'navigate' });
+  return request;
+}
 
 describe('native worker running its served source', () => {
   test('returns and completes the body before a slow Cache.put, then caches an intact EOF', async () => {
@@ -488,6 +494,82 @@ describe('native worker running its served source', () => {
       throw new Error('offline');
     });
     await expect(app.request(new Request(api), 'window-b').response).rejects.toThrow('offline');
+  });
+
+  for (const base of ['', '/mail']) {
+    test.each([
+      { path: '/auth/login', method: 'GET' },
+      { path: '/auth/callback', method: 'GET' },
+      { path: '/auth/organizations', method: 'PUT' },
+    ])(`session transition ${base}$path retires persisted navigation context`, async (route) => {
+      const app = await harness();
+      await app.initialise('acme');
+      app.setFetch(async () => new Response('HTML acme'));
+      const online = app.request(navigation());
+      await (await online.response).text();
+      await online.settled();
+      const drafts = new MemoryCache();
+      await drafts.put('/draft', new Response('keep unsent draft'));
+      app.caches.set('drafts-queue', drafts);
+
+      const transition = app.request(
+        new Request(`${ORIGIN}${base}${route.path}`, { method: route.method }),
+      );
+      await transition.response;
+      await transition.settled();
+      app.setFetch(async () => {
+        throw new Error('offline');
+      });
+      await expect(app.request(navigation(), 'window-b').response).rejects.toThrow('offline');
+
+      const restarted = await harness(undefined, app.caches);
+      restarted.setFetch(async () => {
+        throw new Error('offline');
+      });
+      await expect(restarted.request(navigation(), 'window-b').response).rejects.toThrow('offline');
+      expect(await (await drafts.match('/draft'))!.text()).toBe('keep unsent draft');
+      await restarted.initialise('beta', 'new-session');
+      expect((await restarted.request(navigation(), 'window-b').response).status).toBe(0);
+    });
+  }
+
+  test('authentication retires a pending body without erasing ordinary offline boot', async () => {
+    const app = await harness();
+    await app.initialise();
+    const initial = app.request(navigation());
+    await (await initial.response).text();
+    await initial.settled();
+    const restarted = await harness(undefined, app.caches);
+    restarted.setFetch(async () => {
+      throw new Error('offline');
+    });
+    const recovered = restarted.request(navigation(), 'window-b');
+    expect(await (await recovered.response).text()).toBe('artificial');
+    await recovered.settled();
+
+    let source!: ReadableStreamDefaultController<Uint8Array>;
+    app.setFetch(
+      async () =>
+        new Response(
+          new ReadableStream<Uint8Array>({
+            start(controller) {
+              source = controller;
+              controller.enqueue(new Uint8Array([1]));
+            },
+          }),
+        ),
+    );
+    const work = app.request();
+    const reader = (await work.response).body!.getReader();
+    await reader.read();
+    app.setFetch(async () => new Response('login'));
+    const login = app.request(new Request(`${ORIGIN}/mail/auth/login`));
+    await login.response;
+    await login.settled();
+    source.close();
+    await reader.read();
+    await work.settled();
+    expect(privateCaches(app.caches).some((cache) => cache.values.has(api))).toBe(false);
   });
 
   test('quota/write failure cannot turn a successful response into an offline fallback', async () => {

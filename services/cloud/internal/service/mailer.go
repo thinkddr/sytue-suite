@@ -6,8 +6,11 @@ package service
 import (
 	"context"
 	"crypto/tls"
+	"encoding/base64"
 	"fmt"
+	"mime"
 	"net"
+	"net/mail"
 	"net/smtp"
 	"strings"
 	"sync"
@@ -55,6 +58,10 @@ func sendAlertMail(ctx context.Context, cfg config.Config, to, subject, body str
 	if from == "" {
 		return fmt.Errorf("service: falta el remitente del correo de alertas")
 	}
+	message, err := mailMessage(from, to, subject, body)
+	if err != nil {
+		return err
+	}
 
 	addr := net.JoinHostPort(cfg.SMTPHost, portOrDefault(cfg.SMTPPort))
 	// Plazo corto: esto corre DENTRO de la transacción del dispatcher del outbox,
@@ -91,17 +98,17 @@ func sendAlertMail(ctx context.Context, cfg config.Config, to, subject, body str
 			return fmt.Errorf("service: autenticación SMTP: %w", err)
 		}
 	}
-	if err := c.Mail(from); err != nil {
+	if err := c.Mail(message.from); err != nil {
 		return fmt.Errorf("service: remitente rechazado: %w", err)
 	}
-	if err := c.Rcpt(to); err != nil {
+	if err := c.Rcpt(message.to); err != nil {
 		return fmt.Errorf("service: destinatario rechazado: %w", err)
 	}
 	w, err := c.Data()
 	if err != nil {
 		return fmt.Errorf("service: cuerpo del correo: %w", err)
 	}
-	if _, err := w.Write([]byte(mailMessage(from, to, subject, body))); err != nil {
+	if _, err := w.Write([]byte(message.content)); err != nil {
 		_ = w.Close()
 		return fmt.Errorf("service: escribir el correo: %w", err)
 	}
@@ -111,27 +118,45 @@ func sendAlertMail(ctx context.Context, cfg config.Config, to, subject, body str
 	return c.Quit()
 }
 
-// mailMessage arma el mensaje RFC 5322 mínimo.
-//
-// El asunto y el cuerpo se saneen ANTES de llegar aquí: un salto de línea en el
-// asunto escribe cabeceras de más, que es la misma clase de inyección que se
-// rechaza en las cabeceras HTTP del proyecto.
-func mailMessage(from, to, subject, body string) string {
-	var b strings.Builder
-	b.WriteString("From: " + from + "\r\n")
-	b.WriteString("To: " + to + "\r\n")
-	b.WriteString("Subject: " + sanitizeHeader(subject) + "\r\n")
-	b.WriteString("MIME-Version: 1.0\r\n")
-	b.WriteString("Content-Type: text/plain; charset=utf-8\r\n")
-	b.WriteString("\r\n")
-	b.WriteString(body)
-	b.WriteString("\r\n")
-	return b.String()
+type alertMailMessage struct {
+	from, to, content string
 }
 
-// sanitizeHeader quita saltos de línea de un valor de cabecera de correo.
-func sanitizeHeader(s string) string {
-	return strings.NewReplacer("\r", " ", "\n", " ").Replace(s)
+// mailMessage valida las cabeceras antes de conectar y codifica el cuerpo como
+// MIME text/plain. Los datos de una alerta nunca se interpretan como cabeceras,
+// instrucciones SMTP ni marcado HTML, incluso si contienen saltos de línea.
+func mailMessage(from, to, subject, body string) (alertMailMessage, error) {
+	for _, header := range []string{from, to, subject} {
+		for _, r := range header {
+			if r < 32 || r == 127 {
+				return alertMailMessage{}, fmt.Errorf("service: carácter de control en cabecera de correo")
+			}
+		}
+	}
+	sender, err := mail.ParseAddress(from)
+	if err != nil {
+		return alertMailMessage{}, fmt.Errorf("service: remitente de correo inválido")
+	}
+	recipient, err := mail.ParseAddress(to)
+	if err != nil {
+		return alertMailMessage{}, fmt.Errorf("service: destinatario de correo inválido")
+	}
+	var b strings.Builder
+	b.WriteString("From: " + sender.String() + "\r\n")
+	b.WriteString("To: " + recipient.String() + "\r\n")
+	b.WriteString("Subject: " + mime.BEncoding.Encode("utf-8", subject) + "\r\n")
+	b.WriteString("MIME-Version: 1.0\r\n")
+	b.WriteString("Content-Type: text/plain; charset=utf-8\r\n")
+	b.WriteString("Content-Transfer-Encoding: base64\r\n")
+	b.WriteString("\r\n")
+	encoded := base64.StdEncoding.EncodeToString([]byte(body))
+	for len(encoded) > 0 {
+		n := min(76, len(encoded))
+		b.WriteString(encoded[:n])
+		b.WriteString("\r\n")
+		encoded = encoded[n:]
+	}
+	return alertMailMessage{from: sender.Address, to: recipient.Address, content: b.String()}, nil
 }
 
 func portOrDefault(p string) string {

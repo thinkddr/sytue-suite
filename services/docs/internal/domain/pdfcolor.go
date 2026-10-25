@@ -948,11 +948,11 @@ func ejecutarPS(tokens []tokenPS, pila []valorPS, pasos *int) []valorPS {
 				push(float64(^int64(a.num)))
 			}
 		case "bitshift":
-			sh, v := int(pop().num), int64(pop().num)
+			sh, v := pop().num, int64(pop().num)
 			switch {
 			case sh >= 0 && sh < 64:
 				push(float64(v << uint(sh)))
-			case sh < 0 && -sh < 64:
+			case sh < 0 && sh > -64:
 				push(float64(uint64(v) >> uint(-sh))) //nolint:gosec // G115: desplazamiento lógico de PostScript
 			default:
 				push(0)
@@ -981,18 +981,29 @@ func ejecutarPS(tokens []tokenPS, pila []valorPS, pasos *int) []valorPS {
 				pila = append(pila, pila[len(pila)-1])
 			}
 		case "copy":
-			n := int(pop().num)
-			if n > 0 && n <= len(pila) && len(pila)+n <= 1024 {
-				pila = append(pila, pila[len(pila)-n:]...)
+			raw := pop().num
+			if raw >= 1 && raw <= 1024 && raw <= float64(len(pila)) {
+				n := int(raw)
+				if len(pila)+n <= 1024 {
+					pila = append(pila, pila[len(pila)-n:]...)
+				}
 			}
 		case "index":
-			n := int(pop().num)
-			if n >= 0 && n < len(pila) && len(pila) < 1024 {
+			raw := pop().num
+			if raw >= 0 && raw < 1024 && raw < float64(len(pila)) && len(pila) < 1024 {
+				n := int(raw)
 				pila = append(pila, pila[len(pila)-1-n])
 			}
 		case "roll":
-			j, n := int(pop().num), int(pop().num)
-			if n > 0 && n <= len(pila) {
+			rawJ, rawN := pop().num, pop().num
+			if rawN >= 1 && rawN <= 1024 && rawN <= float64(len(pila)) && !math.IsNaN(rawJ) && !math.IsInf(rawJ, 0) {
+				n := int(rawN)
+				// Reduce before conversion and subtraction: k-MinInt can overflow.
+				rotation := math.Mod(rawJ, float64(n))
+				if rotation < -1024 || rotation > 1024 {
+					continue
+				}
+				j := int(rotation)
 				ini := len(pila) - n
 				viejo := append([]valorPS(nil), pila[ini:]...)
 				for k := 0; k < n; k++ {

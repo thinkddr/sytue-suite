@@ -852,6 +852,9 @@ func (f *fuentePDF) indiceDeGlifo(cara *sfnt.Font, buf *sfnt.Buffer, g glifo) (s
 		// Identity-H: el código ES el índice de glifo, salvo que /CIDToGIDMap traiga
 		// una tabla que diga otra cosa.
 		gid := g.codigo
+		if gid > maxCID {
+			return 0, false
+		}
 		if len(f.cidAGid) > 0 {
 			if int(2*gid+1) >= len(f.cidAGid) {
 				return 0, false

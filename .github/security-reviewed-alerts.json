@@ -63,67 +63,78 @@
       "number": 167,
       "rule": "go/incorrect-integer-conversion",
       "path": "services/docs/internal/domain/pdffont.go",
-      "comment": "This expression widens values from pdfString, whose Go type is []byte, to uint16 or uint32. Each source byte is bounded to 0..255, so these are not narrowing conversions. Numeric pdfObj operands are separated from strings; TestDecodificarSeparaOperandosNumericosDeCadenas covers high-bit byte values without truncation."
+      "comment": "False positive: pdfString is []byte. These casts widen 8-bit bytes to uint16/uint32; no narrowing or overflow occurs. Numeric operands are separate from string bytes; decoding regression tests preserve high-bit values.",
+      "evidence": "This expression widens values from pdfString, whose Go type is []byte, to uint16 or uint32. Each source byte is bounded to 0..255, so these are not narrowing conversions. Numeric pdfObj operands are separated from strings; TestDecodificarSeparaOperandosNumericosDeCadenas covers high-bit byte values without truncation."
     },
     {
       "number": 168,
       "rule": "go/incorrect-integer-conversion",
       "path": "services/docs/internal/domain/pdffont.go",
-      "comment": "This expression widens values from pdfString, whose Go type is []byte, to uint16 or uint32. Each source byte is bounded to 0..255, so these are not narrowing conversions. Numeric pdfObj operands are separated from strings; TestDecodificarSeparaOperandosNumericosDeCadenas covers high-bit byte values without truncation."
+      "comment": "False positive: pdfString is []byte. These casts widen 8-bit bytes to uint16/uint32; no narrowing or overflow occurs. Numeric operands are separate from string bytes; decoding regression tests preserve high-bit values.",
+      "evidence": "This expression widens values from pdfString, whose Go type is []byte, to uint16 or uint32. Each source byte is bounded to 0..255, so these are not narrowing conversions. Numeric pdfObj operands are separated from strings; TestDecodificarSeparaOperandosNumericosDeCadenas covers high-bit byte values without truncation."
     },
     {
       "number": 169,
       "rule": "go/incorrect-integer-conversion",
       "path": "services/docs/internal/domain/pdffont.go",
-      "comment": "This expression widens values from pdfString, whose Go type is []byte, to uint16 or uint32. Each source byte is bounded to 0..255, so these are not narrowing conversions. Numeric pdfObj operands are separated from strings; TestDecodificarSeparaOperandosNumericosDeCadenas covers high-bit byte values without truncation."
+      "comment": "False positive: pdfString is []byte. These casts widen 8-bit bytes to uint16/uint32; no narrowing or overflow occurs. Numeric operands are separate from string bytes; decoding regression tests preserve high-bit values.",
+      "evidence": "This expression widens values from pdfString, whose Go type is []byte, to uint16 or uint32. Each source byte is bounded to 0..255, so these are not narrowing conversions. Numeric pdfObj operands are separated from strings; TestDecodificarSeparaOperandosNumericosDeCadenas covers high-bit byte values without truncation."
     },
     {
       "number": 170,
       "rule": "go/incorrect-integer-conversion",
       "path": "services/docs/internal/domain/pdffont.go",
-      "comment": "This expression widens values from pdfString, whose Go type is []byte, to uint16 or uint32. Each source byte is bounded to 0..255, so these are not narrowing conversions. Numeric pdfObj operands are separated from strings; TestDecodificarSeparaOperandosNumericosDeCadenas covers high-bit byte values without truncation."
+      "comment": "False positive: pdfString is []byte. These casts widen 8-bit bytes to uint16/uint32; no narrowing or overflow occurs. Numeric operands are separate from string bytes; decoding regression tests preserve high-bit values.",
+      "evidence": "This expression widens values from pdfString, whose Go type is []byte, to uint16 or uint32. Each source byte is bounded to 0..255, so these are not narrowing conversions. Numeric pdfObj operands are separated from strings; TestDecodificarSeparaOperandosNumericosDeCadenas covers high-bit byte values without truncation."
     },
     {
       "number": 175,
       "rule": "go/incorrect-integer-conversion",
       "path": "services/docs/internal/domain/pdffont.go",
-      "comment": "This expression widens values from pdfString, whose Go type is []byte, to uint16 or uint32. Each source byte is bounded to 0..255, so these are not narrowing conversions. Numeric pdfObj operands are separated from strings; TestDecodificarSeparaOperandosNumericosDeCadenas covers high-bit byte values without truncation."
+      "comment": "False positive: pdfString is []byte. These casts widen 8-bit bytes to uint16/uint32; no narrowing or overflow occurs. Numeric operands are separate from string bytes; decoding regression tests preserve high-bit values.",
+      "evidence": "This expression widens values from pdfString, whose Go type is []byte, to uint16 or uint32. Each source byte is bounded to 0..255, so these are not narrowing conversions. Numeric pdfObj operands are separated from strings; TestDecodificarSeparaOperandosNumericosDeCadenas covers high-bit byte values without truncation."
     },
     {
       "number": 218,
       "rule": "go/incorrect-integer-conversion",
       "path": "services/docs/internal/domain/pdftext.go",
-      "comment": "This expression widens values from pdfString, whose Go type is []byte, to uint16 or uint32. Each source byte is bounded to 0..255, so these are not narrowing conversions. Numeric pdfObj operands are separated from strings; TestDecodificarSeparaOperandosNumericosDeCadenas covers high-bit byte values without truncation."
+      "comment": "False positive: pdfString is []byte. These casts widen 8-bit bytes to uint16/uint32; no narrowing or overflow occurs. Numeric operands are separate from string bytes; decoding regression tests preserve high-bit values.",
+      "evidence": "This expression widens values from pdfString, whose Go type is []byte, to uint16 or uint32. Each source byte is bounded to 0..255, so these are not narrowing conversions. Numeric pdfObj operands are separated from strings; TestDecodificarSeparaOperandosNumericosDeCadenas covers high-bit byte values without truncation."
     },
     {
       "number": 245,
       "rule": "go/unvalidated-url-redirection",
       "path": "services/id/internal/http/forgot_password.go",
-      "comment": "The destination always starts with the fixed local path /forgot-password?sent=1. Untrusted return_to is appended only through url.Values.Encode as query data. It cannot alter the scheme, authority or path, or introduce a Location header. The taint path does not represent an open redirect."
+      "comment": "False positive: Location has the fixed local prefix /forgot-password?sent=1. return_to is only url.Values-encoded query data; it cannot change the scheme, host or path or add a header.",
+      "evidence": "The destination always starts with the fixed local path /forgot-password?sent=1. Untrusted return_to is appended only through url.Values.Encode as query data. It cannot alter the scheme, authority or path, or introduce a Location header. The taint path does not represent an open redirect."
     },
     {
       "number": 246,
       "rule": "go/unvalidated-url-redirection",
       "path": "services/id/internal/http/login.go",
-      "comment": "redirectAfterLogin accepts only internal root-relative paths. rutaInternaSegura rejects scheme-relative destinations, backslash authority and control characters; invalid values redirect to /. TestRutaInternaSeguraRechazaLaBarraInvertida and TestRedirectAfterLoginNoSaleDelIdP cover attacker-controlled destinations."
+      "comment": "False positive: rutaInternaSegura permits only internal root-relative paths and rejects //, backslash authority and controls. Invalid input redirects to /. Redirect safety regressions pass.",
+      "evidence": "redirectAfterLogin accepts only internal root-relative paths. rutaInternaSegura rejects scheme-relative destinations, backslash authority and control characters; invalid values redirect to /. TestRutaInternaSeguraRechazaLaBarraInvertida and TestRedirectAfterLoginNoSaleDelIdP cover attacker-controlled destinations."
     },
     {
       "number": 247,
       "rule": "go/unvalidated-url-redirection",
       "path": "services/id/internal/http/logout.go",
-      "comment": "postLogoutTarget requires exact membership in the selected client PostLogoutRedirectURIs and validRegistrationRedirect syntax. Its fallback is trusted service configuration, never request data. The dataflow query does not account for this allowlist guard."
+      "comment": "False positive: postLogoutTarget requires exact membership in registered client logout URIs plus validRegistrationRedirect syntax. The fallback is service configuration, never request data.",
+      "evidence": "postLogoutTarget requires exact membership in the selected client PostLogoutRedirectURIs and validRegistrationRedirect syntax. Its fallback is trusted service configuration, never request data. The dataflow query does not account for this allowlist guard."
     },
     {
       "number": 248,
       "rule": "go/unvalidated-url-redirection",
       "path": "services/id/internal/http/authorize.go",
-      "comment": "handleAuthorize checks exact registered redirect URI membership through client.ValidRedirectURI before redirectErr is reachable. State/error query values are encoded with url.Values. TestClientValidRedirectURI_ExactMatch verifies no wildcard or prefix acceptance. Redirecting to a registered OAuth client is intentional."
+      "comment": "False positive: handleAuthorize requires exact client.ValidRedirectURI membership before redirectErr. State/error values are URL-encoded. Exact-match regression tests reject prefixes and wildcards.",
+      "evidence": "handleAuthorize checks exact registered redirect URI membership through client.ValidRedirectURI before redirectErr is reachable. State/error query values are encoded with url.Values. TestClientValidRedirectURI_ExactMatch verifies no wildcard or prefix acceptance. Redirecting to a registered OAuth client is intentional."
     },
     {
       "number": 273,
       "rule": "go/email-injection",
       "path": "services/cloud/internal/service/mailer.go",
-      "comment": "Recipient headers are parsed as a single net/mail.Address after rejecting control characters before SMTP. Address.String serializes the header; the body is MIME base64 text/plain. Header injection and MIME round-trip regressions pass. The remaining trace is only the validated To header, not executable HTML or injected header data."
+      "comment": "False positive after hardening: mailMessage rejects controls and parses one net/mail address before SMTP; Address.String emits To. The body is MIME base64 text/plain. Header-injection and MIME round-trip tests pass.",
+      "evidence": "Recipient headers are parsed as a single net/mail.Address after rejecting control characters before SMTP. Address.String serializes the header; the body is MIME base64 text/plain. Header injection and MIME round-trip regressions pass. The remaining trace is only the validated To header, not executable HTML or injected header data."
     }
   ]
 }

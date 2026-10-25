@@ -15,7 +15,7 @@ export function validateReview(manifest) {
   for (const review of manifest.reviews) {
     if (!Number.isSafeInteger(review?.number) || review.number < 1 || seen.has(review.number) ||
         !paths.has(review.path) || !/^[a-z]+\/[a-z0-9_/-]+$/.test(review.rule || '') ||
-        typeof review.comment !== 'string' || review.comment.length < 80 || review.comment.length > 1000 || /[\u0000-\u001f\u007f]/u.test(review.comment)) throw new Error('Invalid or duplicate reviewed alert.');
+        typeof review.comment !== 'string' || review.comment.length < 80 || review.comment.length > 280 || /[\u0000-\u001f\u007f]/u.test(review.comment)) throw new Error('Invalid or duplicate reviewed alert.');
     seen.add(review.number);
   }
 }
@@ -75,6 +75,7 @@ export async function reviewSecurityAlerts({ manifest, env = process.env, fetchI
   for (const record of records) {
     const { review } = record;
     let state = record.state;
+    let applied = false;
     if (applying && state === 'open') {
       await checkHead();
       const latest = await request(`/code-scanning/alerts/${review.number}`);
@@ -84,9 +85,10 @@ export async function reviewSecurityAlerts({ manifest, env = process.env, fetchI
         const updated = await request(`/code-scanning/alerts/${review.number}`, { state: 'dismissed', dismissed_reason: 'false positive', dismissed_comment: review.comment });
         if (updated.state !== 'dismissed' || updated.dismissed_reason !== 'false positive') throw new Error(`GitHub did not confirm disposition of #${review.number}.`);
         state = updated.state;
+        applied = true;
       }
     }
-    results.push({ number: review.number, before: record.state, state, classification: 'reviewed false positive', applied: applying && record.state === 'open' && state === 'dismissed' });
+    results.push({ number: review.number, before: record.state, state, classification: 'reviewed false positive', applied });
   }
   return { revision: env.GITHUB_SHA, applying, results };
 }

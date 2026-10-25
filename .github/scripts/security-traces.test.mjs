@@ -34,3 +34,14 @@ test('fails explicitly for missing analysis, invalid SARIF and API denial', () =
   assert.throws(() => goSecurityTraces({ env, api: path => path.endsWith('/42') ? {} : [analysis] }), /Invalid SARIF/);
   assert.throws(() => goSecurityTraces({ env, api: () => { throw new Error('403'); } }), /403/);
 });
+
+test('can inspect a PR analysis while still executing trusted default-branch code', () => {
+  let seen = '';
+  goSecurityTraces({ env: { ...env, ANALYSIS_REF: 'refs/pull/40/merge' }, api: path => {
+    if (path.endsWith('/42')) return { runs: [] };
+    seen = path;
+    return [analysis];
+  } });
+  assert.ok(seen.includes('ref=refs%2Fpull%2F40%2Fmerge'));
+  assert.throws(() => goSecurityTraces({ env: { ...env, ANALYSIS_REF: 'https://evil.example' }, api: () => assert.fail() }), /Invalid analysis ref/);
+});

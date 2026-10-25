@@ -14,7 +14,9 @@ export function goSecurityTraces({ env = process.env, api } = {}) {
   const request = api || ((endpoint, accept = 'application/vnd.github+json') => JSON.parse(execFileSync('gh', [
     'api', '--hostname', 'github.com', endpoint, '-H', `Accept: ${accept}`,
   ], { env, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })));
-  const analyses = request(`${root}?ref=${encodeURIComponent(`refs/heads/${env.DEFAULT_BRANCH}`)}&per_page=100`);
+  const ref = env.ANALYSIS_REF || `refs/heads/${env.DEFAULT_BRANCH}`;
+  if (!/^refs\/(?:heads\/[^\s]+|pull\/[1-9]\d*\/merge)$/.test(ref)) throw new Error('Invalid analysis ref.');
+  const analyses = request(`${root}?ref=${encodeURIComponent(ref)}&per_page=100`);
   if (!Array.isArray(analyses)) throw new Error('Invalid analyses response.');
   const analysis = analyses.find(item => item.category === '/language:go' && item.tool?.name === 'CodeQL');
   if (!Number.isSafeInteger(analysis?.id) || analysis.id < 1 || !/^[0-9a-f]{40,64}$/.test(analysis.commit_sha || '')) throw new Error('No valid Go analysis is available.');

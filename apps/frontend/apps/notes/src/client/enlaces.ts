@@ -11,6 +11,7 @@
  * recargar. Aquí está todo lo que no toca el DOM, para poder probarlo.
  */
 import type { Note, NoteLink } from '@sytue/api-clients';
+import { parseFragment, type DefaultTreeAdapterMap } from 'parse5';
 
 /** El slug de un título: lo que va en `h=` y en el `id` del encabezado. */
 export function slugDe(texto: string): string {
@@ -143,12 +144,20 @@ export function enlacesAAnclas(html: string, idsEnPagina: ReadonlySet<string>): 
 
 /** El texto de un HTML: sin etiquetas y con las entidades básicas resueltas. */
 export function sinEtiquetas(html: string): string {
-  return html
-    .replace(/<[^>]*>/g, '')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&');
+  const pending: DefaultTreeAdapterMap['childNode'][] = [
+    ...parseFragment(html).childNodes,
+  ].reverse();
+  const parts: string[] = [];
+  while (pending.length) {
+    const node = pending.pop()!;
+    if ('value' in node) parts.push(node.value);
+    else if (
+      'tagName' in node &&
+      !['script', 'style', 'template', 'noscript'].includes(node.tagName)
+    ) {
+      for (let i = node.childNodes.length - 1; i >= 0; i--) pending.push(node.childNodes[i]!);
+    }
+  }
+  // Plain text only: callers render this as text, never as sanitized HTML.
+  return parts.join('').replaceAll('\u00a0', ' ');
 }

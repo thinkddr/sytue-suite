@@ -120,10 +120,21 @@ describe('lectores', () => {
     expect(
       textoPlano('<p>Hola <b>mundo</b></p><script>alert(1)</script><p>a &amp; b &lt;c&gt;</p>'),
     ).toBe('Hola mundo\na & b <c>');
-    expect(textoPlano('<scrip<script>is removed</script>t>alert(123)</script>')).toBe('');
+    // Parser text remains data: malformed/encoded markup must not be reparsed.
+    expect(textoPlano('<scrip<script>is removed</script>t>alert(123)</script>')).toBe(
+      'is removedt>alert(123)',
+    );
     expect(
       textoPlano('&lt;scrip&lt;script&gt;is removed&lt;/script&gt;t&gt;alert(123)&lt;/script&gt;'),
-    ).toBe('');
+    ).toBe('<scrip<script>is removed</script>t>alert(123)</script>');
+  });
+  test('HTML boundaries and attributes cannot reconstruct active tags', () => {
+    expect(textoPlano('<p title="a > b">uno<span> dos</span></p><p>tres<br>cuatro</p>')).toBe(
+      'uno dos\ntres\ncuatro',
+    );
+    expect(textoPlano('<<script>script>alert(1)</script>')).toBe('<');
+    expect(textoPlano('<template>hidden</template><!--hidden--><p>visible</p>')).toBe('visible');
+    expect(textoPlano('&amp;lt;script&amp;gt; &#x1f600;')).toBe('&lt;script&gt; 😀');
   });
   test('diapositivas a texto; contenido roto, null', () => {
     const c = JSON.stringify({

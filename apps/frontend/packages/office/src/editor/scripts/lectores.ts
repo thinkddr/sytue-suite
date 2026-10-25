@@ -8,31 +8,37 @@
  * texto, no algo que se pueda inyectar en ningún sitio.
  */
 
-/** Texto plano de un trozo de HTML sin ejecutar nada: sin DOM, con un recorte de etiquetas. */
+import { parseFragment, type DefaultTreeAdapterMap } from 'parse5';
+
+const HIDDEN = new Set(['script', 'style', 'template', 'noscript', 'iframe', 'object', 'embed']);
+const BLOCKS = new Set(['p', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'tr']);
+
+/** Texto plano mediante un parser sin DOM. Las entidades se decodifican una sola vez. */
 export function textoPlano(html: string): string {
-  let texto = removeScripts(html);
-  texto = texto
-    .replace(/<\s*(br|\/p|\/div|\/h[1-6]|\/li|\/tr)\b[^>]*>/gi, '\n')
-    .replace(/<[^>]*>/g, '')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&amp;/g, '&');
-  return removeScripts(texto)
+  const pending: (DefaultTreeAdapterMap['childNode'] | string)[] = [
+    ...parseFragment(html).childNodes,
+  ].reverse();
+  const parts: string[] = [];
+  while (pending.length) {
+    const node = pending.pop()!;
+    if (typeof node === 'string') parts.push(node);
+    else if ('value' in node) parts.push(node.value);
+    else if ('tagName' in node && !HIDDEN.has(node.tagName)) {
+      if (node.tagName === 'br') parts.push('\n');
+      else {
+        if (BLOCKS.has(node.tagName)) {
+          if (parts.length && !parts[parts.length - 1]!.endsWith('\n')) parts.push('\n');
+          pending.push('\n');
+        }
+        for (let i = node.childNodes.length - 1; i >= 0; i--) pending.push(node.childNodes[i]!);
+      }
+    }
+  }
+  return parts
+    .join('')
+    .replaceAll('\u00a0', ' ')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
-}
-
-function removeScripts(input: string): string {
-  let texto = input;
-  let anterior: string;
-  do {
-    anterior = texto;
-    texto = texto.replace(/<(script|style)\b[\s\S]*?<\/\1\s*>/gi, '');
-  } while (texto !== anterior);
-  return texto;
 }
 
 interface CajaMinima {

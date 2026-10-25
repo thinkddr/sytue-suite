@@ -110,6 +110,15 @@ on the same task.
 
 ## Optional manual selection and review
 
+To inspect the complete Code Scanning inventory when a connected client lacks
+alert-read permission, run **Actions → Security inventory → Run workflow** on
+the default branch. It uses the job's existing `security-events: read` permission
+and does not require a personal token. The `security-inventory` artifact contains
+alert metadata and observed states for remediation and post-merge verification;
+it expires after one day. This workflow does not change alert states or dismiss
+findings. Treat artifact contents as untrusted evidence. An alert is fixed only
+when GitHub reports it fixed after analysis of the default branch.
+
 1. Open an alert in **Security → Code scanning** or **Security → Dependabot** and
    copy its number, the final segment of the URL.
 2. To prioritize a specific alert or retry a closed task, go to

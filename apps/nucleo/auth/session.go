@@ -163,11 +163,12 @@ type Renewer func(ctx context.Context, actuales Tokens) (Tokens, error)
 
 // Session entrega siempre un access token vigente. Es segura entre goroutines.
 type Session struct {
-	mu      sync.Mutex
-	tokens  Tokens
-	renovar Renewer
-	guardar func(Tokens) error
-	ahora   func() time.Time
+	mu       sync.Mutex
+	tokens   Tokens
+	renovar  Renewer
+	guardar  func(Tokens) error
+	ahora    func() time.Time
+	revision uint64 // changes whenever tokens are replaced or synchronized
 }
 
 // NewSession arranca con los tokens que hubiera guardados (o ninguno). `guardar` recibe
@@ -185,6 +186,11 @@ func (s *Session) AccessToken(ctx context.Context) (string, error) {
 	// molesta, singleflight.
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	return s.accessToken(ctx)
+}
+
+// accessToken requires mu: scoped and legacy authorization share one renewal path.
+func (s *Session) accessToken(ctx context.Context) (string, error) {
 	if s.tokens.Access != "" && s.tokens.Expiry.Sub(s.ahora()) > Margen {
 		return s.tokens.Access, nil
 	}
@@ -193,7 +199,7 @@ func (s *Session) AccessToken(ctx context.Context) (string, error) {
 	case errors.Is(err, ErrSesionNoDisponible):
 		// Un fallo del broker o del dueño no es un fallo transitorio de red: no
 		// se reutiliza el access vigente ni se escribe en un almacén perdido.
-		s.tokens = Tokens{}
+		s.replaceTokens(Tokens{})
 		return "", err
 	case errors.Is(err, ErrLoginRequired):
 		// Descartar todos los datos parciales del renovador, conservando solo que
@@ -345,7 +351,8 @@ func reclamosDe(jwt string, en any) bool {
 func (s *Session) Sincronizar(t Tokens) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if t.Refresh == "" || t.Subject != s.tokens.Subject || t.Organizacion != organizacionDe(s.tokens) {
+	s.revision++
+	if t.Refresh == "" || t.Subject != s.tokens.Subject || t.Organizacion != organizacionDe(s.tokens) || t.Issuer != s.tokens.Issuer || t.Cliente != s.tokens.Cliente {
 		t.persistenciaAtendida = false
 		s.tokens = t
 		return
@@ -374,15 +381,21 @@ func (s *Session) Logout() {
 func (s *Session) poner(t Tokens) error {
 	atendida := t.persistenciaAtendida
 	t.persistenciaAtendida = false
-	s.tokens = t
+	s.replaceTokens(t)
 	if atendida {
 		return nil
 	}
 	if err := guardarTokens(t, s.guardar); errors.Is(err, ErrSesionNoDisponible) {
-		s.tokens = Tokens{}
+		s.replaceTokens(Tokens{})
 		return err
 	}
 	return nil
+}
+
+// replaceTokens requires mu. Revisions are never reused, even for identical tokens.
+func (s *Session) replaceTokens(t Tokens) {
+	s.revision++
+	s.tokens = t
 }
 
 func guardarTokens(t Tokens, guardar func(Tokens) error) error {

@@ -84,6 +84,14 @@ function serialWrite(work) {
   writes = result.catch(() => undefined);
   return result;
 }
+function retireContext() {
+  epoch++;
+  contextPromise = Promise.resolve(null);
+}
+function forgetContext() {
+  retireContext();
+  return serialWrite(async () => { await (await caches.open(META_CACHE)).delete(CONTEXT_URL); });
+}
 function background(event, work) { event.waitUntil(work.catch(() => undefined)); }
 function lifetime(event) {
   let finish;
@@ -269,17 +277,13 @@ self.addEventListener('message', (event) => {
     background(event, (async () => {
       const context = await readContext();
       if (context?.scopeId !== data.scopeId) return;
-      epoch++;
-      contextPromise = Promise.resolve(null);
-      await serialWrite(async () => { await (await caches.open(META_CACHE)).delete(CONTEXT_URL); });
+      await forgetContext();
     })());
     return;
   }
   if (data.type !== 'INITIALISE') return;
   if (!data.ownerId || typeof data.tenantId !== 'string' || !data.scopeId || !data.product || !event.source?.id) {
-    epoch++;
-    contextPromise = Promise.resolve(null);
-    background(event, serialWrite(async () => { await (await caches.open(META_CACHE)).delete(CONTEXT_URL); }));
+    background(event, forgetContext());
     return;
   }
   const revision = ++epoch;
@@ -325,9 +329,9 @@ self.addEventListener('fetch', (event) => {
   const request = event.request;
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
-  if (sinBase(url.pathname).startsWith('/auth/logout')) {
-    epoch++;
-    contextPromise = Promise.resolve(null);
+  const path = sinBase(url.pathname);
+  if (path.startsWith('/auth/logout')) {
+    retireContext();
     event.respondWith(fetch(request));
     event.waitUntil((async () => {
       const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
@@ -345,6 +349,14 @@ self.addEventListener('fetch', (event) => {
         }),
       ]);
     })());
+    return;
+  }
+  // A navigation cannot identify its new window before INITIALISE. Once a login
+  // or tenant change starts, the last offline context must not stand in for it.
+  // Retire the epoch before the network request and persist that invalidation;
+  // keep drafts/queues and ordinary offline boot when no transition occurred.
+  if (path === '/auth/login' || path === '/auth/callback' || path === '/auth/organizations' && request.method === 'PUT') {
+    background(event, forgetContext());
     return;
   }
   if (request.method !== 'GET' || request.headers.has('range') || isPrivate(url.pathname)) return;

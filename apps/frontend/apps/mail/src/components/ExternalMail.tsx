@@ -56,6 +56,22 @@ function errorKey(
   return 'externalMail.error';
 }
 
+function newAccountForm() {
+  return {
+    name: '',
+    address: '',
+    host: '',
+    port: '993',
+    username: '',
+    password: '',
+    smtpHost: '',
+    smtpPort: '465',
+    smtpUser: '',
+    smtpPassword: '',
+    smtpSecurity: 'tls' as 'tls' | 'starttls',
+  };
+}
+
 export function ExternalMail({ onClose, t }: { onClose: () => void; t: T }): JSX.Element {
   const { t: commonT } = useI18n();
   const api = useMemo(externalMailClient, []);
@@ -72,19 +88,7 @@ export function ExternalMail({ onClose, t }: { onClose: () => void; t: T }): JSX
   const [selected, setSelected] = useState<ExternalMailAccount | null>(null);
   const [disconnecting, setDisconnecting] = useState<ExternalMailAccount | null>(null);
   const [footer, setFooter] = useState<HTMLDivElement | null>(null);
-  const [form, setForm] = useState({
-    name: '',
-    address: '',
-    host: '',
-    port: '993',
-    username: '',
-    password: '',
-    smtpHost: '',
-    smtpPort: '465',
-    smtpUser: '',
-    smtpPassword: '',
-    smtpSecurity: 'tls' as 'tls' | 'starttls',
-  });
+  const [form, setForm] = useState(newAccountForm);
   const formRef = useRef<HTMLFormElement | null>(null);
   const alive = useRef(true);
   const returned = useRef(
@@ -559,6 +563,9 @@ export function ExternalMail({ onClose, t }: { onClose: () => void; t: T }): JSX
           ) : (
             <Button
               onClick={() => {
+                setProvider('gmail');
+                setServices(['mail']);
+                setForm(newAccountForm());
                 setReconnectInstance('');
                 setConnecting(true);
                 setStep(0);

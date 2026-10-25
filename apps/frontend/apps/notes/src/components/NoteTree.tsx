@@ -21,10 +21,11 @@ import type { T } from '../i18n/index.js';
 import { construirArbol, type Nodo } from '../client/arbol.js';
 import { terminada } from '../client/diario.js';
 import { extracto } from '../client/extracto.js';
-export { extracto } from '../client/extracto.js';
 import type { ClaroPorNota } from './NoteCanvas.js';
 import { Glyph, type GlyphName } from './glyphs.js';
 import { RecordatorioEnFila } from './NoteCard.js';
+
+export { extracto } from '../client/extracto.js';
 
 interface Props {
   t: T;

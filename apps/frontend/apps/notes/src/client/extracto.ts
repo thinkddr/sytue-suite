@@ -1,39 +1,53 @@
-/*
- * SPDX-License-Identifier: Apache-2.0
- * SPDX-FileCopyrightText: (c) 2026 Daniel Delgado Ramos
- */
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Daniel Delgado Ramos
 import { parseFragment, type DefaultTreeAdapterMap } from 'parse5';
 
-const OMITIR = new Set(['script', 'style', 'template']);
-const BLOQUES = new Set([
+const HIDDEN = new Set(['script', 'style', 'template', 'noscript', 'iframe', 'object', 'embed']);
+const BLOCKS = new Set([
   'br',
+  'hr',
   'p',
   'div',
   'li',
+  'ul',
+  'ol',
+  'blockquote',
+  'pre',
   'h1',
   'h2',
   'h3',
   'h4',
   'h5',
   'h6',
-  'blockquote',
-  'pre',
+  'table',
+  'thead',
+  'tbody',
+  'tfoot',
   'tr',
+  'td',
+  'th',
 ]);
 
-function textoDeNodo(nodo: DefaultTreeAdapterMap['childNode']): string {
-  if ('value' in nodo) return nodo.value;
-  if (!('childNodes' in nodo) || OMITIR.has(nodo.tagName)) return '';
-  const texto = nodo.childNodes.map(textoDeNodo).join('');
-  return BLOQUES.has(nodo.tagName) ? `${texto} ` : texto;
-}
-
-/** Texto para Preact, nunca HTML: el parser también funciona sin DOM en SSR. */
+/** Plain-text preview, never HTML: parse without a browser DOM or resource loads. */
 export function extracto(html: string, max = 72): string {
-  const texto = parseFragment(html)
-    .childNodes.map(textoDeNodo)
-    .join('')
-    .replace(/\s+/g, ' ')
-    .trim();
-  return texto.length > max ? `${texto.slice(0, Math.max(0, max - 1))}…` : texto;
+  const pending: (DefaultTreeAdapterMap['childNode'] | string)[] = [
+    ...parseFragment(html).childNodes,
+  ].reverse();
+  const parts: string[] = [];
+  while (pending.length) {
+    const node = pending.pop()!;
+    if (typeof node === 'string') {
+      parts.push(node);
+    } else if ('value' in node) {
+      parts.push(node.value);
+    } else if ('tagName' in node && !HIDDEN.has(node.tagName)) {
+      if (BLOCKS.has(node.tagName)) {
+        parts.push(' ');
+        pending.push(' ');
+      }
+      for (let i = node.childNodes.length - 1; i >= 0; i--) pending.push(node.childNodes[i]!);
+    }
+  }
+  const text = parts.join('').replace(/\s+/g, ' ').trim();
+  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }

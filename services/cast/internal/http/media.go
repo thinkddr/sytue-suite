@@ -13,6 +13,7 @@ import (
 
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/platform/pkg/log"
+	"git.sytue.eu/sytue/one/platform/pkg/logsafe"
 	"git.sytue.eu/sytue/one/services/cast/internal/domain"
 	"git.sytue.eu/sytue/one/services/cast/internal/service"
 )
@@ -71,6 +72,6 @@ func (h *Handlers) Media(w http.ResponseWriter, r *http.Request) {
 	}
 	if _, err := io.Copy(w, f.Cuerpo); err != nil {
 		// Quien cierra el reproductor a medias corta la copia: no es un error del servicio.
-		log.From(r.Context()).Debug("cast/media: copia interrumpida", "video", id, "ruta", ruta, "error", err)
+		log.From(r.Context()).Debug("cast/media: copia interrumpida", "video", id, "ruta", logsafe.Text(ruta), "error", err)
 	}
 }

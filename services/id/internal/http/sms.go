@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"git.sytue.eu/sytue/one/platform/pkg/logsafe"
 	"io"
 	"log/slog"
 	"net/http"
@@ -46,7 +47,7 @@ func newSMS(cfg Config, logger *slog.Logger) SMS {
 type logSMS struct{ log *slog.Logger }
 
 func (m logSMS) Send(ctx context.Context, to, text string) error {
-	m.log.WarnContext(ctx, "SMS no configurado: mensaje SOLO en el log (dev)", "to", to, "text", text)
+	m.log.WarnContext(ctx, "SMS no configurado: mensaje SOLO en el log (dev)", "to", logsafe.Text(to), "text", text)
 	return nil
 }
 

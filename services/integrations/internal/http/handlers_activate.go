@@ -11,6 +11,7 @@ import (
 
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/platform/pkg/log"
+	"git.sytue.eu/sytue/one/platform/pkg/logsafe"
 	"git.sytue.eu/sytue/one/services/integrations/internal/domain"
 	"git.sytue.eu/sytue/one/services/integrations/internal/manifest"
 	"git.sytue.eu/sytue/one/services/integrations/internal/store"
@@ -49,7 +50,7 @@ func (h *Handlers) Activate(w http.ResponseWriter, r *http.Request) {
 	merged, _ := json.Marshal(cfg)
 	if _, err := h.store.UpdateInstance(ctx, id, inst.Name, merged, domain.StatusActive, inst.LevelEnabled); err != nil {
 		if rbErr := rollback(ctx); rbErr != nil {
-			log.From(ctx).Error("integrations: rollback de materialización falló (posible SP huérfano)", "instance", id, "error", rbErr)
+			log.From(ctx).Error("integrations: rollback de materialización falló (posible SP huérfano)", "instance", logsafe.Text(id), "error", rbErr)
 		}
 		httpx.Fail(w, r, toAPIError(err))
 		return
@@ -59,7 +60,7 @@ func (h *Handlers) Activate(w http.ResponseWriter, r *http.Request) {
 	// la activación (el SP/client ya está persistido); el admin puede reintentar el sync.
 	if out.EnqueueSCIM {
 		if err := h.store.EnqueueSync(ctx, id); err != nil {
-			log.From(ctx).Warn("integrations: no se pudo agendar el sync SCIM inicial", "instance", id, "error", err)
+			log.From(ctx).Warn("integrations: no se pudo agendar el sync SCIM inicial", "instance", logsafe.Text(id), "error", err)
 		}
 	}
 

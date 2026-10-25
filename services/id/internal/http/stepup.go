@@ -33,6 +33,7 @@ import (
 	"time"
 
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
+	"git.sytue.eu/sytue/one/platform/pkg/logsafe"
 )
 
 // frescuraStepUp es cuánto vale una identificación para las acciones
@@ -68,7 +69,7 @@ func (s *Server) requireStepUp(next http.Handler) http.Handler {
 		// factor» y «hace demasiado que se identificó» se arreglan de formas
 		// distintas. A quien llama se le contesta lo mismo en los dos casos.
 		s.log.WarnContext(r.Context(), "step-up: acción sensible sin reautenticación",
-			"user_id", c.Subject, "path", r.URL.Path, "amr", c.AMR,
+			"user_id", c.Subject, "path", logsafe.Text(r.URL.Path), "amr", c.AMR,
 			"mfa", hasMFA(c.AMR), "auth_time_fresca", fresca)
 		// RFC 9470: decir qué falta, para que el cliente pueda pedirlo.
 		w.Header().Set("WWW-Authenticate",

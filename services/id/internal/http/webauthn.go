@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
+	"git.sytue.eu/sytue/one/platform/pkg/logsafe"
 	"git.sytue.eu/sytue/one/services/id/internal/domain"
 	"git.sytue.eu/sytue/one/services/id/internal/webauthn"
 )
@@ -37,7 +38,7 @@ func (s *Server) webauthnUser(r *http.Request) (string, bool) {
 		return "", false
 	}
 	if o := r.Header.Get("Origin"); o == "" || !originAllowed(o, s.cfg.RPOrigins) {
-		slog.WarnContext(r.Context(), "passkeys: origen rechazado", "origin", o)
+		slog.WarnContext(r.Context(), "passkeys: origen rechazado", "origin", logsafe.Text(o))
 		return "", false
 	}
 	return sess.UserID, true

@@ -27,6 +27,7 @@ import (
 	"git.sytue.eu/sytue/one/platform/pkg/events"
 	"git.sytue.eu/sytue/one/platform/pkg/hubnotify"
 	"git.sytue.eu/sytue/one/platform/pkg/log"
+	"git.sytue.eu/sytue/one/platform/pkg/logsafe"
 	"git.sytue.eu/sytue/one/platform/pkg/objectstore"
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 	"git.sytue.eu/sytue/one/services/mail/internal/auth"
@@ -159,7 +160,7 @@ func (in *Inbound) Deliver(ctx context.Context, msg InboundMessage) error {
 	if in.enforceDMARC && dmarc.Disposition == "reject" && dmarc.Result == auth.ResultFail {
 		if in.rejectOnFail {
 			in.logger.Warn("inbound: rechazado por DMARC=reject",
-				"from", parsed.Envelope.FromAddr, "ip", msg.RemoteIP.String())
+				"from", logsafe.Text(parsed.Envelope.FromAddr), "ip", msg.RemoteIP.String())
 			return ErrRejectedPolicy
 		}
 	}

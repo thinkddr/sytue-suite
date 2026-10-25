@@ -13,6 +13,7 @@ import (
 
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/platform/pkg/log"
+	"git.sytue.eu/sytue/one/platform/pkg/logsafe"
 	"git.sytue.eu/sytue/one/services/cast/internal/directo"
 	"git.sytue.eu/sytue/one/services/cast/internal/domain"
 	"git.sytue.eu/sytue/one/services/cast/internal/service"
@@ -178,7 +179,7 @@ func (x *directoHTTP) webhook(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := x.d.Webhook(r.Context(), r.Header.Get("Authorization"), cuerpo); err != nil {
 		if errors.Is(err, directo.ErrWebhookInvalido) {
-			log.From(r.Context()).Warn("cast: webhook de LiveKit rechazado", "error", err)
+			log.From(r.Context()).Warn("cast: webhook de LiveKit rechazado", "error", logsafe.Text(err))
 			httpx.Fail(w, r, httpx.ErrUnauthorized.WithMessage("Unauthenticated webhook.").Wrap(err))
 			return
 		}

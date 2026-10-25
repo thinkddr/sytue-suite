@@ -20,6 +20,7 @@ import (
 	"github.com/google/uuid"
 
 	"git.sytue.eu/sytue/one/platform/pkg/log"
+	"git.sytue.eu/sytue/one/platform/pkg/logsafe"
 	"git.sytue.eu/sytue/one/services/cloud/internal/domain"
 	"git.sytue.eu/sytue/one/services/cloud/internal/store"
 )
@@ -391,6 +392,6 @@ func (s *Service) sendAlertConfirmEmail(ctx context.Context, to, event, rawToken
 		"  " + link + "\n\n" +
 		"Si no has solicitado estas alertas, ignora este mensaje: no se enviará ningún aviso mientras no confirmes el enlace."
 	if err := sendAlertMail(ctx, s.cfg, to, subject, body); err != nil {
-		log.From(ctx).Warn("enviar correo de confirmación de alerta falló", "to", to, "error", err)
+		log.From(ctx).Warn("enviar correo de confirmación de alerta falló", "to", logsafe.Text(to), "error", err)
 	}
 }

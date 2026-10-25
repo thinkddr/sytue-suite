@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
+	"git.sytue.eu/sytue/one/platform/pkg/logsafe"
 	"git.sytue.eu/sytue/one/platform/pkg/ssrfhttp"
 	"git.sytue.eu/sytue/one/services/integrations/internal/connector"
 	"git.sytue.eu/sytue/one/services/integrations/internal/domain"
@@ -315,7 +316,7 @@ func (t *transport) record(req *http.Request, resp *http.Response, callErr error
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(req.Context()), 5*time.Second)
 	defer cancel()
 	if err := t.audit.RecordEgress(ctx, rec); err != nil {
-		t.log.Warn("policy: no se pudo auditar el egress", "error", err, "host", rec.Host)
+		t.log.Warn("policy: no se pudo auditar el egress", "error", err, "host", logsafe.Text(rec.Host))
 	}
 }
 

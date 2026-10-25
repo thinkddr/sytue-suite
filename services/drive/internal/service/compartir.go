@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"git.sytue.eu/sytue/one/platform/pkg/log"
+	"git.sytue.eu/sytue/one/platform/pkg/logsafe"
 	"git.sytue.eu/sytue/one/platform/pkg/objectstore"
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 	"git.sytue.eu/sytue/one/services/drive/internal/store"
@@ -77,14 +78,14 @@ func (s *Service) compartirBlob(ctx context.Context, t tenancy.Tenant, propia, h
 	}
 	if !existe {
 		if err := s.blobs.Copiar(ctx, t, propia, destino); err != nil {
-			log.From(ctx).Warn("drive: compartir blob", "key", destino, "error", err)
+			log.From(ctx).Warn("drive: compartir blob", "key", destino, "error", logsafe.Text(err))
 			return propia
 		}
 	}
 	if err := s.blobs.Delete(ctx, t, propia); err != nil {
 		// El objeto propio sobra; si no se pudo borrar lo hará un barrido. No es
 		// motivo para renunciar a la clave compartida.
-		log.From(ctx).Warn("drive: borrar subida propia tras compartir", "key", propia, "error", err)
+		log.From(ctx).Warn("drive: borrar subida propia tras compartir", "key", logsafe.Text(propia), "error", logsafe.Text(err))
 	}
 	return destino
 }
@@ -120,7 +121,7 @@ func (s *Service) hashDe(ctx context.Context, t tenancy.Tenant, key string, tope
 func (s *Service) soltarBlob(ctx context.Context, t tenancy.Tenant, key string) {
 	if !esCompartida(key) {
 		if err := s.blobs.Delete(ctx, t, key); err != nil {
-			log.From(ctx).Warn("drive: borrar blob", "key", key, "error", err)
+			log.From(ctx).Warn("drive: borrar blob", "key", logsafe.Text(key), "error", logsafe.Text(err))
 		}
 		return
 	}
@@ -128,7 +129,7 @@ func (s *Service) soltarBlob(ctx context.Context, t tenancy.Tenant, key string) 
 		return
 	}
 	if err := s.team.AnotarBlobCandidato(ctx, key); err != nil {
-		log.From(ctx).Warn("drive: anotar candidato", "key", key, "error", err)
+		log.From(ctx).Warn("drive: anotar candidato", "key", logsafe.Text(key), "error", err)
 	}
 }
 

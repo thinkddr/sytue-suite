@@ -10,6 +10,7 @@ import (
 
 	"git.sytue.eu/sytue/one/platform/pkg/commerce"
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
+	"git.sytue.eu/sytue/one/platform/pkg/logsafe"
 	"git.sytue.eu/sytue/one/services/id/internal/domain"
 )
 
@@ -214,7 +215,7 @@ func (s *Server) handleMollieWebhook(w http.ResponseWriter, r *http.Request) {
 	id := r.Form.Get("id")
 	payment, err := s.billing.GetPayment(r.Context(), id)
 	if err != nil || payment.ID != id {
-		s.log.Warn("webhook de pago no verificable", "payment_id", id, "error", err)
+		s.log.Warn("webhook de pago no verificable", "payment_id", logsafe.Text(id), "error", err)
 		httpx.Fail(w, r, httpx.ErrBadRequest.WithMessage("The payment could not be verified."))
 		return
 	}
@@ -235,7 +236,7 @@ func (s *Server) handleMollieWebhook(w http.ResponseWriter, r *http.Request) {
 	if err != nil || payment.CustomerID != sub.ProviderCustomerID || payment.Currency != domain.SuiteCurrency ||
 		sub.Plan.PriceCents() == 0 ||
 		payment.AmountCents != expectedAmount || expectedAmount != sub.Seats*sub.Plan.UnitPriceCents(sub.Education) {
-		s.log.Warn("pago no coincide con el contrato local", "payment_id", id, "error", err)
+		s.log.Warn("pago no coincide con el contrato local", "payment_id", logsafe.Text(id), "error", err)
 		httpx.Fail(w, r, httpx.ErrBadRequest.WithMessage("Unrecognised payment."))
 		return
 	}
@@ -252,7 +253,7 @@ func (s *Server) handleMollieWebhook(w http.ResponseWriter, r *http.Request) {
 				sub.OrgID, payment.ID, sub.Seats, expectedAmount, payment.PaidAt, s.cfg.MollieWebhookURL)
 			if err != nil {
 				s.log.Error("pago cobrado pero suscripción recurrente no creada",
-					"payment_id", id, "org_id", sub.OrgID, "error", err)
+					"payment_id", logsafe.Text(id), "org_id", sub.OrgID, "error", err)
 				http.Error(w, "retry", http.StatusServiceUnavailable)
 				return
 			}

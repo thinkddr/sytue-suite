@@ -15,6 +15,7 @@ import (
 
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/platform/pkg/log"
+	"git.sytue.eu/sytue/one/platform/pkg/logsafe"
 	"git.sytue.eu/sytue/one/services/hub/internal/instaladores"
 )
 
@@ -87,7 +88,7 @@ func (h *Handlers) BajarInstalador(w http.ResponseWriter, r *http.Request) {
 	_ = http.NewResponseController(w).SetWriteDeadline(time.Time{})
 	if _, err := io.Copy(w, cuerpo); err != nil {
 		// Las cabeceras ya salieron: la app lo nota al comprobar la suma.
-		log.From(r.Context()).Info("instaladores: la descarga no terminó", "fichero", inst.Fichero, "error", err)
+		log.From(r.Context()).Info("instaladores: la descarga no terminó", "fichero", logsafe.Text(inst.Fichero), "error", err)
 	}
 }
 

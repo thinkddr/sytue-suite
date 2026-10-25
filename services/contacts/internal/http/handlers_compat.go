@@ -14,6 +14,7 @@ import (
 
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/platform/pkg/log"
+	"git.sytue.eu/sytue/one/platform/pkg/logsafe"
 	"git.sytue.eu/sytue/one/services/contacts/internal/compat"
 	"git.sytue.eu/sytue/one/services/contacts/internal/config"
 	"git.sytue.eu/sytue/one/services/contacts/internal/domain"
@@ -119,7 +120,7 @@ func compatError(r *http.Request, err error) *httpx.Error {
 		e = httpx.AsError(toAPIError(err))
 	}
 	if e.Status >= http.StatusInternalServerError {
-		log.From(r.Context()).Error("compat: error de servidor", "code", e.Code, "error", e.Error())
+		log.From(r.Context()).Error("compat: error de servidor", "code", logsafe.Text(e.Code), "error", logsafe.Text(e.Error()))
 	}
 	return e
 }

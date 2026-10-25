@@ -37,3 +37,27 @@ func TestStructuredLogRetainsFieldsAndOneRecord(t *testing.T) {
 		t.Fatalf("unexpected fields: %#v", record)
 	}
 }
+
+func TestArgsEscapesTextWithoutFlatteningNumericFields(t *testing.T) {
+	type namedString string
+	in := []any{"name", namedString("request\r\nforged"), "count", int64(42), "enabled", true, "error", errors.New("bad\ninput")}
+	out := Args(in)
+	if out[1] != `request\r\nforged` || out[3] != int64(42) || out[5] != true || out[7] != `bad\ninput` {
+		t.Fatalf("unexpected args: %#v", out)
+	}
+	if in[1] != namedString("request\r\nforged") {
+		t.Fatal("caller args were modified")
+	}
+	var buffer bytes.Buffer
+	slog.New(slog.NewJSONHandler(&buffer, nil)).Info("audit", out...)
+	if strings.Count(buffer.String(), "\n") != 1 {
+		t.Fatal("audit input injected a record")
+	}
+	var record map[string]any
+	if err := json.Unmarshal(buffer.Bytes(), &record); err != nil {
+		t.Fatal(err)
+	}
+	if record["count"] != float64(42) || record["enabled"] != true {
+		t.Fatal("structured field types changed")
+	}
+}

@@ -4,6 +4,11 @@ name: Security inventory
 
 on:
   workflow_dispatch:
+    inputs:
+      analysis_ref:
+        description: Optional branch or PR merge ref for Go trace diagnostics
+        type: string
+        required: false
 
 permissions:
   contents: read
@@ -31,6 +36,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           TRACES_PATH: ${{ runner.temp }}/security-inventory/go-traces.json
+          ANALYSIS_REF: ${{ inputs.analysis_ref }}
         run: node .github/scripts/security-traces.mjs
       - name: Retain metadata for remediation and closure verification
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

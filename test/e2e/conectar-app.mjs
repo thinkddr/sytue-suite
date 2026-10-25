@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: Apache-2.0
 // Remote CI: actual Console wizard, synthetic Gateway and provider consent.
+import { createReportDirectory, writeReport } from './lib/report-output.mjs';
 import { chromium } from 'playwright';
 import { expect as baseExpect } from '@playwright/test';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync } from 'node:fs';
 import { assertWizardAccessibility as accessible } from './lib/wizard-checks.mjs';
 
 const expect = baseExpect.configure({ timeout: 15000 });
 
 const BASE = process.env.CONSOLE_URL || 'http://127.0.0.1:4343/admin/prueba/dev/conectar-app';
-const OUT = process.env.CONSOLE_OUT || '/tmp/conectar-app';
+const OUT = createReportDirectory('conectar-app', process.env.CONSOLE_OUT);
 const CONSENT = 'https://slack.com/sytue-test-consent';
-mkdirSync(OUT, { recursive: true });
 const browser = await chromium.launch();
 const results = [];
 
@@ -145,6 +145,6 @@ try {
   }, { width: 390, height: 700 });
 } finally {
   await browser.close();
-  writeFileSync(`${OUT}/report.json`, `${JSON.stringify(results, null, 2)}\n`);
+  writeReport(`${OUT}/report.json`, `${JSON.stringify(results, null, 2)}\n`);
 }
 if (results.some((result) => !result.ok)) process.exitCode = 1;

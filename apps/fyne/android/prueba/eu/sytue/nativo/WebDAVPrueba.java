@@ -95,7 +95,7 @@ public final class WebDAVPrueba {
             comprobar(visto.get(0).startsWith("POST>PROPFIND /dav/Facturas auth=Basic abc depth=1"), visto.get(0));
             comprobar(!d.existe("/nada"), "existe /nada");
 
-            File tmp = File.createTempFile("webdav", ".txt");
+            File tmp = Files.createTempFile("webdav", ".txt").toFile();
             tmp.deleteOnExit();
             d.bajar("/Facturas/enero y más.pdf", tmp);
             comprobar(new String(Files.readAllBytes(tmp.toPath()), StandardCharsets.UTF_8).equals("hola"), "bajar");

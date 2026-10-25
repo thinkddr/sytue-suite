@@ -2,7 +2,8 @@
 
 import { Buffer } from "node:buffer";
 import { createHash } from "node:crypto";
-import { readFile, realpath, stat } from "node:fs/promises";
+import { open, realpath, stat } from "node:fs/promises";
+import { constants } from "node:fs";
 import { dirname, extname, isAbsolute, relative, resolve } from "node:path";
 import type { BitmapResource } from "./ir.ts";
 
@@ -183,18 +184,34 @@ export async function loadBitmap(
     if (!canonical) throw new Error(`Recurso bitmap ausente: ${src}`);
     if (!contained(await realpath(directory), canonical))
       throw new Error("img src enlaza fuera del directorio public.");
+    path = canonical;
   } else {
     path = resolve(dirname(source), src);
     const canonical = await realpath(path).catch(() => undefined);
     if (!canonical) throw new Error(`Recurso bitmap ausente: ${src}`);
+    path = canonical;
   }
-  const info = await stat(path);
-  if (!info.isFile())
-    throw new Error(`El recurso bitmap no es un archivo: ${src}`);
-  if (info.size > maxBytes) throw new Error("El recurso bitmap supera 20 MiB.");
-  const bytes = await readFile(path);
-  if (bytes.length > maxBytes)
-    throw new Error("El recurso bitmap supera 20 MiB.");
+  // Inspect and read the same open file, not a path which can be swapped after stat.
+  const file = await open(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+  let bytes: Buffer;
+  try {
+    const info = await file.stat();
+    if (!info.isFile()) throw new Error(`El recurso bitmap no es un archivo: ${src}`);
+    if (info.size > maxBytes) throw new Error("El recurso bitmap supera 20 MiB.");
+    const chunks: Buffer[] = [];
+    let total = 0;
+    for (;;) {
+      const chunk = Buffer.alloc(Math.min(64 * 1024, maxBytes + 1 - total));
+      const { bytesRead } = await file.read(chunk);
+      if (!bytesRead) break;
+      total += bytesRead;
+      if (total > maxBytes) throw new Error("El recurso bitmap supera 20 MiB.");
+      chunks.push(chunk.subarray(0, bytesRead));
+    }
+    bytes = Buffer.concat(chunks, total);
+  } finally {
+    await file.close();
+  }
   const name = relative(root, path).replaceAll("\\", "/");
   const digest = hash(bytes);
   return {

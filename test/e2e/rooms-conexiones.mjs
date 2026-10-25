@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // Remote CI: real Rooms modal, synthetic Gateway responses and provider consent.
+import { createReportDirectory, writeReport } from './lib/report-output.mjs';
 import { chromium } from 'playwright';
 import { expect as baseExpect } from '@playwright/test';
 import {
@@ -8,13 +9,12 @@ import {
   describeWizardState,
   openWizardFixture,
 } from './lib/wizard-checks.mjs';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync } from 'node:fs';
 
 const expect = baseExpect.configure({ timeout: 15000 });
 
 const BASE = process.env.ROOMS_URL || 'http://127.0.0.1:4343/rooms/prueba/dev/conexiones';
-const OUT = process.env.ROOMS_OUT || '/tmp/rooms-conexiones';
-mkdirSync(OUT, { recursive: true });
+const OUT = createReportDirectory('rooms-conexiones', process.env.ROOMS_OUT);
 const browser = await chromium.launch();
 const results = [];
 const PROVIDERS = {
@@ -473,7 +473,7 @@ try {
     );
   }
 } finally {
-  writeFileSync(`${OUT}/results.json`, JSON.stringify(results, null, 2));
+  writeReport(`${OUT}/results.json`, JSON.stringify(results, null, 2));
   await browser.close();
 }
 if (results.some((result) => !result.ok)) process.exitCode = 1;

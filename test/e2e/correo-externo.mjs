@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 // Real Mail wizard and reader. Every account, provider and message is synthetic.
+import { createReportDirectory, writeReport } from './lib/report-output.mjs';
 import { chromium } from "playwright";
 import { expect as baseExpect } from "@playwright/test";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync } from "node:fs";
 import {
   assertWizardLayout,
   assertWizardAccessibility,
@@ -14,8 +15,7 @@ const expect = baseExpect.configure({ timeout: 15000 });
 const BASE =
   process.env.MAIL_EXTERNAL_URL ||
   "http://127.0.0.1:4343/mail/prueba/dev/correo-externo";
-const OUT = process.env.MAIL_EXTERNAL_OUT || "/tmp/correo-externo";
-mkdirSync(OUT, { recursive: true });
+const OUT = createReportDirectory('correo-externo', process.env.MAIL_EXTERNAL_OUT);
 const browser = await chromium.launch();
 const report = [];
 const account = {
@@ -326,7 +326,7 @@ try {
   await oauthPage
     .getByRole("button", { name: "Continue to provider", exact: true })
     .click();
-  await expect(oauthPage).toHaveURL(/https:\/\/accounts\.google\.com\//);
+  await expect(oauthPage).toHaveURL(/^https:\/\/accounts\.google\.com\//);
   expect(consentRequests).toBe(1);
   await openWizardFixture(
     oauthPage,
@@ -345,9 +345,9 @@ try {
     consentRequests,
   });
   await oauthContext.close();
-  writeFileSync(`${OUT}/report.json`, JSON.stringify(report, null, 2));
+  writeReport(`${OUT}/report.json`, JSON.stringify(report, null, 2));
 } catch (error) {
-  writeFileSync(`${OUT}/failure.txt`, String(error));
+  writeReport(`${OUT}/failure.txt`, String(error));
   throw error;
 } finally {
   await browser.close();

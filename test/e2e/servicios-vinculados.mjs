@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 // The production shared panel; all provider responses and accounts are artificial.
+import { createReportDirectory, writeReport } from './lib/report-output.mjs';
 import {chromium} from 'playwright';
 import {expect as baseExpect} from '@playwright/test';
-import {mkdirSync,writeFileSync} from 'node:fs';
+import {mkdirSync} from 'node:fs';
 import {assertWizardAccessibility,assertWizardLayout,openWizardFixture} from './lib/wizard-checks.mjs';
 const expect=baseExpect.configure({timeout:15000});
 const BASE=process.env.LINKED_URL??'http://127.0.0.1:4343/calendar/prueba/dev/servicios-vinculados';
-const OUT=process.env.LINKED_OUT??'/tmp/servicios-vinculados';
-mkdirSync(OUT,{recursive:true});
+const OUT=createReportDirectory('servicios-vinculados', process.env.LINKED_OUT);
 const browser=await chromium.launch();const report=[];
 const id='11111111-1111-4111-8111-111111111111';
 const account={instance_id:id,provider:'microsoft',address:'fixture@example.eu',name:'Fixture',connected:true,services:['mail','calendar','contacts','notes'],capabilities:{read:true,send:true}};
@@ -79,5 +79,5 @@ try{
   const unavailable=await fixture(viewport,'notes','unavailable');await unavailable.dialog.getByRole('button',{name:'Sign in',exact:true}).first().click();await unavailable.dialog.getByText('Microsoft Outlook',{exact:true}).click();await expect(unavailable.dialog.getByText('Connection to this provider is not available for your account.',{exact:true})).toBeVisible();await expect(unavailable.dialog.getByRole('button',{name:'Sign in',exact:true}).last()).toBeDisabled();await unavailable.context.close();
   report.push({viewport:viewport.width,emptyOAuth:true,deniedExactRetry:true,unavailableDisabled:true});
  }
- writeFileSync(`${OUT}/report.json`,JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));
+ writeReport(`${OUT}/report.json`,JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));
 }finally{await browser.close();}

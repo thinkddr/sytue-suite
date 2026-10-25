@@ -2,14 +2,14 @@
 // perfil de dispositivo, y señala el elemento que lo provoca.
 //
 // Uso: bun run mobile-audit.mjs [app...]   (sin args = todas las que respondan)
-// Salida: /tmp/mobile-audit.json + capturas en /tmp/mobile/.
+// Salida: informe.json y capturas en un directorio privado indicado en consola.
 //
 // SUPERFICIE=escritorio mide las mismas apps en VENTANAS de escritorio en vez de
 // en teléfonos. Es el
 // mismo barrido con otra tabla de perfiles —ver PERFILES_ESCRITORIO—: la sesión,
 // las rutas, las pestañas y los desplegables son idénticos, así que un guion
 // aparte serían novecientas líneas duplicadas para diverger. Sale en
-// /tmp/escritorio-audit.json + /tmp/escritorio/.
+// Cada ejecución de escritorio también usa su propio directorio privado.
 //
 // POR DEFECTO VA CONTRA PRODUCCIÓN (sytue.eu): levantar la suite entera en local
 // para auditarla ahoga la máquina, y prod es además lo que de verdad ve un
@@ -20,10 +20,11 @@
 // donde el admin de dev es público y está en el repo de todos modos.
 //
 // ponytail: script de verificación, no forma parte de la suite de specs.
+import { createReportDirectory, writeReport } from './lib/report-output.mjs';
 import { chromium, devices } from 'playwright';
 import { appsDesplegadas, desplegada } from './apps-desplegadas.mjs';
 import { fileURLToPath } from 'node:url';
-import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync } from 'node:fs';
 import { codigoTOTP, esCuentaDelIdPDesdeAdmin, porQueNoEntra } from './tests/helpers.ts';
 import {
   DETECTOR,
@@ -1030,8 +1031,8 @@ if (sinCubrir.length)
 // Salidas SEPARADAS por superficie: los dos barridos corren en el mismo runner
 // y con un solo destino el segundo borraría las capturas y el informe del
 // primero — y el informe borrado es siempre el que hacía falta leer.
-const SALIDA = ESCRITORIO ? '/tmp/escritorio' : '/tmp/mobile';
-const INFORME = ESCRITORIO ? '/tmp/escritorio-audit.json' : '/tmp/mobile-audit.json';
+const SALIDA = createReportDirectory(ESCRITORIO ? 'escritorio' : 'mobile');
+const INFORME = `${SALIDA}/informe.json`;
 mkdirSync(SALIDA, { recursive: true });
 const browser = await chromium.launch();
 const informe = [];
@@ -1341,7 +1342,7 @@ for (const [nombre, perfil, opts] of ELEGIDOS) {
   await ctx.close();
 }
 await browser.close();
-writeFileSync(INFORME, JSON.stringify(informe, null, 2));
+writeReport(INFORME, JSON.stringify(informe, null, 2));
 const graves = informe.filter((r) => r.grave);
 const caidas = informe.filter((r) => r.fallo);
 const saltadas = informe.filter((r) => r.salto && !r.opcional);

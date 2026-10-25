@@ -86,7 +86,7 @@ def insertar(productos, host, destino, identidad, app, generador):
         shutil.copytree(origen, destino_bundle, symlinks=True)
     perfil_destino = widget / ("embedded.mobileprovision" if plataforma == "ios" else "Contents/embedded.provisionprofile")
     shutil.copyfile(perfil, perfil_destino)
-    os.chmod(perfil_destino, 0o644)
+    os.chmod(perfil_destino, 0o600)
     bibliotecas = ["xcrun", "swift-stdlib-tool", "--copy", "--platform", "iphoneos" if plataforma == "ios" else "macosx",
                    "--scan-executable", ejecutable, "--scan-folder", extensiones,
                    "--scan-folder", frameworks, "--destination", frameworks, "--sign", identidad]

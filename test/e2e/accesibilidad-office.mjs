@@ -15,7 +15,7 @@
 //   cd test/e2e && ACC_URL=http://127.0.0.1:4338/docus/prueba bun run accesibilidad-office.mjs
 //   (o `bash correr-accesibilidad.sh`, que levanta el servidor y lanza este y cinta.mjs)
 // Salida: informe en consola, `informe.json` y capturas de lo que falle en ACC_OUT (por
-// defecto /tmp/accesibilidad). Código de salida 1 si algo grave falla.
+// defecto, un directorio temporal privado). Código de salida 1 si algo grave falla.
 //
 // Qué comprueba, por producto, ancho (1280, 390, 320) y esquema (claro, oscuro):
 //   1. axe-core (WCAG 2.0/2.1/2.2 A y AA) sobre la página y con cada pestaña de la cinta
@@ -32,17 +32,17 @@
 //
 // ponytail: script de verificación, no forma parte de la suite de specs de @playwright/test
 // (esa pide la pila dev entera con sesión). Un fallo es un fallo de la página, no del script.
+import { createReportDirectory, writeReport } from './lib/report-output.mjs';
 import { chromium } from 'playwright';
 import AxeBuilder from '@axe-core/playwright';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync } from 'node:fs';
 import { es } from '../../apps/frontend/packages/office/src/i18n/messages/es.ts';
 import { pruebasDeInicio } from './inicio-office-scroll.mjs';
 
 const BASE = process.env.ACC_URL || 'http://127.0.0.1:4338/docus/prueba';
-const OUT = process.env.ACC_OUT || '/tmp/accesibilidad';
+const OUT = createReportDirectory('accesibilidad', process.env.ACC_OUT);
 const SOLO = (process.env.ACC_SOLO || '').split(',').filter(Boolean);
 const IDIOMA = process.env.ACC_LANG || 'es';
-mkdirSync(OUT, { recursive: true });
 
 const PRODUCTOS = [
   { id: 'docus', kind: 'document', ruta: '/dev/editor?kind=document' },
@@ -707,7 +707,7 @@ await pruebasDeInicio(navegador, { BASE, OUT, SOLO, IDIOMA, falla, ok });
 await navegador.close();
 
 const listaMenores = [...menores.entries()].map(([k, v]) => ({ regla: k, impacto: v.impacto, nodos: v.n, ayuda: v.ayuda, donde: v.donde }));
-writeFileSync(`${OUT}/informe.json`, JSON.stringify({ resumen, fallos, menores: listaMenores }, null, 2));
+writeReport(`${OUT}/informe.json`, JSON.stringify({ resumen, fallos, menores: listaMenores }, null, 2));
 console.log('\n--- Menores (moderate/minor), no bloquean ---');
 for (const m of listaMenores) console.log(` · ${m.regla} [${m.impacto}] ×${m.nodos}: ${m.ayuda} → ${m.donde}`);
 console.log(`\n${fallos.length === 0 ? 'TODO EN VERDE' : `${fallos.length} FALLOS ${JSON.stringify(resumen)}`}`);

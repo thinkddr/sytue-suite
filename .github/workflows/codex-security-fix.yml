@@ -57,6 +57,7 @@ jobs:
       finding_type: ${{ steps.queue.outputs.finding_type }}
       alert_number: ${{ steps.queue.outputs.alert_number }}
       existing_pr_number: ${{ steps.queue.outputs.existing_pr_number }}
+      dependabot_credential: ${{ steps.alert_auth.outputs.credential }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -66,10 +67,16 @@ jobs:
       - name: Check connector configuration
         env:
           PR_TOKEN_CONFIGURED: ${{ secrets.CODEX_PR_TOKEN != '' }}
-          ALERT_TOKEN_CONFIGURED: ${{ secrets.SECURITY_ALERTS_TOKEN != '' }}
         run: |
           test "$PR_TOKEN_CONFIGURED" = true || { echo 'Configure CODEX_PR_TOKEN (Contents y Pull requests: write).' >&2; exit 1; }
-          test "$ALERT_TOKEN_CONFIGURED" = true || { echo 'Configure SECURITY_ALERTS_TOKEN (Dependabot alerts: read).' >&2; exit 1; }
+
+      - name: Verify Dependabot read permission before selecting work
+        id: alert_auth
+        if: inputs.finding_type != 'code-scanning'
+        env:
+          ALERT_PRIMARY_TOKEN: ${{ secrets.SECURITY_ALERTS_TOKEN }}
+          ALERT_CONNECTOR_TOKEN: ${{ secrets.CODEX_PR_TOKEN }}
+        run: node .github/scripts/security-auth.mjs
 
       - name: Select one unassigned open finding
         id: queue
@@ -78,7 +85,7 @@ jobs:
           ALERT_NUMBER: ${{ inputs.alert_number }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           CODE_SCANNING_TOKEN: ${{ github.token }}
-          SECURITY_ALERTS_TOKEN: ${{ secrets.SECURITY_ALERTS_TOKEN }}
+          SECURITY_ALERTS_TOKEN: ${{ steps.alert_auth.outputs.credential == 'connector' && secrets.CODEX_PR_TOKEN || secrets.SECURITY_ALERTS_TOKEN }}
           GH_TOKEN: ${{ github.token }}
         run: node .github/scripts/security-queue.mjs
 
@@ -131,7 +138,7 @@ jobs:
           FINDING_TYPE: ${{ needs.select.outputs.finding_type }}
           ALERT_NUMBER: ${{ needs.select.outputs.alert_number }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
-          SECURITY_ALERTS_TOKEN: ${{ needs.select.outputs.finding_type == 'dependabot' && secrets.SECURITY_ALERTS_TOKEN || github.token }}
+          SECURITY_ALERTS_TOKEN: ${{ needs.select.outputs.finding_type == 'dependabot' && (needs.select.outputs.dependabot_credential == 'connector' && secrets.CODEX_PR_TOKEN || secrets.SECURITY_ALERTS_TOKEN) || github.token }}
           ALERT_CONTEXT_PATH: ${{ runner.temp }}/alert-context/alert.json
         run: |
           mkdir -p "$RUNNER_TEMP/alert-context"

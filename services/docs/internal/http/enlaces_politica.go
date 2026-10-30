@@ -5,7 +5,6 @@ package http
 
 import (
 	"context"
-	"git.sytue.eu/sytue/one/platform/pkg/logsafe"
 	"log/slog"
 	"net/http"
 

@@ -520,8 +520,11 @@ func TestRecorridoConSesion(t *testing.T) {
 		default:
 			a.Ir(r)
 		}
-		montaje.ComprobarRotacion(t, w, fmt.Sprintf("cast/ruta-%d", r), iconos.Cast, r == RutaVer,
-			func() { prepararPosters(w, a) })
+		var prep []func()
+		if r == RutaVer {
+			prep = []func(){func() { prepararPosters(w, a) }}
+		}
+		montaje.ComprobarRotacion(t, w, fmt.Sprintf("cast/ruta-%d", r), iconos.Cast, r == RutaVer, prep...)
 		// Sin el carril: si no, lo primero que se pulsa es la navegación y todas las
 		// rutas acaban recorriendo lo mismo. La página entera a la vista. Para Play no:
 		// sin el armazón la app no se entera de que la ventana es de teléfono

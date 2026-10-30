@@ -462,6 +462,7 @@ func appDePrueba(t *testing.T, s *servicioFalso, sesion bool) (*App, fyne.Window
 	a := Nueva(api.NewCast(srv.URL, nil, nil), v, w)
 	teca.Pedir = a.PedirPoster
 	a.lanzar = func(f func()) { f() }
+	a.sinSondeo = true
 	a.ConSesion = func() bool { return sesion }
 	a.WebDe = func(ruta string) string { return "https://cast.sytue.eu/cast" + ruta }
 	// El reproductor de verdad tiene sus propias rutinas: aquí no se abre (lo prueba

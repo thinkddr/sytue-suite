@@ -4,6 +4,7 @@
 package cast
 
 import (
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -232,6 +233,39 @@ func TestRelojCanceladoDescartaElPulsoEnCola(t *testing.T) {
 	pulso()
 	if a.visor.tiempo.Text != "sin actualizar" {
 		t.Fatal("un pulso pendiente actualizó la vista después de cancelarse")
+	}
+}
+
+func TestSondeoCanceladoNoBloqueaNiActualizaDespues(t *testing.T) {
+	a := &App{}
+	cola := make(chan func(), 1)
+	a.enLaInterfaz = func(f func()) { cola <- f }
+	llamadas := 0
+	a.sondear(10*time.Millisecond, func() bool { return true }, func() { llamadas++ })
+	var pulso func()
+	select {
+	case pulso = <-cola:
+	case <-time.After(3 * time.Second):
+		a.Cerrar()
+		t.Fatal("el sondeo no envió el pulso a la interfaz")
+	}
+	a.Cerrar()
+	salio := false
+	for limite := time.Now().Add(500 * time.Millisecond); time.Now().Before(limite); time.Sleep(5 * time.Millisecond) {
+		buf := make([]byte, 1<<18)
+		n := runtime.Stack(buf, true)
+		if !strings.Contains(string(buf[:n]), ".(*App).sondear") {
+			salio = true
+			break
+		}
+	}
+	if !salio {
+		pulso()
+		t.Fatal("Cerrar dejó la rutina de sondear bloqueada esperando a la interfaz")
+	}
+	pulso()
+	if llamadas != 0 {
+		t.Fatalf("un pulso pendiente ejecutó el sondeo después de Cerrar (%d veces)", llamadas)
 	}
 }
 

@@ -5,7 +5,7 @@ que respalda a `@sytue/shell`). Reúne cuatro capacidades transversales sobre lo
 servicios de producto, **sin** datos propios de negocio: **búsqueda federada**,
 **notificaciones unificadas**, **presencia** e **intents cross-app**.
 
-Código propietario © Sytue; dependencias de terceros solo permisivas
+Código Apache-2.0 © 2026 Daniel Delgado Ramos (thinkddr); dependencias de terceros solo permisivas
 (MIT/BSD/Apache). Clean-room sobre estándares abiertos (REST, **SSE** —
 WHATWG EventSource, **LISTEN/NOTIFY** de PostgreSQL). Sin motores AGPL; sin
 Redis/Valkey.

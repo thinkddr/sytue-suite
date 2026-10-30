@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"git.sytue.eu/sytue/one/platform/pkg/logsafe"
 	"github.com/google/uuid"
 
 	"git.sytue.eu/sytue/one/platform/pkg/logsafe"

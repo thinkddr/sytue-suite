@@ -9,6 +9,7 @@ import (
 	"unicode/utf8"
 
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
+	"git.sytue.eu/sytue/one/platform/pkg/logsafe"
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 	"git.sytue.eu/sytue/one/services/id/internal/domain"
 	"git.sytue.eu/sytue/one/services/id/internal/store"
@@ -91,7 +92,7 @@ func (s *Server) handlePlatformModeracionAcceso(w http.ResponseWriter, r *http.R
 	// Sin registro no hay acceso: a diferencia de auditPlatform, un fallo aquí
 	// DENIEGA, porque lo que se pide es leer contenido de un cliente.
 	if err := s.store.Audit(r.Context(), nil, e); err != nil {
-		s.log.Error("platform: no se pudo registrar un acceso de moderación", "action", e.Action, "error", err)
+		s.log.Error("platform: no se pudo registrar un acceso de moderación", "action", logsafe.Text(e.Action), "error", err)
 		httpx.Fail(w, r, httpx.ErrUnavailable)
 		return
 	}

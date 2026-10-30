@@ -311,6 +311,9 @@ func colaDeInterfaz(t *testing.T, a *App) func(que string, hasta func() bool) {
 func TestEmitirDesdeAquiEntraEnLaSala(t *testing.T) {
 	s := servicioCompleto()
 	a, w := appDePrueba(t, s, true)
+	if os.Getenv("SYTUE_CAPTURA") != "" {
+		recorrido.AMedida(w)
+	}
 	vaciar := colaDeInterfaz(t, a)
 	sala := &salaFalsa{}
 	var servidor, token string
@@ -701,7 +704,10 @@ func TestVerReproduceElWebM(t *testing.T) {
 		}
 	}
 	s := servicioCompleto()
-	a, _ := appDePrueba(t, s, true)
+	a, w := appDePrueba(t, s, true)
+	if os.Getenv("SYTUE_CAPTURA") != "" {
+		recorrido.AMedida(w)
+	}
 	a.enLaInterfaz = func(f func()) { cola <- f }
 	a.AbrirMedia = nil // el cliente de verdad: HEAD y Range contra el servicio falso
 	a.AbrirVideo("v01")
@@ -710,6 +716,9 @@ func TestVerReproduceElWebM(t *testing.T) {
 		return a.reproductor != nil && img != nil && img.Bounds().Dx() == 320
 	}
 	vaciar("el primer fotograma", fotograma)
+	if os.Getenv("SYTUE_CAPTURA") != "" {
+		guardar(t, "cast-vod-fixture", w.Canvas().Capture())
+	}
 	if !a.reproductor.Pausado() || a.visor.Mando == nil {
 		t.Fatal("el vídeo tiene que abrir en pausa y con sus mandos")
 	}

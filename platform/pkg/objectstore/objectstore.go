@@ -19,11 +19,13 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
+	"github.com/minio/minio-go/v7/pkg/s3utils"
 
 	pcfg "git.sytue.eu/sytue/one/platform/pkg/config"
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
@@ -362,8 +364,27 @@ func (c *Client) PresignGet(ctx context.Context, t tenancy.Tenant, key string, e
 
 // PresignPut genera una URL prefirmada de subida válida durante expiry.
 func (c *Client) PresignPut(ctx context.Context, t tenancy.Tenant, key string, expiry time.Duration) (*url.URL, error) {
+	return c.PresignPutConTamano(ctx, t, key, 0, expiry)
+}
+
+// PresignPutConTamano genera una URL prefirmada de subida PUT válida durante expiry.
+// Si size > 0, firma la cabecera Content-Length en la solicitud canónica SigV4
+// (X-Amz-SignedHeaders=content-length;host) para que S3 rechace en origen cualquier
+// cuerpo cuya longitud no coincida con la autorizada (FILE-08).
+func (c *Client) PresignPutConTamano(ctx context.Context, t tenancy.Tenant, key string, size int64, expiry time.Duration) (*url.URL, error) {
 	full := tenantKey(t, key)
 	mc, bucket, _ := c.backend(t, key)
+	if size > 0 {
+		if err := s3utils.CheckValidObjectName(full); err != nil {
+			return nil, fmt.Errorf("objectstore: presign put %q: %w", full, err)
+		}
+		hdr := http.Header{"Content-Length": []string{strconv.FormatInt(size, 10)}}
+		u, err := mc.PresignHeader(ctx, http.MethodPut, bucket, full, expiry, nil, hdr)
+		if err != nil {
+			return nil, fmt.Errorf("objectstore: presign put %q: %w", full, err)
+		}
+		return u, nil
+	}
 	u, err := mc.PresignedPutObject(ctx, bucket, full, expiry)
 	if err != nil {
 		return nil, fmt.Errorf("objectstore: presign put %q: %w", full, err)

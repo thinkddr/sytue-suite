@@ -1698,6 +1698,8 @@ export const nb: AppCatalog<typeof en> = {
   'extdata.msg.generic': 'Operasjonen kunne ikke fullføres.',
   'extdata.msg.notAllowed':
     'Bare personene på listen til denne tilkoblingen kan spørre mot den. Be den som administrerer organisasjonen, om å legge deg til.',
+  'extdata.msg.ownerOnly':
+    'Bare den som opprettet tilkoblingen eller den som administrerer organisasjonen, kan endre eller slette den.',
   'sheet.msg.badValue': 'Verdien er ikke tillatt',
   'sheet.msg.clipboardDenied': 'Nettleseren nektet tilgang til utklippstavlen.',
   'sheet.msg.pasteFailed': 'Kunne ikke lime inn',

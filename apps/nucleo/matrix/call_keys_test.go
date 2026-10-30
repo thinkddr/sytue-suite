@@ -114,6 +114,37 @@ func TestCallKeysTargetOnlyCurrentDeviceAndPinLeader(t *testing.T) {
 	}
 }
 
+func TestLiveOlmCallControlsReachKeysWithoutChannel(t *testing.T) {
+	binding := callBinding()
+	leader, err := NewCallKeys(t.Context(), &keyTransport{device: "ACTIVE"}, "leader", binding)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer leader.Close()
+	if err = leader.Start(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	key, _, err := leader.Key(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	receiver, err := NewCallKeys(t.Context(), &keyTransport{device: "CURRENT"}, "person", binding)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer receiver.Close()
+	client := &Client{callKeys: map[*CallKeys]struct{}{receiver: {}}}
+	value := liveKey(t, binding, key)
+	if value.ChannelID != "" {
+		t.Fatal("fixture must use a to-device event")
+	}
+	client.deliver(value, nil)
+	actual, _, ready := receiver.CurrentKey()
+	if !ready || actual != key {
+		t.Fatal("native timeline routing discarded the live Olm key")
+	}
+}
+
 func TestCallKeysRejectsReplacedOwnDeviceAndController(t *testing.T) {
 	binding := callBinding()
 	if _, err := NewCallKeys(t.Context(), &keyTransport{device: "OLD"}, "person", binding); !errors.Is(err, ErrIdentity) {

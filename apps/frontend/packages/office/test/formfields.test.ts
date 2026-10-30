@@ -99,3 +99,47 @@ test('answersToText: «Nombre: valor» por línea', () => {
   );
   expect(answersToText(answers)).toBe('Nombre: Ana\nAcepto: Sí');
 });
+
+test('extractFormAnswers: parsea atributos con >, comillas simples y spans anidados', () => {
+  expect(
+    extractFormAnswers(
+      "<span title='a > b' data-name='Nombre' data-formfield='text'>Ana <span><b>María</b></span> López</span>",
+    ),
+  ).toEqual([{ name: 'Nombre', type: 'text', value: 'Ana María López' }]);
+});
+
+test('extractFormAnswers: no reconstruye etiquetas a partir de marcado malformado', () => {
+  expect(
+    extractFormAnswers(
+      '<span data-formfield="text" data-name="x"><<script>script>alert(1)</script>fin</span>',
+    ),
+  ).toEqual([{ name: 'x', type: 'text', value: '<fin' }]);
+});
+
+test('extractFormAnswers: ignora scripts, estilos, plantillas y campos en comentarios', () => {
+  const fake = '<span data-formfield="text" data-name="falso">oculto</span>';
+  expect(
+    extractFormAnswers(
+      `<!--${fake}--><script>${fake}</script><template>${fake}</template>` +
+        '<span data-formfield="text" data-name="real">antes<script>alert(1)</script><style>body{}</style>después</span>',
+    ),
+  ).toEqual([{ name: 'real', type: 'text', value: 'antesdespués' }]);
+});
+
+test('extractFormAnswers: decodifica entidades de nombres y valores una sola vez', () => {
+  expect(
+    extractFormAnswers(
+      '<span data-formfield="text" data-name="&#78;ombre">&amp;lt;script&amp;gt; &#x1f600; &lt;b&gt;</span>' +
+        '<span data-formfield="select" data-name="Opción" data-value="&amp;lt; &quot;x&quot;"></span>',
+    ),
+  ).toEqual([
+    { name: 'Nombre', type: 'text', value: '&lt;script&gt; 😀 <b>' },
+    { name: 'Opción', type: 'select', value: '&lt; "x"' },
+  ]);
+});
+
+test('extractFormAnswers: no confunde atributos prefijados con campos reales', () => {
+  expect(extractFormAnswers('<span other-data-formfield="text" data-name="x">no</span>')).toEqual(
+    [],
+  );
+});

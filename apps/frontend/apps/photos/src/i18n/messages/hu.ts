@@ -131,7 +131,9 @@ export const hu: AppCatalog<typeof en> = {
   'gallery.selectMonth': 'Hónap kijelölése',
   'gallery.unselectMonth': 'Hónap kijelölésének megszüntetése',
   'gallery.downloadSelected': 'Letöltés',
-  'gallery.downloading': { one: '1 fotó letöltése…', other: '{count} fotó letöltése…' },
+  'gallery.downloading':
+    'Elindított letöltési kérések: {count}. Ellenőrizze a böngésző letöltéseit.',
+  'gallery.downloadCapped': 'Ebből a kötegből kimaradó fényképek: {count}.',
   'gallery.newAlbum': 'Új album',
   'gallery.newAlbumTitle': 'Új album',
   'gallery.newAlbumPrompt': {

@@ -138,12 +138,9 @@ export const sk: AppCatalog<typeof en> = {
   'gallery.selectMonth': 'Vybrať mesiac',
   'gallery.unselectMonth': 'Zrušiť výber mesiaca',
   'gallery.downloadSelected': 'Stiahnuť',
-  'gallery.downloading': {
-    one: 'Sťahuje sa 1 fotka…',
-    few: 'Sťahujú sa {count} fotky…',
-    many: 'Sťahuje sa {count} fotky…',
-    other: 'Sťahuje sa {count} fotiek…',
-  },
+  'gallery.downloading':
+    'Spustené požiadavky na stiahnutie: {count}. Skontrolujte sťahovanie v prehliadači.',
+  'gallery.downloadCapped': 'Fotografie mimo tejto dávky: {count}.',
   'gallery.newAlbum': 'Nový album',
   'gallery.newAlbumTitle': 'Nový album',
   'gallery.newAlbumPrompt': {

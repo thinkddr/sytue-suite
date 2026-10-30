@@ -18,6 +18,7 @@ import (
 	"strings"
 
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
+	"git.sytue.eu/sytue/one/platform/pkg/logsafe"
 	"git.sytue.eu/sytue/one/platform/pkg/pg"
 	"git.sytue.eu/sytue/one/services/id/internal/domain"
 	"git.sytue.eu/sytue/one/services/id/internal/i18n"
@@ -196,14 +197,14 @@ func (s *Server) sameOrigin(r *http.Request) bool {
 	case "same-origin", "none":
 		return true
 	case "same-site", "cross-site":
-		slog.WarnContext(r.Context(), "account POST: fetch-site rechazado", "sec_fetch_site", fs)
+		slog.WarnContext(r.Context(), "account POST: fetch-site rechazado", "sec_fetch_site", logsafe.Text(fs))
 		return false
 	}
 	o := r.Header.Get("Origin")
 	if o == "" || o == "null" || originAllowed(o, s.cfg.RPOrigins) {
 		return true
 	}
-	slog.WarnContext(r.Context(), "account POST: origin rechazado", "origin", o)
+	slog.WarnContext(r.Context(), "account POST: origin rechazado", "origin", logsafe.Text(o))
 	return false
 }
 

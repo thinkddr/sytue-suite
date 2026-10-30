@@ -4,8 +4,8 @@
 #
 # Gate: la marca vendorizada es la que producen los generadores.
 #
-# POR QUÉ. Hay tres destinos que salen de `branding/` —los favicons de cada app,
-# los iconos de @sytue/ui y los de escritorio— y quien los escribe es un guion:
+# POR QUÉ. Los favicons, los iconos de @sytue/ui y los de Fyne y Sytue ID salen
+# de `branding/`, y quien los escribe es un guion:
 # `gen-marks.sh` produce las marcas y `sync-branding.sh` las reparte. Pero nadie
 # COMPROBABA que se hubieran ejecutado.
 #
@@ -20,11 +20,8 @@
 set -uo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/../../.." || exit 1
 
-# Sin ImageMagick 7 no se comprueba, y en el CI eso es ROJO: allí «no se pudo mirar»
-# salía en verde y el gate llevaba meses sin ver un icono. El runner no puede traerlo
-# (su IM6 no instala `magick`, y otro IM7 rasteriza distinto: ver ci-frontend.yml), así
-# que el CI lo salta A LA VISTA con SYTUE_MARCA_NO_SE_COMPRUEBA=<motivo> y lo dice en el
-# log. Fuera del CI (el frontal, un portátil sin IM7) avisa y sigue: corre en el piloto.
+# El CI prepara el ImageMagick 7 fijado con RSVG mediante el instalador común.
+# Si falta, «no se pudo mirar» no equivale a verde. Fuera del CI se deja el aviso.
 command -v magick >/dev/null 2>&1 || {
   if [ -n "${SYTUE_MARCA_NO_SE_COMPRUEBA:-}" ]; then
     echo "::warning::lint:marca NO se ha comprobado: $SYTUE_MARCA_NO_SE_COMPRUEBA"
@@ -42,7 +39,19 @@ command -v magick >/dev/null 2>&1 || {
 tmp_img="$(mktemp)"
 trap 'rm -f "$tmp_img" "$tmp_img".*' EXIT
 
-sucio_antes="$(git status --porcelain -- branding apps/frontend/packages/ui/src/assets apps/frontend/apps/*/public 2>/dev/null)"
+imagenes_sistema=(
+  'apps/fyne/cmd/*/Icon.png'
+  services/id/internal/http/marca.svg
+  services/id/internal/http/marca.ico
+  services/id/internal/http/marca-apple.png
+)
+destinos=(
+  branding
+  apps/frontend/packages/ui/src/assets
+  ':(glob)apps/frontend/apps/*/public/**'
+  "${imagenes_sistema[@]}"
+)
+sucio_antes="$(git status --porcelain -- "${destinos[@]}" 2>/dev/null)"
 if [ -n "$sucio_antes" ]; then
   # Con cambios sin confirmar no se puede distinguir «el generador produce otra
   # cosa» de «alguien está trabajando en ello»; decirlo es mejor que acusar.
@@ -63,11 +72,15 @@ fi
 # que dice el mensaje de más abajo.
 rm -f apps/frontend/apps/*/public/favicon.ico \
       apps/frontend/apps/*/public/favicon-64.png 2>/dev/null || true
+while IFS= read -r -d '' imagen; do
+  rm -f -- "$imagen"
+done < <(git ls-files -z -- "${imagenes_sistema[@]}")
 
-bash scripts/gen-marks.sh >/dev/null 2>&1 || { echo "✗ marca: gen-marks.sh falló" >&2; exit 1; }
-bash scripts/sync-branding.sh >/dev/null 2>&1 || { echo "✗ marca: sync-branding.sh falló" >&2; exit 1; }
+# Los generadores explican sus fallos por stderr; ocultarlo deja el gate sin causa.
+bash scripts/gen-marks.sh >/dev/null || { echo "✗ marca: gen-marks.sh falló" >&2; exit 1; }
+bash scripts/sync-branding.sh >/dev/null || { echo "✗ marca: sync-branding.sh falló" >&2; exit 1; }
 
-sucio="$(git status --porcelain -- branding apps/frontend/packages/ui/src/assets apps/frontend/apps/*/public 2>/dev/null)"
+sucio="$(git status --porcelain -- "${destinos[@]}" 2>/dev/null)"
 
 # SE COMPARA LA IMAGEN, NO LOS BYTES, y esto es la diferencia entre un gate que
 # sirve y uno que solo sabe estar en rojo.
@@ -111,7 +124,7 @@ if [ -n "$sucio" ]; then
     # es justo el caso de la recompresión. Un patrón que solo aceptara dígitos y
     # punto no lo captura, deja `r` vacío y el fichero se cuenta como «ilegible»:
     # el gate acababa fallando por los ficheros que MENOS cambian.
-    r="$(magick compare -metric RMSE "$viejo_img[0]" "$f[0]" null: 2>&1 |
+    r="$(magick compare -metric RMSE "${viejo_img}[0]" "${f}[0]" null: 2>&1 |
       grep -oE '\([0-9.]+(e-?[0-9]+)?\)' | tr -d '()')"
     rm -f "$viejo_img"
     [ -n "$r" ] || { reales="$reales $f(ilegible)"; continue; }
@@ -127,7 +140,10 @@ if [ -n "$sucio" ]; then
   # vista son idénticos ensucia el historial y no arregla nada, porque el siguiente
   # que los regenere con otra versión volverá a verlos «cambiados».
   echo "· marca: $(printf '%s\n' "$sucio" | wc -l | tr -d ' ') ficheros recomprimidos (misma imagen); se restauran"
-  git checkout -- branding apps/frontend/packages/ui/src/assets apps/frontend/apps/*/public 2>/dev/null || true
+  if ! git checkout -- "${destinos[@]}"; then
+    echo "✗ marca: no se pudieron restaurar los archivos recomprimidos." >&2
+    exit 1
+  fi
 fi
 # Y EL ESPEJO TIPADO. `packages/config/src/tokens.ts` copia a mano la paleta de
 # producto que vive en `branding/tokens/colors.css` —lo dice sync-branding: «un

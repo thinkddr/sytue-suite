@@ -26,12 +26,13 @@ import (
 // como interfaz (satisfecha por *service.Service) para poder inyectar dobles en
 // los tests sin depender de una base de datos.
 type chatService interface {
-	StartMatrixNative(context.Context, string, string, string) (service.MatrixNativeStart, error)
+	StartMatrixNative(context.Context, string, string, string, string) (service.MatrixNativeStart, error)
 	PreviewMatrixNative(context.Context, string, string) (service.MatrixNativePreview, error)
 	AcceptMatrixNative(context.Context, string, string, string) (service.MatrixNativeAccepted, error)
 	FinishMatrixNative(context.Context, string, string, string, string) (string, error)
 
 	BootstrapMatrix(context.Context, string, string) (service.MatrixBootstrap, error)
+	BootstrapMatrixStorage(context.Context, string, string) (service.MatrixBootstrap, error)
 	MatrixAccountAccess(context.Context, string, string, int64) error
 	MatrixTenantAccess(context.Context, string, string, string, int64) error
 	EditMatrixMessage(context.Context, uuid.UUID, string, string, domain.MatrixEventRef) (domain.Message, error)

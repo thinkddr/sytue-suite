@@ -271,6 +271,7 @@
     "one": "{count} Notiz",
     "other": "{count} Notizen"
   },
+  "notebook.ownerOnly": "Nur wer dieses Notizbuch erstellt hat oder die Administration der Organisation kann es verschieben, seine Sichtbarkeit ändern oder es verschlüsseln.",
   "notebook.rename": "Umbenennen",
   "notebook.settings": "Notizbuch-Einstellungen",
   "notebook.title": "Name",

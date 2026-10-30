@@ -138,12 +138,9 @@ export const cs: AppCatalog<typeof en> = {
   'gallery.selectMonth': 'Vybrat měsíc',
   'gallery.unselectMonth': 'Zrušit výběr měsíce',
   'gallery.downloadSelected': 'Stáhnout',
-  'gallery.downloading': {
-    one: 'Stahování 1 fotky…',
-    few: 'Stahování {count} fotek…',
-    many: 'Stahování {count} fotky…',
-    other: 'Stahování {count} fotek…',
-  },
+  'gallery.downloading':
+    'Zahájené požadavky na stažení: {count}. Zkontrolujte stahování v prohlížeči.',
+  'gallery.downloadCapped': 'Fotografie mimo tuto dávku: {count}.',
   'gallery.newAlbum': 'Nové album',
   'gallery.newAlbumTitle': 'Nové album',
   'gallery.newAlbumPrompt': {

@@ -430,7 +430,8 @@ export const sk: AppCatalog<typeof en> = {
   'product.cast.f2': 'Adaptívne prehrávanie v troch kvalitách; prehliadač si vyberie tú najlepšiu.',
   'product.cast.f3':
     'Živé vysielanie z vysielacieho programu cez RTMP, s vysielacím kľúčom pre každú osobu.',
-  'product.cast.f4': 'Naživo z prehliadača alebo z aplikácie: kamera, obrazovka a mikrofón.',
+  'product.cast.f4':
+    'Naživo z prehliadača alebo aplikácie: kamera a mikrofón. Zdieľanie obrazovky v podporovaných prehliadačoch, počítačových systémoch a Androide; v aplikácii pre iOS/iPadOS nie je dostupné.',
   'product.cast.f5': 'Záznamy živých prenosov sa automaticky stávajú videami na požiadanie.',
   'product.cast.f6': 'Verejná úvodná stránka a kanál pre každú organizáciu, indexovateľné.',
   'product.cast.f7':

@@ -190,7 +190,8 @@ type estilos09 map[string]*nodo09
 func leerEstilos09(raiz *nodo09) estilos09 {
 	e := estilos09{}
 	raiz.recorrer(func(n *nodo09) bool {
-		if n.nombre == "sf:paragraphstyle" || n.nombre == "sf:characterstyle" {
+		switch n.nombre {
+		case "sf:paragraphstyle", "sf:characterstyle", "sf:liststyle", "sf:cell-style", "sf:number-format":
 			// ponytail: el mismo ident puede venir en varias hojas de estilos (la de la
 			// plantilla y la del documento); gana la primera, que en el corpus son iguales.
 			for _, k := range []string{"sfa:ID", "sf:ident"} {
@@ -198,11 +199,29 @@ func leerEstilos09(raiz *nodo09) estilos09 {
 					e[id] = n
 				}
 			}
-			return false
+			return n.nombre == "sf:cell-style"
 		}
 		return true
 	})
 	return e
+}
+
+func (e estilos09) valorProp09(v *nodo09) (*nodo09, bool) {
+	for _, h := range v.hijos {
+		if h.nombre == "sf:null" {
+			return nil, true
+		}
+		if h.nombre == "" {
+			continue
+		}
+		if strings.HasSuffix(h.nombre, "-ref") {
+			if ref := e[h.attr["sfa:IDREF"]]; ref != nil {
+				return ref, true
+			}
+		}
+		return h, true
+	}
+	return nil, false
 }
 
 // prop es el valor de la propiedad `nombre` del primer estilo de `estilos` que la defina,
@@ -215,13 +234,8 @@ func (e estilos09) prop(nombre string, estilos ...string) *nodo09 {
 				break
 			}
 			if v := s.hijo("sf:property-map").hijo("sf:" + nombre); v != nil {
-				for _, h := range v.hijos {
-					if h.nombre == "sf:null" {
-						return nil
-					}
-					if h.nombre != "" {
-						return h
-					}
+				if h, ok := e.valorProp09(v); ok {
+					return h
 				}
 			}
 			id = s.attr["sf:parent-ident"]
@@ -255,11 +269,14 @@ func (e estilos09) nombre(id string) string {
 	return ""
 }
 
-// color es «RRGGBB» de `sf:fontColor`, o "" si no lo define o es negro (el del editor).
-func (e estilos09) color(estilos ...string) string {
-	v := e.prop("fontColor", estilos...)
+// colorNodo09 convierte un `sf:color` (RGB `sfa:r/g/b` o gris `sfa:w` en 0..1) a «RRGGBB».
+func colorNodo09(v *nodo09) string {
 	if v == nil || v.nombre != "sf:color" {
 		return ""
+	}
+	if w, err := strconv.ParseFloat(v.attr["sfa:w"], 64); err == nil && v.attr["sfa:r"] == "" {
+		b := fmt.Sprintf("%02X", int(min(max(w, 0), 1)*255+0.5))
+		return b + b + b
 	}
 	var hex strings.Builder
 	for _, k := range []string{"sfa:r", "sfa:g", "sfa:b"} {
@@ -269,10 +286,45 @@ func (e estilos09) color(estilos ...string) string {
 		}
 		fmt.Fprintf(&hex, "%02X", int(min(max(f, 0), 1)*255+0.5))
 	}
-	if hex.String() == "000000" {
+	return hex.String()
+}
+
+// color es «RRGGBB» de `sf:fontColor`, o "" si no lo define o es negro (el del editor).
+func (e estilos09) color(estilos ...string) string {
+	hex := colorNodo09(e.prop("fontColor", estilos...))
+	if hex == "000000" {
 		return ""
 	}
-	return hex.String()
+	return hex
+}
+
+// tipoLista09 devuelve "bullet", "number" o "" según el `sf:liststyle` para `nivel` (base 0).
+func (e estilos09) tipoLista09(ls *nodo09, nivel int) string {
+	for i := 0; ls != nil && i < maxHerencia09; i++ {
+		var infos []*nodo09
+		for _, h := range ls.hijo("sf:property-map").hijo("sf:listLabelTypes").hijo("sf:array").hijosDe() {
+			if h.nombre == "sf:list-label-typeinfo" {
+				infos = append(infos, h)
+			}
+		}
+		if len(infos) > 0 {
+			info := infos[min(max(nivel, 0), len(infos)-1)]
+			switch info.attr["sf:type"] {
+			case "image":
+				return "bullet"
+			case "text":
+				tl := info.hijo("sf:text-label")
+				if tl == nil || tl.attr["sf:type"] == "" || tl.attr["sf:type"] == "bullet" {
+					return "bullet"
+				}
+				return "number"
+			default:
+				return ""
+			}
+		}
+		ls = e[ls.attr["sf:parent-ident"]]
+	}
+	return ""
 }
 
 // tituloDeEstilo09 traduce el nombre del estilo de párrafo al título del editor:
@@ -316,18 +368,26 @@ func alineacion09(v float64) string {
 
 // lector09 convierte almacenes de texto al modelo rico del editor.
 type lector09 struct {
-	est estilos09
+	paquete *paqueteIWork
+	est     estilos09
 	// notas son las notas al pie por su número (`sf:footnote-mark sf:mark`).
 	notas map[string][]xrun
 	// usadas, las notas ya serializadas en el orden de sus llamadas.
 	usadas []string
 	// adjuntos son los objetos anclados en el texto por su `sfa:ID` (`sf:attachments` >
-	// `sf:attachment`); de ellos se convierten las tablas.
+	// `sf:attachment`); de ellos se convierten las tablas y las imágenes.
 	adjuntos map[string]*nodo09
+	// binarios son los nodos `sf:unfiltered`, `sf:binary` y `sf:data` con `sfa:ID`.
+	binarios map[string]*nodo09
+	// conComentarios activa la extracción de comentarios (`sf:annotation`, `sf:sticky-note`).
+	conComentarios bool
+	anotaciones    map[string]*nodo09
+	comentariosPor map[string]*rawComment
+	comentarios    []*rawComment
 	// vinetas: los párrafos con `sf:list-level` son puntos de una lista (el cuerpo de una
 	// diapositiva; el nivel 1 es el primero).
 	vinetas bool
-	// omitido: algo del fichero (una imagen, un gráfico) no se ha convertido.
+	// omitido: algo del fichero (una imagen sin datos, un gráfico) no se ha convertido.
 	omitido bool
 }
 
@@ -355,6 +415,39 @@ func tramos(bs []xblock) []xrun {
 	return out
 }
 
+func (l *lector09) tramoComentado09(texto, ec, ep, enlace string, titulo bool, com *rawComment) xrun {
+	r := l.tramo(texto, ec, ep, enlace, titulo)
+	if com != nil && texto != "" {
+		r.mark = com.id
+		com.marked = true
+		com.anchored = true
+		com.quote.WriteString(texto)
+	}
+	return r
+}
+
+func (l *lector09) adjunto09(id string, cur, base *xpara, out []xblock) []xblock {
+	adj := l.adjuntos[id]
+	t := leerTabla09(primerModelo09(adj), l.est)
+	if t == nil {
+		t = leerGrafico09(adj)
+	}
+	if t != nil {
+		if len(cur.runs) > 0 {
+			c := *cur
+			out = append(out, xblock{para: &c})
+			*cur = *base
+		}
+		return append(out, xblock{table: t.xtable()})
+	}
+	if src, w, h := l.imagenNodo09(adj); src != "" {
+		cur.runs = append(cur.runs, xrun{raw: l.paquete.imgHTML(src, w, h)})
+		return out
+	}
+	l.omitido = true
+	return out
+}
+
 func (l *lector09) parrafo(p *nodo09, out []xblock) []xblock {
 	ep := p.attr["sf:style"]
 	base := l.base09(p)
@@ -364,8 +457,8 @@ func (l *lector09) parrafo(p *nodo09, out []xblock) []xblock {
 		out = append(out, xblock{para: &c})
 		cur = base
 	}
-	var enLinea func(n *nodo09, ec, enlace string)
-	enLinea = func(n *nodo09, ec, enlace string) {
+	var enLinea func(n *nodo09, ec, enlace string, com *rawComment)
+	enLinea = func(n *nodo09, ec, enlace string, com *rawComment) {
 		for _, h := range n.hijos {
 			switch h.nombre {
 			case "":
@@ -374,7 +467,7 @@ func (l *lector09) parrafo(p *nodo09, out []xblock) []xblock {
 				if strings.TrimSpace(h.texto) == "" && strings.Contains(h.texto, "\n") {
 					continue
 				}
-				cur.runs = append(cur.runs, l.tramo(h.texto, ec, ep, enlace, base.style != ""))
+				cur.runs = append(cur.runs, l.tramoComentado09(h.texto, ec, ep, enlace, base.style != "", com))
 			case "sf:br":
 				cerrar()
 			case "sf:lnbr":
@@ -382,9 +475,11 @@ func (l *lector09) parrafo(p *nodo09, out []xblock) []xblock {
 			case "sf:tab":
 				cur.runs = append(cur.runs, l.tramo("\t", ec, ep, enlace, false))
 			case "sf:span":
-				enLinea(h, h.attr["sf:style"], enlace)
+				enLinea(h, h.attr["sf:style"], enlace, com)
 			case "sf:link":
-				enLinea(h, ec, h.attr["href"])
+				enLinea(h, ec, h.attr["href"], com)
+			case "sf:annotation-field":
+				enLinea(h, ec, enlace, l.comentarioCampo09(h.attr["sfa:ID"]))
 			case "sf:page-number":
 				cur.runs = append(cur.runs, xrun{field: "PAGE", text: "1"})
 			case "sf:footnote":
@@ -393,37 +488,43 @@ func (l *lector09) parrafo(p *nodo09, out []xblock) []xblock {
 					cur.runs = append(cur.runs, xrun{raw: footnoteMarker(len(l.usadas))})
 				}
 			case "sf:attachment-ref":
-				// Una tabla es un bloque: corta el párrafo en el que está anclada.
-				if t := leerTabla09(primerModelo09(l.adjuntos[h.attr["sfa:IDREF"]])); t != nil {
-					if len(cur.runs) > 0 {
-						cerrar()
-					}
-					out = append(out, xblock{table: t.xtable()})
-				} else {
-					l.omitido = true
-				}
+				out = l.adjunto09(h.attr["sfa:IDREF"], &cur, &base, out)
 			case "sf:footnote-mark", "sf:footnotebr", "sf:crbr", "sf:pgbr", "sf:sectbr", "sf:contbr",
 				"sf:insertion-point", "sf:selection-start", "sf:selection-end", "sf:page-start", "sf:container-hint":
 				// marcas de maquetación o de la selección: no son texto
 			default:
-				enLinea(h, ec, enlace)
+				enLinea(h, ec, enlace, com)
 			}
 		}
 	}
-	enLinea(p, "", "")
+	enLinea(p, "", "", nil)
 	if len(cur.runs) > 0 {
 		cerrar()
 	}
 	return out
 }
 
-// base09 es el párrafo vacío con el estilo de bloque de `p`: título, alineación y, en el
-// cuerpo de una diapositiva, su nivel de lista.
+// base09 es el párrafo vacío con el estilo de bloque de `p`: título, alineación y su
+// estilo y nivel de lista (del propio párrafo, de su estilo o del cuerpo de diapositiva).
 func (l *lector09) base09(p *nodo09) xpara {
 	ep := p.attr["sf:style"]
 	base := xpara{style: tituloDeEstilo09(l.est.nombre(ep)), align: alineacion09(l.est.num("alignment", ep))}
-	if n, err := strconv.Atoi(p.attr["sf:list-level"]); l.vinetas && err == nil && n >= 1 {
-		base.list, base.level = "bullet", n-1
+	nivel, hayNivel := 0, false
+	if n, err := strconv.Atoi(p.attr["sf:list-level"]); err == nil && n >= 1 {
+		nivel, hayNivel = n-1, true
+	} else if v := l.est.prop("listLevel", ep); v != nil {
+		if f, err := strconv.ParseFloat(v.attr["sfa:number"], 64); err == nil && f >= 0 {
+			nivel, hayNivel = int(f), true
+		}
+	}
+	ls := l.est[p.attr["sf:list-style"]]
+	if ls == nil {
+		ls = l.est.prop("listStyle", ep)
+	}
+	if tipo := l.est.tipoLista09(ls, nivel); tipo != "" {
+		base.list, base.level = tipo, nivel
+	} else if l.vinetas && hayNivel {
+		base.list, base.level = "bullet", nivel
 	}
 	return base
 }
@@ -506,26 +607,195 @@ func (l *lector09) region09(lista *nodo09) string {
 	return ""
 }
 
-// conTexto dice si unos bloques llevan algo que leer: texto o una tabla.
+// conTexto dice si unos bloques llevan algo que leer: texto, una tabla o una imagen.
 func conTexto(bs []xblock) bool {
 	for _, b := range bs {
-		if b.table != nil || b.para != nil && strings.TrimSpace(b.para.plain()) != "" {
+		if b.table != nil || b.raw != "" {
 			return true
+		}
+		if b.para != nil {
+			if strings.TrimSpace(b.para.plain()) != "" {
+				return true
+			}
+			for _, r := range b.para.runs {
+				if r.raw != "" {
+					return true
+				}
+			}
 		}
 	}
 	return false
 }
 
-// importPages09 convierte el índice de un documento .pages '09: el cuerpo con sus notas y
-// tablas, el encabezado y el pie, y el texto de los cuadros de la maquetación libre (que
-// van detrás del cuerpo: no tienen sitio en un flujo de texto). "" si no hay texto.
+// leerBinarios09 indexa los nodos de datos binarios (`sf:unfiltered`, `sf:binary`, `sf:data`)
+// por su `sfa:ID` para resolver referencias de imágenes.
+func leerBinarios09(raiz *nodo09) map[string]*nodo09 {
+	m := map[string]*nodo09{}
+	raiz.recorrer(func(n *nodo09) bool {
+		switch n.nombre {
+		case "sf:unfiltered", "sf:binary", "sf:data":
+			if id := n.attr["sfa:ID"]; id != "" && m[id] == nil {
+				m[id] = n
+			}
+		}
+		return true
+	})
+	return m
+}
+
+func recogerImagen09(x *nodo09, gw, gh *int, candidatos *[]string) {
+	x.recorrer(func(c *nodo09) bool {
+		if c.nombre == "sf:size" && *gw == 0 && *gh == 0 {
+			wf, _ := strconv.ParseFloat(c.attr["sfa:w"], 64)
+			hf, _ := strconv.ParseFloat(c.attr["sfa:h"], 64)
+			if wf > 0 && hf > 0 {
+				*gw, *gh = int(wf+0.5), int(hf+0.5)
+			}
+		}
+		if c.nombre == "sf:data" {
+			for _, k := range []string{"sf:path", "sfa:sfpath", "sf:displayname"} {
+				if v := c.attr[k]; v != "" {
+					*candidatos = append(*candidatos, v)
+				}
+			}
+		}
+		return true
+	})
+}
+
+// imagenNodo09 extrae la imagen incrustada de un nodo (`sf:image`, `sf:media`,
+// `sf:attachment`) y el tamaño de su geometría en puntos (o sus píxeles).
+func (l *lector09) imagenNodo09(n *nodo09) (src string, w, h int) {
+	if n == nil || l.paquete == nil {
+		return "", 0, 0
+	}
+	var candidatos []string
+	var gw, gh int
+	recogerImagen09(n, &gw, &gh, &candidatos)
+	n.recorrer(func(c *nodo09) bool {
+		switch c.nombre {
+		case "sf:unfiltered-ref", "sf:binary-ref", "sf:data-ref":
+			if ref := l.binarios[c.attr["sfa:IDREF"]]; ref != nil {
+				recogerImagen09(ref, &gw, &gh, &candidatos)
+			}
+		}
+		return true
+	})
+	src, iw, ih := l.paquete.imagenDataURL(candidatos...)
+	if src == "" {
+		return "", 0, 0
+	}
+	if gw > 0 && gh > 0 {
+		return src, gw, gh
+	}
+	return src, iw, ih
+}
+
+// leerAnotaciones09 indexa los nodos `sf:annotation` por su `sf:target`.
+func (l *lector09) leerAnotaciones09(raiz *nodo09) {
+	if !l.conComentarios {
+		return
+	}
+	l.anotaciones = map[string]*nodo09{}
+	l.comentariosPor = map[string]*rawComment{}
+	raiz.recorrer(func(n *nodo09) bool {
+		if n.nombre == "sf:annotation" {
+			if t := n.attr["sf:target"]; t != "" && l.anotaciones[t] == nil {
+				l.anotaciones[t] = n
+			}
+			return false
+		}
+		return true
+	})
+}
+
+func (l *lector09) textosAnotacion09(n *nodo09) []string {
+	var partes []string
+	n.recorrer(func(h *nodo09) bool {
+		if h.nombre == "sf:text-storage" {
+			for _, b := range (&lector09{est: l.est}).bloques(h) {
+				if b.para != nil {
+					if s := strings.TrimSpace(b.para.plain()); s != "" {
+						partes = append(partes, s)
+					}
+				}
+			}
+			return false
+		}
+		return true
+	})
+	return partes
+}
+
+func fechaAnotacion09(s string) string {
+	s = strings.TrimSpace(s)
+	if len(s) >= 19 && s[4] == ':' && s[7] == ':' && s[10] == ':' {
+		return s[:4] + "-" + s[5:7] + "-" + s[8:10] + "T" + s[11:19] + "Z"
+	}
+	return s
+}
+
+func (l *lector09) comentarioCampo09(id string) *rawComment {
+	if !l.conComentarios || id == "" {
+		return nil
+	}
+	if c := l.comentariosPor[id]; c != nil {
+		return c
+	}
+	a := l.anotaciones[id]
+	if a == nil {
+		return nil
+	}
+	paras := l.textosAnotacion09(a)
+	autor := strings.TrimSpace(a.attr["sf:author"])
+	fecha := fechaAnotacion09(a.attr["sf:date"])
+	c := &rawComment{
+		id:     markID(len(l.comentarios)+1, autor, fecha, strings.Join(paras, "\n")),
+		key:    id,
+		author: autor,
+		date:   fecha,
+		paras:  paras,
+	}
+	l.comentariosPor[id] = c
+	l.comentarios = append(l.comentarios, c)
+	return c
+}
+
+func (l *lector09) leerNotaAdhesiva09(n *nodo09) {
+	if !l.conComentarios {
+		return
+	}
+	paras := l.textosAnotacion09(n)
+	if len(paras) == 0 {
+		return
+	}
+	autor := strings.TrimSpace(n.attr["sf:author"])
+	fecha := fechaAnotacion09(n.attr["sf:date"])
+	l.comentarios = append(l.comentarios, &rawComment{
+		id:     markID(len(l.comentarios)+1, autor, fecha, strings.Join(paras, "\n")),
+		author: autor,
+		date:   fecha,
+		paras:  paras,
+	})
+}
+
+// importPages09 convierte el índice de un documento .pages '09: el cuerpo con sus notas,
+// tablas, imágenes y comentarios, el encabezado y el pie, y el texto de los cuadros de la
+// maquetación libre (que van detrás del cuerpo: no tienen sitio en un flujo de texto). ""
+// si no hay contenido.
 //
 // `sl:document` > `sf:text-storage[sf:kind=body]` es el cuerpo: el hijo DIRECTO; los de
 // `sl:section-prototypes` son el texto de muestra de la plantilla. Los cuadros de texto
 // y las tablas flotantes están en `sl:drawables` > `sl:page-group` (`sl:masters-group` es
 // la maqueta de la plantilla).
-func importPages09(raiz *nodo09) (cuerpo string, omitido bool) {
-	l := &lector09{est: leerEstilos09(raiz)}
+func importPages09(raiz *nodo09, p *paqueteIWork, conComentarios bool) (cuerpo string, coms []ImportedComment, omitido bool) {
+	l := &lector09{
+		paquete:        p,
+		est:            leerEstilos09(raiz),
+		binarios:       leerBinarios09(raiz),
+		conComentarios: conComentarios,
+	}
+	l.leerAnotaciones09(raiz)
 	var blocks []xblock
 	for _, h := range raiz.hijos {
 		if h.nombre == "sf:text-storage" && h.attr["sf:kind"] == "body" {
@@ -540,23 +810,37 @@ func importPages09(raiz *nodo09) (cuerpo string, omitido bool) {
 		}
 		g.recorrer(func(n *nodo09) bool {
 			switch n.nombre {
+			case "sf:sticky-note":
+				l.leerNotaAdhesiva09(n)
+				return false
 			case "sf:text-storage":
 				blocks = append(blocks, l.bloques(n)...)
 				return false
 			case "sf:tabular-model":
-				if t := leerTabla09(n); t != nil {
+				if t := leerTabla09(n, l.est); t != nil {
 					blocks = append(blocks, xblock{table: t.xtable()})
 				}
 				return false
-			case "sf:image", "sf:media", "sf:chart-info":
-				l.omitido = true
+			case "sf:image", "sf:media":
+				if src, w, h := l.imagenNodo09(n); src != "" {
+					blocks = append(blocks, xblock{para: &xpara{runs: []xrun{{raw: p.imgHTML(src, w, h)}}}})
+				} else {
+					l.omitido = true
+				}
+				return false
+			case "sf:chart-info":
+				if t := leerGrafico09(n); t != nil {
+					blocks = append(blocks, xblock{table: t.xtable()})
+				} else {
+					l.omitido = true
+				}
 				return false
 			}
 			return true
 		})
 	}
 	if !conTexto(blocks) {
-		return "", l.omitido
+		return "", nil, l.omitido
 	}
 	if h := l.region09(raiz.hijo("sf:headers")); h != "" {
 		blocks = append([]xblock{{raw: `<div data-doc-header style="` + docHeaderStyle + `">` + h + `</div>`}}, blocks...)
@@ -567,5 +851,8 @@ func importPages09(raiz *nodo09) (cuerpo string, omitido bool) {
 	if sec := footnotesSection(l.usadas); sec != "" {
 		blocks = append(blocks, xblock{raw: sec})
 	}
-	return blocksToHTML(blocks), l.omitido
+	if conComentarios {
+		coms = importedComments(l.comentarios)
+	}
+	return blocksToHTML(blocks), coms, l.omitido
 }

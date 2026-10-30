@@ -9,12 +9,15 @@
 //   · que la pantalla tenga contenido de verdad y no un esqueleto vacío.
 //
 // Uso: bun run barrido-pantallas.mjs [app...]
-// Salida: /tmp/barrido.json y un resumen por pantalla en consola.
+// Salida: informe.json en el directorio privado por ejecución indicado en consola.
+import { createReportDirectory, writeReport } from './lib/report-output.mjs';
 import { chromium } from "playwright";
 import { fileURLToPath } from "node:url";
-import { existsSync, writeFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { activarOrganizacion, codigoTOTP, esCuentaDelIdPDesdeAdmin, porQueNoEntra } from "./tests/helpers.ts";
 import { appsDesplegadas, desplegada } from "./apps-desplegadas.mjs";
+
+const INFORME = `${createReportDirectory('barrido')}/informe.json`;
 
 const DOMINIO = process.env.SYTUE_BASE_DOMAIN || "sytue.eu";
 const IDP = `id.${DOMINIO}`;
@@ -60,6 +63,7 @@ const APPS = {
   // catálogo entero y la organización; si el servicio no contesta, es aquí
   // donde se ve.
   erp: { host: "erp", base: "/erp", rutas: ["/"] },
+  bases: { host: "bases", base: "/bases", rutas: ["/"] },
   // SYTUE WEB: se salta sola mientras la instalación no la levante (`PAGES_ENABLED`
   // en el piloto; `OPCIONALES` de apps-desplegadas.mjs).
   pages: { host: "web", base: "/web", rutas: ["/", "/new", "/settings"] },
@@ -378,7 +382,7 @@ for (const app of apps) {
 
 await contexto.storageState({ path: STORAGE });
 await navegador.close();
-writeFileSync("/tmp/barrido.json", JSON.stringify(resultados, null, 2));
+writeReport(INFORME, JSON.stringify(resultados, null, 2));
 
 const conFallo = resultados.filter(
   (r) => !r.desviada && !r.sinPermiso && (r.error || r.consola.length || r.red.length || (r.titulo !== "404 esperado (sonda de ausencia)" && r.texto < 40)),

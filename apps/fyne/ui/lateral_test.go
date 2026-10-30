@@ -183,7 +183,8 @@ func TestElCarrilMide260YDejaSuCanalon(t *testing.T) {
 	if got := fila.Size().Width; got != anchoUtilWeb {
 		t.Errorf("la fila recibe %v de ancho dentro del carril y en producción mide %v", got, float32(anchoUtilWeb))
 	}
-	if got := seccion.Position().X; got != tema.Espacio(4) {
+	viewport := test.WidgetRenderer(menu).(*lateralRenderer).desplaza
+	if got := viewport.Position().X + seccion.Position().X; got != tema.Espacio(4) {
 		t.Errorf("el cuerpo empieza en x=%v y `px-4` con el rem de 14 son %v", got, tema.Espacio(4))
 	}
 	// Plegado, el carril es el token de 64.

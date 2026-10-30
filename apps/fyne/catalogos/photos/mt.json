@@ -108,6 +108,7 @@
   "gallery.describeStop": "Waqqaf",
   "gallery.described": "{count} ritratti deskritti",
   "gallery.describing": "Qed jiġu deskritti {done} minn {total}…",
+  "gallery.downloadCapped": "Ritratti barra minn dan il-grupp: {count}.",
   "gallery.downloadSelected": "Niżżel",
   "gallery.downloading": {
     "one": "Qed jitniżżel ritratt wieħed…",

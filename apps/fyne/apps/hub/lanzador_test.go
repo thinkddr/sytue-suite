@@ -859,3 +859,19 @@ func TestLaTarjetaDeProductoCambiaElBordeConElPuntero(t *testing.T) {
 	}
 	x.MouseOut()
 }
+
+// ApplyThemeTo pide Layout antes de Refresh. La transición de Marco a Carril
+// medía la tarjeta de accesos que la forma anterior todavía no había construido.
+func TestLaRotacionDeFormaRecomponeElHubAntesDeMedir(t *testing.T) {
+	enMarco(t)
+	l := lanzadorDePrueba(t)
+	l.Resize(fyne.NewSize(568, 320))
+	r := test.WidgetRenderer(l).(*lanzadorRenderer)
+	for _, forma := range []string{"carril", "marco", "carril"} {
+		tema.ElegirForma(forma)
+		r.Layout(l.Size())
+		if (r.tAccesos == nil) != tema.EsMarco() || (r.tiraPildoras != nil) != tema.EsMarco() {
+			t.Fatalf("%s: el Hub conserva la composición de la forma anterior", forma)
+		}
+	}
+}

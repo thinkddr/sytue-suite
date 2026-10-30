@@ -12,7 +12,7 @@ component: analytics-api
 replicaCount: 1
 
 image:
-  registry: ""                 # cae a global.imageRegistry (Scaleway Registry, UE)
+  registry: ghcr.io/thinkddr   # global.imageRegistry lo pisa en producción
   repository: sytue-analytics  # MISMA imagen que analytics-ingest
   tag: "1.0.0"
   pullPolicy: IfNotPresent

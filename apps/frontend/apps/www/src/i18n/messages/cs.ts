@@ -418,7 +418,8 @@ export const cs: AppCatalog<typeof en> = {
   'product.cast.f2': 'Adaptivní přehrávání ve třech kvalitách; prohlížeč zvolí tu nejlepší.',
   'product.cast.f3':
     'Živé vysílání z vysílacího programu přes RTMP, s vysílacím klíčem pro každou osobu.',
-  'product.cast.f4': 'Živě z prohlížeče nebo z aplikace: kamera, obrazovka a mikrofon.',
+  'product.cast.f4':
+    'Živě z prohlížeče nebo aplikace: kamera a mikrofon. Sdílení obrazovky v podporovaných prohlížečích, počítačových systémech a Androidu; v aplikaci pro iOS/iPadOS není dostupné.',
   'product.cast.f5': 'Záznamy živých přenosů se automaticky stávají videi na vyžádání.',
   'product.cast.f6': 'Veřejná úvodní stránka a kanál pro každou organizaci, indexovatelné.',
   'product.cast.f7':

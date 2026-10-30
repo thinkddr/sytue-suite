@@ -14,14 +14,52 @@ import (
 )
 
 type almacenHub struct {
-	available bool
-	err       error
-	calls     int
+	available    bool
+	err          error
+	calls        int
+	providers    map[string]bool
+	accountCalls int
+	accountsErr  error
 }
 
 func (s *almacenHub) ExternalStorage(context.Context) (api.AlmacenExterno, error) {
 	s.calls++
 	return api.AlmacenExterno{Available: s.available}, s.err
+}
+
+func (s *almacenHub) ExternalStorageAccounts(context.Context) (api.CuentasAlmacenExterno, error) {
+	s.accountCalls++
+	return api.CuentasAlmacenExterno{Providers: s.providers}, s.accountsErr
+}
+
+func TestElAccesoNativoDeHubUsaOAuthSinKEKSinAmpliarPermisos(t *testing.T) {
+	admin := auth.Reclamos{Sub: "person", Tenant: "org", Roles: []string{"admin"}}
+	for _, caso := range []struct {
+		nombre              string
+		claims              auth.Reclamos
+		providers           map[string]bool
+		err, accountsErr    error
+		want                bool
+		calls, accountCalls int
+	}{
+		{nombre: "google", claims: admin, providers: map[string]bool{"gdrive": true}, want: true, calls: 1, accountCalls: 1},
+		{nombre: "microsoft", claims: admin, providers: map[string]bool{"onedrive": true}, want: true, calls: 1, accountCalls: 1},
+		{nombre: "dropbox", claims: admin, providers: map[string]bool{"dropbox": true}, want: true, calls: 1, accountCalls: 1},
+		{nombre: "todos apagados", claims: admin, providers: map[string]bool{"gdrive": false}, calls: 1, accountCalls: 1},
+		{nombre: "desconocido", claims: admin, providers: map[string]bool{"unsupported": true}, calls: 1, accountCalls: 1},
+		{nombre: "miembro", claims: auth.Reclamos{Sub: "person", Tenant: "org", Roles: []string{"member"}}, providers: map[string]bool{"gdrive": true}},
+		{nombre: "Drive deniega", claims: admin, providers: map[string]bool{"gdrive": true}, err: errors.New("forbidden"), calls: 1},
+		{nombre: "OAuth falla", claims: admin, providers: map[string]bool{"gdrive": true}, accountsErr: errors.New("offline"), calls: 1, accountCalls: 1},
+	} {
+		t.Run(caso.nombre, func(t *testing.T) {
+			almacen := &almacenHub{providers: caso.providers, err: caso.err, accountsErr: caso.accountsErr}
+			v := NuevaVista(traductor(t), nil, time.Now()).ConAlmacenamiento(almacen)
+			v.cargarAccesosConexiones(t.Context(), caso.claims)
+			if v.lanzador.PuedeConectarAlmacen != caso.want || almacen.calls != caso.calls || almacen.accountCalls != caso.accountCalls {
+				t.Fatalf("shortcut=%v consultas=%d/%d; quiero %v %d/%d", v.lanzador.PuedeConectarAlmacen, almacen.calls, almacen.accountCalls, caso.want, caso.calls, caso.accountCalls)
+			}
+		})
+	}
 }
 
 func TestElAccesoNativoDeHubSeAutorizaEnDrive(t *testing.T) {

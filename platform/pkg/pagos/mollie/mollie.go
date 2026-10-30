@@ -63,6 +63,14 @@ func New(apiKey, profileID string) *Mollie {
 	}
 }
 
+// ConTransporte sustituye el transporte HTTP manteniendo el timeout y la prohibición de redirecciones.
+func (m *Mollie) ConTransporte(rt http.RoundTripper) *Mollie {
+	if m != nil && rt != nil {
+		m.http.Transport = rt
+	}
+	return m
+}
+
 // Checkout es el primer pago de una suscripción de Sytue ID.
 type Checkout struct {
 	CustomerID  string

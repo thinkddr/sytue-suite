@@ -24,7 +24,7 @@ func ComprobarRotacion(t testing.TB, w fyne.Window, nombre string, producto icon
 	if err != nil {
 		t.Fatal(err)
 	}
-	contenido, tamano := w.Canvas().Content(), w.Canvas().Size()
+	contenido, tamano, relleno := w.Canvas().Content(), w.Canvas().Size(), w.Padded()
 	barra, restaurar := ui.BarraSuiteDePrueba(tr, producto)
 	switch producto {
 	case iconos.Docs, iconos.Sheets, iconos.Slides, iconos.PDF:
@@ -32,13 +32,19 @@ func ComprobarRotacion(t testing.TB, w fyne.Window, nombre string, producto icon
 	default:
 	}
 	defer func() {
+		fallo := recover()
 		restaurar()
+		if fallo != nil {
+			panic(fallo) // No reentrar en la configuración que causó el error.
+		}
 		w.SetContent(contenido)
+		w.SetPadded(relleno)
 		w.Resize(tamano)
-		fyne.DoAndWait(func() { fyne.CurrentApp().Settings().SetTheme(fyne.CurrentApp().Settings().Theme()) })
+		fyne.CurrentApp().Settings().SetTheme(fyne.CurrentApp().Settings().Theme())
 		contenido.Refresh()
 		fyne.DoAndWait(func() {})
 	}()
+	w.SetPadded(false) // todos los cmd/<app> montan el cromo hasta el borde
 	w.SetContent(barra.Montar(contenido))
 	recorrido.ComprobarRotacion(t, w, nombre, ui.TactilDePrueba, capturar, preparacion...)
 }

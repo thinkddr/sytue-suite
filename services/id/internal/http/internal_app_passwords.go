@@ -4,6 +4,7 @@
 package http
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -46,10 +47,11 @@ type verifyAppPasswordResp struct {
 }
 
 // internalSecretAuth exige el secreto compartido en Authorization: Bearer, en
-// tiempo constante. Un secreto vacío rechaza siempre: sin él la ruta no se monta,
-// pero la defensa en profundidad no cuesta nada.
+// tiempo constante, y rechaza con 404 si llega por el Ingress (X-Forwarded-For).
+// Un secreto vacío rechaza siempre: sin él la ruta no se monta, pero la defensa
+// en profundidad no cuesta nada.
 func (s *Server) internalSecretAuth(next http.Handler) http.Handler {
-	return httpx.SecretoInterno(s.cfg.InternalSecret)(next)
+	return httpx.SoloDesdeDentro(s.cfg.InternalSecret)(next)
 }
 
 // handleInternalVerifyAppPassword valida una contraseña de aplicación y devuelve
@@ -76,6 +78,18 @@ type dueno struct {
 	buzon string
 }
 
+// appPasswordFallida descuenta el presupuesto por cuenta (5/min, ráfaga 5) solo
+// cuando la contraseña de aplicación falla, igual que credencialFallida en
+// login.go, para no bloquear con 429 a clientes legítimos de correo o WebDAV.
+func (s *Server) appPasswordFallida(ctx context.Context, identity string, invalida error) (dueno, error) {
+	if idCuenta := strings.ToLower(strings.TrimSpace(identity)); idCuenta != "" && s.acctLimiter != nil {
+		if res, lerr := s.acctLimiter.Allow(ctx, "app-pwd:"+idCuenta); lerr == nil && !res.Allowed {
+			return dueno{}, httpx.ErrTooManyRequests
+		}
+	}
+	return dueno{}, invalida
+}
+
 // duenoDeAppPassword lee {identity, password} del cuerpo y resuelve su dueño. Todo
 // rechazo es el MISMO 401, sea la cuenta que no existe o la contraseña que no vale.
 func (s *Server) duenoDeAppPassword(w http.ResponseWriter, r *http.Request) (dueno, error) {
@@ -85,8 +99,8 @@ func (s *Server) duenoDeAppPassword(w http.ResponseWriter, r *http.Request) (due
 	}
 	invalida := httpx.ErrUnauthorized.WithMessage("Invalid credentials.")
 	pass := NormalizeAppPassword(req.Password)
-	if pass == "" {
-		return dueno{}, invalida
+	if pass == "" || s.store == nil {
+		return s.appPasswordFallida(r.Context(), req.Identity, invalida)
 	}
 
 	// La búsqueda es por el HASH, que es único: la contraseña identifica por sí
@@ -96,13 +110,13 @@ func (s *Server) duenoDeAppPassword(w http.ResponseWriter, r *http.Request) (due
 		if !errors.Is(err, domain.ErrNotFound) {
 			return dueno{}, err
 		}
-		return dueno{}, invalida
+		return s.appPasswordFallida(r.Context(), req.Identity, invalida)
 	}
 	// Una cuenta suspendida, dada de baja o borrada por su titular no entra por
 	// IMAP/SMTP aunque conserve una contraseña de aplicación: la que se creara con
 	// un access token aún vivo tras la baja abría el buzón hasta la purga.
 	if !user.Active() {
-		return dueno{}, invalida
+		return s.appPasswordFallida(r.Context(), req.Identity, invalida)
 	}
 
 	// La credencial ya viene ligada a su organización. El store ha comprobado la
@@ -120,7 +134,7 @@ func (s *Server) duenoDeAppPassword(w http.ResponseWriter, r *http.Request) (due
 	// MAIL FROM y no puede volver a comprobar por su cuenta.
 	if id := strings.TrimSpace(req.Identity); id != "" &&
 		!strings.EqualFold(id, user.Email) && !strings.EqualFold(id, buzon) {
-		return dueno{}, invalida
+		return s.appPasswordFallida(r.Context(), req.Identity, invalida)
 	}
 	return dueno{user: user, org: org, buzon: buzon}, nil
 }

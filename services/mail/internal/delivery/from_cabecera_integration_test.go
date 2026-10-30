@@ -56,10 +56,12 @@ func TestSubmitRechazaUnFromQueNoEsDeLaCuenta(t *testing.T) {
 		}
 	}
 	for _, from := range []string{
-		"Bea <bea@acme.sytue.eu>",    // una compañera
-		"Eva <eva@globex.sytue.eu>",  // otra organización
-		"Soporte <soporte@sytue.eu>", // una dirección que no es de nadie
-		"jefa@otra-empresa.example",  // fuera de la plataforma
+		"Bea <bea@acme.sytue.eu>",                             // una compañera
+		"Eva <eva@globex.sytue.eu>",                           // otra organización
+		"Soporte <soporte@sytue.eu>",                          // una dirección que no es de nadie
+		"jefa@otra-empresa.example",                           // fuera de la plataforma
+		"ana@acme.sytue.eu\r\nFrom: Bea <bea@acme.sytue.eu>",  // dos cabeceras From (COM-05)
+		"ana@acme.sytue.eu, Bea <bea@acme.sytue.eu>",          // dos direcciones en From (COM-05)
 	} {
 		if err := out.Submit(acme, mensaje(from)); !errors.Is(err, domain.ErrFromNoAutorizado) {
 			t.Errorf("Submit con From %q: err = %v, quiero ErrFromNoAutorizado", from, err)

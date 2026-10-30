@@ -422,7 +422,8 @@ export const nb: AppCatalog<typeof en> = {
   'product.cast.f1': 'Last opp videoer på opptil 8 GiB; originalen beholdes.',
   'product.cast.f2': 'Adaptiv avspilling i tre kvaliteter; nettleseren velger den beste.',
   'product.cast.f3': 'Direktesending fra et sendeprogram over RTMP, med en strømnøkkel per person.',
-  'product.cast.f4': 'Direkte fra nettleseren eller appen: kamera, skjerm og mikrofon.',
+  'product.cast.f4':
+    'Direkte fra nettleseren eller appen: kamera og mikrofon. Skjermdeling i støttede nettlesere, skrivebordssystemer og Android; ikke tilgjengelig i iOS/iPadOS-appen.',
   'product.cast.f5': 'Opptak av direktesendinger blir automatisk til videoer på forespørsel.',
   'product.cast.f6': 'En offentlig forside og en kanal per organisasjon, indekserbare.',
   'product.cast.f7':

@@ -131,8 +131,9 @@ type driveService interface {
 
 // Handlers agrupa los manejadores de la API REST de Drive.
 type Handlers struct {
-	svc driveService
-	cfg config.Config
+	svc    driveService
+	cipher cipherBlobService
+	cfg    config.Config
 	// wopi acuña los tokens de acceso del host WOPI. Nil ⇒ el endpoint de acuñación
 	// responde 404, igual que si el protocolo no existiera (sin WOPI_KEY no se monta).
 	wopi *wopi.Minter

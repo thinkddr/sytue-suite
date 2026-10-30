@@ -336,6 +336,7 @@ func (p *Pantalla) cryptoVigente(epoch uint64, generacion string) bool {
 // ReiniciarSesion descarta también el claro y las respuestas pendientes al cambiar
 // la identidad adoptada por Suite, antes de cargar la cuenta nueva.
 func (p *Pantalla) ReiniciarSesion() {
+	p.cerrarAjustes()
 	p.cancelarMigracion()
 	p.olvidarClaveActiva()
 	p.bloqueado = false

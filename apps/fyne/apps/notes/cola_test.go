@@ -10,6 +10,8 @@ import (
 	"strings"
 	"testing"
 
+	"git.sytue.eu/sytue/one/apps/nucleo/auth/authtest"
+
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/offline"
@@ -17,7 +19,7 @@ import (
 
 func almacenDePrueba(t *testing.T) *offline.Store {
 	t.Helper()
-	st, err := offline.Open(t.TempDir())
+	st, err := offline.OpenWithSecrets(t.TempDir(), new(authtest.Secrets))
 	if err != nil {
 		t.Fatal(err)
 	}

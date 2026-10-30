@@ -6,7 +6,7 @@ Vaši videozapisi i vaši prijenosi uživo, na zahtjev i u stvarnom vremenu, bez
 • Chat uživo i komentari, s osnovnom moderacijom od strane onoga tko objavljuje.
 • Prenesite videozapise do 8 GiB; original se čuva.
 • Prijenos uživo iz programa za emitiranje putem RTMP-a, s ključem prijenosa po osobi.
-• Uživo iz preglednika ili aplikacije: kamera, zaslon i mikrofon.
+• Uživo iz preglednika ili aplikacije: kamera i mikrofon. Dijeljenje zaslona u podržanim preglednicima, stolnim sustavima i Androidu; nije dostupno u aplikaciji za iOS/iPadOS.
 • Snimke prijenosa uživo automatski postaju videozapisi na zahtjev.
 • Javna naslovnica i kanal za svaku organizaciju, s mogućnošću indeksiranja.
 • Neuvrštene poveznice, videozapisi samo za organizaciju ili pristup određenim osobama po @korisničkom imenu.

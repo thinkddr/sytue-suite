@@ -271,6 +271,7 @@
     "one": "{count} note",
     "other": "{count} notes"
   },
+  "notebook.ownerOnly": "Only the person who created this notebook or an organisation administrator can move it, change who sees it or encrypt it.",
   "notebook.rename": "Rename",
   "notebook.settings": "Notebook settings",
   "notebook.title": "Name",

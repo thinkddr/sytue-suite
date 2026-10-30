@@ -104,6 +104,7 @@
   "gallery.describeStop": "Peata",
   "gallery.described": "{count} fotot kirjeldatud",
   "gallery.describing": "Kirjeldamine: {done}/{total}…",
+  "gallery.downloadCapped": "Sellest partiist välja jäänud fotod: {count}.",
   "gallery.downloadSelected": "Laadi alla",
   "gallery.downloading": {
     "one": "1 foto allalaadimine…",

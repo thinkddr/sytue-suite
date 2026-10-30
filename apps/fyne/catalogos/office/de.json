@@ -741,6 +741,7 @@
   "extdata.msg.noEncryption": "Die Verschlüsselung von Anmeldeinformationen ist auf dem Server nicht konfiguriert.",
   "extdata.msg.notAllowed": "Nur die Personen auf der Liste dieser Verbindung können sie abfragen. Bitten Sie die Administration Ihrer Organisation, Sie hinzuzufügen.",
   "extdata.msg.notFound": "Die Verbindung oder die Abfrage existiert nicht mehr.",
+  "extdata.msg.ownerOnly": "Nur wer diese Verbindung erstellt hat oder die Administration der Organisation kann sie ändern oder löschen.",
   "extdata.msg.rate": "Zu viele Ausführungen hintereinander. Warten Sie ein paar Sekunden und versuchen Sie es erneut.",
   "extdata.msg.timeout": "Die externe Datenquelle hat zu lange gebraucht.",
   "extdata.msg.unauth": "Ihre Sitzung ist abgelaufen. Melden Sie sich erneut an.",

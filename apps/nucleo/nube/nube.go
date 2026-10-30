@@ -25,13 +25,16 @@ package nube
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf16"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/nombres"
@@ -519,4 +522,43 @@ func hora(t time.Time) int64 {
 		return 0
 	}
 	return t.UnixNano()/100 + 116444736000000000
+}
+
+// SHFILEOPSTRUCTW de x64 y arm64: sin empaquetar (shellapi.h solo empaqueta en 32 bits).
+type operacionShell struct {
+	_        uintptr // hwnd
+	funcion  uint32
+	desde    *uint16 // lista de rutas completas acabada en doble nulo
+	_        *uint16 // pTo
+	banderas uint16
+	abortada int32   // fAnyOperationsAborted
+	_        uintptr // hNameMappings
+	_        *uint16 // lpszProgressTitle
+}
+
+const (
+	foBorrar = 0x3 // FO_DELETE
+	// FOF_SILENT | FOF_NOCONFIRMATION | FOF_ALLOWUNDO | FOF_NOCONFIRMMKDIR | FOF_NOERRORUI:
+	// a la papelera, sin preguntar ni enseñar nada.
+	papeleraCallada = 0x4 | 0x10 | 0x40 | 0x200 | 0x400
+	// FOF_WANTNUKEWARNING: si algo no cabe en la papelera, Windows pregunta antes de
+	// borrarlo para siempre. Sin él, lo borraría sin decir nada.
+	avisarSiNoCabe = 0x4000
+)
+
+func enviarAPapelera(ruta string, llamar func(*operacionShell) uintptr) error {
+	if ruta == "" || strings.IndexByte(ruta, 0) != -1 {
+		return errors.New("nube: ruta inválida para la papelera")
+	}
+	desde := append(utf16.Encode([]rune(ruta)), 0, 0)
+	op := operacionShell{funcion: foBorrar, desde: &desde[0], banderas: papeleraCallada | avisarSiNoCabe}
+	r := llamar(&op)
+	runtime.KeepAlive(desde)
+	switch {
+	case r != 0:
+		return fmt.Errorf("nube: SHFileOperation: 0x%x", r)
+	case op.abortada != 0:
+		return errors.New("nube: no se ha mandado a la papelera")
+	}
+	return nil
 }

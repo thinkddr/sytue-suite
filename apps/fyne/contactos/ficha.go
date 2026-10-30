@@ -97,7 +97,9 @@ func (p *Pantalla) ficha() fyne.CanvasObject {
 			x.Accion = ui.NuevoBoton(p.t("nav.newContact", nil), p.AlCrearContacto).
 				Con(ui.Primario, ui.TallaSM).ConIcono(iconos.Mas, 0)
 		}
-		return x
+		// El bloque ilustrado puede medir más que el área útil en horizontal.
+		// Conservar su alto y desplazarlo mantiene alcanzable «Nuevo contacto».
+		return container.NewVScroll(x)
 	}
 	c := *p.Seleccionado
 	cuerpo := agenda.EnColumna(0,

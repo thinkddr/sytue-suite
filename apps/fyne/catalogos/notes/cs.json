@@ -281,6 +281,7 @@
     "many": "{count} poznámky",
     "other": "{count} poznámek"
   },
+  "notebook.ownerOnly": "Přesunout tento zápisník, změnit jeho viditelnost nebo ho zašifrovat může jen osoba, která ho vytvořila, nebo správa organizace.",
   "notebook.rename": "Přejmenovat",
   "notebook.settings": "Nastavení zápisníku",
   "notebook.title": "Název",

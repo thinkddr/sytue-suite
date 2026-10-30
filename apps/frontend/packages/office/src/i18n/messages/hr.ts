@@ -1705,6 +1705,8 @@ export const hr: AppCatalog<typeof en> = {
   'extdata.msg.generic': 'Radnju nije moguće dovršiti.',
   'extdata.msg.notAllowed':
     'Upite ovoj vezi mogu slati samo osobe s njezina popisa. Zatražite od administracije svoje organizacije da vas doda.',
+  'extdata.msg.ownerOnly':
+    'Ovu vezu može izmijeniti ili izbrisati samo osoba koja ju je stvorila ili administracija organizacije.',
   'sheet.msg.badValue': 'Vrijednost nije dopuštena',
   'sheet.msg.clipboardDenied': 'Preglednik je odbio pristup međuspremniku.',
   'sheet.msg.pasteFailed': 'Lijepljenje nije uspjelo',

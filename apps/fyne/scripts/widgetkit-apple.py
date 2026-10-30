@@ -93,7 +93,7 @@ def insertar(productos, host, destino, identidad, app, generador, incluir_widget
         shutil.copytree(productos / nombre, bundle, symlinks=True)
         perfil_destino = bundle / ("embedded.mobileprovision" if plataforma == "ios" else "Contents/embedded.provisionprofile")
         shutil.copyfile(perfil, perfil_destino)
-        os.chmod(perfil_destino, 0o644)
+        os.chmod(perfil_destino, 0o600)
         anidadas.append((bundle, derechos))
     puente = None
     if incluir_widgets:

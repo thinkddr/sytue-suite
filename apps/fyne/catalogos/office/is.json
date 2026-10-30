@@ -741,6 +741,7 @@
   "extdata.msg.noEncryption": "Dulkóðun auðkenningarupplýsinga er ekki stillt á þjóninum.",
   "extdata.msg.notAllowed": "Aðeins þau sem eru á lista þessarar tengingar geta sent fyrirspurnir á hana. Biddu stjórnendur stofnunarinnar um að bæta þér við.",
   "extdata.msg.notFound": "Tengingin eða fyrirspurnin er ekki lengur til.",
+  "extdata.msg.ownerOnly": "Aðeins sá sem bjó tenginguna til eða stjórnandi stofnunarinnar getur breytt henni eða eytt.",
   "extdata.msg.rate": "Of margar keyrslur í röð. Bíddu í nokkrar sekúndur og reyndu aftur.",
   "extdata.msg.timeout": "Ytri gagnagjafinn var of lengi að svara.",
   "extdata.msg.unauth": "Lotan er útrunnin. Skráðu þig inn aftur.",

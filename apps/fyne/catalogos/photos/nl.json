@@ -104,6 +104,7 @@
   "gallery.describeStop": "Stoppen",
   "gallery.described": "{count} foto's beschreven",
   "gallery.describing": "{done} van {total} beschrijven…",
+  "gallery.downloadCapped": "Foto’s buiten deze batch: {count}.",
   "gallery.downloadSelected": "Downloaden",
   "gallery.downloading": {
     "one": "1 foto downloaden…",

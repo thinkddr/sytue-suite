@@ -476,23 +476,29 @@ func (s *Server) altaConPassword(w http.ResponseWriter, r *http.Request, org dom
 		return
 	}
 
-	var nuevo bool
 	var userID string
 	err = s.store.InTx(ctx, func(q pg.Querier) error {
-		u, e := s.store.GetUserByEmail(ctx, email)
+		if _, e := s.store.GetUserByEmail(ctx, email); e == nil {
+			// Si la cuenta global YA existe, no se le puede cambiar la contraseña
+			// desde aquí: hacerlo permitiría al administrador de cualquier
+			// organización secuestrar una cuenta existente con solo saber su correo.
+			// Para incorporar una cuenta existente se usa la invitación sin contraseña.
+			return domain.ErrConflict
+		} else if !errors.Is(e, domain.ErrNotFound) {
+			return e
+		}
+		// Igual que en SCIM (#679), que un administrador escriba una dirección no
+		// demuestra control del buzón en el directorio global: nace con
+		// EmailVerified: false para que no cuente como correo verificado en OIDC,
+		// en DuenosGlobales ni al reclamar invitaciones de otras organizaciones.
+		// Al quedar como miembro de esta organización en la misma transacción,
+		// soloCuentasPersonales es false y entra desde el primer momento sin que
+		// haga falta mandarle ningún correo de confirmación.
+		u, e := s.store.CreateUser(ctx, q, domain.User{
+			Email: email, EmailVerified: false, Status: domain.StatusActive,
+		})
 		if e != nil {
-			// No existe: se crea con el correo YA verificado. Lo verifica el hecho
-			// de que un administrador de la organización lo escriba, igual que en
-			// el aprovisionamiento por SCIM; pedirle después que confirme una
-			// dirección que le acaban de dar sería mandarle otro correo, que es
-			// justo lo que aquí no funciona.
-			u, e = s.store.CreateUser(ctx, q, domain.User{
-				Email: email, EmailVerified: true, Status: domain.StatusActive,
-			})
-			if e != nil {
-				return e
-			}
-			nuevo = true
+			return e
 		}
 		userID = u.ID
 		if e := s.store.SetPassword(ctx, q, u.ID, hash); e != nil {
@@ -522,6 +528,6 @@ func (s *Server) altaConPassword(w http.ResponseWriter, r *http.Request, org dom
 		"email": email, "role": role, "user_id": userID,
 		// `invited` distingue las dos altas para que la consola no diga «le hemos
 		// enviado un correo» cuando no se ha enviado ninguno.
-		"invited": false, "created": nuevo,
+		"invited": false, "created": true,
 	})
 }

@@ -271,6 +271,7 @@
     "one": "{count} muistiinpano",
     "other": "{count} muistiinpanoa"
   },
+  "notebook.ownerOnly": "Vain tämän muistikirjan luoja tai organisaation ylläpitäjä voi siirtää sitä, muuttaa sen näkyvyyttä tai salata sen.",
   "notebook.rename": "Nimeä uudelleen",
   "notebook.settings": "Muistikirjan asetukset",
   "notebook.title": "Nimi",

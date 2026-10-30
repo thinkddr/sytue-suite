@@ -234,6 +234,11 @@ func (c *Contexto) AjustarZoom(delta int) {
 
 // PonerZoom fija el zoom acotado.
 func (c *Contexto) PonerZoom(z int) {
+	// El lienzo puede retirar su encuadre automático incluso si se elige el
+	// mismo porcentaje que éste había puesto. Los demás lienzos no lo necesitan.
+	if l, ok := c.Lienzo.(interface{ ZoomExplicito() }); ok {
+		l.ZoomExplicito()
+	}
 	c.Zoom = min(max(z, ZoomMin), ZoomMax)
 	c.refrescar()
 }

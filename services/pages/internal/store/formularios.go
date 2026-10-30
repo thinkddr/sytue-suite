@@ -59,8 +59,8 @@ func (s *Store) Formularios(ctx context.Context, tenant string, siteID uuid.UUID
 	return raw, res, err
 }
 
-// GuardarAvisosFormulario fija a quién avisa un formulario. Crea su fila si no la tenía
-// (nada la crea al publicar) y no toca si está encendido.
+// GuardarAvisosFormulario fija a quién avisa un formulario. Crea su fila si aún no la
+// tenía (sitios publicados antes de WEB-07) y no toca si está encendido.
 func (s *Store) GuardarAvisosFormulario(ctx context.Context, tenant string, siteID uuid.UUID, formID string, notify []domain.StoreNotifyPerson) error {
 	if notify == nil {
 		notify = []domain.StoreNotifyPerson{}

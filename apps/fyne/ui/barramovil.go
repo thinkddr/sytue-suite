@@ -151,7 +151,7 @@ func (r *barraMovilRenderer) Refresh() {
 	r.fondo.Show()
 	r.marco.esconder()
 	r.titulo.Show()
-	if tema.EsMarco() {
+	if tema.EsMarco() || b.enCarril {
 		r.fondo.Hide()
 		r.titulo.Color = tema.Color("sidebar-fg", v)
 		r.boton.Trazo, r.boton.TrazoEncima = "sidebar-fg", "sidebar-fg"
@@ -159,9 +159,15 @@ func (r *barraMovilRenderer) Refresh() {
 	}
 	if b.enCarril {
 		r.titulo.Hide()
-		r.marco.pintar(v)
-		r.marco.degradado.EndColor = r.marco.colorEn(AnchoCarrilMovil, b.anchoMarco)
-		r.marco.degradado.Refresh()
+		if tema.EsMarco() {
+			r.marco.pintar(v)
+			r.marco.degradado.EndColor = r.marco.colorEn(AnchoCarrilMovil, b.anchoMarco)
+			r.marco.degradado.Refresh()
+		} else {
+			// Carril no declara los tokens de Marco: su navegación usa sidebar-bg.
+			r.fondo.FillColor = FondoCarril(v)
+			r.fondo.Show()
+		}
 	}
 	r.boton.Show()
 	switch {

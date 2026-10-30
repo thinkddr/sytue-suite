@@ -5,6 +5,7 @@ package http
 
 import (
 	"crypto/sha256"
+	"encoding/hex"
 	"log/slog"
 	"net"
 	"net/http"
@@ -248,6 +249,25 @@ func deriveCaptchaKey(kek []byte) []byte {
 	return h[:]
 }
 
+// rateKeyPorCliente compone la clave del cubo por IP con un discriminador de
+// contexto cuando la dirección no identifica a una persona (INF-04: par privado
+// detrás de un túnel sin X-Forwarded-For público). Cuando la IP sí identifica al
+// cliente, devuelve `<prefijo><ip>` sin tocar nada.
+func rateKeyPorCliente(prefijo string, r *http.Request) string {
+	ip := clientIP(r)
+	if domain.TrustedProxiesFrom(r.Context()).Identifica(ip) {
+		return prefijo + ip
+	}
+	h := sha256.New()
+	_, _ = h.Write([]byte(ip))
+	for _, hdr := range []string{"User-Agent", "Accept-Language", "Sec-CH-UA", "Cookie", "Authorization"} {
+		_, _ = h.Write([]byte{0})
+		_, _ = h.Write([]byte(r.Header.Get(hdr)))
+	}
+	sum := h.Sum(nil)
+	return prefijo + ip + ":" + hex.EncodeToString(sum[:8])
+}
+
 // oauth2RateKey es la clave de bucket de los endpoints OAuth2 (/token, /revoke,
 // /introspect, /register): la IP del cliente con PREFIJO propio.
 //
@@ -257,7 +277,7 @@ func deriveCaptchaKey(kek []byte) []byte {
 // escribirían la MISMA fila: el login (10/min, ráfaga 10) y OAuth2 (60/min,
 // ráfaga 30) se pisarían el presupuesto y el tráfico normal de refresh acabaría
 // recargando el bucket anti-fuerza-bruta del login. Con prefijo son dos filas.
-func oauth2RateKey(r *http.Request) string { return "oauth2:" + clientIP(r) }
+func oauth2RateKey(r *http.Request) string { return rateKeyPorCliente("oauth2:", r) }
 
 // loginRateKey es la clave del bucket por IP del login interactivo.
 //
@@ -266,7 +286,7 @@ func oauth2RateKey(r *http.Request) string { return "oauth2:" + clientIP(r) }
 // de httpx, que lee la primera entrada de X-Forwarded-For sin mirar quién
 // conecta: con aquel, un atacante estrenaba bucket en cada intento poniendo una
 // cabecera distinta, y el tope de 10/min no frenaba absolutamente nada.
-func loginRateKey(r *http.Request) string { return "login-ip:" + clientIP(r) }
+func loginRateKey(r *http.Request) string { return rateKeyPorCliente("login-ip:", r) }
 
 // conProxiesDeConfianza deja la lista de proxies de confianza en el contexto de
 // cada petición. Va lo PRIMERO del router: de ella depende clientIP, y clientIP
@@ -488,7 +508,7 @@ func (s *Server) Router() http.Handler {
 		// --- Recolector de logs de plataforma, protegido por bearer estático ---
 		// Lo llaman los OTROS servicios, no una persona: por eso vive fuera de
 		// /api/v1 (donde manda el JWT del usuario). Ver servicelogs_ingest.go.
-		r.Post("/service-logs", s.handleIngestServiceLogs)
+		r.With(httpx.SinPasarPorElIngress).Post("/service-logs", s.handleIngestServiceLogs)
 
 		// --- Verificación de contraseñas de aplicación (service-to-service) ---
 		// La consulta Sytue Mail en cada AUTH de IMAP/SMTP. Fuera de /api/v1 por lo

@@ -1709,6 +1709,8 @@ export const nl: AppCatalog<typeof en> = {
   'extdata.msg.generic': 'De bewerking kon niet worden voltooid.',
   'extdata.msg.notAllowed':
     'Alleen de mensen op de lijst van deze koppeling kunnen die raadplegen. Vraag wie je organisatie beheert om je toe te voegen.',
+  'extdata.msg.ownerOnly':
+    'Alleen wie deze koppeling heeft aangemaakt of wie de organisatie beheert kan die wijzigen of verwijderen.',
   'sheet.msg.badValue': 'Waarde niet toegestaan',
   'sheet.msg.clipboardDenied': 'De browser weigerde toegang tot het klembord.',
   'sheet.msg.pasteFailed': 'Plakken is niet gelukt',

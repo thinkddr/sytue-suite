@@ -1699,6 +1699,8 @@ export const fi: AppCatalog<typeof en> = {
   'extdata.msg.generic': 'Toimintoa ei voitu suorittaa loppuun.',
   'extdata.msg.notAllowed':
     'Tätä yhteyttä voivat kysellä vain sen listalla olevat henkilöt. Pyydä organisaatiosi ylläpitoa lisäämään sinut.',
+  'extdata.msg.ownerOnly':
+    'Vain tämän yhteyden luoja tai organisaation ylläpitäjä voi muuttaa tai poistaa sen.',
   'sheet.msg.badValue': 'Arvo ei ole sallittu',
   'sheet.msg.clipboardDenied': 'Selain esti pääsyn leikepöydälle.',
   'sheet.msg.pasteFailed': 'Liittäminen epäonnistui',

@@ -743,6 +743,7 @@
   "extdata.msg.noEncryption": "Akreditācijas datu šifrēšana serverī nav konfigurēta.",
   "extdata.msg.notAllowed": "Vaicājumus šim savienojumam var sūtīt tikai tā sarakstā esošie cilvēki. Lūdziet savas organizācijas administrāciju jūs pievienot.",
   "extdata.msg.notFound": "Savienojums vai vaicājums vairs nepastāv.",
+  "extdata.msg.ownerOnly": "Mainīt vai dzēst šo savienojumu var tikai tā izveidotājs vai organizācijas administrācija.",
   "extdata.msg.rate": "Pārāk daudz izpilžu pēc kārtas. Uzgaidiet dažas sekundes un mēģiniet vēlreiz.",
   "extdata.msg.timeout": "Ārējais datu avots pārāk ilgi neatbildēja.",
   "extdata.msg.unauth": "Sesija ir beigusies. Piesakieties vēlreiz.",

@@ -28,16 +28,20 @@ func TestEnElTelefonoElTecladoSoloSaleParaEscribir(t *testing.T) {
 	antes := esMovil
 	t.Cleanup(func() { esMovil = antes })
 	esMovil = func() bool { return true }
+	Enfocar(c, boton)
 	test.Tap(boton)
 	if c.Focused() != nil {
 		t.Errorf("en el teléfono tocar un botón lo enfoca (%T) y saca el teclado", c.Focused())
 	}
-	enfocar(c, campo.editor)
+	Enfocar(c, campo.editor)
 	if c.Focused() != fyne.Focusable(campo.editor) {
 		t.Errorf("en el teléfono un campo no se enfoca: %T", c.Focused())
 	}
 
-	c.Unfocus()
+	Enfocar(c, nil)
+	if c.Focused() != nil {
+		t.Fatal("retirar el foco deja un campo activo en el teléfono")
+	}
 	esMovil = func() bool { return false }
 	test.Tap(boton)
 	if c.Focused() != fyne.Focusable(boton) {

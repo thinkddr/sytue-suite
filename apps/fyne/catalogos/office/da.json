@@ -741,6 +741,7 @@
   "extdata.msg.noEncryption": "Kryptering af legitimationsoplysninger er ikke konfigureret på serveren.",
   "extdata.msg.notAllowed": "Kun personerne på forbindelsens liste kan forespørge den. Bed den, der administrerer organisationen, om at tilføje dig.",
   "extdata.msg.notFound": "Forbindelsen eller forespørgslen findes ikke længere.",
+  "extdata.msg.ownerOnly": "Kun den, der har oprettet forbindelsen, eller den, der administrerer organisationen, kan ændre eller slette den.",
   "extdata.msg.rate": "For mange kørsler i træk. Vent et par sekunder, og prøv igen.",
   "extdata.msg.timeout": "Den eksterne datakilde var for længe om at svare.",
   "extdata.msg.unauth": "Din session er udløbet. Log ind igen.",

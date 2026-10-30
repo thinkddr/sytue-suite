@@ -238,4 +238,3 @@ func TestRLSOwnerScopeIsEnforcedByThePolicy(t *testing.T) {
 		t.Fatalf("sin app.owner_sub se ven %d carpetas de alice, quiero 0", n)
 	}
 }
-

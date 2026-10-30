@@ -74,7 +74,7 @@ func MedidaSelectorCinta(ancho float32) fyne.Size {
 	if ancho <= 0 {
 		ancho = AnchoSelectorPorDefecto
 	}
-	return fyne.NewSize(ancho, AltoSelectorCinta)
+	return fyne.NewSize(ui.SueloTactil(ancho), ui.SueloTactil(AltoSelectorCinta))
 }
 
 // SelectorCinta es RibbonSelect: el `<select>` compacto de la cinta.
@@ -118,7 +118,7 @@ func (s *SelectorCinta) MinSize() fyne.Size {
 	s.ExtendBaseWidget(s)
 	m := MedidaSelectorCinta(s.Ancho)
 	if s.Alto > 0 {
-		m.Height = s.Alto
+		m.Height = ui.SueloTactil(s.Alto)
 	}
 	return m
 }

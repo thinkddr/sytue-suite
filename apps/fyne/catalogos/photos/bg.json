@@ -104,6 +104,7 @@
   "gallery.describeStop": "Спиране",
   "gallery.described": "{count} снимки са описани",
   "gallery.describing": "Описване на {done} от {total}…",
+  "gallery.downloadCapped": "Снимки извън тази партида: {count}.",
   "gallery.downloadSelected": "Изтегляне",
   "gallery.downloading": {
     "one": "Изтегляне на 1 снимка…",

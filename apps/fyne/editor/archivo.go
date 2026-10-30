@@ -60,6 +60,7 @@ type BotonArchivo struct {
 	ctx   *Contexto
 	menu  *ui.Menu
 	ancla fyne.CanvasObject
+	antes func() []fyne.CanvasObject
 }
 
 var _ fyne.Widget = (*BotonArchivo)(nil)
@@ -84,6 +85,9 @@ func (b *BotonArchivo) Menu() *ui.Menu {
 		return e
 	}
 	var elems []fyne.CanvasObject
+	if b.antes != nil {
+		elems = append(elems, b.antes()...)
+	}
 	// «Nuevo» y «Abrir…», solo en nativo (abrir.go); sin gancho no salen, para que un
 	// editor que aún no los tiene no enseñe entradas muertas.
 	if c.Nuevo != nil {
@@ -131,7 +135,7 @@ func (b *BotonArchivo) Menu() *ui.Menu {
 	}
 	elems = append(elems, ui.NuevoSeparadorMenu(),
 		item("file.saveVersion", c.SinRed, c.preguntarVersion(b)),
-		item("file.rename", false, c.EnfocarTitulo),
+		item("file.rename", b.antes != nil && c.AlRenombrar == nil, c.EnfocarTitulo),
 		ui.NuevoSeparadorMenu(),
 		// En nativo «volver» es a la portada de la app, como la flecha de la cabecera:
 		// al Hub se va cambiando de aplicación (`docs/CONVENTIONS.md` §13.6).

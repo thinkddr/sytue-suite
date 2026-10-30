@@ -17,6 +17,10 @@ import (
 func TestRecorridoConSesion(t *testing.T) {
 	sa, _, w := salaEn(t, servicioConDos(), 1280)
 	sa.Arrancar(context.Background())
-	montaje.ComprobarRotacion(t, w, "rooms/canal", iconos.Rooms, true)
+	h := sa.P.Canal.Historial
+	comprobarHistorialRotacion(t, w, h, "antes")
+	montaje.ComprobarRotacion(t, w, "rooms/canal", iconos.Rooms, true, func() {
+		comprobarHistorialRotacion(t, w, h, "girado")
+	})
 	recorrido.Comprobar(t, w, 400)
 }

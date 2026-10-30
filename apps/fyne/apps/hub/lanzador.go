@@ -271,6 +271,9 @@ func (l *Lanzador) CreateRenderer() fyne.WidgetRenderer {
 type lanzadorRenderer struct {
 	l *Lanzador
 	v tema.Variante
+	// La forma con que se construyeron los objetos. Fyne puede pedir Layout antes
+	// de Refresh al cambiar el tema; Marco y Carril llevan tarjetas distintas.
+	marco bool
 
 	atajosConexiones fyne.CanvasObject
 	fondo            *ui.FondoSuite
@@ -329,6 +332,7 @@ func (r *lanzadorRenderer) Refresh() {
 //nolint:gocyclo // rehacer lays out launcher UI blocks with dense options.
 func (r *lanzadorRenderer) rehacer() {
 	l := r.l
+	r.marco = tema.EsMarco()
 	r.v = tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	v, t := r.v, l.T
 	_, ancho := CajaContenido(l.Ancho())
@@ -694,6 +698,9 @@ func (r *lanzadorRenderer) filaDe(it api.HubHit) *FilaReciente {
 // alto es lo que ocupa la portada entera a ese ancho de ventana. Es la ÚNICA cuenta:
 // `Layout` recorre lo mismo y el guardián compara contra ella.
 func (r *lanzadorRenderer) alto(ventana float32) float32 {
+	if r.marco != tema.EsMarco() {
+		r.rehacer()
+	}
 	_, ancho := CajaContenido(ventana)
 	r.medirCabecerasTarjetas(ventana, ancho)
 	if tema.EsMarco() {

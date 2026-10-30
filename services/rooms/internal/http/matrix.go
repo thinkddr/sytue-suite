@@ -18,6 +18,17 @@ func (h *Handlers) MatrixBootstrap(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, r, http.StatusOK, result)
 }
 
+func (h *Handlers) MatrixStorageBootstrap(w http.ResponseWriter, r *http.Request) {
+	actor, _ := caller(r)
+	result, err := h.svc.BootstrapMatrixStorage(r.Context(), actor, r.URL.Query().Get("product"))
+	if err != nil {
+		httpx.Fail(w, r, toAPIError(err))
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	httpx.JSON(w, r, http.StatusOK, result)
+}
+
 func (h *Handlers) MatrixAccountAccess(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Subject string `json:"subject"`

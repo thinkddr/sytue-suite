@@ -17,11 +17,12 @@ func (c *Client) UpdateBindings(next Bootstrap) error {
 	if c.closed.Load() {
 		return ErrClosed
 	}
-	if next.ControllerUserID != c.cfg.Bootstrap.ControllerUserID || next.Actor != c.cfg.Subject || next.Tenant != c.cfg.Tenant || next.MatrixUserID != c.cfg.Bootstrap.MatrixUserID || strings.TrimRight(next.HomeserverURL, "/") != c.cfg.Bootstrap.HomeserverURL || next.Encryption != c.cfg.Bootstrap.Encryption {
+	if next.StorageProduct != c.cfg.Bootstrap.StorageProduct || (next.StorageProduct != "" && !validStorageBindings(next)) || next.ControllerUserID != c.cfg.Bootstrap.ControllerUserID || next.Actor != c.cfg.Subject || next.Tenant != c.cfg.Tenant || next.MatrixUserID != c.cfg.Bootstrap.MatrixUserID || strings.TrimRight(next.HomeserverURL, "/") != c.cfg.Bootstrap.HomeserverURL || next.Encryption != c.cfg.Bootstrap.Encryption {
 		return ErrIdentity
 	}
 	next.Channels = slices.Clone(next.Channels)
 	next.DraftRoomIDs = slices.Clone(next.DraftRoomIDs)
+	next.StorageRoomIDs = slices.Clone(next.StorageRoomIDs)
 	c.cfg.Bootstrap = next
 	return nil
 }

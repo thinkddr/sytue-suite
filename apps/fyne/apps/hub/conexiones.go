@@ -22,6 +22,7 @@ import (
 // AlmacenConectable is the authoritative availability check shared with Drive.
 type AlmacenConectable interface {
 	ExternalStorage(context.Context) (api.AlmacenExterno, error)
+	ExternalStorageAccounts(context.Context) (api.CuentasAlmacenExterno, error)
 }
 
 // ConAlmacenamiento adds the direct Drive wizard shortcut for permitted accounts.
@@ -43,7 +44,13 @@ func (v *Vista) cargarAccesosConexiones(ctx context.Context, r auth.Reclamos) {
 	externo := false
 	if permitido && v.almacen != nil {
 		estado, err := v.almacen.ExternalStorage(ctx)
-		externo = err == nil && estado.Available
+		if err == nil {
+			externo = estado.Available
+			if !externo {
+				cuentas, err := v.almacen.ExternalStorageAccounts(ctx)
+				externo = err == nil && (cuentas.Providers["gdrive"] || cuentas.Providers["onedrive"] || cuentas.Providers["dropbox"])
+			}
+		}
 	}
 	v.enUI(func() {
 		v.lanzador.PuedeConectarAlmacen = externo

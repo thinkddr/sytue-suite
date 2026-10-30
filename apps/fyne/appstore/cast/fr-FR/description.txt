@@ -6,7 +6,7 @@ Vidéo à la demande et direct : téléverser, diffuser et partager, dans l’UE
 • Tchat en direct et commentaires, avec une modération de base par la personne qui publie.
 • Téléversez des vidéos jusqu’à 8 Gio ; l’original est conservé.
 • Direct depuis un logiciel de diffusion via RTMP, avec une clé de flux par personne.
-• Direct depuis le navigateur ou l’application : caméra, écran et micro.
+• Direct depuis le navigateur ou l’application : caméra et micro. Partage d’écran dans les navigateurs, systèmes de bureau et Android compatibles ; indisponible dans l’app iOS/iPadOS.
 • Les enregistrements des directs deviennent automatiquement des vidéos à la demande.
 • Une page d’accueil publique et une chaîne par organisation, indexables.
 • Liens non répertoriés, vidéos réservées à l’organisation ou accès à des personnes précises par @identifiant.

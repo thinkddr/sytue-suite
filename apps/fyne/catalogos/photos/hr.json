@@ -106,6 +106,7 @@
   "gallery.describeStop": "Zaustavi",
   "gallery.described": "{count} fotografija opisano",
   "gallery.describing": "Opisivanje {done} od {total}…",
+  "gallery.downloadCapped": "Fotografije izvan ove serije: {count}.",
   "gallery.downloadSelected": "Preuzmi",
   "gallery.downloading": {
     "one": "Preuzimanje {count} fotografije…",

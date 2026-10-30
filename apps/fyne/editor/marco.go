@@ -46,6 +46,8 @@ type Marco struct {
 	lienzoAtajo fyne.Canvas
 	// buscarAbierto es si el panel «Buscar» estaba abierto en la última recomposición.
 	buscarAbierto bool
+	compacto      bool
+	renombrar     *ui.Dialogo
 }
 
 // ResaltesDeBusqueda es el lienzo que pinta las coincidencias de «Buscar» y las quita
@@ -83,7 +85,13 @@ func NuevoMarco(ctx *Contexto, r *Registro, alVolver func()) *Marco {
 	ctx.Refrescar = m.Recomponer
 	ctx.Volver = alVolver
 	m.cabecera = NuevaCabecera(ctx, alVolver)
-	ctx.EnfocarTitulo = m.cabecera.EnfocarTitulo
+	ctx.EnfocarTitulo = func() {
+		if m.compacto {
+			m.renombrarCompacto()
+		} else {
+			m.cabecera.EnfocarTitulo()
+		}
+	}
 	m.cinta = NuevaCinta(ctx, r)
 	m.carril = NuevoCarril(ctx)
 	// La barra se construye UNA vez y aquí.
@@ -240,15 +248,23 @@ func (r *marcoRenderer) Layout(t fyne.Size) {
 		o.Resize(fyne.NewSize(t.Width, alto))
 		return y + alto
 	}
-	y := banda(m.cabecera, 0, AltoCabecera)
+	m.ponerCompacto()
+	y := float32(0)
+	altoEstado := float32(0)
+	if !m.compacto {
+		y = banda(m.cabecera, 0, AltoCabecera)
+		altoEstado = AltoEstado
+	}
 	y = banda(m.cinta, y, m.cinta.Alto(t.Width))
 	if m.franja != nil {
 		y = banda(m.franja, y, m.franja.MinSize().Height)
 	}
 
-	altoCentro := max(t.Height-y-AltoEstado, 0)
-	m.estado.Move(fyne.NewPos(0, t.Height-AltoEstado))
-	m.estado.Resize(fyne.NewSize(t.Width, AltoEstado))
+	altoCentro := max(t.Height-y-altoEstado, 0)
+	if !m.compacto {
+		m.estado.Move(fyne.NewPos(0, t.Height-altoEstado))
+		m.estado.Resize(fyne.NewSize(t.Width, altoEstado))
+	}
 
 	x := float32(0)
 	m.carril.Move(fyne.NewPos(x, y))

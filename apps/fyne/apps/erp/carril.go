@@ -223,7 +223,25 @@ func (c *CarrilIconos) Objeto(v tema.Variante) fyne.CanvasObject {
 		titulo.Derecha = true
 		hijos = append(hijos, titulo)
 	}
-	return container.New(&columnaCarril{arriba: len(c.Arriba)}, hijos...)
+	contenido := container.New(&columnaCarril{arriba: len(c.Arriba)}, hijos...)
+	desplaza := container.NewVScroll(contenido)
+	ui.RevelarFocoEnScroll(desplaza, contenido)
+	return container.New(viewportCarril{}, desplaza)
+}
+
+// El carril conserva su ancho y permite recorrer todas las acciones con poco alto.
+type viewportCarril struct{}
+
+func (viewportCarril) MinSize([]fyne.CanvasObject) fyne.Size {
+	return fyne.NewSize(AnchoCarril, 0)
+}
+
+func (viewportCarril) Layout(objs []fyne.CanvasObject, t fyne.Size) {
+	objs[0].Move(fyne.Position{})
+	objs[0].Resize(t)
+	if s, ok := objs[0].(*container.Scroll); ok && ui.RevelarFocoEnScroll(s, s.Content) {
+		ui.MostrarFoco(s, fyne.CurrentApp().Driver().CanvasForObject(s), 0)
+	}
 }
 
 // columnaCarril coloca [fondo, las de arriba…, las de abajo…]: las primeras desde el

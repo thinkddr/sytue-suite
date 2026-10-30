@@ -32,9 +32,10 @@ type ExternalChatAccount struct {
 	AccountID     string `json:"account_id"`
 }
 type ExternalChatProvider struct {
-	Provider     string                   `json:"provider"`
-	Available    bool                     `json:"available"`
-	Capabilities ExternalChatCapabilities `json:"capabilities"`
+	Provider      string                   `json:"provider"`
+	Available     bool                     `json:"available"`
+	DisabledByOrg bool                     `json:"disabled_by_org"`
+	Capabilities  ExternalChatCapabilities `json:"capabilities"`
 }
 type ExternalChatAccounts struct {
 	Items     []ExternalChatAccount  `json:"items"`

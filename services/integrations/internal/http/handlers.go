@@ -24,6 +24,7 @@ import (
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/platform/pkg/keycrypto"
 	"git.sytue.eu/sytue/one/platform/pkg/log"
+	"git.sytue.eu/sytue/one/platform/pkg/logsafe"
 	"git.sytue.eu/sytue/one/services/integrations/internal/connector"
 	"git.sytue.eu/sytue/one/services/integrations/internal/directory"
 	"git.sytue.eu/sytue/one/services/integrations/internal/domain"
@@ -427,7 +428,7 @@ func (h *Handlers) TestInstance(w http.ResponseWriter, r *http.Request) {
 
 		// Runtime: único cliente de egress. El Bearer sale del vault; el driver no lo ve.
 		rt := h.egressRuntime(inst, log.From(ctx).With(
-			"instance", inst.ID, "org", inst.OrgID, "capability", string(capab),
+			"instance", logsafe.Text(inst.ID), "org", inst.OrgID, "capability", string(capab),
 		))
 
 		// El driver recibe la instancia SIN secretos (seguridad por construcción), con la
@@ -442,7 +443,7 @@ func (h *Handlers) TestInstance(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			log.From(ctx).Warn("integrations: Test de conector falló",
-				"instance", id, "capability", capab, "error", testErr)
+				"instance", logsafe.Text(id), "capability", capab, "error", testErr)
 			results = append(results, capabilityResult{Capability: string(capab), Error: testErr.Error()})
 			failed = true
 			continue

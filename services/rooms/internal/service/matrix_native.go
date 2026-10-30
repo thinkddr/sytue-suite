@@ -9,20 +9,25 @@ import (
 	"slices"
 	"strings"
 
+	"git.sytue.eu/sytue/one/apps/nucleo/storage"
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 	"git.sytue.eu/sytue/one/services/rooms/internal/domain"
 )
 
 type MatrixNativeStart struct {
+	Product      string `json:"product"`
 	AuthorizeURL string `json:"authorize_url"`
 	State        string `json:"state"`
 }
 type MatrixNativePreview struct {
 	MatrixNativeStart
-	Actor  string `json:"actor"`
-	Tenant string `json:"tenant"`
+	Actor         string `json:"actor"`
+	Tenant        string `json:"tenant"`
+	HomeserverURL string `json:"homeserver_url"`
+	SSOProviderID string `json:"sso_provider_id"`
 }
 type MatrixNativeAccepted struct {
+	Product     string `json:"product"`
 	Ticket      string `json:"ticket"`
 	RedirectURL string `json:"redirect_url"`
 }
@@ -74,8 +79,11 @@ func (s *Service) matrixNativePublicURL(path, state string) (string, error) {
 	return base.String(), nil
 }
 
-func (s *Service) StartMatrixNative(ctx context.Context, actor, challenge, method string) (MatrixNativeStart, error) {
-	if method != "S256" || !matrixOpaque(challenge) {
+func (s *Service) StartMatrixNative(ctx context.Context, actor, challenge, method, product string) (MatrixNativeStart, error) {
+	if product == "" {
+		product = "rooms"
+	}
+	if method != "S256" || !matrixOpaque(challenge) || storage.NativeApp(product) == "" {
 		return MatrixNativeStart{}, domain.ErrInvalidInput
 	}
 	if err := s.matrixNativeActor(ctx, actor); err != nil {
@@ -84,7 +92,7 @@ func (s *Service) StartMatrixNative(ctx context.Context, actor, challenge, metho
 	if _, err := s.matrix.EnsureUser(ctx, actor); err != nil {
 		return MatrixNativeStart{}, err
 	}
-	state, err := s.pstore.CreateMatrixNativeConsent(ctx, actor, challenge)
+	state, err := s.pstore.CreateMatrixNativeConsentFor(ctx, actor, challenge, product)
 	if err != nil {
 		return MatrixNativeStart{}, err
 	}
@@ -92,7 +100,7 @@ func (s *Service) StartMatrixNative(ctx context.Context, actor, challenge, metho
 	if err != nil {
 		return MatrixNativeStart{}, err
 	}
-	return MatrixNativeStart{AuthorizeURL: target, State: state}, nil
+	return MatrixNativeStart{AuthorizeURL: target, State: state, Product: product}, nil
 }
 
 func (s *Service) PreviewMatrixNative(ctx context.Context, actor, state string) (MatrixNativePreview, error) {
@@ -102,7 +110,8 @@ func (s *Service) PreviewMatrixNative(ctx context.Context, actor, state string) 
 	if err := s.matrixNativeActor(ctx, actor); err != nil {
 		return MatrixNativePreview{}, err
 	}
-	if err := s.pstore.PreviewMatrixNativeConsent(ctx, actor, state); err != nil {
+	product, err := s.pstore.PreviewMatrixNativeProduct(ctx, actor, state)
+	if err != nil {
 		return MatrixNativePreview{}, err
 	}
 	callback, err := s.matrixNativePublicURL("callback", state)
@@ -115,7 +124,7 @@ func (s *Service) PreviewMatrixNative(ctx context.Context, actor, state string) 
 	}
 	authorize.Path = "/_matrix/client/v3/login/sso/redirect/" + s.cfg.MatrixSSOProviderID
 	authorize.RawQuery = url.Values{"redirectUrl": {callback}}.Encode()
-	return MatrixNativePreview{MatrixNativeStart: MatrixNativeStart{AuthorizeURL: authorize.String(), State: state}, Actor: actor, Tenant: tenancy.MustFrom(ctx).Slug}, nil
+	return MatrixNativePreview{MatrixNativeStart: MatrixNativeStart{Product: product, AuthorizeURL: authorize.String(), State: state}, Actor: actor, Tenant: tenancy.MustFrom(ctx).Slug, HomeserverURL: s.cfg.MatrixHomeserverURL, SSOProviderID: s.cfg.MatrixSSOProviderID}, nil
 }
 
 func (s *Service) AcceptMatrixNative(ctx context.Context, actor, state, loginToken string) (MatrixNativeAccepted, error) {
@@ -125,12 +134,16 @@ func (s *Service) AcceptMatrixNative(ctx context.Context, actor, state, loginTok
 	if err := s.matrixNativeActor(ctx, actor); err != nil {
 		return MatrixNativeAccepted{}, err
 	}
-	ticket, err := s.pstore.AcceptMatrixNativeConsent(ctx, actor, state, loginToken)
+	ticket, product, err := s.pstore.AcceptMatrixNativeConsentWithProduct(ctx, actor, state, loginToken)
 	if err != nil {
 		return MatrixNativeAccepted{}, err
 	}
-	target := url.URL{Scheme: "sytue-rooms", Host: "matrix", Path: "/callback", RawQuery: url.Values{"state": {state}, "ticket": {ticket}}.Encode()}
-	return MatrixNativeAccepted{Ticket: ticket, RedirectURL: target.String()}, nil
+	native := storage.NativeApp(product)
+	if native == "" {
+		return MatrixNativeAccepted{}, domain.ErrForbidden
+	}
+	target := url.URL{Scheme: "sytue-" + native, Host: "matrix", Path: "/callback", RawQuery: url.Values{"state": {state}, "ticket": {ticket}}.Encode()}
+	return MatrixNativeAccepted{Product: product, Ticket: ticket, RedirectURL: target.String()}, nil
 }
 
 func (s *Service) FinishMatrixNative(ctx context.Context, actor, state, ticket, verifier string) (string, error) {

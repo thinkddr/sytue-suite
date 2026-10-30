@@ -72,6 +72,7 @@ type DataConnection struct {
 	Kind           Kind            `json:"kind"`
 	Config         json.RawMessage `json:"config"`
 	HasCredentials bool            `json:"has_credentials"`
+	CanEdit        bool            `json:"can_edit"`
 	CreatedBy      string          `json:"created_by"`
 	CreatedAt      time.Time       `json:"created_at"`
 	UpdatedAt      time.Time       `json:"updated_at"`

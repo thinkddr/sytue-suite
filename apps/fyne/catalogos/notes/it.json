@@ -271,6 +271,7 @@
     "one": "{count} nota",
     "other": "{count} note"
   },
+  "notebook.ownerOnly": "Solo chi ha creato questo taccuino o chi amministra l’organizzazione può spostarlo, cambiarne la visibilità o cifrarlo.",
   "notebook.rename": "Rinomina",
   "notebook.settings": "Impostazioni del taccuino",
   "notebook.title": "Nome",

@@ -15,6 +15,7 @@ import (
 
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 	"git.sytue.eu/sytue/one/services/pages/internal/domain"
+	"git.sytue.eu/sytue/one/services/pages/internal/ir"
 )
 
 // SitioCompleto devuelve toda la información de un sitio dentro del tenant activo.
@@ -163,11 +164,12 @@ func (s *Store) CrearPublicacionLiveConArchivos(
 		if err := tx.QueryRow(ctx, `SELECT id FROM sites WHERE id=$1 AND tenant=$2 AND deleted_at IS NULL FOR UPDATE`, siteID, tenant.Slug).Scan(&bloqueado); err != nil {
 			return err
 		}
-		if err := asegurarVersionSitio(ctx, tx, siteID, versionID, tenant.Slug); err != nil {
+		rawIR, err := asegurarVersionSitio(ctx, tx, siteID, versionID, tenant.Slug)
+		if err != nil {
 			return err
 		}
 		// Calcular siguiente número para este sitio
-		err := tx.QueryRow(ctx, `
+		err = tx.QueryRow(ctx, `
 			SELECT COALESCE(MAX(number), 0) + 1
 			FROM publications
 			WHERE site_id = $1 AND tenant = $2 AND kind = 'live'`,
@@ -222,7 +224,7 @@ func (s *Store) CrearPublicacionLiveConArchivos(
 			}
 		}
 
-		return nil
+		return registrarFormulariosPublicados(ctx, tx, tenant.Slug, siteID, rawIR)
 	})
 
 	return number, err
@@ -250,7 +252,7 @@ func (s *Store) CrearPublicacionPreview(
 	}
 
 	return s.enTenant(ctx, tenant.Slug, func(tx pgx.Tx) error {
-		if err := asegurarVersionSitio(ctx, tx, siteID, versionID, tenant.Slug); err != nil {
+		if _, err := asegurarVersionSitio(ctx, tx, siteID, versionID, tenant.Slug); err != nil {
 			return err
 		}
 		_, err := tx.Exec(ctx, `
@@ -317,16 +319,20 @@ func (s *Store) Rollback(ctx context.Context, siteID uuid.UUID, number int) erro
 	}
 
 	return s.enTenant(ctx, tenant.Slug, func(tx pgx.Tx) error {
-		var exists bool
+		var versionID uuid.UUID
 		err := tx.QueryRow(ctx, `
-			SELECT EXISTS(SELECT 1 FROM publications WHERE site_id = $1 AND tenant = $2 AND kind = 'live' AND number = $3)`,
+			SELECT version_id FROM publications WHERE site_id = $1 AND tenant = $2 AND kind = 'live' AND number = $3`,
 			siteID, tenant.Slug, number,
-		).Scan(&exists)
+		).Scan(&versionID)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.ErrNoExiste
+		}
 		if err != nil {
 			return err
 		}
-		if !exists {
-			return domain.ErrNoExiste
+		rawIR, err := asegurarVersionSitio(ctx, tx, siteID, versionID, tenant.Slug)
+		if err != nil {
+			return err
 		}
 
 		tag, err := tx.Exec(ctx, `
@@ -341,7 +347,7 @@ func (s *Store) Rollback(ctx context.Context, siteID uuid.UUID, number int) erro
 		if tag.RowsAffected() == 0 {
 			return domain.ErrNoExiste
 		}
-		return nil
+		return registrarFormulariosPublicados(ctx, tx, tenant.Slug, siteID, rawIR)
 	})
 }
 
@@ -480,11 +486,36 @@ func (s *Store) ExportarDatosHub(ctx context.Context, sub string) ([]domain.Siti
 }
 
 // La FK por UUID no asegura por sí sola que una versión pertenezca al sitio y tenant.
-func asegurarVersionSitio(ctx context.Context, tx pgx.Tx, siteID, versionID uuid.UUID, tenant string) error {
-	var id uuid.UUID
-	err := tx.QueryRow(ctx, `SELECT id FROM site_versions WHERE id=$1 AND site_id=$2 AND tenant=$3 FOR KEY SHARE`, versionID, siteID, tenant).Scan(&id)
+func asegurarVersionSitio(ctx context.Context, tx pgx.Tx, siteID, versionID uuid.UUID, tenant string) ([]byte, error) {
+	var raw []byte
+	err := tx.QueryRow(ctx, `SELECT ir FROM site_versions WHERE id=$1 AND site_id=$2 AND tenant=$3 FOR KEY SHARE`, versionID, siteID, tenant).Scan(&raw)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return domain.ErrNoExiste
+		return nil, domain.ErrNoExiste
 	}
-	return err
+	return raw, err
+}
+
+// registrarFormulariosPublicados crea las filas por defecto en form_settings para los
+// formularios presentes en la versión publicada (WEB-07), conservando intactos los ajustes
+// existentes (incluidos los desactivados con enabled = false o con destinatarios en notify).
+func registrarFormulariosPublicados(ctx context.Context, tx pgx.Tx, tenant string, siteID uuid.UUID, rawIR []byte) error {
+	if len(rawIR) == 0 {
+		return nil
+	}
+	sitio, decErr := ir.Decodificar(rawIR)
+	if decErr != nil {
+		//nolint:nilerr // un IR mínimo de pruebas ("{}") no lleva páginas ni formularios
+		return nil
+	}
+	for formID := range ir.Formularios(sitio) {
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO form_settings (site_id, tenant, form_id, enabled, notify)
+			VALUES ($1, $2, $3, true, '[]'::jsonb)
+			ON CONFLICT (site_id, form_id) DO NOTHING`,
+			siteID, tenant, formID,
+		); err != nil {
+			return fmt.Errorf("registrar formulario publicado %s: %w", formID, err)
+		}
+	}
+	return nil
 }

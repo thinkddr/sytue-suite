@@ -13,7 +13,7 @@ component: pages
 replicaCount: 2
 
 image:
-  registry: ""
+  registry: ghcr.io/thinkddr
   repository: sytue-pages
   tag: "1.0.0"
   pullPolicy: IfNotPresent

@@ -6,7 +6,7 @@ Video pēc pieprasījuma un tiešraides: augšupielādējiet, raidiet un kopīgo
 • Tiešraides tērzēšana un komentāri, ar publicētāja pamata moderāciju.
 • Augšupielādējiet video līdz 8 GiB; oriģināls tiek saglabāts.
 • Tiešraide no raidīšanas programmas caur RTMP, ar straumes atslēgu katrai personai.
-• Tiešraidē no pārlūka vai lietotnes: kamera, ekrāns un mikrofons.
+• Tiešraidē no pārlūka vai lietotnes: kamera un mikrofons. Ekrāna kopīgošana atbalstītos pārlūkos, darbvirsmas sistēmās un Android; nav pieejama iOS/iPadOS lietotnē.
 • Tiešraižu ieraksti automātiski kļūst par video pēc pieprasījuma.
 • Publiska sākumlapa un kanāls katrai organizācijai, indeksējami.
 • Nesarakstītas saites, video tikai organizācijai vai piekļuve konkrētām personām pēc @lietotājvārda.

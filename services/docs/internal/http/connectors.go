@@ -112,6 +112,19 @@ type connectionReq struct {
 	Credentials *connectors.Credentials `json:"credentials,omitempty"`
 }
 
+// puedeEditarConexion dice si quien llama puede cambiar o borrar la conexión:
+// quien la creó o quien administra la organización.
+func puedeEditarConexion(r *http.Request, c *connectors.DataConnection) bool {
+	if c == nil {
+		return false
+	}
+	subj, ok := subjectFrom(r)
+	if !ok {
+		return false
+	}
+	return (subj.Sub != "" && c.CreatedBy == subj.Sub) || esAdminOrg(r)
+}
+
 func (h *Handler) listConnections(w http.ResponseWriter, r *http.Request) {
 	if _, ok := subjectFrom(r); !ok {
 		httpx.Fail(w, r, httpx.ErrUnauthorized)
@@ -121,6 +134,9 @@ func (h *Handler) listConnections(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		failConnector(w, r, err)
 		return
+	}
+	for i := range conns {
+		conns[i].CanEdit = puedeEditarConexion(r, &conns[i])
 	}
 	httpx.JSON(w, r, http.StatusOK, map[string]any{"connections": conns})
 }
@@ -151,6 +167,7 @@ func (h *Handler) createConnection(w http.ResponseWriter, r *http.Request) {
 		failConnector(w, r, err)
 		return
 	}
+	conn.CanEdit = puedeEditarConexion(r, conn)
 	httpx.JSON(w, r, http.StatusCreated, map[string]any{"connection": conn})
 }
 
@@ -164,6 +181,7 @@ func (h *Handler) getConnection(w http.ResponseWriter, r *http.Request) {
 		failConnector(w, r, err)
 		return
 	}
+	conn.CanEdit = puedeEditarConexion(r, conn)
 	httpx.JSON(w, r, http.StatusOK, map[string]any{"connection": conn})
 }
 
@@ -174,7 +192,7 @@ var errSoloQuienLaCreo = httpx.ErrForbidden.WithCode("connection_owner_only").
 // conexionEditable carga la conexión de la ruta si quien llama puede cambiarla o
 // borrarla: quien la creó o quien administra la organización. Si no, ya ha contestado.
 func (h *Handler) conexionEditable(w http.ResponseWriter, r *http.Request) (*connectors.DataConnection, bool) {
-	subj, ok := subjectFrom(r)
+	_, ok := subjectFrom(r)
 	if !ok {
 		httpx.Fail(w, r, httpx.ErrUnauthorized)
 		return nil, false
@@ -184,7 +202,7 @@ func (h *Handler) conexionEditable(w http.ResponseWriter, r *http.Request) (*con
 		failConnector(w, r, err)
 		return nil, false
 	}
-	if (subj.Sub == "" || existing.CreatedBy != subj.Sub) && !esAdminOrg(r) {
+	if !puedeEditarConexion(r, existing) {
 		httpx.Fail(w, r, errSoloQuienLaCreo)
 		return nil, false
 	}
@@ -233,6 +251,7 @@ func (h *Handler) updateConnection(w http.ResponseWriter, r *http.Request) {
 		failConnector(w, r, err)
 		return
 	}
+	conn.CanEdit = puedeEditarConexion(r, conn)
 	httpx.JSON(w, r, http.StatusOK, map[string]any{"connection": conn})
 }
 

@@ -271,6 +271,7 @@
     "one": "{count} note",
     "other": "{count} notes"
   },
+  "notebook.ownerOnly": "Seule la personne qui a créé ce carnet ou l’administration de l’organisation peut le déplacer, changer sa visibilité ou le chiffrer.",
   "notebook.rename": "Renommer",
   "notebook.settings": "Réglages du carnet",
   "notebook.title": "Nom",

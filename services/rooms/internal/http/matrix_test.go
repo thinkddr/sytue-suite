@@ -16,6 +16,10 @@ func (*fakeService) BootstrapMatrix(context.Context, string, string) (service.Ma
 	return service.MatrixBootstrap{}, domain.ErrMatrixUnavailable
 }
 
+func (*fakeService) BootstrapMatrixStorage(context.Context, string, string) (service.MatrixBootstrap, error) {
+	return service.MatrixBootstrap{}, domain.ErrMatrixUnavailable
+}
+
 func (*fakeService) MatrixAccountAccess(context.Context, string, string, int64) error {
 	return domain.ErrMatrixUnavailable
 }
@@ -28,7 +32,7 @@ func (*fakeService) EditMatrixMessage(context.Context, uuid.UUID, string, string
 	return domain.Message{}, domain.ErrMatrixUnavailable
 }
 
-func (*fakeService) StartMatrixNative(context.Context, string, string, string) (service.MatrixNativeStart, error) {
+func (*fakeService) StartMatrixNative(context.Context, string, string, string, string) (service.MatrixNativeStart, error) {
 	return service.MatrixNativeStart{}, domain.ErrMatrixUnavailable
 }
 

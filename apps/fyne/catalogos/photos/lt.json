@@ -108,6 +108,7 @@
   "gallery.describeStop": "Sustabdyti",
   "gallery.described": "Aprašyta nuotraukų: {count}",
   "gallery.describing": "Aprašoma {done} iš {total}…",
+  "gallery.downloadCapped": "Į šį rinkinį neįtrauktos nuotraukos: {count}.",
   "gallery.downloadSelected": "Atsisiųsti",
   "gallery.downloading": {
     "one": "Atsisiunčiama {count} nuotrauka…",

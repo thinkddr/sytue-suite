@@ -27,7 +27,7 @@
     "astro": "catalog:",
     "livekit-client": "2.22.3",
     "preact": "10.29.8",
-    "matrix-js-sdk": "43.0.0",
+    "matrix-js-sdk": "44.0.0",
     "@matrix-org/matrix-sdk-crypto-wasm": "18.9.0"
   },
   "devDependencies": {

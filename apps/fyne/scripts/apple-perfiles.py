@@ -5,6 +5,8 @@
 
 Por defecto sólo consulta la API. --preparar reutiliza una identidad válida del
 llavero efímero y crea perfiles, nunca certificados, App IDs ni capacidades.
+Con --solo-existentes sólo reutiliza y guarda perfiles válidos ya emitidos;
+la ausencia de uno compatible es un error y el cliente sólo admite GET.
 Antes de prepararlos hay que asociar el App Group real en Developer Portal;
 ningún perfil se guarda si no autoriza todos los derechos que se van a firmar.
 """
@@ -208,7 +210,7 @@ def guardar_perfil(salida, identificador, plataforma, datos):
     return str(destino)
 
 
-def preparar(asc, requisito, plataforma, certificado="", salida=None):
+def preparar(asc, requisito, plataforma, certificado="", salida=None, solo_existentes=False):
     identificador = requisito["id"]
     resultado = {"app": requisito["app"], "app_id": identificador, "platform": plataforma,
                  "profile_type": TIPOS[plataforma], "profile_ready": False,
@@ -225,6 +227,8 @@ def preparar(asc, requisito, plataforma, certificado="", salida=None):
     if requisito["protection"] and not REGISTRO["completa"](por_tipo.get("DATA_PROTECTION", {})):
         return {**resultado, "reason": "data_protection_complete_missing"}
     perfil, datos = perfiles_validos(asc, bundle, requisito, plataforma, certificado)
+    if perfil is None and solo_existentes:
+        return {**resultado, "reason": "existing_profile_missing_or_invalid"}
     if perfil is None and salida is not None:
         if not certificado:
             raise ValueError("preparar un perfil exige verificar antes la identidad importada")
@@ -258,7 +262,7 @@ def destinos_app(app):
         yield ".archivos", False, True
 
 
-def comprobar_recibo(ruta, catalogo, plataforma):
+def comprobar_recibo(ruta, catalogo, plataforma, solo_existentes=False):
     """Recibo completo del preparador: sólo catálogo y JSONL, sin API ni llavero."""
     esperados = {app["id"] + sufijo: app["clave"]
                  for app in catalogo.values() for sufijo, _, _ in destinos_app(app)}
@@ -280,6 +284,8 @@ def comprobar_recibo(ruta, catalogo, plataforma):
                     dato.get("profile_type") != TIPOS[plataforma] or dato.get("profile_ready") is not True or
                     dato.get("certificate_verified") is not True or not isinstance(dato.get("created"), bool)):
                 raise ValueError("el recibo no acredita el tipo, certificado y perfil de cada destino")
+            if solo_existentes and dato["created"] is not False:
+                raise ValueError("el recibo de sólo existentes contiene un perfil creado")
             recibos[identificador] = {campo: dato[campo] for campo in
                                       ("app", "app_id", "platform", "profile_type", "profile_ready", "certificate_verified", "created")}
     if set(recibos) != set(esperados):
@@ -291,11 +297,26 @@ def comprobar_recibo(ruta, catalogo, plataforma):
     return 0
 
 
+def cliente_apple(api, solo_existentes=False):
+    """Reutiliza autenticación y paginación; el modo existente no permite escribir."""
+    if not solo_existentes:
+        return api.Apple()
+
+    class SoloLectura(api.Apple):
+        def pedir(self, metodo, ruta, cuerpo=None, tolerar=()):
+            if metodo != "GET" or cuerpo is not None:
+                raise RuntimeError("--solo-existentes sólo admite consultas GET sin cuerpo")
+            return super().pedir(metodo, ruta, tolerar=tolerar)
+
+    return SoloLectura()
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--plataforma", choices=TIPOS, required=True)
     parser.add_argument("--destinos", choices=("hosts", "widgets", "archivos", "nativos", "todos"), default="hosts")
     parser.add_argument("--preparar", action="store_true")
+    parser.add_argument("--solo-existentes", action="store_true", help="reutilizar perfiles válidos sin crear ni modificar recursos Apple")
     parser.add_argument("--salida", type=pathlib.Path)
     parser.add_argument("--certificado-sha1", default="")
     parser.add_argument("--comprobar-recibo", type=pathlib.Path, help="validar los recibos de todos los destinos del catálogo sin API ni llavero")
@@ -309,7 +330,7 @@ def main():
     gen = REGISTRO["importar"]("sytue_xcode_perfiles", AQUI.parent / "xcode/generar.py")
     catalogo = {a["clave"]: a for a in gen.apps()}
     if args.comprobar_recibo:
-        return comprobar_recibo(args.comprobar_recibo, catalogo, args.plataforma)
+        return comprobar_recibo(args.comprobar_recibo, catalogo, args.plataforma, args.solo_existentes)
     seleccion = args.apps or list(catalogo)
     if len(set(seleccion)) != len(seleccion) or any(a not in catalogo for a in seleccion):
         parser.error("selecciona apps del catálogo sin repetirlas")
@@ -324,7 +345,7 @@ def main():
                               **{k: v for k, v in requisito.items() if k != "entitlements"}}, ensure_ascii=False))
         return 0
     api = REGISTRO["importar"]("sytue_asc_perfiles", AQUI / "appstore-publicar.py")
-    asc = api.Apple()
+    asc = cliente_apple(api, args.solo_existentes)
     certificado = ""
     if args.preparar:
         identidad = identidad_importada(args.plataforma, gen.EQUIPO, args.certificado_sha1)
@@ -332,7 +353,7 @@ def main():
     fallos = 0
     for requisito in pendientes:
         try:
-            resultado = preparar(asc, requisito, args.plataforma, certificado, args.salida)
+            resultado = preparar(asc, requisito, args.plataforma, certificado, args.salida, args.solo_existentes)
             fallos += not resultado["profile_ready"]
             print(json.dumps(resultado, ensure_ascii=False))
         except (RuntimeError, ValueError, OSError, subprocess.CalledProcessError) as err:

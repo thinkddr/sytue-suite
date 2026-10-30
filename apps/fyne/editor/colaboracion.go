@@ -335,6 +335,8 @@ func (r *chipRenderer) Layout(t fyne.Size) {
 }
 
 func (r *chipRenderer) Refresh() {
+	r.texto.Text = r.b.Texto
+	r.Layout(r.b.Size())
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	if r.b.Plano {
 		r.pintarPlano(v)

@@ -58,7 +58,11 @@ func (s *Store) writeHTTP(ctx context.Context, owner, product, id string, produc
 	}
 	namespaces = append(namespaces, espacioHTTP(product))
 	key := clave(owner, espacioHTTP(product), id)
-	if err := planner.pruneHTTP(namespaces, key+".json", int64(len(encoded))); err != nil {
+	size := int64(len(encoded))
+	if sealed, ok := s.b.(interface{ storedSize(int64) int64 }); ok {
+		size = sealed.storedSize(size)
+	}
+	if err := planner.pruneHTTP(namespaces, key+".json", size); err != nil {
 		return err
 	}
 	if !valid() {

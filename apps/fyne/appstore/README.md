@@ -90,27 +90,27 @@ en-US es-ES fi fr-FR hr hu it nl-NL no pl pt-PT ro sk sl-SI sv`. El principal es
 
 ## Lo que hace la API y lo que no
 
-| Paso                                                                       | ¿Por la API?                                                        | Quién                                               |
-| -------------------------------------------------------------------------- | ------------------------------------------------------------------- | --------------------------------------------------- |
-| Crear el App ID y la ficha de la app                                       | No (el alta de apps no está en la API)                              | Hecho por el dueño el 2026-10-06, las quince        |
-| Nombre, subtítulo y URL de privacidad, por idioma                          | Sí, `appInfoLocalizations`                                          | `--ficha`                                           |
-| Categoría principal y secundaria                                           | Sí, `appInfos`                                                      | `--ficha`                                           |
-| Clasificación por edades                                                   | Sí, `ageRatingDeclarations`                                         | `--ficha`                                           |
-| Derechos de contenido («no usa contenido de terceros»)                     | Sí, `apps.contentRightsDeclaration`                                 | `--ficha`                                           |
-| Descripción, palabras clave, texto promocional, URL de soporte y marketing | Sí, `appStoreVersionLocalizations`                                  | `--ficha`                                           |
-| Copyright, número de versión y publicación tras aprobar                    | Sí, `appStoreVersions`                                              | `--ficha`                                           |
-| Capturas de iPhone, iPad y Mac                                             | Sí, `appScreenshotSets` + `appScreenshots`                          | `--ficha`                                           |
-| Notas para la revisión                                                     | Sí, `appStoreReviewDetails`                                         | `--ficha`                                           |
-| Contacto y **cuenta de prueba** para el revisor                            | Sí, pero **no están en el repositorio**                             | El dueño: variables en Codemagic, o en la web       |
-| Precio gratis                                                              | Sí, `appPriceSchedules` (solo si no hay ninguno puesto)             | `--ficha`                                           |
-| Países (UE + EEE + CH, sin Francia: veintinueve)                            | Sí, `appAvailabilities` v2 (solo si no hay ninguno puesto)          | `--ficha`                                           |
-| **Etiquetas de privacidad («App Privacy»)**                                | **No**: la API no las tiene                                         | El dueño, con `<app>/privacidad.txt`                |
-| **Cifrado (cumplimiento de exportación)**                                  | Cuestionario por API autorizado; exención documental en el plist: ver abajo | Pipeline y revisión de los hechos                  |
-| Estado de comerciante de la DSA                                            | No                                                                  | Hecho por el dueño                                  |
-| Acuerdos, fiscalidad y banca                                               | No                                                                  | El dueño (las apps son gratuitas: basta el acuerdo) |
-| Subir el build                                                             | Sí, pero no es de este guion                                        | Codemagic `ios-fyne` (y el `.pkg` de macOS)         |
-| Atar el build y **enviar a revisión**                                      | Sí, `reviewSubmissions`                                             | `--revision`, con la frase de confirmación          |
-| Publicar tras la aprobación                                                | Automático (`releaseType: AFTER_APPROVAL`)                          | —                                                   |
+| Paso                                                                       | ¿Por la API?                                                                | Quién                                               |
+| -------------------------------------------------------------------------- | --------------------------------------------------------------------------- | --------------------------------------------------- |
+| Crear el App ID y la ficha de la app                                       | No (el alta de apps no está en la API)                                      | Hecho por el dueño el 2026-10-06, las quince        |
+| Nombre, subtítulo y URL de privacidad, por idioma                          | Sí, `appInfoLocalizations`                                                  | `--ficha`                                           |
+| Categoría principal y secundaria                                           | Sí, `appInfos`                                                              | `--ficha`                                           |
+| Clasificación por edades                                                   | Sí, `ageRatingDeclarations`                                                 | `--ficha`                                           |
+| Derechos de contenido («no usa contenido de terceros»)                     | Sí, `apps.contentRightsDeclaration`                                         | `--ficha`                                           |
+| Descripción, palabras clave, texto promocional, URL de soporte y marketing | Sí, `appStoreVersionLocalizations`                                          | `--ficha`                                           |
+| Copyright, número de versión y publicación tras aprobar                    | Sí, `appStoreVersions`                                                      | `--ficha`                                           |
+| Capturas de iPhone, iPad y Mac                                             | Sí, `appScreenshotSets` + `appScreenshots`                                  | `--ficha`                                           |
+| Notas para la revisión                                                     | Sí, `appStoreReviewDetails`                                                 | `--ficha` o sólo `--notas`                          |
+| Contacto y **cuenta de prueba** para el revisor                            | Sí, pero **no están en el repositorio**                                     | El dueño: variables en Codemagic, o en la web       |
+| Precio gratis                                                              | Sí, `appPriceSchedules` (solo si no hay ninguno puesto)                     | `--ficha`                                           |
+| Países (UE + EEE + CH, sin Francia: veintinueve)                           | Sí, `appAvailabilities` v2 (solo si no hay ninguno puesto)                  | `--ficha`                                           |
+| **Etiquetas de privacidad («App Privacy»)**                                | **No**: la API no las tiene                                                 | El dueño, con `<app>/privacidad.txt`                |
+| **Cifrado (cumplimiento de exportación)**                                  | Cuestionario por API autorizado; exención documental en el plist: ver abajo | Pipeline y revisión de los hechos                   |
+| Estado de comerciante de la DSA                                            | No                                                                          | Hecho por el dueño                                  |
+| Acuerdos, fiscalidad y banca                                               | No                                                                          | El dueño (las apps son gratuitas: basta el acuerdo) |
+| Subir el build                                                             | Sí, pero no es de este guion                                                | Codemagic `ios-fyne` (y el `.pkg` de macOS)         |
+| Atar el build y **enviar a revisión**                                      | Sí, `reviewSubmissions`                                                     | `--revision`, con la frase de confirmación          |
+| Publicar tras la aprobación                                                | Automático (`releaseType: AFTER_APPROVAL`)                                  | —                                                   |
 
 Las fichas de las quince apps y sus dos plataformas se actualizaron por la API el
 2026-10-14. Esto no equivale a envío a revisión ni publicación: siguen siendo necesarias
@@ -149,6 +149,24 @@ El contrato se verifica además contra una API de prueba
   O las escribe en la web (_App Review Information_), treinta veces. Sin ellas `--ficha`
   no toca esos campos y `--revision` se niega. `--seco` es rojo si algo con pinta de
   credencial aparece en `ficha.json`.
+
+Las notas de revisión se componen en un único sitio: `revision.notas`, las
+`notas` de cada app y, al final, `revision.notas_por_plataforma[IOS|MAC_OS]`.
+La justificación del listener OIDC de escritorio vive en `MAC_OS`, de modo que
+`--ficha` la conserva al regenerar las notas y no la envía a iOS. El límite de
+4000 bytes UTF-8 incluye el anexo y los separadores de cada plataforma.
+Credenciales y contactos siguen en los campos privados de App Store Connect.
+El vídeo de un dispositivo físico se incorpora sólo cuando exista: las notas
+del repositorio no afirman que se haya grabado ni contienen enlaces de ejemplo.
+
+Para reparar sólo esas notas, `--notas --version X.Y.Z` exige la versión exacta ya
+existente y editable, con su detalle de revisión ya creado. Primero comprueba todos
+los destinos seleccionados (por defecto las quince apps en iOS y macOS) y después
+hace únicamente `PATCH` de `notes`, sin cambiar contactos, cuenta de prueba, builds,
+versiones ni envíos. Recomprueba el destino antes de escribir y relee las notas para
+confirmar su igualdad; el recibo muestra sólo el resultado y su SHA-256. Un rechazo
+anterior pendiente no se cancela ni se reenvía. En el workflow manual se elige
+`modo=notas`, `ref=vX.Y.Z` y, opcionalmente, apps y plataformas.
 
 ## Clasificación por edades, pregunta a pregunta
 
@@ -271,12 +289,12 @@ Los hechos, para responderlo con verdad:
 - **Rooms y Cast** llevan **DTLS-SRTP** propio para la voz y el vídeo.
 - Ninguna usa algoritmos propios ni no estándar.
 
-| Pregunta                                                                                                    | Respuesta veraz                                                                                    |
-| ----------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| ¿La app usa cifrado (lo implementa, lo incorpora o accede a él)?                                            | **Sí**, las quince                                                                                 |
-| ¿Usa algoritmos propietarios o no aceptados como estándar por organismos internacionales (IEEE, IETF, ITU)? | **No**                                                                                             |
-| ¿Usa algoritmos estándar **en lugar de, o además de**, el cifrado del sistema operativo de Apple?           | **Sí**, las quince: el TLS es el de Go; además AES-256-GCM en Notepads y DTLS-SRTP en Rooms y Cast |
-| ¿Se limita al cifrado del sistema operativo (HTTPS de `URLSession`, etc.)?                                  | **No**: marcar esto sería falso, aunque sea la respuesta que evita papeles                         |
+| Pregunta                                                                                                    | Respuesta veraz                                                                                          |
+| ----------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| ¿La app usa cifrado (lo implementa, lo incorpora o accede a él)?                                            | **Sí**, las quince                                                                                       |
+| ¿Usa algoritmos propietarios o no aceptados como estándar por organismos internacionales (IEEE, IETF, ITU)? | **No**                                                                                                   |
+| ¿Usa algoritmos estándar **en lugar de, o además de**, el cifrado del sistema operativo de Apple?           | **Sí**, las quince: el TLS es el de Go; además AES-256-GCM en Notepads y DTLS-SRTP en Rooms y Cast       |
+| ¿Se limita al cifrado del sistema operativo (HTTPS de `URLSession`, etc.)?                                  | **No**: marcar esto sería falso, aunque sea la respuesta que evita papeles                               |
 | ¿Estará disponible en Francia?                                                                              | **No**, por decisión del dueño del 2026-10-14; Francia queda fuera de la distribución de las quince apps |
 
 Lo que se deriva de esas respuestas —si hace falta documentación de exportación de EE. UU.,

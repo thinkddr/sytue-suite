@@ -112,6 +112,8 @@ export const hu: AppCatalog<typeof en> = {
   'backlinks.emptyHint': 'Hivatkozzon rá egy másik jegyzetből, és magától megjelenik itt.',
   'notebook.delete': 'Jegyzetfüzet törlése',
   'notebook.deleteConfirm': 'Törli a(z) „{title}” füzetet és mindent, ami benne van?',
+  'notebook.ownerOnly':
+    'Ezt a jegyzetfüzetet csak a létrehozója vagy a szervezet adminisztrációja helyezheti át, módosíthatja a láthatóságát vagy titkosíthatja.',
   'notebook.newChild': 'Új jegyzetfüzet belül',
   'notebook.notes': { one: '{count} jegyzet', other: '{count} jegyzet' },
   'notebook.emoji': 'Ikon',

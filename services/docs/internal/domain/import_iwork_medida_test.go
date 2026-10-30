@@ -21,8 +21,14 @@ import (
 
 func TestMedirIWork(t *testing.T) {
 	corpus, salida := os.Getenv("SYTUE_IWORK_CORPUS"), os.Getenv("SYTUE_IWORK_SALIDA")
-	if corpus == "" || salida == "" {
-		t.Skip("sin SYTUE_IWORK_CORPUS ni SYTUE_IWORK_SALIDA")
+	if corpus == "" {
+		corpus = os.Getenv("SYTUE_IWORK_SAMPLES")
+	}
+	if corpus == "" {
+		t.Skip("sin SYTUE_IWORK_CORPUS ni SYTUE_IWORK_SAMPLES")
+	}
+	if salida == "" {
+		salida = t.TempDir()
 	}
 	_ = filepath.WalkDir(corpus, func(ruta string, d os.DirEntry, err error) error {
 		if err != nil {
@@ -35,17 +41,17 @@ func TestMedirIWork(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		res, err := ImportLocalized(filepath.Base(ruta), data, false, "en")
-		texto, contenido := "", ""
+		res, err := ImportLocalized(filepath.Base(ruta), data, true, "en")
+		texto, contenido, nCom := "", "", 0
 		if err == nil {
-			texto, contenido = textoDelContenido(res.Content), res.Content
+			texto, contenido, nCom = textoDelContenido(res.Content), res.Content, len(res.Comments)
 		}
 		rel, _ := filepath.Rel(corpus, ruta)
 		destino := filepath.Join(salida, rel)
 		_ = os.MkdirAll(filepath.Dir(destino), 0o755)
 		_ = os.WriteFile(destino+".txt", []byte(texto), 0o644)
 		_ = os.WriteFile(destino+".contenido", []byte(contenido), 0o644)
-		t.Logf("%s\t%v\t%d", rel, err, len(texto))
+		t.Logf("%s\t%v\t%d\tcom=%d", rel, err, len(texto), nCom)
 		return nil
 	})
 }

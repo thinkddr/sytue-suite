@@ -271,6 +271,7 @@
     "one": "{count} nota",
     "other": "{count} notas"
   },
+  "notebook.ownerOnly": "Solo quien creó el cuaderno o quien administra la organización puede moverlo, cambiar quién lo ve o cifrarlo.",
   "notebook.rename": "Cambiar el nombre",
   "notebook.settings": "Ajustes del cuaderno",
   "notebook.title": "Nombre",

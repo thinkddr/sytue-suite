@@ -1707,6 +1707,8 @@ export const lv: AppCatalog<typeof en> = {
   'extdata.msg.generic': 'Darbību neizdevās pabeigt.',
   'extdata.msg.notAllowed':
     'Vaicājumus šim savienojumam var sūtīt tikai tā sarakstā esošie cilvēki. Lūdziet savas organizācijas administrāciju jūs pievienot.',
+  'extdata.msg.ownerOnly':
+    'Mainīt vai dzēst šo savienojumu var tikai tā izveidotājs vai organizācijas administrācija.',
   'sheet.msg.badValue': 'Vērtība nav atļauta',
   'sheet.msg.clipboardDenied': 'Pārlūks liedza piekļuvi starpliktuvei.',
   'sheet.msg.pasteFailed': 'Neizdevās ielīmēt',

@@ -115,6 +115,8 @@ export const ga: AppCatalog<typeof en> = {
   'backlinks.emptyHint': 'Nasc leis ó nóta eile agus taispeánfar anseo é as a stuaim féin.',
   'notebook.delete': 'Scrios an leabhar nótaí',
   'notebook.deleteConfirm': 'Scrios “{title}” agus gach a bhfuil istigh ann?',
+  'notebook.ownerOnly':
+    'Ní féidir ach leis an duine a chruthaigh an leabhar nótaí seo nó le riarthóir na heagraíochta é a bhogadh, a infheictheacht a athrú nó é a chriptiú.',
   'notebook.newChild': 'Leabhar nótaí nua istigh',
   'notebook.notes': { one: '{count} nóta', other: '{count} nóta' },
   'notebook.emoji': 'Deilbhín',

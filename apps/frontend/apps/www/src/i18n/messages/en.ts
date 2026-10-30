@@ -443,7 +443,8 @@ export const en = {
     'Adaptive playback in three qualities, with the browser choosing the best one.',
   'product.cast.f3':
     'Live streaming from broadcasting software over RTMP, with a stream key per person.',
-  'product.cast.f4': 'Live from the browser or the app: camera, screen and microphone.',
+  'product.cast.f4':
+    'Live from the browser or app: camera and microphone. Screen sharing in supported browsers, desktop systems and Android; unavailable in the iOS/iPadOS app.',
   'product.cast.f5': 'Live recordings become videos on demand automatically.',
   'product.cast.f6': 'A public front page and a channel per organisation, indexable.',
   'product.cast.f7':

@@ -2,14 +2,14 @@
 // perfil de dispositivo, y señala el elemento que lo provoca.
 //
 // Uso: bun run mobile-audit.mjs [app...]   (sin args = todas las que respondan)
-// Salida: /tmp/mobile-audit.json + capturas en /tmp/mobile/.
+// Salida: informe.json y capturas en un directorio privado indicado en consola.
 //
 // SUPERFICIE=escritorio mide las mismas apps en VENTANAS de escritorio en vez de
 // en teléfonos. Es el
 // mismo barrido con otra tabla de perfiles —ver PERFILES_ESCRITORIO—: la sesión,
 // las rutas, las pestañas y los desplegables son idénticos, así que un guion
 // aparte serían novecientas líneas duplicadas para diverger. Sale en
-// /tmp/escritorio-audit.json + /tmp/escritorio/.
+// Cada ejecución de escritorio también usa su propio directorio privado.
 //
 // POR DEFECTO VA CONTRA PRODUCCIÓN (sytue.eu): levantar la suite entera en local
 // para auditarla ahoga la máquina, y prod es además lo que de verdad ve un
@@ -20,10 +20,11 @@
 // donde el admin de dev es público y está en el repo de todos modos.
 //
 // ponytail: script de verificación, no forma parte de la suite de specs.
+import { createReportDirectory, writeReport } from './lib/report-output.mjs';
 import { chromium, devices } from 'playwright';
 import { appsDesplegadas, desplegada } from './apps-desplegadas.mjs';
 import { fileURLToPath } from 'node:url';
-import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync } from 'node:fs';
 import { codigoTOTP, esCuentaDelIdPDesdeAdmin, porQueNoEntra } from './tests/helpers.ts';
 import {
   DETECTOR,
@@ -37,6 +38,7 @@ import {
   lineaVertical,
 } from './detector-desbordamiento.mjs';
 import { DETECTOR_MARGENES, lineaMargen } from './detector-margenes.mjs';
+import { esperarCajones } from './esperar-cajones.mjs';
 
 /**
  * QUÉ SE MIDE. Por defecto, desbordamiento horizontal. `AUDITAR=margenes` mide
@@ -874,6 +876,9 @@ async function conDesplegablesAbiertos(page) {
   for (let i = 0; i < Math.min(n, 6); i++) {
     await page.evaluate((k) => globalThis.__sytueDisparadores[k]?.click(), i);
     await page.waitForTimeout(400);
+    // El reloj externo no certifica que Chromium haya terminado el transform.
+    // El detector conserva su umbral de 1px y mide el cajón ya en reposo.
+    await esperarCajones(page);
     const r = await page.evaluate(MEDIDOR);
     if (!MARGENES) await page.evaluate(DETECTOR_FUGAS);
     unir(hallazgos, r.hallazgos);
@@ -1030,18 +1035,19 @@ if (sinCubrir.length)
 // Salidas SEPARADAS por superficie: los dos barridos corren en el mismo runner
 // y con un solo destino el segundo borraría las capturas y el informe del
 // primero — y el informe borrado es siempre el que hacía falta leer.
-const SALIDA = ESCRITORIO ? '/tmp/escritorio' : '/tmp/mobile';
-const INFORME = ESCRITORIO ? '/tmp/escritorio-audit.json' : '/tmp/mobile-audit.json';
-mkdirSync(SALIDA, { recursive: true });
-const browser = await chromium.launch();
-const informe = [];
-
+const SALIDA = createReportDirectory(ESCRITORIO ? 'escritorio' : 'mobile', process.env.MOBILE_AUDIT_OUT);
+const INFORME = `${SALIDA}/informe.json`;
 // PERFILES="Moto G4,Galaxy S9+" acota el barrido a esos perfiles: para iterar
 // sobre un arreglo concreto sin esperar a los dieciocho.
 const PEDIDOS = (process.env.PERFILES || '')
   .split(',')
   .map((s) => s.trim())
   .filter(Boolean);
+const desconocidos = PEDIDOS.filter((n) => !ELEGIDOS.some(([nombre]) => nombre === n));
+if (desconocidos.length) throw new Error(`Perfiles desconocidos: ${desconocidos.join(', ')}`);
+mkdirSync(SALIDA, { recursive: true });
+const browser = await chromium.launch();
+const informe = [];
 
 for (const [nombre, perfil, opts] of ELEGIDOS) {
   if (PEDIDOS.length && !PEDIDOS.includes(nombre)) continue;
@@ -1341,7 +1347,7 @@ for (const [nombre, perfil, opts] of ELEGIDOS) {
   await ctx.close();
 }
 await browser.close();
-writeFileSync(INFORME, JSON.stringify(informe, null, 2));
+writeReport(INFORME, JSON.stringify(informe, null, 2));
 const graves = informe.filter((r) => r.grave);
 const caidas = informe.filter((r) => r.fallo);
 const saltadas = informe.filter((r) => r.salto && !r.opcional);

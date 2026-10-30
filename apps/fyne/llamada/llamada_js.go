@@ -28,6 +28,9 @@ func (*Llamada) Participantes() []Participante { return nil }
 // Reconectando nunca.
 func (*Llamada) Reconectando() bool { return false }
 
+// PuedePublicar nunca en el destino sin transporte nativo.
+func (*Llamada) PuedePublicar() bool { return false }
+
 // Camara no hace nada.
 func (*Llamada) Camara(bool) error { return ErrSinLlamadaNativa }
 

@@ -6,6 +6,7 @@
 package ficheros
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 
@@ -43,9 +44,9 @@ func Revelar(ruta string) error {
 	return lanzar("explorer.exe", "/select,"+abs)
 }
 
-// Abrir entrega el fichero a la aplicación asociada a su extensión en el registro: es el
+// abrirConContexto entrega el fichero a la aplicación asociada a su extensión en el registro: es el
 // doble clic del Explorador, y quien elige es la configuración de la persona, no Sytue.
-func Abrir(ruta string) error { return porShell(ruta, "open") }
+func abrirConContexto(_ context.Context, ruta string) error { return porShell(ruta, "open") }
 
 // Imprimir usa el verbo `print` del shell: Windows se lo pasa al manejador registrado
 // para ese tipo de fichero, que enseña SU diálogo de impresión —el nativo, con las

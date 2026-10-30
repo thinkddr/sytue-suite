@@ -4,6 +4,7 @@
 package matrix
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -95,7 +96,7 @@ func (c *Client) decryptedEvent(ctx context.Context, evt *event.Event) (Decrypte
 	if !status.Verified {
 		return DecryptedEvent{}, ErrUnverified
 	}
-	content, err := json.Marshal(&evt.Content)
+	content, err := eventContentBytes(evt)
 	if err != nil {
 		return DecryptedEvent{}, err
 	}
@@ -107,4 +108,17 @@ func (c *Client) decryptedEvent(ctx context.Context, evt *event.Event) (Decrypte
 		}
 	}
 	return DecryptedEvent{ChannelID: channel, Reference: EventRef{RoomID: evt.RoomID.String(), EventID: evt.ID.String()}, Sender: evt.Sender.String(), Timestamp: evt.Timestamp, Type: evt.Type.Type, Content: content, Trust: trust, Recovered: trust == id.TrustStateBackup}, nil
+}
+
+// The SDK's generic Raw map uses float64 for unknown extensions. Re-marshalling
+// it would change precise integers (for example amounts or object revisions).
+// Keep the authenticated original JSON from the maintained decryptor instead.
+func eventContentBytes(evt *event.Event) (json.RawMessage, error) {
+	if len(evt.Content.VeryRaw) != 0 {
+		if !json.Valid(evt.Content.VeryRaw) {
+			return nil, ErrIdentity
+		}
+		return bytes.Clone(evt.Content.VeryRaw), nil
+	}
+	return json.Marshal(&evt.Content)
 }

@@ -128,7 +128,9 @@ export const nb: AppCatalog<typeof en> = {
   'gallery.selectMonth': 'Velg måned',
   'gallery.unselectMonth': 'Fjern valg av måned',
   'gallery.downloadSelected': 'Last ned',
-  'gallery.downloading': { one: 'Laster ned 1 bilde…', other: 'Laster ned {count} bilder…' },
+  'gallery.downloading':
+    'Startede nedlastingsforespørsler: {count}. Sjekk nedlastingene i nettleseren.',
+  'gallery.downloadCapped': 'Bilder utenfor denne puljen: {count}.',
   'gallery.newAlbum': 'Nytt album',
   'gallery.newAlbumTitle': 'Nytt album',
   'gallery.newAlbumPrompt': {

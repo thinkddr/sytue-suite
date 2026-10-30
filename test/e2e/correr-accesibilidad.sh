@@ -15,10 +15,12 @@
 # Variables: PUERTO (4338), ACC_SOLO=docus,calcus,... para acotar, ACC_OUT y CINTA_OUT para
 # las capturas. Sale con 1 si cualquiera falla.
 set -uo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")" || exit 1
 PUERTO="${PUERTO:-4338}"
 RAIZ="$(cd ../.. && pwd)"
-LOG="${TMPDIR:-/tmp}/astro-dev-docus-$PUERTO.log"
+umask 077
+DIRECTORIO_LOG="$(mktemp -d "${TMPDIR:-/tmp}/astro-dev-docus.XXXXXX")"
+LOG="$DIRECTORIO_LOG/astro.log"
 
 # El middleware de la ofimática construye su cliente OIDC al arrancar y se niega sin estas variables,
 # aunque los bancos de pruebas (`/dev/*`) no inician sesión. Valores de mentira: no se llama

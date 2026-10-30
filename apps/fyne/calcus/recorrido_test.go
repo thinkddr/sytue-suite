@@ -32,6 +32,18 @@ func TestRecorridoConSesion(t *testing.T) {
 	}
 	for _, doc := range []string{"", "h1"} {
 		a := appDePrueba(t, s)
+		if os.Getenv("SYTUE_ROTACION_CAPTURAS") != "" && a.T == nil {
+			tr, err := i18n.New("es", i18n.Common(), catalogos.Docs())
+			if err != nil {
+				t.Fatal(err)
+			}
+			// Solo este recorrido usa rótulos reales para medir su texto al girar.
+			// Se conservan el servicio y la ejecución determinista del fixture.
+			previa := a
+			a = NuevaApp(tr.T, "es", previa.Svc)
+			a.lanzar = previa.lanzar
+			a.portada.Lanzar = a.lanzar
+		}
 		w := test.NewTempWindow(t, a.Objeto())
 		w.Resize(fyne.NewSize(1280, 800))
 		a.Arrancar()

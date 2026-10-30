@@ -3,18 +3,13 @@
 • Kanalai pagal komandą ar projektą.
 • Vaizdo skambutis, įtaisytas kiekviename kanale.
 • Paminėjimai ir pranešimai, suvienodinti visame rinkinyje.
-• Istorija, kurioje galima ieškoti iš bet kurios Sytue One vietos.
 • Vieši ir privatūs kanalai kategorijose; tiesioginės žinutės ir grupės.
 • Gijos, reakcijos, paminėjimai, prisegtos ir išsaugotos žinutės bei juodraščiai.
 • Formatavimas su „Aa“ juosta ir sparčiaisiais klavišais: paryškinimas, kursyvas, kodas, citatos, sąrašai ir nuorodos.
 • Priedai, vaizdai, GIF ir nuosavi jaustukai; failai iš Drive.
-• Suplanuotas siuntimas, prioritetas, perskaitymo patvirtinimas ir „matė“.
-• Pasvirojo brūkšnio komandos ir kortelės: apklausos ir priskiriamos užduotys.
-• Vaizdo skambučiai kanale: kamera, ekranas, pakelta ranka, pokalbis ir įrašymas.
 • Suplanuoti susitikimai ir kvietimo nuorodos.
 • Robotai, žiniatinklio kabliukai ir integracijos su kitais įrankiais.
 • Buvimo būsena ir pasirinktinė būsena; pranešimų nustatymai kiekvienam kanalui.
-• Paieška istorijoje, taip pat iš viso rinkinio.
 • Realusis laikas per WebSocket, su pakartotiniu prisijungimu ir be prarastų žinučių.
 
 Šifruojama perduodant (TLS 1.3). „Sytue“ infrastruktūra yra ES. Išorinių paslaugų vieta priklauso nuo jų teikėjo.

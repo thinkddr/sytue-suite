@@ -448,7 +448,8 @@ export const es: AppCatalog<typeof en> = {
   'product.cast.f2': 'Reproducción adaptativa en tres calidades: el navegador elige la mejor.',
   'product.cast.f3':
     'Directo desde un programa de emisión por RTMP, con una clave de emisión por persona.',
-  'product.cast.f4': 'Directo desde el navegador o la app: cámara, pantalla y micrófono.',
+  'product.cast.f4':
+    'Directo desde el navegador o la app: cámara y micrófono. Compartir pantalla en navegadores, sistemas de escritorio y Android compatibles; no disponible en la app de iOS/iPadOS.',
   'product.cast.f5': 'Las grabaciones de los directos se convierten en vídeos bajo demanda solas.',
   'product.cast.f6': 'Portada pública y un canal por organización, indexables.',
   'product.cast.f7':

@@ -119,6 +119,8 @@ export const ro: AppCatalog<typeof en> = {
   'backlinks.emptyHint': 'Faceți legătura din altă notiță și va apărea aici, singură.',
   'notebook.delete': 'Șterge carnetul',
   'notebook.deleteConfirm': 'Ștergeți „{title}” și tot ce e înăuntru?',
+  'notebook.ownerOnly':
+    'Doar persoana care a creat acest carnet sau administrația organizației îl poate muta, îi poate schimba vizibilitatea sau îl poate cripta.',
   'notebook.newChild': 'Carnet nou înăuntru',
   'notebook.notes': { one: '{count} notiță', few: '{count} notițe', other: '{count} de notițe' },
   'notebook.emoji': 'Pictogramă',

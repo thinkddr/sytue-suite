@@ -418,7 +418,8 @@ export const is: AppCatalog<typeof en> = {
   'product.cast.f2': 'Aðlagandi spilun í þremur gæðum; vafrinn velur þau bestu.',
   'product.cast.f3':
     'Bein útsending úr útsendingarforriti um RTMP, með straumlykli fyrir hvern einstakling.',
-  'product.cast.f4': 'Í beinni úr vafranum eða forritinu: myndavél, skjár og hljóðnemi.',
+  'product.cast.f4':
+    'Í beinni úr vafranum eða forritinu: myndavél og hljóðnemi. Skjádeiling í studdum vöfrum, tölvukerfum og Android; ekki í boði í iOS/iPadOS-forritinu.',
   'product.cast.f5': 'Upptökur af beinum útsendingum verða sjálfkrafa að myndböndum eftir pöntun.',
   'product.cast.f6': 'Opinber forsíða og rás fyrir hvert fyrirtæki, skráanlegar í leitarvélum.',
   'product.cast.f7':

@@ -131,7 +131,9 @@ export const es: AppCatalog<typeof en> = {
   'gallery.selectMonth': 'Seleccionar el mes',
   'gallery.unselectMonth': 'Quitar el mes',
   'gallery.downloadSelected': 'Descargar',
-  'gallery.downloading': { one: 'Descargando 1 foto…', other: 'Descargando {count} fotos…' },
+  'gallery.downloading':
+    'Peticiones de descarga iniciadas: {count}. Comprueba las descargas del navegador.',
+  'gallery.downloadCapped': 'Fotos fuera de este lote: {count}.',
   'gallery.newAlbum': 'Álbum nuevo',
   'gallery.newAlbumTitle': 'Álbum nuevo',
   'gallery.newAlbumPrompt': {

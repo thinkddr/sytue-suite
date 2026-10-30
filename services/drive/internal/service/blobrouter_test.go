@@ -20,9 +20,11 @@ import (
 )
 
 type fakeExternal struct {
-	cfg map[string]store.ExternalStorage
-	n   int
-	err error
+	cfg          map[string]store.ExternalStorage
+	locations    map[uuid.UUID]store.ExternalStorage
+	n            int
+	err          error
+	lastLocation uuid.UUID
 }
 
 func (*fakeExternal) PutExternalObject(context.Context, string, string, string) error { return nil }
@@ -40,6 +42,40 @@ func (f *fakeExternal) ExternalStorageFor(_ context.Context, tenant string) (sto
 		return c, nil
 	}
 	return store.ExternalStorage{}, domain.ErrNotFound
+}
+
+func (f *fakeExternal) ExternalStorageLocation(ctx context.Context, tenant string, id uuid.UUID) (store.ExternalStorage, error) {
+	f.lastLocation = id
+	if f.locations != nil {
+		if cfg, ok := f.locations[id]; ok {
+			return cfg, nil
+		}
+		return store.ExternalStorage{}, domain.ErrNotFound
+	}
+	return f.ExternalStorageFor(ctx, tenant)
+}
+
+func TestVersionedBlobDoesNotFollowNewActiveAccount(t *testing.T) {
+	first, second := uuid.New(), uuid.New()
+	a := store.ExternalStorage{LocationID: first, Kind: "gdrive", InstanceID: "first"}
+	b := store.ExternalStorage{LocationID: second, Kind: "gdrive", InstanceID: "second"}
+	ext := &fakeExternal{cfg: map[string]store.ExternalStorage{"acme": a}, locations: map[uuid.UUID]store.ExternalStorage{first: a, second: b}}
+	r := newBlobRouter(&fakeBlobs{}, ext, "", &integrationsClient{secret: "fixture"})
+	ctx := tenantCtx(t)
+	tenant, _ := tenancy.From(ctx)
+	key, err := r.nuevaClave(ctx, tenant, "opaque")
+	if err != nil || key != store.ExternalPrefix+"v1/"+first.String()+"/opaque" {
+		t.Fatal("location not pinned", key, err)
+	}
+	ext.cfg["acme"] = b
+	r.Forget("acme")
+	if _, err = r.pick(ctx, tenant, key); err != nil || ext.lastLocation != first {
+		t.Fatal("old blob followed active connection", err)
+	}
+	// A corrupt locator never falls back to the active account or Sytue.
+	if _, err = r.pick(ctx, tenant, store.ExternalPrefix+"v1/not-a-location/opaque"); !errors.Is(err, ErrExternalStorageOff) {
+		t.Fatal("corrupt locator accepted", err)
+	}
 }
 
 // El reparto por clave es lo que decide dónde acaban los bytes y quién paga la
@@ -112,7 +148,7 @@ func TestUnavailableExternalStorageNeverFallsBackForNewUploads(t *testing.T) {
 	}{
 		{name: "configuration unavailable", err: errors.New("configuration unavailable")},
 		{name: "missing KEK", cfg: store.ExternalStorage{SecretKeyEnc: "encv1:fixture", UseSSL: true}},
-		{name: "missing OAuth connector", cfg: store.ExternalStorage{Kind: "gdrive", InstanceID: "connected-account"}},
+		{name: "missing OAuth connector", cfg: store.ExternalStorage{Kind: "gdrive", InstanceID: "connected-account", LocationID: uuid.New()}},
 		{name: "unsafe external endpoint", cfg: store.ExternalStorage{Kind: "s3", UseSSL: false}},
 	} {
 		t.Run(scenario.name, func(t *testing.T) {
@@ -154,7 +190,7 @@ func TestNewBlobDestinationDistinguishesMissingStorageFromFailedStorage(t *testi
 		t.Fatalf("a tenant without external storage cannot use its own storage: %s %v", key, err)
 	}
 	s.router.Forget(tenant.Slug)
-	ext.cfg[tenant.Slug] = store.ExternalStorage{Kind: "gdrive", InstanceID: "connected-account"}
+	ext.cfg[tenant.Slug] = store.ExternalStorage{Kind: "gdrive", InstanceID: "connected-account", LocationID: uuid.New()}
 	s.router.conn = &integrationsClient{secret: "fixture"}
 	key, err = s.claveDeBlob(ctx, tenant, uuid.New(), "private.bin")
 	if err != nil || !store.EsExterno(key) {

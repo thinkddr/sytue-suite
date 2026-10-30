@@ -167,7 +167,7 @@ func (p *Pantalla) añadir(n Nota) {
 
 // fallo avisa de una escritura que no ha salido. En el hilo de la interfaz.
 func (p *Pantalla) fallo(clave string, err error) {
-	p.avisos.Notificar(ui.NuevoAviso(ui.AvisoPeligro, p.tr.T(clave, nil), Motivo(err)))
+	p.avisos.Notificar(ui.NuevoAviso(ui.AvisoPeligro, p.tr.T(clave, nil), p.motivo(err)))
 }
 
 // puedeEscribir son las condiciones de TODA escritura: servicio, red y cuaderno abierto.
@@ -831,7 +831,7 @@ func (p *Pantalla) guardarCuaderno(id string, in api.NotebookInput) error {
 		nb, err = p.svc.UpdateNotebook(ctx, id, in)
 	}
 	if err != nil {
-		p.avisar(ui.AvisoPeligro, p.tr.T("note.saveFailed", nil), Motivo(err))
+		p.avisar(ui.AvisoPeligro, p.tr.T("note.saveFailed", nil), p.motivo(err))
 		return err
 	}
 	c := DeCuaderno(nb)
@@ -857,7 +857,7 @@ func (p *Pantalla) borrarCuaderno(c Cuaderno) {
 	ctx, cancelar := p.ctx()
 	defer cancelar()
 	if err := p.svc.DeleteNotebook(ctx, c.ID); err != nil {
-		p.avisar(ui.AvisoPeligro, p.tr.T("note.saveFailed", nil), Motivo(err))
+		p.avisar(ui.AvisoPeligro, p.tr.T("note.saveFailed", nil), p.motivo(err))
 		return
 	}
 	p.olvidarClave(c.ID) // su clave recordada ya no abre nada

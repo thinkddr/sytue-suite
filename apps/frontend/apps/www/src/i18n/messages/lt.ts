@@ -451,7 +451,8 @@ export const lt: AppCatalog<typeof en> = {
   'product.cast.f2': 'Adaptyvus atkūrimas trimis kokybėmis; naršyklė pasirenka geriausią.',
   'product.cast.f3':
     'Tiesioginė transliacija iš transliavimo programos per RTMP, su srauto raktu kiekvienam asmeniui.',
-  'product.cast.f4': 'Tiesiogiai iš naršyklės ar programėlės: kamera, ekranas ir mikrofonas.',
+  'product.cast.f4':
+    'Tiesiogiai iš naršyklės ar programėlės: kamera ir mikrofonas. Ekrano bendrinimas palaikomose naršyklėse, kompiuterių sistemose ir Android; iOS/iPadOS programėlėje nepasiekiamas.',
   'product.cast.f5':
     'Tiesioginių transliacijų įrašai automatiškai tampa vaizdo įrašais pagal užklausą.',
   'product.cast.f6': 'Viešas pradinis puslapis ir kanalas kiekvienai organizacijai, indeksuojami.',

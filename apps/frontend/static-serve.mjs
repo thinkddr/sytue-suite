@@ -113,6 +113,28 @@ export function createStaticHandler(root = ROOT) {
     if (path.split('/').includes('..')) {
       return new Response('Bad Request', { status: 400, headers: SECURITY_HEADERS });
     }
+    if (path === 'healthz') {
+      if (req.headers.get('x-forwarded-for') !== null) {
+        return new Response(req.method === 'HEAD' ? null : '{"status":"ok"}\n', {
+          status: 200,
+          headers: {
+            ...SECURITY_HEADERS,
+            'content-type': 'application/json; charset=utf-8',
+            'cache-control': 'no-store',
+          },
+        });
+      }
+      const healthFile = Bun.file(`${root}/healthz`);
+      const body = (await healthFile.exists()) ? healthFile : '{"status":"ok"}\n';
+      return new Response(req.method === 'HEAD' ? null : body, {
+        status: 200,
+        headers: {
+          ...SECURITY_HEADERS,
+          'content-type': 'application/json; charset=utf-8',
+          'cache-control': 'no-store',
+        },
+      });
+    }
     const redirect = path === '' ? rootRedirect(req) : null;
     if (redirect) return redirect;
     const candidates = path === '' ? ['index.html'] : [path, `${path}/index.html`, `${path}.html`];

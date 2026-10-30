@@ -104,6 +104,7 @@
   "gallery.describeStop": "Stöðva",
   "gallery.described": "{count} myndum lýst",
   "gallery.describing": "Lýsir {done} af {total}…",
+  "gallery.downloadCapped": "Myndir utan þessarar lotu: {count}.",
   "gallery.downloadSelected": "Sækja",
   "gallery.downloading": {
     "one": "Sækir {count} mynd…",

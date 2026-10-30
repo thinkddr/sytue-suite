@@ -32,8 +32,10 @@ func TestColaHaciaDocs(t *testing.T) {
 	root, _ := st.EnsureRoot(ctx)
 	nuevo := func(carpeta uuid.UUID, nombre string) uuid.UUID {
 		t.Helper()
-		f, err := st.CreateFile(ctx, store.NewFileRecord{FolderID: carpeta, Name: nombre,
-			StorageKey: "files/" + uuid.NewString(), SizeBytes: 10, ContentType: "application/octet-stream", OwnerSub: "ana"})
+		f, err := st.CreateFile(ctx, store.NewFileRecord{
+			FolderID: carpeta, Name: nombre,
+			StorageKey: "files/" + uuid.NewString(), SizeBytes: 10, ContentType: "application/octet-stream", OwnerSub: "ana",
+		})
 		if err != nil {
 			t.Fatal(err)
 		}

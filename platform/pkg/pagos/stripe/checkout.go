@@ -39,6 +39,14 @@ func New(key, comercio string) (*Stripe, error) {
 	return &Stripe{key: key, comercio: comercio, http: &http.Client{Timeout: 12 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}, nil
 }
 
+// ConTransporte sustituye el transporte HTTP manteniendo el timeout y la prohibición de redirecciones.
+func (s *Stripe) ConTransporte(rt http.RoundTripper) *Stripe {
+	if s != nil && rt != nil {
+		s.http.Transport = rt
+	}
+	return s
+}
+
 func (s *Stripe) CrearPago(ctx context.Context, p pagos.Solicitud) (pagos.Creado, error) {
 	if s == nil || p.Centimos <= 0 || p.Divisa != pagos.DivisaEUR || p.ClaveIdempotencia == "" || p.Metadatos[pagos.MetadatoPago] == "" || !httpsURL(p.URLRetorno) || p.Caduca.Before(time.Now().Add(30*time.Minute)) || p.Caduca.After(time.Now().Add(24*time.Hour)) {
 		return pagos.Creado{}, errors.New("stripe: invalid payment request")

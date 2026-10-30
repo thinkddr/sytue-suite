@@ -106,6 +106,7 @@
   "gallery.describeStop": "Apturēt",
   "gallery.described": "Aprakstīti {count} fotoattēli",
   "gallery.describing": "Apraksta {done} no {total}…",
+  "gallery.downloadCapped": "Šajā grupā neiekļautie fotoattēli: {count}.",
   "gallery.downloadSelected": "Lejupielādēt",
   "gallery.downloading": {
     "zero": "Lejupielādē {count} fotoattēlus…",

@@ -20,7 +20,7 @@ elif [[ "$NOMBRE" == cinta-* ]]; then
   # Native touch widths or Spanish portrait/landscape web states per editor.
   (cd "$DIRECTORIO" && find . -maxdepth 1 -regextype posix-extended -type f \( -name 'native-*.png' -o -regex './(document|spreadsheet|presentation)-es-(320|844|1024)(-derecha|-popover)?\.png' \) -print0) >"$TEMPORAL/files"
 else
-  (cd "$DIRECTORIO" && find . -maxdepth 1 -type f \( -name '*.png' -o -name report.json -o -name results.json \) -print0) >"$TEMPORAL/files"
+  (cd "$DIRECTORIO" && find . -maxdepth 3 -type f \( -name '*.png' -o -name report.json -o -name results.json \) -print0) >"$TEMPORAL/files"
 fi
 [[ -s "$TEMPORAL/files" ]] || exit 0
 tar -C "$DIRECTORIO" --null -T "$TEMPORAL/files" -czf "$TEMPORAL/capturas.tar.gz"

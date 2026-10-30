@@ -6,7 +6,7 @@ Videoene dine og direktesendingene dine, på forespørsel og i sanntid, uten å 
 • Direktechat og kommentarer, med enkel moderering av den som publiserer.
 • Last opp videoer på opptil 8 GiB; originalen beholdes.
 • Direktesending fra et sendeprogram over RTMP, med en strømnøkkel per person.
-• Direkte fra nettleseren eller appen: kamera, skjerm og mikrofon.
+• Direkte fra nettleseren eller appen: kamera og mikrofon. Skjermdeling i støttede nettlesere, skrivebordssystemer og Android; ikke tilgjengelig i iOS/iPadOS-appen.
 • Opptak av direktesendinger blir automatisk til videoer på forespørsel.
 • En offentlig forside og en kanal per organisasjon, indekserbare.
 • Ikke-oppførte lenker, videoer bare for organisasjonen eller tilgang for bestemte personer via @brukernavn.

@@ -67,3 +67,71 @@ test('solo se ofrece una puerta que Drive confirma disponible y autorizada', asy
     await almacenamientoExternoDisponible({ roles: ['owner'] }, 'token', driveUrl, offline),
   ).toBe(false);
 });
+
+test('OAuth conserva el acceso sin KEK de Drive sólo con un proveedor permitido y preparado', async () => {
+  for (const provider of ['gdrive', 'onedrive', 'dropbox']) {
+    const requests: string[] = [];
+    const fetcher: StorageFetch = async (input, init) => {
+      requests.push(String(input));
+      expect(new Headers(init?.headers).get('authorization')).toBe('Bearer session-token');
+      return String(input).endsWith('/instances')
+        ? Response.json({ providers: { [provider]: true } })
+        : Response.json({ available: false });
+    };
+    expect(
+      await almacenamientoExternoDisponible(
+        { roles: ['admin'] },
+        'session-token',
+        driveUrl,
+        fetcher,
+      ),
+    ).toBe(true);
+    expect(requests).toEqual([
+      'https://drive.internal/api/v1/storage/external',
+      'https://drive.internal/api/v1/storage/external/instances',
+    ]);
+  }
+});
+
+test('el fallback OAuth conserva bloqueos y rechaza capacidades desconocidas o inválidas', async () => {
+  for (const body of [
+    { providers: { gdrive: false, onedrive: false, dropbox: false } },
+    { providers: { unsupported: true } },
+    { providers: { gdrive: 'true' } },
+    { providers: null },
+    {},
+  ]) {
+    const fetcher: StorageFetch = async (input) =>
+      String(input).endsWith('/instances')
+        ? Response.json(body)
+        : Response.json({ available: false });
+    expect(
+      await almacenamientoExternoDisponible({ roles: ['owner'] }, 'token', driveUrl, fetcher),
+    ).toBe(false);
+  }
+});
+
+test('Drive debe autorizar antes del fallback OAuth y la segunda lectura también debe responder bien', async () => {
+  for (const status of [401, 403, 503]) {
+    let calls = 0;
+    const fetcher: StorageFetch = async () => {
+      calls += 1;
+      return Response.json({ available: false, providers: { gdrive: true } }, { status });
+    };
+    expect(
+      await almacenamientoExternoDisponible({ roles: ['admin'] }, 'token', driveUrl, fetcher),
+    ).toBe(false);
+    expect(calls).toBe(1);
+  }
+  for (const response of [
+    new Response(null, { status: 403 }),
+    new Response(null, { status: 503 }),
+    new Response('invalid JSON'),
+  ]) {
+    const fetcher: StorageFetch = async (input) =>
+      String(input).endsWith('/instances') ? response : Response.json({ available: false });
+    expect(
+      await almacenamientoExternoDisponible({ roles: ['owner'] }, 'token', driveUrl, fetcher),
+    ).toBe(false);
+  }
+});

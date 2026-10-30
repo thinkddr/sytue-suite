@@ -5,21 +5,22 @@ package hub
 
 import "strings"
 
-// Destino es una de las pantallas de ESTA aplicación. Son las ocho páginas del portal
-// de la web, y ninguna más: saltar a otro PRODUCTO no es un destino, es una acción del
+// Destino es una pantalla de ESTA aplicación: las ocho del portal y el asistente
+// secundario de clientes externos. Saltar a otro PRODUCTO no es un destino, es una acción del
 // sistema (ver `productos.go`).
 type Destino uint8
 
-// Las ocho, con la ruta de la web que porta cada una.
+// Pantallas del portal y asistente secundario, sin cambiar el menú principal.
 const (
-	AInicio       Destino = iota // /one
-	AActividad                   // /one/actividad
-	ABuscar                      // /one/buscar
-	AAvisos                      // /one/notificaciones
-	ADatos                       // /one/datos
-	ADescargas                   // /one/descargas
-	ADispositivos                // /one/dispositivos
-	ABienvenida                  // /one/bienvenida
+	AInicio           Destino = iota // /one
+	AActividad                       // /one/actividad
+	ABuscar                          // /one/buscar
+	AAvisos                          // /one/notificaciones
+	ADatos                           // /one/datos
+	ADescargas                       // /one/descargas
+	ADispositivos                    // /one/dispositivos
+	ABienvenida                      // /one/bienvenida
+	AClientesExternos                // /one/dispositivos/clientes
 )
 
 // Ruta es el camino que esa pantalla tiene en la web. Se conserva porque es lo que
@@ -30,7 +31,7 @@ func (d Destino) Ruta() string {
 	return [...]string{
 		AInicio: "/", AActividad: "/actividad", ABuscar: "/buscar", AAvisos: "/notificaciones",
 		ADatos: "/datos", ADescargas: "/descargas", ADispositivos: "/dispositivos",
-		ABienvenida: "/bienvenida",
+		ABienvenida: "/bienvenida", AClientesExternos: "/dispositivos/clientes",
 	}[d]
 }
 
@@ -40,7 +41,7 @@ func (d Destino) ClaveTitulo() string {
 	return [...]string{
 		AInicio: "page.home", AActividad: "page.activity", ABuscar: "page.search",
 		AAvisos: "page.inbox", ADatos: "page.data", ADescargas: "page.downloads",
-		ADispositivos: "page.devices", ABienvenida: "page.welcome",
+		ADispositivos: "page.devices", ABienvenida: "page.welcome", AClientesExternos: "page.devices",
 	}[d]
 }
 
@@ -54,7 +55,7 @@ func DestinoDeRuta(ruta string) (Destino, bool) {
 	if ruta == "" {
 		ruta = "/"
 	}
-	for d := AInicio; d <= ABienvenida; d++ {
+	for d := AInicio; d <= AClientesExternos; d++ {
 		if d.Ruta() == ruta {
 			return d, true
 		}

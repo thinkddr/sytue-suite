@@ -197,3 +197,96 @@ func TestViajePorLibreOfficeConservaMedioYDisenos(t *testing.T) {
 		}
 	}
 }
+
+// TestDiaposImportaGraficosYObjetosIncrustados comprueba que un gráfico y un objeto OLE
+// en .pptx y en .odp se importan como tabla de datos e imagen/caja en la diapositiva.
+func TestDiaposImportaGraficosYObjetosIncrustados(t *testing.T) {
+	basePptx := exportarPptx(t, jsonDe(t, slidesModel{Slides: []slideT{{ID: "s1"}}}))
+	partsPptx := zipParts(t, basePptx)
+	partsPptx["ppt/charts/chart1.xml"] = `<?xml version="1.0" encoding="UTF-8"?>` +
+		`<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">` +
+		`<c:chart><c:title><c:tx><a:rich><a:p><a:r><a:t>Ventas trimestrales</a:t></a:r></a:p></a:rich></c:tx></c:title>` +
+		`<c:plotArea><c:barChart>` +
+		`<c:ser><c:tx><c:v>2025</c:v></c:tx>` +
+		`<c:cat><c:strRef><c:strCache><c:pt idx="0"><c:v>T1</c:v></c:pt><c:pt idx="1"><c:v>T2</c:v></c:pt></c:strCache></c:strRef></c:cat>` +
+		`<c:val><c:numRef><c:numCache><c:pt idx="0"><c:v>120</c:v></c:pt><c:pt idx="1"><c:v>180</c:v></c:pt></c:numCache></c:numRef></c:val></c:ser>` +
+		`<c:ser><c:tx><c:v>2026</c:v></c:tx>` +
+		`<c:cat><c:strRef><c:strCache><c:pt idx="0"><c:v>T1</c:v></c:pt><c:pt idx="1"><c:v>T2</c:v></c:pt></c:strCache></c:strRef></c:cat>` +
+		`<c:val><c:numRef><c:numCache><c:pt idx="0"><c:v>150</c:v></c:pt><c:pt idx="1"><c:v>210</c:v></c:pt></c:numCache></c:numRef></c:val></c:ser>` +
+		`</c:barChart></c:plotArea></c:chart></c:chartSpace>`
+	partsPptx["ppt/media/ole1.jpg"] = string(jpegDe(t, 32, 24))
+	partsPptx["ppt/slides/_rels/slide1.xml.rels"] = `<?xml version="1.0" encoding="UTF-8"?>` +
+		`<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">` +
+		`<Relationship Id="rIdChart1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart" Target="../charts/chart1.xml"/>` +
+		`<Relationship Id="rIdImg1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/ole1.jpg"/>` +
+		`</Relationships>`
+	partsPptx["ppt/slides/slide1.xml"] = `<?xml version="1.0" encoding="UTF-8"?>` +
+		`<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">` +
+		`<p:cSld><p:spTree>` +
+		`<p:graphicFrame><p:xfrm><a:off x="914400" y="685800"/><a:ext cx="4572000" cy="3429000"/></p:xfrm>` +
+		`<a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart r:id="rIdChart1"/></a:graphicData></a:graphic></p:graphicFrame>` +
+		`<p:graphicFrame><p:xfrm><a:off x="5486400" y="685800"/><a:ext cx="2743200" cy="2057400"/></p:xfrm>` +
+		`<a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/presentationml/2006/ole">` +
+		`<p:oleObj name="Hoja incrustada"><p:pic><p:blipFill><a:blip r:embed="rIdImg1"/></p:blipFill></p:pic></p:oleObj>` +
+		`</a:graphicData></a:graphic></p:graphicFrame>` +
+		`<p:graphicFrame><p:xfrm><a:off x="914400" y="4572000"/><a:ext cx="2743200" cy="1371600"/></p:xfrm>` +
+		`<a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/presentationml/2006/ole">` +
+		`<p:oleObj name="Presupuesto.xlsx" progId="Excel.Sheet.12"/>` +
+		`</a:graphicData></a:graphic></p:graphicFrame>` +
+		`</p:spTree></p:cSld></p:sld>`
+
+	gotPptx := reimportar(t, "graficos.pptx", zipStore(t, partsPptx))
+	if len(gotPptx.Slides) != 1 || len(gotPptx.Slides[0].Boxes) != 3 {
+		t.Fatalf("pptx cajas = %+v", gotPptx.Slides)
+	}
+	b0, b1, b2 := gotPptx.Slides[0].Boxes[0], gotPptx.Slides[0].Boxes[1], gotPptx.Slides[0].Boxes[2]
+	if !strings.Contains(b0.HTML, "<table>") || !strings.Contains(b0.HTML, "Ventas trimestrales") ||
+		!strings.Contains(b0.HTML, "<td>T1</td>") || !strings.Contains(b0.HTML, "<td>210</td>") {
+		t.Errorf("pptx gráfico = %+v", b0)
+	}
+	if b1.Kind != "image" || !strings.HasPrefix(b1.Src, "data:image/jpeg;base64,") || b1.W <= 0 {
+		t.Errorf("pptx objeto OLE con imagen = %+v", b1)
+	}
+	if b2.Kind != "text" || !strings.Contains(b2.HTML, "Presupuesto.xlsx") {
+		t.Errorf("pptx objeto OLE sin imagen = %+v", b2)
+	}
+
+	// En .odp: un marco con <draw:object xlink:href="./Object 1"/> (gráfico ODF con <table:table>)
+	// y dos marcos con <draw:object-ole> (uno con <draw:image> de reemplazo y otro sin ella).
+	baseOdp := exportarOdp(t, jsonDe(t, slidesModel{Slides: []slideT{{ID: "s1"}}}))
+	partsOdp := zipParts(t, baseOdp)
+	partsOdp["Object 1/content.xml"] = `<?xml version="1.0" encoding="UTF-8"?>` +
+		`<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:chart="urn:oasis:names:tc:opendocument:xmlns:chart:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">` +
+		`<office:body><office:chart><chart:chart chart:class="chart:bar">` +
+		`<chart:title><text:p>Cuota por región</text:p></chart:title>` +
+		`<table:table table:name="local-table">` +
+		`<table:table-header-rows><table:table-row><table:table-cell><text:p/></table:table-cell><table:table-cell><text:p>2025</text:p></table:table-cell><table:table-cell><text:p>2026</text:p></table:table-cell></table:table-row></table:table-header-rows>` +
+		`<table:table-rows>` +
+		`<table:table-row><table:table-cell><text:p>Norte</text:p></table:table-cell><table:table-cell><text:p>40</text:p></table:table-cell><table:table-cell><text:p>55</text:p></table:table-cell></table:table-row>` +
+		`<table:table-row><table:table-cell><text:p>Sur</text:p></table:table-cell><table:table-cell><text:p>60</text:p></table:table-cell><table:table-cell><text:p>75</text:p></table:table-cell></table:table-row>` +
+		`</table:table-rows></table:table></chart:chart></office:chart></office:body></office:document-content>`
+	partsOdp["Pictures/ole.jpg"] = string(jpegDe(t, 32, 24))
+	partsOdp["content.xml"] = `<?xml version="1.0" encoding="UTF-8"?>` +
+		`<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink">` +
+		`<office:body><office:presentation><draw:page draw:name="page1">` +
+		`<draw:frame svg:x="2cm" svg:y="2cm" svg:width="12cm" svg:height="8cm"><draw:object xlink:href="./Object 1"/><draw:image xlink:href="Pictures/ole.jpg"/></draw:frame>` +
+		`<draw:frame draw:name="Tabla OLE" svg:x="15cm" svg:y="2cm" svg:width="8cm" svg:height="6cm"><draw:object-ole xlink:href="./Object 2"/><draw:image xlink:href="Pictures/ole.jpg"/></draw:frame>` +
+		`<draw:frame draw:name="Fórmula OLE" svg:x="15cm" svg:y="9cm" svg:width="8cm" svg:height="4cm"><draw:object-ole xlink:href="./Object 3"/></draw:frame>` +
+		`</draw:page></office:presentation></office:body></office:document-content>`
+
+	gotOdp := reimportar(t, "graficos.odp", zipStore(t, partsOdp))
+	if len(gotOdp.Slides) != 1 || len(gotOdp.Slides[0].Boxes) != 3 {
+		t.Fatalf("odp cajas = %+v", gotOdp.Slides)
+	}
+	o0, o1, o2 := gotOdp.Slides[0].Boxes[0], gotOdp.Slides[0].Boxes[1], gotOdp.Slides[0].Boxes[2]
+	if !strings.Contains(o0.HTML, "<table>") || !strings.Contains(o0.HTML, "Cuota por región") ||
+		!strings.Contains(o0.HTML, "<td>Norte</td>") || !strings.Contains(o0.HTML, "<td>75</td>") {
+		t.Errorf("odp gráfico = %+v", o0)
+	}
+	if o1.Kind != "image" || !strings.HasPrefix(o1.Src, "data:image/jpeg;base64,") {
+		t.Errorf("odp objeto OLE con imagen = %+v", o1)
+	}
+	if o2.Kind != "text" || !strings.Contains(o2.HTML, "Fórmula OLE") {
+		t.Errorf("odp objeto OLE sin imagen = %+v", o2)
+	}
+}

@@ -151,7 +151,7 @@ func (s *Store) ApplyMatrixAccountAccess(ctx context.Context, subject, status st
 	if err := s.revokeSubjectCalls(ctx, subject, ""); err != nil {
 		return err
 	}
-	if err := s.revokeMatrixDraftRooms(ctx, subject, ""); err != nil {
+	if err := s.revokeMatrixPrivateRooms(ctx, subject, ""); err != nil {
 		return err
 	}
 	return s.pool.InMaintenanceTx(ctx, func(tx pgx.Tx) error {
@@ -287,7 +287,7 @@ func (s *Store) ApplyMatrixTenantAccess(ctx context.Context, subject, status str
 	if err := s.revokeSubjectCalls(ctx, subject, t.Slug); err != nil {
 		return err
 	}
-	if err := s.revokeMatrixDraftRooms(ctx, subject, t.Slug); err != nil {
+	if err := s.revokeMatrixPrivateRooms(ctx, subject, t.Slug); err != nil {
 		return err
 	}
 	return s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {

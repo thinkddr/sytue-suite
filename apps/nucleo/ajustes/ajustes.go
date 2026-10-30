@@ -34,6 +34,7 @@ package ajustes
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"os"
@@ -228,21 +229,7 @@ func escribirProtegido(destino string, datos []byte, soloNuevo bool, proteger fu
 		_ = tmp.Close()
 		return err
 	}
-	if _, err := tmp.Write(datos); err != nil {
-		_ = tmp.Close()
-		return err
-	}
-	if err := tmp.Chmod(permisoFichero); err != nil {
-		_ = tmp.Close()
-		return err
-	}
-	// A disco antes del rename: tras un corte de luz, el nombre no puede apuntar a un
-	// fichero vacío.
-	if err := tmp.Sync(); err != nil {
-		_ = tmp.Close()
-		return err
-	}
-	if err := tmp.Close(); err != nil {
+	if err := llenarTemporal(tmp, datos); err != nil {
 		return err
 	}
 	if soloNuevo {
@@ -252,6 +239,41 @@ func escribirProtegido(destino string, datos []byte, soloNuevo bool, proteger fu
 		return nil
 	}
 	return os.Rename(tmp.Name(), destino)
+}
+
+// EscribirEnRaiz comparte la escritura duradera y atómica de preferencias, pero
+// conserva el confinamiento del descriptor os.Root para las cachés cifradas.
+func EscribirEnRaiz(raiz *os.Root, destino string, datos []byte) error {
+	if err := raiz.MkdirAll(filepath.Dir(destino), permisoCarpeta); err != nil {
+		return err
+	}
+	temporal := destino + ".tmp-" + rand.Text()
+	tmp, err := raiz.OpenFile(temporal, os.O_CREATE|os.O_EXCL|os.O_WRONLY, permisoFichero)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = raiz.Remove(temporal) }()
+	if err := llenarTemporal(tmp, datos); err != nil {
+		return err
+	}
+	return raiz.Rename(temporal, destino)
+}
+
+func llenarTemporal(tmp *os.File, datos []byte) error {
+	if _, err := tmp.Write(datos); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Chmod(permisoFichero); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	// Persistir el contenido antes de que su nombre sustituya al anterior.
+	if err := tmp.Sync(); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	return tmp.Close()
 }
 
 // Cerrojo excluye procesos mediante un bloqueo del sistema operativo. El fichero es

@@ -73,7 +73,7 @@ por la API» de `docs/operations.md`.
 | Seguridad de los datos                                                                          | Sí, `applications.dataSafety` (fuera de la edición)                               | `play-publicar.sh`                             |
 | AAB a «internal» (como borrador)                                                                | Sí, `edits.bundles.upload` + `edits.tracks.update`                                | `play-publicar.sh --aab`                       |
 | Testers de «internal»                                                                           | Solo **grupos de Google** (`edits.testers`); las listas de correos, en la consola | El dueño                                       |
-| Países (UE + EEE + CH)                                                                          | **No**: `countryAvailability` solo se lee                                         | El dueño; DECISIÓN abajo                       |
+| Países (30: UE + EEE + CH, sin Francia)                                                         | **No**: `countryAvailability` solo se lee                                         | El dueño; DECISIÓN abajo                       |
 | Clasificación de contenido, público objetivo, anuncios, acceso, declaraciones, ID de publicidad | **No**                                                                            | El dueño, con las respuestas de abajo          |
 | Enviar a revisión y a producción                                                                | No se hace                                                                        | El dueño                                       |
 
@@ -295,9 +295,14 @@ Se sube por la API desde `seguridad-datos.csv`. Resumen de lo declarado:
 | Sytue ERP         | `eu.sytue.erp`      | Empresa                           | Contabilidad         |
 | Sytue Bases       | `eu.sytue.bases`    | Productividad                     | Bases de datos       |
 
-**Países** (DECISIÓN): los 27 de la UE, Islandia, Liechtenstein, Noruega y Suiza —los 31 de
-las obligaciones (`obligaciones-fuentes-oficiales`)—. _Prueba y publicación → Producción →
-Países o regiones_; en «internal» no hace falta.
+**Países** (DECISIÓN): **30**, los 26 de la UE sin Francia, Islandia, Liechtenstein,
+Noruega y Suiza. Se conserva la exclusión de Francia decidida por el titular el
+**2026-10-14**, posterior a la lista de 31 de septiembre. La disponibilidad de Play
+se fija por esa decisión de distribución del titular.
+
+El **2026-10-25** quedaron guardados esos 30 países en las **quince apps** de Play
+Console, sin enviar los cambios a revisión ni publicar. Se configuran en _Prueba y
+publicación → Producción → Países o regiones_; en «internal» no hace falta.
 
 **Lo que le queda al dueño en CADA una de las quince**, en este orden:
 

@@ -8,7 +8,9 @@
   "exports": {
     ".": "./src/index.ts",
     "./preact": "./src/preact.ts",
-    "./worker": "./src/worker.ts"
+    "./worker": "./src/worker.ts",
+    "./matrix": "./src/matrix/index.ts",
+    "./matrix/types": "./src/matrix/types.ts"
   },
   "files": [
     "src"
@@ -20,7 +22,9 @@
   },
   "dependencies": {
     "@sytue/config": "workspace:*",
-    "preact": "10.29.8"
+    "preact": "10.29.8",
+    "matrix-js-sdk": "44.0.0",
+    "@matrix-org/matrix-sdk-crypto-wasm": "18.9.0"
   },
   "devDependencies": {
     "@types/node": "catalog:",

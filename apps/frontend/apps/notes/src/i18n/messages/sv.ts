@@ -116,6 +116,8 @@ export const sv: AppCatalog<typeof en> = {
     'Länka till den från en annan anteckning så dyker den upp här av sig själv.',
   'notebook.delete': 'Ta bort anteckningsbok',
   'notebook.deleteConfirm': 'Ta bort ”{title}” och allt som finns i den?',
+  'notebook.ownerOnly':
+    'Bara den som skapade anteckningsboken eller den som administrerar organisationen kan flytta den, ändra vem som ser den eller kryptera den.',
   'notebook.newChild': 'Ny anteckningsbok inuti',
   'notebook.notes': { one: '{count} anteckning', other: '{count} anteckningar' },
   'notebook.emoji': 'Ikon',

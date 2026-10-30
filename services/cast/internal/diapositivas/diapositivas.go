@@ -28,6 +28,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"git.sytue.eu/sytue/one/platform/pkg/logsafe"
 	"git.sytue.eu/sytue/one/platform/pkg/pg"
 	"git.sytue.eu/sytue/one/services/cast/internal/domain"
 	"git.sytue.eu/sytue/one/services/cast/internal/service"
@@ -186,7 +187,7 @@ func (s *Servicio) Avanzar(ctx context.Context, quien service.Quien, id uuid.UUI
 	if nueva {
 		// La huella de la presentación: quién, en qué directo y de dónde. No se registra cada
 		// cambio de diapositiva, que está en `slide_marks`.
-		s.logger.InfoContext(ctx, "cast: presentación iniciada", "tenant", v.Tenant, "video", v.ID, "by", quien.Sub, "ref", p.Ref, "total", p.Total)
+		s.logger.InfoContext(ctx, "cast: presentación iniciada", "tenant", v.Tenant, "video", v.ID, "by", quien.Sub, "ref", logsafe.Text(p.Ref), "total", p.Total)
 	}
 	est, _, err := s.leer(ctx, v.Tenant, v.ID)
 	return est, err

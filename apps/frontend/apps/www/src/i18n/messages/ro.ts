@@ -437,7 +437,8 @@ export const ro: AppCatalog<typeof en> = {
   'product.cast.f2': 'Redare adaptivă în trei calități; navigatorul o alege pe cea mai bună.',
   'product.cast.f3':
     'Transmisiune dintr-un program de difuzare prin RTMP, cu o cheie de flux pentru fiecare persoană.',
-  'product.cast.f4': 'În direct din navigator sau din aplicație: cameră, ecran și microfon.',
+  'product.cast.f4':
+    'În direct din navigator sau aplicație: cameră și microfon. Partajarea ecranului în navigatoare, sisteme desktop și Android compatibile; indisponibilă în aplicația iOS/iPadOS.',
   'product.cast.f5': 'Înregistrările transmisiunilor devin automat videoclipuri la cerere.',
   'product.cast.f6':
     'O pagină principală publică și un canal pentru fiecare organizație, indexabile.',

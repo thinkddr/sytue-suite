@@ -17,13 +17,15 @@ import (
 	"strings"
 	"testing"
 
+	"git.sytue.eu/sytue/one/apps/nucleo/auth/authtest"
+
 	"git.sytue.eu/sytue/one/apps/nucleo/webref"
 )
 
 func abrir(t *testing.T) (*Store, string) {
 	t.Helper()
 	dir := filepath.Join(t.TempDir(), "offline")
-	s, err := Open(dir)
+	s, err := OpenWithSecrets(dir, new(authtest.Secrets))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -281,7 +283,7 @@ func TestLasReglasSonLasDelServiceWorker(t *testing.T) {
 
 // TestContarVeTodosLosDuenos: lo que se perdería al vaciar el almacén, de cualquier cuenta.
 func TestContarVeTodosLosDuenos(t *testing.T) {
-	s, err := Open(t.TempDir())
+	s, err := OpenWithSecrets(t.TempDir(), new(authtest.Secrets))
 	if err != nil {
 		t.Fatal(err)
 	}

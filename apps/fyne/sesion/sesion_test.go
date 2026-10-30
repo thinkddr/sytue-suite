@@ -5,6 +5,8 @@ package sesion
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"log/slog"
@@ -833,5 +835,211 @@ func TestHabilitarDriveRespetaBloqueoYFaltaDeSesionLocal(t *testing.T) {
 				t.Fatal("habilitar Drive eludió la sesión local o su bloqueo")
 			}
 		})
+	}
+}
+
+type dispositivoMovilFalso struct {
+	fyne.Device
+	movil bool
+}
+
+func (d dispositivoMovilFalso) IsMobile() bool { return d.movil }
+
+type driverMovilFalso struct {
+	fyne.Driver
+	movil bool
+}
+
+func (d driverMovilFalso) Device() fyne.Device {
+	return dispositivoMovilFalso{Device: d.Driver.Device(), movil: d.movil}
+}
+
+type appDispositivoFalso struct {
+	fyne.App
+	movil   bool
+	esquema string
+	abrir   func(*url.URL) error
+}
+
+func (a appDispositivoFalso) Driver() fyne.Driver {
+	return driverMovilFalso{Driver: a.App.Driver(), movil: a.movil}
+}
+
+func (a appDispositivoFalso) Metadata() fyne.AppMetadata {
+	m := a.App.Metadata()
+	m.Custom = map[string]string{"esquema": a.esquema}
+	return m
+}
+
+func (a appDispositivoFalso) OpenURL(u *url.URL) error {
+	if a.abrir != nil {
+		return a.abrir(u)
+	}
+	return nil
+}
+
+// TestEntrarRecuerdaElDispositivoEnEscritorioYMovil (NAT-02): en escritorio (loopback) y
+// en móvil (iOS/Android por esquema propio), Entrar manda sytue_device en /authorize y
+// sytue_device_secret en /token. Sytue ID pide consentimiento la primera vez por
+// (cliente, redirect_uri, dispositivo), lo recuerda tras Salir() y vuelve a pedirlo si
+// cambia el cliente/esquema o el dispositivo.
+func TestEntrarRecuerdaElDispositivoEnEscritorioYMovil(t *testing.T) {
+	aparte(t)
+	base := test.NewApp()
+	defer base.Quit()
+
+	consentidos := map[string]bool{}
+	var (
+		preguntas         int
+		ultimoDispositivo string
+		ultimoCliente     string
+		ultimoRedirect    string
+		ultimoReto        string
+	)
+	var idp *httptest.Server
+	idp = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/.well-known/openid-configuration":
+			_ = json.NewEncoder(w).Encode(map[string]string{
+				"issuer":                 idp.URL,
+				"authorization_endpoint": idp.URL + "/authorize",
+				"token_endpoint":         idp.URL + "/token",
+			})
+		case "/authorize":
+			q := r.URL.Query()
+			ultimoCliente = q.Get("client_id")
+			ultimoRedirect = q.Get("redirect_uri")
+			ultimoReto = q.Get("code_challenge")
+			ultimoDispositivo = q.Get("sytue_device")
+			clave := ultimoCliente + "\x00" + ultimoRedirect + "\x00" + ultimoDispositivo
+			if ultimoDispositivo == "" || !consentidos[clave] {
+				preguntas++
+				if ultimoDispositivo != "" {
+					consentidos[clave] = true
+				}
+			}
+			vuelta, err := url.Parse(ultimoRedirect)
+			if err != nil {
+				t.Errorf("redirect_uri inválido: %v", err)
+				return
+			}
+			vq := vuelta.Query()
+			vq.Set("code", "c0d1g0")
+			vq.Set("state", q.Get("state"))
+			vuelta.RawQuery = vq.Encode()
+			w.Header().Set("Location", vuelta.String())
+			w.WriteHeader(http.StatusFound)
+		case "/token":
+			_ = r.ParseForm()
+			secreto := r.PostForm.Get("sytue_device_secret")
+			sumaSecreto := sha256.Sum256([]byte(secreto))
+			sumaPKCE := sha256.Sum256([]byte(r.PostForm.Get("code_verifier")))
+			if r.PostForm.Get("client_id") != ultimoCliente ||
+				r.PostForm.Get("redirect_uri") != ultimoRedirect ||
+				base64.RawURLEncoding.EncodeToString(sumaPKCE[:]) != ultimoReto ||
+				secreto == "" ||
+				base64.RawURLEncoding.EncodeToString(sumaSecreto[:]) != ultimoDispositivo {
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = w.Write([]byte(`{"error":"invalid_grant","error_description":"dispositivo o PKCE inválido"}`))
+				return
+			}
+			reclamos := base64.RawURLEncoding.EncodeToString([]byte(`{"sub":"ada","tenant":"acme"}`))
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"access_token":  "cabecera." + reclamos + ".firma",
+				"refresh_token": "r-dispositivo",
+				"expires_in":    300,
+				"id_token":      "x." + reclamos + ".y",
+			})
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer idp.Close()
+
+	noSeguir := &http.Client{
+		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+	}
+
+	apuntarIDP := func(s *Suite) {
+		s.oidc.Issuer = idp.URL
+		s.almacen = s.oidc.Almacen()
+		s.Sesion = auth.NewSession(auth.Tokens{}, auth.Compartida(s.oidc.Renew, s.cargarSesion, s.almacen.Guardar), s.almacen.Guardar)
+	}
+
+	// 1. Móvil (iOS / Android): primer login pregunta consentimiento (preguntas == 1);
+	// tras Salir(), el secreto del dispositivo sigue en el almacén seguro y el segundo
+	// login NO vuelve a preguntar (preguntas sigue en 1).
+	var suiteMovil *Suite
+	appMovil := appDispositivoFalso{
+		App:     base,
+		movil:   true,
+		esquema: "sytue-mail",
+		abrir: func(u *url.URL) error {
+			resp, err := noSeguir.Get(u.String())
+			if err != nil {
+				return err
+			}
+			_ = resp.Body.Close()
+			loc, err := url.Parse(resp.Header.Get("Location"))
+			if err != nil {
+				return err
+			}
+			suiteMovil.recibirURL(loc)
+			return nil
+		},
+	}
+	suiteMovil = Abrir(appMovil, "sytue.eu")
+	apuntarIDP(suiteMovil)
+	if suiteMovil.oidc.Cliente != auth.ClientIDMovil {
+		t.Fatalf("en móvil el cliente OIDC es %q; quiero %q", suiteMovil.oidc.Cliente, auth.ClientIDMovil)
+	}
+	if err := suiteMovil.Entrar(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if preguntas != 1 || !suiteMovil.Estado().Dentro() {
+		t.Fatalf("primer login móvil: preguntas = %d, estado = %+v", preguntas, suiteMovil.Estado())
+	}
+	suiteMovil.Salir()
+	if suiteMovil.Estado().Dentro() {
+		t.Fatal("sigue dentro tras Salir()")
+	}
+	if err := suiteMovil.Entrar(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if preguntas != 1 {
+		t.Fatalf("tras Salir() en el mismo móvil volvió a pedir consentimiento: %d preguntas", preguntas)
+	}
+
+	// 2. Cambiar de esquema/app en el mismo móvil (p. ej. sytue-drive://) o de cliente
+	// (escritorio) vuelve a pedir consentimiento una vez y luego lo recuerda.
+	appDriveMovil := appMovil
+	appDriveMovil.esquema = "sytue-drive"
+	suiteMovil = Abrir(appDriveMovil, "sytue.eu")
+	apuntarIDP(suiteMovil)
+	if err := suiteMovil.Entrar(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if preguntas != 2 {
+		t.Fatalf("otra app móvil no pidió consentimiento la primera vez: %d preguntas", preguntas)
+	}
+	suiteMovil.Salir()
+	if err := suiteMovil.Entrar(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if preguntas != 2 {
+		t.Fatalf("la segunda app móvil no recordó su consentimiento: %d preguntas", preguntas)
+	}
+
+	// 3. Dispositivo nuevo (almacén seguro sin el secreto de dispositivo): vuelve a pedir
+	// consentimiento.
+	if err := auth.BorrarSecreto("dispositivo"); err != nil {
+		t.Fatal(err)
+	}
+	suiteMovil.Salir()
+	if err := suiteMovil.Entrar(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if preguntas != 3 {
+		t.Fatalf("un dispositivo nuevo no pidió consentimiento: %d preguntas", preguntas)
 	}
 }

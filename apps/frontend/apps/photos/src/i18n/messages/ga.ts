@@ -143,13 +143,9 @@ export const ga: AppCatalog<typeof en> = {
   'gallery.selectMonth': 'Roghnaigh mí',
   'gallery.unselectMonth': 'Díroghnaigh mí',
   'gallery.downloadSelected': 'Íoslódáil',
-  'gallery.downloading': {
-    one: '1 ghrianghraf á íoslódáil…',
-    two: '{count} ghrianghraf á n-íoslódáil…',
-    few: '{count} ghrianghraf á n-íoslódáil…',
-    many: '{count} ngrianghraf á n-íoslódáil…',
-    other: '{count} grianghraf á n-íoslódáil…',
-  },
+  'gallery.downloading':
+    'Iarratais íoslódála tosaithe: {count}. Seiceáil íoslódálacha do bhrabhsálaí.',
+  'gallery.downloadCapped': 'Grianghraif lasmuigh den bhaisc seo: {count}.',
   'gallery.newAlbum': 'Albam nua',
   'gallery.newAlbumTitle': 'Albam nua',
   'gallery.newAlbumPrompt': {

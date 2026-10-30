@@ -88,22 +88,6 @@ spec:
         - { protocol: TCP, port: {{ . }} }
         {{- end }}
     {{- end }}
-    {{- with $np.apiServer }}
-    {{- if .cidrs }}
-    # API SERVER DEL PROPIO CLÚSTER. El porqué completo está en el comentario del
-    # valor: kube-router compara el destino TRAS el DNAT, así que aquí se nombra
-    # la IP real del nodo y el puerto real del API, no la ClusterIP ni el 443.
-    # Sin esto Traefik no lista Ingress y la suite entera responde 404.
-    - to:
-        {{- range .cidrs }}
-        - ipBlock:
-            cidr: {{ . | quote }}
-        {{- end }}
-      ports:
-        - protocol: TCP
-          port: {{ .port | default 6443 }}
-    {{- end }}
-    {{- end }}
     # Egress a los servicios gestionados de Scaleway: RDB, Object Storage,
     # Secret Manager y SMTP.
     #
@@ -128,6 +112,9 @@ spec:
         - ipBlock:
             cidr: 0.0.0.0/0
             except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
               - 169.254.0.0/16
       ports:
         - protocol: TCP

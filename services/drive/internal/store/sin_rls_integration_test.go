@@ -363,4 +363,3 @@ func TestSinRLSMiUnidadAisladaPorPersona(t *testing.T) {
 		})
 	}
 }
-

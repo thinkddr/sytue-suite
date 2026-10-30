@@ -1725,6 +1725,8 @@ export const cs: AppCatalog<typeof en> = {
   'extdata.msg.generic': 'Operaci se nepodařilo dokončit.',
   'extdata.msg.notAllowed':
     'Dotazy na toto připojení mohou posílat jen lidé z jeho seznamu. Požádejte správu své organizace o přidání.',
+  'extdata.msg.ownerOnly':
+    'Změnit nebo smazat toto připojení může jen osoba, která ho vytvořila, nebo správa organizace.',
   'sheet.msg.badValue': 'Nepovolená hodnota',
   'sheet.msg.clipboardDenied': 'Prohlížeč odepřel přístup ke schránce.',
   'sheet.msg.pasteFailed': 'Nepodařilo se vložit',

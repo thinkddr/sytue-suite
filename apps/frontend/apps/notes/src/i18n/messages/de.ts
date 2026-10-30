@@ -115,6 +115,8 @@ export const de: AppCatalog<typeof en> = {
   'backlinks.emptyHint': 'Verlinke sie aus einer anderen Notiz und sie erscheint hier von selbst.',
   'notebook.delete': 'Notizbuch löschen',
   'notebook.deleteConfirm': '„{title}“ mit allem Inhalt löschen?',
+  'notebook.ownerOnly':
+    'Nur wer dieses Notizbuch erstellt hat oder die Administration der Organisation kann es verschieben, seine Sichtbarkeit ändern oder es verschlüsseln.',
   'notebook.newChild': 'Neues Notizbuch darin',
   'notebook.notes': { one: '{count} Notiz', other: '{count} Notizen' },
   'notebook.emoji': 'Symbol',

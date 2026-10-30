@@ -138,11 +138,9 @@ export const lv: AppCatalog<typeof en> = {
   'gallery.selectMonth': 'Atlasīt mēnesi',
   'gallery.unselectMonth': 'Noņemt mēneša atlasi',
   'gallery.downloadSelected': 'Lejupielādēt',
-  'gallery.downloading': {
-    zero: 'Lejupielādē {count} fotoattēlus…',
-    one: 'Lejupielādē {count} fotoattēlu…',
-    other: 'Lejupielādē {count} fotoattēlus…',
-  },
+  'gallery.downloading':
+    'Sāktie lejupielādes pieprasījumi: {count}. Pārbaudiet pārlūka lejupielādes.',
+  'gallery.downloadCapped': 'Šajā grupā neiekļautie fotoattēli: {count}.',
   'gallery.newAlbum': 'Jauns albums',
   'gallery.newAlbumTitle': 'Jauns albums',
   'gallery.newAlbumPrompt': {

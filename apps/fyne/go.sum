@@ -233,8 +233,8 @@ github.com/tetratelabs/wazero v1.12.0 h1:DuWcpNu/FzgEXgGBDp8J1Spc+CWOvvtvVyjKlaZ
 github.com/tetratelabs/wazero v1.12.0/go.mod h1:LvKtzl2RqO4gyF27BiXU+nKAjcV8f38U+kP/q2vgxh0=
 github.com/thesyncim/govpx v0.0.0-20260716224042-691cd0512c48 h1:FksWpQxtBteDfzvInJoEo8ZkiNgZnKU1VCVt124GIbI=
 github.com/thesyncim/govpx v0.0.0-20260716224042-691cd0512c48/go.mod h1:NtVLM5omlmx4IstMc/Rx+YsHQ4sAVq3VQ25wnMl43L4=
-github.com/thinkddr/fyne/v2 v2.8.2-sytue.1 h1:4EyK1lo9Xa+bDwG2zzyKybuKciXH5xHnWgBZ2JswKWI=
-github.com/thinkddr/fyne/v2 v2.8.2-sytue.1/go.mod h1:eXHJ/D9Y58UcDw7SkguadCRI64M4flXyjoMn827Q5SI=
+github.com/thinkddr/fyne/v2 v2.8.2-sytue.2 h1:FpMZcSqCy2NDBesZsDGOMYX1YN10VDLgpFRAfAv4Kxk=
+github.com/thinkddr/fyne/v2 v2.8.2-sytue.2/go.mod h1:Woh/rEARztuuoGHPKmK+iXvUOxbombOxvP3AbQVcMB0=
 github.com/thinkddr/glfw/v3.4/glfw v0.1.0-sytue.4 h1:rnI0FqcdfXNP6BalG4Uki79mdUWTIzJ+St7LeSfjsn8=
 github.com/thinkddr/glfw/v3.4/glfw v0.1.0-sytue.4/go.mod h1:T5Dn0JwIJOX1euPZ/iT4tq6nFYtmukjcYa7937HuYK8=
 github.com/thinkddr/typesetting v0.3.5-sytue.1 h1:dtqy6maR+LRqhYCRqjySd1RpTI6MJ10axa1opsq6bp8=
@@ -297,8 +297,8 @@ golang.org/x/exp v0.0.0-20261014143641-f0251eb4aa3e h1:HgI6W1OolKK6tcV74is+rl9SM
 golang.org/x/exp v0.0.0-20261014143641-f0251eb4aa3e/go.mod h1:DBoxwWhjaW8DJJw/YeM4zpeOKMC1FMXSblsYy+1mFSw=
 golang.org/x/image v0.47.0 h1:za/8gVz++PPZqmZJBNSISICN5Rrj5zixP/8K++fgmqo=
 golang.org/x/image v0.47.0/go.mod h1:IkN5o4A7vq55vXN8FWjjnhg9Rs2GOtffqsSi9mWAKYE=
-golang.org/x/net v0.61.0 h1:RR+6j/BTBCrggOLugxa+66R8FvoN6MHlzDlZIbN9YFw=
-golang.org/x/net v0.61.0/go.mod h1:WgDCOTH8iwtB66T4/GfI94AHo/hhdb7Hah9NDseQfiI=
+golang.org/x/net v0.62.0 h1:18ELalfM5+XNRwzM2nYqXsZQ9ByS1uhj2O/U7+5jqRY=
+golang.org/x/net v0.62.0/go.mod h1:WgDCOTH8iwtB66T4/GfI94AHo/hhdb7Hah9NDseQfiI=
 golang.org/x/sync v0.24.0 h1:iqiDrGoDgyuvAKrhLQthUEzU/R378N78gXbBjxed7oA=
 golang.org/x/sync v0.24.0/go.mod h1:sUUOizhqBxiL6pEWpqNLUiaJn1ShEbZ6BBqskPbjZm0=
 golang.org/x/sys v0.6.0/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=

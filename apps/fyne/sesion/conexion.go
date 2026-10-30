@@ -6,6 +6,7 @@
 package sesion
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -113,11 +114,31 @@ func (s *Suite) scopeCache() string {
 // usa la caché «red primero» de Conexion, y donde una app guarda lo que no puede
 // perder sin red (los borradores y la cola de capturas de Notepads).
 func Almacen() (*offline.Store, error) {
-	dir, err := os.UserCacheDir()
+	return AlmacenConContexto(context.Background())
+}
+
+func AlmacenConContexto(ctx context.Context) (*offline.Store, error) {
+	dir, err := directorioAlmacen()
 	if err != nil {
 		return nil, err
 	}
-	return offline.Open(filepath.Join(dir, "sytue", "offline"))
+	return offline.OpenContext(ctx, dir)
+}
+
+func directorioAlmacen() (string, error) {
+	dir, err := os.UserCacheDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, "sytue", "offline"), nil
+}
+
+func contarAlmacen(espacios ...string) (int, error) {
+	dir, err := directorioAlmacen()
+	if err != nil {
+		return 0, err
+	}
+	return offline.CountDirectory(dir, espacios...)
 }
 
 // vaciarAlmacen quita del disco, al cerrar sesión, TODO lo que las apps guardaron para
@@ -125,9 +146,9 @@ func Almacen() (*offline.Store, error) {
 // de respuestas y también la cola y los borradores de Notepads, de los que ya se ha
 // avisado antes de salir (NAT-08, ver notepads.go). Es lo que hace la web.
 func (s *Suite) vaciarAlmacen() {
-	alm, err := Almacen()
+	dir, err := directorioAlmacen()
 	if err == nil {
-		err = alm.Clear()
+		err = offline.ClearDirectory(dir)
 	}
 	if err != nil {
 		slog.Warn("sesion: la caché sin conexión no se ha podido vaciar al cerrar sesión", "error", err)

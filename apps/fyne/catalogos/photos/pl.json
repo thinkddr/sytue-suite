@@ -108,6 +108,7 @@
   "gallery.describeStop": "Zatrzymaj",
   "gallery.described": "Opisano {count} zdjęć",
   "gallery.describing": "Opisywanie {done} z {total}…",
+  "gallery.downloadCapped": "Zdjęcia poza tą partią: {count}.",
   "gallery.downloadSelected": "Pobierz",
   "gallery.downloading": {
     "one": "Pobieranie 1 zdjęcia…",

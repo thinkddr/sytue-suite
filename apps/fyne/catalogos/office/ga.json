@@ -748,6 +748,7 @@
   "extdata.msg.noEncryption": "Níl criptiú dintiúr cumraithe ar an bhfreastalaí.",
   "extdata.msg.notAllowed": "Ní féidir ach leis na daoine atá ar liosta an cheangail seo é a fhiosrú. Iarr ar lucht riaracháin d’eagraíochta tú a chur leis.",
   "extdata.msg.notFound": "Níl an ceangal ná an fiosrú ann a thuilleadh.",
+  "extdata.msg.ownerOnly": "Ní féidir ach leis an duine a chruthaigh an ceangal seo nó le riarthóir na heagraíochta é a athrú nó a scriosadh.",
   "extdata.msg.rate": "An iomarca rití as a chéile. Fan cúpla soicind agus bain triail eile as.",
   "extdata.msg.timeout": "Thóg an fhoinse sonraí sheachtrach rófhada chun freagairt.",
   "extdata.msg.unauth": "Tá do sheisiún imithe in éag. Logáil isteach arís.",

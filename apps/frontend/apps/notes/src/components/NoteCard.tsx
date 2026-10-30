@@ -40,6 +40,7 @@ import type { FuentesDeEnlace } from './LinkTool.js';
 import { RichText } from './RichText.js';
 import { terminada, vecesTrasladada } from '../client/diario.js';
 import { rotuloRecordatorio, yaPaso } from '../client/recordatorios.js';
+import { textoDeNota } from '../client/extracto.js';
 import { useVistaPreviaEnlaces, type VistaPrevia } from './VistaPreviaEnlace.js';
 import { alternarPlegado, liPlegable } from '../client/en-nota.js';
 
@@ -805,10 +806,11 @@ function Cuerpo({
     case 'event':
     case 'room':
     case 'crossref':
-    case 'launcher':
+    case 'launcher': {
+      const textoCuerpo = textoDeNota(contenido);
       return (
         <div class="grid gap-1">
-          {contenido ? <p class="text-text-muted text-base break-words">{contenido}</p> : null}
+          {textoCuerpo ? <p class="text-text-muted text-base break-words">{textoCuerpo}</p> : null}
           <EnlaceExterno
             t={t}
             url={enlace?.url ?? texto(note.data, 'url')}
@@ -816,6 +818,7 @@ function Cuerpo({
           />
         </div>
       );
+    }
 
     default:
       // Texto y tarea: HTML ya saneado por el servicio al guardarlo (allowlist en

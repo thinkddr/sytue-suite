@@ -741,6 +741,7 @@
   "extdata.msg.noEncryption": "Versleuteling van referenties is op de server niet geconfigureerd.",
   "extdata.msg.notAllowed": "Alleen de mensen op de lijst van deze koppeling kunnen die raadplegen. Vraag wie je organisatie beheert om je toe te voegen.",
   "extdata.msg.notFound": "De koppeling of de query bestaat niet meer.",
+  "extdata.msg.ownerOnly": "Alleen wie deze koppeling heeft aangemaakt of wie de organisatie beheert kan die wijzigen of verwijderen.",
   "extdata.msg.rate": "Te veel uitvoeringen achter elkaar. Wacht een paar seconden en probeer het opnieuw.",
   "extdata.msg.timeout": "De externe gegevensbron deed er te lang over om te antwoorden.",
   "extdata.msg.unauth": "Je sessie is verlopen. Meld je opnieuw aan.",

@@ -579,7 +579,7 @@ func (r *porLienzo[T]) de(c fyne.Canvas) *T {
 // lienzoDe busca el lienzo de un objeto ya montado. Devuelve nil si no lo está.
 func lienzoDe(o fyne.CanvasObject) fyne.Canvas {
 	a := fyne.CurrentApp()
-	if a == nil {
+	if a == nil || len(a.Driver().AllWindows()) == 0 {
 		return nil
 	}
 	return a.Driver().CanvasForObject(o)

@@ -424,7 +424,8 @@ export const da: AppCatalog<typeof en> = {
   'product.cast.f2': 'Adaptiv afspilning i tre kvaliteter; browseren vælger den bedste.',
   'product.cast.f3':
     'Livestreaming fra et udsendelsesprogram via RTMP, med en streamnøgle pr. person.',
-  'product.cast.f4': 'Live fra browseren eller appen: kamera, skærm og mikrofon.',
+  'product.cast.f4':
+    'Live fra browseren eller appen: kamera og mikrofon. Skærmdeling i understøttede browsere, computersystemer og Android; ikke tilgængelig i iOS/iPadOS-appen.',
   'product.cast.f5': 'Optagelser af livestreams bliver automatisk til videoer på forespørgsel.',
   'product.cast.f6': 'En offentlig forside og en kanal pr. organisation, indekserbare.',
   'product.cast.f7':

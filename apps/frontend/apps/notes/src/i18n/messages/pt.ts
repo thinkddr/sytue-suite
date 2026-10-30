@@ -111,6 +111,8 @@ export const pt: AppCatalog<typeof en> = {
   'backlinks.emptyHint': 'Ligue-a a partir de outra nota e aparecerá aqui, sozinha.',
   'notebook.delete': 'Eliminar bloco',
   'notebook.deleteConfirm': 'Eliminar “{title}” e tudo o que está lá dentro?',
+  'notebook.ownerOnly':
+    'Só quem criou este bloco ou quem administra a organização o pode mover, alterar quem o vê ou cifrar.',
   'notebook.newChild': 'Novo bloco dentro',
   'notebook.notes': { one: '{count} nota', other: '{count} notas' },
   'notebook.emoji': 'Ícone',

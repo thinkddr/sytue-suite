@@ -23,10 +23,18 @@ if (!session) {
 let failed = false;
 try {
   const sdk = chatSdk(session.tokens.accessToken);
-  const [preview, bootstrap] = await Promise.all([
-    sdk.previewMatrixNative(state),
-    sdk.matrixBootstrap(),
-  ]);
+  const preview = await sdk.previewMatrixNative(state);
+  // New storage handoffs do not initialize a Rooms conversation space. Keep the
+  // old metadata lookup only for an older backend during a rolling deployment.
+  const bootstrap =
+    preview.homeserver_url !== undefined && preview.sso_provider_id !== undefined
+      ? {
+          actor: preview.actor,
+          tenant: preview.tenant,
+          homeserver_url: preview.homeserver_url,
+          sso_provider_id: preview.sso_provider_id,
+        }
+      : await sdk.matrixBootstrap();
   const target = new URL(preview.authorize_url);
   const home = new URL(bootstrap.homeserver_url);
   const callback = new URL(target.searchParams.get('redirectUrl') ?? '');
@@ -35,6 +43,8 @@ try {
     preview.actor !== bootstrap.actor ||
     preview.tenant !== bootstrap.tenant ||
     preview.state !== state ||
+    target.protocol !== 'https:' ||
+    home.protocol !== 'https:' ||
     target.origin !== home.origin ||
     target.pathname !== `/_matrix/client/v3/login/sso/redirect/${bootstrap.sso_provider_id}` ||
     target.username ||
@@ -42,6 +52,9 @@ try {
     target.hash ||
     callback.origin !== Astro.url.origin ||
     callback.pathname !== `${bff.basePath}/matrix/native/callback` ||
+    callback.username ||
+    callback.password ||
+    callback.hash ||
     callback.searchParams.get('state') !== state ||
     [...callback.searchParams.keys()].join(',') !== 'state'
   )
@@ -60,7 +73,7 @@ try {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width" />
-    <title>Sytue Rooms</title>
+    <title>Sytue</title>
   </head>
   <body>
     <main>

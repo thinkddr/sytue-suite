@@ -1694,6 +1694,8 @@ export const pt: AppCatalog<typeof en> = {
   'extdata.msg.generic': 'Não foi possível concluir a operação.',
   'extdata.msg.notAllowed':
     'Só as pessoas da lista desta ligação a podem consultar. Peça a quem administra a sua organização que inclua o seu nome na lista.',
+  'extdata.msg.ownerOnly':
+    'Só quem criou esta ligação ou quem administra a organização a pode alterar ou eliminar.',
   'sheet.msg.badValue': 'Valor não permitido',
   'sheet.msg.clipboardDenied': 'O navegador recusou o acesso à área de transferência.',
   'sheet.msg.pasteFailed': 'Não foi possível colar',

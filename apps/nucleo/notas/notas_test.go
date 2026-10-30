@@ -9,6 +9,8 @@ import (
 	"slices"
 	"testing"
 
+	"git.sytue.eu/sytue/one/apps/nucleo/auth/authtest"
+
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/offline"
 )
@@ -17,7 +19,7 @@ import (
 // como la nota que habría hecho Intro en su cuaderno (o en su día, si aún no existe),
 // la cola también, y no queda nada. Sin red, todo se queda y se cuenta.
 func TestSubirLlevaLosBorradoresYLaCola(t *testing.T) {
-	st, err := offline.Open(t.TempDir())
+	st, err := offline.OpenWithSecrets(t.TempDir(), new(authtest.Secrets))
 	if err != nil {
 		t.Fatal(err)
 	}

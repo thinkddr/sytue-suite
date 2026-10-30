@@ -57,23 +57,42 @@ func Clave(t tenancy.Tenant, hash string) string {
 // GuardarMensaje deja el mensaje en el almacén de la organización (si no estaba
 // ya) y devuelve la clave que debe llevar la fila de `messages`.
 func GuardarMensaje(ctx context.Context, reg Registro, alm Almacen, t tenancy.Tenant, raw []byte) (string, error) {
+	return GuardarMensajeDesde(ctx, reg, alm, t, bytes.NewReader(raw), int64(len(raw)))
+}
+
+// GuardarMensajeDesde calcula el SHA-256 en flujo desde rs, reserva el blob compartido y
+// sube el mensaje rebobinando rs sin cargar el mensaje entero en un []byte adicional.
+func GuardarMensajeDesde(ctx context.Context, reg Registro, alm Almacen, t tenancy.Tenant, rs io.ReadSeeker, size int64) (string, error) {
 	if t.Slug == "" {
 		return "", fmt.Errorf("blobs: mensaje sin organización")
 	}
-	suma := sha256.Sum256(raw)
+	if _, err := rs.Seek(0, io.SeekStart); err != nil {
+		return "", fmt.Errorf("blobs: rebobinar para hash: %w", err)
+	}
+	h := sha256.New()
+	if _, err := io.Copy(h, rs); err != nil {
+		return "", fmt.Errorf("blobs: leer para hash: %w", err)
+	}
+	hexHash := hex.EncodeToString(h.Sum(nil))
 	// En `blob_refs` el «hash» identifica el blob: el de la organización.
-	hash := t.Slug + "/" + hex.EncodeToString(suma[:])
-	key := Clave(t, hex.EncodeToString(suma[:]))
-	existe, listo, err := reg.ReservarBlobCompartido(ctx, hash, key, int64(len(raw)))
+	hash := t.Slug + "/" + hexHash
+	key := Clave(t, hexHash)
+	existe, listo, err := reg.ReservarBlobCompartido(ctx, hash, key, size)
 	if err != nil {
 		return "", fmt.Errorf("blobs: reservar: %w", err)
 	}
 	if existe && listo {
 		return key, nil
 	}
+	if _, err := rs.Seek(0, io.SeekStart); err != nil {
+		if !existe {
+			_ = reg.LiberarBlobCompartido(ctx, hash)
+		}
+		return "", fmt.Errorf("blobs: rebobinar para subida: %w", err)
+	}
 	// El objectstore no antepone el prefijo de la organización a `shared/`: la
 	// organización ya va en la clave.
-	err = alm.Put(ctx, t, key, bytes.NewReader(raw), int64(len(raw)),
+	err = alm.Put(ctx, t, key, rs, size,
 		objectstore.PutOptions{ContentType: "message/rfc822", Comprimir: true})
 	if err != nil {
 		if !existe {

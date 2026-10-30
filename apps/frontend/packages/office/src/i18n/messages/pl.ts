@@ -1735,6 +1735,8 @@ export const pl: AppCatalog<typeof en> = {
   'extdata.msg.generic': 'Nie udało się ukończyć operacji.',
   'extdata.msg.notAllowed':
     'Zapytania do tego połączenia mogą wysyłać tylko osoby z jego listy. Poproś administrację organizacji o dodanie do listy.',
+  'extdata.msg.ownerOnly':
+    'Tylko osoba, która utworzyła to połączenie, lub administracja organizacji może je zmienić lub usunąć.',
   'sheet.msg.badValue': 'Niedozwolona wartość',
   'sheet.msg.clipboardDenied': 'Przeglądarka odmówiła dostępu do schowka.',
   'sheet.msg.pasteFailed': 'Nie udało się wkleić',

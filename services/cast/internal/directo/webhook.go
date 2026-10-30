@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"git.sytue.eu/sytue/one/platform/pkg/livekit"
+	"git.sytue.eu/sytue/one/platform/pkg/logsafe"
 	"git.sytue.eu/sytue/one/services/cast/internal/domain"
 )
 
@@ -63,7 +64,7 @@ func (s *Servicio) ingresoEmpezo(ctx context.Context, in *livekit.WebhookIngress
 	v, err := s.directoDeIngress(ctx, c, in.RoomName)
 	if err != nil {
 		if errors.Is(err, domain.ErrEntradaInvalida) {
-			s.logger.Warn("cast: ingress en una room ajena", "ingress", in.IngressID, "room", in.RoomName)
+			s.logger.Warn("cast: ingress en una room ajena", "ingress", logsafe.Text(in.IngressID), "room", logsafe.Text(in.RoomName))
 			return nil
 		}
 		return err

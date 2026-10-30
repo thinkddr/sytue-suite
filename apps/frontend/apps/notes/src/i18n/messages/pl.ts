@@ -123,6 +123,8 @@ export const pl: AppCatalog<typeof en> = {
   'backlinks.emptyHint': 'Podlinkuj ją z innej notatki, a pojawi się tutaj sama.',
   'notebook.delete': 'Usuń notatnik',
   'notebook.deleteConfirm': 'Usunąć „{title}” i wszystko, co jest w środku?',
+  'notebook.ownerOnly':
+    'Tylko osoba, która utworzyła ten notatnik, lub administracja organizacji może go przenieść, zmienić jego widoczność lub zaszyfrować.',
   'notebook.newChild': 'Nowy notatnik wewnątrz',
   'notebook.notes': {
     one: '{count} notatka',

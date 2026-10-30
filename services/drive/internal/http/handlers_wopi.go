@@ -20,6 +20,7 @@ import (
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/platform/pkg/keycrypto"
 	"git.sytue.eu/sytue/one/platform/pkg/log"
+	"git.sytue.eu/sytue/one/platform/pkg/logsafe"
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 	"git.sytue.eu/sytue/one/services/drive/internal/config"
 	"git.sytue.eu/sytue/one/services/drive/internal/domain"
@@ -104,7 +105,7 @@ func mountWopi(r chi.Router, h *wopiHandlers) {
 // detalles internos a un tercero.
 func wopiFail(w http.ResponseWriter, r *http.Request, status int, motivo string) {
 	if motivo != "" {
-		log.From(r.Context()).Debug("wopi rechazado", "status", status, "motivo", motivo)
+		log.From(r.Context()).Debug("wopi rechazado", "status", status, "motivo", logsafe.Text(motivo))
 	}
 	w.WriteHeader(status)
 }

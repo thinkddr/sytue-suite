@@ -747,6 +747,7 @@
   "extdata.msg.noEncryption": "Šifrování přihlašovacích údajů není na serveru nakonfigurováno.",
   "extdata.msg.notAllowed": "Dotazy na toto připojení mohou posílat jen lidé z jeho seznamu. Požádejte správu své organizace o přidání.",
   "extdata.msg.notFound": "Připojení nebo dotaz už neexistuje.",
+  "extdata.msg.ownerOnly": "Změnit nebo smazat toto připojení může jen osoba, která ho vytvořila, nebo správa organizace.",
   "extdata.msg.rate": "Příliš mnoho spuštění za sebou. Počkejte několik sekund a zkuste to znovu.",
   "extdata.msg.timeout": "Externí zdroj dat odpovídal příliš dlouho.",
   "extdata.msg.unauth": "Relace vypršela. Přihlaste se znovu.",

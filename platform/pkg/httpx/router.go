@@ -302,7 +302,11 @@ func ReadyHandler(checkTimeout time.Duration, checkers ...Checker) http.HandlerF
 			status = http.StatusServiceUnavailable
 			state = "not_ready"
 		}
-		JSON(w, r, status, map[string]any{"status": state, "dependencies": deps})
+		out := map[string]any{"status": state}
+		if r.Header.Get("X-Forwarded-For") == "" {
+			out["dependencies"] = deps
+		}
+		JSON(w, r, status, out)
 	}
 }
 

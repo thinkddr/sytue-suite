@@ -61,8 +61,8 @@ func Login(ctx context.Context, cfg Config, openBrowser func(string) error) (*Cl
 			}
 			return nil
 		},
-		Success: "Sytue Rooms: return to the app to finish signing in.",
-		Failure: "Sytue Rooms: sign-in could not be completed. Return to the app and try again.",
+		Success: "Sytue: return to the app to finish signing in.",
+		Failure: "Sytue: sign-in could not be completed. Return to the app and try again.",
 	})
 	if err != nil {
 		return nil, err
@@ -83,11 +83,15 @@ func LoginNative(ctx context.Context, cfg Config, rooms *api.Rooms, await func(c
 	}
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
 	defer cancel()
-	authorization, err := rooms.MatrixNativeStart(ctx)
+	product := cfg.Bootstrap.StorageProduct
+	if product == "" {
+		product = "rooms"
+	}
+	authorization, err := rooms.MatrixNativeStartFor(ctx, product)
 	if err != nil {
 		return nil, err
 	}
-	if !authorization.ForRooms(cfg.SytueApex) {
+	if !authorization.ForProduct(cfg.SytueApex, product) {
 		return nil, api.ErrMatrixSSO
 	}
 	callback, err := await(ctx, authorization)

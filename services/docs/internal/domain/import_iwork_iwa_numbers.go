@@ -44,15 +44,21 @@ import (
 //     fecha.
 
 const (
-	tipoIWADocumento = 1
-	tipoIWAHoja      = 2
-	tipoIWATabla     = 6000
-	tipoIWAModelo    = 6001
-	tipoIWATesela    = 6002
-	tipoIWALista     = 6005
-	tipoIWARico      = 6218
-	filasPorTesela   = 256
-	celdaVacia       = 0xFFFF
+	tipoIWADocumento     = 1
+	tipoIWAHoja          = 2
+	tipoIWAGrafico       = 5000
+	tipoIWAGraficoModelo = 5004
+	tipoIWAGrafico2      = 5021
+	tipoIWATabla         = 6000
+	tipoIWAModelo        = 6001
+	tipoIWATesela        = 6002
+	tipoIWAEstiloCelda   = 6004
+	tipoIWALista         = 6005
+	tipoIWACombinadas    = 6144
+	tipoIWARico          = 6218
+	tipoIWAResumen       = 6316
+	filasPorTesela       = 256
+	celdaVacia           = 0xFFFF
 )
 
 // listaIWA son las entradas de una lista de la tabla por su clave: la cadena, o el texto
@@ -75,6 +81,59 @@ func (l *lectorIWA) listaIWA(id uint64) map[uint64]string {
 	return out
 }
 
+func (l *lectorIWA) listaObjetosIWA(ids ...uint64) map[uint64]uint64 {
+	out := map[uint64]uint64{}
+	for _, id := range ids {
+		l.doc.de(id, tipoIWALista).cada(3, func(e campoPB) {
+			if ref := e.b.ref(4); ref != 0 {
+				out[e.b.uint(1)] = ref
+			}
+		})
+	}
+	return out
+}
+
+func (l *lectorIWA) listaFormatosIWA(ids ...uint64) map[uint64]pb {
+	out := map[uint64]pb{}
+	for _, id := range ids {
+		l.doc.de(id, tipoIWALista).cada(3, func(e campoPB) {
+			if f := e.b.msg(6); len(f) > 0 {
+				out[e.b.uint(1)] = f
+			}
+		})
+	}
+	return out
+}
+
+type tablasModeloIWA struct {
+	cadenas, ricos     map[uint64]string
+	estCelda, estTexto map[uint64]uint64
+	formatos           map[uint64]pb
+}
+
+func (l *lectorIWA) tablasDatosIWA(ds pb) tablasModeloIWA {
+	return tablasModeloIWA{
+		cadenas:  l.listaIWA(ds.ref(4)),
+		ricos:    l.listaIWA(ds.ref(17)),
+		estCelda: l.listaObjetosIWA(ds.ref(5), ds.ref(1)),
+		estTexto: l.listaObjetosIWA(ds.ref(5), ds.ref(2)),
+		formatos: l.listaFormatosIWA(ds.ref(11), ds.ref(22)),
+	}
+}
+
+// tablaInfoIWA lee un objeto tabla (`6000`): su modelo (`6001` en 2) y, si es una tabla
+// dinámica, su modelo de resumen (`6316` en 4).
+func (l *lectorIWA) tablaInfoIWA(tb pb) *tabla09 {
+	if len(tb) == 0 {
+		return nil
+	}
+	t := l.tablaIWA(tb.ref(2))
+	if idRes := tb.ref(4); idRes != 0 {
+		l.resumenIWA(&t, idRes)
+	}
+	return t
+}
+
 // tablaIWA lee el modelo de tabla `id`. nil si no hay celdas que se lean.
 func (l *lectorIWA) tablaIWA(id uint64) *tabla09 {
 	m := l.doc.de(id, tipoIWAModelo)
@@ -83,8 +142,14 @@ func (l *lectorIWA) tablaIWA(id uint64) *tabla09 {
 		return nil
 	}
 	ds := m.msg(4)
-	t := &tabla09{nombre: string(m.msg(8)), filas: nr, cols: nc, celdas: map[[2]int]celda09{}}
-	cadenas, ricos := l.listaIWA(ds.ref(4)), l.listaIWA(ds.ref(17))
+	t := &tabla09{
+		nombre:     string(m.msg(8)),
+		filas:      nr,
+		cols:       nc,
+		celdas:     map[[2]int]celda09{},
+		combinadas: l.combinadasIWA(ds.ref(13), nr, nc),
+	}
+	tb := l.tablasDatosIWA(ds)
 	l.doc.de(ds.ref(6), tipoIWALista).cada(3, func(campoPB) { t.formulas++ })
 	ds.msg(3).cada(1, func(te campoPB) {
 		base := acotado(te.b.uint(1), maxFilasHoja/filasPorTesela) * filasPorTesela
@@ -97,7 +162,7 @@ func (l *lectorIWA) tablaIWA(id uint64) *tabla09 {
 				return
 			}
 			if fila < nr {
-				t.filaIWA(fila, fi.b, cadenas, ricos)
+				l.filaIWA(t, fila, t.cols, false, fi.b, tb)
 			}
 		})
 	})
@@ -107,12 +172,150 @@ func (l *lectorIWA) tablaIWA(id uint64) *tabla09 {
 	return t
 }
 
+func (l *lectorIWA) resumenIWA(tp **tabla09, id uint64) {
+	sm := l.doc.de(id, tipoIWAResumen)
+	if sm == nil {
+		return
+	}
+	ds := sm.msg(2)
+	t := *tp
+	if t == nil {
+		t = &tabla09{celdas: map[[2]int]celda09{}}
+	}
+	tb := l.tablasDatosIWA(ds)
+	l.doc.de(ds.ref(6), tipoIWALista).cada(3, func(campoPB) { t.formulas++ })
+	ds.msg(3).cada(1, func(te campoPB) {
+		base := acotado(te.b.uint(1), maxFilasHoja/filasPorTesela) * filasPorTesela
+		if base < 0 {
+			return
+		}
+		l.doc.de(te.b.ref(2), tipoIWATesela).cada(5, func(fi campoPB) {
+			fila := base + acotado(fi.b.uint(1), filasPorTesela-1)
+			if fila < base || fila >= maxFilasHoja {
+				return
+			}
+			l.filaIWA(t, fila, maxColumnasHoja, true, fi.b, tb)
+		})
+	})
+	if len(t.celdas) > 0 {
+		*tp = t
+	}
+}
+
+func (l *lectorIWA) combinadasIWA(id uint64, nr, nc int) []string {
+	var out []string
+	l.doc.de(id, tipoIWACombinadas).cada(1, func(c campoPB) {
+		orig := c.b.msg(1).uint(1)
+		tam := c.b.msg(2).uint(1)
+		f, col := int(orig&0xFFFF), int((orig>>16)&0xFFFF)
+		rs, cs := int(tam&0xFFFF), int((tam>>16)&0xFFFF)
+		if f >= nr || col >= nc || (rs <= 1 && cs <= 1) {
+			return
+		}
+		r2 := min(f+max(rs, 1)-1, nr-1)
+		c2 := min(col+max(cs, 1)-1, nc-1)
+		if r2 > f || c2 > col {
+			out = append(out, A1Ref(f+1, col+1)+":"+A1Ref(r2+1, c2+1))
+		}
+	})
+	return out
+}
+
+func (l *lectorIWA) graficoIWA(id uint64) (t *tabla09, forma pb) {
+	o, ok := l.doc[id]
+	if !ok || (o.tipo != tipoIWAGrafico && o.tipo != tipoIWAGrafico2) {
+		return nil, nil
+	}
+	datos := o.datos
+	if o.tipo == tipoIWAGrafico2 {
+		if sub := l.doc.de(datos.ref(1), tipoIWAGrafico); len(sub) > 0 {
+			datos = sub
+		} else if sub := datos.msg(1); len(sub) > 0 && len(datos.msg(4)) == 0 {
+			datos = sub
+		}
+	}
+	forma = datos
+	if len(datos.msg(1).msg(1).msg(1)) > 0 {
+		forma = datos.msg(1)
+	}
+	titulo := strings.TrimSpace(string(datos.msg(11)))
+	candidatos := []pb{datos.msg(4), datos.msg(2).msg(1), datos.msg(2)}
+	for _, num := range []int{4, 2} {
+		if ref := datos.ref(num); ref != 0 {
+			m := l.doc[ref].datos
+			candidatos = append(candidatos, m, m.msg(4), m.msg(1))
+		}
+	}
+	var rejilla pb
+	for _, cand := range candidatos {
+		if len(cand.msg(2)) > 0 || len(cand.msg(3)) > 0 || len(cand.msg(4)) > 0 {
+			rejilla = cand
+			break
+		}
+	}
+	if len(rejilla) == 0 {
+		return nil, forma
+	}
+	var filas, cols []string
+	rejilla.cada(2, func(c campoPB) {
+		if len(c.b) > 0 {
+			filas = append(filas, string(c.b))
+		}
+	})
+	rejilla.cada(3, func(c campoPB) {
+		if len(c.b) > 0 {
+			cols = append(cols, string(c.b))
+		}
+	})
+	var matriz [][]celda09
+	rejilla.cada(4, func(f campoPB) {
+		var fila []celda09
+		f.b.cada(1, func(cel campoPB) {
+			fila = append(fila, celdaGraficoIWA(cel.b))
+		})
+		if len(fila) > 0 {
+			matriz = append(matriz, fila)
+		}
+	})
+	return armarTablaGrafico(titulo, filas, cols, matriz), forma
+}
+
+func celdaGraficoIWA(m pb) celda09 {
+	if c1, ok := m.campo(1); ok {
+		switch c1.wire {
+		case 1:
+			v := math.Float64frombits(c1.n)
+			if !math.IsNaN(v) && !math.IsInf(v, 0) {
+				return celda09{texto: strconv.FormatFloat(v, 'f', -1, 64), num: true}
+			}
+		case 5:
+			v := float64(math.Float32frombits(uint32(c1.n))) //nolint:gosec // G115: wire 5 es uint32
+			if !math.IsNaN(v) && !math.IsInf(v, 0) {
+				return celda09{texto: strconv.FormatFloat(v, 'f', -1, 64), num: true}
+			}
+		case 0:
+			return celda09{texto: strconv.FormatUint(c1.n, 10), num: true}
+		}
+	}
+	if c2, ok := m.campo(2); ok && c2.wire == 1 {
+		v := math.Float64frombits(c2.n)
+		if !math.IsNaN(v) && !math.IsInf(v, 0) {
+			return celda09{texto: strconv.FormatFloat(v, 'f', -1, 64), num: true}
+		}
+	}
+	if s := string(m.msg(3)); s != "" {
+		return celda09{texto: s}
+	}
+	return celda09{}
+}
+
 // valoresIWA son los valores que trae una celda, cada uno con si está.
 type valoresIWA struct {
-	num, seg       float64
-	cad, rico      uint64
-	hayNum, hayFec bool
-	hayCad, hayRic bool
+	num, seg               float64
+	cad, rico, fmt         uint64
+	estCelda, estTexto     uint64
+	hayNum, hayFec         bool
+	hayCad, hayRic, hayFmt bool
 }
 
 // lectorCelda lee valores de una celda sin salirse de ella.
@@ -158,18 +361,62 @@ func valoresV5(c lectorCelda) (v valoresIWA) {
 	}
 	if flags&0x10 != 0 {
 		v.rico, v.hayRic = c.u32(off)
+		off += 4
 	}
+	if flags&0x20 != 0 {
+		v.estCelda, _ = c.u32(off)
+		off += 4
+	}
+	if flags&0x40 != 0 {
+		v.estTexto, _ = c.u32(off)
+		off += 4
+	}
+	off += 4 * bitsEnUno(flags&0x1F80)
+	v.fmt, v.hayFmt = formatoV5(c, off, flags, c[1])
 	return v
+}
+
+func formatoV5(c lectorCelda, off int, flags uint32, tipo byte) (fmt uint64, hay bool) {
+	for bit := uint32(0x2000); bit <= 0x40000; bit <<= 1 {
+		if flags&bit == 0 {
+			continue
+		}
+		fk, ok := c.u32(off)
+		off += 4
+		if !ok {
+			break
+		}
+		if !hay || (tipo == 7 && bit == 0x10000) || ((tipo == 2 || tipo == 10) && (bit == 0x2000 || bit == 0x4000)) {
+			fmt, hay = fk, true
+		}
+	}
+	return fmt, hay
 }
 
 // valoresViejos lee los valores de los formatos anteriores al 5.
 func valoresViejos(c lectorCelda) (v valoresIWA) {
 	flags := binary.LittleEndian.Uint32(c[4:])
-	off, previas, intermedias := 12, uint32(0x0D8E), uint32(0x3000)
+	off, intermedias := 12, uint32(0x3000)
+	extraPrevias := uint32(0x0D00)
 	if c[0] <= 1 {
-		off, previas, intermedias = 8, 0x018E, 0x1000
+		off, intermedias, extraPrevias = 8, 0x1000, 0x0100
 	}
-	off += 4 * bitsEnUno(flags&previas)
+	if flags&0x2 != 0 {
+		v.fmt, v.hayFmt = c.u32(off)
+		off += 4
+	}
+	if flags&0x4 != 0 {
+		v.estCelda, _ = c.u32(off)
+		off += 4
+	}
+	if flags&0x8 != 0 {
+		off += 4
+	}
+	if flags&0x80 != 0 {
+		v.estTexto, _ = c.u32(off)
+		off += 4
+	}
+	off += 4 * bitsEnUno(flags&extraPrevias)
 	if flags&0x200 != 0 {
 		v.rico, v.hayRic = c.u32(off)
 		off += 4
@@ -185,18 +432,27 @@ func valoresViejos(c lectorCelda) (v valoresIWA) {
 	}
 	if flags&0x40 != 0 {
 		v.seg, v.hayFec = c.f64(off)
+		off += 8
+	}
+	if c[0] > 1 {
+		flags2 := binary.LittleEndian.Uint32(c[8:]) >> 16
+		if flags2&0xFF != 0 {
+			if fk, ok := c.u32(off); ok {
+				v.fmt, v.hayFmt = fk, true
+			}
+		}
 	}
 	return v
 }
 
 // filaIWA lee las celdas de una fila de tesela (`fi`).
-func (t *tabla09) filaIWA(fila int, fi pb, cadenas, ricos map[uint64]string) {
+func (l *lectorIWA) filaIWA(t *tabla09, fila, maxCol int, expandir bool, fi pb, tb tablasModeloIWA) {
 	celdas, posiciones := fi.msg(6), fi.msg(7)
 	if len(posiciones) == 0 {
 		celdas, posiciones = fi.msg(3), fi.msg(4)
 	}
 	ancho := fi.uint(8) != 0
-	for col := 0; col*2+1 < len(posiciones) && col < t.cols; col++ {
+	for col := 0; col*2+1 < len(posiciones) && col < maxCol; col++ {
 		o := int(binary.LittleEndian.Uint16(posiciones[col*2:]))
 		if o == celdaVacia {
 			continue
@@ -207,39 +463,246 @@ func (t *tabla09) filaIWA(fila int, fi pb, cadenas, ricos map[uint64]string) {
 		if o >= len(celdas) {
 			continue
 		}
-		if v := celdaIWA(celdas[o:], cadenas, ricos); v.texto != "" {
+		if v := l.celdaIWA(celdas[o:], tb); v.texto != "" {
 			t.celdas[[2]int{fila, col}] = v
+			if expandir {
+				t.filas = max(t.filas, fila+1)
+				t.cols = max(t.cols, col+1)
+			}
 		}
 	}
 }
 
+func tipoCeldaIWA(c []byte) byte {
+	if c[0] < 5 && c[1] == 0 {
+		return c[2]
+	}
+	return c[1]
+}
+
 // celdaIWA lee una celda; vacía si no se entiende.
-func celdaIWA(c []byte, cadenas, ricos map[uint64]string) celda09 {
+func (l *lectorIWA) celdaIWA(c []byte, tb tablasModeloIWA) celda09 {
 	if len(c) < 12 {
 		return celda09{}
 	}
+	tipo := tipoCeldaIWA(c)
 	var v valoresIWA
 	if c[0] >= 5 {
 		v = valoresV5(c)
 	} else {
 		v = valoresViejos(c)
 	}
+	var out celda09
 	switch {
-	case (c[1] == 2 || c[1] == 10) && v.hayNum:
-		return celda09{texto: strconv.FormatFloat(v.num, 'f', -1, 64), num: true}
-	case c[1] == 3 && v.hayCad:
-		return celda09{texto: cadenas[v.cad]}
-	case c[1] == 5 && v.hayFec:
-		return fechaIWA(v.seg)
-	case c[1] == 6 && v.hayNum:
-		return celda09{texto: strings.ToUpper(strconv.FormatBool(v.num > 0))}
-	case c[1] == 7 && v.hayNum:
-		// ponytail: una duración sale en días, sin su formato («1 semana» es 7).
-		return celda09{texto: strconv.FormatFloat(v.num/86400, 'f', -1, 64), num: true}
-	case c[1] == 9 && v.hayRic:
-		return celda09{texto: ricos[v.rico]}
+	case (tipo == 2 || tipo == 10) && v.hayNum:
+		out = celda09{texto: strconv.FormatFloat(v.num, 'f', -1, 64), num: true}
+		if v.hayFmt {
+			out.formato = formatoNumeroIWA(tb.formatos[v.fmt])
+		}
+	case tipo == 3 && v.hayCad:
+		out = celda09{texto: tb.cadenas[v.cad]}
+	case tipo == 5 && v.hayFec:
+		out = fechaIWA(v.seg)
+	case tipo == 6 && v.hayNum:
+		out = celda09{texto: strings.ToUpper(strconv.FormatBool(v.num > 0))}
+	case tipo == 7 && v.hayNum:
+		f, ok := tb.formatos[v.fmt]
+		out = celda09{texto: duracionIWA(v.num, f, v.hayFmt && ok)}
+	case tipo == 9 && v.hayRic:
+		out = celda09{texto: tb.ricos[v.rico]}
 	}
-	return celda09{}
+	if out.texto != "" {
+		out.estilo = l.estiloCeldaIWA(tb.estCelda[v.estCelda], tb.estTexto[v.estTexto])
+	}
+	return out
+}
+
+func (l *lectorIWA) estiloCeldaIWA(idCelda, idTexto uint64) cellStyle {
+	var st cellStyle
+	for i := 0; idCelda != 0 && i < maxHerenciaIWA; i++ {
+		o, ok := l.doc[idCelda]
+		if !ok || o.tipo != tipoIWAEstiloCelda {
+			break
+		}
+		if c, ok := o.datos.msg(11).campo(1); ok {
+			if hex := colorMensajeIWA(c.b.msg(1)); hex != "" && hex != "FFFFFF" {
+				st.Fill = "#" + hex
+			}
+			break
+		}
+		idCelda = o.datos.msg(1).ref(3)
+	}
+	if idTexto != 0 {
+		if col := l.colorIWA(idTexto); col != "" {
+			st.Color = "#" + col
+		}
+		if c, ok := l.propIWA(11, 11, idTexto); ok && c.n != 0 {
+			st.U = true
+		}
+		if c, ok := l.propIWA(11, 12, idTexto); ok && c.n != 0 {
+			st.S = true
+		}
+	}
+	return st
+}
+
+func formatoNumeroIWA(f pb) numFmtSpec {
+	ft := acotado(f.uint(1), 258) - 256
+	if len(f) == 0 || ft < 0 {
+		return numFmtSpec{}
+	}
+	cDec, hayDec := f.campo(2)
+	dec := acotado(cDec.n, 8)
+	miles := f.uint(4) != 0 || f.uint(5) != 0
+	return especFormatoNumero(ft, dec, hayDec && dec >= 0, miles)
+}
+
+type unidadDuracionIWA struct {
+	cod             uint64
+	ms              int64
+	corto, sing, pl string
+}
+
+var unidadesDuracionIWA = []unidadDuracionIWA{
+	{1, 604800000, "w", "week", "weeks"},
+	{2, 86400000, "d", "day", "days"},
+	{4, 3600000, "h", "hour", "hours"},
+	{8, 60000, "m", "minute", "minutes"},
+	{16, 1000, "s", "second", "seconds"},
+	{32, 1, "ms", "millisecond", "milliseconds"},
+}
+
+func rangoUnidadesDuracionIWA(total int64, f pb, hayFmt bool) (estilo uint64, activas []unidadDuracionIWA) {
+	estilo, umax, umin, auto := uint64(1), uint64(0), uint64(0), true
+	if hayFmt && f.uint(1) == 268 {
+		if c, ok := f.campo(7); ok {
+			estilo = c.n
+		}
+		umax, umin = f.uint(15), f.uint(16)
+		auto = f.uint(40) != 0
+	}
+	if auto && total == 0 {
+		umax, umin = 2, 2
+	} else if umax == 0 || umin == 0 {
+		umax, umin = extremosDuracionIWA(total)
+	}
+	dentro := false
+	for _, u := range unidadesDuracionIWA {
+		if u.cod == umax {
+			dentro = true
+		}
+		if dentro {
+			activas = append(activas, u)
+		}
+		if u.cod == umin {
+			break
+		}
+	}
+	if len(activas) == 0 {
+		activas = unidadesDuracionIWA[1:2]
+	}
+	return estilo, activas
+}
+
+func extremosDuracionIWA(total int64) (umax, umin uint64) {
+	rem := total
+	for _, u := range unidadesDuracionIWA {
+		v := rem / u.ms
+		rem %= u.ms
+		if v > 0 {
+			if umax == 0 {
+				umax = u.cod
+			}
+			umin = u.cod
+		}
+	}
+	if umax == 0 {
+		return 2, 2
+	}
+	return umax, umin
+}
+
+func desglosarDuracionIWA(total int64, activas []unidadDuracionIWA) []int64 {
+	vals := make([]int64, len(activas))
+	rem := total
+	for i, u := range activas {
+		if i == len(activas)-1 {
+			vals[i] = int64(math.Round(float64(rem) / float64(u.ms)))
+		} else {
+			vals[i] = rem / u.ms
+			rem %= u.ms
+		}
+	}
+	for i := len(activas) - 1; i > 0; i-- {
+		tope := activas[i-1].ms / activas[i].ms
+		if vals[i] >= tope {
+			vals[i-1] += vals[i] / tope
+			vals[i] %= tope
+		}
+	}
+	return vals
+}
+
+func duracionIWA(seg float64, f pb, hayFmt bool) string {
+	if math.IsNaN(seg) || math.IsInf(seg, 0) || math.Abs(seg) > 1e13 {
+		return ""
+	}
+	neg := seg < 0
+	total := int64(math.Round(math.Abs(seg) * 1000))
+	estilo, activas := rangoUnidadesDuracionIWA(total, f, hayFmt)
+	vals := desglosarDuracionIWA(total, activas)
+	var partes []string
+	for i, u := range activas {
+		partes = agregarUnidadDuracionIWA(partes, estilo, u, vals[i], neg, i, len(activas))
+	}
+	if estilo == 0 {
+		return strings.Join(partes, ":")
+	}
+	return strings.Join(partes, " ")
+}
+
+func agregarUnidadDuracionIWA(partes []string, estilo uint64, u unidadDuracionIWA, val int64, neg bool, i, n int) []string {
+	v := val
+	if neg && v > 0 {
+		v = -v
+	}
+	switch estilo {
+	case 0:
+		if u.cod == 32 && i > 0 && len(partes) > 0 {
+			partes[len(partes)-1] += "." + fmtZerosIWA(val, 3)
+			return partes
+		}
+		if u.cod == 32 {
+			return append(partes, fmtConSignoIWA(v, 3))
+		}
+		if (u.cod == 8 || u.cod == 16) && (i > 0 || n > 1) {
+			return append(partes, fmtConSignoIWA(v, 2))
+		}
+		return append(partes, strconv.FormatInt(v, 10))
+	case 1:
+		return append(partes, strconv.FormatInt(v, 10)+u.corto)
+	default:
+		et := u.pl
+		if val == 1 {
+			et = u.sing
+		}
+		return append(partes, strconv.FormatInt(v, 10)+" "+et)
+	}
+}
+
+func fmtZerosIWA(v int64, ancho int) string {
+	s := strconv.FormatInt(v, 10)
+	for len(s) < ancho {
+		s = "0" + s
+	}
+	return s
+}
+
+func fmtConSignoIWA(v int64, ancho int) string {
+	if v < 0 {
+		return "-" + fmtZerosIWA(-v, ancho)
+	}
+	return fmtZerosIWA(v, ancho)
 }
 
 func bitsEnUno(x uint32) int {
@@ -293,13 +756,21 @@ func importNumbersIWA(doc documentoIWA) (m *sheetModel, formulas int, omitido bo
 		hoja := doc.de(h.b.uint(1), tipoIWAHoja)
 		var tablas []*tabla09
 		hoja.cada(2, func(d campoPB) {
-			o := doc[d.b.uint(1)]
-			if o.tipo != tipoIWATabla {
+			idObj := d.b.uint(1)
+			o := doc[idObj]
+			switch o.tipo {
+			case tipoIWATabla:
+				if t := l.tablaInfoIWA(o.datos); t != nil {
+					tablas = append(tablas, t)
+				}
+			case tipoIWAGrafico, tipoIWAGrafico2:
+				if t, _ := l.graficoIWA(idObj); t != nil {
+					tablas = append(tablas, t)
+				} else {
+					l.omitido = true
+				}
+			default:
 				l.omitido = true
-				return
-			}
-			if t := l.tablaIWA(o.datos.ref(2)); t != nil {
-				tablas = append(tablas, t)
 			}
 		})
 		for _, t := range tablas {

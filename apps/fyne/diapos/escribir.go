@@ -71,6 +71,7 @@ func (e *Editor) EmpezarEscritura(id string) {
 // tinta de la diapositiva y lo que hace al salir.
 func (w *escritura) caja(e *Editor, tam fyne.Size, k float32, tinta color.NRGBA) docus.Caja {
 	c := cajaFolio(tam, k, hojaCaja(tinta, e.m.Visuales(e.activa).Familia, ""))
+	c.AlDesplazar = e.desliz.Scrolled
 	c.Rotulo = e.t("slides.textBox")
 	c.AlSalir = func() {
 		e.TerminarEscritura()

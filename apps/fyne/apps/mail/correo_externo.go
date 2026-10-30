@@ -127,9 +127,14 @@ func (c *correoExterno) limpiarConfiguracion() {
 	for _, key := range []string{"name", "address", "host", "username", "password", "smtpHost", "smtpUser", "smtpPassword"} {
 		c.campos[key].PonerTexto("")
 	}
-	c.campos["port"].PonerTexto("993")
+	port := "993"
+	if c.proveedor == "pop3" {
+		port = "995"
+	}
+	c.campos["port"].PonerTexto(port)
 	c.campos["smtpPort"].PonerTexto("465")
 	c.smtpSecurity = "tls"
+	c.avanzado = false
 }
 
 func (c *correoExterno) limpiarBorrador() {
@@ -268,6 +273,7 @@ func (c *correoExterno) abrirCuenta(a api.ExternalMailAccount) {
 
 func (c *correoExterno) reconectar(a api.ExternalMailAccount) {
 	c.proveedor, c.instancia, c.asistente, c.paso = a.Provider, a.InstanceID, true, 1
+	c.limpiarConfiguracion()
 	c.servicios = append([]string(nil), a.Services...)
 	if !slices.Contains(c.servicios, "mail") {
 		c.servicios = append([]string{"mail"}, c.servicios...)
@@ -275,7 +281,6 @@ func (c *correoExterno) reconectar(a api.ExternalMailAccount) {
 	c.cuenta = nil
 	c.mensaje = nil
 	c.mensajes = nil
-	c.limpiarClaves()
 	c.errorClave = ""
 	c.campos["name"].PonerTexto(a.Name)
 	c.campos["address"].PonerTexto(a.Address)

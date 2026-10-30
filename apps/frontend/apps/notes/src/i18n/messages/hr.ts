@@ -119,6 +119,8 @@ export const hr: AppCatalog<typeof en> = {
   'backlinks.emptyHint': 'Povežite je iz druge bilješke i pojavit će se ovdje, sama.',
   'notebook.delete': 'Izbriši bilježnicu',
   'notebook.deleteConfirm': 'Izbrisati „{title}” i sve što je unutra?',
+  'notebook.ownerOnly':
+    'Ovu bilježnicu može premjestiti, promijeniti tko je vidi ili je šifrirati samo osoba koja ju je stvorila ili administracija organizacije.',
   'notebook.newChild': 'Nova bilježnica unutra',
   'notebook.notes': {
     one: '{count} bilješka',

@@ -9,11 +9,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jackc/pgx/v5"
+
 	"git.sytue.eu/sytue/one/platform/pkg/pgtest"
 	"git.sytue.eu/sytue/one/services/rooms/db"
 	"git.sytue.eu/sytue/one/services/rooms/internal/domain"
 	"git.sytue.eu/sytue/one/services/rooms/internal/store"
-	"github.com/jackc/pgx/v5"
 )
 
 func TestMatrixNativeHandoffBindsActorTenantPKCEAndConsumesOnce(t *testing.T) {
@@ -81,5 +82,37 @@ func TestMatrixDraftRoomsOnlyProvisionForActorAndStopAfterDenial(t *testing.T) {
 	}
 	if calls != 1 {
 		t.Fatalf("denial created a new room: calls=%d", calls)
+	}
+}
+
+func TestMatrixNativeConsentPersistsOnlyItsOriginalProduct(t *testing.T) {
+	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
+	st := store.New(h.Pool, testCipher(t))
+	ctx := tenantCtx("acme")
+	for _, product := range []string{"hub", "mail", "drive", "docs", "sheets", "slides", "pdf", "calendar", "contacts", "notes", "photos", "rooms", "cast", "erp", "bases"} {
+		state, err := st.CreateMatrixNativeConsentFor(ctx, "alice", "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM", product)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, err := st.PreviewMatrixNativeProduct(ctx, "alice", state)
+		if err != nil || got != product {
+			t.Fatal("original product was not bound to state", got, err)
+		}
+		if _, err = st.PreviewMatrixNativeProduct(ctx, "bob", state); !errors.Is(err, domain.ErrForbidden) {
+			t.Fatal("another actor read a grant", err)
+		}
+		if _, err = st.PreviewMatrixNativeProduct(tenantCtx("other"), "alice", state); !errors.Is(err, domain.ErrForbidden) {
+			t.Fatal("another tenant read a grant", err)
+		}
+		ticket, bound, err := st.AcceptMatrixNativeConsentWithProduct(ctx, "alice", state, "one-use-matrix-login-token")
+		if err != nil || ticket == "" || bound != product {
+			t.Fatal("ticket lost its original destination", err)
+		}
+		if _, _, err = st.AcceptMatrixNativeConsentWithProduct(ctx, "alice", state, "one-use-matrix-login-token"); !errors.Is(err, domain.ErrForbidden) {
+			t.Fatal("callback replay issued another ticket", err)
+		}
+	}
+	if _, err := st.CreateMatrixNativeConsentFor(ctx, "alice", "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM", "javascript:alert(1)"); !errors.Is(err, domain.ErrInvalidInput) {
+		t.Fatal("unregistered redirect product persisted", err)
 	}
 }

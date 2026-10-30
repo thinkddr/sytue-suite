@@ -104,6 +104,7 @@
   "gallery.describeStop": "Stoppa",
   "gallery.described": "{count} foton beskrivna",
   "gallery.describing": "Beskriver {done} av {total}…",
+  "gallery.downloadCapped": "Foton utanför den här omgången: {count}.",
   "gallery.downloadSelected": "Ladda ner",
   "gallery.downloading": {
     "one": "Laddar ner 1 foto…",

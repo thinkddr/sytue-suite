@@ -218,6 +218,36 @@ abrir_edicion() { json POST "$API/$1/edits" --data '{}' | jq -er '.id | select(t
 
 # Completar una prueba interna reutiliza el bundle ya subido. La consulta sólo
 # abre ediciones temporales que el trap borra: no cambia pistas, fichas ni testers.
+seleccionar_release_interna() {
+  # Play conserva el completed que sirve mientras el siguiente AAB está en draft.
+  # Sólo ese par conocido permite elegir el draft por su versión, nunca por orden.
+  jq -e --arg v "$version_esperada" '
+    def anteriores:
+      .versionCodes as $codigos |
+      ($codigos | type) == "array" and ($codigos | length) == 1 and
+      all($codigos[];
+        if type != "string" then false else
+          test("^[1-9][0-9]*$") and
+          (length < ($v | length) or (length == ($v | length) and . < $v))
+        end);
+    (.releases // []) as $releases |
+    if .track != "internal" or ($releases | type) != "array" then false
+    elif ($releases | length) <= 1 then
+      if all($releases[]; (.status == "draft" or .status == "completed"))
+      then ($releases[0] // {}) else false end
+    elif ($releases | length) == 2 then
+      [$releases[] | select(.status == "draft")] as $draft |
+      [$releases[] | select(.status == "completed")] as $completed |
+      if ($draft | length) == 1 and ($completed | length) == 1 and
+        ($draft[0].versionCodes | type) == "array" and
+        $draft[0].versionCodes == [$v] and
+        $draft[0].userFraction == null and $completed[0].userFraction == null and
+        ($completed[0] | anteriores)
+      then $draft[0] else false end
+    else false end
+  ' "$1"
+}
+
 preparar_interno() {
   local app="$1" paquete edit e grupos
   paquete="$(paquete_de "$app")"
@@ -231,10 +261,10 @@ preparar_interno() {
     return 1
   }
   api GET "$e/tracks/internal" >"$TMP/$app-internal.json" || return 1
-  jq -e '.track == "internal" and ((.releases // []) | type == "array" and length <= 1)
-    and all(.releases[]?; (.status == "draft" or .status == "completed"))' \
-    "$TMP/$app-internal.json" >/dev/null || {
-    echo "✗ $app: internal contiene varias releases o un rollout parcial; requiere revisión" >&2
+  seleccionar_release_interna "$TMP/$app-internal.json" >"$TMP/$app-release-interna.json" || {
+    jq -c --arg a "$app" '{app:$a, internal:{track, releases:[.releases[]? | {versionCodes,status}]}}' \
+      "$TMP/$app-internal.json" >&2 || true
+    echo "✗ $app: internal contiene un estado o una combinación de versiones no admitidos; requiere revisión" >&2
     return 1
   }
   # La API sólo cuenta Google Groups; las listas de correos de Console no son
@@ -256,17 +286,16 @@ interno() {
   [ "$estado" != sondear ] || return 0
   for i in "${!apps[@]}"; do
     app="${apps[$i]}" e="${ediciones[$i]}"
-    if jq -e --arg v "$version_esperada" '.releases | length == 1 and
-      .[0].status == "completed" and (.[0].versionCodes | map(tostring) | unique) == [$v]' \
-      "$TMP/$app-internal.json" >/dev/null; then
+    if jq -e --arg v "$version_esperada" '.status == "completed" and
+      (.versionCodes | map(tostring) | unique) == [$v]' "$TMP/$app-release-interna.json" >/dev/null; then
       echo "✓ $app: internal $tag ($version_esperada) ya está completed; sin cambios"
       continue
     fi
     # Conserva notas, prioridad y targeting de la pista; sólo sustituye la versión
     # y su estado. No se toca production ni ninguna configuración de probadores.
     if ! jq --arg v "$version_esperada" --arg t "$tag" '{track:"internal", releases:[
-      ((.releases[0] // {}) | .name=$t | .versionCodes=[$v] | .status="completed" | del(.userFraction))]}' \
-      "$TMP/$app-internal.json" | json PUT "$e/tracks/internal" --data @- >/dev/null; then
+      (. | .name=$t | .versionCodes=[$v] | .status="completed" | del(.userFraction))]}' \
+      "$TMP/$app-release-interna.json" | json PUT "$e/tracks/internal" --data @- >/dev/null; then
       malas+=("$app")
       continue
     fi

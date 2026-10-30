@@ -12,7 +12,9 @@ import json
 import os
 import pathlib
 import plistlib
+import shlex
 import stat
+import sys
 import tempfile
 import types
 import unittest
@@ -193,6 +195,73 @@ class Perfiles(unittest.TestCase):
         identidad.assert_called_once_with("ios", "VHC5QW7BZ3", "a" * 40)
         self.assertTrue(json.loads(salida.getvalue())["certificate_verified"])
         self.assertFalse(asc.escritos)
+
+    def test_cliente_solo_existentes_rechaza_todas_las_escrituras_antes_de_autenticar(self):
+        pedir = mock.Mock(return_value={"data": []})
+
+        class Base:
+            def pedir(self, *args, **kwargs):
+                return pedir(*args, **kwargs)
+
+            def escribir(self):
+                return self.pedir("POST", "/v1/profiles", {"data": {}})
+
+        asc = p.cliente_apple(types.SimpleNamespace(Apple=Base), True)
+        for metodo, cuerpo in (("POST", {}), ("PATCH", {}), ("DELETE", None), ("GET", {})):
+            with self.subTest(metodo=metodo, cuerpo=cuerpo), self.assertRaisesRegex(RuntimeError, "sólo admite consultas GET"):
+                asc.pedir(metodo, "/v1/profiles", cuerpo)
+        with self.assertRaises(RuntimeError):
+            asc.escribir()
+        pedir.assert_not_called()
+        self.assertEqual(asc.pedir("GET", "/v1/profiles"), {"data": []})
+        pedir.assert_called_once_with("GET", "/v1/profiles", tolerar=())
+
+    def test_solo_existentes_no_crea_si_falta_certificado_vigencia_tipo_o_derechos(self):
+        invalido, caducado, tipo = perfil(), perfil(), perfil()
+        invalido["attributes"]["profileState"] = "INVALID"
+        caducado["attributes"]["expirationDate"] = "2020-01-01T00:00:00Z"
+        tipo["attributes"]["profileType"] = "IOS_APP_DEVELOPMENT"
+        for perfiles in ([], [perfil(certificado="otra-clave")], [invalido], [caducado], [tipo], [perfil(autorizado=False)]):
+            asc = API()
+            asc.perfiles = perfiles
+            with self.subTest(perfiles=perfiles), tempfile.TemporaryDirectory() as tmp, \
+                    mock.patch.object(p, "validar_perfil", side_effect=self.validar_falso):
+                resultado = p.preparar(asc, REQUISITO, "ios", "cert-importado", pathlib.Path(tmp), True)
+                self.assertFalse(resultado["profile_ready"])
+                self.assertFalse(resultado["created"])
+                self.assertEqual(resultado["reason"], "existing_profile_missing_or_invalid")
+                self.assertFalse(asc.escritos)
+                self.assertFalse(list(pathlib.Path(tmp).iterdir()))
+
+    def test_solo_existentes_reutiliza_y_guarda_solo_despues_de_validar_el_perfil(self):
+        asc = API()
+        asc.perfiles = [perfil()]
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(p, "validar_perfil", side_effect=self.validar_falso) as cms:
+            resultado = p.preparar(asc, REQUISITO, "ios", "cert-importado", pathlib.Path(tmp), True)
+            self.assertTrue(resultado["profile_ready"])
+            self.assertTrue(resultado["certificate_verified"])
+            self.assertFalse(resultado["created"])
+            self.assertEqual(pathlib.Path(resultado["path"]).read_bytes(), b"perfil publico")
+            self.assertEqual(stat.S_IMODE(pathlib.Path(resultado["path"]).stat().st_mode), 0o600)
+            cms.assert_called_once()
+            self.assertFalse(asc.escritos)
+
+    def test_recibo_solo_existentes_exige_31_perfiles_no_creados_por_plataforma(self):
+        for plataforma in p.TIPOS:
+            catalogo, datos = self.recibos(plataforma)
+            datos = [{**dato, "created": False} for dato in datos]
+            with self.subTest(plataforma=plataforma), tempfile.TemporaryDirectory() as tmp:
+                ruta = pathlib.Path(tmp, "recibo.jsonl")
+                ruta.write_text("".join(json.dumps(dato) + "\n" for dato in datos))
+                with contextlib.redirect_stdout(io.StringIO()) as salida:
+                    self.assertFalse(p.comprobar_recibo(ruta, catalogo, plataforma, True))
+                self.assertEqual(json.loads(salida.getvalue().splitlines()[-1]),
+                                 {"platform": plataforma, "profile_count": 31, "ready_count": 31, "created_count": 0})
+                datos[-1]["created"] = True
+                ruta.write_text("".join(json.dumps(dato) + "\n" for dato in datos))
+                with self.assertRaisesRegex(ValueError, "perfil creado"), contextlib.redirect_stdout(io.StringIO()) as salida:
+                    p.comprobar_recibo(ruta, catalogo, plataforma, True)
+                self.assertEqual(salida.getvalue(), "")
 
     def test_perfil_de_otro_certificado_no_se_reutiliza_y_siguiente_ejecucion_no_duplica(self):
         asc = API()
@@ -413,9 +482,10 @@ class Perfiles(unittest.TestCase):
         item = perfil()
         item["attributes"]["profileContent"] = base64.b64encode(plistlib.dumps(contenido)).decode()
         with tempfile.TemporaryDirectory() as tmp:
-            security = pathlib.Path(tmp, "security")
-            security.write_text('#!/usr/bin/env python3\nimport pathlib,sys\nassert sys.argv[1:4]==["cms","-D","-i"]\nsys.stdout.buffer.write(pathlib.Path(sys.argv[4]).read_bytes())\n')
-            security.chmod(0o755)
+            python = pathlib.Path(tmp, "python3")
+            python.write_text('#!/bin/sh\nexec ' + shlex.quote(sys.executable) + ' ' +
+                              shlex.quote(str(AQUI / "apple_perfil_test_fixtures.py")) + ' "$@"\n')
+            python.chmod(0o755)
             with mock.patch.dict(os.environ, {"PATH": tmp + os.pathsep + os.environ["PATH"]}):
                 self.assertIsNotNone(p.validar_perfil(item, REQUISITO, "ios"))
                 incompleto = {**REQUISITO, "entitlements": {**REQUISITO["entitlements"],

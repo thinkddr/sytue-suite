@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"git.sytue.eu/sytue/one/platform/pkg/logsafe"
 )
 
 // Vault sella y abre las claves privadas at-rest. Lo satisface
@@ -128,7 +130,7 @@ func (s *Service) issue(ctx context.Context, tenant, org string, accountID uuid.
 		return nil, err
 	}
 	s.logger.Info("smime: certificado emitido",
-		"tenant", tenant, "address", id.Address, "not_after", id.NotAfter)
+		"tenant", tenant, "address", logsafe.Text(id.Address), "not_after", id.NotAfter)
 	return id, nil
 }
 
@@ -255,14 +257,14 @@ func (s *Service) SignMessage(ctx context.Context, tenant, org string, accountID
 	if err != nil || id == nil {
 		if err != nil {
 			s.logger.Warn("smime: no se pudo preparar la firma; el correo sale sin firmar",
-				"tenant", tenant, "address", address, "error", err)
+				"tenant", tenant, "address", logsafe.Text(address), "error", logsafe.Text(err))
 		}
 		return raw
 	}
 	signed, err := Sign(id, raw)
 	if err != nil {
 		s.logger.Warn("smime: no se pudo firmar; el correo sale sin firmar",
-			"tenant", tenant, "address", address, "error", err)
+			"tenant", tenant, "address", logsafe.Text(address), "error", err)
 		return raw
 	}
 	return signed

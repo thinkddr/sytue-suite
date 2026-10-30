@@ -741,6 +741,7 @@
   "extdata.msg.noEncryption": "A hitelesítő adatok titkosítása nincs beállítva a kiszolgálón.",
   "extdata.msg.notAllowed": "Ezt a kapcsolatot csak a listáján szereplő személyek kérdezhetik le. Kérje meg a szervezete adminisztrációját, hogy vegye fel a listára.",
   "extdata.msg.notFound": "A kapcsolat vagy a lekérdezés már nem létezik.",
+  "extdata.msg.ownerOnly": "Ezt a kapcsolatot csak a létrehozója vagy a szervezet adminisztrációja módosíthatja vagy törölheti.",
   "extdata.msg.rate": "Túl sok futtatás egymás után. Várjon néhány másodpercet, és próbálja újra.",
   "extdata.msg.timeout": "A külső adatforrás túl sokáig nem válaszolt.",
   "extdata.msg.unauth": "A munkamenet lejárt. Jelentkezzen be újra.",

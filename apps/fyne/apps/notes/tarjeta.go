@@ -22,6 +22,7 @@ import (
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
+	"git.sytue.eu/sytue/one/apps/nucleo/htmltext"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 	"git.sytue.eu/sytue/one/apps/nucleo/tokens"
 )
@@ -644,8 +645,8 @@ func (t *Tarjeta) cuerpoContenido(v tema.Variante) fyne.CanvasObject {
 		// `grid gap-1`: el texto que traiga, en apagado, y el enlace para abrirlo. El
 		// `doc` es `grid gap-1.5` con la vista previa encima (doc.go).
 		var piezas []fyne.CanvasObject
-		if n.Contenido != "" && n.Tipo != "doc" {
-			piezas = append(piezas, ui.NuevoParrafo(n.Contenido, tema.TextoBase, ui.Normal, "text-muted", v))
+		if texto := htmltext.Text(n.Contenido); texto != "" && n.Tipo != "doc" {
+			piezas = append(piezas, ui.NuevoParrafo(texto, tema.TextoBase, ui.Normal, "text-muted", v))
 		}
 		url, rotulo := n.URL, ""
 		if len(n.Enlaces) > 0 {

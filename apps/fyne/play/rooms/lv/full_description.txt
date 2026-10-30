@@ -3,18 +3,13 @@
 • Kanāli pa komandām vai projektiem.
 • Videozvans iebūvēts katrā kanālā.
 • Pieminējumi un paziņojumi vienoti visā komplektā.
-• Meklējama vēsture no jebkuras Sytue One vietas.
 • Publiski un privāti kanāli kategorijās; tiešie ziņojumi un grupas.
 • Pavedieni, reakcijas, pieminējumi, piespraustie un saglabātie ziņojumi un melnraksti.
 • Formatēšana ar joslu “Aa” un īsinājumtaustiņiem: treknraksts, slīpraksts, kods, citāti, saraksti un saites.
 • Pielikumi, attēli, GIF un pielāgotas emocijzīmes; faili no Drive.
-• Ieplānota sūtīšana, prioritāte, izlasīšanas apstiprinājums un “redzēja”.
-• Slīpsvītras komandas un kartītes: aptaujas un piešķirami uzdevumi.
-• Videozvani kanālā: kamera, ekrāns, pacelta roka, tērzēšana un ierakstīšana.
 • Ieplānotas sapulces un uzaicinājuma saites.
 • Roboti, tīmekļa āķi un integrācijas ar citiem rīkiem.
 • Klātbūtne un pielāgots statuss; paziņojumu iestatījumi katram kanālam.
-• Meklēšana vēsturē, arī no visa komplekta.
 • Reāllaiks ar WebSocket, ar atkārtotu savienošanu un bez pazaudētiem ziņojumiem.
 
 Šifrēts pārsūtīšanas laikā (TLS 1.3). Sytue infrastruktūra atrodas ES. Ārējo pakalpojumu atrašanās vieta ir atkarīga no to sniedzēja.

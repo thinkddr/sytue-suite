@@ -48,6 +48,7 @@ import {
   buildConnectionBody,
   buildExecuteBody,
   buildQuerySpec,
+  canEditConnection,
   errorMessageFrom,
   gatewayQueryFields,
   parseConnection,
@@ -660,7 +661,7 @@ export function ExternalDataModal({
           />
         </fieldset>
 
-        {selected ? (
+        {canEditConnection(selected) && selected ? (
           <div class="flex flex-wrap items-center gap-2">
             <Button variant="ghost" size="sm" onClick={() => void deleteConnection(selected.id)}>
               <EditorIcon name="trash" size="sm" />
@@ -835,7 +836,7 @@ export function ExternalDataModal({
             }
           >
             <p>{advice.action}</p>
-            {advice.fix === 'credential' && selected ? (
+            {advice.fix === 'credential' && canEditConnection(selected) && selected ? (
               newSecret === null ? (
                 <Button variant="secondary" size="sm" class="mt-2" onClick={() => setNewSecret('')}>
                   {t('extdata.secret.reenter')}

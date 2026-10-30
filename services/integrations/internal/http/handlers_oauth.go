@@ -19,6 +19,7 @@ import (
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/platform/pkg/keycrypto"
 	"git.sytue.eu/sytue/one/platform/pkg/log"
+	"git.sytue.eu/sytue/one/platform/pkg/logsafe"
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 	"git.sytue.eu/sytue/one/services/integrations/internal/config"
 	"git.sytue.eu/sytue/one/services/integrations/internal/connector"
@@ -335,7 +336,7 @@ func (h *Handlers) OAuthFinish(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		// El motivo se registra pero NO vuelve con detalle: a quien manipula un
 		// callback no se le explica en qué paso ha fallado.
-		log.From(ctx).Warn("integrations: consentimiento rechazado", "error", err)
+		log.From(ctx).Warn("integrations: consentimiento rechazado", "error", logsafe.Text(err))
 		out := oauthFinishResp{Section: "apps", Error: "state"}
 		// Solo un estado autenticado y la sesión que lo inició deciden la vuelta.
 		if esDeQuienEmpezo(ctx, rd) {
@@ -359,7 +360,7 @@ func (h *Handlers) OAuthFinish(w http.ResponseWriter, r *http.Request) {
 	out := oauthFinishResp{Section: sectionOr(section), Out: salida}
 	if !esDeQuienEmpezo(ctx, rd) {
 		log.From(ctx).Warn("integrations: consentimiento terminado por otra sesión que la que lo empezó",
-			"instance", rd.Instance)
+			"instance", logsafe.Text(rd.Instance))
 		out.Error = "state"
 		httpx.JSON(w, r, http.StatusOK, out)
 		return
@@ -373,14 +374,14 @@ func (h *Handlers) OAuthFinish(w http.ResponseWriter, r *http.Request) {
 	// veces, y un estado de un arranque anterior ya no vale.
 	if ok, err := h.store.ConsumirConsentimiento(ctx, rd.Instance, rd.Challenge()); err != nil || !ok {
 		log.From(ctx).Warn("integrations: consentimiento ya usado o sustituido por otro arranque",
-			"instance", rd.Instance, "error", err)
+			"instance", logsafe.Text(rd.Instance), "error", err)
 		out.Error = "state"
 		httpx.JSON(w, r, http.StatusOK, out)
 		return
 	}
 	if err := h.redeemAndStore(r, rd); err != nil {
 		log.From(ctx).Error("integrations: canje del código de autorización falló",
-			"instance", rd.Instance, "error", err)
+			"instance", logsafe.Text(rd.Instance), "error", logsafe.Text(err))
 		out.Error = "exchange"
 	}
 	httpx.JSON(w, r, http.StatusOK, out)
@@ -644,7 +645,7 @@ func (h *Handlers) revokeAtProvider(ctx context.Context, id, templateKey string,
 	}
 	revokeURL, err := manifest.RenderURL(m.OAuth.RevokeURL, cfg)
 	if err != nil {
-		log.From(ctx).Warn("integrations: revoke_url sin resolver, no se revoca", "instance", id, "error", err)
+		log.From(ctx).Warn("integrations: revoke_url sin resolver, no se revoca", "instance", logsafe.Text(id), "error", err)
 		return
 	}
 	conn, err := h.loadInstance(ctx, id)
@@ -674,7 +675,7 @@ func (h *Handlers) revokeAtProvider(ctx context.Context, id, templateKey string,
 	resp, err := h.egressRuntime(conn, log.From(ctx)).HTTP.Do(req)
 	if err != nil {
 		log.From(ctx).Warn("integrations: no se pudo revocar el token en el proveedor",
-			"instance", id, "error", err)
+			"instance", logsafe.Text(id), "error", err)
 		return
 	}
 	defer func() { _ = resp.Body.Close() }()
@@ -682,7 +683,7 @@ func (h *Handlers) revokeAtProvider(ctx context.Context, id, templateKey string,
 	// se registra para que quede rastro de que el tercero pudo quedarse el permiso.
 	if resp.StatusCode != http.StatusOK {
 		log.From(ctx).Warn("integrations: el proveedor no confirmó la revocación",
-			"instance", id, "status", resp.StatusCode)
+			"instance", logsafe.Text(id), "status", resp.StatusCode)
 	}
 }
 

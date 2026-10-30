@@ -161,8 +161,8 @@ const (
 // convert despacha al parser del formato y devuelve (kind, contenido).
 func convert(f srcFormat, data []byte, comments bool, locale string, p *presupuesto) (Kind, string, []ImportedComment, error) {
 	if esIWork(f) {
-		k, c := importIWork(f, data, locale)
-		return k, c, nil, nil
+		k, c, cm := importIWork(f, data, comments, locale)
+		return k, c, cm, nil
 	}
 	if f == fmtDocx {
 		return importDocxComments(data, comments, p)
@@ -780,6 +780,9 @@ func agruparCampos(runs []xrun) []xrun {
 			if k := strings.LastIndexByte(t, ' ') + 1; k < len(t) {
 				g.text = t[k:] + " 1"
 				out[n-1].text = t[:k]
+				if out[n-1].text == "" {
+					out = out[:n-1]
+				}
 			}
 		}
 		if i+2 < len(runs) && plano(runs[i+1]) && runs[i+2].field == "NUMPAGES" {

@@ -6,7 +6,7 @@ Jūsų vaizdo įrašai ir tiesioginės transliacijos, pagal užklausą ir realiu
 • Tiesioginis pokalbis ir komentarai, su pagrindiniu paskelbusiojo moderavimu.
 • Įkelkite iki 8 GiB vaizdo įrašus; originalas išsaugomas.
 • Tiesioginė transliacija iš transliavimo programos per RTMP, su srauto raktu kiekvienam asmeniui.
-• Tiesiogiai iš naršyklės ar programėlės: kamera, ekranas ir mikrofonas.
+• Tiesiogiai iš naršyklės ar programėlės: kamera ir mikrofonas. Ekrano bendrinimas palaikomose naršyklėse, kompiuterių sistemose ir Android; iOS/iPadOS programėlėje nepasiekiamas.
 • Tiesioginių transliacijų įrašai automatiškai tampa vaizdo įrašais pagal užklausą.
 • Viešas pradinis puslapis ir kanalas kiekvienai organizacijai, indeksuojami.
 • Neįtrauktos į sąrašą nuorodos, vaizdo įrašai tik organizacijai arba prieiga konkretiems asmenims pagal @naudotoją.

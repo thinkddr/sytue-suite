@@ -237,7 +237,7 @@ func (h *Historial) construir() fyne.CanvasObject {
 		}
 		filas = append(filas, f)
 	}
-	sc := container.NewVScroll(container.New(ui.Columna{}, filas...))
+	sc := container.NewVScroll(container.New(&columnaHistorial{}, filas...))
 	sc.OnScrolled = func(p fyne.Position) {
 		if p.Y < UmbralAnteriores && h.HayAnteriores && !h.CargandoAnteriores && h.AlCargarAnteriores != nil {
 			h.AlCargarAnteriores()
@@ -247,6 +247,23 @@ func (h *Historial) construir() fyne.CanvasObject {
 }
 
 type historialRenderer struct{ h *Historial }
+
+// columnaHistorial usa la medida al ancho actual antes de colocar las filas. Un
+// mínimo basado en su ancho anterior impedía encoger el Scroll vertical y dejaba
+// los separadores y cuerpos de texto fuera del viewport al girar.
+type columnaHistorial struct {
+	ui.Columna
+	ancho float32
+}
+
+func (c *columnaHistorial) MinSize(objetos []fyne.CanvasObject) fyne.Size {
+	return fyne.NewSize(0, c.AltoCon(objetos, c.ancho))
+}
+
+func (c *columnaHistorial) Layout(objetos []fyne.CanvasObject, t fyne.Size) {
+	c.ancho = t.Width
+	c.Columna.Layout(objetos, t)
+}
 
 // MinSize es cero de ancho: el historial ocupa lo que le den, como el `flex-1` de la
 // web. De alto pide una fila, que es lo que mide un canal con un solo mensaje.
@@ -260,13 +277,57 @@ func (r *historialRenderer) Destroy()                     {}
 // Layout deja el cuerpo dentro del `px-4`.
 func (r *historialRenderer) Layout(t fyne.Size) {
 	r.h.fondo.Resize(t)
-	r.h.cuerpo.Move(fyne.NewPos(CanalonHistorial, 0))
-	r.h.cuerpo.Resize(fyne.NewSize(max(t.Width-2*CanalonHistorial, 0), t.Height))
+	cuerpo := r.h.cuerpo
+	tam := fyne.NewSize(max(t.Width-2*CanalonHistorial, 0), t.Height)
+	cuerpo.Move(fyne.NewPos(CanalonHistorial, 0))
+	if s, ok := cuerpo.(*container.Scroll); ok {
+		r.colocarMensajes(s, tam)
+	} else {
+		cuerpo.Resize(tam)
+	}
 	// La píldora de «cargando anteriores»: `absolute inset-x-0 top-2 justify-center`,
 	// encima de la lista sin empujarla.
 	m := r.h.pildora.MinSize()
 	r.h.pildora.Move(fyne.NewPos((t.Width-m.Width)/2, tema.Espacio(2)))
 	r.h.pildora.Resize(m)
+}
+
+func (r *historialRenderer) colocarMensajes(s *container.Scroll, tam fyne.Size) {
+	contenido, ok := s.Content.(*fyne.Container)
+	if !ok {
+		s.Resize(tam)
+		return
+	}
+	col, ok := contenido.Layout.(*columnaHistorial)
+	if !ok {
+		s.Resize(tam)
+		return
+	}
+	pegado, antes := alFondo(s), s.Offset
+	var ancla fyne.CanvasObject
+	var dentro float32
+	if !pegado {
+		for _, o := range contenido.Objects {
+			if o.Position().Y+o.Size().Height > antes.Y {
+				ancla, dentro = o, antes.Y-o.Position().Y
+				break
+			}
+		}
+	}
+	col.ancho = tam.Width
+	alto := contenido.MinSize().Height
+	contenido.Resize(fyne.NewSize(tam.Width, max(tam.Height, alto)))
+	s.Resize(tam)
+	s.Refresh()
+	if pegado {
+		s.ScrollToBottom()
+	} else {
+		if ancla != nil {
+			antes.Y = ancla.Position().Y + min(dentro, max(ancla.Size().Height-1, 0))
+		}
+		s.ScrollToOffset(fyne.NewPos(antes.X, max(0, min(antes.Y, alto-tam.Height))))
+	}
+	r.h.altoAntes = alto
 }
 
 // Refresh REHACE el cuerpo: cambiar de canal o de estado no cambia el tamaño del
@@ -281,6 +342,7 @@ func (r *historialRenderer) Refresh() {
 	h.fondo.FillColor = tema.Color("surface", v)
 	h.fondo.Refresh()
 	pegado, antes := true, fyne.Position{}
+	altoAntes := h.altoAntes
 	if s, ok := h.cuerpo.(*container.Scroll); ok {
 		antes = s.Offset
 		pegado = alFondo(s)
@@ -302,7 +364,7 @@ func (r *historialRenderer) Refresh() {
 			h.centrar(s)
 		case primero != h.primero && h.primero != "" && !pegado:
 			// Han entrado mensajes arriba: se sigue viendo lo mismo.
-			s.Offset.Y = antes.Y + alto - h.altoAntes
+			s.Offset.Y = antes.Y + alto - altoAntes
 			s.Refresh()
 		case pegado:
 			s.ScrollToBottom()
@@ -475,6 +537,13 @@ var (
 	_ desktop.Hoverable = (*FilaMensaje)(nil)
 	_ fyne.Tappable     = (*FilaMensaje)(nil)
 )
+
+// AltoPara es la medida que ui.Columna necesita antes del Resize. Montar primero
+// el renderer conserva en la cuenta adjuntos, tarjetas y enlaces del mensaje.
+func (f *FilaMensaje) AltoPara(ancho float32) float32 {
+	f.MinSize()
+	return MedidaFilaMensaje(f, ancho).Height
+}
 
 // MouseIn es el `group-hover` de la fila.
 func (f *FilaMensaje) MouseIn(*desktop.MouseEvent) { f.encima = true; f.pintarHover() }

@@ -4,6 +4,7 @@
 package delivery
 
 import (
+	"bytes"
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
@@ -17,6 +18,7 @@ import (
 
 	"git.sytue.eu/sytue/one/services/mail/internal/auth"
 	"git.sytue.eu/sytue/one/services/mail/internal/domain"
+	"git.sytue.eu/sytue/one/services/mail/internal/mime"
 )
 
 // dnsFalso es el DNS de la prueba: solo registros TXT (claves DKIM y políticas DMARC).
@@ -72,7 +74,7 @@ func TestUnCorreoFirmadoPorOtroNoPasaPorElRemitente(t *testing.T) {
 		raw := firmaDe(t, dns, "atacante.example", []byte("From: Direccion <direccion@corporate.sytue.eu>\r\n"+
 			"To: ana@corporate.sytue.eu\r\nSubject: Cambio de cuenta\r\nDate: Mon, 05 Oct 2026 10:00:00 +0000\r\n"+
 			"Message-Id: <1@x>\r\n\r\nNueva cuenta bancaria.\r\n"))
-		_, dkim, dmarc := in.authenticate(t.Context(), sobre, raw, "direccion@corporate.sytue.eu")
+		_, dkim, dmarc := in.authenticate(t.Context(), sobre, bytes.NewReader(raw), "direccion@corporate.sytue.eu")
 		if dkim != auth.ResultPass {
 			t.Fatalf("dkim = %q: la firma del atacante sí es válida, y por eso no basta", dkim)
 		}
@@ -86,7 +88,7 @@ func TestUnCorreoFirmadoPorOtroNoPasaPorElRemitente(t *testing.T) {
 		env := domain.Message{FromAddr: "luis@gmail.com"}
 
 		falso := firmaDe(t, dns, "atacante.example", replyDeFuera())
-		_, dkim, dmarc := in.authenticate(t.Context(), sobre, falso, env.FromAddr)
+		_, dkim, dmarc := in.authenticate(t.Context(), sobre, bytes.NewReader(falso), env.FromAddr)
 		if dkim != auth.ResultPass || dmarc.Alineado {
 			t.Fatalf("dkim=%q dmarc=%+v, quiero firma válida y remitente SIN autenticar", dkim, dmarc)
 		}
@@ -95,7 +97,7 @@ func TestUnCorreoFirmadoPorOtroNoPasaPorElRemitente(t *testing.T) {
 		noLlega(t, llegan, "el REPLY firmado por otro dominio ha cambiado la respuesta de luis@gmail.com")
 
 		bueno := firmaDe(t, dns, "gmail.com", replyDeFuera())
-		_, _, dmarc = in.authenticate(t.Context(), InboundMessage{MailFrom: "luis@gmail.com"}, bueno, env.FromAddr)
+		_, _, dmarc = in.authenticate(t.Context(), InboundMessage{MailFrom: "luis@gmail.com"}, bytes.NewReader(bueno), env.FromAddr)
 		if !dmarc.Alineado {
 			t.Fatalf("dmarc = %+v: firmado por gmail.com, el remitente está autenticado", dmarc)
 		}
@@ -104,6 +106,27 @@ func TestUnCorreoFirmadoPorOtroNoPasaPorElRemitente(t *testing.T) {
 		case <-llegan:
 		case <-time.After(5 * time.Second):
 			t.Fatal("el REPLY legítimo no ha llegado a Calendar")
+		}
+	})
+
+	t.Run("dos cabeceras From no pasan por la primera", func(t *testing.T) {
+		// El atacante pone primero su propio From (que alinea con su DKIM y su SPF)
+		// y añade una segunda cabecera From suplantando a dirección@corporate.sytue.eu.
+		raw := firmaDe(t, dns, "atacante.example", []byte(
+			"From: Atacante <rebotes@atacante.example>\r\n"+
+				"From: Direccion <direccion@corporate.sytue.eu>\r\n"+
+				"To: ana@corporate.sytue.eu\r\nSubject: Cambio de cuenta\r\nDate: Mon, 05 Oct 2026 10:00:00 +0000\r\n"+
+				"Message-Id: <2@x>\r\n\r\nNueva cuenta bancaria.\r\n"))
+		env, err := mime.ParseSobre(bytes.NewReader(raw), int64(len(raw)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, dkim, dmarc := in.authenticate(t.Context(), sobre, bytes.NewReader(raw), env.FromAddr)
+		if dkim != auth.ResultPass {
+			t.Fatalf("dkim = %q: la firma del atacante sí es válida", dkim)
+		}
+		if dmarc.Result != auth.ResultFail || dmarc.Disposition != "quarantine" || dmarc.Alineado {
+			t.Fatalf("dmarc con dos cabeceras From = %+v, quiero fail/quarantine sin alinear", dmarc)
 		}
 	})
 }

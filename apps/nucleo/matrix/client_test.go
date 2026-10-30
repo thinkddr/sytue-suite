@@ -12,6 +12,7 @@ import (
 	"net/http/httptest"
 	"sync"
 	"testing"
+	"time"
 
 	"maunium.net/go/mautrix"
 	"maunium.net/go/mautrix/event"
@@ -141,5 +142,54 @@ func TestSyncReadinessChangesAfterMembershipProcessing(t *testing.T) {
 	_, _ = s.OnFailedSync(nil, errors.New("network disconnected"))
 	if c.ready.Load() {
 		t.Fatal("failed sync left sending enabled")
+	}
+}
+
+func TestSendWaitsForMembershipUpdateBeforeCheckingReadiness(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"algorithm":"unsupported"}`))
+	}))
+	defer server.Close()
+	c, err := newClient(configFor(t, server))
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.stateMu.Lock()
+	result := make(chan error, 1)
+	go func() {
+		_, sendErr := c.SendText(t.Context(), "!room:matrix.test", "private")
+		result <- sendErr
+	}()
+	select {
+	case err := <-result:
+		c.stateMu.Unlock()
+		t.Fatal("send did not wait for the in-progress state update", err)
+	case <-time.After(20 * time.Millisecond):
+	}
+	c.ready.Store(true)
+	c.stateMu.Unlock()
+	if err := <-result; !errors.Is(err, ErrNotEncrypted) {
+		t.Fatal("send did not validate encryption after the update", err)
+	}
+}
+
+func TestPendingSyncUpdateDoesNotInvalidateALockedRead(t *testing.T) {
+	c := &Client{}
+	c.ready.Store(true)
+	s := &guardedSyncer{DefaultSyncer: mautrix.NewDefaultSyncer(), owner: c}
+	c.stateMu.RLock()
+	result := make(chan error, 1)
+	go func() { result <- s.ProcessResponse(t.Context(), &mautrix.RespSync{}, "previous") }()
+	select {
+	case err := <-result:
+		c.stateMu.RUnlock()
+		t.Fatal("sync bypassed the active state reader", err)
+	case <-time.After(20 * time.Millisecond):
+	}
+	ready := c.ready.Load()
+	c.stateMu.RUnlock()
+	if err := <-result; err != nil || !ready || !c.ready.Load() {
+		t.Fatal("membership update invalidated a read before acquiring its lock", err)
 	}
 }

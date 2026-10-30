@@ -127,7 +127,8 @@ export const en = {
   'gallery.selectMonth': 'Select month',
   'gallery.unselectMonth': 'Unselect month',
   'gallery.downloadSelected': 'Download',
-  'gallery.downloading': { one: 'Downloading 1 photo…', other: 'Downloading {count} photos…' },
+  'gallery.downloading': "Download requests started: {count}. Check your browser's downloads.",
+  'gallery.downloadCapped': 'Photos outside this batch: {count}.',
   'gallery.newAlbum': 'New album',
   'gallery.newAlbumTitle': 'New album',
   'gallery.newAlbumPrompt': {

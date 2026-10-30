@@ -6,7 +6,7 @@ Tellitav video ja otseülekanded: laadige üles, edastage ja jagage, ELis.
 • Otsevestlus ja kommentaarid, avaldaja põhimodereerimisega.
 • Laadige üles kuni 8 GiB videoid; originaal säilitatakse.
 • Otseülekanne edastusprogrammist RTMP kaudu, iga inimese oma voovõtmega.
-• Otse brauserist või rakendusest: kaamera, ekraan ja mikrofon.
+• Otse brauserist või rakendusest: kaamera ja mikrofon. Ekraani jagamine toetatud brauserites, töölauasüsteemides ja Androidis; iOS-i/iPadOS-i rakenduses pole saadaval.
 • Otseülekannete salvestised muutuvad automaatselt tellitavateks videoteks.
 • Avalik esileht ja kanal iga organisatsiooni kohta, indekseeritavad.
 • Loendist väljas lingid, videod ainult organisatsioonile või juurdepääs kindlatele inimestele @kasutajanime järgi.

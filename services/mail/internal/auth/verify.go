@@ -217,6 +217,42 @@ func VerifyDMARC(ctx context.Context, res Resolver, fromDomain, spfDomain string
 	return DMARCResult{Result: ResultFail, Disposition: policy.disposicion}
 }
 
+// VerifyDMARCFroms evalúa DMARC sobre todas las direcciones/dominios From: del
+// mensaje (RFC 5322 §3.6.2 y RFC 7489 §6.6.1, COM-05). Un mensaje válido lleva una
+// sola cabecera From: con una sola dirección; si trae más de una (por ejemplo, la
+// primera del dominio del atacante para pasar SPF/DKIM y la segunda suplantando a otro
+// remitente, o una segunda cabecera añadida sin firmar sobre un DKIM legítimo), nunca
+// queda alineado y falla DMARC con la disposición más estricta de los dominios afectados.
+func VerifyDMARCFroms(ctx context.Context, res Resolver, fromDomains []string, spfDomain string, spf Result, dkimDomains []string, dkim Result) DMARCResult {
+	if len(fromDomains) == 1 {
+		return VerifyDMARC(ctx, res, fromDomains[0], spfDomain, spf, dkimDomains, dkim)
+	}
+	disp := "none"
+	for _, d := range fromDomains {
+		if p, ok := lookupDMARCPolicy(ctx, res, d); ok {
+			disp = disposicionMasEstricta(disp, p.disposicion)
+		}
+	}
+	return DMARCResult{Result: ResultFail, Disposition: disp, Alineado: false}
+}
+
+func disposicionMasEstricta(a, b string) string {
+	peso := func(s string) int {
+		switch s {
+		case "reject":
+			return 2
+		case "quarantine":
+			return 1
+		default:
+			return 0
+		}
+	}
+	if peso(b) > peso(a) {
+		return b
+	}
+	return a
+}
+
 // Alineado dice si el dominio del `From:` queda autenticado por SPF o por DKIM:
 // el mecanismo tiene que haber pasado Y su dominio casar con el del From.
 func Alineado(fromDomain, spfDomain string, spf Result, dkimDomains []string, dkim Result, spfEstricto, dkimEstricto bool) bool {

@@ -62,6 +62,14 @@ func New(merchant, terminal, key, mode string) (*Redsys, error) {
 	return &Redsys{merchant: merchant, terminal: terminal, key: key, mode: mode, restURL: restURL, http: &http.Client{Timeout: 12 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}, nil
 }
 
+// ConTransporte sustituye el transporte HTTP manteniendo el timeout y la prohibición de redirecciones.
+func (r *Redsys) ConTransporte(rt http.RoundTripper) *Redsys {
+	if r != nil && rt != nil {
+		r.http.Transport = rt
+	}
+	return r
+}
+
 // CrearPago abre el formulario del TPV. El `Ds_Merchant_Order` sale del id de
 // nuestro pago (pagos.MetadatoPago), no de `Referencia`: Redsys exige 12
 // caracteres (4 dígitos y 8 alfanuméricos) y únicos por comercio, y el número de

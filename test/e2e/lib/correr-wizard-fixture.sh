@@ -5,7 +5,14 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 APLICACION="${1:?application required}"
 RUTA="${2:?fixture route required}"
-SALIDA="${3:?artifact directory required}"
+SALIDA_BASE="${3:?artifact directory required}"
+umask 077
+# Stable artifact root, validated before writing; each invocation has its own child.
+node --input-type=module - "$SALIDA_BASE" <<'JS'
+import { createReportDirectory } from './lib/report-output.mjs';
+createReportDirectory('wizard', process.argv[2]);
+JS
+SALIDA="$(mktemp -d "${SALIDA_BASE%/}/run.XXXXXX")"
 PRUEBA="${4:?browser script required}"
 PREFIJO="${5:?environment prefix required}"
 BASE_RUTA="${6:-$APLICACION}"
@@ -13,7 +20,7 @@ BASE_RUTA="${6:-$APLICACION}"
 ORGANIZACION="${7-prueba}"
 PUERTO="${PUERTO:-4343}"
 RAIZ="$(cd ../.. && pwd)"
-mkdir -p "$SALIDA"
+echo "Report directory: $SALIDA"
 LOG="$SALIDA/astro.log"
 export SYTUE_OIDC_ISSUER="${SYTUE_OIDC_ISSUER:-https://id.prueba.invalid}"
 export SYTUE_OIDC_CLIENT_ID="${SYTUE_OIDC_CLIENT_ID:-prueba}"

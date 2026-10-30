@@ -3,7 +3,7 @@ enabled: true
 replicaCount: 1
 
 image:
-  registry: ""
+  registry: ghcr.io/thinkddr
   repository: sytue-cloud-builder
   tag: "1.0.0"
   pullPolicy: IfNotPresent

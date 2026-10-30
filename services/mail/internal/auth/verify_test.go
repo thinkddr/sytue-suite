@@ -312,3 +312,36 @@ func TestResultToDomain(t *testing.T) {
 		t.Fatal("ToDomain mapea mal")
 	}
 }
+
+// COM-05. Un mensaje con más de una cabecera From: (prohibido por RFC 5322 §3.6.2) no
+// puede evaluarse solo por la primera: falla DMARC, nunca queda alineado y aplica la
+// disposición más estricta de los dominios en las cabeceras From:.
+func TestVerifyDMARCFromsRechazaMultiplesCabeceras(t *testing.T) {
+	ctx := context.Background()
+	res := &fakeResolver{txt: map[string][]string{
+		"_dmarc.atacante.example": {"v=DMARC1; p=none"},
+		"_dmarc.sytue.eu":         {"v=DMARC1; p=quarantine"},
+		"_dmarc.victima.example":  {"v=DMARC1; p=reject"},
+	}}
+
+	t.Run("primera alineada con el atacante y segunda de sytue.eu -> quarantine", func(t *testing.T) {
+		d := VerifyDMARCFroms(ctx, res, []string{"atacante.example", "corporate.sytue.eu"}, "atacante.example", ResultPass, []string{"atacante.example"}, ResultPass)
+		if d.Result != ResultFail || d.Disposition != "quarantine" || d.Alineado {
+			t.Fatalf("DMARC = %+v, quiero fail/quarantine sin alinear", d)
+		}
+	})
+
+	t.Run("primera alineada con el atacante y segunda con p=reject -> reject", func(t *testing.T) {
+		d := VerifyDMARCFroms(ctx, res, []string{"atacante.example", "victima.example"}, "atacante.example", ResultPass, []string{"atacante.example"}, ResultPass)
+		if d.Result != ResultFail || d.Disposition != "reject" || d.Alineado {
+			t.Fatalf("DMARC = %+v, quiero fail/reject sin alinear", d)
+		}
+	})
+
+	t.Run("dos cabeceras From del mismo dominio tampoco pasan", func(t *testing.T) {
+		d := VerifyDMARCFroms(ctx, res, []string{"victima.example", "victima.example"}, "victima.example", ResultPass, []string{"victima.example"}, ResultPass)
+		if d.Result != ResultFail || d.Disposition != "reject" || d.Alineado {
+			t.Fatalf("DMARC = %+v, quiero fail/reject sin alinear", d)
+		}
+	})
+}

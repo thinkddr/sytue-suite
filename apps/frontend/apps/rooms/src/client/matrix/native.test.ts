@@ -17,3 +17,35 @@ test('native return contains only one-use opaque ticket and original state on th
     expect(() => matrixNativeReturn({ ticket, redirect_url: url }, state)).toThrow();
   expect(opaqueMatrixNative('token')).toBe(false);
 });
+
+test('native storage return follows the product fixed before authorization', () => {
+  for (const [product, native] of [
+    ['hub', 'one'],
+    ['mail', 'mail'],
+    ['drive', 'drive'],
+    ['docs', 'docs'],
+    ['sheets', 'sheets'],
+    ['slides', 'slides'],
+    ['pdf', 'pdf'],
+    ['calendar', 'calendar'],
+    ['contacts', 'contacts'],
+    ['notes', 'notes'],
+    ['photos', 'photos'],
+    ['rooms', 'rooms'],
+    ['cast', 'cast'],
+    ['erp', 'erp'],
+    ['bases', 'bases'],
+  ]) {
+    const redirect_url = `sytue-${native}://matrix/callback?state=${state}&ticket=${ticket}`;
+    expect(matrixNativeReturn({ product, ticket, redirect_url }, state)).toBe(redirect_url);
+    expect(() =>
+      matrixNativeReturn({ product: 'unregistered', ticket, redirect_url }, state),
+    ).toThrow();
+    expect(() =>
+      matrixNativeReturn(
+        { product: native === 'drive' ? 'mail' : 'drive', ticket, redirect_url },
+        state,
+      ),
+    ).toThrow();
+  }
+});

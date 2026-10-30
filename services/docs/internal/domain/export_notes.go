@@ -90,6 +90,7 @@ func collectHTMLNotes(nodes []*html.Node) (map[string]*xnote, map[*html.Node]boo
 func noteFromHTML(n *html.Node, class string) *xnote {
 	// Como el cuerpo de una exportación a OOXML/ODF: el formato del texto de la nota también viaja.
 	b := &rtBuilder{office: true}
+	b.open(xpara{})
 	b.children(n, xrun{})
 	b.flush()
 	note := &xnote{class: class}

@@ -479,3 +479,106 @@ func TestDocxMarcosPosicionVerticalVMLYTabla(t *testing.T) {
 		`<div data-marco="" style="float:left;width:252px;margin-left:50.67px"><table style="width:160px"><tbody><tr><td style="border:1px solid #000000;width:160px">Ingrediente</td></tr></tbody></table></div>`,
 	)
 }
+
+// Cierra las pérdidas de propiedades CSS en la ida y vuelta Docus → .docx → Docus:
+//  1. Una fuente cuyo nombre coincide con una genérica CSS («Monospace,serif») conserva su nombre
+//     y su familia en fontTable.xml.
+//  2. Un tramo de una sola palabra absorbido como prefijo de un campo PAGE no deja un <span> vacío
+//     con estilo que se perdería al exportar.
+//  3. margin-top:0 procedente de contextualSpacing sobrevive en <p> y <li> al reimportar un .docx
+//     exportado por Docus.
+//  4. Una llamada a nota (<sup data-footnote-ref>) dentro de <ins data-track> y una nota que
+//     empieza por un espacio revisado conservan su marca de revisión (--sytue-track).
+//  5. Una nota al pie o un encabezado/pie que empieza por un espacio tras w:footnoteRef conserva
+//     ese tramo inicial, de modo que subirComun no descarta el font-size del único tramo restante
+//     ni se pierde un espacio inicial con font-size y color propios.
+func TestDocxIdaYVueltaCeroPerdidas(t *testing.T) {
+	styles := `<w:styles ` + wNS + `>` +
+		`<w:style w:type="paragraph" w:styleId="Compacto">` +
+		`<w:name w:val="Compacto"/>` +
+		`<w:pPr><w:spacing w:before="240" w:after="120"/><w:contextualSpacing/></w:pPr>` +
+		`</w:style>` +
+		`</w:styles>`
+	fonts := `<w:fonts ` + wNS + `>` +
+		`<w:font w:name="Monospace"><w:family w:val="roman"/></w:font>` +
+		`</w:fonts>`
+	numbering := `<w:numbering ` + wNS + `>` +
+		`<w:abstractNum w:abstractNumId="1">` +
+		`<w:lvl w:ilvl="0"><w:numFmt w:val="bullet"/><w:lvlText w:val="•"/></w:lvl>` +
+		`</w:abstractNum>` +
+		`<w:num w:numId="1"><w:abstractNumId w:val="1"/></w:num>` +
+		`</w:numbering>`
+	footnotes := `<w:footnotes ` + wNS + `>` +
+		`<w:footnote w:id="1"><w:p>` +
+		`<w:r><w:footnoteRef/></w:r>` +
+		`<w:ins w:id="2" w:author="Ana" w:date="2026-01-02T03:04:05Z"><w:r><w:t xml:space="preserve"> </w:t></w:r></w:ins>` +
+		`<w:ins w:id="3" w:author="Ana" w:date="2026-01-02T03:05:00Z"><w:r><w:t>nota revisada</w:t></w:r></w:ins>` +
+		`</w:p></w:footnote>` +
+		`<w:footnote w:id="2"><w:p>` +
+		`<w:r><w:footnoteRef/></w:r>` +
+		`<w:r><w:t xml:space="preserve"> </w:t></w:r>` +
+		`<w:r><w:rPr><w:sz w:val="18"/></w:rPr><w:t>enlace en 9pt</w:t></w:r>` +
+		`</w:p></w:footnote>` +
+		`<w:footnote w:id="3"><w:p>` +
+		`<w:r><w:footnoteRef/></w:r>` +
+		`<w:r><w:t xml:space="preserve"> </w:t></w:r>` +
+		`<w:r><w:rPr><w:color w:val="000000"/><w:sz w:val="13"/></w:rPr><w:t xml:space="preserve"> </w:t></w:r>` +
+		`<w:r><w:rPr><w:color w:val="000000"/><w:sz w:val="20"/></w:rPr><w:t>cita en 10pt</w:t></w:r>` +
+		`</w:p></w:footnote>` +
+		`</w:footnotes>`
+	rels := `<?xml version="1.0" encoding="UTF-8"?>` +
+		`<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">` +
+		`<Relationship Id="rIdNotas" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes" Target="footnotes.xml"/>` +
+		`</Relationships>`
+
+	cuerpo := `<w:p><w:r><w:rPr><w:rFonts w:ascii="Monospace" w:hAnsi="Monospace"/><w:sz w:val="16"/></w:rPr><w:t>codigo</w:t></w:r></w:p>` +
+		`<w:p><w:r><w:rPr><w:caps/><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:sz w:val="22"/></w:rPr><w:t xml:space="preserve">página </w:t></w:r>` +
+		`<w:fldSimple w:instr="PAGE"><w:r><w:t>1</w:t></w:r></w:fldSimple>` +
+		`<w:r><w:rPr><w:caps/></w:rPr><w:t> de portada</w:t></w:r></w:p>` +
+		`<w:p><w:pPr><w:pStyle w:val="Compacto"/></w:pPr><w:r><w:t>Primero compacto</w:t></w:r></w:p>` +
+		`<w:p><w:pPr><w:pStyle w:val="Compacto"/></w:pPr><w:r><w:t>Segundo sin margen superior</w:t></w:r></w:p>` +
+		`<w:p><w:pPr><w:pStyle w:val="Compacto"/><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr></w:pPr><w:r><w:t>Elemento uno</w:t></w:r></w:p>` +
+		`<w:p><w:pPr><w:pStyle w:val="Compacto"/><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr></w:pPr><w:r><w:t>Elemento dos sin margen superior</w:t></w:r></w:p>` +
+		`<w:p><w:r><w:t>Texto con notas</w:t></w:r>` +
+		`<w:ins w:id="1" w:author="Ana" w:date="2026-01-02T03:04:05Z"><w:r><w:footnoteReference w:id="1"/></w:r></w:ins>` +
+		`<w:r><w:footnoteReference w:id="2"/></w:r>` +
+		`<w:r><w:footnoteReference w:id="3"/></w:r></w:p>`
+
+	ida := importarDocx(t, cuerpo, map[string]string{
+		"word/styles.xml":              styles,
+		"word/fontTable.xml":           fonts,
+		"word/numbering.xml":           numbering,
+		"word/footnotes.xml":           footnotes,
+		"word/_rels/document.xml.rels": rels,
+	})
+	if strings.Contains(ida, `<span style="text-transform:uppercase"></span>`) || strings.Contains(ida, `font-size:11pt"></span>`) {
+		t.Fatalf("agruparCampos dejó un <span> vacío al absorber el prefijo del campo PAGE:\n%s", ida)
+	}
+
+	salida, _, _, err := Export(KindDocument, "", stateWithContent(t, "doc:html", ida), FormatOOXML)
+	if err != nil {
+		t.Fatal(err)
+	}
+	vuelta, err := Import("vuelta.docx", salida)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tieneTodo(t, vuelta.Content,
+		`font-family:Monospace,serif`,
+		`margin-top:0`,
+		`<ins data-track data-author="Ana" data-author-id="Ana" data-ts="1767323045000" style="--sytue-track:var(--sytue-avatar-3)"><sup data-footnote-ref="1" id="fnref-1"><a href="#fn-1">1</a></sup></ins>`,
+		`<ins data-track data-author="Ana" data-author-id="Ana" data-ts="1767323045000" style="--sytue-track:var(--sytue-avatar-3)"> </ins>`,
+		`<span style="font-size:9pt">enlace en 9pt</span>`,
+		`<span style="color:#000000;font-size:6.5pt"> </span>`,
+		`<span style="color:#000000;font-size:10pt">cita en 10pt</span>`,
+	)
+
+	antes, despues := declaracionesDe(ida), declaracionesDe(vuelta.Content)
+	for decl, n := range antes {
+		if despues[decl] < n {
+			t.Errorf("se pierde %s en la ida y vuelta (ida=%d, vuelta=%d)\nIDA:    %s\nVUELTA: %s",
+				decl, n, despues[decl], ida, vuelta.Content)
+		}
+	}
+}

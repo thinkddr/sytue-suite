@@ -1740,6 +1740,8 @@ export const mt: AppCatalog<typeof en> = {
   'extdata.msg.generic': 'L-operazzjoni ma setgħetx titlesta.',
   'extdata.msg.notAllowed':
     'Il-persuni fil-lista ta’ din il-konnessjoni biss jistgħu jagħmlulha query. Itlob lill-amministrazzjoni tal-organizzazzjoni tiegħek biex iżżidek.',
+  'extdata.msg.ownerOnly':
+    'Min ħoloq din il-konnessjoni jew l-amministrazzjoni tal-organizzazzjoni biss jistgħu jibdluha jew iħassruha.',
   'sheet.msg.badValue': 'Valur mhux permess',
   'sheet.msg.clipboardDenied': 'Il-browser ċaħad l-aċċess għall-clipboard.',
   'sheet.msg.pasteFailed': 'Ma setax jitwaħħal',

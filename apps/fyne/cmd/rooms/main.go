@@ -114,9 +114,11 @@ func main() {
 	// Sin ella (js/wasm, que solo se compila para comprobar tipos) Conectar se queda nil y
 	// la llamada se abre en la web.
 	if llamada.Disponible {
-		sala.Conectar = func(u, token string, o llamada.Opciones) (rooms.EnCurso, error) {
+		sala.Conectar = func(ctx context.Context, call api.RoomsCall, o llamada.Opciones) (rooms.EnCurso, error) {
 			o.Audio = altavoz.Sistema{Micro: sala.MicroElegido, Altavoz: sala.AltavozElegido}
-			return llamada.Entrar(u, token, o)
+			return secure.ConectarLlamada(ctx, call, o, func(u, token string, opciones llamada.Opciones) (rooms.EnCurso, error) {
+				return llamada.Entrar(u, token, opciones)
+			})
 		}
 		sala.AudioDe = func(micro, alt string) llamada.Dispositivo {
 			return altavoz.Sistema{Micro: micro, Altavoz: alt}
@@ -142,7 +144,7 @@ func main() {
 		// Compartir la pantalla en escritorio y en Android (MediaProjection). En iOS pide
 		// una extensión de ReplayKit que `fyne package` no construye (docs/roadmap.md), y
 		// un botón que falla no se ofrece.
-		if runtime.GOOS != "ios" {
+		if camara.PantallaDisponible {
 			camara.TextoAvisoPantalla = t.T("meet.shareScreen", nil)
 			sala.Pantalla = camara.AbrirPantalla
 		}

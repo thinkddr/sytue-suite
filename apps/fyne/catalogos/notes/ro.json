@@ -276,6 +276,7 @@
     "few": "{count} notițe",
     "other": "{count} de notițe"
   },
+  "notebook.ownerOnly": "Doar persoana care a creat acest carnet sau administrația organizației îl poate muta, îi poate schimba vizibilitatea sau îl poate cripta.",
   "notebook.rename": "Redenumește",
   "notebook.settings": "Setările carnetului",
   "notebook.title": "Nume",

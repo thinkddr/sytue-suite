@@ -4,7 +4,7 @@
 enabled: true
 
 image:
-  registry: ""                 # cae a global.imageRegistry
+  registry: ghcr.io/thinkddr   # global.imageRegistry lo pisa en producción
   # Repo base; la imagen de cada app es <repoBase>-<app>:<tag>
   repoBase: sytue-frontend
   tag: "1.0.0"

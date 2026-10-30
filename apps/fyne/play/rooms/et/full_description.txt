@@ -3,18 +3,13 @@
 • Kanalid meeskonna või projekti kaupa.
 • Igasse kanalisse sisseehitatud videokõne.
 • Mainimised ja teavitused kogu komplektis ühtsed.
-• Otsitav ajalugu kõikjalt Sytue One’ist.
 • Avalikud ja privaatsed kanalid kategooriates; otsesõnumid ja rühmad.
 • Lõimed, reaktsioonid, mainimised, kinnitatud ja salvestatud sõnumid ning mustandid.
 • Vormindamine „Aa“-riba ja otseteedega: paks kiri, kaldkiri, kood, tsitaadid, loendid ja lingid.
 • Manused, pildid, GIF-id ja kohandatud emotikonid; failid Drive’ist.
-• Ajastatud saatmine, prioriteet, lugemiskinnitus ja „nägid“.
-• Kaldkriipsukäsud ja kaardid: küsitlused ja määratavad ülesanded.
-• Videokõned kanalis: kaamera, ekraan, tõstetud käsi, vestlus ja salvestamine.
 • Ajastatud koosolekud ja kutselingid.
 • Botid, veebikonksud ja integratsioonid teiste tööriistadega.
 • Kohalolek ja kohandatud olek; teavitusseaded kanali kaupa.
-• Otsing ajaloost, ka kogu komplektist.
 • Reaalaeg WebSocketi kaudu, taasühendamise ja kadumata sõnumitega.
 
 Krüpteeritud edastamisel (TLS 1.3). Sytue taristu asub ELis. Väliste teenuste asukoht sõltub nende pakkujast.

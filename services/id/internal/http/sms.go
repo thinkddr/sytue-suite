@@ -13,6 +13,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"git.sytue.eu/sytue/one/platform/pkg/logsafe"
 )
 
 // sweegoSendURL es el envío de Sweego (Mindbaz SAS, Lille; alojado en Francia).
@@ -46,7 +48,7 @@ func newSMS(cfg Config, logger *slog.Logger) SMS {
 type logSMS struct{ log *slog.Logger }
 
 func (m logSMS) Send(ctx context.Context, to, text string) error {
-	m.log.WarnContext(ctx, "SMS no configurado: mensaje SOLO en el log (dev)", "to", to, "text", text)
+	m.log.WarnContext(ctx, "SMS no configurado: mensaje SOLO en el log (dev)", "to", logsafe.Text(to), "text", text)
 	return nil
 }
 

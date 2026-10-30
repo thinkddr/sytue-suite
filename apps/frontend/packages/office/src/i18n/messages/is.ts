@@ -1694,6 +1694,8 @@ export const is: AppCatalog<typeof en> = {
   'extdata.msg.generic': 'Ekki tókst að ljúka aðgerðinni.',
   'extdata.msg.notAllowed':
     'Aðeins þau sem eru á lista þessarar tengingar geta sent fyrirspurnir á hana. Biddu stjórnendur stofnunarinnar um að bæta þér við.',
+  'extdata.msg.ownerOnly':
+    'Aðeins sá sem bjó tenginguna til eða stjórnandi stofnunarinnar getur breytt henni eða eytt.',
   'sheet.msg.badValue': 'Gildi ekki leyft',
   'sheet.msg.clipboardDenied': 'Vafrinn neitaði aðgangi að klippispjaldinu.',
   'sheet.msg.pasteFailed': 'Ekki tókst að líma',

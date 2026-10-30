@@ -5,6 +5,7 @@ package ficheros
 
 import (
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -29,6 +30,24 @@ func TestUnNombreConSaltoDeLineaNoEligeOtroFichero(t *testing.T) {
 	} {
 		if len(got) != 1 || got[0] != "/home/ana/Descargas/informe.pdf" {
 			t.Errorf("rutas: %q", got)
+		}
+	}
+}
+
+// TestElTituloYLaRutaNoLleganAlGuionDePowerShellComoCodigo (FYS-12): tanto el título del
+// selector como la ruta temporal del portapapeles de Windows van en Base64, de modo que
+// una comilla recta o tipográfica (’ ‘ ‚ ‛) nunca cierra el literal ni inyecta código.
+func TestElTituloYLaRutaNoLleganAlGuionDePowerShellComoCodigo(t *testing.T) {
+	peligroso := "L’app‘‚‛'; Remove-Item C:\\x; '"
+	for _, guion := range []string{
+		guionElegirWindows(peligroso, []string{"pdf", "docx"}),
+		guionCopiarImagenWindows(`C:\Users\` + peligroso + `\AppData\Local\Temp\sytue-recorte-1.png`),
+	} {
+		if strings.Contains(guion, "Remove-Item") || strings.ContainsAny(guion, "’‘‚‛") {
+			t.Fatalf("el texto va en claro en el guion de PowerShell: %s", guion)
+		}
+		if !strings.Contains(guion, "FromBase64String('") {
+			t.Fatalf("el guion no decodifica desde Base64: %s", guion)
 		}
 	}
 }

@@ -115,6 +115,8 @@ export const fr: AppCatalog<typeof en> = {
   'backlinks.emptyHint': 'Reliez-la depuis une autre note et elle apparaîtra ici, toute seule.',
   'notebook.delete': 'Supprimer le carnet',
   'notebook.deleteConfirm': 'Supprimer « {title} » et tout son contenu ?',
+  'notebook.ownerOnly':
+    'Seule la personne qui a créé ce carnet ou l’administration de l’organisation peut le déplacer, changer sa visibilité ou le chiffrer.',
   'notebook.newChild': 'Nouveau carnet à l’intérieur',
   'notebook.notes': { one: '{count} note', other: '{count} notes' },
   'notebook.emoji': 'Icône',

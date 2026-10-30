@@ -112,6 +112,8 @@ export const fi: AppCatalog<typeof en> = {
     'Linkitä siihen toisesta muistiinpanosta, niin se ilmestyy tänne itsestään.',
   'notebook.delete': 'Poista muistikirja',
   'notebook.deleteConfirm': 'Poistetaanko ”{title}” ja kaikki sen sisältö?',
+  'notebook.ownerOnly':
+    'Vain tämän muistikirjan luoja tai organisaation ylläpitäjä voi siirtää sitä, muuttaa sen näkyvyyttä tai salata sen.',
   'notebook.newChild': 'Uusi muistikirja sisälle',
   'notebook.notes': { one: '{count} muistiinpano', other: '{count} muistiinpanoa' },
   'notebook.emoji': 'Kuvake',

@@ -36,7 +36,7 @@ require (
 	github.com/tphakala/go-opus v1.3.0
 	github.com/zalando/go-keyring v0.2.8
 	golang.org/x/image v0.47.0
-	golang.org/x/net v0.61.0
+	golang.org/x/net v0.62.0
 	golang.org/x/sys v0.49.0
 	golang.org/x/text v0.43.0
 	google.golang.org/protobuf v1.36.12
@@ -150,11 +150,11 @@ require (
 // El núcleo compartido de los clientes vive en el mismo repositorio.
 replace git.sytue.eu/sytue/one/apps/nucleo => ../nucleo
 
-// Fyne no entrega al programa las URL entrantes de Android, iOS ni macOS.
-// El fork público conserva BSD-3-Clause de upstream y publica sus cambios bajo
-// Apache-2.0. Añade ese puente y conserva la API pública de v2;
-// se borra este replace cuando upstream acepte el parche.
-replace fyne.io/fyne/v2 => github.com/thinkddr/fyne/v2 v2.8.2-sytue.1
+// El fork de Fyne v2.8.2 conserva la API pública y añade URL entrantes, gestos
+// móviles y geometría de la ventana UIKit al girar o redimensionar. El original
+// conserva BSD-3-Clause y las modificaciones Apache-2.0; parches y retirada en
+// upstream/README.md.
+replace fyne.io/fyne/v2 => github.com/thinkddr/fyne/v2 v2.8.2-sytue.2
 
 // GLFW solo acepta FICHEROS soltados: su XDnD de X11 y su wl_data_device de Wayland
 // piden `text/uri-list` y nada más. El fork —el mismo commit que requiere Fyne, con un

@@ -741,6 +741,7 @@
   "extdata.msg.noEncryption": "Le chiffrement des identifiants n’est pas configuré sur le serveur.",
   "extdata.msg.notAllowed": "Seules les personnes inscrites sur la liste de cette connexion peuvent l’interroger. Demandez à l’administration de votre organisation de vous y ajouter.",
   "extdata.msg.notFound": "La connexion ou la requête n’existe plus.",
+  "extdata.msg.ownerOnly": "Seule la personne qui a créé cette connexion ou l’administration de l’organisation peut la modifier ou la supprimer.",
   "extdata.msg.rate": "Trop d’exécutions d’affilée. Attendez quelques secondes et réessayez.",
   "extdata.msg.timeout": "La source de données externe a mis trop de temps à répondre.",
   "extdata.msg.unauth": "Votre session a expiré. Reconnectez-vous.",

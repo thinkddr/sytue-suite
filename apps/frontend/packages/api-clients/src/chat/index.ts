@@ -155,18 +155,25 @@ export class ChatClient {
   startMatrixNative(input: {
     code_challenge: string;
     code_challenge_method: 'S256';
-  }): Promise<{ authorize_url: string; state: string }> {
+    product?: string;
+  }): Promise<{ authorize_url: string; state: string; product?: string }> {
     return this.http.postJson('/matrix/native/start', input);
   }
-  previewMatrixNative(
-    state: string,
-  ): Promise<{ authorize_url: string; state: string; actor: string; tenant: string }> {
+  previewMatrixNative(state: string): Promise<{
+    authorize_url: string;
+    state: string;
+    actor: string;
+    tenant: string;
+    product?: string;
+    homeserver_url?: string;
+    sso_provider_id?: string;
+  }> {
     return this.http.json({ path: '/matrix/native/preview', query: { state } });
   }
   acceptMatrixNative(input: {
     state: string;
     login_token: string;
-  }): Promise<{ ticket: string; redirect_url: string }> {
+  }): Promise<{ ticket: string; redirect_url: string; product?: string }> {
     return this.http.postJson('/matrix/native/accept', input);
   }
   finishMatrixNative(input: {

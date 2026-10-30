@@ -26,10 +26,12 @@ if command -v magick >/dev/null 2>&1; then
   magick -background none "$RAIZ/branding/marks/one.svg" -resize 192x192 "$trabajo/color.png"
   magick -background none "$RAIZ/branding/marks/one.svg" -resize 32x32 "$trabajo/outline.png"
 else
-  echo "::warning::sin ImageMagick: el zip de Teams saldrá sin iconos y el vendor los rechazará."
+  echo "::error::falta ImageMagick 7 (magick): Teams exige ambos iconos PNG." >&2
+  exit 1
 fi
 cp "$ORIGEN/microsoft-teams/manifest.json" "$trabajo/"
 (cd "$trabajo" && zip -q -r "$SALIDA/microsoft-teams.zip" .)
+bash "$RAIZ/.github/actions/toolchain/preparar-teams.sh" "$SALIDA/microsoft-teams.zip"
 echo "✓ dist-marketplace/microsoft-teams.zip"
 
 # El resto: un zip por directorio, con el contenido en la raíz.

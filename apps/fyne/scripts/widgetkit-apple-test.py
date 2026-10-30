@@ -163,11 +163,11 @@ class InsercionTests(unittest.TestCase):
             with contextlib.redirect_stdout(io.StringIO()):
                 widgetkit.insertar(self.productos, self.host, "ios", "Distribución de pruebas", self.app, self.generador)
 
-    def test_firma_anidada_perfil_0644_y_swift_support_dentro_del_ipa(self):
+    def test_firma_anidada_perfil_0600_y_swift_support_dentro_del_ipa(self):
         self.insertar()
         perfil = self.host / "PlugIns/Sytue-rooms-Widgets.appex/embedded.mobileprovision"
         self.assertEqual(perfil.read_bytes(), self.perfil.read_bytes())
-        self.assertEqual(perfil.stat().st_mode & 0o777, 0o644)
+        self.assertEqual(perfil.stat().st_mode & 0o777, 0o600)
         self.assertIn("verificar-perfil-grupo", self.comandos[0])
         swift = next(c for c in self.comandos if "swift-stdlib-tool" in c)
         self.assertEqual(swift[swift.index("--unsigned-destination") + 1], self.raiz / "ipa/SwiftSupport/iphoneos")
@@ -265,7 +265,7 @@ class InsercionTests(unittest.TestCase):
                     with contextlib.redirect_stdout(io.StringIO()):
                         widgetkit.insertar(self.productos, self.host, destino, "Distribución de pruebas", self.app, self.generador)
                 perfil = self.host / "Contents/PlugIns/Sytue-rooms-Widgets.appex/Contents/embedded.provisionprofile"
-                self.assertEqual(perfil.stat().st_mode & 0o777, 0o644)
+                self.assertEqual(perfil.stat().st_mode & 0o777, 0o600)
                 self.assertEqual(self.lecturas[2][-1], destino)
                 swift = next(c for c in self.comandos if "swift-stdlib-tool" in c)
                 self.assertNotIn("--unsigned-destination", swift)

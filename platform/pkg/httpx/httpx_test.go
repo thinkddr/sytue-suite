@@ -197,3 +197,31 @@ func TestHealthNoFiltraLaVersionHaciaFuera(t *testing.T) {
 		t.Errorf("desde dentro debe seguir informando de la versión: %s", cuerpo)
 	}
 }
+
+// /readyz tampoco puede regalar hacia fuera el mapa de dependencias internas ni
+// los errores del driver de PostgreSQL o S3 (INF-12): a través de Traefik
+// (X-Forwarded-For) solo devuelve el estado general; sin esa cabecera, el
+// kubelet y el diagnóstico interno siguen viendo el desglose por dependencia.
+func TestReadyNoFiltraLasDependenciasHaciaFuera(t *testing.T) {
+	healthy := CheckerFunc{Label: "postgres", Fn: func(context.Context) error { return nil }}
+	broken := CheckerFunc{Label: "s3", Fn: func(context.Context) error { return errors.New("dial tcp 10.43.0.9:8333: i/o timeout") }}
+	h := ReadyHandler(time.Second, healthy, broken)
+
+	deFuera := httptest.NewRequest(http.MethodGet, "/readyz", http.NoBody)
+	deFuera.Header.Set("X-Forwarded-For", "203.0.113.7")
+	rec := httptest.NewRecorder()
+	h(rec, deFuera)
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("readyz con dependencia caída desde fuera = %d, quería 503", rec.Code)
+	}
+	if cuerpo := rec.Body.String(); strings.Contains(cuerpo, "dependencies") || strings.Contains(cuerpo, "postgres") || strings.Contains(cuerpo, "10.43.0.9") {
+		t.Errorf("desde internet se filtraron las dependencias internas: %s", cuerpo)
+	}
+
+	deDentro := httptest.NewRequest(http.MethodGet, "/readyz", http.NoBody)
+	rec = httptest.NewRecorder()
+	h(rec, deDentro)
+	if cuerpo := rec.Body.String(); !strings.Contains(cuerpo, "dependencies") || !strings.Contains(cuerpo, "postgres") {
+		t.Errorf("desde dentro debe seguir informando de las dependencias: %s", cuerpo)
+	}
+}

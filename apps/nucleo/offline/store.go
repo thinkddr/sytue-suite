@@ -12,6 +12,7 @@
 package offline
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -46,6 +47,44 @@ type backend interface {
 type Store struct {
 	mu sync.Mutex
 	b  backend
+}
+
+var ErrEncryptedStore = errors.New("offline: an encrypted store with native record locking is required")
+
+// Encrypted lets private-key journals reject a plaintext backend, including the
+// legacy browser store. It exposes no key material.
+func (s *Store) Encrypted() bool {
+	if s == nil {
+		return false
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	b, ok := s.b.(interface{ encrypted() bool })
+	return ok && b.encrypted()
+}
+
+// Exclusive serializes a resumable operation across suite processes. The lease
+// lives separately from the replaceable record; ordinary Read/Write remain usable
+// inside fn. Implementations without encrypted storage and OS locks fail closed.
+func (s *Store) Exclusive(ctx context.Context, owner, namespace, id string, fn func() error) error {
+	if !s.Encrypted() || fn == nil {
+		return ErrEncryptedStore
+	}
+	b, ok := s.b.(interface {
+		lockRecord(context.Context, string) (func(), error)
+	})
+	if !ok {
+		return ErrEncryptedStore
+	}
+	unlock, err := b.lockRecord(ctx, clave(owner, namespace, id))
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return fn()
 }
 
 // clave nunca lleva texto de fuera: cada parte es un hash, así que un id como

@@ -48,6 +48,7 @@ import (
 	"time"
 
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
+	"git.sytue.eu/sytue/one/platform/pkg/logsafe"
 	"git.sytue.eu/sytue/one/services/id/internal/dns"
 	"git.sytue.eu/sytue/one/services/id/internal/domain"
 	"git.sytue.eu/sytue/one/services/id/internal/store"
@@ -299,14 +300,14 @@ func (s *Server) reclamarDominioCloudflare(w http.ResponseWriter, r *http.Reques
 	case dns.Denied(zerr):
 		// El token no vale o le falta el permiso. Ni el token ni su longitud
 		// entran en el log: solo lo que dijo Cloudflare.
-		s.log.WarnContext(ctx, "el token de Cloudflare del cliente no autoriza", "domain", host)
+		s.log.WarnContext(ctx, "el token de Cloudflare del cliente no autoriza", "domain", logsafe.Text(host))
 		httpx.Fail(w, r, httpx.ErrForbidden.WithMessage(
 			"That token does not let us see your DNS. When creating it in Cloudflare you have to tick "+
 				"el permiso «Zone · DNS · Edit» e incluir la zona de "+host+".",
 		))
 		return
 	case zerr != nil:
-		s.log.ErrorContext(ctx, "buscar la zona del cliente en Cloudflare falló", "error", zerr, "domain", host)
+		s.log.ErrorContext(ctx, "buscar la zona del cliente en Cloudflare falló", "error", zerr, "domain", logsafe.Text(host))
 		httpx.Fail(w, r, httpx.ErrUnavailable.WithMessage(
 			"We could not reach Cloudflare just now. Try again in a moment.",
 		))
@@ -324,7 +325,7 @@ func (s *Server) reclamarDominioCloudflare(w http.ResponseWriter, r *http.Reques
 	plan := s.cloudflarePlan(prof, req.Mail)
 	out, applied, cerr := s.applyCloudflarePlan(cfCtx, cf, plan, req, host)
 	if cerr != nil {
-		s.log.ErrorContext(ctx, "leer la zona del cliente en Cloudflare falló", "error", cerr, "domain", host)
+		s.log.ErrorContext(ctx, "leer la zona del cliente en Cloudflare falló", "error", cerr, "domain", logsafe.Text(host))
 		httpx.Fail(w, r, httpx.ErrUnavailable.WithMessage(
 			"Hemos localizado tu zona pero no hemos podido leer sus registros. Vuelve a intentarlo.",
 		))
@@ -427,7 +428,7 @@ func (s *Server) applyCloudflarePlan(
 				// Un fallo aquí NO tumba el resto: se cuenta en SU registro y los
 				// demás siguen. La operación entera no se da por buena.
 				s.log.ErrorContext(ctx, "escribir en la zona del cliente falló",
-					"error", aerr, "domain", host, "record", p.key())
+					"error", aerr, "domain", logsafe.Text(host), "record", p.key())
 				w.State, w.Detail = stateFailed, cloudflareReason(aerr)
 				out = append(out, w)
 				continue

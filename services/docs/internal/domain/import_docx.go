@@ -626,16 +626,15 @@ func (d *docxDec) cerrarParrafo(p xpara, directo docxPPr) (xpara, bool) {
 func (d *docxDec) cssParrafo(pp docxPPr, base, baseTexto docxRPr, lista, titulo, tab bool) string {
 	var css docxCSS
 	d.h().cssBase(&css, baseTexto, titulo)
-	if pp.antes != nil && (*pp.antes != 0 || titulo) {
-		// Un <p> del editor no tiene margen de arriba; un título, sí.
+	if pp.antes != nil && (*pp.antes != 0 || titulo || d.h().exportado) {
+		// Un <p> del editor no tiene margen de arriba; un título, sí. En un .docx exportado por
+		// Docus, w:before="0" solo se escribió si el bloque traía margin-top:0 (contextualSpacing).
 		css.add("margin-top", docxPx(*pp.antes))
 	}
 	if pp.despues != nil {
 		css.add("margin-bottom", docxPx(*pp.despues))
 	}
-	if lh := interlineado(pp, base); lh != "" {
-		css.add("line-height", lh)
-	}
+	css.add("line-height", interlineado(pp, base))
 	if !lista {
 		// En una lista las sangrías las pone la lista del editor, no la del nivel de Word.
 		if pp.izq != nil && *pp.izq > 0 {
@@ -662,9 +661,7 @@ func (d *docxDec) cssParrafo(pp docxPPr, base, baseTexto docxRPr, lista, titulo,
 		// pintan la web (canvas/tabulaciones.ts) y rico; las dos cuentan desde el borde del texto.
 		css.add("white-space", "pre-wrap")
 		css.add("tab-size", docxPx(d.h().tabulador))
-		if v := paradasCSS(pp, lista); v != "" {
-			css.add("--sytue-tabs", v)
-		}
+		css.add("--sytue-tabs", paradasCSS(pp, lista))
 	}
 	return css.String()
 }

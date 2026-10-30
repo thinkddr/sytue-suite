@@ -415,3 +415,34 @@ func TestEmitirHablaDeLaAppYNoDelNavegador(t *testing.T) {
 		t.Errorf("el origen en español es %q y el dueño decidió «Este Cast»", got)
 	}
 }
+
+// Un destino sin capturador (iOS sin ReplayKit) no ofrece un control que sólo falla.
+func TestEmitirNoOfrecePantallaSinCapturador(t *testing.T) {
+	v := vistaDePrueba(t, tema.Claro)
+	for _, disponible := range []bool{false, true} {
+		t.Run(fmt.Sprint(disponible), func(t *testing.T) {
+			pulsado := false
+			e := Emision{AlCamara: func() {}, AlMicro: func() {}}
+			if disponible {
+				e.AlPantalla = func() { pulsado = true }
+			}
+			w := test.NewWindow(panelEmision(v, e))
+			defer w.Close()
+			w.Resize(fyne.NewSize(360, 500))
+			b := hayIcono(w, v.Traduce("studio.browser.screen"))
+			if !disponible {
+				if b != nil {
+					t.Fatal("se ofrece compartir pantalla sin capturador")
+				}
+				return
+			}
+			if b == nil || b.Inerte {
+				t.Fatal("la pantalla implementada no se puede activar")
+			}
+			test.Tap(b)
+			if !pulsado {
+				t.Fatal("no se invocó la captura de pantalla")
+			}
+		})
+	}
+}

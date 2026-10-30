@@ -1700,6 +1700,8 @@ export const hu: AppCatalog<typeof en> = {
   'extdata.msg.generic': 'Nem sikerült befejezni a műveletet.',
   'extdata.msg.notAllowed':
     'Ezt a kapcsolatot csak a listáján szereplő személyek kérdezhetik le. Kérje meg a szervezete adminisztrációját, hogy vegye fel a listára.',
+  'extdata.msg.ownerOnly':
+    'Ezt a kapcsolatot csak a létrehozója vagy a szervezet adminisztrációja módosíthatja vagy törölheti.',
   'sheet.msg.badValue': 'Nem engedélyezett érték',
   'sheet.msg.clipboardDenied': 'A böngésző megtagadta a hozzáférést a vágólaphoz.',
   'sheet.msg.pasteFailed': 'Nem sikerült beilleszteni',

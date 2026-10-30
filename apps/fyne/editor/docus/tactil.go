@@ -99,7 +99,12 @@ func (f *Folio) arrastrarTactil(e *fyne.DragEvent) {
 		f.tiradorTexto = f.tiradorTextoEn(e.Position.Subtract(e.Dragged))
 	}
 	if f.tiradorTexto == sinTirador {
-		f.scroll.Scrolled(&fyne.ScrollEvent{Scrolled: e.Dragged})
+		gesto := &fyne.ScrollEvent{PointEvent: e.PointEvent, Scrolled: e.Dragged}
+		if f.caja != nil && f.caja.AlDesplazar != nil {
+			f.caja.AlDesplazar(gesto)
+		} else {
+			f.scroll.Scrolled(gesto)
+		}
 		return
 	}
 	a, b := f.orden()

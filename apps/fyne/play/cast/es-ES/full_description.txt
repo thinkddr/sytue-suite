@@ -6,7 +6,7 @@ Vídeo bajo demanda y directo: sube, emite y comparte, en la UE.
 • Chat en directo y comentarios, con moderación básica de quien publica.
 • Sube vídeos de hasta 8 GiB; el original se conserva.
 • Directo desde un programa de emisión por RTMP, con una clave de emisión por persona.
-• Directo desde el navegador o la app: cámara, pantalla y micrófono.
+• Directo desde el navegador o la app: cámara y micrófono. Compartir pantalla en navegadores, sistemas de escritorio y Android compatibles; no disponible en la app de iOS/iPadOS.
 • Las grabaciones de los directos se convierten en vídeos bajo demanda solas.
 • Portada pública y un canal por organización, indexables.
 • Enlaces ocultos, vídeos solo para la organización o acceso a personas concretas por @usuario.

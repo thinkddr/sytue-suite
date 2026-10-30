@@ -434,7 +434,8 @@ export const hr: AppCatalog<typeof en> = {
   'product.cast.f2': 'Prilagodljiva reprodukcija u tri kvalitete; preglednik bira najbolju.',
   'product.cast.f3':
     'Prijenos uživo iz programa za emitiranje putem RTMP-a, s ključem prijenosa po osobi.',
-  'product.cast.f4': 'Uživo iz preglednika ili aplikacije: kamera, zaslon i mikrofon.',
+  'product.cast.f4':
+    'Uživo iz preglednika ili aplikacije: kamera i mikrofon. Dijeljenje zaslona u podržanim preglednicima, stolnim sustavima i Androidu; nije dostupno u aplikaciji za iOS/iPadOS.',
   'product.cast.f5': 'Snimke prijenosa uživo automatski postaju videozapisi na zahtjev.',
   'product.cast.f6': 'Javna naslovnica i kanal za svaku organizaciju, s mogućnošću indeksiranja.',
   'product.cast.f7':

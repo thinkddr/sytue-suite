@@ -18,7 +18,14 @@ import (
 // el diálogo de impresión tienen que sobrevivir a esta llamada. Sin plazo a propósito, por
 // lo mismo.
 func lanzar(orden string, args ...string) error {
-	return exec.CommandContext(context.Background(), orden, args...).Start() //nolint:gosec // G204: la ruta la ha validado local(); no hay intérprete de órdenes
+	return lanzarConContexto(context.Background(), orden, args...)
+}
+
+func lanzarConContexto(ctx context.Context, orden string, args ...string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return exec.CommandContext(context.WithoutCancel(ctx), orden, args...).Start() //nolint:gosec // G204: la ruta la ha validado local(); no hay intérprete de órdenes
 }
 
 // elegirCon corre el selector de ficheros del sistema y devuelve las rutas que escribe,

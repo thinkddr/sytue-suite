@@ -16,6 +16,7 @@ import (
 	"io"
 	"log/slog"
 	"net"
+	"net/mail"
 	"os"
 	"strings"
 	"sync"
@@ -27,6 +28,7 @@ import (
 	"git.sytue.eu/sytue/one/platform/pkg/events"
 	"git.sytue.eu/sytue/one/platform/pkg/hubnotify"
 	"git.sytue.eu/sytue/one/platform/pkg/log"
+	"git.sytue.eu/sytue/one/platform/pkg/logsafe"
 	"git.sytue.eu/sytue/one/platform/pkg/objectstore"
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 	"git.sytue.eu/sytue/one/services/mail/internal/auth"
@@ -139,27 +141,28 @@ type InboundMessage struct {
 // Deliver verifica el remitente, parsea el MIME, sube el .eml a S3 y guarda el
 // sobre en el Inbox de cada destinatario local. Se llama desde la fase DATA del MX.
 func (in *Inbound) Deliver(ctx context.Context, msg InboundMessage) error {
-	raw, soltar, err := in.recibir(ctx, msg.Body)
+	r, soltar, err := in.recibir(ctx, msg.Body)
 	if err != nil {
 		return err
 	}
 	defer soltar()
+	seccion := func() *io.SectionReader { return io.NewSectionReader(r, 0, r.Size()) }
 
-	parsed, err := mime.Parse(bytes.NewReader(raw))
+	env, err := mime.ParseSobre(seccion(), r.Size())
 	if err != nil {
 		return fmt.Errorf("delivery: parsear: %w", err)
 	}
 
 	// --- Autenticación del remitente (SPF/DKIM/DMARC) ---
-	spf, dkimRes, dmarc := in.authenticate(ctx, msg, raw, parsed.Envelope.FromAddr)
-	parsed.Envelope.SPFResult = spf.ToDomain()
-	parsed.Envelope.DKIMResult = dkimRes.ToDomain()
-	parsed.Envelope.DMARCResult = dmarc.Result.ToDomain()
+	spf, dkimRes, dmarc := in.authenticate(ctx, msg, seccion(), env.FromAddr)
+	env.SPFResult = spf.ToDomain()
+	env.DKIMResult = dkimRes.ToDomain()
+	env.DMARCResult = dmarc.Result.ToDomain()
 
 	if in.enforceDMARC && dmarc.Disposition == "reject" && dmarc.Result == auth.ResultFail {
 		if in.rejectOnFail {
 			in.logger.Warn("inbound: rechazado por DMARC=reject",
-				"from", parsed.Envelope.FromAddr, "ip", msg.RemoteIP.String())
+				"from", logsafe.Text(env.FromAddr), "ip", msg.RemoteIP.String())
 			return ErrRejectedPolicy
 		}
 	}
@@ -170,7 +173,7 @@ func (in *Inbound) Deliver(ctx context.Context, msg InboundMessage) error {
 	// autorespuesta de vacaciones? Depende solo de sus cabeceras + remitente de
 	// sobre, no del destinatario. La comprobación «uno mismo» y de vacaciones
 	// activas la hace maybeAutoReply por destinatario.
-	autoEligible := autoReplyEligible(raw, msg.MailFrom)
+	autoEligible := autoReplyEligibleReader(seccion(), msg.MailFrom)
 
 	// Entregar una copia a cada destinatario local (fan-out).
 	// UN objeto por mensaje y organización, compartido por todos sus buzones que
@@ -180,7 +183,7 @@ func (in *Inbound) Deliver(ctx context.Context, msg InboundMessage) error {
 		if k, ok := claves[t.Slug]; ok {
 			return k, nil
 		}
-		k, err := blobs.GuardarMensaje(ctx, in.store, in.blobs, t, raw)
+		k, err := blobs.GuardarMensajeDesde(ctx, in.store, in.blobs, t, seccion(), r.Size())
 		if err != nil {
 			return "", fmt.Errorf("delivery: guardar blob: %w", err)
 		}
@@ -188,7 +191,7 @@ func (in *Inbound) Deliver(ctx context.Context, msg InboundMessage) error {
 		return k, nil
 	}
 	for _, rcpt := range msg.Recipients {
-		if err := in.deliverTo(ctx, rcpt, raw, guardar, parsed.Envelope, junk, msg.MailFrom, autoEligible, dmarc.Alineado); err != nil {
+		if err := in.deliverTo(ctx, rcpt, seccion, r.Size(), guardar, env, junk, msg.MailFrom, autoEligible, dmarc.Alineado); err != nil {
 			return err // el MX devolverá 4xx y el remitente reintentará todo el lote
 		}
 	}
@@ -211,22 +214,15 @@ const (
 // errOcupado: no hay hueco ahora. El MX lo traduce a 451 y el remitente reintenta.
 var errOcupado = errors.New("delivery: demasiadas recepciones a la vez")
 
-// recibir lee el mensaje SIN tenerlo en memoria mientras llega y sin que lo que hay en
-// memoria a la vez pase de un tope.
+// recibir lee el mensaje SIN tenerlo en memoria mientras llega y devuelve un
+// SectionReader sobre el fichero temporal (ya desenlazado de /tmp para no dejar
+// ficheros huérfanos en el directorio), de modo que el parseo MIME, la verificación
+// DKIM y la subida de blobs trabajen en flujo desde el fichero dentro del presupuesto
+// compartido (COM-06).
 //
-// Antes era un io.ReadAll de la conexión: cada remitente lento retenía su búfer
-// creciendo, y N mensajes grandes a la vez sumaban N veces su tamaño (más las copias
-// del parseo) contra los 512 Mi del pod. Ahora el cuerpo se vuelca a un fichero
-// temporal —ahí se corta por tamaño— y solo sube a memoria cuando cabe en el
-// presupuesto compartido: como mucho, los bytes de UN mensaje máximo entre todos.
-//
-// soltar devuelve esa memoria al presupuesto; se llama al acabar de procesar.
-//
-// ponytail: una vez admitido, el procesado sigue en memoria (parseo, DKIM, subida).
-// Hacerlo en flujo desde el fichero es un cambio de mime.Parse, auth.VerifyDKIM y
-// blobs.GuardarMensaje; hace falta el día que el tope tenga que pasar de lo que cabe
-// en el pod.
-func (in *Inbound) recibir(ctx context.Context, cuerpo io.Reader) (raw []byte, soltar func(), err error) {
+// soltar cierra el fichero temporal y devuelve su cuota al presupuesto; se llama al
+// acabar de procesar.
+func (in *Inbound) recibir(ctx context.Context, cuerpo io.Reader) (r *io.SectionReader, soltar func(), err error) {
 	recepciones, memoria := in.cupos()
 	if !recepciones.TryAcquire(1) {
 		return nil, nil, errOcupado
@@ -237,9 +233,12 @@ func (in *Inbound) recibir(ctx context.Context, cuerpo io.Reader) (raw []byte, s
 	if err != nil {
 		return nil, nil, fmt.Errorf("delivery: abrir temporal: %w", err)
 	}
+	_ = os.Remove(f.Name())
+	cerrarEnError := true
 	defer func() {
-		_ = f.Close()
-		_ = os.Remove(f.Name())
+		if cerrarEnError {
+			_ = f.Close()
+		}
 	}()
 	n, err := io.Copy(f, io.LimitReader(cuerpo, in.maxBytes+1))
 	if err != nil {
@@ -254,12 +253,11 @@ func (in *Inbound) recibir(ctx context.Context, cuerpo io.Reader) (raw []byte, s
 	if err := memoria.Acquire(espera, n); err != nil {
 		return nil, nil, fmt.Errorf("%w: sin memoria libre para %d bytes", errOcupado, n)
 	}
-	raw = make([]byte, n)
-	if _, err := f.ReadAt(raw, 0); err != nil && (!errors.Is(err, io.EOF) || n != 0) {
+	cerrarEnError = false
+	return io.NewSectionReader(f, 0, n), sync.OnceFunc(func() {
+		_ = f.Close()
 		memoria.Release(n)
-		return nil, nil, fmt.Errorf("delivery: releer temporal: %w", err)
-	}
-	return raw, func() { memoria.Release(n) }, nil
+	}), nil
 }
 
 // cupos crea los dos presupuestos al primer uso, para que un Inbound literal (los
@@ -272,8 +270,8 @@ func (in *Inbound) cupos() (recepciones, memoria *semaphore.Weighted) {
 	return in.recepciones, in.memoria
 }
 
-func (in *Inbound) authenticate(ctx context.Context, msg InboundMessage, raw []byte, fromAddr string) (auth.Result, auth.Result, auth.DMARCResult) {
-	fromDomain := domainOf(fromAddr)
+func (in *Inbound) authenticate(ctx context.Context, msg InboundMessage, r io.Reader, fromAddr string) (auth.Result, auth.Result, auth.DMARCResult) {
+	fromDomains, r := dominiosFromDeCabecera(r, fromAddr)
 	mailFromDomain := domainOf(msg.MailFrom)
 
 	spf := auth.ResultNone
@@ -286,10 +284,20 @@ func (in *Inbound) authenticate(ctx context.Context, msg InboundMessage, raw []b
 	var dkimDomains []string
 	if in.verifyDKIM {
 		var err error
-		dkimRes, dkimDomains, err = auth.VerifyDKIM(ctx, in.resolver, raw)
+		dkimRes, dkimDomains, err = auth.VerifyDKIMReader(ctx, in.resolver, r)
 		if err != nil {
 			dkimRes, dkimDomains = auth.ResultTempError, nil
 		}
+	}
+	if len(fromDomains) > 1 {
+		if in.enforceDMARC {
+			return spf, dkimRes, auth.VerifyDMARCFroms(ctx, in.resolver, fromDomains, mailFromDomain, spf, dkimDomains, dkimRes)
+		}
+		return spf, dkimRes, auth.DMARCResult{Result: auth.ResultFail, Disposition: "none", Alineado: false}
+	}
+	fromDomain := domainOf(fromAddr)
+	if len(fromDomains) == 1 && fromDomains[0] != "" {
+		fromDomain = fromDomains[0]
 	}
 	dmarc := auth.DMARCResult{
 		Result: auth.ResultNone, Disposition: "none",
@@ -301,18 +309,80 @@ func (in *Inbound) authenticate(ctx context.Context, msg InboundMessage, raw []b
 	return spf, dkimRes, dmarc
 }
 
+// dominiosFromDeCabecera devuelve un dominio por cada cabecera `From:` y por cada
+// dirección que contenga (COM-05). Así un mensaje con dos cabeceras `From:` —o dos
+// direcciones en `From:`— nunca se evalúa solo por la primera permitiendo que la
+// segunda suplante a otro remitente. Rebobina r (o lo reconstruye) para que DKIM lea
+// el mensaje íntegro desde el principio.
+func dominiosFromDeCabecera(r io.Reader, fromAddr string) ([]string, io.Reader) {
+	if r == nil {
+		if d := domainOf(fromAddr); d != "" {
+			return []string{d}, nil
+		}
+		return nil, nil
+	}
+	var m *mail.Message
+	var err error
+	if rs, ok := r.(io.ReadSeeker); ok {
+		_, _ = rs.Seek(0, io.SeekStart)
+		m, err = mail.ReadMessage(rs)
+		_, _ = rs.Seek(0, io.SeekStart)
+	} else {
+		raw, rerr := io.ReadAll(r)
+		if rerr != nil {
+			return []string{domainOf(fromAddr)}, bytes.NewReader(raw)
+		}
+		m, err = mail.ReadMessage(bytes.NewReader(raw))
+		r = bytes.NewReader(raw)
+	}
+	if err != nil || len(m.Header["From"]) == 0 {
+		if d := domainOf(fromAddr); d != "" {
+			return []string{d}, r
+		}
+		return nil, r
+	}
+	cabeceras := m.Header["From"]
+	out := make([]string, 0, len(cabeceras))
+	for _, h := range cabeceras {
+		lista, perr := lectorDeFrom.ParseList(h)
+		if perr != nil || len(lista) == 0 {
+			if dir := rescatarAngulos(h); dir != "" {
+				out = append(out, domainOf(dir))
+			} else {
+				out = append(out, domainOf(fromAddr))
+			}
+			continue
+		}
+		for _, a := range lista {
+			out = append(out, domainOf(a.Address))
+		}
+	}
+	return out, r
+}
+
+func rescatarAngulos(valor string) string {
+	valor = strings.TrimSpace(valor)
+	if i, j := strings.IndexByte(valor, '<'), strings.IndexByte(valor, '>'); i >= 0 && j > i {
+		return strings.TrimSpace(valor[i+1 : j])
+	}
+	if strings.Contains(valor, "@") && !strings.ContainsAny(valor, " \t\r\n\"") {
+		return valor
+	}
+	return ""
+}
+
 // fromAutenticado: el `From:` quedó autenticado por SPF o DKIM alineados. Solo
 // entonces se pasa a Calendar la respuesta a una invitación que traiga el correo.
-func (in *Inbound) deliverTo(ctx context.Context, rcpt string, raw []byte, guardar func(context.Context, tenancy.Tenant) (string, error), env domain.Message, junk bool, envelopeFrom string, autoEligible, fromAutenticado bool) error {
+func (in *Inbound) deliverTo(ctx context.Context, rcpt string, seccion func() *io.SectionReader, size int64, guardar func(context.Context, tenancy.Tenant) (string, error), env domain.Message, junk bool, envelopeFrom string, autoEligible, fromAutenticado bool) error {
 	// Correo a un canal de Sytue Rooms: no hay buzón que abrir. Va antes del lookup
 	// porque esa dirección no existe en la tabla de cuentas ni de alias.
 	if token, ok := in.channels.Token(rcpt); ok {
-		if esAutomatico(raw) {
+		if esAutomaticoReader(seccion()) {
 			// Una autorespuesta publicada en el canal sería la mitad de un bucle.
 			in.logger.Debug("correo a canal: descartado por automático")
 			return nil
 		}
-		return in.channels.Publish(ctx, token, raw)
+		return in.channels.PublishReader(ctx, token, seccion(), size)
 	}
 	resolved, err := in.store.LookupAddress(ctx, rcpt)
 	if err != nil {
@@ -343,7 +413,7 @@ func (in *Inbound) deliverTo(ctx context.Context, rcpt string, raw []byte, guard
 	m.AccountID = resolved.AccountID
 	m.MailboxID = mailbox.ID
 	m.BlobKey = blobKey
-	m.SizeBytes = int64(len(raw))
+	m.SizeBytes = size
 
 	// Reglas de usuario: solo sobre correo legítimo (el spam va a Junk sin filtrar).
 	// Pueden mover el mensaje a otra carpeta y/o marcarlo leído/destacado ANTES de
@@ -362,7 +432,7 @@ func (in *Inbound) deliverTo(ctx context.Context, rcpt string, raw []byte, guard
 	in.publishDelivered(tctx, resolved.Tenant, resolved.AccountID, resolved.Subject, m, !junk)
 	// La respuesta a una invitación de Calendar, si la trae (y no es spam).
 	if !junk {
-		in.calendario.Pasar(tctx, resolved.Tenant, env, raw, fromAutenticado)
+		in.calendario.PasarReader(tctx, resolved.Tenant, env, seccion(), fromAutenticado)
 	}
 
 	// Autorespuesta de vacaciones (best-effort, tras la entrega). No sobre spam

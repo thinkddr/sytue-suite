@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"math"
 	"strings"
 	"testing"
 
@@ -310,18 +311,45 @@ func TestLasFigurasConAgujerosLosConservan(t *testing.T) {
 	}
 }
 
-// TestCadaArcoLlevaSuLetra: el círculo de dos medios arcos tras una sola `a` es el de
-// la mitad de la suite —la cabeza de Contacts, el aro de ID, la lupa, el círculo de
-// información— y `oksvg` pintaba el segundo medio con los datos del primero. Con la
-// letra repetida sale el círculo entero: el punto de su borde izquierdo está pintado.
-// Sin ella (`rasterizaCon` con el SVG crudo menos el `scale`), no: es el rojo que trae.
-func TestCadaArcoLlevaSuLetra(t *testing.T) {
-	// Tres arcos con su letra, las banderas pegadas separadas y el resto intacto (los
-	// radios llevan la holgura, que no se compara al decimal).
-	got := arcosSueltos("M20 9.2a5 5 0 1 1 0 10.8 5 5 0 0 1 0-10.8Zm1 2a2 2 0 012 2")
-	if strings.Count(got, "a") != 3 || !strings.Contains(got, " 0 1 1 0 10.8a") ||
+// TestLosArcosAgrupadosPintanElCirculoCompleto protege la interpretación nativa de
+// A/a de `oksvg`: no se repite la letra ni se normalizan los radios en esta prueba.
+// La cobertura se compara con un círculo analítico, también en su mitad izquierda.
+func TestLosArcosAgrupadosPintanElCirculoCompleto(t *testing.T) {
+	for _, tc := range []struct{ nombre, d string }{
+		{"relativos", "M10 4a6 6 0 1 1 0 12 6 6 0 0 1 0-12z"},
+		{"absolutos", "M10 4A6 6 0 1 1 10 16 6 6 0 0 1 10 4z"},
+	} {
+		t.Run(tc.nombre, func(t *testing.T) {
+			svg := []byte(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path fill="#fff" d="` + tc.d + `"/></svg>`)
+			img := rasterizaCon(svg, 80, 80, nil)
+			// Radio 24 y centro (40,40), en píxeles físicos. Se omite una franja
+			// de dos píxeles del borde para no depender del antialiasing.
+			for y := range 80 {
+				for x := range 80 {
+					d := math.Hypot(float64(x)+0.5-40, float64(y)+0.5-40)
+					if math.Abs(d-24) < 2 {
+						continue
+					}
+					want := uint8(0)
+					if d < 24 {
+						want = 255
+					}
+					if got := img.NRGBAAt(x, y).A; got != want {
+						t.Fatalf("alfa en (%d,%d) = %d; debe ser %d", x, y, got, want)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestLosArcosConHolguraConservanLaGeometria(t *testing.T) {
+	// Se conserva la agrupación de arcos; solo se separan las banderas pegadas y
+	// se ajustan sus radios con la holgura, que no se compara al decimal.
+	got := arcosConHolgura("M20 9.2a5 5 0 1 1 0 10.8 5 5 0 0 1 0-10.8Zm1 2a2 2 0 012 2")
+	if strings.Count(got, "a") != 2 || !strings.Contains(got, " 0 1 1 0 10.8 ") ||
 		!strings.HasSuffix(got, " 0 0 1 2 2") || !strings.HasPrefix(got, "M20 9.2a") || !strings.Contains(got, "Zm1 2a") {
-		t.Errorf("arcosSueltos = %q", got)
+		t.Errorf("arcosConHolgura = %q", got)
 	}
 	contacts, err := marcasFS.ReadFile("marcas/contacts.svg")
 	if err != nil {
@@ -333,10 +361,6 @@ func TestCadaArcoLlevaSuLetra(t *testing.T) {
 	if c := rasteriza(contacts, 80, 80).NRGBAAt(31, 29); !blanco(c) {
 		t.Errorf("el lado izquierdo de la cabeza de Contacts no está pintado (%v)", c)
 	}
-	crudo := escalaDeUno.ReplaceAll(contacts, []byte("scale($1 $1)"))
-	if c := rasterizaCon(crudo, 80, 80, nil).NRGBAAt(31, 29); blanco(c) {
-		t.Errorf("sin la corrección la cabeza ya sale entera (%v): `oksvg` repite bien los arcos y `arcosSueltos` sobra", c)
-	}
 	// El aro de ID es un semicírculo exacto con el final relativo: sin la holgura de los
 	// radios no pinta nada y del aro queda solo el agujero.
 	id, err := marcasFS.ReadFile("marcas/id.svg")
@@ -347,6 +371,10 @@ func TestCadaArcoLlevaSuLetra(t *testing.T) {
 	// izquierdo, por x ≈ 10,5; a 80 px y con su `scale(0.9692)`, por (22, 47).
 	if c := rasteriza(id, 80, 80).NRGBAAt(22, 47); !blanco(c) {
 		t.Errorf("el aro de la llave de ID no está pintado (%v)", c)
+	}
+	crudo := escalaDeUno.ReplaceAll(id, []byte("scale($1 $1)"))
+	if c := rasterizaCon(crudo, 80, 80, nil).NRGBAAt(22, 47); blanco(c) {
+		t.Errorf("sin la holgura el semicírculo de ID ya sale entero (%v): revisar la normalización de radios", c)
 	}
 }
 

@@ -1781,6 +1781,8 @@ export const es: AppCatalog<typeof en> = {
   'extdata.msg.generic': 'No se pudo completar la operación.',
   'extdata.msg.notAllowed':
     'Esta conexión solo la consultan las personas de su lista. Pide a quien administra tu organización que te añada.',
+  'extdata.msg.ownerOnly':
+    'Solo quien creó esta conexión o quien administra la organización puede cambiarla o borrarla.',
 
   // --- Avisos del editor de hojas ---
   'sheet.msg.badValue': 'Valor no permitido',

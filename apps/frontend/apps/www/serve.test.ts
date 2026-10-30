@@ -15,6 +15,10 @@ beforeAll(async () => {
   await writeFile(join(root, 'index.html'), '<!doctype html><title>Sytue</title>');
   await writeFile(join(root, '404.html'), '<!doctype html><title>No encontrado</title>');
   await writeFile(join(root, '_astro', 'app.js'), 'console.log("Sytue")');
+  await writeFile(
+    join(root, 'healthz'),
+    '{"status":"ok","version":"v3.14.2","commit":"0a1b2c3d4e5f"}\n',
+  );
 });
 
 afterAll(async () => {
@@ -55,6 +59,26 @@ describe('servidor estático de producción', () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get('cache-control')).toBe('public, max-age=31536000, immutable');
+  });
+
+  test('no filtra versión ni commit en /healthz cuando llega desde fuera (X-Forwarded-For)', async () => {
+    const handler = createStaticHandler(root);
+    const deFuera = await handler(
+      new Request('https://sytue.eu/healthz', {
+        headers: { 'x-forwarded-for': '203.0.113.7' },
+      }),
+    );
+    expect(deFuera.status).toBe(200);
+    expect(deFuera.headers.get('cache-control')).toBe('no-store');
+    const textoFuera = await deFuera.text();
+    expect(textoFuera).toBe('{"status":"ok"}\n');
+    expect(textoFuera).not.toContain('v3.14.2');
+    expect(textoFuera).not.toContain('0a1b2c3d4e5f');
+
+    const deDentro = await handler(new Request('https://sytue.eu/healthz'));
+    expect(deDentro.status).toBe(200);
+    expect(deDentro.headers.get('cache-control')).toBe('no-store');
+    expect(await deDentro.text()).toContain('v3.14.2');
   });
 });
 

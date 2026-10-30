@@ -16,6 +16,7 @@ import (
 
 	"git.sytue.eu/sytue/one/apps/fyne/llamada"
 	"git.sytue.eu/sytue/one/apps/fyne/llamada/camara"
+	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 )
 
@@ -89,6 +90,7 @@ func (c *camaraFalsa) Cerrar()                    { c.cerrada = true }
 func (e *enCursoFalsa) Participantes() []llamada.Participante { return e.ps }
 func (e *enCursoFalsa) Micro(a bool) error                    { e.micro = append(e.micro, a); return nil }
 func (e *enCursoFalsa) Reconectando() bool                    { return false }
+func (e *enCursoFalsa) PuedePublicar() bool                   { return true }
 func (e *enCursoFalsa) Colgar()                               { e.colgada++ }
 
 // «Llamar» en un canal entra en la llamada NATIVA con el token del servicio —la sala
@@ -111,7 +113,8 @@ func TestLaLlamadaNativaDeUnCanal(t *testing.T) {
 		{Identidad: "beto", Nombre: "Beto", MicroCerrado: true},
 	}}
 	var conectado []string
-	sa.Conectar = func(u, token string, o llamada.Opciones) (EnCurso, error) {
+	sa.Conectar = func(_ context.Context, call api.RoomsCall, o llamada.Opciones) (EnCurso, error) {
+		u, token := call.LiveKitURL, call.Token
 		conectado = append(conectado, u, token)
 		if o.Micro {
 			t.Error("se entra con el micro abierto y en la antesala se cerró")
@@ -191,7 +194,7 @@ func TestLaReunionEntraEnNativo(t *testing.T) {
 		t.Fatal("sin Conectar entra en nativo")
 	}
 	en := &enCursoFalsa{}
-	sa.Conectar = func(string, string, llamada.Opciones) (EnCurso, error) { return en, nil }
+	sa.Conectar = func(context.Context, api.RoomsCall, llamada.Opciones) (EnCurso, error) { return en, nil }
 	sa.Arrancar(context.Background())
 	sa.AbrirPanel(PanelReuniones)
 	sa.reuniones.AlUnirse("r1")
@@ -219,7 +222,7 @@ func TestElEnlaceDeUnaReunionAbreLaLlamada(t *testing.T) {
 	s := &conLlamada{conReuniones: &conReuniones{servicioFalso: base}}
 	sa, _ := salaDePrueba(t, base)
 	sa.S = s
-	sa.Conectar = func(string, string, llamada.Opciones) (EnCurso, error) { return &enCursoFalsa{}, nil }
+	sa.Conectar = func(context.Context, api.RoomsCall, llamada.Opciones) (EnCurso, error) { return &enCursoFalsa{}, nil }
 	sa.EntrarPorEnlace("r9", "")
 	if sa.ventanaLlamada != nil {
 		t.Fatal("con la sala sin arrancar ya abre la llamada")
@@ -246,7 +249,7 @@ func TestLaCamaraDeLaLlamada(t *testing.T) {
 	sa, relojes, _ := salaEn(t, base, 1280)
 	sa.S = s
 	en := &enCursoFalsa{ps: []llamada.Participante{{Identidad: "yo", Yo: true}}}
-	sa.Conectar = func(_, _ string, o llamada.Opciones) (EnCurso, error) {
+	sa.Conectar = func(_ context.Context, _ api.RoomsCall, o llamada.Opciones) (EnCurso, error) {
 		if o.Camara == nil || o.Pantalla == nil {
 			t.Error("la llamada no recibe con qué abrir la cámara y la pantalla")
 		}
@@ -332,6 +335,27 @@ func (s *conModeracion) RecordMeeting(_ context.Context, id string, grabar bool)
 	return nil
 }
 
+func TestLaLlamadaCifradaNoOfreceGrabacionDelServidor(t *testing.T) {
+	base := servicioConDos()
+	sa, _, _ := salaEn(t, base, 1280)
+	s := &conModeracion{conLlamada: &conLlamada{conReuniones: &conReuniones{servicioFalso: base}}}
+	sa.S = s
+	en := &enCursoFalsa{}
+	v := NuevaVistaLlamada(sa.P.T, "Equipo", en, false)
+	v.Lanzar = func(fn func()) { fn() }
+	call := api.RoomsCall{Room: api.RoomsMeeting{ID: "call"}, Role: "host", Encryption: &api.RoomsCallEncryption{CallID: "call"}}
+	sa.prepararBarra(v, call, "", en)
+	for _, item := range v.elementosMas() {
+		if element, ok := item.(*ui.ElementoMenu); ok && element.Texto == sa.P.T.T("meet.startRecording", nil) {
+			t.Fatal("encrypted media offered server recording")
+		}
+	}
+	v.AlternarGrabacion()
+	if s.pidio("Record(call,true)") {
+		t.Fatal("encrypted media requested server recording")
+	}
+}
+
 // El resto de la barra: el chat es el del canal (carga lo último, lo que se escribe va
 // al canal y lo que llega en vivo entra), el anfitrión modera (silenciar, quitar la
 // palabra, cerrar la puerta y ver quién espera, abrirle, grabar), las reacciones flotan
@@ -347,7 +371,7 @@ func TestLaBarraDeLaLlamada(t *testing.T) {
 	sa, relojes, _ := salaEn(t, base, 1280)
 	sa.S = s
 	en := &enCursoFalsa{ps: []llamada.Participante{{Identidad: "yo", Yo: true}, {Identidad: "ana", Nombre: "Ana"}}}
-	sa.Conectar = func(string, string, llamada.Opciones) (EnCurso, error) { return en, nil }
+	sa.Conectar = func(context.Context, api.RoomsCall, llamada.Opciones) (EnCurso, error) { return en, nil }
 	sa.Dispositivos = func() (m, a, c []Opcion) {
 		return []Opcion{{"m1", "Micro USB"}}, []Opcion{{"a1", "Cascos"}}, []Opcion{{"c1", "Webcam"}}
 	}
@@ -525,7 +549,7 @@ func TestLaAntesalaMideYEligeDispositivo(t *testing.T) {
 	s := &conLlamada{conReuniones: &conReuniones{servicioFalso: base}}
 	sa, relojes, _ := salaEn(t, base, 1280)
 	sa.S = s
-	sa.Conectar = func(string, string, llamada.Opciones) (EnCurso, error) { return &enCursoFalsa{}, nil }
+	sa.Conectar = func(context.Context, api.RoomsCall, llamada.Opciones) (EnCurso, error) { return &enCursoFalsa{}, nil }
 	sa.Dispositivos = func() (m, a, c []Opcion) {
 		return []Opcion{{"m1", "Micro USB"}}, []Opcion{{"a1", "Cascos"}}, []Opcion{{"c1", "Webcam"}}
 	}

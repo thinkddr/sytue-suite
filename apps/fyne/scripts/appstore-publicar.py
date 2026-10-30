@@ -14,6 +14,8 @@ Store: ficha y envío por la API» en docs/operations.md y apps/fyne/appstore/RE
                                             textos, capturas, categoría, edades, precio y países
   appstore-publicar.py --revision --version X.Y.Z [app...]
                                             ata el build de esa versión y la ENVÍA A REVISIÓN
+  appstore-publicar.py --notas --version X.Y.Z [app...]
+                                            actualiza sólo las notas de la versión exacta existente
   appstore-publicar.py --cifrado-exento --version X.Y.Z [app...]
                                             completa solo el cifrado pendiente, sin Francia ni revisión
 
@@ -137,6 +139,20 @@ def capturas_de(app, clase):
 # ---------------------------------------------------------------- validación (--seco)
 
 
+def notas_revision(ficha, datos, plataforma):
+    revision = ficha["revision"]
+    por_plataforma = revision.get("notas_por_plataforma", {})
+    if not isinstance(por_plataforma, dict) or set(por_plataforma) - {"IOS", "MAC_OS"}:
+        raise RuntimeError("notas_por_plataforma sólo admite IOS y MAC_OS")
+    partes = [revision["notas"], datos.get("notas", ""), por_plataforma.get(plataforma, "")]
+    if any(not isinstance(parte, str) for parte in partes):
+        raise RuntimeError("las notas para la revisión tienen que ser texto")
+    notas = "\n\n".join(parte.strip() for parte in partes if parte.strip())
+    if len(notas.encode("utf-8")) > 4000:
+        raise RuntimeError(f"las notas para la revisión de {plataforma} pasan de 4000 bytes")
+    return notas
+
+
 def validar(app, ficha):
     datos = ficha["apps"].get(app)
     if not datos:
@@ -178,9 +194,11 @@ def validar(app, ficha):
                 error(f"{app}: {os.path.basename(f)} es {ancho}×{alto} y tiene que ser {medida[0]}×{medida[1]}")
             if color != 2:
                 error(f"{app}: {os.path.basename(f)} lleva canal alfa o paleta (tipo {color}): Apple pide RGB sin transparencia")
-    notas = ficha["revision"]["notas"] + "\n\n" + datos.get("notas", "")
-    if len(notas) > 4000:
-        error(f"{app}: las notas para la revisión pasan de 4000 caracteres")
+    for plataforma in ("IOS", "MAC_OS"):
+        try:
+            notas_revision(ficha, datos, plataforma)
+        except RuntimeError as e:
+            error(f"{app}: {e}")
 
 
 def validar_comun(ficha):
@@ -335,8 +353,9 @@ def builds_de(asc, id, plataforma, version, solo_validos=False):
     return asc.lista(ruta + "&sort=-uploadedDate&limit=" + ("1" if solo_validos else "200"))
 
 
-def revision_de(asc, id_version):
-    r = asc.pedir("GET", f"/v1/appStoreVersions/{id_version}/appStoreReviewDetail", tolerar=(404,))
+def revision_de(asc, id_version, solo_notas=False):
+    campos = "?fields[appStoreReviewDetails]=notes" if solo_notas else ""
+    r = asc.pedir("GET", f"/v1/appStoreVersions/{id_version}/appStoreReviewDetail{campos}", tolerar=(404,))
     return (r or {}).get("data") or {}
 
 
@@ -528,6 +547,58 @@ def version_editable(asc, id, plataforma, version):
     ]
 
 
+def version_para_notas(asc, id, plataforma, version):
+    # Apple permite editar la información de revisión más ampliamente. Esta
+    # reparación sólo actúa sobre la versión editable expresamente elegida.
+    encontradas = [v for v in versiones(asc, id, plataforma) if v["attributes"]["versionString"] == version]
+    if len(encontradas) != 1:
+        raise RuntimeError("notes_version_missing_or_ambiguous")
+    if estado(encontradas[0]) not in EDITABLE:
+        raise RuntimeError("notes_version_not_editable")
+    return encontradas[0]
+
+
+def actualizar_notas(asc, apps, ficha, plataformas, version):
+    """Sólo PATCH: destinos exactos existentes, preflight completo y ningún campo privado."""
+    plan, malas = [], []
+    seguros = {"notes_version_missing_or_ambiguous", "notes_version_not_editable", "notes_review_detail_missing", "notes_target_changed"}
+    for app in apps:
+        plataforma = ""
+        try:
+            id, _ = comprobar_app(asc, app, ficha)
+            for plataforma in plataformas:
+                v = version_para_notas(asc, id, plataforma, version)
+                detalle = revision_de(asc, v["id"], solo_notas=True)
+                if not detalle.get("id"):
+                    raise RuntimeError("notes_review_detail_missing")
+                plan.append((app, id, plataforma, v["id"], detalle["id"], notas_revision(ficha, ficha["apps"][app], plataforma)))
+        except (RuntimeError, KeyError, TypeError, urllib.error.URLError) as e:
+            codigo = str(e) if str(e) in seguros else "notes_preflight_failed"
+            print(f"✗ {app} {plataforma}: {codigo}; ninguna nota modificada", file=sys.stderr)
+            malas.append(app)
+    if malas:
+        return 1
+
+    for app, id, plataforma, vid, detalle_id, notas in plan:
+        try:
+            v = version_para_notas(asc, id, plataforma, version)
+            detalle = revision_de(asc, v["id"], solo_notas=True)
+            if v["id"] != vid or detalle.get("id") != detalle_id:
+                raise RuntimeError("notes_target_changed")
+            cambiado = detalle.get("attributes", {}).get("notes") != notas
+            if cambiado:
+                asc.escribir("appStoreReviewDetails", {"notes": notas}, id=detalle_id)
+            confirmado = revision_de(asc, vid, solo_notas=True).get("attributes", {}).get("notes") == notas
+            print(json.dumps({"app": app, "platform": plataforma, "version": version, "changed": cambiado, "notes_equal": confirmado, "notes_sha256": hashlib.sha256(notas.encode("utf-8")).hexdigest()}, sort_keys=True))
+            if not confirmado:
+                return 1
+        except (RuntimeError, KeyError, TypeError, urllib.error.URLError) as e:
+            codigo = str(e) if str(e) in seguros else "notes_update_failed"
+            print(f"✗ {app} {plataforma}: {codigo}; sin reintentar otros destinos ni alterar revisiones", file=sys.stderr)
+            return 1
+    return 0
+
+
 def subir_capturas(asc, loc_id, app, plataforma):
     juegos = {
         j["attributes"]["screenshotDisplayType"]: j
@@ -695,8 +766,7 @@ def publicar_ficha(asc, app, ficha, plataformas, version):
         hechos.append(f"{len(PAISES)} países")
     # Un contacto incompleto no impide terminar las dos plataformas, el precio y
     # los países. Los errores siguen siendo rojos y se identifican por plataforma.
-    notas = (ficha["revision"]["notas"] + "\n\n" + datos.get("notas", "")).strip()
-    attrs = {"notes": notas, "demoAccountRequired": bool(ficha["revision"]["cuenta_de_prueba"])}
+    attrs = {"demoAccountRequired": bool(ficha["revision"]["cuenta_de_prueba"])}
     # Los valores reales solo proceden de las variables secretas del dueño; si
     # faltan, se conserva lo que exista en App Store Connect.
     for campo, var in DATOS_REVISION:
@@ -705,11 +775,12 @@ def publicar_ficha(asc, app, ficha, plataformas, version):
     errores_revision = []
     for p, id_version in pendientes_revision:
         try:
+            attrs_plataforma = {**attrs, "notes": notas_revision(ficha, datos, p)}
             detalle = revision_de(asc, id_version)
             if detalle:
-                asc.escribir("appStoreReviewDetails", attrs, id=detalle["id"])
+                asc.escribir("appStoreReviewDetails", attrs_plataforma, id=detalle["id"])
             else:
-                asc.escribir("appStoreReviewDetails", attrs, {"appStoreVersion": rel("appStoreVersions", id_version)})
+                asc.escribir("appStoreReviewDetails", attrs_plataforma, {"appStoreVersion": rel("appStoreVersions", id_version)})
         except RuntimeError as e:
             errores_revision.append(f"{p}: {e}")
     resumen_plat = []
@@ -833,7 +904,7 @@ def main(argv):
     i = 0
     while i < len(argv):
         a = argv[i]
-        if a in ("--seco", "--sondear", "--preparacion", "--ficha", "--revision", "--cifrado-exento"):
+        if a in ("--seco", "--sondear", "--preparacion", "--ficha", "--revision", "--cifrado-exento", "--notas"):
             if modo:
                 sys.exit("appstore-publicar: un solo modo cada vez")
             modo = a[2:]
@@ -850,12 +921,20 @@ def main(argv):
             apps.append(a)
         i += 1
     if not modo or not plataformas or set(plataformas) - {"IOS", "MAC_OS"}:
-        print(f"uso: {sys.argv[0]} --seco|--sondear|--preparacion|--ficha|--revision|--cifrado-exento [--version X.Y.Z] [--plataformas \"IOS MAC_OS\"] [app...]", file=sys.stderr)
+        print(f"uso: {sys.argv[0]} --seco|--sondear|--preparacion|--ficha|--revision|--cifrado-exento|--notas [--version X.Y.Z] [--plataformas \"IOS MAC_OS\"] [app...]", file=sys.stderr)
         return 2
     if version and not re.fullmatch(r"\d+\.\d+\.\d+", version):
         print(f"appstore-publicar: la versión tiene que ser X.Y.Z y es «{version}»", file=sys.stderr)
         return 2
     apps = apps or las_quince()
+
+    if modo == "notas":
+        if not version:
+            print("appstore-publicar: notas requiere --version X.Y.Z de una versión existente", file=sys.stderr)
+            return 2
+        if len(apps) != len(set(apps)) or len(plataformas) != len(set(plataformas)):
+            print("appstore-publicar: notas no admite apps o plataformas repetidas", file=sys.stderr)
+            return 2
 
     if modo == "cifrado-exento":
         if os.environ.get("APPSTORE_CONFIRMAR_CIFRADO") != "ESTANDAR_EXENTO_SIN_FRANCIA" or not version:
@@ -916,6 +995,8 @@ def main(argv):
         return 1
     if modo == "cifrado-exento":
         return completar_exencion(asc, apps, ficha, plataformas, version)
+    if modo == "notas":
+        return actualizar_notas(asc, apps, ficha, plataformas, version)
     hacer = {"sondear": sondear, "preparacion": preparacion, "ficha": publicar_ficha, "revision": enviar_a_revision}[modo]
     malas = []
     for app in apps:

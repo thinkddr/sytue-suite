@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 // Remote only: the actual personal-channel wizard, with synthetic provider data.
+import { createReportDirectory, writeReport } from './lib/report-output.mjs';
 import { chromium } from "playwright";
 import { expect } from "@playwright/test";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync } from "node:fs";
 import {
   assertWizardLayout,
   assertWizardAccessibility,
@@ -12,8 +13,7 @@ import {
 
 const BASE =
   process.env.ROOMS_URL || "http://127.0.0.1:4343/rooms/prueba/dev/conexiones";
-const OUT = `${process.env.ROOMS_OUT || "/tmp/rooms-conexiones"}/externos`;
-mkdirSync(OUT, { recursive: true });
+const OUT = createReportDirectory('rooms-externos', process.env.ROOMS_OUT ? `${process.env.ROOMS_OUT}/externos` : undefined);
 const browser = await chromium.launch();
 const results = [];
 const providers = {
@@ -588,7 +588,7 @@ try {
     { available: false },
   );
 } finally {
-  writeFileSync(`${OUT}/results.json`, JSON.stringify(results, null, 2));
+  writeReport(`${OUT}/results.json`, JSON.stringify(results, null, 2));
   await browser.close();
 }
 if (results.some((result) => !result.ok)) process.exitCode = 1;

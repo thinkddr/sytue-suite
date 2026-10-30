@@ -163,6 +163,10 @@ func nuevoIDP(t *testing.T) *idpFalso {
 			suma := sha256.Sum256([]byte(r.PostForm.Get("code_verifier")))
 			ok = ok && r.PostForm.Get("code") == "c0d1g0" && r.PostForm.Get("redirect_uri") == idp.redirect &&
 				base64.RawURLEncoding.EncodeToString(suma[:]) == idp.reto
+			if idp.dispositivo != "" {
+				sumaDispositivo := sha256.Sum256([]byte(idp.secretoVisto))
+				ok = ok && idp.secretoVisto != "" && base64.RawURLEncoding.EncodeToString(sumaDispositivo[:]) == idp.dispositivo
+			}
 		case "refresh_token":
 			idp.refrescadas++
 			ok = ok && r.PostForm.Get("refresh_token") == idp.refreshVale
@@ -357,6 +361,7 @@ func (idp *idpFalso) abreYVuelve(t *testing.T, o *OIDC, cambiar func(url.Values)
 			t.Errorf("/authorize mal formado: %v", q)
 		}
 		idp.reto = q.Get("code_challenge")
+		idp.dispositivo = q.Get("sytue_device")
 		vuelta := url.Values{"code": {"c0d1g0"}, "state": {q.Get("state")}}
 		if cambiar != nil {
 			cambiar(vuelta)
@@ -672,5 +677,35 @@ func TestElLoginLlevaElDispositivo(t *testing.T) {
 	}
 	if idp.dispositivo != primero {
 		t.Fatalf("tras cerrar sesión el dispositivo ha cambiado: %q → %q", primero, idp.dispositivo)
+	}
+
+	// En móvil (LoginEsquema, iOS y Android) viajan el mismo hash sytue_device a /authorize
+	// y su secreto a /token; y si otro proceso intenta canjear sin el secreto del dispositivo
+	// al que está atado el código, el IdP lo rechaza.
+	const redirectMovil = "sytue-mail://auth/callback"
+	idp.cliente, idp.redirect = ClientIDMovil, redirectMovil
+	idp.dispositivo, idp.secretoVisto = "", ""
+	movil := &OIDC{Issuer: idp.URL, Cliente: ClientIDMovil}
+	movil.Open = idp.abreYVuelve(t, movil, nil)
+	if _, err := movil.LoginEsquema(context.Background(), redirectMovil); err != nil {
+		t.Fatal(err)
+	}
+	if idp.dispositivo != primero || idp.secretoVisto == "" {
+		t.Fatalf("LoginEsquema no llevó el dispositivo %q: visto %q y secreto %q", primero, idp.dispositivo, idp.secretoVisto)
+	}
+	// Cambiar de dispositivo (almacén seguro limpio) genera otro sytue_device.
+	if err := BorrarSecreto(cuentaDispositivo); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := movil.LoginEsquema(context.Background(), redirectMovil); err != nil {
+		t.Fatal(err)
+	}
+	if idp.dispositivo == "" || idp.dispositivo == primero {
+		t.Fatalf("un dispositivo nuevo reutilizó el hash anterior: %q", idp.dispositivo)
+	}
+	// Y un canje cuyo sytue_device_secret no coincide con el hash sytue_device de /authorize
+	// es rechazado por el IdP con invalid_grant (ErrLoginRequired).
+	if _, err := movil.canjear(context.Background(), "c0d1g0", "verificador", redirectMovil, "secreto-ajeno"); !errors.Is(err, ErrLoginRequired) {
+		t.Fatalf("canjear con secreto de otro dispositivo dio %v; quiero ErrLoginRequired", err)
 	}
 }

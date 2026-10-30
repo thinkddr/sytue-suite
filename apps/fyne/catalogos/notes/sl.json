@@ -281,6 +281,7 @@
     "few": "{count} zapiski",
     "other": "{count} zapiskov"
   },
+  "notebook.ownerOnly": "To beležnico lahko premakne, spremeni njeno vidnost ali jo šifrira le oseba, ki jo je ustvarila, ali skrbništvo organizacije.",
   "notebook.rename": "Preimenuj",
   "notebook.settings": "Nastavitve beležnice",
   "notebook.title": "Ime",

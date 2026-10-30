@@ -479,7 +479,8 @@ export const de: AppCatalog<typeof en> = {
   'product.cast.f2': 'Adaptive Wiedergabe in drei Qualitäten; der Browser wählt die beste.',
   'product.cast.f3':
     'Livestreaming aus einer Sendesoftware über RTMP, mit einem Streamschlüssel pro Person.',
-  'product.cast.f4': 'Live aus dem Browser oder der App: Kamera, Bildschirm und Mikrofon.',
+  'product.cast.f4':
+    'Live aus dem Browser oder der App: Kamera und Mikrofon. Bildschirmfreigabe in unterstützten Browsern, Desktopsystemen und Android; nicht in der iOS/iPadOS-App verfügbar.',
   'product.cast.f5': 'Aufzeichnungen von Livestreams werden automatisch zu Videos auf Abruf.',
   'product.cast.f6': 'Eine öffentliche Startseite und ein Kanal pro Organisation, indexierbar.',
   'product.cast.f7':

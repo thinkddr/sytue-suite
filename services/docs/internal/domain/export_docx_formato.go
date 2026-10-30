@@ -45,7 +45,7 @@ func familiaDeCSS(v string) (nombre, generica string) {
 	if g := strings.ToLower(limpia(partes[len(partes)-1])); docxGenericas[g] != "" && len(partes) > 1 {
 		generica = g
 	}
-	if docxGenericas[strings.ToLower(nombre)] != "" {
+	if len(partes) == 1 && docxGenericas[strings.ToLower(nombre)] != "" {
 		return "", "" // solo una genérica: no es una fuente que se pueda nombrar en Word
 	}
 	return nombre, generica

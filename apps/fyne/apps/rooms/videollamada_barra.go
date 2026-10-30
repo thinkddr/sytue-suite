@@ -213,6 +213,9 @@ func (v *VistaLlamada) mirarPuerta() {
 // AlternarGrabacion empieza o para la grabación. Que está grabando lo dice el SFU a
 // todos (la cabecera); hasta entonces el botón dice «Empezando…».
 func (v *VistaLlamada) AlternarGrabacion() {
+	if !v.Modera || v.Mod.Grabar == nil {
+		return
+	}
 	grabar := !v.L.Grabando()
 	v.grabPendiente = true
 	v.moderar(func() error { return v.Mod.Grabar(grabar) }, nil)
@@ -296,15 +299,17 @@ func (v *VistaLlamada) elementosMas() []fyne.CanvasObject {
 	}
 	out = append(out, ui.NuevoElementoMenu(mano, iconos.Ninguno, v.AlternarMano))
 	if v.Modera {
-		grabar := t.T("meet.startRecording", nil)
-		switch {
-		case v.grabPendiente && !v.L.Grabando():
-			grabar = t.T("meet.recordingStarting", nil)
-		case v.L.Grabando():
-			grabar = t.T("meet.stopRecording", nil)
+		if v.Mod.Grabar != nil {
+			grabar := t.T("meet.startRecording", nil)
+			switch {
+			case v.grabPendiente && !v.L.Grabando():
+				grabar = t.T("meet.recordingStarting", nil)
+			case v.L.Grabando():
+				grabar = t.T("meet.stopRecording", nil)
+			}
+			out = append(out, ui.NuevoElementoMenu(grabar, iconos.Ninguno, v.AlternarGrabacion))
 		}
 		out = append(out,
-			ui.NuevoElementoMenu(grabar, iconos.Ninguno, v.AlternarGrabacion),
 			ui.NuevoElementoMenu(t.T("meet.muteEveryone", nil), iconos.Ninguno, func() {
 				v.moderar(func() error { return v.Mod.SilenciarTodos() }, nil)
 			}))

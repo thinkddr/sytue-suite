@@ -25,7 +25,7 @@ type matrixAuthorization struct {
 // system browser and Suite's registered incoming-URL owner. Call off the UI thread.
 // No Matrix login token or E2EE secret appears in the incoming URL.
 func (s *Suite) MatrixBrowserReturn(ctx context.Context, start api.MatrixNativeAuthorization) (api.MatrixNativeCallback, error) {
-	if s.app == nil || s.app.Metadata().Custom["esquema"] != api.Esquema("rooms") || !start.ForRooms(s.apex) {
+	if s.app == nil || s.app.Metadata().Custom["esquema"] != start.ReturnScheme() || !start.ForProduct(s.apex, start.Product()) {
 		return api.MatrixNativeCallback{}, api.ErrMatrixSSO
 	}
 	flow := &matrixAuthorization{start: start, arrived: make(chan api.MatrixNativeCallback, 1)}
@@ -62,23 +62,27 @@ func (s *Suite) MatrixBrowserReturn(ctx context.Context, start api.MatrixNativeA
 }
 
 func (s *Suite) recibirMatrix(u *url.URL) bool {
-	if u == nil || s.app == nil || s.app.Metadata().Custom["esquema"] != api.Esquema("rooms") || u.Scheme != api.Esquema("rooms") || u.Host != "matrix" || u.Path != "/callback" {
+	if u == nil || s.app == nil || u.Scheme != s.app.Metadata().Custom["esquema"] || u.Host != "matrix" || u.Path != "/callback" {
 		return false
 	}
 	// Consume even invalid/unsolicited callback routes. They must never be queued
 	// as screen navigation or retained in Suite's deferred URL inventory.
-	callback, ok := api.ParseMatrixNativeCallback(u)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	flow := s.matrixConsent
+	if flow == nil {
+		return true
+	}
+	callback, ok := api.ParseMatrixNativeCallbackFor(u, flow.start.Product())
 	if !ok {
 		return true
 	}
-	s.mu.Lock()
-	flow := s.matrixConsent
-	if flow != nil && flow.start.Accepts(callback) {
+
+	if flow.start.Accepts(callback) {
 		select {
 		case flow.arrived <- callback:
 		default:
 		}
 	}
-	s.mu.Unlock()
 	return true
 }

@@ -40,7 +40,8 @@ type pulsable struct {
 	// AlEnfocar avisa de que el control ha ganado el foco: lo usa quien lo tiene dentro de
 	// algo que se desplaza para llevarlo a la vista, que es lo que hace el navegador al
 	// enfocar un botón recortado (la banda de la cinta). Mismo nombre que en Boton.
-	AlEnfocar func()
+	AlEnfocar   func()
+	mostrarFoco func()
 
 	encima, pulsado, enfocado bool
 	// pista es la ayuda que envuelve al control, para abrirla con el teclado.
@@ -114,7 +115,12 @@ func (p *pulsable) FocusGained() {
 	if p.AlEnfocar != nil {
 		p.AlEnfocar()
 	}
+	if p.mostrarFoco != nil {
+		p.mostrarFoco()
+	}
 }
+
+func (p *pulsable) revelarAlFoco(f func()) { p.mostrarFoco = f }
 
 // FocusLost apaga el anillo.
 func (p *pulsable) FocusLost() {

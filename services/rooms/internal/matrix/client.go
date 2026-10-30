@@ -269,6 +269,18 @@ func (c *Client) EnsureDraftRoom(ctx context.Context, tenant, subject, room stri
 	return c.ensureRoom(ctx, "drafts_"+tenant+"_"+subject, room, []string{subject}, false)
 }
 
+// EnsureStorageRoom provisions only routing and membership. The controller is
+// excluded from key sharing by the clients, just as in encrypted Rooms channels.
+func (c *Client) EnsureStorageRoom(ctx context.Context, tenant, subject, product, room string) (string, error) {
+	if !domain.StorageProduct(product) {
+		return "", domain.ErrInvalidInput
+	}
+	if _, err := c.UserID(subject); err != nil {
+		return "", err
+	}
+	return c.ensureRoom(ctx, "storage_"+product+"_"+tenant+"_"+subject, room, []string{subject}, false)
+}
+
 func (c *Client) ensureRoom(ctx context.Context, local, room string, subjects []string, archived bool) (string, error) {
 	if room == "" {
 		var resolved struct {

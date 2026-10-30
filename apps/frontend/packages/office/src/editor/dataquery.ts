@@ -116,6 +116,13 @@ export interface DataConnection {
   kind: ConnKind;
   config: RestConnConfig | PgConnConfig | Record<string, unknown>;
   has_credentials: boolean;
+  /** Solo quien la creó o quien administra la organización puede cambiarla o borrarla. */
+  can_edit?: boolean;
+}
+
+/** Dice si la persona actual puede editar o borrar la conexión. */
+export function canEditConnection(c: DataConnection | null | undefined): boolean {
+  return Boolean(c && c.can_edit !== false);
 }
 
 /** Columna del resultado: nombre + tipo lógico inferido por el backend. */
@@ -651,13 +658,15 @@ function sanitizeConnectionDTO(raw: unknown): DataConnection | null {
   if (typeof c.id !== 'string' || typeof c.name !== 'string') return null;
   if (c.kind !== 'rest' && c.kind !== 'postgres' && c.kind !== 'gateway' && c.kind !== 'bases')
     return null;
-  return {
+  const out: DataConnection = {
     id: c.id,
     name: c.name,
     kind: c.kind,
     config: c.config && typeof c.config === 'object' ? (c.config as Record<string, unknown>) : {},
     has_credentials: c.has_credentials === true,
   };
+  if (typeof c.can_edit === 'boolean') out.can_edit = c.can_edit;
+  return out;
 }
 
 /** Valida y extrae {columns, rows} de la respuesta de execute; null si no encaja. */
@@ -1014,6 +1023,8 @@ export function dataQueryErrorMessage(code?: string): string {
       return editorT()('extdata.msg.unreachable');
     case 'connection_not_allowed':
       return editorT()('extdata.msg.notAllowed');
+    case 'connection_owner_only':
+      return editorT()('extdata.msg.ownerOnly');
     default:
       return editorT()('extdata.msg.generic');
   }
@@ -1028,10 +1039,11 @@ export function errorMessageFrom(raw: unknown, fallbackCode?: string): string {
   if (raw && typeof raw === 'object') {
     const e = (raw as { error?: unknown }).error;
     if (typeof e === 'string') return dataQueryErrorMessage(e);
-    // No estar en la lista de la conexión (NEG-06) lo dice la interfaz, en el idioma de
-    // quien consulta: el `message` del servidor viene en español.
-    if (errorCodeFrom(raw) === 'connection_not_allowed') {
-      return dataQueryErrorMessage('connection_not_allowed');
+    // No estar en la lista de la conexión (NEG-06) o no ser su creador lo dice la
+    // interfaz en el idioma de quien consulta.
+    const code = errorCodeFrom(raw);
+    if (code === 'connection_not_allowed' || code === 'connection_owner_only') {
+      return dataQueryErrorMessage(code);
     }
     if (e && typeof e === 'object') {
       const msg = (e as { message?: unknown }).message;

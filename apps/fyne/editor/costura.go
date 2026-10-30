@@ -137,6 +137,13 @@ type Lienzo interface {
 	Formato() Formato
 }
 
+// ComandosCompactos permite trasladar los mandos propios del lienzo a la misma fila
+// de la cinta cuando el teléfono apaisado necesita la altura para editar. El lienzo
+// conserva sus callbacks y permisos; no se crea una segunda barra de comandos.
+type ComandosCompactos interface {
+	ComandosCompactos() []fyne.CanvasObject
+}
+
 // Comando es un comando de edición de la cinta. Son los mismos identificadores que
 // `EditorCommand` en `editor/types.ts`, porque el mismo documento se edita en las dos y
 // dos vocabularios distintos son dos comportamientos distintos.

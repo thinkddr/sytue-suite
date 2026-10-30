@@ -127,10 +127,8 @@ const AnchoUtilMenu = tema.AnchoLateral - 2*4*0.25*tema.Rem
 
 // Lateral es el `<nav>` de Sidebar.tsx: el carril de tinta de 260 que se pliega a 64.
 //
-// El cuerpo NO desplaza por su cuenta. La web le pone `overflow-y-auto` y aquí lo
-// decide quien lo monta, envolviendo su contenido en lo que necesite: meterle un
-// `container.Scroll` desde dentro traería la barra de desplazamiento del tema de Fyne
-// —con su medida y su color— a los seis menús de la suite a la vez.
+// El cuerpo desplaza como `overflow-y-auto` en la web: cabecera y pie conservan su
+// sitio al girar un teléfono. Si la app ya aporta un Scroll, se reutiliza.
 //
 // # Este menú es de UNA aplicación
 //
@@ -264,7 +262,7 @@ func (l *Lateral) CreateRenderer() fyne.WidgetRenderer {
 	}
 	r.fondo.Hidden = l.SinFondo
 	r.objetos = []fyne.CanvasObject{r.fondo}
-	for _, o := range []fyne.CanvasObject{l.Cabecera, l.Cuerpo, l.Pie} {
+	for _, o := range []fyne.CanvasObject{l.Cabecera, r.cuerpo(), l.Pie} {
 		if o != nil {
 			r.objetos = append(r.objetos, o)
 		}
@@ -281,6 +279,27 @@ type lateralRenderer struct {
 	l                *Lateral
 	fondo, filetePie *canvas.Rectangle
 	objetos          []fyne.CanvasObject
+	desplaza         *container.Scroll
+}
+
+func (r *lateralRenderer) cuerpo() fyne.CanvasObject {
+	o := r.l.Cuerpo
+	if o == nil {
+		return nil
+	}
+	if s, ya := o.(*container.Scroll); ya {
+		RevelarFocoEnScroll(s, s.Content)
+		return s
+	}
+	if r.desplaza == nil {
+		r.desplaza = container.NewVScroll(o)
+	} else if r.desplaza.Content != o {
+		r.desplaza.Content = o
+		r.desplaza.Offset = fyne.Position{}
+		r.desplaza.Refresh()
+	}
+	RevelarFocoEnScroll(r.desplaza, o)
+	return r.desplaza
 }
 
 func (r *lateralRenderer) MinSize() fyne.Size           { return MedidaLateral(r.l) }
@@ -293,16 +312,22 @@ func (r *lateralRenderer) Layout(t fyne.Size) {
 	r.fondo.Resize(t)
 
 	// Sin filete a la derecha: 232 de útil con los 260 del carril.
-	ancho := t.Width - 2*canalonMenu
+	ancho := max(t.Width-2*canalonMenu, 0)
+	r.objetos = []fyne.CanvasObject{r.fondo}
 	y := float32(0)
 	if r.l.Cabecera != nil {
 		h := r.l.Cabecera.MinSize().Height
 		r.l.Cabecera.Move(fyne.NewPos(canalonMenu, y+cabeceraPY))
 		r.l.Cabecera.Resize(fyne.NewSize(ancho, h))
+		r.objetos = append(r.objetos, r.l.Cabecera)
 		y += h + 2*cabeceraPY
 	}
 	abajo := t.Height
 	if r.l.Pie != nil {
+		if r.filetePie == nil {
+			v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
+			r.filetePie = canvas.NewRectangle(BordeSobre("sidebar-border", TokenCarril(), v))
+		}
 		h := r.l.Pie.MinSize().Height
 		abajo -= h + 2*rellenoMenu
 		r.filetePie.Move(fyne.NewPos(0, abajo-tema.Borde))
@@ -311,9 +336,19 @@ func (r *lateralRenderer) Layout(t fyne.Size) {
 		r.l.Pie.Resize(fyne.NewSize(ancho, h))
 		abajo -= tema.Borde
 	}
-	if r.l.Cuerpo != nil {
-		r.l.Cuerpo.Move(fyne.NewPos(canalonMenu, y+rellenoMenu))
-		r.l.Cuerpo.Resize(fyne.NewSize(ancho, max(abajo-y-2*rellenoMenu, 0)))
+	if cuerpo := r.cuerpo(); cuerpo != nil {
+		cuerpo.Move(fyne.NewPos(canalonMenu, y+rellenoMenu))
+		cuerpo.Resize(fyne.NewSize(ancho, max(abajo-y-2*rellenoMenu, 0)))
+		r.objetos = append(r.objetos, cuerpo)
+		s, _ := cuerpo.(*container.Scroll)
+		if RevelarFocoEnScroll(s, r.l.Cuerpo) {
+			MostrarFoco(s, lienzoDe(r.l), 0)
+		}
+	}
+	// El orden de Tab sigue cabecera, destinos y cuenta, aunque el pie se mida
+	// antes para reservarle su sitio fuera del desplazamiento.
+	if r.l.Pie != nil {
+		r.objetos = append(r.objetos, r.l.Pie, r.filetePie)
 	}
 }
 
@@ -329,6 +364,7 @@ func (r *lateralRenderer) Refresh() {
 		r.filetePie.FillColor = BordeSobre("sidebar-border", TokenCarril(), v)
 		r.filetePie.Refresh()
 	}
+	r.Layout(r.l.Size())
 }
 
 // SeccionLateral es SidebarSection: un rótulo en versalitas, sus filas separadas por
@@ -872,6 +908,8 @@ func (f *FilaLateral) metricaBase() metricaFila {
 // del renderer la llama y el guardián compara contra ella y contra los píxeles.
 //
 // El ancho es el mínimo; en el menú la fila se estira a los 231 de ancho útil.
+// Con el dedo, también las filas compactas y plegadas conservan los 44 px de alto
+// del resto de controles de navegación; el cuerpo se desplaza en vez de encogerlas.
 func MedidaFilaLateral(f *FilaLateral) fyne.Size {
 	m := f.metrica()
 	alto, ancho := m.texto.Linea, f.pliegue(m)
@@ -881,7 +919,7 @@ func MedidaFilaLateral(f *FilaLateral) fyne.Size {
 		ancho += m.cajaIcono
 	}
 	if f.Plegada {
-		return fyne.NewSize(ancho+2*m.px, alto+2*m.py)
+		return fyne.NewSize(ancho+2*m.px, SueloTactil(alto+2*m.py))
 	}
 	if conMarca {
 		ancho += m.hueco
@@ -908,7 +946,7 @@ func MedidaFilaLateral(f *FilaLateral) fyne.Size {
 		rotulo = min(rotulo, max(cabe, 0))
 	}
 	ancho += rotulo
-	return fyne.NewSize(ancho+m.px+m.pxDer, alto+2*m.py)
+	return fyne.NewSize(ancho+m.px+m.pxDer, SueloTactil(alto+2*m.py))
 }
 
 // lineasRotulo reparte el rótulo en `cabe`. Una fila del menú va en `line-clamp-2

@@ -112,8 +112,11 @@ func comprobarCabeceraReducida(t *testing.T, w fyne.Window, c *Cabecera) {
 		}
 		w.Canvas().Focus(f)
 		x := donde(o).X - donde(c.reducida).X
-		if x < -0.01 || x+o.Size().Width > c.reducida.Size().Width+0.01 || o.Size().Height < 44 {
+		if x < -0.01 || x+o.Size().Width > c.reducida.Size().Width+0.01 {
 			t.Fatalf("un mando de cabecera no se alcanza con foco: %T %v/%v", o, o.Position(), o.Size())
+		}
+		if o.Size().Width < 44 || o.Size().Height < 44 {
+			t.Fatalf("un mando de cabecera pierde su blanco táctil: %T %v", o, o.Size())
 		}
 	}
 	c.reducida.Dragged(&fyne.DragEvent{Dragged: fyne.NewDelta(1e6, 0)})

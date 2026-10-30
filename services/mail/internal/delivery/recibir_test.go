@@ -4,11 +4,18 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
+	"git.sytue.eu/sytue/one/platform/pkg/objectstore"
+	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
+	"git.sytue.eu/sytue/one/services/mail/internal/auth"
+	"git.sytue.eu/sytue/one/services/mail/internal/blobs"
 	"git.sytue.eu/sytue/one/services/mail/internal/domain"
+	"git.sytue.eu/sytue/one/services/mail/internal/mime"
 )
 
 // COM-06: el MX no pide credenciales, así que lo que un mensaje entrante puede hacerle
@@ -40,15 +47,76 @@ func TestRecibirCortaPorTamanoYNoDejaTemporales(t *testing.T) {
 	}
 	sinTemporales(t, tmp)
 
-	raw, soltar, err := in.recibir(context.Background(), bytes.NewReader([]byte("12345678")))
+	r, soltar, err := in.recibir(context.Background(), bytes.NewReader([]byte("12345678")))
 	if err != nil {
 		t.Fatalf("un mensaje del tamaño justo tiene que entrar: %v", err)
 	}
 	defer soltar()
-	if string(raw) != "12345678" {
-		t.Fatalf("lo releído del temporal no es lo recibido: %q", raw)
+	leido, err := io.ReadAll(r)
+	if err != nil || string(leido) != "12345678" {
+		t.Fatalf("lo releído del temporal no es lo recibido: %q (err=%v)", leido, err)
 	}
 	sinTemporales(t, tmp)
+}
+
+type regBlobMemoria struct{ listo bool }
+
+func (r *regBlobMemoria) ReservarBlobCompartido(context.Context, string, string, int64) (bool, bool, error) {
+	return false, r.listo, nil
+}
+
+func (r *regBlobMemoria) MarcarBlobListo(context.Context, string) error       { r.listo = true; return nil }
+func (r *regBlobMemoria) LiberarBlobCompartido(context.Context, string) error { return nil }
+
+type almBlobMemoria struct{ cuerpo []byte }
+
+func (a *almBlobMemoria) Put(_ context.Context, _ tenancy.Tenant, _ string, r io.Reader, _ int64, _ objectstore.PutOptions) error {
+	var err error
+	a.cuerpo, err = io.ReadAll(r)
+	return err
+}
+
+// Una vez admitido en el fichero temporal, el parseo MIME, la verificación DKIM y la
+// subida al almacén de blobs trabajan en flujo sobre el propio lector del fichero sin
+// volcar el mensaje entero a un []byte en memoria (COM-06).
+func TestProcesadoEnFlujoDesdeFichero(t *testing.T) {
+	in, tmp := inboundDe(t, 4096)
+	eml := "From: Ana <ana@acme.example>\r\n" +
+		"To: Luis <luis@sytue.eu>\r\n" +
+		"Subject: Flujo desde temporal\r\n" +
+		"Message-ID: <flujo-1@acme.example>\r\n" +
+		"MIME-Version: 1.0\r\n" +
+		"Content-Type: text/plain; charset=utf-8\r\n\r\n" +
+		"Cuerpo procesado desde el fichero temporal sin cargarlo en RAM.\r\n"
+
+	r, soltar, err := in.recibir(context.Background(), strings.NewReader(eml))
+	if err != nil {
+		t.Fatalf("recibir: %v", err)
+	}
+	defer soltar()
+	sinTemporales(t, tmp)
+
+	env, err := mime.ParseSobre(io.NewSectionReader(r, 0, r.Size()), r.Size())
+	if err != nil {
+		t.Fatalf("ParseSobre: %v", err)
+	}
+	if env.Subject != "Flujo desde temporal" || env.FromAddr != "ana@acme.example" || env.SizeBytes != int64(len(eml)) {
+		t.Fatalf("sobre inesperado: %+v", env)
+	}
+
+	res, doms, err := auth.VerifyDKIMReader(context.Background(), nil, io.NewSectionReader(r, 0, r.Size()))
+	if err != nil || res != auth.ResultNone || len(doms) != 0 {
+		t.Fatalf("VerifyDKIMReader sin firmas: res=%v doms=%v err=%v", res, doms, err)
+	}
+
+	reg, alm := &regBlobMemoria{}, &almBlobMemoria{}
+	key, err := blobs.GuardarMensajeDesde(context.Background(), reg, alm, tenancy.Tenant{Slug: "acme"}, io.NewSectionReader(r, 0, r.Size()), r.Size())
+	if err != nil {
+		t.Fatalf("GuardarMensajeDesde: %v", err)
+	}
+	if !strings.HasPrefix(key, "shared/mensajes/acme/") || string(alm.cuerpo) != eml {
+		t.Fatalf("blob guardado key=%q len=%d", key, len(alm.cuerpo))
+	}
 }
 
 // Dos mensajes del tamaño máximo no están en memoria a la vez: el segundo espera a que

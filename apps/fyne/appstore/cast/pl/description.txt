@@ -6,7 +6,7 @@ Twoje filmy i twoje transmisje, na żądanie i w czasie rzeczywistym, bez opuszc
 • Czat na żywo i komentarze, z podstawową moderacją przez osobę publikującą.
 • Przesyłaj filmy do 8 GiB; oryginał jest zachowywany.
 • Transmisja z programu do nadawania przez RTMP, z kluczem strumienia na osobę.
-• Na żywo z przeglądarki lub aplikacji: kamera, ekran i mikrofon.
+• Na żywo z przeglądarki lub aplikacji: kamera i mikrofon. Udostępnianie ekranu w obsługiwanych przeglądarkach, systemach komputerowych i Androidzie; niedostępne w aplikacji iOS/iPadOS.
 • Nagrania transmisji same stają się filmami na żądanie.
 • Publiczna strona główna i kanał na organizację, indeksowalne.
 • Linki niepubliczne, filmy tylko dla organizacji lub dostęp dla konkretnych osób przez @nazwę.

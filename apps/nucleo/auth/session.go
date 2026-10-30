@@ -180,6 +180,10 @@ func NewSession(guardados Tokens, renovar Renewer, guardar func(Tokens) error) *
 
 // AccessToken devuelve el token vigente, renovándolo antes si le queda menos del Margen.
 func (s *Session) AccessToken(ctx context.Context) (string, error) {
+	if RequestAuthorizationIntent(ctx) != nil {
+		token, _, err := s.AccessTokenScoped(ctx)
+		return token, err
+	}
 	// ponytail: el cerrojo se mantiene durante la renovación. Eso YA es el «una sola
 	// petición en vuelo» de la web: quien llega mientras tanto espera y se encuentra
 	// el token nuevo. A cambio, esa espera no atiende a su propio ctx; si algún día

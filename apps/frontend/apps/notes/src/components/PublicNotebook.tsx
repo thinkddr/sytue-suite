@@ -15,6 +15,7 @@ import { Icon } from '@sytue/ui';
 import type { Note, Notebook } from '@sytue/api-clients';
 import { useT, type T } from '../i18n/index.js';
 import { conAnclas, enlacesAAnclas } from '../client/enlaces.js';
+import { textoDeNota } from '../client/extracto.js';
 
 interface Props {
   locale: Locale;
@@ -58,32 +59,36 @@ export function NotasSoloLectura({ t, notes }: { t: T; notes: Note[] }): JSX.Ele
   const enPagina = new Set(notes.map((n) => n.id));
   return (
     <ul class="grid gap-3">
-      {notes.map((n) => (
-        <li
-          key={n.id}
-          id={`nota-${n.id}`}
-          class="bg-surface border-border rounded-lg border p-4 shadow-sm"
-        >
-          {n.title ? <h2 class="text-text mb-1 text-base font-medium">{n.title}</h2> : null}
-          {n.content_cipher ? (
-            // Una nota cifrada se DICE, no se omite: quien mira tiene que ver que
-            // ahí hay algo que no puede leer sin su clave.
-            <p class="text-text-subtle inline-flex items-center gap-1 text-base">
-              <Icon name="lock" size={14} /> {t('crypto.locked')}
-            </p>
-          ) : n.kind === 'text' || n.kind === 'todo' ? (
-            <div
-              class="sytue-prose text-text text-base leading-relaxed break-words"
-              // eslint-disable-next-line react/no-danger
-              dangerouslySetInnerHTML={{
-                __html: enlacesAAnclas(conAnclas(n.content ?? ''), enPagina),
-              }}
-            />
-          ) : n.content ? (
-            <p class="text-text-muted text-base break-words">{n.content}</p>
-          ) : null}
-        </li>
-      ))}
+      {notes.map((n) => {
+        const textoCuerpo =
+          n.kind === 'text' || n.kind === 'todo' ? '' : textoDeNota(n.content ?? '');
+        return (
+          <li
+            key={n.id}
+            id={`nota-${n.id}`}
+            class="bg-surface border-border rounded-lg border p-4 shadow-sm"
+          >
+            {n.title ? <h2 class="text-text mb-1 text-base font-medium">{n.title}</h2> : null}
+            {n.content_cipher ? (
+              // Una nota cifrada se DICE, no se omite: quien mira tiene que ver que
+              // ahí hay algo que no puede leer sin su clave.
+              <p class="text-text-subtle inline-flex items-center gap-1 text-base">
+                <Icon name="lock" size={14} /> {t('crypto.locked')}
+              </p>
+            ) : n.kind === 'text' || n.kind === 'todo' ? (
+              <div
+                class="sytue-prose text-text text-base leading-relaxed break-words"
+                // eslint-disable-next-line react/no-danger
+                dangerouslySetInnerHTML={{
+                  __html: enlacesAAnclas(conAnclas(n.content ?? ''), enPagina),
+                }}
+              />
+            ) : textoCuerpo ? (
+              <p class="text-text-muted text-base break-words">{textoCuerpo}</p>
+            ) : null}
+          </li>
+        );
+      })}
     </ul>
   );
 }

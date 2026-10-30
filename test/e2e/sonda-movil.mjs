@@ -12,10 +12,13 @@
 // comando. Contra producción por defecto (SYTUE_BASE_DOMAIN para cambiarlo).
 //
 // SOLO LEE. Abre menús y mide; no envía, no crea y no borra nada.
+import { createReportDirectory, writeReport } from './lib/report-output.mjs';
 import { chromium, devices } from "playwright";
 import { fileURLToPath } from "node:url";
-import { existsSync, writeFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { codigoTOTP } from "./tests/helpers.ts";
+
+const INFORME = `${createReportDirectory('sonda-movil')}/informe.json`;
 
 const DOMINIO = process.env.SYTUE_BASE_DOMAIN || "sytue.eu";
 const IDP = `id.${DOMINIO}`;
@@ -198,10 +201,10 @@ for (const app of objetivo) {
 }
 
 await navegador.close();
-writeFileSync("/tmp/sonda-movil.json", JSON.stringify(hallazgos, null, 2));
+writeReport(INFORME, JSON.stringify(hallazgos, null, 2));
 console.log(`\n${"═".repeat(60)}`);
 const porTipo = {};
 for (const h of hallazgos) porTipo[h.tipo] = (porTipo[h.tipo] || 0) + 1;
 console.log("HALLAZGOS:", JSON.stringify(porTipo));
-console.log("Detalle en /tmp/sonda-movil.json");
+console.log(`Detalle en ${INFORME}`);
 process.exit(hallazgos.length ? 1 : 0);

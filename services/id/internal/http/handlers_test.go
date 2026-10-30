@@ -558,3 +558,41 @@ func TestClientIPNoSeCreeUnXFFDeCualquiera(t *testing.T) {
 		})
 	}
 }
+
+// INF-04: cuando la cadena entera es privada (p. ej. el túnel entrega por una
+// dirección interna y no llega una IP pública en X-Forwarded-For), clientIP cae
+// al peer interno. Si loginRateKey y oauth2RateKey devolvieran solo la IP, todas
+// las personas de la plataforma compartirían un único cubo de 10/min.
+func TestLoginRateKeyNoEsUnCuboGlobalConParPrivado(t *testing.T) {
+	r1 := trasElProxy(httptest.NewRequest(http.MethodPost, "/login/", http.NoBody), "10.42.0.1")
+	r1.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) Firefox/130.0")
+	r1.Header.Set("Accept-Language", "es-ES,es;q=0.9")
+
+	r2 := trasElProxy(httptest.NewRequest(http.MethodPost, "/login/", http.NoBody), "10.42.0.1")
+	r2.Header.Set("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) Chrome/131.0")
+	r2.Header.Set("Accept-Language", "de-DE,de;q=0.9")
+
+	k1 := loginRateKey(r1)
+	k2 := loginRateKey(r2)
+	if k1 == "login-ip:10.42.0.7" || k2 == "login-ip:10.42.0.7" {
+		t.Fatalf("con IP interna sin identificar, loginRateKey no puede ser el cubo global desnudo: k1=%q k2=%q", k1, k2)
+	}
+	if k1 == k2 {
+		t.Fatalf("dos clientes distintos detrás de un salto privado comparten cubo: %q", k1)
+	}
+	if loginRateKey(r1) != k1 {
+		t.Fatalf("el mismo cliente debe caer siempre en su propio cubo: %q", k1)
+	}
+	if oauth2RateKey(r1) == oauth2RateKey(r2) {
+		t.Fatalf("oauth2RateKey también debe separar clientes cuando la IP no identifica: %q", oauth2RateKey(r1))
+	}
+
+	// Y cuando sí llega una IP pública identificable, la clave sigue siendo la IP sola.
+	pub1 := trasElProxy(httptest.NewRequest(http.MethodPost, "/login/", http.NoBody), "203.0.113.9")
+	pub1.Header.Set("User-Agent", "Agente-A")
+	pub2 := trasElProxy(httptest.NewRequest(http.MethodPost, "/login/", http.NoBody), "203.0.113.9")
+	pub2.Header.Set("User-Agent", "Agente-B")
+	if got := loginRateKey(pub1); got != "login-ip:203.0.113.9" || loginRateKey(pub2) != got {
+		t.Fatalf("con IP pública identificable, loginRateKey debe ser login-ip:<ip>: %q / %q", got, loginRateKey(pub2))
+	}
+}

@@ -271,6 +271,7 @@
     "one": "{count} jegyzet",
     "other": "{count} jegyzet"
   },
+  "notebook.ownerOnly": "Ezt a jegyzetfüzetet csak a létrehozója vagy a szervezet adminisztrációja helyezheti át, módosíthatja a láthatóságát vagy titkosíthatja.",
   "notebook.rename": "Átnevezés",
   "notebook.settings": "A jegyzetfüzet beállításai",
   "notebook.title": "Név",

@@ -107,7 +107,9 @@ func main() {
 			pedido.ID = p.CamaraElegida()
 			return camara.Abrir(pedido)
 		}
-		p.Pantalla = camara.AbrirPantalla
+		if camara.PantallaDisponible {
+			p.Pantalla = camara.AbrirPantalla
+		}
 		p.Camaras = camara.Dispositivos
 		p.CamaraConcedida = camara.Concedido
 		p.PedirMicro = altavoz.PedirMicro

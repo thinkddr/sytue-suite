@@ -82,7 +82,8 @@ type BotonIcono struct {
 	Rotulo   string
 	AlPulsar func()
 	// AlEnfocar permite que una tira desplazable revele el control al tabular.
-	AlEnfocar func()
+	AlEnfocar   func()
+	mostrarFoco func()
 	// TokenAro es el color del anillo de foco. Vacío es `focus-ring`, el azul de la
 	// hoja; sobre la banda de tinta lo pone `SobreBanda` en `chrome-focus`.
 	TokenAro string
@@ -293,7 +294,12 @@ func (b *BotonIcono) FocusGained() {
 	if b.AlEnfocar != nil {
 		b.AlEnfocar()
 	}
+	if b.mostrarFoco != nil {
+		b.mostrarFoco()
+	}
 }
+
+func (b *BotonIcono) revelarAlFoco(f func()) { b.mostrarFoco = f }
 
 // FocusLost lo apaga.
 func (b *BotonIcono) FocusLost() { b.enfocado = false; b.pista.alFoco(false); b.Refresh() }

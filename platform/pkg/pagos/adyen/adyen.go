@@ -50,6 +50,14 @@ func New(apiKey, merchant, mode, livePrefix string) (*Adyen, error) {
 	return a, nil
 }
 
+// ConTransporte sustituye el transporte HTTP manteniendo el timeout y la prohibición de redirecciones.
+func (a *Adyen) ConTransporte(rt http.RoundTripper) *Adyen {
+	if a != nil && rt != nil {
+		a.http.Transport = rt
+	}
+	return a
+}
+
 // CrearPago abre Hosted Checkout. Adyen comunica después el resultado definitivo
 // por webhook; consultar repetidamente una sesión no lo actualiza.
 //
@@ -203,6 +211,7 @@ func (n Notificacion) Estado(modo string, metadatos map[string]string) (pagos.Es
 		return pagos.Estado{}, errors.New("adyen: invalid webhook notification")
 	}
 	var estado string
+	var reembolsado int64
 	switch n.EventCode {
 	case "AUTHORISATION":
 		if n.Success == "true" {
@@ -211,11 +220,18 @@ func (n Notificacion) Estado(modo string, metadatos map[string]string) (pagos.Es
 			estado = pagos.EstadoFallido
 		}
 	case "CANCELLATION", "CANCEL_OR_REFUND":
-		estado = pagos.EstadoCancelado
+		if n.Success == "true" {
+			estado = pagos.EstadoCancelado
+		} else {
+			estado = pagos.EstadoAbierto
+		}
 	case "REFUND":
 		estado = pagos.EstadoPagado
+		if n.Success == "true" {
+			reembolsado = n.Amount.Value
+		}
 	default:
 		return pagos.Estado{}, errors.New("adyen: unsupported webhook event")
 	}
-	return pagos.Estado{Estado: estado, Importe: n.Amount.Value, Divisa: pagos.DivisaEUR, Modo: modo, Comercio: n.MerchantAccountCode, Metadatos: metadatos}, nil
+	return pagos.Estado{Estado: estado, Importe: n.Amount.Value, Reembolsado: reembolsado, Divisa: pagos.DivisaEUR, Modo: modo, Comercio: n.MerchantAccountCode, Metadatos: metadatos}, nil
 }

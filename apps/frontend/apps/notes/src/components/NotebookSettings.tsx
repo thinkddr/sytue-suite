@@ -37,6 +37,8 @@ interface Props {
   /** Archivar o devolver al árbol. Solo su dueño, y nunca un diario. */
   onArchive?: () => void;
   archivado?: boolean;
+  /** Solo quien creó el cuaderno o quien administra la organización puede cambiar su visibilidad o cifrado. */
+  puedeCambiarAcceso?: boolean;
 }
 
 const VISIBILIDADES: { key: NoteVisibility; glyph: GlyphName }[] = [
@@ -80,6 +82,7 @@ export function NotebookSettings({
   onDelete,
   onArchive,
   archivado = false,
+  puedeCambiarAcceso = notebook === null,
 }: Props): JSX.Element {
   const toast = useToast();
   const base = useId();
@@ -248,31 +251,35 @@ export function NotebookSettings({
             </div>
           </fieldset>
 
-          <fieldset>
-            <legend class="text-text mb-1.5 text-base font-medium">{t('visibility.label')}</legend>
-            <div class="grid gap-1.5">
-              {VISIBILIDADES.map((v) => (
-                <button
-                  key={v.key}
-                  type="button"
-                  aria-pressed={visibility === v.key}
-                  onClick={() => cambiarVisibilidad(v.key)}
-                  class={cx(
-                    'border-border sytue-focus-ring flex items-start gap-2.5 rounded-md border p-2.5 text-left transition-colors duration-150',
-                    visibility === v.key ? 'border-primary bg-primary/5' : 'hover:bg-bg-subtle',
-                  )}
-                >
-                  <Glyph name={v.glyph} size={18} class="text-text-muted mt-0.5 shrink-0" />
-                  <span class="min-w-0">
-                    <span class="text-text block text-base font-medium">
-                      {t(`visibility.${v.key}` as never)}
+          {puedeCambiarAcceso ? (
+            <fieldset>
+              <legend class="text-text mb-1.5 text-base font-medium">
+                {t('visibility.label')}
+              </legend>
+              <div class="grid gap-1.5">
+                {VISIBILIDADES.map((v) => (
+                  <button
+                    key={v.key}
+                    type="button"
+                    aria-pressed={visibility === v.key}
+                    onClick={() => cambiarVisibilidad(v.key)}
+                    class={cx(
+                      'border-border sytue-focus-ring flex items-start gap-2.5 rounded-md border p-2.5 text-left transition-colors duration-150',
+                      visibility === v.key ? 'border-primary bg-primary/5' : 'hover:bg-bg-subtle',
+                    )}
+                  >
+                    <Glyph name={v.glyph} size={18} class="text-text-muted mt-0.5 shrink-0" />
+                    <span class="min-w-0">
+                      <span class="text-text block text-base font-medium">
+                        {t(`visibility.${v.key}` as never)}
+                      </span>
+                      <span class="sytue-meta block">{t(`visibility.${v.key}.hint` as never)}</span>
                     </span>
-                    <span class="sytue-meta block">{t(`visibility.${v.key}.hint` as never)}</span>
-                  </span>
-                </button>
-              ))}
-            </div>
-          </fieldset>
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+          ) : null}
 
           {enlacePublico ? (
             <div class="border-border bg-bg-subtle flex items-center gap-2 rounded-md border p-2.5">
@@ -305,18 +312,22 @@ export function NotebookSettings({
                 {encrypted ? t('index.lockedByEncryption') : t('index.hint')}
               </p>
             </div>
-            <div class="grid gap-1">
-              <Switch
-                checked={encrypted}
-                label={t('crypto.title')}
-                onChange={(e) => activarCifrado((e.target as HTMLInputElement).checked)}
-              />
-              <p class="sytue-meta pl-12">{t('crypto.hint')}</p>
-            </div>
-            {notebook?.encrypted && !encrypted ? (
-              <p class="text-warning-text text-base" role="alert">
-                {t('crypto.disableWarning')}
-              </p>
+            {puedeCambiarAcceso ? (
+              <>
+                <div class="grid gap-1">
+                  <Switch
+                    checked={encrypted}
+                    label={t('crypto.title')}
+                    onChange={(e) => activarCifrado((e.target as HTMLInputElement).checked)}
+                  />
+                  <p class="sytue-meta pl-12">{t('crypto.hint')}</p>
+                </div>
+                {notebook?.encrypted && !encrypted ? (
+                  <p class="text-warning-text text-base" role="alert">
+                    {t('crypto.disableWarning')}
+                  </p>
+                ) : null}
+              </>
             ) : null}
           </div>
         </div>

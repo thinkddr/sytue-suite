@@ -15,7 +15,11 @@ import {
   type ShowSasCallbacks,
   type VerificationRequest,
 } from 'matrix-js-sdk/lib/crypto-api';
-import { matrixBootstrap, beginMatrixSso } from '../client/matrix/auth.js';
+import {
+  matrixBootstrap,
+  beginMatrixSso,
+  roomsMatrixSessionAdapter,
+} from '../client/matrix/auth.js';
 import { RoomsMatrix, setRoomsMatrix, type MatrixDevice } from '../client/matrix/client.js';
 import { MatrixSecurityError, type MatrixBootstrap } from '../client/matrix/types.js';
 import { roomsT } from '../i18n/index.js';
@@ -93,37 +97,41 @@ export function MatrixRoomsGate({
         if (data.actor !== actor) throw new MatrixSecurityError('identity');
         if (disposed) return;
         setBootstrap(data);
-        const instance = await RoomsMatrix.open(data, {
-          saveRecoveryKey: (value) =>
-            new Promise<void>((resolve, reject) => {
-              if (disposed) {
-                reject(new MatrixSecurityError('device'));
-                return;
-              }
-              pendingSecretRef.current = { resolve: () => resolve(), reject };
-              setSaved(false);
-              setSecret({ kind: 'save', value });
-            }),
-          readRecoveryKey: () =>
-            new Promise<string>((resolve, reject) => {
-              if (disposed) {
-                reject(new MatrixSecurityError('device'));
-                return;
-              }
-              pendingSecretRef.current = { resolve, reject };
-              setSecret({ kind: 'read', value: '' });
-            }),
-          authenticate: (url) =>
-            new Promise<void>((resolve, reject) => {
-              if (disposed || new URL(url).origin !== data.homeserver_url) {
-                reject(new MatrixSecurityError('identity'));
-                return;
-              }
-              pendingAuthRef.current = { resolve, reject };
-              setAuthOpened(false);
-              setAuthentication(url);
-            }),
-        });
+        const instance = await RoomsMatrix.open(
+          data,
+          {
+            saveRecoveryKey: (value) =>
+              new Promise<void>((resolve, reject) => {
+                if (disposed) {
+                  reject(new MatrixSecurityError('device'));
+                  return;
+                }
+                pendingSecretRef.current = { resolve: () => resolve(), reject };
+                setSaved(false);
+                setSecret({ kind: 'save', value });
+              }),
+            readRecoveryKey: () =>
+              new Promise<string>((resolve, reject) => {
+                if (disposed) {
+                  reject(new MatrixSecurityError('device'));
+                  return;
+                }
+                pendingSecretRef.current = { resolve, reject };
+                setSecret({ kind: 'read', value: '' });
+              }),
+            authenticate: (url) =>
+              new Promise<void>((resolve, reject) => {
+                if (disposed || new URL(url).origin !== data.homeserver_url) {
+                  reject(new MatrixSecurityError('identity'));
+                  return;
+                }
+                pendingAuthRef.current = { resolve, reject };
+                setAuthOpened(false);
+                setAuthentication(url);
+              }),
+          },
+          roomsMatrixSessionAdapter,
+        );
         if (disposed) {
           instance.close();
           return;

@@ -118,6 +118,44 @@ func TestExternalConfigurationKeepsExplicitTLSModeAndClearsSecrets(t *testing.T)
 	}
 }
 
+func TestExternalReconnectWithoutConfigurationClearsPreviousServers(t *testing.T) {
+	for _, provider := range []string{"imap", "pop3"} {
+		t.Run(provider, func(t *testing.T) {
+			c := correoDePrueba(t, &correoFalso{})
+			for key, value := range map[string]string{"name": "Previous account", "address": "previous@example.eu", "host": "incoming.previous.example.eu", "port": "1993", "username": "previous-incoming", "password": "synthetic-previous-secret", "smtpHost": "smtp.previous.example.eu", "smtpPort": "2525", "smtpUser": "previous-smtp", "smtpPassword": "synthetic-previous-smtp-secret"} {
+				c.campos[key].PonerTexto(value)
+			}
+			c.smtpSecurity, c.avanzado = "starttls", true
+			c.reconectar(api.ExternalMailAccount{InstanceID: "new-account", Provider: provider, Name: "New account", Address: "new@example.eu", Services: []string{"calendar"}})
+			for _, key := range []string{"host", "username", "password", "smtpHost", "smtpUser", "smtpPassword"} {
+				if c.campos[key].Texto() != "" {
+					t.Errorf("reconnect without configuration retained %s", key)
+				}
+			}
+			wantPort := "993"
+			if provider == "pop3" {
+				wantPort = "995"
+			}
+			if c.campos["port"].Texto() != wantPort || c.campos["smtpPort"].Texto() != "465" || c.smtpSecurity != "tls" || c.avanzado {
+				t.Fatal("reconnect without configuration retained previous advanced settings")
+			}
+			if c.campos["name"].Texto() != "New account" || c.campos["address"].Texto() != "new@example.eu" ||
+				c.instancia != "new-account" || c.proveedor != provider || c.paso != 1 || !c.asistente ||
+				!slices.Equal(c.servicios, []string{"mail", "calendar"}) {
+				t.Fatal("reconnect lost account identity or its mail consent")
+			}
+			for key, value := range map[string]string{"host": "incoming.new.example.eu", "smtpHost": "smtp.new.example.eu", "password": "synthetic-new-secret"} {
+				c.campos[key].PonerTexto(value)
+			}
+			cfg, err := c.configuracion()
+			if err != nil || cfg.InstanceID != "new-account" || cfg.Incoming.Username != "new@example.eu" ||
+				cfg.Outgoing.Username != "new@example.eu" || cfg.Outgoing.Port != 465 || cfg.Outgoing.Security != "tls" || cfg.SMTPPassword != "" {
+				t.Fatal("reconnection payload inherited previous account settings", err)
+			}
+		})
+	}
+}
+
 func TestExternalAttachmentLimitIsAppliedBeforeReadingAllFiles(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "fixture.txt")

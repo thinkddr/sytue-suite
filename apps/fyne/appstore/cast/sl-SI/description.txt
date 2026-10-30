@@ -6,7 +6,7 @@ Vaši videoposnetki in vaši prenosi v živo, na zahtevo in v realnem času, ne 
 • Klepet v živo in komentarji, z osnovnim moderiranjem s strani tistega, ki objavlja.
 • Naložite videoposnetke do 8 GiB; izvirnik se ohrani.
 • Prenos v živo iz programa za oddajanje prek RTMP, s ključem prenosa za vsako osebo.
-• V živo iz brskalnika ali aplikacije: kamera, zaslon in mikrofon.
+• V živo iz brskalnika ali aplikacije: kamera in mikrofon. Skupna raba zaslona v podprtih brskalnikih, namiznih sistemih in Androidu; ni na voljo v aplikaciji za iOS/iPadOS.
 • Posnetki prenosov v živo samodejno postanejo videoposnetki na zahtevo.
 • Javna naslovnica in kanal za vsako organizacijo, z možnostjo indeksiranja.
 • Skrite povezave, videoposnetki samo za organizacijo ali dostop za določene osebe po @uporabniškem imenu.

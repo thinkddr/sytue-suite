@@ -481,3 +481,13 @@ func Motivo(err error) string {
 	}
 	return ""
 }
+
+// motivo traduce el código del servicio cuando tiene mensaje propio en el catálogo.
+func (p *Pantalla) motivo(err error) string {
+	switch m := Motivo(err); m {
+	case "notebook_owner_only":
+		return p.tr.T("notebook.ownerOnly", nil)
+	default:
+		return m
+	}
+}

@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Daniel Delgado Ramos
 // Diagnóstico read-only: reutiliza la sesión del barrido y el detector real.
 import assert from 'node:assert/strict';
-import { existsSync, writeFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { chromium, devices } from 'playwright';
 import { DETECTOR } from './detector-desbordamiento.mjs';
@@ -164,7 +164,6 @@ try {
     }
   }
 } finally {
-  writeFileSync('/tmp/drawer-animation.json', JSON.stringify(pruebas, null, 2));
   console.log(JSON.stringify({ tipo: 'drawer-animation', modo: SOLO_BANCO ? 'banco' : 'produccion', destino: SOLO_BANCO ? 'fixture' : destino, perfil: 'Pixel 5', locale: 'de-DE', pruebas }));
   await browser.close();
 }

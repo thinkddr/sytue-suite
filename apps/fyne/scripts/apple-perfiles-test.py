@@ -503,6 +503,59 @@ class Perfiles(unittest.TestCase):
                 widget = {**REQUISITO, "id": "eu.sytue.rooms.widgets", "keychain": "", "protection": "NSFileProtectionComplete"}
                 self.assertIsNone(p.validar_perfil(item, widget, "ios"))
 
+    def test_identidad_omitida_por_find_identity_v_se_acepta_solo_si_verify_cert_local_pasa(self):
+        selector, otra = "a" * 40, "b" * 40
+        der = b"developer id g2 publico"
+        candidata = ' 1) ' + selector + ' "Developer ID Application: Sytue (VHC5QW7BZ3)" (CSSMERR_TP_NOT_TRUSTED)\n     0 valid identities found'
+        pem_exportado = exportado(der, selector)
+        with tempfile.TemporaryDirectory() as job_dir:
+            llavero = str(pathlib.Path(job_dir, "firma.keychain-db"))
+            vistos_cert = []
+
+            def capturar_valido(argv):
+                cmd = [str(a) for a in argv]
+                if cmd[-1] == "llavero-efimero":
+                    return llavero + "\n"
+                if cmd == ["security", "find-identity", "-v", "-p", "codesigning", llavero]:
+                    return "     0 valid identities found\n"
+                if cmd == ["security", "find-identity", "-p", "codesigning", llavero]:
+                    return candidata
+                if cmd == ["security", "find-certificate", "-a", "-Z", "-p", llavero]:
+                    return pem_exportado
+                if cmd[:5] == ["security", "verify-cert", "-L", "-p", "codeSign"]:
+                    ruta_c = pathlib.Path(cmd[cmd.index("-c") + 1])
+                    self.assertEqual(ruta_c.parent, pathlib.Path(job_dir))
+                    self.assertEqual(cmd[cmd.index("-k") + 1], llavero)
+                    self.assertIn("-----BEGIN CERTIFICATE-----", ruta_c.read_text())
+                    vistos_cert.append(ruta_c)
+                    return ""
+                raise AssertionError("orden inesperada: " + repr(cmd))
+
+            with mock.patch.dict(os.environ, {"SYTUE_APPLE_JOB_DIR": job_dir}), \
+                    mock.patch.object(p, "capturar", side_effect=capturar_valido):
+                self.assertEqual(p.identidad_importada("developerid", "VHC5QW7BZ3"), der)
+            self.assertEqual(len(vistos_cert), 1)
+            self.assertFalse(vistos_cert[0].exists())
+
+            def capturar_rechazado(argv):
+                cmd = [str(a) for a in argv]
+                if cmd[:2] == ["security", "verify-cert"]:
+                    vistos_cert.append(pathlib.Path(cmd[cmd.index("-c") + 1]))
+                    raise p.subprocess.CalledProcessError(1, cmd)
+                return capturar_valido(argv)
+
+            with mock.patch.dict(os.environ, {"SYTUE_APPLE_JOB_DIR": job_dir}), \
+                    mock.patch.object(p, "capturar", side_effect=capturar_rechazado):
+                with self.assertRaisesRegex(ValueError, "identidad válida única"):
+                    p.identidad_importada("developerid", "VHC5QW7BZ3")
+            self.assertFalse(vistos_cert[-1].exists())
+
+            ambiguas = candidata + '\n 2) ' + otra + ' "Developer ID Application: Otro (VHC5QW7BZ3)" (CSSMERR_TP_NOT_TRUSTED)'
+            with mock.patch.dict(os.environ, {"SYTUE_APPLE_JOB_DIR": job_dir}), \
+                    mock.patch.object(p, "capturar", side_effect=[llavero + "\n", "     0 valid identities found\n", ambiguas]):
+                with self.assertRaisesRegex(ValueError, "identidad válida única"):
+                    p.identidad_importada("developerid", "VHC5QW7BZ3")
+
 
 if __name__ == "__main__":
     unittest.main()

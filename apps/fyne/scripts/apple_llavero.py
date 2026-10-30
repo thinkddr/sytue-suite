@@ -61,6 +61,9 @@ def herramienta(argumentos, entrada=None, vacio_no_encontrado=False):
         raise ErrorLlavero("herramienta_no_disponible") from None
     if vacio_no_encontrado and salida.returncode == 44 and salida.stdout == b"":
         return b""
+    if (len(argumentos) >= 2 and argumentos[:2] == ["/usr/bin/security", "import"] and
+            salida.returncode != 0 and b"The specified item already exists in the keychain" in salida.stderr):
+        return salida.stdout
     exigir(salida.returncode == 0 and len(salida.stdout) <= 1048576, "herramienta_del_llavero_fallo")
     return salida.stdout
 
@@ -248,9 +251,23 @@ def importar(directorio, herramientas):
     exigir(carpeta.parent == ruta.parent and re.fullmatch(r"certificates\.[a-zA-Z0-9_]+", carpeta.name), "certificados_fuera_del_job")
     propietario(carpeta, directorio=True, privado=True)
     certificados = sorted(carpeta.glob("*.p12"))
-    exigir(1 <= len(certificados) <= 8, "cantidad_de_identidades_invalida")
+    exigir(1 <= len(certificados) <= 128, "cantidad_de_identidades_invalida")
+    # fetch-signing-files exporta un .p12 nuevo (<TIPO>_<ID>_<sufijo>.p12) por cada App ID
+    # del catálogo aunque todos reutilicen el mismo certificado; deduplicamos por identidad
+    # tras comprobar permisos y propietario de todos los ficheros presentes.
+    vistos = set()
+    unicos = []
+    patron_id = re.compile(r"^((?:DEVELOPER_ID_APPLICATION(?:_G2)?|DISTRIBUTION|MAC_INSTALLER_DISTRIBUTION)_[A-Za-z0-9]+)_.+\.p12$")
     for certificado in certificados:
         propietario(certificado, privado=True)
+        coincidencia = patron_id.match(certificado.name)
+        clave = coincidencia.group(1) if coincidencia else certificado.name
+        if clave in vistos:
+            continue
+        vistos.add(clave)
+        unicos.append(certificado)
+    exigir(1 <= len(unicos) <= 8, "cantidad_de_identidades_invalida")
+    for certificado in unicos:
         argv = ["/usr/bin/security", "import", str(certificado), "-f", "pkcs12", "-k", str(llavero), "-P", estado["password"]]
         for nombre in herramientas:
             argv += ["-T", "/usr/bin/" + nombre]

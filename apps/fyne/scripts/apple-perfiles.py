@@ -74,27 +74,9 @@ def requisitos(generador, app, plataforma, widget=False, archivos=False):
             "protection": derechos.get("com.apple.developer.default-data-protection", "")}
 
 
-def identidad_importada(plataforma, equipo, elegida=""):
-    # El selector compartido rechaza el llavero personal antes de inspeccionarlo.
-    llavero = capturar(["bash", AQUI / "apple-firma.sh", "llavero-efimero"]).strip()
-    salida = capturar(["security", "find-identity", "-v", "-p", "codesigning", llavero])
-    prefijo = "Developer ID Application: " if plataforma == "developerid" else "Apple Distribution: "
-    validas = {huella.lower() for huella, nombre in re.findall(r'\b([0-9A-Fa-f]{40})\s+"([^"\n]+)"', salida)
-               if nombre.startswith(prefijo) and nombre.endswith("(" + equipo + ")")}
-    if elegida:
-        elegida = elegida.replace(":", "").lower()
-        if not re.fullmatch(r"[0-9a-f]{40}", elegida) or elegida not in validas:
-            raise ValueError("la huella no corresponde a una identidad válida importada en el llavero efímero")
-    else:
-        if len(validas) != 1:
-            raise ValueError("se necesita una identidad válida única; selecciona su huella pública con --certificado-sha1")
-        elegida = next(iter(validas))
-    # SHA-1 sólo selecciona la identidad de codesign en este llavero. Conservamos
-    # el DER local para autenticar por igualdad el certificado que devuelve Apple.
-    # -Z incluye ambos identificadores junto a cada PEM; no consultamos el llavero
-    # personal ni aceptamos dos certificados distintos con el mismo selector.
+def exportar_certificados_llavero(llavero):
     salida = capturar(["security", "find-certificate", "-a", "-Z", "-p", llavero])
-    certificados = []
+    exportados = []
     bloques = salida.split("SHA-256 hash: ")
     if bloques[0].strip():
         raise ValueError("no se puede verificar la exportación de certificados del llavero efímero")
@@ -105,14 +87,72 @@ def identidad_importada(plataforma, equipo, elegida=""):
         if registro is None:
             raise ValueError("no se puede verificar la exportación de certificados del llavero efímero")
         sha256, selector, contenido = registro.groups()
+        limpio = "".join(contenido.split())
         try:
-            der = base64.b64decode("".join(contenido.split()), validate=True)
+            der = base64.b64decode(limpio, validate=True)
         except ValueError as error:
             raise ValueError("el llavero efímero no devuelve un certificado válido") from error
         if not der or hashlib.sha256(der).hexdigest() != sha256.lower():
             raise ValueError("el certificado exportado no coincide con su huella SHA-256")
-        if selector.lower() == elegida:
-            certificados.append(der)
+        pem = ("-----BEGIN CERTIFICATE-----\n" + limpio + "\n-----END CERTIFICATE-----\n").encode("ascii")
+        exportados.append((selector.lower(), der, pem))
+    return exportados
+
+
+def identidad_importada(plataforma, equipo, elegida=""):
+    # El selector compartido rechaza el llavero personal antes de inspeccionarlo.
+    llavero = capturar(["bash", AQUI / "apple-firma.sh", "llavero-efimero"]).strip()
+    salida = capturar(["security", "find-identity", "-v", "-p", "codesigning", llavero])
+    prefijo = "Developer ID Application: " if plataforma == "developerid" else "Apple Distribution: "
+    validas = {huella.lower() for huella, nombre in re.findall(r'\b([0-9A-Fa-f]{40})\s+"([^"\n]+)"', salida)
+               if nombre.startswith(prefijo) and nombre.endswith("(" + equipo + ")")}
+    if elegida:
+        elegida = elegida.replace(":", "").lower()
+        if not re.fullmatch(r"[0-9a-f]{40}", elegida):
+            raise ValueError("la huella no corresponde a una identidad válida importada en el llavero efímero")
+    exportados = None
+    # En macOS actual, el clasificador legado de find-identity -v omite identidades
+    # cuya evaluación nativa sí es válida (como en apple-firma.sh identidad). Aceptar
+    # sólo un candidato inequívoco del llavero propio y verificar su cadena sin AIA.
+    if not validas:
+        sin_clasificador = capturar(["security", "find-identity", "-p", "codesigning", llavero])
+        candidatas = {huella.lower() for huella, nombre in re.findall(r'\b([0-9A-Fa-f]{40})\s+"([^"\n]+)"', sin_clasificador)
+                      if nombre.startswith(prefijo) and nombre.endswith("(" + equipo + ")")}
+        if len(candidatas) == 1 and (not elegida or elegida in candidatas):
+            candidata = next(iter(candidatas))
+            exportados = exportar_certificados_llavero(llavero)
+            coincidencias = [item for item in exportados if item[0] == candidata]
+            if len(coincidencias) == 1:
+                base_job = os.environ.get("SYTUE_APPLE_JOB_DIR", "")
+                dir_cert = pathlib.Path(base_job) if base_job else pathlib.Path(llavero).parent
+                if not dir_cert.is_dir():
+                    dir_cert.mkdir(parents=True, exist_ok=True, mode=0o700)
+                fd, ruta_cert = tempfile.mkstemp(prefix="identity.", dir=dir_cert)
+                try:
+                    with os.fdopen(fd, "wb") as archivo:
+                        os.fchmod(archivo.fileno(), 0o600)
+                        archivo.write(coincidencias[0][2])
+                    capturar(["security", "verify-cert", "-L", "-p", "codeSign", "-c", ruta_cert, "-k", llavero])
+                    validas = {candidata}
+                except subprocess.CalledProcessError:
+                    pass
+                finally:
+                    if os.path.exists(ruta_cert):
+                        os.unlink(ruta_cert)
+    if elegida:
+        if elegida not in validas:
+            raise ValueError("la huella no corresponde a una identidad válida importada en el llavero efímero")
+    else:
+        if len(validas) != 1:
+            raise ValueError("se necesita una identidad válida única; selecciona su huella pública con --certificado-sha1")
+        elegida = next(iter(validas))
+    # SHA-1 sólo selecciona la identidad de codesign en este llavero. Conservamos
+    # el DER local para autenticar por igualdad el certificado que devuelve Apple.
+    # -Z incluye ambos identificadores junto a cada PEM; no consultamos el llavero
+    # personal ni aceptamos dos certificados distintos con el mismo selector.
+    if exportados is None:
+        exportados = exportar_certificados_llavero(llavero)
+    certificados = [der for selector, der, _ in exportados if selector == elegida]
     if len(certificados) != 1:
         raise ValueError("la identidad importada no tiene un certificado único en el llavero efímero")
     return certificados[0]

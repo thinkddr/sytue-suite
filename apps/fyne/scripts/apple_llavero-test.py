@@ -19,6 +19,7 @@ SCRIPT = Path(__file__).with_name("apple_llavero.py")
 spec = importlib.util.spec_from_file_location("apple_llavero_pruebas", SCRIPT)
 module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
+ORIGINAL_HERRAMIENTA = module.herramienta
 
 
 class SecuritySintetico:
@@ -174,6 +175,58 @@ class Aislamiento(unittest.TestCase):
         module.importar(str(folder), ["codesign", "productbuild"])
         module.limpiar()
         self.assertFalse(state.parent.exists())
+
+    def test_importar_deduplica_copias_p12_del_catalogo_y_tolera_item_ya_existente(self):
+        state = self.crear()
+        folder = state.parent / "certificates.catalogo"
+        folder.mkdir(mode=0o700)
+        for idx in range(15):
+            copia = folder / f"DISTRIBUTION_9A8B7C6D5E_{idx:08d}.p12"
+            copia.write_bytes(b"synthetic distribution fixture")
+            copia.chmod(0o600)
+        instalador = folder / "MAC_INSTALLER_DISTRIBUTION_1122334455_1234_567.p12"
+        instalador.write_bytes(b"synthetic installer fixture")
+        instalador.chmod(0o600)
+        module.importar(str(folder), ["codesign", "productsign", "productbuild"])
+        importadas = [call[2] for call in self.security.calls if call[1] == "import"]
+        self.assertEqual(len(importadas), 2)
+
+        # Segunda importación en el mismo job (como preparar macappstore tras preparar ios):
+        # /usr/bin/security import devuelve código 1 cuando el ítem ya existe en el llavero.
+        real_security = self.security
+
+        def run_con_duplicado(argv, input=None, capture_output=True, timeout=30, check=False):
+            if argv[1] == "import":
+                return SimpleNamespace(
+                    returncode=1,
+                    stdout=b"",
+                    stderr=b"security: SecKeychainItemImport: The specified item already exists in the keychain.\n",
+                )
+            return SimpleNamespace(returncode=0, stdout=real_security(argv, input), stderr=b"")
+
+        with mock.patch.object(module, "herramienta", new=ORIGINAL_HERRAMIENTA), \
+                mock.patch.object(module.subprocess, "run", side_effect=run_con_duplicado):
+            module.importar(str(folder), ["codesign", "productsign", "productbuild"])
+
+        def run_con_otro_error(argv, input=None, capture_output=True, timeout=30, check=False):
+            if argv[1] == "import":
+                return SimpleNamespace(returncode=1, stdout=b"", stderr=b"security: SecKeychainItemImport: MAC verification failed\n")
+            return SimpleNamespace(returncode=0, stdout=real_security(argv, input), stderr=b"")
+
+        with mock.patch.object(module, "herramienta", new=ORIGINAL_HERRAMIENTA), \
+                mock.patch.object(module.subprocess, "run", side_effect=run_con_otro_error):
+            with self.assertRaisesRegex(module.ErrorLlavero, "^herramienta_del_llavero_fallo$"):
+                module.importar(str(folder), ["codesign"])
+
+        exceso = state.parent / "certificates.exceso"
+        exceso.mkdir(mode=0o700)
+        for idx in range(9):
+            distinto = exceso / f"DISTRIBUTION_CERT{idx:06d}_abcdefgh.p12"
+            distinto.write_bytes(b"synthetic excess fixture")
+            distinto.chmod(0o600)
+        with self.assertRaisesRegex(module.ErrorLlavero, "^cantidad_de_identidades_invalida$"):
+            module.importar(str(exceso), ["codesign"])
+        module.limpiar()
 
     def test_der_publico_fijado_no_se_duplica_y_un_der_alterado_no_se_importa(self):
         self.crear()

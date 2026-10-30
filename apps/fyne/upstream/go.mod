@@ -9,10 +9,3 @@
 module git.sytue.eu/sytue/one/apps/fyne/upstream
 
 go 1.27.3
-
-require (
-	fyne.io/fyne/v2 v2.8.2
-	github.com/go-gl/glfw/v3.4/glfw v0.1.0-pre.2
-	github.com/go-text/typesetting v0.3.5
-	github.com/livekit/server-sdk-go/v2 v2.19.0
-)

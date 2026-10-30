@@ -3,7 +3,7 @@
 Servidor de archivos **Sytue-native** de la suite **Sytue One**: almacenamiento,
 sincronización y compartición de ficheros. Reimplementación **clean-room** sobre
 estándares abiertos (**WebDAV — RFC 4918**) con una **API REST propia**. Código
-propietario © Sytue; dependencias de terceros solo permisivas (BSD/MIT/Apache).
+Apache-2.0 © 2026 Daniel Delgado Ramos (thinkddr); dependencias de terceros solo permisivas (BSD/MIT/Apache).
 
 - **Puerto:** `8082` (HTTP + WebDAV) · **Subdominio:** `drive.sytue.eu`
 - **Datastore:** PostgreSQL (metadatos, cuotas, outbox de eventos) — única fuente

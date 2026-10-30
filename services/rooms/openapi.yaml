@@ -9,7 +9,7 @@ info:
     reacciones, menciones, estado de lectura y búsqueda. El estado vive en
     PostgreSQL; el fan-out en tiempo real se hace por LISTEN/NOTIFY y se entrega
     a los clientes vía WebSocket en /ws. Los adjuntos referencian ficheros de
-    Sytue Drive. Clean-room © Sytue; sin motores AGPL (Mattermost fuera).
+    Sytue Drive. Clean-room, © 2026 Daniel Delgado Ramos (thinkddr); sin motores AGPL (Mattermost fuera).
   version: "1.0.0"
   license:
     name: MIT

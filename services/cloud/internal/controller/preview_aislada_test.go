@@ -89,7 +89,7 @@ func TestElValorPropioDeLaVistaPreviaGanaAlCompartido(t *testing.T) {
 	proj := domain.Project{ID: uuid.New(), Tenant: "acme", Slug: "web"}
 	fs := &fakeCtrlStore{}
 	c := newTestController(fs, &specPlatform{}, nil)
-	secreto, err := c.sealer.SealString("sk_test_previa")
+	secreto, err := c.sealer.SealString("test_previa_key")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -106,7 +106,7 @@ func TestElValorPropioDeLaVistaPreviaGanaAlCompartido(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if secrets["API_KEY"] != "sk_test_previa" {
+	if secrets["API_KEY"] != "test_previa_key" {
 		t.Errorf("API_KEY secreto = %q; se esperaba el de la vista previa", secrets["API_KEY"])
 	}
 	if _, hay := env["API_KEY"]; hay {

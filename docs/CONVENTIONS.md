@@ -24,7 +24,7 @@
 2. **Productos Sytue-native y originales.** No se despliega **ningún motor de
    terceros AGPL** (Nextcloud, OnlyOffice, Stalwart, Mattermost, Keycloak quedan **fuera**). Cada
    producto es **obra original de Sytue** (reimplementación **clean-room** sobre **estándares
-   abiertos**), con licencia **Apache-2.0** (© 2026 Daniel Delgado Ramos).
+   abiertos**), con licencia **Apache-2.0** (© 2026 Daniel Delgado Ramos (thinkddr)).
    **Excepción expresa del titular (2026-10-16, [ADR 0077](decisions.md#0077)):**
    Rooms puede operar Synapse sin modificar, como transporte Matrix separado (AGPL),
    y usar mautrix-go con su dependencia go.mau.fi/util (MPL-2.0) en los clientes Fyne. La excepción a lenguaje y licencia
@@ -103,7 +103,7 @@
 > por ella van los enlaces entre apps, los avisos, las apps nativas y el login
 > (ADR 0055). `<slug>.sytue.eu` sigue sirviendo la suite durante la transición.
 
-> **Licencia:** todo el código de producto Sytue es **Apache-2.0 (© 2026 Daniel Delgado Ramos)**. Las **librerías**
+> **Licencia:** todo el código de producto Sytue es **Apache-2.0 (© 2026 Daniel Delgado Ramos (thinkddr))**. Las **librerías**
 > Go/JS incorporadas son **permisivas** (MIT/BSD/Apache-2.0) — compatibles con la Apache-2.0 del
 > producto, conservando sus avisos (NOTICE). Las excepciones son **LiveKit** (SFU de medios) y
 > **Synapse sin modificar**, separado del producto propietario (§0.2). Los dos módulos
@@ -317,7 +317,7 @@ sytueOne/
 ├── apps/fyne/       # Interfaz nativa (escritorio y móvil); su empaquetado, en scripts/
 ├── apps/nucleo/     # Núcleo Go de los clientes nativos, sin toolkit
 ├── apps/mobile/     # Capacitor (Rooms; la suite ya no publica)
-├── deploy/          compose/ (dev local)   helm/ (prod Kapsule)   private-production/ (piloto)
+├── deploy/          compose/ (dev local)   helm/ (prod Kapsule)   helm/ (piloto)
 ├── infra/terraform/ modules/{network,kapsule,database,object-storage,registry,dns,secrets,loadbalancer,livekit}
 │                    environments/{dev,staging,prod}
 ├── branding/        logo/ icons/ tokens/ brand-guidelines.md   (sin themes de motores de terceros)
@@ -394,7 +394,7 @@ calendar/contacts/notes/rooms), notificaciones unificadas (SSE/WS), presencia, *
 
 ## 12. Licencias, propiedad y política clean-room
 
-- **Código de producto Sytue = PROPIETARIO (© Sytue).** No copyleft; no obligación de publicar fuente.
+- **Código de producto Sytue = Apache-2.0 (© 2026 Daniel Delgado Ramos (thinkddr)).** No copyleft;
 - **Reimplementación clean-room:** los productos son **obra original** sobre **estándares abiertos**
   (OIDC, WebDAV, CalDAV, CardDAV, SMTP/IMAP/JMAP, OOXML/ODF, ActivityPub/propio) — las ideas, la
   funcionalidad, el _look & feel_ y los protocolos **no** tienen copyright. **Prohibido** copiar,
@@ -440,7 +440,7 @@ calendar/contacts/notes/rooms), notificaciones unificadas (SSE/WS), presencia, *
   existe en `platform/pkg/` y en `apps/frontend/packages/`, y qué NO se unifica y por qué. Las
   reglas de eficiencia están en [§13.3](#13-3-eficiencia) y qué prueba dejar en
   [§13.4](#13-4-pruebas). El porqué de todo ello, en el [ADR 0037](decisions.md#0037).
-- Documentación de producto en **español**; identificadores en inglés. Licencia del código: **propietaria © Sytue**.
+- Documentación de producto en **español**; identificadores en inglés. Licencia del código: **Apache-2.0, © 2026 Daniel Delgado Ramos (thinkddr)**.
 
 <a id="13-1-idiomas-de-producto"></a>
 

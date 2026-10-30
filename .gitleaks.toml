@@ -1,0 +1,49 @@
+# Config de gitleaks — Sytue One.
+# Reglas por defecto de gitleaks + allowlist de fixtures de test.
+#
+# Los ficheros *_test.go contienen claves/keys de PRUEBA (p. ej. la API key de
+# LiveKit en los tests de meet/cloud, o una clave RSA generada para el test de
+# keycrypto). NO son secretos reales: los reales viven en Scaleway Secret Manager
+# / Sealed Secrets y NUNCA en el código (docs/CONVENTIONS.md §8, §10). Por eso se
+# excluyen del escaneo de secretos, que sí sigue activo sobre el resto del árbol.
+title = "Sytue One — gitleaks"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Fixtures de test y catálogos i18n: cadenas de PRUEBA o de interfaz, no secretos reales (los reales van a Secret Manager)"
+paths = [
+  # API FALSA de Cast para desarrollo y capturas: no entra en el build y sus
+  # «claves» (stream_key…) son datos inventados, como los de los *_test.go.
+  '''apps/frontend/apps/cast/scripts/api-falsa\.ts$''',
+  '''.*_test\.go$''',
+  # Catálogos de traducción: son texto de interfaz. La regla generic-api-key marca
+  # entradas como 'storage.access': 'S3-compatible access' — una clave de diccionario
+  # que acaba en «access» seguida de una frase. No hay secreto posible aquí: estos
+  # ficheros son literales que se muestran al usuario en cinco idiomas.
+  '''apps/frontend/apps/[^/]+/src/i18n/messages/.*\.ts$''',
+  # Vectores de prueba de cifrado de extremo a extremo (LiveKit SFrame y Matrix Olm/Megolm):
+  # sender_key, session_key y key_b64 son material sintético reproducible de los tests.
+  '''test/fixtures/rooms-(livekit-js|matrix-go|matrix-js)\.json$''',
+  # Los dos productores de almacenamiento generan aquí únicamente claves desechables
+  # y exigen artificial=true al consumir el vector del otro SDK.
+  '''test/fixtures/storage-matrix-(go|js)\.json$''',
+]
+# REFERENCIAS a variables de Terraform, no valores. `secret_key = var.hetzner_s3_secret_key`
+# es un puntero a un TF_VAR_* que se inyecta en tiempo de ejecución; el secreto NUNCA está
+# en el repositorio. Se acota por el patrón `= var.…` y no excluyendo los ficheros .tf,
+# para que un secreto pegado de verdad en un .tf siga rompiendo el build.
+# El "secreto" que detecta ES la propia referencia (`var.hetzner_s3_secret_key`), así que
+# la allowlist se compara contra ella, no contra la línea entera.
+regexes = [
+  '''^var\.[a-z0-9_]+$''',
+  # El ALFABETO con el que se generan las contraseñas de aplicación
+  # (services/id/internal/http/account_app_passwords.go): los 32 caracteres que
+  # PUEDE llevar una, no una credencial. Es público por construcción —viaja en el
+  # binario y en la documentación— y su valor está justo en poder leerlo: excluye
+  # los caracteres que se confunden al copiar de una pantalla a un móvil (l/1,
+  # o/0). Se acota al valor exacto: cualquier otra cadena de 32 caracteres sigue
+  # rompiendo el gate.
+  '''^abcdefghijkmnpqrstuvwxyz23456789$''',
+]

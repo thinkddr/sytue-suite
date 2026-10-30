@@ -26,6 +26,9 @@ paths = [
   # Vectores de prueba de cifrado de extremo a extremo (LiveKit SFrame y Matrix Olm/Megolm):
   # sender_key, session_key y key_b64 son material sintético reproducible de los tests.
   '''test/fixtures/rooms-(livekit-js|matrix-go|matrix-js)\.json$''',
+  # Los dos productores de almacenamiento generan aquí únicamente claves desechables
+  # y exigen artificial=true al consumir el vector del otro SDK.
+  '''test/fixtures/storage-matrix-(go|js)\.json$''',
 ]
 # REFERENCIAS a variables de Terraform, no valores. `secret_key = var.hetzner_s3_secret_key`
 # es un puntero a un TF_VAR_* que se inyecta en tiempo de ejecución; el secreto NUNCA está

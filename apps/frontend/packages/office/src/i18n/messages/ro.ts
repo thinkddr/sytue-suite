@@ -1726,6 +1726,8 @@ export const ro: AppCatalog<typeof en> = {
   'extdata.msg.generic': 'Operația nu a putut fi finalizată.',
   'extdata.msg.notAllowed':
     'Doar persoanele de pe lista acestei conexiuni o pot interoga. Cereți administrației organizației dumneavoastră să vă adauge.',
+  'extdata.msg.ownerOnly':
+    'Doar persoana care a creat această conexiune sau administrația organizației o poate modifica sau șterge.',
   'sheet.msg.badValue': 'Valoare nepermisă',
   'sheet.msg.clipboardDenied': 'Browserul a refuzat accesul la clipboard.',
   'sheet.msg.pasteFailed': 'Lipirea nu a reușit',

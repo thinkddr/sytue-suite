@@ -104,6 +104,7 @@
   "gallery.describeStop": "Stop",
   "gallery.described": "{count} fotos beskrevet",
   "gallery.describing": "Beskriver {done} af {total}…",
+  "gallery.downloadCapped": "Fotos uden for denne portion: {count}.",
   "gallery.downloadSelected": "Download",
   "gallery.downloading": {
     "one": "Downloader 1 foto…",

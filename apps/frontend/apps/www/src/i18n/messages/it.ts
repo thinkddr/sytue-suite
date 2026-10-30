@@ -464,7 +464,8 @@ export const it: AppCatalog<typeof en> = {
   'product.cast.f2': 'Riproduzione adattiva in tre qualità: il browser sceglie la migliore.',
   'product.cast.f3':
     'Diretta da un programma di trasmissione via RTMP, con una chiave di streaming per persona.',
-  'product.cast.f4': 'Diretta dal browser o dall’app: fotocamera, schermo e microfono.',
+  'product.cast.f4':
+    'Diretta dal browser o dall’app: fotocamera e microfono. Condivisione dello schermo nei browser, sistemi desktop e Android compatibili; non disponibile nell’app iOS/iPadOS.',
   'product.cast.f5': 'Le registrazioni delle dirette diventano video on demand da sole.',
   'product.cast.f6': 'Una pagina iniziale pubblica e un canale per organizzazione, indicizzabili.',
   'product.cast.f7':

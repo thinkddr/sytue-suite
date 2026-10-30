@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/mail"
 	"net/url"
@@ -111,11 +112,17 @@ var ErrChannelRejected = errors.New("delivery: el canal no aceptó el mensaje")
 
 // Publish manda al canal el asunto y el cuerpo del correo.
 func (b *ChannelBridge) Publish(ctx context.Context, token string, raw []byte) error {
-	parsed, err := mime.Parse(bytes.NewReader(raw))
+	return b.PublishReader(ctx, token, bytes.NewReader(raw), int64(len(raw)))
+}
+
+// PublishReader manda al canal el asunto y el cuerpo leyendo el correo en flujo desde rs.
+func (b *ChannelBridge) PublishReader(ctx context.Context, token string, rs io.ReadSeeker, size int64) error {
+	env, err := mime.ParseSobre(rs, size)
 	if err != nil {
 		return fmt.Errorf("delivery: parsear correo de canal: %w", err)
 	}
-	texto := channelText(parsed.Envelope, mime.ReadBody(raw, channelMailMaxRunes))
+	_, _ = rs.Seek(0, io.SeekStart)
+	texto := channelText(env, mime.ReadBodyReader(rs, channelMailMaxRunes))
 	body, err := json.Marshal(map[string]string{"text": texto})
 	if err != nil {
 		return err
@@ -184,7 +191,11 @@ func remitenteLegible(addr, name string) string {
 // vacaciones» de alguien, y ese alguien tuviera reenvío al canal, el par se retroalimenta.
 // RFC 3834 existe justo para poder cortarlo.
 func esAutomatico(raw []byte) bool {
-	m, err := mail.ReadMessage(bytes.NewReader(raw))
+	return esAutomaticoReader(bytes.NewReader(raw))
+}
+
+func esAutomaticoReader(r io.Reader) bool {
+	m, err := mail.ReadMessage(r)
 	if err != nil {
 		return false
 	}

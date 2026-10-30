@@ -271,6 +271,7 @@
     "one": "{count} nota",
     "other": "{count} notas"
   },
+  "notebook.ownerOnly": "Só quem criou este bloco ou quem administra a organização o pode mover, alterar quem o vê ou cifrar.",
   "notebook.rename": "Mudar o nome",
   "notebook.settings": "Definições do bloco",
   "notebook.title": "Nome",

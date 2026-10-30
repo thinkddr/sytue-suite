@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (c) 2026 Daniel Delgado Ramos
-"""Auditoría ASC sin red ni credenciales: sólo GET, presencia y estados de capturas."""
+"""Auditoría y notas ASC contra una API simulada, sin red ni credenciales reales."""
 import contextlib
 import copy
 import importlib.util
@@ -10,6 +10,8 @@ import json
 import pathlib
 import sys
 import unittest
+from unittest import mock
+from urllib.parse import parse_qs, urlsplit
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 spec = importlib.util.spec_from_file_location("appstore_publicar", pathlib.Path(__file__).with_name("appstore-publicar.py"))
@@ -55,6 +57,182 @@ class API:
 
     def lista(self, ruta):
         return self.pedir("GET", ruta)["data"]
+
+
+class NotasRevision(unittest.TestCase):
+    def test_mac_no_contamina_ios_y_conserva_notas_de_la_app(self):
+        ficha = {"revision": {"notas": "común", "notas_por_plataforma": {"MAC_OS": "listener local"}}}
+        datos = {"notas": "detalle de la app"}
+        self.assertEqual(asc.notas_revision(ficha, datos, "IOS"), "común\n\ndetalle de la app")
+        self.assertEqual(asc.notas_revision(ficha, datos, "MAC_OS"), "común\n\ndetalle de la app\n\nlistener local")
+
+    def test_4000_incluye_el_anexo_y_los_separadores(self):
+        ficha = {"revision": {"notas": "x" * 3995, "notas_por_plataforma": {"MAC_OS": "mac"}}}
+        self.assertEqual(len(asc.notas_revision(ficha, {}, "MAC_OS")), 4000)
+        ficha["revision"]["notas_por_plataforma"]["MAC_OS"] += "x"
+        with self.assertRaisesRegex(RuntimeError, "MAC_OS.*4000"):
+            asc.notas_revision(ficha, {}, "MAC_OS")
+        self.assertEqual(len(asc.notas_revision(ficha, {}, "IOS")), 3995)
+
+    def test_conserva_formato_anterior_sin_anexos(self):
+        self.assertEqual(asc.notas_revision({"revision": {"notas": " común "}}, {"notas": " app "}, "IOS"), "común\n\napp")
+
+    def test_rechaza_plataforma_o_texto_mal_configurados(self):
+        for por_plataforma in ({"ANDROID": "otro"}, {"MAC_OS": None}, "mac"):
+            with self.subTest(por_plataforma=por_plataforma), self.assertRaises(RuntimeError):
+                asc.notas_revision({"revision": {"notas": "común", "notas_por_plataforma": por_plataforma}}, {}, "MAC_OS")
+
+
+class APINotas(API):
+    def __init__(self, apps=("rooms",), plataformas=("IOS", "MAC_OS")):
+        super().__init__()
+        self.escrituras, self.confirmar = [], True
+        self.total = len(apps) * len(plataformas)
+        self.ficha = {"revision": {"notas": "común", "notas_por_plataforma": {"MAC_OS": "listener local"}}, "apps": {}}
+        for app in apps:
+            ident = app + "-app"
+            self.ficha["apps"][app] = {"id": ident, "notas": "detalle de " + app}
+            self.datos[f"/v1/apps/{ident}"] = {"attributes": {"bundleId": asc.bundle_de(app)}}
+            versiones = []
+            for plataforma in plataformas:
+                vid = app + "-" + plataforma
+                versiones.append({"id": "nueva-" + vid, "attributes": {"versionString": "3.14.1", "platform": plataforma, "appStoreState": "PREPARE_FOR_SUBMISSION"}})
+                versiones.append({"id": vid, "attributes": {"versionString": "3.14.0", "platform": plataforma, "appStoreState": "PREPARE_FOR_SUBMISSION"}})
+                self.datos[f"/v1/appStoreVersions/{vid}/appStoreReviewDetail"] = {"id": "rd-" + vid, "attributes": {**{campo: PRIVADO for campo, _ in asc.DATOS_REVISION}, "demoAccountRequired": True, "notes": PRIVADO}}
+            self.datos[f"/v1/apps/{ident}/appStoreVersions"] = versiones
+
+    def lista(self, ruta):
+        datos = super().lista(ruta)
+        if urlsplit(ruta).path.endswith("/appStoreVersions"):
+            plataforma = parse_qs(urlsplit(ruta).query)["filter[platform]"][0]
+            return [v for v in datos if v["attributes"]["platform"] == plataforma]
+        return datos
+
+    def escribir(self, tipo, attrs=None, rels=None, id=None, ruta=None):
+        assert tipo == "appStoreReviewDetails" and set(attrs) == {"notes"} and id and rels is None and ruta is None
+        revisadas = {r.split("?")[0] for r in self.rutas if "/appStoreReviewDetail" in r}
+        assert len(revisadas) == self.total, "se escribió antes del preflight global"
+        self.escrituras.append((id, copy.deepcopy(attrs)))
+        for data in self.datos.values():
+            if isinstance(data, dict) and data.get("id") == id:
+                data["attributes"]["notes"] = attrs["notes"] if self.confirmar else PRIVADO
+                return {"data": copy.deepcopy(data)}
+        raise AssertionError("se escribe otro detalle")
+
+
+class NotasSolamente(unittest.TestCase):
+    def ejecutar(self, api, apps=("rooms",), plataformas=("IOS", "MAC_OS"), version="3.14.0"):
+        out, err = io.StringIO(), io.StringIO()
+
+        class Entorno(dict):
+            def get(self, key, default=None):
+                if key.startswith(("APPSTORE_CONTACTO_", "APPSTORE_DEMO_")):
+                    raise AssertionError("el modo notas leyó datos privados del entorno")
+                return super().get(key, default)
+
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err), mock.patch.object(asc.os, "environ", Entorno()):
+            resultado = asc.actualizar_notas(api, list(apps), api.ficha, list(plataformas), version)
+        self.assertNotIn(PRIVADO, out.getvalue() + err.getvalue())
+        return resultado, out.getvalue(), err.getvalue()
+
+    def test_30_destinos_exactos_sin_tocar_credenciales_builds_o_revisiones(self):
+        apps = asc.las_quince()
+        api = APINotas(apps)
+        resultado, out, _ = self.ejecutar(api, apps)
+        self.assertEqual(resultado, 0)
+        self.assertEqual(len(api.escrituras), 30)
+        resumen = [json.loads(linea) for linea in out.splitlines()]
+        self.assertEqual(len(resumen), 30)
+        self.assertTrue(all(x["notes_equal"] and len(x["notes_sha256"]) == 64 for x in resumen))
+        self.assertTrue(all("nueva-" not in ident for ident, _ in api.escrituras))
+        self.assertTrue(all("/build" not in ruta and "reviewSubmissions" not in ruta for ruta in api.rutas))
+        self.assertTrue(all("fields[appStoreReviewDetails]=notes" in ruta for ruta in api.rutas if "/appStoreReviewDetail" in ruta))
+        for data in api.datos.values():
+            if isinstance(data, dict) and str(data.get("id", "")).startswith("rd-"):
+                self.assertTrue(data["attributes"]["demoAccountRequired"])
+                self.assertTrue(all(data["attributes"][campo] == PRIVADO for campo, _ in asc.DATOS_REVISION))
+
+    def test_plataforma_seleccionada_y_sin_submission_guard(self):
+        api = APINotas(plataformas=("IOS",))
+        api.datos["/v1/reviewSubmissions"] = [{"attributes": {"state": "UNRESOLVED_ISSUES"}}]
+        self.assertEqual(self.ejecutar(api, plataformas=("IOS",))[0], 0)
+        self.assertEqual([x[0] for x in api.escrituras], ["rd-rooms-IOS"])
+
+    def test_preflight_global_falla_sin_version_detalle_o_estado_editable(self):
+        apps = asc.las_quince()
+        for fallo in ("version", "ambigua", "detalle", "estado"):
+            with self.subTest(fallo=fallo):
+                api = APINotas(apps)
+                ultima = apps[-1]
+                versiones = api.datos[f"/v1/apps/{ultima}-app/appStoreVersions"]
+                if fallo == "version":
+                    api.datos[f"/v1/apps/{ultima}-app/appStoreVersions"] = [v for v in versiones if v["attributes"]["platform"] != "MAC_OS"]
+                elif fallo == "ambigua":
+                    versiones.append(copy.deepcopy(next(v for v in versiones if v["id"] == ultima + "-MAC_OS")))
+                elif fallo == "detalle":
+                    api.datos[f"/v1/appStoreVersions/{ultima}-MAC_OS/appStoreReviewDetail"] = None
+                else:
+                    next(v for v in versiones if v["id"] == ultima + "-MAC_OS")["attributes"]["appStoreState"] = "IN_REVIEW"
+                self.assertEqual(self.ejecutar(api, apps)[0], 1)
+                self.assertEqual(api.escrituras, [])
+
+    def test_notas_ya_iguales_no_se_reescriben(self):
+        api = APINotas(plataformas=("MAC_OS",))
+        esperado = asc.notas_revision(api.ficha, api.ficha["apps"]["rooms"], "MAC_OS")
+        api.datos["/v1/appStoreVersions/rooms-MAC_OS/appStoreReviewDetail"]["attributes"]["notes"] = esperado
+        resultado, out, _ = self.ejecutar(api, plataformas=("MAC_OS",))
+        self.assertEqual(resultado, 0)
+        self.assertEqual(api.escrituras, [])
+        self.assertEqual(json.loads(out)["changed"], False)
+        self.assertTrue(json.loads(out)["notes_equal"])
+
+    def test_recomprueba_estado_destino_y_sanea_errores_antes_del_patch(self):
+        for fallo in ("estado", "version_id", "detalle_id", "error"):
+            with self.subTest(fallo=fallo):
+                api = APINotas(plataformas=("IOS",))
+                original = api.lista
+                llamadas = 0
+
+                def lista(ruta):
+                    nonlocal llamadas
+                    llamadas += 1
+                    if llamadas == 2:
+                        v = api.datos["/v1/apps/rooms-app/appStoreVersions"][1]
+                        if fallo == "estado":
+                            v["attributes"]["appStoreState"] = "WAITING_FOR_REVIEW"
+                        elif fallo == "version_id":
+                            v["id"] = "otro-id"
+                            api.datos["/v1/appStoreVersions/otro-id/appStoreReviewDetail"] = {"id": "otro-detalle"}
+                        elif fallo == "detalle_id":
+                            api.datos["/v1/appStoreVersions/rooms-IOS/appStoreReviewDetail"]["id"] = "otro-detalle"
+                        else:
+                            raise RuntimeError(PRIVADO)
+                    return original(ruta)
+
+                api.lista = lista
+                resultado, _, _ = self.ejecutar(api, plataformas=("IOS",))
+                self.assertEqual(resultado, 1)
+                self.assertEqual(api.escrituras, [])
+
+    def test_readback_no_confirmado_es_rojo_sin_volcar_notas(self):
+        api = APINotas(plataformas=("IOS",))
+        api.confirmar = False
+        resultado, out, _ = self.ejecutar(api, plataformas=("IOS",))
+        self.assertEqual(resultado, 1)
+        self.assertFalse(json.loads(out)["notes_equal"])
+
+    def test_limite_utf8_del_anexo_mac_no_es_solo_numero_de_caracteres(self):
+        ficha = {"revision": {"notas": "ñ" * 2000}}
+        self.assertEqual(len(asc.notas_revision(ficha, {}, "MAC_OS").encode("utf-8")), 4000)
+        ficha["revision"]["notas"] += "ñ"
+        with self.assertRaisesRegex(RuntimeError, "MAC_OS.*4000"):
+            asc.notas_revision(ficha, {}, "MAC_OS")
+
+    def test_notas_requiere_version_antes_de_credenciales(self):
+        out = io.StringIO()
+        with contextlib.redirect_stderr(out), mock.patch.object(asc, "Apple", side_effect=AssertionError("leyó credenciales")):
+            self.assertEqual(asc.main(["--notas", "rooms"]), 2)
+        self.assertIn("notas requiere --version", out.getvalue())
 
 
 class Preparacion(unittest.TestCase):

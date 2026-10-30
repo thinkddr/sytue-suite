@@ -31,8 +31,8 @@ mal() {
   fallos=1
 }
 
-if ! grep -qx 'replace fyne.io/fyne/v2 => github.com/thinkddr/fyne/v2 v2.8.2-sytue.1' "$FYNE/go.mod"; then
-  mal "apps/fyne debe usar el fork público BSD-3-Clause/Apache-2.0 que recibe URL entrantes de Fyne v2.8.2"
+if ! grep -qx 'replace fyne.io/fyne/v2 => github.com/thinkddr/fyne/v2 v2.8.2-sytue.2' "$FYNE/go.mod"; then
+  mal "apps/fyne debe usar el fork mantenido con URL entrantes y geometría UIKit de Fyne v2.8.2"
 fi
 
 command -v go >/dev/null 2>&1 || {
@@ -858,6 +858,8 @@ case "$url" in
 */bundles)
   if [ "${PLAY_ESCENARIO:-}:$paquete" = interno-falta:eu.sytue.rooms ]; then
     respuesta='{"bundles":[]}'
+  elif [[ "${PLAY_ESCENARIO:-}" == interno-coexistente* ]]; then
+    respuesta='{"bundles":[{"versionCode":3014001}]}'
   else
     respuesta='{"bundles":[{"versionCode":3013004}]}'
   fi
@@ -872,6 +874,46 @@ case "$url" in
     fi
   else
   case "${PLAY_ESCENARIO:-}:$paquete" in
+  interno-par-*:*)
+    respuesta='{"track":"internal","releases":[{"name":"Borrador","versionCodes":["3013004"],"status":"draft","releaseNotes":[{"language":"es-ES","text":"Notas del borrador"}],"countryTargeting":{"countries":["ES"]},"inAppUpdatePriority":3},{"name":"Activo","versionCodes":["3013003"],"status":"completed","releaseNotes":[{"language":"es-ES","text":"Notas del activo"}],"countryTargeting":{"countries":["DE"]},"inAppUpdatePriority":1}]}'
+    case "${PLAY_ESCENARIO:-}:$paquete" in
+    interno-par-activo-primero:*) respuesta="$(jq '.releases |= reverse' <<<"$respuesta")" ;;
+    interno-par-dos-drafts:eu.sytue.rooms) respuesta="$(jq '.releases[1].status="draft"' <<<"$respuesta")" ;;
+    interno-par-dos-completed:eu.sytue.rooms) respuesta="$(jq '.releases[0].status="completed"' <<<"$respuesta")" ;;
+    interno-par-parcial:eu.sytue.rooms) respuesta="$(jq '.releases[1].status="inProgress" | .releases[1].userFraction=0.5' <<<"$respuesta")" ;;
+    interno-par-otro-tag:eu.sytue.rooms) respuesta="$(jq '.releases[0].versionCodes=["3013005"]' <<<"$respuesta")" ;;
+    interno-par-mezclado:eu.sytue.rooms) respuesta="$(jq '.releases[0].versionCodes=["3013004","3013005"]' <<<"$respuesta")" ;;
+    interno-par-igual:eu.sytue.rooms) respuesta="$(jq '.releases[1].versionCodes=["3013004"]' <<<"$respuesta")" ;;
+    interno-par-futuro:eu.sytue.rooms) respuesta="$(jq '.releases[1].versionCodes=["3013005"]' <<<"$respuesta")" ;;
+    interno-par-duplicado:eu.sytue.rooms) respuesta="$(jq '.releases[1].versionCodes=["3013003","3013003"]' <<<"$respuesta")" ;;
+    interno-par-texto:eu.sytue.rooms) respuesta="$(jq '.releases[1].versionCodes=["no-numerico"]' <<<"$respuesta")" ;;
+    interno-par-vacio:eu.sytue.rooms) respuesta="$(jq '.releases[1].versionCodes=[]' <<<"$respuesta")" ;;
+    interno-par-fraccion:eu.sytue.rooms) respuesta="$(jq '.releases[0].userFraction=0.5' <<<"$respuesta")" ;;
+    interno-par-halted:eu.sytue.rooms) respuesta="$(jq '.releases[1].status="halted"' <<<"$respuesta")" ;;
+    interno-par-tres:eu.sytue.rooms) respuesta="$(jq '.releases += [.releases[1]]' <<<"$respuesta")" ;;
+    esac
+    ;;
+  interno-vacio:*) respuesta='{"track":"internal","releases":[]}' ;;
+  interno-coexistente*:*)
+    respuesta='{"track":"internal","releases":[{"versionCodes":["3014001"],"status":"draft","name":"NO-MOSTRAR","releaseNotes":[{"language":"es-ES","text":"NO-MOSTRAR"}],"inAppUpdatePriority":2},{"versionCodes":["3014000"],"status":"completed","name":"NO-MOSTRAR"}]}'
+    case "$PLAY_ESCENARIO" in
+    interno-coexistente-inverso) respuesta="$(jq '.releases |= reverse' <<<"$respuesta")" ;;
+    interno-coexistente-duplicado) respuesta="$(jq '.releases[1].versionCodes=["3014001"]' <<<"$respuesta")" ;;
+    interno-coexistente-mixto) respuesta="$(jq '.releases[0].versionCodes += ["3014000"]' <<<"$respuesta")" ;;
+    interno-coexistente-ausente) respuesta="$(jq '.releases[0].versionCodes=["3014002"]' <<<"$respuesta")" ;;
+    interno-coexistente-ajeno-draft) respuesta="$(jq '.releases[1].status="draft"' <<<"$respuesta")" ;;
+    interno-coexistente-ajeno-nuevo) respuesta="$(jq '.releases[1].versionCodes=["3014002"]' <<<"$respuesta")" ;;
+    interno-coexistente-ajeno-mixto) respuesta="$(jq '.releases[1].versionCodes += ["3013999"]' <<<"$respuesta")" ;;
+    interno-coexistente-ajeno-numero) respuesta="$(jq '.releases[1].versionCodes=[3014000]' <<<"$respuesta")" ;;
+    interno-coexistente-ajeno-enorme) respuesta="$(jq '.releases[1].versionCodes=["999999999999999999999999999999"]' <<<"$respuesta")" ;;
+    interno-coexistente-desconocido) respuesta="$(jq '.releases[0].status="future"' <<<"$respuesta")" ;;
+    interno-coexistente-fraccion) respuesta="$(jq '.releases[0].userFraction=0.5' <<<"$respuesta")" ;;
+    interno-coexistente-tres) respuesta="$(jq '.releases += [{versionCodes:["3013999"],status:"completed"}]' <<<"$respuesta")" ;;
+    esac
+    ;;
+  interno-track-invalido:eu.sytue.rooms) respuesta='{"track":"qa","releases":[{"versionCodes":["3013004"],"status":"draft","name":"NO-MOSTRAR","releaseNotes":[{"language":"es-ES","text":"NO-MOSTRAR"}]}]}' ;;
+  interno-multiples:eu.sytue.rooms) respuesta='{"track":"internal","releases":[{"versionCodes":["3013003"],"status":"draft","name":"NO-MOSTRAR"},{"versionCodes":["3013004"],"status":"draft"}]}' ;;
+  interno-parcial:eu.sytue.rooms) respuesta='{"track":"internal","releases":[{"versionCodes":["3013004"],"status":"inProgress","userFraction":0.5,"name":"NO-MOSTRAR"}]}' ;;
   interno-completado:*) respuesta='{"track":"internal","releases":[{"versionCodes":["3013004"],"status":"completed"}]}' ;;
   interno-anterior:*) respuesta='{"track":"internal","releases":[{"name":"Anterior","versionCodes":["3013003"],"status":"completed","releaseNotes":[{"language":"es-ES","text":"Notas revisadas"}],"countryTargeting":{"countries":["ES"]},"inAppUpdatePriority":2}]}' ;;
   interno-*:*) respuesta='{"track":"internal","releases":[{"name":"Conservar","versionCodes":["3013004"],"status":"draft","releaseNotes":[{"language":"es-ES","text":"Notas revisadas"}],"countryTargeting":{"countries":["ES"]},"inAppUpdatePriority":2}]}' ;;
@@ -955,6 +997,56 @@ SH
   grep -q 'testers-privados@example.com' "$falso/interno" && mal "el sondeo internal revela los grupos privados"
   [ "$(grep -c '^DELETE .*edits/e1$' "$falso/peticiones")" = 2 ] || mal "el sondeo internal deja ediciones abiertas"
 
+  for escenario in interno-coexistente interno-coexistente-inverso; do
+    interno_falso "$escenario" sondear v3.14.1 || mal "no se consulta el borrador junto a la versión activa: $escenario"
+    grep -qE '^(PUT|PATCH)|:commit' "$falso/peticiones" && mal "consultar dos releases modifica una pista"
+    [ "$(grep -c '^GET .*testers/internal$' "$falso/peticiones")" = 2 ] || mal "la consulta de dos releases pierde la lectura de probadores"
+    [ "$(grep -c '^DELETE .*edits/e1$' "$falso/peticiones")" = 2 ] || mal "la consulta de dos releases deja ediciones abiertas"
+    grep -qE 'NO-MOSTRAR|testers-privados@example.com' "$falso/interno" && mal "la consulta de dos releases revela notas, nombres o grupos"
+    python3 - "$falso/interno" <<'PY' || mal "el sondeo no conserva las dos versiones y sus estados sin confundir el tag"
+import json, sys
+filas = [json.loads(linea) for linea in open(sys.argv[1]) if linea.startswith('{"app":')]
+assert len(filas) == 2
+for fila in filas:
+    assert set(fila) == {"app", "expectedVersionCode", "internal", "googleGroups", "emailListsVisibleViaAPI"}
+    assert fila["expectedVersionCode"] == "3014001"
+    assert fila["googleGroups"] == 1 and fila["emailListsVisibleViaAPI"] is False
+    assert sorted(fila["internal"], key=lambda release: release["versionCodes"]) == [
+        {"versionCodes": ["3014000"], "status": "completed"},
+        {"versionCodes": ["3014001"], "status": "draft"},
+    ]
+PY
+    interno_falso "$escenario" completed v3.14.1 || mal "no se completa el borrador exacto junto a la versión anterior"
+    [ "$(grep -c '^PUT .*tracks/internal$' "$falso/peticiones")" = 2 ] || mal "no se completa exactamente el borrador de las dos apps"
+    [ "$(grep -c '^POST .*:commit' "$falso/peticiones")" = 2 ] || mal "no se confirman exactamente las dos pistas internas"
+    grep -qE 'tracks/production|/listings/|/bundles\?uploadType|/testers/.*$' <(grep -E '^(PUT|PATCH|POST)' "$falso/peticiones") &&
+      mal "completar el borrador coexistente modifica producción, ficha, bundles o probadores"
+  done
+  for escenario in duplicado mixto ausente ajeno-draft ajeno-nuevo ajeno-mixto ajeno-numero ajeno-enorme desconocido fraccion tres; do
+    interno_falso "interno-coexistente-$escenario" sondear v3.14.1 && mal "el sondeo acepta releases ambiguas: $escenario"
+    grep -qE '^(PUT|PATCH)|:commit' "$falso/peticiones" && mal "un sondeo ambiguo modifica pistas"
+    [ "$(grep -c '^DELETE .*edits/e1$' "$falso/peticiones")" = 2 ] || mal "un sondeo ambiguo deja ediciones abiertas"
+    grep -qE 'NO-MOSTRAR|testers-privados@example.com' "$falso/interno" && mal "el diagnóstico ambiguo revela notas, nombres o grupos"
+  done
+  echo 'ok - sondear admite el borrador exacto y la anterior activa; completed selecciona ese borrador; los estados ambiguos siguen bloqueados sin escrituras'
+
+  for escenario in interno-track-invalido interno-multiples interno-parcial; do
+    interno_falso "$escenario" sondear && mal "internal acepta $escenario"
+    grep -qE '^(PUT|PATCH)|:commit' "$falso/peticiones" && mal "un sondeo internal rechazado modifica pistas"
+    [ "$(grep -c '^DELETE .*edits/e1$' "$falso/peticiones")" = 2 ] || mal "un sondeo internal rechazado deja ediciones abiertas"
+    grep -qE 'NO-MOSTRAR|testers-privados@example.com' "$falso/interno" && mal "el diagnóstico internal revela datos libres o grupos privados"
+    python3 - "$falso/interno" <<'PY' || mal "internal no explica el rechazo con metadatos filtrados"
+import json, sys
+filas = [json.loads(linea) for linea in open(sys.argv[1]) if linea.startswith('{"app":')]
+rechazo = next(fila for fila in filas if fila["app"] == "rooms")
+assert set(rechazo) == {"app", "internal"}
+assert set(rechazo["internal"]) == {"track", "releases"}
+assert isinstance(rechazo["internal"]["track"], str)
+assert rechazo["internal"]["releases"]
+assert all(set(release) == {"versionCodes", "status"} for release in rechazo["internal"]["releases"])
+PY
+  done
+
   for escenario in interno-normal interno-anterior; do
     interno_falso "$escenario" completed || mal "no se completa internal con el AAB ya presente"
     [ "$(grep -c '^PUT .*tracks/internal$' "$falso/peticiones")" = 2 ] || mal "internal no actualiza exactamente las dos apps"
@@ -973,6 +1065,33 @@ SH
   grep -qE '^PUT|:commit' "$falso/peticiones" && mal "un tag diferente modifica una pista"
   interno_falso interno-rechazado completed && mal "se oculta el rechazo draft de Google"
   grep -q 'Only releases with status draft' "$falso/interno" || mal "se pierde el motivo del rechazo internal"
+  interno_falso interno-vacio completed || mal "internal vacío no admite el bundle ya subido"
+  for escenario in interno-par-borrador-primero interno-par-activo-primero; do
+    interno_falso "$escenario" sondear || mal "el sondeo rechaza el draft del tag junto al completed anterior"
+    grep -qE '^(PUT|PATCH)|:commit' "$falso/peticiones" && mal "sondear el par modifica pistas"
+    [ "$(grep -c '^DELETE .*edits/e1$' "$falso/peticiones")" = 2 ] || mal "sondear el par deja ediciones abiertas"
+    interno_falso "$escenario" completed || mal "no se completa el draft del tag junto al completed anterior"
+    [ "$(grep -c '^PUT .*tracks/internal$' "$falso/peticiones")" = 2 ] || mal "el par no publica exactamente las dos apps"
+    jq -e '.releases | length == 1 and .[0].versionCodes == ["3013004"] and .[0].status == "completed" and
+      .[0].releaseNotes[0].text == "Notas del borrador" and .[0].countryTargeting.countries == ["ES"] and
+      .[0].inAppUpdatePriority == 3' "$falso/internos/eu.sytue.mail.json" >/dev/null ||
+      mal "el par hereda campos del activo por posición o pierde el pin"
+  done
+  for escenario in dos-drafts dos-completed parcial otro-tag mezclado igual futuro duplicado texto vacio fraccion halted tres; do
+    interno_falso "interno-par-$escenario" completed && mal "internal acepta un par ambiguo: $escenario"
+    grep -qE '^(PUT|PATCH)|:commit' "$falso/peticiones" && mal "el par inválido modifica otra app: $escenario"
+    [ "$(grep -c '^DELETE .*edits/e1$' "$falso/peticiones")" = 2 ] || mal "el par inválido deja ediciones: $escenario"
+  done
+  # Producción mantiene un pin distinto: no admite aún un completed anterior.
+  : >"$falso/peticiones"
+  PATH="$falso/bin:$PATH" PLAY_ESCENARIO=interno-par-borrador-primero PLAY_CREDENCIALES="$falso/cuenta.json" \
+    RUNNER_TEMP="$falso" PLAY_CONFIRMAR_PRODUCCION=PUBLICAR_15_APPS \
+    "$PLAY_GUION" --produccion --tag v3.13.4 --estado draft >"$falso/produccion-par" 2>&1 &&
+    mal "producción acepta el par antes de completar la actualización interna"
+  grep -qE '^(PUT|PATCH)|:commit' "$falso/peticiones" && mal "el par interno permite modificar production"
+  [ "$(grep -c '^DELETE .*edits/e1$' "$falso/peticiones")" = 15 ] || mal "el rechazo de production deja ediciones abiertas"
+  [ "$(grep -c 'internal debe contener exclusivamente versionCode 3013004' "$falso/produccion-par")" = 15 ] ||
+    mal "el rechazo de production no procede de su pin independiente"
   echo 'ok - internal consulta sin publicar y completa sólo el tag conservando probadores y targeting'
   "$PLAY_GUION" --interno --tag v3.13.4 --estado completed mail mail >/dev/null 2>&1 &&
     mal "internal acepta dos ediciones simultáneas de la misma app"
@@ -1209,7 +1328,7 @@ SH
   # Control negativo: al quitar el pin, el mismo guardián debe rechazar la mutación.
   mutacion="$falso/mutacion"
   mkdir -p "$mutacion/scripts"
-  sed 's/^    \.track == "internal" and .*/    true/' \
+  sed '/^preparar_produccion()/,/^}/s/^    \.track == "internal" and .*/    true/' \
     "$PLAY_GUION" >"$mutacion/scripts/play-publicar.sh"
   chmod +x "$mutacion/scripts/play-publicar.sh"
   ln -s "$AQUI/empaquetar.sh" "$mutacion/scripts/empaquetar.sh"
@@ -1750,11 +1869,13 @@ pie="$tmp/bin-pie"
 "$GUION" verificar-pie "$pie" >/dev/null 2>&1 || mal "el guardián rechaza un binario PIE"
 "$GUION" verificar-pie "$amd64" >/dev/null 2>&1 && mal "el guardián da por PIE un binario que no lo es"
 
-# --- FYP-05: UninstallString entre comillas -------------------------------------
+# --- FYP-05: UninstallString y QuietUninstallString entre comillas --------------
 # La carpeta lleva espacio («Sytue One»): sin comillas, Windows prueba antes
 # «…\Programs\Sytue.exe».
 grep -qF "\"UninstallString\" '\"\\\$INSTDIR\\\\Desinstalar.exe\"'" "$GUION" ||
   mal "el UninstallString del instalador de Windows no va entre comillas"
+grep -qF "\"QuietUninstallString\" '\"\\\$INSTDIR\\\\Desinstalar.exe\" /S'" "$GUION" ||
+  mal "el QuietUninstallString del instalador de Windows no lleva la ruta entre comillas"
 
 # --- FYP-07: lo que escribe `fyne build` al compilar no ensucia el árbol --------
 git -C "$RAIZ" check-ignore -q apps/fyne/cmd/drive/fyne_metadata_init.go ||

@@ -344,3 +344,54 @@ func TestUnPUTVacioCreaElFichero(t *testing.T) {
 		t.Fatal("el PUT vacío no creó el fichero")
 	}
 }
+
+// Clientes reales (Windows WebClient, Finder, Office): PROPPATCH no debe abrir el
+// fichero como writeFile (truncándolo a 0 bytes), MOVE sin cabecera Overwrite
+// sobrescribe por defecto (RFC 4918 §9.9.3) y la cabecera If con ruta sin esquema
+// ni host (</dav/...>) desbloquea igual que con URL absoluta.
+func TestPROPPATCHNoTruncaFicheroYCabecerasClientesReales(t *testing.T) {
+	d := &driveFalso{ficheros: map[string][]byte{
+		"informe.docx": []byte("contenido intacto"),
+		"temp.tmp":     []byte("version nueva"),
+	}}
+	h := manejador("/dav", &FileSystem{svc: d})
+
+	const proppatchBody = `<?xml version="1.0" encoding="utf-8" ?>
+<D:propertyupdate xmlns:D="DAV:" xmlns:Z="urn:schemas-microsoft-com:">
+  <D:set><D:prop><Z:Win32LastModifiedTime>Thu, 29 Oct 2026 10:00:00 GMT</Z:Win32LastModifiedTime></D:prop></D:set>
+</D:propertyupdate>`
+	rec := pedirComo(h, "acme", "PROPPATCH", "/dav/informe.docx", strings.NewReader(proppatchBody))
+	if rec.Code != http.StatusMultiStatus {
+		t.Fatalf("PROPPATCH = %d: %s", rec.Code, rec.Body.String())
+	}
+	if got := string(d.ficheros["informe.docx"]); got != "contenido intacto" {
+		t.Fatalf("PROPPATCH truncó el fichero: %q", got)
+	}
+
+	// Bloquear informe.docx y escribir enviando If con ruta relativa (Windows WebClient / Office).
+	const lockinfo = `<?xml version="1.0" encoding="utf-8"?><D:lockinfo xmlns:D="DAV:"><D:lockscope><D:exclusive/></D:lockscope><D:locktype><D:write/></D:locktype><D:owner>office</D:owner></D:lockinfo>`
+	recLock := pedirComo(h, "acme", "LOCK", "/dav/informe.docx", strings.NewReader(lockinfo), "Depth", "0")
+	if recLock.Code != http.StatusOK {
+		t.Fatalf("LOCK = %d: %s", recLock.Code, recLock.Body.String())
+	}
+	token := strings.Trim(recLock.Header().Get("Lock-Token"), "<>")
+	if token == "" {
+		t.Fatalf("LOCK sin Lock-Token: %v", recLock.Header())
+	}
+
+	recPut := pedirComo(h, "acme", http.MethodPut, "/dav/informe.docx", strings.NewReader("editado con lock"),
+		"If", "</dav/informe.docx> (<"+token+">)")
+	if recPut.Code != http.StatusNoContent && recPut.Code != http.StatusCreated {
+		t.Fatalf("PUT con If de ruta relativa = %d: %s", recPut.Code, recPut.Body.String())
+	}
+
+	// Desbloquear y probar MOVE sin cabecera Overwrite sobre un destino existente (Finder / Office).
+	pedirComo(h, "acme", "UNLOCK", "/dav/informe.docx", http.NoBody, "Lock-Token", "<"+token+">")
+	recMove := pedirComo(h, "acme", "MOVE", "/dav/temp.tmp", http.NoBody, "Destination", "/dav/informe.docx")
+	if recMove.Code != http.StatusNoContent && recMove.Code != http.StatusCreated {
+		t.Fatalf("MOVE sin Overwrite sobre destino existente = %d: %s", recMove.Code, recMove.Body.String())
+	}
+	if got := string(d.ficheros["informe.docx"]); got != "version nueva" {
+		t.Fatalf("tras MOVE esperaba 'version nueva', obtuve %q", got)
+	}
+}

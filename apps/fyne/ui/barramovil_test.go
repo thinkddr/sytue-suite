@@ -11,6 +11,7 @@ import (
 	"fyne.io/fyne/v2/test"
 
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
+	"git.sytue.eu/sytue/one/apps/fyne/tema"
 )
 
 // TestLaBarraMovilEsLaDeAppShell: `h-11` (38,5) con el botón de 28 a `px-4`, centrado
@@ -80,5 +81,26 @@ func TestElBotonFlotanteSoloEnElTelefono(t *testing.T) {
 	capa.Resize(fyne.NewSize(1280, 800))
 	if fab.Visible() {
 		t.Error("en ancho el botón flotante sigue a la vista y es `md:hidden`")
+	}
+}
+
+// El cambio de forma llegaba con enCarril todavía activo y pedía frame-from en
+// Carril, donde ese token no existe: SetTheme entraba en pánico.
+func TestLaBarraMovilConservaElCarrilAlGirarYCambiarLaForma(t *testing.T) {
+	enMarco(t)
+	b := NuevaBarraMovil()
+	b.AlMenu = func() {}
+	b.enCarril, b.anchoMarco = true, 568
+	b.Resize(fyne.NewSize(AnchoCarrilMovil, 268))
+	r := test.WidgetRenderer(b).(*barraMovilRenderer)
+	for _, forma := range []string{"marco", "carril", "marco"} {
+		tema.ElegirForma(forma)
+		b.Refresh()
+		if r.titulo.Visible() || r.boton.Trazo != "sidebar-fg" {
+			t.Fatalf("%s: el carril perdió el contraste o recuperó el título", forma)
+		}
+		if forma == "carril" && (!r.fondo.Visible() || r.fondo.FillColor != FondoCarril(tema.De(fyne.CurrentApp().Settings().ThemeVariant()))) {
+			t.Fatal("Carril no conserva el fondo de la navegación")
+		}
 	}
 }

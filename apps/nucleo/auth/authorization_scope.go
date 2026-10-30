@@ -6,6 +6,7 @@ package auth
 import (
 	"context"
 	"crypto/sha256"
+	"errors"
 )
 
 // IdentitySnapshot is the session's existing non-secret identity, read under one
@@ -39,9 +40,24 @@ type AuthorizationScope struct {
 func (s *Session) AccessTokenScoped(ctx context.Context) (string, *AuthorizationScope, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	intent := RequestAuthorizationIntent(ctx)
+	if err := ctx.Err(); err != nil {
+		return "", nil, err
+	}
+	if intent != nil && !intent.currentLocked(s) {
+		return "", nil, ErrAuthorizationChanged
+	}
 	token, err := s.accessToken(ctx)
 	if err != nil {
 		return "", nil, err
+	}
+	if intent != nil {
+		if intent.identity != s.identityLocked() {
+			return "", nil, ErrAuthorizationChanged
+		}
+		// This acquisition may have renewed the same identity under this lock.
+		// Other adoptions cannot run between the check and this update.
+		intent.revision = s.revision
 	}
 	if token == "" {
 		return token, nil, nil
@@ -71,4 +87,62 @@ func WithAuthorizationScope(ctx context.Context, scope *AuthorizationScope) cont
 func RequestAuthorizationScope(ctx context.Context) *AuthorizationScope {
 	scope, _ := ctx.Value(authorizationScopeKey{}).(*AuthorizationScope)
 	return scope
+}
+
+// ErrAuthorizationChanged rejects an operation begun in a different session.
+var ErrAuthorizationChanged = errors.New("auth: authorization identity changed")
+
+// AuthorizationIntent binds a user's action before token acquisition. Unlike an
+// issued AuthorizationScope it contains no header, token or token fingerprint.
+// Its revision is read and updated only under its session's mutex.
+type AuthorizationIntent struct {
+	session  *Session
+	revision uint64
+	identity IdentitySnapshot
+}
+
+type authorizationIntentKey struct{}
+
+// WithAuthorizationIntent captures this session now, before any asynchronous
+// work. Reusing the resulting context cannot adopt a later account on a 401.
+func (s *Session) WithAuthorizationIntent(ctx context.Context) context.Context {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	intent := &AuthorizationIntent{s, s.revision, s.identityLocked()}
+	return context.WithValue(ctx, authorizationIntentKey{}, intent)
+}
+
+func RequestAuthorizationIntent(ctx context.Context) *AuthorizationIntent {
+	intent, _ := ctx.Value(authorizationIntentKey{}).(*AuthorizationIntent)
+	return intent
+}
+
+func (i *AuthorizationIntent) currentLocked(s *Session) bool {
+	return i != nil && i.session == s && i.revision == s.revision &&
+		i.identity.Subject != "" && i.identity == s.identityLocked()
+}
+
+// Current excludes appearance/presence changes, and rejects adoption including ABA.
+func (i *AuthorizationIntent) Current() bool {
+	if i == nil || i.session == nil {
+		return false
+	}
+	i.session.mu.Lock()
+	defer i.session.mu.Unlock()
+	return i.currentLocked(i.session)
+}
+
+// Allows requires the issued authorization and the earlier intent to belong to
+// the same Session instance and identity, including through SDK wrappers.
+func (i *AuthorizationIntent) Allows(scope *AuthorizationScope, header string) bool {
+	return i != nil && scope != nil && i.session == scope.session && i.identity == scope.identity &&
+		i.Current() && scope.Current(header)
+}
+
+// Identity is the non-secret identity captured with this intent, never a new snapshot.
+func (i *AuthorizationIntent) Identity() IdentitySnapshot {
+	if i == nil {
+		return IdentitySnapshot{}
+	}
+	return i.identity
 }

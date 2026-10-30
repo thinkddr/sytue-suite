@@ -34,7 +34,10 @@ type Cinta struct {
 	registro *Registro
 	// activa es el índice dentro de las pestañas VISIBLES, no del registro entero:
 	// cambiar de tipo de documento cambia cuáles se ven.
-	activa int
+	activa       int
+	compacta     bool
+	selector     *ChipCinta
+	menuPestanas *ui.Menu
 
 	archivo          *BotonArchivo
 	envolturaArchivo *fyne.Container
@@ -68,6 +71,7 @@ func NuevaCinta(ctx *Contexto, r *Registro) *Cinta {
 	c.sepMas = canvas.NewRectangle(tema.Color("border", v))
 	c.mas = NuevoChipCinta(ctx.Traducir("ribbon.more"), ctx.Traducir("ribbon.moreHint"), c.alternarMas)
 	c.mas.Plano = true
+	c.selector = NuevoChipCinta("", ctx.Traducir("ribbon.label"), c.abrirPestanas)
 	c.ExtendBaseWidget(c)
 	c.reconstruir()
 	return c
@@ -89,10 +93,19 @@ func (c *Cinta) Elegir(i int) {
 	c.Refresh()
 }
 
-// Alto es lo que ocupa la cinta a ese ancho: la tira y la banda y, por debajo de `md`,
-// la tira y la banda estrecha, siempre visible y sin envolver.
+// bandaEstrecha conserva una fila de comandos sin rótulos en TODA pantalla táctil,
+// incluida la tableta. Con puntero fino se mantiene el corte de ancho de escritorio.
+func bandaEstrecha(ancho float32) bool {
+	return ui.EsTactil() || (ancho > 0 && ancho < ui.CorteMD)
+}
+
+// Alto es lo que ocupa la cinta: las pestañas y una banda de comandos, estrecha
+// con el dedo o por debajo de `md`, siempre visible y sin envolver.
 func (c *Cinta) Alto(ancho float32) float32 {
-	if ancho >= ui.CorteMD || ancho <= 0 {
+	if c.compacta {
+		return AltoBandaEstrecha
+	}
+	if !bandaEstrecha(ancho) {
 		return AltoCinta()
 	}
 	if c.cuerpo == nil {
@@ -139,6 +152,14 @@ func (c *Cinta) reconstruir() {
 	c.cuerpo = nil
 	if len(vis) > 0 && vis[c.activa].Cuerpo != nil {
 		c.cuerpo = vis[c.activa].Cuerpo(c.ctx)
+	}
+	if propios, ok := c.ctx.Lienzo.(ComandosCompactos); ok && c.compacta {
+		objetos := []fyne.CanvasObject{NuevoGrupo("", propios.ComandosCompactos()...)}
+		if c.cuerpo != nil {
+			objetos = append(objetos, SeparadorGrupos())
+			objetos = append(objetos, objetosDeBanda(c.cuerpo)...)
+		}
+		c.cuerpo = Grupos(objetos...)
 	}
 	if c.cuerpo != nil {
 		// `px-2` dentro de lo que se desplaza: el primer grupo empieza a 8 y, desplazada
@@ -271,7 +292,7 @@ func AltoCinta() float32 { return AltoDeTira() + AltoBanda }
 // MinSize es la medida declarada.
 func (c *Cinta) MinSize() fyne.Size {
 	c.ExtendBaseWidget(c)
-	return fyne.NewSize(0, AltoCinta())
+	return fyne.NewSize(0, c.Alto(0))
 }
 
 // CreateRenderer compone los dos fondos, sus líneas, las pestañas y el cuerpo.
@@ -297,7 +318,7 @@ func (r *cintaRenderer) MinSize() fyne.Size { return r.c.MinSize() }
 func (r *cintaRenderer) Objects() []fyne.CanvasObject {
 	return []fyne.CanvasObject{
 		r.fondo, r.lineaT, r.lineaB, r.c.envolturaArchivo, r.c.tira,
-		r.c.banda, r.c.sepMas, r.c.mas,
+		r.c.banda, r.c.sepMas, r.c.mas, r.c.selector,
 	}
 }
 
@@ -305,6 +326,14 @@ func (r *cintaRenderer) Destroy() {}
 
 func (r *cintaRenderer) Layout(t fyne.Size) {
 	c := r.c
+	if c.compacta {
+		r.colocarCompacta(t)
+		return
+	}
+	c.selector.Hide()
+	c.restaurarArchivo()
+	c.tira.Show()
+	r.lineaT.Show()
 	tira := AltoDeTira()
 	r.fondo.Move(fyne.NewPos(0, 0))
 	r.fondo.Resize(t)
@@ -313,7 +342,7 @@ func (r *cintaRenderer) Layout(t fyne.Size) {
 	r.lineaT.Move(fyne.NewPos(0, tira-tema.Borde))
 	r.lineaT.Resize(fyne.NewSize(t.Width, tema.Borde))
 
-	estrecha := t.Width > 0 && t.Width < ui.CorteMD
+	estrecha := bandaEstrecha(t.Width)
 	if c.desplegada != nil && (t.Width != c.anchoDesplegada || ui.EsTactil()) {
 		c.plegarMas()
 	}
@@ -375,8 +404,8 @@ func (c *Cinta) activaTira() *PestanaCinta {
 	return nil
 }
 
-// ponerEstrecha le dice a los grupos y separadores de la banda si la ventana está por
-// debajo de `md`: alineados al principio, sin rótulo y con la fila más arriba.
+// ponerEstrecha alinea los grupos al principio, sin rótulo y con una sola fila:
+// toda pantalla táctil o, con puntero fino, una ventana por debajo de `md`.
 func ponerEstrecha(cuerpo fyne.CanvasObject, estrecha bool) {
 	for _, o := range objetosDeBanda(cuerpo) {
 		switch g := o.(type) {

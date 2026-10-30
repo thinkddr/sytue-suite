@@ -122,6 +122,8 @@ export const sk: AppCatalog<typeof en> = {
   'backlinks.emptyHint': 'Odkážte na ňu z inej poznámky a objaví sa tu sama.',
   'notebook.delete': 'Odstrániť zápisník',
   'notebook.deleteConfirm': 'Odstrániť „{title}“ a všetko, čo je vnútri?',
+  'notebook.ownerOnly':
+    'Presunúť tento zápisník, zmeniť jeho viditeľnosť alebo ho zašifrovať môže len osoba, ktorá ho vytvorila, alebo správa organizácie.',
   'notebook.newChild': 'Nový zápisník vnútri',
   'notebook.notes': {
     one: '{count} poznámka',

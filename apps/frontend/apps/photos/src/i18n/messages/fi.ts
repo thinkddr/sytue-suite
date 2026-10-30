@@ -128,7 +128,8 @@ export const fi: AppCatalog<typeof en> = {
   'gallery.selectMonth': 'Valitse kuukausi',
   'gallery.unselectMonth': 'Poista kuukauden valinta',
   'gallery.downloadSelected': 'Lataa',
-  'gallery.downloading': { one: 'Ladataan 1 kuvaa…', other: 'Ladataan {count} kuvaa…' },
+  'gallery.downloading': 'Aloitettuja latauspyyntöjä: {count}. Tarkista selaimen lataukset.',
+  'gallery.downloadCapped': 'Tämän erän ulkopuolelle jääviä kuvia: {count}.',
   'gallery.newAlbum': 'Uusi albumi',
   'gallery.newAlbumTitle': 'Uusi albumi',
   'gallery.newAlbumPrompt': {

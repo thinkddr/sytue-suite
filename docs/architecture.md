@@ -4709,10 +4709,17 @@ de eso, y `TestPresupuestoNoCortaLoQueCabe`, si el corte rechaza algo que habrí
 
 Lo que el modelo no tiene y se pierde o se aproxima, por cuánto se ve: los degradados y las
 tramas llegan con su color medio; las viñetas que un marcador hereda (llegan las que dice el
-párrafo); los gráficos y los objetos incrustados de Diapos; la disposición de un
-SmartArt sin dibujo compuesto (llega su texto como lista); y una tabla de diapositiva se guarda en
-.pptx/.odp como texto, celda a celda. De Numbers y Keynote hay muy pocas muestras con licencia
-libre (8 .xlsx con la firma de Numbers, ninguna de Keynote): están sin medir de verdad.
+párrafo); los gráficos de Diapos (`c:chart` en `.pptx` y `chart:chart` en `.odp`) llegan como
+tabla con su título, sus categorías y los valores de cada serie, y los objetos incrustados
+(`p:oleObj`, `draw:object-ole` y `draw:object`) con su imagen de reemplazo o su nombre; la
+disposición de un SmartArt sin dibujo compuesto llega con su texto como lista; y una tabla de
+diapositiva se guarda en `.pptx`/`.odp` como texto, celda a celda. En iWork (`.pages`, `.numbers`
+y `.key`, tanto '09 en XML como 2013+ en IWA, medido con `TestMedirIWork` sobre las 133 muestras
+de `tika`, `keynote-parser`, `numbers-parser`, `libetonyek` y `muestras-completas`), se convierten
+al 100 % texto, estilos, listas por niveles, tablas, celdas v0–v5, celdas combinadas (`sf:col-span`/
+`sf:row-span` y `MergeRegionMapArchive` `6144`), tablas dinámicas con sus filas y columnas de
+totales (`SummaryModel` `6316`), gráficos (`sf:chart-info` y `5000`/`5021` como tabla u hoja con
+sus datos), imágenes incrustadas (`Data/*`), comentarios anclados y flotantes y notas del orador.
 
 <a id="segmentadores-excel"></a>
 
@@ -4975,14 +4982,14 @@ editor (12 pt, interlineado 1,5, títulos de 24, 18 y 14 pt).
 
 | Ida y vuelta (858 ficheros)       | Antes | Después |
 | --------------------------------- | ----- | ------- |
-| Vuelven idénticos                 | 2     | 263     |
+| Vuelven idénticos                 | 2     | 277     |
 | Cambia el texto                   | 41    | 2       |
-| Pierden font-family               | 828   | 2       |
-| Pierden font-size                 | 772   | 5       |
+| Pierden font-family               | 828   | 0       |
+| Pierden font-size                 | 772   | 0       |
 | Pierden margin-bottom             | 667   | 0       |
 | Pierden line-height               | 651   | 0       |
-| Pierden margin-top                | 196   | 4       |
-| Pierden color                     | 181   | 2       |
+| Pierden margin-top                | 196   | 0       |
+| Pierden color                     | 181   | 0       |
 | Pierden width                     | 146   | 0       |
 | Pierden padding                   | 142   | 0       |
 | Pierden margin-left               | 102   | 0       |
@@ -4991,7 +4998,7 @@ editor (12 pt, interlineado 1,5, títulos de 24, 18 y 14 pt).
 | Pierden background-color          | 88    | 0       |
 | Pierden tab-size y white-space    | 72    | 0       |
 | Pierden border-top                | 69    | 0       |
-| Pierden text-transform            | 66    | 1       |
+| Pierden text-transform            | 66    | 0       |
 | Pierden text-indent               | 63    | 0       |
 | Pierden border-left, border-right | 54    | 0       |
 | Pierden margin-right              | 43    | 0       |
@@ -5003,7 +5010,7 @@ editor (12 pt, interlineado 1,5, títulos de 24, 18 y 14 pt).
 | Pierden display                   | 11    | 0       |
 | Pierden font-variant              | 9     | 0       |
 
-De los 858, 595 no vuelven idénticos sobre todo por el orden de las declaraciones y porque el
+De los 858, 581 no vuelven idénticos sobre todo por el orden de las declaraciones y porque el
 color de un párrafo vuelve en sus tramos. Los dos en los que cambia el texto lo hacen en el valor
 guardado de un campo (un número de página) o en un espacio no separable dentro de una tabla.
 
@@ -5045,25 +5052,28 @@ la entrada ya la provocara; desde el 2026-10-15 solo cuentan los errores **nuevo
 así que se recalcularon. «Después» es `main` del 2026-10-15 con las PR #655 (texto por el intérprete,
 edición y CFF), #656 (guardar sin perder y no romper firmas), #657 (censura de trazados) y #658.
 
-| Medida                                                        | Antes (12/10) | Después (15/10) | 16/10    | 17/10    |
-| ------------------------------------------------------------- | ------------- | --------------- | -------- | -------- |
-| Abrir                                                         | 98,4 %        | 98,4 %          | 98,7 %   | 98,8 %   |
-| Abrir, donde Poppler abre                                     | 99,7 %        | 99,7 %          | 99,9 %   | 99,96 %  |
-| Sin pánico                                                    | 100 %         | 100 %           | 100 %    | 100 %    |
-| Pintar bien (páginas, contra Poppler)                         | 92,0 %        | 92,3 %          | 92,9 %   | 93,5 %   |
-| Extraer el texto completo (≥ 95 % de las palabras de Poppler) | 25,6 %        | 80,3 %          | 91,1 %   | 96,0 %   |
-| Buscar (≥ 95 % de las palabras)                               | 29,1 %        | 85,5 %          | 92,8 %   | 97,1 %   |
-| Rellenar el formulario                                        | 69,8 %        | 69,8 %          | 93,0 %   | 93,0 %   |
-| Anotar                                                        | 99,4 %        | 99,6 %          | 99,4 %   | 99,4 %   |
-| Censurar                                                      | 89,6 %        | 91,2 %          | 93,6 %   | 94,0 %   |
-| Editar texto                                                  | 81,7 %        | 85,0 %          | 96,9 %   | 96,4 %   |
-| Girar páginas                                                 | 99,1 %        | 99,5 %          | 99,2 %   | 99,2 %   |
-| Firmar (validada por pyHanko y Poppler)                       | 98,7 %        | 98,7 %          | 98,4 %   | 99,3 %   |
-| Anotar o rellenar un PDF firmado sin romper la firma          | 0 de 37       | 33 de 37        | 33 de 33 | 33 de 33 |
-| Salidas válidas (qpdf, pypdf y Poppler)                       | 97,9 %        | 99,0 %          | 99,2 %   | 99,2 %   |
-| Salidas sin pérdidas (sin lo que se quita a propósito)        | 43,3 %        | 84,9 %          | 99,8 %   | 99,8 %   |
-| Salidas sin pérdidas, contándolo todo                         | 41,0 %        | 82,6 %          | 83,3 %   | 83,3 %   |
-| Salidas que siguen siendo PDF/A                               | 15,4 %        | 24,0 %          | 73,3 %   | 86,2 %   |
+| Medida                                                        | Antes (12/10) | Después (15/10) | 16/10    | 17/10    | 22/10    |
+| ------------------------------------------------------------- | ------------- | --------------- | -------- | -------- | -------- |
+| Abrir                                                         | 98,4 %        | 98,4 %          | 98,7 %   | 98,8 %   | 98,8 %   |
+| Abrir, donde Poppler abre                                     | 99,7 %        | 99,7 %          | 99,9 %   | 99,96 %  | 99,96 %  |
+| Sin pánico                                                    | 100 %         | 100 %           | 100 %    | 100 %    | 100 %    |
+| Pintar bien (páginas, contra Poppler)                         | 92,0 %        | 92,3 %          | 92,9 %   | 93,5 %   | 95,0 %   |
+| Extraer el texto completo (≥ 95 % de las palabras de Poppler) | 25,6 %        | 80,3 %          | 91,1 %   | 96,0 %   | 97,2 %   |
+| Buscar (≥ 95 % de las palabras)                               | 29,1 %        | 85,5 %          | 92,8 %   | 97,1 %   | 98,2 %   |
+| Rellenar el formulario                                        | 69,8 %        | 69,8 %          | 93,0 %   | 93,0 %   | 93,0 %   |
+| Anotar                                                        | 99,4 %        | 99,6 %          | 99,4 %   | 99,4 %   | 99,4 %   |
+| Censurar                                                      | 89,6 %        | 91,2 %          | 93,6 %   | 94,0 %   | 94,5 %   |
+| Editar texto                                                  | 81,7 %        | 85,0 %          | 96,9 %   | 96,4 %   | 98,8 %   |
+| Girar páginas                                                 | 99,1 %        | 99,5 %          | 99,2 %   | 99,2 %   | 99,2 %   |
+| Firmar (validada por pyHanko y Poppler)                       | 98,7 %        | 98,7 %          | 98,4 %   | 99,3 %   | 99,4 %   |
+| Anotar o rellenar un PDF firmado sin romper la firma          | 0 de 37       | 33 de 37        | 33 de 33 | 33 de 33 | 33 de 33 |
+| Salidas válidas (qpdf, pypdf y Poppler)                       | 97,9 %        | 99,0 %          | 99,2 %   | 99,2 %   | 99,4 %   |
+| Salidas sin pérdidas (sin lo que se quita a propósito)        | 43,3 %        | 84,9 %          | 99,8 %   | 99,8 %   | 99,8 %   |
+| Salidas sin pérdidas, contándolo todo                         | 41,0 %        | 82,6 %          | 83,3 %   | 83,3 %   | 83,4 %   |
+| Salidas que siguen siendo PDF/A                               | 15,4 %        | 24,0 %          | 73,3 %   | 86,2 %   | 91,0 %   |
+
+La columna del 22/10 es `main` tras cerrar las PR #895, #896, #1014, #1022 y #1030 (`medida/despues4`,
+con el 100 % de las 3.852 salidas PDF/A honestas).
 
 La columna del 17/10 es `main` de esa mañana (`medida/despues3`), con todas las PR de la tabla de
 abajo hasta #880. Editar baja de 96,9 a 96,4 % porque ahora se intenta en más ficheros (1.993 frente a
@@ -5088,36 +5098,41 @@ formulario, capas y firmas— (`catalogoSinTexto`), y el /DSS al reescribir un f
 
 Después de esa medida, cada PR mide su pieza sobre el subconjunto que mueve:
 
-| PR   | Pieza                                                                              | Medida                                                          |
-| ---- | ---------------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| #689 | Abrir sin `%PDF-`, árbol hondo, sin /Pages, solo adjuntos cifrados, predictor TIFF | Abrir 98,37 → 98,74 %; donde Poppler abre 99,71 → 99,94 %       |
-| #693 | Type 1 incrustadas y acentuados de CFF                                             | Páginas con Type 1/Type1C 80,3 → 87,4 %; pintar 92,69 → 92,99 % |
-| #695 | Rellenar con /NeedAppearances                                                      | Rellenar 69,8 → 79,2 %                                          |
-| #705 | El texto incluye las apariencias de las anotaciones                                | Texto completo 80,3 → 89,1 %; buscar 85,5 → 91,6 %              |
-| #711 | Radios: solo el widget del estado elegido; /Opt por valor                          | Rellenar 79,2 → 93,3 %                                          |
-| #718 | Editar cuenta los fragmentos igual que al listarlos                                | Editar 89,3 → 97,9 % en su subconjunto                          |
-| #721 | Medida: certificados P1/P2 imposibles; editar sin intento no cuenta                | Firmados sin romper 33 de 33                                    |
-| #727 | PDF/A: solo la marca, si cumple; «a» → «b» al censurar; aviso                      | Siguen siendo PDF/A 23,9 → 72,8 %                               |
-| #739 | Medida: glifo entero que cruza la zona; marca PDF/A vigente                        | Censurar 91,2 → ~93,7 %                                         |
-| #740 | PDF/A en firmados anexados, en lo enlazado y en CMYK                               | PDF/A honestas 99,1 → 100 %; siguen 72,8 → 74,0 %               |
-| #746 | Censurar conserva los campos de fuera de la zona                                   | Censurar en formularios 96,8 → 97,9 %                           |
-| #779 | CMaps no Identity, /ToUnicode «Identity», cmap de la TrueType, zlib con suma mala  | Texto completo 841 → 849 de 944; buscar 830 → 839 de 906        |
-| #788 | Codificaciones simples: MacRoman, estándar, propia, ZapfDingbats, nombres de Adobe | Texto completo 849 → 863 de 944; buscar 839 → 847 de 906        |
-| #821 | Medida: desempate con pypdf donde Poppler falla (texto y buscar)                   | Texto completo 89,1 → 91,1 %; buscar 91,7 → 92,8 %              |
-| #824 | Medida: en firmar no cuenta lo que los lectores ya rechazaban de la entrada        | Firmar 98,4 → 99,3 %                                            |
-| #825 | Verificar: CMS sin atributos firmados se acepta; serie negativa con su motivo      | Verificar 49 → 50 de 53 (contra pyHanko)                        |
-| #828 | Árabe y hebreo en orden de lectura                                                 | Texto completo 863 → 869 de 944; buscar 847 → 851 de 906        |
-| #831 | /NeedAppearances: campos redibujados desde /V; texto libre sin /AP                 | En 564 formularios: texto 89,2 → 95,5 %; buscar 90,6 → 97,1 %   |
-| #832 | Editar avisa cuando la fuente no dice qué letras usa                               | Mensaje propio en vez de «no tiene la letra «​»»                |
-| #833 | Censura: hueco de TJ ≤ 32 000 y espacio de color calibrado de la imagen            | PDF/A honestas 99,8 → 100 % (las 6 salidas deshonestas, a 0)    |
-| #837 | JBIG2: operadores de composición, página, MMR, longitud desconocida y símbolos     | 24 imágenes de prueba idénticas a `pdfimages`                   |
-| #838 | PDF/A anotado: texto libre y sello con Liberation Sans incrustada                  | Anotados que siguen siendo PDF/A: 0 → 99 de 184                 |
-| #856 | Verificar lee firmas CMS en BER                                                    | Verificar 50 → 51 de 53                                         |
-| #859 | JBIG2: regiones de refinamiento e intermedias (sin TPGRON)                         | Páginas JBIG2 bien pintadas 41 → 63 de 98                       |
-| #888 | JBIG2: predicción típica del refinamiento (TPGRON), de la norma T.88               | 3 imágenes `*-tpgron`: 9,7–42,9 % de píxeles distintos → 0 %    |
-| #889 | JBIG2: semitonos y diccionario de patrones                                         | Imágenes idénticas a `pdfimages` 53 → 62 de 98                  |
-| #891 | JBIG2: Huffman, símbolos agregados y refinados, contextos retenidos                | Páginas JBIG2 bien pintadas 63 → 87 de 98                       |
-| #893 | Medida: páginas JBIG2 que Poppler pinta mal (abajo, una a una)                     | Páginas JBIG2 bien pintadas 87 → 97 de 98                       |
+| PR    | Pieza                                                                                        | Medida                                                           |
+| ----- | -------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| #689  | Abrir sin `%PDF-`, árbol hondo, sin /Pages, solo adjuntos cifrados, predictor TIFF           | Abrir 98,37 → 98,74 %; donde Poppler abre 99,71 → 99,94 %        |
+| #693  | Type 1 incrustadas y acentuados de CFF                                                       | Páginas con Type 1/Type1C 80,3 → 87,4 %; pintar 92,69 → 92,99 %  |
+| #695  | Rellenar con /NeedAppearances                                                                | Rellenar 69,8 → 79,2 %                                           |
+| #705  | El texto incluye las apariencias de las anotaciones                                          | Texto completo 80,3 → 89,1 %; buscar 85,5 → 91,6 %               |
+| #711  | Radios: solo el widget del estado elegido; /Opt por valor                                    | Rellenar 79,2 → 93,3 %                                           |
+| #718  | Editar cuenta los fragmentos igual que al listarlos                                          | Editar 89,3 → 97,9 % en su subconjunto                           |
+| #721  | Medida: certificados P1/P2 imposibles; editar sin intento no cuenta                          | Firmados sin romper 33 de 33                                     |
+| #727  | PDF/A: solo la marca, si cumple; «a» → «b» al censurar; aviso                                | Siguen siendo PDF/A 23,9 → 72,8 %                                |
+| #739  | Medida: glifo entero que cruza la zona; marca PDF/A vigente                                  | Censurar 91,2 → ~93,7 %                                          |
+| #740  | PDF/A en firmados anexados, en lo enlazado y en CMYK                                         | PDF/A honestas 99,1 → 100 %; siguen 72,8 → 74,0 %                |
+| #746  | Censurar conserva los campos de fuera de la zona                                             | Censurar en formularios 96,8 → 97,9 %                            |
+| #779  | CMaps no Identity, /ToUnicode «Identity», cmap de la TrueType, zlib con suma mala            | Texto completo 841 → 849 de 944; buscar 830 → 839 de 906         |
+| #788  | Codificaciones simples: MacRoman, estándar, propia, ZapfDingbats, nombres de Adobe           | Texto completo 849 → 863 de 944; buscar 839 → 847 de 906         |
+| #821  | Medida: desempate con pypdf donde Poppler falla (texto y buscar)                             | Texto completo 89,1 → 91,1 %; buscar 91,7 → 92,8 %               |
+| #824  | Medida: en firmar no cuenta lo que los lectores ya rechazaban de la entrada                  | Firmar 98,4 → 99,3 %                                             |
+| #825  | Verificar: CMS sin atributos firmados se acepta; serie negativa con su motivo                | Verificar 49 → 50 de 53 (contra pyHanko)                         |
+| #828  | Árabe y hebreo en orden de lectura                                                           | Texto completo 863 → 869 de 944; buscar 847 → 851 de 906         |
+| #831  | /NeedAppearances: campos redibujados desde /V; texto libre sin /AP                           | En 564 formularios: texto 89,2 → 95,5 %; buscar 90,6 → 97,1 %    |
+| #832  | Editar avisa cuando la fuente no dice qué letras usa                                         | Mensaje propio en vez de «no tiene la letra «​»»                 |
+| #833  | Censura: hueco de TJ ≤ 32 000 y espacio de color calibrado de la imagen                      | PDF/A honestas 99,8 → 100 % (las 6 salidas deshonestas, a 0)     |
+| #837  | JBIG2: operadores de composición, página, MMR, longitud desconocida y símbolos               | 24 imágenes de prueba idénticas a `pdfimages`                    |
+| #838  | PDF/A anotado: texto libre y sello con Liberation Sans incrustada                            | Anotados que siguen siendo PDF/A: 0 → 99 de 184                  |
+| #856  | Verificar lee firmas CMS en BER                                                              | Verificar 50 → 51 de 53                                          |
+| #859  | JBIG2: regiones de refinamiento e intermedias (sin TPGRON)                                   | Páginas JBIG2 bien pintadas 41 → 63 de 98                        |
+| #888  | JBIG2: predicción típica del refinamiento (TPGRON), de la norma T.88                         | 3 imágenes `*-tpgron`: 9,7–42,9 % de píxeles distintos → 0 %     |
+| #889  | JBIG2: semitonos y diccionario de patrones                                                   | Imágenes idénticas a `pdfimages` 53 → 62 de 98                   |
+| #891  | JBIG2: Huffman, símbolos agregados y refinados, contextos retenidos                          | Páginas JBIG2 bien pintadas 63 → 87 de 98                        |
+| #893  | Medida: páginas JBIG2 que Poppler pinta mal (abajo, una a una)                               | Páginas JBIG2 bien pintadas 87 → 97 de 98                        |
+| #895  | Huecos de palabra dentro de la cadena (salvo CJK), escritura vertical al extraer y OCR `Tz`  | Texto completo 889 → 893 de 945                                  |
+| #896  | Degradados axiales y radiales (tipos 2 y 3) en la salida PNG                                 | Páginas con sombreados bien pintadas 0 → 11 de 29                |
+| #1014 | Type 3 (`/FirstChar..LastChar` y `/Differences`), pila CMap 4096, marcas combinantes y `Tc`  | Texto completo 96,0 → 97,2 % (919 de 945); buscar 97,1 → 98,2 %  |
+| #1022 | Mallas (tipos 4–7), sombreado de función (tipo 1), funciones 0 y 4, capas `/OFF` y vertical  | Pintar 93,5 → 95,0 % (24 de 31 páginas de malla/función a igual) |
+| #1030 | Editar con `\(` y CMap Unicode/Identity/TrueType; PDF/A con `/DefaultRGB`, `/Group` y campos | Editar 96,4 → 98,8 %; siguen siendo PDF/A 86,2 → 91,0 %          |
 
 <a id="corpus-certipdf-jbig2"></a>
 
@@ -5192,6 +5207,16 @@ O` en vez de `PDFM PDF EDITOR`), `bug1157493.pdf` (`n e t : " h o s t "` letra a
   `ControlCharacters.pdf` (descarta los caracteres de control `0x01..0x1F` que el propio test de
   PDFBox pone entre las letras) y `veraPDF 6-3-8-t01-fail-a.pdf` (test deliberadamente inválido de
   PDF/A con `U+FFFD` en `/ToUnicode`).
+- **Resaltados en PDF/A-1 (`1a` y `1b`)**: ISO 19005-1:2005 §6.4 prohíbe la transparencia (`/CA < 1`,
+  `/ca < 1`, `/BM` distinto de `/Normal` o `/Compatible`) y §6.5.3 exige que toda anotación lleve
+  apariencia `/AP /N`, que se pinta encima del contenido de la página; un resaltado opaco taparía el
+  texto en lugar de resaltarlo, así que al añadir un resaltado sobre un PDF/A-1 se retira `pdfaid` y
+  se avisa (`X-Sytue-PDFA: perdido`, 100 % de salidas honestas).
+- **Edición de texto con solo adjuntos cifrados o subconjuntos de prueba rotos**: en los 5 ficheros
+  de qpdf con `/EFF` (solo adjuntos cifrados con clave distinta de la vacía), reescribir sin clave
+  pide la contraseña para no corromper el adjunto; y en los tests negativos de veraPDF
+  (`6-2-11-4-1-t02-fail-*`, `6-2-10-4-1-t02-fail-*`, `isartor-6-3-5-t01-fail-*`) la fuente de
+  subconjunto declara anchura 0 en glifos presentes en la cadena.
 
 <a id="calcus-filtros"></a>
 

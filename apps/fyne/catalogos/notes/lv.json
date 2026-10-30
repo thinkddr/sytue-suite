@@ -276,6 +276,7 @@
     "one": "{count} piezīme",
     "other": "{count} piezīmes"
   },
+  "notebook.ownerOnly": "Pārvietot šo piezīmju grāmatu, mainīt tās redzamību vai to šifrēt var tikai tās izveidotājs vai organizācijas administrācija.",
   "notebook.rename": "Pārdēvēt",
   "notebook.settings": "Piezīmju grāmatas iestatījumi",
   "notebook.title": "Nosaukums",

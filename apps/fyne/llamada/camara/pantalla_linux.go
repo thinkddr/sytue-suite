@@ -64,6 +64,10 @@ type pantallaX11 struct {
 	cerrada bool
 }
 
+// PantallaDisponible indica que este destino implementa la captura; los permisos
+// y el acceso al equipo se comprueban al abrirla.
+const PantallaDisponible = true
+
 func abrirPantalla() (Fuente, error) {
 	if esWayland() {
 		return abrirPantallaPortal()

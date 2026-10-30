@@ -44,8 +44,11 @@ func TestAltaDirectaConPassword(t *testing.T) {
 	if u.Status != domain.StatusActive {
 		t.Errorf("estado %q: la cuenta nace inutilizable", u.Status)
 	}
-	if !u.EmailVerified {
-		t.Error("correo sin verificar: se le pediría confirmarlo por el correo que no funciona")
+	if u.EmailVerified {
+		t.Error("email_verified=true sin haber demostrado control del buzón: un admin de org podría fabricarse correo verificado global (como en SCIM #679)")
+	}
+	if l.srv.soloCuentasPersonales(l.ctx, u.ID) {
+		t.Error("soloCuentasPersonales=true siendo miembro de una organización: el login le pediría verificar el correo")
 	}
 	m, err := l.st.GetMembership(l.ctx, org.ID, u.ID)
 	if err != nil || m.Role != domain.RoleMember {
@@ -83,5 +86,38 @@ func TestAltaDirectaConPassword(t *testing.T) {
 	})
 	if rr.Code != http.StatusCreated && rr.Code != http.StatusServiceUnavailable {
 		t.Errorf("invitación normal: código=%d body=%v", rr.Code, body)
+	}
+
+	// 6. Una cuenta global que YA existe no se puede pisar con alta directa con contraseña:
+	//    hacerlo permitiría a cualquier admin de organización cambiarle la contraseña a
+	//    una cuenta existente sin demostrar control del correo.
+	adminAntes, err := l.st.GetUserByID(l.ctx, admin.ID)
+	if err != nil {
+		t.Fatalf("GetUserByID admin: %v", err)
+	}
+	rr, _ = l.do(t, http.MethodPost, "/api/v1/admin/invitations", adminTok, map[string]any{
+		"email": admin.Email, "role": "member", "password": "Otra-contraseña-2026",
+	})
+	if rr.Code != http.StatusConflict {
+		t.Errorf("alta con contraseña sobre cuenta existente: código=%d, quiero 409", rr.Code)
+	}
+	adminDespues, err := l.st.GetUserByID(l.ctx, admin.ID)
+	if err != nil {
+		t.Fatalf("GetUserByID admin después: %v", err)
+	}
+	if adminDespues.PasswordHash != adminAntes.PasswordHash {
+		t.Error("el alta directa con contraseña sobrescribió el hash de una cuenta ya existente")
+	}
+
+	// 7. Cambiar el correo de una cuenta verificada deja email_verified=false
+	//    hasta que confirme el nuevo buzón.
+	adminCambiado, err := l.st.UpdateUser(l.ctx, nil, domain.User{
+		ID: admin.ID, Email: "nuevo-admin@acme.test", Name: admin.Name, Status: domain.StatusActive,
+	})
+	if err != nil {
+		t.Fatalf("UpdateUser admin: %v", err)
+	}
+	if adminCambiado.EmailVerified {
+		t.Error("cambiar el correo dejó email_verified=true con un buzón nuevo sin verificar")
 	}
 }

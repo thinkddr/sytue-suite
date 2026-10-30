@@ -271,6 +271,7 @@
     "one": "{count} märge",
     "other": "{count} märget"
   },
+  "notebook.ownerOnly": "Seda märkmikku saab teisaldada, selle nähtavust muuta või seda krüptida ainult selle looja või organisatsiooni haldaja.",
   "notebook.rename": "Nimeta ümber",
   "notebook.settings": "Märkmiku sätted",
   "notebook.title": "Nimi",

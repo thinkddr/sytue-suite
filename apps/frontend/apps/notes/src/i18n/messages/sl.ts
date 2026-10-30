@@ -123,6 +123,8 @@ export const sl: AppCatalog<typeof en> = {
   'backlinks.emptyHint': 'Povežite ga iz drugega zapiska in prikazal se bo tukaj, sam od sebe.',
   'notebook.delete': 'Izbriši beležnico',
   'notebook.deleteConfirm': 'Izbrišem »{title}« in vse, kar je notri?',
+  'notebook.ownerOnly':
+    'To beležnico lahko premakne, spremeni njeno vidnost ali jo šifrira le oseba, ki jo je ustvarila, ali skrbništvo organizacije.',
   'notebook.newChild': 'Nova beležnica znotraj',
   'notebook.notes': {
     one: '{count} zapisek',

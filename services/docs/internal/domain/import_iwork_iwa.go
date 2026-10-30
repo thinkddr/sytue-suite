@@ -9,7 +9,10 @@ import (
 	"encoding/binary"
 	"errors"
 	"math"
+	"slices"
+	"strconv"
 	"strings"
+	"time"
 	"unicode/utf16"
 
 	"github.com/klauspost/compress/snappy"
@@ -65,9 +68,15 @@ func (p *paqueteIWork) iwa() documentoIWA {
 			}
 		}
 	}
+	nombres := make([]string, 0, len(fuentes))
+	for n := range fuentes {
+		nombres = append(nombres, n)
+	}
+	slices.Sort(nombres)
 	doc := documentoIWA{}
 	total := 0
-	for _, f := range fuentes {
+	for _, n := range nombres {
+		f := fuentes[n]
 		crudo := leerEntrada(f, maxIndice09)
 		if crudo == nil {
 			return nil
@@ -143,8 +152,18 @@ func (d documentoIWA) objetos(b []byte) error {
 		if mal || len(d) >= maxNodos09 {
 			return errIWA
 		}
-		if _, ya := d[id]; !ya && !primero {
-			d[id] = o
+		if !primero {
+			if o.tipo == tipoIWAMetadata {
+				if _, ya := d[id]; ya {
+					id = math.MaxUint64 - uint64(len(d))
+				}
+				d[id] = o
+			} else if prev, ya := d[id]; !ya {
+				d[id] = o
+			} else if prev.tipo == tipoIWAMetadata {
+				d[math.MaxUint64-uint64(len(d))] = prev
+				d[id] = o
+			}
 		}
 	}
 	return nil
@@ -256,6 +275,15 @@ func (m pb) f32(num int) float32 {
 	return math.Float32frombits(binary.LittleEndian.Uint32(c.b))
 }
 
+// f64 es un float64 (campo fijo de 8 bytes), o 0.
+func (m pb) f64(num int) float64 {
+	c, _ := m.campo(num)
+	if c.wire != 1 {
+		return 0
+	}
+	return math.Float64frombits(binary.LittleEndian.Uint64(c.b))
+}
+
 // ref es el id de una referencia a otro objeto: un mensaje con el id en el campo 1.
 func (m pb) ref(num int) uint64 {
 	return m.msg(num).uint(1)
@@ -283,19 +311,60 @@ func (m pb) ref(num int) uint64 {
 // marca un objeto anclado (una tabla, una imagen) que no se convierte.
 
 const (
-	tipoIWAPages      = 10000
-	tipoIWAAlmacen    = 2001
-	tipoIWACuadro     = 2011
-	tipoIWAEstiloCar  = 2021
-	tipoIWAEstiloParr = 2022
-	maxHerenciaIWA    = 32
+	tipoIWAPages          = 10000
+	tipoIWAMetadata       = 11006
+	tipoIWAAutor          = 212
+	tipoIWAAlmacen        = 2001
+	tipoIWAAdjunto        = 2003
+	tipoIWACuadro         = 2011
+	tipoIWAHighlight      = 2013
+	tipoIWAComentarioInfo = 2014
+	tipoIWAEstiloCar      = 2021
+	tipoIWAEstiloParr     = 2022
+	tipoIWAListaEstilo    = 2023
+	tipoIWAImagen         = 3005
+	tipoIWAGrupo          = 3008
+	tipoIWAComentario     = 3056
+	maxHerenciaIWA        = 32
 )
 
 // lectorIWA convierte almacenes de texto IWA al modelo rico del editor.
 type lectorIWA struct {
-	doc documentoIWA
-	// omitido: algo del fichero (una tabla, una imagen) no se ha convertido.
+	doc            documentoIWA
+	paquete        *paqueteIWork
+	archivos       map[uint64][]string
+	conComentarios bool
+	comentarios    []*rawComment
+	porIDCom       map[uint64]*rawComment
+	// omitido: algo del fichero (una tabla, una imagen sin datos) no se ha convertido.
 	omitido bool
+}
+
+func nuevoLectorIWA(doc documentoIWA, p *paqueteIWork, conComentarios bool) *lectorIWA {
+	archivos := map[uint64][]string{}
+	for _, o := range doc {
+		if o.tipo != tipoIWAMetadata {
+			continue
+		}
+		o.datos.cada(4, func(c campoPB) {
+			id := c.b.uint(1)
+			if id == 0 {
+				return
+			}
+			for _, num := range []int{4, 3} {
+				if nom := string(c.b.msg(num)); nom != "" {
+					archivos[id] = append(archivos[id], nom)
+				}
+			}
+		})
+	}
+	return &lectorIWA{
+		doc:            doc,
+		paquete:        p,
+		archivos:       archivos,
+		conComentarios: conComentarios,
+		porIDCom:       map[uint64]*rawComment{},
+	}
 }
 
 // estiloEn es la tabla de estilos de un almacén: el estilo que rige desde cada posición.
@@ -312,6 +381,24 @@ func tablaDeEstilosIWA(m pb, heredaSinEstilo bool) []estiloEn {
 			e.id = out[len(out)-1].id
 		}
 		out = append(out, e)
+	})
+	return out
+}
+
+func tablaDeNivelesIWA(m pb) []estiloEn {
+	var out []estiloEn
+	m.cada(1, func(c campoPB) {
+		out = append(out, estiloEn{desde: acotado(c.b.uint(1), math.MaxInt32), id: c.b.uint(2)})
+	})
+	return out
+}
+
+func tablaDeAdjuntosIWA(m pb) map[int]uint64 {
+	out := map[int]uint64{}
+	m.cada(1, func(c campoPB) {
+		if pos := acotado(c.b.uint(1), math.MaxInt32); pos >= 0 {
+			out[pos] = c.b.ref(2)
+		}
 	})
 	return out
 }
@@ -361,14 +448,16 @@ func (l *lectorIWA) nombreIWA(id uint64) string {
 	return ""
 }
 
-func (l *lectorIWA) colorIWA(ids ...uint64) string {
-	c, ok := l.propIWA(11, 7, ids...)
-	if !ok {
+func colorMensajeIWA(m pb) string {
+	_, okR := m.campo(3)
+	_, okG := m.campo(4)
+	_, okB := m.campo(5)
+	if !okR && !okG && !okB {
 		return ""
 	}
 	var hex strings.Builder
 	for _, n := range []int{3, 4, 5} {
-		f := float64(c.b.f32(n))
+		f := float64(m.f32(n))
 		if math.IsNaN(f) {
 			return ""
 		}
@@ -377,14 +466,263 @@ func (l *lectorIWA) colorIWA(ids ...uint64) string {
 		hex.WriteByte(digitos[v>>4])
 		hex.WriteByte(digitos[v&15])
 	}
-	if hex.String() == "000000" {
-		return ""
-	}
 	return hex.String()
 }
 
-// parrafos son los párrafos del almacén `id`.
-func (l *lectorIWA) parrafos(id uint64) []xpara {
+func (l *lectorIWA) colorIWA(ids ...uint64) string {
+	c, ok := l.propIWA(11, 7, ids...)
+	if !ok {
+		return ""
+	}
+	hex := colorMensajeIWA(c.b)
+	if hex == "000000" {
+		return ""
+	}
+	return hex
+}
+
+// tipoListaIWA devuelve "bullet", "number" o "" según el estilo de lista 2023 para `nivel`.
+func (l *lectorIWA) tipoListaIWA(id uint64, nivel int) string {
+	for i := 0; id != 0 && i < maxHerenciaIWA; i++ {
+		o, ok := l.doc[id]
+		if !ok || o.tipo != tipoIWAListaEstilo {
+			return ""
+		}
+		var tipos []uint64
+		o.datos.cada(11, func(c campoPB) { tipos = append(tipos, c.n) })
+		if len(tipos) > 0 {
+			switch tipos[min(max(nivel, 0), len(tipos)-1)] {
+			case 1, 2:
+				return "bullet"
+			case 3:
+				return "number"
+			default:
+				return ""
+			}
+		}
+		id = o.datos.msg(1).ref(3)
+	}
+	return ""
+}
+
+func (l *lectorIWA) abrirParrafoIWA(ep, niv, idLista uint64) *xpara {
+	p := &xpara{style: tituloDeEstilo09(l.nombreIWA(ep)), level: max(acotado(niv, 8), 0)}
+	if a, ok := l.propIWA(12, 1, ep); ok {
+		p.align = alineacion09(float64(a.n))
+	}
+	if idLista == 0 {
+		if c, ok := l.propIWA(12, 40, ep); ok {
+			idLista = c.b.uint(1)
+		}
+	}
+	p.list = l.tipoListaIWA(idLista, p.level)
+	return p
+}
+
+func (l *lectorIWA) tramoIWA(tramo []uint16, ec, ep uint64, titulo bool) xrun {
+	ids := []uint64{ec, ep}
+	if titulo {
+		ids = ids[:1] // en un título la negrita del párrafo ya la pone el título
+	}
+	b := func(num int) bool {
+		c, ok := l.propIWA(11, num, ids...)
+		return ok && c.n != 0
+	}
+	return xrun{
+		text: string(utf16.Decode(tramo)), b: b(1), i: b(2), u: b(11), strike: b(12),
+		color: l.colorIWA(ec, ep),
+	}
+}
+
+func (l *lectorIWA) tablaAdjuntaIWA(idAdj uint64) *tabla09 {
+	idObj := l.doc.de(idAdj, tipoIWAAdjunto).ref(1)
+	if idObj == 0 {
+		idObj = idAdj
+	}
+	if tb := l.doc.de(idObj, tipoIWATabla); tb != nil {
+		return l.tablaInfoIWA(tb)
+	}
+	t, _ := l.graficoIWA(idObj)
+	return t
+}
+
+func geometriaFormaIWA(m pb) (pos, tm pb) {
+	for _, g := range []pb{m.msg(1).msg(1).msg(1), m.msg(1).msg(1), m.msg(1)} {
+		if p, t := g.msg(1), g.msg(2); len(t) > 0 && (t.f32(1) > 0 || t.f32(2) > 0) {
+			return p, t
+		}
+	}
+	return nil, m.msg(4)
+}
+
+func (l *lectorIWA) imagenIWA(id uint64) (src string, w, h int, pos, tm pb) {
+	im := l.doc.de(id, tipoIWAImagen)
+	if im == nil || l.paquete == nil {
+		return "", 0, 0, nil, nil
+	}
+	var candidatos []string
+	for _, num := range []int{11, 15, 17, 13} {
+		dataID := im.ref(num)
+		if dataID == 0 {
+			continue
+		}
+		candidatos = append(candidatos, l.archivos[dataID]...)
+		candidatos = append(candidatos, "-"+strconv.FormatUint(dataID, 10)+".")
+	}
+	src, iw, ih := l.paquete.imagenDataURL(candidatos...)
+	if src == "" {
+		return "", 0, 0, nil, nil
+	}
+	pos, tm = geometriaFormaIWA(im)
+	gw, gh := int(tm.f32(1)+0.5), int(tm.f32(2)+0.5)
+	if gw > 0 && gh > 0 {
+		return src, gw, gh, pos, tm
+	}
+	return src, iw, ih, pos, tm
+}
+
+func (l *lectorIWA) registrarComentarioIWA(id uint64, parentKey string) *rawComment {
+	if !l.conComentarios || id == 0 {
+		return nil
+	}
+	if h := l.doc.de(id, tipoIWAHighlight); h != nil {
+		id = h.ref(1)
+	} else if ci := l.doc.de(id, tipoIWAComentarioInfo); ci != nil {
+		if r := ci.ref(2); r != 0 {
+			id = r
+		} else {
+			id = ci.ref(1)
+		}
+	}
+	if l.porIDCom == nil {
+		l.porIDCom = map[uint64]*rawComment{}
+	}
+	if c := l.porIDCom[id]; c != nil {
+		return c
+	}
+	com := l.doc.de(id, tipoIWAComentario)
+	if com == nil {
+		return nil
+	}
+	body := strings.TrimSpace(string(com.msg(1)))
+	if body == "" {
+		return nil
+	}
+	autor := strings.TrimSpace(string(l.doc.de(com.ref(3), tipoIWAAutor).msg(1)))
+	fecha := ""
+	if seg := com.msg(2).f64(1); seg != 0 && !math.IsNaN(seg) && !math.IsInf(seg, 0) {
+		fecha = epoca09.Add(time.Duration(seg * float64(time.Second))).UTC().Format(time.RFC3339)
+	}
+	key := strconv.FormatUint(id, 10)
+	r := &rawComment{
+		id:        markID(len(l.comentarios)+1, autor, fecha, body),
+		key:       key,
+		parentKey: parentKey,
+		author:    autor,
+		date:      fecha,
+		paras:     []string{body},
+	}
+	l.porIDCom[id] = r
+	l.comentarios = append(l.comentarios, r)
+	com.cada(4, func(rep campoPB) {
+		l.registrarComentarioIWA(rep.b.uint(1), key)
+	})
+	return r
+}
+
+type rangoComIWA struct {
+	ini, fin int
+	com      *rawComment
+}
+
+func (l *lectorIWA) rangosComentariosIWA(st pb, tope int) []rangoComIWA {
+	if !l.conComentarios {
+		return nil
+	}
+	var out []rangoComIWA
+	var entradas []estiloEn
+	st.msg(23).cada(1, func(c campoPB) {
+		if pos := acotado(c.b.uint(1), tope); pos >= 0 {
+			entradas = append(entradas, estiloEn{desde: pos, id: c.b.ref(2)})
+		}
+	})
+	for idx, e := range entradas {
+		if e.id == 0 {
+			continue
+		}
+		fin := tope
+		if idx+1 < len(entradas) {
+			fin = entradas[idx+1].desde
+		}
+		if com := l.registrarComentarioIWA(e.id, ""); com != nil && fin > e.desde {
+			out = append(out, rangoComIWA{ini: e.desde, fin: fin, com: com})
+		}
+	}
+	st.msg(25).cada(1, func(c campoPB) {
+		rng := c.b.msg(1)
+		ini := acotado(rng.uint(1), tope)
+		ln := acotado(rng.uint(2), tope)
+		if ini >= 0 && ln > 0 {
+			if com := l.registrarComentarioIWA(c.b.ref(2), ""); com != nil {
+				out = append(out, rangoComIWA{ini: ini, fin: min(tope, ini+ln), com: com})
+			}
+		}
+	})
+	return out
+}
+
+func comentarioEnIWA(rs []rangoComIWA, i int) *rawComment {
+	for _, r := range rs {
+		if i >= r.ini && i < r.fin {
+			return r.com
+		}
+	}
+	return nil
+}
+
+func (l *lectorIWA) adjuntoEnLineaIWA(idAdj uint64, cur **xpara, trasTabla *bool, cerrarTramo func(), out []xblock) []xblock {
+	idObj := l.doc.de(idAdj, tipoIWAAdjunto).ref(1)
+	if idObj == 0 {
+		idObj = idAdj
+	}
+	cerrarBloque := func() {
+		cerrarTramo()
+		if len((*cur).runs) > 0 {
+			p := **cur
+			out = append(out, xblock{para: &p})
+		}
+		*cur, *trasTabla = nil, true
+	}
+	if t := l.tablaAdjuntaIWA(idAdj); t != nil {
+		cerrarBloque()
+		return append(out, xblock{table: t.xtable()})
+	}
+	if src, w, h, _, _ := l.imagenIWA(idObj); src != "" {
+		cerrarTramo()
+		(*cur).runs = append((*cur).runs, xrun{raw: l.paquete.imgHTML(src, w, h)})
+		*trasTabla = false
+		return out
+	}
+	if c := l.doc.de(idObj, tipoIWACuadro); c != nil {
+		cerrarBloque()
+		return append(out, l.bloques(c.ref(2))...)
+	}
+	l.omitido = true
+	return out
+}
+
+func marcarTramoIWA(r xrun, com *rawComment) xrun {
+	if com != nil && r.text != "" {
+		r.mark = com.id
+		com.marked = true
+		com.anchored = true
+		com.quote.WriteString(r.text)
+	}
+	return r
+}
+
+// bloques son los párrafos, tablas e imágenes ancladas del almacén `id`.
+func (l *lectorIWA) bloques(id uint64) []xblock {
 	st := l.doc.de(id, tipoIWAAlmacen)
 	if st == nil {
 		return nil
@@ -393,93 +731,113 @@ func (l *lectorIWA) parrafos(id uint64) []xpara {
 	st.cada(3, func(c campoPB) { sb.Write(c.b) })
 	u := utf16.Encode([]rune(sb.String()))
 	parr, car := tablaDeEstilosIWA(st.msg(5), true), tablaDeEstilosIWA(st.msg(8), false)
+	niv, listas := tablaDeNivelesIWA(st.msg(6)), tablaDeEstilosIWA(st.msg(7), true)
+	adj := tablaDeAdjuntosIWA(st.msg(9))
+	rangos := l.rangosComentariosIWA(st, len(u))
 
-	var out []xpara
+	var out []xblock
 	var cur *xpara
-	var ep uint64
+	var ep, ec uint64
+	var comAct *rawComment
 	var tramo []uint16
-	var ec uint64
+	trasTabla := false
 	cerrarTramo := func() {
-		if len(tramo) == 0 {
-			return
+		if len(tramo) > 0 {
+			cur.runs = append(cur.runs, marcarTramoIWA(l.tramoIWA(tramo, ec, ep, cur.style != ""), comAct))
+			tramo = tramo[:0]
 		}
-		b := func(num int) bool {
-			ids := []uint64{ec, ep}
-			if cur.style != "" {
-				ids = ids[:1] // en un título la negrita del párrafo ya la pone el título
-			}
-			c, ok := l.propIWA(11, num, ids...)
-			return ok && c.n != 0
-		}
-		cur.runs = append(cur.runs, xrun{
-			text: string(utf16.Decode(tramo)), b: b(1), i: b(2), u: b(11), strike: b(12),
-			color: l.colorIWA(ec, ep),
-		})
-		tramo = tramo[:0]
 	}
 	for i, c := range u {
 		if cur == nil {
 			ep = en(parr, i)
-			cur = &xpara{style: tituloDeEstilo09(l.nombreIWA(ep))}
-			if a, ok := l.propIWA(12, 1, ep); ok {
-				cur.align = alineacion09(float64(a.n))
-			}
+			cur = l.abrirParrafoIWA(ep, en(niv, i), en(listas, i))
 		}
-		if e := en(car, i); e != ec {
+		if e, com := en(car, i), comentarioEnIWA(rangos, i); e != ec || com != comAct {
 			cerrarTramo()
-			ec = e
+			ec, comAct = e, com
 		}
 		switch {
 		case c == '\n' || c == 0x2029:
 			cerrarTramo()
-			out = append(out, *cur)
-			cur = nil
+			if !trasTabla || len(cur.runs) > 0 {
+				p := *cur
+				out = append(out, xblock{para: &p})
+			}
+			cur, trasTabla = nil, false
 		case c == 0x2028:
 			cerrarTramo()
 			cur.runs = append(cur.runs, xrun{brk: true})
+			trasTabla = false
 		case c == 0xFFFC:
-			l.omitido = true
+			out = l.adjuntoEnLineaIWA(adj[i], &cur, &trasTabla, cerrarTramo, out)
 		case c < 0x20 && c != '\t':
 			// saltos de página, de sección o de columna, y marcas de nota: no son texto
 		default:
 			tramo = append(tramo, c)
+			trasTabla = false
 		}
 	}
 	if cur != nil {
 		cerrarTramo()
 		if len(cur.runs) > 0 {
-			out = append(out, *cur)
+			p := *cur
+			out = append(out, xblock{para: &p})
 		}
 	}
 	return out
 }
 
-// importPagesIWA convierte un documento .pages de 2013 en adelante: el cuerpo y, detrás,
-// el texto de los cuadros flotantes. "" si no hay texto.
-func importPagesIWA(doc documentoIWA) (cuerpo string, omitido bool) {
-	raiz := doc.de(1, tipoIWAPages)
-	if raiz == nil {
-		return "", false
+// parrafos son los párrafos del almacén `id`.
+func (l *lectorIWA) parrafos(id uint64) []xpara {
+	var out []xpara
+	for _, b := range l.bloques(id) {
+		if b.para != nil {
+			out = append(out, *b.para)
+		}
 	}
-	l := &lectorIWA{doc: doc}
-	paras := l.parrafos(raiz.ref(4))
-	doc[raiz.ref(3)].datos.cada(1, func(g campoPB) {
-		g.b.cada(4, func(r campoPB) {
-			if c := doc.de(r.b.ref(1), tipoIWACuadro); c != nil {
-				paras = append(paras, l.parrafos(c.ref(2))...)
-			} else {
-				l.omitido = true
-			}
-		})
-	})
-	return htmlDeParrafos(paras), l.omitido
+	return out
 }
 
-// htmlDeParrafos es el HTML de unos párrafos, o "" si no tienen texto.
-func htmlDeParrafos(paras []xpara) string {
-	bs := bloquesDeParrafos(paras)
-	if !conTexto(bs) {
-		return ""
+// importPagesIWA convierte un documento .pages de 2013 en adelante: el cuerpo (con sus
+// tablas, imágenes y comentarios anclados) y, detrás, el texto, las tablas y las imágenes
+// de los objetos flotantes. "" si no hay contenido.
+func importPagesIWA(doc documentoIWA, p *paqueteIWork, conComentarios bool) (cuerpo string, coms []ImportedComment, omitido bool) {
+	raiz := doc.de(1, tipoIWAPages)
+	if raiz == nil {
+		return "", nil, false
 	}
-	return blocksToHTML(bs)
+	l := nuevoLectorIWA(doc, p, conComentarios)
+	bs := l.bloques(raiz.ref(4))
+	var agregarFlotante func(id uint64)
+	agregarFlotante = func(id uint64) {
+		if c := doc.de(id, tipoIWACuadro); c != nil {
+			bs = append(bs, l.bloques(c.ref(2))...)
+		} else if tb := doc.de(id, tipoIWATabla); tb != nil {
+			if t := l.tablaInfoIWA(tb); t != nil {
+				bs = append(bs, xblock{table: t.xtable()})
+			}
+		} else if t, _ := l.graficoIWA(id); t != nil {
+			bs = append(bs, xblock{table: t.xtable()})
+		} else if src, w, h, _, _ := l.imagenIWA(id); src != "" {
+			bs = append(bs, xblock{para: &xpara{runs: []xrun{{raw: p.imgHTML(src, w, h)}}}})
+		} else if gr := doc.de(id, tipoIWAGrupo); gr != nil {
+			gr.cada(2, func(h campoPB) { agregarFlotante(h.b.uint(1)) })
+		} else if doc.de(id, tipoIWAComentarioInfo) != nil {
+			l.registrarComentarioIWA(id, "")
+		} else {
+			l.omitido = true
+		}
+	}
+	doc[raiz.ref(3)].datos.cada(1, func(g campoPB) {
+		g.b.cada(4, func(r campoPB) {
+			agregarFlotante(r.b.ref(1))
+		})
+	})
+	if !conTexto(bs) {
+		return "", nil, l.omitido
+	}
+	if conComentarios {
+		coms = importedComments(l.comentarios)
+	}
+	return blocksToHTML(bs), coms, l.omitido
 }

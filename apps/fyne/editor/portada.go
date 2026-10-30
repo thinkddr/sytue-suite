@@ -991,7 +991,13 @@ func (r *vistaRenderer) Layout(t fyne.Size) {
 		izquierda += ui.MedidaInsignia(w.insignia.Texto).Width + HuecoEncabezado
 	}
 	busc.Width = max(min(AnchoBuscador, 0.6*ancho, ancho-izquierda), 0)
-	fila = max(busc.Height, fil.Height, tema.TextoXS.Linea)
+	// Si no cabe el icono y una palabra, conserva un campo útil en otra fila.
+	// Un Entry de ancho cero además hacía dibujar un rectángulo de -0,5 px.
+	buscDebajo := busc.Width < min(tema.Espacio(16), ancho)
+	fila = max(fil.Height, tema.TextoXS.Linea)
+	if !buscDebajo {
+		fila = max(fila, busc.Height)
+	}
 	r.reciente.Colocar(x, y+(fila-tema.TextoXS.Linea)/2)
 	if conInsignia {
 		m := ui.MedidaInsignia(w.insignia.Texto)
@@ -999,12 +1005,19 @@ func (r *vistaRenderer) Layout(t fyne.Size) {
 		w.insignia.Resize(m)
 	}
 	der := x + ancho
-	w.buscador.Move(fyne.NewPos(der-busc.Width, y+(fila-busc.Height)/2))
-	w.buscador.Resize(busc)
-	der -= busc.Width + HuecoEncabezado
+	if !buscDebajo {
+		w.buscador.Move(fyne.NewPos(der-busc.Width, y+(fila-busc.Height)/2))
+		der -= busc.Width + HuecoEncabezado
+	}
 	w.filtro.Move(fyne.NewPos(der-fil.Width, y+(fila-fil.Height)/2))
 	w.filtro.Resize(fil)
 	y += fila + BajoEncabezado
+	if buscDebajo {
+		busc.Width = ancho
+		w.buscador.Move(fyne.NewPos(x, y))
+		y += busc.Height + BajoEncabezado
+	}
+	w.buscador.Resize(busc)
 
 	// Los recientes conservan todas sus filas en el mismo flujo que las plantillas.
 	if w.cuerpo != nil {

@@ -9,7 +9,9 @@ import (
 	"encoding/base64"
 	"html"
 	"image"
-	_ "image/jpeg" // la vista previa de iWork es JPEG
+	_ "image/gif"  // imágenes incrustadas GIF
+	_ "image/jpeg" // vista previa e imágenes JPEG
+	_ "image/png"  // imágenes incrustadas PNG
 	"io"
 	"path"
 	"strconv"
@@ -44,6 +46,10 @@ const (
 	// maxVistaPrevia es lo más que se lee de la imagen de muestra. Las reales pesan
 	// entre 10 y 200 KB.
 	maxVistaPrevia = 4 << 20
+	// maxImagenIWork y maxTotalImagenesIWork acotan lo que se lee de `Data/*` por imagen
+	// y en todo el paquete.
+	maxImagenIWork        = 4 << 20
+	maxTotalImagenesIWork = 16 << 20
 	// anchoVistaPrevia es el ancho con que se pinta la imagen en el folio.
 	anchoVistaPrevia = 600
 )
@@ -56,6 +62,8 @@ type paqueteIWork struct {
 	v09 bool
 	// cifrado: el documento lleva contraseña y su contenido no se puede leer.
 	cifrado bool
+	// bytesImagenes cuenta lo ya leído de imágenes de `Data/*`.
+	bytesImagenes int64
 }
 
 // abrirPaqueteIWork reconoce un paquete de iWork por su disposición, sin leer ninguna
@@ -195,54 +203,60 @@ func sniffIWork(filename string, data []byte) srcFormat {
 // importIWork convierte un fichero de iWork. Lo que todavía no se sabe convertir se abre
 // con su vista previa y un aviso (documentoNoConvertido): nunca falla. Lo que se convierte
 // a medias lleva delante el aviso de conversión parcial y, al final, la vista previa.
-func importIWork(f srcFormat, data []byte, idioma string) (Kind, string) {
+func importIWork(f srcFormat, data []byte, comments bool, idioma string) (Kind, string, []ImportedComment) {
 	p := abrirPaqueteIWork(data)
 	if p != nil && !p.cifrado {
 		// Lo que no cabe en un documento (una hoja de 65 000 filas) tampoco es un error: se
 		// abre como lo que no se convierte, con su vista previa.
-		if kind, contenido := convertirIWork(f, p, idioma); contenido != "" {
+		if kind, contenido, coms := convertirIWork(f, p, comments, idioma); contenido != "" {
 			if _, err := caberEnElDocumento(contenido); err == nil {
-				return kind, contenido
+				return kind, contenido, coms
 			}
 		}
 	}
-	return KindDocument, documentoNoConvertido(f, p, idioma)
+	return KindDocument, documentoNoConvertido(f, p, idioma), nil
 }
 
 // convertirIWork convierte lo que se sabe convertir; "" si nada. La aplicación la dice el
 // propio documento (la raíz del índice '09 o el tipo del objeto raíz IWA), no la extensión.
-func convertirIWork(f srcFormat, p *paqueteIWork, idioma string) (Kind, string) {
+func convertirIWork(f srcFormat, p *paqueteIWork, comments bool, idioma string) (Kind, string, []ImportedComment) {
 	if p.v09 {
 		raiz := p.indice09()
 		if raiz == nil {
-			return "", ""
+			return "", "", nil
 		}
 		switch raiz.nombre {
 		case "sl:document":
-			cuerpo, omitido := importPages09(raiz)
-			return documentoIWork(f, p, idioma, cuerpo, omitido)
+			cuerpo, coms, omitido := importPages09(raiz, p, comments)
+			k, c := documentoIWork(f, p, idioma, cuerpo, omitido)
+			return k, c, coms
 		case "ls:document":
 			m, formulas, omitido := importNumbers09(raiz)
-			return hojaIWork(f, idioma, m, formulas, omitido)
+			k, c := hojaIWork(f, idioma, m, formulas, omitido)
+			return k, c, nil
 		case "key:presentation":
-			m, omitido := importKeynote09(raiz)
-			return presentacionIWork(f, p, idioma, m, omitido)
+			m, omitido := importKeynote09(raiz, p)
+			k, c := presentacionIWork(f, p, idioma, m, omitido)
+			return k, c, nil
 		}
-		return "", ""
+		return "", "", nil
 	}
 	doc := p.iwa()
 	switch {
 	case doc.de(1, tipoIWAPages) != nil:
-		cuerpo, omitido := importPagesIWA(doc)
-		return documentoIWork(f, p, idioma, cuerpo, omitido)
+		cuerpo, coms, omitido := importPagesIWA(doc, p, comments)
+		k, c := documentoIWork(f, p, idioma, cuerpo, omitido)
+		return k, c, coms
 	case esKeynoteIWA(doc):
-		m, omitido := importKeynoteIWA(doc)
-		return presentacionIWork(f, p, idioma, m, omitido)
+		m, omitido := importKeynoteIWA(doc, p)
+		k, c := presentacionIWork(f, p, idioma, m, omitido)
+		return k, c, nil
 	case doc.de(1, tipoIWADocumento) != nil:
 		m, formulas, omitido := importNumbersIWA(doc)
-		return hojaIWork(f, idioma, m, formulas, omitido)
+		k, c := hojaIWork(f, idioma, m, formulas, omitido)
+		return k, c, nil
 	}
-	return "", ""
+	return "", "", nil
 }
 
 // documentoIWork es el documento convertido; si algo se quedó fuera, con el aviso de
@@ -376,3 +390,112 @@ func (p *paqueteIWork) vistaPrevia() ([]byte, image.Config) {
 // tiposIWork es la clave del nombre de cada tipo de fichero en los avisos; fmtIWork no
 // está porque no se sabe cuál es.
 var tiposIWork = map[srcFormat]string{fmtPages: "tipo.pages", fmtNumbers: "tipo.numbers", fmtKeynote: "tipo.key"}
+
+// esMiniaturaIWork distingue las vistas previas y miniaturas del paquete (`QuickLook/`,
+// `thumbs/`, `*-small*`, `mt-*`, `st-*`, `mt[0-9]*`, `st[0-9]*`, `PresetImageFill*`) de
+// las imágenes del documento.
+func esMiniaturaIWork(nombre string) bool {
+	low := strings.ToLower(strings.ReplaceAll(nombre, `\`, "/"))
+	if strings.HasPrefix(low, "quicklook/") || strings.Contains(low, "/quicklook/") ||
+		strings.HasPrefix(low, "thumbs/") || strings.Contains(low, "/thumbs/") ||
+		strings.HasPrefix(low, "templates/") || strings.HasPrefix(low, "charts/") {
+		return true
+	}
+	base := path.Base(low)
+	if strings.HasPrefix(base, "preview") || strings.HasPrefix(base, "mt-") || strings.HasPrefix(base, "st-") ||
+		strings.HasPrefix(base, "presetimagefill") || strings.Contains(base, "-small") {
+		return true
+	}
+	if (strings.HasPrefix(base, "mt") || strings.HasPrefix(base, "st")) && len(base) > 2 && base[2] >= '0' && base[2] <= '9' {
+		return true
+	}
+	return false
+}
+
+func (p *paqueteIWork) buscarEnDatosIWork(pred func(string) bool) *zip.File {
+	mejor := ""
+	for n := range p.ficheros {
+		if strings.HasPrefix(n, "Data/") && !esMiniaturaIWork(n) && pred(n) && (mejor == "" || n < mejor) {
+			mejor = n
+		}
+	}
+	return p.ficheros[mejor]
+}
+
+// buscarImagenIWork localiza una imagen del documento en el paquete a partir de las rutas
+// o sufijos candidatos (`Data/foto.jpg`, `foto.jpg`, `-701.`), descartando miniaturas.
+func (p *paqueteIWork) buscarImagenIWork(candidatos ...string) *zip.File {
+	if p == nil {
+		return nil
+	}
+	for _, c := range candidatos {
+		c = strings.TrimSpace(strings.ReplaceAll(c, `\`, "/"))
+		if c == "" {
+			continue
+		}
+		if strings.HasPrefix(c, "-") && strings.HasSuffix(c, ".") {
+			if f := p.buscarEnDatosIWork(func(n string) bool { return strings.Contains(n, c) }); f != nil {
+				return f
+			}
+			continue
+		}
+		for _, ruta := range []string{"Data/" + strings.TrimPrefix(c, "Data/"), c} {
+			if f := p.ficheros[ruta]; f != nil && !esMiniaturaIWork(ruta) {
+				return f
+			}
+		}
+		base := strings.ToLower(path.Base(c))
+		if f := p.buscarEnDatosIWork(func(n string) bool { return strings.ToLower(path.Base(n)) == base }); f != nil {
+			return f
+		}
+	}
+	return nil
+}
+
+// imagenDataURL lee y convierte una imagen incrustada del paquete a data:URL con sus
+// dimensiones en píxeles, respetando el tope por imagen y el tope total del paquete.
+func (p *paqueteIWork) imagenDataURL(candidatos ...string) (src string, w, h int) {
+	f := p.buscarImagenIWork(candidatos...)
+	if f == nil || p.bytesImagenes >= maxTotalImagenesIWork {
+		return "", 0, 0
+	}
+	tope := min(int64(maxImagenIWork), maxTotalImagenesIWork-p.bytesImagenes)
+	raw := leerEntrada(f, tope)
+	if len(raw) == 0 {
+		return "", 0, 0
+	}
+	ext := strings.ToLower(path.Ext(f.Name))
+	if ext == ".tif" || ext == ".tiff" {
+		u := tiffADataURL(raw)
+		if u == "" {
+			return "", 0, 0
+		}
+		p.bytesImagenes += int64(len(raw))
+		_, b64, _ := strings.Cut(u, ",")
+		if dec, err := base64.StdEncoding.DecodeString(b64); err == nil {
+			if cfg, _, err := image.DecodeConfig(bytes.NewReader(dec)); err == nil {
+				return u, cfg.Width, cfg.Height
+			}
+		}
+		return u, 0, 0
+	}
+	cfg, formato, err := image.DecodeConfig(bytes.NewReader(raw))
+	if err != nil || cfg.Width <= 0 || cfg.Height <= 0 {
+		return "", 0, 0
+	}
+	switch formato {
+	case "jpeg", "png", "gif":
+	default:
+		return "", 0, 0
+	}
+	p.bytesImagenes += int64(len(raw))
+	return "data:image/" + formato + ";base64," + base64.StdEncoding.EncodeToString(raw), cfg.Width, cfg.Height
+}
+
+// imgHTML devuelve la etiqueta <img> escalada a lo ancho del folio sin deformarla.
+func (p *paqueteIWork) imgHTML(src string, w, h int) string {
+	if w > anchoVistaPrevia && h > 0 {
+		w, h = anchoVistaPrevia, max(1, h*anchoVistaPrevia/w)
+	}
+	return imgTag(src, w, h)
+}

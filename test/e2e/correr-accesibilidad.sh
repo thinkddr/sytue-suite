@@ -15,7 +15,7 @@
 # Variables: PUERTO (4338), ACC_SOLO=docus,calcus,... para acotar, ACC_OUT y CINTA_OUT para
 # las capturas. Sale con 1 si cualquiera falla.
 set -uo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")" || exit 1
 PUERTO="${PUERTO:-4338}"
 RAIZ="$(cd ../.. && pwd)"
 umask 077

@@ -6,7 +6,7 @@ Ihre Videos und Ihre Livestreams, auf Abruf und in Echtzeit, ohne Europa zu verl
 • Live-Chat und Kommentare, mit einfacher Moderation durch die veröffentlichende Person.
 • Videos bis 8 GiB hochladen; das Original bleibt erhalten.
 • Livestreaming aus einer Sendesoftware über RTMP, mit einem Streamschlüssel pro Person.
-• Live aus dem Browser oder der App: Kamera, Bildschirm und Mikrofon.
+• Live aus dem Browser oder der App: Kamera und Mikrofon. Bildschirmfreigabe in unterstützten Browsern, Desktopsystemen und Android; nicht in der iOS/iPadOS-App verfügbar.
 • Aufzeichnungen von Livestreams werden automatisch zu Videos auf Abruf.
 • Eine öffentliche Startseite und ein Kanal pro Organisation, indexierbar.
 • Ungelistete Links, Videos nur für die Organisation oder Zugriff für bestimmte Personen per @Benutzername.

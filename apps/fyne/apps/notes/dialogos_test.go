@@ -8,6 +8,7 @@ import (
 	"image/png"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"fyne.io/fyne/v2"
@@ -263,6 +264,95 @@ func TestGuardarSinNombreNoSePuede(t *testing.T) {
 	titulo.PonerTexto("   ")
 	if !guardar.Inerte {
 		t.Error("un nombre en blanco no es un nombre")
+	}
+}
+
+// TestAjustesDeCuadernoAjenoNoOfreceAccionesDeDueno: en un cuaderno de otra persona de
+// la organización, quien no es su dueño no ve Eliminar, Visibilidad ni Cifrar, y el
+// código `notebook_owner_only` del servicio se traduce al catálogo.
+func TestAjustesDeCuadernoAjenoNoOfreceAccionesDeDueno(t *testing.T) {
+	w := test.NewWindow(nil)
+	w.SetPadded(false)
+	defer w.Close()
+	p := NuevaPantalla(trInterno(t), "es", nil, nil, w)
+	p.Yo = func() string { return "luis" }
+	w.SetContent(p.Objeto())
+	w.Resize(fyne.NewSize(1280, 800))
+
+	ajeno := DeCuaderno(api.Notebook{
+		ID:         "c1",
+		Title:      "Equipo",
+		OwnerSub:   "ana",
+		Visibility: "organization",
+		Color:      ColoresCuaderno[0],
+	})
+	p.dialogoAjustes(&ajeno, "")
+	defer p.cerrarAjustes()
+
+	vistos := map[string]bool{}
+	recorrerInterno(w.Canvas().Overlays().Top(), func(o fyne.CanvasObject) {
+		if x, ok := o.(*canvas.Text); ok {
+			vistos[x.Text] = true
+		}
+		if b, ok := o.(*ui.Boton); ok {
+			vistos[b.Texto] = true
+		}
+	})
+	for _, oculto := range []string{
+		p.tr.T("notebook.delete", nil),
+		p.tr.T("visibility.label", nil),
+		p.tr.T("crypto.title", nil),
+	} {
+		if vistos[oculto] {
+			t.Errorf("el diálogo de un cuaderno ajeno sigue enseñando %q", oculto)
+		}
+	}
+	if !vistos[p.tr.T("index.label", nil)] || !vistos[p.tr.T("common.save", nil)] {
+		t.Error("el diálogo de un cuaderno ajeno oculta lo que sí es editable")
+	}
+
+	err := &api.Error{Status: 403, Body: `{"error":{"code":"notebook_owner_only","message":"Only the notebook's owner..."}}`}
+	if got, want := p.motivo(err), p.tr.T("notebook.ownerOnly", nil); got != want {
+		t.Errorf("motivo(notebook_owner_only) = %q, quiero %q", got, want)
+	}
+}
+
+func TestNotaNoTextoResuelveEntidadesSinPintarMarcadoCrudo(t *testing.T) {
+	w := test.NewWindow(nil)
+	w.SetPadded(false)
+	defer w.Close()
+	tr := trInterno(t)
+	p := NuevaPantalla(tr, "es", nil, nil, w)
+	nota := DeNota(api.Note{
+		ID:      "n-link",
+		Kind:    "link",
+		Title:   "Acta",
+		Content: "<p>I &amp; D &lt;2026&gt;</p><script>alert(1)</script>",
+	})
+	tarjeta := NuevaTarjeta(tr, nota)
+	lectura := p.notasSoloLectura([]Nota{nota}, tema.Claro)
+	w.SetContent(container.NewVBox(tarjeta, lectura))
+	w.Resize(fyne.NewSize(800, 600))
+
+	for nombre, raiz := range map[string]fyne.CanvasObject{
+		"tarjeta":          tarjeta,
+		"notasSoloLectura": lectura,
+	} {
+		var textos []string
+		recorrerInterno(raiz, func(o fyne.CanvasObject) {
+			if x, ok := o.(*canvas.Text); ok {
+				textos = append(textos, x.Text)
+			}
+		})
+		unido := strings.Join(textos, " ")
+		if !strings.Contains(unido, "I & D <2026>") {
+			t.Errorf("%s: no muestra el texto con entidades resueltas: %q", nombre, unido)
+		}
+		for _, crudo := range []string{"&amp;", "&lt;", "<p>", "alert(1)"} {
+			if strings.Contains(unido, crudo) {
+				t.Errorf("%s: dejó marcado o entidad sin resolver %q en %q", nombre, crudo, unido)
+			}
+		}
 	}
 }
 

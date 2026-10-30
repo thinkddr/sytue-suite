@@ -167,10 +167,14 @@ func (s *Service) ChannelUploadFile(ctx context.Context, channelID uuid.UUID, su
 // acotado por MaxUploadBytes (si se pasa, borra el objeto y devuelve
 // ErrQuotaExceeded). Lo comparten la subida a «Mi unidad» y la de un canal.
 func (s *Service) putBlob(ctx context.Context, t tenancy.Tenant, key, name, contentType, ownerSub string, body io.Reader) (string, int64, string, error) {
+	return s.putBlobLimited(ctx, t, key, name, contentType, ownerSub, body, s.cfg.MaxUploadBytes)
+}
+
+func (s *Service) putBlobLimited(ctx context.Context, t tenancy.Tenant, key, name, contentType, ownerSub string, body io.Reader, maximum int64) (string, int64, string, error) {
 	if contentType == "" {
 		contentType = "application/octet-stream"
 	}
-	limited := io.LimitReader(body, s.cfg.MaxUploadBytes+1)
+	limited := io.LimitReader(body, maximum+1)
 	hasher := sha256.New()
 	counter := &countingReader{r: io.TeeReader(limited, hasher)}
 	// minio requiere el tamaño; como llega por stream sin Content-Length fiable,
@@ -184,7 +188,7 @@ func (s *Service) putBlob(ctx context.Context, t tenancy.Tenant, key, name, cont
 	}); err != nil {
 		return "", 0, "", fmt.Errorf("service: subir blob: %w", err)
 	}
-	if counter.n > s.cfg.MaxUploadBytes {
+	if counter.n > maximum {
 		_ = s.blobs.Delete(ctx, t, key)
 		return "", 0, "", domain.ErrQuotaExceeded
 	}

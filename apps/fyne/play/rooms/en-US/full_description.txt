@@ -3,18 +3,13 @@ Channels, messages and team video calls in one place.
 • Channels per team or project.
 • A video call embedded in every channel.
 • Mentions and notifications unified across the suite.
-• Searchable history from anywhere in Sytue One.
 • Public and private channels in categories; direct messages and groups.
 • Threads, reactions, mentions, pins, saved messages and drafts.
 • Formatting with an “Aa” bar and shortcuts: bold, italic, code, quotes, lists and links.
 • Attachments, images, GIFs and custom emoji; files from Drive.
-• Scheduled send, priority, read acknowledgement and “seen by”.
-• Slash commands and cards: polls and assignable tasks.
-• Video calls inside the channel: camera, screen, raised hand, chat and recording.
 • Scheduled meetings and invite links.
 • Bots, webhooks and integrations with other tools.
 • Presence and custom status; per-channel notification settings.
-• Search the history, and from across the suite.
 • Real time over WebSocket, with reconnection and no lost messages.
 
 Encrypted in transit (TLS 1.3). Sytue’s infrastructure is in the EU. The location of external services depends on their provider.

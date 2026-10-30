@@ -54,6 +54,18 @@ type remoto struct {
 	video, compartida image.Image
 }
 
+// PuedePublicar reads the SDK's live permission, including changes delivered
+// after the metadata API acknowledges encryption readiness.
+func (l *Llamada) PuedePublicar() bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.colgada || l.room == nil {
+		return false
+	}
+	permiso := l.room.LocalParticipant.Permissions()
+	return permiso.GetCanPublish()
+}
+
 // Entrar conecta con el SFU con la conexión que dio el servicio.
 func Entrar(url, token string, o Opciones) (*Llamada, error) {
 	if url == "" || token == "" {

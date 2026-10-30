@@ -16,6 +16,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/emersion/go-msgauth/dkim"
@@ -110,11 +111,16 @@ const maxFirmasDKIM = 8
 // res resuelve la clave pública (TXT de <selector>._domainkey.<d=>); nil usa el
 // DNS del sistema.
 func VerifyDKIM(ctx context.Context, res Resolver, raw []byte) (Result, []string, error) {
+	return VerifyDKIMReader(ctx, res, bytes.NewReader(raw))
+}
+
+// VerifyDKIMReader verifica las firmas DKIM leyendo el mensaje en flujo desde r.
+func VerifyDKIMReader(ctx context.Context, res Resolver, r io.Reader) (Result, []string, error) {
 	opts := &dkim.VerifyOptions{MaxVerifications: maxFirmasDKIM}
 	if res != nil {
 		opts.LookupTXT = func(name string) ([]string, error) { return res.LookupTXT(ctx, name) }
 	}
-	verifications, err := dkim.VerifyWithOptions(bytes.NewReader(raw), opts)
+	verifications, err := dkim.VerifyWithOptions(r, opts)
 	if err != nil && !errors.Is(err, dkim.ErrTooManySignatures) {
 		return ResultTempError, nil, fmt.Errorf("auth: verificar DKIM: %w", err)
 	}

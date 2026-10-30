@@ -8,12 +8,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"git.sytue.eu/sytue/one/platform/pkg/logsafe"
 	"io"
 	"log/slog"
 	"net/http"
 	"strings"
 	"time"
+
+	"git.sytue.eu/sytue/one/platform/pkg/logsafe"
 )
 
 // sweegoSendURL es el envío de Sweego (Mindbaz SAS, Lille; alojado en Francia).

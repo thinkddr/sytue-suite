@@ -43,19 +43,36 @@ func Parse(r io.Reader) (Parsed, error) {
 	if err != nil {
 		return Parsed{}, fmt.Errorf("mime: leer mensaje: %w", err)
 	}
+	env, err := ParseSobre(bytes.NewReader(raw), int64(len(raw)))
+	if err != nil {
+		return Parsed{}, err
+	}
+	return Parsed{Envelope: env, Raw: raw}, nil
+}
 
-	mr, err := gomail.CreateReader(bytes.NewReader(raw))
+// ParseSobre analiza el sobre indexable de un mensaje RFC 5322 en flujo desde rs
+// (por ejemplo, el fichero temporal de un entrante en el MX), sin volcar el cuerpo
+// entero a un []byte en memoria.
+func ParseSobre(rs io.ReadSeeker, size int64) (domain.Message, error) {
+	if _, err := rs.Seek(0, io.SeekStart); err != nil {
+		return domain.Message{}, fmt.Errorf("mime: rebobinar mensaje: %w", err)
+	}
+	mr, err := gomail.CreateReader(rs)
 	if err != nil {
 		// Reintento como mensaje genérico (algunos remitentes envían cuerpos no
 		// estrictamente conformes); si tampoco parsea, devolvemos el error.
-		if _, gerr := gomessage.Read(bytes.NewReader(raw)); gerr != nil {
-			return Parsed{}, fmt.Errorf("mime: parsear mensaje: %w", err)
+		if _, serr := rs.Seek(0, io.SeekStart); serr != nil {
+			return domain.Message{}, fmt.Errorf("mime: rebobinar mensaje: %w", serr)
 		}
-		return Parsed{Envelope: envelopeFromHeaders(raw), Raw: raw}, nil
+		if _, gerr := gomessage.Read(rs); gerr != nil {
+			return domain.Message{}, fmt.Errorf("mime: parsear mensaje: %w", err)
+		}
+		_, _ = rs.Seek(0, io.SeekStart)
+		return envelopeFromHeadersReader(rs, size), nil
 	}
 	defer mr.Close()
 
-	env := domain.Message{Flags: []string{}, SizeBytes: int64(len(raw))}
+	env := domain.Message{Flags: []string{}, SizeBytes: size}
 	h := mr.Header
 
 	env.Subject, _ = h.Subject()
@@ -122,14 +139,14 @@ func Parse(r io.Reader) (Parsed, error) {
 	}
 	env.Snippet = truncate(snippet.String(), maxSnippet)
 
-	return Parsed{Envelope: env, Raw: raw}, nil
+	return env, nil
 }
 
-// envelopeFromHeaders es el camino de degradación: extrae lo esencial con el
+// envelopeFromHeadersReader es el camino de degradación: extrae lo esencial con el
 // parser de cabeceras estándar cuando go-message/mail no puede leer el cuerpo.
-func envelopeFromHeaders(raw []byte) domain.Message {
-	env := domain.Message{Flags: []string{}, SizeBytes: int64(len(raw)), SentAt: time.Now().UTC()}
-	m, err := mail.ReadMessage(bytes.NewReader(raw))
+func envelopeFromHeadersReader(r io.Reader, size int64) domain.Message {
+	env := domain.Message{Flags: []string{}, SizeBytes: size, SentAt: time.Now().UTC()}
+	m, err := mail.ReadMessage(r)
 	if err != nil {
 		return env
 	}

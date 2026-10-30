@@ -6,6 +6,7 @@
 package ficheros
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 )
@@ -31,14 +32,14 @@ func Revelar(ruta string) error {
 	return lanzar("open", "-R", abs)
 }
 
-// Abrir entrega el fichero a la aplicación que LaunchServices tenga asociada a su tipo: es
+// abrirConContexto entrega el fichero a la aplicación que LaunchServices tenga asociada a su tipo: es
 // el doble clic del Finder, y quien elige es la configuración de la persona, no Sytue.
-func Abrir(ruta string) error {
+func abrirConContexto(ctx context.Context, ruta string) error {
 	abs, err := local(ruta)
 	if err != nil {
 		return err
 	}
-	return lanzar("open", abs)
+	return lanzarConContexto(ctx, "open", abs)
 }
 
 // Imprimir entrega el fichero a la cadena de impresión del sistema.

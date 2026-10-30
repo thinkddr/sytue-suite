@@ -442,7 +442,8 @@ export const pl: AppCatalog<typeof en> = {
   'product.cast.f2': 'Odtwarzanie adaptacyjne w trzech jakościach; przeglądarka wybiera najlepszą.',
   'product.cast.f3':
     'Transmisja z programu do nadawania przez RTMP, z kluczem strumienia na osobę.',
-  'product.cast.f4': 'Na żywo z przeglądarki lub aplikacji: kamera, ekran i mikrofon.',
+  'product.cast.f4':
+    'Na żywo z przeglądarki lub aplikacji: kamera i mikrofon. Udostępnianie ekranu w obsługiwanych przeglądarkach, systemach komputerowych i Androidzie; niedostępne w aplikacji iOS/iPadOS.',
   'product.cast.f5': 'Nagrania transmisji same stają się filmami na żądanie.',
   'product.cast.f6': 'Publiczna strona główna i kanał na organizację, indeksowalne.',
   'product.cast.f7':

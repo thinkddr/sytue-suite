@@ -1,0 +1,527 @@
+From dd89cf90a53b470fac10b8e3e57163b01ba3aa5d Mon Sep 17 00:00:00 2001
+From: Daniel Delgado <328510259+thinkddr@users.noreply.github.com>
+Date: Sat, 24 Oct 2026 00:09:13 +0200
+Subject: [PATCH] fix(ios): derive canvas geometry from the attached view
+
+Measure the attached view bounds, rendering scale and safe-area insets, and
+refresh them when layout, safe areas or scene orientation change. Send the
+already oriented drawable dimensions to Go without a second landscape swap.
+Use the same view coordinate space and scale for touches. Convert keyboard
+rectangles from the screen coordinate space; only full-width docked overlap
+reserves the canvas bottom edge.
+
+Include 24 portable geometry/keyboard cases and source contracts. The real
+Go/Fyne/UIKit app was compiled and linked for device and simulator with
+Xcode 27.0, then exercised on iPhone and iPad iOS 27.0 simulators across
+rotation cycles and full, half, offset-small and restored-full viewports,
+with 32 native taps. See the source PR and CI for the retained UIKit harness.
+
+Base: v2.8.2-sytue.1 (62c88876f8c30d381abd4a53601b270485c205cb)
+Source: dd89cf90a53b470fac10b8e3e57163b01ba3aa5d
+PR: https://github.com/thinkddr/fyne/pull/5
+CI: https://github.com/thinkddr/fyne/actions/runs/40196864106
+
+This minimal export contains driver code, portable C regressions and source
+contracts. Original driver copyright/BSD notices and new helper/regression
+Apache-2.0 notices are preserved from the source. See FORK-NOTICE.md and
+LICENSE-MODIFICATIONS in the source repository for the fork license terms.
+---
+ internal/driver/mobile/app/darwin_ios.go           |  33 +++---
+ internal/driver/mobile/app/darwin_ios.m            | 121 +++++++++++----------
+ .../driver/mobile/app/ios_geometry_source_test.go  |  80 ++++++++++++++
+ internal/driver/mobile/app/ios_view_geometry.h     |  31 ++++++
+ .../driver/mobile/app/testdata/ios_view_geometry.c |  43 ++++++++
+ 5 files changed, 234 insertions(+), 74 deletions(-)
+
+diff --git a/internal/driver/mobile/app/darwin_ios.go b/internal/driver/mobile/app/darwin_ios.go
+index 1b2b28b55c878f7137278a5a820bdab0b8b6a614..6af5e83f47fc689d464a21c1427da32b5e805d13 100644
+--- a/internal/driver/mobile/app/darwin_ios.go
++++ b/internal/driver/mobile/app/darwin_ios.go
+@@ -8,12 +8,12 @@ package app
+ 
+ /*
+ #cgo CFLAGS: -x objective-c -DGL_SILENCE_DEPRECATION
+-#cgo LDFLAGS: -framework Foundation -framework UIKit -framework MobileCoreServices -framework GLKit -framework OpenGLES -framework QuartzCore -framework UserNotifications
++#cgo LDFLAGS: -framework Foundation -framework UIKit -framework CoreGraphics -framework MobileCoreServices -framework GLKit -framework OpenGLES -framework QuartzCore -framework UserNotifications
+ #include <sys/utsname.h>
+ #include <stdint.h>
+ #include <stdbool.h>
+ #include <pthread.h>
+-#include <UIKit/UIDevice.h>
++#include <UIKit/UIKit.h>
+ #import <GLKit/GLKit.h>
+ 
+ extern struct utsname sysInfo;
+@@ -23,7 +23,6 @@ void makeCurrentContext(GLintptr ctx);
+ void swapBuffers(GLintptr ctx);
+ uint64_t threadID();
+ 
+-UIEdgeInsets getDevicePadding();
+ bool isDark();
+ void showKeyboard(int keyboardType);
+ void hideKeyboard();
+@@ -75,10 +74,7 @@ func main(f func(App)) {
+ 	panic("unexpected return from app.runApp")
+ }
+ 
+-var (
+-	pixelsPerPt float32
+-	screenScale int // [UIScreen mainScreen].scale, either 1, 2, or 3.
+-)
++var pixelsPerPt float32
+ 
+ var DisplayMetrics struct {
+ 	WidthPx  int
+@@ -96,7 +92,7 @@ func setDisplayMetrics(width, height int, scale int) {
+ }
+ 
+ //export setScreen
+-func setScreen(scale int) {
++func setScreen(scale float32) {
+ 	C.uname(&C.sysInfo)
+ 	name := C.GoString(&C.sysInfo.machine[0])
+ 
+@@ -122,31 +118,30 @@ func setScreen(scale int) {
+ 		v = 163 // emergency fallback
+ 	}
+ 
+-	pixelsPerPt = v * float32(scale) / 72
+-	screenScale = scale
++	pixelsPerPt = v * scale / 72
+ }
+ 
+ //export updateConfig
+-func updateConfig(width, height, orientation int32) {
++func updateConfig(width, height, orientation, top, bottom, left, right int32) {
++	// UIKit sends the current view pixels, already oriented and scaled.
++	// Orientation describes them; it must not rotate the dimensions again.
+ 	o := size.OrientationUnknown
+ 	switch orientation {
+-	case C.UIDeviceOrientationPortrait, C.UIDeviceOrientationPortraitUpsideDown:
++	case C.UIInterfaceOrientationPortrait, C.UIInterfaceOrientationPortraitUpsideDown:
+ 		o = size.OrientationPortrait
+-	case C.UIDeviceOrientationLandscapeLeft, C.UIDeviceOrientationLandscapeRight:
++	case C.UIInterfaceOrientationLandscapeLeft, C.UIInterfaceOrientationLandscapeRight:
+ 		o = size.OrientationLandscape
+-		width, height = height, width
+ 	}
+-	insets := C.getDevicePadding()
+ 
+ 	theApp.events.In() <- size.Event{
+ 		WidthPx:       int(width),
+ 		HeightPx:      int(height),
+ 		WidthPt:       float32(width) / pixelsPerPt,
+ 		HeightPt:      float32(height) / pixelsPerPt,
+-		InsetTopPx:    int(float32(insets.top) * float32(screenScale)),
+-		InsetBottomPx: int(float32(insets.bottom) * float32(screenScale)),
+-		InsetLeftPx:   int(float32(insets.left) * float32(screenScale)),
+-		InsetRightPx:  int(float32(insets.right) * float32(screenScale)),
++		InsetTopPx:    int(top),
++		InsetBottomPx: int(bottom),
++		InsetLeftPx:   int(left),
++		InsetRightPx:  int(right),
+ 		PixelsPerPt:   pixelsPerPt,
+ 		Orientation:   o,
+ 		DarkMode:      bool(C.isDark()),
+diff --git a/internal/driver/mobile/app/darwin_ios.m b/internal/driver/mobile/app/darwin_ios.m
+index 2c3518940bd90dbf5f2616b77f5e4b108da5a9f3..3af3befe5406ab6eee37532b2e5060625bb6902d 100644
+--- a/internal/driver/mobile/app/darwin_ios.m
++++ b/internal/driver/mobile/app/darwin_ios.m
+@@ -8,6 +8,7 @@
+ #include <pthread.h>
+ #include <stdio.h>
+ #include <sys/utsname.h>
++#include "ios_view_geometry.h"
+ 
+ #import <UIKit/UIKit.h>
+ #import <MobileCoreServices/MobileCoreServices.h>
+@@ -16,9 +17,8 @@
+ 
+ struct utsname sysInfo;
+ 
+-static CGFloat keyboardHeight;
+-
+ @interface GoAppAppController : GLKViewController<UIContentContainer, GLKViewDelegate>
++- (void)updateGeometry;
+ @end
+ 
+ @interface GoInputView : UITextField<UITextFieldDelegate>
+@@ -145,8 +145,7 @@ - (void)scene:(UIScene *)scene willConnectToSession:(UISceneSession *)session op
+ 	[self.window makeKeyAndVisible];
+ 
+ 	// update insets once key window is set
+-	CGSize size = [UIScreen mainScreen].nativeBounds.size;
+-	updateConfig((int)size.width, (int)size.height, ((UIWindowScene *)scene).interfaceOrientation);
++	[app.controller updateGeometry];
+ 
+ 	[self scene:scene openURLContexts:connectionOptions.URLContexts];
+ 	for (NSUserActivity *activity in connectionOptions.userActivities) {
+@@ -185,6 +184,7 @@ @interface GoAppAppController ()
+ @property (strong, nonatomic) EAGLContext *context;
+ @property (strong, nonatomic) GLKView *glview;
+ @property (strong, nonatomic) GoInputView *inputView;
++@property (nonatomic) CGRect keyboardFrame;
+ @end
+ 
+ @implementation GoAppAppController
+@@ -194,14 +194,14 @@ - (void)viewWillAppear:(BOOL)animated
+ 	[super viewWillAppear:animated];
+ 	self.paused = YES;
+ 
+-    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(keyboardWillShow:) name:UIKeyboardWillShowNotification object:nil];
++    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(keyboardWillChangeFrame:) name:UIKeyboardWillChangeFrameNotification object:nil];
+     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(keyboardWillHide:) name:UIKeyboardWillHideNotification object:nil];
+ }
+ 
+ - (void)viewWillDisappear:(BOOL)animated {
+     [super viewWillDisappear:animated];
+ 
+-    [[NSNotificationCenter defaultCenter] removeObserver:self name:UIKeyboardWillShowNotification object:nil];
++    [[NSNotificationCenter defaultCenter] removeObserver:self name:UIKeyboardWillChangeFrameNotification object:nil];
+     [[NSNotificationCenter defaultCenter] removeObserver:self name:UIKeyboardWillHideNotification object:nil];
+ }
+ 
+@@ -218,6 +218,7 @@ - (void)viewDidLoad {
+ 	self.glview.multipleTouchEnabled = true; // TODO expose setting to user.
+ 	self.glview.context = self.context;
+ 	self.glview.userInteractionEnabled = YES;
++	self.keyboardFrame = CGRectNull;
+ 	//self.glview.enableSetNeedsDisplay = YES; // only invoked once
+ 
+ 	// Do not use the GLKViewController draw loop.
+@@ -225,28 +226,60 @@ - (void)viewDidLoad {
+ 	//self.resumeOnDidBecomeActive = NO;
+ 	//self.preferredFramesPerSecond = 0;
+ 
+-	int scale = 1;
+-	if ([[UIScreen mainScreen] respondsToSelector:@selector(displayLinkWithTarget:selector:)]) {
+-		scale = (int)[UIScreen mainScreen].scale; // either 1.0, 2.0, or 3.0.
+-	}
+-	setScreen(scale);
+-
+-	CGSize size = [UIScreen mainScreen].nativeBounds.size;
+-	UIInterfaceOrientation orientation = [[UIApplication sharedApplication] statusBarOrientation];
+-	updateConfig((int)size.width, (int)size.height, orientation);
+-
+     self.glview.enableSetNeedsDisplay = NO;
+     CADisplayLink* displayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(render:)];
+     [displayLink addToRunLoop:[NSRunLoop currentRunLoop] forMode:NSDefaultRunLoopMode];
+ }
+ 
++- (void)updateGeometry {
++	UIWindow *window = self.view.window;
++	UIWindowScene *scene = window.windowScene;
++	if (scene == nil) {
++		return; // viewDidLoad can run before the view has joined its scene.
++	}
++	CGRect bounds = self.view.bounds;
++	CGFloat scale = self.view.contentScaleFactor;
++	int width = ios_view_pixels(bounds.size.width, scale);
++	int height = ios_view_pixels(bounds.size.height, scale);
++	if (width == 0 || height == 0) {
++		return;
++	}
++	UIInterfaceOrientation orientation;
++	if (@available(iOS 16.0, *)) {
++		orientation = scene.effectiveGeometry.interfaceOrientation;
++	} else {
++		orientation = scene.interfaceOrientation;
++	}
++	UIEdgeInsets inset = self.view.safeAreaInsets;
++	if (!CGRectIsNull(self.keyboardFrame)) {
++		CGRect keyboard = [self.view convertRect:self.keyboardFrame fromCoordinateSpace:window.screen.coordinateSpace];
++		CGFloat bottom = ios_keyboard_bottom_inset(bounds.size.width, bounds.size.height,
++			CGRectGetMinX(keyboard) - CGRectGetMinX(bounds), CGRectGetMinY(keyboard) - CGRectGetMinY(bounds),
++			keyboard.size.width, keyboard.size.height);
++		inset.bottom = MAX(inset.bottom, bottom);
++	}
++	setScreen((float)scale);
++	updateConfig(width, height, orientation,
++		ios_view_pixels(inset.top, scale), ios_view_pixels(inset.bottom, scale),
++		ios_view_pixels(inset.left, scale), ios_view_pixels(inset.right, scale));
++}
++
++- (void)viewDidLayoutSubviews {
++	[super viewDidLayoutSubviews];
++	[self updateGeometry];
++}
++
++- (void)viewSafeAreaInsetsDidChange {
++	[super viewSafeAreaInsetsDidChange];
++	[self updateGeometry];
++}
++
+ - (void)viewWillTransitionToSize:(CGSize)ptSize withTransitionCoordinator:(id<UIViewControllerTransitionCoordinator>)coordinator {
++	[super viewWillTransitionToSize:ptSize withTransitionCoordinator:coordinator];
+ 	[coordinator animateAlongsideTransition:^(id<UIViewControllerTransitionCoordinatorContext> context) {
+ 		// TODO(crawshaw): come up with a plan to handle animations.
+ 	} completion:^(id<UIViewControllerTransitionCoordinatorContext> context) {
+-		UIInterfaceOrientation orientation = [[UIApplication sharedApplication] statusBarOrientation];
+-		CGSize size = [UIScreen mainScreen].nativeBounds.size;
+-		updateConfig((int)size.width, (int)size.height, orientation);
++		[self updateGeometry];
+ 	}];
+ }
+ 
+@@ -265,53 +298,45 @@ - (void)glkView:(GLKView *)view drawInRect:(CGRect)rect {
+ #define TOUCH_TYPE_END   2 // touch.TypeEnd
+ #define TOUCH_TYPE_CANCEL 3 // touch.TypeCancel
+ 
+-static void sendTouches(int change, NSSet* touches) {
+-	CGFloat scale = [UIScreen mainScreen].nativeScale;
++static void sendTouches(int change, NSSet* touches, UIView *view) {
++	CGFloat scale = view.contentScaleFactor;
+ 	for (UITouch* touch in touches) {
+-		CGPoint p = [touch locationInView:touch.view];
++		CGPoint p = [touch locationInView:view];
+ 		sendTouch((GoUintptr)touch, (GoUintptr)change, p.x*scale, p.y*scale);
+ 	}
+ }
+ 
+ - (void)touchesBegan:(NSSet*)touches withEvent:(UIEvent*)event {
+-	sendTouches(TOUCH_TYPE_BEGIN, touches);
++	sendTouches(TOUCH_TYPE_BEGIN, touches, self.view);
+ }
+ 
+ - (void)touchesMoved:(NSSet*)touches withEvent:(UIEvent*)event {
+-	sendTouches(TOUCH_TYPE_MOVE, touches);
++	sendTouches(TOUCH_TYPE_MOVE, touches, self.view);
+ }
+ 
+ - (void)touchesEnded:(NSSet*)touches withEvent:(UIEvent*)event {
+-	sendTouches(TOUCH_TYPE_END, touches);
++	sendTouches(TOUCH_TYPE_END, touches, self.view);
+ }
+ 
+ - (void)touchesCancelled:(NSSet*)touches withEvent:(UIEvent*)event {
+-    sendTouches(TOUCH_TYPE_CANCEL, touches);
++    sendTouches(TOUCH_TYPE_CANCEL, touches, self.view);
+ }
+ 
+ - (void) traitCollectionDidChange: (UITraitCollection *) previousTraitCollection {
+     [super traitCollectionDidChange: previousTraitCollection];
+ 
+-	UIInterfaceOrientation orientation = [[UIApplication sharedApplication] statusBarOrientation];
+-	CGSize size = [UIScreen mainScreen].nativeBounds.size;
+-	updateConfig((int)size.width, (int)size.height, orientation);
++	[self updateGeometry];
+ }
+ 
+-- (void)keyboardWillShow:(NSNotification *)note {
+-    CGSize keyboardSize = [[[note userInfo] objectForKey:UIKeyboardFrameEndUserInfoKey] CGRectValue].size;
+-    keyboardHeight = keyboardSize.height;
+-
+-    CGSize size = [UIScreen mainScreen].nativeBounds.size;
+-	UIInterfaceOrientation orientation = [[UIApplication sharedApplication] statusBarOrientation];
+-	updateConfig((int)size.width, (int)size.height, orientation);
++- (void)keyboardWillChangeFrame:(NSNotification *)note {
++	NSValue *frame = note.userInfo[UIKeyboardFrameEndUserInfoKey];
++	self.keyboardFrame = frame == nil ? CGRectNull : frame.CGRectValue;
++	[self updateGeometry];
+ }
+ 
+ - (void)keyboardWillHide:(NSNotification *)note {
+-    keyboardHeight = 0;
+-
+-    CGSize size = [UIScreen mainScreen].nativeBounds.size;
+-	UIInterfaceOrientation orientation = [[UIApplication sharedApplication] statusBarOrientation];
+-	updateConfig((int)size.width, (int)size.height, orientation);
++	self.keyboardFrame = CGRectNull;
++	[self updateGeometry];
+ }
+ 
+ @end
+@@ -377,20 +402,6 @@ uint64_t threadID() {
+ 	return id;
+ }
+ 
+-UIEdgeInsets getDevicePadding() {
+-    if (@available(iOS 11.0, *)) {
+-        UIWindow *window = UIApplication.sharedApplication.keyWindow;
+-
+-        UIEdgeInsets inset = window.safeAreaInsets;
+-        if (keyboardHeight != 0) {
+-            inset.bottom = keyboardHeight;
+-        }
+-        return inset;
+-    }
+-
+-    return UIEdgeInsetsZero;
+-}
+-
+ bool isDark() {
+     UIViewController *rootVC = [[[[UIApplication sharedApplication] delegate] window] rootViewController];
+     return rootVC.traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark;
+diff --git a/internal/driver/mobile/app/ios_geometry_source_test.go b/internal/driver/mobile/app/ios_geometry_source_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..f52facb4a23dec64dccf0dfafec6261ac3cfa1fc
+--- /dev/null
++++ b/internal/driver/mobile/app/ios_geometry_source_test.go
+@@ -0,0 +1,80 @@
++// SPDX-License-Identifier: Apache-2.0
++// Copyright (c) 2026 Daniel Delgado Ramos
++
++package app
++
++import (
++	"go/ast"
++	"go/parser"
++	"go/token"
++	"os"
++	"path/filepath"
++	"runtime"
++	"strings"
++	"testing"
++)
++
++// These contracts complement the native UIKit compilation: Linux mobile tests
++// cannot compile the Objective-C bridge and used to miss its global-screen path.
++func iosGeometrySource(t *testing.T, name string) []byte {
++	t.Helper()
++	_, file, _, ok := runtime.Caller(0)
++	if !ok {
++		t.Fatal("cannot locate the native source")
++	}
++	source, err := os.ReadFile(filepath.Join(filepath.Dir(file), name))
++	if err != nil {
++		t.Fatal(err)
++	}
++	return source
++}
++
++func TestIOSGeometryUsesTheAttachedView(t *testing.T) {
++	text := string(iosGeometrySource(t, "darwin_ios.m"))
++	for _, required := range []string{
++		"CGRect bounds = self.view.bounds", "CGFloat scale = self.view.contentScaleFactor",
++		"scene.effectiveGeometry.interfaceOrientation", "self.view.safeAreaInsets",
++		"viewDidLayoutSubviews", "viewSafeAreaInsetsDidChange", "UIKeyboardWillChangeFrameNotification",
++		"fromCoordinateSpace:window.screen.coordinateSpace", "ios_keyboard_bottom_inset",
++		"ios_view_pixels(bounds.size.width, scale)", "ios_view_pixels(bounds.size.height, scale)",
++		"CGFloat scale = view.contentScaleFactor", "locationInView:view",
++		"sendTouches(TOUCH_TYPE_CANCEL, touches, self.view)",
++	} {
++		if !strings.Contains(text, required) {
++			t.Errorf("iOS geometry is missing %q", required)
++		}
++	}
++	for _, legacy := range []string{"statusBarOrientation", "nativeScale", "keyboardHeight", "UIApplication.sharedApplication.keyWindow"} {
++		if strings.Contains(text, legacy) {
++			t.Errorf("iOS geometry still uses global or unconverted %q", legacy)
++		}
++	}
++	// The one remaining use only initializes the physical DisplayMetrics at launch.
++	if strings.Count(text, "nativeBounds") > 1 {
++		t.Error("window geometry still reads the physical screen bounds")
++	}
++}
++
++func TestIOSConfigDoesNotRotateAlreadyOrientedPixels(t *testing.T) {
++	source, err := parser.ParseFile(token.NewFileSet(), "darwin_ios.go", iosGeometrySource(t, "darwin_ios.go"), 0)
++	if err != nil {
++		t.Fatal(err)
++	}
++	ast.Inspect(source, func(node ast.Node) bool {
++		assignment, ok := node.(*ast.AssignStmt)
++		if !ok || len(assignment.Lhs) != 2 || len(assignment.Rhs) != 2 {
++			return true
++		}
++		name := func(expression ast.Expr) string {
++			if id, ok := expression.(*ast.Ident); ok {
++				return id.Name
++			}
++			return ""
++		}
++		if name(assignment.Lhs[0]) == "width" && name(assignment.Lhs[1]) == "height" &&
++			name(assignment.Rhs[0]) == "height" && name(assignment.Rhs[1]) == "width" {
++			t.Error("Go swaps the view pixels a second time in landscape")
++		}
++		return true
++	})
++}
+diff --git a/internal/driver/mobile/app/ios_view_geometry.h b/internal/driver/mobile/app/ios_view_geometry.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..9a44cf572c05999f3fc672100ffb73803c07c741
+--- /dev/null
++++ b/internal/driver/mobile/app/ios_view_geometry.h
+@@ -0,0 +1,31 @@
++// SPDX-License-Identifier: Apache-2.0
++// Copyright (c) 2026 Daniel Delgado Ramos
++
++#ifndef FYNE_IOS_VIEW_GEOMETRY_H
++#define FYNE_IOS_VIEW_GEOMETRY_H
++
++#include <limits.h>
++#include <math.h>
++
++// GLKView allocates its drawable from view points, not UIScreen.nativeBounds.
++static inline int ios_view_pixels(double extent, double scale) {
++	if (!isfinite(extent) || !isfinite(scale) || extent <= 0 || scale <= 0 || extent * scale > INT_MAX) {
++		return 0;
++	}
++	return (int)lround(extent * scale);
++}
++
++// The keyboard rectangle is already in view coordinates. Floating/undocked
++// keyboards must not shrink the entire canvas by their bounding-box height.
++static inline double ios_keyboard_bottom_inset(double width, double height,
++	double x, double y, double keyboard_width, double keyboard_height) {
++	if (!isfinite(width) || !isfinite(height) || !isfinite(x) || !isfinite(y) ||
++		!isfinite(keyboard_width) || !isfinite(keyboard_height) || width <= 0 || height <= 0 ||
++		keyboard_width <= 0 || keyboard_height <= 0 || x > 0.5 || x + keyboard_width < width - 0.5 ||
++		y >= height || y + keyboard_height < height - 0.5) {
++		return 0;
++	}
++	return fmin(height, fmax(0, height - fmax(0, y)));
++}
++
++#endif
+diff --git a/internal/driver/mobile/app/testdata/ios_view_geometry.c b/internal/driver/mobile/app/testdata/ios_view_geometry.c
+new file mode 100644
+index 0000000000000000000000000000000000000000..fde7479613da28c59b9cc96537afbc8eb2980b7f
+--- /dev/null
++++ b/internal/driver/mobile/app/testdata/ios_view_geometry.c
+@@ -0,0 +1,43 @@
++// SPDX-License-Identifier: Apache-2.0
++// Copyright (c) 2026 Daniel Delgado Ramos
++
++#include "../ios_view_geometry.h"
++#include <stdio.h>
++#include <stdlib.h>
++
++static void expect(const char *name, double got, double want) {
++	if (!isfinite(got) || fabs(got - want) > 0.000001) {
++		fprintf(stderr, "%s: got %g, want %g\n", name, got, want);
++		exit(1);
++	}
++}
++
++int main(void) {
++	expect("portrait width", ios_view_pixels(390, 3), 1170);
++	expect("portrait height", ios_view_pixels(844, 3), 2532);
++	expect("landscape width already rotated", ios_view_pixels(844, 3), 2532);
++	expect("landscape height already rotated", ios_view_pixels(390, 3), 1170);
++	expect("iPad window narrower than screen", ios_view_pixels(600, 2), 1200);
++	expect("fractional rendering scale", ios_view_pixels(400, 2.5), 1000);
++	expect("fractional bounds", ios_view_pixels(800.25, 2), 1601);
++	expect("zero initial bounds", ios_view_pixels(0, 3), 0);
++	expect("zero scale", ios_view_pixels(390, 0), 0);
++	expect("invalid scale", ios_view_pixels(390, NAN), 0);
++	expect("infinite bounds", ios_view_pixels(INFINITY, 3), 0);
++	expect("negative bounds", ios_view_pixels(-1, 3), 0);
++	expect("overflow", ios_view_pixels(INT_MAX, 2), 0);
++
++	expect("portrait docked", ios_keyboard_bottom_inset(390, 844, 0, 544, 390, 300), 300);
++	expect("landscape docked", ios_keyboard_bottom_inset(844, 390, 0, 190, 844, 200), 200);
++	expect("split view intersection", ios_keyboard_bottom_inset(600, 768, -100, 468, 1024, 300), 300);
++	expect("partial window overlap", ios_keyboard_bottom_inset(600, 600, 0, 500, 600, 300), 100);
++	expect("floating iPad", ios_keyboard_bottom_inset(1024, 768, 400, 300, 320, 240), 0);
++	expect("floating at bottom", ios_keyboard_bottom_inset(1024, 768, 400, 528, 320, 240), 0);
++	expect("undocked full width", ios_keyboard_bottom_inset(1024, 768, 0, 300, 1024, 240), 0);
++	expect("keyboard below view", ios_keyboard_bottom_inset(600, 600, 0, 700, 600, 300), 0);
++	expect("hidden keyboard", ios_keyboard_bottom_inset(600, 600, 0, 0, 0, 0), 0);
++	expect("invalid keyboard", ios_keyboard_bottom_inset(600, 600, 0, NAN, 600, 300), 0);
++	expect("keyboard covers whole view", ios_keyboard_bottom_inset(600, 600, 0, -100, 600, 800), 600);
++	puts("iOS view geometry: all cases passed");
++	return 0;
++}
+-- 

@@ -87,6 +87,7 @@ func (e *Editor) SeleccionarSolo(id string) {
 	}
 	e.sel, e.extra, e.selCon = id, nil, ""
 	e.recomponer()
+	e.refrescarCinta()
 }
 
 // SeleccionarConector es `onConnSelect`: el conector, sin cajas elegidas.
@@ -97,6 +98,7 @@ func (e *Editor) SeleccionarConector(id string) {
 	}
 	e.sel, e.extra, e.selCon = "", nil, id
 	e.recomponer()
+	e.refrescarCinta()
 }
 
 // ConectorElegido es el conector elegido, o "".
@@ -133,6 +135,7 @@ func (e *Editor) Alternar(id string) {
 		e.extra = append(slices.Clone(e.extra), id)
 	}
 	e.recomponer()
+	e.refrescarCinta()
 }
 
 // BorrarSeleccion es Supr sobre el escenario: borra la selección efectiva con sus
@@ -673,6 +676,9 @@ func (m *marcoCaja) Tapped(ev *fyne.PointEvent) {
 func (m *marcoCaja) Dragged(ev *fyne.DragEvent) {
 	c := m.capa
 	if m.texto || c.e.ctx.SoloLectura {
+		if ui.EsTactil() {
+			c.e.desliz.Scrolled(&fyne.ScrollEvent{PointEvent: ev.PointEvent, Scrolled: ev.Dragged})
+		}
 		return
 	}
 	if c.arrastre == nil {

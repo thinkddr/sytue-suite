@@ -457,7 +457,8 @@ export const ga: AppCatalog<typeof en> = {
     'Athsheinm oiriúnaitheach i dtrí cháilíocht; roghnaíonn an brabhsálaí an ceann is fearr.',
   'product.cast.f3':
     'Sruthú beo ó bhogearraí craolacháin thar RTMP, le heochair srutha do gach duine.',
-  'product.cast.f4': 'Beo ón mbrabhsálaí nó ón aip: ceamara, scáileán agus micreafón.',
+  'product.cast.f4':
+    'Beo ón mbrabhsálaí nó ón aip: ceamara agus micreafón. Comhroinnt scáileáin i mbrabhsálaithe, córais deisce agus Android a thacaíonn léi; níl sí ar fáil san aip iOS/iPadOS.',
   'product.cast.f5': 'Déantar físeáin ar éileamh de thaifeadtaí na sruthanna beo go huathoibríoch.',
   'product.cast.f6':
     'Leathanach tosaigh poiblí agus cainéal in aghaidh na heagraíochta, ininnéacsaithe.',

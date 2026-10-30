@@ -24,15 +24,18 @@ func TestElMontajeDeRotacionDevuelveLaAppAlRecorrido(t *testing.T) {
 	b := widget.NewButton("Acción", nil)
 	contenido := container.NewWithoutLayout(b)
 	w := test.NewTempWindow(t, contenido)
-	w.SetPadded(false)
+	w.SetPadded(true)
 	w.Resize(fyne.NewSize(900, 600))
 	b.Move(fyne.NewPos(1000, 1000))
 	ComprobarRotacion(t, w, "fixture", iconos.Docs, false, func() {
+		if w.Padded() {
+			t.Fatal("el montaje conserva el padding que las apps reales desactivan")
+		}
 		tam := contenido.Size()
 		b.Resize(fyne.NewSize(32, 32))
 		b.Move(fyne.NewPos(tam.Width-32, tam.Height-32))
 	})
-	if w.Canvas().Content() != contenido || w.Canvas().Size() != fyne.NewSize(900, 600) || tema.AppElegida() != "drive" {
+	if w.Canvas().Content() != contenido || w.Canvas().Size() != fyne.NewSize(900, 600) || tema.AppElegida() != "drive" || !w.Padded() {
 		t.Fatal("el montaje no ha devuelto el contenido, tamaño y producto originales")
 	}
 }

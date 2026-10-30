@@ -264,6 +264,7 @@ type docxHoja struct {
 	margenArriba float64           // margen superior de la última sección, en twips
 	anchoTexto   float64           // ancho de página menos sus márgenes laterales, en twips; 0 si no se sabe
 	altoPag      float64           // alto de página de la última sección, en twips; 0 si no se sabe
+	exportado    bool              // el paquete trae el styles.xml que escribe la exportación de Docus
 	// descartes cuenta lo que se lee y no se traduce (ver corpus_docx_test.go); nil no cuenta.
 	descartes map[string]int
 }
@@ -311,6 +312,7 @@ func parseDocxHoja(files map[string][]byte) *docxHoja {
 		// solo cuenta la negrita de los títulos 1 a 3, que es la del editor: así un título que
 		// se exportó sin negrita (<w:b w:val="0"/>) vuelve sin ella.
 		if len(data) > 0 {
+			h.exportado = true
 			for _, id := range []string{"Heading1", "Heading2", "Heading3"} {
 				si := true
 				h.estilos[id] = &docxEstilo{tipo: "paragraph", r: docxRPr{b: &si}}
@@ -1252,6 +1254,9 @@ func parseDocxTabulador(data []byte) float64 {
 type docxCSS struct{ b strings.Builder }
 
 func (c *docxCSS) add(prop, val string) {
+	if val == "" {
+		return
+	}
 	if c.b.Len() > 0 {
 		c.b.WriteByte(';')
 	}

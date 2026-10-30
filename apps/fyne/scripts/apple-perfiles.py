@@ -5,6 +5,8 @@
 
 Por defecto sólo consulta la API. --preparar reutiliza una identidad válida del
 llavero efímero y crea perfiles, nunca certificados, App IDs ni capacidades.
+Con --solo-existentes sólo reutiliza y guarda perfiles válidos ya emitidos;
+la ausencia de uno compatible es un error y el cliente sólo admite GET.
 Antes de prepararlos hay que asociar el App Group real en Developer Portal;
 ningún perfil se guarda si no autoriza todos los derechos que se van a firmar.
 """
@@ -72,27 +74,9 @@ def requisitos(generador, app, plataforma, widget=False, archivos=False):
             "protection": derechos.get("com.apple.developer.default-data-protection", "")}
 
 
-def identidad_importada(plataforma, equipo, elegida=""):
-    # El selector compartido rechaza el llavero personal antes de inspeccionarlo.
-    llavero = capturar(["bash", AQUI / "apple-firma.sh", "llavero-efimero"]).strip()
-    salida = capturar(["security", "find-identity", "-v", "-p", "codesigning", llavero])
-    prefijo = "Developer ID Application: " if plataforma == "developerid" else "Apple Distribution: "
-    validas = {huella.lower() for huella, nombre in re.findall(r'\b([0-9A-Fa-f]{40})\s+"([^"\n]+)"', salida)
-               if nombre.startswith(prefijo) and nombre.endswith("(" + equipo + ")")}
-    if elegida:
-        elegida = elegida.replace(":", "").lower()
-        if not re.fullmatch(r"[0-9a-f]{40}", elegida) or elegida not in validas:
-            raise ValueError("la huella no corresponde a una identidad válida importada en el llavero efímero")
-    else:
-        if len(validas) != 1:
-            raise ValueError("se necesita una identidad válida única; selecciona su huella pública con --certificado-sha1")
-        elegida = next(iter(validas))
-    # SHA-1 sólo selecciona la identidad de codesign en este llavero. Conservamos
-    # el DER local para autenticar por igualdad el certificado que devuelve Apple.
-    # -Z incluye ambos identificadores junto a cada PEM; no consultamos el llavero
-    # personal ni aceptamos dos certificados distintos con el mismo selector.
+def exportar_certificados_llavero(llavero):
     salida = capturar(["security", "find-certificate", "-a", "-Z", "-p", llavero])
-    certificados = []
+    exportados = []
     bloques = salida.split("SHA-256 hash: ")
     if bloques[0].strip():
         raise ValueError("no se puede verificar la exportación de certificados del llavero efímero")
@@ -103,14 +87,72 @@ def identidad_importada(plataforma, equipo, elegida=""):
         if registro is None:
             raise ValueError("no se puede verificar la exportación de certificados del llavero efímero")
         sha256, selector, contenido = registro.groups()
+        limpio = "".join(contenido.split())
         try:
-            der = base64.b64decode("".join(contenido.split()), validate=True)
+            der = base64.b64decode(limpio, validate=True)
         except ValueError as error:
             raise ValueError("el llavero efímero no devuelve un certificado válido") from error
         if not der or hashlib.sha256(der).hexdigest() != sha256.lower():
             raise ValueError("el certificado exportado no coincide con su huella SHA-256")
-        if selector.lower() == elegida:
-            certificados.append(der)
+        pem = ("-----BEGIN CERTIFICATE-----\n" + limpio + "\n-----END CERTIFICATE-----\n").encode("ascii")
+        exportados.append((selector.lower(), der, pem))
+    return exportados
+
+
+def identidad_importada(plataforma, equipo, elegida=""):
+    # El selector compartido rechaza el llavero personal antes de inspeccionarlo.
+    llavero = capturar(["bash", AQUI / "apple-firma.sh", "llavero-efimero"]).strip()
+    salida = capturar(["security", "find-identity", "-v", "-p", "codesigning", llavero])
+    prefijo = "Developer ID Application: " if plataforma == "developerid" else "Apple Distribution: "
+    validas = {huella.lower() for huella, nombre in re.findall(r'\b([0-9A-Fa-f]{40})\s+"([^"\n]+)"', salida)
+               if nombre.startswith(prefijo) and nombre.endswith("(" + equipo + ")")}
+    if elegida:
+        elegida = elegida.replace(":", "").lower()
+        if not re.fullmatch(r"[0-9a-f]{40}", elegida):
+            raise ValueError("la huella no corresponde a una identidad válida importada en el llavero efímero")
+    exportados = None
+    # En macOS actual, el clasificador legado de find-identity -v omite identidades
+    # cuya evaluación nativa sí es válida (como en apple-firma.sh identidad). Aceptar
+    # sólo un candidato inequívoco del llavero propio y verificar su cadena sin AIA.
+    if not validas:
+        sin_clasificador = capturar(["security", "find-identity", "-p", "codesigning", llavero])
+        candidatas = {huella.lower() for huella, nombre in re.findall(r'\b([0-9A-Fa-f]{40})\s+"([^"\n]+)"', sin_clasificador)
+                      if nombre.startswith(prefijo) and nombre.endswith("(" + equipo + ")")}
+        if len(candidatas) == 1 and (not elegida or elegida in candidatas):
+            candidata = next(iter(candidatas))
+            exportados = exportar_certificados_llavero(llavero)
+            coincidencias = [item for item in exportados if item[0] == candidata]
+            if len(coincidencias) == 1:
+                base_job = os.environ.get("SYTUE_APPLE_JOB_DIR", "")
+                dir_cert = pathlib.Path(base_job) if base_job else pathlib.Path(llavero).parent
+                if not dir_cert.is_dir():
+                    dir_cert.mkdir(parents=True, exist_ok=True, mode=0o700)
+                fd, ruta_cert = tempfile.mkstemp(prefix="identity.", dir=dir_cert)
+                try:
+                    with os.fdopen(fd, "wb") as archivo:
+                        os.fchmod(archivo.fileno(), 0o600)
+                        archivo.write(coincidencias[0][2])
+                    capturar(["security", "verify-cert", "-L", "-p", "codeSign", "-c", ruta_cert, "-k", llavero])
+                    validas = {candidata}
+                except subprocess.CalledProcessError:
+                    pass
+                finally:
+                    if os.path.exists(ruta_cert):
+                        os.unlink(ruta_cert)
+    if elegida:
+        if elegida not in validas:
+            raise ValueError("la huella no corresponde a una identidad válida importada en el llavero efímero")
+    else:
+        if len(validas) != 1:
+            raise ValueError("se necesita una identidad válida única; selecciona su huella pública con --certificado-sha1")
+        elegida = next(iter(validas))
+    # SHA-1 sólo selecciona la identidad de codesign en este llavero. Conservamos
+    # el DER local para autenticar por igualdad el certificado que devuelve Apple.
+    # -Z incluye ambos identificadores junto a cada PEM; no consultamos el llavero
+    # personal ni aceptamos dos certificados distintos con el mismo selector.
+    if exportados is None:
+        exportados = exportar_certificados_llavero(llavero)
+    certificados = [der for selector, der, _ in exportados if selector == elegida]
     if len(certificados) != 1:
         raise ValueError("la identidad importada no tiene un certificado único en el llavero efímero")
     return certificados[0]
@@ -208,7 +250,7 @@ def guardar_perfil(salida, identificador, plataforma, datos):
     return str(destino)
 
 
-def preparar(asc, requisito, plataforma, certificado="", salida=None):
+def preparar(asc, requisito, plataforma, certificado="", salida=None, solo_existentes=False):
     identificador = requisito["id"]
     resultado = {"app": requisito["app"], "app_id": identificador, "platform": plataforma,
                  "profile_type": TIPOS[plataforma], "profile_ready": False,
@@ -225,6 +267,8 @@ def preparar(asc, requisito, plataforma, certificado="", salida=None):
     if requisito["protection"] and not REGISTRO["completa"](por_tipo.get("DATA_PROTECTION", {})):
         return {**resultado, "reason": "data_protection_complete_missing"}
     perfil, datos = perfiles_validos(asc, bundle, requisito, plataforma, certificado)
+    if perfil is None and solo_existentes:
+        return {**resultado, "reason": "existing_profile_missing_or_invalid"}
     if perfil is None and salida is not None:
         if not certificado:
             raise ValueError("preparar un perfil exige verificar antes la identidad importada")
@@ -258,7 +302,7 @@ def destinos_app(app):
         yield ".archivos", False, True
 
 
-def comprobar_recibo(ruta, catalogo, plataforma):
+def comprobar_recibo(ruta, catalogo, plataforma, solo_existentes=False):
     """Recibo completo del preparador: sólo catálogo y JSONL, sin API ni llavero."""
     esperados = {app["id"] + sufijo: app["clave"]
                  for app in catalogo.values() for sufijo, _, _ in destinos_app(app)}
@@ -280,6 +324,8 @@ def comprobar_recibo(ruta, catalogo, plataforma):
                     dato.get("profile_type") != TIPOS[plataforma] or dato.get("profile_ready") is not True or
                     dato.get("certificate_verified") is not True or not isinstance(dato.get("created"), bool)):
                 raise ValueError("el recibo no acredita el tipo, certificado y perfil de cada destino")
+            if solo_existentes and dato["created"] is not False:
+                raise ValueError("el recibo de sólo existentes contiene un perfil creado")
             recibos[identificador] = {campo: dato[campo] for campo in
                                       ("app", "app_id", "platform", "profile_type", "profile_ready", "certificate_verified", "created")}
     if set(recibos) != set(esperados):
@@ -291,11 +337,26 @@ def comprobar_recibo(ruta, catalogo, plataforma):
     return 0
 
 
+def cliente_apple(api, solo_existentes=False):
+    """Reutiliza autenticación y paginación; el modo existente no permite escribir."""
+    if not solo_existentes:
+        return api.Apple()
+
+    class SoloLectura(api.Apple):
+        def pedir(self, metodo, ruta, cuerpo=None, tolerar=()):
+            if metodo != "GET" or cuerpo is not None:
+                raise RuntimeError("--solo-existentes sólo admite consultas GET sin cuerpo")
+            return super().pedir(metodo, ruta, tolerar=tolerar)
+
+    return SoloLectura()
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--plataforma", choices=TIPOS, required=True)
     parser.add_argument("--destinos", choices=("hosts", "widgets", "archivos", "nativos", "todos"), default="hosts")
     parser.add_argument("--preparar", action="store_true")
+    parser.add_argument("--solo-existentes", action="store_true", help="reutilizar perfiles válidos sin crear ni modificar recursos Apple")
     parser.add_argument("--salida", type=pathlib.Path)
     parser.add_argument("--certificado-sha1", default="")
     parser.add_argument("--comprobar-recibo", type=pathlib.Path, help="validar los recibos de todos los destinos del catálogo sin API ni llavero")
@@ -309,7 +370,7 @@ def main():
     gen = REGISTRO["importar"]("sytue_xcode_perfiles", AQUI.parent / "xcode/generar.py")
     catalogo = {a["clave"]: a for a in gen.apps()}
     if args.comprobar_recibo:
-        return comprobar_recibo(args.comprobar_recibo, catalogo, args.plataforma)
+        return comprobar_recibo(args.comprobar_recibo, catalogo, args.plataforma, args.solo_existentes)
     seleccion = args.apps or list(catalogo)
     if len(set(seleccion)) != len(seleccion) or any(a not in catalogo for a in seleccion):
         parser.error("selecciona apps del catálogo sin repetirlas")
@@ -324,7 +385,7 @@ def main():
                               **{k: v for k, v in requisito.items() if k != "entitlements"}}, ensure_ascii=False))
         return 0
     api = REGISTRO["importar"]("sytue_asc_perfiles", AQUI / "appstore-publicar.py")
-    asc = api.Apple()
+    asc = cliente_apple(api, args.solo_existentes)
     certificado = ""
     if args.preparar:
         identidad = identidad_importada(args.plataforma, gen.EQUIPO, args.certificado_sha1)
@@ -332,7 +393,7 @@ def main():
     fallos = 0
     for requisito in pendientes:
         try:
-            resultado = preparar(asc, requisito, args.plataforma, certificado, args.salida)
+            resultado = preparar(asc, requisito, args.plataforma, certificado, args.salida, args.solo_existentes)
             fallos += not resultado["profile_ready"]
             print(json.dumps(resultado, ensure_ascii=False))
         except (RuntimeError, ValueError, OSError, subprocess.CalledProcessError) as err:

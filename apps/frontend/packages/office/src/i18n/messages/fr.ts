@@ -1808,6 +1808,8 @@ export const fr: AppCatalog<typeof en> = {
   'extdata.msg.generic': 'L’opération n’a pas pu être effectuée.',
   'extdata.msg.notAllowed':
     'Seules les personnes inscrites sur la liste de cette connexion peuvent l’interroger. Demandez à l’administration de votre organisation de vous y ajouter.',
+  'extdata.msg.ownerOnly':
+    'Seule la personne qui a créé cette connexion ou l’administration de l’organisation peut la modifier ou la supprimer.',
 
   // --- Avisos del editor de hojas ---
   'sheet.msg.badValue': 'Valeur non autorisée',

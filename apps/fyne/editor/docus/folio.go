@@ -193,8 +193,12 @@ type Folio struct {
 	// (ver [Caja]). Manda sobre `pagina`.
 	caja *Caja
 	// zoomPuesto es el último zoom que puso el ajuste al ancho: si `ctx.Zoom` ya no es
-	// este, lo ha cambiado la persona y el ajuste se retira.
+	// este, lo ha cambiado la persona y el ajuste se retira. -1 marca una elección
+	// explícita incluso cuando coincide con el último porcentaje automático.
 	zoomPuesto int
+	// ajustandoZoom distingue la actualización automática de una elección manual
+	// del mismo porcentaje. La elección manual siempre retira el ajuste al ancho.
+	ajustandoZoom bool
 
 	// resaltes son las coincidencias de «Buscar» y activa la que se está viendo;
 	// ocultos, que el panel está cerrado y no se pintan, y buscado, la última consulta,
@@ -546,8 +550,8 @@ func (f *Folio) AjustarAlAncho() {
 	f.ctx.PonerZoom(int(disponible/ancho*20+0.5) * 5)
 }
 
-// ajusteInicial es el de la web al abrir: si el folio no cabe —un teléfono—, el zoom
-// baja hasta que quepa (`floor(disponible / pageW * 100)`).
+// ajusteInicial encuadra el folio al abrir. Con el dedo no baja de 75%: el cuerpo
+// normal de 16 conserva 12 dp, y el papel A4 real se alcanza con el scroll en dos ejes.
 //
 // La web lo hace UNA vez, cuando el lienzo ya mide lo que va a medir. Aquí el primer
 // Layout llega con la ventana aún en su tamaño mínimo (SetContent va antes que Resize),
@@ -555,7 +559,7 @@ func (f *Folio) AjustarAlAncho() {
 // tocado el zoom a mano —que es cuando `ctx.Zoom` deja de ser el último que puso él—, y
 // vuelve a 100 si luego el folio cabe.
 func (f *Folio) ajusteInicial(ancho float32) {
-	if ancho <= 0 || f.ctx == nil || f.ctx.Zoom != f.zoomPuesto {
+	if ancho <= 0 || f.caja != nil || f.ctx == nil || f.ctx.Zoom != f.zoomPuesto {
 		return
 	}
 	disponible := ancho - AireFolio
@@ -564,6 +568,9 @@ func (f *Folio) ajusteInicial(ancho float32) {
 	if disponible < pag {
 		z = max(int(disponible/pag*100), editor.ZoomMin)
 	}
+	if ui.EsTactil() {
+		z = max(z, 75)
+	}
 	if z == f.ctx.Zoom {
 		return
 	}
@@ -571,9 +578,35 @@ func (f *Folio) ajusteInicial(ancho float32) {
 	// Fuera del Layout: cambiar el zoom recompone el marco, que es quien está colocando.
 	fyne.Do(func() {
 		if f.ctx.Zoom != z && f.zoomPuesto == z {
+			seguirCursor := f.cursorEnVista()
+			f.ajustandoZoom = true
 			f.ctx.PonerZoom(z)
+			f.ajustandoZoom = false
+			if seguirCursor {
+				f.asegurarVisible()
+			}
 		}
 	})
+}
+
+// ZoomExplicito retira el encuadre automático cuando la persona elige un porcentaje,
+// aunque sea el mismo que éste había elegido. No cambia la página ni el documento.
+func (f *Folio) ZoomExplicito() {
+	if !f.ajustandoZoom {
+		f.zoomPuesto = -1
+	}
+}
+
+// cursorEnVista distingue editar de leer otra zona con el foco conservado. Un
+// cambio de viewport sólo sigue el cursor que ya se estaba viendo.
+func (f *Folio) cursorEnVista() bool {
+	if !f.enfocado || !f.conCursor {
+		return false
+	}
+	x, y, alto, ok := f.caretEnPagina()
+	off, vista := f.scroll.Offset, f.scroll.Size()
+	return ok && vista.Width > 0 && vista.Height > 0 &&
+		x >= off.X && x <= off.X+vista.Width && y >= off.Y && y+alto <= off.Y+vista.Height
 }
 
 type folioRenderer struct {
@@ -588,11 +621,15 @@ func (r *folioRenderer) Objects() []fyne.CanvasObject {
 func (r *folioRenderer) Destroy() {}
 
 func (r *folioRenderer) Layout(t fyne.Size) {
+	seguirCursor := r.f.cursorEnVista()
 	r.fondo.Move(fyne.NewPos(0, 0))
 	r.fondo.Resize(t)
 	r.f.envoltorio.Move(fyne.NewPos(0, 0))
 	r.f.envoltorio.Resize(t)
 	r.f.ajusteInicial(t.Width)
+	if seguirCursor {
+		r.f.asegurarVisible()
+	}
 }
 
 func (r *folioRenderer) Refresh() {

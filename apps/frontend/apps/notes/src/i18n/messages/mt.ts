@@ -114,6 +114,8 @@ export const mt: AppCatalog<typeof en> = {
   'backlinks.emptyHint': 'Agħmel link għaliha minn nota oħra u tidher hawn waħedha.',
   'notebook.delete': 'Ħassar il-ktieb tan-noti',
   'notebook.deleteConfirm': 'Tħassar “{title}” u dak kollu li hemm ġewwa?',
+  'notebook.ownerOnly':
+    'Min ħoloq dan il-ktieb tan-noti jew l-amministrazzjoni tal-organizzazzjoni biss jistgħu jmexxuh, jibdlu min jarah jew jikkriptawh.',
   'notebook.newChild': 'Ktieb tan-noti ġdid ġewwa',
   'notebook.notes': {
     one: 'Nota {count}',

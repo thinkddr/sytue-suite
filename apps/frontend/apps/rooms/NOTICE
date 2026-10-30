@@ -1,6 +1,6 @@
 Sytue Rooms includes the following third-party software:
 
-matrix-js-sdk 43.0.0 — Copyright The Matrix.org Foundation C.I.C. and contributors.
+matrix-js-sdk 44.0.0 — Copyright The Matrix.org Foundation C.I.C. and contributors.
 https://github.com/matrix-org/matrix-js-sdk
 @matrix-org/matrix-sdk-crypto-wasm 18.9.0 — Copyright The Matrix.org Foundation C.I.C. and contributors.
 https://github.com/matrix-org/matrix-sdk-crypto-wasm

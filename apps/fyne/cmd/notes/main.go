@@ -19,7 +19,9 @@ import (
 	"log/slog"
 	"net/url"
 	"os"
+	"slices"
 	"strings"
+	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
@@ -44,6 +46,14 @@ const (
 	anchoInicial = 1280
 	altoInicial  = 800
 )
+
+// administraCuadernos liga los roles a la identidad adoptada por esta app. Una
+// respuesta de otra organización o de un inicio anterior nunca habilita ajustes.
+func administraCuadernos(r auth.Reclamos, generacion string, actual sesion.Estado, org string) bool {
+	return actual.Dentro() && generacion != "" && generacion == actual.GeneracionSesion &&
+		r.Sub == actual.Sujeto && org != "" && r.Tenant == org && !r.EsCuentaPersonal() &&
+		(slices.Contains(r.Roles, "owner") || slices.Contains(r.Roles, "admin"))
+}
 
 func main() {
 	a := app.New()
@@ -94,6 +104,13 @@ func main() {
 	// La cola y los borradores van por persona Y organización (claveAlmacen).
 	p.Org = org
 	p.GeneracionSesion = func() string { return s.Estado().GeneracionSesion }
+	// Como en Rooms, los claims se leen fuera del hilo de la interfaz. Su caché solo
+	// se consulta y publica en ese hilo, con la generación y organización vigentes.
+	var rolesCuadernos auth.Reclamos
+	var generacionRoles string
+	p.AdminOrg = func() bool {
+		return administraCuadernos(rolesCuadernos, generacionRoles, s.Estado(), org())
+	}
 	// El asistente del editor, con Sytue AI en directo (el `/api/ai` de la web).
 	p.Asistir = api.NewIA(s.URL("ai"), s.Sesion, nil).Asistir
 	// «Compartir en Rooms» y los ficheros de Drive de la herramienta de enlaces: los
@@ -137,15 +154,33 @@ func main() {
 	// Se carga en cuanto HAY sesión, y no antes: sin ella cada petición sería un 401 y
 	// la pantalla se llenaría de «tu sesión ha caducado» a quien todavía no ha entrado.
 	// Si entra —aquí o en otra app de la suite—, se carga entonces.
-	generacion, dentro := "", false
+	generacion, sujeto, organizacion, dentro := "", "", "", false
 	arrancar := func(e sesion.Estado) {
-		if e.GeneracionSesion != generacion || !e.Dentro() || !dentro {
+		orgActual := org()
+		cambio := e.GeneracionSesion != generacion || e.Sujeto != sujeto || orgActual != organizacion
+		if cambio || !e.Dentro() || !dentro {
+			rolesCuadernos, generacionRoles = auth.Reclamos{}, ""
 			p.ReiniciarSesion()
 		}
-		if e.Dentro() && (!dentro || e.GeneracionSesion != generacion) {
+		if e.Dentro() && (!dentro || cambio) {
 			p.Arrancar()
+			go func(adoptada sesion.Estado, orgAdoptada string) {
+				ctx, cancelar := context.WithTimeout(context.Background(), 10*time.Second)
+				defer cancelar()
+				r, err := s.Sesion.Reclamos(ctx)
+				if err != nil {
+					return
+				}
+				fyne.Do(func() {
+					actual := s.Estado()
+					if actual.GeneracionSesion == adoptada.GeneracionSesion &&
+						actual.Sujeto == adoptada.Sujeto && org() == orgAdoptada {
+						rolesCuadernos, generacionRoles = r, adoptada.GeneracionSesion
+					}
+				})
+			}(e, orgActual)
 		}
-		generacion, dentro = e.GeneracionSesion, e.Dentro()
+		generacion, sujeto, organizacion, dentro = e.GeneracionSesion, e.Sujeto, orgActual, e.Dentro()
 	}
 	s.AlCambiar(arrancar)
 	arrancar(s.Estado())

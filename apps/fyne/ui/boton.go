@@ -280,7 +280,8 @@ type Boton struct {
 	// AlEnfocar se llama al ganar el foco. Lo pone quien lo contiene cuando tiene que
 	// enseñarlo —la TiraDeslizable lo desplaza a la vista, como hace el navegador al
 	// enfocar un botón que se sale de un `overflow-x-auto`—.
-	AlEnfocar func()
+	AlEnfocar   func()
+	mostrarFoco func()
 
 	encima, pulsado, enfocado bool
 	pista                     *Pista // la ayuda que lo envuelve, para abrirla con el teclado
@@ -888,7 +889,12 @@ func (b *Boton) FocusGained() {
 	if b.AlEnfocar != nil {
 		b.AlEnfocar()
 	}
+	if b.mostrarFoco != nil {
+		b.mostrarFoco()
+	}
 }
+
+func (b *Boton) revelarAlFoco(f func()) { b.mostrarFoco = f }
 
 // boton es el Boton que lleva dentro cualquier tipo que lo incruste (el `botonTriaje`
 // de Mail): así la TiraDeslizable le engancha AlEnfocar sin conocer el tipo.

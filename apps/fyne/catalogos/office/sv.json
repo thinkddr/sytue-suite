@@ -741,6 +741,7 @@
   "extdata.msg.noEncryption": "Kryptering av inloggningsuppgifter är inte konfigurerad på servern.",
   "extdata.msg.notAllowed": "Bara personerna på anslutningens lista kan ställa frågor till den. Be den som administrerar organisationen att lägga till dig.",
   "extdata.msg.notFound": "Anslutningen eller frågan finns inte längre.",
+  "extdata.msg.ownerOnly": "Bara den som skapade anslutningen eller den som administrerar organisationen kan ändra eller ta bort den.",
   "extdata.msg.rate": "För många körningar i följd. Vänta några sekunder och försök igen.",
   "extdata.msg.timeout": "Den externa datakällan tog för lång tid att svara.",
   "extdata.msg.unauth": "Sessionen har gått ut. Logga in igen.",

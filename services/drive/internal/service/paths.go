@@ -141,21 +141,49 @@ func (s *Service) RenamePath(ctx context.Context, oldPath, newPath string) error
 		return err
 	}
 	if node.IsDir() {
-		if _, err := s.MoveFolder(ctx, node.Folder.ID, newParentID); err != nil {
+		return s.moverYRenombrarCarpeta(ctx, *node.Folder, newParentID, newName)
+	}
+	return s.moverYRenombrarFichero(ctx, *node.File, newParentID, newName)
+}
+
+func (s *Service) moverYRenombrarCarpeta(ctx context.Context, folder domain.Folder, newParentID uuid.UUID, newName string) error {
+	if folder.ParentID == nil || *folder.ParentID != newParentID {
+		if _, err := s.MoveFolder(ctx, folder.ID, newParentID); err != nil {
+			if !errors.Is(err, domain.ErrConflict) || strings.EqualFold(folder.Name, newName) {
+				return err
+			}
+			if _, err := s.RenameFolder(ctx, folder.ID, newName); err != nil {
+				return err
+			}
+			_, err = s.MoveFolder(ctx, folder.ID, newParentID)
 			return err
 		}
-		if !strings.EqualFold(node.Folder.Name, newName) {
-			_, err = s.RenameFolder(ctx, node.Folder.ID, newName)
+	}
+	if folder.Name != newName {
+		_, err := s.RenameFolder(ctx, folder.ID, newName)
+		return err
+	}
+	return nil
+}
+
+func (s *Service) moverYRenombrarFichero(ctx context.Context, file domain.File, newParentID uuid.UUID, newName string) error {
+	if file.FolderID != newParentID {
+		if _, err := s.MoveFile(ctx, file.ID, newParentID); err != nil {
+			if !errors.Is(err, domain.ErrConflict) || strings.EqualFold(file.Name, newName) {
+				return err
+			}
+			if _, err := s.RenameFile(ctx, file.ID, newName); err != nil {
+				return err
+			}
+			_, err = s.MoveFile(ctx, file.ID, newParentID)
+			return err
 		}
+	}
+	if file.Name != newName {
+		_, err := s.RenameFile(ctx, file.ID, newName)
 		return err
 	}
-	if _, err := s.MoveFile(ctx, node.File.ID, newParentID); err != nil {
-		return err
-	}
-	if !strings.EqualFold(node.File.Name, newName) {
-		_, err = s.RenameFile(ctx, node.File.ID, newName)
-	}
-	return err
+	return nil
 }
 
 // OpenContentByFile abre el blob de un fichero ya resuelto.

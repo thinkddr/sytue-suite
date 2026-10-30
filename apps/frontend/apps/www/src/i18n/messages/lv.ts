@@ -427,7 +427,8 @@ export const lv: AppCatalog<typeof en> = {
   'product.cast.f2': 'Adaptīva atskaņošana trīs kvalitātēs; pārlūks izvēlas labāko.',
   'product.cast.f3':
     'Tiešraide no raidīšanas programmas caur RTMP, ar straumes atslēgu katrai personai.',
-  'product.cast.f4': 'Tiešraidē no pārlūka vai lietotnes: kamera, ekrāns un mikrofons.',
+  'product.cast.f4':
+    'Tiešraidē no pārlūka vai lietotnes: kamera un mikrofons. Ekrāna kopīgošana atbalstītos pārlūkos, darbvirsmas sistēmās un Android; nav pieejama iOS/iPadOS lietotnē.',
   'product.cast.f5': 'Tiešraižu ieraksti automātiski kļūst par video pēc pieprasījuma.',
   'product.cast.f6': 'Publiska sākumlapa un kanāls katrai organizācijai, indeksējami.',
   'product.cast.f7':

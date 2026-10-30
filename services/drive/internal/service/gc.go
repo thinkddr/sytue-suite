@@ -100,7 +100,11 @@ func (s *Service) barrerSubidasCaducadas(ctx context.Context) {
 		for _, c := range caducadas {
 			t := tenancy.Tenant{Slug: c.Tenant}
 			for _, clave := range []string{c.StorageKey, c.StorageKey + sufijoFirme} {
-				if _, err := s.store.GetFileByStorageKey(tenancy.Into(ctx, t), clave); err == nil {
+				if s.team != nil {
+					if ref, err := s.team.BlobReferenciado(ctx, c.Tenant, clave); err != nil || ref {
+						continue
+					}
+				} else if _, err := s.store.GetFileByStorageKey(tenancy.Into(ctx, t), clave); err == nil {
 					continue
 				}
 				if err := s.blobs.Delete(ctx, t, clave); err != nil && !errors.Is(err, objectstore.ErrNotFound) {

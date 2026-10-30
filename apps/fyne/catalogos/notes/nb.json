@@ -271,6 +271,7 @@
     "one": "{count} notat",
     "other": "{count} notater"
   },
+  "notebook.ownerOnly": "Bare den som opprettet notatboken eller den som administrerer organisasjonen, kan flytte den, endre hvem som ser den, eller kryptere den.",
   "notebook.rename": "Gi nytt navn",
   "notebook.settings": "Innstillinger for notatboken",
   "notebook.title": "Navn",

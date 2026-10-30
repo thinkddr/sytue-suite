@@ -5,6 +5,7 @@ package ficheros
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"os/exec"
 	"strings"
@@ -79,4 +80,30 @@ func rutasDe(salida string) []string {
 		}
 	}
 	return rutas
+}
+
+// cadenaPowerShell codifica un texto en Base64 para pasárselo a PowerShell sin abrir
+// un literal entre comillas: PowerShell cierra una cadena entre comillas simples también
+// con las tipográficas (’ ‘ ‚ ‛), así que un título traducido como «'L’app'» o una ruta
+// temporal con apóstrofo tipográfico rompía el guion (FYS-12).
+func cadenaPowerShell(s string) string {
+	return "[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('" + base64.StdEncoding.EncodeToString([]byte(s)) + "'))"
+}
+
+func guionElegirWindows(titulo string, extensiones []string) string {
+	patrones := make([]string, len(extensiones))
+	for i, e := range extensiones {
+		patrones[i] = "*." + e
+	}
+	return "Add-Type -AssemblyName System.Windows.Forms;" +
+		"$d = New-Object System.Windows.Forms.OpenFileDialog;" +
+		"$d.Multiselect = $true;" +
+		"$d.Title = " + cadenaPowerShell(titulo) + ";" +
+		"$d.Filter = " + cadenaPowerShell(titulo+"|"+strings.Join(patrones, ";")) + ";" +
+		"if ($d.ShowDialog() -eq 'OK') { $d.FileNames -join \"`n\" } else { exit 1 }"
+}
+
+func guionCopiarImagenWindows(ruta string) string {
+	return "Add-Type -AssemblyName System.Windows.Forms, System.Drawing;" +
+		"[System.Windows.Forms.Clipboard]::SetImage([System.Drawing.Image]::FromFile(" + cadenaPowerShell(ruta) + "))"
 }

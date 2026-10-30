@@ -744,6 +744,7 @@
   "extdata.msg.noEncryption": "Criptarea acreditărilor nu este configurată pe server.",
   "extdata.msg.notAllowed": "Doar persoanele de pe lista acestei conexiuni o pot interoga. Cereți administrației organizației dumneavoastră să vă adauge.",
   "extdata.msg.notFound": "Conexiunea sau interogarea nu mai există.",
+  "extdata.msg.ownerOnly": "Doar persoana care a creat această conexiune sau administrația organizației o poate modifica sau șterge.",
   "extdata.msg.rate": "Prea multe rulări la rând. Așteptați câteva secunde și încercați din nou.",
   "extdata.msg.timeout": "Sursa de date externă a răspuns prea târziu.",
   "extdata.msg.unauth": "Sesiunea a expirat. Conectați-vă din nou.",

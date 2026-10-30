@@ -741,6 +741,7 @@
   "extdata.msg.noEncryption": "Mandaatide krüptimine pole serveris seadistatud.",
   "extdata.msg.notAllowed": "Sellele ühendusele saavad päringuid saata ainult selle loendis olevad inimesed. Paluge oma organisatsiooni haldajatel teid lisada.",
   "extdata.msg.notFound": "Ühendust või päringut pole enam olemas.",
+  "extdata.msg.ownerOnly": "Seda ühendust saab muuta või kustutada ainult selle looja või organisatsiooni haldaja.",
   "extdata.msg.rate": "Liiga palju käivitusi järjest. Oodake mõni sekund ja proovige uuesti.",
   "extdata.msg.timeout": "Välisandmeallika vastus võttis liiga kaua aega.",
   "extdata.msg.unauth": "Seanss on aegunud. Logige uuesti sisse.",

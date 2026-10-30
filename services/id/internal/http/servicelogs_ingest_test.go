@@ -77,3 +77,17 @@ func TestIngestServiceLogsCuerpoRoto(t *testing.T) {
 		t.Fatalf("status=%d; quería 400", rr.Code)
 	}
 }
+
+// INF-14: /service-logs es una puerta interna entre pods; si llega por Traefik
+// (X-Forwarded-For), el router responde 404 sin confirmar que existe.
+func TestIngestServiceLogsNoSePublicaEnElIngress(t *testing.T) {
+	s := &Server{cfg: Config{LogIngestToken: "secreto"}}
+	rr := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodPost, "/service-logs", strings.NewReader(`[]`))
+	r.Header.Set("Authorization", "Bearer secreto")
+	r.Header.Set("X-Forwarded-For", "203.0.113.7")
+	s.Router().ServeHTTP(rr, r)
+	if rr.Code != http.StatusNotFound {
+		t.Fatalf("con X-Forwarded-For en /service-logs esperaba 404, dio %d", rr.Code)
+	}
+}

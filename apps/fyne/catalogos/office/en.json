@@ -741,6 +741,7 @@
   "extdata.msg.noEncryption": "Credential encryption is not configured on the server.",
   "extdata.msg.notAllowed": "Only the people on this connection's list can query it. Ask your organisation's administrators to add you.",
   "extdata.msg.notFound": "The connection or the query no longer exists.",
+  "extdata.msg.ownerOnly": "Only the person who created this connection or an organisation administrator can change or delete it.",
   "extdata.msg.rate": "Too many runs in a row. Wait a few seconds and try again.",
   "extdata.msg.timeout": "The external data source took too long to respond.",
   "extdata.msg.unauth": "Your session has expired. Sign in again.",

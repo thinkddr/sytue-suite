@@ -128,7 +128,8 @@ export const da: AppCatalog<typeof en> = {
   'gallery.selectMonth': 'Vælg måned',
   'gallery.unselectMonth': 'Fravælg måned',
   'gallery.downloadSelected': 'Download',
-  'gallery.downloading': { one: 'Downloader 1 foto…', other: 'Downloader {count} fotos…' },
+  'gallery.downloading': 'Startede downloadanmodninger: {count}. Tjek browserens downloads.',
+  'gallery.downloadCapped': 'Fotos uden for denne portion: {count}.',
   'gallery.newAlbum': 'Nyt album',
   'gallery.newAlbumTitle': 'Nyt album',
   'gallery.newAlbumPrompt': {

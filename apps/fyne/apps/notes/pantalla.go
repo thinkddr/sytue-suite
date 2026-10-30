@@ -169,6 +169,9 @@ type Pantalla struct {
 	// Yo es el `sub` de quien usa la app: solo el dueño comparte un cuaderno, y solo quien
 	// la escribió, una nota.
 	Yo func() string
+	// AdminOrg consulta en el hilo de la interfaz el rol de la sesión y organización
+	// vigentes. No sustituye los permisos que comprueba el servicio.
+	AdminOrg func() bool
 	// Org es la organización activa: la cola y los borradores se guardan por persona Y
 	// organización (claveAlmacen), o lo capturado en una saldría con el token de otra.
 	Org func() string
@@ -434,12 +437,16 @@ func (p *Pantalla) notaAbierta() (Nota, bool) {
 	return Nota{}, false
 }
 
-// anchoVentana es el de la ventana, o el de escritorio si no hay ninguna (guardianes).
+// anchoVentana es el área útil: el notch lateral queda fuera al girar el teléfono.
+// Sin una ventana medida, los guardianes conservan el ancho de escritorio.
 func (p *Pantalla) anchoVentana() float32 {
-	if p.win == nil || p.win.Canvas().Size().Width == 0 {
-		return 1280
+	if p.win != nil {
+		_, tam := p.win.Canvas().InteractiveArea()
+		if tam.Width > 0 {
+			return tam.Width
+		}
 	}
-	return p.win.Canvas().Size().Width
+	return 1280
 }
 
 func (p *Pantalla) variante() tema.Variante {

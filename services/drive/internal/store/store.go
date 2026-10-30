@@ -1605,7 +1605,8 @@ func blobReferenced(ctx context.Context, tx pgx.Tx, tenant, storageKey string) (
 	err := conTodaLaOrganizacion(ctx, tx, func() error {
 		return tx.QueryRow(ctx, `
 			SELECT EXISTS (SELECT 1 FROM files         WHERE tenant=$1 AND storage_key=$2)
-			    OR EXISTS (SELECT 1 FROM file_versions WHERE tenant=$1 AND storage_key=$2)`,
+			    OR EXISTS (SELECT 1 FROM file_versions WHERE tenant=$1 AND storage_key=$2)
+			    OR EXISTS (SELECT 1 FROM cipher_blobs WHERE tenant=$1 AND storage_key=$2)`,
 			tenant, storageKey).Scan(&referenced)
 	})
 	if err != nil {
@@ -1811,7 +1812,8 @@ func markOrphanedBlobs(ctx context.Context, tx pgx.Tx, tenant string, deleted []
 		rows, err := tx.Query(ctx, `
 			SELECT storage_key FROM files         WHERE tenant=$1 AND storage_key = ANY($2)
 			UNION
-			SELECT storage_key FROM file_versions WHERE tenant=$1 AND storage_key = ANY($2)`,
+			SELECT storage_key FROM file_versions WHERE tenant=$1 AND storage_key = ANY($2)
+			UNION SELECT storage_key FROM cipher_blobs WHERE tenant=$1 AND storage_key = ANY($2)`,
 			tenant, keys)
 		if err != nil {
 			return err

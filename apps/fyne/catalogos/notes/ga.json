@@ -274,6 +274,7 @@
     "one": "{count} nóta",
     "other": "{count} nóta"
   },
+  "notebook.ownerOnly": "Ní féidir ach leis an duine a chruthaigh an leabhar nótaí seo nó le riarthóir na heagraíochta é a bhogadh, a infheictheacht a athrú nó é a chriptiú.",
   "notebook.rename": "Athainmnigh",
   "notebook.settings": "Socruithe an leabhair nótaí",
   "notebook.title": "Ainm",

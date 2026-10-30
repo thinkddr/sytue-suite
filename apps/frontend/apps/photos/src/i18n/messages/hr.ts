@@ -136,11 +136,9 @@ export const hr: AppCatalog<typeof en> = {
   'gallery.selectMonth': 'Odaberi mjesec',
   'gallery.unselectMonth': 'Poništi odabir mjeseca',
   'gallery.downloadSelected': 'Preuzmi',
-  'gallery.downloading': {
-    one: 'Preuzimanje {count} fotografije…',
-    few: 'Preuzimanje {count} fotografije…',
-    other: 'Preuzimanje {count} fotografija…',
-  },
+  'gallery.downloading':
+    'Pokrenuti zahtjevi za preuzimanje: {count}. Provjerite preuzimanja u pregledniku.',
+  'gallery.downloadCapped': 'Fotografije izvan ove serije: {count}.',
   'gallery.newAlbum': 'Novi album',
   'gallery.newAlbumTitle': 'Novi album',
   'gallery.newAlbumPrompt': {

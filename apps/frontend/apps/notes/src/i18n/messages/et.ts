@@ -111,6 +111,8 @@ export const et: AppCatalog<typeof en> = {
   'backlinks.emptyHint': 'Linkige sellele teisest märkmest ja see ilmub siia iseenesest.',
   'notebook.delete': 'Kustuta märkmik',
   'notebook.deleteConfirm': 'Kas kustutada „{title}“ ja kõik, mis selles on?',
+  'notebook.ownerOnly':
+    'Seda märkmikku saab teisaldada, selle nähtavust muuta või seda krüptida ainult selle looja või organisatsiooni haldaja.',
   'notebook.newChild': 'Uus märkmik sisse',
   'notebook.notes': { one: '{count} märge', other: '{count} märget' },
   'notebook.emoji': 'Ikoon',

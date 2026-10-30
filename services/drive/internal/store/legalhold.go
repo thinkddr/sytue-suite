@@ -137,15 +137,20 @@ func (s *Store) SujetoRetenido(ctx context.Context, sub string) (bool, error) {
 	t := tenancy.MustFrom(ctx)
 	var held bool
 	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
-		return tx.QueryRow(ctx, `
-			SELECT EXISTS (SELECT 1 FROM legal_holds
-			 WHERE tenant = $1 AND released_at IS NULL AND (subject IS NULL OR subject = $2))`,
-			t.Slug, sub).Scan(&held)
+		var err error
+		held, err = subjectUnderHoldTx(ctx, tx, t.Slug, sub)
+		return err
 	})
 	if err != nil {
 		return false, fmt.Errorf("store: comprobar hold de persona: %w", err)
 	}
 	return held, nil
+}
+
+func subjectUnderHoldTx(ctx context.Context, tx pgx.Tx, tenant, subject string) (bool, error) {
+	var held bool
+	err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM legal_holds WHERE tenant=$1 AND released_at IS NULL AND (subject IS NULL OR subject=$2))`, tenant, subject).Scan(&held)
+	return held, err
 }
 
 // fileUnderHoldTx indica si el fichero (tenant, id) está cubierto por algún hold

@@ -3,18 +3,13 @@ Canales, mensajes y videollamadas de equipo en un solo sitio.
 • Canales por equipo o proyecto.
 • Videollamada embebida en cada canal.
 • Menciones y notificaciones unificadas en la suite.
-• Historial buscable desde toda Sytue One.
 • Canales públicos y privados en categorías; mensajes directos y grupos.
 • Hilos, reacciones, menciones, fijados, guardados y borradores.
 • Formato con barra «Aa» y atajos: negrita, cursiva, código, citas, listas y enlaces.
 • Adjuntos, imágenes, GIF y emoji personalizados; ficheros desde Drive.
-• Envío programado, prioridad, acuse de recibo y «visto por».
-• Comandos con «/» y tarjetas: encuestas y tareas asignables.
-• Videollamadas en el propio canal: cámara, pantalla, mano levantada, chat y grabación.
 • Reuniones programadas y enlaces para invitar.
 • Bots, webhooks e integraciones con otras herramientas.
 • Presencia y estado personalizado; avisos por canal a tu medida.
-• Búsqueda en el historial y desde toda la suite.
 • Tiempo real por WebSocket, con reconexión sin perder mensajes.
 
 Cifrado en tránsito (TLS 1.3). La infraestructura de Sytue está en la UE. Los servicios externos siguen la ubicación de su proveedor.

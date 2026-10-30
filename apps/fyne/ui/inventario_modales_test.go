@@ -42,12 +42,11 @@ var capasPropias = []string{
 	// El visor, el editor y la foto pública de SyPhotos: capas a pantalla completa que
 	// implementan `ui.Descartable` y cuyas teclas atiende `teclaSuelta` (sin foco, a
 	// propósito: las flechas, Espacio, «i» y «z» son del visor).
+	// Los tres abren mediante capaVisor.mostrar, que concentra la única Add.
 	// El reproductor de Cast a pantalla completa en el teléfono: una capa a toda la
 	// pantalla, por encima de la barra de la suite, que no es un diálogo (sin velo ni
 	// foco atrapado). Es `ui.Descartable`, así que «atrás» y Escape la cierran.
 	"apps/cast/app_movil.go: Overlays().Add",
-	"apps/photos/app_editor.go: Overlays().Add",
-	"apps/photos/app_publico.go: Overlays().Add",
 	"apps/photos/app_visor.go: Overlays().Add",
 	// Los selectores de ficheros del SISTEMA en el teléfono: el `dialog` de Fyne abre ahí
 	// el del sistema, que se cierra con su propio «atrás».

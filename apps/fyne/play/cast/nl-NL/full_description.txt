@@ -6,7 +6,7 @@ Je video’s en je livestreams, op aanvraag en in realtime, zonder Europa te ver
 • Livechat en reacties, met basismoderatie door wie publiceert.
 • Upload video’s tot 8 GiB; het origineel blijft bewaard.
 • Livestreamen vanuit uitzendsoftware via RTMP, met een streamsleutel per persoon.
-• Live vanuit de browser of de app: camera, scherm en microfoon.
+• Live vanuit de browser of de app: camera en microfoon. Schermdelen in ondersteunde browsers, desktopsystemen en Android; niet beschikbaar in de iOS/iPadOS-app.
 • Opnames van livestreams worden vanzelf video’s op aanvraag.
 • Een openbare voorpagina en een kanaal per organisatie, indexeerbaar.
 • Verborgen links, video’s alleen voor de organisatie of toegang voor specifieke personen via @gebruikersnaam.

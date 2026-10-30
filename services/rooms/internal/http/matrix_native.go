@@ -10,6 +10,7 @@ import (
 func (h *Handlers) MatrixNativeStart(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Challenge string `json:"code_challenge"`
+		Product   string `json:"product"`
 		Method    string `json:"code_challenge_method"`
 	}
 	if err := httpx.DecodeJSON(w, r, &req); err != nil {
@@ -17,7 +18,7 @@ func (h *Handlers) MatrixNativeStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	actor, _ := caller(r)
-	result, err := h.svc.StartMatrixNative(r.Context(), actor, req.Challenge, req.Method)
+	result, err := h.svc.StartMatrixNative(r.Context(), actor, req.Challenge, req.Method, req.Product)
 	if err != nil {
 		httpx.Fail(w, r, toAPIError(err))
 		return

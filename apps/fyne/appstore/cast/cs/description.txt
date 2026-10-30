@@ -6,7 +6,7 @@ Vaše videa a vaše živé přenosy, na vyžádání i v reálném čase, aniž 
 • Živý chat a komentáře se základní moderací od osoby, která vysílá.
 • Nahrávejte videa do 8 GiB; originál se zachová.
 • Živé vysílání z vysílacího programu přes RTMP, s vysílacím klíčem pro každou osobu.
-• Živě z prohlížeče nebo z aplikace: kamera, obrazovka a mikrofon.
+• Živě z prohlížeče nebo aplikace: kamera a mikrofon. Sdílení obrazovky v podporovaných prohlížečích, počítačových systémech a Androidu; v aplikaci pro iOS/iPadOS není dostupné.
 • Záznamy živých přenosů se automaticky stávají videi na vyžádání.
 • Veřejná úvodní stránka a kanál pro každou organizaci, indexovatelné.
 • Nezařazené odkazy, videa jen pro organizaci nebo přístup pro konkrétní osoby podle @uživatelského jména.

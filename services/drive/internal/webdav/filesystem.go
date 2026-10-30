@@ -5,8 +5,10 @@ package webdav
 
 import (
 	"context"
+	"encoding/xml"
 	"errors"
 	"io"
+	"net/http"
 	"os"
 	"path"
 	"strings"
@@ -84,6 +86,13 @@ func (fs *FileSystem) Rename(ctx context.Context, oldName, newName string) error
 
 // Stat devuelve la información de un recurso (PROPFIND de profundidad 0).
 func (fs *FileSystem) Stat(ctx context.Context, name string) (os.FileInfo, error) {
+	if moveSrc := origenMoveDe(ctx); moveSrc != "" {
+		cleanDst := path.Clean("/" + name)
+		cleanSrc := path.Clean("/" + moveSrc)
+		if cleanDst != cleanSrc && strings.EqualFold(cleanDst, cleanSrc) {
+			return nil, os.ErrNotExist
+		}
+	}
 	node, err := fs.svc.ResolvePath(ctx, name)
 	if err != nil {
 		return nil, toOSError(err)
@@ -94,7 +103,10 @@ func (fs *FileSystem) Stat(ctx context.Context, name string) (os.FileInfo, error
 // OpenFile abre un recurso para lectura o escritura según los flags.
 func (fs *FileSystem) OpenFile(ctx context.Context, name string, flag int, _ os.FileMode) (webdav.File, error) {
 	ctx = ctxWithActor(ctx)
-	writing := flag&(os.O_WRONLY|os.O_RDWR|os.O_CREATE) != 0
+	// PROPPATCH abre con os.O_RDWR sin O_CREATE ni O_TRUNC solo para leer/parchear
+	// propiedades muertas; toda escritura de contenido (PUT, COPY, LOCK sobre
+	// recurso nuevo) incluye O_WRONLY, O_CREATE u O_TRUNC.
+	writing := flag&(os.O_WRONLY|os.O_CREATE|os.O_TRUNC) != 0
 
 	if writing {
 		// Apertura para escritura: el contenido sube a S3 mientras se escribe (writeFile).
@@ -249,6 +261,14 @@ func (f *readFile) Readdir(int) ([]os.FileInfo, error) {
 }
 func (f *readFile) Stat() (os.FileInfo, error) { return f.info, nil }
 
+func (f *readFile) DeadProps() (map[xml.Name]webdav.Property, error) {
+	return map[xml.Name]webdav.Property{}, nil
+}
+
+func (f *readFile) Patch(p []webdav.Proppatch) ([]webdav.Propstat, error) {
+	return aceptarProppatch(p), nil
+}
+
 func (f *readFile) Seek(offset int64, whence int) (int64, error) {
 	switch whence {
 	case io.SeekStart:
@@ -285,6 +305,24 @@ func (d *dirFile) Seek(int64, int) (int64, error) {
 	return 0, errors.New("webdav: seek en directorio")
 }
 func (d *dirFile) Stat() (os.FileInfo, error) { return d.info, nil }
+
+func (d *dirFile) DeadProps() (map[xml.Name]webdav.Property, error) {
+	return map[xml.Name]webdav.Property{}, nil
+}
+
+func (d *dirFile) Patch(p []webdav.Proppatch) ([]webdav.Propstat, error) {
+	return aceptarProppatch(p), nil
+}
+
+func aceptarProppatch(patches []webdav.Proppatch) []webdav.Propstat {
+	ps := webdav.Propstat{Status: http.StatusOK}
+	for _, patch := range patches {
+		for _, prop := range patch.Props {
+			ps.Props = append(ps.Props, webdav.Property{XMLName: prop.XMLName})
+		}
+	}
+	return []webdav.Propstat{ps}
+}
 
 func (d *dirFile) Readdir(count int) ([]os.FileInfo, error) {
 	if !d.listado {

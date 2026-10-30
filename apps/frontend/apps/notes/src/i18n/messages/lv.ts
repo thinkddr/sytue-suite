@@ -119,6 +119,8 @@ export const lv: AppCatalog<typeof en> = {
   'backlinks.emptyHint': 'Saistiet to no citas piezīmes, un tā parādīsies šeit pati.',
   'notebook.delete': 'Dzēst piezīmju grāmatu',
   'notebook.deleteConfirm': 'Dzēst “{title}” un visu, kas tajā ir?',
+  'notebook.ownerOnly':
+    'Pārvietot šo piezīmju grāmatu, mainīt tās redzamību vai to šifrēt var tikai tās izveidotājs vai organizācijas administrācija.',
   'notebook.newChild': 'Jauna piezīmju grāmata iekšā',
   'notebook.notes': { zero: '{count} piezīmju', one: '{count} piezīme', other: '{count} piezīmes' },
   'notebook.emoji': 'Ikona',

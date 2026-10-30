@@ -4,10 +4,13 @@
 package http
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 )
 
 // La contraseña se enseña con guiones y se teclea de las dos formas: quien la
@@ -69,5 +72,39 @@ func TestInternalSecretAuth(t *testing.T) {
 				t.Fatalf("status = %d, quería %d", w.Code, c.quiere)
 			}
 		})
+	}
+
+	// INF-14: desde el Ingress (con X-Forwarded-For) contesta 404 aunque lleve el
+	// secreto bueno, igual que el resto de las puertas internas.
+	s := &Server{cfg: Config{InternalSecret: "s3cr3t"}}
+	deFuera := httptest.NewRequest(http.MethodPost, "/internal/app-passwords/verify", http.NoBody)
+	deFuera.Header.Set("Authorization", "Bearer s3cr3t")
+	deFuera.Header.Set("X-Forwarded-For", "203.0.113.7")
+	w := httptest.NewRecorder()
+	s.internalSecretAuth(ok).ServeHTTP(w, deFuera)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("con X-Forwarded-For esperaba 404, dio %d", w.Code)
+	}
+}
+
+type limitadorFijo struct{ permite bool }
+
+func (l limitadorFijo) Allow(context.Context, string) (httpx.RateLimitResult, error) {
+	return httpx.RateLimitResult{Allowed: l.permite, Limit: 5}, nil
+}
+
+// INF-14: la verificación interna de contraseñas de aplicación frena la fuerza
+// bruta por cuenta (Identity) con acctLimiter antes de tocar la base de datos.
+func TestVerifyAppPasswordLimitaPorCuenta(t *testing.T) {
+	s := &Server{
+		cfg:         Config{InternalSecret: "s3cr3t"},
+		acctLimiter: limitadorFijo{permite: false},
+	}
+	req := httptest.NewRequest(http.MethodPost, "/internal/app-passwords/verify",
+		strings.NewReader(`{"identity":"ana@sytue.eu","password":"abcd-efgh-jkmnp-qrstu"}`))
+	w := httptest.NewRecorder()
+	s.handleInternalVerifyAppPassword(w, req)
+	if w.Code != http.StatusTooManyRequests {
+		t.Fatalf("con acctLimiter agotado esperaba 429, dio %d (%s)", w.Code, w.Body.String())
 	}
 }

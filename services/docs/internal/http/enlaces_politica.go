@@ -5,12 +5,12 @@ package http
 
 import (
 	"context"
-	"git.sytue.eu/sytue/one/platform/pkg/logsafe"
 	"log/slog"
 	"net/http"
 
 	"git.sytue.eu/sytue/one/platform/pkg/authn"
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
+	"git.sytue.eu/sytue/one/platform/pkg/logsafe"
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 	"git.sytue.eu/sytue/one/services/docs/internal/domain"
 )

@@ -22,6 +22,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf8"
 
@@ -63,10 +64,27 @@ type Servicio struct {
 	// reembolsar contra un servidor de pruebas sin credenciales.
 	pasarelaFija pagos.Pasarela
 	// enviarCorreo manda un aviso por el relé; lo fija Despachar (y las pruebas).
-	enviarCorreo func(ctx context.Context, op correo.Opciones, para, asunto, cuerpo string) error
-	syerpURL     string
-	syerpSecret  string
+	enviarCorreo     func(ctx context.Context, op correo.Opciones, para, asunto, cuerpo string) error
+	syerpURL         string
+	syerpSecret      string
+	formulariosMu    sync.Mutex
+	formulariosCache map[claveFormularioPublicado]entradaFormularioPublicado
 }
+
+type claveFormularioPublicado struct {
+	sitio   uuid.UUID
+	version int
+}
+
+type entradaFormularioPublicado struct {
+	formularios map[string]*ir.Nodo
+	expira      time.Time
+}
+
+const (
+	ttlFormularioPublicado        = 5 * time.Minute
+	maxCacheFormulariosPublicados = 1024
+)
 
 // ConSyERP configura la URL y el secreto de SyERP para entregar pedidos a contabilidad y facturación.
 func (s *Servicio) ConSyERP(rawURL, secret string) *Servicio {
@@ -344,15 +362,32 @@ func (s *Servicio) CrearPasarelaCliente(gw *domain.Gateway) (pagos.Pasarela, err
 		return nil, err
 	}
 
+	var rt http.RoundTripper
+	if s.client != nil {
+		rt = s.client.Transport
+	}
+
 	switch gw.Provider {
 	case "mollie":
-		return mollie.New(creds["api_key"], creds["profile_id"]), nil
+		return mollie.New(creds["api_key"], creds["profile_id"]).ConTransporte(rt), nil
 	case "adyen":
-		return adyen.New(creds["api_key"], creds["merchant_account"], gw.Mode, creds["live_prefix"])
+		c, err := adyen.New(creds["api_key"], creds["merchant_account"], gw.Mode, creds["live_prefix"])
+		if err != nil {
+			return nil, err
+		}
+		return c.ConTransporte(rt), nil
 	case "redsys":
-		return redsys.New(creds["merchant_code"], creds["terminal"], creds["secret_key"], gw.Mode)
+		c, err := redsys.New(creds["merchant_code"], creds["terminal"], creds["secret_key"], gw.Mode)
+		if err != nil {
+			return nil, err
+		}
+		return c.ConTransporte(rt), nil
 	case "stripe":
-		return stripe.New(creds["secret_key"], comercioDe("stripe", creds))
+		c, err := stripe.New(creds["secret_key"], comercioDe("stripe", creds))
+		if err != nil {
+			return nil, err
+		}
+		return c.ConTransporte(rt), nil
 	default:
 		return nil, fmt.Errorf("tienda: proveedor %q desconocido", gw.Provider)
 	}
@@ -1165,9 +1200,28 @@ const maxAvisosFormularioDia = 200
 
 // formularioPublicado es el nodo del formulario en la versión EN VIVO del sitio, o
 // ErrFormularioNoExiste si el sitio no está publicado o esa versión no lo tiene.
-// ponytail: decodifica el IR publicado en cada envío; una caché por sitio y versión
-// (§10.6 dice 5 min) si los envíos llegan a pesar.
+// Cachea los formularios decodificados por (sitio, versión publicada) durante 5 min
+// (§10.6, WEB-07) para no releer ni decodificar el IR en cada envío, invalidándose
+// en el acto cuando cambia published_number.
 func (s *Servicio) formularioPublicado(ctx context.Context, tenant string, siteID uuid.UUID, formID string) (*ir.Nodo, error) {
+	num, err := s.store.NumeroPublicado(ctx, tenant, siteID)
+	if err != nil {
+		return nil, domain.ErrFormularioNoExiste
+	}
+	clave := claveFormularioPublicado{sitio: siteID, version: num}
+	ahora := time.Now()
+
+	s.formulariosMu.Lock()
+	if ent, ok := s.formulariosCache[clave]; ok && ahora.Before(ent.expira) {
+		nodo, existe := ent.formularios[formID]
+		s.formulariosMu.Unlock()
+		if !existe {
+			return nil, domain.ErrFormularioNoExiste
+		}
+		return nodo, nil
+	}
+	s.formulariosMu.Unlock()
+
 	raw, err := s.store.IRPublicado(ctx, tenant, siteID)
 	if err != nil {
 		return nil, domain.ErrFormularioNoExiste
@@ -1176,7 +1230,32 @@ func (s *Servicio) formularioPublicado(ctx context.Context, tenant string, siteI
 	if err != nil {
 		return nil, domain.ErrFormularioNoExiste
 	}
-	nodo, ok := ir.Formularios(sitio)[formID]
+	formularios := ir.Formularios(sitio)
+
+	s.formulariosMu.Lock()
+	if s.formulariosCache == nil {
+		s.formulariosCache = make(map[claveFormularioPublicado]entradaFormularioPublicado)
+	}
+	if len(s.formulariosCache) >= maxCacheFormulariosPublicados {
+		for k, v := range s.formulariosCache {
+			if !ahora.Before(v.expira) {
+				delete(s.formulariosCache, k)
+			}
+		}
+		if len(s.formulariosCache) >= maxCacheFormulariosPublicados {
+			for k := range s.formulariosCache {
+				delete(s.formulariosCache, k)
+				break
+			}
+		}
+	}
+	s.formulariosCache[clave] = entradaFormularioPublicado{
+		formularios: formularios,
+		expira:      ahora.Add(ttlFormularioPublicado),
+	}
+	s.formulariosMu.Unlock()
+
+	nodo, ok := formularios[formID]
 	if !ok {
 		return nil, domain.ErrFormularioNoExiste
 	}

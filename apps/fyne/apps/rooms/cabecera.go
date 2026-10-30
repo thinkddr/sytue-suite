@@ -208,7 +208,7 @@ func (c *Cabecera) montar(v tema.Variante) {
 	c.menu = nil
 	if c.Estrecha && !c.menuYaVisible && c.AlMenu != nil && !tema.EsMarco() {
 		c.menu = ui.NuevoBotonIcono(iconos.Menu, t.T("sidebar.openChannels", nil), c.AlMenu).SobreBanda()
-		c.menu.Lado, c.menu.TamIcono = LadoAccionCabecera, GlifoCabecera
+		c.menu.Lado, c.menu.TamIcono = ui.SueloTactil(LadoAccionCabecera), GlifoCabecera
 	}
 	c.objetos = []fyne.CanvasObject{c.fondo, c.marca}
 	if c.disparador != nil {
@@ -260,7 +260,7 @@ func (c *Cabecera) montarReducida() {
 		controles = append(controles, c.temaReducido)
 	} else if c.botonTema != nil {
 		b := ui.NuevoBotonIcono(iconos.Lapiz, c.T.T("channel.editTopic", nil), c.AlEditarTema).SobreBanda()
-		b.Lado, b.TamIcono = LadoAccionCabecera, GlifoCabecera
+		b.Lado, b.TamIcono = ui.SueloTactil(LadoAccionCabecera), GlifoCabecera
 		controles = append(controles, b)
 	}
 	controles = append(controles, c.acciones...)
@@ -288,13 +288,13 @@ func (c *Cabecera) construirAcciones(v tema.Variante) []fyne.CanvasObject {
 	boton := func(rotulo, cuerpo, panel string, al func()) *ui.BotonIcono {
 		b := ui.NuevoBotonIcono(iconos.Ninguno, rotulo, al).SobreBanda()
 		b.Glifo = dibujo(cuerpo, GlifoCabecera, "header-fg", v)
-		b.Lado, b.TamIcono = LadoAccionCabecera, GlifoCabecera
+		b.Lado, b.TamIcono = ui.SueloTactil(LadoAccionCabecera), GlifoCabecera
 		b.Pulsado = panel != "" && c.Panel == panel
 		return b
 	}
 	del := func(i iconos.Icono, rotulo, panel string, al func()) *ui.BotonIcono {
 		b := ui.NuevoBotonIcono(i, rotulo, al).SobreBanda()
-		b.Lado, b.TamIcono = LadoAccionCabecera, GlifoCabecera
+		b.Lado, b.TamIcono = ui.SueloTactil(LadoAccionCabecera), GlifoCabecera
 		b.Pulsado = panel != "" && c.Panel == panel
 		return b
 	}
@@ -338,7 +338,7 @@ func (c *Cabecera) pilaDeCaras(v tema.Variante) fyne.CanvasObject {
 	if c.Miembros == 0 {
 		b := ui.NuevoBotonIcono(iconos.Usuarios, rotulo, func() { c.AlAbrirPanel(PanelMiembros) }).
 			SobreBanda()
-		b.Lado, b.TamIcono = LadoAccionCabecera, GlifoCabecera
+		b.Lado, b.TamIcono = ui.SueloTactil(LadoAccionCabecera), GlifoCabecera
 		b.Pulsado = c.Panel == PanelMiembros
 		return b
 	}

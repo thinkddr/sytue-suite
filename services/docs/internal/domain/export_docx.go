@@ -316,7 +316,11 @@ func (w *docxWriter) run(r xrun, isLink bool) {
 			w.notes = append(w.notes, r.note)
 			w.noteIDs[r.note] = id
 		}
-		w.body.WriteString(`<w:r><w:` + r.note.class + `Reference w:id="` + strconv.Itoa(id) + `"/></w:r>`)
+		ref := `<w:r><w:` + r.note.class + `Reference w:id="` + strconv.Itoa(id) + `"/></w:r>`
+		if r.track != nil {
+			ref = w.revisionOpen(r.track) + ref + `</w:` + r.track.kind + `>`
+		}
+		w.body.WriteString(ref)
 		return
 	}
 	if r.image != nil {

@@ -426,7 +426,8 @@ export const sl: AppCatalog<typeof en> = {
   'product.cast.f2': 'Prilagodljivo predvajanje v treh kakovostih; brskalnik izbere najboljšo.',
   'product.cast.f3':
     'Prenos v živo iz programa za oddajanje prek RTMP, s ključem prenosa za vsako osebo.',
-  'product.cast.f4': 'V živo iz brskalnika ali aplikacije: kamera, zaslon in mikrofon.',
+  'product.cast.f4':
+    'V živo iz brskalnika ali aplikacije: kamera in mikrofon. Skupna raba zaslona v podprtih brskalnikih, namiznih sistemih in Androidu; ni na voljo v aplikaciji za iOS/iPadOS.',
   'product.cast.f5': 'Posnetki prenosov v živo samodejno postanejo videoposnetki na zahtevo.',
   'product.cast.f6': 'Javna naslovnica in kanal za vsako organizacijo, z možnostjo indeksiranja.',
   'product.cast.f7':

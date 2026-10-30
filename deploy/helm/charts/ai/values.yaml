@@ -8,9 +8,8 @@
 replicaCount: 2
 
 image:
-  # Sin registro explícito: lo pone global.imageRegistry del umbrella. Un
-  # `image:` sin barra aquí haría que el gate de cadena de suministro dedujera
-  # docker.io, que no es el caso.
+  # El umbrella de producción lo sustituye por su registro privado de la UE.
+  registry: ghcr.io/thinkddr
   repository: sytue-ai
   tag: ""
   pullPolicy: IfNotPresent

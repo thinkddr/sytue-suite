@@ -138,12 +138,8 @@ export const sl: AppCatalog<typeof en> = {
   'gallery.selectMonth': 'Izberi mesec',
   'gallery.unselectMonth': 'Prekliči izbor meseca',
   'gallery.downloadSelected': 'Prenesi',
-  'gallery.downloading': {
-    one: 'Prenašanje {count} fotografije…',
-    two: 'Prenašanje {count} fotografij…',
-    few: 'Prenašanje {count} fotografij…',
-    other: 'Prenašanje {count} fotografij…',
-  },
+  'gallery.downloading': 'Začete zahteve za prenos: {count}. Preverite prenose v brskalniku.',
+  'gallery.downloadCapped': 'Fotografije zunaj tega paketa: {count}.',
   'gallery.newAlbum': 'Nov album',
   'gallery.newAlbumTitle': 'Nov album',
   'gallery.newAlbumPrompt': {

@@ -17,6 +17,9 @@ type MatrixBootstrap struct {
 	SourceURL        string                `json:"source_url,omitempty"`
 	DraftRoomID      string                `json:"draft_room_id"`
 	DraftRoomIDs     []string              `json:"draft_room_ids"`
+	StorageProduct   string                `json:"storage_product,omitempty"`
+	StorageRoomID    string                `json:"storage_room_id,omitempty"`
+	StorageRoomIDs   []string              `json:"storage_room_ids,omitempty"`
 	Actor            string                `json:"actor"`
 	Tenant           string                `json:"tenant"`
 	HomeserverURL    string                `json:"homeserver_url"`
@@ -118,14 +121,11 @@ func (s *Service) matrixIdentity(ctx context.Context, subject string) ([]string,
 }
 
 func (s *Service) BootstrapMatrix(ctx context.Context, actor, name string) (MatrixBootstrap, error) {
-	if err := s.matrixNativeActor(ctx, actor); err != nil {
-		return MatrixBootstrap{}, err
-	}
-	tenant := tenancy.MustFrom(ctx)
-	mxid, err := s.matrix.EnsureUser(ctx, actor)
+	result, err := s.matrixBootstrapIdentity(ctx, actor)
 	if err != nil {
 		return MatrixBootstrap{}, err
 	}
+	tenant := tenancy.MustFrom(ctx)
 	if _, err := s.EnsureDefaultTeams(ctx, actor, name); err != nil {
 		return MatrixBootstrap{}, err
 	}
@@ -139,11 +139,47 @@ func (s *Service) BootstrapMatrix(ctx context.Context, actor, name string) (Matr
 	if err != nil {
 		return MatrixBootstrap{}, err
 	}
-	result := MatrixBootstrap{SourceURL: s.cfg.MatrixSourceURL, Actor: actor, Tenant: tenant.Slug, HomeserverURL: s.cfg.MatrixHomeserverURL, SSOProviderID: s.cfg.MatrixSSOProviderID, MatrixUserID: mxid, ControllerUserID: "@" + domain.MatrixControllerLocalpart + ":" + s.cfg.MatrixServerName, Encryption: domain.MatrixEncryption, Channels: channels, DraftRoomIDs: drafts}
+	result.Channels, result.DraftRoomIDs = channels, drafts
 	if len(drafts) > 0 {
 		result.DraftRoomID = drafts[0]
 	}
 	return result, nil
+}
+
+// BootstrapMatrixStorage does not create teams or expose another application's
+// rooms. The application receives routing references; secrets stay on devices.
+func (s *Service) BootstrapMatrixStorage(ctx context.Context, actor, product string) (MatrixBootstrap, error) {
+	if !domain.StorageProduct(product) {
+		return MatrixBootstrap{}, domain.ErrInvalidInput
+	}
+	result, err := s.matrixBootstrapIdentity(ctx, actor)
+	if err != nil {
+		return MatrixBootstrap{}, err
+	}
+	tenant := tenancy.MustFrom(ctx)
+	rooms, err := s.pstore.EnsureMatrixStorageRooms(ctx, actor, product, func(ctx context.Context, room string) (string, error) {
+		return s.matrix.EnsureStorageRoom(ctx, tenant.Slug, actor, product, room)
+	})
+	if err != nil {
+		return MatrixBootstrap{}, err
+	}
+	result.StorageProduct, result.StorageRoomIDs = product, rooms
+	if len(rooms) > 0 {
+		result.StorageRoomID = rooms[0]
+	}
+	return result, nil
+}
+
+func (s *Service) matrixBootstrapIdentity(ctx context.Context, actor string) (MatrixBootstrap, error) {
+	if err := s.matrixNativeActor(ctx, actor); err != nil {
+		return MatrixBootstrap{}, err
+	}
+	tenant := tenancy.MustFrom(ctx)
+	mxid, err := s.matrix.EnsureUser(ctx, actor)
+	if err != nil {
+		return MatrixBootstrap{}, err
+	}
+	return MatrixBootstrap{SourceURL: s.cfg.MatrixSourceURL, Actor: actor, Tenant: tenant.Slug, HomeserverURL: s.cfg.MatrixHomeserverURL, SSOProviderID: s.cfg.MatrixSSOProviderID, MatrixUserID: mxid, ControllerUserID: "@" + domain.MatrixControllerLocalpart + ":" + s.cfg.MatrixServerName, Encryption: domain.MatrixEncryption, Channels: []store.MatrixChannel{}}, nil
 }
 
 func (s *Service) bootstrapMatrixChannels(ctx context.Context, actor string) ([]store.MatrixChannel, error) {

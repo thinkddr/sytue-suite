@@ -747,6 +747,7 @@
   "extdata.msg.noEncryption": "Szyfrowanie poświadczeń nie jest skonfigurowane na serwerze.",
   "extdata.msg.notAllowed": "Zapytania do tego połączenia mogą wysyłać tylko osoby z jego listy. Poproś administrację organizacji o dodanie do listy.",
   "extdata.msg.notFound": "Połączenie lub zapytanie już nie istnieje.",
+  "extdata.msg.ownerOnly": "Tylko osoba, która utworzyła to połączenie, lub administracja organizacji może je zmienić lub usunąć.",
   "extdata.msg.rate": "Zbyt wiele uruchomień z rzędu. Poczekaj kilka sekund i spróbuj ponownie.",
   "extdata.msg.timeout": "Zewnętrzne źródło danych zbyt długo nie odpowiadało.",
   "extdata.msg.unauth": "Sesja wygasła. Zaloguj się ponownie.",

@@ -104,6 +104,7 @@
   "gallery.describeStop": "Anhalten",
   "gallery.described": "{count} Fotos beschrieben",
   "gallery.describing": "{done} von {total} werden beschrieben…",
+  "gallery.downloadCapped": "Fotos außerhalb dieses Stapels: {count}.",
   "gallery.downloadSelected": "Herunterladen",
   "gallery.downloading": {
     "one": "1 Foto wird heruntergeladen…",

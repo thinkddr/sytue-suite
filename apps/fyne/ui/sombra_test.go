@@ -4,6 +4,7 @@
 package ui
 
 import (
+	"fmt"
 	"image"
 	"image/color"
 	"math"
@@ -40,10 +41,16 @@ func perfilDeSombra(t *testing.T, n tema.NivelSombra, radio, esc float32, v tema
 	s := NuevaSombra(n, radio)
 	s.Ajustar(fyne.NewPos(huecoPrueba, huecoPrueba), panelPrueba, v)
 
-	img := pintaA(t, esc,
-		panelPrueba.Width+2*huecoPrueba, panelPrueba.Height+2*huecoPrueba, s.Objeto())
+	return perfilObjetoDeSombra(t, s.Objeto(), esc, tema.Sombra(n, v)[0].Color.R)
+}
 
-	canal := tema.Sombra(n, v)[0].Color.R
+// perfilObjetoDeSombra conserva la misma captura para sondas de capas individuales
+// y controles de una implementación alternativa, sin copiar el montaje del lienzo.
+func perfilObjetoDeSombra(t *testing.T, objeto fyne.CanvasObject, esc float32, canal uint8) []float64 {
+	t.Helper()
+	img := pintaA(t, esc,
+		panelPrueba.Width+2*huecoPrueba, panelPrueba.Height+2*huecoPrueba, objeto)
+
 	x := int((huecoPrueba + panelPrueba.Width/2) * esc)
 	base := int((huecoPrueba + panelPrueba.Height) * esc)
 
@@ -72,10 +79,10 @@ func cruce(prof []float64, nivel float64, esc float32) float64 {
 //
 //   - **El desplazamiento.** Una gaussiana vale exactamente la mitad justo encima del
 //     borde que difumina, así que el punto donde el alfa cruza el 50 % del token TIENE
-//     que caer `DesplY` px por debajo del panel: 24 en `xl`, 12 en `lg`, 8 en `md`.
+//     que caer `DesplY` px por debajo del panel: 24 en `xl`, 16 en `lg`, 12 en `md`.
 //   - **El desenfoque.** CSS pinta un `blur-radius` de r con una gaussiana de desviación
 //     r/2, así que de ese cruce al 15,87 % —una desviación típica— hay que contar 24 px
-//     en `xl`, 16 en `lg` y 12 en `md`.
+//     en `xl`, 20 en `lg` y 15 en `md`.
 //
 // La tolerancia del σ es del 10 %: tres desenfoques de caja son una aproximación —la
 // misma que usan los navegadores— y las cajas son de ancho entero.
@@ -83,7 +90,8 @@ func cruce(prof []float64, nivel float64, esc float32) float64 {
 // # Contrastado contra un navegador de verdad
 //
 // El 2026-09-21, con Chromium a ×2 pintando ESTA misma escena con el `box-shadow`
-// literal de la hoja, y midiendo el perfil con este mismo método:
+// literal de la hoja, y midiendo el perfil con este mismo método (medidas históricas;
+// el guardián lee los tokens vigentes de la hoja):
 //
 //	nivel   σ Chromium   σ nuestra   σ que pide CSS
 //	xl          24,50       24,00        24,0
@@ -148,27 +156,135 @@ func TestLaSombraTieneElDesenfoqueYElDesplazamientoDeLaHoja(t *testing.T) {
 // por la escala un parámetro que en realidad es σ²/2. La nuestra se declara en px de CSS
 // y tiene que medir lo mismo en las tres.
 func TestLaSombraNoCambiaDeTamanoConLaEscala(t *testing.T) {
-	capa := tema.Sombra(tema.SombraMD, tema.Claro)[0]
-	lleno := float64(capa.Color.A) / 255
-
-	escalas := []float32{1, 2, 3}
-	sigmas := make([]float64, 0, len(escalas))
-	for _, esc := range escalas {
-		prof := perfilDeSombra(t, tema.SombraMD, tema.RadioLG, esc, tema.Claro)
-		mitad := cruce(prof, 0.5*lleno, esc)
-		unaSigma := cruce(prof, 0.1587*lleno, esc)
-		if mitad < 0 || unaSigma < 0 {
-			t.Fatalf("a ×%v el perfil no cruza: mitad=%v sigma=%v", esc, mitad, unaSigma)
-		}
-		sigmas = append(sigmas, unaSigma-mitad)
+	for _, variante := range []struct {
+		nombre string
+		valor  tema.Variante
+	}{{"claro", tema.Claro}, {"oscuro", tema.Oscuro}} {
+		t.Run(variante.nombre, func(t *testing.T) {
+			for i, capa := range tema.Sombra(tema.SombraMD, variante.valor) {
+				t.Run(fmt.Sprintf("capa-%d", i), func(t *testing.T) {
+					// Una composición de dos gaussianas no tiene la sigma de una capa.
+					// Se conserva cada geometría del token y se eleva sólo el alfa de la
+					// sonda: con .05, un nivel de gris mueve el cruce varios píxeles.
+					// El color y los alfas reales se comprueban aparte sobre la sombra completa.
+					escalas := []float32{1, 2, 3}
+					sigmas := make([]float64, 0, len(escalas))
+					for _, esc := range escalas {
+						prof := perfilCapaDeSombra(t, capa, esc, variante.valor)
+						mitad := cruce(prof, 0.5, esc)
+						unaSigma := cruce(prof, 0.1587, esc)
+						if mitad < 0 || unaSigma < 0 {
+							t.Fatalf("a ×%v el perfil no cruza: mitad=%v sigma=%v", esc, mitad, unaSigma)
+						}
+						sigmas = append(sigmas, unaSigma-mitad)
+					}
+					// A ×1 se lee en pasos de 1 px; se mantiene el margen original.
+					for i, sigma := range sigmas[1:] {
+						if math.Abs(sigma-sigmas[0]) > 1.01 {
+							t.Errorf("σ a ×%d es %.2f y a ×1 es %.2f: la sombra cambia de tamaño con el DPI",
+								i+2, sigma, sigmas[0])
+						}
+					}
+				})
+			}
+		})
 	}
+}
 
-	// A ×1 el perfil se lee en pasos de 1 px, así que no se le puede pedir más
-	// precisión que eso; a ×2 y ×3, mejor.
-	for i, s := range sigmas[1:] {
-		if math.Abs(s-sigmas[0]) > 1.01 {
-			t.Errorf("σ a ×%d es %.2f y a ×1 es %.2f: la sombra cambia de tamaño con el DPI",
-				i+2, s, sigmas[0])
+func perfilCapaDeSombra(t *testing.T, capa tema.CapaSombra, esc float32, variante tema.Variante) []float64 {
+	t.Helper()
+	capa.Color.A = 255
+	s := NuevaSombraCon(func(tema.Variante) []tema.CapaSombra { return []tema.CapaSombra{capa} }, tema.RadioLG)
+	s.Ajustar(fyne.NewPos(huecoPrueba, huecoPrueba), panelPrueba, variante)
+	return perfilObjetoDeSombra(t, s.Objeto(), esc, capa.Color.R)
+}
+
+// La sonda geométrica opaca no sustituye el tinte de la sombra real. En claro,
+// sus capas A=13 y A=33 componen A=44; en oscuro la hoja tiene una capa negra A=140.
+func TestLaSombraPintaElAlfaYElColorDeLaHoja(t *testing.T) {
+	for _, caso := range []struct {
+		nombre          string
+		variante        tema.Variante
+		raster, captura color.NRGBA
+	}{
+		{"claro", tema.Claro, color.NRGBA{R: 14, G: 26, B: 20, A: 44}, color.NRGBA{R: 213, G: 215, B: 214, A: 255}},
+		{"oscuro", tema.Oscuro, color.NRGBA{A: 140}, color.NRGBA{R: 115, G: 115, B: 115, A: 255}},
+	} {
+		t.Run(caso.nombre, func(t *testing.T) {
+			s := NuevaSombra(tema.SombraMD, tema.RadioLG)
+			s.Ajustar(fyne.NewPos(huecoPrueba, huecoPrueba), panelPrueba, caso.variante)
+			got := color.NRGBAModel.Convert(s.img.Image.At(int(s.margen+panelPrueba.Width/2), int(s.margen+panelPrueba.Height/2)))
+			if got != caso.raster {
+				t.Fatalf("tinta compuesta=%v; quiero %v", got, caso.raster)
+			}
+			for _, esc := range []float32{1, 2, 3} {
+				img := pintaA(t, esc, panelPrueba.Width+2*huecoPrueba, panelPrueba.Height+2*huecoPrueba, s.Objeto())
+				got := px(img, int((huecoPrueba+panelPrueba.Width/2)*esc), int((huecoPrueba+panelPrueba.Height/2)*esc))
+				if !cerca(got, caso.captura) {
+					t.Errorf("a ×%v la sombra real sobre blanco pinta %v; quiero %v", esc, got, caso.captura)
+				}
+			}
+		})
+	}
+}
+
+// El perfil compuesto no necesita ajustarse a una gaussiana: cada píxel CSS
+// conserva su intensidad al ampliar. Se promedian sus muestras de dispositivo
+// para comparar la misma celda CSS, no dos centros separados medio píxel.
+func TestLasCapasClarasDeLaSombraConservanElPerfilConLaEscala(t *testing.T) {
+	ref := perfilDeSombra(t, tema.SombraMD, tema.RadioLG, 1, tema.Claro)
+	for _, esc := range []int{2, 3} {
+		prof := perfilDeSombra(t, tema.SombraMD, tema.RadioLG, float32(esc), tema.Claro)
+		maximo := errorPerfilSombra(ref, prof, esc)
+		t.Logf("perfil claro a ×%d: diferencia máxima %.3f niveles RGB", esc, maximo)
+		// Premultiplicar a RGBA8 y filtrar a RGBA8 introducen dos cuantizaciones.
+		// Esta cota es de intensidad; la geometría conserva su cota de un píxel.
+		if maximo > 2.01 {
+			t.Errorf("a ×%d el perfil compuesto cambia %.3f niveles RGB", esc, maximo)
+		}
+	}
+}
+
+func errorPerfilSombra(ref, prof []float64, esc int) float64 {
+	if len(prof) != esc*len(ref) {
+		return math.Inf(1)
+	}
+	canal := float64(tema.Sombra(tema.SombraMD, tema.Claro)[0].Color.R)
+	maximo := float64(0)
+	for i, a := range ref {
+		media := float64(0)
+		for j := range esc {
+			media += prof[i*esc+j]
+		}
+		media /= float64(esc)
+		maximo = math.Max(maximo, math.Abs(media-a)*(255-canal))
+	}
+	return maximo
+}
+
+// Control independiente del guardián: dos gaussianas analíticas con los números
+// CSS, sin NuevaSombra, cajasPara ni pintor de Fyne. El mismo recorrido debe
+// aceptar su escala correcta y rechazar una ampliación o contracción deliberada.
+func TestElGuardianDelPerfilDeSombraDetectaUnaEscalaIncorrecta(t *testing.T) {
+	perfil := func(esc int, factor float64) []float64 {
+		out := make([]float64, 120*esc)
+		for i := range out {
+			y := (float64(i) + 0.5) / float64(esc) / factor
+			contacto := 0.05 * math.Erfc((y-2)/(2*math.Sqrt2)) / 2
+			difusa := 0.13 * math.Erfc((y-12)/(15*math.Sqrt2)) / 2
+			out[i] = contacto + difusa*(1-contacto)
+		}
+		return out
+	}
+	ref := perfil(1, 1)
+	if e := errorPerfilSombra(ref, perfil(2, 1), 2); e > 2.01 {
+		t.Fatalf("el guardián rechaza la escala correcta: %.3f niveles RGB", e)
+	}
+	for _, factor := range []float64{0.5, 2} {
+		if e := errorPerfilSombra(ref, perfil(2, factor), 2); e <= 2.01 {
+			t.Errorf("el guardián acepta cambiar el tamaño por %g: %.3f niveles RGB", factor, e)
+		} else {
+			t.Logf("escala incorrecta %g rechazada: %.3f niveles RGB", factor, e)
 		}
 	}
 }

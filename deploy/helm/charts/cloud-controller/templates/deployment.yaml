@@ -106,9 +106,9 @@ spec:
             - name: CERT_ISSUER
               value: {{ include "sytue-cloud-controller.certIssuer" . | quote }}
             - name: APPS_DOMAIN
-              value: {{ .Values.config.appsDomain | quote }}
+              value: {{ if (.Values.global).dominioDeClientes }}{{ printf "apps.%s" (.Values.global).dominioDeClientes | quote }}{{ else }}{{ .Values.config.appsDomain | quote }}{{ end }}
             - name: PREVIEW_DOMAIN
-              value: {{ .Values.config.previewDomain | quote }}
+              value: {{ if (.Values.global).dominioDeClientes }}{{ printf "preview.%s" (.Values.global).dominioDeClientes | quote }}{{ else }}{{ .Values.config.previewDomain | quote }}{{ end }}
             - name: INGRESS_TARGET
               value: {{ .Values.config.ingressTarget | quote }}
             {{- if .Values.config.analytics.enabled }}

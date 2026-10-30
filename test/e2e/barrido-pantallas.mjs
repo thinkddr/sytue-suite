@@ -63,6 +63,7 @@ const APPS = {
   // catálogo entero y la organización; si el servicio no contesta, es aquí
   // donde se ve.
   erp: { host: "erp", base: "/erp", rutas: ["/"] },
+  bases: { host: "bases", base: "/bases", rutas: ["/"] },
   // SYTUE WEB: se salta sola mientras la instalación no la levante (`PAGES_ENABLED`
   // en el piloto; `OPCIONALES` de apps-desplegadas.mjs).
   pages: { host: "web", base: "/web", rutas: ["/", "/new", "/settings"] },

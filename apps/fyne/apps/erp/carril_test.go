@@ -144,7 +144,8 @@ func TestElCarrilDeIconosColocaDondeLaWeb(t *testing.T) {
 		t.Errorf("el carril mide %v de ancho y son 72", got)
 	}
 	o.Resize(fyne.NewSize(72, 480))
-	acciones := o.(*fyne.Container).Objects[1:] // tras el fondo, cada una en su pista
+	desplaza := o.(*fyne.Container).Objects[0].(*container.Scroll)
+	acciones := desplaza.Content.(*fyne.Container).Objects[1:] // tras el fondo, cada una en su pista
 	for i, y := range []float32{24, 78, 132, 186, 240, 358, 412} {
 		a := acciones[i]
 		if a.Position() != fyne.NewPos(14, y) || a.Size() != fyne.NewSize(44, 44) {
@@ -365,5 +366,45 @@ func TestElERPLlevaLaFormaMarco(t *testing.T) {
 	movil.AlMenu()
 	if q.cajon || q.arm.CajonAbierto {
 		t.Fatal("el mismo mando no cierra la navegación del ERP")
+	}
+}
+
+func TestLaRotacionDelCarrilERPAlcanzaTodasLasAccionesConPocoAlto(t *testing.T) {
+	defer ui.TactilDePrueba(true)()
+	c := &CarrilIconos{}
+	for range 5 {
+		c.Arriba = append(c.Arriba, NuevaAccionCarril(iconos.Rejilla, "Destino", false, nil))
+	}
+	activaciones := 0
+	ultimo := NuevaAccionCarril(iconos.IA, "Última acción", false, func() { activaciones++ })
+	c.Abajo = []*AccionCarril{NuevaAccionCarril(iconos.Buscar, "Buscar", false, nil), ultimo}
+	o := c.Objeto(tema.Claro)
+	w := test.NewTempWindow(t, o)
+	w.SetPadded(false)
+	s := o.(*fyne.Container).Objects[0].(*container.Scroll)
+	comprobar := func() {
+		t.Helper()
+		d := fyne.CurrentApp().Driver()
+		p, inicio := d.AbsolutePositionForObject(ultimo), d.AbsolutePositionForObject(s)
+		if p.Y < inicio.Y-1 || p.Y+ultimo.Size().Height > inicio.Y+s.Size().Height+1 || ultimo.Size().Height < 44 {
+			t.Fatalf("última acción fuera del carril: %v/%v en %v/%v", p, ultimo.Size(), inicio, s.Size())
+		}
+	}
+	for _, alto := range []float32{390, 220, 320, 768} {
+		w.Resize(fyne.NewSize(AnchoCarril, alto))
+		w.Canvas().Unfocus()
+		s.ScrollToTop()
+		s.Scrolled(&fyne.ScrollEvent{Scrolled: fyne.NewDelta(0, -10000)})
+		comprobar()
+		test.Tap(ultimo)
+		w.Canvas().Unfocus()
+		s.ScrollToTop()
+		w.Canvas().Focus(ultimo)
+		comprobar()
+		w.Resize(fyne.NewSize(AnchoCarril, 180))
+		comprobar()
+	}
+	if activaciones != 4 {
+		t.Fatalf("las acciones del carril no se activan tras girar: %d", activaciones)
 	}
 }

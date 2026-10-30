@@ -6,7 +6,7 @@ Your videos and your live streams, on demand and in real time, without leaving E
 • Live chat and comments, with basic moderation by the owner.
 • Upload videos of up to 8 GiB; the original is kept.
 • Live streaming from broadcasting software over RTMP, with a stream key per person.
-• Live from the browser or the app: camera, screen and microphone.
+• Live from the browser or app: camera and microphone. Screen sharing in supported browsers, desktop systems and Android; unavailable in the iOS/iPadOS app.
 • Live recordings become videos on demand automatically.
 • A public front page and a channel per organisation, indexable.
 • Unlisted links, organisation-only videos, or access for specific people by @username.

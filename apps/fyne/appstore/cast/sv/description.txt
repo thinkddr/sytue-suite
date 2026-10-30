@@ -6,7 +6,7 @@ Dina videor och dina livesändningar, på begäran och i realtid, utan att lämn
 • Livechatt och kommentarer, med grundläggande moderering av den som publicerar.
 • Ladda upp videor på upp till 8 GiB; originalet behålls.
 • Livesändning från sändningsprogramvara via RTMP, med en strömnyckel per person.
-• Live från webbläsaren eller appen: kamera, skärm och mikrofon.
+• Live från webbläsaren eller appen: kamera och mikrofon. Skärmdelning i webbläsare, skrivbordssystem och Android som stöds; inte tillgänglig i iOS/iPadOS-appen.
 • Inspelningar av livesändningar blir automatiskt videor på begäran.
 • En offentlig startsida och en kanal per organisation, indexerbara.
 • Olistade länkar, videor bara för organisationen eller åtkomst för utvalda personer via @användarnamn.

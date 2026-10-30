@@ -140,12 +140,9 @@ export const lt: AppCatalog<typeof en> = {
   'gallery.selectMonth': 'Pasirinkti mėnesį',
   'gallery.unselectMonth': 'Atžymėti mėnesį',
   'gallery.downloadSelected': 'Atsisiųsti',
-  'gallery.downloading': {
-    one: 'Atsisiunčiama {count} nuotrauka…',
-    few: 'Atsisiunčiamos {count} nuotraukos…',
-    many: 'Atsisiunčiama {count} nuotraukos…',
-    other: 'Atsisiunčiama {count} nuotraukų…',
-  },
+  'gallery.downloading':
+    'Pradėtos atsisiuntimo užklausos: {count}. Patikrinkite naršyklės atsisiuntimus.',
+  'gallery.downloadCapped': 'Į šį rinkinį neįtrauktos nuotraukos: {count}.',
   'gallery.newAlbum': 'Naujas albumas',
   'gallery.newAlbumTitle': 'Naujas albumas',
   'gallery.newAlbumPrompt': {

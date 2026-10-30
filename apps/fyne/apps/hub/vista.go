@@ -134,15 +134,16 @@ type Vista struct {
 	// AlMostrar avisa de que se ha cambiado de pantalla: la ventana pone su título.
 	AlMostrar func(Destino)
 
-	lanzador  *Lanzador
-	actividad *Actividad
-	buscar    *Buscar
-	avisos    *Avisos
-	datos     *Datos
-	disp      *Dispositivos
-	bajadas   *Descargas
-	bienv     *Bienvenida
-	pila      *fyne.Container
+	lanzador        *Lanzador
+	actividad       *Actividad
+	buscar          *Buscar
+	avisos          *Avisos
+	datos           *Datos
+	disp            *Dispositivos
+	controlClientes *controlClientesExternos
+	bajadas         *Descargas
+	bienv           *Bienvenida
+	pila            *fyne.Container
 	// pilaAvisos son los avisos flotantes («Dirección copiada»): van por ENCIMA del
 	// desplazador, no dentro, o se irían con la página al bajar.
 	pilaAvisos *ui.PilaAvisos
@@ -213,6 +214,8 @@ func NuevaVista(t *i18n.Translator, a fyne.App, ahora time.Time) *Vista {
 
 	v.disp = NuevosDispositivos(t)
 	v.disp.AlConectarApps = v.conectarApp
+	v.controlClientes = nuevoControlClientesExternos(v)
+	v.disp.AlClientesExternos = func() { v.Ir(AClientesExternos) }
 	v.pilaAvisos = ui.NuevaPilaAvisos()
 
 	v.bajadas = NuevasDescargas(t)
@@ -228,7 +231,7 @@ func NuevaVista(t *i18n.Translator, a fyne.App, ahora time.Time) *Vista {
 	v.bienv.AbrirURL = v.AbrirURL
 	v.bienv.Ir = v.Ir
 
-	v.pila = container.NewStack(v.lanzador, v.actividad, v.buscar, v.avisos, v.datos, v.disp, v.bajadas, v.bienv)
+	v.pila = container.NewStack(v.lanzador, v.actividad, v.buscar, v.avisos, v.datos, v.disp, v.bajadas, v.bienv, v.controlClientes.pantalla)
 	v.mostrar(AInicio)
 	return v
 }
@@ -243,6 +246,9 @@ func Portadas() []Destino {
 // mostrar enseña una pantalla y esconde las demás. Un objeto invisible no se pinta y
 // tampoco recibe el puntero, que es lo que hace falta aquí.
 func (v *Vista) mostrar(d Destino) {
+	if v.destino == AClientesExternos && d != AClientesExternos {
+		v.controlClientes.limpiar()
+	}
 	v.revisionRefresco++
 	v.destino = d
 	for i, o := range v.pila.Objects {
@@ -272,6 +278,8 @@ func indice(d Destino) int {
 		return 6
 	case ABienvenida:
 		return 7
+	case AClientesExternos:
+		return 8
 	case AInicio:
 	}
 	return 0
@@ -301,6 +309,9 @@ func (v *Vista) Ir(d Destino) {
 	v.mu.Unlock()
 	if v.AlMostrar != nil {
 		v.AlMostrar(d)
+	}
+	if d == AClientesExternos {
+		v.RefrescarClientesExternos()
 	}
 	if d == AActividad && v.hub != nil {
 		go v.cargarActividad(v.actividad.Origen)
@@ -836,6 +847,9 @@ func (v *Vista) enUI(f func()) {
 		v.avisos.Refresh()
 		v.datos.Refresh()
 		v.disp.Refresh()
+		if v.destino == AClientesExternos {
+			v.controlClientes.pantalla.Refresh()
+		}
 		v.bajadas.Refresh()
 	})
 }

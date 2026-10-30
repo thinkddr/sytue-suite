@@ -432,7 +432,8 @@ export const sv: AppCatalog<typeof en> = {
   'product.cast.f2': 'Adaptiv uppspelning i tre kvaliteter; webbläsaren väljer den bästa.',
   'product.cast.f3':
     'Livesändning från sändningsprogramvara via RTMP, med en strömnyckel per person.',
-  'product.cast.f4': 'Live från webbläsaren eller appen: kamera, skärm och mikrofon.',
+  'product.cast.f4':
+    'Live från webbläsaren eller appen: kamera och mikrofon. Skärmdelning i webbläsare, skrivbordssystem och Android som stöds; inte tillgänglig i iOS/iPadOS-appen.',
   'product.cast.f5': 'Inspelningar av livesändningar blir automatiskt videor på begäran.',
   'product.cast.f6': 'En offentlig startsida och en kanal per organisation, indexerbara.',
   'product.cast.f7':

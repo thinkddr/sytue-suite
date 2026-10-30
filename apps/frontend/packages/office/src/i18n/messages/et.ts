@@ -1688,6 +1688,8 @@ export const et: AppCatalog<typeof en> = {
   'extdata.msg.generic': 'Toimingut ei õnnestunud lõpule viia.',
   'extdata.msg.notAllowed':
     'Sellele ühendusele saavad päringuid saata ainult selle loendis olevad inimesed. Paluge oma organisatsiooni haldajatel teid lisada.',
+  'extdata.msg.ownerOnly':
+    'Seda ühendust saab muuta või kustutada ainult selle looja või organisatsiooni haldaja.',
   'sheet.msg.badValue': 'Väärtus pole lubatud',
   'sheet.msg.clipboardDenied': 'Brauser keelas juurdepääsu lõikelauale.',
   'sheet.msg.pasteFailed': 'Kleepimine nurjus',

@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"io"
 	"net/mail"
 	"strings"
 	"time"
@@ -42,11 +43,15 @@ type autoSender interface {
 // La comprobación de «uno mismo» NO va aquí (depende del destinatario): la hace el
 // llamador comparando el remitente con la dirección de la cuenta.
 func autoReplyEligible(raw []byte, envelopeFrom string) bool {
+	return autoReplyEligibleReader(bytes.NewReader(raw), envelopeFrom)
+}
+
+func autoReplyEligibleReader(r io.Reader, envelopeFrom string) bool {
 	ef := strings.Trim(strings.TrimSpace(envelopeFrom), "<>")
 	if ef == "" {
 		return false // MAIL FROM:<> — rebote / mensaje de sistema: nunca responder.
 	}
-	m, err := mail.ReadMessage(bytes.NewReader(raw))
+	m, err := mail.ReadMessage(r)
 	if err != nil {
 		return false // sin cabeceras legibles: fail-safe, no responder.
 	}

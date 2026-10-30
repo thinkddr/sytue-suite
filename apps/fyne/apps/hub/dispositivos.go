@@ -12,17 +12,22 @@ import (
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 )
 
-// The native device screen connects the OS file provider and the suite's OAuth
-// consent wizard. The session manages account changes and access revocation.
+// Dispositivos es la contraparte nativa de «Conectar tus dispositivos» del portal.
+// La variante web guía la configuración manual de clientes externos. En nativo,
+// ConDriveEnSistema conecta el proveedor y el gestor de archivos del SO, y
+// ConConexiones abre el consentimiento OAuth con los permisos de la cuenta.
+// La sesión gestiona los cambios de cuenta y la revocación: esta pantalla no
+// copia direcciones, perfiles ni contraseñas de aplicación del asistente web.
 type Dispositivos struct {
 	pagina
-	T                 *i18n.Translator
-	DriveEnSistema    bool
-	DriveOcupado      bool
-	PuedeConectarApps bool
-	AlCambiarDrive    func(bool)
-	AlAbrirDrive      func()
-	AlConectarApps    func()
+	T                  *i18n.Translator
+	DriveEnSistema     bool
+	DriveOcupado       bool
+	PuedeConectarApps  bool
+	AlCambiarDrive     func(bool)
+	AlAbrirDrive       func()
+	AlConectarApps     func()
+	AlClientesExternos func()
 }
 
 // HuecoAsistente is also the spacing used by onboarding.
@@ -65,18 +70,23 @@ func (d *Dispositivos) CreateRenderer() fyne.WidgetRenderer {
 			d.AlConectarApps()
 		}
 	}).Con(ui.Primario, ui.TallaMD)
+	r.externos = ui.NuevoBoton(d.T.T("devices.step3.again", nil), func() {
+		if d.AlClientesExternos != nil {
+			d.AlClientesExternos()
+		}
+	}).Con(ui.Secundario, ui.TallaMD)
 	r.rehacer()
 	return r
 }
 
 type dispositivosRenderer struct {
-	d               *Dispositivos
-	fondo           *ui.FondoSuite
-	titulo, entrada *ui.Parrafo
-	activo          *ui.Conmutador
-	drive, apps     *ui.Boton
-	cuerpo          bloque
-	objetos         []fyne.CanvasObject
+	d                     *Dispositivos
+	fondo                 *ui.FondoSuite
+	titulo, entrada       *ui.Parrafo
+	activo                *ui.Conmutador
+	drive, apps, externos *ui.Boton
+	cuerpo                bloque
+	objetos               []fyne.CanvasObject
 }
 
 func (r *dispositivosRenderer) rehacer() {
@@ -96,10 +106,12 @@ func (r *dispositivosRenderer) rehacer() {
 	r.drive.Refresh()
 	r.apps.Inerte = !d.PuedeConectarApps || d.AlConectarApps == nil
 	r.apps.Refresh()
+	r.externos.Inerte = d.AlClientesExternos == nil
+	r.externos.Refresh()
 	r.cuerpo = col(HuecoAsistente,
 		nuevaBSeccion("Sytue Drive", t.T("devices.native.driveBody", nil),
 			col(ui.HuecoPieDialogo, fijo{r.activo}, fijo{r.drive})),
-		nuevaBSeccion(t.T("nav.connections", nil), "", fijo{r.apps}))
+		nuevaBSeccion(t.T("nav.connections", nil), "", fijo{r.apps}), fijo{r.externos})
 	r.objetos = append([]fyne.CanvasObject{r.fondo, r.titulo, r.entrada}, r.cuerpo.objetos()...)
 }
 

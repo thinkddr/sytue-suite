@@ -25,9 +25,9 @@ import (
 //
 // Las diapositivas del tema (`key:theme-list`) son el maestro: no se convierten.
 
-// importKeynote09 convierte una presentación .key '09. nil si no hay texto.
-func importKeynote09(raiz *nodo09) (m *slidesModel, omitido bool) {
-	l := &lector09{est: leerEstilos09(raiz)}
+// importKeynote09 convierte una presentación .key '09. nil si no hay contenido.
+func importKeynote09(raiz *nodo09, p *paqueteIWork) (m *slidesModel, omitido bool) {
+	l := &lector09{paquete: p, est: leerEstilos09(raiz), binarios: leerBinarios09(raiz)}
 	ancho, alto := 1024.0, 768.0
 	if s := raiz.hijo("key:size"); s != nil {
 		w, ew := strconv.ParseFloat(s.attr["sfa:w"], 64)
@@ -58,22 +58,7 @@ func importKeynote09(raiz *nodo09) (m *slidesModel, omitido bool) {
 		caja(l.bloques(s.hijo("key:body-placeholder").hijo("key:text").hijo("sf:text-storage")), 5, 24, 90, 68)
 		l.vinetas = false
 		s.hijo("key:page").recorrer(func(n *nodo09) bool {
-			switch n.nombre {
-			case "sf:shape", "sf:tabular-info":
-				x, y, w, h := geometria09(n, ancho, alto)
-				if t := leerTabla09(primerModelo09(n)); t != nil {
-					caja([]xblock{{table: t.xtable()}}, x, y, w, h)
-				} else if st := primerAlmacen09(n); st != nil {
-					caja(l.bloques(st), x, y, w, h)
-				}
-				return false
-			case "sf:image", "sf:media", "sf:chart-info", "sf:movie":
-				l.omitido = true
-				return false
-			case "sf:sticky-note":
-				return false
-			}
-			return true
+			return l.dibujoDiapositiva09(n, ancho, alto, &sl, &texto, caja)
 		})
 		var notas []string
 		for _, b := range l.bloques(s.hijo("key:notes").hijo("sf:text-storage")) {
@@ -89,6 +74,45 @@ func importKeynote09(raiz *nodo09) (m *slidesModel, omitido bool) {
 		return nil, l.omitido
 	}
 	return m, l.omitido
+}
+
+func (l *lector09) dibujoDiapositiva09(n *nodo09, ancho, alto float64, sl *slideT, texto *bool, caja func([]xblock, float64, float64, float64, float64)) bool {
+	switch n.nombre {
+	case "sf:shape", "sf:tabular-info":
+		x, y, w, h := geometria09(n, ancho, alto)
+		if t := leerTabla09(primerModelo09(n), l.est); t != nil {
+			caja([]xblock{{table: t.xtable()}}, x, y, w, h)
+		} else if st := primerAlmacen09(n); st != nil {
+			caja(l.bloques(st), x, y, w, h)
+		}
+		return false
+	case "sf:image", "sf:media":
+		if src, _, _ := l.imagenNodo09(n); src != "" {
+			x, y, w, h := geometria09(n, ancho, alto)
+			*texto = true
+			sl.Boxes = append(sl.Boxes, slideBox{
+				ID: sl.ID + "b" + strconv.Itoa(len(sl.Boxes)+1), Kind: "image", Src: src,
+				X: roundPct(x), Y: roundPct(y), W: roundPct(w), H: roundPct(h),
+			})
+		} else {
+			l.omitido = true
+		}
+		return false
+	case "sf:chart-info":
+		if t := leerGrafico09(n); t != nil {
+			x, y, w, h := geometria09(n, ancho, alto)
+			caja([]xblock{{table: t.xtable()}}, x, y, w, h)
+		} else {
+			l.omitido = true
+		}
+		return false
+	case "sf:movie":
+		l.omitido = true
+		return false
+	case "sf:sticky-note":
+		return false
+	}
+	return true
 }
 
 // primerAlmacen09 es el primer `sf:text-storage` del subárbol, o nil.

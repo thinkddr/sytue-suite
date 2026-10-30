@@ -87,6 +87,7 @@ func TestLosFallosDanSuEstado(t *testing.T) {
 		}
 	}
 	a := Nueva(api.NewCast("http://127.0.0.1:1", nil, nil), vistaDePrueba(t, 0), nil)
+	t.Cleanup(func() { fyne.DoAndWait(a.Cerrar) })
 	a.lanzar = func(f func()) { f() }
 	a.ConSesion = func() bool { return true }
 	a.Arrancar()
@@ -311,6 +312,9 @@ func colaDeInterfaz(t *testing.T, a *App) func(que string, hasta func() bool) {
 func TestEmitirDesdeAquiEntraEnLaSala(t *testing.T) {
 	s := servicioCompleto()
 	a, w := appDePrueba(t, s, true)
+	if os.Getenv("SYTUE_CAPTURA") != "" {
+		recorrido.AMedida(w)
+	}
 	vaciar := colaDeInterfaz(t, a)
 	sala := &salaFalsa{}
 	var servidor, token string
@@ -517,8 +521,11 @@ func TestRecorridoConSesion(t *testing.T) {
 		default:
 			a.Ir(r)
 		}
-		montaje.ComprobarRotacion(t, w, fmt.Sprintf("cast/ruta-%d", r), iconos.Cast, r == RutaVer,
-			func() { prepararPosters(w, a) })
+		var prep []func()
+		if r == RutaVer {
+			prep = []func(){func() { prepararPosters(w, a) }}
+		}
+		montaje.ComprobarRotacion(t, w, fmt.Sprintf("cast/ruta-%d", r), iconos.Cast, r == RutaVer, prep...)
 		// Sin el carril: si no, lo primero que se pulsa es la navegación y todas las
 		// rutas acaban recorriendo lo mismo. La página entera a la vista. Para Play no:
 		// sin el armazón la app no se entera de que la ventana es de teléfono
@@ -701,7 +708,10 @@ func TestVerReproduceElWebM(t *testing.T) {
 		}
 	}
 	s := servicioCompleto()
-	a, _ := appDePrueba(t, s, true)
+	a, w := appDePrueba(t, s, true)
+	if os.Getenv("SYTUE_CAPTURA") != "" {
+		recorrido.AMedida(w)
+	}
 	a.enLaInterfaz = func(f func()) { cola <- f }
 	a.AbrirMedia = nil // el cliente de verdad: HEAD y Range contra el servicio falso
 	a.AbrirVideo("v01")
@@ -710,6 +720,9 @@ func TestVerReproduceElWebM(t *testing.T) {
 		return a.reproductor != nil && img != nil && img.Bounds().Dx() == 320
 	}
 	vaciar("el primer fotograma", fotograma)
+	if os.Getenv("SYTUE_CAPTURA") != "" {
+		guardar(t, "cast-vod-fixture", w.Canvas().Capture())
+	}
 	if !a.reproductor.Pausado() || a.visor.Mando == nil {
 		t.Fatal("el vídeo tiene que abrir en pausa y con sus mandos")
 	}

@@ -115,6 +115,8 @@ export const bg: AppCatalog<typeof en> = {
   'backlinks.emptyHint': 'Свържете я от друга бележка и ще се появи тук сама.',
   'notebook.delete': 'Изтриване на тетрадката',
   'notebook.deleteConfirm': 'Да се изтрие ли „{title}“ и всичко в нея?',
+  'notebook.ownerOnly':
+    'Само човекът, създал тази тетрадка, или администрацията на организацията може да я премести, да промени видимостта ѝ или да я шифрова.',
   'notebook.newChild': 'Нова тетрадка вътре',
   'notebook.notes': { one: '{count} бележка', other: '{count} бележки' },
   'notebook.emoji': 'Икона',

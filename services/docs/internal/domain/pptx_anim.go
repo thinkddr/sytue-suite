@@ -300,6 +300,7 @@ func fmtFrac(v float64) string {
 type xnode struct {
 	XMLName xml.Name
 	Attrs   []xml.Attr `xml:",any,attr"`
+	Text    string     `xml:",chardata"`
 	Kids    []xnode    `xml:",any"`
 }
 

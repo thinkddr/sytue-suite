@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
@@ -27,6 +28,7 @@ func EsExterno(storageKey string) bool { return strings.HasPrefix(storageKey, Ex
 // ExternalStorage es el bucket S3 propio de un tenant (mig 0023). SecretKeyEnc
 // va sellado con la KEK del servicio; el store no lo abre ni lo cierra.
 type ExternalStorage struct {
+	LocationID uuid.UUID `json:"-"`
 	Tenant     string
 	Kind       string // "s3" | "webdav" | "gdrive" | "onedrive" | "dropbox" | "nas"
 	InstanceID string // instancia OAuth del servicio de integraciones (gdrive/onedrive/dropbox)
@@ -57,13 +59,13 @@ type ExternalStorage struct {
 
 const externalStorageCols = `tenant, kind, instance_id, endpoint, base_path, region, bucket, use_ssl, access_key, secret_key_enc,
 	label, enabled, checked_at, check_ok, check_error, accepted_terms_at, updated_by, updated_at,
-	tunnel_site_id, tunnel_resource_id, tunnel_newt_id, tunnel_newt_secret_enc, local_endpoint`
+	tunnel_site_id, tunnel_resource_id, tunnel_newt_id, tunnel_newt_secret_enc, local_endpoint, location_id`
 
 func scanExternalStorage(row pgx.Row) (ExternalStorage, error) {
 	var e ExternalStorage
 	err := row.Scan(&e.Tenant, &e.Kind, &e.InstanceID, &e.Endpoint, &e.BasePath, &e.Region, &e.Bucket, &e.UseSSL, &e.AccessKey, &e.SecretKeyEnc,
 		&e.Label, &e.Enabled, &e.CheckedAt, &e.CheckOK, &e.CheckError, &e.AcceptedTermsAt, &e.UpdatedBy, &e.UpdatedAt,
-		&e.TunnelSiteID, &e.TunnelResourceID, &e.TunnelNewtID, &e.TunnelNewtSecretEnc, &e.LocalEndpoint)
+		&e.TunnelSiteID, &e.TunnelResourceID, &e.TunnelNewtID, &e.TunnelNewtSecretEnc, &e.LocalEndpoint, &e.LocationID)
 	return e, err
 }
 
@@ -93,6 +95,26 @@ func (s *Store) ExternalStorageFor(ctx context.Context, tenant string) (External
 		var err error
 		e, err = scanExternalStorage(tx.QueryRow(ctx,
 			`SELECT `+externalStorageCols+` FROM external_storage WHERE tenant=$1 AND enabled`, tenant))
+		return err
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ExternalStorage{}, domain.ErrNotFound
+	}
+	return e, err
+}
+
+// ExternalStorageLocation resolves an immutable physical destination. A nil ID
+// means a legacy ext/ key, pinned to the configuration present at migration.
+// Disabling new writes does not remove access to previously stored ciphertext.
+func (s *Store) ExternalStorageLocation(ctx context.Context, tenant string, id uuid.UUID) (ExternalStorage, error) {
+	var e ExternalStorage
+	err := s.pool.InMaintenanceTx(ctx, func(tx pgx.Tx) error {
+		var err error
+		e, err = scanExternalStorage(tx.QueryRow(ctx, `SELECT `+externalStorageCols+`
+   FROM jsonb_populate_record(NULL::external_storage, (
+    SELECT configuration FROM external_storage_locations
+    WHERE tenant=$1 AND (location_id=$2 OR ($2='00000000-0000-0000-0000-000000000000'::uuid AND legacy))
+   )) WHERE tenant IS NOT NULL`, tenant, id))
 		return err
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -153,7 +175,8 @@ func (s *Store) DeleteExternalStorage(ctx context.Context) error {
 		if err := conTodaLaOrganizacion(ctx, tx, func() error {
 			return tx.QueryRow(ctx, `
 				SELECT EXISTS (SELECT 1 FROM files         WHERE tenant=$1 AND storage_key LIKE $2)
-				    OR EXISTS (SELECT 1 FROM file_versions WHERE tenant=$1 AND storage_key LIKE $2)`,
+				    OR EXISTS (SELECT 1 FROM file_versions WHERE tenant=$1 AND storage_key LIKE $2)
+				    OR EXISTS (SELECT 1 FROM cipher_blobs WHERE tenant=$1 AND storage_key LIKE $2)`,
 				t.Slug, ExternalPrefix+"%").Scan(&quedan)
 		}); err != nil {
 			return fmt.Errorf("store: contar ficheros externos: %w", err)

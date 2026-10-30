@@ -115,6 +115,8 @@ export const it: AppCatalog<typeof en> = {
   'backlinks.emptyHint': 'Collegala da un’altra nota e comparirà qui, da sola.',
   'notebook.delete': 'Elimina taccuino',
   'notebook.deleteConfirm': 'Eliminare «{title}» e tutto il suo contenuto?',
+  'notebook.ownerOnly':
+    'Solo chi ha creato questo taccuino o chi amministra l’organizzazione può spostarlo, cambiarne la visibilità o cifrarlo.',
   'notebook.newChild': 'Nuovo taccuino dentro',
   'notebook.notes': { one: '{count} nota', other: '{count} note' },
   'notebook.emoji': 'Icona',

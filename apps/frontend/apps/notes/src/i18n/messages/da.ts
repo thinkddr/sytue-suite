@@ -111,6 +111,8 @@ export const da: AppCatalog<typeof en> = {
   'backlinks.emptyHint': 'Link til den fra en anden note, så dukker den op her af sig selv.',
   'notebook.delete': 'Slet notesbog',
   'notebook.deleteConfirm': 'Slet “{title}” og alt, hvad der er i den?',
+  'notebook.ownerOnly':
+    'Kun den, der har oprettet notesbogen, eller den, der administrerer organisationen, kan flytte den, ændre hvem der ser den, eller kryptere den.',
   'notebook.newChild': 'Ny notesbog indeni',
   'notebook.notes': { one: '{count} note', other: '{count} noter' },
   'notebook.emoji': 'Ikon',

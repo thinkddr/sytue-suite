@@ -181,7 +181,9 @@ func panelEmision(v Vista, e Emision) fyne.CanvasObject {
 	fuentes := []fyne.CanvasObject{
 		botonFuente(v, "studio.browser.camera", iconos.Camara, e.Camara, e.AlCamara),
 		botonFuente(v, "studio.browser.mic", microIcono, e.Micro, e.AlMicro),
-		botonFuente(v, "studio.browser.screen", iconos.Pantalla, e.Pantalla, e.AlPantalla),
+	}
+	if e.AlPantalla != nil {
+		fuentes = append(fuentes, botonFuente(v, "studio.browser.screen", iconos.Pantalla, e.Pantalla, e.AlPantalla))
 	}
 	if e.AlCambiarCamara != nil {
 		girar := botonFuente(v, "studio.app.flipCamera", iconos.Rotar, false, e.AlCambiarCamara)

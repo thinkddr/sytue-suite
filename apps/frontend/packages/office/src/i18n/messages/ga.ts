@@ -1750,6 +1750,8 @@ export const ga: AppCatalog<typeof en> = {
   'extdata.msg.generic': 'Níorbh fhéidir an oibríocht a chríochnú.',
   'extdata.msg.notAllowed':
     'Ní féidir ach leis na daoine atá ar liosta an cheangail seo é a fhiosrú. Iarr ar lucht riaracháin d’eagraíochta tú a chur leis.',
+  'extdata.msg.ownerOnly':
+    'Ní féidir ach leis an duine a chruthaigh an ceangal seo nó le riarthóir na heagraíochta é a athrú nó a scriosadh.',
   'sheet.msg.badValue': 'Luach nach gceadaítear',
   'sheet.msg.clipboardDenied': 'Dhiúltaigh an brabhsálaí rochtain ar an ngearrthaisce.',
   'sheet.msg.pasteFailed': 'Níorbh fhéidir greamú',

@@ -7,8 +7,12 @@ APLICACION="${1:?application required}"
 RUTA="${2:?fixture route required}"
 SALIDA_BASE="${3:?artifact directory required}"
 umask 077
-mkdir -p "$(dirname "$SALIDA_BASE")"
-SALIDA="$(mktemp -d "${SALIDA_BASE%/}.XXXXXX")"
+# Stable artifact root, validated before writing; each invocation has its own child.
+node --input-type=module - "$SALIDA_BASE" <<'JS'
+import { createReportDirectory } from './lib/report-output.mjs';
+createReportDirectory('wizard', process.argv[2]);
+JS
+SALIDA="$(mktemp -d "${SALIDA_BASE%/}/run.XXXXXX")"
 PRUEBA="${4:?browser script required}"
 PREFIJO="${5:?environment prefix required}"
 BASE_RUTA="${6:-$APLICACION}"

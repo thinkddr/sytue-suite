@@ -5,7 +5,7 @@ component: id
 replicaCount: 2
 
 image:
-  registry: ""                 # cae a global.imageRegistry (Scaleway Registry, UE)
+  registry: ghcr.io/thinkddr   # global.imageRegistry lo pisa en producción
   repository: sytue-id
   tag: "1.0.0"
   pullPolicy: IfNotPresent

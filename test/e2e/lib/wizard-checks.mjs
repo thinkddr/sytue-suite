@@ -3,7 +3,7 @@ import { expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
 /** Astro dev may replace an optimized dependency during the first hydration. */
-export async function openWizardFixture(page, url) {
+export async function openWizardFixture(page, url, readySelector = 'main') {
   let outdatedDependency = false;
   const observe = (response) => {
     if (response.status() === 504 && response.statusText() === 'Outdated Optimize Dep')
@@ -15,7 +15,7 @@ export async function openWizardFixture(page, url) {
       outdatedDependency = false;
       await page.goto(url, { timeout: 180000 });
       try {
-        await page.locator('main').waitFor({ state: 'visible', timeout: 60000 });
+        await page.locator(readySelector).waitFor({ state: 'visible', timeout: 60000 });
         return;
       } catch (failure) {
         if (!outdatedDependency || attempt >= 2) throw failure;

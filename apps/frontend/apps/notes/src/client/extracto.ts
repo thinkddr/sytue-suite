@@ -28,8 +28,8 @@ const BLOCKS = new Set([
   'th',
 ]);
 
-/** Plain-text preview, never HTML: parse without a browser DOM or resource loads. */
-export function extracto(html: string, max = 72): string {
+/** Plain text of a note body, never HTML: parse without a browser DOM or resource loads. */
+export function textoDeNota(html: string): string {
   const pending: (DefaultTreeAdapterMap['childNode'] | string)[] = [
     ...parseFragment(html).childNodes,
   ].reverse();
@@ -48,6 +48,11 @@ export function extracto(html: string, max = 72): string {
       for (let i = node.childNodes.length - 1; i >= 0; i--) pending.push(node.childNodes[i]!);
     }
   }
-  const text = parts.join('').replace(/\s+/g, ' ').trim();
+  return parts.join('').replace(/\s+/g, ' ').trim();
+}
+
+/** Plain-text preview, never HTML: parse without a browser DOM or resource loads. */
+export function extracto(html: string, max = 72): string {
+  const text = textoDeNota(html);
   return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }

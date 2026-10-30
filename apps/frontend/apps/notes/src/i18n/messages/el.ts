@@ -113,6 +113,8 @@ export const el: AppCatalog<typeof en> = {
   'backlinks.emptyHint': 'Συνδέστε την από άλλη σημείωση και θα εμφανιστεί εδώ, μόνη της.',
   'notebook.delete': 'Διαγραφή σημειωματαρίου',
   'notebook.deleteConfirm': 'Διαγραφή του «{title}» και όλων όσων περιέχει;',
+  'notebook.ownerOnly':
+    'Μόνο το άτομο που δημιούργησε αυτό το σημειωματάριο ή η διαχείριση του οργανισμού μπορεί να το μετακινήσει, να αλλάξει ποιος το βλέπει ή να το κρυπτογραφήσει.',
   'notebook.newChild': 'Νέο σημειωματάριο μέσα',
   'notebook.notes': { one: '{count} σημείωση', other: '{count} σημειώσεις' },
   'notebook.emoji': 'Εικονίδιο',

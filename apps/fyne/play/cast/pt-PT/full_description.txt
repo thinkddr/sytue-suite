@@ -6,7 +6,7 @@ Vídeo a pedido e em direto: carregar, emitir e partilhar, na UE.
 • Chat em direto e comentários, com moderação básica por quem publica.
 • Carregue vídeos até 8 GiB; o original é conservado.
 • Direto a partir de um programa de emissão por RTMP, com uma chave de emissão por pessoa.
-• Direto a partir do navegador ou da aplicação: câmara, ecrã e microfone.
+• Direto a partir do navegador ou da aplicação: câmara e microfone. Partilha de ecrã em navegadores, sistemas de computador e Android compatíveis; indisponível na aplicação iOS/iPadOS.
 • As gravações dos diretos tornam-se vídeos a pedido automaticamente.
 • Uma página inicial pública e um canal por organização, indexáveis.
 • Ligações não listadas, vídeos só para a organização ou acesso a pessoas específicas por @utilizador.

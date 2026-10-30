@@ -281,6 +281,7 @@
     "many": "{count} notatek",
     "other": "{count} notatki"
   },
+  "notebook.ownerOnly": "Tylko osoba, która utworzyła ten notatnik, lub administracja organizacji może go przenieść, zmienić jego widoczność lub zaszyfrować.",
   "notebook.rename": "Zmień nazwę",
   "notebook.settings": "Ustawienia notatnika",
   "notebook.title": "Nazwa",

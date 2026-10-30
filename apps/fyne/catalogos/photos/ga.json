@@ -110,6 +110,7 @@
   "gallery.describeStop": "Stop",
   "gallery.described": "Rinneadh cur síos ar {count} grianghraf",
   "gallery.describing": "Cur síos á dhéanamh ar {done} as {total}…",
+  "gallery.downloadCapped": "Grianghraif lasmuigh den bhaisc seo: {count}.",
   "gallery.downloadSelected": "Íoslódáil",
   "gallery.downloading": {
     "one": "1 ghrianghraf á íoslódáil…",

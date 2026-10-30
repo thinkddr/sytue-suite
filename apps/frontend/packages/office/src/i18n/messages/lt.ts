@@ -1730,6 +1730,8 @@ export const lt: AppCatalog<typeof en> = {
   'extdata.msg.generic': 'Nepavyko užbaigti veiksmo.',
   'extdata.msg.notAllowed':
     'Užklausas šiam ryšiui gali siųsti tik jo sąraše esantys žmonės. Paprašykite savo organizacijos administratorių jus įtraukti.',
+  'extdata.msg.ownerOnly':
+    'Šį ryšį pakeisti arba ištrinti gali tik jį sukūręs asmuo arba organizacijos administratorius.',
   'sheet.msg.badValue': 'Reikšmė neleidžiama',
   'sheet.msg.clipboardDenied': 'Naršyklė neleido pasiekti iškarpinės.',
   'sheet.msg.pasteFailed': 'Nepavyko įklijuoti',

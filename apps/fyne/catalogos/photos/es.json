@@ -104,6 +104,7 @@
   "gallery.describeStop": "Parar",
   "gallery.described": "{count} fotos descritas",
   "gallery.describing": "Describiendo {done} de {total}…",
+  "gallery.downloadCapped": "Fotos fuera de este lote: {count}.",
   "gallery.downloadSelected": "Descargar",
   "gallery.downloading": {
     "one": "Descargando 1 foto…",

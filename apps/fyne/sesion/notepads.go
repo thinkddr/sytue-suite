@@ -13,7 +13,7 @@ import (
 )
 
 // Lo que Notepads guardó en el equipo para no perderlo sin red —la cola de capturas y
-// los borradores— no sobrevive a cerrar sesión: queda en claro en el disco (NAT-08).
+// los borradores— se cifra en el equipo y no sobrevive a cerrar sesión (NAT-08).
 // Decisión del dueño (2026-10-16): «avisar y luego borrar». Quien cierra sesión, en
 // cualquiera de las trece apps, ve cuánto queda sin subir y elige subirlo o
 // descartarlo; después Salir lo borra con todo lo demás, como la web.
@@ -21,11 +21,7 @@ import (
 // PendientesNotepads es cuánto tiene Notepads sin subir en este equipo, de todas las
 // cuentas: lo que Salir va a borrar. Sin almacén (la web), nada.
 func PendientesNotepads() int {
-	alm, err := Almacen()
-	if err != nil {
-		return 0
-	}
-	n, _ := alm.Count(notas.EspacioCapturas, notas.EspacioBorradores)
+	n, _ := contarAlmacen(notas.EspacioCapturas, notas.EspacioBorradores)
 	return n
 }
 
@@ -34,9 +30,9 @@ func PendientesNotepads() int {
 // lo que no salió (sin red, o rechazado) y lo de otras cuentas u organizaciones, que
 // con esta sesión no se puede enviar.
 func (s *Suite) SubirNotepads(ctx context.Context) int {
-	alm, err := Almacen()
+	alm, err := AlmacenConContexto(ctx)
 	if err != nil {
-		return 0
+		return PendientesNotepads()
 	}
 	if dueño := s.dueñoNotas(); dueño != "" {
 		n := api.NewNotes(s.URL("notes"), s.Sesion, nil)

@@ -15,6 +15,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"git.sytue.eu/sytue/one/apps/nucleo/storage"
+
 	"git.sytue.eu/sytue/one/platform/pkg/authn"
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/services/drive/internal/config"
@@ -74,7 +76,7 @@ func NewRouter(d Deps) http.Handler {
 	// límite de 1 MiB y sigue mandando ahí.
 	r := httpx.NewRouter(httpx.RouterOptions{
 		RequestTimeout: 60 * time.Second,
-		MaxBodyBytes:   d.Cfg.MaxUploadBytes + (1 << 20),
+		MaxBodyBytes:   max(d.Cfg.MaxUploadBytes, storage.MaxCipherBlockBytes) + (1 << 20),
 	})
 	httpx.MountHealth(r, d.Cfg.Version, 3*time.Second, d.ReadyCheckers...)
 
@@ -98,6 +100,7 @@ func NewRouter(d Deps) http.Handler {
 	}
 	if d.Service != nil {
 		h.bases = d.Service
+		h.cipher = d.Service
 	}
 	tenantAuth := func(next http.Handler) http.Handler {
 		return d.Verifier.RequireAuth(d.Verifier.RequireTenant(next))
@@ -122,6 +125,10 @@ func NewRouter(d Deps) http.Handler {
 		// Carpetas.
 		// «Exportar tus datos»: los archivos con sus bytes (platform/pkg/portabilidad).
 		api.Get("/export", h.Export)
+		api.With(httpx.MaxBodyBytes(storage.MaxCipherBlockBytes)).Put("/cipher/blobs/{product}/{id}", h.PutCipherBlob)
+		api.Get("/cipher/blobs/{product}/{id}", h.GetCipherBlob)
+		api.Get("/cipher/blobs/{product}/{id}/content", h.DownloadCipherBlob)
+		api.Delete("/cipher/blobs/{product}/{id}", h.DeleteCipherBlob)
 		api.Get("/folders/root", h.GetRoot)
 		api.Post("/folders", h.CreateFolder)
 		api.Get("/folders/{id}", h.GetFolder)

@@ -14,6 +14,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
+
 	"git.sytue.eu/sytue/one/platform/pkg/keycrypto"
 	"git.sytue.eu/sytue/one/platform/pkg/objectstore"
 	"git.sytue.eu/sytue/one/platform/pkg/ssrfhttp"
@@ -26,6 +28,7 @@ import (
 // terceros de un tenant, si lo tiene encendido.
 type externalStorageStore interface {
 	ExternalStorageFor(ctx context.Context, tenant string) (store.ExternalStorage, error)
+	ExternalStorageLocation(context.Context, string, uuid.UUID) (store.ExternalStorage, error)
 	objectstore.ExternalObjects
 }
 
@@ -33,16 +36,9 @@ type externalStorageStore interface {
 // terceros y ese almacén no se puede abrir (desconectado o sin KEK).
 var ErrExternalStorageOff = errors.New("service: almacén de terceros no disponible")
 
-// blobRouter reparte cada operación entre el almacén de Sytue y el bucket S3
-// propio del tenant (mig 0023) mirando SOLO la clave: las que empiezan por
-// store.ExternalPrefix viven fuera. Así una organización puede conectar,
-// apagar o cambiar su bucket sin que nada ya escrito deje de leerse, y sin
-// consultar la base de datos en cada Get.
-//
-// ponytail: el cliente de cada tenant se cachea un minuto; para no esperar ese
-// minuto tras conectar o desconectar, el plano de administración llama a
-// Forget. Un LRU con tamaño máximo llegará si alguna vez hay miles de tenants
-// con bucket propio en un mismo proceso.
+// blobRouter routes by a key pinned to the connection's physical location.
+// Active configuration selects new writes; historical locations remain readable
+// after switching accounts or disabling new external writes.
 type blobRouter struct {
 	base   blobStore
 	ext    externalStorageStore
@@ -57,8 +53,9 @@ type blobRouter struct {
 }
 
 type entradaExterna struct {
-	blobs   blobStore // nil = el tenant no tiene almacén de terceros
-	expires time.Time
+	locationID uuid.UUID
+	blobs      blobStore // nil = el tenant no tiene almacén de terceros
+	expires    time.Time
 }
 
 const cacheExterna = time.Minute
@@ -86,7 +83,11 @@ func (r *blobRouter) Enabled(ctx context.Context, t tenancy.Tenant) bool {
 // el almacén, la siguiente operación vuelve a leer el store.
 func (r *blobRouter) Forget(tenant string) {
 	r.mu.Lock()
-	delete(r.cache, tenant)
+	for key := range r.cache {
+		if key == tenant || strings.HasPrefix(key, tenant+"/") {
+			delete(r.cache, key)
+		}
+	}
 	r.mu.Unlock()
 }
 
@@ -94,50 +95,106 @@ func (r *blobRouter) pick(ctx context.Context, t tenancy.Tenant, key string) (bl
 	if !store.EsExterno(key) {
 		return r.base, nil
 	}
-	b, err := r.externo(ctx, t)
+	location := "legacy"
+	if strings.HasPrefix(key, store.ExternalPrefix+"v1/") {
+		parts := strings.SplitN(strings.TrimPrefix(key, store.ExternalPrefix+"v1/"), "/", 2)
+		if len(parts) != 2 || parts[1] == "" {
+			return nil, ErrExternalStorageOff
+		}
+		id, err := uuid.Parse(parts[0])
+		if err != nil || id == uuid.Nil {
+			return nil, ErrExternalStorageOff
+		}
+		location = id.String()
+	}
+	entry, err := r.externoEn(ctx, t, location)
 	if err != nil {
 		return nil, err
 	}
-	if b == nil {
+	if entry.blobs == nil {
 		return nil, ErrExternalStorageOff
 	}
-	return b, nil
+	return entry.blobs, nil
 }
 
-// externo devuelve el almacén de terceros del tenant (nil si no tiene).
 func (r *blobRouter) externo(ctx context.Context, t tenancy.Tenant) (blobStore, error) {
+	entry, err := r.externoEn(ctx, t, "")
+	return entry.blobs, err
+}
+
+// nuevaClave freezes the location before upload, including when another process
+// switches the tenant's active connection between selection and Put.
+func (r *blobRouter) nuevaClave(ctx context.Context, t tenancy.Tenant, key string) (string, error) {
+	entry, err := r.externoEn(ctx, t, "")
+	if err != nil {
+		return "", errors.Join(ErrExternalStorageOff, err)
+	}
+	if entry.blobs == nil {
+		return key, nil
+	}
+	if entry.locationID == uuid.Nil {
+		return "", ErrExternalStorageOff
+	}
+	return store.ExternalPrefix + "v1/" + entry.locationID.String() + "/" + key, nil
+}
+
+func (r *blobRouter) externoEn(ctx context.Context, t tenancy.Tenant, location string) (entradaExterna, error) {
 	if r.ext == nil {
-		return nil, nil //nolint:nilnil // sin store no hay almacén de terceros: es un estado, no un error
+		return entradaExterna{}, nil
+	}
+	cacheKey := t.Slug + "/" + location
+	if location == "" {
+		cacheKey = t.Slug
 	}
 	r.mu.Lock()
-	e, ok := r.cache[t.Slug]
+	entry, ok := r.cache[cacheKey]
 	r.mu.Unlock()
-	if ok && time.Now().Before(e.expires) {
-		return e.blobs, nil
+	if ok && time.Now().Before(entry.expires) {
+		return entry, nil
 	}
-	cfg, err := r.ext.ExternalStorageFor(ctx, t.Slug)
-	var blobs blobStore
+	var cfg store.ExternalStorage
+	var err error
+	if location == "" {
+		cfg, err = r.ext.ExternalStorageFor(ctx, t.Slug)
+	} else {
+		id := uuid.Nil
+		if location != "legacy" {
+			id, err = uuid.Parse(location)
+			if err != nil {
+				return entradaExterna{}, ErrExternalStorageOff
+			}
+		}
+		cfg, err = r.ext.ExternalStorageLocation(ctx, t.Slug, id)
+	}
 	switch {
 	case err == nil:
 		secret := ""
 		if cfg.SecretKeyEnc != "" {
-			if secret, err = r.cipher.Decrypt(cfg.SecretKeyEnc); err != nil {
-				return nil, fmt.Errorf("service: abrir la clave del almacén de terceros: %w", err)
+			if r.cipher == nil {
+				return entradaExterna{}, ErrExternalStorageOff
+			}
+			secret, err = r.cipher.Decrypt(cfg.SecretKeyEnc)
+			if err != nil {
+				return entradaExterna{}, fmt.Errorf("service: abrir la clave del almacén de terceros: %w", err)
 			}
 		}
-		blobs, err = r.abrir(t, cfg, secret)
+		entry.blobs, err = r.abrir(t, cfg, secret)
 		if err != nil {
-			return nil, err
+			return entradaExterna{}, err
 		}
+		entry.locationID = cfg.LocationID
 	case errors.Is(err, domain.ErrNotFound):
-		// sin almacén: se cachea el «no» igual que el «sí»
+		if location != "" {
+			return entradaExterna{}, ErrExternalStorageOff
+		}
 	default:
-		return nil, err
+		return entradaExterna{}, err
 	}
+	entry.expires = time.Now().Add(cacheExterna)
 	r.mu.Lock()
-	r.cache[t.Slug] = entradaExterna{blobs: blobs, expires: time.Now().Add(cacheExterna)}
+	r.cache[cacheKey] = entry
 	r.mu.Unlock()
-	return blobs, nil
+	return entry, nil
 }
 
 // El resto es el reparto, operación a operación.
@@ -174,10 +231,25 @@ func (r *blobRouter) PresignGet(ctx context.Context, t tenancy.Tenant, key strin
 	return b.PresignGet(ctx, t, key, expiry)
 }
 
+type presignerConTamano interface {
+	PresignPutConTamano(ctx context.Context, t tenancy.Tenant, key string, size int64, expiry time.Duration) (*url.URL, error)
+}
+
 func (r *blobRouter) PresignPut(ctx context.Context, t tenancy.Tenant, key string, expiry time.Duration) (*url.URL, error) {
 	b, err := r.pick(ctx, t, key)
 	if err != nil {
 		return nil, err
+	}
+	return b.PresignPut(ctx, t, key, expiry)
+}
+
+func (r *blobRouter) PresignPutConTamano(ctx context.Context, t tenancy.Tenant, key string, size int64, expiry time.Duration) (*url.URL, error) {
+	b, err := r.pick(ctx, t, key)
+	if err != nil {
+		return nil, err
+	}
+	if pt, ok := b.(presignerConTamano); ok {
+		return pt.PresignPutConTamano(ctx, t, key, size, expiry)
 	}
 	return b.PresignPut(ctx, t, key, expiry)
 }

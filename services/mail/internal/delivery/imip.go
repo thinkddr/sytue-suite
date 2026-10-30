@@ -59,10 +59,15 @@ const maxCalendario = 256 << 10
 // Pasar manda el REPLY del mensaje, si lo trae y su remitente está autenticado, en
 // segundo plano: la entrega del correo no espera a Calendar.
 func (p *PuenteCalendario) Pasar(ctx context.Context, tenant string, env domain.Message, raw []byte, fromAutenticado bool) {
+	p.PasarReader(ctx, tenant, env, bytes.NewReader(raw), fromAutenticado)
+}
+
+// PasarReader manda el REPLY del mensaje leyendo en flujo desde r.
+func (p *PuenteCalendario) PasarReader(ctx context.Context, tenant string, env domain.Message, r io.Reader, fromAutenticado bool) {
 	if p == nil || !fromAutenticado {
 		return
 	}
-	ics, ok := ReplyDeCalendario(raw)
+	ics, ok := ReplyDeCalendarioReader(r)
 	if !ok {
 		return
 	}
@@ -93,7 +98,12 @@ func (p *PuenteCalendario) Pasar(ctx context.Context, tenant string, env domain.
 // ReplyDeCalendario busca en un mensaje RFC 5322 su parte `text/calendar` (o
 // `application/ics`) con METHOD:REPLY y la devuelve decodificada.
 func ReplyDeCalendario(raw []byte) ([]byte, bool) {
-	m, err := mail.ReadMessage(bytes.NewReader(raw))
+	return ReplyDeCalendarioReader(bytes.NewReader(raw))
+}
+
+// ReplyDeCalendarioReader busca la parte `text/calendar` con METHOD:REPLY desde r.
+func ReplyDeCalendarioReader(r io.Reader) ([]byte, bool) {
+	m, err := mail.ReadMessage(r)
 	if err != nil {
 		return nil, false
 	}

@@ -95,4 +95,23 @@ func TestNotificacionEstado(t *testing.T) {
 	if e.Estado != pagos.EstadoPagado || e.Importe != 1130 || e.Comercio != "Cuenta_123" {
 		t.Fatalf("Estado() = %#v", e)
 	}
+
+	cancelFail := n
+	cancelFail.EventCode = "CANCELLATION"
+	cancelFail.Success = "false"
+	if ec, err := cancelFail.Estado(pagos.ModoPrueba, nil); err != nil || ec.Estado != pagos.EstadoAbierto {
+		t.Fatalf("CANCELLATION fallida = %#v, %v; quiero EstadoAbierto", ec, err)
+	}
+
+	cancelOK := cancelFail
+	cancelOK.Success = "true"
+	if ec, err := cancelOK.Estado(pagos.ModoPrueba, nil); err != nil || ec.Estado != pagos.EstadoCancelado {
+		t.Fatalf("CANCELLATION exitosa = %#v, %v; quiero EstadoCancelado", ec, err)
+	}
+
+	ref := n
+	ref.EventCode = "REFUND"
+	if er, err := ref.Estado(pagos.ModoPrueba, nil); err != nil || er.Reembolsado != 1130 {
+		t.Fatalf("REFUND = %#v, %v; quiero Reembolsado=1130", er, err)
+	}
 }

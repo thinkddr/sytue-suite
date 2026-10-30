@@ -15,6 +15,10 @@ func (v *Vista) Atajos(c fyne.Canvas) { ui.AlAtras(c, v.atras) }
 func (v *Vista) atras() bool {
 	d := v.Destino()
 	switch {
+	case d == AClientesExternos && v.controlClientes.pantalla.Paso > 0:
+		v.controlClientes.pantalla.Ir(v.controlClientes.pantalla.Paso - 1)
+	case d == AClientesExternos:
+		v.Ir(ADispositivos)
 	case d == ABienvenida && v.bienv.volverPaso():
 	case d != AInicio:
 		v.Ir(AInicio)

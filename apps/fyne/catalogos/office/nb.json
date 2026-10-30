@@ -741,6 +741,7 @@
   "extdata.msg.noEncryption": "Kryptering av påloggingsinformasjon er ikke konfigurert på serveren.",
   "extdata.msg.notAllowed": "Bare personene på listen til denne tilkoblingen kan spørre mot den. Be den som administrerer organisasjonen, om å legge deg til.",
   "extdata.msg.notFound": "Tilkoblingen eller spørringen finnes ikke lenger.",
+  "extdata.msg.ownerOnly": "Bare den som opprettet tilkoblingen eller den som administrerer organisasjonen, kan endre eller slette den.",
   "extdata.msg.rate": "For mange kjøringer på rad. Vent noen sekunder, og prøv igjen.",
   "extdata.msg.timeout": "Den eksterne datakilden brukte for lang tid på å svare.",
   "extdata.msg.unauth": "Økten er utløpt. Logg på igjen.",

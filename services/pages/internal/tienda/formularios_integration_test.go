@@ -16,6 +16,7 @@ import (
 
 	"git.sytue.eu/sytue/one/platform/pkg/pg"
 	"git.sytue.eu/sytue/one/platform/pkg/pgtest"
+	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 	"git.sytue.eu/sytue/one/services/pages/db"
 	"git.sytue.eu/sytue/one/services/pages/internal/domain"
 	"git.sytue.eu/sytue/one/services/pages/internal/ir"
@@ -164,10 +165,9 @@ func TestUnFormularioSoloAceptaLoQuePublico(t *testing.T) {
 	}
 }
 
-// Un formulario recién publicado, sin fila en form_settings (nada la crea al publicar),
-// existe: su definición pública trae los campos y el consentimiento de la versión en
-// vivo, y acepta envíos. Antes, el GET y el POST daban 404 y, con la fila, el GET
-// devolvía los campos vacíos.
+// Un formulario publicado sin fila previa en form_settings (p. ej. sembrado antes de
+// WEB-07) sigue existiendo: su definición pública trae los campos y el consentimiento de
+// la versión en vivo, y acepta envíos.
 func TestUnFormularioPublicadoSeVeYSeEnviaSinConfigurarlo(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	ctx := context.Background()
@@ -210,3 +210,123 @@ func TestUnFormularioPublicadoSeVeYSeEnviaSinConfigurarlo(t *testing.T) {
 		t.Fatalf("formulario apagado: %v; quiero ErrFormularioNoExiste", err)
 	}
 }
+
+// WEB-07. El IR publicado se cachea en memoria por sitio y versión (5 min, §10.6) para no
+// decodificar el JSONB en cada envío, y al publicar una versión nueva se invalida en el acto.
+func TestCacheDeFormularioPublicadoPorSitioYVersion(t *testing.T) {
+	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
+	ctx := context.Background()
+	super := h.PoolSinRLS(t)
+	const org = "org"
+	var sitio uuid.UUID
+	if err := super.QueryRow(ctx, `INSERT INTO sites (tenant, slug, name, draft, created_by) VALUES ($1, 'web', 'Web', '{}', 'sub') RETURNING id`, org).Scan(&sitio); err != nil {
+		t.Fatal(err)
+	}
+	formID, campos := publicarConFormulario(t, super, org, sitio)
+	svc := Nuevo(store.New(super), nil, "https://web.example.test", "sites.example.test", nil, nil)
+
+	// Primera consulta: calienta la caché de (sitio, versión 1).
+	if _, err := svc.ObtenerFormularioPublico(ctx, org, sitio, formID); err != nil {
+		t.Fatalf("primer lectura del formulario publicado: %v", err)
+	}
+
+	// Si estropeamos el JSONB de la versión 1 en BD sin cambiar published_number,
+	// la caché de 5 min responde sin releer ni volver a decodificar site_versions.ir.
+	if _, err := super.Exec(ctx, `UPDATE site_versions SET ir = '{}'::jsonb WHERE site_id = $1`, sitio); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.EnviarFormularioPublico(ctx, org, sitio, formID, valoresValidos(campos), true, "es"); err != nil {
+		t.Fatalf("el segundo envío dentro de los 5 min debía servirse de la caché de la versión publicada: %v", err)
+	}
+
+	// En cuanto cambia la versión publicada (published_number = 2, con el IR vacío),
+	// la caché de la versión 1 deja de aplicar inmediatamente.
+	var v2 uuid.UUID
+	if err := super.QueryRow(ctx, `INSERT INTO site_versions (tenant, site_id, kind, ir, draft_rev, created_by)
+		VALUES ($1, $2, 'publish', '{}'::jsonb, 2, 'sub') RETURNING id`, org, sitio).Scan(&v2); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := super.Exec(ctx, `INSERT INTO publications (tenant, site_id, kind, number, version_id, files, bytes, renderer_version, created_by)
+		VALUES ($1, $2, 'live', 2, $3, 1, 1, 'test', 'sub')`, org, sitio, v2); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := super.Exec(ctx, `UPDATE sites SET published_number = 2 WHERE id = $1 AND tenant = $2`, sitio, org); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.ObtenerFormularioPublico(ctx, org, sitio, formID); !errors.Is(err, domain.ErrFormularioNoExiste) {
+		t.Fatalf("tras publicar la versión 2 sin formulario: %v; quiero ErrFormularioNoExiste", err)
+	}
+}
+
+// WEB-07. Al publicar un sitio en vivo (CrearPublicacionLive / Rollback), se crean las
+// filas por defecto en form_settings (enabled=true, notify=[]) para los formularios de la
+// versión publicada, sin pisar la configuración existente (incluidos los desactivados con
+// enabled=false o con destinatarios ya configurados).
+func TestPublicarCreaFormSettingsPorDefectoSinPisarLosExistentes(t *testing.T) {
+	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
+	ctx := context.Background()
+	super := h.PoolSinRLS(t)
+	const org = "org"
+	tctx := tenancy.Into(ctx, tenancy.Tenant{Slug: org})
+
+	var sitio uuid.UUID
+	if err := super.QueryRow(ctx, `INSERT INTO sites (tenant, slug, name, draft, created_by) VALUES ($1, 'web', 'Web', '{}', 'sub') RETURNING id`, org).Scan(&sitio); err != nil {
+		t.Fatal(err)
+	}
+
+	p, err := plantillas.ObtenerPlantilla("producto")
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := json.Marshal(p.IR)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var formID string
+	for id := range ir.Formularios(&p.IR) {
+		if formID == "" || id < formID {
+			formID = id
+		}
+	}
+	if formID == "" {
+		t.Fatal("la plantilla «producto» no trae formulario")
+	}
+
+	st := store.New(h.Pool)
+	v1, err := st.CrearVersionConTipo(tctx, sitio, "v1", "publish", raw, 1, "sub")
+	if err != nil {
+		t.Fatalf("crear versión 1: %v", err)
+	}
+	if _, err := st.CrearPublicacionLive(tctx, sitio, v1, 1, 100, "1.0", nil, "sub", nil); err != nil {
+		t.Fatalf("publicar versión 1: %v", err)
+	}
+
+	var enabled bool
+	var notify string
+	if err := super.QueryRow(ctx, `SELECT enabled, notify::text FROM form_settings WHERE site_id = $1 AND tenant = $2 AND form_id = $3`, sitio, org, formID).Scan(&enabled, &notify); err != nil {
+		t.Fatalf("al publicar debía crearse la fila por defecto en form_settings: %v", err)
+	}
+	if !enabled || notify != "[]" {
+		t.Fatalf("fila inicial en form_settings: enabled=%v notify=%s; quiero true y []", enabled, notify)
+	}
+
+	// Si la organización apaga el formulario y configura un correo de aviso, volver a
+	// publicar no pisa ni enabled=false ni notify.
+	if _, err := super.Exec(ctx, `UPDATE form_settings SET enabled = false, notify = '[{"email":"aviso@example.test"}]'::jsonb WHERE site_id = $1 AND tenant = $2 AND form_id = $3`, sitio, org, formID); err != nil {
+		t.Fatal(err)
+	}
+	v2, err := st.CrearVersionConTipo(tctx, sitio, "v2", "publish", raw, 2, "sub")
+	if err != nil {
+		t.Fatalf("crear versión 2: %v", err)
+	}
+	if _, err := st.CrearPublicacionLive(tctx, sitio, v2, 1, 100, "1.0", nil, "sub", nil); err != nil {
+		t.Fatalf("publicar versión 2: %v", err)
+	}
+	if err := super.QueryRow(ctx, `SELECT enabled, notify::text FROM form_settings WHERE site_id = $1 AND tenant = $2 AND form_id = $3`, sitio, org, formID).Scan(&enabled, &notify); err != nil {
+		t.Fatal(err)
+	}
+	if enabled || !strings.Contains(notify, "aviso@example.test") {
+		t.Fatalf("la segunda publicación pisó form_settings: enabled=%v notify=%s", enabled, notify)
+	}
+}
+

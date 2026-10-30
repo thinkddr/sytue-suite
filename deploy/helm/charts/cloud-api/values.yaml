@@ -4,7 +4,7 @@ subdomain: cloud           # API servida bajo cloud.sytue.eu/api/v1 (mismo host 
 replicaCount: 2
 
 image:
-  registry: ""
+  registry: ghcr.io/thinkddr
   repository: sytue-cloud-api
   tag: "1.0.0"
   pullPolicy: IfNotPresent

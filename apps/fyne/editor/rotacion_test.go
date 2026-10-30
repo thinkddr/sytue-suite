@@ -130,7 +130,16 @@ func TestRotacionDelPanelConListaYFormularioMantieneAmbosDesplazamientos(t *test
 		filas[i] = ui.NuevoBoton(fmt.Sprint(i), nil)
 	}
 	lista := container.NewVScroll(container.New(ui.Columna{}, filas...))
-	pie := container.New(ui.Columna{Hueco: 4}, ui.NuevaEntrada("Asunto"), entrada, ultimo)
+	lista.SetMinSize(fyne.NewSize(0, 2*ui.SueloTactilBarra))
+	// La banda compacta deja más alto útil que antes. El caso necesita un
+	// formulario largo de verdad, además de dos filas visibles de la lista.
+	campos := make([]fyne.CanvasObject, 0, 7)
+	campos = append(campos, ui.NuevaEntrada("Asunto"), entrada)
+	for i := range 4 {
+		campos = append(campos, ui.NuevaEntrada(fmt.Sprintf("Campo %d", i)))
+	}
+	campos = append(campos, ultimo)
+	pie := container.New(ui.Columna{Hueco: 4}, campos...)
 	cuerpo := container.NewBorder(nil, pie, nil, nil, lista)
 	ctx := &Contexto{Tipo: Documento, Estado: Listo, Zoom: 100, Panel: PanelComentarios, Paneles: func(Panel) fyne.CanvasObject { return cuerpo }}
 	m := NuevoMarco(ctx, Genericas(), nil)

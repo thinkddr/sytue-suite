@@ -132,7 +132,9 @@ export const sv: AppCatalog<typeof en> = {
   'gallery.selectMonth': 'Markera månad',
   'gallery.unselectMonth': 'Avmarkera månad',
   'gallery.downloadSelected': 'Ladda ner',
-  'gallery.downloading': { one: 'Laddar ner 1 foto…', other: 'Laddar ner {count} foton…' },
+  'gallery.downloading':
+    'Startade nedladdningsbegäranden: {count}. Kontrollera webbläsarens nedladdningar.',
+  'gallery.downloadCapped': 'Foton utanför den här omgången: {count}.',
   'gallery.newAlbum': 'Nytt album',
   'gallery.newAlbumTitle': 'Nytt album',
   'gallery.newAlbumPrompt': {

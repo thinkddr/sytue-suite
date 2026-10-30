@@ -51,6 +51,9 @@ func (s *Servicio) ProcesarWebhookMollie(ctx context.Context, idOrRef string) er
 	if ref == "" {
 		ref = idOrRef
 	}
+	if pago.ProviderRef == "" && strings.HasPrefix(ref, "tr_") {
+		pago.ProviderRef = ref
+	}
 
 	estado, err := pasarela.ConsultarPago(ctx, ref)
 	if err != nil {
@@ -137,6 +140,9 @@ func (s *Servicio) ProcesarWebhookRedsys(ctx context.Context, merchantParams, si
 	if err := s.verificarPago(pago, gw, estado); err != nil {
 		return err
 	}
+	if dsOrder, ok := datos["Ds_Order"].(string); ok && strings.TrimSpace(dsOrder) != "" {
+		pago.ProviderRef = strings.TrimSpace(dsOrder)
+	}
 
 	eventID := fmt.Sprintf("redsys-%s-%s", signature, estado.Estado)
 	_, _ = s.store.RegistrarEventoPago(ctx, tenant, gw.ID, "redsys", eventID, estado.Estado, &pago.ID)
@@ -190,6 +196,26 @@ func (e eventoStripe) estado(comercio string) pagos.Estado {
 	}
 }
 
+func (s *Servicio) resolverPagoStripe(ctx context.Context, sessionID, pagoIDStr string) (*domain.Payment, *domain.Gateway, string, error) {
+	var pago *domain.Payment
+	var gw *domain.Gateway
+	var tenant string
+	var err error
+
+	if sessionID != "" {
+		pago, gw, tenant, err = s.store.ResolverPagoPorReferencia(ctx, "stripe", sessionID)
+	}
+	if (err != nil || pago == nil) && pagoIDStr != "" {
+		if uid, parseErr := uuid.Parse(pagoIDStr); parseErr == nil {
+			pago, gw, tenant, err = s.store.ResolverPagoPorID(ctx, uid)
+		}
+	}
+	if err != nil || pago == nil || gw == nil {
+		return nil, nil, "", fmt.Errorf("tienda: resolver pago stripe: %w", err)
+	}
+	return pago, gw, tenant, nil
+}
+
 // ProcesarWebhookStripe procesa una notificación webhook firmada de Stripe (§10.5).
 func (s *Servicio) ProcesarWebhookStripe(ctx context.Context, rawBody []byte, sigHeader string) error {
 	if len(rawBody) == 0 || sigHeader == "" {
@@ -204,21 +230,9 @@ func (s *Servicio) ProcesarWebhookStripe(ctx context.Context, rawBody []byte, si
 	sessionID := payload.Data.Object.ID
 	pagoIDStr := payload.Data.Object.Metadata[pagos.MetadatoPago]
 
-	var pago *domain.Payment
-	var gw *domain.Gateway
-	var tenant string
-	var err error
-
-	if sessionID != "" {
-		pago, gw, tenant, err = s.store.ResolverPagoPorReferencia(ctx, "stripe", sessionID)
-	}
-	if err != nil && pagoIDStr != "" {
-		if uid, parseErr := uuid.Parse(pagoIDStr); parseErr == nil {
-			pago, gw, tenant, err = s.store.ResolverPagoPorID(ctx, uid)
-		}
-	}
-	if err != nil || pago == nil || gw == nil {
-		return fmt.Errorf("tienda: resolver pago stripe: %w", err)
+	pago, gw, tenant, err := s.resolverPagoStripe(ctx, sessionID, pagoIDStr)
+	if err != nil {
+		return err
 	}
 
 	// Obtener secreto de webhook para verificar firma
@@ -239,6 +253,9 @@ func (s *Servicio) ProcesarWebhookStripe(ctx context.Context, rawBody []byte, si
 	if payload.deSesion() {
 		if err := s.verificarPago(pago, gw, payload.estado(comercioDe("stripe", creds))); err != nil {
 			return err
+		}
+		if sessionID != "" {
+			pago.ProviderRef = sessionID
 		}
 	}
 
@@ -300,11 +317,25 @@ func (s *Servicio) ProcesarWebhookAdyen(ctx context.Context, notif adyen.Notific
 	eventID := fmt.Sprintf("adyen-%s-%s", notif.PSPReference, notif.EventCode)
 	_, _ = s.store.RegistrarEventoPago(ctx, tenant, gw.ID, "adyen", eventID, notif.EventCode, &pago.ID)
 
-	if estado.Estado == pagos.EstadoPagado {
-		return s.tratarPagoCompletado(ctx, tenant, pago, gw, estado.Importe)
+	// Solo AUTHORISATION confirma o rechaza el cobro y sustituye el id de sesión
+	// inicial (CS...) por el PSPReference del pago, que es el que Adyen exige en
+	// /payments/{paymentPspReference}/refunds. Un evento REFUND nunca debe dar por
+	// pagado un pedido pendiente ni pisar el PSPReference del cobro original.
+	switch notif.EventCode {
+	case "AUTHORISATION":
+		pago.ProviderRef = notif.PSPReference
+		if estado.Estado == pagos.EstadoPagado {
+			return s.tratarPagoCompletado(ctx, tenant, pago, gw, estado.Importe)
+		}
+		return s.store.ActualizarEstadoPago(ctx, tenant, pago.ID, notif.PSPReference, domain.PaymentStatusFailed)
+	case "CANCELLATION", "CANCEL_OR_REFUND":
+		if estado.Estado == pagos.EstadoCancelado {
+			return s.store.ActualizarEstadoPago(ctx, tenant, pago.ID, notif.PSPReference, domain.PaymentStatusCanceled)
+		}
+		return nil
+	default:
+		return nil
 	}
-
-	return s.store.ActualizarEstadoPago(ctx, tenant, pago.ID, notif.PSPReference, domain.PaymentStatusFailed)
 }
 
 // verificarSiActua es verificarPago para los estados que cambian algo (pagado, fallido,

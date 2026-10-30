@@ -5,6 +5,7 @@ package domain
 
 import (
 	"bytes"
+	"cmp"
 	"encoding/base64"
 	"encoding/xml"
 	"math"
@@ -360,10 +361,12 @@ func (d *odfDec) readODPFrame(se xml.StartElement, files map[string][]byte) (sli
 		X: odpPct(attrLocal(se, "x"), d.paginaW), Y: odpPct(attrLocal(se, "y"), d.paginaH),
 		W: odpPct(attrLocal(se, "width"), d.paginaW), H: odpPct(attrLocal(se, "height"), d.paginaH),
 	}
+	frameName := cmp.Or(attrLocal(se, "name"), attrLocal(se, "id"))
 	ok := false
 	var directBlocks []xblock
 	var plug odpPlugin
-	var imgHref string
+	var imgHref, chartHTML, oleHref string
+	hayOle := false
 	img := ""
 fin:
 	for {
@@ -387,6 +390,11 @@ fin:
 				_ = d.dec.Skip()
 			case "plugin":
 				plug = d.readODPPlugin(t)
+			case "object":
+				d.leerObjetoODP(t, files, &chartHTML, &hayOle, &oleHref)
+			case "object-ole":
+				hayOle, oleHref = true, attrLocal(t, "href")
+				_ = d.dec.Skip()
 			default:
 				_ = d.dec.Skip()
 			}
@@ -396,15 +404,36 @@ fin:
 			}
 		}
 	}
-	if m, isMedia := odpMediaBox(b, plug, imgHref, img, files); isMedia {
+	return cerrarMarcoODP(b, ok, chartHTML, imgHref, img, plug, directBlocks, hayOle, frameName, oleHref, files)
+}
+
+func (d *odfDec) leerObjetoODP(se xml.StartElement, files map[string][]byte, chartHTML *string, hayOle *bool, oleHref *string) {
+	href := attrLocal(se, "href")
+	var obj xnode
+	_ = d.dec.DecodeElement(&obj, &se)
+	if ch := tablaDeGraficoODF(href, &obj, files); ch != "" {
+		*chartHTML = ch
+	} else {
+		*hayOle, *oleHref = true, href
+	}
+}
+
+func cerrarMarcoODP(b slideBox, ok bool, chartHTML, imgHref, img string, plug odpPlugin, directBlocks []xblock, hayOle bool, frameName, oleHref string, files map[string][]byte) (slideBox, bool) {
+	if chartHTML != "" {
+		b.Kind, b.HTML, ok = "text", chartHTML, true
+	} else if m, isMedia := odpMediaBox(b, plug, imgHref, img, files); isMedia {
 		b, ok = m, true
-	} else if img != "" {
-		b.Kind, b.Src = "image", img
-		ok = true
-	} else if !ok && len(directBlocks) > 0 {
-		b.Kind = "text"
-		b.HTML = blocksToHTML(directBlocks)
-		ok = true
+	} else {
+		switch {
+		case img != "":
+			b.Kind, b.Src, ok = "image", img, true
+		case !ok && len(directBlocks) > 0:
+			b.Kind, b.HTML, ok = "text", blocksToHTML(directBlocks), true
+		case !ok && hayOle:
+			if et := cmp.Or(frameName, strings.TrimPrefix(oleHref, "./")); et != "" {
+				b.Kind, b.HTML, ok = "text", paraToHTML(xpara{runs: []xrun{{text: et}}}), true
+			}
+		}
 	}
 	if b.W <= 0 {
 		b.W = 30
@@ -413,6 +442,112 @@ fin:
 		b.H = 10
 	}
 	return b, ok
+}
+
+func textoPlanoXNode(n *xnode) string {
+	if n == nil {
+		return ""
+	}
+	var partes []string
+	var rec func(*xnode)
+	rec = func(x *xnode) {
+		if s := strings.TrimSpace(x.Text); s != "" {
+			partes = append(partes, s)
+		}
+		for i := range x.Kids {
+			rec(&x.Kids[i])
+		}
+	}
+	rec(n)
+	return strings.Join(partes, " ")
+}
+
+func buscarChartODF(x *xnode) *xnode {
+	if x == nil {
+		return nil
+	}
+	if x.XMLName.Local == "chart" && (x.kid("table") != nil || x.kid("plot-area") != nil || x.kid("title") != nil) {
+		return x
+	}
+	for i := range x.Kids {
+		if ch := buscarChartODF(&x.Kids[i]); ch != nil {
+			return ch
+		}
+	}
+	return nil
+}
+
+func filasTablaODF(x *xnode) [][]string {
+	if x == nil {
+		return nil
+	}
+	var filas [][]string
+	for i := range x.Kids {
+		k := &x.Kids[i]
+		switch k.XMLName.Local {
+		case "table-header-rows", "table-rows":
+			filas = append(filas, filasTablaODF(k)...)
+		case "table-row":
+			var fila []string
+			for j := range k.Kids {
+				if k.Kids[j].XMLName.Local == "table-cell" {
+					fila = append(fila, textoPlanoXNode(&k.Kids[j]))
+				}
+			}
+			if len(fila) > 0 {
+				filas = append(filas, fila)
+			}
+		}
+	}
+	return filas
+}
+
+func tablaDeGraficoODF(href string, inline *xnode, files map[string][]byte) string {
+	root := inline
+	if href != "" {
+		base := strings.Trim(strings.TrimPrefix(strings.TrimPrefix(href, "./"), "../"), "/")
+		raw := files[base+"/content.xml"]
+		if len(raw) == 0 {
+			raw = files[base]
+		}
+		var parsed xnode
+		if len(raw) > 0 && xml.Unmarshal(raw, &parsed) == nil {
+			root = &parsed
+		}
+	}
+	ch := buscarChartODF(root)
+	if ch == nil {
+		return ""
+	}
+	titulo := textoPlanoXNode(ch.kid("title"))
+	filas := filasTablaODF(ch.kid("table"))
+	if len(filas) == 0 {
+		if titulo == "" {
+			return ""
+		}
+		return paraToHTML(xpara{runs: []xrun{{text: titulo}}})
+	}
+	if titulo != "" {
+		if filas[0][0] == "" {
+			filas[0][0] = titulo
+		} else {
+			cab := make([]string, len(filas[0]))
+			cab[0] = titulo
+			filas = append([][]string{cab}, filas...)
+		}
+	}
+	nc := 0
+	for _, f := range filas {
+		nc = max(nc, len(f))
+	}
+	xt := &xtable{cols: nc, rows: make([][]xcell, len(filas))}
+	for r, f := range filas {
+		xt.rows[r] = make([]xcell, nc)
+		for c, s := range f {
+			xt.rows[r][c].paras = []xpara{{runs: []xrun{{text: s}}}}
+		}
+	}
+	return blocksToHTML([]xblock{{table: xt}})
 }
 
 // odpShapeOf es la forma del editor de una geometría de ODF (`draw:type` de su

@@ -1808,6 +1808,8 @@ export const de: AppCatalog<typeof en> = {
   'extdata.msg.generic': 'Der Vorgang konnte nicht abgeschlossen werden.',
   'extdata.msg.notAllowed':
     'Nur die Personen auf der Liste dieser Verbindung können sie abfragen. Bitten Sie die Administration Ihrer Organisation, Sie hinzuzufügen.',
+  'extdata.msg.ownerOnly':
+    'Nur wer diese Verbindung erstellt hat oder die Administration der Organisation kann sie ändern oder löschen.',
 
   // --- Avisos del editor de hojas ---
   'sheet.msg.badValue': 'Unzulässiger Wert',

@@ -111,12 +111,25 @@ func (c *Client) authorize(req *http.Request) (*http.Request, string, error) {
 			err = &Error{Status: http.StatusUnauthorized, URL: req.URL.String(), causa: err}
 		}
 	} else {
+		if auth.RequestAuthorizationIntent(ctx) != nil {
+			return nil, "", auth.ErrAuthorizationChanged
+		}
 		token, err = c.token(ctx, req.URL.String())
 	}
 	if err == nil {
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
 	return req, token, err
+}
+
+func validateAuthorizationIntent(req *http.Request) error {
+	if intent := auth.RequestAuthorizationIntent(req.Context()); intent != nil {
+		scope := auth.RequestAuthorizationScope(req.Context())
+		if !intent.Allows(scope, req.Header.Get("Authorization")) {
+			return auth.ErrAuthorizationChanged
+		}
+	}
+	return nil
 }
 
 func (e *Error) Error() string {
@@ -240,8 +253,14 @@ func (c *Client) una(ctx context.Context, r Request) (*http.Response, string, er
 		req.Header[k] = v
 	}
 	var token string
+	if !r.Anonymous && c.session == nil && auth.RequestAuthorizationIntent(ctx) != nil {
+		return nil, "", auth.ErrAuthorizationChanged
+	}
 	if !r.Anonymous && c.session != nil {
 		if req, token, err = c.authorize(req); err != nil {
+			return nil, "", err
+		}
+		if err := validateAuthorizationIntent(req); err != nil {
 			return nil, "", err
 		}
 	}
@@ -261,10 +280,16 @@ func (c *Client) Stream(ctx context.Context, metodo, path string, query url.Valu
 	for k, v := range cabeceras {
 		req.Header[k] = v
 	}
+	if c.session == nil && auth.RequestAuthorizationIntent(ctx) != nil {
+		return nil, auth.ErrAuthorizationChanged
+	}
 	if c.session != nil {
 		var err error
 		req, _, err = c.authorize(req)
 		if err != nil {
+			return nil, err
+		}
+		if err := validateAuthorizationIntent(req); err != nil {
 			return nil, err
 		}
 	}

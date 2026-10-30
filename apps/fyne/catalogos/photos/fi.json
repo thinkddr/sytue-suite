@@ -104,6 +104,7 @@
   "gallery.describeStop": "Pysäytä",
   "gallery.described": "{count} kuvaa kuvailtu",
   "gallery.describing": "Kuvaillaan {done}/{total}…",
+  "gallery.downloadCapped": "Tämän erän ulkopuolelle jääviä kuvia: {count}.",
   "gallery.downloadSelected": "Lataa",
   "gallery.downloading": {
     "one": "Ladataan 1 kuvaa…",

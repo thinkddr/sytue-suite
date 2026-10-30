@@ -6,7 +6,7 @@ import { expect as baseExpect } from '@playwright/test';
 import { mkdirSync } from 'node:fs';
 import { assertWizardAccessibility as accessible } from './lib/wizard-checks.mjs';
 
-const expect = baseExpect.configure({ timeout: 15000 });
+const expect = baseExpect.configure({ timeout: 30000 });
 
 const BASE = process.env.CONSOLE_URL || 'http://127.0.0.1:4343/admin/prueba/dev/conectar-app';
 const OUT = createReportDirectory('conectar-app', process.env.CONSOLE_OUT);

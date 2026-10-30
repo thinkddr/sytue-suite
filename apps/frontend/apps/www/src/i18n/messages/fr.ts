@@ -480,7 +480,8 @@ export const fr: AppCatalog<typeof en> = {
     'Lecture adaptative en trois qualités, le navigateur choisissant la meilleure.',
   'product.cast.f3':
     'Direct depuis un logiciel de diffusion via RTMP, avec une clé de flux par personne.',
-  'product.cast.f4': 'Direct depuis le navigateur ou l’application : caméra, écran et micro.',
+  'product.cast.f4':
+    'Direct depuis le navigateur ou l’application : caméra et micro. Partage d’écran dans les navigateurs, systèmes de bureau et Android compatibles ; indisponible dans l’app iOS/iPadOS.',
   'product.cast.f5':
     'Les enregistrements des directs deviennent automatiquement des vidéos à la demande.',
   'product.cast.f6': 'Une page d’accueil publique et une chaîne par organisation, indexables.',

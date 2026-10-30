@@ -741,6 +741,7 @@
   "extdata.msg.noEncryption": "Tunnistetietojen salausta ei ole määritetty palvelimelle.",
   "extdata.msg.notAllowed": "Tätä yhteyttä voivat kysellä vain sen listalla olevat henkilöt. Pyydä organisaatiosi ylläpitoa lisäämään sinut.",
   "extdata.msg.notFound": "Yhteyttä tai kyselyä ei ole enää olemassa.",
+  "extdata.msg.ownerOnly": "Vain tämän yhteyden luoja tai organisaation ylläpitäjä voi muuttaa tai poistaa sen.",
   "extdata.msg.rate": "Liian monta suoritusta peräkkäin. Odota muutama sekunti ja yritä uudelleen.",
   "extdata.msg.timeout": "Ulkoisen tietolähteen vastaus kesti liian kauan.",
   "extdata.msg.unauth": "Istuntosi on vanhentunut. Kirjaudu uudelleen.",

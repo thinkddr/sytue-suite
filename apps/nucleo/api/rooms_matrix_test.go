@@ -27,6 +27,9 @@ func TestMatrixNativeHandoffUsesPKCEAndMatchingState(t *testing.T) {
 		_ = json.NewDecoder(r.Body).Decode(&body)
 		switch r.URL.Path {
 		case "/api/v1/matrix/native/start":
+			if _, extra := body["product"]; extra {
+				t.Error("Rooms login lost compatibility with the existing broker")
+			}
 			challenge = body["code_challenge"]
 			if len(challenge) != 43 || body["code_challenge_method"] != "S256" || body["code_verifier"] != "" {
 				t.Error("PKCE verifier exposed at start")
@@ -88,5 +91,49 @@ func TestMatrixNativeReturnRejectsCredentialsAndForeignRoutes(t *testing.T) {
 		if _, ok := ParseMatrixNativeCallback(u); ok {
 			t.Fatal("accepted credential-bearing or unrelated Matrix return")
 		}
+	}
+}
+
+func TestMatrixStorageNativeProductsBindAppBeforeBrowserConsent(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var input map[string]string
+		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+			t.Error(err)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]string{"product": input["product"], "state": "bound-state", "authorize_url": "https://rooms.sytue.eu/rooms/matrix/native/start?state=bound-state"})
+	}))
+	defer server.Close()
+	client := NewRooms(server.URL, nil, server.Client())
+	for _, product := range []string{"hub", "mail", "drive", "docs", "sheets", "slides", "pdf", "calendar", "contacts", "notes", "photos", "rooms", "cast", "erp", "bases"} {
+		flow, err := client.MatrixNativeStartFor(t.Context(), product)
+		if err != nil || !flow.ForProduct("sytue.eu", product) || flow.ForProduct("sytue.eu", "unregistered") {
+			t.Fatal("unbound native app", product, err)
+		}
+		native := product
+		if native == "hub" {
+			native = "one"
+		}
+		if flow.ReturnScheme() != Esquema(native) {
+			t.Fatal("wrong native catalog scheme", product)
+		}
+		u, _ := url.Parse(Esquema(native) + "://matrix/callback?state=bound-state&ticket=opaque-ticket")
+		callback, ok := ParseMatrixNativeCallbackFor(u, product)
+		if !ok || !flow.Accepts(callback) {
+			t.Fatal("own app return rejected", product)
+		}
+		other := "drive"
+		if product == other {
+			other = "mail"
+		}
+		if _, ok := ParseMatrixNativeCallbackFor(u, other); ok {
+			t.Fatal("callback crossed app boundary", product)
+		}
+		callback.product = other
+		if flow.Accepts(callback) {
+			t.Fatal("same state accepted for another app", product)
+		}
+	}
+	if _, err := client.MatrixNativeStartFor(t.Context(), "https://attacker.invalid"); !errors.Is(err, ErrMatrixSSO) {
+		t.Fatal("arbitrary app destination accepted", err)
 	}
 }

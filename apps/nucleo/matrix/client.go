@@ -17,6 +17,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -33,6 +34,7 @@ import (
 
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/auth"
+	"git.sytue.eu/sytue/one/apps/nucleo/storage"
 )
 
 var (
@@ -120,6 +122,7 @@ type Client struct {
 	verify       *verificationhelper.VerificationHelper
 	master       []byte
 	mu           sync.Mutex
+	callKeys     map[*CallKeys]struct{}
 	backupMu     sync.Mutex
 	stateMu      sync.RWMutex
 	done         chan struct{}
@@ -142,12 +145,24 @@ func newClient(cfg Config) (*Client, error) {
 		cfg.Bootstrap.Encryption != string(id.AlgorithmMegolmV1) {
 		return nil, ErrIdentity
 	}
-	return newAccountClient(cfg, u, "")
+	namespace := ""
+	if cfg.Bootstrap.StorageProduct != "" {
+		if !storage.Product(cfg.Bootstrap.StorageProduct) || !validStorageBindings(cfg.Bootstrap) {
+			return nil, ErrIdentity
+		}
+		namespace = "storage:" + cfg.Bootstrap.StorageProduct
+	} else if cfg.Bootstrap.StorageRoomID != "" || len(cfg.Bootstrap.StorageRoomIDs) != 0 {
+		return nil, ErrIdentity
+	}
+	return newAccountClient(cfg, u, namespace)
 }
 
 // newAccountClient only constructs the shared local account/HTTP engine. Each
 // public constructor validates its own identity and authorization policy first.
 func newAccountClient(cfg Config, u *url.URL, namespace string) (*Client, error) {
+	cfg.Bootstrap.Channels = slices.Clone(cfg.Bootstrap.Channels)
+	cfg.Bootstrap.DraftRoomIDs = slices.Clone(cfg.Bootstrap.DraftRoomIDs)
+	cfg.Bootstrap.StorageRoomIDs = slices.Clone(cfg.Bootstrap.StorageRoomIDs)
 	cfg.Bootstrap.HomeserverURL = strings.TrimRight(u.String(), "/")
 	if cfg.Secrets == nil {
 		cfg.Secrets = systemSecrets{}
@@ -291,7 +306,7 @@ func (c *Client) initialize(ctx context.Context, create bool) error {
 	}
 	c.cli.Crypto = helper
 	machine := helper.Machine()
-	machine.CryptoStore = controllerStore{Store: machine.CryptoStore, controller: id.UserID(c.cfg.Bootstrap.ControllerUserID)}
+	machine.CryptoStore = c.devicePolicy(machine.CryptoStore)
 	machine.AllowKeyShare = func(context.Context, *id.Device, event.RequestedKeyInfo) *mxcrypto.KeyShareRejection {
 		return &mxcrypto.KeyShareRejectNoResponse
 	}
@@ -333,6 +348,20 @@ type deliveryResult struct {
 
 func (c *Client) deliver(value DecryptedEvent, err error) {
 	if c.closed.Load() {
+		return
+	}
+	// Olm controls have no channel ID. Consume them before the UI's timeline
+	// routing, including while a call is waiting for its first media key.
+	if err == nil && isControl(value.Type) {
+		c.mu.Lock()
+		keys := make([]*CallKeys, 0, len(c.callKeys))
+		for key := range c.callKeys {
+			keys = append(keys, key)
+		}
+		c.mu.Unlock()
+		for _, key := range keys {
+			key.Receive(value)
+		}
 		return
 	}
 	c.mu.Lock()
@@ -484,9 +513,6 @@ func (c *Client) sendEvent(ctx context.Context, roomID string, kind event.Type, 
 }
 
 func (c *Client) sendEventWithTxn(ctx context.Context, roomID string, kind event.Type, content any, transaction string) (EventRef, error) {
-	if !c.ready.Load() {
-		return EventRef{}, ErrNotReady
-	}
 	c.stateMu.RLock()
 	defer c.stateMu.RUnlock()
 	if err := c.requireEncrypted(ctx, roomID); err != nil {
@@ -517,6 +543,9 @@ func (c *Client) allowedRoom(roomID string) bool {
 	if roomID == "" {
 		return false
 	}
+	if c.cfg.Bootstrap.StorageProduct != "" {
+		return roomID == c.cfg.Bootstrap.StorageRoomID || slices.Contains(c.cfg.Bootstrap.StorageRoomIDs, roomID)
+	}
 	if c.cfg.Bootstrap.DraftRoomID == roomID {
 		return true
 	}
@@ -541,9 +570,11 @@ type guardedSyncer struct {
 }
 
 func (s *guardedSyncer) ProcessResponse(ctx context.Context, response *mautrix.RespSync, since string) error {
-	s.owner.ready.Store(false)
 	s.owner.stateMu.Lock()
 	defer s.owner.stateMu.Unlock()
+	// Existing readers finish against their locked state; new readers wait for
+	// the membership/key update instead of observing a spurious disconnection.
+	s.owner.ready.Store(false)
 	err := s.DefaultSyncer.ProcessResponse(ctx, s.owner.routeDeviceControls(ctx, response, since), since)
 	if err == nil && ctx.Err() == nil && !s.owner.closed.Load() {
 		s.owner.ready.Store(true)
@@ -565,7 +596,6 @@ func (s *guardedSyncer) OnFailedSync(response *mautrix.RespSync, err error) (tim
 // identity. The maintained machine separately excludes unsigned devices, and the
 // fixed controller is never a recipient, regardless of future signing state.
 func (c *Client) checkRoomIdentities(ctx context.Context, roomID id.RoomID) error {
-	machine := c.crypto.Machine()
 	members, err := c.cli.StateStore.GetRoomJoinedOrInvitedMembers(ctx, roomID)
 	if err != nil {
 		return err
@@ -574,6 +604,12 @@ func (c *Client) checkRoomIdentities(ctx context.Context, roomID id.RoomID) erro
 		if userID == c.cli.UserID || userID == id.UserID(c.cfg.Bootstrap.ControllerUserID) {
 			continue
 		}
+		// Private application data/drafts must never be shared with another human,
+		// even one already cross-signed and trusted for ordinary Rooms channels.
+		if c.privateRoom(roomID.String()) {
+			return ErrIdentity
+		}
+		machine := c.crypto.Machine()
 		keys, err := machine.CryptoStore.GetCrossSigningKeys(ctx, userID)
 		if err != nil {
 			return err

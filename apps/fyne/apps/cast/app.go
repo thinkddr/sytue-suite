@@ -159,6 +159,8 @@ type App struct {
 	pip, pendiente *ventanaPiP
 	esperaBusqueda *time.Timer
 	pararReloj     chan struct{}
+	pararSondeo    chan struct{}
+	sinSondeo      bool
 	fuente         Fuente
 	sala           Sala
 	// emiSala es la sala en la que se EMITE desde aquí; sobrevive a cambiar de pantalla.
@@ -434,12 +436,21 @@ func (a *App) Arrancar() {
 
 func (a *App) dentro() bool { return a.ConSesion != nil && a.ConSesion() }
 
+// nuevaPantalla invalida lo que seguía en vuelo o sondeando de la pantalla anterior.
+func (a *App) nuevaPantalla() {
+	a.gen++
+	if a.pararSondeo != nil {
+		close(a.pararSondeo)
+		a.pararSondeo = nil
+	}
+}
+
 // Ir cambia a una de las pantallas sin parámetro.
 func (a *App) Ir(r Ruta) {
 	a.apuntar(lugar{ruta: r})
 	a.salirDeVer()
 	a.ruta = r
-	a.gen++
+	a.nuevaPantalla()
 	a.scroll.Offset = fyne.NewPos(0, 0)
 	switch r {
 	case RutaInicio:
@@ -692,13 +703,30 @@ func (a *App) hayVivoEnInicio() bool {
 // sondear repite `f` cada `cada` mientras se siga en la misma pantalla y `hace`
 // diga que hace falta (useSondeo de la web).
 func (a *App) sondear(cada time.Duration, hace func() bool, f func()) {
-	gen := a.gen
+	if a.sinSondeo {
+		return
+	}
+	if a.pararSondeo == nil {
+		a.pararSondeo = make(chan struct{})
+	}
+	gen, parar := a.gen, a.pararSondeo
 	go func() {
 		t := time.NewTicker(cada)
 		defer t.Stop()
-		for range t.C {
+		for {
+			select {
+			case <-parar:
+				return
+			case <-t.C:
+			}
 			seguir := make(chan bool, 1)
 			a.enLaInterfaz(func() {
+				select {
+				case <-parar:
+					seguir <- false
+					return
+				default:
+				}
 				if gen != a.gen {
 					seguir <- false
 					return
@@ -708,8 +736,13 @@ func (a *App) sondear(cada time.Duration, hace func() bool, f func()) {
 				}
 				seguir <- true
 			})
-			if !<-seguir {
+			select {
+			case <-parar:
 				return
+			case ok := <-seguir:
+				if !ok {
+					return
+				}
 			}
 		}
 	}()
@@ -797,7 +830,7 @@ func (a *App) AbrirCanal(org string) {
 	a.apuntar(lugar{ruta: RutaCanal, param: org})
 	a.salirDeVer()
 	a.ruta = RutaCanal
-	a.gen++
+	a.nuevaPantalla()
 	a.scroll.Offset = fyne.NewPos(0, 0)
 	a.can = estadoCanal{org: org}
 	a.pedirCanal(false)

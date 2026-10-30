@@ -10,7 +10,9 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/minio/minio-go/v7"
 
@@ -121,5 +123,27 @@ func TestCodificacionDeAdmiteLasFormasDelProveedor(t *testing.T) {
 	}
 	if got := codificacionDe(map[string]string{"Original-Name": "x"}); got != "" {
 		t.Errorf("sin metadato debería ser vacío, got %q", got)
+	}
+}
+
+func TestPresignPutConTamanoFirmaContentLength(t *testing.T) {
+	c, err := New(Config{
+		Endpoint:  "s3.fr-par.scw.cloud",
+		Region:    "fr-par",
+		AccessKey: "ak",
+		SecretKey: "sk",
+		UseSSL:    true,
+		Bucket:    "drive-blobs",
+	})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	u, err := c.PresignPutConTamano(t.Context(), tenancy.Tenant{Slug: "acme"}, "files/root/obj1", 1024, 15*time.Minute)
+	if err != nil {
+		t.Fatalf("PresignPutConTamano: %v", err)
+	}
+	signed := u.Query().Get("X-Amz-SignedHeaders")
+	if !strings.Contains(signed, "content-length") {
+		t.Fatalf("X-Amz-SignedHeaders=%q debe incluir content-length", signed)
 	}
 }

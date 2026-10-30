@@ -276,6 +276,7 @@
     "few": "{count} bilješke",
     "other": "{count} bilježaka"
   },
+  "notebook.ownerOnly": "Ovu bilježnicu može premjestiti, promijeniti tko je vidi ili je šifrirati samo osoba koja ju je stvorila ili administracija organizacije.",
   "notebook.rename": "Preimenuj",
   "notebook.settings": "Postavke bilježnice",
   "notebook.title": "Naziv",

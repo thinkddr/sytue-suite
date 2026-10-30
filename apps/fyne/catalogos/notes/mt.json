@@ -275,6 +275,7 @@
     "many": "{count}-il nota",
     "other": "{count} nota"
   },
+  "notebook.ownerOnly": "Min ħoloq dan il-ktieb tan-noti jew l-amministrazzjoni tal-organizzazzjoni biss jistgħu jmexxuh, jibdlu min jarah jew jikkriptawh.",
   "notebook.rename": "Ibdel l-isem",
   "notebook.settings": "Issettjar tal-ktieb tan-noti",
   "notebook.title": "Isem",

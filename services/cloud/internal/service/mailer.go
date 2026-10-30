@@ -150,7 +150,7 @@ func mailMessage(from, to, subject, body string) (alertMailMessage, error) {
 	b.WriteString("Content-Transfer-Encoding: base64\r\n")
 	b.WriteString("\r\n")
 	encoded := base64.StdEncoding.EncodeToString([]byte(body))
-	for len(encoded) > 0 {
+	for encoded != "" {
 		n := min(76, len(encoded))
 		b.WriteString(encoded[:n])
 		b.WriteString("\r\n")

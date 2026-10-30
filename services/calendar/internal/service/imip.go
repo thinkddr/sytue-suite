@@ -162,9 +162,10 @@ func asuntoIMIP(ev domain.Event, metodo domain.SchedulingMethod) (asunto, cuerpo
 }
 
 // maxCorreosAFueraPorHora es cuántos correos de invitación a direcciones de fuera manda
-// una persona en una hora. Salen del remitente de avisos de la plataforma, que comparten
-// Drive, Notepads y la recuperación de cuentas: sin tope, una cuenta cualquiera lo usaba
-// para escribir a quien quisiera con el asunto que quisiera (COM-07).
+// una persona en una hora (tope de 100/h fijado por el dueño el 2026-10-21). Salen del
+// remitente de avisos de la plataforma, que comparten Drive, Notepads y la recuperación
+// de cuentas: sin tope, una cuenta cualquiera lo usaba para escribir a quien quisiera
+// con el asunto que quisiera (COM-07).
 const maxCorreosAFueraPorHora = 100
 
 // cupoHora reparte ese tope por persona, en horas de reloj.

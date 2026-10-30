@@ -288,3 +288,49 @@ func TestPorDebajoDe768LaCabeceraVaEnDosFilas(t *testing.T) {
 	cab.Resize(fyne.NewSize(1280-tema.AnchoLateral, cab.MinSize().Height))
 	casi(t, "el alto de la cabecera en ancho", cab.MinSize().Height, AltoCabeceraVista)
 }
+
+// Marco deja 272 px de hoja en un teléfono de 320; con 16 px de borde seguro
+// quedan 256. La rejilla no puede consumir todo el campo con su icono y relleno.
+func TestLaRotacionDelBuscadorDeDriveConCarrilYAreaSeguraConservaLaConsulta(t *testing.T) {
+	defer ui.TactilDePrueba(true)()
+	forma := "carril"
+	if tema.EsMarco() {
+		forma = "marco"
+	}
+	t.Cleanup(func() { tema.ElegirForma(forma) })
+	tema.ElegirForma("marco")
+	e := NuevoExplorador(traductor(t))
+	e.Ventana = 320
+	nuevos, subidas := 0, 0
+	e.AlNuevo = func(fyne.CanvasObject) { nuevos++ }
+	e.AlSubir = func() { subidas++ }
+	vista := e.Objeto(tema.Claro).(*fyne.Container)
+	cab := vista.Objects[0].(*fyne.Container)
+	lay := cab.Layout.(*CabeceraVista)
+	arm := ui.NuevoArmazon(vista)
+	arm.Menu = ui.NuevoLateral("Drive", nil)
+	w := test.NewTempWindow(t, arm)
+	w.SetPadded(false)
+	e.buscador.PonerTexto("acta")
+	for _, ancho := range []float32{320, 304, 360, 320, 304} {
+		w.Resize(fyne.NewSize(ancho, 700))
+		buscador := e.buscador
+		minimo := ui.MedidaEntrada(ui.CampoCromo, 0, true).Width
+		if buscador.Size().Width < minimo || buscador.Texto() != "acta" {
+			t.Fatalf("ventana útil %g: buscador=%v, consulta=%q", ancho, buscador.Size(), buscador.Texto())
+		}
+		if ancho <= 320 && buscador.Position().Y+buscador.Size().Height > lay.Acciones[1].Position().Y {
+			t.Fatal("Nuevo invade el buscador cuando este necesita una fila completa")
+		}
+		for _, o := range lay.Acciones[1:] {
+			pos, tam := o.Position(), o.Size()
+			if pos.X < 0 || pos.Y < 0 || pos.X+tam.Width > cab.Size().Width || pos.Y+tam.Height > cab.Size().Height {
+				t.Fatalf("un mando queda fuera de la cabecera: %v/%v en %v", pos, tam, cab.Size())
+			}
+			test.Tap(o.(fyne.Tappable))
+		}
+	}
+	if nuevos != 5 || subidas != 5 {
+		t.Fatal("Nuevo o Subir dejó de responder tras cambiar el área útil")
+	}
+}

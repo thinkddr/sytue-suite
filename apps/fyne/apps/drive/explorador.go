@@ -117,6 +117,12 @@ type Explorador struct {
 	deLista      []Elemento
 	franjaScroll *container.Scroll
 	anchoFranja  float32
+	// listaFranja desplaza juntas las carpetas y la lista en una ventana baja.
+	// La lista conserva su propia virtualización y su instancia al repintar.
+	listaFranja *container.Scroll
+	// vista es la única raíz que puede colocar las piezas conservadas. Al
+	// repintar se retira antes de prestarlas a la vista nueva.
+	vista *fyne.Container
 	// rueda es la de la franja de progreso: la MISMA de un repintado a otro, que se
 	// repinta cuatro veces por segundo y una rueda nueva cada vez no llegaría a girar.
 	rueda *ui.Rueda
@@ -235,6 +241,13 @@ func (e *Explorador) AlgoMarcado() bool { return e.Marcados() > 0 && !e.TodoMarc
 // Objeto arma la pantalla entera: cabecera, barras y cuerpo, en una columna donde el
 // cuerpo es el que crece.
 func (e *Explorador) Objeto(v tema.Variante) fyne.CanvasObject {
+	if e.vista != nil {
+		// Un árbol retirado no puede recolocar el scroll, la lista o el buscador
+		// que ahora usa la vista nueva. Hay que retirar layout y descendientes.
+		e.vista.Layout = nil
+		e.vista.Objects = nil
+		e.vista = nil
+	}
 	e.marcados = e.Marcados()
 	cab := e.cabecera(v)
 	franjas := []fyne.CanvasObject{cab}
@@ -248,13 +261,11 @@ func (e *Explorador) Objeto(v tema.Variante) fyne.CanvasObject {
 		elastico++
 	}
 	franjas = append(franjas, e.cuerpo(v))
-	pila := container.New(Pila{Elastico: elastico}, franjas...)
-	if c, ok := cab.(*fyne.Container); ok {
-		if cv, ok := c.Layout.(*CabeceraVista); ok {
-			cv.AlCambiarAlto = pila.Refresh
-		}
-	}
-	return pila
+	// Pila mide AltoCon con el ancho actual antes de colocar la cabecera.
+	// No se encola su Refresh: un repintado retira esta pila pero conserva
+	// listaFranja, y una notificación antigua redimensionaría el scroll vivo.
+	e.vista = container.New(Pila{Elastico: elastico}, franjas...)
+	return e.vista
 }
 
 // ---- La cabecera ----
@@ -641,14 +652,20 @@ func (e *Explorador) lista(v tema.Variante) fyne.CanvasObject {
 		// El `widget.List` separa sus filas con el relleno del TEMA —7 px con el de la
 		// suite, y también con HideSeparators—: 35.000 px de desvío en 5.000 filas.
 		// Con esto van pegadas, que es lo que hace la web.
-		e.Refresco.Arriba = func() bool { return e.filas.GetScrollOffset() <= 0.5 }
 		e.filasObj = ui.RefrescarAlTirar(container.NewThemeOverride(e.filas, SinRelleno{}), &e.Refresco)
 		e.filasCasilla, e.filasLineas = conCasilla, lineas
 	} else {
 		e.filas.Refresh()
 	}
+	conFranja := len(carpetas) > 0 && ui.EsTactil()
+	e.Refresco.Arriba = func() bool {
+		return e.filas.GetScrollOffset() <= 0.5 && (!conFranja || e.listaFranja == nil || e.listaFranja.Offset.Y <= 0.5)
+	}
 	if e.arriba {
 		e.filas.ScrollToTop()
+		if e.listaFranja != nil {
+			e.listaFranja.ScrollToTop()
+		}
 		e.arriba = false
 	}
 
@@ -664,7 +681,36 @@ func (e *Explorador) lista(v tema.Variante) fyne.CanvasObject {
 		col.pie = e.pieCargando(v)
 		hijos = append(hijos, col.pie)
 	}
-	return container.New(col, hijos...)
+	return e.montarLista(col, hijos, lineas)
+}
+
+func (e *Explorador) montarLista(col *columnaLista, hijos []fyne.CanvasObject, lineas int) fyne.CanvasObject {
+	if col.franja == nil || !ui.EsTactil() {
+		return container.New(col, hijos...)
+	}
+	// Conserva el desplazable y su contenido entre repintados.
+	col.altoFilas = float32(min(len(e.deLista), 2)) * ui.AltoFilaDriveCon(lineas)
+	var contenido *fyne.Container
+	if e.listaFranja == nil {
+		contenido = container.New(col, hijos...)
+		e.listaFranja = container.NewVScroll(contenido)
+	} else {
+		var ok bool
+		contenido, ok = e.listaFranja.Content.(*fyne.Container)
+		if !ok || contenido == nil {
+			contenido = container.New(col, hijos...)
+			e.listaFranja.Content = contenido
+		}
+		contenido.Layout, contenido.Objects = col, hijos
+	}
+	viewport := &viewportListaCarpetas{
+		col: col, contenido: contenido, scroll: e.listaFranja,
+		normal: col.franja, natural: e.franjaScroll.Content,
+	}
+	viewport.preparar(e.listaFranja.Size())
+	refresco := e.Refresco
+	refresco.Arriba = func() bool { return e.listaFranja.Offset.Y <= 0.5 && e.filas.GetScrollOffset() <= 0.5 }
+	return ui.RefrescarAlTirar(container.New(viewport, e.listaFranja), &refresco)
 }
 
 // rellenarFila es el `UpdateItem` de la lista. Además de poner los datos, pide la
@@ -772,6 +818,9 @@ type columnaLista struct {
 	// ancho. Sin carpetas en la franja, nil.
 	franja     fyne.CanvasObject
 	altoFranja func(ancho float32) float32
+	compacta   bool
+	ancho      float32
+	altoFilas  float32
 }
 
 var _ fyne.Layout = (*columnaLista)(nil)
@@ -780,6 +829,13 @@ var _ fyne.Layout = (*columnaLista)(nil)
 const PieLista float32 = 6 * 0.25 * tema.Rem
 
 func (c *columnaLista) MinSize([]fyne.CanvasObject) fyne.Size {
+	if c.compacta {
+		alto := c.altoFranja(c.ancho) + ui.AltoCabeceraDrive + c.altoFilas + PieLista
+		if c.pie != nil {
+			alto += AltoPieCargando
+		}
+		return fyne.NewSize(0, alto)
+	}
 	return fyne.NewSize(0, ui.AltoCabeceraDrive)
 }
 
@@ -793,6 +849,9 @@ func (c *columnaLista) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 	arriba := float32(0)
 	if c.franja != nil {
 		arriba = min(c.altoFranja(t.Width), TopeFranja*t.Height)
+		if c.compacta {
+			arriba = c.altoFranja(t.Width)
+		}
 		c.franja.Move(fyne.NewPos(0, 0))
 		c.franja.Resize(fyne.NewSize(t.Width, arriba))
 	}
@@ -809,6 +868,39 @@ func (c *columnaLista) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 	}
 	c.filas.Move(fyne.NewPos(CanalonLista, arriba+ui.AltoCabeceraDrive))
 	c.filas.Resize(fyne.NewSize(ancho, max(abajo-arriba-ui.AltoCabeceraDrive-PieLista, 0)))
+}
+
+// viewportListaCarpetas conserva una tarjeta entera cuando el 45 % del cuerpo no
+// alcanza para su icono, nombre y subtítulo. En ese caso hay un solo desplazamiento
+// alrededor de las carpetas naturales y de dos filas virtualizadas: ningún Scroll
+// de la franja se queda el gesto vertical antes de poder llegar a los archivos.
+type viewportListaCarpetas struct {
+	col             *columnaLista
+	contenido       *fyne.Container
+	scroll          *container.Scroll
+	normal, natural fyne.CanvasObject
+}
+
+func (*viewportListaCarpetas) MinSize([]fyne.CanvasObject) fyne.Size {
+	return fyne.NewSize(0, ui.AltoCabeceraDrive)
+}
+
+func (v *viewportListaCarpetas) preparar(t fyne.Size) {
+	v.col.ancho = t.Width
+	v.col.compacta = TopeFranja*t.Height < RellenoFranja+AltoTeselaFranja+RellenoFranjaAbajo
+	v.col.franja = v.normal
+	if v.col.compacta {
+		v.col.franja = v.natural
+	}
+	v.contenido.Objects[3] = v.col.franja
+}
+
+func (v *viewportListaCarpetas) Layout(_ []fyne.CanvasObject, t fyne.Size) {
+	v.preparar(t)
+	v.contenido.Resize(fyne.NewSize(t.Width, max(t.Height, v.col.MinSize(nil).Height)))
+	v.scroll.Move(fyne.NewPos(0, 0))
+	v.scroll.Resize(t)
+	v.scroll.Refresh()
 }
 
 // ---- La franja de carpetas ----
@@ -835,7 +927,13 @@ func (e *Explorador) franja(carpetas []Elemento) (fyne.CanvasObject, func(ancho 
 		e.tarjetas = append(e.tarjetas, tarjetaPintada{el: el, objeto: o, t: t})
 		teselas = append(teselas, o)
 	}
-	rej := ui.RejillaTarjetas(e.Ventana, HuecoFranja, CortesRejillaDrive)
+	cortes := CortesRejillaDrive
+	if ui.EsTactil() {
+		// En el teléfono, dos columnas no dejan sitio para el icono y los dos
+		// blancos de selección y menú de 44 px.
+		cortes[0] = 1
+	}
+	rej := ui.RejillaTarjetas(e.Ventana, HuecoFranja, cortes)
 	alto := func(float32) float32 { return AltoTeselaFranja }
 	interior := container.New(&marcoFranja{}, container.New(&rejillaDrive{rej: rej, ancho: &e.anchoFranja, alto: alto}, teselas...))
 	// El desplazable es el MISMO de un pintado a otro: marcar una casilla repinta, y con

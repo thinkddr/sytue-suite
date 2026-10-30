@@ -1734,6 +1734,8 @@ export const sl: AppCatalog<typeof en> = {
   'extdata.msg.generic': 'Dejanja ni bilo mogoče dokončati.',
   'extdata.msg.notAllowed':
     'Poizvedbe v to povezavo lahko pošiljajo le osebe z njenega seznama. Prosite skrbništvo svoje organizacije, naj vas doda.',
+  'extdata.msg.ownerOnly':
+    'To povezavo lahko spremeni ali izbriše le oseba, ki jo je ustvarila, ali skrbništvo organizacije.',
   'sheet.msg.badValue': 'Vrednost ni dovoljena',
   'sheet.msg.clipboardDenied': 'Brskalnik je zavrnil dostop do odložišča.',
   'sheet.msg.pasteFailed': 'Lepljenje ni uspelo',

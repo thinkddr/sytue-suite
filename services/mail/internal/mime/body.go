@@ -30,8 +30,13 @@ type Body struct {
 // Se prefiere text/plain y solo se cae al HTML si no hay: un correo bien formado trae
 // las dos partes, y la de texto es la que su autor escribió.
 func ReadBody(raw []byte, limite int) Body {
+	return ReadBodyReader(bytes.NewReader(raw), limite)
+}
+
+// ReadBodyReader extrae el cuerpo legible de un mensaje RFC 5322 desde un io.Reader.
+func ReadBodyReader(r io.Reader, limite int) Body {
 	var b Body
-	mr, err := gomail.CreateReader(bytes.NewReader(raw))
+	mr, err := gomail.CreateReader(r)
 	if err != nil {
 		return b
 	}

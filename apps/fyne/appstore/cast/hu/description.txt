@@ -6,7 +6,7 @@ Az Ön videói és élő adásai, igény szerint és valós időben, Európa elh
 • Élő csevegés és hozzászólások, a közzétevő alapvető moderálásával.
 • Töltsön fel legfeljebb 8 GiB-os videókat; az eredeti megmarad.
 • Élő közvetítés közvetítőprogramból RTMP-n, személyenkénti adáskulccsal.
-• Élőben a böngészőből vagy az alkalmazásból: kamera, képernyő és mikrofon.
+• Élőben a böngészőből vagy az alkalmazásból: kamera és mikrofon. Képernyőmegosztás támogatott böngészőkben, asztali rendszereken és Androidon; az iOS/iPadOS-alkalmazásban nem érhető el.
 • Az élő adások felvételei automatikusan igény szerinti videókká válnak.
 • Nyilvános kezdőlap és szervezetenként egy csatorna, indexelhetően.
 • Nem listázott hivatkozások, csak a szervezetnek szóló videók vagy hozzáférés megadott személyeknek @felhasználónév alapján.

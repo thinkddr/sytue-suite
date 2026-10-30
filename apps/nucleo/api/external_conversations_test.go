@@ -147,3 +147,27 @@ func TestProviderCooldownReadsWrappedErrorAndIsBounded(t *testing.T) {
 		}
 	}
 }
+
+func TestExternalChatPreservesOrganizationPolicyStatus(t *testing.T) {
+	for _, available := range []bool{false, true} {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			_ = json.NewEncoder(w).Encode(map[string]any{"providers": []any{map[string]any{"provider": "slack", "available": available, "disabled_by_org": true}}})
+		}))
+		client := NewIntegraciones(server.URL, nil, server.Client())
+		got, err := client.ExternalChatAccounts(t.Context())
+		server.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+		raw, err := json.Marshal(got)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var retained struct {
+			Providers []map[string]any `json:"providers"`
+		}
+		if json.Unmarshal(raw, &retained) != nil || len(retained.Providers) != 1 || retained.Providers[0]["disabled_by_org"] != true {
+			t.Fatalf("se pierde la política del proveedor: %s", raw)
+		}
+	}
+}

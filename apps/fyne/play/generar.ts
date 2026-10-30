@@ -176,12 +176,14 @@ const FICHAS: Record<string, Ficha> = {
     ],
     claves: [...pp("photos"), ...pf("photos", 12, [3, 5])],
   },
-  // En el teléfono no hay Ctrl+G (f13). Las videollamadas sí van enteras (f7): la cámara y
-  // la pantalla de Android desde el 27/09 (`llamada/camara`), la mano y la grabación.
+  // Sin Ctrl+G (f13). El adaptador de contenido cifrado no implementa búsqueda
+  // (p4/f11), programados (f5) ni comandos remotos/votos de tarjetas (f6). f7
+  // promete pantalla y grabación en todos los destinos: iOS no tiene ReplayKit
+  // y una llamada cifrada no admite la grabación del servidor. p2 cubre la llamada.
   rooms: {
     producto: "rooms",
     corta: ["product.rooms.tagline", "product.rooms.blurb", "product.rooms.p1"],
-    claves: [...pp("rooms"), ...pf("rooms", 13, [13])],
+    claves: [...pp("rooms", [4]), ...pf("rooms", 13, [5, 6, 7, 11, 13])],
   },
   // En el teléfono se ve la versión WebM de 720p, no el HLS adaptativo que elige el
   // navegador (f2), y el reproductor incrustable con oEmbed es de la web (f9; ADR 0061:

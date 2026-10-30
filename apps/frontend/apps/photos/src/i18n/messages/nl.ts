@@ -131,7 +131,9 @@ export const nl: AppCatalog<typeof en> = {
   'gallery.selectMonth': 'Maand selecteren',
   'gallery.unselectMonth': 'Maand deselecteren',
   'gallery.downloadSelected': 'Downloaden',
-  'gallery.downloading': { one: '1 foto downloaden…', other: "{count} foto's downloaden…" },
+  'gallery.downloading':
+    'Gestarte downloadverzoeken: {count}. Controleer de downloads in je browser.',
+  'gallery.downloadCapped': 'Foto’s buiten deze batch: {count}.',
   'gallery.newAlbum': 'Nieuw album',
   'gallery.newAlbumTitle': 'Nieuw album',
   'gallery.newAlbumPrompt': {

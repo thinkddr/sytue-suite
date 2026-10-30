@@ -61,7 +61,7 @@ static int sytueArchivosGuardar(const char *grupo, const char *servicio, const c
 }
 
 // 1 si hay entrada, 0 si no, y el OSStatus si el llavero falla.
-static int sytueArchivosHay(const char *grupo, const char *servicio, const char *cuenta) {
+static int sytueArchivosHay(const char *grupo, const char *servicio, const char *cuenta, const char *esperada) {
 	@autoreleasepool {
 		NSMutableDictionary *q = sytueArchivosConsulta(grupo, servicio, cuenta);
         q[(__bridge id)kSecMatchLimit] = (__bridge id)kSecMatchLimitOne;
@@ -74,7 +74,9 @@ static int sytueArchivosHay(const char *grupo, const char *servicio, const char 
         NSDictionary *credencial = [NSJSONSerialization JSONObjectWithData:datos options:0 error:nil];
         NSString *identidad = [credencial isKindOfClass:NSDictionary.class] ? credencial[@"identidad"] : nil;
         NSCharacterSet *otros = [[NSCharacterSet characterSetWithCharactersInString:@"0123456789abcdef"] invertedSet];
-        return [identidad isKindOfClass:NSString.class] && identidad.length == 64 && [identidad rangeOfCharacterFromSet:otros].location == NSNotFound ? 1 : 0;
+        BOOL valida = [identidad isKindOfClass:NSString.class] && identidad.length == 64 && [identidad rangeOfCharacterFromSet:otros].location == NSNotFound;
+        if (!valida) { return 0; }
+        return (!esperada || [identidad isEqualToString:[NSString stringWithUTF8String:esperada]]) ? 1 : 0;
 	}
 }
 
@@ -148,7 +150,7 @@ static int sytueArchivosDominio(const char *identificador, const char *nombre, i
 }
 // Se pide al File Provider su URL; nunca se deduce ~/Library/CloudStorage ni se usa
 // un esquema privado de Archivos. Se llama fuera del hilo principal.
-static int sytueArchivosAbrir(const char *identificador) {
+static int sytueArchivosAbrir(const char *identificador, int estricto) {
     if (@available(macOS 13.0, iOS 16.0, *)) {
         @autoreleasepool {
             NSFileProviderDomain *domain = [[NSFileProviderDomain alloc]
@@ -158,6 +160,12 @@ static int sytueArchivosAbrir(const char *identificador) {
             dispatch_semaphore_t listo = dispatch_semaphore_create(0);
             __block NSInteger codigo = 0;
             [manager getUserVisibleURLForItemIdentifier:NSFileProviderRootContainerItemIdentifier completionHandler:^(NSURL *url, NSError *error) {
+                // Una apertura ligada a una cuenta no cae al selector global de iOS.
+                if (estricto && (error || !url)) {
+                    codigo = error.code ?: -2;
+                    dispatch_semaphore_signal(listo);
+                    return;
+                }
 #if !TARGET_OS_IPHONE
                 if (error || !url) {
                     codigo = error.code ?: -2;
@@ -242,10 +250,17 @@ func guardarCredencialArchivos(crudo []byte) error {
 	return nil
 }
 
-func hayCredencialArchivos() (bool, error) {
+func hayCredencialArchivos() (bool, error) { return hayCredencialArchivosDe("") }
+
+func hayCredencialArchivosDe(esperada string) (bool, error) {
+	var dueno *C.char
+	if esperada != "" {
+		dueno = C.CString(esperada)
+	}
+	defer C.free(unsafe.Pointer(dueno))
 	g, s, c, soltar := cadenas()
 	defer soltar()
-	switch st := C.sytueArchivosHay(g, s, c); st {
+	switch st := C.sytueArchivosHay(g, s, c, dueno); st {
 	case 0, 1:
 		return st == 1, nil
 	default:
@@ -302,9 +317,21 @@ func abrirArchivos() error {
 	if err != nil {
 		return err
 	}
+	return abrirDominioArchivos(dominio, false)
+}
+
+// El dominio viene ya resuelto; esta función no consulta el marcador global.
+func abrirDominioArchivos(dominio string, estricto bool) error {
+	if !archivosDisponible() {
+		return ErrArchivosNoDisponible
+	}
 	id := C.CString(dominio)
 	defer C.free(unsafe.Pointer(id))
-	if st := C.sytueArchivosAbrir(id); st != 0 {
+	modo := C.int(0)
+	if estricto {
+		modo = 1
+	}
+	if st := C.sytueArchivosAbrir(id, modo); st != 0 {
 		return fmt.Errorf("sistema: no se pudo abrir el dominio de Drive (código %d)", int(st))
 	}
 	return nil

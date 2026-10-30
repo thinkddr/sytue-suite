@@ -8,6 +8,10 @@ import (
 	"fyne.io/fyne/v2/driver/mobile"
 )
 
+// Enfocar aplica la política de foco de la suite también desde las apps: en móvil
+// sólo los campos de escritura reciben foco y nil lo retira.
+func Enfocar(c fyne.Canvas, f fyne.Focusable) { enfocar(c, f) }
+
 // # El foco en el teléfono
 //
 // En el móvil Fyne abre el teclado en pantalla con CUALQUIER objeto enfocado, no solo

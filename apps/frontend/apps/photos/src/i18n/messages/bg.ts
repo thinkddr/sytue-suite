@@ -130,7 +130,9 @@ export const bg: AppCatalog<typeof en> = {
   'gallery.selectMonth': 'Избор на месец',
   'gallery.unselectMonth': 'Отмяна на избора на месец',
   'gallery.downloadSelected': 'Изтегляне',
-  'gallery.downloading': { one: 'Изтегляне на 1 снимка…', other: 'Изтегляне на {count} снимки…' },
+  'gallery.downloading':
+    'Започнати заявки за изтегляне: {count}. Проверете изтеглянията в браузъра.',
+  'gallery.downloadCapped': 'Снимки извън тази партида: {count}.',
   'gallery.newAlbum': 'Нов албум',
   'gallery.newAlbumTitle': 'Нов албум',
   'gallery.newAlbumPrompt': {

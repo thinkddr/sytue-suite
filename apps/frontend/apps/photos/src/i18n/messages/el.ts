@@ -136,7 +136,9 @@ export const el: AppCatalog<typeof en> = {
   'gallery.selectMonth': 'Επιλογή μήνα',
   'gallery.unselectMonth': 'Αποεπιλογή μήνα',
   'gallery.downloadSelected': 'Λήψη',
-  'gallery.downloading': { one: 'Λήψη 1 φωτογραφίας…', other: 'Λήψη {count} φωτογραφιών…' },
+  'gallery.downloading':
+    'Αιτήματα λήψης που ξεκίνησαν: {count}. Ελέγξτε τις λήψεις του προγράμματος περιήγησης.',
+  'gallery.downloadCapped': 'Φωτογραφίες εκτός αυτής της παρτίδας: {count}.',
   'gallery.newAlbum': 'Νέο άλμπουμ',
   'gallery.newAlbumTitle': 'Νέο άλμπουμ',
   'gallery.newAlbumPrompt': {

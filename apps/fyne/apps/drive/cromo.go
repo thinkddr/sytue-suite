@@ -351,14 +351,26 @@ func (c *CabeceraVista) enRejilla() bool {
 // 95.
 const AltoCabeceraRejilla float32 = 2*RellenoYCabecera + AltoLineaCabecera + HuecoAcciones + AltoControlCromo + tema.Borde
 
-// colocarRejilla reparte las dos filas en las tres columnas de la web: la del buscador
-// crece y las otras dos miden lo que su contenido —«Nuevo», y lo más ancho de «Subir» y
-// el conmutador, que va al final de la suya (`justify-self-end`)—, sea cual sea el idioma.
-func (c *CabeceraVista) colocarRejilla(ancho float32) {
-	canalon := CanalonCabecera(c.Ventana)
+// columnasRejilla mide las tres columnas: el buscador crece y las otras dos
+// conservan «Nuevo» y lo más ancho de «Subir» y el conmutador de vista.
+func (c *CabeceraVista) columnasRejilla(ancho float32) [3]float32 {
 	col2 := c.Acciones[1].MinSize().Width
 	col3 := max(c.Acciones[2].MinSize().Width, c.Conmutador.MinSize().Width)
-	col1 := max(ancho-2*canalon-col2-col3-2*HuecoAcciones, 0)
+	col1 := max(ancho-2*CanalonCabecera(c.Ventana)-col2-col3-2*HuecoAcciones, 0)
+	return [3]float32{col1, col2, col3}
+}
+
+func (c *CabeceraVista) buscadorEnFilaPropia(ancho float32) bool {
+	columnas := c.columnasRejilla(ancho)
+	// El mínimo del widget solo deja un cuadratín para escribir. El buscador
+	// necesita tres para poder leer parte de la consulta junto a su icono.
+	return columnas[0] < ui.MedidaEntrada(ui.CampoCromo, 0, true).Width+2*tema.Rem
+}
+
+func (c *CabeceraVista) colocarRejilla(ancho float32) {
+	canalon := CanalonCabecera(c.Ventana)
+	columnas := c.columnasRejilla(ancho)
+	col1, col2 := columnas[0], columnas[1]
 
 	// Las migas ocupan las dos primeras columnas (`col-span-2`) y se recortan si no caben.
 	y := RellenoYCabecera
@@ -367,8 +379,20 @@ func (c *CabeceraVista) colocarRejilla(ancho float32) {
 	centrarEn(c.Conmutador, ancho-canalon-conmutador, y, conmutador, AltoLineaCabecera)
 
 	y += AltoLineaCabecera + HuecoAcciones
+	if c.buscadorEnFilaPropia(ancho) {
+		// El carril móvil y el área segura pueden dejar menos que el propio
+		// relleno del campo. Conservar una columna casi vacía impide escribir.
+		centrarEn(c.Acciones[0], canalon, y, max(ancho-2*canalon, 0), AltoControlCromo)
+		y += AltoControlCromo + HuecoAcciones
+		x := ancho - canalon - columnas[1] - columnas[2] - HuecoAcciones
+		for i := 1; i < len(columnas); i++ {
+			centrarEn(c.Acciones[i], x, y, columnas[i], AltoControlCromo)
+			x += columnas[i] + HuecoAcciones
+		}
+		return
+	}
 	x := canalon
-	for i, w := range []float32{col1, col2, col3} {
+	for i, w := range columnas {
 		centrarEn(c.Acciones[i], x, y, w, AltoControlCromo)
 		x += w + HuecoAcciones
 	}
@@ -377,14 +401,24 @@ func (c *CabeceraVista) colocarRejilla(ancho float32) {
 // MinSize es el alto de las líneas que ocupa en el ancho de la última vez que se colocó
 // (o en el de la ventana, antes de la primera); el ancho lo pone la pantalla.
 func (c *CabeceraVista) MinSize([]fyne.CanvasObject) fyne.Size {
-	if c.enRejilla() {
-		return fyne.NewSize(0, AltoCabeceraRejilla)
-	}
 	ancho := c.ancho
 	if ancho <= 0 {
 		ancho = c.Ventana
 	}
-	return fyne.NewSize(0, AltoCabeceraEn(len(c.lineas(ancho))))
+	return fyne.NewSize(0, c.AltoCon(nil, ancho))
+}
+
+// AltoCon permite que ui.Pila mida el salto del buscador antes de colocarlo,
+// con el ancho útil de la hoja en vez de conservar el de la ventana anterior.
+func (c *CabeceraVista) AltoCon(_ []fyne.CanvasObject, ancho float32) float32 {
+	if c.enRejilla() {
+		alto := AltoCabeceraRejilla
+		if c.buscadorEnFilaPropia(ancho) {
+			alto += AltoControlCromo + HuecoAcciones
+		}
+		return alto
+	}
+	return AltoCabeceraEn(len(c.lineas(ancho)))
 }
 
 // AltoCabeceraEn es lo que mide la cabecera con `n` líneas: el `py-2.5`, las líneas con

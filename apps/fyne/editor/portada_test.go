@@ -359,3 +359,22 @@ func TestA360RecientesNoQuedaTapado(t *testing.T) {
 		})
 	}
 }
+
+func TestLaPortadaConservaElBuscadorAlGirar(t *testing.T) {
+	p := portadaDePrueba(t, &servicio{lista: dosDocs})
+	p.Cargar()
+	w := test.NewTempWindow(t, p.Objeto())
+	w.SetPadded(false)
+	p.vista.buscador.AlCambiar(nil) // este test gira el campo; no programa peticiones
+	p.vista.buscador.PonerTexto("acta")
+	for _, ancho := range []float32{320, 568, 1024, 320} {
+		w.Resize(fyne.NewSize(ancho, 700))
+		buscador, filtro := p.vista.buscador, p.vista.filtro
+		if buscador.Size().Width < min(AnchoBuscador/2, ancho-2*MargenPortada) || buscador.Texto() != "acta" {
+			t.Fatalf("a %g: el buscador perdió su área o consulta: %v/%q", ancho, buscador.Size(), buscador.Texto())
+		}
+		if ancho == 320 && buscador.Position().Y < filtro.Position().Y+filtro.Size().Height {
+			t.Fatal("en el teléfono el buscador no baja a su propia fila")
+		}
+	}
+}

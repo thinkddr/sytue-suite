@@ -136,11 +136,9 @@ export const ro: AppCatalog<typeof en> = {
   'gallery.selectMonth': 'Selectează luna',
   'gallery.unselectMonth': 'Deselectează luna',
   'gallery.downloadSelected': 'Descarcă',
-  'gallery.downloading': {
-    one: 'Se descarcă 1 fotografie…',
-    few: 'Se descarcă {count} fotografii…',
-    other: 'Se descarcă {count} de fotografii…',
-  },
+  'gallery.downloading':
+    'Solicitări de descărcare inițiate: {count}. Verificați descărcările din browser.',
+  'gallery.downloadCapped': 'Fotografii din afara acestui lot: {count}.',
   'gallery.newAlbum': 'Album nou',
   'gallery.newAlbumTitle': 'Album nou',
   'gallery.newAlbumPrompt': {

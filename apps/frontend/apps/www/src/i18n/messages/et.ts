@@ -425,7 +425,8 @@ export const et: AppCatalog<typeof en> = {
   'product.cast.f1': 'Laadige üles kuni 8 GiB videoid; originaal säilitatakse.',
   'product.cast.f2': 'Kohanduv taasesitus kolmes kvaliteedis; brauser valib parima.',
   'product.cast.f3': 'Otseülekanne edastusprogrammist RTMP kaudu, iga inimese oma voovõtmega.',
-  'product.cast.f4': 'Otse brauserist või rakendusest: kaamera, ekraan ja mikrofon.',
+  'product.cast.f4':
+    'Otse brauserist või rakendusest: kaamera ja mikrofon. Ekraani jagamine toetatud brauserites, töölauasüsteemides ja Androidis; iOS-i/iPadOS-i rakenduses pole saadaval.',
   'product.cast.f5': 'Otseülekannete salvestised muutuvad automaatselt tellitavateks videoteks.',
   'product.cast.f6': 'Avalik esileht ja kanal iga organisatsiooni kohta, indekseeritavad.',
   'product.cast.f7':

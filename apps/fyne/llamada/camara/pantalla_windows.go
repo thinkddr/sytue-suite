@@ -56,6 +56,10 @@ type pantallaWindows struct {
 	cerrada bool
 }
 
+// PantallaDisponible indica que este destino implementa la captura; los permisos
+// y el acceso al equipo se comprueban al abrirla.
+const PantallaDisponible = true
+
 func abrirPantalla() (Fuente, error) { return &pantallaWindows{buf: make([]byte, 1920*1080*4)}, nil }
 
 func (p *pantallaWindows) Leer() (*image.YCbCr, bool) {

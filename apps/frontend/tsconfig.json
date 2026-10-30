@@ -14,6 +14,8 @@
       "@sytue/offline": ["./packages/offline/src/index.ts"],
       "@sytue/offline/preact": ["./packages/offline/src/preact.ts"],
       "@sytue/offline/worker": ["./packages/offline/src/worker.ts"],
+      "@sytue/offline/matrix": ["./packages/offline/src/matrix/index.ts"],
+      "@sytue/offline/matrix/types": ["./packages/offline/src/matrix/types.ts"],
       "@sytue/pages-render": ["./packages/pages-render/src/index.ts"],
       "@sytue/pages-render/*": ["./packages/pages-render/src/*"]
     }

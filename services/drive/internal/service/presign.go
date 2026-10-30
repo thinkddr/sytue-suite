@@ -26,6 +26,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
@@ -204,8 +205,14 @@ func (s *Service) PresignUpload(ctx context.Context, path string, size int64, co
 	if contentType == "" {
 		contentType = "application/octet-stream"
 	}
-	u, err := s.blobs.PresignPut(ctx, t, storageKey, s.cfg.PresignTTL)
+	var u *url.URL
+	if pt, ok := s.blobs.(presignerConTamano); ok {
+		u, err = pt.PresignPutConTamano(ctx, t, storageKey, size, s.cfg.PresignTTL)
+	} else {
+		u, err = s.blobs.PresignPut(ctx, t, storageKey, s.cfg.PresignTTL)
+	}
 	if err != nil {
+		s.cerrarReserva(ctx, storageKey)
 		return PresignResult{}, fmt.Errorf("service: presign put: %w", err)
 	}
 
@@ -222,6 +229,7 @@ func (s *Service) PresignUpload(ctx context.Context, path string, size int64, co
 		Expires:     handleExp.Unix(),
 	})
 	if err != nil {
+		s.cerrarReserva(ctx, storageKey)
 		return PresignResult{}, err
 	}
 	return PresignResult{URL: u.String(), Handle: handle, ExpiresAt: urlExp}, nil

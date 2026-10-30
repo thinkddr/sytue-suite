@@ -21,7 +21,8 @@ import (
 //     toda la tabla, bandas de filas y columnas, primera y última fila y columna, y esquinas.
 //   - Un SmartArt llega con las formas de su dibujo ya compuesto (la parte `diagramDrawing`
 //     que guarda PowerPoint): cada forma, su caja.
-//   - Un gráfico o un objeto incrustado, nada: el modelo no tiene dónde ponerlo.
+//   - Un gráfico (`c:chart`) llega como tabla con su título, categorías y series; un objeto
+//     incrustado (`p:oleObj`), con su imagen de reemplazo o su nombre.
 
 // estiloTabla es un `a:tblStyle`: sus partes por nombre (wholeTbl, band1H, firstRow…).
 type estiloTabla map[string]*xnode
@@ -420,12 +421,13 @@ func (p *pptxDec) cssDeCelda(relleno pinturaDML, bordes map[string]pinturaDML, a
 	return b.String()
 }
 
-// readGraphicFrame lee un <p:graphicFrame>: una tabla como caja de texto, un SmartArt como
-// las cajas de su dibujo; nada lo demás. Devuelve también el id de forma.
+// readGraphicFrame lee un <p:graphicFrame>: una tabla, un gráfico (como tabla con sus series
+// y valores), un objeto incrustado (su imagen de reemplazo o su etiqueta) o un SmartArt.
+// Devuelve también el id de forma.
 func (p *pptxDec) readGraphicFrame() ([]slideBox, string) {
 	var nv nvProps
 	var pos xfrmPos
-	var tabla, dibujo, datos string
+	var tabla, dibujo, datos, imgOle string
 	for {
 		tok, err := p.dec.Token()
 		if err != nil {
@@ -438,10 +440,17 @@ func (p *pptxDec) readGraphicFrame() ([]slideBox, string) {
 				nv = p.readNv("nvGraphicFramePr")
 			case "xfrm":
 				pos = p.readXfrm()
-			case "graphic", "graphicData":
+			case "graphic", "graphicData", "AlternateContent", "Choice", "Fallback":
 				continue
 			case "tbl":
 				tabla = p.tablaHTML(p.readTbl())
+			case "chart":
+				if rel := p.rels[attrLocal(t, "id")]; rel != "" {
+					tabla = tablaDeGraficoPPTX(p.files[path.Clean(p.dir+"/"+rel)])
+				}
+				_ = p.dec.Skip()
+			case "oleObj":
+				p.leerOleMarco(t, &imgOle, &tabla)
 			case "relIds":
 				dibujo = p.dibujoDeSmartArt(attrLocal(t, "dm"))
 				if rel := p.rels[attrLocal(t, "dm")]; rel != "" {
@@ -453,17 +462,155 @@ func (p *pptxDec) readGraphicFrame() ([]slideBox, string) {
 			}
 		case xml.EndElement:
 			if t.Name.Local == "graphicFrame" {
-				return p.cajasDeMarco(nv, pos, tabla, dibujo, datos), nv.id
+				return p.cajasDeMarco(nv, pos, tabla, dibujo, datos, imgOle), nv.id
 			}
 		}
 	}
 	return nil, ""
 }
 
+func (p *pptxDec) leerOleMarco(se xml.StartElement, imgOle, tabla *string) {
+	var ole xnode
+	if p.dec.DecodeElement(&ole, &se) != nil {
+		return
+	}
+	if src := p.imagenDeOle(&ole); src != "" && *imgOle == "" {
+		*imgOle = src
+	} else if nom := cmp.Or(ole.attr("name"), ole.attr("progId")); nom != "" && *tabla == "" {
+		*tabla = "<p>" + html.EscapeString(nom) + "</p>"
+	}
+}
+
+func (p *pptxDec) imagenDeOle(n *xnode) string {
+	if n == nil {
+		return ""
+	}
+	for _, k := range []string{"embed", "id", "relid"} {
+		if rid := n.attr(k); rid != "" && p.rels[rid] != "" {
+			if src := dataURLFromZip(path.Clean(p.dir+"/"+p.rels[rid]), p.files); src != "" {
+				return src
+			}
+		}
+	}
+	for i := range n.Kids {
+		if src := p.imagenDeOle(&n.Kids[i]); src != "" {
+			return src
+		}
+	}
+	return ""
+}
+
+func textoNodoChart(n *xnode) string {
+	if n == nil {
+		return ""
+	}
+	var partes []string
+	var rec func(*xnode)
+	rec = func(x *xnode) {
+		if x.XMLName.Local == "t" || x.XMLName.Local == "v" {
+			if s := strings.TrimSpace(x.Text); s != "" {
+				partes = append(partes, s)
+			}
+			return
+		}
+		for i := range x.Kids {
+			rec(&x.Kids[i])
+		}
+	}
+	rec(n)
+	return strings.Join(partes, " ")
+}
+
+func puntosCacheChart(n *xnode) []string {
+	if n == nil {
+		return nil
+	}
+	var out []string
+	var rec func(*xnode)
+	rec = func(x *xnode) {
+		if x.XMLName.Local == "pt" {
+			if v := x.kid("v"); v != nil {
+				out = append(out, strings.TrimSpace(v.Text))
+			}
+			return
+		}
+		for i := range x.Kids {
+			rec(&x.Kids[i])
+		}
+	}
+	rec(n)
+	return out
+}
+
+func tablaDeGraficoPPTX(raw []byte) string {
+	var root xnode
+	if len(raw) == 0 || xml.Unmarshal(raw, &root) != nil {
+		return ""
+	}
+	ch := root.kid("chart")
+	if ch == nil {
+		ch = &root
+	}
+	titulo := textoNodoChart(ch.kid("title"))
+	plot := ch.kid("plotArea")
+	if plot == nil {
+		return ""
+	}
+	var nombresSeries, cats []string
+	var series [][]celda09
+	for i := range plot.Kids {
+		ck := &plot.Kids[i]
+		if !strings.HasSuffix(ck.XMLName.Local, "Chart") {
+			continue
+		}
+		for j := range ck.Kids {
+			ser := &ck.Kids[j]
+			if ser.XMLName.Local != "ser" {
+				continue
+			}
+			nombresSeries = append(nombresSeries, textoNodoChart(ser.kid("tx")))
+			if len(cats) == 0 {
+				cats = puntosCacheChart(cmp.Or(ser.kid("cat"), ser.kid("xVal")))
+			}
+			vals := puntosCacheChart(cmp.Or(ser.kid("val"), ser.kid("yVal")))
+			fila := make([]celda09, len(vals))
+			for k, v := range vals {
+				fila[k] = celda09{texto: v}
+			}
+			series = append(series, fila)
+		}
+	}
+	nr := len(cats)
+	for _, s := range series {
+		nr = max(nr, len(s))
+	}
+	datos := make([][]celda09, nr)
+	for r := range datos {
+		datos[r] = make([]celda09, len(series))
+		for c, s := range series {
+			if r < len(s) {
+				datos[r][c] = s[r]
+			}
+		}
+	}
+	t := armarTablaGrafico(titulo, cats, nombresSeries, datos)
+	if t == nil {
+		return ""
+	}
+	return blocksToHTML([]xblock{{table: t.xtable()}})
+}
+
 // cajasDeMarco son las cajas de un marco: la de su tabla o las de su SmartArt, en su sitio.
-func (p *pptxDec) cajasDeMarco(nv nvProps, pos xfrmPos, tabla, dibujo, datos string) []slideBox {
+func (p *pptxDec) cajasDeMarco(nv nvProps, pos xfrmPos, tabla, dibujo, datos, imgOle string) []slideBox {
 	if nv.oculta || p.master && nv.ph || p.theme != nil && p.theme.soloMarcadores {
 		return nil
+	}
+	if imgOle != "" {
+		return []slideBox{{
+			Kind: "image", Src: imgOle,
+			X: pctOf(pos.x, p.wEMU), Y: pctOf(pos.y, p.hEMU),
+			W: max(pctOf(pos.cx, p.wEMU), 10), H: max(pctOf(pos.cy, p.hEMU), 10),
+		}}
 	}
 	if tabla != "" {
 		return []slideBox{buildShapeBox(pos, true, "rect", "", "", tabla, p.wEMU, p.hEMU)}

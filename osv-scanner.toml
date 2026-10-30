@@ -7,7 +7,7 @@
 # versión corregida; se mantiene actualizado porque otros paquetes sí se usan.
 [[IgnoredVulns]]
 id = "GO-2026-5932"
-ignoreUntil = 2026-11-01
+ignoreUntil = 2026-12-14
 reason = "openpgp no se importa ni se alcanza; confirmado por govulncheck en root y clientes nativos"
 
 # `extract-zip` 2.0.1 (GHSA-jmr9-qjv8-65gv y GHSA-7pqw-9j4j-h8q3) YA NO SE IGNORA:
@@ -100,3 +100,12 @@ reason = "braces 3.0.3, sin parche publicado: solo globs del tooling @parcel/wat
 id = "GHSA-hp3w-g68c-fv3c"
 ignoreUntil = 2026-12-14
 reason = "sprintf-js solo lo usa el registro del proxy de Renovate (global-agent/roarr), inactivo sin GLOBAL_AGENT_*; sin versión corregida"
+
+# deepmerge 4.3.1 entra únicamente en el árbol de Renovate (tools/renovate/bun.lock), que
+# corre en .github/workflows/dependencias.yml sobre la configuración interna del propio
+# repositorio sin recibir objetos controlados por usuarios. 4.3.1 es la última versión
+# publicada en npm (FIXED VERSION: --).
+[[IgnoredVulns]]
+id = "GHSA-gcqx-w48m-w2h4"
+ignoreUntil = 2026-12-14
+reason = "deepmerge 4.3.1 solo en tools/renovate/bun.lock (tooling de CI sobre configuración propia del repositorio); sin versión corregida publicada"

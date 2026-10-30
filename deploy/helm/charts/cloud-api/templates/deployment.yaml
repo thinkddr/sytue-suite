@@ -112,9 +112,9 @@ spec:
             - name: PUBLIC_URL
               value: "https://{{ include "sytue-cloud-api.host" . }}"
             - name: APPS_DOMAIN
-              value: {{ .Values.config.appsDomain | quote }}
+              value: {{ if (.Values.global).dominioDeClientes }}{{ printf "apps.%s" (.Values.global).dominioDeClientes | quote }}{{ else }}{{ .Values.config.appsDomain | quote }}{{ end }}
             - name: PREVIEW_DOMAIN
-              value: {{ .Values.config.previewDomain | quote }}
+              value: {{ if (.Values.global).dominioDeClientes }}{{ printf "preview.%s" (.Values.global).dominioDeClientes | quote }}{{ else }}{{ .Values.config.previewDomain | quote }}{{ end }}
             - name: INGRESS_TARGET
               value: {{ .Values.config.ingressTarget | quote }}
             - name: ABIERTO_A_TERCEROS

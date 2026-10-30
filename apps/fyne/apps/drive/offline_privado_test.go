@@ -9,6 +9,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"git.sytue.eu/sytue/one/apps/nucleo/auth/authtest"
+
 	"git.sytue.eu/sytue/one/apps/nucleo/offline"
 )
 
@@ -20,7 +22,7 @@ func TestLaCacheNoGuardaContenidoDeEquipoNiElSecretoDelNAS(t *testing.T) {
 		_, _ = w.Write([]byte(`{"command":"newt --secret S3CR3T"}`))
 	}))
 	defer srv.Close()
-	almacen, err := offline.Open(t.TempDir())
+	almacen, err := offline.OpenWithSecrets(t.TempDir(), new(authtest.Secrets))
 	if err != nil {
 		t.Fatal(err)
 	}

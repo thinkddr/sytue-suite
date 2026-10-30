@@ -219,12 +219,8 @@ var (
 	// `scale(k)` es `scale(k, k)`. `oksvg` pide dos números y, si solo hay uno, aborta
 	// el fichero ENTERO con «param mismatch»: la marca se quedaba sin su glifo.
 	escalaDeUno = regexp.MustCompile(`scale\(\s*(-?[0-9.]+)\s*\)`)
-	// Un arco puede llevar VARIOS juegos de siete parámetros tras una sola `a` —el
-	// círculo de «a9 9 0 1 0 0 18 9 9 0 0 0 0-18» son dos medios—, y `oksvg` pinta el
-	// segundo con los radios, las banderas y el final del PRIMERO (`AddArc` recibe el
-	// búfer entero, no su trozo). Salía medio círculo: la cabeza de Contacts, el aro
-	// de ID y de Hub, la lupa y el círculo de información. `arcosSueltos` le pone su
-	// propia letra a cada juego.
+	// Los semicírculos relativos necesitan una holgura en sus radios para evitar
+	// puntos de control en NaN por el redondeo de sus extremos; ver `holgura`.
 	atributoD = regexp.MustCompile(`(\s)d="([^"]*)"`)
 	numeroSVG = regexp.MustCompile(`^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?`)
 	// Un `stroke-width` DENTRO de un `<g transform="… scale(…)">` se pinta en el sistema
@@ -238,11 +234,11 @@ var (
 	grosorExplicit = regexp.MustCompile(`\bstroke-width="([0-9.]+)"`)
 )
 
-// arcosSueltos reescribe los datos de un trayecto para que cada arco lleve su letra:
-// «a9 9 0 1 0 0 18 9 9 0 0 0 0-18» pasa a «a9 9 0 1 0 0 18a9 9 0 0 0 0-18». El resto
-// de órdenes se deja tal cual. Las banderas pueden ir pegadas («a2 2 0 012 2»), así
-// que se leen como un solo carácter, que es lo que dice la gramática de SVG.
-func arcosSueltos(d string) string {
+// arcosConHolgura ajusta los radios sin separar los arcos agrupados: `oksvg` ya
+// interpreta cada juego de siete parámetros tras una sola A/a. El resto de órdenes
+// se deja tal cual. Las banderas pueden ir pegadas («a2 2 0 012 2»), así que se leen
+// como un solo carácter, que es lo que dice la gramática de SVG.
+func arcosConHolgura(d string) string {
 	var out strings.Builder
 	for i := 0; i < len(d); {
 		c := d[i]
@@ -252,19 +248,19 @@ func arcosSueltos(d string) string {
 			continue
 		}
 		i++
+		out.WriteByte(c)
 		leidos := 0
 		for {
 			args, fin, ok := juegoDeArco(d[i:])
 			if !ok {
 				break
 			}
-			out.WriteByte(c)
+			if leidos > 0 {
+				out.WriteByte(' ')
+			}
 			out.WriteString(strings.Join(args, " "))
 			i += fin
 			leidos++
-		}
-		if leidos == 0 {
-			out.WriteByte(c) // mal formado: se deja como venía, y `oksvg` dirá lo suyo
 		}
 	}
 	return out.String()
@@ -307,8 +303,8 @@ func juegoDeArco(s string) (args []string, fin int, ok bool) {
 
 // holgura agranda un radio de arco en una diezmillonésima.
 //
-// Es el otro fallo de los arcos de `oksvg`, medido: un semicírculo EXACTO —el radio es
-// la mitad de la cuerda, que es como se dibujan todos los círculos de dos medios— sale
+// Un semicírculo EXACTO —el radio es la mitad de la cuerda, como se dibujan los
+// círculos de dos medios— sale
 // de un solo cubo con los puntos de control en NaN cuando el final es relativo, porque
 // `placeY + 12.8` da 31,400000000000002 y la cuerda queda un pelo más larga que el
 // diámetro. «a6.4 6.4 0 1 1 0 12.8» no pinta nada; «a6.41…» y el mismo arco en absoluto
@@ -471,7 +467,7 @@ func normaliza(svg []byte) []byte {
 	svg = grupoEscalado.ReplaceAllFunc(svg, grosorEnGrupo)
 	svg = atributoD.ReplaceAllFunc(svg, func(m []byte) []byte {
 		p := atributoD.FindSubmatch(m)
-		return fmt.Appendf(nil, `%sd="%s"`, p[1], arcosSueltos(string(p[2])))
+		return fmt.Appendf(nil, `%sd="%s"`, p[1], arcosConHolgura(string(p[2])))
 	})
 	return rectSinRy.ReplaceAllFunc(svg, func(m []byte) []byte {
 		if yaTieneRy.Match(m) {

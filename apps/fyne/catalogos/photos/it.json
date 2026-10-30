@@ -104,6 +104,7 @@
   "gallery.describeStop": "Ferma",
   "gallery.described": "{count} foto descritte",
   "gallery.describing": "Sto descrivendo {done} di {total}…",
+  "gallery.downloadCapped": "Foto escluse da questo gruppo: {count}.",
   "gallery.downloadSelected": "Scarica",
   "gallery.downloading": {
     "one": "Scaricamento di 1 foto…",

@@ -1,4 +1,5 @@
 import type { SytueUser } from '@sytue/auth';
+import { isStorageOAuthKind } from '@sytue/api-clients';
 
 type StorageFetch = (url: string, init?: RequestInit) => Promise<Response>;
 
@@ -15,13 +16,24 @@ export async function almacenamientoExternoDisponible(
 ): Promise<boolean> {
   if (!user.roles.some((role) => role === 'owner' || role === 'admin')) return false;
   try {
-    const res = await fetcher(`${driveUrl.replace(/\/+$/, '')}/api/v1/storage/external`, {
+    const base = `${driveUrl.replace(/\/+$/, '')}/api/v1/storage/external`;
+    const request = {
       headers: { authorization: `Bearer ${accessToken}` },
       signal: AbortSignal.timeout(1500),
-    });
+    };
+    const res = await fetcher(base, request);
     if (!res.ok) return false;
     const state = (await res.json()) as { available?: unknown };
-    return state.available === true;
+    if (state.available === true) return true;
+    if (state.available !== false) return false;
+    // Drive seals WebDAV/S3 credentials. OAuth accounts use the gateway vault,
+    // and its capability flags already include the organisation opt-out policy.
+    const accounts = await fetcher(`${base}/instances`, request);
+    if (!accounts.ok) return false;
+    const { providers } = (await accounts.json()) as { providers?: Record<string, unknown> };
+    return Object.entries(providers ?? {}).some(
+      ([provider, available]) => isStorageOAuthKind(provider) && available === true,
+    );
   } catch {
     return false;
   }

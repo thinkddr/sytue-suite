@@ -1731,6 +1731,8 @@ export const sk: AppCatalog<typeof en> = {
   'extdata.msg.generic': 'Operáciu sa nepodarilo dokončiť.',
   'extdata.msg.notAllowed':
     'Dopyty na toto pripojenie môžu posielať len ľudia z jeho zoznamu. Požiadajte správu svojej organizácie o pridanie.',
+  'extdata.msg.ownerOnly':
+    'Zmeniť alebo odstrániť toto pripojenie môže len osoba, ktorá ho vytvorila, alebo správa organizácie.',
   'sheet.msg.badValue': 'Nepovolená hodnota',
   'sheet.msg.clipboardDenied': 'Prehliadač odoprel prístup do schránky.',
   'sheet.msg.pasteFailed': 'Nepodarilo sa prilepiť',

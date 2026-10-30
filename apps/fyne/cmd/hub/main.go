@@ -40,6 +40,7 @@ import (
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
+	"git.sytue.eu/sytue/one/apps/nucleo/sistema"
 	"git.sytue.eu/sytue/one/apps/nucleo/sistema/escritorio"
 )
 
@@ -91,7 +92,50 @@ func main() {
 		})
 	v.Widget = s.CapturarWidget
 	v.ConDriveEnSistema(s.DriveEnSistema, s.PonerDriveEnSistema, s.AbrirDriveEnSistema)
-	s.AlCambiar(func(sesion.Estado) { fyne.Do(func() { v.RefrescarDriveEnSistema(s.DriveEnSistema()) }) })
+	s.AlCambiar(func(sesion.Estado) {
+		fyne.Do(func() { v.RefrescarDriveEnSistema(s.DriveEnSistema()); v.RefrescarSesionClientesExternos() })
+	})
+	v.ConCoordenadasClientesExternos(func(ctx context.Context) (api.Coordenadas, error) {
+		return api.CoordenadasDe(ctx, s.URL("id"), nil)
+	})
+	v.ConAutorizacionClientesExternos(s.Sesion.SnapshotIdentity, s.Sesion.WithAuthorizationIntent)
+	// El Hub no aloja el dominio Apple ni un selector Android ligado al dueño.
+	// Esos clientes conservan los pasos WebDAV manuales; One primario sigue igual.
+	if runtime.GOOS == "linux" || runtime.GOOS == "windows" {
+		v.ConMontaje(func(ctx context.Context, _ string) error { return s.AbrirDriveEnSistemaCon(ctx) })
+	}
+	// El perfil de Apple con su propia contraseña de aplicación: correo, calendario y
+	// contactos sin escribir nada. En el Mac se le da al sistema aquí mismo; en el iPhone,
+	// que solo instala perfiles desde Safari, se abre allí un enlace de un solo uso.
+	cuenta := api.NewAccount(s.URL("id"), s.Sesion, nil)
+	v.ConEnlacePerfilApple(cuenta.EnlacePerfilApple)
+	switch runtime.GOOS {
+	case "darwin":
+		v.ConPerfilApple(hub.Mac, func(ctx context.Context) (func() error, error) {
+			perfil, err := cuenta.PerfilApple(ctx, sistema.EtiquetaEquipo())
+			if err != nil {
+				return nil, err
+			}
+			return func() error { return instalarPerfilApple(ctx, perfil) }, nil
+		})
+	case "ios":
+		v.ConPerfilApple(hub.IPhone, func(ctx context.Context) (func() error, error) {
+			enlace, err := cuenta.EnlacePerfilApple(ctx, sistema.EtiquetaEquipo())
+			if err != nil {
+				return nil, err
+			}
+			return func() error { return abrirEnSafari(a, enlace) }, nil
+		})
+	}
+	// Thunderbird, Outlook y Android en un clic: la contraseña de aplicación del cliente,
+	// copiada y a la vista, y el programa abierto si está en este equipo.
+	v.ConClientes(func(ctx context.Context, p hub.Plataforma) (string, error) {
+		nueva, err := cuenta.CreateAppPassword(ctx, etiquetaCliente(p))
+		return nueva.Password, err
+	}, func(p hub.Plataforma) error { return escritorio.AbrirPrograma(string(p)) })
+	if runtime.GOOS == "android" {
+		v.ConDAVx5()
+	}
 	w := a.NewWindow(t.T(hub.AInicio.ClaveTitulo(), nil))
 	integraciones := api.NewIntegraciones(s.URL("integrations"), s.Sesion, nil)
 	v.ConConexiones(w, integraciones, func(ctx context.Context, plantilla, instancia string) (string, error) {
@@ -259,4 +303,15 @@ func etiquetaMenu(titulo string) string {
 		return titulo
 	}
 	return strings.Join(quedan, " — ")
+}
+
+// etiquetaCliente es el nombre con el que sale en Mi cuenta la contraseña de `p`:
+// «Thunderbird · <equipo>». La de Android es la de un teléfono, que casi nunca es este
+// equipo, así que va sin él.
+func etiquetaCliente(p hub.Plataforma) string {
+	nombre := strings.ToUpper(string(p)[:1]) + string(p)[1:]
+	if p == hub.Android {
+		return nombre
+	}
+	return sistema.EtiquetaCliente(nombre)
 }

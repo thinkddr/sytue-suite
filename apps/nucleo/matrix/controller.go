@@ -18,10 +18,19 @@ import (
 type controllerStore struct {
 	mxcrypto.Store
 	controller id.UserID
+	ownerOnly  id.UserID
+}
+
+func (c *Client) devicePolicy(store mxcrypto.Store) mxcrypto.Store {
+	policy := controllerStore{Store: store, controller: id.UserID(c.cfg.Bootstrap.ControllerUserID)}
+	if c.cfg.Bootstrap.StorageProduct != "" {
+		policy.ownerOnly = c.cli.UserID
+	}
+	return policy
 }
 
 func (s controllerStore) GetDevices(ctx context.Context, user id.UserID) (map[id.DeviceID]*id.Device, error) {
-	if user == s.controller {
+	if user == s.controller || s.ownerOnly != "" && user != s.ownerOnly {
 		return map[id.DeviceID]*id.Device{}, nil
 	}
 	return s.Store.GetDevices(ctx, user)
@@ -54,6 +63,10 @@ func (c *Client) rotateRestoredOutbound(ctx context.Context) error {
 	}
 	rooms[c.cfg.Bootstrap.DraftRoomID] = struct{}{}
 	for _, room := range c.cfg.Bootstrap.DraftRoomIDs {
+		rooms[room] = struct{}{}
+	}
+	rooms[c.cfg.Bootstrap.StorageRoomID] = struct{}{}
+	for _, room := range c.cfg.Bootstrap.StorageRoomIDs {
 		rooms[room] = struct{}{}
 	}
 	delete(rooms, "")

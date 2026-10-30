@@ -747,6 +747,7 @@
   "extdata.msg.noEncryption": "Šifriranje poverilnic na strežniku ni konfigurirano.",
   "extdata.msg.notAllowed": "Poizvedbe v to povezavo lahko pošiljajo le osebe z njenega seznama. Prosite skrbništvo svoje organizacije, naj vas doda.",
   "extdata.msg.notFound": "Povezava ali poizvedba ne obstaja več.",
+  "extdata.msg.ownerOnly": "To povezavo lahko spremeni ali izbriše le oseba, ki jo je ustvarila, ali skrbništvo organizacije.",
   "extdata.msg.rate": "Preveč zagonov zapored. Počakajte nekaj sekund in poskusite znova.",
   "extdata.msg.timeout": "Zunanji vir podatkov je predolgo odgovarjal.",
   "extdata.msg.unauth": "Seja je potekla. Znova se prijavite.",

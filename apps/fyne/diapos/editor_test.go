@@ -320,8 +320,8 @@ func TestEnUnTelefonoElCarrilEsUnaTiraArriba(t *testing.T) {
 	if got := e.carril.Size(); got.Height != 89 || got.Width != e.raiz.Size().Width {
 		t.Errorf("la tira mide %v y tiene que ir a lo ancho con 89 de alto", got)
 	}
-	if e.zona.Position().Y != 89 || e.zona.Position().X != 0 {
-		t.Errorf("la zona empieza en %v y va debajo de la tira", e.zona.Position())
+	if e.deslizZona.Position().Y != 89 || e.deslizZona.Position().X != 0 {
+		t.Errorf("la zona empieza en %v y va debajo de la tira", e.deslizZona.Position())
 	}
 	if !e.carril.tira || e.carril.desliz.Direction != container.ScrollHorizontalOnly {
 		t.Error("las miniaturas de la tira se deslizan de lado")
@@ -411,4 +411,26 @@ func TestEscribirSeVeComoLaWeb(t *testing.T) {
 	e, _, w := montar(t, string(crudo))
 	e.EmpezarEscritura("t2")
 	guarda(t, "ref-escribir.png", w.Canvas().Capture())
+}
+
+func TestLaRotacionDeDiaposConservaElEscenarioYLasNotasConPocoAlto(t *testing.T) {
+	defer ui.TactilDePrueba(true)()
+	e, _, w := montar(t, `{"slides":[{"id":"a","boxes":[],"notes":"borrador"}]}`)
+	for _, tam := range []fyne.Size{{Width: 320, Height: 700}, {Width: 568, Height: 320}, {Width: 844, Height: 390}, {Width: 320, Height: 700}} {
+		w.Resize(tam)
+		if tam.Width > tam.Height && e.carril.tira {
+			t.Fatal("la tira de miniaturas consume el alto del teléfono horizontal")
+		}
+		if e.desliz.Size().Height < 160 || e.notas.area.Texto() != "borrador" {
+			t.Fatalf("a %v: escenario %v, notas %q", tam, e.desliz.Size(), e.notas.area.Texto())
+		}
+		e.deslizZona.ScrollToBottom()
+		d := fyne.CurrentApp().Driver()
+		area, viewport := e.notas.area.Objeto(), e.deslizZona
+		p, origen := d.AbsolutePositionForObject(area), d.AbsolutePositionForObject(viewport)
+		if p.Y < origen.Y-1 || p.Y+area.Size().Height > origen.Y+viewport.Size().Height+1 {
+			t.Fatalf("a %v: no se alcanzan las notas: %v/%v en %v/%v", tam, p, area.Size(), origen, viewport.Size())
+		}
+		e.deslizZona.ScrollToTop()
+	}
 }

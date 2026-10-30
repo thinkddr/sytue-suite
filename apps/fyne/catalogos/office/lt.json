@@ -747,6 +747,7 @@
   "extdata.msg.noEncryption": "Kredencialų šifravimas serveryje nesukonfigūruotas.",
   "extdata.msg.notAllowed": "Užklausas šiam ryšiui gali siųsti tik jo sąraše esantys žmonės. Paprašykite savo organizacijos administratorių jus įtraukti.",
   "extdata.msg.notFound": "Ryšio arba užklausos nebėra.",
+  "extdata.msg.ownerOnly": "Šį ryšį pakeisti arba ištrinti gali tik jį sukūręs asmuo arba organizacijos administratorius.",
   "extdata.msg.rate": "Per daug vykdymų iš eilės. Palaukite kelias sekundes ir bandykite dar kartą.",
   "extdata.msg.timeout": "Išorinis duomenų šaltinis per ilgai neatsakė.",
   "extdata.msg.unauth": "Seansas baigėsi. Prisijunkite dar kartą.",

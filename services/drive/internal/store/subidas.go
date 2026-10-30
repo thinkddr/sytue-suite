@@ -96,6 +96,19 @@ func (s *Store) SubidaFinalizada(ctx context.Context, clave string) error {
 	})
 }
 
+// BlobReferenciado indica si algún fichero (vivo o en papelera), versión
+// archivada o blob cifrado de la organización sigue referenciando storageKey,
+// en cualquier ámbito (unidad personal, unidad de equipo o canal).
+func (s *Store) BlobReferenciado(ctx context.Context, tenant, storageKey string) (bool, error) {
+	var ref bool
+	err := s.pool.InMaintenanceTx(ctx, func(tx pgx.Tx) error {
+		var e error
+		ref, e = blobReferenced(ctx, tx, tenant, storageKey)
+		return e
+	})
+	return ref, err
+}
+
 // SubidaCaducada es una URL de subida que ya no vale.
 type SubidaCaducada struct {
 	Tenant     string

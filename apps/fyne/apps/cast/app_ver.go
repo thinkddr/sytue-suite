@@ -33,7 +33,7 @@ func (a *App) AbrirVideo(id string) {
 	a.apuntar(lugar{ruta: RutaVer, param: id})
 	a.salirDeVer()
 	a.ruta = RutaVer
-	a.gen++
+	a.nuevaPantalla()
 	a.scroll.Offset = fyne.NewPos(0, 0)
 	a.ver = estadoVer{id: id, estadoCarga: estadoCarga{cargando: true}}
 	a.visor = NuevoVisor(a.v)

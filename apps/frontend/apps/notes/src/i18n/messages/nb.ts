@@ -113,6 +113,8 @@ export const nb: AppCatalog<typeof en> = {
   'backlinks.emptyHint': 'Lenk til det fra et annet notat, så dukker det opp her av seg selv.',
   'notebook.delete': 'Slett notatbok',
   'notebook.deleteConfirm': 'Slette «{title}» og alt som ligger i den?',
+  'notebook.ownerOnly':
+    'Bare den som opprettet notatboken eller den som administrerer organisasjonen, kan flytte den, endre hvem som ser den, eller kryptere den.',
   'notebook.newChild': 'Ny notatbok inni',
   'notebook.notes': { one: '{count} notat', other: '{count} notater' },
   'notebook.emoji': 'Ikon',

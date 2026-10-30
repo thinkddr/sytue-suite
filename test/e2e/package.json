@@ -5,7 +5,7 @@
   "description": "Harness e2e (Playwright) para trazar errores de render/consola/red por producto.",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "bun test ./totp.test.ts",
+    "test": "bun test ./totp.test.ts ./lib/wizard-checks.test.ts",
     "audit:pages-pilot": "bun run auditar-pages-piloto.mjs"
   },
   "devDependencies": {

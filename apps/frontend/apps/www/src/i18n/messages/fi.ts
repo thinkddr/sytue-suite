@@ -444,7 +444,8 @@ export const fi: AppCatalog<typeof en> = {
   'product.cast.f2': 'Mukautuva toisto kolmessa laadussa; selain valitsee parhaan.',
   'product.cast.f3':
     'Suora lähetys lähetysohjelmasta RTMP:llä, henkilökohtaisella lähetysavaimella.',
-  'product.cast.f4': 'Suorana selaimesta tai sovelluksesta: kamera, näyttö ja mikrofoni.',
+  'product.cast.f4':
+    'Suorana selaimesta tai sovelluksesta: kamera ja mikrofoni. Näytön jakaminen tuetuissa selaimissa, työpöytäjärjestelmissä ja Androidissa; ei saatavilla iOS/iPadOS-sovelluksessa.',
   'product.cast.f5': 'Suorien lähetysten tallenteet muuttuvat tilausvideoiksi automaattisesti.',
   'product.cast.f6': 'Julkinen etusivu ja kanava jokaiselle organisaatiolle, indeksoitavissa.',
   'product.cast.f7':

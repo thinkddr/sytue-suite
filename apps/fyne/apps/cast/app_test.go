@@ -19,6 +19,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -103,9 +104,14 @@ func deLaOrganizacion() []api.CastVideo {
 	}
 }
 
+var postersCache sync.Map
+
 // posterDe es una imagen plana de colores de la marca, distinta para cada vídeo: una
 // banda, un sol y el suelo. Sin degradados, como pide el listón del producto.
 func posterDe(id string) []byte {
+	if guardado, ok := postersCache.Load(id); ok {
+		return slices.Clone(guardado.([]byte))
+	}
 	n := 0
 	for _, c := range id {
 		n = n*31 + int(c)
@@ -134,7 +140,9 @@ func posterDe(id string) []byte {
 	}
 	var b bytes.Buffer
 	_ = jpeg.Encode(&b, m, &jpeg.Options{Quality: 85})
-	return b.Bytes()
+	raw := b.Bytes()
+	postersCache.Store(id, raw)
+	return slices.Clone(raw)
 }
 
 // ---- El servicio falso ----
@@ -462,6 +470,7 @@ func appDePrueba(t *testing.T, s *servicioFalso, sesion bool) (*App, fyne.Window
 	a := Nueva(api.NewCast(srv.URL, nil, nil), v, w)
 	teca.Pedir = a.PedirPoster
 	a.lanzar = func(f func()) { f() }
+	a.sinSondeo = true
 	a.ConSesion = func() bool { return sesion }
 	a.WebDe = func(ruta string) string { return "https://cast.sytue.eu/cast" + ruta }
 	// El reproductor de verdad tiene sus propias rutinas: aquí no se abre (lo prueba

@@ -1,9 +1,35 @@
 # El parche de URL entrantes, listo para enviar a Fyne
 
-`apps/fyne/go.mod` reemplaza Fyne por `github.com/thinkddr/fyne/v2 v2.8.2-sytue.1`
+`apps/fyne/go.mod` reemplaza Fyne por `github.com/thinkddr/fyne/v2 v2.8.2-sytue.2`
 (alojado en GitHub desde el 2026-09-27; antes en git.gay, con las mismas ramas y tags)
 (ADR «URL entrante» en `docs/decisions.md`). Un fork es deuda: esta carpeta tiene lo que
 hace falta para quitarlo, que es que el parche entre aguas arriba.
+
+## Geometría de iOS y actualización a Fyne 2.8.2 (2026-10-25)
+
+La [release estable `v2.8.2-sytue.2`](https://github.com/thinkddr/fyne/releases/tag/v2.8.2-sytue.2)
+parte de Fyne 2.8.2 y conserva todos los cambios de `.21`. La ventana sigue el tamaño
+y la escala de la vista UIKit a la que está unida, incluidos sus márgenes seguros al
+girar y al reducir su viewport. Go conserva los píxeles ya orientados; los toques y el
+rectángulo del teclado se convierten al espacio de la vista. Un teclado flotante o
+separado del borde inferior no encoge todo el lienzo.
+
+`0015-ios-window-geometry.patch` recoge únicamente el cambio del driver y sus pruebas
+portables sobre `v2.8.2-sytue.1`. Los avisos BSD-3-Clause del original y Apache-2.0 de
+las modificaciones se conservan. La suite fija también typesetting `v0.3.5-sytue.1`
+y GLFW `v0.1.0-sytue.4`, rebases de los originales 0.3.5 y 0.1.0-pre.2, y actualiza el
+inventario de originales que consulta OSV.
+
+La fuente final pasó las cinco matrices del fork. Con Xcode 27.0 y Go 1.27.3 se
+compiló y enlazó el driver para dispositivo y simulador iOS arm64. Los simuladores de
+iPhone 18 Pro e iPad Pro de 13 pulgadas recorrieron cuatro estados de rotación y
+cuatro tamaños/posiciones de la vista por estado: 32 medidas y 32 toques UIKit
+correctos. El arnés desactiva las animaciones UIKit y lo declara en sus informes;
+el bucle de renderizado y el driver de producción no cambian. Se verificaron además
+24 casos portables de geometría/teclado. No se automatizan los gestos de Stage Manager
+ni la ejecución en un dispositivo físico. La instalación limpia del tag pasó en
+[`public-install`](https://github.com/thinkddr/fyne/actions/runs/40198336656/job/121183936450):
+Go 1.27.3, descarga del módulo publicado, sumas verificadas y build externo limpio.
 
 ## Actualización a Fyne 2.8.2 (2026-10-23)
 

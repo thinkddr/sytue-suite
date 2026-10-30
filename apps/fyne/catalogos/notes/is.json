@@ -271,6 +271,7 @@
     "one": "{count} minnispunktur",
     "other": "{count} minnispunktar"
   },
+  "notebook.ownerOnly": "Aðeins sá sem bjó minnisbókina til eða stjórnandi stofnunarinnar getur fært hana, breytt sýnileika hennar eða dulkóðað hana.",
   "notebook.rename": "Endurnefna",
   "notebook.settings": "Stillingar minnisbókar",
   "notebook.title": "Heiti",

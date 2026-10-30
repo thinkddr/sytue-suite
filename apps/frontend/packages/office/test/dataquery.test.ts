@@ -18,9 +18,11 @@ import {
   buildConnectionBody,
   buildExecuteBody,
   buildQuerySpec,
+  canEditConnection,
   cellText,
   dataQueryErrorMessage,
   errorMessageFrom,
+  parseConnection,
   parseConnections,
   parseExecuteResult,
   parseSavedQueries,
@@ -533,4 +535,49 @@ test('queryErrorAdvice: el fallo se traduce a una acción, y la acción depende 
   // Sin cuerpo (500 de PostgreSQL): no se inventa la causa, se nombran las probables.
   const unknown = queryErrorAdvice(null, 500, 'postgres');
   expect(unknown.action).toContain('Lo más habitual');
+});
+
+test('connection_owner_only y can_edit: traduce el código e informa si la conexión es editable', () => {
+  expect(
+    errorMessageFrom({
+      error: {
+        code: 'connection_owner_only',
+        message:
+          'Only whoever created this connection or an organisation administrator can change or delete it.',
+      },
+    }),
+  ).toBe(
+    'Only the person who created this connection or an organisation administrator can change or delete it.',
+  );
+  expect(errorMessageFrom({ error: 'connection_owner_only' })).toBe(
+    dataQueryErrorMessage('connection_owner_only'),
+  );
+
+  const ajena = parseConnection({
+    connection: {
+      id: 'c1',
+      name: 'ERP',
+      kind: 'rest',
+      config: { base_url: 'https://api.example.com/v1', auth: { type: 'bearer' } },
+      has_credentials: true,
+      can_edit: false,
+    },
+  });
+  expect(ajena?.can_edit).toBe(false);
+  expect(canEditConnection(ajena)).toBe(false);
+
+  const propia = parseConnection({
+    connection: {
+      id: 'c2',
+      name: 'Propia',
+      kind: 'rest',
+      config: { base_url: 'https://api.example.com/v1', auth: { type: 'bearer' } },
+      has_credentials: true,
+      can_edit: true,
+    },
+  });
+  expect(propia?.can_edit).toBe(true);
+  expect(canEditConnection(propia)).toBe(true);
+  expect(canEditConnection(null)).toBe(false);
+  expect(canEditConnection(undefined)).toBe(false);
 });

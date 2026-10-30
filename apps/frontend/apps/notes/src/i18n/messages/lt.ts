@@ -122,6 +122,8 @@ export const lt: AppCatalog<typeof en> = {
   'backlinks.emptyHint': 'Susiekite jį iš kito užrašo ir jis čia atsiras pats.',
   'notebook.delete': 'Ištrinti užrašinę',
   'notebook.deleteConfirm': 'Ištrinti „{title}“ ir viską, kas joje?',
+  'notebook.ownerOnly':
+    'Perkelti šią užrašinę, pakeisti jos matomumą arba ją užšifruoti gali tik ją sukūręs asmuo arba organizacijos administratorius.',
   'notebook.newChild': 'Nauja užrašinė viduje',
   'notebook.notes': {
     one: '{count} užrašas',

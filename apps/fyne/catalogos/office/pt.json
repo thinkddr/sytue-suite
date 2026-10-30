@@ -741,6 +741,7 @@
   "extdata.msg.noEncryption": "A encriptação de credenciais não está configurada no servidor.",
   "extdata.msg.notAllowed": "Só as pessoas da lista desta ligação a podem consultar. Peça a quem administra a sua organização que inclua o seu nome na lista.",
   "extdata.msg.notFound": "A ligação ou a consulta já não existe.",
+  "extdata.msg.ownerOnly": "Só quem criou esta ligação ou quem administra a organização a pode alterar ou eliminar.",
   "extdata.msg.rate": "Demasiadas execuções seguidas. Aguarde alguns segundos e tente novamente.",
   "extdata.msg.timeout": "A origem de dados externa demorou demasiado a responder.",
   "extdata.msg.unauth": "A sua sessão expirou. Inicie sessão novamente.",

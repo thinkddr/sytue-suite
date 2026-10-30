@@ -3,18 +3,13 @@ Kanali, poruke i timski videopozivi na jednom mjestu.
 • Kanali po timu ili projektu.
 • Videopoziv ugrađen u svaki kanal.
 • Spominjanja i obavijesti objedinjeni u cijelom paketu.
-• Pretraživa povijest s bilo kojeg mjesta u Sytue Oneu.
 • Javni i privatni kanali u kategorijama; izravne poruke i grupe.
 • Niti, reakcije, spominjanja, prikvačene i spremljene poruke te skice.
 • Oblikovanje trakom „Aa” i prečacima: podebljano, kurziv, kod, citati, popisi i poveznice.
 • Privici, slike, GIF-ovi i prilagođeni emotikoni; datoteke iz Drivea.
-• Zakazano slanje, prioritet, potvrda čitanja i „vidjeli su”.
-• Naredbe s kosom crtom i kartice: ankete i zadaci koji se mogu dodijeliti.
-• Videopozivi unutar kanala: kamera, zaslon, podignuta ruka, chat i snimanje.
 • Zakazani sastanci i poveznice za pozivnice.
 • Botovi, webhookovi i integracije s drugim alatima.
 • Prisutnost i prilagođeni status; postavke obavijesti po kanalu.
-• Pretraživanje povijesti, i iz cijelog paketa.
 • Stvarno vrijeme preko WebSocketa, s ponovnim povezivanjem i bez izgubljenih poruka.
 
 Šifrirano u prijenosu (TLS 1.3). Infrastruktura Sytuea nalazi se u EU-u. Lokacija vanjskih usluga ovisi o njihovu pružatelju.

@@ -76,6 +76,18 @@ func TestExternalStorageReparaLa0023Original(t *testing.T) {
 			t.Fatalf("%v\n%s", err, sql)
 		}
 	}
+	// Later code also reads the pinned physical location. Replay that migration
+	// after rebuilding the historical schema, as a production upgrade does.
+	locations, err := fs.ReadFile(db.Migrations, path.Join(db.MigrationsDir, "0034_external_storage_locations.up.sql"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = admin.Exec(ctx, `DROP FUNCTION pin_external_storage_location(); DROP FUNCTION archive_external_storage_location(); DROP TABLE external_storage_locations;`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = admin.Exec(ctx, string(locations)); err != nil {
+		t.Fatal(err)
+	}
 
 	st := store.New(h.Pool)
 	e, err := st.ExternalStorage(tenantCtx("acme"))

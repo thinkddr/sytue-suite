@@ -1860,6 +1860,8 @@ export const en = {
   'extdata.msg.generic': 'The operation could not be completed.',
   'extdata.msg.notAllowed':
     "Only the people on this connection's list can query it. Ask your organisation's administrators to add you.",
+  'extdata.msg.ownerOnly':
+    'Only the person who created this connection or an organisation administrator can change or delete it.',
 
   // --- Avisos del editor de hojas ---
   'sheet.msg.badValue': 'Value not allowed',

@@ -16,6 +16,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"git.sytue.eu/sytue/one/apps/nucleo/auth/authtest"
 )
 
 // These inputs are artificial bytes, never a user response or decrypted E2E data.
@@ -103,7 +105,7 @@ func benchmarkTransportCache(b *testing.B, size int, mode string) {
 	data := bytes.Repeat([]byte{0xa5}, size)
 	source := &benchmarkSource{data: data}
 	dir := b.TempDir()
-	store, err := Open(dir)
+	store, err := OpenWithSecrets(dir, new(authtest.Secrets))
 	if err != nil {
 		b.Fatal(err)
 	}

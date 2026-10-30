@@ -443,7 +443,8 @@ export const nl: AppCatalog<typeof en> = {
   'product.cast.f2': 'Adaptieve weergave in drie kwaliteiten; de browser kiest de beste.',
   'product.cast.f3':
     'Livestreamen vanuit uitzendsoftware via RTMP, met een streamsleutel per persoon.',
-  'product.cast.f4': 'Live vanuit de browser of de app: camera, scherm en microfoon.',
+  'product.cast.f4':
+    'Live vanuit de browser of de app: camera en microfoon. Schermdelen in ondersteunde browsers, desktopsystemen en Android; niet beschikbaar in de iOS/iPadOS-app.',
   'product.cast.f5': 'Opnames van livestreams worden vanzelf video’s op aanvraag.',
   'product.cast.f6': 'Een openbare voorpagina en een kanaal per organisatie, indexeerbaar.',
   'product.cast.f7':

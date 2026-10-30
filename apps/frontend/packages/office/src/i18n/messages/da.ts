@@ -1699,6 +1699,8 @@ export const da: AppCatalog<typeof en> = {
   'extdata.msg.generic': 'Handlingen kunne ikke fuldføres.',
   'extdata.msg.notAllowed':
     'Kun personerne på forbindelsens liste kan forespørge den. Bed den, der administrerer organisationen, om at tilføje dig.',
+  'extdata.msg.ownerOnly':
+    'Kun den, der har oprettet forbindelsen, eller den, der administrerer organisationen, kan ændre eller slette den.',
   'sheet.msg.badValue': 'Værdien er ikke tilladt',
   'sheet.msg.clipboardDenied': 'Browseren nægtede adgang til udklipsholderen.',
   'sheet.msg.pasteFailed': 'Kunne ikke indsætte',

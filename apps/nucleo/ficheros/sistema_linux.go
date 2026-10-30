@@ -6,6 +6,7 @@
 package ficheros
 
 import (
+	"context"
 	"errors"
 	"os"
 	"os/exec"
@@ -121,9 +122,9 @@ func porFileManager1(abs string) error {
 	return obj.Call("org.freedesktop.FileManager1.ShowItems", 0, []string{"file://" + abs}, "").Err
 }
 
-// Abrir entrega el fichero a la aplicación que el sistema tenga asociada a su tipo: es el
+// abrirConContexto entrega el fichero a la aplicación que el sistema tenga asociada a su tipo: es el
 // «Abrir con…» del escritorio, y quien elige es la configuración de la persona, no Sytue.
-func Abrir(ruta string) error {
+func abrirConContexto(ctx context.Context, ruta string) error {
 	abs, err := local(ruta)
 	if err != nil {
 		return err
@@ -131,7 +132,7 @@ func Abrir(ruta string) error {
 	if _, err := exec.LookPath("xdg-open"); err != nil {
 		return ErrNoDisponible
 	}
-	return lanzar("xdg-open", abs)
+	return lanzarConContexto(ctx, "xdg-open", abs)
 }
 
 // Imprimir enseña el diálogo de impresión DEL SISTEMA con el fichero ya dentro, por el

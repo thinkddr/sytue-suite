@@ -3,6 +3,7 @@
 import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
 import { chromium } from "playwright";
+import { openWizardFixture } from "./lib/wizard-checks.mjs";
 
 const base = process.env.SYTUE_DM_FIXTURE_BASE;
 const fixtureURL =
@@ -49,6 +50,8 @@ async function fixture({
     { legacy },
   );
   const page = await context.newPage();
+  page.setDefaultTimeout(30000);
+  page.setDefaultNavigationTimeout(60000);
   activePage = page;
   let enabled = true;
   let fail = error;
@@ -71,7 +74,7 @@ async function fixture({
       json: fail ? { error: "unavailable" } : { enabled },
     });
   });
-  await page.goto(fixtureURL);
+  await openWizardFixture(page, fixtureURL);
   await page
     .getByRole("button", { name: "Organization", exact: true })
     .waitFor();

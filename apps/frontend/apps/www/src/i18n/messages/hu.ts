@@ -444,7 +444,8 @@ export const hu: AppCatalog<typeof en> = {
   'product.cast.f1': 'Töltsön fel legfeljebb 8 GiB-os videókat; az eredeti megmarad.',
   'product.cast.f2': 'Adaptív lejátszás három minőségben; a böngésző választja a legjobbat.',
   'product.cast.f3': 'Élő közvetítés közvetítőprogramból RTMP-n, személyenkénti adáskulccsal.',
-  'product.cast.f4': 'Élőben a böngészőből vagy az alkalmazásból: kamera, képernyő és mikrofon.',
+  'product.cast.f4':
+    'Élőben a böngészőből vagy az alkalmazásból: kamera és mikrofon. Képernyőmegosztás támogatott böngészőkben, asztali rendszereken és Androidon; az iOS/iPadOS-alkalmazásban nem érhető el.',
   'product.cast.f5': 'Az élő adások felvételei automatikusan igény szerinti videókká válnak.',
   'product.cast.f6': 'Nyilvános kezdőlap és szervezetenként egy csatorna, indexelhetően.',
   'product.cast.f7':

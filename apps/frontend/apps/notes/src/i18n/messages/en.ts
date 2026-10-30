@@ -114,6 +114,8 @@ export const en = {
   'backlinks.emptyHint': 'Link to it from another note and it will show up here, on its own.',
   'notebook.delete': 'Delete notebook',
   'notebook.deleteConfirm': 'Delete “{title}” and everything inside it?',
+  'notebook.ownerOnly':
+    'Only the person who created this notebook or an organisation administrator can move it, change who sees it or encrypt it.',
   'notebook.newChild': 'New notebook inside',
   'notebook.notes': { one: '{count} note', other: '{count} notes' },
   'notebook.emoji': 'Icon',

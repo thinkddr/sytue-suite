@@ -104,6 +104,7 @@
   "gallery.describeStop": "Leállítás",
   "gallery.described": "{count} fotó leírva",
   "gallery.describing": "Leírás: {done}/{total}…",
+  "gallery.downloadCapped": "Ebből a kötegből kimaradó fényképek: {count}.",
   "gallery.downloadSelected": "Letöltés",
   "gallery.downloading": {
     "one": "1 fotó letöltése…",

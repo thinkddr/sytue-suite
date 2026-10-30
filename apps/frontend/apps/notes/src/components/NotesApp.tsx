@@ -54,7 +54,7 @@ import {
   haySuperposicionAbierta,
   withBase,
 } from '@sytue/ui';
-import type { SytueUser } from '@sytue/auth';
+import { esCuentaPersonal, type SytueUser } from '@sytue/auth';
 import { MARCA_ORG, RE_SLUG_ORG, rutaConOrg } from '@sytue/config';
 import { contiene, translate, type Locale } from '@sytue/i18n';
 import type {
@@ -1121,8 +1121,14 @@ function NotesView({
         setAjustes(null);
         await cargarArbol();
         setActivo(nb);
-      } catch {
-        toast.notify({ tone: 'danger', title: t('note.saveFailed') });
+      } catch (err) {
+        toast.notify({
+          tone: 'danger',
+          title:
+            err instanceof api.NotesApiError && err.code === 'notebook_owner_only'
+              ? t('notebook.ownerOnly')
+              : t('note.saveFailed'),
+        });
       }
     },
     [ajustes, cargarArbol, toast, t],
@@ -1187,8 +1193,14 @@ function NotesView({
       try {
         await api.setNoteState(noteId, tagId, stateId);
         if (activo) setNotes(await api.listNotes(activo.id));
-      } catch {
-        toast.notify({ tone: 'danger', title: t('note.saveFailed') });
+      } catch (err) {
+        toast.notify({
+          tone: 'danger',
+          title:
+            err instanceof api.NotesApiError && err.code === 'notebook_owner_only'
+              ? t('notebook.ownerOnly')
+              : t('note.saveFailed'),
+        });
       }
     },
     [activo, toast, t],
@@ -1509,8 +1521,14 @@ function NotesView({
         } else {
           setTareas((ls) => (ls ?? []).filter((n) => n.id !== x.id));
         }
-      } catch {
-        toast.notify({ tone: 'danger', title: t('note.saveFailed') });
+      } catch (err) {
+        toast.notify({
+          tone: 'danger',
+          title:
+            err instanceof api.NotesApiError && err.code === 'notebook_owner_only'
+              ? t('notebook.ownerOnly')
+              : t('note.saveFailed'),
+        });
       }
     },
     [toast, t, estadoTareas, cargarRecordatorios],
@@ -1691,6 +1709,13 @@ function NotesView({
     nb.owner_sub === user.id &&
     !nb.daily_date &&
     (!nb.archived_at || raicesArchivadas(notebooks).some((r) => r.id === nb.id));
+
+  const puedeAdministrarCuaderno = (nb: Notebook) =>
+    (user.id !== '' && nb.owner_sub === user.id) ||
+    (nb.visibility === 'organization' &&
+      user.tenant !== '' &&
+      !esCuentaPersonal(user) &&
+      (user.roles.includes('owner') || user.roles.includes('admin')));
 
   vaciarRef.current = async () => {
     if (offline) return;
@@ -1876,15 +1901,23 @@ function NotesView({
                   const target = notebooks.find((n) => n.id === targetId);
                   const dragged = notebooks.find((n) => n.id === draggedId);
                   if (!target || !dragged || dragged.id === target.id) return;
+                  const targetParent = target.parent_id ?? null;
+                  const draggedParent = dragged.parent_id ?? null;
+                  if (targetParent !== draggedParent && !puedeAdministrarCuaderno(dragged)) {
+                    toast.notify({ tone: 'danger', title: t('notebook.ownerOnly') });
+                    return;
+                  }
                   try {
                     await api.updateNotebook(dragged.id, {
                       title: dragged.title,
-                      parent_id: target.parent_id ?? null,
+                      parent_id: targetParent,
                       position: target.position + 1,
                     });
                     await cargarArbol();
-                  } catch {
-                    // Revertir
+                  } catch (err) {
+                    if (err instanceof api.NotesApiError && err.code === 'notebook_owner_only') {
+                      toast.notify({ tone: 'danger', title: t('notebook.ownerOnly') });
+                    }
                   }
                 })();
               }}
@@ -2471,6 +2504,7 @@ function NotesView({
           t={t}
           notebook={ajustes.nb}
           parentId={ajustes.parentId ?? null}
+          puedeCambiarAcceso={!ajustes.nb || puedeAdministrarCuaderno(ajustes.nb)}
           onClose={() => setAjustes(null)}
           onSave={guardarCuaderno}
           {...(ajustes.nb && puedeArchivar(ajustes.nb)
@@ -2483,7 +2517,7 @@ function NotesView({
                 },
               }
             : {})}
-          {...(ajustes.nb
+          {...(ajustes.nb && user.id !== '' && ajustes.nb.owner_sub === user.id
             ? {
                 onDelete: () => {
                   const nb = ajustes.nb!;
@@ -2494,10 +2528,20 @@ function NotesView({
                     tone: 'danger',
                   }).then(async (ok) => {
                     if (!ok) return;
-                    await api.deleteNotebook(nb.id);
-                    setAjustes(null);
-                    setActivo(null);
-                    await cargarArbol();
+                    try {
+                      await api.deleteNotebook(nb.id);
+                      setAjustes(null);
+                      setActivo(null);
+                      await cargarArbol();
+                    } catch (err) {
+                      toast.notify({
+                        tone: 'danger',
+                        title:
+                          err instanceof api.NotesApiError && err.code === 'notebook_owner_only'
+                            ? t('notebook.ownerOnly')
+                            : t('note.saveFailed'),
+                      });
+                    }
                   });
                 },
               }

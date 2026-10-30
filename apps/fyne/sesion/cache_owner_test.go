@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"git.sytue.eu/sytue/one/apps/nucleo/auth/authtest"
+
 	"git.sytue.eu/sytue/one/apps/nucleo/auth"
 	"git.sytue.eu/sytue/one/apps/nucleo/offline"
 )
@@ -21,7 +23,7 @@ func suiteCacheIdentity(apex, issuer, sub, tenant string) *Suite {
 }
 
 func TestHTTPCacheOwnerSeparatesDeploymentsIssuersAndUnambiguousComponents(t *testing.T) {
-	store, err := offline.Open(filepath.Join(t.TempDir(), "offline"))
+	store, err := offline.OpenWithSecrets(filepath.Join(t.TempDir(), "offline"), new(authtest.Secrets))
 	if err != nil {
 		t.Fatal(err)
 	}

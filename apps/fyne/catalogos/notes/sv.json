@@ -271,6 +271,7 @@
     "one": "{count} anteckning",
     "other": "{count} anteckningar"
   },
+  "notebook.ownerOnly": "Bara den som skapade anteckningsboken eller den som administrerar organisationen kan flytta den, ändra vem som ser den eller kryptera den.",
   "notebook.rename": "Byt namn",
   "notebook.settings": "Inställningar för anteckningsboken",
   "notebook.title": "Namn",

@@ -108,6 +108,7 @@
   "gallery.describeStop": "Ustavi",
   "gallery.described": "{count} fotografij opisanih",
   "gallery.describing": "Opisovanje {done} od {total}…",
+  "gallery.downloadCapped": "Fotografije zunaj tega paketa: {count}.",
   "gallery.downloadSelected": "Prenesi",
   "gallery.downloading": {
     "one": "Prenašanje {count} fotografije…",

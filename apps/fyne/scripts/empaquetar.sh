@@ -896,7 +896,7 @@ PY
   fi
   if [ -n "$host" ]; then
     perfil="$dir/perfil.plist"
-    security cms -D -i "$app/embedded.mobileprovision" >"$perfil" 2>/dev/null || {
+    python3 "$AQUI/apple_perfil.py" decodificar "$app/embedded.mobileprovision" ios >"$perfil" 2>/dev/null || {
       echo "::error::$ipa no trae un embedded.mobileprovision legible." >&2
       exit 1
     }
@@ -947,7 +947,7 @@ firmar_tienda() { # <.app> <dir de la app> <app id>
   echo "   perfil: $perfil"
   claro="$(mktemp)"
   ent="$(mktemp)"
-  security cms -D -i "$perfil" >"$claro" 2>/dev/null || {
+  python3 "$AQUI/apple_perfil.py" decodificar "$perfil" macappstore >"$claro" 2>/dev/null || {
     echo "::error::el perfil de $appid ($perfil) no se deja leer." >&2
     exit 1
   }
@@ -2749,6 +2749,7 @@ $(nsis_mesa "$ESCENARIO/mesa")
   ; Entre comillas: la carpeta lleva espacio («Sytue One») y Windows probaría antes
   ; «…\Programs\Sytue.exe» (FYP-05).
   WriteRegStr HKCU "$desinstalar" "UninstallString" '"\$INSTDIR\\Desinstalar.exe"'
+  WriteRegStr HKCU "$desinstalar" "QuietUninstallString" '"\$INSTDIR\\Desinstalar.exe" /S'
   WriteRegStr HKCU "$desinstalar" "DisplayVersion" "$version"
   WriteRegStr HKCU "$desinstalar" "InstallLocation" "\$INSTDIR"
   WriteUninstaller "\$INSTDIR\\Desinstalar.exe"

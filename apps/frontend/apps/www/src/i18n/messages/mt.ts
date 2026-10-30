@@ -437,7 +437,8 @@ export const mt: AppCatalog<typeof en> = {
     'Riproduzzjoni adattiva fi tliet kwalitajiet; il-browser jagħżel l-aħjar waħda.',
   'product.cast.f3':
     'Xandir dirett minn softwer tax-xandir permezz ta’ RTMP, b’ċavetta tal-fluss għal kull persuna.',
-  'product.cast.f4': 'Dirett mill-browser jew mill-app: kamera, skrin u mikrofonu.',
+  'product.cast.f4':
+    'Dirett mill-browser jew mill-app: kamera u mikrofonu. Qsim tal-iskrin fi browsers, sistemi desktop u Android appoġġjati; mhux disponibbli fl-app iOS/iPadOS.',
   'product.cast.f5':
     'Ir-reġistrazzjonijiet tax-xandiriet diretti jsiru vidjos fuq talba awtomatikament.',
   'product.cast.f6': 'Paġna ewlenija pubblika u kanal għal kull organizzazzjoni, indiċjabbli.',

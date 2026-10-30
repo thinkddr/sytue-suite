@@ -115,6 +115,59 @@ func MostrarFoco(s *container.Scroll, c fyne.Canvas, tapado float32) bool {
 	return true
 }
 
+// RevelarFocoEnScroll mantiene a la vista los controles de navegación compartidos.
+// Conserva AlEnfocar y sustituye solamente el revelador del viewport que los contiene,
+// de modo que reconstruir el lateral no acumula callbacks de scrolls retirados.
+// Devuelve si el foco pertenece a este árbol: al redimensionar no basta con que un
+// control de otra capa coincida geométricamente con el viewport.
+func RevelarFocoEnScroll(s *container.Scroll, o fyne.CanvasObject) bool {
+	if s == nil || o == nil {
+		return false
+	}
+	var foco fyne.CanvasObject
+	if c := lienzoDe(s); c != nil {
+		foco, _ = c.Focused().(fyne.CanvasObject)
+	}
+	return revelarFocoEnScroll(s, o, foco)
+}
+
+// El lienzo se consulta una vez, antes de recorrer el cuerpo. Los callbacks
+// consultan el foco al activarse para respetar los cambios de capa posteriores.
+func revelarFocoEnScroll(s *container.Scroll, o, foco fyne.CanvasObject) bool {
+	if o == nil {
+		return false
+	}
+	enfocado := o == foco
+	if r, ok := o.(interface{ revelarAlFoco(func()) }); ok {
+		r.revelarAlFoco(func() {
+			if c := lienzoDe(o); c != nil {
+				if enfocado, es := c.Focused().(fyne.CanvasObject); es && enfocado == o {
+					MostrarFoco(s, c, 0)
+				}
+			}
+		})
+	}
+	switch v := o.(type) {
+	case *fyne.Container:
+		for _, h := range v.Objects {
+			if revelarFocoEnScroll(s, h, foco) {
+				enfocado = true
+			}
+		}
+	case *container.Scroll:
+		enfocado = revelarFocoEnScroll(s, v.Content, foco) || enfocado
+	case *Pista:
+		enfocado = revelarFocoEnScroll(s, v.Hijo, foco) || enfocado
+	case conHijos:
+		for _, h := range v.hijosDeCajon() {
+			if revelarFocoEnScroll(s, h, foco) {
+				enfocado = true
+			}
+		}
+	}
+	return enfocado
+}
+
 // AlEscribir, si no es nil, se llama cuando un campo de la suite recibe el foco en el
 // teléfono, con su lienzo: es donde la app deja el campo a la vista por encima del
 // teclado (MostrarFoco), que en el teléfono Fyne no hace.

@@ -203,9 +203,10 @@ func (t *TarjetaDrive) grosorHalo() float32 {
 // MargenEsquina es el `top-1.5`/`left-1.5`/`right-1.5` de la casilla y del «⋯».
 const MargenEsquina float32 = 1.5 * 0.25 * tema.Rem
 
-// cajaMasTarjeta es dónde cae el «⋯»: 28 × 28 en la esquina de arriba a la derecha.
+// cajaMasTarjeta es dónde cae el «⋯»: en el teléfono conserva el blanco de 44 px.
 func cajaMasTarjeta(t fyne.Size) (fyne.Position, fyne.Size) {
-	return fyne.NewPos(t.Width-MargenEsquina-ui.LadoMasFila, MargenEsquina), fyne.NewSize(ui.LadoMasFila, ui.LadoMasFila)
+	lado := ui.SueloTactil(ui.LadoMasFila)
+	return fyne.NewPos(t.Width-MargenEsquina-lado, MargenEsquina), fyne.NewSize(lado, lado)
 }
 
 func (t *TarjetaDrive) enMas(p fyne.Position) bool {
@@ -384,9 +385,13 @@ func (r *tarjetaRenderer) Layout(t fyne.Size) {
 	r.colocarHalo(t)
 	if r.casilla != nil {
 		m := ui.MedidaEleccion("")
+		m.Width, m.Height = ui.SueloTactil(m.Width), ui.SueloTactil(m.Height)
 		x := MargenEsquina
 		if r.t.Franja {
 			x = t.Width - CasillaFranja - m.Width
+			if ui.EsTactil() {
+				x = t.Width - MargenEsquina - ui.SueloTactil(ui.LadoMasFila) - tema.Espacio(1) - m.Width
+			}
 		}
 		r.casilla.Move(fyne.NewPos(x, MargenEsquina))
 		r.casilla.Resize(m)

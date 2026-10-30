@@ -38,6 +38,7 @@ import {
   lineaVertical,
 } from './detector-desbordamiento.mjs';
 import { DETECTOR_MARGENES, lineaMargen } from './detector-margenes.mjs';
+import { esperarCajones } from './esperar-cajones.mjs';
 
 /**
  * QUÉ SE MIDE. Por defecto, desbordamiento horizontal. `AUDITAR=margenes` mide
@@ -875,6 +876,9 @@ async function conDesplegablesAbiertos(page) {
   for (let i = 0; i < Math.min(n, 6); i++) {
     await page.evaluate((k) => globalThis.__sytueDisparadores[k]?.click(), i);
     await page.waitForTimeout(400);
+    // El reloj externo no certifica que Chromium haya terminado el transform.
+    // El detector conserva su umbral de 1px y mide el cajón ya en reposo.
+    await esperarCajones(page);
     const r = await page.evaluate(MEDIDOR);
     if (!MARGENES) await page.evaluate(DETECTOR_FUGAS);
     unir(hallazgos, r.hallazgos);
@@ -1031,18 +1035,19 @@ if (sinCubrir.length)
 // Salidas SEPARADAS por superficie: los dos barridos corren en el mismo runner
 // y con un solo destino el segundo borraría las capturas y el informe del
 // primero — y el informe borrado es siempre el que hacía falta leer.
-const SALIDA = createReportDirectory(ESCRITORIO ? 'escritorio' : 'mobile');
+const SALIDA = createReportDirectory(ESCRITORIO ? 'escritorio' : 'mobile', process.env.MOBILE_AUDIT_OUT);
 const INFORME = `${SALIDA}/informe.json`;
-mkdirSync(SALIDA, { recursive: true });
-const browser = await chromium.launch();
-const informe = [];
-
 // PERFILES="Moto G4,Galaxy S9+" acota el barrido a esos perfiles: para iterar
 // sobre un arreglo concreto sin esperar a los dieciocho.
 const PEDIDOS = (process.env.PERFILES || '')
   .split(',')
   .map((s) => s.trim())
   .filter(Boolean);
+const desconocidos = PEDIDOS.filter((n) => !ELEGIDOS.some(([nombre]) => nombre === n));
+if (desconocidos.length) throw new Error(`Perfiles desconocidos: ${desconocidos.join(', ')}`);
+mkdirSync(SALIDA, { recursive: true });
+const browser = await chromium.launch();
+const informe = [];
 
 for (const [nombre, perfil, opts] of ELEGIDOS) {
   if (PEDIDOS.length && !PEDIDOS.includes(nombre)) continue;

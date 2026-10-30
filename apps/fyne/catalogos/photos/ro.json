@@ -106,6 +106,7 @@
   "gallery.describeStop": "Oprește",
   "gallery.described": "{count} fotografii descrise",
   "gallery.describing": "Se descrie {done} din {total}…",
+  "gallery.downloadCapped": "Fotografii din afara acestui lot: {count}.",
   "gallery.downloadSelected": "Descarcă",
   "gallery.downloading": {
     "one": "Se descarcă 1 fotografie…",

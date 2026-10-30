@@ -271,6 +271,7 @@
     "one": "{count} notitie",
     "other": "{count} notities"
   },
+  "notebook.ownerOnly": "Alleen wie dit notitieboek heeft aangemaakt of wie de organisatie beheert kan het verplaatsen, de zichtbaarheid wijzigen of het versleutelen.",
   "notebook.rename": "Hernoemen",
   "notebook.settings": "Instellingen van het notitieboek",
   "notebook.title": "Naam",

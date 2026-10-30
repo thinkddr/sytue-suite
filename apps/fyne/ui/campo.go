@@ -551,6 +551,9 @@ func (e *Entrada) FocusGained() { e.editor.FocusGained() }
 // FocusLost se lo quita.
 func (e *Entrada) FocusLost() { e.editor.FocusLost() }
 
+// Enfocado incluye el editor interno, que recibe el foco al tocar el campo.
+func (e *Entrada) Enfocado() bool { return e.enfocado }
+
 // TypedRune pasa la letra al editor. Un campo de solo lectura se las come: tiene el
 // foco y el cursor, pero no cambia.
 func (e *Entrada) TypedRune(r rune) {

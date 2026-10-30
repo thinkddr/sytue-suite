@@ -65,6 +65,31 @@ def normalizar_clave(valor):
 
 
 
+def normalizar_clave_firma(valor):
+    """Material de firma CI en memoria; nunca referencias a archivos/variables."""
+    if not isinstance(valor, str) or not 0 < len(valor) <= 65536:
+        raise ValueError("contenido de clave de firma inválido")
+    texto = valor.strip().lstrip("\ufeff").replace("\\r\\n", "\n").replace("\\n", "\n").replace("\r\n", "\n")
+    if texto.startswith("@"):
+        raise ValueError("referencia de clave de firma no permitida")
+    if not texto.startswith("-----BEGIN "):
+        try:
+            datos = base64.b64decode("".join(texto.split()), validate=True)
+            if not datos.startswith(b"\x30"):
+                texto = datos.decode("utf8").strip().lstrip("\ufeff").replace("\\r\\n", "\n").replace("\\n", "\n").replace("\r\n", "\n")
+        except (binascii.Error, UnicodeError, ValueError):
+            raise ValueError("contenido de clave de firma inválido") from None
+        if texto.startswith("@"):
+            raise ValueError("referencia de clave de firma no permitida")
+    tipo = "RSA PRIVATE KEY"
+    rsa = re.fullmatch(rf"-----BEGIN {tipo}-----\s+([A-Za-z0-9+/=\s]+)\s+-----END {tipo}-----", texto)
+    if rsa:
+        datos = base64.b64decode("".join(rsa[1].split()), validate=True)
+        cuerpo = base64.b64encode(datos).decode("ascii")
+        return f"-----BEGIN {tipo}-----\n" + "\n".join(cuerpo[i:i+64] for i in range(0, len(cuerpo), 64)) + f"\n-----END {tipo}-----\n"
+    return normalizar_clave(texto)
+
+
 def guardar(ruta):
     """Materializa un PEM nuevo con permisos 600; nunca imprime la credencial."""
     try:

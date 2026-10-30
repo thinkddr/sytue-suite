@@ -27,6 +27,10 @@ type pantallaAndroid struct {
 	cerrada bool
 }
 
+// PantallaDisponible indica que este destino implementa la captura; los permisos
+// y el acceso al equipo se comprueban al abrirla.
+const PantallaDisponible = true
+
 func abrirPantalla() (Fuente, error) {
 	err := llamarClase(clasePantalla, func(env jni.Env, ctx jni.Object, cls jni.Class) error {
 		m := jni.GetStaticMethodID(env, cls, "pedir", "(Landroid/content/Context;Ljava/lang/String;)V")

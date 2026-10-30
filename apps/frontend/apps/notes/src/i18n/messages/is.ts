@@ -115,6 +115,8 @@ export const is: AppCatalog<typeof en> = {
   'backlinks.emptyHint': 'Tengdu á hann úr öðrum minnispunkti og hann birtist hér af sjálfu sér.',
   'notebook.delete': 'Eyða minnisbók',
   'notebook.deleteConfirm': 'Eyða „{title}“ og öllu sem í henni er?',
+  'notebook.ownerOnly':
+    'Aðeins sá sem bjó minnisbókina til eða stjórnandi stofnunarinnar getur fært hana, breytt sýnileika hennar eða dulkóðað hana.',
   'notebook.newChild': 'Ný minnisbók innan í',
   'notebook.notes': { one: '{count} minnispunktur', other: '{count} minnispunktar' },
   'notebook.emoji': 'Táknmynd',

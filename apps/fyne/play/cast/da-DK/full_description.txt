@@ -6,7 +6,7 @@ Dine videoer og dine livestreams, på forespørgsel og i realtid, uden at forlad
 • Livechat og kommentarer, med grundlæggende moderation af den, der udgiver.
 • Upload videoer på op til 8 GiB; originalen bevares.
 • Livestreaming fra et udsendelsesprogram via RTMP, med en streamnøgle pr. person.
-• Live fra browseren eller appen: kamera, skærm og mikrofon.
+• Live fra browseren eller appen: kamera og mikrofon. Skærmdeling i understøttede browsere, computersystemer og Android; ikke tilgængelig i iOS/iPadOS-appen.
 • Optagelser af livestreams bliver automatisk til videoer på forespørgsel.
 • En offentlig forside og en kanal pr. organisation, indekserbare.
 • Ikke-listede links, videoer kun for organisationen eller adgang for bestemte personer via @brugernavn.

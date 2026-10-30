@@ -116,6 +116,8 @@ export const es: AppCatalog<typeof en> = {
   'backlinks.emptyHint': 'Enlázala desde otra nota y aparecerá aquí, sola.',
   'notebook.delete': 'Eliminar cuaderno',
   'notebook.deleteConfirm': '¿Eliminar «{title}» y todo lo que contiene?',
+  'notebook.ownerOnly':
+    'Solo quien creó el cuaderno o quien administra la organización puede moverlo, cambiar quién lo ve o cifrarlo.',
   'notebook.newChild': 'Nuevo cuaderno dentro',
   'notebook.notes': { one: '{count} nota', other: '{count} notas' },
   'notebook.emoji': 'Icono',

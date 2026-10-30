@@ -64,6 +64,10 @@ var (
 
 var formasUI = editor.FormasUI
 
+// El h-9 de escritorio contiene un mando de 28; con el dedo la fila debe contener
+// los 44 completos más su borde, sin centrar un botón mayor en un recorte de 35.
+func altoMiniBarra() float32 { return ui.SueloTactil(AltoMiniBarra-tema.Borde) + tema.Borde }
+
 var disposicionesSmartUI = editor.DisposicionesSmartUI
 
 // paletaFondo es SLIDE_BG_PALETTE: 'transparent' (el del tema) y los sólidos de los
@@ -150,10 +154,12 @@ type Editor struct {
 	// no depender del tiempo.
 	Programar func(time.Duration, func())
 
-	raiz      *fyne.Container
-	carril    *carrilDiapos
-	zona      *fyne.Container
-	miniBarra *fyne.Container
+	raiz   *fyne.Container
+	carril *carrilDiapos
+	zona   *fyne.Container
+	// El escenario y sus paneles conservan un viewport propio con poco alto.
+	deslizZona *container.Scroll
+	miniBarra  *fyne.Container
 	// deslizBarra es el `overflow-x-auto` de la mini-barra: en un teléfono sus ~483 px
 	// de controles no caben y se desliza de lado, sin encoger ninguno.
 	deslizBarra *container.Scroll
@@ -162,6 +168,7 @@ type Editor struct {
 	desliz      *container.Scroll
 	notas       *panelNotas
 	avisos      *ui.PilaAvisos
+	menuDiapos  *ui.Menu
 }
 
 var _ editor.Lienzo = (*Editor)(nil)
@@ -186,7 +193,8 @@ func NuevoEditor(ctx *editor.Contexto) *Editor {
 	e.miniBarra = container.New(&filaMiniBarra{})
 	e.deslizBarra = container.NewHScroll(e.miniBarra)
 	e.zona = container.New(&zonaDiapo{e: e})
-	e.raiz = container.New(&disposicionDiapos{e: e}, e.carril, e.zona)
+	e.deslizZona = container.NewVScroll(e.zona)
+	e.raiz = container.New(&disposicionDiapos{e: e}, e.carril, e.deslizZona)
 	e.recomponer()
 	return e
 }
@@ -216,6 +224,7 @@ func (e *Editor) EditarPatron() {
 	e.patron, e.diseno, e.abajo = true, "", ""
 	e.sel, e.extra, e.selCon = "", nil, ""
 	e.recomponer()
+	e.refrescarCinta()
 }
 
 // EditarDiseno abre en el modo patrón la edición del diseño `id` (tanto sus formas
@@ -228,6 +237,7 @@ func (e *Editor) EditarDiseno(id string) {
 	e.patron, e.diseno, e.abajo = true, id, ""
 	e.sel, e.extra, e.selCon = "", nil, ""
 	e.recomponer()
+	e.refrescarCinta()
 }
 
 // DisenoEditado devuelve el id del diseño que se está editando en el modo patrón, o "".
@@ -247,6 +257,7 @@ func (e *Editor) CerrarPatron() {
 	e.patron, e.diseno = false, ""
 	e.sel, e.extra, e.selCon = "", nil, ""
 	e.recomponer()
+	e.refrescarCinta()
 }
 
 // EditandoPatron dice si el escenario edita el patrón.
@@ -473,18 +484,31 @@ const (
 // alternarAbajo abre ese panel o, si ya estaba abierto, lo cierra: los botones de la
 // mini-barra son conmutadores.
 func (e *Editor) alternarAbajo(p string) {
+	// En horizontal las notas abiertas viven debajo del escenario, no le quitan
+	// altura. El primer toque las lleva a la vista; otro toque vuelve al escenario.
+	if e.compacto() && e.abajo == p && e.deslizZona.Offset.Y == 0 {
+		e.deslizZona.ScrollToBottom()
+		return
+	}
 	if e.abajo == p {
 		e.abajo = ""
 	} else {
 		e.abajo = p
 	}
 	e.recomponer()
+	e.refrescarCinta()
+	if e.compacto() {
+		if e.abajo != "" {
+			e.deslizZona.ScrollToBottom()
+		} else {
+			e.deslizZona.ScrollToTop()
+		}
+	}
 }
 
 // AlternarNotas es el conmutador de notas de la mini-barra.
 func (e *Editor) AlternarNotas() {
 	e.alternarAbajo(abajoNotas)
-	e.recomponer()
 }
 
 // NuevaCajaTexto es `addTextBox`.
@@ -797,7 +821,22 @@ func (d disposicionDiapos) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 	objs[0].Move(fyne.NewPos(0, 0))
 	tira := d.e.enTira()
 	if tira != d.e.carril.tira {
-		d.e.carril.ponerTira(tira) // la ventana ha cruzado los 640
+		d.e.carril.ponerTira(tira)
+	}
+	if d.e.compacto() {
+		objs[0].Hide()
+		objs[1].Move(fyne.NewPos(0, 0))
+		objs[1].Resize(t)
+		return
+	}
+	objs[0].Show()
+	if d.e.menuDiapos != nil {
+		abierto := d.e.menuDiapos.Abierto()
+		d.e.menuDiapos.Cerrar()
+		d.e.menuDiapos = nil
+		if abierto {
+			d.e.capa.enfocar()
+		}
 	}
 	if tira {
 		alto := d.e.carril.altoTira()
@@ -811,14 +850,18 @@ func (d disposicionDiapos) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 	objs[1].Resize(fyne.NewSize(max(t.Width-AnchoCarrilDiapos, 0), t.Height))
 }
 
+func (e *Editor) compacto() bool { return editor.CompactoHorizontal(e.raiz) }
+
 // enTira dice si la VENTANA es de teléfono: `max-sm:` mide la ventana con el rem de
 // 16 del navegador (640 px), no el hueco del lienzo, que es 80 px más estrecho.
 func (e *Editor) enTira() bool {
-	ancho := e.raiz.Size().Width
+	tamano := e.raiz.Size()
 	if c := fyne.CurrentApp().Driver().CanvasForObject(e.raiz); c != nil {
-		ancho = c.Size().Width
+		tamano = c.Size()
 	}
-	return ancho > 0 && ancho < ui.CorteSM
+	// En horizontal la tira consume 89 px antes del escenario. La columna deja
+	// ese alto disponible, aunque el teléfono siga midiendo menos de 640 px.
+	return tamano.Width > 0 && tamano.Width < ui.CorteSM && tamano.Height >= tamano.Width
 }
 
 // zonaDiapo apila la mini-barra, la banda de aviso si la hay, el área del escenario
@@ -826,14 +869,43 @@ func (e *Editor) enTira() bool {
 // llegan en ese orden desde `recomponer`.
 type zonaDiapo struct{ e *Editor }
 
-func (z *zonaDiapo) MinSize([]fyne.CanvasObject) fyne.Size { return fyne.NewSize(240, 160) }
+func (z *zonaDiapo) MinSize(objs []fyne.CanvasObject) fyne.Size {
+	ancho := float32(240)
+	if z.e.zona != nil {
+		ancho = max(z.e.zona.Size().Width, ancho)
+	}
+	altos, area := z.altosFijos(objs, ancho)
+	altos[area] = 160 // el escenario sigue teniendo área antes de los paneles inferiores
+	if z.e.compacto() {
+		// El panel inferior se alcanza con su scroll; nunca encoge la escena para
+		// hacer caber al mismo tiempo notas, aviso y diapositiva.
+		altos[area] = max(z.e.deslizZona.Size().Height, 160)
+		for _, h := range altos[:area] {
+			altos[area] -= h
+		}
+	}
+	var alto float32
+	for _, h := range altos {
+		alto += h
+	}
+	return fyne.NewSize(240, alto)
+}
 
-func (z *zonaDiapo) Layout(objs []fyne.CanvasObject, t fyne.Size) {
+func (z *zonaDiapo) altosFijos(objs []fyne.CanvasObject, ancho float32) ([]float32, int) {
 	altos := make([]float32, len(objs))
-	altos[0] = AltoMiniBarra
+	if len(objs) == 0 {
+		return []float32{0}, 0
+	}
+	altos[0] = altoMiniBarra()
+	if z.e.compacto() {
+		objs[0].Hide()
+		altos[0] = 0
+	} else {
+		objs[0].Show()
+	}
 	area := 1
 	if b, ok := objs[area].(*bandaPatron); ok {
-		altos[area] = b.alto(t.Width)
+		altos[area] = b.alto(ancho)
 		area++
 	}
 	if z.e.aviso != "" {
@@ -841,8 +913,13 @@ func (z *zonaDiapo) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 		area++
 	}
 	if area+1 < len(objs) {
-		altos[area+1] = ui.AltoA(objs[area+1], t.Width)
+		altos[area+1] = ui.AltoA(objs[area+1], ancho)
 	}
+	return altos, area
+}
+
+func (z *zonaDiapo) Layout(objs []fyne.CanvasObject, t fyne.Size) {
+	altos, area := z.altosFijos(objs, t.Width)
 	var fijo float32
 	for _, a := range altos {
 		fijo += a
@@ -860,7 +937,9 @@ func (z *zonaDiapo) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 // mini-barra (`h-9 border-b bg-surface`).
 type bandaInferior struct{}
 
-func (bandaInferior) MinSize([]fyne.CanvasObject) fyne.Size { return fyne.NewSize(0, AltoMiniBarra) }
+func (bandaInferior) MinSize([]fyne.CanvasObject) fyne.Size {
+	return fyne.NewSize(0, altoMiniBarra())
+}
 
 func (bandaInferior) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 	objs[0].Resize(t)
@@ -888,7 +967,7 @@ func (filaMiniBarra) ancho(objs []fyne.CanvasObject) float32 {
 }
 
 func (f filaMiniBarra) MinSize(objs []fyne.CanvasObject) fyne.Size {
-	return fyne.NewSize(f.ancho(objs)+2*tema.Espacio(1), AltoMiniBarra-tema.Borde)
+	return fyne.NewSize(f.ancho(objs)+2*tema.Espacio(1), altoMiniBarra()-tema.Borde)
 }
 
 func (f filaMiniBarra) Layout(objs []fyne.CanvasObject, t fyne.Size) {
@@ -914,18 +993,32 @@ type areaDiapo struct {
 }
 
 func (a *areaDiapo) escala() float32 {
+	if a.e.compacto() {
+		// Encajar por alto convertía el cuerpo de 20 px en texto de 3–4 px. A
+		// 100 % se conserva un suelo de lectura de 12 dp y se desplaza la escena
+		// con el Scroll existente. El zoom explícito sigue perteneciendo al usuario.
+		k := a.e.m.Encaje(a.desliz.Size(), 2*a.relleno(), 100)
+		return max(12/tamCuerpo, k) * float32(a.e.ctx.Zoom) / 100
+	}
 	return a.e.m.Encaje(a.desliz.Size(), HuecoEncaje, float32(a.e.ctx.Zoom))
+}
+
+func (a *areaDiapo) relleno() float32 {
+	if a.e.compacto() {
+		return tema.Espacio(2)
+	}
+	return RellenoArea
 }
 
 func (a *areaDiapo) MinSize([]fyne.CanvasObject) fyne.Size {
 	k := a.escala()
-	return fyne.NewSize(AnchoEscenario*k+2*RellenoArea, a.e.m.AltoEscenario()*k+2*RellenoArea)
+	return fyne.NewSize(AnchoEscenario*k+2*a.relleno(), a.e.m.AltoEscenario()*k+2*a.relleno())
 }
 
 func (a *areaDiapo) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 	k := a.escala()
 	esc := fyne.NewSize(AnchoEscenario*k, a.e.m.AltoEscenario()*k)
-	pos := fyne.NewPos(max((t.Width-esc.Width)/2, RellenoArea), max((t.Height-esc.Height)/2, RellenoArea))
+	pos := fyne.NewPos(max((t.Width-esc.Width)/2, a.relleno()), max((t.Height-esc.Height)/2, a.relleno()))
 	a.e.escenario.Escala = k
 	a.e.escenario.Move(pos)
 	a.e.escenario.Resize(esc)
@@ -1031,7 +1124,7 @@ func (r *carrilRenderer) Destroy() {}
 
 func (r *carrilRenderer) Layout(t fyne.Size) {
 	r.fondo.Resize(t)
-	lado, p1 := editor.LadoBotonCinta, tema.Espacio(1)
+	lado, p1 := ui.SueloTactil(editor.LadoBotonCinta), tema.Espacio(1)
 	anchoPie := float32(len(r.c.pie))*lado + float32(max(len(r.c.pie)-1, 0))*p1
 	if r.c.tira {
 		r.layoutTira(t, lado, anchoPie)
@@ -1040,7 +1133,7 @@ func (r *carrilRenderer) Layout(t fyne.Size) {
 	dentro := t.Width - tema.Borde // `border-r` dentro de los 160
 	r.borde.Move(fyne.NewPos(dentro, 0))
 	r.borde.Resize(fyne.NewSize(tema.Borde, t.Height))
-	arriba := max(t.Height-AltoPieCarril, 0)
+	arriba := max(t.Height-(AltoPieCarril+lado-editor.LadoBotonCinta), 0)
 	r.c.desliz.Move(fyne.NewPos(0, 0))
 	r.c.desliz.Resize(fyne.NewSize(dentro, arriba))
 	r.lineaP.Move(fyne.NewPos(0, arriba))

@@ -1,17 +1,24 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 import { withBase } from '@sytue/ui';
+import { productColor } from '@sytue/config';
 import { MatrixSecurityError } from './types.js';
 export function opaqueMatrixNative(value: unknown): value is string {
   return typeof value === 'string' && /^[A-Za-z0-9_-]{43}$/.test(value);
 }
 export function matrixNativeReturn(input: unknown, state: string): string {
   if (!input || typeof input !== 'object') throw new MatrixSecurityError('identity');
-  const result = input as { ticket?: unknown; redirect_url?: unknown };
+  const result = input as { ticket?: unknown; redirect_url?: unknown; product?: unknown };
   if (!opaqueMatrixNative(result.ticket) || typeof result.redirect_url !== 'string')
     throw new MatrixSecurityError('identity');
   const url = new URL(result.redirect_url);
+  // The server fixes the product in the actor/tenant/PKCE grant. Reuse the
+  // suite catalog to narrow the custom scheme; never accept a return_to URL.
+  const product = result.product ?? 'rooms';
+  if (typeof product !== 'string') throw new MatrixSecurityError('identity');
+  const native = product === 'hub' ? 'one' : product;
+  if (!Object.hasOwn(productColor, native)) throw new MatrixSecurityError('identity');
   if (
-    url.protocol !== 'sytue-rooms:' ||
+    url.protocol !== `sytue-${native}:` ||
     url.host !== 'matrix' ||
     url.pathname !== '/callback' ||
     url.username ||

@@ -501,7 +501,7 @@ func (b *rtBuilder) tramo(n *html.Node, f xrun) {
 func (b *rtBuilder) indice(n *html.Node, f xrun) {
 	if n.DataAtom == atom.Sup {
 		if note := b.notes[attr(n, "data-footnote-ref")]; note != nil {
-			b.para().runs = append(b.para().runs, xrun{note: note})
+			b.para().runs = append(b.para().runs, xrun{note: note, track: f.track, mark: f.mark})
 			return
 		}
 	}
@@ -811,6 +811,7 @@ func (b *rtBuilder) region(n *html.Node, f xrun) bool {
 	}
 	b.flush()
 	sub := &rtBuilder{office: true, depth: b.depth}
+	sub.open(xpara{})
 	sub.children(n, f)
 	sub.flush()
 	p := &xpara{}

@@ -39,6 +39,9 @@ type Caja struct {
 	Rotulo string
 	// AlSalir es Escape; AlPerderFoco, cuando el foco se va (el `blur` de la web).
 	AlSalir, AlPerderFoco func()
+	// AlDesplazar recibe el gesto táctil fuera de los tiradores de selección. Una
+	// caja recorta con ScrollNone: el desplazamiento pertenece a su escenario.
+	AlDesplazar func(*fyne.ScrollEvent)
 }
 
 // NuevoFolioCaja crea el folio de una caja. El contexto es el del folio, no el del

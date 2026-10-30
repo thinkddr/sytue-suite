@@ -16,6 +16,7 @@ import (
 	"fyne.io/fyne/v2/test"
 
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
+	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 )
@@ -52,8 +53,17 @@ func cintaAncha(t *testing.T, ancho float32) (*Cinta, fyne.Window) {
 // que es lo que pasaba en Calcus a 1280 con «Ventana» y «Proteger». La banda acaba antes de
 // «Más», «Más» va en la fila de controles, y el último grupo se alcanza desplazando.
 // VISTO EN ROJO con la banda sin DesplazaLado (el último grupo empezaba en x=1.6xx).
-func TestLaBandaQueNoCabeSeDesplazaYTieneMas(t *testing.T) {
+func TestLaBandaQueNoCabeSeDesplazaYTieneMasDespuesDeGirar(t *testing.T) {
+	defer ui.TactilDePrueba(false)()
 	c, _ := cintaAncha(t, 1280)
+	if c.Size().Height != AltoCinta() || c.banda.Size().Height != AltoBanda-tema.Borde {
+		t.Fatal("el puntero fino perdió la banda de escritorio")
+	}
+	for _, o := range objetosDeBanda(c.cuerpo) {
+		if g, ok := o.(*Grupo); ok && (g.AlPrincipio || !g.conRotulo()) {
+			t.Fatal("el puntero fino perdió los rótulos de sus grupos")
+		}
+	}
 	if !c.mas.Visible() {
 		t.Fatal("la banda no cabe y no hay «Más»")
 	}
@@ -95,6 +105,25 @@ func TestLaBandaMovilAlcanzaLosExtremosYAbreSusPaneles(t *testing.T) {
 			w.Resize(fyne.NewSize(ancho, 740))
 			c := m.cinta
 			alto := c.Size().Height
+			quiereAlto := AltoDeTira() + AltoBandaEstrecha
+			if alto != quiereAlto || c.Alto(ancho) != quiereAlto || c.MinSize().Height != quiereAlto || c.banda.Size().Height != AltoBandaEstrecha-tema.Borde {
+				t.Fatalf("a %g táctil: cinta %g/%g, mínimo %g, banda %g; se necesita una fila sin rótulos", ancho, alto, c.Alto(ancho), c.MinSize().Height, c.banda.Size().Height)
+			}
+			d := fyne.CurrentApp().Driver()
+			arriba := d.AbsolutePositionForObject(c.banda).Y
+			for _, o := range objetosDeBanda(c.cuerpo) {
+				if g, ok := o.(*Grupo); ok {
+					if !g.AlPrincipio || g.conRotulo() || g.Desplegado || test.WidgetRenderer(g).(*grupoRenderer).rotulo.Visible() {
+						t.Fatal("la banda táctil conserva rótulos o un grupo expandido")
+					}
+					for _, control := range g.Controles {
+						y := d.AbsolutePositionForObject(control).Y
+						if control.Size().Width < 44 || control.Size().Height < 44 || y < arriba || y+control.Size().Height > arriba+AltoBandaEstrecha-tema.Borde {
+							t.Fatalf("control táctil fuera de la única fila: %v/%v en y=%g", control.Position(), control.Size(), arriba)
+						}
+					}
+				}
+			}
 			if !c.banda.Visible() || c.mas.Visible() || c.banda.Size().Width != ancho {
 				t.Fatalf("móvil pierde la fila visible o reserva una expansión: %v", c.banda.Size())
 			}
@@ -116,7 +145,6 @@ func TestLaBandaMovilAlcanzaLosExtremosYAbreSusPaneles(t *testing.T) {
 			}
 			capturar("inicio")
 			c.banda.Scrolled(&fyne.ScrollEvent{Scrolled: fyne.NewDelta(-10000, 0)})
-			d := fyne.CurrentApp().Driver()
 			pos := d.AbsolutePositionForObject(muestra)
 			if pos.X < 0 || pos.X+muestra.Size().Width > ancho+0.5 || c.banda.X() == 0 {
 				t.Fatalf("el gesto no alcanza el último control: %v", pos)
@@ -220,6 +248,11 @@ func TestLaCintaConElDedoMide44(t *testing.T) {
 	defer ui.TactilDePrueba(true)()
 	if m := MedidaBotonCinta(); m.Width < 44 || m.Height < 44 {
 		t.Errorf("el botón de la cinta mide %v con el dedo", m)
+	}
+	sel := NuevoSelectorCinta("Selector táctil", 20, []Opcion{{"a", "A"}}, "a", nil)
+	sel.Alto = 24 // los paneles pueden pedir una densidad menor en escritorio
+	if m := sel.MinSize(); m.Width < 44 || m.Height < 44 {
+		t.Errorf("el selector de la cinta anula el suelo táctil: %v", m)
 	}
 	if h := MedidaPestanaCinta("Vista", false).Height; h < 43 {
 		t.Errorf("la pestaña mide %.1f de alto con el dedo", h)

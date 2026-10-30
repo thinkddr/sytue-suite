@@ -21,18 +21,16 @@
 #   apple-firma.sh perfil-mac <id>         # ruta del perfil de Mac App Store instalado de ese App ID
 #   apple-firma.sh perfil-ruta <id> <ios|macappstore|developerid> # ruta para app o extensión
 #
-# DE DÓNDE SALE CADA SECRETO, y ninguno pasa por argv ni por el log:
+# DE DÓNDE SALE CADA SECRETO, y ninguno persistente pasa por argv ni por el log:
 #   - APP_STORE_CONNECT_ISSUER_ID, _KEY_IDENTIFIER y _PRIVATE_KEY son secretos de
 #     GitHub Actions que el job pasa en su `env:`.
 #   - CERTIFICATE_PRIVATE_KEY es la clave privada RSA de NUESTROS certificados, otro
 #     secreto de GitHub Actions. Es SIEMPRE LA MISMA: con una clave nueva
 #     en cada build Apple emitiría un certificado nuevo cada vez, y los limita (cinco
-#     Developer ID, tres de distribución). Por eso el Developer ID aquí solo se LISTA,
-#     nunca se crea: lo crea el dueño una vez, con esa clave. El Apple Distribution de
-#     iOS sí lo puede crear la API, y con la clave fija lo hace una sola vez. Es el MISMO
-#     que firma las apps de la Mac App Store (el tipo DISTRIBUTION de Apple vale para las
-#     dos tiendas). El de instalador (MAC_INSTALLER_DISTRIBUTION, «3rd Party Mac Developer
-#     Installer»), que firma el .pkg, también lo crea la API si no existe: una vez.
+#     Developer ID, tres de distribución). Aquí sólo se reutilizan certificados y
+#     perfiles ya emitidos con esa clave. El Apple Distribution sirve también para
+#     las apps de la Mac App Store; el de instalador debe existir por separado.
+#     La ausencia de cualquier recurso es un error: no se crea ni se revoca.
 #
 # LO QUE AQUÍ NO SE HACE NUNCA: registrar un App ID (los quince los registró el dueño;
 # uno que falte es rojo, no un alta), pedir la revisión beta de TestFlight ni enviar
@@ -84,9 +82,28 @@ credenciales() {
 # Con un tercer argumento se miran TODAS las identidades y no solo las de firmar código:
 # la de instalador no es de esa política y `-p codesigning` no la enseña.
 identidad() { # <patrón> <qué falta si no está> [todas]
-  local nombre politica=(-p codesigning)
+  local nombre llavero candidato certificado evaluar=no politica_nativa=codeSign politica=(-p codesigning)
+  llavero="$(llavero_efimero)" || exit 1
   [ -z "${3:-}" ] || politica=()
-  nombre="$(security find-identity -v ${politica[@]+"${politica[@]}"} | sed -n "s/.*\"\($1: [^\"]*\)\".*/\1/p" | sed -n 1p)" || nombre=""
+  nombre="$(security find-identity -v ${politica[@]+"${politica[@]}"} "$llavero" | sed -n "s/.*\"\($1: [^\"]*\)\".*/\1/p" | sed -n 1p)" || nombre=""
+  # En el Mac actual, el clasificador legado de find-identity -v omite
+  # identidades cuya evaluación nativa sí es válida. Aceptar
+  # sólo un candidato inequívoco del llavero propio y verificar su cadena sin AIA.
+  case "$1:${3:-}" in
+    'Developer ID Application:' | 'Apple Distribution:') evaluar=si ;;
+    '3rd Party Mac Developer Installer:todas' | 'Mac Installer Distribution:todas') evaluar=si; politica_nativa=basic ;;
+  esac
+  if [ -z "$nombre" ] && [ "$evaluar" = si ]; then
+    candidato="$(security find-identity ${politica[@]+"${politica[@]}"} "$llavero" | sed -n "s/.*\"\($1: [^\"]*\)\".*/\1/p")" || candidato=""
+    if [ -n "$candidato" ] && [ "$(printf '%s\n' "$candidato" | wc -l | tr -d ' ')" = 1 ]; then
+      certificado="$(mktemp "$CERTS/identity.XXXXXXXX")" || exit 1
+      if security find-certificate -c "$candidato" -p "$llavero" >"$certificado" &&
+        security verify-cert -L -p "$politica_nativa" -c "$certificado" -k "$llavero" >/dev/null 2>&1; then
+        nombre="$candidato"
+      fi
+      rm -f -- "$certificado"
+    fi
+  fi
   if [ -z "$nombre" ]; then
     [ "$1" != 'Developer ID Application' ] || diagnostico_developer_id >&2 || true
     mal "no hay ninguna identidad válida «$1» en el llavero. $2"
@@ -100,13 +117,12 @@ identidad() { # <patrón> <qué falta si no está> [todas]
 #         https://www.apple.com/certificateauthority/DeveloperIDCA.cer
 #         https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer
 llavero_efimero() {
-  local llavero
-  llavero="$(keychain get-default)" || mal 'no se pudo localizar el llavero efímero de codemagic-cli-tools'
-  case "$llavero" in
-  "$HOME/Library/codemagic-cli-tools/keychains/"*.keychain-db) ;;
-  *) mal 'el llavero por defecto no es el efímero de codemagic-cli-tools; no se importa el intermedio' ;;
-  esac
-  printf '%s\n' "$llavero"
+  python3 "$(dirname "${BASH_SOURCE[0]}")/apple_llavero.py" ruta ||
+    mal 'no se pudo validar el llavero exclusivo de este job'
+}
+
+llavero_operacion() {
+  python3 "$(dirname "${BASH_SOURCE[0]}")/apple_llavero.py" "$@"
 }
 
 # intermedios <fichero.cer>...: los certificados PÚBLICOS de Apple que cierran la cadena,
@@ -114,28 +130,11 @@ llavero_efimero() {
 # suyos y Apple Distribution el WWDR G3: un Mac sin Xcode reciente solo trae el WWDR
 # antiguo, caducado en 2023, y la identidad no sale válida (v3.13.2, Mac propio).
 intermedios() {
-  local dir llavero f
+  local dir f archivos=()
   dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)/.github/actions/apple"
-  python3 - "$dir" "$@" <<'PY' || mal 'los intermedios de Apple faltan o no coinciden con la huella fijada; no se importan'
-import hashlib, pathlib, sys
-HUELLAS = {
-    "AppleRootCA.cer": "b0b1730ecbc7ff4505142c49f1295e6eda6bcaed7e2c68c5be91b5a11001f024",
-    "DeveloperIDCA.cer": "7afc9d01a62f03a2de9637936d4afe68090d2de18d03f29c88cfb0b1ba63587f",
-    "DeveloperIDG2CA.cer": "f16cd3c54c7f83cea4bf1a3e6a0819c8aaa8e4a1528fd144715f350643d2df3a",
-    "AppleWWDRCAG3.cer": "dcf21878c77f4198e4b4614f03d696d89c66c66008d4244e1b99161aac91601f",
-}
-base = pathlib.Path(sys.argv[1])
-for nombre in sys.argv[2:]:
-    p = base / nombre
-    if nombre not in HUELLAS or not p.is_file() or hashlib.sha256(p.read_bytes()).hexdigest() != HUELLAS[nombre]:
-        sys.exit(1)
-sys.exit(0)
-PY
-  llavero="$(llavero_efimero)" || exit 1
-  for f in "$@"; do
-    security add-certificates -k "$llavero" "$dir/$f" >&2 ||
-      mal "no se pudo añadir el intermedio público $f al llavero efímero"
-  done
+  for f in "$@"; do archivos+=("$dir/$f"); done
+  llavero_operacion publicos "${archivos[@]}" ||
+    mal 'no se pudo añadir el intermedio público fijado al llavero exclusivo'
 }
 
 intermedio_developer_id() { intermedios AppleRootCA.cer DeveloperIDCA.cer DeveloperIDG2CA.cer; }
@@ -144,7 +143,11 @@ intermedio_developer_id() { intermedios AppleRootCA.cer DeveloperIDCA.cer Develo
 # salir. Su sitio por defecto es la carpeta de Xcode de la persona, que en un Mac propio
 # no se vacía (v3.13.2 dejó allí quince).
 certificados_temporales() {
-  CERTS="$(mktemp -d)" || mal 'no se pudo crear el directorio temporal de certificados'
+  umask 077
+  [ -n "${SYTUE_APPLE_JOB_DIR:-}" ] || mal 'falta el contexto privado de firma del job'
+  llavero_efimero >/dev/null || exit 1
+  export SYTUE_PERFILES_DIR="$SYTUE_APPLE_JOB_DIR/perfiles-apple"
+  CERTS="$(mktemp -d "$SYTUE_APPLE_JOB_DIR/certificates.XXXXXXXX")" || mal 'no se pudo crear el directorio temporal de certificados'
   trap 'rm -rf "$CERTS"' EXIT
 }
 
@@ -153,9 +156,9 @@ certificados_temporales() {
 # cadena incompleta. El fallo del diagnóstico no convierte la identidad en válida.
 diagnostico_developer_id() (
   local llavero certificado
-  llavero="$(keychain get-default)" || return 0
+  llavero="$(llavero_efimero)" || return 0
   security find-identity -p codesigning "$llavero" || true
-  certificado="$(mktemp)" || return 0
+  certificado="$(mktemp "$SYTUE_APPLE_JOB_DIR/diagnostic.XXXXXXXX")" || return 0
   trap 'rm -f "$certificado"' EXIT
   if security find-certificate -c 'Developer ID Application' -p "$llavero" >"$certificado"; then
     openssl x509 -in "$certificado" -noout -subject -issuer -dates -serial -fingerprint -sha256 || true
@@ -178,13 +181,10 @@ preparar() {
   macos)
     credenciales || exit 1
     certificados_temporales
-    keychain initialize >&2
     intermedio_developer_id
-    app-store-connect certificates list --type DEVELOPER_ID_APPLICATION DEVELOPER_ID_APPLICATION_G2 \
+    llavero_operacion cli certificates list --type DEVELOPER_ID_APPLICATION DEVELOPER_ID_APPLICATION_G2 \
       --certificates-dir "$CERTS" --certificate-key @env:CERTIFICATE_PRIVATE_KEY --save >&2
-    keychain add-certificates --certificate "$CERTS/*.p12" >&2
-    llavero="$(llavero_efimero)" || exit 1
-    security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "" "$llavero" >&2 || true
+    llavero_operacion importar "$CERTS" codesign >&2
     identidad 'Developer ID Application' 'Revisa la cadena de confianza, las fechas y la asociación con la clave en el diagnóstico anterior. Aquí no se emiten ni revocan certificados.'
     ;;
   ios | macappstore)
@@ -198,39 +198,33 @@ preparar() {
     [ "$#" -gt 0 ] || mal "preparar $destino: falta al menos un App ID"
     credenciales || exit 1
     certificados_temporales
-    keychain initialize >&2
     intermedios AppleRootCA.cer AppleWWDRCAG3.cer
     local id registrados
     for id in "$@"; do
-      # `fetch-signing-files --create` REGISTRARÍA el App ID si no existe (cli-tools,
-      # _get_or_create_bundle_ids): se mira antes, y uno sin registrar es rojo.
+      # Se exige el App ID exacto existente antes de solicitar su material de firma.
       registrados="$(app-store-connect bundle-ids list --bundle-id-identifier "$id" --strict-match-identifier --json)" ||
         mal "no se pudo preguntar a Apple por el App ID $id"
       grep -q "\"$id\"" <<<"$registrados" ||
         mal "el App ID $id no está registrado en la cuenta de Apple (Certificates, Identifiers & Profiles → Identifiers): aquí no se da de alta."
       # El perfil de tienda de ESTE App ID y el Apple Distribution de nuestra clave:
-      # se reutilizan si existen y se crean si no (una vez, la clave no cambia).
-      app-store-connect fetch-signing-files "$id" --platform "$plataforma" --type "$tipo" \
-        --strict-match-identifier --certificates-dir "$CERTS" --certificate-key @env:CERTIFICATE_PRIVATE_KEY --create >&2 ||
+      # sólo se reutilizan: sin --create ni --delete-stale-profiles, falta = error.
+      llavero_operacion cli fetch-signing-files "$id" --platform "$plataforma" --type "$tipo" \
+        --strict-match-identifier --certificates-dir "$CERTS" --certificate-key @env:CERTIFICATE_PRIVATE_KEY >&2 ||
         mal "no se pudo traer el perfil de tienda ($tipo) de $id"
       # Y que el de Mac está donde `empaquetar.sh` lo va a buscar: aquí, en el primer
       # minuto, y no después de compilar.
       [ "$destino" != macappstore ] || perfil "$id" mac >/dev/null
     done
     if [ "$destino" = macappstore ]; then
-      # EL DE INSTALADOR, que firma el .pkg: se lista el de nuestra clave y, solo si no
-      # hay ninguno, se crea. Con la clave fija eso pasa UNA vez; con otra, Apple se
-      # niega al llegar a su tope y el build cae aquí, no al firmar.
-      app-store-connect certificates list --type MAC_INSTALLER_DISTRIBUTION \
-        --certificates-dir "$CERTS" --certificate-key @env:CERTIFICATE_PRIVATE_KEY --save >&2 || true
-      keychain add-certificates --certificate "$CERTS/*.p12" --allow-app "${herramientas[@]}" >&2
-      if ! (instalador '') >/dev/null 2>&1; then
-        app-store-connect certificates create --type MAC_INSTALLER_DISTRIBUTION \
-          --certificates-dir "$CERTS" --certificate-key @env:CERTIFICATE_PRIVATE_KEY --save >&2 ||
-          mal "Apple no dejó crear el certificado Mac Installer Distribution: o ya hay uno emitido con otra clave (revócalo en Certificates, Identifiers & Profiles → Certificates) o la clave de API no tiene rol para crear certificados (docs/operations.md, «Mac App Store»)."
-      fi
+      # El instalador debe existir, ser válido y corresponder a la clave fija.
+      llavero_operacion cli certificates list --type MAC_INSTALLER_DISTRIBUTION \
+        --certificates-dir "$CERTS" --certificate-key @env:CERTIFICATE_PRIVATE_KEY --save >&2 ||
+        mal 'no se pudo consultar el Mac Installer Distribution existente'
+      llavero_operacion importar "$CERTS" "${herramientas[@]}" >&2
+      (instalador '') >/dev/null 2>&1 ||
+        mal 'falta un Mac Installer Distribution existente y válido para la clave fija; aquí no se crea ni revoca'
     fi
-    keychain add-certificates --certificate "$CERTS/*.p12" --allow-app "${herramientas[@]}" >&2
+    llavero_operacion importar "$CERTS" "${herramientas[@]}" >&2
     identidad 'Apple Distribution' 'fetch-signing-files no dejó ningún certificado Apple Distribution: mira arriba qué contestó Apple.'
     # En la Mac App Store, DOS líneas: la identidad de la app y, debajo, la del instalador.
     [ "$destino" != macappstore ] ||
@@ -251,7 +245,9 @@ preparar() {
 # Los de Developer ID (`ProvisionsAllDevices`) y los de desarrollo quedan fuera igual.
 perfil() { # <App ID> [mac|developerid] [ruta]
   local id="${1:?uso: $0 perfil <App ID>}" mac="${2:-}" formato="${3:-}" dir f elegido=""
-  local dirs=()
+  local dirs=() plataforma=ios
+  [ -z "$mac" ] || plataforma=macappstore
+  [ "$mac" != developerid ] || plataforma=developerid
   if [ -n "${SYTUE_PERFILES_DIR:-}" ]; then
     dirs=("$SYTUE_PERFILES_DIR")
   else
@@ -266,7 +262,7 @@ perfil() { # <App ID> [mac|developerid] [ruta]
       # Los de iOS, solo con su extensión (como siempre); los de Mac, con las dos.
       [ -n "$mac" ] || [ "${f##*.}" = mobileprovision ] || continue
       [ -f "$f" ] || continue
-      security cms -D -i "$f" 2>/dev/null | python3 -c '
+      python3 "$(dirname "${BASH_SOURCE[0]}")/apple_perfil.py" decodificar "$f" "$plataforma" 2>/dev/null | python3 -c '
 import datetime, plistlib, sys
 try:
     p = plistlib.loads(sys.stdin.buffer.read())
@@ -294,97 +290,7 @@ if (appid.split(".", 1)[-1] == sys.argv[1]
 # El perfil autoriza el grupo, además de identificar la app. Se comparte entre
 # hosts de SSO y extensiones de widgets, que no reciben el grupo del Keychain.
 verificar_perfil_grupo() { # <ruta> <App ID> <ios|macappstore|developerid> <grupo> [protección] [llavero] [derechos.plist]
-  python3 - "$(dirname "${BASH_SOURCE[0]}")/../../nucleo/ajustes/grupo_apple.go" "$@" <<'PY'
-import datetime, fnmatch, pathlib, plistlib, re, subprocess, sys, tomllib
-def mal(motivo):
-    sys.exit('::error::perfil de grupo: ' + motivo)
-if len(sys.argv) not in (6, 7, 8, 9):
-    mal('uso: verificar-perfil-grupo <ruta> <AppID> <ios|macappstore|developerid> <grupo> [protección] [llavero] [derechos.plist]')
-fuente, ruta, appid, modo, grupo = sys.argv[1:6]
-proteccion = sys.argv[6] if len(sys.argv) >= 7 else ''
-llavero = sys.argv[7] if len(sys.argv) >= 8 else ''
-solicitados = sys.argv[8] if len(sys.argv) == 9 else ''
-if modo not in ('ios', 'macappstore', 'developerid') or not re.fullmatch(r'eu\.sytue\.[a-z0-9.]+', appid):
-    mal('AppID o plataforma no admitidos')
-if not re.fullmatch(r'group\.[a-z0-9.]+|[A-Z0-9]{10}\.[a-z0-9.]+', grupo):
-    mal('grupo no admitido')
-if proteccion and (modo != 'ios' or proteccion != 'NSFileProtectionComplete'):
-    mal('protección no admitida')
-try:
-    grupos_llavero = re.findall(r'^const GrupoSuite = "([A-Z0-9]{10}\.[a-z0-9.]+)"$', pathlib.Path(fuente).read_text(), re.M)
-    if len(grupos_llavero) != 1:
-        mal('no hay un equipo canónico en ajustes/grupo_apple.go')
-    equipo = grupos_llavero[0].split('.', 1)[0]
-    llavero_proveedor = ""
-    if appid.endswith('.archivos'):
-        host = appid.removesuffix('.archivos')
-        catalogo = pathlib.Path(fuente).resolve().parents[2] / 'fyne/cmd'
-        declarados = [tomllib.loads(p.read_text()) for p in catalogo.glob('*/FyneApp.toml')]
-        if not any(a.get('Details', {}).get('ID') == host and a.get('Development', {}).get('archivos') == 'si' for a in declarados):
-            mal('el catálogo no declara este proveedor de archivos')
-        llavero_proveedor = equipo + '.' + host + '.shared'
-        if grupo != 'group.' + host or llavero != llavero_proveedor:
-            mal('el proveedor exige su propio AppGroup y Keychain')
-    elif llavero and llavero != grupos_llavero[0]:
-        mal('el grupo de Keychain no es el canónico de la suite')
-    r = subprocess.run(['security', 'cms', '-D', '-i', ruta], capture_output=True, check=False)
-    if r.returncode:
-        mal('el perfil no se puede leer')
-    perfil = plistlib.loads(r.stdout)
-    derechos = perfil['Entitlements']
-    equipo = grupos_llavero[0].split('.', 1)[0]
-    if perfil.get('TeamIdentifier') != [equipo]:
-        mal('el equipo no es el de la suite')
-    clave = 'application-identifier' if modo == 'ios' else 'com.apple.application-identifier'
-    if derechos.get(clave) != equipo + '.' + appid:
-        mal('el AppID no coincide exactamente')
-    plataformas = perfil.get('Platform', [])
-    if not isinstance(plataformas, list) or ('iOS' if modo == 'ios' else 'OSX') not in plataformas:
-        mal('la plataforma del perfil no coincide')
-    caduca = perfil['ExpirationDate'].replace(tzinfo=datetime.timezone.utc)
-    if caduca <= datetime.datetime.now(datetime.timezone.utc):
-        mal('el perfil ha caducado')
-    if 'ProvisionedDevices' in perfil or derechos.get('get-task-allow') or derechos.get('com.apple.security.get-task-allow'):
-        mal('se requiere distribución, sin dispositivos de desarrollo')
-    directo = perfil.get('ProvisionsAllDevices', False)
-    if not isinstance(directo, bool) or directo != (modo == 'developerid'):
-        mal('el tipo de distribución no coincide')
-    grupos = derechos.get('com.apple.security.application-groups', [])
-    if not isinstance(grupos, list) or grupo not in grupos:
-        mal('el perfil no autoriza el AppGroup: registrar/asociar el grupo y regenerar el perfil')
-    if proteccion and derechos.get('com.apple.developer.default-data-protection') != proteccion:
-        mal('el perfil no autoriza Data Protection Complete')
-    if llavero:
-        permitidos = derechos.get('keychain-access-groups', [])
-        if not isinstance(permitidos, list) or not any(isinstance(p, str) and fnmatch.fnmatchcase(llavero, p) for p in permitidos):
-            mal('el perfil no autoriza el grupo de Keychain de la sesión')
-    if solicitados:
-        peticion = plistlib.loads(pathlib.Path(solicitados).read_bytes())
-        grupos_pedidos = peticion.get('com.apple.security.application-groups')
-        claves_pedidas = peticion.get('keychain-access-groups', [])
-        if not isinstance(grupos_pedidos, list) or grupo not in grupos_pedidos or not all(isinstance(g, str) for g in grupos_pedidos):
-            mal('los derechos no declaran los AppGroups esperados')
-        if not isinstance(claves_pedidas, list) or not all(isinstance(g, str) for g in claves_pedidas):
-            mal('los derechos de Keychain no son una lista válida')
-        if llavero and llavero not in claves_pedidas:
-            mal('los derechos del host omiten el Keychain de la suite')
-        if appid.endswith('.widgets') and claves_pedidas:
-            mal('los widgets no pueden solicitar acceso al Keychain')
-        if llavero_proveedor and claves_pedidas != [llavero_proveedor]:
-            mal('File Provider no puede leer el Keychain de la sesión ni de otra app')
-        for pedido in grupos_pedidos:
-            # macOS autoriza también grupos <TeamID>.* mediante la firma del
-            # mismo equipo. El grupo legado se conserva sólo para migrar MAS.
-            legado_mac = modo != 'ios' and pedido == grupos_llavero[0]
-            if not legado_mac and pedido not in grupos:
-                mal('el perfil no autoriza todos los AppGroups solicitados')
-        permitidos = derechos.get('keychain-access-groups', [])
-        if not isinstance(permitidos, list) or any(not any(isinstance(p, str) and fnmatch.fnmatchcase(g, p) for p in permitidos) for g in claves_pedidas):
-            mal('el perfil no autoriza todos los grupos de Keychain solicitados')
-except (OSError, ValueError, KeyError, TypeError, AttributeError):
-    mal('el perfil o la configuración no son válidos')
-print('perfil válido: ' + appid + ' (' + modo + ')')
-PY
+  python3 "$(dirname "${BASH_SOURCE[0]}")/apple_perfil.py" verificar "$@"
 }
 
 # subir <ipa|pkg>...: a App Store Connect (los .pkg son los de la Mac App Store). SIN --testflight (que pide la revisión beta para
@@ -526,6 +432,11 @@ perfil-ruta)
   developerid) perfil "${1:-}" developerid ruta ;;
   *) mal 'uso: perfil-ruta <App ID> <ios|macappstore|developerid>' ;;
   esac ;;
+instalar-perfil-ios)
+  [ "$#" = 1 ] || mal 'uso: instalar-perfil-ios <App ID>'
+  perfil_instalar="$(perfil "$1" "" ruta)" || exit 1
+  llavero_operacion instalar-perfil "$perfil_instalar" "$1"
+  ;;
 verificar-perfil-grupo) verificar_perfil_grupo "$@" ;;
 llavero-efimero) llavero_efimero ;;
 subir) subir "$@" ;;

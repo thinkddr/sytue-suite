@@ -132,10 +132,9 @@ export const pt: AppCatalog<typeof en> = {
   'gallery.selectMonth': 'Selecionar o mês',
   'gallery.unselectMonth': 'Desselecionar o mês',
   'gallery.downloadSelected': 'Transferir',
-  'gallery.downloading': {
-    one: 'A transferir {count} foto…',
-    other: 'A transferir {count} fotos…',
-  },
+  'gallery.downloading':
+    'Pedidos de transferência iniciados: {count}. Verifique as transferências do navegador.',
+  'gallery.downloadCapped': 'Fotografias fora deste lote: {count}.',
   'gallery.newAlbum': 'Novo álbum',
   'gallery.newAlbumTitle': 'Novo álbum',
   'gallery.newAlbumPrompt': {

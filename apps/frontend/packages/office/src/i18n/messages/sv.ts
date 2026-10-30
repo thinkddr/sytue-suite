@@ -1694,6 +1694,8 @@ export const sv: AppCatalog<typeof en> = {
   'extdata.msg.generic': 'Åtgärden kunde inte slutföras.',
   'extdata.msg.notAllowed':
     'Bara personerna på anslutningens lista kan ställa frågor till den. Be den som administrerar organisationen att lägga till dig.',
+  'extdata.msg.ownerOnly':
+    'Bara den som skapade anslutningen eller den som administrerar organisationen kan ändra eller ta bort den.',
   'sheet.msg.badValue': 'Värdet är inte tillåtet',
   'sheet.msg.clipboardDenied': 'Webbläsaren nekade åtkomst till urklipp.',
   'sheet.msg.pasteFailed': 'Det gick inte att klistra in',

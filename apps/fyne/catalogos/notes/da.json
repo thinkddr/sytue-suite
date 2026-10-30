@@ -271,6 +271,7 @@
     "one": "{count} note",
     "other": "{count} noter"
   },
+  "notebook.ownerOnly": "Kun den, der har oprettet notesbogen, eller den, der administrerer organisationen, kan flytte den, ændre hvem der ser den, eller kryptere den.",
   "notebook.rename": "Omdøb",
   "notebook.settings": "Indstillinger for notesbogen",
   "notebook.title": "Navn",

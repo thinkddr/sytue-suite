@@ -122,3 +122,10 @@ export async function completeMatrixSso(): Promise<string> {
   } satisfies MatrixSession);
   return pending.returnTo;
 }
+
+/** Keeps the deployed Rooms session namespace and BFF routing during extraction. */
+export const roomsMatrixSessionAdapter = {
+  readSession: readMatrixSession,
+  forgetSession: forgetMatrixSession,
+  refreshBootstrap: matrixBootstrap,
+};

@@ -45,6 +45,7 @@ type EnCurso interface {
 	Grabando() bool
 	CambiarAudio(d llamada.Dispositivo) error
 	Reconectando() bool
+	PuedePublicar() bool
 	Colgar()
 }
 
@@ -151,7 +152,7 @@ var _ fyne.Widget = (*VistaLlamada)(nil)
 
 // NuevaVistaLlamada crea la vista con el micro como se eligió en la antesala.
 func NuevaVistaLlamada(t *i18n.Translator, titulo string, l EnCurso, micro bool) *VistaLlamada {
-	v := &VistaLlamada{T: t, Titulo: titulo, L: l, micro: micro, Modo: ModoMosaico, Lanzar: func(f func()) { go f() }}
+	v := &VistaLlamada{T: t, Titulo: titulo, L: l, micro: micro && l.PuedePublicar(), Modo: ModoMosaico, Lanzar: func(f func()) { go f() }}
 	v.ExtendBaseWidget(v)
 	return v
 }
@@ -169,6 +170,9 @@ func (v *VistaLlamada) Micro() bool { return v.micro }
 
 // AlternarMicro es el primer botón de la barra.
 func (v *VistaLlamada) AlternarMicro() {
+	if !v.L.PuedePublicar() {
+		return
+	}
 	if err := v.L.Micro(!v.micro); err != nil {
 		v.micro = false // sin permiso o sin tarjeta: cerrado, no roto
 	} else {
@@ -196,6 +200,9 @@ func (v *VistaLlamada) Pantalla() bool { return v.pantalla }
 // AlternarCamara es el segundo botón. Abrir la cámara puede pedir permiso y tardar: va
 // fuera del hilo de la interfaz y el botón cambia cuando contesta.
 func (v *VistaLlamada) AlternarCamara() {
+	if !v.L.PuedePublicar() {
+		return
+	}
 	quiero := !v.camara
 	v.Lanzar(func() {
 		err := v.L.Camara(quiero)
@@ -208,6 +215,9 @@ func (v *VistaLlamada) AlternarCamara() {
 
 // AlternarPantalla es «Compartir pantalla» y «Dejar de compartir».
 func (v *VistaLlamada) AlternarPantalla() {
+	if !v.L.PuedePublicar() {
+		return
+	}
 	quiero := !v.pantalla
 	v.Lanzar(func() {
 		err := v.L.Pantalla(quiero)
@@ -423,7 +433,7 @@ func (r *vistaLlamadaRenderer) Refresh() {
 		claveMicro, glifoMicro, varMicro = "meet.muteMic", iconos.Microfono, ui.Secundario
 	}
 	micro := ui.NuevoBoton("", v.AlternarMicro).Con(varMicro, ui.TallaSM).ConIcono(glifoMicro, 18)
-	micro.Rotulo = t.T(claveMicro, nil)
+	micro.Rotulo, micro.Inerte = t.T(claveMicro, nil), !v.L.PuedePublicar()
 	// La cámara: el color dice el estado (rojo apagada), el icono lo que es y el nombre
 	// accesible la acción, como la web. Sin cámara que abrir, inerte.
 	claveCam, varCam := "meet.cameraOn", ui.Peligro
@@ -431,7 +441,7 @@ func (r *vistaLlamadaRenderer) Refresh() {
 		claveCam, varCam = "meet.cameraOff", ui.Secundario
 	}
 	cam := ui.NuevoBoton("", v.AlternarCamara).Con(varCam, ui.TallaSM).ConIcono(iconos.Camara, 18)
-	cam.Rotulo, cam.Inerte = t.T(claveCam, nil), !v.ConCamara
+	cam.Rotulo, cam.Inerte = t.T(claveCam, nil), !v.ConCamara || !v.L.PuedePublicar()
 	botones := []fyne.CanvasObject{micro, cam}
 	if v.ConPantalla {
 		clavePan, varPan := "meet.shareScreen", ui.Secundario
@@ -439,7 +449,7 @@ func (r *vistaLlamadaRenderer) Refresh() {
 			clavePan, varPan = "meet.stopSharing", ui.Primario
 		}
 		pantalla := ui.NuevoBoton("", v.AlternarPantalla).Con(varPan, ui.TallaSM).ConIcono(iconos.Pantalla, 18)
-		pantalla.Rotulo = t.T(clavePan, nil)
+		pantalla.Rotulo, pantalla.Inerte = t.T(clavePan, nil), !v.L.PuedePublicar()
 		botones = append(botones, pantalla)
 	}
 	botones = append(botones, v.botonesExtra()...)
@@ -698,7 +708,7 @@ func conAlfa(c color.NRGBA, a uint8) color.NRGBA {
 
 // Conector abre la conexión con el SFU; el de la app es `llamada.Entrar` con la tarjeta
 // del sistema (cmd/rooms), y los guardianes ponen un doble.
-type Conector func(url, token string, o llamada.Opciones) (EnCurso, error)
+type Conector func(context.Context, api.RoomsCall, llamada.Opciones) (EnCurso, error)
 
 // LlamarEnCanal es «Llamar» de la cabecera: la sala del canal (la crea o la reutiliza el
 // servicio) con su puerta, si la han echado.
@@ -743,12 +753,15 @@ func (sa *Sala) abrirLlamada(titulo, canal string, obtener func(context.Context)
 	t := sa.P.T
 	w := fyne.CurrentApp().NewWindow(titulo)
 	sa.ventanaLlamada = w
+	callCtx, cancelarLlamada := context.WithCancel(sa.ctx)
 	a := NuevaAntesala(t, titulo)
 	// La cámara empieza APAGADA: se enciende cuando la persona lo pide, que es cuando
 	// se pide el permiso (ADR 0046). Sin cámara que abrir, el interruptor no hace nada.
 	a.Camara, a.SinCamara = false, sa.Camara == nil
 	if sa.PedirMicro != nil {
-		_ = sa.PedirMicro() // negado, se entra a escuchar
+		if err := sa.PedirMicro(); err != nil {
+			a.Micro = false // negado, se entra a escuchar
+		}
 	}
 	var (
 		enCurso EnCurso
@@ -760,6 +773,7 @@ func (sa *Sala) abrirLlamada(titulo, canal string, obtener func(context.Context)
 	pa := &previaAntesala{sa: sa, a: a, w: w}
 	pa.preparar()
 	w.SetOnClosed(func() {
+		cancelarLlamada()
 		pa.soltar()
 		if parar != nil {
 			parar()
@@ -820,7 +834,7 @@ func (sa *Sala) abrirLlamada(titulo, canal string, obtener func(context.Context)
 			micro, conCamara := a.Micro, a.Camara
 			pa.soltar() // la llamada abre su cámara y su tarjeta
 			pedir(sa, func(context.Context) (EnCurso, error) {
-				return sa.Conectar(c.LiveKitURL, c.Token, llamada.Opciones{
+				return sa.Conectar(callCtx, c, llamada.Opciones{
 					Micro:       micro,
 					Camara:      sa.Camara,
 					Pantalla:    sa.Pantalla,
@@ -837,7 +851,7 @@ func (sa *Sala) abrirLlamada(titulo, canal string, obtener func(context.Context)
 					},
 					AlSalir: func(string) { fyne.Do(w.Close) },
 				})
-			}, func(l EnCurso, err error) {
+			}, func(l EnCurso, err error) { //nolint:contextcheck // Fyne view actions retain the current room lifecycle; connection work uses callCtx.
 				if err != nil {
 					a.Entrando, a.Aviso = false, t.T("meet.connectFailed", nil)
 					a.Refresh()
@@ -908,6 +922,9 @@ func (sa *Sala) prepararBarra(v *VistaLlamada, c api.RoomsCall, canal string, l 
 	v.Modera = c.Role == "host" || c.Room.CreatedBy == sa.Yo || sa.adminEquipo
 	v.Bloqueada = c.Room.Locked
 	v.Mod = sa.moderacionDe(c.Room.ID)
+	if c.Encryption != nil {
+		v.Mod.Grabar = nil // server recording cannot decrypt native E2E media
+	}
 	if sa.Copiar != nil {
 		v.AlCopiarEnlace = func() { sa.Copiar(sa.EnlaceReunion(c.Room.ID)) }
 	}

@@ -387,7 +387,7 @@ func (a *App) AbrirDesdeDrive(id string) {
 	a.apuntar(lugar{ruta: RutaDesdeDrive, param: id})
 	a.salirDeVer()
 	a.ruta = RutaDesdeDrive
-	a.gen++
+	a.nuevaPantalla()
 	a.scroll.Offset = fyne.NewPos(0, 0)
 	a.dri = estadoDrive{id: IDDeDrive(id), visibilidad: api.CastOrg, libres: -1}
 	a.tituloDrive.PonerTexto("")
@@ -493,7 +493,7 @@ func (a *App) AbrirGestionar(id string) {
 	a.apuntar(lugar{ruta: RutaGestionar, param: id})
 	a.salirDeVer()
 	a.ruta = RutaGestionar
-	a.gen++
+	a.nuevaPantalla()
 	a.scroll.Offset = fyne.NewPos(0, 0)
 	a.ges = estadoGestionar{id: id, estadoCarga: estadoCarga{cargando: true}}
 	a.visor = nil
@@ -1430,7 +1430,11 @@ func (a *App) acabar() {
 
 // Cerrar lo suelta todo al cerrar la ventana: reproductor, salas y chat.
 func (a *App) Cerrar() {
-	a.gen++ // lo que esté en vuelo o sondeando ya no es de ninguna pantalla
+	a.nuevaPantalla() // lo que esté en vuelo o sondeando ya no es de ninguna pantalla
+	if a.esperaBusqueda != nil {
+		a.esperaBusqueda.Stop()
+		a.esperaBusqueda = nil
+	}
 	// La ventana primero: si su vídeo está en la página, vuelve a ella y salirDeVer lo
 	// suelta con lo demás.
 	a.cerrarPiP(false)

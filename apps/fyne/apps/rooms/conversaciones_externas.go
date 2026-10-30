@@ -135,13 +135,18 @@ func (c *conversacionExterna) canal() *api.ExternalChatChannel {
 	return nil
 }
 
-func (c *conversacionExterna) disponible() bool {
+func (c *conversacionExterna) estadoProveedor(proveedor string) api.ExternalChatProvider {
 	for _, p := range c.cuentas.Providers {
-		if p.Provider == c.proveedor {
-			return p.Available
+		if p.Provider == proveedor {
+			return p
 		}
 	}
-	return false
+	return api.ExternalChatProvider{}
+}
+
+func (c *conversacionExterna) disponible() bool {
+	estado := c.estadoProveedor(c.proveedor)
+	return estado.Available && !estado.DisabledByOrg
 }
 
 func nombreCuentaExterna(a api.ExternalChatAccount) string {
@@ -276,6 +281,10 @@ func (c *conversacionExterna) avanzar() {
 	if c.ocupado || c.cargando {
 		return
 	}
+	if c.estadoProveedor(c.proveedor).DisabledByOrg {
+		c.pintar()
+		return
+	}
 	c.errorClave = ""
 	switch c.paso {
 	case 0:
@@ -367,10 +376,11 @@ func (c *conversacionExterna) pintar() {
 		clave = "external.open"
 	}
 	siguiente := c.boton(clave, c.avanzar)
+	siguiente.Inerte = siguiente.Inerte || c.estadoProveedor(c.proveedor).DisabledByOrg
 	if c.paso == 1 && c.esperada != "" {
 		siguiente.Texto = t.T("action.retry", nil)
 	}
-	if c.paso == 1 && c.esperada == "" && (c.cuenta() == nil || !c.cuenta().Connected) {
+	if c.requiereConsentimiento() {
 		siguiente.Texto = t.T("appConnection.continue", i18n.Vars{"provider": c.nombre()})
 		siguiente.Inerte = siguiente.Inerte || !c.disponible() || c.sa.AutorizarConversaciones == nil
 	}
@@ -383,6 +393,11 @@ func (c *conversacionExterna) pintar() {
 	c.d.Refresh()
 }
 
+func (c *conversacionExterna) requiereConsentimiento() bool {
+	cuenta := c.cuenta()
+	return c.paso == 1 && c.esperada == "" && (cuenta == nil || !cuenta.Connected)
+}
+
 func (c *conversacionExterna) pasoContenido() []fyne.CanvasObject {
 	t := c.sa.P.T
 	hijos := []fyne.CanvasObject{}
@@ -390,7 +405,11 @@ func (c *conversacionExterna) pasoContenido() []fyne.CanvasObject {
 	case 0:
 		hijos = append(hijos, c.texto(t.T("external.body", nil)))
 		for _, p := range proveedoresConversaciones {
-			tarjeta := ui.NuevaTarjetaEleccion(p.nombre, "", func() { c.proveedor, c.instancia, c.esperada, c.pendiente = p.id, "", "", ""; c.pintar() })
+			descripcion := ""
+			if c.estadoProveedor(p.id).DisabledByOrg {
+				descripcion = t.T("app.disabled", nil)
+			}
+			tarjeta := ui.NuevaTarjetaEleccion(p.nombre, descripcion, func() { c.proveedor, c.instancia, c.esperada, c.pendiente = p.id, "", "", ""; c.pintar() })
 			tarjeta.Elegida, tarjeta.Inerte, tarjeta.Ancho = c.proveedor == p.id, c.ocupado, max(180, min(520, c.lienzo.Size().Width-48))
 			hijos = append(hijos, tarjeta)
 		}
@@ -411,7 +430,9 @@ func (c *conversacionExterna) pasoContenido() []fyne.CanvasObject {
 		if c.cuenta() != nil {
 			hijos = append(hijos, c.boton("integrations.bridgeDisconnect", c.confirmarDesconexion))
 		}
-		if !c.disponible() {
+		if c.estadoProveedor(c.proveedor).DisabledByOrg {
+			hijos = append(hijos, c.texto(t.T("app.disabled", nil)))
+		} else if !c.disponible() {
 			hijos = append(hijos, c.texto(t.T("external.unavailable", i18n.Vars{"provider": c.nombre()})))
 		}
 	case 2:

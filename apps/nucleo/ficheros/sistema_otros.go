@@ -6,6 +6,7 @@
 package ficheros
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -39,7 +40,7 @@ func Revelar(ruta string) error {
 	return revelarMovil(abs)
 }
 
-func Abrir(ruta string) error {
+func abrirConContexto(_ context.Context, ruta string) error {
 	abs, err := local(ruta)
 	if err != nil {
 		return err

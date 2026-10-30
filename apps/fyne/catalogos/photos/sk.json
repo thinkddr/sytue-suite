@@ -108,6 +108,7 @@
   "gallery.describeStop": "Zastaviť",
   "gallery.described": "Opísaných fotiek: {count}",
   "gallery.describing": "Opisuje sa {done} z {total}…",
+  "gallery.downloadCapped": "Fotografie mimo tejto dávky: {count}.",
   "gallery.downloadSelected": "Stiahnuť",
   "gallery.downloading": {
     "one": "Sťahuje sa 1 fotka…",

@@ -36,16 +36,22 @@ func ComprobarRotacion(t testing.TB, w fyne.Window, nombre string, tactil func(b
 	apariencia := fyne.CurrentApp().Settings().Theme()
 	restaurar := tactil(true)
 	defer func() {
+		fallo := recover()
 		restaurar()
 		tema.ElegirForma(forma)
-		fyne.DoAndWait(func() { fyne.CurrentApp().Settings().SetTheme(apariencia) })
+		if fallo != nil {
+			panic(fallo) // SetTheme puede conservar un mutex tomado tras el panic.
+		}
+		fyne.CurrentApp().Settings().SetTheme(apariencia)
 		w.Resize(tamano)
 		w.Canvas().Content().Refresh()
 		fyne.DoAndWait(func() {})
 	}()
 	for _, forma := range []string{"marco", "carril"} {
 		tema.ElegirForma(forma)
-		fyne.DoAndWait(func() { fyne.CurrentApp().Settings().SetTheme(apariencia) })
+		// Ya estamos en la rutina del test, como el TestMain de Suite. El
+		// DoAndWait vacío de abajo drena el trabajo pendiente tras el cambio.
+		fyne.CurrentApp().Settings().SetTheme(apariencia)
 		for paso, tam := range []fyne.Size{
 			{Width: 320, Height: 700},
 			{Width: 568, Height: 320},

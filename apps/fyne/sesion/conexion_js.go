@@ -6,6 +6,7 @@
 package sesion
 
 import (
+	"context"
 	"errors"
 	"net/http"
 
@@ -30,3 +31,12 @@ func ponerSoloLectura() {}
 func Almacen() (*offline.Store, error) {
 	return nil, errors.New("sesion: sin almacén local en js")
 }
+
+func AlmacenConContexto(ctx context.Context) (*offline.Store, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return Almacen()
+}
+
+func contarAlmacen(...string) (int, error) { return 0, nil }

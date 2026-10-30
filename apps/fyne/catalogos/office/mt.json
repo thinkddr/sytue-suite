@@ -750,6 +750,7 @@
   "extdata.msg.noEncryption": "Il-kriptaġġ tal-kredenzjali mhux ikkonfigurat fuq is-server.",
   "extdata.msg.notAllowed": "Il-persuni fil-lista ta’ din il-konnessjoni biss jistgħu jagħmlulha query. Itlob lill-amministrazzjoni tal-organizzazzjoni tiegħek biex iżżidek.",
   "extdata.msg.notFound": "Il-konnessjoni jew il-query m’għadhomx jeżistu.",
+  "extdata.msg.ownerOnly": "Min ħoloq din il-konnessjoni jew l-amministrazzjoni tal-organizzazzjoni biss jistgħu jibdluha jew iħassruha.",
   "extdata.msg.rate": "Wisq eżekuzzjonijiet wara xulxin. Stenna ftit sekondi u erġa’ pprova.",
   "extdata.msg.timeout": "Is-sors tad-data esterna dam wisq biex iwieġeb.",
   "extdata.msg.unauth": "Is-sessjoni tiegħek skadiet. Idħol mill-ġdid.",

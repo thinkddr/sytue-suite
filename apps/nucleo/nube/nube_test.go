@@ -14,6 +14,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf16"
+	"unsafe"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 )
@@ -434,5 +436,44 @@ func TestQuitarVaALaPapeleraYNoTocaLoPendiente(t *testing.T) {
 		func(string) error { t.Error("a la papelera sin saber qué hay dentro"); return nil })
 	if err == nil {
 		t.Error("sin poder leer lo de dentro, no falla")
+	}
+}
+
+// TestAPapeleraPideAvisoSiNoCabeYTerminaEnDobleNulo (FYS-03): SHFileOperationW recibe
+// FO_DELETE con FOF_ALLOWUNDO (0x40) y FOF_WANTNUKEWARNING (0x4000), la ruta UTF-16
+// terminada en doble nulo (\x00\x00) para que Windows no lea memoria contigua como otra
+// ruta, y falla si la persona cancela el aviso de borrado permanente (fAnyOperationsAborted).
+func TestAPapeleraPideAvisoSiNoCabeYTerminaEnDobleNulo(t *testing.T) {
+	const ruta = `C:\Users\Ana\Sytue Drive – acme\Clientes (2)\informe.docx`
+	esperado := append(utf16.Encode([]rune(ruta)), 0, 0)
+	var visto operacionShell
+	var bufer []uint16
+	err := enviarAPapelera(ruta, func(op *operacionShell) uintptr {
+		visto = *op
+		bufer = slices.Clone(unsafe.Slice(op.desde, len(esperado)))
+		return 0
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if visto.funcion != foBorrar {
+		t.Fatalf("funcion = 0x%x; quiero 0x%x (FO_DELETE)", visto.funcion, foBorrar)
+	}
+	if visto.banderas&0x40 == 0 || visto.banderas&0x4000 == 0 || visto.banderas != papeleraCallada|avisarSiNoCabe {
+		t.Fatalf("banderas = 0x%x; quiero 0x%x con FOF_ALLOWUNDO (0x40) y FOF_WANTNUKEWARNING (0x4000)", visto.banderas, papeleraCallada|avisarSiNoCabe)
+	}
+	if !slices.Equal(bufer, esperado) || bufer[len(bufer)-2] != 0 || bufer[len(bufer)-1] != 0 {
+		t.Fatalf("pFrom UTF-16 no acaba en doble nulo: %v", bufer[len(bufer)-2:])
+	}
+	for _, mala := range []string{"", "C:\\Users\\Ana\\a\x00C:\\otro"} {
+		if err := enviarAPapelera(mala, func(*operacionShell) uintptr { t.Fatal("llamó a SHFileOperationW con ruta inválida"); return 0 }); err == nil {
+			t.Fatalf("aceptó la ruta inválida %q", mala)
+		}
+	}
+	if err := enviarAPapelera(ruta, func(op *operacionShell) uintptr { op.abortada = 1; return 0 }); err == nil {
+		t.Fatal("fAnyOperationsAborted != 0 no devolvió error")
+	}
+	if err := enviarAPapelera(ruta, func(*operacionShell) uintptr { return 0x78 }); err == nil {
+		t.Fatal("un código de error de SHFileOperationW no devolvió error")
 	}
 }

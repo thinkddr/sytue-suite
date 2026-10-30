@@ -6,7 +6,7 @@ Videoclipurile și transmisiunile dumneavoastră, la cerere și în timp real, f
 • Chat în direct și comentarii, cu moderare de bază de către cine publică.
 • Încărcați videoclipuri de până la 8 GiB; originalul se păstrează.
 • Transmisiune dintr-un program de difuzare prin RTMP, cu o cheie de flux pentru fiecare persoană.
-• În direct din navigator sau din aplicație: cameră, ecran și microfon.
+• În direct din navigator sau aplicație: cameră și microfon. Partajarea ecranului în navigatoare, sisteme desktop și Android compatibile; indisponibilă în aplicația iOS/iPadOS.
 • Înregistrările transmisiunilor devin automat videoclipuri la cerere.
 • O pagină principală publică și un canal pentru fiecare organizație, indexabile.
 • Linkuri nelistate, videoclipuri doar pentru organizație sau acces pentru persoane anume după @utilizator.

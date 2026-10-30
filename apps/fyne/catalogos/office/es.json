@@ -741,6 +741,7 @@
   "extdata.msg.noEncryption": "El cifrado de credenciales no está configurado en el servidor.",
   "extdata.msg.notAllowed": "Esta conexión solo la consultan las personas de su lista. Pide a quien administra tu organización que te añada.",
   "extdata.msg.notFound": "La conexión o la consulta ya no existe.",
+  "extdata.msg.ownerOnly": "Solo quien creó esta conexión o quien administra la organización puede cambiarla o borrarla.",
   "extdata.msg.rate": "Demasiadas ejecuciones seguidas. Espera unos segundos e inténtalo de nuevo.",
   "extdata.msg.timeout": "El origen de datos externo tardó demasiado en responder.",
   "extdata.msg.unauth": "Tu sesión ha caducado. Vuelve a iniciar sesión.",

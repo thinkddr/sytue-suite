@@ -8,12 +8,10 @@ package nube
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io/fs"
 	"log/slog"
 	"os"
 	"path/filepath"
-	"runtime"
 	"sync"
 	"syscall"
 	"time"
@@ -150,49 +148,13 @@ func renombrarSinPisar(de, a string) error {
 
 var procOperacionShell = windows.NewLazySystemDLL("shell32.dll").NewProc("SHFileOperationW")
 
-// SHFILEOPSTRUCTW de x64 y arm64: sin empaquetar (shellapi.h solo empaqueta en 32 bits).
-type operacionShell struct {
-	_        uintptr // hwnd
-	funcion  uint32
-	desde    *uint16 // lista de rutas completas acabada en doble nulo
-	_        *uint16 // pTo
-	banderas uint16
-	abortada int32   // fAnyOperationsAborted
-	_        uintptr // hNameMappings
-	_        *uint16 // lpszProgressTitle
-}
-
-const (
-	foBorrar = 0x3 // FO_DELETE
-	// FOF_SILENT | FOF_NOCONFIRMATION | FOF_ALLOWUNDO | FOF_NOCONFIRMMKDIR | FOF_NOERRORUI:
-	// a la papelera, sin preguntar ni enseñar nada.
-	papeleraCallada = 0x4 | 0x10 | 0x40 | 0x200 | 0x400
-	// FOF_WANTNUKEWARNING: si algo no cabe en la papelera, Windows pregunta antes de
-	// borrarlo para siempre. Sin él, lo borraría sin decir nada.
-	avisarSiNoCabe = 0x4000
-)
-
 // aPapelera manda `ruta` a la papelera de reciclaje de Windows, como «Eliminar» del
 // Explorador: nunca la borra para siempre sin preguntar (FYS-03, decidido por el dueño).
-//
-// No visto en un Windows de verdad (FYS-03): el mismo «mover fuera» que hace el
-// Explorador, que sí se midió (`alRenombrar`).
 func aPapelera(ruta string) error {
-	desde, err := windows.UTF16FromString(ruta)
-	if err != nil {
-		return err
-	}
-	desde = append(desde, 0)
-	op := operacionShell{funcion: foBorrar, desde: &desde[0], banderas: papeleraCallada | avisarSiNoCabe}
-	r, _, _ := procOperacionShell.Call(uintptr(unsafe.Pointer(&op)))
-	runtime.KeepAlive(desde)
-	switch {
-	case r != 0:
-		return fmt.Errorf("nube: SHFileOperation: 0x%x", r)
-	case op.abortada != 0:
-		return errors.New("nube: no se ha mandado a la papelera")
-	}
-	return nil
+	return enviarAPapelera(ruta, func(op *operacionShell) uintptr {
+		r, _, _ := procOperacionShell.Call(uintptr(unsafe.Pointer(op)))
+		return r
+	})
 }
 
 // locales son los marcadores y ficheros que hay en la carpeta del disco.

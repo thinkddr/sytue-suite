@@ -6,7 +6,7 @@ Sinun videosi ja suorat lähetyksesi, tilauksesta ja reaaliajassa, poistumatta E
 • Suora keskustelu ja kommentit, julkaisijan perusmoderoinnilla.
 • Lataa enintään 8 GiB:n videoita; alkuperäinen säilytetään.
 • Suora lähetys lähetysohjelmasta RTMP:llä, henkilökohtaisella lähetysavaimella.
-• Suorana selaimesta tai sovelluksesta: kamera, näyttö ja mikrofoni.
+• Suorana selaimesta tai sovelluksesta: kamera ja mikrofoni. Näytön jakaminen tuetuissa selaimissa, työpöytäjärjestelmissä ja Androidissa; ei saatavilla iOS/iPadOS-sovelluksessa.
 • Suorien lähetysten tallenteet muuttuvat tilausvideoiksi automaattisesti.
 • Julkinen etusivu ja kanava jokaiselle organisaatiolle, indeksoitavissa.
 • Piilotetut linkit, videot vain organisaatiolle tai pääsy tietyille henkilöille @käyttäjänimellä.

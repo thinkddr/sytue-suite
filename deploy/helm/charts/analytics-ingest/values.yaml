@@ -8,7 +8,7 @@ component: analytics-ingest
 replicaCount: 2
 
 image:
-  registry: ""                 # cae a global.imageRegistry (Scaleway Registry, UE)
+  registry: ghcr.io/thinkddr   # global.imageRegistry lo pisa en producción
   # MISMA imagen que analytics-api (services/analytics/Dockerfile trae los dos
   # binarios). No hay build-arg BINARY: lo que cambia es el proceso, no la imagen.
   repository: sytue-analytics

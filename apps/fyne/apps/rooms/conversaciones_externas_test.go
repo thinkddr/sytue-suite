@@ -4,9 +4,11 @@ package rooms
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -15,6 +17,7 @@ import (
 
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
+	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 )
 
 func TestOtraCuentaPersonalEsNuevaYNoRepiteOAuthAntesDeConfirmarla(t *testing.T) {
@@ -280,5 +283,72 @@ func TestTeamsMeetingGenerationChangeBlocksLateCreation(t *testing.T) {
 	generation = "session-a"
 	if c.vigenteMeet() {
 		t.Fatal("closed wizard accepted a late result")
+	}
+}
+
+func TestLaPoliticaDeConversacionesExternasBloqueaOAuthYCanales(t *testing.T) {
+	for _, provider := range []string{"slack", "microsoft-teams", "google-chat"} {
+		for _, available := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/%v", provider, available), func(t *testing.T) {
+				sala, _ := salaDePrueba(t, servicioConDos())
+				var consultas, autorizaciones atomic.Int32
+				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { consultas.Add(1); _, _ = w.Write([]byte(`{"items":[]}`)) }))
+				defer server.Close()
+				sala.CuentasApps = api.NewIntegraciones(server.URL, nil, server.Client())
+				sala.AutorizarConversaciones = func(context.Context, string, string) (string, error) { autorizaciones.Add(1); return "nueva", nil }
+				w := test.NewTempWindow(t, sala.P.Objeto())
+				c := &conversacionExterna{sa: sala, ctx: t.Context(), lienzo: w.Canvas(), cuerpo: container.NewStack(), pie: container.NewStack(), entrada: ui.NuevaAreaTexto(""), proveedor: provider, instancia: "activa", paso: 1}
+				c.d = ui.NuevoDialogo("Conectar", c.cuerpo).Con(ui.DialogoLG, c.pie)
+				raw := fmt.Sprintf(`{"providers":[{"provider":%q,"available":%v,"disabled_by_org":true}],"items":[{"instance_id":"activa","provider":%q,"connected":true}]}`, provider, available, provider)
+				if err := json.Unmarshal([]byte(raw), &c.cuentas); err != nil {
+					t.Fatal(err)
+				}
+				if c.disponible() {
+					t.Error("la política no prevalece sobre available")
+				}
+				c.autorizarNueva()
+				c.avanzar()
+				if autorizaciones.Load() != 0 || consultas.Load() != 0 || c.paso != 1 {
+					t.Fatalf("política ignorada: OAuth=%d canales=%d paso=%d", autorizaciones.Load(), consultas.Load(), c.paso)
+				}
+				c.paso = 1
+				contenido := c.pasoContenido()
+				encontrado := false
+				for _, objeto := range contenido {
+					if texto, ok := objeto.(*ui.Parrafo); ok && texto.Texto == sala.P.T.T("app.disabled", nil) {
+						encontrado = true
+					}
+				}
+				if !encontrado {
+					t.Error("un bloqueo de la organización se muestra como falta de configuración global")
+				}
+				if len(c.pie.Objects) == 0 {
+					t.Fatal("el bloqueo no actualiza las acciones del asistente")
+				}
+				if boton, ok := c.pie.Objects[len(c.pie.Objects)-1].(*ui.Boton); !ok || !boton.Inerte {
+					t.Error("continuar está habilitado para un proveedor bloqueado")
+				}
+			})
+		}
+	}
+}
+
+func TestLaIndisponibilidadGlobalDeChatNoSeConfundeConPolitica(t *testing.T) {
+	sala, _ := salaDePrueba(t, servicioConDos())
+	w := test.NewTempWindow(t, sala.P.Objeto())
+	c := &conversacionExterna{sa: sala, lienzo: w.Canvas(), proveedor: "slack", paso: 1, cuentas: api.ExternalChatAccounts{Providers: []api.ExternalChatProvider{{Provider: "slack"}}}}
+	encontrado := false
+	for _, objeto := range c.pasoContenido() {
+		if texto, ok := objeto.(*ui.Parrafo); ok {
+			if texto.Texto == sala.P.T.T("app.disabled", nil) {
+				t.Error("la falta de configuración global se presenta como bloqueo")
+			}
+			if texto.Texto == sala.P.T.T("external.unavailable", i18n.Vars{"provider": "Slack"}) {
+				encontrado = true
+			}
+		}
+	}
+	if !encontrado {
+		t.Error("no se explica la falta de configuración del proveedor")
 	}
 }

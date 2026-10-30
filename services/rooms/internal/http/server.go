@@ -75,6 +75,7 @@ func NewRouter(d Deps) http.Handler {
 		api.Use(d.Verifier.RequireTenant)
 		api.Use(withBearer)
 		api.Get("/matrix/bootstrap", h.MatrixBootstrap)
+		api.Get("/matrix/storage/bootstrap", h.MatrixStorageBootstrap)
 		api.Post("/matrix/native/start", h.MatrixNativeStart)
 		api.Get("/matrix/native/preview", h.MatrixNativePreview)
 		api.Post("/matrix/native/accept", h.MatrixNativeAccept)

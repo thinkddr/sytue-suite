@@ -189,21 +189,9 @@ func (s sesionDriveSistema) Invalidate(token string) { s.sesion.Invalidate(token
 func (s *Suite) conectarDriveSistema(ctx context.Context, e estadoDriveSistema) error {
 	fuente := s.autorizacionDriveSistema(e.identidad)
 	if runtime.GOOS == "windows" {
-		// CFAPI admite una sola conexión por raíz. El mismo cerrojo permite
-		// que otra app continúe al cerrar la que estaba atendiendo Windows.
-		soltar, err := cerrojoDriveSistema(ctx)
-		if err != nil {
-			return err
-		}
-		defer soltar()
-		if s.Sesion.SnapshotIdentity() != e.identidad || !s.DriveEnSistema() {
-			return context.Canceled
-		}
-		dir, err := nube.CarpetaCon(ctx, nube.Cuenta{Emisor: e.identidad.Issuer, Sub: e.identidad.Subject, Org: e.identidad.Organization})
-		if err != nil {
-			return err
-		}
-		return nube.Conectar(ctx, dir, api.NewDrive(s.URL("drive"), fuente, nil))
+		return conectarCarpetaDriveWindows(ctx, s, e, func(ctx context.Context, dir string, fuente sesionDriveSistema) error {
+			return nube.Conectar(ctx, dir, api.NewDrive(s.URL("drive"), fuente, nil))
+		})
 	}
 	if err := documentos.Habilitar(true); err != nil {
 		return err
@@ -211,6 +199,28 @@ func (s *Suite) conectarDriveSistema(ctx context.Context, e estadoDriveSistema) 
 	plazo, parar := context.WithTimeout(ctx, time.Minute)
 	defer parar()
 	return documentos.AsegurarIdentidad(plazo, api.NewAccount(s.URL("id"), fuente, nil), s.URL("drive")+"/dav/", "Sytue Drive · "+sistemaDriveEquipo(), identidadDocumentos(e.identidad, s.almacen.Identificador()))
+}
+
+func cuentaNube(i auth.IdentitySnapshot) nube.Cuenta {
+	return nube.Cuenta{Emisor: i.Issuer, Sub: i.Subject, Org: i.Organization}
+}
+
+func conectarCarpetaDriveWindows(ctx context.Context, s *Suite, e estadoDriveSistema, conectar func(ctx context.Context, dir string, fuente sesionDriveSistema) error) error {
+	// CFAPI admite una sola conexión por raíz. El mismo cerrojo permite
+	// que otra app continúe al cerrar la que estaba atendiendo Windows.
+	soltar, err := cerrojoDriveSistema(ctx)
+	if err != nil {
+		return err
+	}
+	defer soltar()
+	if s.Sesion.SnapshotIdentity() != e.identidad || !s.DriveEnSistema() {
+		return context.Canceled
+	}
+	dir, err := nube.CarpetaCon(ctx, cuentaNube(e.identidad))
+	if err != nil {
+		return err
+	}
+	return conectar(ctx, dir, s.autorizacionDriveSistema(e.identidad))
 }
 
 func cerrojoDriveSistema(ctx context.Context) (func(), error) {

@@ -192,12 +192,17 @@ export async function loadBitmap(
     path = canonical;
   }
   // Inspect and read the same open file, not a path which can be swapped after stat.
-  const file = await open(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+  const file = await open(
+    path,
+    constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0),
+  );
   let bytes: Buffer;
   try {
     const info = await file.stat();
-    if (!info.isFile()) throw new Error(`El recurso bitmap no es un archivo: ${src}`);
-    if (info.size > maxBytes) throw new Error("El recurso bitmap supera 20 MiB.");
+    if (!info.isFile())
+      throw new Error(`El recurso bitmap no es un archivo: ${src}`);
+    if (info.size > maxBytes)
+      throw new Error("El recurso bitmap supera 20 MiB.");
     const chunks: Buffer[] = [];
     let total = 0;
     for (;;) {

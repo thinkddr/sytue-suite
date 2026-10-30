@@ -108,6 +108,22 @@ func entradaAjustes(orig *Cuaderno, padre, titulo, emoji string, f formAjustes) 
 	return in
 }
 
+// esDuenoCuaderno conserva los cuadernos de muestra sin servicio ni sesión; en una
+// sesión real, el identificador del dueño tiene que coincidir.
+func (p *Pantalla) esDuenoCuaderno(c *Cuaderno) bool {
+	if c == nil || (p.svc == nil && p.Yo == nil) {
+		return true
+	}
+	return p.esMio(c.Crudo.OwnerSub)
+}
+
+// puedeAdministrarCuaderno sigue la regla del servicio: el dueño, o quien
+// administra la organización si el cuaderno pertenece a esa organización.
+func (p *Pantalla) puedeAdministrarCuaderno(c *Cuaderno) bool {
+	return p.esDuenoCuaderno(c) || (c != nil && c.Crudo.Visibility == "organization" &&
+		p.AdminOrg != nil && p.AdminOrg())
+}
+
 // dialogoAjustes abre los ajustes de `c`, o el de «nuevo cuaderno» con c == nil y, si
 // cuelga de otro, su `padre`.
 func (p *Pantalla) dialogoAjustes(c *Cuaderno, padre string) {
@@ -136,7 +152,7 @@ func (p *Pantalla) dialogoAjustes(c *Cuaderno, padre string) {
 	guardar.Inerte = strings.TrimSpace(titulo.Texto()) == ""
 	cancelar := ui.NuevoBoton(t("common.cancel", nil), nil).Con(ui.Fantasma, ui.TallaMD)
 	var borrar fyne.CanvasObject
-	if c != nil {
+	if c != nil && p.esDuenoCuaderno(c) {
 		borrar = ui.NuevoBoton(t("notebook.delete", nil), func() {
 			p.confirmar(t("notebook.delete", nil), t("notebook.deleteConfirm", i18n.Vars{"title": c.Titulo}),
 				t("common.delete", nil), func() {
@@ -288,26 +304,28 @@ func (p *Pantalla) cuerpoAjustes(c *Cuaderno, emoji, titulo *ui.Entrada, f *form
 	disposicion := leyenda(t("layout.label", nil),
 		container.New(rejillaAjustes{ventana: func() float32 { return p.win.Canvas().Size().Width }}, dispos...), v)
 
-	// Visibilidad.
-	vis := make([]fyne.CanvasObject, 0, len(Visibilidades))
-	for _, x := range Visibilidades {
-		clave := x.Clave
-		texto := container.New(ui.Columna{},
-			ui.NuevoParrafo(t("visibility."+clave, nil), tema.TextoBase, ui.Medio, "text", v),
-			ui.NuevoParrafo(t("visibility."+clave+".hint", nil), tema.TextoXS, ui.Normal, "text-subtle", v))
-		glifo := container.New(&margenY{arriba: 0.5 * 0.25 * tema.Rem}, Glifo(x.Glifo, 18, "text-muted", v))
-		vis = append(vis, opcionAjuste(
-			container.New(ui.FilaAuto{Hueco: 2.5 * 0.25 * tema.Rem, Derecha: 2, Partir: true, Elastico: 2}, glifo, texto),
-			t("visibility."+clave, nil), f.visibilidad == clave, func() {
-				f.visibilidad = clave
-				f.indexable = defectoIndexable(clave, f.cifrado)
-				repintar()
-			}, v))
+	piezas := []fyne.CanvasObject{campos, paleta, disposicion}
+	if p.puedeAdministrarCuaderno(c) {
+		// Visibilidad.
+		vis := make([]fyne.CanvasObject, 0, len(Visibilidades))
+		for _, x := range Visibilidades {
+			clave := x.Clave
+			texto := container.New(ui.Columna{},
+				ui.NuevoParrafo(t("visibility."+clave, nil), tema.TextoBase, ui.Medio, "text", v),
+				ui.NuevoParrafo(t("visibility."+clave+".hint", nil), tema.TextoXS, ui.Normal, "text-subtle", v))
+			glifo := container.New(&margenY{arriba: 0.5 * 0.25 * tema.Rem}, Glifo(x.Glifo, 18, "text-muted", v))
+			vis = append(vis, opcionAjuste(
+				container.New(ui.FilaAuto{Hueco: 2.5 * 0.25 * tema.Rem, Derecha: 2, Partir: true, Elastico: 2}, glifo, texto),
+				t("visibility."+clave, nil), f.visibilidad == clave, func() {
+					f.visibilidad = clave
+					f.indexable = defectoIndexable(clave, f.cifrado)
+					repintar()
+				}, v))
+		}
+		visibilidad := leyenda(t("visibility.label", nil),
+			container.New(ui.Columna{Hueco: HuecoVisibilidad}, vis...), v)
+		piezas = append(piezas, visibilidad)
 	}
-	visibilidad := leyenda(t("visibility.label", nil),
-		container.New(ui.Columna{Hueco: HuecoVisibilidad}, vis...), v)
-
-	piezas := []fyne.CanvasObject{campos, paleta, disposicion, visibilidad}
 	if enlace := p.enlacePublico(c, f.visibilidad); enlace != "" {
 		piezas = append(piezas, p.filaEnlacePublico(enlace, v))
 	}
@@ -385,31 +403,33 @@ func (p *Pantalla) cajaIndice(c *Cuaderno, f *formAjustes, repintar func(), v te
 		sangrado2(SangriaAyudaCasilla, ui.NuevoParrafo(t(ayudaIndice, nil), tema.TextoXS, ui.Normal,
 			"text-subtle", v)))
 
-	interruptor := ui.NuevoConmutador(t("crypto.title", nil), func(si bool) {
-		if !si {
-			f.cifrado, f.crypto = false, nil
-			f.indexable = defectoIndexable(f.visibilidad, false)
+	piezas := []fyne.CanvasObject{indice}
+	if p.puedeAdministrarCuaderno(c) {
+		interruptor := ui.NuevoConmutador(t("crypto.title", nil), func(si bool) {
+			if !si {
+				f.cifrado, f.crypto = false, nil
+				f.indexable = defectoIndexable(f.visibilidad, false)
+				repintar()
+				return
+			}
+			// Encender pide la contraseña dos veces (`PassphraseDialog modo="crear"`); hasta
+			// que se da, el interruptor sigue apagado.
 			repintar()
-			return
-		}
-		// Encender pide la contraseña dos veces (`PassphraseDialog modo="crear"`); hasta
-		// que se da, el interruptor sigue apagado.
-		repintar()
-		p.cifrarCuaderno(func(crypto json.RawMessage) {
-			f.cifrado, f.crypto, f.indexable = true, crypto, false
-			repintar()
+			p.cifrarCuaderno(func(crypto json.RawMessage) {
+				f.cifrado, f.crypto, f.indexable = true, crypto, false
+				repintar()
+			})
 		})
-	})
-	interruptor.Encendido = f.cifrado
-	interruptor.AnchoEtiqueta = ui.Medir(interruptor.Etiqueta, tema.TextoBase, ui.Normal).Width
-	cifrado := container.New(ui.Columna{Hueco: 1 * 0.25 * tema.Rem}, interruptor,
-		sangrado2(SangriaAyudaInterruptor, ui.NuevoParrafo(t("crypto.hint", nil), tema.TextoXS, ui.Normal,
-			"text-subtle", v)))
-
-	piezas := []fyne.CanvasObject{indice, cifrado}
-	if c != nil && c.Cifrado && !f.cifrado {
-		piezas = append(piezas, ui.NuevoParrafo(t("crypto.disableWarning", nil), tema.TextoBase, ui.Normal,
-			"warning-text", v))
+		interruptor.Encendido = f.cifrado
+		interruptor.AnchoEtiqueta = ui.Medir(interruptor.Etiqueta, tema.TextoBase, ui.Normal).Width
+		cifrado := container.New(ui.Columna{Hueco: 1 * 0.25 * tema.Rem}, interruptor,
+			sangrado2(SangriaAyudaInterruptor, ui.NuevoParrafo(t("crypto.hint", nil), tema.TextoXS, ui.Normal,
+				"text-subtle", v)))
+		piezas = append(piezas, cifrado)
+		if c != nil && c.Cifrado && !f.cifrado {
+			piezas = append(piezas, ui.NuevoParrafo(t("crypto.disableWarning", nil), tema.TextoBase, ui.Normal,
+				"warning-text", v))
+		}
 	}
 	return enCajaDe(tema.Color("surface-raised", v), RellenoCajaIndice,
 		container.New(ui.Columna{Hueco: 3 * 0.25 * tema.Rem}, piezas...), v)

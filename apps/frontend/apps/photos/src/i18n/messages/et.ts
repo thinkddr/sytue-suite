@@ -131,7 +131,9 @@ export const et: AppCatalog<typeof en> = {
   'gallery.selectMonth': 'Vali kuu',
   'gallery.unselectMonth': 'Tühista kuu valik',
   'gallery.downloadSelected': 'Laadi alla',
-  'gallery.downloading': { one: '1 foto allalaadimine…', other: '{count} foto allalaadimine…' },
+  'gallery.downloading':
+    'Alustatud allalaadimistaotlused: {count}. Kontrollige brauseri allalaadimisi.',
+  'gallery.downloadCapped': 'Sellest partiist välja jäänud fotod: {count}.',
   'gallery.newAlbum': 'Uus album',
   'gallery.newAlbumTitle': 'Uus album',
   'gallery.newAlbumPrompt': {

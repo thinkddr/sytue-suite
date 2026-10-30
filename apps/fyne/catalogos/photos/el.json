@@ -104,6 +104,7 @@
   "gallery.describeStop": "Διακοπή",
   "gallery.described": "{count} φωτογραφίες περιγράφηκαν",
   "gallery.describing": "Περιγραφή {done} από {total}…",
+  "gallery.downloadCapped": "Φωτογραφίες εκτός αυτής της παρτίδας: {count}.",
   "gallery.downloadSelected": "Λήψη",
   "gallery.downloading": {
     "one": "Λήψη 1 φωτογραφίας…",

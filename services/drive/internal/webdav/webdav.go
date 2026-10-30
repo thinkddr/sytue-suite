@@ -47,13 +47,79 @@ func manejador(prefix string, fs *FileSystem) http.Handler {
 	return comoDescarga(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		metodoDeVerdad(r)
 		acotarBloqueo(r)
+		ctx := normalizarCabecerasCliente(r.Context(), r, prefix)
+		r = r.WithContext(ctx)
 		(&webdav.Handler{
 			Prefix:     prefix,
 			FileSystem: fs,
-			LockSystem: bloqueos.organizacion(r.Context()),
+			LockSystem: bloqueos.organizacion(ctx),
 			Logger:     logger,
 		}).ServeHTTP(w, r)
 	}))
+}
+
+type claveOrigenMove struct{}
+
+func conOrigenMove(ctx context.Context, src string) context.Context {
+	return context.WithValue(ctx, claveOrigenMove{}, src)
+}
+
+func origenMoveDe(ctx context.Context) string {
+	v, _ := ctx.Value(claveOrigenMove{}).(string)
+	return v
+}
+
+// normalizarCabecerasCliente adapta cabeceras RFC 4918 válidas que envían clientes
+// reales (macOS Finder, Windows WebClient, Microsoft Office) a lo que espera
+// golang.org/x/net/webdav:
+//  1. En MOVE sin cabecera Overwrite, el valor por defecto según RFC 4918 §9.9.3 y
+//     §10.6 es "T" (golang.org/x/net/webdav exige explícitamente Overwrite == "T").
+//  2. En la cabecera If con etiquetas de recurso de solo ruta `</dav/...>` (RFC 4918
+//     §10.4.2), antepone el esquema y r.Host para que confirmLocks no las descarte
+//     por tener u.Host vacío.
+func normalizarCabecerasCliente(ctx context.Context, r *http.Request, prefix string) context.Context {
+	if ifHdr := r.Header.Get("If"); ifHdr != "" && r.Host != "" {
+		r.Header.Set("If", normalizarIfEtiquetado(ifHdr, r.Host))
+	}
+	if r.Method == "MOVE" {
+		if r.Header.Get("Overwrite") == "" {
+			r.Header.Set("Overwrite", "T")
+		}
+		src := strings.TrimPrefix(r.URL.Path, prefix)
+		ctx = conOrigenMove(ctx, src)
+	}
+	return ctx
+}
+
+func normalizarIfEtiquetado(hdr, host string) string {
+	var b strings.Builder
+	rest := hdr
+	for {
+		idx := strings.Index(rest, "</")
+		if idx < 0 {
+			b.WriteString(rest)
+			break
+		}
+		// Solo es un resource-tag si no va precedido inmediatamente de '(' o 'Not' dentro de una lista.
+		prefix := strings.TrimSpace(rest[:idx])
+		esTag := prefix == "" || strings.HasSuffix(prefix, ")")
+		if !esTag {
+			b.WriteString(rest[:idx+2])
+			rest = rest[idx+2:]
+			continue
+		}
+		end := strings.IndexByte(rest[idx:], '>')
+		if end < 0 {
+			b.WriteString(rest)
+			break
+		}
+		b.WriteString(rest[:idx])
+		b.WriteString("<http://")
+		b.WriteString(host)
+		b.WriteString(rest[idx+1 : idx+end+1])
+		rest = rest[idx+end+1:]
+	}
+	return b.String()
 }
 
 // metodosOcultos son los de WebDAV que un cliente puede mandar como POST con

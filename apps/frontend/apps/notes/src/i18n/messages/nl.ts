@@ -112,6 +112,8 @@ export const nl: AppCatalog<typeof en> = {
   'backlinks.emptyHint': 'Link ernaar vanuit een andere notitie en ze verschijnt hier vanzelf.',
   'notebook.delete': 'Notitieboek verwijderen',
   'notebook.deleteConfirm': '“{title}” en alles wat erin zit verwijderen?',
+  'notebook.ownerOnly':
+    'Alleen wie dit notitieboek heeft aangemaakt of wie de organisatie beheert kan het verplaatsen, de zichtbaarheid wijzigen of het versleutelen.',
   'notebook.newChild': 'Nieuw notitieboek erin',
   'notebook.notes': { one: '{count} notitie', other: '{count} notities' },
   'notebook.emoji': 'Pictogram',

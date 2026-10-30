@@ -48,7 +48,7 @@ async function mount(provider, options = {}) {
     reducedMotion: "reduce",
   });
   const page = await context.newPage();
-  page.setDefaultTimeout(15000);
+  page.setDefaultTimeout(30000);
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
   const state = {

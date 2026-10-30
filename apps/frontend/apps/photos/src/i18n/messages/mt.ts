@@ -139,12 +139,8 @@ export const mt: AppCatalog<typeof en> = {
   'gallery.selectMonth': 'Agħżel ix-xahar',
   'gallery.unselectMonth': 'Neħħi l-għażla tax-xahar',
   'gallery.downloadSelected': 'Niżżel',
-  'gallery.downloading': {
-    one: 'Qed jitniżżel ritratt wieħed…',
-    few: 'Qed jitniżżlu {count} ritratti…',
-    many: 'Qed jitniżżlu {count}-il ritratt…',
-    other: 'Qed jitniżżlu {count} ritratt…',
-  },
+  'gallery.downloading': 'Talbiet ta’ tniżżil mibdija: {count}. Iċċekkja t-tniżżil tal-browser.',
+  'gallery.downloadCapped': 'Ritratti barra minn dan il-grupp: {count}.',
   'gallery.newAlbum': 'Album ġdid',
   'gallery.newAlbumTitle': 'Album ġdid',
   'gallery.newAlbumPrompt': {

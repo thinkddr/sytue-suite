@@ -131,7 +131,8 @@ export const is: AppCatalog<typeof en> = {
   'gallery.selectMonth': 'Velja mánuð',
   'gallery.unselectMonth': 'Afvelja mánuð',
   'gallery.downloadSelected': 'Sækja',
-  'gallery.downloading': { one: 'Sækir {count} mynd…', other: 'Sækir {count} myndir…' },
+  'gallery.downloading': 'Hafnar niðurhalsbeiðnir: {count}. Athugaðu niðurhal vafrans.',
+  'gallery.downloadCapped': 'Myndir utan þessarar lotu: {count}.',
   'gallery.newAlbum': 'Nýtt albúm',
   'gallery.newAlbumTitle': 'Nýtt albúm',
   'gallery.newAlbumPrompt': {

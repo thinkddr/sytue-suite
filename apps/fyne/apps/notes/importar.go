@@ -14,6 +14,7 @@ import (
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/ficheros"
+	"git.sytue.eu/sytue/one/apps/nucleo/htmltext"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 )
 
@@ -126,7 +127,9 @@ func (p *Pantalla) notasSoloLectura(notas []Nota, v tema.Variante) fyne.CanvasOb
 		case n.Tipo == "text" || n.Tipo == "todo":
 			piezas = append(piezas, NuevaProsa(n.Doc))
 		case n.Contenido != "":
-			piezas = append(piezas, ui.NuevoParrafo(n.Contenido, tema.TextoBase, ui.Normal, "text-muted", v))
+			if texto := htmltext.Text(n.Contenido); texto != "" {
+				piezas = append(piezas, ui.NuevoParrafo(texto, tema.TextoBase, ui.Normal, "text-muted", v))
+			}
 		}
 		caja := ui.NuevaCaja(tema.Color("surface", v), tema.Color("border", v), tema.RadioLG)
 		g := RellenoNotaLectura + tema.Borde

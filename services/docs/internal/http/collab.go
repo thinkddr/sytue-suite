@@ -11,6 +11,7 @@ import (
 
 	"github.com/coder/websocket"
 
+	"git.sytue.eu/sytue/one/platform/pkg/authn"
 	pcfg "git.sytue.eu/sytue/one/platform/pkg/config"
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/platform/pkg/log"
@@ -171,13 +172,10 @@ func (h *Handler) collabWS(w http.ResponseWriter, r *http.Request) {
 
 	// Contexto desligado del request HTTP para que la conexión sobreviva… pero no a
 	// su token: al caducar se cierra, y al reconectar el token nuevo dice lo que vale
-	// AHORA —quien salió de la organización ya no trae su `tenant`— (ADR 0052).
-	ctx := context.WithoutCancel(r.Context())
-	if c, ok := authnClaims(r); ok && !c.Expira.IsZero() {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithDeadline(ctx, c.Expira)
-		defer cancel()
-	}
+	// AHORA —quien salió de la organización ya no trae su `tenant`— (ADR 0052, COM-08).
+	claims, _ := authnClaims(r)
+	ctx, cancel := authn.HastaQueCaduque(context.WithoutCancel(r.Context()), claims)
+	defer cancel()
 	client := collab.NewClient(h.hub, conn, doc.ID, subj, role, subjName(r))
 	client.Serve(ctx, h, doc.Seq)
 }

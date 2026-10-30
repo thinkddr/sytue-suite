@@ -281,6 +281,7 @@
     "many": "{count} užrašo",
     "other": "{count} užrašų"
   },
+  "notebook.ownerOnly": "Perkelti šią užrašinę, pakeisti jos matomumą arba ją užšifruoti gali tik ją sukūręs asmuo arba organizacijos administratorius.",
   "notebook.rename": "Pervadinti",
   "notebook.settings": "Užrašinės nustatymai",
   "notebook.title": "Pavadinimas",

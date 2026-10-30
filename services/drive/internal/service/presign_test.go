@@ -347,6 +347,23 @@ func TestFinalizeUploadCortaFlujoMayorQueLoAutorizado(t *testing.T) {
 	}
 }
 
+// TestPresignUploadLiberaReservaSiFallaPresignPut (FILE-08): si el almacén no
+// admite subida directa (p. ej. conector externo que devuelve ErrPresignUnsupported)
+// o falla al firmar la URL, la reserva abierta en subidas_pendientes se cierra
+// de inmediato para no bloquear la cuota durante 2*PresignTTL.
+func TestPresignUploadLiberaReservaSiFallaPresignPut(t *testing.T) {
+	s, fs, fb := presignSvc(t)
+	fb.prePutErr = objectstore.ErrPresignUnsupported
+
+	_, err := s.PresignUpload(tenantCtx(t), "/big.bin", 50, "application/octet-stream", "user-1")
+	if !errors.Is(err, objectstore.ErrPresignUnsupported) {
+		t.Fatalf("esperaba ErrPresignUnsupported, got %v", err)
+	}
+	if fb.lastPutKey == "" || !fs.finalizadas[fb.lastPutKey] {
+		t.Fatalf("la reserva %q quedó abierta tras fallar PresignPut (finalizadas=%v)", fb.lastPutKey, fs.finalizadas)
+	}
+}
+
 // flipFirstRune cambia el primer carácter para invalidar la firma del handle.
 func flipFirstRune(s string) string {
 	if s == "" {

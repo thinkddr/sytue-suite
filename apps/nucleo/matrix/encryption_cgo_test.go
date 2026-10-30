@@ -24,6 +24,7 @@ import (
 	"maunium.net/go/mautrix/id"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
+	"git.sytue.eu/sytue/one/apps/nucleo/storage"
 )
 
 // This uses real maintained Go Olm and SQLite, with a transport double that records
@@ -191,6 +192,31 @@ func TestEncryptedSendAndAttachmentSurviveRestart(t *testing.T) {
 	if ref.EventID != "$event" || bytes.Contains(ciphertext, []byte(secret)) {
 		t.Fatal("server received plaintext or no encrypted event")
 	}
+	// The application record bound must include the maintained codec's expansion,
+	// not merely the size of plaintext JSON. Reserve 8 KiB for the server PDU.
+	recordScope := storage.Scope{Tenant: strings.Repeat("t", 63), Subject: strings.Repeat("s", 255), Product: "drive"}
+	record := storage.Record{Version: 1, Scope: recordScope, ObjectID: strings.Repeat("o", 128), RevisionID: strings.Repeat("r", 128), Role: "content"}
+	low, high := 0, storage.MaxRecordBytes
+	for low < high {
+		length := low + (high-low+1)/2
+		record.Payload = []byte(`"` + strings.Repeat("x", length) + `"`)
+		if record.Validate(recordScope) == nil {
+			low = length
+		} else {
+			high = length - 1
+		}
+	}
+	record.Payload = []byte(`"` + strings.Repeat("x", low) + `"`)
+	maxContent := map[string]any{"msgtype": "m.text", "body": "", "org.sytue.storage": record}
+	maxCipher, err := c.crypto.Encrypt(t.Context(), "!room:matrix.test", event.EventMessage, maxContent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	maxWire, err := json.Marshal(maxCipher)
+	if err != nil || len(maxWire) > 56<<10 || bytes.Contains(maxWire, []byte(record.ObjectID)) {
+		t.Fatal("maximum private record exceeds the Matrix envelope budget", len(maxWire), err)
+	}
+	t.Logf("maximum storage record: encrypted event content=%d bytes", len(maxWire))
 	// A lost receipt must reuse the same homeserver transaction while retaining
 	// the encrypted wire contract; the SDK generates a fresh transaction otherwise.
 	const meetingURL, meetingTxn = "https://meet.google.com/abc-defg-hij", "meeting-stable-transaction"

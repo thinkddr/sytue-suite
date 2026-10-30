@@ -65,6 +65,7 @@ import type { Receta } from '../editor/receta.js';
 import { Nav } from './Nav.js';
 import { Recuerdos } from './Recuerdos.js';
 import { porMes } from '../lib/agrupar.js';
+import { planDeDescarga, programarDescarga } from '../lib/descargaEnLote.js';
 import { estiloDeTesela } from '../lib/filas.js';
 import { CAMPO_TACTIL } from '../lib/tactil.js';
 import { RUTA } from '../lib/ruta.js';
@@ -120,6 +121,16 @@ export function PhotosApp({ locale, user, hubBaseUrl, soloFavoritas = false }: P
   // visor hace de una en una: el servicio no tiene un «borrar varios» y no
   // hace falta para unas decenas de fotos.
   const [seleccion, setSeleccion] = useState<Set<string> | null>(null);
+  const cancelarDescarga = useRef<(() => void) | null>(null);
+  const pararDescarga = useCallback(() => {
+    cancelarDescarga.current?.();
+    cancelarDescarga.current = null;
+  }, []);
+  useEffect(() => pararDescarga, [pararDescarga]);
+  const salirDeSeleccion = useCallback(() => {
+    pararDescarga();
+    setSeleccion(null);
+  }, [pararDescarga]);
   // La barra de selección, para el aviso de que queda contenido a la derecha.
   // Depende de `seleccion` porque la barra SOLO existe con selección marcada.
   const barraSeleccion = useScrollRestante<HTMLDivElement>(seleccion !== null);
@@ -130,11 +141,11 @@ export function PhotosApp({ locale, user, hubBaseUrl, soloFavoritas = false }: P
     // `esAtajoDeApp`: con un menú o un diálogo abiertos, Escape es SUYO. Sin esto,
     // cerrar «Álbum nuevo» con Escape se llevaba también la selección.
     const alPulsar = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && esAtajoDeApp(e)) setSeleccion(null);
+      if (e.key === 'Escape' && esAtajoDeApp(e)) salirDeSeleccion();
     };
     window.addEventListener('keydown', alPulsar);
     return () => window.removeEventListener('keydown', alPulsar);
-  }, [seleccion, confirmarPapelera]);
+  }, [seleccion, confirmarPapelera, salirDeSeleccion]);
   // «u» añade fotos: el atajo que pulsa el menú nativo de la app de escritorio.
   useEffect(() => {
     const alPulsar = (e: KeyboardEvent) => {
@@ -163,14 +174,42 @@ export function PhotosApp({ locale, user, hubBaseUrl, soloFavoritas = false }: P
       }
       return s;
     });
-  // Descargar lo marcado: una exportación JPEG por foto, con un respiro entre
-  // ellas para que el navegador no las tome por una ráfaga y las pare.
+  // Se limita y espacia el lote; el navegador puede bloquear peticiones.
+  // Un enlace pulsado no confirma que el archivo se haya guardado.
   const descargarSeleccion = () => {
     if (!seleccion) return;
-    [...seleccion].forEach((id, i) => {
-      setTimeout(() => descargar(urlDeExportacion(id, 'jpeg')), i * 400);
+    const plan = planDeDescarga([...seleccion]);
+    if (plan.ahora.length === 0) return;
+    pararDescarga();
+    let iniciadas = 0;
+    const iniciar = (id: string) => {
+      try {
+        descargar(urlDeExportacion(id, 'jpeg'));
+      } catch (e) {
+        setError(String(e));
+        return;
+      }
+      iniciadas++;
+      // Solo sale de la selección cuando se pide: cancelar el goteo conserva
+      // las pendientes y otro lote no vuelve a pedir las mismas primeras fotos.
+      setSeleccion((prev) => {
+        if (prev === null || !prev.has(id)) return prev;
+        const pendientes = new Set(prev);
+        pendientes.delete(id);
+        return pendientes;
+      });
+      setAviso(
+        plan.fuera > 0
+          ? `${t('gallery.downloading', { count: iniciadas })} · ${t('gallery.downloadCapped', { count: plan.fuera })}`
+          : t('gallery.downloading', { count: iniciadas }),
+      );
+    };
+    // La primera petición conserva el gesto de la persona. Las demás quedan
+    // registradas para cancelarlas al reemplazar el lote, salir o desmontar.
+    cancelarDescarga.current = programarDescarga(plan.ahora, iniciar, {
+      programar: (accion, espera) => window.setTimeout(accion, espera),
+      cancelar: (id) => window.clearTimeout(id),
     });
-    setAviso(t('gallery.downloading', { count: seleccion.size }));
   };
   /**
    * Marcar favorita cambia la lista AL VOLVER la llamada, no antes: en la vista
@@ -217,7 +256,7 @@ export function PhotosApp({ locale, user, hubBaseUrl, soloFavoritas = false }: P
       // vez que se abra el selector traiga el nuevo.
       setAlbumesLista(null);
       setAviso(t('gallery.addedToAlbum', { count: seleccion.size, title: album.title }));
-      setSeleccion(null);
+      salirDeSeleccion();
     } catch (e) {
       setError(String(e));
     }
@@ -228,7 +267,7 @@ export function PhotosApp({ locale, user, hubBaseUrl, soloFavoritas = false }: P
     try {
       await anyadirAlAlbum(al.id, [...seleccion]);
       setAviso(t('gallery.addedToAlbum', { count: seleccion.size, title: al.title }));
-      setSeleccion(null);
+      salirDeSeleccion();
     } catch (e) {
       // En un álbum de otra persona lo añadido se copia a su Drive: si no cabe, se dice.
       setError(sinEspacio(e) ? translate(locale, 'sharedAlbum.quotaFull') : String(e));
@@ -301,7 +340,7 @@ export function PhotosApp({ locale, user, hubBaseUrl, soloFavoritas = false }: P
     const resultados = await Promise.allSettled(ids.map((id) => alaPapelera(id)));
     const hechas = new Set(ids.filter((_, i) => resultados[i]?.status === 'fulfilled'));
     setFotos((l) => l.filter((f) => !hechas.has(f.id)));
-    setSeleccion(null);
+    salirDeSeleccion();
     setAviso(t('gallery.trashed', { count: hechas.size }));
     if (hechas.size < ids.length)
       setError(t('gallery.trashFailed', { count: ids.length - hechas.size }));
@@ -621,11 +660,7 @@ export function PhotosApp({ locale, user, hubBaseUrl, soloFavoritas = false }: P
               barraSeleccion.queda && MASCARA_SCROLL_X,
             )}
           >
-            <IconButton
-              label={t('gallery.cancelSelection')}
-              size="lg"
-              onClick={() => setSeleccion(null)}
-            >
+            <IconButton label={t('gallery.cancelSelection')} size="lg" onClick={salirDeSeleccion}>
               <Icon name="close" />
             </IconButton>
             <span

@@ -34,23 +34,29 @@
   },
   "revision": {
     "cuenta_de_prueba": true,
-    "notas": "Sytue is a European productivity suite for organisations; each product is its own app and all of them share one account (Sytue ID).\n\nSIGN IN: tap \"Sign in\". The system browser opens id.sytue.eu; use the demo account given above. It belongs to a demo organisation with sample mail, files, calendar and channels, and it does not ask for a second factor. The same account works in all fifteen Sytue apps.\n\nThe app is free, has no in-app purchases, no ads and no third-party SDKs or analytics. Accounts are created by an organisation's administrator or at sytue.eu; an account can be deleted at https://id.sytue.eu/account/delete."
+    "notas": "Sytue is a European productivity suite for adults using it individually or in an organisation. Each product is a separate native app; all share one Sytue ID account.\n\nACCESS: tap Sign in. The system browser opens https://id.sytue.eu; use the dedicated demo credentials in App Review Information > Sign-in Information, then return to the app. Accounts are created through Sytue onboarding or by an organisation administrator. Account avatar > My account opens https://id.sytue.eu/account; account deletion is at https://id.sytue.eu/account/delete. Use a disposable account to test deletion.\n\nPAYMENTS: the native app is free, has no in-app purchases or ads, and contains no purchase flow. Account permissions and service availability still apply.\n\nREGIONAL DIFFERENCES: the review workflows use the same app across distribution territories. Language and date/number formats follow locale settings. Organisation policies and external-provider availability can affect optional integrations. Store territory availability is configured separately.\n\nCONTENT: users or their organisation provide documents, records and media. No licensed third-party film, music or news catalogue is bundled. Review samples should be developer-owned or synthetic.",
+    "notas_por_plataforma": {
+      "MAC_OS": "MAC APP STORE — network.server: This Sytue app uses this entitlement for its desktop Sytue ID sign-in callback. Tap Sign in: the app first binds a temporary listener to 127.0.0.1:8921 and opens the system browser at id.sytue.eu. After login, the browser returns an authorization code to http://127.0.0.1:8921/auth/callback. The receiver accepts only the expected GET/path/loopback Host and validates a random state; the code is exchanged over HTTPS using PKCE S256. The listener is closed on completion, cancellation or the three-minute timeout. It is not bound to LAN/public interfaces and does not provide a user-facing network server. The port is fixed (8921); the listener lifetime is temporary. To reproduce, sign out if needed, choose Sign in and complete browser authentication."
+    }
   },
   "apps": {
     "bases": {
       "id": "6819660194",
       "categoria": "PRODUCTIVITY",
-      "secundaria": "BUSINESS"
+      "secundaria": "BUSINESS",
+      "notas": "APP PURPOSE: Linked tables for business records such as customers, orders and stock, with roles and a change history. It helps teams manage related records without building a separate database app.\n\nREVIEW WORKFLOW: Create/open a review base, add a table and text/number field, add a synthetic record, link it to another table if available, and inspect the change history.\n\nCORE SERVICES: Sytue Bases API and Sytue ID. The basic table workflow does not require a third-party provider account."
     },
     "calcus": {
       "id": "6819659049",
       "categoria": "PRODUCTIVITY",
-      "secundaria": "BUSINESS"
+      "secundaria": "BUSINESS",
+      "notas": "APP PURPOSE: Spreadsheet editing with formulas, data validation, charts and collaboration. It helps teams prepare calculations and structured reports in Drive.\n\nREVIEW WORKFLOW: Create/open a spreadsheet, enter sample numeric cells and a formula, format a range, add a chart, save, and export a copy.\n\nCORE SERVICES: Sytue Docs/Drive APIs and Sytue ID. Optional connected data sources are selected by the user; no external data account is required for the sample calculation."
     },
     "calendar": {
       "id": "6819660334",
       "categoria": "PRODUCTIVITY",
-      "secundaria": "BUSINESS"
+      "secundaria": "BUSINESS",
+      "notas": "APP PURPOSE: Calendars, invitations, recurring events and reminders shared with an organisation. It brings scheduling together with Mail and the other suite apps.\n\nREVIEW WORKFLOW: Open a calendar, create a disposable event, add a reminder and invite a controlled review account, then edit and delete the event.\n\nCORE SERVICES: Sytue Calendar/CalDAV and Sytue ID. Optional external calendar connections depend on the selected provider and its authorization."
     },
     "cast": {
       "id": "6819660618",
@@ -60,42 +66,49 @@
         "messagingAndChat": true,
         "ageRatingOverrideV2": "EIGHTEEN_PLUS"
       },
-      "notas": "CAMERA AND MICROPHONE are requested only when the user starts a live broadcast. REPORT AND BLOCK (guideline 1.2): \"Report\" next to a video (to report the video or the person, or \"Block {name}\"); \"Report\" and \"Block {name}\" under each comment; the \"…\" menu of each live chat message; and the header of a channel. Reports go to the administrators of the organisation that owns the content, who can dismiss them, delete the comment or message, take the video off the public front page, unpublish it or block the person. Blocks are listed and undone in \"Reports and blocks\"."
+      "notas": "APP PURPOSE: Video publishing and live streaming for organisations, with public/unlisted/organisation/private visibility, comments and live chat. It brings uploaded videos and live sessions into the suite.\n\nREVIEW WORKFLOW: Open a developer-owned sample video and its comments. To test capture, explicitly start a live broadcast and grant camera/microphone permission. Open Report/Block and the Reports and blocks screen using controlled review accounts.\n\nCORE SERVICES: Sytue Cast/Drive APIs; Sytue-operated media/LiveKit services handle live sessions. Camera/microphone are requested when starting a live broadcast.\n\nCAMERA AND MICROPHONE are requested only when the user starts a live broadcast. REPORT AND BLOCK (guideline 1.2): \"Report\" next to a video (to report the video or the person, or \"Block {name}\"); \"Report\" and \"Block {name}\" under each comment; the \"…\" menu of each live chat message; and the header of a channel. Reports go to the administrators of the organisation that owns the content, who can dismiss them, delete the comment or message, take the video off the public front page, unpublish it or block the person. Blocks are listed and undone in \"Reports and blocks\"."
     },
     "certipdf": {
       "id": "6819660930",
       "categoria": "PRODUCTIVITY",
-      "secundaria": "BUSINESS"
+      "secundaria": "BUSINESS",
+      "notas": "APP PURPOSE: A PDF viewer/editor for annotation, forms, page operations, redaction and document signatures. It lets users work with PDFs without moving them to a separate document service.\n\nREVIEW WORKFLOW: Open a harmless sample PDF, add a comment/highlight, fill a sample form if available, and save/export a copy. Signing is optional and uses a certificate supplied by the user.\n\nCORE SERVICES: Sytue Docs/Drive PDF APIs and Sytue ID. Certificate-based signing uses the user's certificate; no certificate or identity credential is supplied in these notes.\n\nCertificate signing uses a certificate supplied by the signer; this workflow does not issue identity/signing certificates or assert a qualified-trust-service status."
     },
     "contacts": {
       "id": "6819661406",
       "categoria": "PRODUCTIVITY",
-      "secundaria": "BUSINESS"
+      "secundaria": "BUSINESS",
+      "notas": "APP PURPOSE: Personal and organisation address books with contact cards, search, labels, import/export and duplicate handling. It provides the contacts used by Mail and Calendar.\n\nREVIEW WORKFLOW: Open an address book, create a synthetic contact, edit a phone/email field, search for it, export it as vCard, and delete or restore the disposable contact.\n\nCORE SERVICES: Sytue Contacts/CardDAV and Sytue ID. Optional connected address books depend on the selected external provider."
     },
     "diapos": {
       "id": "6819661711",
       "categoria": "PRODUCTIVITY",
-      "secundaria": "BUSINESS"
+      "secundaria": "BUSINESS",
+      "notas": "APP PURPOSE: Presentation editing with slides, text, images, themes, presenter notes and export. It helps teams prepare and present material stored in Drive.\n\nREVIEW WORKFLOW: Create/open a presentation, add a slide and text, insert a harmless image, start presentation mode, then save/export a copy.\n\nCORE SERVICES: Sytue Docs/Drive APIs and Sytue ID. The basic presentation workflow does not require an external provider account."
     },
     "docus": {
       "id": "6819661966",
       "categoria": "PRODUCTIVITY",
-      "secundaria": "BUSINESS"
+      "secundaria": "BUSINESS",
+      "notas": "APP PURPOSE: Document editing with formatting, tables, comments, collaboration and export. It lets teams create and revise documents stored in Drive.\n\nREVIEW WORKFLOW: Create or open a sample document, edit a paragraph, add a small table/comment, save it and export a PDF or document copy.\n\nCORE SERVICES: Sytue Docs/Drive APIs and Sytue ID. Optional AI assistance is not needed to edit/save/export; the AI gateway supports Scaleway or a configured OpenAI-compatible endpoint."
     },
     "drive": {
       "id": "6819662326",
       "categoria": "PRODUCTIVITY",
-      "secundaria": "BUSINESS"
+      "secundaria": "BUSINESS",
+      "notas": "APP PURPOSE: File storage and sharing for individuals and teams: folders, team drives, previews, versions, trash and access-controlled links. It keeps files available to the other Sytue apps.\n\nREVIEW WORKFLOW: Open My drive, upload a harmless sample file, create a folder, preview the file, inspect sharing permissions, and move a disposable file to Trash and restore it.\n\nCORE SERVICES: Sytue Drive API and storage. Google Drive, OneDrive, Dropbox and WebDAV are optional connected storage accounts, not prerequisites for the native Drive review workflow."
     },
     "erp": {
       "id": "6819662679",
       "categoria": "BUSINESS",
-      "secundaria": "FINANCE"
+      "secundaria": "FINANCE",
+      "notas": "APP PURPOSE: Business records for contacts, sales, purchasing, inventory, invoicing and accounting. It keeps related operational records and their ledger entries together.\n\nREVIEW WORKFLOW: Open the review organisation's business modules, inspect a synthetic contact/order, create a disposable record and inspect its history. Use synthetic, unposted accounting data for destructive actions.\n\nCORE SERVICES: Sytue ERP API and Sytue ID. This is business record keeping; the native review workflow does not require a banking, trading or payment-provider account.\n\nERP is business accounting/record keeping, not an investment or banking product. No claim is made that statutory tax/filing requirements are identical across countries."
     },
     "hub": {
       "id": "6819662979",
       "categoria": "PRODUCTIVITY",
-      "secundaria": "BUSINESS"
+      "secundaria": "BUSINESS",
+      "notas": "APP PURPOSE: A starting point for the Sytue productivity suite: application launcher, today's agenda, unread mail, recent activity and notifications. It reduces the steps needed to find work and open the right app.\n\nREVIEW WORKFLOW: Open the home screen, review the agenda/unread-mail cards, open Applications, and use a quick action to create an event, document or upload. Return to Hub to inspect recent activity.\n\nCORE SERVICES: Sytue Hub, Mail, Calendar, Drive and Integrations APIs. Optional connected apps use the provider's browser consent flow."
     },
     "mail": {
       "id": "6819663133",
@@ -103,17 +116,20 @@
       "secundaria": "BUSINESS",
       "edades": {
         "messagingAndChat": true
-      }
+      },
+      "notas": "APP PURPOSE: Email with folders, conversations, search, composition and Drive attachments. It lets a user work with their Sytue mailbox and connect supported external mail accounts.\n\nREVIEW WORKFLOW: Open Inbox, read a sample conversation, compose a message to another review account, attach a harmless Drive file, save a draft, and delete the disposable draft.\n\nCORE SERVICES: Sytue Mail/JMAP and Drive APIs. Optional Gmail, Microsoft or Yahoo connections require that provider's authorization; manual secure IMAP/POP3 configurations require the mailbox provider's settings."
     },
     "notes": {
       "id": "6819663636",
       "categoria": "PRODUCTIVITY",
-      "secundaria": "BUSINESS"
+      "secundaria": "BUSINESS",
+      "notas": "APP PURPOSE: Notebooks for text, tasks, links and references to other suite items. It lets a user collect and organise working information in free, column or list layouts.\n\nREVIEW WORKFLOW: Create a disposable notebook and text/task note, edit the note, move it, inspect sharing, and export or delete the disposable notebook.\n\nCORE SERVICES: Sytue Notes and Drive APIs with Sytue ID. The basic notebook workflow does not require an external provider account."
     },
     "photos": {
       "id": "6819663851",
       "categoria": "PRODUCTIVITY",
-      "secundaria": "PHOTO_AND_VIDEO"
+      "secundaria": "PHOTO_AND_VIDEO",
+      "notas": "APP PURPOSE: A gallery, albums and non-destructive image editing over originals held in Drive. It lets users organise and adjust their own images while retaining the original.\n\nREVIEW WORKFLOW: Open the timeline, open a synthetic sample image, create an album, adjust exposure/crop, and export the edited result. Inspect the original in Drive.\n\nCORE SERVICES: Sytue Photos/Drive APIs with Sytue ID. Image storage and rendering are provided through the Sytue backend."
     },
     "rooms": {
       "id": "6819664143",
@@ -122,7 +138,7 @@
       "edades": {
         "messagingAndChat": true
       },
-      "notas": "CAMERA AND MICROPHONE are requested only when the user joins a call. BLOCK AND REPORT (guideline 1.2): \"…\" on a message → \"Report message\" or \"Block…\"; \"People\" panel → \"…\" on a person → \"Report…\" or \"Block…\". Reports go to the team and organisation administrators, who can dismiss them, delete the message or remove the person from the channel."
+      "notas": "APP PURPOSE: Team channels, direct messages and meetings with messages, threads, reactions, attachments and calls. It brings team discussion and live meetings together.\n\nREVIEW WORKFLOW: Open a review channel, send a harmless message/reply, attach a Drive file and join a call with a controlled second account. Message … opens Report message/Block; People … opens Report/Block for a person.\n\nCORE SERVICES: Sytue Rooms/Drive APIs, Sytue-operated LiveKit media and Matrix transport. Slack, Teams, Google Chat/Meet and other connected providers are optional and require their own account consent.\n\nCAMERA AND MICROPHONE are requested only when the user joins a call. BLOCK AND REPORT (guideline 1.2): \"…\" on a message → \"Report message\" or \"Block…\"; \"People\" panel → \"…\" on a person → \"Report…\" or \"Block…\". Reports go to the team and organisation administrators, who can dismiss them, delete the message or remove the person from the channel.\n\nNATIVE ENCRYPTED CONTENT LIMITS: Server-side message search, scheduled message send/reschedule, remote slash commands and poll/task-card voting are unavailable in the current encrypted adapter. They are outside this review walkthrough. Integrated local commands such as presence/status are separate; these notes do not claim verified native call E2E."
     }
   }
 }

@@ -1047,7 +1047,7 @@ func (s *Store) obtenerUltimoPagoTx(ctx context.Context, tx pgx.Tx, tenant strin
 		       idempotency_key, created_at, updated_at
 		  FROM payments
 		 WHERE order_id = $1 AND tenant = $2
-		 ORDER BY attempt DESC
+		 ORDER BY (status IN ('paid', 'partially_refunded')) DESC, attempt DESC
 		 LIMIT 1`, orderID, tenant,
 	).Scan(
 		&p.ID, &p.Tenant, &p.OrderID, &p.GatewayID, &p.Attempt, &p.Provider, &p.Method,
@@ -1726,6 +1726,26 @@ func (s *Store) RegistrarDesistimiento(ctx context.Context, tenant string, w *do
 	})
 }
 
+// NumeroPublicado devuelve el published_number en vivo de un sitio, o ErrNoExiste si el
+// sitio no existe o no está publicado. Permite consultar la caché de formularios por
+// (sitio, versión) sin leer ni decodificar el JSONB de site_versions en cada envío.
+func (s *Store) NumeroPublicado(ctx context.Context, tenant string, siteID uuid.UUID) (int, error) {
+	var num *int
+	err := s.enSitio(ctx, tenant, siteID, func(tx pgx.Tx) error {
+		return tx.QueryRow(ctx, `
+			SELECT published_number
+			  FROM sites
+			 WHERE id = $1 AND tenant = $2 AND deleted_at IS NULL`, siteID, tenant).Scan(&num)
+	})
+	if errors.Is(err, pgx.ErrNoRows) || (err == nil && num == nil) {
+		return 0, domain.ErrNoExiste
+	}
+	if err != nil {
+		return 0, err
+	}
+	return *num, nil
+}
+
 // IRPublicado es el IR de la versión EN VIVO de un sitio, o ErrNoExiste si no está
 // publicado: lo que acepta un formulario es lo publicado (§10.6, WEB-07).
 func (s *Store) IRPublicado(ctx context.Context, tenant string, siteID uuid.UUID) ([]byte, error) {
@@ -1782,11 +1802,10 @@ func (s *Store) GuardarFormulario(ctx context.Context, tenant string, sub *domai
 	})
 }
 
-// ObtenerDefinicionFormulario lee los ajustes de un formulario para un sitio. Un
-// formulario sin fila es uno publicado que nadie ha configurado: encendido y sin
-// nadie a quien avisar. Nada crea la fila al publicar (ni al volver a una
-// publicación anterior), así que exigirla dejaba todos los formularios en 404.
-// Que el formulario exista lo dice la versión publicada, no esta tabla.
+// ObtenerDefinicionFormulario lee los ajustes de un formulario para un sitio. Al
+// publicar se crea la fila por defecto (enabled=true, notify=[]); si un sitio publicado
+// antes de WEB-07 aún no tiene fila, se trata igual: encendido y sin nadie a quien
+// avisar. Que el formulario exista lo dice la versión publicada, no esta tabla.
 func (s *Store) ObtenerDefinicionFormulario(ctx context.Context, tenant string, siteID uuid.UUID, formID string) (*domain.FormSettings, error) {
 	var fs domain.FormSettings
 	var notifyRaw []byte

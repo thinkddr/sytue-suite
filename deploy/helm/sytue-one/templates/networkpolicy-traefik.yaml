@@ -71,4 +71,19 @@ spec:
       ports:
         - { protocol: TCP, port: 6443 }
     {{- end }}
+    {{- with .Values.global.networkPolicy.apiServer }}
+    {{- if .cidrs }}
+    # API SERVER DEL PROPIO CLÚSTER EN BARE-METAL (INF-07). Solo Traefik necesita
+    # alcanzar SERVER_LAN_IP:6443 tras el DNAT de kube-router; en la baseline
+    # quedaba abierto a todos los pods del namespace.
+    - to:
+        {{- range .cidrs }}
+        - ipBlock:
+            cidr: {{ . | quote }}
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: {{ .port | default 6443 }}
+    {{- end }}
+    {{- end }}
 {{- end }}

@@ -11,6 +11,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/test"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
@@ -192,5 +193,37 @@ func TestEtiquetarEsOptimistaYVuelveAtras(t *testing.T) {
 	}
 	if len(a.avisos.Avisos()) != 1 {
 		t.Errorf("hay %d avisos y debería haber uno", len(a.avisos.Avisos()))
+	}
+}
+
+func TestLaFichaVaciaAlGirarPermiteAlcanzarCrearContacto(t *testing.T) {
+	defer ui.TactilDePrueba(true)()
+	p := pantallaDeMuestra(t)
+	creados := 0
+	p.AlCrearContacto = func() { creados++ }
+	contenido := p.ficha()
+	w := test.NewTempWindow(t, contenido)
+	w.SetPadded(false)
+	for _, tam := range []fyne.Size{{Width: 400, Height: 700}, {Width: 400, Height: 230}, {Width: 280, Height: 230}, {Width: 400, Height: 700}} {
+		w.Resize(tam)
+		scroll, ok := contenido.(*container.Scroll)
+		if !ok {
+			t.Fatal("el estado vacío deja la acción fuera cuando no cabe en alto")
+		}
+		vacio := scroll.Content.(*ui.Vacio)
+		accion := vacio.Accion.(*ui.Boton)
+		scroll.ScrollToBottom()
+		donde := fyne.CurrentApp().Driver().AbsolutePositionForObject
+		pos, origen := donde(accion), donde(scroll)
+		if pos.X < origen.X || pos.Y < origen.Y || pos.X+accion.Size().Width > origen.X+scroll.Size().Width || pos.Y+accion.Size().Height > origen.Y+scroll.Size().Height {
+			t.Fatalf("a %v la acción no se alcanza: %v/%v en %v/%v", tam, pos, accion.Size(), origen, scroll.Size())
+		}
+		if accion.Size().Width < 44 || accion.Size().Height < 44 {
+			t.Fatal("Nuevo contacto perdió su blanco táctil")
+		}
+		test.Tap(accion)
+	}
+	if creados != 4 {
+		t.Fatal("la acción de crear dejó de responder tras girar")
 	}
 }

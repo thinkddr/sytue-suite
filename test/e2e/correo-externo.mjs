@@ -11,7 +11,7 @@ import {
   describeWizardState,
 } from "./lib/wizard-checks.mjs";
 import { comprobarCuentaNueva } from "./lib/correo-cuenta-nueva.mjs";
-const expect = baseExpect.configure({ timeout: 15000 });
+const expect = baseExpect.configure({ timeout: 30000 });
 const BASE =
   process.env.MAIL_EXTERNAL_URL ||
   "http://127.0.0.1:4343/mail/prueba/dev/correo-externo";

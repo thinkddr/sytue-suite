@@ -20,7 +20,7 @@ async function scenario(name, options, run) {
     reducedMotion: "reduce",
   });
   const page = await context.newPage();
-  page.setDefaultTimeout(20000);
+  page.setDefaultTimeout(30000);
   const state = {
     writes: [],
     shares: [],

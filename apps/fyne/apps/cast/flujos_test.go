@@ -87,6 +87,7 @@ func TestLosFallosDanSuEstado(t *testing.T) {
 		}
 	}
 	a := Nueva(api.NewCast("http://127.0.0.1:1", nil, nil), vistaDePrueba(t, 0), nil)
+	t.Cleanup(func() { fyne.DoAndWait(a.Cerrar) })
 	a.lanzar = func(f func()) { f() }
 	a.ConSesion = func() bool { return true }
 	a.Arrancar()

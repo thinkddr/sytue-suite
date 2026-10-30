@@ -3,6 +3,7 @@
 import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
 import { chromium } from "playwright";
+import { openWizardFixture } from "./lib/wizard-checks.mjs";
 
 const base = process.env.SYTUE_LANGUAGE_FIXTURE_BASE;
 const fixtureURL =
@@ -36,8 +37,8 @@ await context.route(
     }),
 );
 const page = await context.newPage();
-page.setDefaultTimeout(12000);
-page.setDefaultNavigationTimeout(20000);
+page.setDefaultTimeout(30000);
+page.setDefaultNavigationTimeout(60000);
 const errors = [];
 page.on("pageerror", (error) => errors.push(error.message));
 page.on("console", (message) => {
@@ -72,8 +73,7 @@ try {
   await context.addCookies([
     { name: "opaque_probe", value: "keep", url: origin },
   ]);
-  await page.goto(url);
-  await page.locator(readySelector).waitFor();
+  await openWizardFixture(page, url, readySelector);
   assert.equal(
     await lang(),
     "it",

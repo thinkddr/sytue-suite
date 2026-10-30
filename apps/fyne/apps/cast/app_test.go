@@ -19,6 +19,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -103,9 +104,14 @@ func deLaOrganizacion() []api.CastVideo {
 	}
 }
 
+var postersCache sync.Map
+
 // posterDe es una imagen plana de colores de la marca, distinta para cada vídeo: una
 // banda, un sol y el suelo. Sin degradados, como pide el listón del producto.
 func posterDe(id string) []byte {
+	if guardado, ok := postersCache.Load(id); ok {
+		return slices.Clone(guardado.([]byte))
+	}
 	n := 0
 	for _, c := range id {
 		n = n*31 + int(c)
@@ -134,7 +140,9 @@ func posterDe(id string) []byte {
 	}
 	var b bytes.Buffer
 	_ = jpeg.Encode(&b, m, &jpeg.Options{Quality: 85})
-	return b.Bytes()
+	raw := b.Bytes()
+	postersCache.Store(id, raw)
+	return slices.Clone(raw)
 }
 
 // ---- El servicio falso ----

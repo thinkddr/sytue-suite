@@ -181,9 +181,30 @@ func NuevoLateral(nombre string, cuerpo fyne.CanvasObject) *Lateral {
 // `Sidebar.tsx` cambia `--sytue-focus-ring` en su hijo directo con aro de botón. El
 // color de foco del tema no se ve sobre el carril.
 func (l *Lateral) ConCabecera(b *Boton) *Lateral {
-	b.SobreCromo, b.TokenAro = true, "sidebar-focus"
+	if b != nil {
+		b.SobreCromo, b.TokenAro = true, "sidebar-focus"
+		if accion := b.AlPulsar; accion != nil {
+			b.AlPulsar = func() {
+				cerrarCajonMovil(b)
+				accion()
+			}
+		}
+	}
 	l.Cabecera = b
 	return l
+}
+
+// cerrarCajonMovil cierra el cajón abierto del armazón que contiene este control al
+// elegir un destino o la acción principal del menú, como el delegador de `<aside>` en
+// AppShell.tsx: en móvil el cajón tapa la pantalla y la vista nueva quedaría detrás.
+func cerrarCajonMovil(o fyne.CanvasObject) {
+	c := lienzoDe(o)
+	if c == nil {
+		return
+	}
+	if a := cajonDe(c); a != nil && a.CajonAbierto {
+		a.cerrarDesdeMando()
+	}
 }
 
 // azulSobreTinta es la otra mitad de esa reasignación: en la web `--color-primary`
@@ -775,6 +796,9 @@ type FilaLateral struct {
 	// cae en la misma columna que las acciones del encabezado de sección. No se pinta en
 	// el carril plegado (`action && !collapsed`).
 	Accion *AccionLateral
+	// MantieneCajon impide que pulsar la fila cierre automáticamente el cajón móvil del
+	// armazón (por defecto `false`: todo destino de navegación recoge el cajón).
+	MantieneCajon bool
 
 	// encimaHijo es que el puntero está sobre el pliegue: para la fila cuenta como
 	// encima, igual que el `:hover` de un padre en la web.
@@ -793,6 +817,27 @@ func (f *FilaLateral) MouseIn(e *desktop.MouseEvent) {
 func (f *FilaLateral) MouseOut() {
 	f.pulsable.MouseOut()
 	f.titulo.alPuntero(false)
+}
+
+// Tapped recoge el cajón móvil cuando la fila actúa como destino de navegación antes de
+// ejecutar su acción, para que los diálogos o vistas que abra reciban el foco limpio.
+func (f *FilaLateral) Tapped(e *fyne.PointEvent) {
+	if f.Inerte {
+		return
+	}
+	if !f.MantieneCajon && f.AlPulsar != nil {
+		cerrarCajonMovil(f)
+	}
+	f.pulsable.Tapped(e)
+}
+
+// TypedKey recoge el cajón móvil al activar la fila con Intro o Espacio.
+func (f *FilaLateral) TypedKey(e *fyne.KeyEvent) {
+	if !f.Inerte && !f.MantieneCajon && f.AlPulsar != nil &&
+		(e.Name == fyne.KeyReturn || e.Name == fyne.KeyEnter || e.Name == fyne.KeySpace) {
+		cerrarCajonMovil(f)
+	}
+	f.pulsable.TypedKey(e)
 }
 
 // hijosDeCajon son el pliegue, la cola y la acción de la fila.
@@ -1246,7 +1291,7 @@ func (r *filaRenderer) Refresh() {
 		r.Layout(f.Size())
 	}
 	if f.Rama != nil && f.Rama.ColaAlPasar != nil {
-		if f.encima || f.encimaHijo || f.enfocado {
+		if EsTactil() || f.encima || f.encimaHijo || f.enfocado {
 			f.Rama.ColaAlPasar.Show()
 		} else {
 			f.Rama.ColaAlPasar.Hide()
@@ -1496,8 +1541,8 @@ func (r *plegadorRenderer) Layout(t fyne.Size) {
 func (r *plegadorRenderer) Refresh() {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	tono := tema.Color("sidebar-fg-muted", v)
-	if r.p.encima {
-		tono = tema.Color("sidebar-fg", v) // hover:text-sidebar-fg
+	if r.p.encima || r.p.pulsado {
+		tono = tema.Color("sidebar-fg", v) // hover:text-sidebar-fg / active
 	}
 	r.aro.Ver(r.p.enfocado)
 	r.aro.Pintar(v)

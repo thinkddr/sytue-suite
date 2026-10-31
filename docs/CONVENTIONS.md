@@ -920,8 +920,10 @@ preguntarlas:
      contenido rectangular encima, cuatro máscaras de esquina del color del marco
      sobre él y la sombra `md` en ocho teselas. Lo coloca `ui.Armazon` (la hoja
      empieza donde acaba el menú, que deja ver el marco) y, para lo que no trae
-     armazón —el Hub, SyPhotos, los editores, «Iniciar sesión»—, `BarraSuite.Montar`.
-     Un editor declara `ConHojaASangre()`. El ERP lleva hoja como los demás: su carril
+     armazón —el Hub, SyPhotos, Cast, los cuatro editores (Docus, Calcus, Diapos,
+     CertiPDF), «Iniciar sesión»—, `BarraSuite.Montar`, todos con el mismo `sheet-gap`
+     (10 px desde 768 px, 0 px por debajo de 768 px) para que toda la suite se vea
+     uniforme entre web y Fyne. El ERP lleva hoja como los demás: su carril
      de iconos va en `Armazon.Carril` —la hoja empieza donde él acaba— y con él el menú
      de módulos es un cajón a cualquier ancho, que conserva su fondo. Por debajo de 768
      va siempre a sangre. Ninguna app pinta esquinas ni sombra de hoja por su cuenta.

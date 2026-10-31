@@ -28,26 +28,16 @@ export function Shell({ user, hubBaseUrl, locale, producto = 'docs', children }:
       accessToken={getAccessToken}
       locale={locale}
     >
-      {/* Landmark main + destino del skip-link de la shell. En la forma «Carril» los dos
-          envoltorios son display:contents y no alteran el layout de la página (lista o
-          editor a viewport). En «Marco» son el marco y la hoja, aquí A SANGRE: un editor
-          no cede ni un píxel de lienzo, y la hoja solo conserva las esquinas de arriba
-          (tokens/appearance.css). */}
+      {/* Landmark main + destino del skip-link de la shell. En la forma «Carril» el
+          envoltorio de hoja es display:contents y no altera el layout de la página (lista o
+          editor a viewport). En «Marco» son el marco y la hoja con la separación común de
+          toda la suite (`--sytue-sheet-gap`, tokens/appearance.css). */}
       <main
         id="contenido"
         tabIndex={-1}
         class="sytue-frame sytue-frame-page sytue-safe-workspace focus-visible:outline-none"
       >
-        {/* El main ya reserva la zona segura inferior: la hoja no debe volver a
-            sumarla a su mínimo y crear un segundo scroll en el documento. */}
-        <div
-          class="sytue-sheet sytue-sheet-page sytue-sheet-bleed"
-          style={{
-            minHeight: 'calc(100dvh - var(--spacing-topbar) - var(--sytue-safe-bottom, 0px))',
-          }}
-        >
-          {children}
-        </div>
+        <div class="sytue-sheet sytue-sheet-page">{children}</div>
       </main>
     </SytueShell>
   );

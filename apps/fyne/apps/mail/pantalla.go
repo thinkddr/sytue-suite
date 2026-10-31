@@ -81,6 +81,10 @@ func NuevaPantalla(t *i18n.Translator, l i18n.Locale) *Pantalla {
 		}
 	}
 	p.armazon.BarraMovil = p.Movil
+	p.armazon.AlCajon = func(abierto bool) {
+		p.Movil.CajonAbierto = abierto
+		p.Movil.Refresh()
+	}
 	// «Redactar al alcance del pulgar: en móvil el menú lateral es un cajón cerrado»
 	// (`MobileFab` en MailApp.tsx).
 	fab := ui.NuevoBotonFlotante(t.T("nav.compose", nil), iconos.Mas, func() {
@@ -94,8 +98,12 @@ func NuevaPantalla(t *i18n.Translator, l i18n.Locale) *Pantalla {
 
 // ponerCajon abre o cierra el menú en ventana estrecha.
 func (p *Pantalla) ponerCajon(abierto bool) {
-	p.armazon.CajonAbierto, p.Movil.CajonAbierto = abierto, abierto
-	p.armazon.Refresh()
+	p.Movil.CajonAbierto = abierto
+	if abierto {
+		p.armazon.AbrirCajon()
+	} else {
+		p.armazon.CerrarCajon()
+	}
 	p.Movil.Refresh()
 }
 

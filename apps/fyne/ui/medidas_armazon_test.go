@@ -49,7 +49,7 @@ func TestLasMedidasPreviasSiguenAlArmazonAlGirar(t *testing.T) {
 							if got := a.Contenido.Size().Width; got != quiero {
 								t.Fatalf("a%g: la medición previa reserva%g, el renderer asigna%g", ancho, quiero, got)
 							}
-							if a.menuEnCarril() {
+							if ancho < Estrecho || carril > 0 {
 								a.AbrirCajon()
 								if a.Contenido.Size().Width != quiero {
 									t.Fatal("abrir el menú cambió el ancho disponible")

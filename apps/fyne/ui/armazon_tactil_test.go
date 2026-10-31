@@ -15,8 +15,8 @@ import (
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 )
 
-// El teléfono y la tablet conservan la selección y su navegación al girar.
-// Abrir el menú desplaza las columnas, sin cambiar su ancho ni el retorno físico.
+// El teléfono y la tablet conservan la selección, el ancho manual del panel y el
+// retorno físico al girar entre retrato (< 768) y paisaje (≥ 768).
 func TestElMenuTactilConservaColumnasEstadoYFocoAlGirar(t *testing.T) {
 	enMarco(t)
 	sinAnimacionDelMenu(t)
@@ -26,7 +26,7 @@ func TestElMenuTactilConservaColumnasEstadoYFocoAlGirar(t *testing.T) {
 		tamanos []fyne.Size
 	}{
 		{nombre: "telefono", tamanos: []fyne.Size{{Width: 320, Height: 700}, {Width: 844, Height: 390}, {Width: 320, Height: 700}}},
-		{nombre: "tablet", tamanos: []fyne.Size{{Width: 768, Height: 1024}, {Width: 1024, Height: 768}, {Width: 768, Height: 1024}}},
+		{nombre: "tablet", tamanos: []fyne.Size{{Width: 600, Height: 900}, {Width: 768, Height: 1024}, {Width: 1024, Height: 768}, {Width: 600, Height: 900}}},
 	} {
 		for _, propia := range []bool{false, true} {
 			t.Run(fmt.Sprintf("%s/barraPropia=%v", ciclo.nombre, propia), func(t *testing.T) {
@@ -42,93 +42,85 @@ func TestElMenuTactilConservaColumnasEstadoYFocoAlGirar(t *testing.T) {
 				if propia {
 					b := NuevaBarraMovil()
 					b.EnDetalle = true
-					b.AlMenu = func() { a.CajonAbierto = !a.CajonAbierto; a.Refresh() }
+					b.AlMenu = func() {
+						if a.CajonAbierto {
+							a.CerrarCajon()
+						} else {
+							a.AbrirCajon()
+						}
+					}
 					b.AlVolver = func() { vueltas++; a.DetalleAbierto, b.EnDetalle = false, false; a.Refresh() }
 					a.BarraMovil = b
 				}
 				w := test.NewTempWindow(t, a)
 				w.SetPadded(false)
 				c := w.Canvas()
-				for paso, tam := range ciclo.tamanos {
+
+				for _, tam := range ciclo.tamanos {
 					w.Resize(tam)
 					a.Resize(tam)
 					a.Refresh()
-					if paso > 0 && !a.CajonAbierto {
-						t.Fatal("girar ha cerrado el cajón táctil")
-					}
 					b := a.barraMovil().(*BarraMovil)
-					if !a.menuEnCarril() || !b.Visible() || !b.EnDetalle || b.AlVolver == nil || vueltas != 0 {
-						t.Fatalf("%v: se perdió el mando o el estado de la selección", tam)
-					}
-					icono := iconos.Menu
-					if tam.Width < Estrecho {
-						icono = iconos.ChevronIzquierda
-					}
-					if b.boton.Icono != icono {
-						t.Fatalf("%v: el mando no ofrece menú con ambas columnas, o volver con detalle exclusivo", tam)
-					}
-					separa := float32(0)
-					if tam.Width >= Estrecho {
-						separa = tema.Forma("sheet-gap")
-					}
-					util := tam.Width - AnchoCarrilMovil - separa
-					anchoPanel, anchoDetalle := util, util
-					xDetalle := float32(0)
-					if tam.Width >= Estrecho {
-						anchoPanel = min(600, util-AnchoContenidoMinimo)
-						anchoDetalle, xDetalle = util-anchoPanel, anchoPanel
-					}
 					r := test.WidgetRenderer(a).(*armazonRenderer)
-					comprobar := func(desplaza float32) {
-						t.Helper()
-						x := AnchoCarrilMovil + desplaza
-						if a.Panel.Position().X != x || a.Panel.Size().Width != anchoPanel ||
-							fuera.Position().X != x+xDetalle || fuera.Size().Width != anchoDetalle ||
-							r.marco.hoja.Position().X != x || r.marco.hoja.Size().Width != util {
-							t.Fatalf("%v: cambian los anchos al desplazar %g: panel=%v/%v detalle=%v/%v hoja=%v/%v",
-								tam, desplaza, a.Panel.Position(), a.Panel.Size(), fuera.Position(), fuera.Size(), r.marco.hoja.Position(), r.marco.hoja.Size())
+
+					if tam.Width < Estrecho {
+						if !b.Visible() || !b.EnDetalle || b.AlVolver == nil || b.boton.Icono != iconos.ChevronIzquierda {
+							t.Fatalf("%v: la barra móvil perdió el estado de detalle o el botón de volver", tam)
 						}
-						if a.Panel.Visible() != (tam.Width >= Estrecho) || !fuera.Visible() ||
-							b.Size() != fyne.NewSize(AnchoCarrilMovil, tam.Height) ||
-							!a.DetalleAbierto || a.AnchoPanelPersonalizado != 600 {
-							t.Fatal("se perdió la selección, las columnas o su ancho manual")
+						if b.Size() != fyne.NewSize(tam.Width, AltoBarraMovil) {
+							t.Fatalf("%v: barra móvil=%v, quiero %g×%g", tam, b.Size(), tam.Width, AltoBarraMovil)
 						}
-					}
-					if paso == 0 {
-						comprobar(0)
+						alto := tam.Height - AltoBarraMovil
+						if a.Panel.Visible() || !fuera.Visible() ||
+							fuera.Position() != fyne.NewPos(0, AltoBarraMovil) || fuera.Size() != fyne.NewSize(tam.Width, alto) ||
+							r.marco.hoja.Position() != fyne.NewPos(0, AltoBarraMovil) || r.marco.hoja.Size() != fyne.NewSize(tam.Width, alto) {
+							t.Fatalf("%v: el detalle móvil no ocupa la hoja completa bajo la barra", tam)
+						}
+
 						a.AbrirCajon()
-					}
-					anchoMenu := a.Menu.Size().Width
-					comprobar(anchoMenu)
-					a.entrada = -anchoMenu / 2
-					a.Refresh()
-					comprobar(anchoMenu / 2)
-					a.entrada = 0
-					for range 6 {
-						c.FocusNext()
-						if c.Focused() == fyne.Focusable(fuera) {
-							t.Fatal("el Tab sale del menú y alcanza el detalle bajo el velo")
+						if !a.CajonAbierto || !a.Menu.Visible() || fuera.Size().Width != tam.Width {
+							t.Fatalf("%v: abrir el cajón encogió o desplazó el detalle", tam)
 						}
-					}
-					Descartar(c)
-					if a.CajonAbierto || c.Focused() != fyne.Focusable(b.boton) {
-						t.Fatal("Escape no cierra o no devuelve el foco al mando")
-					}
-					comprobar(0)
-					if tam.Width >= Estrecho {
-						b.boton.AlPulsar()
+						for range 6 {
+							c.FocusNext()
+							if c.Focused() == fyne.Focusable(fuera) {
+								t.Fatal("el Tab sale del menú y alcanza el detalle bajo el velo")
+							}
+						}
+						Descartar(c)
+						if a.CajonAbierto || c.Focused() != fyne.Focusable(b.boton) {
+							t.Fatal("Escape no cierra el cajón o no devuelve el foco al mando")
+						}
+						// Dejarlo abierto antes de girar a paisaje: al cruzar ≥ 768 debe cerrarse solo.
+						a.AbrirCajon()
 					} else {
-						a.AbrirCajon()
-					}
-					if !a.CajonAbierto || !a.Menu.Visible() || vueltas != 0 {
-						t.Fatal("la hamburguesa ancha ha vuelto a la lista en lugar de abrir el menú")
-					}
-					if c.Focused() != fyne.Focusable(a.Menu.(*Lateral)) {
-						t.Fatal("abrir el cajón no lleva el foco al menú")
+						if a.CajonAbierto {
+							t.Fatalf("%v: cruzar a ≥ 768 no cerró el cajón móvil", tam)
+						}
+						if b.Visible() {
+							t.Fatalf("%v: la barra móvil sigue visible en ancho", tam)
+						}
+						separa := tema.Forma("sheet-gap")
+						hoja := tam.Width - tema.AnchoLateral - separa
+						anchoPanel := AcotarAnchoPanel(600, hoja)
+						anchoDetalle := hoja - anchoPanel
+						if !a.Menu.Visible() || a.Menu.Position() != fyne.NewPos(0, 0) || a.Menu.Size() != fyne.NewSize(tema.AnchoLateral, tam.Height) {
+							t.Fatalf("%v: menú lateral fijo mal colocado en ancho: %v/%v", tam, a.Menu.Position(), a.Menu.Size())
+						}
+						if !a.Panel.Visible() || a.Panel.Position() != fyne.NewPos(tema.AnchoLateral, 0) || a.Panel.Size().Width != anchoPanel {
+							t.Fatalf("%v: panel mal colocado en ancho: %v/%v (quiero ancho %g)", tam, a.Panel.Position(), a.Panel.Size(), anchoPanel)
+						}
+						if !fuera.Visible() || fuera.Position() != fyne.NewPos(tema.AnchoLateral+anchoPanel, 0) || fuera.Size().Width != anchoDetalle {
+							t.Fatalf("%v: detalle mal colocado en ancho: %v/%v (quiero ancho %g)", tam, fuera.Position(), fuera.Size(), anchoDetalle)
+						}
+						if !a.DetalleAbierto || a.AnchoPanelPersonalizado != 600 || vueltas != 0 {
+							t.Fatalf("%v: girar alteró la selección o el ancho personalizado", tam)
+						}
 					}
 				}
+
 				a.CerrarCajon()
-				if !a.volverAlPanel() || a.DetalleAbierto || vueltas != 1 {
+				if !a.volverAlPanel() || a.DetalleAbierto || vueltas != 1 || !a.Panel.Visible() {
 					t.Fatal("el retorno físico perdió AlVolver después de girar")
 				}
 			})
@@ -157,10 +149,10 @@ func TestElMenuDeEscritorioConservaMarcoYCarril(t *testing.T) {
 				a.Refresh()
 				separa := a.separacionHoja(false)
 				panel, detalle := a.Panel.Size(), a.Contenido.Size()
-				if a.menuEnCarril() || a.barra.Visible() || a.Menu.Visible() == conCarril ||
+				if a.barra.Visible() || a.Menu.Visible() == conCarril ||
 					a.Panel.Position().X != x || a.Contenido.Position().X != x+panel.Width ||
 					detalle.Width != 1024-x-panel.Width-separa {
-					t.Fatal("el menú táctil cambió la disposición del escritorio")
+					t.Fatal("el menú móvil cambió la disposición del escritorio")
 				}
 				if conCarril {
 					a.AbrirCajon()

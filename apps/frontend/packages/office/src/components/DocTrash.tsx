@@ -180,7 +180,7 @@ export function DocTrash({ locale, kind = '', org }: DocTrashProps) {
   const volver = r(kind ? `/?kind=${kind}` : '/', org);
 
   return (
-    <div class="mx-auto flex min-h-[calc(100dvh-var(--spacing-topbar))] w-full max-w-[var(--container-content,1280px)] flex-col px-6 pt-8 pb-10">
+    <div class="mx-auto flex min-h-[calc(100dvh-var(--spacing-topbar)-var(--sytue-sheet-gap,0px)-var(--sytue-safe-bottom,0px))] w-full max-w-[var(--container-content,1280px)] flex-col px-6 pt-8 pb-10">
       <header class="mb-6 flex flex-wrap items-start gap-3">
         <div class="min-w-0 flex-1">
           <a

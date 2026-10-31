@@ -84,23 +84,81 @@ func TestElBotonFlotanteSoloEnElTelefono(t *testing.T) {
 	}
 }
 
-// El cambio de forma llegaba con enCarril todavía activo y pedía frame-from en
-// Carril, donde ese token no existe: SetTheme entraba en pánico.
-func TestLaBarraMovilConservaElCarrilAlGirarYCambiarLaForma(t *testing.T) {
+func TestLaBarraMovilSigueLaFormaYElSueloTactil(t *testing.T) {
 	enMarco(t)
 	b := NuevaBarraMovil()
+	b.Titulo = "Bandeja"
 	b.AlMenu = func() {}
-	b.enCarril, b.anchoMarco = true, 568
-	b.Resize(fyne.NewSize(AnchoCarrilMovil, 268))
+	b.Resize(fyne.NewSize(390, AltoBarraMovil))
 	r := test.WidgetRenderer(b).(*barraMovilRenderer)
+	centroEscritorio := r.boton.Position().X + r.boton.Size().Width/2
+
 	for _, forma := range []string{"marco", "carril", "marco"} {
 		tema.ElegirForma(forma)
 		b.Refresh()
-		if r.titulo.Visible() || r.boton.Trazo != "sidebar-fg" {
-			t.Fatalf("%s: el carril perdió el contraste o recuperó el título", forma)
+		v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
+		enM := forma == "marco"
+		if !r.titulo.Visible() || r.titulo.Text != "Bandeja" {
+			t.Fatalf("%s: el título desapareció de la barra móvil", forma)
 		}
-		if forma == "carril" && (!r.fondo.Visible() || r.fondo.FillColor != FondoCarril(tema.De(fyne.CurrentApp().Settings().ThemeVariant()))) {
-			t.Fatal("Carril no conserva el fondo de la navegación")
+		if r.fondo.Visible() == enM || r.filete.Hidden != enM {
+			t.Fatalf("%s: fondo visible=%v, filete oculto=%v", forma, r.fondo.Visible(), r.filete.Hidden)
 		}
+		quieroTrazo := "primary-text"
+		if enM {
+			quieroTrazo = "sidebar-fg"
+		} else if r.fondo.FillColor != tema.Color("surface", v) {
+			t.Fatalf("Carril no pinta `surface` en la barra móvil: %v", r.fondo.FillColor)
+		}
+		if r.boton.Trazo != quieroTrazo {
+			t.Fatalf("%s: trazo del botón=%q, quiero %q", forma, r.boton.Trazo, quieroTrazo)
+		}
+	}
+
+	restaurar := TactilDePrueba(true)
+	defer restaurar()
+	b.Refresh()
+	if r.boton.Size() != fyne.NewSize(44, 44) || r.boton.Position().Y < 0 {
+		t.Fatalf("en táctil el botón mide %v en %v; quiero 44×44 sin Y negativa", r.boton.Size(), r.boton.Position())
+	}
+	if centroTactil := r.boton.Position().X + r.boton.Size().Width/2; centroTactil != centroEscritorio {
+		t.Fatalf("el suelo táctil desplazó el eje del glifo de %g a %g", centroEscritorio, centroTactil)
+	}
+}
+
+func TestElBotonFlotanteSeAtenuaYCierraElCajonAbierto(t *testing.T) {
+	sinAnimacionDelMenu(t)
+	pulsaciones := 0
+	a := NuevoArmazon(contenidoDePrueba())
+	a.Menu = NuevoLateral("Menú", nil)
+	fab := NuevoBotonFlotante("Redactar", iconos.Mas, func() { pulsaciones++ })
+	raiz := container.NewStack(a, container.New(CapaFlotante{}, fab))
+	w := test.NewTempWindow(t, raiz)
+	w.SetPadded(false)
+	w.Resize(fyne.NewSize(390, 844))
+	rf := test.WidgetRenderer(fab).(*flotanteRenderer)
+
+	if rf.velo.Visible() {
+		t.Fatal("el botón flotante aparece velado con el cajón cerrado")
+	}
+	a.AbrirCajon()
+	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
+	if !rf.velo.Visible() || rf.velo.FillColor != ColorVelo(v, 1) {
+		t.Fatalf("el botón flotante no se atenúa bajo el velo del cajón: visible=%v color=%v", rf.velo.Visible(), rf.velo.FillColor)
+	}
+	test.Tap(fab)
+	if pulsaciones != 0 || a.CajonAbierto || rf.velo.Visible() {
+		t.Fatalf("pulsar el botón flotante bajo el velo disparó la acción (%d) o no cerró el cajón (%v)", pulsaciones, a.CajonAbierto)
+	}
+	test.Tap(fab)
+	if pulsaciones != 1 {
+		t.Fatalf("con el cajón cerrado el botón flotante no ejecutó su acción: %d", pulsaciones)
+	}
+
+	fab.Inerte = true
+	a.AbrirCajon()
+	fab.Refresh()
+	if rf.velo.Visible() {
+		t.Fatal("un botón flotante inerte no debe pintar un segundo velo")
 	}
 }

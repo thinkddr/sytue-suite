@@ -13,7 +13,6 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
-	"fyne.io/fyne/v2/container"
 
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 )
@@ -48,6 +47,9 @@ const (
 	AnchoSeparadorPanel float32 = 6
 	// AnchoContenidoMinimo es el espacio mínimo reservado para el detalle (280 px, como en la web).
 	AnchoContenidoMinimo float32 = 280
+	// MargenCajonMovil deja siempre una franja de velo visible y pulsable a la derecha
+	// del cajón en pantallas estrechas (56 px = 3,5 rem).
+	MargenCajonMovil float32 = 56
 )
 
 // AnchoPanel es el escalón que le toca al panel de lista con esa anchura de ventana.
@@ -84,7 +86,7 @@ type Armazon struct {
 	// DetalleAbierto solo cuenta con Panel y ventana estrecha: `true` enseña el
 	// detalle y `false` la lista. Sin él, en estrecho el detalle sería inalcanzable.
 	DetalleAbierto bool
-	// CajonAbierto abre el menú móvil: en Marco desplaza la hoja; en Carril la cubre.
+	// CajonAbierto abre el menú como cajón superpuesto en móvil (o con carril de iconos).
 	CajonAbierto bool
 	// Titulo es el de la barra móvil que pone el propio armazón cuando la app no trae
 	// la suya (el `title` de AppShell.tsx).
@@ -116,10 +118,12 @@ type Armazon struct {
 	barra      *BarraMovil // la del armazón, cuando la app no trae ninguna
 	anchoPanel float32
 	separador  *separadorPanel
-	// entrada es lo que le falta al cajón para llegar a su sitio: `sytue-drawer-in`, de
-	// `translateX(-100%)` a cero en 180 ms.
-	entrada    float32
-	focoCarril *fyne.Container
+	// entrada es lo que le falta al cajón para llegar a su sitio (`<= 0`): `sytue-drawer-in`,
+	// de `translateX(-100%)` a cero en 180 ms, el cierre inverso y el arrastre táctil.
+	entrada          float32
+	arrastrandoCajon bool
+	cerrandoCajon    bool
+	r                *armazonRenderer
 }
 
 func (a *Armazon) anchoPanelActual() float32 {
@@ -199,8 +203,21 @@ func (a *Armazon) separadorPanel() *separadorPanel {
 // DuracionCajon es `sytue-drawer-in`.
 const DuracionCajon = 180 * time.Millisecond
 
-// desplazamientoCajon es lo que le queda al cajón de `sytue-drawer-in`: cero si el menú
-// no es cajón o ya ha entrado.
+// anchoCajon acota el ancho del menú cuando sale como cajón en teléfono para conservar
+// siempre velo libre a la derecha (`MargenCajonMovil`).
+func (a *Armazon) anchoCajon(anchoVentana float32, estrecha bool) float32 {
+	if a.Menu == nil {
+		return 0
+	}
+	ancho := a.Menu.MinSize().Width
+	if estrecha && anchoVentana > 0 {
+		ancho = min(ancho, max(anchoVentana-MargenCajonMovil, 0))
+	}
+	return ancho
+}
+
+// desplazamientoCajon es lo que le queda al cajón para su posición de reposo: cero si el
+// menú no es cajón o ya está completamente abierto.
 func (a *Armazon) desplazamientoCajon(cajon bool) float32 {
 	if cajon {
 		return a.entrada
@@ -208,57 +225,250 @@ func (a *Armazon) desplazamientoCajon(cajon bool) float32 {
 	return 0
 }
 
-// entrarCajon arranca `sytue-drawer-in`: el cajón entra desde la izquierda, todo su ancho.
-// El velo no se mueve: en la web lleva `sytue-fade-in` y aparece en su sitio.
-func (a *Armazon) entrarCajon() {
-	if a.Menu == nil || SinMovimiento {
+// progresoCajon devuelve la fracción visible del cajón (`0..1`) para sincronizar la
+// opacidad del velo y la atenuación de botones flotantes.
+func (a *Armazon) progresoCajon() float32 {
+	if !a.CajonAbierto && !a.arrastrandoCajon && !a.cerrandoCajon {
+		return 0
+	}
+	t := a.Size()
+	ancho := a.anchoCajon(t.Width, t.Width < Estrecho)
+	if ancho <= 0 {
+		if a.CajonAbierto {
+			return 1
+		}
+		return 0
+	}
+	posX := min(max(a.entrada, -ancho), 0)
+	return min(max((ancho+posX)/ancho, 0), 1)
+}
+
+func (a *Armazon) moverCajonEnVivo() {
+	r := a.r
+	if r == nil || a.Menu == nil {
 		return
 	}
-	ancho := a.Menu.MinSize().Width
-	if a.menuEnCarril() {
-		ancho = min(ancho, max(a.Size().Width-AnchoCarrilMovil, 0))
+	t := a.Size()
+	estrecha := t.Width < Estrecho
+	ancho := a.anchoCajon(t.Width, estrecha)
+	if ancho <= 0 {
+		return
 	}
-	anim := fyne.NewAnimation(DuracionCajon, func(p float32) {
-		a.entrada = -ancho * (1 - p)
-		if a.CajonAbierto {
-			if a.menuEnCarril() {
-				a.Refresh()
-			} else {
-				a.Menu.Move(fyne.NewPos(a.entrada, 0))
-			}
+	posX := min(max(a.entrada, -ancho), 0)
+	progreso := min(max((ancho+posX)/ancho, 0), 1)
+	a.Menu.Move(fyne.NewPos(posX, 0))
+	r.ponerBase(true)
+	r.colocarAdornosCajon(posX, ancho, t.Height, progreso, true)
+	a.refrescarFlotantes()
+}
+
+func (a *Armazon) refrescarFlotantes() {
+	c := lienzoDe(a)
+	if c == nil {
+		return
+	}
+	refrescarFlotantesEn(c.Content())
+}
+
+func refrescarFlotantesEn(o fyne.CanvasObject) {
+	switch v := o.(type) {
+	case nil:
+	case *BotonFlotante:
+		v.Refresh()
+	case *raizGestos:
+		refrescarFlotantesEn(v.content)
+	case *fyne.Container:
+		for _, h := range v.Objects {
+			refrescarFlotantesEn(h)
 		}
+	}
+}
+
+// animarHaciaAbierto desliza el cajón desde `desde` (`<= 0`) hasta `0`.
+func (a *Armazon) animarHaciaAbierto(desde float32) {
+	t := a.Size()
+	ancho := a.anchoCajon(t.Width, t.Width < Estrecho)
+	if a.Menu == nil || SinMovimiento || lienzoDe(a) == nil || ancho <= 0 || desde >= 0 {
+		a.entrada = 0
+		a.Refresh()
+		a.refrescarFlotantes()
+		return
+	}
+	a.entrada = desde
+	a.Refresh()
+	a.refrescarFlotantes()
+	anim := fyne.NewAnimation(DuracionCajon, func(p float32) {
+		if !a.CajonAbierto || a.arrastrandoCajon {
+			return
+		}
+		if p >= 1 {
+			a.entrada = 0
+			a.moverCajonEnVivo()
+			return
+		}
+		a.entrada = desde * (1 - p)
+		a.moverCajonEnVivo()
 	})
 	anim.Curve = CurvaEstandar
 	anim.Start()
 }
 
-// CerrarCajon cierra el cajón. Es lo que la web hace al activar algo del menú en el
-// teléfono —el cajón tapa la pantalla y lo pulsado se abría detrás—, y aquí lo llama la
-// app desde lo que se activa en su menú, porque Fyne no deja escuchar desde el
-// contenedor los toques de los hijos.
-//
-// ponytail: la web lo hace sola con un delegador en el `<aside>`; aquí cada app lo
-// llama en sus destinos (Contactos ya lo hace con `enMenu`). Y el teclado del cajón
-// (`useNavDrawer`: foco dentro, Tab atrapado, Escape cierra, foco de vuelta al botón)
-// no está: el cajón no es una capa de Fyne, que es lo que daría las tres cosas.
+// animarHaciaCerrado desliza el cajón desde `desde` (`<= 0`) hasta `-ancho` y lo oculta.
+func (a *Armazon) animarHaciaCerrado(desde float32) {
+	t := a.Size()
+	ancho := a.anchoCajon(t.Width, t.Width < Estrecho)
+	if a.Menu == nil || SinMovimiento || lienzoDe(a) == nil || ancho <= 0 || desde <= -ancho {
+		a.cerrandoCajon = false
+		a.entrada = 0
+		a.Refresh()
+		a.refrescarFlotantes()
+		return
+	}
+	a.cerrandoCajon = true
+	a.entrada = desde
+	a.Refresh()
+	a.refrescarFlotantes()
+	anim := fyne.NewAnimation(DuracionCajon, func(p float32) {
+		if a.CajonAbierto || a.arrastrandoCajon {
+			return
+		}
+		if p >= 1 {
+			a.cerrandoCajon = false
+			a.entrada = 0
+			a.Refresh()
+			a.refrescarFlotantes()
+			return
+		}
+		a.entrada = desde + (-ancho-desde)*p
+		a.moverCajonEnVivo()
+	})
+	anim.Curve = CurvaEstandar
+	anim.Start()
+}
+
+// arrastrarAperturaCajon sigue el dedo desde el borde izquierdo mientras abre el cajón.
+func (a *Armazon) arrastrarAperturaCajon(dx float32) {
+	t := a.Size()
+	ancho := a.anchoCajon(t.Width, t.Width < Estrecho)
+	if a.Menu == nil || ancho <= 0 {
+		return
+	}
+	visibles := min(max(dx, 0), ancho)
+	antes := a.arrastrandoCajon
+	a.arrastrandoCajon = true
+	a.cerrandoCajon = false
+	a.entrada = visibles - ancho
+	if !antes {
+		a.Refresh()
+		a.refrescarFlotantes()
+		return
+	}
+	a.moverCajonEnVivo()
+}
+
+// arrastrarCierreCajon sigue el dedo hacia la izquierda mientras recoge el cajón abierto.
+func (a *Armazon) arrastrarCierreCajon(dx float32) {
+	t := a.Size()
+	ancho := a.anchoCajon(t.Width, t.Width < Estrecho)
+	if a.Menu == nil || ancho <= 0 {
+		return
+	}
+	desplaza := min(max(dx, -ancho), 0)
+	antes := a.arrastrandoCajon
+	a.arrastrandoCajon = true
+	a.entrada = desplaza
+	if !antes {
+		a.Refresh()
+		a.refrescarFlotantes()
+		return
+	}
+	a.moverCajonEnVivo()
+}
+
+// cancelarArrastreCajon devuelve el cajón a su estado previo cuando el gesto no llega al
+// umbral o se interrumpe.
+func (a *Armazon) cancelarArrastreCajon() {
+	if !a.arrastrandoCajon {
+		return
+	}
+	desde := a.entrada
+	a.arrastrandoCajon = false
+	if a.CajonAbierto {
+		a.animarHaciaAbierto(desde)
+		return
+	}
+	a.animarHaciaCerrado(desde)
+}
+
+// CerrarCajon cierra el cajón con transición suave y devuelve el foco si procede.
 func (a *Armazon) CerrarCajon() { a.cambiarCajon(false) }
 
 // AbrirCajon lo abre, con su entrada y su teclado: es el botón de menú que la app lleva
-// fuera de la barra móvil del armazón (el del carril de iconos del ERP).
+// fuera de la barra móvil del armazón (el del carril de iconos del ERP o Rooms).
 func (a *Armazon) AbrirCajon() { a.cambiarCajon(true) }
 
-func (a *Armazon) cambiarCajon(abierto bool) {
-	if a.CajonAbierto == abierto {
+// cerrarDesdeMando cierra el cajón respetando el mando de la barra móvil propia de la
+// app cuando existe (Mail, Notepads, Calendar, Contacts), para mantener sincronizado su
+// estado interno.
+func (a *Armazon) cerrarDesdeMando() {
+	if !a.CajonAbierto {
+		if a.arrastrandoCajon {
+			a.cancelarArrastreCajon()
+		}
 		return
 	}
+	if a.BarraMovil != nil {
+		if b, ok := a.BarraMovil.(*BarraMovil); ok && b.CajonAbierto && b.AlMenu != nil {
+			b.AlMenu()
+			if !a.CajonAbierto {
+				if a.arrastrandoCajon {
+					desde := a.entrada
+					a.arrastrandoCajon = false
+					a.animarHaciaCerrado(desde)
+				}
+				if c := lienzoDe(a); c != nil && cajones.de(c) == a {
+					a.tecladoCajon(false)
+				}
+				if a.AlCajon != nil {
+					a.AlCajon(false)
+				}
+				return
+			}
+		}
+	}
+	a.CerrarCajon()
+}
+
+func (a *Armazon) cambiarCajon(abierto bool) {
+	if a.CajonAbierto == abierto && !a.arrastrandoCajon && !a.cerrandoCajon {
+		return
+	}
+	t := a.Size()
+	ancho := a.anchoCajon(t.Width, t.Width < Estrecho)
+	desde := a.entrada
+	enCurso := a.arrastrandoCajon || a.cerrandoCajon
+	a.arrastrandoCajon = false
+	a.cerrandoCajon = false
 	a.CajonAbierto = abierto
 	if a.AlCajon != nil {
 		a.AlCajon(abierto)
 	}
-	a.Refresh()
-	a.tecladoCajon(abierto)
 	if abierto {
-		a.entrarCajon()
+		if !enCurso {
+			desde = -ancho
+		}
+		a.animarHaciaAbierto(desde)
+		if c := lienzoDe(a); c != nil && cajones.de(c) != a {
+			a.tecladoCajon(true)
+		}
+		return
+	}
+	if !enCurso {
+		desde = 0
+	}
+	a.animarHaciaCerrado(desde)
+	if c := lienzoDe(a); c != nil && cajones.de(c) == a {
+		a.tecladoCajon(false)
 	}
 }
 
@@ -277,14 +487,6 @@ var cajones porLienzo[Armazon]
 // dice sus hijos—, y la barra de la suite sigue viva encima para el puntero.
 func (a *Armazon) FocusScope() fyne.CanvasObject {
 	if a.CajonAbierto && a.Menu != nil && a.Menu.Visible() {
-		if a.menuEnCarril() {
-			if a.focoCarril == nil {
-				a.focoCarril = container.NewWithoutLayout()
-			}
-			a.focoCarril.Objects = []fyne.CanvasObject{a.Menu, a.barraMovil()}
-			a.focoCarril.Resize(a.Size())
-			return a.focoCarril
-		}
 		return a.Menu
 	}
 	return nil
@@ -326,7 +528,7 @@ func (a *Armazon) barraMovil() fyne.CanvasObject {
 	if a.BarraMovil != nil {
 		return a.BarraMovil
 	}
-	if (a.SinBarraMovil && !a.menuEnCarril()) || (a.Menu == nil && a.Panel == nil) {
+	if a.SinBarraMovil || (a.Menu == nil && a.Panel == nil) {
 		return nil
 	}
 	if a.barra == nil {
@@ -342,20 +544,18 @@ func (a *Armazon) barraMovil() fyne.CanvasObject {
 	if a.Menu != nil {
 		b.AlMenu = func() { a.cambiarCajon(!a.CajonAbierto) }
 	}
-	b.AlVolver = func() {
-		a.DetalleAbierto = false
-		if a.AlVolver != nil {
-			a.AlVolver()
+	if a.AlVolver != nil {
+		b.AlVolver = func() {
+			a.DetalleAbierto = false
+			if a.AlVolver != nil {
+				a.AlVolver()
+			}
+			a.Refresh()
 		}
-		a.Refresh()
+	} else {
+		b.AlVolver = nil
 	}
 	return b
-}
-
-// menuEnCarril deja el mando junto a la cabecera y conserva una franja del marco
-// cuando el menú está cerrado. El cajón desplaza la hoja sin estrecharla.
-func (a *Armazon) menuEnCarril() bool {
-	return tema.EsMarco() && (EsTactil() || a.Size().Width < Estrecho) && a.Menu != nil
 }
 
 // volverAlPanel usa la misma acción que el botón visible, también después de
@@ -400,15 +600,22 @@ func MedidaArmazon(a *Armazon) fyne.Size {
 // CreateRenderer construye el marco: fondo, velo del cajón y las tres columnas.
 func (a *Armazon) CreateRenderer() fyne.WidgetRenderer {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
+	sombra := NuevaSombra(tema.SombraXL, 0).SinInterior()
+	sombra.Objeto().Hide()
+	borde := canvas.NewRectangle(color.NRGBA{})
+	borde.Hidden = true
 	r := &armazonRenderer{
 		a:     a,
 		fondo: NuevoFondoSuite(v),
 		// El velo del cajón SE PULSA y lo cierra, como el `onClick` del de AppShell.
 		// Era un rectángulo y el toque lo atravesaba hasta el contenido de debajo.
-		velo:  NuevoVelo(true, func() { a.cambiarCajon(false) }),
-		base:  canvas.NewRectangle(color.NRGBA{}),
-		marco: nuevoMarco(),
+		velo:        NuevoVelo(true, a.cerrarDesdeMando),
+		sombraCajon: sombra,
+		base:        canvas.NewRectangle(color.NRGBA{}),
+		bordeCajon:  borde,
+		marco:       nuevoMarco(),
 	}
+	a.r = r
 	if a.Panel != nil && a.Contenido != nil {
 		r.separador = a.separadorPanel()
 	}
@@ -417,14 +624,16 @@ func (a *Armazon) CreateRenderer() fyne.WidgetRenderer {
 }
 
 type armazonRenderer struct {
-	a     *Armazon
-	fondo *FondoSuite
-	velo  *Velo
+	a           *Armazon
+	fondo       *FondoSuite
+	velo        *Velo
+	sombraCajon *Sombra
 	// base es el suelo OPACO del cajón. El carril del traslúcido deja ver un punto de lo
 	// que tiene debajo, que en escritorio es el fondo ambiental y en el cajón, el
 	// contenido: el texto se colaba entre los rótulos del menú. La web le pone el mismo
 	// color sobre `neutral-50` (`nav.bg-sidebar` por debajo de 768, appearance.css).
-	base *canvas.Rectangle
+	base       *canvas.Rectangle
+	bordeCajon *canvas.Rectangle
 	// marco es la forma «Marco»: el color continuo detrás del menú y la hoja en la que
 	// van el panel y el contenido (ver marco.go). En Carril no se ve.
 	marco     *marco
@@ -432,13 +641,12 @@ type armazonRenderer struct {
 	objetos   []fyne.CanvasObject
 }
 
-// rehacer deja el menú sobre su velo y el mando lateral de Marco sobre la entrada
-// del menú, para que el botón siga visible durante el desplazamiento.
+// rehacer compone el árbol visual en orden de profundidad: marco y hoja abajo, contenido
+// en medio, y el cajón con su velo, sombra y filete por encima.
 func (r *armazonRenderer) rehacer() {
 	a := r.a
 	r.objetos = append([]fyne.CanvasObject{r.fondo}, r.marco.detras()...)
-	barra := a.barraMovil()
-	if barra != nil && !a.menuEnCarril() {
+	if barra := a.barraMovil(); barra != nil {
 		r.objetos = append(r.objetos, barra)
 	}
 	for _, o := range []fyne.CanvasObject{a.Panel, a.Contenido} {
@@ -459,10 +667,7 @@ func (r *armazonRenderer) rehacer() {
 		r.objetos = append(r.objetos, a.Carril)
 	}
 	if a.Menu != nil {
-		r.objetos = append(r.objetos, r.velo, r.base, a.Menu)
-	}
-	if barra != nil && a.menuEnCarril() {
-		r.objetos = append(r.objetos, barra)
+		r.objetos = append(r.objetos, r.velo, r.sombraCajon.Objeto(), r.base, a.Menu, r.bordeCajon)
 	}
 }
 
@@ -481,7 +686,7 @@ func (a *Armazon) separacionHoja(estrecha bool) float32 {
 // en el cajón —el del teléfono y el de quien lleva carril de iconos— conserva su fondo.
 func (r *armazonRenderer) colocarMarco(t fyne.Size, x, arriba, separa float32, estrecha bool) {
 	enMarco := tema.EsMarco()
-	sinFondo := enMarco && ((!estrecha && r.a.Carril == nil) || r.a.menuEnCarril())
+	sinFondo := enMarco && !estrecha && r.a.Carril == nil
 	if l := lateralEn(r.a.Menu); l != nil && l.SinFondo != sinFondo {
 		l.SinFondo = sinFondo
 		l.Refresh()
@@ -494,9 +699,6 @@ func (r *armazonRenderer) colocarMarco(t fyne.Size, x, arriba, separa float32, e
 	r.fondo.Hide()
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	hoja := fyne.NewSize(max(t.Width-x-separa, 0), max(t.Height-arriba-separa, 0))
-	if r.a.menuEnCarril() {
-		hoja.Width = max(t.Width-AnchoCarrilMovil-separa, 0)
-	}
 	r.marco.colocar(fyne.NewPos(0, 0), t, fyne.NewPos(x, arriba), hoja, estrecha, v)
 }
 
@@ -514,8 +716,9 @@ func (r *armazonRenderer) MinSize() fyne.Size           { return MedidaArmazon(r
 func (r *armazonRenderer) Objects() []fyne.CanvasObject { return r.objetos }
 func (r *armazonRenderer) Destroy()                     {}
 
-// Layout reparte la ventana. Ancha: menú, panel y contenido en fila. Estrecha: panel
-// y contenido se turnan; el menú desplaza la hoja en Marco y la cubre en Carril.
+// Layout reparte la ventana. Ancha: menú, panel y contenido en fila. Estrecha: la barra
+// móvil va arriba a todo el ancho, panel y contenido se turnan debajo, y el menú sale
+// como cajón elevado sobre su velo.
 func (r *armazonRenderer) Layout(t fyne.Size) {
 	defer func() { sincronizarExclusionMenuMovil(lienzoDe(r.a)) }()
 	a := r.a
@@ -527,61 +730,48 @@ func (r *armazonRenderer) Layout(t fyne.Size) {
 	// En estrecho llega al borde y conserva las cuatro esquinas.
 	separa := a.separacionHoja(estrecha)
 
-	// En táctil el mando de Marco y el cajón siguen accesibles al girar.
-	esCajon := estrecha || a.Carril != nil || a.menuEnCarril()
+	esCajon := estrecha || a.Carril != nil
 	// Al pasar a ancho el cajón se cierra solo, que es lo que hace `useNavDrawer`: si
 	// no, al volver a estrecho aparecía abierto sin que nadie lo hubiera pedido.
-	if !esCajon && a.CajonAbierto {
+	if !esCajon && (a.CajonAbierto || a.arrastrandoCajon || a.cerrandoCajon) {
+		estabaAbierto := a.CajonAbierto
 		a.CajonAbierto = false
-		if a.AlCajon != nil {
+		a.arrastrandoCajon = false
+		a.cerrandoCajon = false
+		a.entrada = 0
+		if estabaAbierto && a.AlCajon != nil {
 			a.AlCajon(false)
 		}
 	}
 	arriba := float32(0)
 	if bm := a.barraMovil(); bm != nil {
 		if b, es := bm.(*BarraMovil); es {
-			b.enCarril, b.anchoMarco = a.menuEnCarril(), t.Width
 			b.ConLista = a.Panel != nil
 			b.listaVisible = a.Panel != nil && !estrecha
 			b.CajonAbierto = a.CajonAbierto
 			b.Refresh()
 		}
 		h := bm.MinSize().Height
-		visible := estrecha || a.menuEnCarril()
-		esconder(bm, !visible)
-		if visible {
+		esconder(bm, !estrecha)
+		if estrecha {
 			bm.Move(fyne.NewPos(0, 0))
-			if a.menuEnCarril() {
-				bm.Resize(fyne.NewSize(AnchoCarrilMovil, t.Height))
-			} else {
-				bm.Resize(fyne.NewSize(t.Width, h))
-				arriba = h
-			}
+			bm.Resize(fyne.NewSize(t.Width, h))
+			arriba = h
 		}
 	}
 	alto := max(t.Height-arriba-separa, 0)
 
 	x := r.colocarNavegacion(t, separa, estrecha, esCajon)
-	inicioHoja := x
 
 	r.colocarMarco(t, x, arriba, separa, estrecha)
 
 	verDetalle := a.Panel == nil || !estrecha || a.DetalleAbierto
-	panelTam := t
-	if a.menuEnCarril() {
-		panelTam.Width = max(t.Width-AnchoCarrilMovil-separa, 0)
-	}
-	x = r.colocarPanel(panelTam, x, arriba, alto, estrecha, verDetalle)
+	x = r.colocarPanel(t, x, arriba, alto, estrecha, verDetalle)
 	if a.Contenido == nil {
 		return
 	}
 	esconder(a.Contenido, !verDetalle)
 	ancho := max(t.Width-x-separa, 0)
-	if a.menuEnCarril() {
-		// El desplazamiento del menú no consume ancho de la hoja. El panel sí:
-		// en tablet lista y detalle conservan sus medidas al abrir el cajón.
-		ancho = max(panelTam.Width-(x-inicioHoja), 0)
-	}
 	if !a.Restringido {
 		a.Contenido.Move(fyne.NewPos(x, arriba))
 		a.Contenido.Resize(fyne.NewSize(ancho, alto))
@@ -594,17 +784,21 @@ func (r *armazonRenderer) Layout(t fyne.Size) {
 }
 
 // Las barras que configura cada app también pueden cambiar CajonAbierto y
-// refrescar directamente. Comparten el mismo Escape, foco inicial y retorno.
+// refrescar directamente. Comparten el mismo Escape, foco inicial, retorno y
+// atenuación de botones flotantes.
 func (a *Armazon) enlazarCajonMovil() {
 	c := lienzoDe(a)
 	if c == nil {
 		return
 	}
+	esCajon := a.Size().Width < Estrecho || a.Carril != nil
 	registrado := cajones.de(c) == a
-	if a.menuEnCarril() && a.CajonAbierto && !registrado {
+	if esCajon && a.CajonAbierto && !registrado {
 		a.tecladoCajon(true)
-	} else if registrado && !a.CajonAbierto {
+		a.refrescarFlotantes()
+	} else if registrado && (!a.CajonAbierto || !esCajon) {
 		a.tecladoCajon(false)
+		a.refrescarFlotantes()
 	}
 }
 
@@ -647,9 +841,6 @@ func (r *armazonRenderer) colocarPanel(t fyne.Size, x, arriba, alto float32, est
 // su velo— y devuelve dónde empieza lo que va a su derecha.
 func (r *armazonRenderer) colocarNavegacion(t fyne.Size, separa float32, estrecha, esCajon bool) float32 {
 	a := r.a
-	if a.menuEnCarril() {
-		return r.colocarMenuEnCarril(t)
-	}
 	x := separa
 	if a.Carril != nil {
 		esconder(a.Carril, estrecha)
@@ -662,19 +853,28 @@ func (r *armazonRenderer) colocarNavegacion(t fyne.Size, separa float32, estrech
 	if a.Menu == nil {
 		return x
 	}
-	ancho := a.Menu.MinSize().Width
-	conCajon := esCajon && a.CajonAbierto
-	visible := !esCajon || a.CajonAbierto
+	ancho := a.anchoCajon(t.Width, estrecha)
+	conCajon := esCajon && (a.CajonAbierto || a.arrastrandoCajon || a.cerrandoCajon)
+	visible := !esCajon || conCajon
 	esconder(a.Menu, !visible)
 	esconder(r.velo, !conCajon)
 	// El cajón y su velo arrancan ARRIBA, justo bajo la barra de la suite, y tapan
-	// la barra móvil, como en AppShell.tsx (`BAJO_LA_TOPBAR`): con 38,5 de desfase
-	// la barra quedaba viva y sin velo entre la de la suite y el cajón.
+	// la barra móvil, como en AppShell.tsx (`BAJO_LA_TOPBAR`): con desfase la barra
+	// quedaría viva y sin velo entre la de la suite y el cajón.
+	posX := float32(0)
 	if visible {
-		a.Menu.Move(fyne.NewPos(a.desplazamientoCajon(conCajon), 0))
+		if conCajon {
+			posX = min(max(a.desplazamientoCajon(true), -ancho), 0)
+		}
+		a.Menu.Move(fyne.NewPos(posX, 0))
 		a.Menu.Resize(fyne.NewSize(ancho, t.Height))
 	}
 	r.ponerBase(conCajon)
+	progreso := float32(0)
+	if conCajon && ancho > 0 {
+		progreso = min(max((ancho+posX)/ancho, 0), 1)
+	}
+	r.colocarAdornosCajon(posX, ancho, t.Height, progreso, conCajon)
 	if !esCajon {
 		return ancho
 	}
@@ -685,25 +885,26 @@ func (r *armazonRenderer) colocarNavegacion(t fyne.Size, separa float32, estrech
 	return x
 }
 
-func (r *armazonRenderer) colocarMenuEnCarril(t fyne.Size) float32 {
-	a := r.a
-	if a.Carril != nil {
-		a.Carril.Hide()
+func (r *armazonRenderer) colocarAdornosCajon(posX, ancho, alto, progreso float32, conCajon bool) {
+	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
+	activo := conCajon && progreso > 0
+	if activo {
+		r.sombraCajon.Objeto().Show()
+		r.sombraCajon.Ajustar(fyne.NewPos(posX, 0), fyne.NewSize(ancho, alto), v)
+	} else {
+		r.sombraCajon.Objeto().Hide()
 	}
-	ancho := min(a.Menu.MinSize().Width, max(t.Width-AnchoCarrilMovil, 0))
-	desplaza := float32(0)
-	if a.CajonAbierto {
-		desplaza = min(max(ancho+a.entrada, 0), ancho)
-		a.Menu.Move(fyne.NewPos(AnchoCarrilMovil+desplaza-ancho, 0))
-		a.Menu.Resize(fyne.NewSize(ancho, t.Height))
+	conBorde := activo && ancho >= tema.Borde
+	esconder(r.bordeCajon, !conBorde)
+	if conBorde {
+		r.bordeCajon.FillColor = BordeSobre("sidebar-border", TokenCarril(), v)
+		r.bordeCajon.Move(fyne.NewPos(posX+ancho-tema.Borde, 0))
+		r.bordeCajon.Resize(fyne.NewSize(tema.Borde, alto))
+		r.bordeCajon.Refresh()
 	}
-	esconder(a.Menu, !a.CajonAbierto)
-	r.base.Hide()
-	esconder(r.velo, !a.CajonAbierto)
-	x := AnchoCarrilMovil + desplaza
-	r.velo.Move(fyne.NewPos(x, 0))
-	r.velo.Resize(fyne.NewSize(max(t.Width-x, 0), t.Height))
-	return x
+	if conCajon {
+		r.velo.PonerOpacidad(progreso)
+	}
 }
 
 // esconder es el `hidden` de la web: un objeto invisible no se pinta y tampoco recibe

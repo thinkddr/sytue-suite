@@ -4,6 +4,8 @@
 package ui
 
 import (
+	"image/color"
+
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/widget"
@@ -42,9 +44,7 @@ type BarraMovil struct {
 	RotuloAbrir, RotuloCerrar, RotuloVolver string
 	AlMenu, AlVolver                        func()
 
-	boton      *BotonIcono // el de menú o volver: adonde vuelve el foco al cerrar el cajón
-	enCarril   bool
-	anchoMarco float32
+	boton *BotonIcono // el de menú o volver: adonde vuelve el foco al cerrar el cajón
 	// listaVisible conserva EnDetalle y su callback al girar, pero ofrece el menú
 	// cuando lista y detalle ya se ven juntos.
 	listaVisible bool
@@ -52,11 +52,8 @@ type BarraMovil struct {
 
 var _ fyne.Widget = (*BarraMovil)(nil)
 
-// AltoBarraMovil es el `h-11`: 38,5 con el rem de 14.
+// AltoBarraMovil es el `h-11` (44 px).
 var AltoBarraMovil = tema.Espacio(11)
-
-// AnchoCarrilMovil reserva el mando de navegación junto a la cabecera de la app.
-var AnchoCarrilMovil = tema.Espacio(12)
 
 var (
 	canalonBarraMovil = tema.Espacio(4)   // px-4
@@ -86,7 +83,6 @@ func (b *BarraMovil) CreateRenderer() fyne.WidgetRenderer {
 		filete: canvas.NewRectangle(tema.Color("border", v)),
 		boton:  boton,
 		titulo: Texto("", tema.TextoSM, SemiNegrita, tema.Color("text", v)),
-		marco:  nuevoFondoMarco(),
 	}
 	r.Refresh()
 	return r
@@ -97,12 +93,11 @@ type barraMovilRenderer struct {
 	fondo, filete *canvas.Rectangle
 	boton         *BotonIcono
 	titulo        *canvas.Text
-	marco         *fondoMarco
 }
 
 func (r *barraMovilRenderer) MinSize() fyne.Size { return MedidaBarraMovil() }
 func (r *barraMovilRenderer) Objects() []fyne.CanvasObject {
-	return append(r.marco.objetos(), r.fondo, r.filete, r.boton, r.titulo)
+	return []fyne.CanvasObject{r.fondo, r.filete, r.boton, r.titulo}
 }
 func (r *barraMovilRenderer) Destroy() {}
 
@@ -110,21 +105,20 @@ func (r *barraMovilRenderer) Layout(t fyne.Size) {
 	r.fondo.Resize(t)
 	r.filete.Move(fyne.NewPos(0, t.Height-tema.Borde))
 	r.filete.Resize(fyne.NewSize(t.Width, tema.Borde))
-	linea := t.Height - tema.Borde
-	if r.b.enCarril {
-		linea = MinCabeceraApp
-		r.marco.colocar(fyne.NewPos(0, 0), t)
+	linea := t.Height
+	if !r.filete.Hidden {
+		linea = t.Height - tema.Borde
 	}
 	x := canalonBarraMovil
 	if r.boton.Visible() {
 		lado := r.boton.MinSize()
-		izquierda := canalonBarraMovil
-		if r.b.enCarril {
-			izquierda = (t.Width - lado.Width) / 2
-		}
-		r.boton.Move(fyne.NewPos(izquierda, (linea-lado.Height)/2))
+		base := ladoSoloIcono(TallaSM)
+		// En táctil el área pulsable crece a 44 px sin desplazar la vertical del glifo
+		// respecto a la marca de la barra superior.
+		izquierda := max(canalonBarraMovil-max(lado.Width-base, 0)/2, 0)
+		r.boton.Move(fyne.NewPos(izquierda, max((linea-lado.Height)/2, 0)))
 		r.boton.Resize(lado)
-		x += lado.Width + huecoBarraMovil
+		x = izquierda + lado.Width + huecoBarraMovil
 	}
 	Truncar(r.titulo, r.tituloVisible(), tema.TextoSM, SemiNegrita, max(t.Width-canalonBarraMovil-x, 0))
 	ColocarTexto(r.titulo, tema.TextoSM, x, (linea-tema.TextoSM.Linea)/2)
@@ -140,34 +134,22 @@ func (r *barraMovilRenderer) tituloVisible() string {
 func (r *barraMovilRenderer) Refresh() {
 	b := r.b
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
+	r.boton.Lado = MedidaBotonCon("", TallaSM, 0, 0, true, iconos.TallaMD).Width
 	r.fondo.FillColor = tema.Color("surface", v)
 	r.filete.FillColor = tema.Color("border", v)
-	// En Marco esta fila prolonga la barra de la suite. El fondo lo pinta el
-	// armazón, con el mismo degradado horizontal; la hoja empieza debajo.
+	// En Marco esta fila prolonga la barra de la suite (`.sytue-mobilebar`). El fondo
+	// lo pinta el armazón con el mismo degradado horizontal; la hoja empieza debajo.
 	r.filete.Hidden = tema.EsMarco()
 	r.titulo.Color = tema.Color("text", v)
 	r.boton.Trazo, r.boton.TrazoEncima = "primary-text", "primary-text"
 	r.boton.FondoEncima, r.boton.FondoActivo, r.boton.TokenAro = "selected", "selected", "focus-ring"
 	r.fondo.Show()
-	r.marco.esconder()
 	r.titulo.Show()
-	if tema.EsMarco() || b.enCarril {
+	if tema.EsMarco() {
 		r.fondo.Hide()
 		r.titulo.Color = tema.Color("sidebar-fg", v)
 		r.boton.Trazo, r.boton.TrazoEncima = "sidebar-fg", "sidebar-fg"
 		r.boton.FondoEncima, r.boton.FondoActivo, r.boton.TokenAro = "sidebar-active-bg", "sidebar-active-bg", "sidebar-focus"
-	}
-	if b.enCarril {
-		r.titulo.Hide()
-		if tema.EsMarco() {
-			r.marco.pintar(v)
-			r.marco.degradado.EndColor = r.marco.colorEn(AnchoCarrilMovil, b.anchoMarco)
-			r.marco.degradado.Refresh()
-		} else {
-			// Carril no declara los tokens de Marco: su navegación usa sidebar-bg.
-			r.fondo.FillColor = FondoCarril(v)
-			r.fondo.Show()
-		}
 	}
 	r.boton.Show()
 	switch {
@@ -213,15 +195,32 @@ func NuevoBotonFlotante(rotulo string, icono iconos.Icono, alPulsar func()) *Bot
 	return b
 }
 
-// CreateRenderer compone sombra, caja, icono y anillo. Termina en Refresh.
+// Tapped delega en el cierre del cajón si el menú móvil está abierto por debajo en la
+// pila: el botón flotante vive sobre el armazón, pero en la web queda bajo el velo
+// (`z-20` frente a `z-sidebar`).
+func (b *BotonFlotante) Tapped(e *fyne.PointEvent) {
+	if b.Inerte {
+		return
+	}
+	if a := cajonDe(lienzoDe(b)); a != nil && a.CajonAbierto {
+		a.cerrarDesdeMando()
+		return
+	}
+	b.Pulsable.Tapped(e)
+}
+
+// CreateRenderer compone sombra, caja, icono, anillo y velo de cajón. Termina en Refresh.
 func (b *BotonFlotante) CreateRenderer() fyne.WidgetRenderer {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
+	velo := canvas.NewRectangle(color.NRGBA{})
+	velo.Hidden = true
 	r := &flotanteRenderer{
 		b:      b,
 		sombra: NuevaSombra(tema.SombraLG, tema.Forma("radius-control")),
 		fondo:  canvas.NewRectangle(tema.Color("primary", v)),
 		glifo:  iconos.Trazo(b.Icono, iconos.TallaXL, "on-primary", v),
 		aro:    NuevoAro(tema.Forma("radius-control"), SinHueco, v),
+		velo:   velo,
 	}
 	r.Refresh()
 	return r
@@ -233,6 +232,7 @@ type flotanteRenderer struct {
 	fondo  *canvas.Rectangle
 	glifo  *iconos.Dibujo
 	aro    *Aro
+	velo   *canvas.Rectangle
 }
 
 func (r *flotanteRenderer) MinSize() fyne.Size {
@@ -240,7 +240,8 @@ func (r *flotanteRenderer) MinSize() fyne.Size {
 }
 
 func (r *flotanteRenderer) Objects() []fyne.CanvasObject {
-	return append([]fyne.CanvasObject{r.sombra.Objeto()}, r.aro.Antes(r.fondo, r.glifo.Objeto())...)
+	out := append([]fyne.CanvasObject{r.sombra.Objeto()}, r.aro.Antes(r.fondo, r.glifo.Objeto())...)
+	return append(out, r.velo)
 }
 func (r *flotanteRenderer) Destroy() {}
 
@@ -250,16 +251,18 @@ func (r *flotanteRenderer) Layout(t fyne.Size) {
 	r.fondo.Resize(t)
 	r.aro.Colocar(t)
 	r.glifo.Colocar((t.Width-iconos.TallaXL)/2, (t.Height-iconos.TallaXL)/2, iconos.TallaXL)
+	r.velo.Resize(t)
 }
 
 func (r *flotanteRenderer) Refresh() {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	radio := tema.Forma("radius-control")
 	r.fondo.CornerRadius = radio
+	r.velo.CornerRadius = radio
 	r.sombra.CambiarRadio(radio)
 	r.aro.CambiarRadio(radio)
 	switch {
-	case r.b.Encima():
+	case r.b.pulsado, r.b.Encima():
 		r.fondo.FillColor = tema.Color("primary-hover", v)
 	default:
 		r.fondo.FillColor = tema.Color("primary", v)
@@ -267,6 +270,21 @@ func (r *flotanteRenderer) Refresh() {
 	r.glifo.Tenir("on-primary", v)
 	r.aro.Pintar(v)
 	r.aro.Ver(r.b.Enfocado())
+	var a *Armazon
+	if !r.b.Inerte {
+		if c := lienzoDe(r.b); c != nil {
+			a = cajonDe(c)
+			if a == nil {
+				a = armazonEn(c.Content())
+			}
+		}
+	}
+	bajoVelo := a != nil && (a.CajonAbierto || a.arrastrandoCajon || a.cerrandoCajon)
+	esconder(r.velo, !bajoVelo)
+	if bajoVelo {
+		r.velo.FillColor = ColorVelo(v, a.progresoCajon())
+		r.velo.Refresh()
+	}
 	r.fondo.Refresh()
 	r.Layout(r.b.Size())
 }

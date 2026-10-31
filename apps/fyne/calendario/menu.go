@@ -4,6 +4,8 @@
 package calendario
 
 import (
+	"time"
+
 	"fyne.io/fyne/v2"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
@@ -30,7 +32,16 @@ func (p *Pantalla) menu() fyne.CanvasObject {
 	mini.Zona = p.zona()
 	mini.RotuloAnterior = p.t("nav.prevMonth", nil)
 	mini.RotuloSiguiente = p.t("nav.nextMonth", nil)
-	mini.AlElegir = p.AlElegirDia
+	mini.AlElegir = func(d time.Time) {
+		if p.cajonAbierto && p.AlConmutarCajon != nil {
+			p.AlConmutarCajon()
+		} else {
+			p.cajonAbierto = false
+		}
+		if p.AlElegirDia != nil {
+			p.AlElegirDia(d)
+		}
+	}
 	mini.AlDesplazar = p.AlDesplazarMes
 
 	bloques := []fyne.CanvasObject{mini, p.seccionMisCalendarios()}

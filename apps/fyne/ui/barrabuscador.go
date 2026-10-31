@@ -12,6 +12,7 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
+	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/driver/mobile"
 	"fyne.io/fyne/v2/widget"
@@ -45,8 +46,15 @@ const (
 	// MinimoBuscador es el `query.trim().length < 2` que decide si se busca.
 	MinimoBuscador = 2
 	// MaxResultadosBarra es lo que se pide al Hub. La web no acota y el panel enseña
-	// `max-h-96` con desplazamiento; aquí se acota a lo que cabe sin desplazar.
+	// `max-h-96` con desplazamiento; aquí se acota la petición y el panel desplaza si
+	// la pantalla es baja (p. ej. móvil apaisado).
 	MaxResultadosBarra = 12
+	// AltoMaximoPanelBarra es el `max-h-96` (24 rem) del desplegable de resultados.
+	AltoMaximoPanelBarra float32 = 24 * tema.Rem
+	// LadoLimpiarBuscador es el botón interior de vaciado (`×`) cuando hay texto escrito.
+	LadoLimpiarBuscador float32 = 28
+	// MargenLimpiarBuscador separa el botón de vaciado del borde derecho de la píldora.
+	MargenLimpiarBuscador float32 = 4
 	// SeparacionPanel es el `top-[calc(100%+6px)]` del panel bajo el campo.
 	SeparacionPanel float32 = 6
 	// MargenPanel es el `p-1` del panel.
@@ -79,9 +87,13 @@ type buscadorBarra struct {
 	hub *api.Hub
 	s   *sesion.Suite
 
-	campo *Entrada
-	panel *panelBarra
-	atajo *pistaAtajo
+	campo   *Entrada
+	panel   *panelBarra
+	atajo   *pistaAtajo
+	limpiar *BotonIcono
+
+	ultimoX, ultimoAncho float32
+	ultimaVentana        fyne.Size
 
 	mu       sync.Mutex
 	termino  string
@@ -115,43 +127,107 @@ func nuevoBuscadorBarra(t *i18n.Translator, s *sesion.Suite) *buscadorBarra {
 	b.panel = nuevoPanelBarra()
 	b.panel.Hide()
 	b.atajo = nuevaPistaAtajo(atajoDelSistema())
+	b.limpiar = NuevoBotonIcono(iconos.Cerrar, t.T("ui.close", nil), b.vaciar)
+	b.limpiar.Lado = LadoLimpiarBuscador
+	b.limpiar.TamIcono = iconos.TallaXS
+	b.limpiar.Radio = tema.RadioPill
+	b.limpiar.Hide()
+	b.enCarril(false)
 	return b
+}
+
+func (b *buscadorBarra) enCarril(carril bool) {
+	if carril {
+		b.limpiar.Trazo, b.limpiar.TrazoEncima = "sidebar-fg-muted", "sidebar-fg"
+		b.limpiar.FondoEncima, b.limpiar.FondoActivo, b.limpiar.TokenAro = "sidebar-hover-bg", "sidebar-active-bg", "sidebar-focus"
+	} else {
+		b.limpiar.Trazo, b.limpiar.TrazoEncima = "text-muted", "text"
+		b.limpiar.FondoEncima, b.limpiar.FondoActivo, b.limpiar.TokenAro = "bg-subtle", "selected", "focus-ring"
+	}
+	b.limpiar.Refresh()
+}
+
+func (b *buscadorBarra) vaciar() {
+	b.parar()
+	b.campo.PonerTexto("")
+	b.mu.Lock()
+	b.termino, b.estado, b.hits, b.fallidos, b.activa = "", enReposo, nil, nil, -1
+	b.mu.Unlock()
+	b.verAtajo()
+	b.pintar()
+	if esMovil() {
+		enfocar(lienzoDe(b.campo), nil)
+	} else {
+		enfocar(lienzoDe(b.campo), b.campo)
+	}
 }
 
 // atajoDelSistema es «⌘K» en un Mac y «Ctrl K» en todo lo demás, igual que la web lo
 // decide al montar y no en el servidor.
 func atajoDelSistema() string { return AtajoDelSistema("Ctrl K") }
 
-// colocar sitúa el campo, la pista del atajo y el panel. `ventana` es el tamaño de la
-// barra, que es lo que acota el ancho del panel.
+// colocar sitúa el campo, la pista del atajo, el aspa de vaciado y el panel. `ventana`
+// es el tamaño de la barra, que es lo que acota el ancho del panel.
 func (b *buscadorBarra) colocar(x, y, ancho float32, ventana fyne.Size) {
+	b.ultimoX, b.ultimoAncho, b.ultimaVentana = x, ancho, ventana
+	altoCampo := AltoCampo(CampoMD)
 	b.campo.Move(fyne.NewPos(x, y))
-	b.campo.Resize(fyne.NewSize(max(ancho, 0), AltoCampo(CampoMD)))
+	b.campo.Resize(fyne.NewSize(max(ancho, 0), altoCampo))
 	tam := b.atajo.MinSize()
-	b.atajo.Move(fyne.NewPos(x+ancho-RaizAtajo-tam.Width, y+(AltoCampo(CampoMD)-tam.Height)/2))
+	b.atajo.Move(fyne.NewPos(x+ancho-RaizAtajo-tam.Width, y+(altoCampo-tam.Height)/2))
 	b.atajo.Resize(tam)
+	ladoLimpiar := min(LadoLimpiarBuscador, max(altoCampo-2*MargenLimpiarBuscador, 0))
+	b.limpiar.Lado = ladoLimpiar
+	b.limpiar.Move(fyne.NewPos(max(x+ancho-MargenLimpiarBuscador-ladoLimpiar, x), y+(altoCampo-ladoLimpiar)/2))
+	b.limpiar.Resize(fyne.NewSize(ladoLimpiar, ladoLimpiar))
 	b.estrecho = EsTactil() || ventana.Width < CorteAtajo
 	b.verAtajo()
 	b.registrarAtajo()
+	b.colocarPanel()
+}
 
+func (b *buscadorBarra) colocarPanel() {
+	x, ancho, ventana := b.ultimoX, b.ultimoAncho, b.ultimaVentana
 	alto := b.panel.MinSize().Height
+	yPanel := AltoBarraSuite() + SeparacionPanel
+	if ventana.Width > 0 && ventana.Width < Estrecho {
+		yPanel = AltoBarraSuite()
+	}
+	tope := AltoMaximoPanelBarra
+	if c := lienzoDe(b.campo); c != nil && c.Size().Height > yPanel+tema.Espacio(4) {
+		tope = min(tope, c.Size().Height-yPanel-tema.Espacio(2))
+	}
+	if alto > tope {
+		alto = tope
+	}
 	if ventana.Width > 0 && ventana.Width < Estrecho {
 		// En el teléfono, a todo el ancho bajo la barra (como la web, `max-md:inset-x-0
 		// top-14`): colgado del campo medía lo que él y los títulos no se leían.
 		b.panel.aSangre = true
-		b.panel.Move(fyne.NewPos(0, AltoBarraSuite()))
+		b.panel.Move(fyne.NewPos(0, yPanel))
 		b.panel.Resize(fyne.NewSize(ventana.Width, alto))
 		return
 	}
 	b.panel.aSangre = false
-	b.panel.Move(fyne.NewPos(x, AltoBarraSuite()+SeparacionPanel))
+	b.panel.Move(fyne.NewPos(x, yPanel))
 	b.panel.Resize(fyne.NewSize(max(ancho, 0), alto))
 }
 
-// verAtajo enseña la pista solo en reposo, vacío y con sitio: con texto, `type=search`
-// pinta ahí su aspa, y enfocado ya no hace falta decir cómo se llega.
+// verAtajo enseña la pista solo en reposo, vacío y con sitio, y el aspa de vaciado
+// siempre que haya texto escrito en el campo (`type="search"`).
 func (b *buscadorBarra) verAtajo() {
-	b.atajo.Visible2(!b.estrecho && !b.campo.enfocado && b.campo.Texto() == "")
+	conTexto := b.campo.Texto() != ""
+	mostrarLimpiar := conTexto && b.ultimoAncho >= 2*LadoLimpiarBuscador
+	b.atajo.Visible2(!b.estrecho && !b.campo.enfocado && !conTexto)
+	esconder(b.limpiar, !mostrarLimpiar)
+	margenDer := float32(0)
+	if mostrarLimpiar {
+		margenDer = b.limpiar.Lado + MargenLimpiarBuscador
+	}
+	if b.campo.MargenDerecho != margenDer {
+		b.campo.MargenDerecho = margenDer
+		b.campo.Refresh()
+	}
 }
 
 // parar cancela la búsqueda que estuviera esperando su turno.
@@ -368,6 +444,7 @@ func (b *buscadorBarra) pintar() {
 			b.panel.Poner(b.filas(hits, fallidos, activa, termino))
 		}
 		b.panel.Show()
+		b.colocarPanel()
 		b.panel.Refresh()
 	})
 }
@@ -519,13 +596,14 @@ func nuevaFilaResultado(titulo, fragmento string, alPulsar func()) *filaResultad
 	return f
 }
 
-// MedidaFilaResultado es el alto de la fila, con fragmento o sin él.
+// MedidaFilaResultado es el alto de la fila, con fragmento o sin él. En táctil respeta
+// los 44 px mínimos de control de navegación.
 func MedidaFilaResultado(conFragmento bool) float32 {
 	alto := 2*margenYResultado + tema.TextoBase.Linea
 	if conFragmento {
 		alto += tema.TextoSM.Linea
 	}
-	return alto
+	return SueloTactil(alto)
 }
 
 func (f *filaResultado) MinSize() fyne.Size {
@@ -571,11 +649,16 @@ func (r *filaResultadoRenderer) Destroy()                     {}
 func (r *filaResultadoRenderer) Layout(t fyne.Size) {
 	r.caja.Redimensionar(t)
 	ancho := max(t.Width-2*margenXResultado, 0)
+	bloque := tema.TextoBase.Linea
+	if r.f.fragmento != "" {
+		bloque += tema.TextoSM.Linea
+	}
+	y := max((t.Height-bloque)/2, margenYResultado)
 	r.titulo.Text = recorta(r.f.titulo, tema.TextoBase, Medio, ancho)
-	ColocarTexto(r.titulo, tema.TextoBase, margenXResultado, margenYResultado)
+	ColocarTexto(r.titulo, tema.TextoBase, margenXResultado, y)
 	r.fragmento.Hidden = r.f.fragmento == ""
 	r.fragmento.Text = recorta(r.f.fragmento, tema.TextoSM, Normal, ancho)
-	ColocarTexto(r.fragmento, tema.TextoSM, margenXResultado, margenYResultado+tema.TextoBase.Linea)
+	ColocarTexto(r.fragmento, tema.TextoSM, margenXResultado, y+tema.TextoBase.Linea)
 }
 
 func (r *filaResultadoRenderer) Refresh() {
@@ -698,10 +781,11 @@ func (p *panelBarra) CreateRenderer() fyne.WidgetRenderer {
 }
 
 type panelBarraRenderer struct {
-	p       *panelBarra
-	sombra  *Sombra
-	caja    *Caja
-	objetos []fyne.CanvasObject
+	p        *panelBarra
+	sombra   *Sombra
+	caja     *Caja
+	desplaza *container.Scroll
+	objetos  []fyne.CanvasObject
 }
 
 // IsClip recorta lo que se salga: el panel es una caja con esquinas y lo de dentro no
@@ -709,8 +793,26 @@ type panelBarraRenderer struct {
 func (r *panelBarraRenderer) IsClip() {}
 
 func (r *panelBarraRenderer) rehacer() {
+	if r.desplaza != nil {
+		r.desplaza.Content = container.New(Columna{}, r.p.hijos...)
+		r.desplaza.Offset = fyne.Position{}
+		r.desplaza.Refresh()
+	}
+	r.sincronizarObjetos(r.p.Size())
+}
+
+func (r *panelBarraRenderer) sincronizarObjetos(t fyne.Size) bool {
+	conScroll := t.Height > 0 && t.Height+0.5 < r.p.MinSize().Height && len(r.p.hijos) > 0
 	r.objetos = append([]fyne.CanvasObject{r.sombra.Objeto()}, r.caja.Objetos()...)
+	if conScroll {
+		if r.desplaza == nil {
+			r.desplaza = container.NewVScroll(container.New(Columna{}, r.p.hijos...))
+		}
+		r.objetos = append(r.objetos, r.desplaza)
+		return true
+	}
 	r.objetos = append(r.objetos, r.p.hijos...)
+	return false
 }
 
 func (r *panelBarraRenderer) MinSize() fyne.Size           { return r.p.MinSize() }
@@ -728,6 +830,11 @@ func (r *panelBarraRenderer) Layout(t fyne.Size) {
 	}
 	r.caja.Redimensionar(t)
 	dentro := MargenPanel + tema.Borde
+	if r.sincronizarObjetos(t) {
+		r.desplaza.Move(fyne.NewPos(dentro, dentro))
+		r.desplaza.Resize(fyne.NewSize(max(t.Width-2*dentro, 0), max(t.Height-2*dentro, 0)))
+		return
+	}
 	y := dentro
 	for _, h := range r.p.hijos {
 		alto := h.MinSize().Height

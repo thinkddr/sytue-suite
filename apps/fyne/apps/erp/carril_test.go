@@ -336,8 +336,8 @@ func TestElERPLlevaLaFormaMarco(t *testing.T) {
 		t.Error("el aspa no cierra el cajón")
 	}
 
-	// Por debajo de 768: el mando compartido ocupa la franja de Marco, sin duplicarlo
-	// dentro de main ni conservar el carril de iconos del escritorio.
+	// Por debajo de 768: no se pinta el carril de iconos del escritorio ni una
+	// segunda barra móvil del armazón; el único mando es `#erp-cajon-boton`.
 	q := pantallaDePrueba(t)
 	q.Ventana = fyne.NewSize(360, 740)
 	e := test.NewWindow(q.Objeto())
@@ -345,6 +345,7 @@ func TestElERPLlevaLaFormaMarco(t *testing.T) {
 	e.SetPadded(false)
 	e.Resize(q.Ventana)
 	var enCarril, botones int
+	var boton *BotonCajon
 	var movil *ui.BarraMovil
 	recorrer(e.Content(), func(o fyne.CanvasObject) {
 		switch b := o.(type) {
@@ -352,20 +353,21 @@ func TestElERPLlevaLaFormaMarco(t *testing.T) {
 			enCarril++
 		case *BotonCajon:
 			botones++
+			boton = b
 		case *ui.BarraMovil:
 			movil = b
 		}
 	})
-	if enCarril != 0 || botones != 0 || movil == nil || movil.Size().Width != ui.AnchoCarrilMovil {
-		t.Fatalf("a 360 hay %d acciones de carril, %d botones duplicados y mando=%v", enCarril, botones, movil)
+	if enCarril != 0 || botones != 1 || boton == nil || movil != nil {
+		t.Fatalf("a 360 hay %d acciones de carril, %d botones de cajón y barraMovil=%v", enCarril, botones, movil)
 	}
-	movil.AlMenu()
+	test.Tap(boton)
 	if !q.cajon || !q.arm.CajonAbierto || !q.arm.Menu.Visible() {
-		t.Fatal("el mando compartido no abre la navegación del ERP")
+		t.Fatal("el botón del cajón no abre la navegación móvil del ERP")
 	}
-	movil.AlMenu()
+	q.arm.CerrarCajon()
 	if q.cajon || q.arm.CajonAbierto {
-		t.Fatal("el mismo mando no cierra la navegación del ERP")
+		t.Fatal("cerrar el cajón del ERP no sincroniza su estado")
 	}
 }
 

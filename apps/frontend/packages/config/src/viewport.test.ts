@@ -31,10 +31,13 @@ test('Hub y Office reservan las zonas seguras también en Carril sin crear cajas
   ]) {
     const shell = await Bun.file(new URL(ruta, import.meta.url)).text();
     expect(shell, ruta).toMatch(/class="[^"]*sytue-frame-page[^"]*sytue-safe-workspace/);
+    // Office y Hub comparten exactamente los mismos márgenes de hoja en Marco (sin bleed).
+    expect(shell, ruta).toContain('class="sytue-sheet sytue-sheet-page"');
+    expect(shell, ruta).not.toContain('sytue-sheet-bleed');
   }
 });
 
-test('los editores Office dejan el inset inferior al main que los contiene', async () => {
+test('los editores Office dejan el inset inferior y el margen de la hoja al main que los contiene', async () => {
   const office = new URL('../../office/src/', import.meta.url);
   const shell = await Bun.file(new URL('components/Shell.tsx', office)).text();
   expect(shell).toContain('sytue-safe-workspace');
@@ -43,9 +46,11 @@ test('los editores Office dejan el inset inferior al main que los contiene', asy
     const alturas = [...fuente.matchAll(/h-\[calc\((100dvh[^\]]+)\)\]/g)];
     expect(alturas.length, ruta).toBeGreaterThan(0);
     for (const [, altura] of alturas) {
-      // Sin esta resta, el editor acaba bajo el indicador y el padding del main
-      // se añade después de la pantalla. Restarlo dos veces también roba lienzo.
-      expect(altura, ruta).toBe('100dvh-var(--spacing-topbar)-var(--sytue-safe-bottom,0px)');
+      // Sin esta resta, el editor acaba bajo el indicador o añade los 10 px de margen
+      // inferior de la hoja fuera del viewport creando un segundo scroll.
+      expect(altura, ruta).toBe(
+        '100dvh-var(--spacing-topbar)-var(--sytue-sheet-gap,0px)-var(--sytue-safe-bottom,0px)',
+      );
     }
     expect(fuente, ruta).not.toMatch(/sytue-safe-(?:workspace|fullscreen)/);
     if (ruta.includes('Edicion')) expect(fuente).toContain('min-h-[32rem]');

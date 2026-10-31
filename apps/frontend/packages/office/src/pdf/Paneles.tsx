@@ -724,7 +724,7 @@ export function PanelLateral({
         // —que es `inset-y-0`, o sea que arranca en y=0— se dibujaba DEBAJO de ella en
         // móvil y su botón de cerrar, de 44 px, quedaba entero tapado e inalcanzable.
         // Mismo patrón que el drawer de AppShell.
-        class={`sytue-popover-surface border-border flex w-72 shrink-0 flex-col border-r max-lg:fixed max-lg:inset-y-0 max-lg:left-0 max-lg:z-[var(--z-modal)] max-lg:pt-[var(--sytue-safe-top,0px)] max-lg:pb-[var(--sytue-safe-bottom,0px)] max-lg:pl-[var(--sytue-safe-left,0px)] max-lg:shadow-xl ${
+        class={`sytue-popover-surface sytue-sheet-corners border-border marco:overflow-clip flex w-72 shrink-0 flex-col border-r [--sytue-sheet-br:0px] [--sytue-sheet-tl:0px] [--sytue-sheet-tr:0px] max-lg:fixed max-lg:inset-y-0 max-lg:left-0 max-lg:z-[var(--z-modal)] max-lg:pt-[var(--sytue-safe-top,0px)] max-lg:pb-[var(--sytue-safe-bottom,0px)] max-lg:pl-[var(--sytue-safe-left,0px)] max-lg:shadow-xl max-lg:[--sytue-sheet-bl:0px] ${
           abierto ? '' : 'max-lg:hidden'
         }`}
       >

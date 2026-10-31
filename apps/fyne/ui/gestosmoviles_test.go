@@ -244,3 +244,102 @@ func TestGestoNoSeIniciaNiRefrescaSobreUnModal(t *testing.T) {
 	comprobarFiltro(t, g, eventoGesto(mobile.FilterEnd, 100, 180, l), mobile.FilterClaim)
 	comprobarFiltro(t, g, eventoGesto(mobile.FilterBegin, 100, 100, l), mobile.FilterPass)
 }
+
+func TestGestoAperturaYCierreSiguenElDedoEnVivo(t *testing.T) {
+	sinAnimacionDelMenu(t)
+	a := NuevoArmazon(widget.NewLabel("lista"))
+	a.Menu = NuevoLateral("Menú", nil)
+	a.Resize(fyne.NewSize(390, 700))
+	r := test.WidgetRenderer(a).(*armazonRenderer)
+	a.Refresh()
+	g := &gestosMoviles{}
+
+	// Arrastre corto desde el borde izquierdo: muestra el cajón en vivo y cancela al soltar.
+	comprobarFiltro(t, g, eventoGesto(mobile.FilterBegin, 10, 200, a), mobile.FilterDefer)
+	comprobarFiltro(t, g, eventoGesto(mobile.FilterMove, 110, 204, a), mobile.FilterClaim)
+	if !a.arrastrandoCajon || !a.Menu.Visible() || a.Menu.Position().X != 100-a.Menu.Size().Width || !r.velo.Visible() {
+		t.Fatalf("el cajón no sigue al dedo al abrir: arrastrando=%v pos=%v velo=%v", a.arrastrandoCajon, a.Menu.Position(), r.velo.Visible())
+	}
+	comprobarFiltro(t, g, eventoGesto(mobile.FilterEnd, 40, 204, a), mobile.FilterClaim)
+	if a.CajonAbierto || a.arrastrandoCajon || a.Menu.Visible() {
+		t.Fatalf("un gesto corto dejó el cajón abierto: abierto=%v visible=%v", a.CajonAbierto, a.Menu.Visible())
+	}
+
+	// Arrastre completo desde el borde izquierdo: abre y asienta en x=0.
+	comprobarFiltro(t, g, eventoGesto(mobile.FilterBegin, 8, 200, a), mobile.FilterDefer)
+	comprobarFiltro(t, g, eventoGesto(mobile.FilterMove, 60, 202, a), mobile.FilterClaim)
+	comprobarFiltro(t, g, eventoGesto(mobile.FilterEnd, 96, 202, a), mobile.FilterClaim)
+	if !a.CajonAbierto || a.arrastrandoCajon || a.Menu.Position().X != 0 {
+		t.Fatalf("el gesto de apertura no asentó el cajón: abierto=%v pos=%v", a.CajonAbierto, a.Menu.Position())
+	}
+
+	// Desplazamiento vertical con el cajón abierto: pasa al scroll del menú sin reclamarlo.
+	comprobarFiltro(t, g, eventoGesto(mobile.FilterBegin, 120, 300, a), mobile.FilterDefer)
+	comprobarFiltro(t, g, eventoGesto(mobile.FilterMove, 122, 220, a), mobile.FilterPass)
+	if !a.CajonAbierto || a.arrastrandoCajon {
+		t.Fatal("el scroll vertical interfirió con el cajón abierto")
+	}
+
+	// Arrastre corto hacia la izquierda: sigue al dedo y vuelve a abrirse al soltar antes del umbral.
+	comprobarFiltro(t, g, eventoGesto(mobile.FilterBegin, 220, 250, a), mobile.FilterDefer)
+	comprobarFiltro(t, g, eventoGesto(mobile.FilterMove, 180, 252, a), mobile.FilterClaim)
+	if !a.arrastrandoCajon || a.Menu.Position().X != -40 {
+		t.Fatalf("el cajón no sigue al dedo al recoger: arrastrando=%v pos=%v", a.arrastrandoCajon, a.Menu.Position())
+	}
+	comprobarFiltro(t, g, eventoGesto(mobile.FilterEnd, 195, 252, a), mobile.FilterClaim)
+	if !a.CajonAbierto || a.Menu.Position().X != 0 {
+		t.Fatalf("un cierre corto cerró el cajón: abierto=%v pos=%v", a.CajonAbierto, a.Menu.Position())
+	}
+
+	// Arrastre decidido hacia la izquierda: cierra el cajón y sincroniza AlCajon.
+	cierres := 0
+	a.AlCajon = func(abierto bool) {
+		if !abierto {
+			cierres++
+		}
+	}
+	comprobarFiltro(t, g, eventoGesto(mobile.FilterBegin, 240, 250, a), mobile.FilterDefer)
+	comprobarFiltro(t, g, eventoGesto(mobile.FilterMove, 180, 252, a), mobile.FilterClaim)
+	comprobarFiltro(t, g, eventoGesto(mobile.FilterEnd, 160, 252, a), mobile.FilterClaim)
+	if a.CajonAbierto || a.Menu.Visible() || cierres != 1 {
+		t.Fatalf("el gesto hacia la izquierda no cerró el cajón: abierto=%v visible=%v cierres=%d", a.CajonAbierto, a.Menu.Visible(), cierres)
+	}
+}
+
+func TestBuscadorBarraLimpiarYAlturaMovil(t *testing.T) {
+	t.Cleanup(TactilDePrueba(true))
+	b := barraPruebaA(t, 568)
+	montado := b.Montar(contenidoDePrueba())
+	w := test.NewTempWindow(t, montado)
+	w.SetPadded(false)
+	w.Resize(fyne.NewSize(568, 220))
+
+	if b.buscador.limpiar.Visible() || b.buscador.campo.MargenDerecho != 0 {
+		t.Fatal("el botón de vaciar aparece con el buscador vacío")
+	}
+	b.buscador.campo.PonerTexto("presupuesto")
+	b.buscador.verAtajo()
+	if !b.buscador.limpiar.Visible() || b.buscador.campo.MargenDerecho <= 0 {
+		t.Fatal("escribir en el buscador no enseña el botón de vaciar ni reserva su margen")
+	}
+
+	filas := make([]fyne.CanvasObject, 0, 8)
+	for range 8 {
+		filas = append(filas, nuevaFilaResultado("Documento", "Fragmento", nil))
+	}
+	b.buscador.panel.Poner(filas)
+	b.buscador.panel.Show()
+	b.buscador.colocarPanel()
+	b.buscador.panel.Refresh()
+	if fin := b.buscador.panel.Position().Y + b.buscador.panel.Size().Height; fin > 220 {
+		t.Fatalf("el panel del buscador desborda la pantalla apaisada: fin=%g > 220", fin)
+	}
+	if b.buscador.panel.r == nil || b.buscador.panel.r.desplaza == nil {
+		t.Fatal("el panel acotado en altura no activó el contenedor desplazable")
+	}
+
+	test.Tap(b.buscador.limpiar)
+	if b.buscador.campo.Texto() != "" || b.buscador.limpiar.Visible() || b.buscador.campo.MargenDerecho != 0 || b.buscador.panel.Visible() {
+		t.Fatal("el botón de vaciar no limpió el texto ni cerró el panel")
+	}
+}

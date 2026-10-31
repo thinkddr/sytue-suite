@@ -503,6 +503,9 @@ type Entrada struct {
 	// AlPulsarIcono se llama al pulsar el icono de la izquierda: el del `CampoFecha`
 	// abre el calendario (`ConCalendario`). Nil, el icono es solo dibujo.
 	AlPulsarIcono func()
+	// MargenDerecho reserva hueco al final de la caja para un mando interior (como el
+	// aspa de vaciado del buscador). Cero usa el margen natural de la talla.
+	MargenDerecho float32
 
 	// marca es la marca de agua ENTERA; la del editor es la que cabe, con «…».
 	marca       string
@@ -963,7 +966,7 @@ func (r *campoRenderer) Layout(t fyne.Size) {
 		// contenido: en la web es un `absolute` dentro del envoltorio, no relleno.
 		r.glifo.Colocar(m.iconoX, (t.Height-m.icono)/2, m.icono)
 	}
-	der := tema.Borde + m.margen
+	der := tema.Borde + max(m.margen, r.e.MargenDerecho)
 	if p := r.e.Propia; p != nil && p.Centrado && !r.arriba {
 		// ponytail: se mide con Figtree normal; un campo Mono o de contraseña centrado
 		// quedaría corrido. Hoy solo lo usa el número de página de CertiPDF.

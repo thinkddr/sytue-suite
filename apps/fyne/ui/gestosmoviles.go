@@ -16,6 +16,7 @@ const (
 	bordeMenuMovil       float32 = 24
 	decidirGesto         float32 = 12
 	abrirMenuMovil       float32 = 64
+	cerrarMenuMovil      float32 = 48
 	actualizarListaMovil float32 = 72
 	dominioGesto         float32 = 1.5
 )
@@ -144,6 +145,7 @@ type claseGesto uint8
 const (
 	gestoPendiente claseGesto = iota
 	gestoMenu
+	gestoCerrarMenu
 	gestoActualizar
 )
 
@@ -153,6 +155,7 @@ type gestosMoviles struct {
 	inicio            fyne.Position
 	hora              time.Time
 	menu              *Armazon
+	cierre            *Armazon
 	lista             *listaActualizable
 	clase             claseGesto
 	revision          uint64
@@ -160,9 +163,16 @@ type gestosMoviles struct {
 }
 
 func (g *gestosMoviles) cancelar() {
+	menu, cierre := g.menu, g.cierre
 	g.activo, g.capturado = false, false
-	g.menu, g.lista = nil, nil
+	g.menu, g.cierre, g.lista = nil, nil, nil
 	g.clase = gestoPendiente
+	if menu != nil && menu.arrastrandoCajon {
+		menu.cancelarArrastreCajon()
+	}
+	if cierre != nil && cierre.arrastrandoCajon {
+		cierre.cancelarArrastreCajon()
+	}
 }
 
 func (g *gestosMoviles) bloqueado() bool {
@@ -188,32 +198,18 @@ func (g *gestosMoviles) recibir(e mobile.FilterEvent) mobile.FilterResult {
 func (g *gestosMoviles) empezar(e mobile.FilterEvent) mobile.FilterResult {
 	sincronizarExclusionMenuMovil(g.canvas)
 	g.cancelar()
-	if g.bloqueado() || e.Position.X < 0 || e.Position.Y < 0 {
+	if !g.puedeEmpezar(e) {
 		return mobile.FilterPass
 	}
-	if g.canvas != nil {
-		if _, editing := g.canvas.Focused().(mobile.Keyboardable); editing {
-			return mobile.FilterPass
-		}
-	}
-	left := float32(0)
-	if g.canvas != nil {
-		position, _ := g.canvas.InteractiveArea()
-		left = position.X
-	}
+	left := bordeIzquierdoLienzo(g.canvas)
 	for _, object := range e.Path {
 		if _, editing := object.(mobile.Keyboardable); editing {
 			g.cancelar()
 			return mobile.FilterPass
 		}
-		if a, ok := object.(*Armazon); ok && e.Position.X >= left && e.Position.X <= left+bordeMenuMovil && menuPorGesto(a) {
-			g.menu = a
-		}
-		if list, ok := object.(*listaActualizable); ok && list.disponible() {
-			g.lista = list
-		}
+		g.anotarObjetivo(object, e.Position.X, left)
 	}
-	if g.menu == nil && g.lista == nil {
+	if g.menu == nil && g.cierre == nil && g.lista == nil {
 		return mobile.FilterPass
 	}
 	g.id, g.inicio, g.hora, g.activo = e.ID, e.Position, e.Time, true
@@ -223,8 +219,46 @@ func (g *gestosMoviles) empezar(e mobile.FilterEvent) mobile.FilterResult {
 	return mobile.FilterDefer
 }
 
+func (g *gestosMoviles) puedeEmpezar(e mobile.FilterEvent) bool {
+	if g.bloqueado() || e.Position.X < 0 || e.Position.Y < 0 {
+		return false
+	}
+	if g.canvas != nil {
+		if _, editing := g.canvas.Focused().(mobile.Keyboardable); editing {
+			return false
+		}
+	}
+	return true
+}
+
+func bordeIzquierdoLienzo(c fyne.Canvas) float32 {
+	if c == nil {
+		return 0
+	}
+	position, _ := c.InteractiveArea()
+	return position.X
+}
+
+func (g *gestosMoviles) anotarObjetivo(object fyne.CanvasObject, posX, left float32) {
+	if a, ok := object.(*Armazon); ok {
+		if posX >= left && posX <= left+bordeMenuMovil && menuPorGesto(a) {
+			g.menu = a
+		} else if cierreMenuPorGesto(a) {
+			g.cierre = a
+		}
+	}
+	if list, ok := object.(*listaActualizable); ok && list.disponible() {
+		g.lista = list
+	}
+}
+
 func menuPorGesto(a *Armazon) bool {
 	return a.Visible() && a.Menu != nil && !a.CajonAbierto && !a.DetalleAbierto &&
+		(a.Size().Width < Estrecho || a.Carril != nil)
+}
+
+func cierreMenuPorGesto(a *Armazon) bool {
+	return a.Visible() && a.Menu != nil && a.CajonAbierto &&
 		(a.Size().Width < Estrecho || a.Carril != nil)
 }
 
@@ -246,6 +280,18 @@ func (g *gestosMoviles) seguir(e mobile.FilterEvent) mobile.FilterResult {
 		}
 	}
 	if e.Phase != mobile.FilterEnd {
+		dx, _, _, _ := g.distancias(e.Position)
+		switch g.clase {
+		case gestoMenu:
+			if g.menu != nil && menuPorGesto(g.menu) {
+				g.menu.arrastrarAperturaCajon(dx)
+			}
+		case gestoCerrarMenu:
+			if g.cierre != nil && cierreMenuPorGesto(g.cierre) {
+				g.cierre.arrastrarCierreCajon(dx)
+			}
+		default:
+		}
 		return mobile.FilterClaim
 	}
 	return g.soltar(e)
@@ -253,6 +299,7 @@ func (g *gestosMoviles) seguir(e mobile.FilterEvent) mobile.FilterResult {
 
 func (g *gestosMoviles) enLaMismaVista(path []fyne.CanvasObject) bool {
 	return (g.menu == nil || enRutaTactil(path, g.menu)) &&
+		(g.cierre == nil || enRutaTactil(path, g.cierre)) &&
 		(g.lista == nil || enRutaTactil(path, g.lista))
 }
 
@@ -261,6 +308,8 @@ func (g *gestosMoviles) decidir(e mobile.FilterEvent) mobile.FilterResult {
 	switch {
 	case dx >= decidirGesto && x >= dominioGesto*y && g.menu != nil && menuPorGesto(g.menu):
 		g.clase, g.capturado = gestoMenu, true
+	case dx <= -decidirGesto && x >= dominioGesto*y && g.cierre != nil && cierreMenuPorGesto(g.cierre):
+		g.clase, g.capturado = gestoCerrarMenu, true
 	case dy >= decidirGesto && y >= dominioGesto*x && g.lista != nil && g.lista.disponible():
 		g.clase, g.capturado = gestoActualizar, true
 	case x >= decidirGesto || y >= decidirGesto || e.Phase == mobile.FilterEnd:
@@ -280,20 +329,63 @@ func (g *gestosMoviles) distancias(position fyne.Position) (dx, dy, x, y float32
 
 func (g *gestosMoviles) soltar(e mobile.FilterEvent) mobile.FilterResult {
 	dx, dy, x, y := g.distancias(e.Position)
-	menu, list, kind := g.menu, g.lista, g.clase
-	g.cancelar()
-	if kind == gestoMenu && dx >= abrirMenuMovil && x >= dominioGesto*y && enRutaTactil(e.Path, menu) && menuPorGesto(menu) {
-		// Use the existing button action so app-owned drawer state stays in sync.
-		if bar, ok := menu.barraMovil().(*BarraMovil); ok && bar.AlMenu != nil {
-			bar.AlMenu()
-		} else {
-			menu.AbrirCajon()
+	menu, cierre, list, kind := g.menu, g.cierre, g.lista, g.clase
+	g.activo, g.capturado = false, false
+	g.menu, g.cierre, g.lista = nil, nil, nil
+	g.clase = gestoPendiente
+	switch kind {
+	case gestoMenu:
+		soltarAperturaMenu(menu, dx, x, y, e.Path)
+	case gestoCerrarMenu:
+		soltarCierreMenu(cierre, dx, x, y, e.Path)
+	case gestoActualizar:
+		if dy >= actualizarListaMovil && y >= dominioGesto*x && enRutaTactil(e.Path, list) && list.disponible() {
+			list.options.Actualizar()
 		}
-	}
-	if kind == gestoActualizar && dy >= actualizarListaMovil && y >= dominioGesto*x && enRutaTactil(e.Path, list) && list.disponible() {
-		list.options.Actualizar()
+	default:
 	}
 	return mobile.FilterClaim
+}
+
+func soltarAperturaMenu(menu *Armazon, dx, x, y float32, path []fyne.CanvasObject) {
+	if menu == nil {
+		return
+	}
+	if dx < abrirMenuMovil || x < dominioGesto*y || !enRutaTactil(path, menu) || !menuPorGesto(menu) {
+		menu.cancelarArrastreCajon()
+		return
+	}
+	// Use the existing button action so app-owned drawer state stays in sync.
+	bar, ok := menu.barraMovil().(*BarraMovil)
+	if !ok || bar.AlMenu == nil {
+		menu.AbrirCajon()
+		return
+	}
+	bar.AlMenu()
+	if !menu.arrastrandoCajon {
+		return
+	}
+	if !menu.CajonAbierto {
+		menu.cancelarArrastreCajon()
+		return
+	}
+	desde := menu.entrada
+	menu.arrastrandoCajon = false
+	if menu.AlCajon != nil {
+		menu.AlCajon(true)
+	}
+	menu.animarHaciaAbierto(desde)
+}
+
+func soltarCierreMenu(cierre *Armazon, dx, x, y float32, path []fyne.CanvasObject) {
+	if cierre == nil {
+		return
+	}
+	if -dx >= cerrarMenuMovil && x >= dominioGesto*y && enRutaTactil(path, cierre) && cierreMenuPorGesto(cierre) {
+		cierre.cerrarDesdeMando()
+		return
+	}
+	cierre.cancelarArrastreCajon()
 }
 
 func enRutaTactil(path []fyne.CanvasObject, expected fyne.CanvasObject) bool {

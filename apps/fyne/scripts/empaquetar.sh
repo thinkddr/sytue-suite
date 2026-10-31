@@ -866,13 +866,34 @@ opengl32_diferida() { # <exe>
 # comprueba AQUÍ y no en el teléfono. La identidad es SYTUE_IOS_IDENTIDAD, la misma
 # que firmó (`Apple Distribution: …`).
 firmar_ipa() { # <dir del ipa abierto> <.app> <ipa de salida> <app id> <host o vacío> <fuentes>
-  local dir="$1" app="$2" ipa host="$5" ent perfil sesion equipo
+  local dir="$1" app="$2" ipa host="$5" ent perfil perfil_ruta sesion equipo
   ipa="$(cd "$(dirname "$3")" && pwd)/$(basename "$3")"
   ent="$dir/derechos.plist"
-  codesign -d --entitlements :- "$app" >"$ent" 2>/dev/null || {
-    echo "::error::$ipa no trae derechos que leer: ¿salió sin firmar?" >&2
-    exit 1
-  }
+  if [ ! -f "$app/embedded.mobileprovision" ]; then
+    perfil_ruta="$(bash "$AQUI/apple-firma.sh" perfil-ruta "$4" ios)" || exit 1
+    install -m 0644 "$perfil_ruta" "$app/embedded.mobileprovision"
+  fi
+  if ! codesign -d --entitlements :- "$app" >"$ent" 2>/dev/null || [ ! -s "$ent" ]; then
+    perfil="$dir/perfil.plist"
+    python3 "$AQUI/apple_perfil.py" decodificar "$app/embedded.mobileprovision" ios >"$perfil" 2>/dev/null || {
+      echo "::error::$ipa no trae un embedded.mobileprovision legible." >&2
+      exit 1
+    }
+    python3 - "$perfil" "$ent" "$4" <<'PY' || exit 1
+import pathlib, plistlib, sys
+perfil = plistlib.loads(pathlib.Path(sys.argv[1]).read_bytes())
+ent_perfil = perfil.get("Entitlements", {})
+equipos = perfil.get("TeamIdentifier") or []
+equipo = equipos[0] if equipos else ent_perfil.get("com.apple.developer.team-identifier", "")
+appid = ent_perfil.get("application-identifier") or (f"{equipo}.{sys.argv[3]}" if equipo else "")
+if not equipo or appid != f"{equipo}.{sys.argv[3]}":
+    sys.exit("::error::el perfil embebido no corresponde al App ID " + sys.argv[3])
+base = {"application-identifier": appid, "com.apple.developer.team-identifier": equipo, "get-task-allow": False}
+if ent_perfil.get("beta-reports-active") is True:
+    base["beta-reports-active"] = True
+pathlib.Path(sys.argv[2]).write_bytes(plistlib.dumps(base))
+PY
+  fi
   # La sesión compartida (el Keychain de la suite) desde que existe grupo_apple.go; un tag
   # anterior se firma con lo que trae. El App Group y su comprobación contra el perfil,
   # solo con el interruptor de los widgets encendido (widgets_apple_activos).
@@ -895,24 +916,33 @@ PY
     rm -f "$sesion"
   fi
   if [ -n "$host" ]; then
-    perfil="$dir/perfil.plist"
-    python3 "$AQUI/apple_perfil.py" decodificar "$app/embedded.mobileprovision" ios >"$perfil" 2>/dev/null || {
-      echo "::error::$ipa no trae un embedded.mobileprovision legible." >&2
-      exit 1
-    }
-    /usr/libexec/PlistBuddy -c "Print :Entitlements:com.apple.developer.associated-domains" "$perfil" >/dev/null 2>&1 || {
-      echo "::error::el perfil de $4 no tiene la capacidad Associated Domains: actívala en Apple Developer y regenera el perfil." >&2
-      exit 1
-    }
-    /usr/libexec/PlistBuddy -c "Delete :com.apple.developer.associated-domains" "$ent" >/dev/null 2>&1 || true
-    /usr/libexec/PlistBuddy -c "Add :com.apple.developer.associated-domains array" \
-      -c "Add :com.apple.developer.associated-domains:0 string applinks:$host" "$ent"
+    if [ -z "${perfil:-}" ] || [ ! -s "${perfil:-}" ]; then
+      perfil="$dir/perfil.plist"
+      python3 "$AQUI/apple_perfil.py" decodificar "$app/embedded.mobileprovision" ios >"$perfil" 2>/dev/null || {
+        echo "::error::$ipa no trae un embedded.mobileprovision legible." >&2
+        exit 1
+      }
+    fi
+    python3 - "$perfil" "$ent" "$4" "$host" <<'PY' || exit 1
+import pathlib, plistlib, sys
+perfil = plistlib.loads(pathlib.Path(sys.argv[1]).read_bytes())
+if "com.apple.developer.associated-domains" not in perfil.get("Entitlements", {}):
+    sys.exit(f"::error::el perfil de {sys.argv[3]} no tiene la capacidad Associated Domains: actívala en Apple Developer y regenera el perfil.")
+destino = pathlib.Path(sys.argv[2])
+derechos = plistlib.loads(destino.read_bytes())
+derechos["com.apple.developer.associated-domains"] = [f"applinks:{sys.argv[4]}"]
+destino.write_bytes(plistlib.dumps(derechos))
+PY
   fi
   # Los derechos se leen ANTES de reemplazar el ejecutable firmado de la CLI.
   # Fyne tools 1.7.2 ignora --executable en iOS y enlaza con mínimo 7.0; la
   # xcconfig solo arregla el envoltorio Xcode, no ese Mach-O ya compilado.
   compilar_ios_paquete "$6" "$app" "$version" "$build" || return 1
+  # La CLI escribe Info.plist con 0600 en su temporal; instalado pertenece a root
+  # y Apple exige lectura pública (90255).
+  chmod -R u+rwX,go+rX "$app"
   incorporar_widgets_apple "$app" "$6" ios "${SYTUE_IOS_IDENTIDAD:?}" || return 1
+  ! command -v xattr >/dev/null 2>&1 || xattr -cr "$app"
   codesign -f -s "${SYTUE_IOS_IDENTIDAD:?para volver a firmar el IPA hace falta SYTUE_IOS_IDENTIDAD}" \
     --entitlements "$ent" "$app"
   rm -f "$ent" "${perfil:-}"
@@ -926,6 +956,15 @@ PY
     echo "::error::$ipa no lleva embedded.mobileprovision: App Store Connect lo rechazaría." >&2
     exit 1
   }
+  verificar_permisos_apple "$app" || exit 1
+  chmod 0755 "$dir" "$dir/Payload"
+  # Con mínimo iOS 15.0+ (Swift ABI estable en el sistema desde iOS 12.2),
+  # swift-stdlib-tool crea SwiftSupport/iphoneos vacío; archivarlo en el IPA
+  # provoca el rechazo ITMS-90430 («The file iphoneos doesn't have a signing ID»).
+  if [ -d "$dir/SwiftSupport" ] && [ -z "$(find "$dir/SwiftSupport" -type f -name '*.dylib' -print -quit)" ]; then
+    rm -rf "$dir/SwiftSupport"
+  fi
+  [ ! -d "$dir/SwiftSupport" ] || chmod -R u+rwX,go+rX "$dir/SwiftSupport"
   # SwiftSupport contiene las bibliotecas sin firmar que Apple necesita para
   # validar las extensiones Swift; Payload lleva sus copias firmadas.
   (
@@ -965,6 +1004,7 @@ firmar_tienda() { # <.app> <dir de la app> <app id>
   # El perfil del almacén privado es 0600. Dentro del instalador pertenece a
   # root y debe poder leerlo quien ejecuta la app (Apple rechaza 90255 si no).
   install -m 0644 "$perfil" "$app/Contents/embedded.provisionprofile"
+  chmod -R u+rwX,go+rX "$app"
   incorporar_widgets_apple "$app" "$dir" macappstore "$SYTUE_MAS_IDENTIDAD" || return 1
   # Atributos extendidos fuera (un com.apple.FinderInfo hace fallar a codesign).
   xattr -cr "$app"
@@ -2056,9 +2096,38 @@ trap 'restaurar_toml; rm -rf "$ESCENARIO"' EXIT
 # La CLI de Fyne genera su propio proyecto con iOS 9. Xcode 27 solo admite desde
 # iOS 15: el mínimo del proyecto versionado también debe llegar a ese proyecto
 # temporal. XCODE_XCCONFIG_FILE prevalece sobre sus ajustes, sin cambiar la firma.
+xcrun_ios_previo=""
 if [ "$plataforma" = ios ]; then
   minimo_proyecto_ios="$(minimo_ios)"
   printf 'IPHONEOS_DEPLOYMENT_TARGET = %s\n' "$minimo_proyecto_ios" >"$ESCENARIO/ios.xcconfig"
+  # En el Mac propio el llavero efímero del job no entra en `security list-keychains`,
+  # que es donde DVTFoundation busca `Apple Distribution` al ejecutar el `xcodebuild`
+  # de `fyne package`. Ese `xcodebuild` solo arma el envoltorio de recursos (`Info.plist`
+  # y `Assets.car`); `firmar_ipa` embebe después el perfil `0644`, recompila el Mach-O
+  # y firma con `codesign` (acotado al llavero efímero).
+  xcrun_ios_previo="$(command -v xcrun || true)"
+  if [ -n "$xcrun_ios_previo" ]; then
+    mkdir -m 0700 -p "$ESCENARIO/ios-xcrun"
+    cat >"$ESCENARIO/ios-xcrun/xcrun" <<'SH'
+#!/usr/bin/env bash
+set -euo pipefail
+if [ "${1:-}" = xcodebuild ]; then
+  shift
+  args=()
+  for a in "$@"; do
+    case "$a" in
+      DEVELOPMENT_TEAM=* | CODE_SIGN_IDENTITY=* | PROVISIONING_PROFILE_SPECIFIER=* | CODE_SIGN_STYLE=*) ;;
+      *) args+=("$a") ;;
+    esac
+  done
+  exec "$SYTUE_XCRUN_REAL" xcodebuild ${args[@]+"${args[@]}"} \
+    CODE_SIGN_STYLE=Manual CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+    CODE_SIGN_IDENTITY= DEVELOPMENT_TEAM= PROVISIONING_PROFILE_SPECIFIER=
+fi
+exec "$SYTUE_XCRUN_REAL" "$@"
+SH
+    chmod 0700 "$ESCENARIO/ios-xcrun/xcrun"
+  fi
 fi
 
 for app in "${apps[@]}"; do
@@ -2338,7 +2407,10 @@ XML
     entorno_movil=(GOFLAGS=)
     [ "$plataforma" = android ] &&
       entorno_movil=(GOFLAGS=-ldflags=-checklinkname=0 "CGO_LDFLAGS=-Wl,-z,max-page-size=16384")
-    [ "$plataforma" != ios ] || entorno_movil+=("XCODE_XCCONFIG_FILE=$ESCENARIO/ios.xcconfig")
+    if [ "$plataforma" = ios ]; then
+      entorno_movil+=("XCODE_XCCONFIG_FILE=$ESCENARIO/ios.xcconfig")
+      [ -z "$xcrun_ios_previo" ] || entorno_movil+=("SYTUE_XCRUN_REAL=$xcrun_ios_previo" "PATH=$ESCENARIO/ios-xcrun:$PATH")
+    fi
     (cd "$dir" && env "${entorno_movil[@]}" "$CLI" package --tags goolm "${comunes[@]}" ${extra[@]+"${extra[@]}"})
     ;;
   esac
@@ -2469,6 +2541,7 @@ XML
         firmar_tienda "$destino" "$dir" "$appid"
       elif [ "$plataforma" = macos ] && [ -n "${SYTUE_MACOS_IDENTIDAD:-}" ]; then
         derechos="$(mktemp)"
+        chmod -R u+rwX,go+rX "$destino"
         if [ "$app" != demo ]; then
           # App Group y Keychain de la suite son derechos restringidos fuera de la tienda:
           # piden un perfil Developer ID (MAC_APP_DIRECT) que los autorice, dentro del .app.
@@ -2490,8 +2563,14 @@ XML
             printf '</dict></plist>\n'
           } >"$derechos"
         fi
+        ! command -v xattr >/dev/null 2>&1 || xattr -cr "$destino"
         codesign -f -s "$SYTUE_MACOS_IDENTIDAD" --options runtime --timestamp --entitlements "$derechos" "$destino"
         rm -f "$derechos"
+        codesign --verify --strict "$destino" || {
+          echo "::error::la firma Developer ID de $destino no verifica." >&2
+          exit 1
+        }
+        verificar_permisos_apple "$destino" || exit 1
         # Sin tubería hacia `grep -q`: con pipefail, grep corta al primer acierto y
         # el acierto sale como fallo (ci-sin-azar-test.sh).
         [ "$llamadas" != si ] || grep -q 'device.audio-input' <<<"$(codesign -d --entitlements - "$destino" 2>/dev/null)" || {
@@ -2771,6 +2850,7 @@ NSI
       # El DMG es lo que se instala arrastrando a /Aplicaciones, y un .app suelto
       # perdería los permisos al viajar en un zip. Todas las apps del bundle y, a su
       # lado, el alias a Aplicaciones.
+      chmod 0755 "$caja"
       ln -s /Applications "$caja/Applications"
       # TAMAÑO EXPLÍCITO y HFS+. Con solo -srcfolder, hdiutil estima el tamaño de la
       # imagen y en Codemagic se queda corto: «hdiutil: create failed - No space left

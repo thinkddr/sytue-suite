@@ -264,7 +264,7 @@ func (p *Pantalla) principal(v tema.Variante) fyne.CanvasObject {
 		contenido = container.New(ui.Columna{}, append(fs, contenido)...)
 	}
 	var cajon *BotonCajon
-	if movil && !tema.EsMarco() {
+	if movil {
 		cajon = NuevoBotonCajon(p.t("nav.menu"), p.abrirCajon)
 	}
 	m := &mainERP{cajon: cajon, contenido: contenido}

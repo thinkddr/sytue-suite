@@ -392,22 +392,28 @@ def testflight_de(asc, build):
     }
 
 
-def errores_procesamiento(asc, id, plataforma, version, build):
-    # Apple puede aceptar el transporte y rechazar después el binario. El motivo
-    # vive en buildUploads.state, no en builds.processingState. Solo GET y campos
-    # de diagnóstico: nunca URLs de carga, tokens ni datos de los probadores.
+def errores_procesamiento(asc, id, plataforma, version, build=None):
+    # Apple puede aceptar el transporte y rechazar después el binario, incluso
+    # antes de crear un recurso en /v1/builds. El motivo vive en buildUploads.state.
+    # Solo GET y campos de diagnóstico: nunca URLs de carga, tokens ni datos de los probadores.
+    filtro_build = f"&filter[cfBundleVersion]={build}" if build is not None else ""
+    campos = "state" if build is not None else "cfBundleVersion,state"
     ruta = (
         f"/v1/apps/{id}/buildUploads?filter[cfBundleShortVersionString]={version}"
-        f"&filter[cfBundleVersion]={build}&filter[platform]={plataforma}"
-        "&fields[buildUploads]=state&sort=-uploadedDate&limit=1"
+        f"{filtro_build}&filter[platform]={plataforma}"
+        f"&fields[buildUploads]={campos}&sort=-uploadedDate&limit=1"
     )
     estados = []
     for subida in asc.lista(ruta):
-        datos = subida.get("attributes", {}).get("state") or {}
-        estados.append({
+        atributos = subida.get("attributes") or {}
+        datos = atributos.get("state") or {}
+        entrada = {
             "state": datos.get("state"),
             "errors": [{"code": e.get("code"), "description": e.get("description")} for e in datos.get("errors", [])],
-        })
+        }
+        if build is None and "cfBundleVersion" in atributos:
+            entrada["cfBundleVersion"] = atributos.get("cfBundleVersion")
+        estados.append(entrada)
     return estados
 
 
@@ -432,7 +438,12 @@ def sondear(asc, app, ficha, plataformas, version=""):
                 if a.get("processingState") in {"INVALID", "FAILED"}:
                     diagnostico = errores_procesamiento(asc, id, p, version, a["version"])
                     estados[-1] += "; processingDetails=" + json.dumps(diagnostico, sort_keys=True)
-            partes[-1] += f"; builds {version}: " + (", ".join(estados) or "SIN BUILDS")
+            if estados:
+                partes[-1] += f"; builds {version}: " + ", ".join(estados)
+            else:
+                diagnostico = errores_procesamiento(asc, id, p, version)
+                sufijo = "; processingDetails=" + json.dumps(diagnostico, sort_keys=True) if diagnostico else ""
+                partes[-1] += f"; builds {version}: SIN BUILDS{sufijo}"
             objetivo = next((v for v in vs if v["attributes"]["versionString"] == version), None)
             if objetivo:
                 da = revision_de(asc, objetivo["id"]).get("attributes", {})

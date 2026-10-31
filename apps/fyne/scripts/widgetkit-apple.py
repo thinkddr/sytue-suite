@@ -14,6 +14,7 @@ import pathlib
 import plistlib
 import re
 import shutil
+import stat
 import subprocess
 import sys
 
@@ -37,12 +38,40 @@ def capturar(argumentos):
     return subprocess.check_output([str(a) for a in argumentos], text=True)
 
 
+def identificador_firma(ruta):
+    salida = subprocess.run(
+        ["codesign", "-dv", str(ruta)],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        check=False,
+    )
+    if salida.returncode != 0:
+        raise ValueError(ruta.name + ": sin firma en SwiftSupport (" + salida.stdout.strip() + ")")
+    coincidencia = re.search(r"^Identifier=(.+)$", salida.stdout, re.M)
+    identificador = coincidencia.group(1).strip() if coincidencia else ""
+    if not identificador or identificador == "not set":
+        raise ValueError(ruta.name + ": sin signing ID en SwiftSupport (" + salida.stdout.strip() + ")")
+    return identificador
+
+
 def plist_del_host(app, plataforma):
     if app.is_symlink() or not app.is_dir():
         raise ValueError("el host debe ser un bundle real")
     ruta = app / ("Info.plist" if plataforma == "ios" else "Contents/Info.plist")
     with ruta.open("rb") as archivo:
         return plistlib.load(archivo)
+
+
+def hacer_legible_publico(raiz):
+    for carpeta, _, archivos in os.walk(raiz, followlinks=False):
+        for ruta in [pathlib.Path(carpeta)] + [pathlib.Path(carpeta) / nombre for nombre in archivos]:
+            if ruta.is_symlink():
+                continue
+            modo = ruta.stat().st_mode
+            minimo = 0o555 if stat.S_ISDIR(modo) or (modo & 0o100) else 0o444
+            if stat.S_IMODE(modo) & minimo != minimo:
+                os.chmod(ruta, stat.S_IMODE(modo) | minimo)
 
 
 def insertar(productos, host, destino, identidad, app, generador, incluir_widgets=True):
@@ -65,63 +94,127 @@ def insertar(productos, host, destino, identidad, app, generador, incluir_widget
         if not re.search(r"^\s*path " + re.escape(rpath) + r" \(offset \d+\)$",
                          capturar(["xcrun", "otool", "-l", ejecutable]), re.M):
             raise ValueError("el host no puede resolver su framework WidgetKit")
-    extensiones, frameworks = raiz / "PlugIns", raiz / "Frameworks"
-    for carpeta in (extensiones, frameworks):
-        if carpeta.is_symlink() or not carpeta.resolve().is_relative_to(host.resolve()):
-            raise ValueError("el contenido anidado debe quedar dentro del host")
-        carpeta.mkdir(parents=True, exist_ok=True)
-    planes = []
-    if incluir_widgets:
-        planes.append(("Sytue-" + app["clave"] + "-Widgets.appex", app["id"] + ".widgets", "widgets",
-                       generador.grupo_widgets(), "NSFileProtectionComplete" if plataforma == "ios" else "", ""))
-    if app.get("archivos"):
-        planes.append(("Archivos.appex", app["id"] + ".archivos", "archivos", "group." + app["id"],
-                       "NSFileProtectionComplete" if plataforma == "ios" else "", generador.EQUIPO + "." + app["id"] + ".shared"))
-    if not planes:
-        raise ValueError("la app no declara ninguna extensión seleccionada")
-    anidadas = []
-    for nombre, identificador, carpeta, grupo, proteccion, llavero in planes:
-        perfil = pathlib.Path(capturar(["bash", AQUI / "apple-firma.sh", "perfil-ruta", identificador, destino]).strip())
-        derechos = PROYECTOS / app["clave"] / carpeta / ("ios.entitlements" if plataforma == "ios" else "macos.entitlements")
-        ejecutar(["bash", AQUI / "apple-firma.sh", "verificar-perfil-grupo", perfil,
-                  identificador, destino, grupo, proteccion, llavero, derechos])
-        bundle = extensiones / nombre
-        if bundle.is_symlink():
-            raise ValueError("no se sustituye contenido anidado enlazado fuera del bundle")
-        if bundle.exists():
-            shutil.rmtree(bundle)
-        shutil.copytree(productos / nombre, bundle, symlinks=True)
-        perfil_destino = bundle / ("embedded.mobileprovision" if plataforma == "ios" else "Contents/embedded.provisionprofile")
-        shutil.copyfile(perfil, perfil_destino)
-        os.chmod(perfil_destino, 0o600)
-        anidadas.append((bundle, derechos))
-    puente = None
-    if incluir_widgets:
-        puente = frameworks / (generador.PUENTE_WIDGETS + ".framework")
-        if puente.is_symlink():
-            raise ValueError("no se sustituye contenido anidado enlazado fuera del bundle")
-        if puente.exists():
-            shutil.rmtree(puente)
-        shutil.copytree(productos / puente.name, puente, symlinks=True)
-    bibliotecas = ["xcrun", "swift-stdlib-tool", "--copy", "--platform", "iphoneos" if plataforma == "ios" else "macosx",
-                   "--scan-executable", ejecutable, "--scan-folder", extensiones,
-                   "--scan-folder", frameworks, "--destination", frameworks, "--sign", identidad]
-    if plataforma == "ios":
-        bibliotecas += ["--unsigned-destination", host.parent.parent / "SwiftSupport/iphoneos", "--strip-bitcode"]
-    else:
-        bibliotecas += ["--Xcodesign", "--options=runtime", "--Xcodesign", "--timestamp"]
-    ejecutar(bibliotecas)
-    firma = ["codesign", "-f", "-s", identidad]
-    if plataforma == "macos":
-        firma += ["--options", "runtime", "--timestamp"]
-    if puente:
-        ejecutar(firma + [puente])
-    for bundle, derechos in anidadas:
-        ejecutar(firma + ["--entitlements", derechos, bundle])
-    for bundle in ([puente] if puente else []) + [b for b, _ in anidadas]:
-        ejecutar(["codesign", "--verify", "--strict", bundle])
-    print(json.dumps({"host": app["id"], "extensions": [p[1] for p in planes], "distribution": destino,
-                      "profileVerified": True, "nestedSignaturesVerified": True}))
+    umask_previa = os.umask(0o022)
+    try:
+        extensiones, frameworks = raiz / "PlugIns", raiz / "Frameworks"
+        for carpeta in (extensiones, frameworks):
+            if carpeta.is_symlink() or not carpeta.resolve().is_relative_to(host.resolve()):
+                raise ValueError("el contenido anidado debe quedar dentro del host")
+            carpeta.mkdir(parents=True, exist_ok=True)
+            os.chmod(carpeta, 0o755)
+        planes = []
+        if incluir_widgets:
+            planes.append(("Sytue-" + app["clave"] + "-Widgets.appex", app["id"] + ".widgets", "widgets",
+                           generador.grupo_widgets(), "NSFileProtectionComplete" if plataforma == "ios" else "", ""))
+        if app.get("archivos"):
+            planes.append(("Archivos.appex", app["id"] + ".archivos", "archivos", "group." + app["id"],
+                           "NSFileProtectionComplete" if plataforma == "ios" else "", generador.EQUIPO + "." + app["id"] + ".shared"))
+        if not planes:
+            raise ValueError("la app no declara ninguna extensión seleccionada")
+        anidadas = []
+        for nombre, identificador, carpeta, grupo, proteccion, llavero in planes:
+            perfil = pathlib.Path(capturar(["bash", AQUI / "apple-firma.sh", "perfil-ruta", identificador, destino]).strip())
+            derechos = PROYECTOS / app["clave"] / carpeta / ("ios.entitlements" if plataforma == "ios" else "macos.entitlements")
+            ejecutar(["bash", AQUI / "apple-firma.sh", "verificar-perfil-grupo", perfil,
+                      identificador, destino, grupo, proteccion, llavero, derechos])
+            bundle = extensiones / nombre
+            if bundle.is_symlink():
+                raise ValueError("no se sustituye contenido anidado enlazado fuera del bundle")
+            if bundle.exists():
+                shutil.rmtree(bundle)
+            shutil.copytree(productos / nombre, bundle, symlinks=True)
+            perfil_destino = bundle / ("embedded.mobileprovision" if plataforma == "ios" else "Contents/embedded.provisionprofile")
+            shutil.copyfile(perfil, perfil_destino)
+            # El árbol clonado del job Apple y su almacén privado son 0600; instalado
+            # pertenece a root y debe poder leerlo quien ejecuta la app (90255).
+            os.chmod(perfil_destino, 0o644)
+            hacer_legible_publico(bundle)
+            anidadas.append((bundle, derechos))
+        puente = None
+        if incluir_widgets:
+            puente = frameworks / (generador.PUENTE_WIDGETS + ".framework")
+            if puente.is_symlink():
+                raise ValueError("no se sustituye contenido anidado enlazado fuera del bundle")
+            if puente.exists():
+                shutil.rmtree(puente)
+            shutil.copytree(productos / puente.name, puente, symlinks=True)
+            hacer_legible_publico(puente)
+        soporte_swift = host.parent.parent / "SwiftSupport"
+        soporte_iphoneos = soporte_swift / "iphoneos"
+        ids_soporte = {}
+        bibliotecas = ["xcrun", "swift-stdlib-tool", "--copy", "--platform", "iphoneos" if plataforma == "ios" else "macosx",
+                       "--scan-executable", ejecutable, "--scan-folder", extensiones,
+                       "--scan-folder", frameworks, "--destination", frameworks, "--sign", identidad]
+        if plataforma == "ios":
+            if soporte_swift.is_symlink() or (soporte_swift.exists() and soporte_iphoneos.is_symlink()):
+                raise ValueError("SwiftSupport no puede ser un enlace simbólico")
+            if (soporte_swift.exists() and not soporte_swift.is_dir()) or (soporte_iphoneos.exists() and not soporte_iphoneos.is_dir()):
+                raise ValueError("SwiftSupport/iphoneos debe ser un directorio")
+            # swift-stdlib-tool añade por su cuenta el subdirectorio <platform> (iphoneos)
+            # bajo --unsigned-destination: pasar SwiftSupport/iphoneos creaba
+            # SwiftSupport/iphoneos/iphoneos y disparaba el rechazo 90430 en Apple.
+            # Tampoco se pasa --strip-bitcode (retirado en Xcode 16+).
+            soporte_swift.mkdir(parents=True, exist_ok=True)
+            os.chmod(soporte_swift, 0o755)
+            bibliotecas += ["--unsigned-destination", soporte_swift]
+        else:
+            bibliotecas += ["--Xcodesign", "--options=runtime", "--Xcodesign", "--timestamp"]
+        ejecutar(bibliotecas)
+        # En Xcode 27 swift-stdlib-tool deja copias *.dylib.original firmadas con el
+        # certificado de cadena antiguo de Apple (serie 33, caducado), que App Store
+        # Connect y notarytool rechazan (90284, 41166113491 en Sytue Cast/Rooms).
+        for carpeta_swift in [frameworks] + ([soporte_swift] if plataforma == "ios" else []):
+            if carpeta_swift.exists():
+                for residuo in sorted(carpeta_swift.rglob("*.original")):
+                    if residuo.is_symlink() or not residuo.is_file():
+                        raise ValueError("residuo .original inesperado en soporte Swift")
+                    residuo.unlink()
+        for entrada in sorted(frameworks.iterdir()):
+            if entrada.is_symlink() or not ((entrada.is_file() and entrada.suffix == ".dylib")
+                                            or (entrada.is_dir() and entrada.suffix == ".framework")):
+                raise ValueError("contenido no admitido en Frameworks: " + entrada.name)
+        dylibs = sorted(p for p in frameworks.glob("*.dylib") if p.is_file() and not p.is_symlink())
+        hacer_legible_publico(extensiones)
+        hacer_legible_publico(frameworks)
+        if plataforma == "ios" and soporte_swift.exists():
+            dylibs_soporte = []
+            for entrada in sorted(soporte_swift.rglob("*")):
+                if entrada.is_symlink():
+                    raise ValueError("contenido no admitido en SwiftSupport: " + entrada.name)
+                if entrada.is_dir():
+                    if entrada != soporte_iphoneos:
+                        raise ValueError("contenido no admitido en SwiftSupport: " + entrada.name)
+                    continue
+                if entrada.parent != soporte_iphoneos or not entrada.is_file() or entrada.suffix != ".dylib":
+                    raise ValueError("contenido no admitido en SwiftSupport: " + entrada.name)
+                dylibs_soporte.append(entrada)
+            if [p.name for p in dylibs_soporte] != [p.name for p in dylibs]:
+                raise ValueError("SwiftSupport no coincide con Frameworks: "
+                                 + repr([p.name for p in dylibs_soporte]) + " != " + repr([p.name for p in dylibs]))
+            if dylibs_soporte:
+                hacer_legible_publico(soporte_swift)
+                for dylib_soporte in dylibs_soporte:
+                    ids_soporte[dylib_soporte.name] = identificador_firma(dylib_soporte)
+            else:
+                shutil.rmtree(soporte_swift)
+        firma = ["codesign", "-f", "-s", identidad]
+        if plataforma == "macos":
+            firma += ["--options", "runtime", "--timestamp"]
+        for dylib in dylibs:
+            ejecutar(firma + [dylib])
+        if puente:
+            ejecutar(firma + [puente])
+        for bundle, derechos in anidadas:
+            ejecutar(firma + ["--entitlements", derechos, bundle])
+        for bundle in dylibs + ([puente] if puente else []) + [b for b, _ in anidadas]:
+            ejecutar(["codesign", "--verify", "--strict", bundle])
+    finally:
+        os.umask(umask_previa)
+    resumen = {"host": app["id"], "extensions": [p[1] for p in planes], "distribution": destino,
+               "profileVerified": True, "nestedSignaturesVerified": True}
+    if ids_soporte:
+        resumen["swiftSupport"] = ids_soporte
+    print(json.dumps(resumen))
 
 
 def minimo_apple(plataforma):

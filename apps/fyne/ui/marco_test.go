@@ -102,18 +102,19 @@ func TestLaHojaFlotaEnElMarco(t *testing.T) {
 		t.Error("en Marco el menú tiene que dejar ver el marco, que ya es de su color")
 	}
 
-	// En estrecho va a sangre: sin separación y con las cuatro esquinas. Y el
-	// menú, que es un cajón, conserva su fondo.
+	// En estrecho va a sangre bajo la barra móvil, sin separación y con las cuatro
+	// esquinas. Y el menú, que es un cajón, conserva su fondo.
 	a.Resize(fyne.NewSize(600, alto))
 	a.Refresh()
 	img = pinta(t, 600, alto, a)
 	// Bajo la barra móvil, que prolonga el marco y deja la hoja debajo.
 	mira(t, img, "a sangre, el borde derecho es contenido", 598, 300, magenta)
 	mira(t, img, "a sangre, el borde de abajo es contenido", 300, alto-2, magenta)
-	mira(t, img, "a sangre, la esquina de abajo es del marco", AnchoCarrilMovil+1, alto-2, marco)
+	mira(t, img, "a sangre, la esquina de abajo es del marco", 1, alto-2, marco)
+	mira(t, img, "a sangre, la esquina superior de la hoja es del marco", 1, AltoBarraMovil+1, marco)
 	mira(t, img, "a sangre, arriba sí", 1, 1, marco)
-	if l := lateralEn(a.Menu); !l.SinFondo {
-		t.Error("el menú móvil desplazado tiene que prolongar el color del marco")
+	if l := lateralEn(a.Menu); l == nil || l.SinFondo {
+		t.Error("en estrecho el menú es un cajón y conserva su fondo")
 	}
 
 	// En Carril no hay nada de esto: el contenido llega a la esquina.
@@ -150,30 +151,33 @@ func TestElMarcoMovilProlongaLaBarraHastaLaHoja(t *testing.T) {
 			montado.Resize(fyne.NewSize(390, 360))
 			r := test.WidgetRenderer(a).(*armazonRenderer)
 			nav := test.WidgetRenderer(a.barra).(*barraMovilRenderer)
-			if r.marco.hoja.Position() != fyne.NewPos(AnchoCarrilMovil, 0) || nav.fondo.Visible() {
+			if r.marco.hoja.Position() != fyne.NewPos(0, AltoBarraMovil) || nav.fondo.Visible() {
 				t.Fatalf("%s/%s: la hoja empieza en %v y el fondo opaco de navegación es visible=%v",
 					variante, colorSuite, r.marco.hoja.Position(), nav.fondo.Visible())
 			}
 			v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 			_, tinta := nav.boton.colores(v)
-			if tinta != tema.Color("sidebar-fg", v) || nav.boton.TokenAro != "sidebar-focus" {
-				t.Error("el botón de navegación no usa la tinta y el foco del marco")
+			if tinta != tema.Color("sidebar-fg", v) || nav.boton.TokenAro != "sidebar-focus" ||
+				nav.titulo.Text != "Bandeja" || nav.titulo.Color != tema.Color("sidebar-fg", v) {
+				t.Error("la barra móvil no usa la tinta, el título y el foco del marco")
 			}
 			for _, esc := range []float32{1, 2, 3} {
 				img := pintaA(t, esc, 390, 360, montado)
-				for _, x := range []float32{2, AnchoCarrilMovil / 2, AnchoCarrilMovil - 2} {
+				for _, x := range []float32{2, 195, 388} {
 					quiero := r.marco.fondo.colorEn(x, 390)
-					for _, y := range []float32{AltoBarraSuite() - 1, AltoBarraSuite(), AltoBarraSuite() + 1, AltoBarraSuite() + MinCabeceraApp + 20, 300} {
+					for _, y := range []float32{AltoBarraSuite() - 1, AltoBarraSuite(), AltoBarraSuite() + 1, AltoBarraSuite() + AltoBarraMovil - 1} {
 						got := px(img, int(x*esc), int(y*esc))
 						if !cercaDe(got, quiero, 3) {
-							t.Errorf("%s/%s ×%g: banda en (%g,%g): %v, quiero marco %v", variante, colorSuite, esc, x, y, got, quiero)
+							t.Errorf("%s/%s ×%g: unión en (%g,%g): %v, quiero marco %v", variante, colorSuite, esc, x, y, got, quiero)
 						}
 					}
 				}
-				// La hoja empieza junto al mando, a la altura de la cabecera.
-				x, y := AnchoCarrilMovil+1, AltoBarraSuite()+1
-				if got := px(img, int(x*esc), int(y*esc)); !cercaDe(got, r.marco.fondo.colorEn(x, 390), 3) {
-					t.Errorf("la esquina de la hoja no está junto al carril: %v", got)
+				// La hoja empieza a sangre bajo la barra móvil con sus esquinas superiores redondeadas.
+				for _, x := range []float32{1, 388} {
+					y := AltoBarraSuite() + AltoBarraMovil + 1
+					if got := px(img, int(x*esc), int(y*esc)); !cercaDe(got, r.marco.fondo.colorEn(x, 390), 3) {
+						t.Errorf("la esquina superior de la hoja en x=%g no deja ver el marco: %v", x, got)
+					}
 				}
 			}
 			b.Parar()
@@ -309,8 +313,8 @@ func TestElArmazonConCarrilDeIconos(t *testing.T) {
 
 	a.Resize(fyne.NewSize(360, alto))
 	a.Refresh()
-	if carril.Visible() || contenido.Position() != fyne.NewPos(AnchoCarrilMovil, 0) || contenido.Size() != fyne.NewSize(360-AnchoCarrilMovil, alto) {
-		t.Errorf("a 360 el carril de escritorio se ve (%v) y la hoja está en %v con %v; debe dejar sitio al mando móvil", carril.Visible(), contenido.Position(), contenido.Size())
+	if carril.Visible() || contenido.Position() != fyne.NewPos(0, 0) || contenido.Size() != fyne.NewSize(360, alto) {
+		t.Errorf("a 360 el carril de escritorio se ve (%v) y la hoja está en %v con %v; con SinBarraMovil va a sangre", carril.Visible(), contenido.Position(), contenido.Size())
 	}
 }
 

@@ -294,7 +294,7 @@ func scanFile(path, text string, unique map[string]observation) {
 	for _, re := range []*regexp.Regexp{urlHost, hostPath} {
 		limpio := xmlns.ReplaceAllString(doctype.ReplaceAllString(text, ""), "")
 		for _, match := range re.FindAllStringSubmatch(limpio, -1) {
-			if re == hostPath && (strings.Contains(strings.ToLower(match[0]), ".app/contents/") || strings.Contains(strings.ToLower(match[0]), ".app/info.plist") || strings.HasSuffix(strings.ToLower(match[0]), ".app/main")) {
+			if re == hostPath && (strings.Contains(strings.ToLower(match[0]), ".app/contents/") || strings.Contains(strings.ToLower(match[0]), ".app/info.plist") || strings.Contains(strings.ToLower(match[0]), ".app/embedded.mobileprovision") || strings.HasSuffix(strings.ToLower(match[0]), ".app/main")) {
 				continue
 			}
 			addObservation(unique, strings.ToLower(match[1]), path)

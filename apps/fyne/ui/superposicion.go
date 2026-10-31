@@ -74,7 +74,7 @@ func Descartar(c fyne.Canvas) bool {
 	if !es {
 		// Sin capa encima, un cajón abierto: Escape lo cierra (`useNavDrawer`).
 		if a := cajonDe(c); a != nil && c.Overlays().Top() == nil {
-			a.CerrarCajon()
+			a.cerrarDesdeMando()
 			return true
 		}
 		return false
@@ -219,7 +219,9 @@ type Velo struct {
 	// cae sobre el velo, y no lo tiene que cerrar (ver Tapped).
 	nacido time.Time
 
-	fondo *canvas.Rectangle
+	opacidad    float32
+	conOpacidad bool
+	fondo       *canvas.Rectangle
 }
 
 var (
@@ -274,6 +276,30 @@ func ColorVelo(v tema.Variante, p float32) color.NRGBA {
 	return c
 }
 
+// PonerOpacidad modula la intensidad del velo (`0..1`) cuando acompaña el recorrido de un
+// cajón arrastrable o animado, incluso antes de que se construya su renderer.
+func (v *Velo) PonerOpacidad(p float32) {
+	p = min(max(p, 0), 1)
+	v.opacidad = p
+	v.conOpacidad = true
+	if v.fondo == nil {
+		return
+	}
+	if v.Opaco {
+		v.fondo.FillColor = ColorVelo(tema.De(fyne.CurrentApp().Settings().ThemeVariant()), p)
+	} else {
+		v.fondo.FillColor = color.NRGBA{}
+	}
+	canvas.Refresh(v.fondo)
+}
+
+func (v *Velo) opacidadEfectiva() float32 {
+	if v.conOpacidad {
+		return v.opacidad
+	}
+	return 1
+}
+
 // CreateRenderer construye el velo: un rectángulo y nada más.
 func (v *Velo) CreateRenderer() fyne.WidgetRenderer {
 	// Nace con el color FINAL, no a cero: si el driver no anima —o alguien apaga las
@@ -282,7 +308,7 @@ func (v *Velo) CreateRenderer() fyne.WidgetRenderer {
 	// cero y lo trae de vuelta; si no llega a correr, no se pierde nada.
 	c := color.NRGBA{}
 	if v.Opaco {
-		c = ColorVelo(tema.De(fyne.CurrentApp().Settings().ThemeVariant()), 1)
+		c = ColorVelo(tema.De(fyne.CurrentApp().Settings().ThemeVariant()), v.opacidadEfectiva())
 	}
 	v.fondo = canvas.NewRectangle(c)
 	return &veloRenderer{v: v}
@@ -332,7 +358,9 @@ func (r *veloRenderer) Layout(t fyne.Size)           { r.v.fondo.Resize(t) }
 // Refresh sigue al tema: el `overlay` del oscuro es otro.
 func (r *veloRenderer) Refresh() {
 	if r.v.Opaco {
-		r.v.fondo.FillColor = ColorVelo(tema.De(fyne.CurrentApp().Settings().ThemeVariant()), 1)
+		r.v.fondo.FillColor = ColorVelo(tema.De(fyne.CurrentApp().Settings().ThemeVariant()), r.v.opacidadEfectiva())
+	} else {
+		r.v.fondo.FillColor = color.NRGBA{}
 	}
 	canvas.Refresh(r.v.fondo)
 }

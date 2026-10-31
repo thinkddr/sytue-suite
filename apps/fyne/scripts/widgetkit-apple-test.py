@@ -5,6 +5,7 @@
 import contextlib
 import importlib.util
 import io
+import os
 import pathlib
 import plistlib
 import tempfile
@@ -163,14 +164,29 @@ class InsercionTests(unittest.TestCase):
             with contextlib.redirect_stdout(io.StringIO()):
                 widgetkit.insertar(self.productos, self.host, "ios", "Distribución de pruebas", self.app, self.generador)
 
-    def test_firma_anidada_perfil_0600_y_swift_support_dentro_del_ipa(self):
-        self.insertar()
+    def test_firma_anidada_perfil_0644_y_swift_support_dentro_del_ipa(self):
+        creado_antes = []
+
+        def registrar(comando):
+            if "swift-stdlib-tool" in comando:
+                destino = comando[comando.index("--unsigned-destination") + 1]
+                plataforma = comando[comando.index("--platform") + 1]
+                creado_antes.append(destino.is_dir() and not destino.is_symlink())
+                (destino / plataforma).mkdir(parents=True, exist_ok=True)
+            self.comandos.append(comando)
+
+        with patch.object(widgetkit, "capturar", self.capturar), patch.object(widgetkit, "ejecutar", registrar):
+            with contextlib.redirect_stdout(io.StringIO()):
+                widgetkit.insertar(self.productos, self.host, "ios", "Distribución de pruebas", self.app, self.generador)
+        self.assertEqual(creado_antes, [True])
+        self.assertFalse((self.raiz / "ipa/SwiftSupport").exists())
         perfil = self.host / "PlugIns/Sytue-rooms-Widgets.appex/embedded.mobileprovision"
         self.assertEqual(perfil.read_bytes(), self.perfil.read_bytes())
-        self.assertEqual(perfil.stat().st_mode & 0o777, 0o600)
+        self.assertEqual(perfil.stat().st_mode & 0o777, 0o644)
         self.assertIn("verificar-perfil-grupo", self.comandos[0])
         swift = next(c for c in self.comandos if "swift-stdlib-tool" in c)
-        self.assertEqual(swift[swift.index("--unsigned-destination") + 1], self.raiz / "ipa/SwiftSupport/iphoneos")
+        self.assertEqual(swift[swift.index("--unsigned-destination") + 1], self.raiz / "ipa/SwiftSupport")
+        self.assertNotIn("--strip-bitcode", swift)
         firmas = [c for c in self.comandos if c[0] == "codesign" and "-s" in c]
         self.assertEqual(len(firmas), 2)
         self.assertTrue(str(firmas[0][-1]).endswith("SytueWidgetBridge.framework"))
@@ -251,6 +267,57 @@ class InsercionTests(unittest.TestCase):
             self.insertar()
         self.assertFalse(list(fuera.iterdir()))
 
+    def test_recursos_anidados_copiados_con_umask_077_quedan_legibles_antes_de_firmar(self):
+        recursos = self.productos / "Sytue-rooms-Widgets.appex/Contents/Resources"
+        recursos.mkdir(parents=True)
+        icono = recursos / "Icon.png"
+        icono.write_bytes(b"png")
+        os.chmod(icono, 0o600)
+        os.chmod(recursos, 0o700)
+        os.chmod(self.productos / "Sytue-rooms-Widgets.appex/main", 0o700)
+        puente_info = self.productos / "SytueWidgetBridge.framework/Resources"
+        puente_info.mkdir(parents=True)
+        (puente_info / "Info.plist").write_bytes(b"plist")
+        os.chmod(puente_info / "Info.plist", 0o600)
+        os.chmod(puente_info, 0o700)
+        modos_al_firmar = {}
+
+        def registrar(comando):
+            self.comandos.append(comando)
+            if "swift-stdlib-tool" in comando:
+                destino = comando[comando.index("--unsigned-destination") + 1]
+                plataforma = comando[comando.index("--platform") + 1]
+                self.assertTrue(destino.is_dir())
+                soporte = destino / plataforma
+                soporte.mkdir(parents=True, exist_ok=True)
+                (self.host / "Frameworks/libswiftCore.dylib").write_bytes(b"dylib")
+                (soporte / "libswiftCore.dylib").write_bytes(b"dylib")
+            if comando[0] == "codesign" and "-s" in comando:
+                objetivo = pathlib.Path(comando[-1])
+                modos_al_firmar[objetivo.name] = {
+                    str(r.relative_to(objetivo)): r.stat().st_mode & 0o777
+                    for c, _, fs in os.walk(objetivo)
+                    for r in [pathlib.Path(c)] + [pathlib.Path(c) / f for f in fs]
+                }
+
+        umask_previa = os.umask(0o077)
+        try:
+            with patch.object(widgetkit, "capturar", self.capturar), \
+                 patch.object(widgetkit, "ejecutar", registrar), \
+                 patch.object(widgetkit, "identificador_firma", return_value="com.apple.dt.runtime.swiftCore"):
+                with contextlib.redirect_stdout(io.StringIO()):
+                    widgetkit.insertar(self.productos, self.host, "ios", "Distribución de pruebas", self.app, self.generador)
+        finally:
+            os.umask(umask_previa)
+
+        self.assertEqual(modos_al_firmar["Sytue-rooms-Widgets.appex"]["Contents/Resources/Icon.png"], 0o644)
+        self.assertEqual(modos_al_firmar["Sytue-rooms-Widgets.appex"]["Contents/Resources"], 0o755)
+        self.assertEqual(modos_al_firmar["Sytue-rooms-Widgets.appex"]["main"], 0o755)
+        self.assertEqual(modos_al_firmar["SytueWidgetBridge.framework"]["Resources/Info.plist"], 0o644)
+        self.assertEqual(modos_al_firmar["SytueWidgetBridge.framework"]["Resources"], 0o755)
+        self.assertEqual((self.raiz / "ipa/SwiftSupport").stat().st_mode & 0o777, 0o755)
+        self.assertEqual((self.raiz / "ipa/SwiftSupport/iphoneos/libswiftCore.dylib").stat().st_mode & 0o777, 0o644)
+
     def test_macos_firma_antes_del_host_con_perfil_del_destino_correcto(self):
         (self.host / "Contents/MacOS").mkdir(parents=True)
         (self.host / "Info.plist").rename(self.host / "Contents/Info.plist")
@@ -265,7 +332,7 @@ class InsercionTests(unittest.TestCase):
                     with contextlib.redirect_stdout(io.StringIO()):
                         widgetkit.insertar(self.productos, self.host, destino, "Distribución de pruebas", self.app, self.generador)
                 perfil = self.host / "Contents/PlugIns/Sytue-rooms-Widgets.appex/Contents/embedded.provisionprofile"
-                self.assertEqual(perfil.stat().st_mode & 0o777, 0o600)
+                self.assertEqual(perfil.stat().st_mode & 0o777, 0o644)
                 self.assertEqual(self.lecturas[2][-1], destino)
                 swift = next(c for c in self.comandos if "swift-stdlib-tool" in c)
                 self.assertNotIn("--unsigned-destination", swift)
@@ -273,6 +340,129 @@ class InsercionTests(unittest.TestCase):
                 for firma in (c for c in self.comandos if c[0] == "codesign" and "-s" in c):
                     self.assertIn("--timestamp", firma)
                     self.assertNotEqual(firma[-1], self.host)
+
+    def test_swift_stdlib_elimina_residuos_original_y_firma_dylibs_en_macos(self):
+        (self.host / "Contents/MacOS").mkdir(parents=True)
+        (self.host / "Info.plist").rename(self.host / "Contents/Info.plist")
+        (self.host / "main").rename(self.host / "Contents/MacOS/main")
+        (self.productos / "Sytue-rooms-Widgets.appex/Contents").mkdir()
+        self.rpath = "@executable_path/../Frameworks"
+        frameworks = self.host / "Contents/Frameworks"
+
+        def registrar(comando):
+            self.comandos.append(comando)
+            if "swift-stdlib-tool" in comando:
+                dylib = frameworks / "libswiftCore.dylib"
+                dylib.write_bytes(b"dylib")
+                os.chmod(dylib, 0o600)
+                (frameworks / "libswiftCore.dylib.original").write_bytes(b"expired-serial-33")
+
+        with patch.object(widgetkit, "capturar", self.capturar), patch.object(widgetkit, "ejecutar", registrar):
+            with contextlib.redirect_stdout(io.StringIO()):
+                widgetkit.insertar(self.productos, self.host, "macappstore", "Distribución de pruebas", self.app, self.generador)
+
+        self.assertFalse((frameworks / "libswiftCore.dylib.original").exists())
+        self.assertEqual((frameworks / "libswiftCore.dylib").stat().st_mode & 0o777, 0o644)
+        firmas = [c for c in self.comandos if c[0] == "codesign" and "-s" in c]
+        self.assertIn(frameworks / "libswiftCore.dylib", [c[-1] for c in firmas])
+        verificaciones = [c[-1] for c in self.comandos if c[:3] == ["codesign", "--verify", "--strict"]]
+        self.assertIn(frameworks / "libswiftCore.dylib", verificaciones)
+
+    def test_swift_stdlib_elimina_residuos_original_en_ios_y_rechaza_basura_en_frameworks(self):
+        frameworks = self.host / "Frameworks"
+        soporte = self.raiz / "ipa/SwiftSupport/iphoneos"
+
+        def registrar(comando):
+            self.comandos.append(comando)
+            if "swift-stdlib-tool" in comando:
+                destino = comando[comando.index("--unsigned-destination") + 1]
+                plataforma = comando[comando.index("--platform") + 1]
+                self.assertTrue(destino.is_dir())
+                soporte_real = destino / plataforma
+                soporte_real.mkdir(parents=True, exist_ok=True)
+                (frameworks / "libswiftCore.dylib").write_bytes(b"dylib")
+                (frameworks / "libswiftCore.dylib.original").write_bytes(b"backup")
+                (soporte_real / "libswiftCore.dylib").write_bytes(b"unsigned")
+                (soporte_real / "libswiftCore.dylib.original").write_bytes(b"unsigned-backup")
+
+        with patch.object(widgetkit, "capturar", self.capturar), \
+             patch.object(widgetkit, "ejecutar", registrar), \
+             patch.object(widgetkit, "identificador_firma", return_value="com.apple.dt.runtime.swiftCore"):
+            with contextlib.redirect_stdout(io.StringIO()):
+                widgetkit.insertar(self.productos, self.host, "ios", "Distribución de pruebas", self.app, self.generador)
+
+        self.assertFalse((frameworks / "libswiftCore.dylib.original").exists())
+        self.assertFalse((soporte / "libswiftCore.dylib.original").exists())
+        firmados = [c[-1] for c in self.comandos if c[0] == "codesign" and "-s" in c]
+        self.assertIn(frameworks / "libswiftCore.dylib", firmados)
+        self.assertNotIn(soporte / "libswiftCore.dylib", firmados)
+
+        def registrar_desajuste(comando):
+            self.comandos.append(comando)
+            if "swift-stdlib-tool" in comando:
+                destino = comando[comando.index("--unsigned-destination") + 1]
+                plataforma = comando[comando.index("--platform") + 1]
+                (destino / plataforma).mkdir(parents=True, exist_ok=True)
+                (frameworks / "libswiftCore.dylib").write_bytes(b"dylib")
+
+        (soporte / "libswiftCore.dylib").unlink()
+        with patch.object(widgetkit, "capturar", self.capturar), patch.object(widgetkit, "ejecutar", registrar_desajuste):
+            with self.assertRaisesRegex(ValueError, "SwiftSupport no coincide con Frameworks"):
+                widgetkit.insertar(self.productos, self.host, "ios", "Distribución de pruebas", self.app, self.generador)
+
+        def registrar_basura(comando):
+            self.comandos.append(comando)
+            if "swift-stdlib-tool" in comando:
+                (frameworks / "libswiftCore.dylib.bak").write_bytes(b"basura")
+
+        with patch.object(widgetkit, "capturar", self.capturar), patch.object(widgetkit, "ejecutar", registrar_basura):
+            with self.assertRaisesRegex(ValueError, "contenido no admitido en Frameworks"):
+                widgetkit.insertar(self.productos, self.host, "ios", "Distribución de pruebas", self.app, self.generador)
+
+    def test_swift_support_vacio_en_ios_se_elimina_para_evitar_90430(self):
+        def registrar_vacio(comando):
+            self.comandos.append(comando)
+            if "swift-stdlib-tool" in comando:
+                destino = comando[comando.index("--unsigned-destination") + 1]
+                plataforma = comando[comando.index("--platform") + 1]
+                self.assertTrue(destino.is_dir())
+                soporte_real = destino / plataforma
+                soporte_real.mkdir(parents=True, exist_ok=True)
+                (soporte_real / "libswiftCore.dylib.original").write_bytes(b"backup")
+
+        with patch.object(widgetkit, "capturar", self.capturar), patch.object(widgetkit, "ejecutar", registrar_vacio):
+            with contextlib.redirect_stdout(io.StringIO()):
+                widgetkit.insertar(self.productos, self.host, "ios", "Distribución de pruebas", self.app, self.generador)
+
+        self.assertFalse((self.raiz / "ipa/SwiftSupport").exists())
+
+        def registrar_basura_soporte(comando):
+            self.comandos.append(comando)
+            if "swift-stdlib-tool" in comando:
+                destino = comando[comando.index("--unsigned-destination") + 1]
+                plataforma = comando[comando.index("--platform") + 1]
+                soporte_real = destino / plataforma
+                soporte_real.mkdir(parents=True, exist_ok=True)
+                (soporte_real / "basura.txt").write_bytes(b"basura")
+
+        with patch.object(widgetkit, "capturar", self.capturar), patch.object(widgetkit, "ejecutar", registrar_basura_soporte):
+            with self.assertRaisesRegex(ValueError, "contenido no admitido en SwiftSupport"):
+                widgetkit.insertar(self.productos, self.host, "ios", "Distribución de pruebas", self.app, self.generador)
+
+    def test_identificador_firma_exige_signing_id_real_en_swift_support(self):
+        dylib = self.raiz / "libswift_Concurrency.dylib"
+        dylib.write_bytes(b"macho")
+        resultado_ok = types.SimpleNamespace(returncode=0, stdout="Executable=/x\nIdentifier=com.apple.dt.runtime.swiftConcurrency\n")
+        with patch.object(widgetkit.subprocess, "run", return_value=resultado_ok):
+            self.assertEqual(widgetkit.identificador_firma(dylib), "com.apple.dt.runtime.swiftConcurrency")
+        sin_id = types.SimpleNamespace(returncode=0, stdout="Executable=/x\nIdentifier=not set\n")
+        with patch.object(widgetkit.subprocess, "run", return_value=sin_id):
+            with self.assertRaisesRegex(ValueError, "sin signing ID en SwiftSupport"):
+                widgetkit.identificador_firma(dylib)
+        sin_firma = types.SimpleNamespace(returncode=1, stdout="code object is not signed at all\n")
+        with patch.object(widgetkit.subprocess, "run", return_value=sin_firma):
+            with self.assertRaisesRegex(ValueError, "sin firma en SwiftSupport"):
+                widgetkit.identificador_firma(dylib)
 
 
 if __name__ == "__main__":

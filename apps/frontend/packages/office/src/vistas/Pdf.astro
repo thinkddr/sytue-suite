@@ -34,7 +34,7 @@ const nombre = path ? (path.split('/').filter(Boolean).pop() ?? path) : t('pdf.o
 ---
 
 <AppLayout title={`${nombre} — ${t('pdf.title')}`} producto="pdf">
-  <div class="h-[calc(100dvh-var(--spacing-topbar)-var(--sytue-safe-bottom,0px))] min-h-0">
+  <div class="h-[calc(100dvh-var(--spacing-topbar)-var(--sytue-sheet-gap,0px)-var(--sytue-safe-bottom,0px))] min-h-0">
     {path ? (
       <PdfApp
         client:only="preact"

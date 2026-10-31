@@ -120,7 +120,7 @@ func main() {
 	p.AlElegir = c.elegir
 	p.AlAbrirLocal = func(ruta string) { go c.abrirElegido(ruta) }
 	p.AlEscanear = c.escanear
-	w.SetContent(ui.NuevaBarraSuite(tr, s, iconos.PDF).ConSinSesionPropia().ConHojaASangre().Montar(p.Objeto()))
+	w.SetContent(ui.NuevaBarraSuite(tr, s, iconos.PDF).ConSinSesionPropia().Montar(p.Objeto()))
 	p.Atajos(w.Canvas())
 	// Sin documento es la portada de la web (`PortadaPdf`): lo que hay en la carpeta
 	// «PDF» de Drive.

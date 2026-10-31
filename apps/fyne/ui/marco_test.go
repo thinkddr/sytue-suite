@@ -8,6 +8,9 @@ import (
 	"image"
 	"image/color"
 	"math"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"fyne.io/fyne/v2"
@@ -811,9 +814,6 @@ func TestLasEsquinasInferioresDeMarcoMovil(t *testing.T) {
 					}
 					b := NuevaBarraSuite(traductorPrueba(t), nil, iconos.Mail)
 					t.Cleanup(b.Parar)
-					if tipo == "editor" {
-						b.ConHojaASangre()
-					}
 					montado := b.Montar(contenido).(*fyne.Container)
 					montado.Resize(fyne.NewSize(ancho, alto))
 					m := montado.Layout.(*montaje).marco
@@ -846,5 +846,73 @@ func TestLasEsquinasInferioresDeMarcoMovil(t *testing.T) {
 				})
 			}
 		}
+	}
+}
+
+// TestTodasLasAppsNativasCompartenMargenDeHojaEnMarco asegura que Docus, Calcus, Diapos y
+// CertiPDF usan exactamente los mismos márgenes de hoja (`sheet-gap` = 10 en >= 768 y 0 en
+// < 768) que el Hub, Mail o Calendar, sin que ningún `cmd/*/main.go` vuelva a pedir sangre.
+func TestTodasLasAppsNativasCompartenMargenDeHojaEnMarco(t *testing.T) {
+	conPetroleoClaro(t)
+	enMarco(t)
+
+	entradas, err := filepath.Glob(filepath.Join("..", "cmd", "*", "main.go"))
+	if err != nil || len(entradas) == 0 {
+		t.Fatalf("no se encontraron cmd/*/main.go: %v (%d)", err, len(entradas))
+	}
+	for _, ruta := range entradas {
+		fuente, err := os.ReadFile(ruta) //nolint:gosec // G304: rutas fijas del propio árbol
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(string(fuente), "ConHojaASangre") {
+			t.Errorf("%s sigue llamando a ConHojaASangre(); toda la suite debe compartir sheet-gap en Marco", ruta)
+		}
+	}
+
+	separa := tema.Forma("sheet-gap")
+	if separa != 10 {
+		t.Fatalf("sheet-gap = %v, quiero 10", separa)
+	}
+	const ancho, alto = 1280, 800
+	barra := AltoBarraSuite()
+
+	// Sin menú lateral: Hub, Docus, Calcus, Diapos, CertiPDF, Cast y Photos comparten (10, barra) y (ancho-20, alto-barra-10).
+	for _, p := range []iconos.Producto{iconos.One, iconos.Docs, iconos.Sheets, iconos.Slides, iconos.PDF, iconos.Cast, iconos.Photos} {
+		contenido := contenidoDePrueba()
+		b := NuevaBarraSuite(traductorPrueba(t), nil, p)
+		m := b.Montar(contenido)
+		m.Resize(fyne.NewSize(ancho, alto))
+		if got, quiero := contenido.Position(), fyne.NewPos(separa, barra); got != quiero {
+			t.Errorf("%v en escritorio: pos = %v, quiero %v", p, got, quiero)
+		}
+		if got, quiero := contenido.Size(), fyne.NewSize(ancho-2*separa, alto-barra-separa); got != quiero {
+			t.Errorf("%v en escritorio: tam = %v, quiero %v", p, got, quiero)
+		}
+		m.Resize(fyne.NewSize(390, 844))
+		if got, quiero := contenido.Position(), fyne.NewPos(0, barra); got != quiero {
+			t.Errorf("%v en móvil: pos = %v, quiero %v", p, got, quiero)
+		}
+		if got, quiero := contenido.Size(), fyne.NewSize(390, 844-barra); got != quiero {
+			t.Errorf("%v en móvil: tam = %v, quiero %v", p, got, quiero)
+		}
+		b.Parar()
+	}
+
+	// Con menú lateral (Mail, Calendar): mismo margen derecho e inferior (`sheet-gap` = 10).
+	for _, p := range []iconos.Producto{iconos.Mail, iconos.Calendar} {
+		hoja := contenidoDePrueba()
+		arm := NuevoArmazon(hoja)
+		arm.Menu = NuevoLateral("Menú", nil)
+		b := NuevaBarraSuite(traductorPrueba(t), nil, p)
+		m := b.Montar(arm)
+		m.Resize(fyne.NewSize(ancho, alto))
+		if got, quiero := hoja.Position().X+hoja.Size().Width, ancho-separa; got != quiero {
+			t.Errorf("%v borde derecho de la hoja = %v, quiero %v", p, got, quiero)
+		}
+		if got, quiero := arm.Position().Y+hoja.Position().Y+hoja.Size().Height, alto-separa; got != quiero {
+			t.Errorf("%v borde inferior de la hoja = %v, quiero %v", p, got, quiero)
+		}
+		b.Parar()
 	}
 }

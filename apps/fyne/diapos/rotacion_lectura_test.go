@@ -42,7 +42,7 @@ func TestLaRotacionDeDiaposConPocaAlturaConservaLecturaReal(t *testing.T) {
 	}
 	barra, parar := ui.BarraSuiteDePrueba(tr, iconos.Slides)
 	t.Cleanup(parar)
-	w.SetContent(barra.ConHojaASangre().Montar(w.Content()))
+	w.SetContent(barra.Montar(w.Content()))
 	for _, tam := range []fyne.Size{{Width: 568, Height: 320}, {Width: 568, Height: 272}} {
 		w.Resize(tam)
 		e.deslizZona.ScrollToTop()

@@ -1852,12 +1852,14 @@ html {
       var(--sytue-sheet-bl, 0px);
   }
   :root:not([data-forma='carril']) .sytue-frame-page {
-    display: block;
+    display: flow-root;
     min-height: calc(100dvh - var(--spacing-topbar));
   }
   :root:not([data-forma='carril']) .sytue-sheet-page {
     display: block;
-    min-height: calc(100dvh - var(--spacing-topbar) - var(--sytue-sheet-gap));
+    min-height: calc(
+      100dvh - var(--spacing-topbar) - var(--sytue-sheet-gap) - var(--sytue-safe-bottom, 0px)
+    );
   }
 }
 

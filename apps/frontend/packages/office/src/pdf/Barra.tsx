@@ -176,7 +176,7 @@ export function BarraHerramientas(p: Props) {
   const tl = useTablist(IDS_PESTANAS, pestana, setPestana);
 
   return (
-    <div class="sytue-sheet-corners border-border bg-surface flex flex-col border-b">
+    <div class="sytue-sheet-corners border-border bg-surface flex flex-col border-b [--sytue-sheet-bl:0px] [--sytue-sheet-br:0px]">
       {/* Fila de pestañas. En el teléfono se desliza: seis rótulos no caben en
           320 px, y plegarlos en un menú esconde justo lo que hay que ver. */}
       <div class="flex items-center gap-1 px-1 pt-1">

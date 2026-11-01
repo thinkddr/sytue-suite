@@ -101,7 +101,6 @@ def insertar(productos, host, destino, identidad, app, generador, incluir_widget
             if carpeta.is_symlink() or not carpeta.resolve().is_relative_to(host.resolve()):
                 raise ValueError("el contenido anidado debe quedar dentro del host")
             carpeta.mkdir(parents=True, exist_ok=True)
-            os.chmod(carpeta, 0o755)
         planes = []
         if incluir_widgets:
             planes.append(("Sytue-" + app["clave"] + "-Widgets.appex", app["id"] + ".widgets", "widgets",
@@ -125,9 +124,6 @@ def insertar(productos, host, destino, identidad, app, generador, incluir_widget
             shutil.copytree(productos / nombre, bundle, symlinks=True)
             perfil_destino = bundle / ("embedded.mobileprovision" if plataforma == "ios" else "Contents/embedded.provisionprofile")
             shutil.copyfile(perfil, perfil_destino)
-            # El árbol clonado del job Apple y su almacén privado son 0600; instalado
-            # pertenece a root y debe poder leerlo quien ejecuta la app (90255).
-            os.chmod(perfil_destino, 0o644)
             hacer_legible_publico(bundle)
             anidadas.append((bundle, derechos))
         puente = None
@@ -155,7 +151,6 @@ def insertar(productos, host, destino, identidad, app, generador, incluir_widget
             # SwiftSupport/iphoneos/iphoneos y disparaba el rechazo 90430 en Apple.
             # Tampoco se pasa --strip-bitcode (retirado en Xcode 16+).
             soporte_swift.mkdir(parents=True, exist_ok=True)
-            os.chmod(soporte_swift, 0o755)
             bibliotecas += ["--unsigned-destination", soporte_swift]
         else:
             bibliotecas += ["--Xcodesign", "--options=runtime", "--Xcodesign", "--timestamp"]

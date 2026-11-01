@@ -25,6 +25,14 @@ import {
   type StorageRecordEntry,
   type StorageObjectCommit,
 } from './storage.js';
+import {
+  decodeAttestedStorageSessions,
+  decodeSsssVaultSecret,
+  encodeAttestedStorageSessions,
+  encodeSsssVaultSecret,
+  ssssEnvelopeDigest,
+  storageSessionsSecretId,
+} from './ssss-vault.js';
 import type { MatrixStorageScope } from './types.js';
 beforeAll(async () => {
   await initAsync();
@@ -163,4 +171,34 @@ test('Rust decrypts independently generated Go records and preserves concurrent 
     settings.free();
     machine.close();
   }
+});
+
+test('Web SSSS vault envelope and session attestation match Go mautrix wire encoding byte-for-byte', async () => {
+  expect(await storageSessionsSecretId(scope)).toBe('sessions_413ada11ea36bb9ea24f2589b1363702');
+  const payload = text.encode('{"k":"artificial-vault-secret","n":9007199254740993}');
+  expect(await ssssEnvelopeDigest('vault_pin', scope, 3, payload)).toBe(
+    'feab8c4026c3cd8b8061b4a5a5b2904ae57b8069674f16e38135bc2dca41b448',
+  );
+  const encoded = await encodeSsssVaultSecret('vault_pin', scope, 3, payload);
+  expect(encoded).toBe(
+    'eyJraW5kIjoib3JnLnN5dHVlLnNzc3MudjEiLCJpZCI6InZhdWx0X3BpbiIsInNjb3BlIjp7InRlbmFudCI6ImFjbWUiLCJzdWJqZWN0IjoicGVyc29uIiwicHJvZHVjdCI6ImRyaXZlIn0sInJldmlzaW9uIjozLCJwYXlsb2FkIjoiZXlKcklqb2lZWEowYVdacFkybGhiQzEyWVhWc2RDMXpaV055WlhRaUxDSnVJam81TURBM01UazVNalUwTnpRd09Ua3pmUT09Iiwic2hhMjU2IjoiZmVhYjhjNDAyNmMzY2Q4YjgwNjFiNGE1YTViMjkwNGFlNTdiODA2OTY3NGYxNmUzODEzNWJjMmRjYTQxYjQ0OCJ9',
+  );
+  const decoded = await decodeSsssVaultSecret(encoded, 'vault_pin', scope, 3);
+  expect(decoded.revision).toBe(3);
+  expect(decoded.payload).toEqual(payload);
+
+  const sessionsPayload = encodeAttestedStorageSessions([
+    {
+      room_id: room,
+      session_id: go.sessions[0]!.session_id,
+      sender_key: go.sessions[0]!.sender_key,
+    },
+  ]);
+  expect(decodeAttestedStorageSessions(sessionsPayload)).toEqual([
+    {
+      room_id: room,
+      session_id: go.sessions[0]!.session_id,
+      sender_key: go.sessions[0]!.sender_key,
+    },
+  ]);
 });

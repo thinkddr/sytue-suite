@@ -207,8 +207,8 @@ func (l *lienzo) dibujarEstarcido(e *ejecucion, st *pdfStream, m matriz) {
 	img := image.NewNRGBA(image.Rect(0, 0, ancho, alto))
 	r, g, b := desdeCSS(e.estado.relleno)
 	var deg *degradadoRaster
-	if e.estado.patronRelleno != "" {
-		deg = e.estado.degRelleno
+	if e.estado.patRelleno != nil {
+		deg = e.estado.patRelleno.deg
 	}
 	porFila := (ancho + 7) / 8
 	for y := 0; y < alto; y++ {

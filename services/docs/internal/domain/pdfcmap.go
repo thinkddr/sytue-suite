@@ -96,9 +96,9 @@ func (d *PDFDoc) leerCMapCodigos(st *pdfStream) *cmapCodigos {
 		switch op {
 		case "endcodespacerange":
 			c.anadirEspacios(pila)
-		case "endcidchar":
+		case "endcidchar", "endbfchar":
 			c.anadirCIDs(pila)
-		case "endcidrange":
+		case "endcidrange", "endbfrange":
 			c.anadirRangos(pila)
 		}
 	})
@@ -106,6 +106,18 @@ func (d *PDFDoc) leerCMapCodigos(st *pdfStream) *cmapCodigos {
 		return nil
 	}
 	return c
+}
+
+func cidDeObjetivoCMap(v pdfObj) (uint32, bool) {
+	if cid, ok := comoEntero(v); ok && cid >= 0 && cid <= maxCID {
+		return uint32(cid), true
+	}
+	if s, ok := v.(pdfString); ok && len(s) >= 1 && len(s) <= 4 {
+		if cid := codigoDeHex(s); cid <= maxCID {
+			return cid, true
+		}
+	}
+	return 0, false
 }
 
 func (c *cmapCodigos) anadirEspacios(pila []pdfObj) {
@@ -124,9 +136,9 @@ func (c *cmapCodigos) anadirEspacios(pila []pdfObj) {
 func (c *cmapCodigos) anadirCIDs(pila []pdfObj) {
 	for i := 0; i+1 < len(pila); i += 2 {
 		o, ok := pila[i].(pdfString)
-		cid, ok2 := comoEntero(pila[i+1])
-		if ok && ok2 && cid >= 0 && cid <= maxCID && len(c.cids) < 70000 {
-			c.cids[codigoDeHex(o)] = uint32(cid)
+		cid, ok2 := cidDeObjetivoCMap(pila[i+1])
+		if ok && ok2 && len(c.cids) < 70000 {
+			c.cids[codigoDeHex(o)] = cid
 		}
 	}
 }
@@ -135,9 +147,20 @@ func (c *cmapCodigos) anadirRangos(pila []pdfObj) {
 	for i := 0; i+2 < len(pila); i += 3 {
 		a, ok1 := pila[i].(pdfString)
 		b, ok2 := pila[i+1].(pdfString)
-		cid, ok3 := comoEntero(pila[i+2])
-		if ok1 && ok2 && ok3 && cid >= 0 && cid <= maxCID && len(c.rangos) < 70000 {
-			c.rangos = append(c.rangos, rangoCID{n: len(a), desde: codigoDeHex(a), hasta: codigoDeHex(b), base: uint32(cid)})
+		if !ok1 || !ok2 {
+			continue
+		}
+		if arr, okArr := pila[i+2].(pdfArray); okArr {
+			desde, hasta := codigoDeHex(a), codigoDeHex(b)
+			for k := 0; k < len(arr) && desde+uint32(k) <= hasta && len(c.cids) < 70000; k++ { //nolint:gosec // k >= 0 acotado por len(arr)
+				if cid, ok := cidDeObjetivoCMap(arr[k]); ok {
+					c.cids[desde+uint32(k)] = cid //nolint:gosec // idem
+				}
+			}
+			continue
+		}
+		if cid, ok3 := cidDeObjetivoCMap(pila[i+2]); ok3 && len(c.rangos) < 70000 {
+			c.rangos = append(c.rangos, rangoCID{n: len(a), desde: codigoDeHex(a), hasta: codigoDeHex(b), base: cid})
 		}
 	}
 }

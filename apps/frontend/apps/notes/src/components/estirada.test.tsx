@@ -19,17 +19,26 @@
  * aquí se ve.
  */
 import { GlobalRegistrator } from '@happy-dom/global-registrator';
-import { expect, test } from 'bun:test';
+import { afterEach, expect, test } from 'bun:test';
 import { render } from 'preact';
 import { RichText } from './RichText.js';
 
 if (typeof document === 'undefined') GlobalRegistrator.register();
 
 const t = ((k: string) => k) as never;
+const hosts: HTMLElement[] = [];
+
+afterEach(() => {
+  for (const h of hosts.splice(0)) {
+    render(null, h);
+    h.remove();
+  }
+});
 
 function montar(estirado: boolean): { raiz: HTMLElement; campo: HTMLElement } {
   const host = document.createElement('div');
   document.body.appendChild(host);
+  hosts.push(host);
   render(
     <RichText
       t={t}

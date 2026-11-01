@@ -829,8 +829,12 @@ func (d *Dialogo) Cerrar() {
 	if d.capa == nil {
 		return
 	}
-	ocultar(lienzoDe(d.capa), d.capa, d.previo)
+	c := lienzoDe(d.capa)
+	ocultar(c, d.capa, d.previo)
 	d.capa, d.previo = nil, nil
+	if c != nil && dialogoArriba(c) == nil {
+		detenerSeguimientoTeclado(c)
+	}
 }
 
 // Recolocar vuelve a medir el diálogo abierto y a centrarlo cuando su cuerpo cambia de
@@ -904,9 +908,13 @@ func primerCampo(o fyne.CanvasObject) fyne.Focusable {
 	return nil
 }
 
-// Tapped no hace nada, y por eso está: se traga el clic que cae en el panel y fuera de
-// un control, para que no lo recoja el velo de debajo y cierre el diálogo.
-func (d *Dialogo) Tapped(*fyne.PointEvent) {}
+// Tapped se traga el clic que cae en el panel y fuera de un control, para que no lo
+// recoja el velo de debajo y cierre el diálogo; en móvil retira además el teclado activo.
+func (d *Dialogo) Tapped(*fyne.PointEvent) {
+	if c := lienzoDe(d); c != nil {
+		cerrarTecladoMovil(c)
+	}
+}
 
 // FocusGained y FocusLost no pintan nada: el panel recibe el foco para poder atender a
 // Escape, no para verse enfocado. El anillo es de los controles.
@@ -940,6 +948,9 @@ func (d *Dialogo) Dragged(ev *fyne.DragEvent) {
 		}
 		d.arrastrando = true
 		d.inicioArrastre = time.Now()
+		if c := lienzoDe(d); c != nil {
+			cerrarTecladoMovil(c)
+		}
 	}
 	// Solo hacia abajo: hacia arriba la hoja ya está en su sitio.
 	d.arrastre = max(0, d.arrastre+ev.Dragged.DY)

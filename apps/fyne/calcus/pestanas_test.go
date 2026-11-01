@@ -15,6 +15,7 @@ import (
 	"git.sytue.eu/sytue/one/apps/fyne/catalogos"
 	"git.sytue.eu/sytue/one/apps/fyne/editor"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
+	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 	"git.sytue.eu/sytue/one/apps/nucleo/webref"
 )
@@ -325,5 +326,31 @@ func TestElPulgarClasicoSeCogeYSeEnciende(t *testing.T) {
 	tira.Tapped(&fyne.PointEvent{Position: fyne.NewPos(ancho-LadoBotonClasico-2, alto-3)})
 	if quiero := min(FraccionPagina*ancho, total-ancho); tira.desX != quiero {
 		t.Errorf("un clic en la pista corre %v y en Chromium %v", tira.desX, quiero)
+	}
+}
+
+// TestLaTiraDeHojasSeDesplazaConElDedoSinReordenar: en táctil, arrastrar sobre una
+// pestaña de hoja o sobre la propia tira desplaza las hojas horizontalmente (como
+// `overflow-x-auto` en `SheetCanvas.tsx`), sin mover hojas de sitio.
+func TestLaTiraDeHojasSeDesplazaConElDedoSinReordenar(t *testing.T) {
+	defer ui.TactilDePrueba(true)()
+	nombres := []string{"Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto"}
+	c := NuevoLienzo(NuevoLibroCon(nombres, 0))
+	c.Resize(fyne.NewSize(360, 300))
+	pinta(t, 360, 300, c)
+	tira := c.Pestanas.tira
+	primera := tira.pestanas[0]
+	primera.Dragged(&fyne.DragEvent{Dragged: fyne.NewDelta(-80, 0)})
+	primera.DragEnd()
+	if tira.desX != 80 {
+		t.Fatalf("arrastrar sobre una pestaña en táctil dejó desX=%g, quiero 80", tira.desX)
+	}
+	if got := c.Libro.Hojas()[0]; got != "Enero" {
+		t.Fatalf("arrastrar con el dedo reordenó las hojas: primera=%q", got)
+	}
+	tira.Dragged(&fyne.DragEvent{Dragged: fyne.NewDelta(30, 0)})
+	tira.DragEnd()
+	if tira.desX != 50 {
+		t.Fatalf("arrastrar sobre la tira en táctil dejó desX=%g, quiero 50", tira.desX)
 	}
 }

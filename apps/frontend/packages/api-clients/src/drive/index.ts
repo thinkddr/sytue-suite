@@ -13,7 +13,7 @@
  *               ruta→ID caminando el árbol desde /folders/root.
  * WebDAV base:  /dav
  */
-import { HttpClient, HttpError, type AuthProvider } from '../core/http.js';
+import { HttpClient, HttpError, ResponseTooLargeError, type AuthProvider } from '../core/http.js';
 export {
   driveQuotaFromResponse,
   hasCompleteExternalCapacity,
@@ -21,6 +21,213 @@ export {
   type DriveQuotaResponse,
   type ExternalStorageCapacity,
 } from './quota.js';
+
+export const CIPHER_STORAGE_PRODUCTS = [
+  'hub',
+  'mail',
+  'drive',
+  'docs',
+  'sheets',
+  'slides',
+  'pdf',
+  'calendar',
+  'contacts',
+  'notes',
+  'photos',
+  'rooms',
+  'cast',
+  'erp',
+  'bases',
+] as const;
+
+export type CipherStorageProduct = (typeof CIPHER_STORAGE_PRODUCTS)[number];
+
+/** Maximum size of a single encrypted block accepted by `/cipher/blobs/{product}/{id}` (8 MiB). */
+export const MAX_CIPHER_BLOB_BYTES = 8 * 1024 * 1024;
+
+export interface CipherBlobReceipt {
+  id: string;
+  product: CipherStorageProduct;
+  size_bytes: number;
+  sha256: string;
+}
+
+export function isCipherStorageProduct(value: unknown): value is CipherStorageProduct {
+  return (
+    typeof value === 'string' && (CIPHER_STORAGE_PRODUCTS as readonly string[]).includes(value)
+  );
+}
+
+export function isCipherBlobId(value: unknown): value is string {
+  return typeof value === 'string' && /^[A-Z2-7]{26,64}$/.test(value);
+}
+
+export function isValidCipherBlobReceipt(
+  value: unknown,
+  expectedProduct: CipherStorageProduct,
+  expectedId: string,
+): value is CipherBlobReceipt {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  return (
+    isCipherStorageProduct(expectedProduct) &&
+    isCipherBlobId(expectedId) &&
+    record.product === expectedProduct &&
+    record.id === expectedId &&
+    typeof record.size_bytes === 'number' &&
+    Number.isSafeInteger(record.size_bytes) &&
+    record.size_bytes >= 0 &&
+    record.size_bytes <= MAX_CIPHER_BLOB_BYTES &&
+    typeof record.sha256 === 'string' &&
+    /^[0-9a-f]{64}$/.test(record.sha256)
+  );
+}
+
+async function readBoundedBytes(res: Response, maxBytes: number): Promise<Uint8Array<ArrayBuffer>> {
+  const advertised = res.headers.get('content-length')?.trim();
+  const encoding = res.headers.get('content-encoding');
+  if (
+    (!encoding || encoding.toLowerCase() === 'identity') &&
+    advertised &&
+    /^\d+$/.test(advertised) &&
+    Number(advertised) > maxBytes
+  ) {
+    await res.body?.cancel().catch(() => undefined);
+    throw new ResponseTooLargeError(maxBytes);
+  }
+  if (!res.body) return new Uint8Array(0);
+  const reader = res.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value.byteLength > maxBytes - total) {
+        throw new ResponseTooLargeError(maxBytes);
+      }
+      total += value.byteLength;
+      chunks.push(value);
+    }
+    const out = new Uint8Array(total);
+    let offset = 0;
+    for (const chunk of chunks) {
+      out.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    return out;
+  } catch (error) {
+    await reader.cancel(error).catch(() => undefined);
+    throw error;
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+export interface BffCipherBlobGateway {
+  put: (
+    product: CipherStorageProduct,
+    id: string,
+    ciphertext: Uint8Array<ArrayBuffer>,
+    signal?: AbortSignal,
+  ) => Promise<CipherBlobReceipt>;
+  read: (
+    product: CipherStorageProduct,
+    id: string,
+    signal?: AbortSignal,
+  ) => Promise<Uint8Array<ArrayBuffer>>;
+  get: (
+    product: CipherStorageProduct,
+    id: string,
+    signal?: AbortSignal,
+  ) => Promise<CipherBlobReceipt | null>;
+  delete: (product: CipherStorageProduct, id: string, signal?: AbortSignal) => Promise<void>;
+}
+
+/**
+ * Browser-side gateway against the surface's authenticated BFF (`/api/cipher-blobs`),
+ * compatible with `@sytue/offline/matrix` `CipherBlobGateway`.
+ */
+export function createBffCipherBlobGateway(
+  endpointBase = '/api/cipher-blobs',
+  fetchImpl: typeof fetch = globalThis.fetch.bind(globalThis),
+): BffCipherBlobGateway {
+  const cleanBase = endpointBase.replace(/\/$/, '');
+  const blobUrl = (product: CipherStorageProduct, id: string, suffix = ''): string => {
+    if (!isCipherStorageProduct(product) || !isCipherBlobId(id)) {
+      throw new RangeError('Invalid cipher blob product or identifier');
+    }
+    return `${cleanBase}/${encodeURIComponent(product)}/${encodeURIComponent(id)}${suffix}`;
+  };
+  return {
+    put: async (product, id, ciphertext, signal) => {
+      if (ciphertext.byteLength > MAX_CIPHER_BLOB_BYTES) {
+        throw new RangeError('Cipher blob exceeds 8 MiB maximum');
+      }
+      const target = blobUrl(product, id);
+      const res = await fetchImpl(target, {
+        method: 'PUT',
+        headers: {
+          'content-type': 'application/octet-stream',
+          accept: 'application/json',
+        },
+        body: ciphertext,
+        credentials: 'same-origin',
+        cache: 'no-store',
+        ...(signal ? { signal } : {}),
+      });
+      if (!res.ok) throw new HttpError(res.status, res.statusText, target, await res.text());
+      const receipt: unknown = await res.json();
+      if (
+        !isValidCipherBlobReceipt(receipt, product, id) ||
+        receipt.size_bytes !== ciphertext.byteLength
+      ) {
+        throw new Error('Invalid cipher blob receipt');
+      }
+      return receipt;
+    },
+    read: async (product, id, signal) => {
+      const target = blobUrl(product, id, '/content');
+      const res = await fetchImpl(target, {
+        method: 'GET',
+        credentials: 'same-origin',
+        cache: 'no-store',
+        ...(signal ? { signal } : {}),
+      });
+      if (!res.ok) throw new HttpError(res.status, res.statusText, target, await res.text());
+      return readBoundedBytes(res, MAX_CIPHER_BLOB_BYTES);
+    },
+    get: async (product, id, signal) => {
+      const target = blobUrl(product, id);
+      const res = await fetchImpl(target, {
+        method: 'GET',
+        headers: { accept: 'application/json' },
+        credentials: 'same-origin',
+        cache: 'no-store',
+        ...(signal ? { signal } : {}),
+      });
+      if (res.status === 404) return null;
+      if (!res.ok) throw new HttpError(res.status, res.statusText, target, await res.text());
+      const receipt: unknown = await res.json();
+      if (!isValidCipherBlobReceipt(receipt, product, id)) {
+        throw new Error('Invalid cipher blob receipt');
+      }
+      return receipt;
+    },
+    delete: async (product, id, signal) => {
+      const target = blobUrl(product, id);
+      const res = await fetchImpl(target, {
+        method: 'DELETE',
+        credentials: 'same-origin',
+        cache: 'no-store',
+        ...(signal ? { signal } : {}),
+      });
+      if (!res.ok && res.status !== 404) {
+        throw new HttpError(res.status, res.statusText, target, await res.text());
+      }
+    },
+  };
+}
 
 export interface DriveOptions {
   /** URL base, p.ej. https://drive.sytue.eu */
@@ -757,5 +964,86 @@ export class DriveClient {
   davUrl(path = '/'): string {
     const clean = path.startsWith('/') ? path : `/${path}`;
     return `${this.davRoot}${clean.split('/').map(encodeURIComponent).join('/')}`;
+  }
+
+  private cipherBlobPath(product: CipherStorageProduct, id: string): string {
+    if (!isCipherStorageProduct(product) || !isCipherBlobId(id)) {
+      throw new RangeError('Invalid cipher blob product or identifier');
+    }
+    return `/cipher/blobs/${encodeURIComponent(product)}/${encodeURIComponent(id)}`;
+  }
+
+  /** Stores already-encrypted opaque bytes (<= 8 MiB) in Sytue Drive cipher storage. */
+  async putCipherBlob(
+    product: CipherStorageProduct,
+    id: string,
+    ciphertext: Uint8Array,
+    signal?: AbortSignal,
+  ): Promise<CipherBlobReceipt> {
+    const path = this.cipherBlobPath(product, id);
+    if (ciphertext.byteLength > MAX_CIPHER_BLOB_BYTES) {
+      throw new RangeError('Cipher blob exceeds 8 MiB maximum');
+    }
+    const receipt = await this.http.json<unknown>({
+      method: 'PUT',
+      path,
+      headers: { 'content-type': 'application/octet-stream' },
+      body: ciphertext as BodyInit,
+      maxResponseBytes: 4096,
+      ...(signal ? { signal } : {}),
+    });
+    if (
+      !isValidCipherBlobReceipt(receipt, product, id) ||
+      receipt.size_bytes !== ciphertext.byteLength
+    ) {
+      throw new Error('Invalid cipher blob receipt');
+    }
+    return receipt;
+  }
+
+  /** Fetches the authenticated receipt metadata for an opaque ciphertext blob. */
+  async cipherBlob(
+    product: CipherStorageProduct,
+    id: string,
+    signal?: AbortSignal,
+  ): Promise<CipherBlobReceipt> {
+    const path = this.cipherBlobPath(product, id);
+    const receipt = await this.http.json<unknown>({
+      path,
+      maxResponseBytes: 4096,
+      ...(signal ? { signal } : {}),
+    });
+    if (!isValidCipherBlobReceipt(receipt, product, id)) {
+      throw new Error('Invalid cipher blob receipt');
+    }
+    return receipt;
+  }
+
+  /** Downloads the raw ciphertext bytes (bounded to <= 8 MiB) for an opaque blob. */
+  async readCipherBlob(
+    product: CipherStorageProduct,
+    id: string,
+    signal?: AbortSignal,
+  ): Promise<Uint8Array<ArrayBuffer>> {
+    const path = this.cipherBlobPath(product, id);
+    const res = await this.http.request({
+      path: `${path}/content`,
+      ...(signal ? { signal } : {}),
+    });
+    return readBoundedBytes(res, MAX_CIPHER_BLOB_BYTES);
+  }
+
+  /** Deletes an opaque ciphertext blob. */
+  async deleteCipherBlob(
+    product: CipherStorageProduct,
+    id: string,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    const path = this.cipherBlobPath(product, id);
+    await this.http.request({
+      method: 'DELETE',
+      path,
+      ...(signal ? { signal } : {}),
+    });
   }
 }

@@ -109,17 +109,14 @@ func partirType1(b []byte, len1 int) (claro, cifrado []byte) {
 	if i < 0 {
 		return b, nil
 	}
-	inicio := len1
-	if inicio < i+5 || inicio > len(b) {
-		inicio = i + 5
-		for inicio < len(b) && (b[inicio] == '\r' || b[inicio] == '\n' || b[inicio] == ' ' || b[inicio] == '\t') {
-			inicio++
-		}
-	}
-	claro, cifrado = b[:i], b[inicio:]
-	if len(cifrado) >= 4 && esHex(cifrado[:4]) {
-		limpio := make([]byte, 0, len(cifrado))
-		for _, c := range cifrado {
+	claro = b[:i]
+	recortado := bytes.TrimLeft(b[i+5:], " \t\r\n")
+	// En codificación ASCII hexadecimal tras `eexec` puede ir cualquier salto de
+	// línea (\r\n incluido, aunque /Length1 apunte en medio como en issue11740) y
+	// los primeros al menos 8 caracteres no blancos son dígitos hexadecimales.
+	if len(recortado) >= 8 && esHex(recortado[:8]) {
+		limpio := make([]byte, 0, len(recortado))
+		for _, c := range recortado {
 			if esHex([]byte{c}) {
 				limpio = append(limpio, c)
 			} else if c > ' ' {
@@ -128,10 +125,19 @@ func partirType1(b []byte, len1 int) (claro, cifrado []byte) {
 		}
 		dec := make([]byte, len(limpio)/2)
 		if n, err := hex.Decode(dec, limpio[:2*len(dec)]); err == nil {
-			cifrado = dec[:n]
+			return claro, dec[:n]
 		}
 	}
-	return claro, cifrado
+	inicio := len1
+	if inicio < i+5 || inicio > len(b) {
+		inicio = i + 5
+		if inicio+1 < len(b) && b[inicio] == '\r' && b[inicio+1] == '\n' {
+			inicio += 2
+		} else if inicio < len(b) && (b[inicio] == '\r' || b[inicio] == '\n' || b[inicio] == ' ' || b[inicio] == '\t') {
+			inicio++
+		}
+	}
+	return claro, b[inicio:]
 }
 
 func esHex(b []byte) bool {

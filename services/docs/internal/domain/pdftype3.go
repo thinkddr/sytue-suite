@@ -64,23 +64,34 @@ func (l *lienzo) leerType3(fd pdfDict) *type3 {
 		return nil // sin dibujos no hay nada que hacer
 	}
 
-	l.leerCodificacionType3(fd, t.codificacion)
+	l.leerCodificacionType3(fd, t.procs, t.codificacion)
 	if len(t.codificacion) == 0 {
 		return nil // no hay forma de saber qué dibujo va con qué código
 	}
 	return t
 }
 
-// leerCodificacionType3 usa solo /Differences: en tipo 3 no hay codificación
-// base que valga, porque los nombres de glifo los inventa el documento.
-func (l *lienzo) leerCodificacionType3(fd pdfDict, codificacion map[byte]pdfName) {
-	enc, ok := l.d.resolver(fd["Encoding"]).(pdfDict)
-	if !ok {
+// leerCodificacionType3 carga primero los nombres de la codificación base (si
+// existen en /CharProcs) y aplica encima /Differences.
+func (l *lienzo) leerCodificacionType3(fd, procs pdfDict, codificacion map[byte]pdfName) {
+	var baseEnc pdfName
+	var difs pdfArray
+	switch v := l.d.resolver(fd["Encoding"]).(type) {
+	case pdfName:
+		baseEnc = v
+	case pdfDict:
+		baseEnc, _ = l.d.resolver(v["BaseEncoding"]).(pdfName)
+		difs, _ = l.d.resolver(v["Differences"]).(pdfArray)
+	default:
 		return
 	}
-	difs, ok := l.d.resolver(enc["Differences"]).(pdfArray)
-	if !ok {
-		return
+	if baseEnc != "" && procs != nil {
+		for c := 0; c < 256; c++ {
+			nom := nombreGlifoCodificacionBase(baseEnc, byte(c))
+			if nom != "" && procs[pdfName(nom)] != nil {
+				codificacion[byte(c)] = pdfName(nom)
+			}
+		}
 	}
 	codigo := 0
 	for _, e := range difs {
@@ -123,7 +134,6 @@ func (e *ejecucion) dibujarGlifosType3(f *fuentePDF, codigos pdfString) bool {
 		return false
 	}
 
-	pintado := false
 	for i, codigo := range codigos {
 		if i >= maxGlifosTipo3PorCadena {
 			break
@@ -162,11 +172,66 @@ func (e *ejecucion) dibujarGlifosType3(f *fuentePDF, codigos pdfString) bool {
 		e.l.prof++
 		e.l.ejecutar(contenido, recursos, sub)
 		e.l.prof--
-		pintado = true
 
 		e.avanzarUnGlifo(f, codigo)
 	}
-	return pintado
+	// La matriz de texto ya avanzó código a código (incluidos los espacios sin
+	// entrada en /CharProcs), así que `mostrar` no debe volver a avanzar `e.tm`.
+	return true
+}
+
+func nombreGlifoCodificacionBase(base pdfName, c byte) string {
+	switch base {
+	case "StandardEncoding":
+		return nombreEstandarCFF(c)
+	case "MacRomanEncoding":
+		if c >= 32 && c < 127 {
+			return nombreEstandarCFF(c)
+		}
+		return nombreGlifoPorRuna(charmapMacDecode(c))
+	case "WinAnsiEncoding":
+		if c == '\'' {
+			return "quotesingle"
+		}
+		if c >= 32 && c < 127 {
+			return nombreEstandarCFF(c)
+		}
+		if wr, ok := winAnsiEspecial[c]; ok {
+			return nombreGlifoPorRuna(wr)
+		}
+	}
+	return ""
+}
+
+func nombreEstandarCFF(c byte) string {
+	if sid, ok := codificacionEstandarCFF[c]; ok && sid < len(cadenasEstandarCFF) {
+		return cadenasEstandarCFF[sid]
+	}
+	return ""
+}
+
+func nombreGlifoPorRuna(r rune) string {
+	if r == 0 {
+		return ""
+	}
+	for n, gr := range nombresAcentuados {
+		if gr == r {
+			return n
+		}
+	}
+	for n, gr := range nombresDeGlifo {
+		if gr == r {
+			return n
+		}
+	}
+	return ""
+}
+
+func charmapMacDecode(c byte) rune {
+	for _, r := range textoMacRoman(c) {
+		return r
+	}
+	return 0
 }
 
 // avanzarUnGlifo mueve la matriz de texto lo que ocupa UN código.

@@ -13,6 +13,7 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
+	"fyne.io/fyne/v2/driver/mobile"
 	"fyne.io/fyne/v2/test"
 
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
@@ -289,5 +290,134 @@ func TestElChipAbiertoSeVe(t *testing.T) {
 	m.Cerrar()
 	if chip.abierto() || fondo() != reposo {
 		t.Errorf("cerrado el menú, el chip sigue abierto (fondo %v)", fondo())
+	}
+}
+
+// arrastrableMovilCinta replica `findObjectAtPositionMatching` del driver móvil de Fyne:
+// devuelve el descendiente visible más profundo en `pos` que implemente `fyne.Draggable`
+// o `mobile.Touchable`, convertido a `fyne.Draggable`.
+func arrastrableMovilCinta(raiz fyne.CanvasObject, pos fyne.Position) fyne.Draggable {
+	var hallado fyne.CanvasObject
+	var caminar func(o fyne.CanvasObject, origen, clipPos fyne.Position, clipTam fyne.Size)
+	caminar = func(o fyne.CanvasObject, origen, clipPos fyne.Position, clipTam fyne.Size) {
+		if o == nil || !o.Visible() {
+			return
+		}
+		p := origen.Add(o.Position())
+		tam := o.Size()
+		if pos.X < clipPos.X || pos.Y < clipPos.Y || pos.X >= clipPos.X+clipTam.Width || pos.Y >= clipPos.Y+clipTam.Height {
+			return
+		}
+		dentro := pos.X >= p.X && pos.Y >= p.Y && pos.X < p.X+tam.Width && pos.Y < p.Y+tam.Height
+		recorta := false
+		if _, ok := o.(fyne.Scrollable); ok {
+			recorta = true
+		}
+		var hijos []fyne.CanvasObject
+		switch x := o.(type) {
+		case fyne.Widget:
+			r := test.WidgetRenderer(x)
+			if _, ok := r.(interface{ IsClip() }); ok {
+				recorta = true
+			}
+			hijos = r.Objects()
+		case *fyne.Container:
+			hijos = x.Objects
+		}
+		if recorta && !dentro {
+			return
+		}
+		if dentro {
+			switch o.(type) {
+			case fyne.Draggable, mobile.Touchable:
+				hallado = o
+			}
+		}
+		sigPos, sigTam := clipPos, clipTam
+		if recorta {
+			x0 := max(clipPos.X, p.X)
+			y0 := max(clipPos.Y, p.Y)
+			x1 := min(clipPos.X+clipTam.Width, p.X+tam.Width)
+			y1 := min(clipPos.Y+clipTam.Height, p.Y+tam.Height)
+			sigPos = fyne.NewPos(x0, y0)
+			sigTam = fyne.NewSize(max(x1-x0, 0), max(y1-y0, 0))
+		}
+		for _, h := range hijos {
+			caminar(h, p, sigPos, sigTam)
+		}
+	}
+	caminar(raiz, fyne.NewPos(0, 0), fyne.NewPos(0, 0), raiz.Size())
+	d, _ := hallado.(fyne.Draggable)
+	return d
+}
+
+// TestLaCintaMovilSeDesplazaConElDedoSobrePestanasYBotones: en iOS y Android un dedo
+// sobre una pestaña o un botón de la cinta tiene que alcanzar `c.tira` y `c.banda` como
+// `fyne.Draggable` (el driver móvil nunca envía `Scrolled` con un dedo) y llevar hasta
+// el extremo tanto la tira como la banda, también en apaisado compacto.
+func TestLaCintaMovilSeDesplazaConElDedoSobrePestanasYBotones(t *testing.T) {
+	defer ui.TactilDePrueba(true)()
+	ctx := &Contexto{Tipo: Documento, Zoom: 100, Estado: Listo, T: func(k string, _ i18n.Vars) string { return k }}
+	r := Genericas()
+	for i := range 6 {
+		r.Insertar("", Pestana{
+			ID:     fmt.Sprintf("extra-%d", i),
+			Rotulo: fmt.Sprintf("Pestaña extra %d", i),
+			Tipos:  []Tipo{Documento},
+			Cuerpo: bandaAncha,
+		})
+	}
+	r.Sustituir("inicio", bandaAncha)
+	m := NuevoMarco(ctx, r, nil)
+	w := test.NewTempWindow(t, m)
+	w.SetPadded(false)
+	w.Resize(fyne.NewSize(390, 740))
+	c := m.cinta
+	drv := fyne.CurrentApp().Driver()
+
+	// 1. Tira de pestañas: tocar sobre la primera pestaña arrastra `c.tira` hasta la última.
+	p0 := drv.AbsolutePositionForObject(c.tiras[0]).AddXY(10, 10)
+	dragTira := arrastrableMovilCinta(w.Canvas().Content(), p0)
+	if dragTira != c.tira {
+		t.Fatalf("sobre una pestaña el driver móvil alcanza %T y no c.tira", dragTira)
+	}
+	dragTira.Dragged(&fyne.DragEvent{Dragged: fyne.NewDelta(-2000, 0)})
+	dragTira.DragEnd()
+	ultimaPestana := c.tiras[len(c.tiras)-1]
+	if fin := drv.AbsolutePositionForObject(ultimaPestana).X + ultimaPestana.Size().Width; c.tira.X() == 0 || fin > 390+0.5 {
+		t.Fatalf("el dedo no alcanza la última pestaña: X=%g, fin=%g", c.tira.X(), fin)
+	}
+
+	// 2. Banda de comandos: tocar sobre el primer botón arrastra `c.banda` hasta el último grupo.
+	grupos := objetosDeBanda(c.cuerpo)
+	primerBoton := grupos[0].(*Grupo).Controles[0]
+	b0 := drv.AbsolutePositionForObject(primerBoton).AddXY(10, 10)
+	dragBanda := arrastrableMovilCinta(w.Canvas().Content(), b0)
+	if dragBanda != c.banda {
+		t.Fatalf("sobre un botón de la cinta el driver móvil alcanza %T y no c.banda", dragBanda)
+	}
+	dragBanda.Dragged(&fyne.DragEvent{Dragged: fyne.NewDelta(-5000, 0)})
+	dragBanda.DragEnd()
+	ultimoGrupo := grupos[len(grupos)-1]
+	if fin := drv.AbsolutePositionForObject(ultimoGrupo).X + ultimoGrupo.Size().Width; c.banda.X() == 0 || fin > 390+0.5 {
+		t.Fatalf("el dedo no alcanza el último grupo de la banda: X=%g, fin=%g", c.banda.X(), fin)
+	}
+
+	// 3. Teléfono apaisado compacto: la banda compacta también se desplaza con el dedo.
+	w.Resize(fyne.NewSize(844, 360))
+	if !c.compacta {
+		t.Fatal("a 844×360 táctil no entró el modo compacto")
+	}
+	c.banda.Mostrar(0, 0)
+	gruposCompactos := objetosDeBanda(c.cuerpo)
+	bc := drv.AbsolutePositionForObject(gruposCompactos[0].(*Grupo).Controles[0]).AddXY(10, 10)
+	dragCompacta := arrastrableMovilCinta(w.Canvas().Content(), bc)
+	if dragCompacta != c.banda {
+		t.Fatalf("en modo compacto el driver móvil alcanza %T y no c.banda", dragCompacta)
+	}
+	dragCompacta.Dragged(&fyne.DragEvent{Dragged: fyne.NewDelta(-5000, 0)})
+	dragCompacta.DragEnd()
+	if c.banda.X() == 0 {
+		t.Fatal("en modo compacto el dedo no desplaza la banda")
 	}
 }

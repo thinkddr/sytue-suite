@@ -62,7 +62,7 @@ export function FieldGroup({
   const helpId = `${htmlFor}-help`;
   const errorId = `${htmlFor}-error`;
   return (
-    <div class={cx('flex flex-col gap-1.5', cls)}>
+    <div data-field-group="" class={cx('flex flex-col gap-1.5', cls)}>
       <label for={htmlFor} class="text-text text-sm font-semibold">
         {label}
         {required ? (
@@ -314,7 +314,7 @@ function Choice(type: 'checkbox' | 'radio') {
     const control = (input: ChoiceProps['class']) => (
       <span
         class={cx(
-          'sytue-focus-ring-choice',
+          'sytue-focus-ring-choice shrink-0',
           type === 'checkbox' ? 'rounded-[2px]' : 'rounded-full',
           ringClass,
         )}
@@ -327,7 +327,7 @@ function Choice(type: 'checkbox' | 'radio') {
       <label
         for={fieldId}
         class={cx(
-          'inline-flex cursor-pointer items-center gap-2 text-base',
+          'inline-flex max-w-full cursor-pointer items-center gap-2 text-base',
           // Con el dedo, la ETIQUETA es el blanco: 44 de alto, como un botón. La casilla
           // de 16 sola dejaba 22 (medido en el barrido de diálogos, 2026-10-16).
           'pointer-coarse:min-h-[max(44px,2.75rem)]',
@@ -337,7 +337,7 @@ function Choice(type: 'checkbox' | 'radio') {
         )}
       >
         {control(CHOICE_INPUT)}
-        <span class="text-text">{label}</span>
+        <span class="text-text min-w-0 break-words">{label}</span>
       </label>
     );
   };
@@ -363,14 +363,14 @@ export function Switch({ label, checked, class: cls, id, ...rest }: SwitchProps)
     <label
       for={fieldId}
       class={cx(
-        'inline-flex cursor-pointer items-center gap-2.5 text-base',
+        'inline-flex max-w-full cursor-pointer items-center gap-2.5 text-base',
         // Con el dedo, 44 de alto, como un botón (el carril solo daba 22).
         'pointer-coarse:min-h-[max(44px,2.75rem)]',
         'has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50',
         cls,
       )}
     >
-      <span class="relative inline-flex">
+      <span class="relative inline-flex shrink-0">
         <input
           id={fieldId}
           type="checkbox"
@@ -414,7 +414,7 @@ export function Switch({ label, checked, class: cls, id, ...rest }: SwitchProps)
           aria-hidden="true"
         />
       </span>
-      <span class="text-text">{label}</span>
+      <span class="text-text min-w-0 break-words">{label}</span>
     </label>
   );
 }

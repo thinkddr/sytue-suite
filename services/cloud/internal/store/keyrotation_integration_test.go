@@ -45,7 +45,7 @@ type secretosSembrados struct {
 func sembrarSecretos(t *testing.T, ctx context.Context, st *store.Store, tenant string, sealer *crypto.Sealer) secretosSembrados {
 	t.Helper()
 	s := secretosSembrados{
-		webhook:    "whsec_de-antes-de-rotar",
+		webhook:    "test_webhook_prev",
 		deployKey:  "-----BEGIN PRIVATE KEY-----\nfalsa\n-----END PRIVATE KEY-----",
 		envSecreto: "postgres://app:s3cr3t@db:5432/x",
 		credsSvc:   `{"dsn":"postgres://svc:pwd@db:5432/y"}`,

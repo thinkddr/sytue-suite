@@ -121,7 +121,11 @@ func mismaFecha(a, b time.Time) bool {
 
 func (m *MesFecha) pintar() {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
-	ancho := 7 * LadoDiaFecha
+	ladoDia := float32(LadoDiaFecha)
+	if EsTactil() {
+		ladoDia = 40
+	}
+	ancho := 7 * ladoDia
 	titulo := Texto(i18n.FormatMonthYear(m.Locale, m.Mes), tema.TextoSM, SemiNegrita, tema.Color("text", v))
 	flecha := func(icono iconos.Icono, meses int) *Boton {
 		b := NuevoBoton("", func() { m.Desplazar(meses) }).Con(Fantasma, TallaSM)
@@ -142,18 +146,18 @@ func (m *MesFecha) pintar() {
 	y := altoCab + SeparaCabeceraF
 	for i, ini := range i18n.WeekdaysNarrow(m.Locale) {
 		s := NuevoVersal(ini, tema.Texto2XS, SemiNegrita, tema.Color("text-muted", v))
-		s.Colocar(float32(i)*LadoDiaFecha+(LadoDiaFecha-s.Ancho())/2, y+(AltoInicialDia-tema.Texto2XS.Linea)/2)
+		s.Colocar(float32(i)*ladoDia+(ladoDia-s.Ancho())/2, y+(AltoInicialDia-tema.Texto2XS.Linea)/2)
 		objs = append(objs, s.Objetos()...)
 	}
 	y += AltoInicialDia
 	for i, d := range m.Dias() {
 		dia := d
 		c := nuevoDiaFecha(m, dia)
-		c.Move(fyne.NewPos(float32(i%7)*LadoDiaFecha, y+float32(i/7)*LadoDiaFecha))
-		c.Resize(fyne.NewSize(LadoDiaFecha, LadoDiaFecha))
+		c.Move(fyne.NewPos(float32(i%7)*ladoDia, y+float32(i/7)*ladoDia))
+		c.Resize(fyne.NewSize(ladoDia, ladoDia))
 		objs = append(objs, c)
 	}
-	alto := y + 6*LadoDiaFecha
+	alto := y + 6*ladoDia
 	m.caja.Objects = []fyne.CanvasObject{container.New(tamFijo{fyne.NewSize(ancho, alto)}, objs...)}
 	m.caja.Refresh()
 }

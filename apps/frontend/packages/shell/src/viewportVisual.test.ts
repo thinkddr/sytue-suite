@@ -1,8 +1,22 @@
 import { GlobalRegistrator } from '@happy-dom/global-registrator';
-import { expect, test } from 'bun:test';
+import { afterAll, beforeAll, expect, test } from 'bun:test';
 import { publicarViewportVisual } from './viewportVisual.js';
 
-if (typeof document === 'undefined') GlobalRegistrator.register();
+let registradoAqui = false;
+
+beforeAll(() => {
+  if (typeof document === 'undefined') {
+    GlobalRegistrator.register();
+    registradoAqui = true;
+  }
+});
+
+afterAll(async () => {
+  if (registradoAqui) {
+    await GlobalRegistrator.unregister();
+    registradoAqui = false;
+  }
+});
 
 function preparar() {
   const vv = Object.assign(new EventTarget(), {
@@ -87,4 +101,22 @@ test('el pellizco no se interpreta como cierre de teclado y al desmontar se deja
   }
   p.vv.dispatchEvent(new Event('resize'));
   expect(document.documentElement.style.getPropertyValue('--sytue-vvh')).toBe('');
+});
+
+test('en un diálogo móvil devuelve la ventana al origen al cerrar el teclado aunque Safari solo desplace offsetTop', async () => {
+  const p = preparar();
+  const dialogo = document.body.appendChild(document.createElement('div'));
+  dialogo.setAttribute('role', 'dialog');
+  const campo = dialogo.appendChild(document.createElement('input'));
+  try {
+    campo.focus();
+    p.vv.offsetTop = 64;
+    p.vv.dispatchEvent(new Event('scroll'));
+    campo.blur();
+    await new Promise((r) => setTimeout(r, 30));
+    expect(p.llamadas).toEqual([[0, 0]]);
+  } finally {
+    dialogo.remove();
+    p.restaurar();
+  }
 });

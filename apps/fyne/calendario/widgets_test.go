@@ -24,6 +24,7 @@ func TestWidgetCalendariosCompletosSinPublicarListaParcial(t *testing.T) {
 	for _, caso := range []string{"completos", "compartidos fallan", "propios fallan", "cambia sesión", "sin conexión"} {
 		t.Run(caso, func(t *testing.T) {
 			t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+			t.Setenv("HOME", t.TempDir())
 			ajustes.MarcarSesion()
 			var listados atomic.Int32
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

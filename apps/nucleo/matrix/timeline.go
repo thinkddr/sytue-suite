@@ -50,6 +50,7 @@ func (c *Client) History(ctx context.Context, roomID, from string, limit int) (T
 		if err := encrypted.Content.ParseRaw(encrypted.Type); err != nil {
 			return TimelinePage{}, err
 		}
+		wire := encrypted.Content.AsEncrypted()
 		decrypted, decryptErr := c.crypto.Decrypt(ctx, encrypted)
 		if decryptErr != nil {
 			return TimelinePage{}, decryptErr
@@ -60,6 +61,10 @@ func (c *Client) History(ctx context.Context, roomID, from string, limit int) (T
 		value, decodeErr := c.decryptedEvent(ctx, decrypted)
 		if decodeErr != nil {
 			return TimelinePage{}, decodeErr
+		}
+		if wire != nil {
+			value.SessionID = wire.SessionID.String()
+			value.SenderKey = wire.SenderKey.String()
 		}
 		page.Events = append(page.Events, value)
 	}

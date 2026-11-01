@@ -29,6 +29,9 @@ func (c *Client) StorageObjectHistory(ctx context.Context, room, cursor string, 
 	}
 	out := StorageObjectPage{Next: page.Next}
 	for _, value := range page.Events {
+		if err := c.verifyRecoveredStorageEvent(ctx, scope, value); err != nil {
+			return StorageObjectPage{}, err
+		}
 		rec, err := decodePrivateRecord(value, scope, c.session.UserID.String())
 		if err != nil {
 			return StorageObjectPage{}, err

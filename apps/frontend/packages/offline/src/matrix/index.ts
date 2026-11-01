@@ -11,4 +11,7 @@ export {
 } from './client.js';
 export * from './types.js';
 export * from './storage.js';
-export type { StorageRepository } from './storage-repository.js';
+export * from './storage-blocks.js';
+export * from './storage-files.js';
+export * from './ssss-vault.js';
+export { StorageRepository, type StorageRecordTransport } from './storage-repository.js';

@@ -10,7 +10,7 @@ Google Cloud*. **Control plane** en Go que conecta repositorios git, construye
 imágenes con **Kaniko**, despliega apps de clientes en **Kapsule** con dominios y
 **TLS automático**, gestiona **previews por PR**, e integra **servicios
 gestionados** (Sytue Postgres/PostgREST, Storage, Functions, Cron, Auth). Código
-propietario © Sytue; dependencias de terceros solo permisivas (BSD/MIT/Apache).
+Apache-2.0 © 2026 Daniel Delgado Ramos (thinkddr); dependencias de terceros solo permisivas (BSD/MIT/Apache).
 Reimplementación **clean-room** sobre estándares abiertos (OCI, Kubernetes, OIDC,
 S3, PostgREST). **Soberanía 100 % UE** (Scaleway).
 

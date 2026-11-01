@@ -395,7 +395,7 @@ flowchart LR
 > pueda exfiltrarla — el push lo hace un contenedor aparte que sí la tiene. Una caché
 > remota exigiría que esa fase pudiera leer y escribir la imagen de caché, es decir,
 > darle una credencial. La salida es una credencial ACOTADA solo a la imagen de caché del
-> tenant, que depende del IAM del registry (infraestructura). Ver `PENDIENTES.md`.
+> tenant, que depende del IAM del registry (infraestructura). 
 > Mientras tanto, el coste se paga en `build_minutes`, que se factura al cliente.
 
 #### 7.1 Servicios gestionados (Sytue Postgres / PostgREST / Storage / Functions / Cron)
@@ -610,7 +610,7 @@ flowchart LR
   migraciones `goose`/`golang-migrate`, Dockerfile multi-stage `golang:1.23` → `distroless/static`).
   PostgreSQL como único datastore (estado + colas con `riverqueue`/`pgmq`/LISTEN-NOTIFY + caché).
   **Sin Redis/Valkey.**
-- **Sytue-native, clean-room, propietario.** Cada producto es obra original de Sytue (© Sytue)
+- **Sytue-native, clean-room, propietario.** Cada producto es obra original de Daniel Delgado Ramos (thinkddr)
   sobre estándares abiertos y librerías permisivas (MIT/BSD/Apache); **prohibido** copiar/portar
   código AGPL. Sin motores de terceros (Keycloak/Nextcloud/OnlyOffice/Mattermost/Stalwart fuera).
 - **Sytue ID nuclear.** Servicio Go propio (OIDC/PKCE, JWKS, SCIM, MFA/WebAuthn). Cada servicio
@@ -1167,7 +1167,7 @@ flowchart LR
 > - **Subdominio del panel:** `cloud.sytue.eu` · **API:** client OIDC `sytue-cloud` (+ `sytue-cloud-api`)
 > - **Frontend:** Astro + Preact (app `cloud-dashboard`), monta `@sytue/shell` y usa `@sytue/ui`
 > - **Backend:** servicio Go propio (`services/cloud/`: `api/`, `builder/`, `controller/`) + PostgREST
-> - **Licencia código propio:** propietaria (© Sytue, SPDX `MIT`) · **Soberanía:** 100 % UE sobre Scaleway (solo regiones UE)
+> - **Licencia código propio:** propietaria (Apache-2.0, © 2026 Daniel Delgado Ramos (thinkddr)) · **Soberanía:** 100 % UE sobre Scaleway (solo regiones UE)
 
 <a id="31-que-es-sytue-cloud"></a>
 
@@ -1567,7 +1567,7 @@ Pocas pantallas, acciones evidentes, lenguaje claro.
 
 ### 3.8 Arquitectura interna (resumen)
 
-`services/cloud/` (Go, propietario © Sytue):
+`services/cloud/` (Go, Apache-2.0 © 2026 Daniel Delgado Ramos (thinkddr)):
 
 - **`api/`** — API de control de la plataforma (proyectos, deployments, servicios, dominios,
   env/secretos). Autoriza con tokens de **Sytue ID** (clients `sytue-cloud` / `sytue-cloud-api`).
@@ -2788,7 +2788,7 @@ la URL de arranque). Las rutas BFF viven en
 Antes de esto el CRUD no tenía **ningún** consumidor en el
 frontend, así que los SP que creaba `integrations` al activar una plantilla quedaban
 invisibles. Sigue sin haber alta MANUAL desde la Console (pide certificado PEM, formato de
-NameID y mapeo de atributos); el backend la soporta y está anotada en `PENDIENTES.md`.
+NameID y mapeo de atributos); el backend la soporta y está anotada en el backlog.
 
 Este es el **L1** del [Integration Gateway](./architecture.md#4-integration-gateway-saliente),
 que lo materializa en 1 clic desde el manifiesto de cada plantilla del catálogo.
@@ -3387,7 +3387,7 @@ registros» del panel).
   en el ERP. El correo dice tu fecha, la de domiciliación, el plazo legal, qué es, qué falta,
   cómo se hace y el enlace.
 - Por defecto sale por el MSA de Sytue Mail (`<release>-mail-mx:587`, STARTTLS obligatorio
-  con credenciales) con un buzón de servicio. En private-production sale **directo por el
+  con credenciales) con un buzón de servicio. En helm sale **directo por el
   relé propio** (`mx-out.<dominio>:587`) con su usuario SASL `erp` y remitente
   `no-reply@<dominio>` (`deploy/mail-relay/README.md` §5). La credencial va en el secreto
   `sytue-syerp` (`smtp-user`, `smtp-password`; `SYERP_SMTP_PASSWORD` en `.secrets.env`).
@@ -6136,9 +6136,11 @@ El servidor HTTP del harness se apagó al terminar. Las claves del fixture son s
 3. **Recuperación:** las API existentes son `client.secretStorage.store/get` en web y
    `Machine().SSSS.SetEncryptedAccountData/GetDecryptedAccountData` en Go. El secreto
    namespaced debe coincidir exactamente: Go recibe bytes crudos y web el string base64 de
-   esos bytes. No usar metadatos adicionales en claro. Hoy sólo Rooms conecta ese cliente y
-   Go no expone una bóveda general ni conserva la raíz SSSS tras recuperar; conectar las otras
-   apps requiere ese trabajo. Falta de clave/backup o identidad incompatible bloquea el
+   esos bytes (`apps/nucleo/matrix` y `@sytue/offline/matrix` comparten la derivación de
+   nombre `sytue.<producto>.v1.<hex32>` y el sobre contextual JSON en base64, conservando la
+   clave SSSS en memoria tras desbloquear el backup). No usar metadatos adicionales en claro.
+   Falta conectar esa bóveda común a los repositorios de producto del resto de apps. Falta de
+   clave/backup o identidad incompatible bloquea el
    acceso, sin crear una bóveda vacía encima de la anterior.
    **SSSS no garantiza frescura:** un fixture con el SDK mautrix 0.32.0 y account-data
    artificial rechazó MAC alterado y el traslado a otro nombre, pero aceptó una revisión

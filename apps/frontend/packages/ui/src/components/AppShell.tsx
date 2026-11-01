@@ -10,11 +10,12 @@
  * docs/design.md §2 / §9 / §10.
  */
 import type { ComponentChildren, JSX } from 'preact';
-import { useId, useState } from 'preact/hooks';
+import { useId, useRef, useState } from 'preact/hooks';
 import { useT } from '@sytue/i18n/preact';
 import { cx } from '../lib/cx.js';
 import { useNavDrawer } from '../lib/useNavDrawer.js';
 import { useMobileBack } from '../lib/useMobileBack.js';
+import { IndicadorRefrescoTactil, usePullToRefresh } from '../lib/usePullToRefresh.js';
 import { Button } from './Button.js';
 import { Icon } from './Icon.js';
 import { ResizablePanel } from './ResizablePanel.js';
@@ -76,6 +77,8 @@ export function AppShell({
 }: AppShellProps): JSX.Element {
   const t = useT();
   const [open, setOpen] = useState(false);
+  const hojaRef = useRef<HTMLDivElement>(null);
+  const refresco = usePullToRefresh(hojaRef);
   const base = useId();
   const drawerId = `sytue-app-nav-${base}`;
   const toggleId = `sytue-app-menu-${base}`;
@@ -218,7 +221,8 @@ export function AppShell({
               esquinas las redondea lo de dentro (`sytue-sheet-corners`). En escritorio
               panel y detalle comparten las esquinas; en móvil cada uno ocupa la hoja
               entera, con sus dos esquinas superiores. */}
-          <div class="sytue-sheet flex min-h-0 min-w-0 flex-1">
+          <div ref={hojaRef} class="sytue-sheet relative flex min-h-0 min-w-0 flex-1">
+            <IndicadorRefrescoTactil estado={refresco} />
             {secondaryPanel ? (
               <ResizablePanel
                 label={

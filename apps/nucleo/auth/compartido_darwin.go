@@ -9,13 +9,13 @@ package auth
 #include <stdlib.h>
 int sytue_llavero_autorizado(const char *grupo);
 */
-import "C"
+import "C" //nolint:gocritic // CGO exige importar C por separado
 
 import (
 	"log/slog"
 	"strings"
 	"sync"
-	"unsafe"
+	"unsafe" //nolint:gocritic // dupImport falso positivo con import C
 
 	"git.sytue.eu/sytue/one/apps/nucleo/ajustes"
 )
@@ -57,8 +57,9 @@ func leerSecretoCompartido(cuenta string) ([]byte, error) {
 	// Conservar el testigo anterior de bloqueo después de actualizar el DMG.
 	datos, err = leerSecretoLegado(cuenta)
 	if err == nil && len(datos) > 0 {
-		if guardar := guardarDatosApple(cuenta, ajustes.GrupoSuite, datos); guardar != nil {
-			slog.Warn("auth: se conserva el bloqueo anterior; no se pudo migrar al grupo de la suite", "error", guardar)
+		errMig := guardarDatosApple(cuenta, ajustes.GrupoSuite, datos)
+		if errMig != nil {
+			slog.Warn("auth: se conserva el bloqueo anterior; no se pudo migrar al grupo de la suite", "error", errMig)
 		}
 	}
 	return datos, err

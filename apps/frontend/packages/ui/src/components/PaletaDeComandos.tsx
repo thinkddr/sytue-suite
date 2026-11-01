@@ -94,7 +94,7 @@ export function PaletaDeComandos<O extends OpcionDePaleta>({
     document.body.style.overflow = 'hidden';
     return () => {
       document.body.style.overflow = antes;
-      previoRef.current?.focus();
+      previoRef.current?.focus({ preventScroll: true });
     };
   }, [open]);
 
@@ -124,6 +124,7 @@ export function PaletaDeComandos<O extends OpcionDePaleta>({
     setActiva((((i + d) % opciones.length) + opciones.length) % opciones.length);
 
   const teclas = (e: KeyboardEvent): void => {
+    if (e.isComposing || e.keyCode === 229) return;
     switch (e.key) {
       case 'ArrowDown':
         e.preventDefault();
@@ -164,7 +165,7 @@ export function PaletaDeComandos<O extends OpcionDePaleta>({
       // Alto y origen = viewport VISUAL, como el `Modal`: con el teclado fuera, la hoja
       // acaba encima de él y la lista sigue a la vista.
       class={cx(
-        'fixed inset-x-0 top-[var(--sytue-vvy,0px)] flex h-[var(--sytue-vvh,100dvh)]',
+        'fixed inset-x-0 top-[var(--sytue-vvy,0px)] flex h-[var(--sytue-vvh,100dvh)] overscroll-contain',
         'max-md:items-stretch max-md:pt-[max(2.5rem,calc(env(safe-area-inset-top)_+_1rem))]',
         'md:items-start md:justify-center md:p-4 md:pt-[12dvh]',
       )}

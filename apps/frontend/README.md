@@ -4,7 +4,7 @@ Núcleo del frontend de **Sytue One**: el design system, la shell común, la
 autenticación OIDC y los SDKs a los **servicios Go propios** (Sytue-native).
 **Astro 7 + Preact 10.29**, monorepo con **Bun** (runtime/instalación/bundler;
 sustituye a Node + pnpm), **Tailwind CSS 4**. Lenguaje visual **Sytue-native**.
-Soberanía **100 % UE**. Código **propietario © Sytue** (`MIT`).
+Soberanía **100 % UE**. Código **Apache-2.0 © 2026 Daniel Delgado Ramos (thinkddr)**.
 
 > Fuente de verdad del contrato: [`docs/CONVENTIONS.md`](../../docs/CONVENTIONS.md).
 > Diseño: [`docs/design.md#2-sistema-de-diseno`](../../docs/design.md#2-sistema-de-diseno) y `branding/`.

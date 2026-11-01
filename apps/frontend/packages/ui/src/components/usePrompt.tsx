@@ -100,6 +100,7 @@ export function usePrompt(): {
           autoFocus
           onInput={(e) => setTexto(e.currentTarget.value)}
           onKeyDown={(e) => {
+            if (e.isComposing || e.keyCode === 229) return;
             // Enter acepta, como en el diálogo del navegador.
             if (e.key === 'Enter' && !(vacio && !pendiente?.permitirVacio)) {
               e.preventDefault();

@@ -216,6 +216,13 @@ select optgroup:disabled {
   box-shadow: none;
 }
 
+/* Un `<dialog>` modal nativo (Fotos, visor de presentación) no deja que el rebote de
+   fin de recorrido arrastre el documento de debajo (paridad con el velo de `Modal`). */
+dialog:modal,
+dialog::backdrop {
+  overscroll-behavior: contain;
+}
+
 /* El PANEL de un diálogo (`Modal`) recibe el foco por código —con el dedo, para no sacar
      el teclado— y el lector lo anuncia como el diálogo; no es un control y no lleva aro.
      Sin esto el global de theme.css, que no va en capa y gana a cualquier utilidad, le

@@ -838,13 +838,11 @@ func dimensionRango(inicio, fin, tope int) (int, bool) {
 	if tope <= 0 || fin < inicio {
 		return 0, false
 	}
-	delta := fin - inicio
-	// Con fin >= inicio, una diferencia negativa indica desbordamiento.
-	// delta < tope garantiza que sumar la celda final tampoco desborda.
-	if delta < 0 || delta >= tope {
+	delta := uint64(fin) - uint64(inicio)
+	if delta >= uint64(tope) {
 		return 0, false
 	}
-	return delta + 1, true
+	return int(delta + 1), true
 }
 
 func dimensionesRango(rr RefRange, tope int) (filas, cols int, ok bool) {

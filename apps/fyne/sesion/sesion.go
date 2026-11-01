@@ -120,6 +120,12 @@ type Suite struct {
 	// un segundo login, que no podría escuchar en el mismo puerto de vuelta.
 	entrando    bool
 	autorizando string
+
+	tareasAlmacenMu  sync.Mutex
+	tareasAlmacen    map[uint64]context.CancelCauseFunc
+	tareasAlmacenSeq uint64
+	tareasAlmacenWG  sync.WaitGroup
+	almacenCerrando  bool
 }
 
 // Estado es lo que el menú de cuenta enseña.
@@ -704,6 +710,8 @@ func (s *Suite) SalirConError() error {
 		}()
 	}
 	s.retirarDriveDelSistema()
+	reabrirAlmacen := s.detenerTareasAlmacenamiento()
+	defer reabrirAlmacen()
 	errCierre := s.Sesion.Logout()
 	if errCierre != nil {
 		// Hasta un login completado, ni la vigilancia ni un cambio de ajustes
@@ -857,6 +865,7 @@ func (s *Suite) aplicar(e ajustes.Estado) {
 		guardados, generacion, err = s.leerSesionCompartida(context.Background())
 	}
 	s.mu.Lock()
+	anterior := s.generacionSesion
 	s.visto = e
 	if cambioSesion && err == nil {
 		s.Sesion.Sincronizar(guardados)
@@ -868,7 +877,11 @@ func (s *Suite) aplicar(e ajustes.Estado) {
 		s.generacionSesion = ""
 		s.visto.Sesion = ""
 	}
+	cambioGeneracion := cambioSesion && s.generacionSesion != anterior
 	s.mu.Unlock()
+	if cambioGeneracion {
+		s.cancelarTareasAlmacenamiento()
+	}
 	if err != nil {
 		slog.Warn("sesion: el almacén seguro no se deja leer", "error", err)
 	}

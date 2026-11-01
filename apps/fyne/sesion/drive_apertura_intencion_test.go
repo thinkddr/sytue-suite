@@ -46,6 +46,7 @@ func TestAperturaDriveRevalidaLaIntencionTrasEsperasAntesDeAbrir(t *testing.T) {
 	for _, cambio := range []string{"cancelar", "cuenta", "servidor", "organizacion"} {
 		t.Run(cambio, func(t *testing.T) {
 			t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+			t.Setenv("HOME", t.TempDir())
 			tokens := tokensAperturaDrive()
 			s := &Suite{Sesion: auth.NewSession(tokens, nil, nil)}
 			ctx, cancelar := context.WithCancel(s.Sesion.WithAuthorizationIntent(context.Background()))
@@ -92,6 +93,7 @@ func TestAperturaDriveRevalidaLaIntencionTrasEsperasAntesDeAbrir(t *testing.T) {
 
 func TestAperturaDriveNoRehabilitaLaPreferenciaDesactivada(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv("HOME", t.TempDir())
 	s := &Suite{Sesion: auth.NewSession(tokensAperturaDrive(), nil, nil)}
 	ctx := s.Sesion.WithAuthorizationIntent(context.Background())
 	if _, err := s.prepararAperturaDrive(ctx); err != nil {

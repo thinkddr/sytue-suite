@@ -15,7 +15,7 @@ func TestMailboxLocalPart(t *testing.T) {
 	}{
 		{"caso corriente", "Ana", "Pérez", "", "", "ana.perez"},
 		{"tildes y eñe plegadas", "Íñigo", "Muñoz", "", "", "inigo.munoz"},
-		{"apellido doble español", "Daniel", "Delgado Ruiz", "", "", "daniel.delgado.ruiz"},
+		{"apellido doble español", "Laura", "Perez Ruiz", "", "", "laura.perez.ruiz"},
 		{"nombre compuesto", "María del Carmen", "Pérez", "", "", "maria.del.carmen.perez"},
 		{"guion del apellido se conserva", "Jean", "Sáenz-López", "", "", "jean.saenz-lopez"},
 		{"apóstrofo se cae", "Sean", "O'Donnell", "", "", "sean.odonnell"},

@@ -23,10 +23,9 @@
 // `x/image/font/sfnt` sobre la MISMA tipografía incrustada que el SVG reemite.
 //
 // LO QUE ESTA SALIDA NO HACE, y la de SVG sí (dicho aquí para que no se descubra
-// tarde): regla par-impar (`f*` se rellena como no-cero), modos de fusión, mallas
-// de sombreado y mosaicos. Cada uno degrada a algo visible —el color medio del
-// sombreado, el relleno normal— nunca a un hueco mudo. Quien necesite fidelidad
-// completa pide SVG, que sigue siendo lo que la web usa.
+// tarde): los modos de fusión no separables de CSS. La regla par-impar (`f*`/`W*`),
+// los recortes por contorno de texto (`Tr` 4-7), las mallas de sombreado y los
+// mosaicos (`PatternType 1`, coloreados y no coloreados) sí se rasterizan aquí.
 package domain
 
 import (
@@ -34,6 +33,7 @@ import (
 	"image"
 	"image/color"
 	"math"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -48,6 +48,8 @@ import (
 	"golang.org/x/image/math/f64"
 	"golang.org/x/image/math/fixed"
 	"golang.org/x/image/vector"
+
+	"git.sytue.eu/sytue/one/platform/pkg/pdffuente"
 )
 
 // maxPixelesRaster acota el mapa de bits de UNA página. Son 4 bytes por píxel
@@ -276,8 +278,131 @@ func (r *rasterizador) mascara(subs [][]punto, caja image.Rectangle) *image.Alph
 	return m
 }
 
-// rellenar pinta los subcaminos con un color liso.
+func (r *rasterizador) mascaraRegla(subs [][]punto, caja image.Rectangle, parImpar bool) *image.Alpha {
+	if parImpar {
+		return r.mascaraParImpar(subs, caja)
+	}
+	return r.mascara(subs, caja)
+}
+
+type aristaParImpar struct {
+	y0, y1 float32
+	x0     float32
+	invDy  float32
+}
+
+// mascaraParImpar rasteriza los subcaminos con la regla par-impar (`f*`, `B*`,
+// `b*`, `W*`) mediante cobertura analítica horizontal sobre 8 sublíneas por fila.
+func (r *rasterizador) mascaraParImpar(subs [][]punto, caja image.Rectangle) *image.Alpha {
+	w, h := caja.Dx(), caja.Dy()
+	n := w * h
+	if cap(r.tmp) < n {
+		r.tmp = make([]uint8, n)
+	}
+	pix := r.tmp[:n]
+	clear(pix)
+	aristas := recogerAristasParImpar(subs, float32(caja.Min.Y), float32(caja.Max.Y))
+	if len(aristas) == 0 {
+		return &image.Alpha{Pix: pix, Stride: w, Rect: caja}
+	}
+	fila := make([]uint16, w)
+	xs := make([]float32, 0, 32)
+	activas := make([]aristaParImpar, 0, len(aristas))
+	ox := float32(caja.Min.X)
+	for y := caja.Min.Y; y < caja.Max.Y; y++ {
+		yMin, yMax := float32(y), float32(y+1)
+		activas = activas[:0]
+		for _, a := range aristas {
+			if a.y1 > yMin && a.y0 < yMax {
+				activas = append(activas, a)
+			}
+		}
+		if len(activas) == 0 {
+			continue
+		}
+		clear(fila)
+		for sub := 0; sub < 8; sub++ {
+			ys := yMin + (float32(sub)+0.5)*0.125
+			xs = interseccionesParImpar(activas, ys, xs[:0])
+			acumularTramosParImpar(fila, xs, ox, w)
+		}
+		off := (y - caja.Min.Y) * w
+		for ix, acc := range fila {
+			pix[off+ix] = uint8(min((acc+4)>>3, 255)) //nolint:gosec // G115: acotado a 255
+		}
+	}
+	return &image.Alpha{Pix: pix, Stride: w, Rect: caja}
+}
+
+func recogerAristasParImpar(subs [][]punto, yCajaMin, yCajaMax float32) []aristaParImpar {
+	var out []aristaParImpar
+	for _, s := range subs {
+		if len(s) < 2 {
+			continue
+		}
+		for i := range s {
+			a, b := s[i], s[(i+1)%len(s)]
+			if a.y > b.y {
+				a, b = b, a
+			}
+			dy := b.y - a.y
+			if dy < 1e-6 || b.y <= yCajaMin || a.y >= yCajaMax {
+				continue
+			}
+			out = append(out, aristaParImpar{
+				y0:    a.y,
+				y1:    b.y,
+				x0:    a.x,
+				invDy: (b.x - a.x) / dy,
+			})
+		}
+	}
+	return out
+}
+
+func interseccionesParImpar(aristas []aristaParImpar, ys float32, xs []float32) []float32 {
+	for _, a := range aristas {
+		if ys >= a.y0 && ys < a.y1 {
+			xs = append(xs, a.x0+(ys-a.y0)*a.invDy)
+		}
+	}
+	slices.Sort(xs)
+	return xs
+}
+
+func acumularTramosParImpar(fila []uint16, xs []float32, ox float32, w int) {
+	wf := float32(w)
+	for k := 0; k+1 < len(xs); k += 2 {
+		xL := max(xs[k]-ox, 0)
+		xR := min(xs[k+1]-ox, wf)
+		if xR <= xL {
+			continue
+		}
+		i0, i1 := int(xL), int(xR)
+		if i0 == i1 {
+			if i0 >= 0 && i0 < w {
+				fila[i0] += uint16((xR-xL)*255 + 0.5)
+			}
+			continue
+		}
+		if i0 >= 0 && i0 < w {
+			fila[i0] += uint16((float32(i0+1)-xL)*255 + 0.5)
+		}
+		for ix := max(i0+1, 0); ix < min(i1, w); ix++ {
+			fila[ix] += 255
+		}
+		if i1 >= 0 && i1 < w && xR > float32(i1) {
+			fila[i1] += uint16((xR-float32(i1))*255 + 0.5)
+		}
+	}
+}
+
+// rellenar pinta los subcaminos con un color liso y regla no-cero.
 func (r *rasterizador) rellenar(subs [][]punto, c color.NRGBA, rc *recorteRaster) {
+	r.rellenarRegla(subs, c, rc, false)
+}
+
+func (r *rasterizador) rellenarRegla(subs [][]punto, c color.NRGBA, rc *recorteRaster, parImpar bool) {
 	if c.A == 0 || len(subs) == 0 {
 		return
 	}
@@ -285,11 +410,48 @@ func (r *rasterizador) rellenar(subs [][]punto, c color.NRGBA, rc *recorteRaster
 	if caja.Empty() {
 		return
 	}
-	m := r.mascara(subs, caja)
+	m := r.mascaraRegla(subs, caja, parImpar)
 	if rc != nil && rc.mask != nil {
 		multiplicarMascara(m, rc.mask)
 	}
 	draw.DrawMask(r.dst, caja, image.NewUniform(c), image.Point{}, m, caja.Min, draw.Over)
+}
+
+// ensancharFranjaFina ajusta al píxel entero las reglas rectangulares alineadas
+// con los ejes cuyo espesor cae por debajo de 1 px (como los fondos de franjas
+// `-0.12 re f*` o filetes de tabla), igual que hace el ajuste de trazos finos
+// de un visor de PDF. No se aplica a contornos de glifos.
+func ensancharFranjaFina(subs [][]punto) [][]punto {
+	if len(subs) != 1 {
+		return subs
+	}
+	s := subs[0]
+	if len(s) != 4 && len(s) != 5 {
+		return subs
+	}
+	for i := 0; i < 4; i++ {
+		a, b := s[i], s[(i+1)%4]
+		if math.Abs(float64(a.x-b.x)) > 0.02 && math.Abs(float64(a.y-b.y)) > 0.02 {
+			return subs
+		}
+	}
+	minX, maxX := s[0].x, s[0].x
+	minY, maxY := s[0].y, s[0].y
+	for _, p := range s {
+		minX, maxX = min(minX, p.x), max(maxX, p.x)
+		minY, maxY = min(minY, p.y), max(maxY, p.y)
+	}
+	dx, dy := maxX-minX, maxY-minY
+	switch {
+	case dy > 0 && dy < 1.0 && dx >= 2.0:
+		py := float32(math.Floor(float64(minY+maxY) * 0.5))
+		return [][]punto{{{minX, py}, {maxX, py}, {maxX, py + 1}, {minX, py + 1}, {minX, py}}}
+	case dx > 0 && dx < 1.0 && dy >= 2.0:
+		px := float32(math.Floor(float64(minX+maxX) * 0.5))
+		return [][]punto{{{px, minY}, {px + 1, minY}, {px + 1, maxY}, {px, maxY}, {px, minY}}}
+	default:
+		return subs
+	}
 }
 
 // multiplicarMascara interseca dos coberturas. Es cómo se acumula un recorte
@@ -308,7 +470,7 @@ func multiplicarMascara(dst, rec *image.Alpha) {
 }
 
 // nuevoRecorte interseca el recorte vigente con un camino.
-func (r *rasterizador) nuevoRecorte(subs [][]punto, previo *recorteRaster) *recorteRaster {
+func (r *rasterizador) nuevoRecorte(subs [][]punto, previo *recorteRaster, parImpar bool) *recorteRaster {
 	caja := r.caja(subs, previo)
 	if caja.Empty() {
 		return &recorteRaster{rect: image.Rectangle{}}
@@ -321,7 +483,7 @@ func (r *rasterizador) nuevoRecorte(subs [][]punto, previo *recorteRaster) *reco
 		}
 	}
 	m := image.NewAlpha(caja)
-	copiarAlfa(m, r.mascara(subs, caja))
+	copiarAlfa(m, r.mascaraRegla(subs, caja, parImpar))
 	if previo != nil && previo.mask != nil {
 		multiplicarMascara(m, previo.mask)
 	}
@@ -375,7 +537,7 @@ func (r *rasterizador) recorteDeCaja(v [4]float64, m matriz, previo *recorteRast
 	subs := [][]punto{{
 		r.punto(m, x0, y0), r.punto(m, x1, y0), r.punto(m, x1, y1), r.punto(m, x0, y1),
 	}}
-	return r.nuevoRecorte(subs, previo)
+	return r.nuevoRecorte(subs, previo, false)
 }
 
 // --- Trazo --------------------------------------------------------------------
@@ -384,35 +546,36 @@ func (r *rasterizador) recorteDeCaja(v [4]float64, m matriz, previo *recorteRast
 // convierte en un polígono y se rellenan todos JUNTOS y con el MISMO sentido de
 // giro, que es lo que hace que los solapes de dos tramos consecutivos no se
 // resten entre sí con la regla no-cero.
-func (r *rasterizador) trazar(subs [][]punto, e *ejecucion, c color.NRGBA) {
-	w := float32(e.estado.grosor * r.factor(e.estado.ctm))
+func (r *rasterizador) trazar(subs [][]punto, e *ejecucion) {
+	factor := r.factor(e.estado.ctm)
+	w := float32(e.estado.grosor * factor)
 	if e.estado.grosor <= 0 || w < 1 {
 		// Grosor 0 en PDF es «lo más fino que el dispositivo sepa pintar» (§8.4.3.2),
 		// y por debajo de un píxel una tabla se queda sin bordes.
 		w = 1
 	}
-	if g := guionesEnPixeles(e.estado.guiones, r.factor(e.estado.ctm)); len(g) > 0 {
-		subs = trocearConGuiones(subs, g)
+	if g := guionesEnPixeles(e.estado.guiones, factor); len(g) > 0 {
+		subs = trocearConGuiones(subs, g, float32(e.estado.faseGuion*factor))
 	}
 	polis := make([][]punto, 0, len(subs))
 	for _, s := range subs {
 		polis = append(polis, poligonosDeTramo(s, w, e.estado.tapa, e.estado.union, e.estado.limite)...)
 	}
-	r.rellenar(polis, c, e.estado.recorte)
+	r.pintarConPatron(e, polis, false, e.estado.patTrazo, e.estado.trazo, e.estado.alfaTrazo)
 }
 
 // poligonosDeTramo convierte UNA polilínea en los polígonos que la dibujan: un
 // rectángulo por tramo, una unión por vértice interior y un remate por punta.
 func poligonosDeTramo(s []punto, w float32, tapa, union int, limite float64) [][]punto {
-	if len(s) < 2 {
-		if len(s) == 1 && tapa == 1 {
-			return [][]punto{circulo(s[0], w/2)}
-		}
+	hw := w / 2
+	if len(s) == 0 {
 		return nil
 	}
-	hw := w / 2
+	if tramoDegenerado(s) {
+		return rematePuntoDegenerado(s[0], hw, tapa)
+	}
 	var out [][]punto
-	cerrado := s[0] == s[len(s)-1]
+	cerrado := len(s) > 2 && s[0] == s[len(s)-1]
 	for i := 0; i+1 < len(s); i++ {
 		a, b := s[i], s[i+1]
 		if a == b {
@@ -557,54 +720,128 @@ func guionesEnPixeles(csv string, factor float64) []float32 {
 	return out
 }
 
-// trocearConGuiones parte las polilíneas en los trozos que sí se pintan.
-func trocearConGuiones(subs [][]punto, patron []float32) [][]punto {
+func tramoDegenerado(s []punto) bool {
+	p0 := s[0]
+	for _, p := range s[1:] {
+		if distancia(p0, p) > 1e-4 {
+			return false
+		}
+	}
+	return true
+}
+
+func rematePuntoDegenerado(p punto, hw float32, tapa int) [][]punto {
+	switch tapa {
+	case 1:
+		return [][]punto{circulo(p, hw)}
+	case 2:
+		return [][]punto{orientar([]punto{
+			{p.x - hw, p.y - hw},
+			{p.x + hw, p.y - hw},
+			{p.x + hw, p.y + hw},
+			{p.x - hw, p.y + hw},
+		})}
+	default:
+		return nil
+	}
+}
+
+// trocearConGuiones parte las polilíneas en los trozos que sí se pintan,
+// respetando la fase inicial y los guiones de longitud 0 (`[0 gap] d` + `1 J`).
+func trocearConGuiones(subs [][]punto, patron []float32, fase float32) [][]punto {
+	idxIni, restoIni, pintaIni := estadoInicialGuion(patron, fase)
 	var out [][]punto
 	for _, s := range subs {
-		idx, resto, pinta := 0, patron[0], true
-		var act []punto
-		if pinta {
-			act = []punto{s[0]}
-		}
-		for i := 0; i+1 < len(s); i++ {
-			a, b := s[i], s[i+1]
-			largo := distancia(a, b)
-			for largo > resto {
-				t := resto / largo
-				corte := punto{a.x + (b.x-a.x)*t, a.y + (b.y-a.y)*t}
-				if pinta {
-					act = append(act, corte)
-					out = append(out, act)
-					act = nil
-				} else {
-					act = []punto{corte}
-				}
-				pinta = !pinta
-				a = corte
-				largo -= resto
-				idx = (idx + 1) % len(patron)
-				resto = patron[idx]
-				if resto <= 0 {
-					resto = 0.01
-				}
-			}
-			resto -= largo
-			if pinta {
-				act = append(act, b)
-			}
-		}
-		if len(act) > 1 {
-			out = append(out, act)
+		if len(s) > 0 {
+			out = append(out, trocearPolilineaConGuiones(s, patron, idxIni, restoIni, pintaIni)...)
 		}
 	}
 	return out
+}
+
+func trocearPolilineaConGuiones(
+	s []punto, patron []float32, idx int, resto float32, pinta bool,
+) [][]punto {
+	var out [][]punto
+	var act []punto
+	if pinta {
+		act = []punto{s[0]}
+	}
+	for i := 0; i+1 < len(s); i++ {
+		a, b := s[i], s[i+1]
+		largo := distancia(a, b)
+		pasosCero := 0
+		for largo > resto || (resto <= 0 && pasosCero < len(patron)) {
+			corte, nuevoA, nuevoLargo := avanzarCorteGuion(a, b, largo, resto)
+			if resto <= 0 {
+				pasosCero++
+			} else {
+				a, largo, pasosCero = nuevoA, nuevoLargo, 0
+			}
+			if pinta {
+				out = append(out, append(act, corte))
+				act = nil
+			} else {
+				act = []punto{corte}
+			}
+			pinta = !pinta
+			idx = (idx + 1) % len(patron)
+			resto = max(patron[idx], 0)
+		}
+		resto -= largo
+		if pinta {
+			act = append(act, b)
+		}
+	}
+	if len(act) > 1 {
+		out = append(out, act)
+	} else if len(act) == 1 && resto <= 0 {
+		out = append(out, []punto{act[0], act[0]})
+	}
+	return out
+}
+
+func avanzarCorteGuion(a, b punto, largo, resto float32) (punto, punto, float32) {
+	if resto <= 0 {
+		return a, a, largo
+	}
+	t := resto / largo
+	corte := punto{a.x + (b.x-a.x)*t, a.y + (b.y-a.y)*t}
+	return corte, corte, largo - resto
+}
+
+func estadoInicialGuion(patron []float32, fase float32) (int, float32, bool) {
+	var periodo float32
+	for _, x := range patron {
+		if x > 0 {
+			periodo += x
+		}
+	}
+	if periodo <= 0 {
+		return 0, patron[0], true
+	}
+	f := float32(math.Mod(float64(fase), float64(periodo)))
+	if f < 0 {
+		f += periodo
+	}
+	idx, pinta := 0, true
+	for pasos := 0; f > 0 && pasos < len(patron)*2; pasos++ {
+		d := max(patron[idx], 0)
+		if f < d {
+			return idx, d - f, pinta
+		}
+		f -= d
+		pinta = !pinta
+		idx = (idx + 1) % len(patron)
+	}
+	return idx, max(patron[idx], 0), pinta
 }
 
 // --- Pintado de caminos ---------------------------------------------------------
 
 // pintarRaster es lo que `pintar` hace en el mapa de bits: el MISMO camino, el
 // MISMO estado gráfico y el mismo orden, con otro destino.
-func (e *ejecucion) pintarRaster(hab, relleno, trazo bool, pend int) {
+func (e *ejecucion) pintarRaster(hab, relleno, trazo, parImpar bool, pend int) {
 	if !hab {
 		return
 	}
@@ -613,44 +850,233 @@ func (e *ejecucion) pintarRaster(hab, relleno, trazo bool, pend int) {
 	if len(subs) == 0 {
 		return
 	}
-	switch {
-	case relleno && e.estado.patronRelleno != "" && len(e.estado.mallaRelleno) > 0:
-		r.dibujarMalla(e.estado.mallaRelleno, e.estado.matrizMalla, e.estado.alfaRelleno, r.nuevoRecorte(subs, e.estado.recorte))
-	case relleno && e.estado.patronRelleno != "" && e.estado.degRelleno != nil:
-		r.rellenarConDegradado(subs, e.estado.degRelleno.conAlfa(e.estado.alfaRelleno), e.estado.recorte)
-	case relleno:
-		if c, ok := colorDePintura(e.estado.relleno, e.estado.patronRelleno,
-			e.estado.aproxRelleno, e.estado.alfaRelleno); ok {
-			r.rellenar(subs, c, e.estado.recorte)
+	if relleno {
+		subsRelleno := subs
+		if !trazo {
+			subsRelleno = ensancharFranjaFina(subs)
 		}
+		r.pintarConPatron(e, subsRelleno, parImpar, e.estado.patRelleno, e.estado.relleno, e.estado.alfaRelleno)
 	}
 	if trazo {
-		if c, ok := colorDePintura(e.estado.trazo, e.estado.patronTrazo,
-			e.estado.aproxTrazo, e.estado.alfaTrazo); ok {
-			r.trazar(subs, e, c)
-		}
+		r.trazar(subs, e)
 	}
 	if pend != 0 {
 		// El recorte entra en el estado gráfico vigente y lo deshace `Q`, igual que
 		// en PDF. En el SVG eso mismo es un `<g clip-path>` que se cierra al salir
 		// del nivel.
-		e.estado.recorte = r.nuevoRecorte(subs, e.estado.recorte)
+		e.estado.recorte = r.nuevoRecorte(subs, e.estado.recorte, pend == 2)
 	}
 }
 
-// colorDePintura decide con qué color liso se pinta. Un patrón no es un color:
-// de un sombreado se toma su color medio —que es lo que ya hace el SVG con las
-// mallas— y de un mosaico no se toma nada, porque inventar uno pintaría bloques
-// del color equivocado encima del documento.
-func colorDePintura(css, patron, aprox string, alfa float64) (color.NRGBA, bool) {
-	if patron != "" {
-		if aprox == "" {
+func (r *rasterizador) pintarConPatron(
+	e *ejecucion, subs [][]punto, parImpar bool, pat *patronPDF, css string, alfa float64,
+) {
+	switch {
+	case pat != nil && pat.tipo == 1:
+		r.rellenarConMosaico(e, subs, parImpar, pat, alfa)
+	case pat != nil && len(pat.malla) > 0:
+		r.dibujarMalla(pat.malla, pat.mp, alfa, r.nuevoRecorte(subs, e.estado.recorte, parImpar))
+	case pat != nil && pat.deg != nil:
+		r.rellenarConDegradadoRegla(subs, pat.deg.conAlfa(alfa), e.estado.recorte, parImpar)
+	default:
+		if c, ok := colorDePintura(css, pat, alfa); ok {
+			r.rellenarRegla(subs, c, e.estado.recorte, parImpar)
+		}
+	}
+}
+
+func colorDePintura(css string, pat *patronPDF, alfa float64) (color.NRGBA, bool) {
+	if pat != nil {
+		if pat.aprox == "" {
 			return color.NRGBA{}, false
 		}
-		return colorRaster(aprox, alfa), true
+		return colorRaster(pat.aprox, alfa), true
 	}
 	c := colorRaster(css, alfa)
 	return c, c.A != 0
+}
+
+// rellenarConMosaico pinta un patrón de tipo 1 en PNG: directamente celda por
+// celda cuando caben pocas repeticiones (preserva degradados y fuentes anidadas
+// con nitidez vectorial) y muestreando una celda periódica transparente cuando
+// el rayado es denso.
+func (r *rasterizador) rellenarConMosaico(
+	e *ejecucion, subs [][]punto, parImpar bool, pat *patronPDF, alfa float64,
+) {
+	if pat == nil || pat.st == nil || alfa <= 0 || len(subs) == 0 || e.l.prof > maxProfundidadXObject {
+		return
+	}
+	caja := r.caja(subs, e.estado.recorte)
+	if caja.Empty() {
+		return
+	}
+	inv, ok := pat.mp.inversa()
+	if !ok {
+		return
+	}
+	contenido, err := e.l.d.datosDeFlujo(pat.st)
+	if err != nil {
+		return
+	}
+	mCopia := image.NewAlpha(caja)
+	copiarAlfa(mCopia, r.mascaraRegla(subs, caja, parImpar))
+	if e.estado.recorte != nil && e.estado.recorte.mask != nil {
+		multiplicarMascara(mCopia, e.estado.recorte.mask)
+	}
+	if alfa < 1 {
+		escalarMascara(mCopia, uint8(acotar01(alfa)*255))
+	}
+
+	kxMin, kxMax, kyMin, kyMax := rangoCeldasMosaico(caja, r.escala, inv, pat.bbox, pat.ancho, pat.alto)
+	nx, ny := kxMax-kxMin+1, kyMax-kyMin+1
+	if nx <= 0 || ny <= 0 {
+		return
+	}
+	recursos, _ := e.l.d.resolver(pat.st.Dict["Resources"]).(pdfDict)
+	if nx <= 16 && ny <= 16 && nx*ny <= 256 {
+		r.reproducirCeldasMosaico(e, contenido, recursos, pat, &recorteRaster{rect: caja, mask: mCopia}, kxMin, kxMax, kyMin, kyMax)
+		return
+	}
+	r.muestrearCeldaMosaico(e, contenido, recursos, pat, caja, mCopia, inv)
+}
+
+func escalarMascara(m *image.Alpha, factor uint8) {
+	f := uint32(factor)
+	for i, a := range m.Pix {
+		m.Pix[i] = uint8((uint32(a)*f + 127) / 255) //nolint:gosec // G115: a·f/255 ≤ 255
+	}
+}
+
+func rangoCeldasMosaico(
+	caja image.Rectangle, escala float64, inv matriz, bbox [4]float64, dx, dy float64,
+) (int, int, int, int) {
+	x0, y0 := float64(caja.Min.X)/escala, float64(caja.Min.Y)/escala
+	x1, y1 := float64(caja.Max.X)/escala, float64(caja.Max.Y)/escala
+	esquinas := [4][2]float64{{x0, y0}, {x1, y0}, {x1, y1}, {x0, y1}}
+	uMin, vMin := math.Inf(1), math.Inf(1)
+	uMax, vMax := math.Inf(-1), math.Inf(-1)
+	for _, pt := range esquinas {
+		u := inv[0]*pt[0] + inv[2]*pt[1] + inv[4]
+		v := inv[1]*pt[0] + inv[3]*pt[1] + inv[5]
+		uMin, uMax = math.Min(uMin, u), math.Max(uMax, u)
+		vMin, vMax = math.Min(vMin, v), math.Max(vMax, v)
+	}
+	kxMin := int(math.Floor((uMin - bbox[2]) / dx))
+	kxMax := int(math.Ceil((uMax - bbox[0]) / dx))
+	kyMin := int(math.Floor((vMin - bbox[3]) / dy))
+	kyMax := int(math.Ceil((vMax - bbox[1]) / dy))
+	return kxMin, kxMax, kyMin, kyMax
+}
+
+func (r *rasterizador) reproducirCeldasMosaico(
+	e *ejecucion, contenido []byte, recursos pdfDict, pat *patronPDF,
+	recForma *recorteRaster, kxMin, kxMax, kyMin, kyMax int,
+) {
+	prevSolo := e.l.soloRaster
+	e.l.soloRaster = true
+	defer func() { e.l.soloRaster = prevSolo }()
+
+	ignorar := pat.paintType == 2
+	for ky := kyMin; ky <= kyMax; ky++ {
+		for kx := kxMin; kx <= kxMax; kx++ {
+			ctmCelda := matriz{1, 0, 0, 1, float64(kx) * pat.ancho, float64(ky) * pat.alto}.por(pat.mp)
+			recCelda := r.recorteDeCaja(pat.bbox, ctmCelda, recForma)
+			if recCelda.area(r.pagina).Empty() {
+				continue
+			}
+			est := estadoInicial(ctmCelda)
+			est.recorte = recCelda
+			if ignorar {
+				est.relleno, est.trazo = pat.colorBase, pat.colorBase
+			}
+			e.l.prof++
+			e.l.ejecutarModo(contenido, recursos, est, ignorar)
+			e.l.prof--
+		}
+	}
+}
+
+func (r *rasterizador) muestrearCeldaMosaico(
+	e *ejecucion, contenido []byte, recursos pdfDict, pat *patronPDF,
+	caja image.Rectangle, mCopia *image.Alpha, inv matriz,
+) {
+	sx := math.Hypot(pat.mp[0], pat.mp[1]) * r.escala
+	sy := math.Hypot(pat.mp[2], pat.mp[3]) * r.escala
+	wC := min(max(int(math.Ceil(pat.ancho*max(sx*2, 4))), 4), 512)
+	hC := min(max(int(math.Ceil(pat.alto*max(sy*2, 4))), 4), 512)
+
+	dstCelda := image.NewRGBA(image.Rect(0, 0, wC, hC))
+	rCelda := &rasterizador{dst: dstCelda, escala: 1, pagina: dstCelda.Bounds()}
+	sub := &lienzo{
+		d:           e.l.d,
+		opts:        e.l.opts,
+		fuentes:     e.l.fuentes,
+		caraCSS:     e.l.caraCSS,
+		ocgApagados: e.l.ocgApagados,
+		prof:        e.l.prof + 1,
+		r:           rCelda,
+		soloRaster:  true,
+	}
+	escX, escY := float64(wC)/pat.ancho, float64(hC)/pat.alto
+	mCelda := matriz{escX, 0, 0, escY, -pat.bbox[0] * escX, -pat.bbox[1] * escY}
+	ox := min(max(int(math.Ceil((pat.bbox[2]-pat.bbox[0])/pat.ancho))-1, 0), 4)
+	oy := min(max(int(math.Ceil((pat.bbox[3]-pat.bbox[1])/pat.alto))-1, 0), 4)
+	ignorar := pat.paintType == 2
+	for jy := -oy; jy <= 0; jy++ {
+		for jx := -ox; jx <= 0; jx++ {
+			ctmJ := matriz{1, 0, 0, 1, float64(jx) * pat.ancho, float64(jy) * pat.alto}.por(mCelda)
+			est := estadoInicial(ctmJ)
+			est.recorte = rCelda.recorteDeCaja(pat.bbox, ctmJ, nil)
+			if ignorar {
+				est.relleno, est.trazo = pat.colorBase, pat.colorBase
+			}
+			sub.ejecutarModo(contenido, recursos, est, ignorar)
+		}
+	}
+	r.aplicarMuestrasCelda(dstCelda, wC, hC, pat, caja, mCopia, inv)
+}
+
+func (r *rasterizador) aplicarMuestrasCelda(
+	celda *image.RGBA, wC, hC int, pat *patronPDF,
+	caja image.Rectangle, mCopia *image.Alpha, inv matriz,
+) {
+	bx0, by0, dx, dy := pat.bbox[0], pat.bbox[1], pat.ancho, pat.alto
+	for y := caja.Min.Y; y < caja.Max.Y; y++ {
+		py := (float64(y) + 0.5) / r.escala
+		mRow := mCopia.PixOffset(caja.Min.X, y)
+		dRow := r.dst.PixOffset(caja.Min.X, y)
+		for ix := 0; ix < caja.Dx(); ix++ {
+			cob := uint32(mCopia.Pix[mRow+ix])
+			if cob == 0 {
+				continue
+			}
+			px := (float64(caja.Min.X+ix) + 0.5) / r.escala
+			uu := math.Mod(inv[0]*px+inv[2]*py+inv[4]-bx0, dx)
+			if uu < 0 {
+				uu += dx
+			}
+			vv := math.Mod(inv[1]*px+inv[3]*py+inv[5]-by0, dy)
+			if vv < 0 {
+				vv += dy
+			}
+			cx := min(int(uu/dx*float64(wC)), wC-1)
+			cy := min(int(vv/dy*float64(hC)), hC-1)
+			cOff := celda.PixOffset(cx, cy)
+			sa := (uint32(celda.Pix[cOff+3])*cob + 127) / 255
+			if sa == 0 {
+				continue
+			}
+			sr := (uint32(celda.Pix[cOff])*cob + 127) / 255
+			sg := (uint32(celda.Pix[cOff+1])*cob + 127) / 255
+			sb := (uint32(celda.Pix[cOff+2])*cob + 127) / 255
+			invA := 255 - sa
+			o := dRow + ix*4
+			r.dst.Pix[o] = uint8(min(sr+(uint32(r.dst.Pix[o])*invA+127)/255, 255))     //nolint:gosec // G115: acotado a 255
+			r.dst.Pix[o+1] = uint8(min(sg+(uint32(r.dst.Pix[o+1])*invA+127)/255, 255)) //nolint:gosec // G115: acotado a 255
+			r.dst.Pix[o+2] = uint8(min(sb+(uint32(r.dst.Pix[o+2])*invA+127)/255, 255)) //nolint:gosec // G115: acotado a 255
+			r.dst.Pix[o+3] = uint8(min(sa+(uint32(r.dst.Pix[o+3])*invA+127)/255, 255)) //nolint:gosec // G115: acotado a 255
+		}
+	}
 }
 
 // rellenarArea pinta todo el recorte vigente, que es lo que pide el operador
@@ -677,13 +1103,13 @@ func (r *rasterizador) rellenarAreaCon(rc *recorteRaster, g *degradadoRaster) {
 	r.pintarDegradado(g, area, nil)
 }
 
-// rellenarConDegradado es rellenar con un degradado en vez de un color.
-func (r *rasterizador) rellenarConDegradado(subs [][]punto, g *degradadoRaster, rc *recorteRaster) {
+// rellenarConDegradadoRegla es rellenar con un degradado en vez de un color.
+func (r *rasterizador) rellenarConDegradadoRegla(subs [][]punto, g *degradadoRaster, rc *recorteRaster, parImpar bool) {
 	caja := r.caja(subs, rc)
 	if caja.Empty() {
 		return
 	}
-	m := r.mascara(subs, caja)
+	m := r.mascaraRegla(subs, caja, parImpar)
 	if rc != nil && rc.mask != nil {
 		multiplicarMascara(m, rc.mask)
 	}
@@ -712,10 +1138,14 @@ func (e *ejecucion) dibujarTexto(f *fuentePDF, glifos []glifo) {
 			dx = -g.vx / 1000 * e.estado.tamano
 			dy = desplazamiento - g.vy/1000*e.estado.tamano
 		}
-		if gid, ok := f.indiceDeGlifo(cara, &r.buf, g); ok {
+		if f.reserva && esZapfDingbatsNombre(f.nombreBase) {
+			e.pintarGlifoReservaExtendida(f, g, trm, dx, dy, relleno)
+		} else if gid, ok := f.indiceDeGlifo(cara, &r.buf, g); ok {
 			if subs := r.contorno(cara, gid, upem, trm, dx, dy, e.estado.tamano); len(subs) > 0 {
 				e.pintarGlifo(subs, relleno)
 			}
+		} else if f.reserva {
+			e.pintarGlifoReservaExtendida(f, g, trm, dx, dy, relleno)
 		}
 		paso := g.ancho
 		if f.vertical {
@@ -730,25 +1160,163 @@ func (e *ejecucion) dibujarTexto(f *fuentePDF, glifos []glifo) {
 }
 
 // pintarGlifo aplica el modo de render del texto (§9.3.6) al contorno ya
-// transformado. Los modos 4-6 añaden recorte además de pintar; el recorte no se
-// aplica, pero lo que dibujan sí, que es lo que se ve.
+// transformado. El recorte de los modos 4-7 se acumula en `acumularRecorteTexto`
+// y se aplica al cerrar `ET`.
 func (e *ejecucion) pintarGlifo(subs [][]punto, relleno color.NRGBA) {
 	r := e.l.r
 	rellenar := func() {
-		if e.estado.patronRelleno != "" && e.estado.degRelleno != nil {
-			r.rellenarConDegradado(subs, e.estado.degRelleno.conAlfa(e.estado.alfaRelleno), e.estado.recorte)
+		if e.estado.patRelleno != nil {
+			r.pintarConPatron(e, subs, false, e.estado.patRelleno, e.estado.relleno, e.estado.alfaRelleno)
 			return
 		}
 		r.rellenar(subs, relleno, e.estado.recorte)
 	}
 	switch e.estado.modoRender {
 	case 1, 5:
-		r.trazar(subs, e, colorRaster(e.estado.trazo, e.estado.alfaTrazo))
+		r.trazar(subs, e)
 	case 2, 6:
 		rellenar()
-		r.trazar(subs, e, colorRaster(e.estado.trazo, e.estado.alfaTrazo))
+		r.trazar(subs, e)
 	default:
 		rellenar()
+	}
+}
+
+func (e *ejecucion) reiniciarRecorteTexto() {
+	e.hayClipTexto = false
+	e.clipTextoSVG.Reset()
+	e.clipTextoPts = nil
+}
+
+// acumularRecorteTexto añade los contornos de los glifos mostrados con `Tr` 4-7
+// para intersectarlos con el recorte vigente al ejecutar `ET` (§9.3.6).
+func (e *ejecucion) acumularRecorteTexto(f *fuentePDF, glifos []glifo) {
+	cara, upem := f.caraSfnt()
+	if cara == nil || upem <= 0 {
+		return
+	}
+	e.hayClipTexto = true
+	trm := matriz{e.estado.escalaH, 0, 0, 1, 0, e.estado.subida}.por(e.tm).por(e.estado.ctm)
+	var bufLocal sfnt.Buffer
+	buf := &bufLocal
+	if e.l.r != nil {
+		buf = &e.l.r.buf
+	}
+	desplazamiento := 0.0
+	for _, g := range glifos {
+		dx, dy := desplazamiento, 0.0
+		if f.vertical {
+			dx = -g.vx / 1000 * e.estado.tamano
+			dy = desplazamiento - g.vy/1000*e.estado.tamano
+		}
+		caraGlifo, upemGlifo, gid, ok := resolverContornoRecorte(f, cara, upem, buf, g)
+		if ok {
+			if e.l.r != nil {
+				e.clipTextoPts = append(e.clipTextoPts, e.l.r.contorno(caraGlifo, gid, upemGlifo, trm, dx, dy, e.estado.tamano)...)
+			}
+			if !e.l.soloRaster {
+				escribirContornoSVG(&e.clipTextoSVG, caraGlifo, buf, gid, upemGlifo, trm, dx, dy, e.estado.tamano)
+			}
+		}
+		paso := g.ancho
+		if f.vertical {
+			paso = g.alto
+		}
+		a := paso/1000*e.estado.tamano + e.estado.espCar
+		if g.esEspacioSimple {
+			a += e.estado.espPal
+		}
+		desplazamiento += a
+	}
+}
+
+func resolverContornoRecorte(
+	f *fuentePDF, cara *sfnt.Font, upem float64, buf *sfnt.Buffer, g glifo,
+) (*sfnt.Font, float64, sfnt.GlyphIndex, bool) {
+	if gid, ok := f.indiceDeGlifo(cara, buf, g); ok {
+		return cara, upem, gid, true
+	}
+	if !f.reserva {
+		return nil, 0, 0, false
+	}
+	uni := primeraRuna(g.texto)
+	if uni <= ' ' {
+		return nil, 0, 0, false
+	}
+	pila := pdffuente.Pila(f.negrita, f.italica)
+	for i := len(pila) - 1; i >= 0; i-- {
+		caraExt := pila[i].SFNT()
+		if caraExt == nil {
+			continue
+		}
+		if gid, err := caraExt.GlyphIndex(buf, uni); err == nil && gid != 0 {
+			return caraExt, float64(caraExt.UnitsPerEm()), gid, true
+		}
+	}
+	return nil, 0, 0, false
+}
+
+func escribirContornoSVG(
+	b *strings.Builder, cara *sfnt.Font, buf *sfnt.Buffer, gid sfnt.GlyphIndex,
+	upem float64, trm matriz, dx, dy, tamano float64,
+) {
+	segs, err := cara.LoadGlyph(buf, gid, fixed.Int26_6(int32(upem)<<6), nil)
+	if err != nil || len(segs) == 0 {
+		return
+	}
+	k := tamano / upem / 64
+	pt := func(fx, fy fixed.Int26_6) (float64, float64) {
+		lx, ly := dx+float64(fx)*k, dy-float64(fy)*k
+		return trm[0]*lx + trm[2]*ly + trm[4], trm[1]*lx + trm[3]*ly + trm[5]
+	}
+	abierto := false
+	for _, s := range segs {
+		switch s.Op {
+		case sfnt.SegmentOpMoveTo:
+			if abierto {
+				b.WriteByte('Z')
+			}
+			x0, y0 := pt(s.Args[0].X, s.Args[0].Y)
+			b.WriteString("M" + num(x0) + " " + num(y0))
+			abierto = true
+		case sfnt.SegmentOpLineTo:
+			x0, y0 := pt(s.Args[0].X, s.Args[0].Y)
+			b.WriteString("L" + num(x0) + " " + num(y0))
+		case sfnt.SegmentOpQuadTo:
+			x0, y0 := pt(s.Args[0].X, s.Args[0].Y)
+			x1, y1 := pt(s.Args[1].X, s.Args[1].Y)
+			b.WriteString("Q" + num(x0) + " " + num(y0) + " " + num(x1) + " " + num(y1))
+		case sfnt.SegmentOpCubeTo:
+			x0, y0 := pt(s.Args[0].X, s.Args[0].Y)
+			x1, y1 := pt(s.Args[1].X, s.Args[1].Y)
+			x2, y2 := pt(s.Args[2].X, s.Args[2].Y)
+			b.WriteString("C" + num(x0) + " " + num(y0) + " " + num(x1) + " " + num(y1) + " " + num(x2) + " " + num(y2))
+		}
+	}
+	if abierto {
+		b.WriteByte('Z')
+	}
+}
+
+func (e *ejecucion) aplicarRecorteTexto() {
+	if !e.hayClipTexto {
+		return
+	}
+	dClip := e.clipTextoSVG.String()
+	pts := e.clipTextoPts
+	e.reiniciarRecorteTexto()
+
+	if e.l.r != nil {
+		e.estado.recorte = e.l.r.nuevoRecorte(pts, e.estado.recorte, false)
+	}
+	if !e.l.soloRaster {
+		id := e.l.id("rec")
+		if dClip == "" {
+			e.l.defsEscribir(`<clipPath id="` + id + `"/>`)
+		} else {
+			e.l.defsEscribir(`<clipPath id="` + id + `"><path d="` + dClip + `"/></clipPath>`)
+		}
+		e.abrirGrupo(`<g clip-path="url(#` + id + `)">`)
 	}
 }
 
@@ -825,20 +1393,7 @@ func (r *rasterizador) cuadratica(
 func (f *fuentePDF) caraSfnt() (*sfnt.Font, float64) {
 	if !f.caraLista {
 		f.caraLista = true
-		if len(f.programa) > 0 {
-			if cara, err := sfnt.Parse(f.programa); err == nil {
-				f.cara = cara
-				f.cmapUnicode = tieneCmapUnicode(f.programa)
-				f.cmapMacRoman = tieneCmapMacRoman(f.programa)
-			}
-		}
-		if f.cara == nil {
-			// Sin tipografía utilizable —no incrustada, Type1 antiguo, CFF suelto—
-			// se dibuja con la de reserva y CADA GLIFO EN SU SITIO: el avance lo
-			// manda el PDF, así que la línea no se descuadra aunque la letra sea
-			// otra. Es la misma degradación que el SVG hace con `familiaSustituta`.
-			f.cara, f.reserva = caraDeReserva(f.negrita, f.italica, f.familia), true
-		}
+		f.cargarCaraSfnt()
 	}
 	if f.cara == nil {
 		return nil, 0
@@ -846,31 +1401,61 @@ func (f *fuentePDF) caraSfnt() (*sfnt.Font, float64) {
 	return f.cara, float64(f.cara.UnitsPerEm())
 }
 
+func (f *fuentePDF) cargarCaraSfnt() {
+	if len(f.programa) > 0 {
+		if f.crudo == nil && !f.yaEnvueltaCFF && !f.dosBytes {
+			if limpia, ok := normalizarSfnt(f.programa, f.nombreBase); ok {
+				f.crudo = leerTablasCrudasSfnt(limpia)
+			}
+		}
+		cara, err := sfnt.Parse(f.programa)
+		if err != nil {
+			saneada := f.repararProgramaParaSfnt(f.programa)
+			cara, err = sfnt.Parse(saneada)
+			if err == nil {
+				f.programa = saneada
+			}
+		}
+		if err == nil {
+			f.cara = cara
+			f.cmapUnicode = tieneCmapUnicode(f.programa)
+			f.cmapMacRoman = tieneCmapMacRoman(f.programa)
+			return
+		}
+	}
+	// Sin tipografía utilizable —no incrustada, Type1 antiguo, CFF suelto—
+	// se dibuja con la de reserva y CADA GLIFO EN SU SITIO: el avance lo
+	// manda el PDF, así que la línea no se descuadra aunque la letra sea
+	// otra. Es la misma degradación que el SVG hace con `familiaSustituta`.
+	f.cara, f.reserva = caraDeReserva(f.negrita, f.italica, f.familia), true
+}
+
+func (f *fuentePDF) repararProgramaParaSfnt(programa []byte) []byte {
+	saneada := f.completarMetadatosTTF(programa)
+	if !f.dosBytes {
+		if p, ok := f.cmapSimpleParaTexto(saneada); ok {
+			return p
+		}
+		return saneada
+	}
+	if p, inv, ok := f.reescribirCmapCompuesta(saneada, 0); ok {
+		f.inversoCompuesto = inv
+		return p
+	}
+	return saneada
+}
+
 // indiceDeGlifo resuelve qué contorno dibujar para un código del PDF.
 func (f *fuentePDF) indiceDeGlifo(cara *sfnt.Font, buf *sfnt.Buffer, g glifo) (sfnt.GlyphIndex, bool) {
-	if f.dosBytes && !f.reserva {
-		// Identity-H: el código ES el índice de glifo, salvo que /CIDToGIDMap traiga
-		// una tabla que diga otra cosa.
-		gid := g.codigo
-		if gid > maxCID {
-			return 0, false
+	if !f.reserva {
+		if f.dosBytes {
+			return f.indiceGlifoCompuesto(cara, g.codigo)
 		}
-		if len(f.cidAGid) > 0 {
-			if int(2*gid+1) >= len(f.cidAGid) {
-				return 0, false
-			}
-			gid = uint32(f.cidAGid[2*gid])<<8 | uint32(f.cidAGid[2*gid+1])
+		if gid, ok := f.indiceGlifoSimpleDirecto(cara, g); ok {
+			return gid, true
 		}
-		if gid > math.MaxUint16 || int(gid) >= cara.NumGlyphs() {
-			return 0, false
-		}
-		return sfnt.GlyphIndex(gid), true //nolint:gosec // G115: acotado por NumGlyphs, que maxp guarda en 16 bits
 	}
-	// Fuente simple (§9.6.6.4). Con una tabla Unicode se busca por carácter; con
-	// una (3,0) o (1,0) —lo corriente en un SUBCONJUNTO, que renumera los
-	// códigos desde 1— la clave es el CÓDIGO, y buscar por carácter no encuentra
-	// nada: medido en un formulario de CUPS, no salía ni una letra. Las de
-	// símbolos colocan sus códigos en el área privada F000.
+	// Fuente simple (§9.6.6.4) o de reserva.
 	uni, codigo := primeraRuna(g.texto), rune(g.codigo&0xFF)
 	orden := [3]rune{uni, 0xF000 + codigo, codigo}
 	if !f.cmapUnicode && !f.cmapMacRoman {
@@ -888,6 +1473,29 @@ func (f *fuentePDF) indiceDeGlifo(cara *sfnt.Font, buf *sfnt.Buffer, g glifo) (s
 		}
 		if x, err := cara.GlyphIndex(buf, r); err == nil && x != 0 {
 			return x, true
+		}
+	}
+	return 0, false
+}
+
+func (f *fuentePDF) indiceGlifoCompuesto(cara *sfnt.Font, codigo uint32) (sfnt.GlyphIndex, bool) {
+	// Identity-H: el código ES el índice de glifo, salvo que /CIDToGIDMap traiga
+	// una tabla que diga otra cosa.
+	gid, ok := f.gidDeCID(codigo)
+	if !ok || int(gid) >= cara.NumGlyphs() {
+		return 0, false
+	}
+	return sfnt.GlyphIndex(gid), true
+}
+
+func (f *fuentePDF) indiceGlifoSimpleDirecto(cara *sfnt.Font, g glifo) (sfnt.GlyphIndex, bool) {
+	c := byte(g.codigo & 0xFF)
+	if gid := f.simpleGid[c]; gid != 0 && int(gid) < cara.NumGlyphs() {
+		return sfnt.GlyphIndex(gid), true
+	}
+	if f.crudo != nil {
+		if gid, ok := f.resolverGlifoSimple(f.crudo, g); ok && gid != 0 && int(gid) < cara.NumGlyphs() {
+			return sfnt.GlyphIndex(gid), true
 		}
 	}
 	return 0, false
@@ -969,6 +1577,165 @@ func caraDeReserva(negrita, italica bool, familia string) *sfnt.Font {
 		return reservaItal
 	}
 	return reservaNormal
+}
+
+// pintarGlifoReservaExtendida cubre en la salida PNG los caracteres que Go Font
+// no trae (griego de Symbol, cirílico, operadores matemáticos y ZapfDingbats),
+// apoyándose primero en Liberation Sans (`pdffuente.Pila`) y después en trazos
+// geométricos para los símbolos de Dingbats.
+func (e *ejecucion) pintarGlifoReservaExtendida(
+	f *fuentePDF, g glifo, trm matriz, dx, dy float64, relleno color.NRGBA,
+) {
+	uni := primeraRuna(g.texto)
+	if uni <= ' ' {
+		return
+	}
+	r := e.l.r
+	if esZapfDingbatsNombre(f.nombreBase) {
+		if subs := r.contornoDingbatReserva(uni, trm, dx, dy, e.estado.tamano); len(subs) > 0 {
+			e.pintarGlifo(subs, relleno)
+			return
+		}
+	}
+	pila := pdffuente.Pila(f.negrita, f.italica)
+	for i := len(pila) - 1; i >= 0; i-- {
+		caraExt := pila[i].SFNT()
+		if caraExt == nil {
+			continue
+		}
+		if gid, err := caraExt.GlyphIndex(&r.buf, uni); err == nil && gid != 0 {
+			if subs := r.contorno(caraExt, gid, float64(caraExt.UnitsPerEm()), trm, dx, dy, e.estado.tamano); len(subs) > 0 {
+				e.pintarGlifo(subs, relleno)
+				return
+			}
+		}
+	}
+	if subs := r.contornoDingbatReserva(uni, trm, dx, dy, e.estado.tamano); len(subs) > 0 {
+		e.pintarGlifo(subs, relleno)
+	}
+}
+
+func esZapfDingbatsNombre(nombre string) bool {
+	n := strings.ToLower(nombre)
+	return strings.Contains(n, "zapf") || strings.Contains(n, "dingbat")
+}
+
+func (r *rasterizador) contornoDingbatReserva(uni rune, trm matriz, dx, dy, tamano float64) [][]punto {
+	pt := func(u, v float64) punto {
+		return r.punto(trm, dx+u*tamano, dy+v*tamano)
+	}
+	if forma, ok := dingbatFijo(uni, pt); ok {
+		return forma
+	}
+	if esDiscoDingbat(uni) {
+		return [][]punto{discoDingbat(pt)}
+	}
+	if esEstrellaDingbat(uni) {
+		return [][]punto{estrellaDingbat(pt)}
+	}
+	if uni >= 0x2701 && uni <= 0x27BF {
+		return [][]punto{{pt(0.14, 0.16), pt(0.66, 0.16), pt(0.66, 0.62), pt(0.14, 0.62)}}
+	}
+	return nil
+}
+
+func dingbatFijo(uni rune, pt func(u, v float64) punto) ([][]punto, bool) {
+	switch uni {
+	case '✓', '✔':
+		return [][]punto{{pt(0.08, 0.35), pt(0.28, 0.12), pt(0.76, 0.68), pt(0.68, 0.75), pt(0.28, 0.28), pt(0.15, 0.43)}}, true
+	case '✗', '✘', 0x2715, 0x2716:
+		return [][]punto{
+			{pt(0.12, 0.16), pt(0.20, 0.10), pt(0.72, 0.66), pt(0.64, 0.72)},
+			{pt(0.64, 0.10), pt(0.72, 0.16), pt(0.20, 0.72), pt(0.12, 0.66)},
+		}, true
+	case '■', 0x274F, 0x2750, 0x2751, 0x2752:
+		return [][]punto{{pt(0.10, 0.08), pt(0.70, 0.08), pt(0.70, 0.68), pt(0.10, 0.68)}}, true
+	case '▲':
+		return [][]punto{{pt(0.08, 0.08), pt(0.72, 0.08), pt(0.40, 0.70)}}, true
+	case '▼':
+		return [][]punto{{pt(0.08, 0.70), pt(0.72, 0.70), pt(0.40, 0.08)}}, true
+	case '◆', '❖', '♦':
+		return [][]punto{{pt(0.40, 0.06), pt(0.72, 0.38), pt(0.40, 0.70), pt(0.08, 0.38)}}, true
+	case '♠':
+		return [][]punto{
+			{pt(0.40, 0.74), pt(0.10, 0.38), pt(0.16, 0.22), pt(0.34, 0.24), pt(0.40, 0.34), pt(0.46, 0.24), pt(0.64, 0.22), pt(0.70, 0.38)},
+			{pt(0.35, 0.28), pt(0.45, 0.28), pt(0.52, 0.06), pt(0.28, 0.06)},
+		}, true
+	case '♥', 0x2764, 0x2765:
+		return [][]punto{{
+			pt(0.40, 0.06), pt(0.10, 0.42), pt(0.10, 0.58), pt(0.24, 0.70),
+			pt(0.40, 0.56), pt(0.56, 0.70), pt(0.70, 0.58), pt(0.70, 0.42),
+		}}, true
+	case '♣':
+		return [][]punto{
+			discoCentroDingbat(pt, 0.40, 0.54, 0.16),
+			discoCentroDingbat(pt, 0.24, 0.34, 0.16),
+			discoCentroDingbat(pt, 0.56, 0.34, 0.16),
+			{pt(0.35, 0.30), pt(0.45, 0.30), pt(0.52, 0.06), pt(0.28, 0.06)},
+		}, true
+	case '→', '➔', 0x2799, 0x279C, 0x279D, 0x279E, 0x279F, 0x27A0, 0x27A1:
+		return [][]punto{{
+			pt(0.06, 0.32), pt(0.48, 0.32), pt(0.48, 0.16), pt(0.76, 0.38),
+			pt(0.48, 0.60), pt(0.48, 0.44), pt(0.06, 0.44),
+		}}, true
+	case '↔':
+		return [][]punto{{
+			pt(0.06, 0.38), pt(0.26, 0.20), pt(0.26, 0.32), pt(0.54, 0.32),
+			pt(0.54, 0.20), pt(0.74, 0.38), pt(0.54, 0.56), pt(0.54, 0.44),
+			pt(0.26, 0.44), pt(0.26, 0.56),
+		}}, true
+	case '↕':
+		return [][]punto{{
+			pt(0.40, 0.74), pt(0.22, 0.54), pt(0.34, 0.54), pt(0.34, 0.24),
+			pt(0.22, 0.24), pt(0.40, 0.04), pt(0.58, 0.24), pt(0.46, 0.24),
+			pt(0.46, 0.54), pt(0.58, 0.54),
+		}}, true
+	case '☎', '☛', '☞':
+		return [][]punto{{pt(0.10, 0.18), pt(0.70, 0.18), pt(0.70, 0.58), pt(0.10, 0.58)}}, true
+	case '◗':
+		return [][]punto{{pt(0.40, 0.08), pt(0.68, 0.20), pt(0.68, 0.56), pt(0.40, 0.68)}}, true
+	default:
+		return nil, false
+	}
+}
+
+func discoCentroDingbat(pt func(u, v float64) punto, cx, cy, rad float64) []punto {
+	poly := make([]punto, 0, 12)
+	for i := 0; i < 12; i++ {
+		a := float64(i) * math.Pi / 6
+		poly = append(poly, pt(cx+rad*math.Cos(a), cy+rad*math.Sin(a)))
+	}
+	return poly
+}
+
+func esDiscoDingbat(uni rune) bool {
+	return uni == '●' || uni == '❍' || (uni >= 0x2460 && uni <= 0x2469) || (uni >= 0x2776 && uni <= 0x2793)
+}
+
+func esEstrellaDingbat(uni rune) bool {
+	return uni == '★' || (uni >= 0x2729 && uni <= 0x274B)
+}
+
+func discoDingbat(pt func(u, v float64) punto) []punto {
+	poly := make([]punto, 0, 16)
+	for i := 0; i < 16; i++ {
+		a := float64(i) * math.Pi / 8
+		poly = append(poly, pt(0.40+0.30*math.Cos(a), 0.38+0.30*math.Sin(a)))
+	}
+	return poly
+}
+
+func estrellaDingbat(pt func(u, v float64) punto) []punto {
+	poly := make([]punto, 0, 10)
+	for i := 0; i < 10; i++ {
+		rad := 0.34
+		if i%2 == 1 {
+			rad = 0.14
+		}
+		a := math.Pi/2 + float64(i)*math.Pi/5
+		poly = append(poly, pt(0.40+rad*math.Cos(a), 0.38+rad*math.Sin(a)))
+	}
+	return poly
 }
 
 // --- Imágenes -------------------------------------------------------------------

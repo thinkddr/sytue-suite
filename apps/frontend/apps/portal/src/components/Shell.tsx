@@ -5,7 +5,9 @@
  * props serializables (usuario, Hub) desde el layout SSR.
  */
 import type { ComponentChildren } from 'preact';
+import { useRef } from 'preact/hooks';
 import { SytueShell } from '@sytue/shell';
+import { IndicadorRefrescoTactil, usePullToRefresh } from '@sytue/ui';
 import type { SytueUser } from '@sytue/auth';
 import type { Locale } from '@sytue/i18n';
 import { getAccessToken } from '@sytue/auth/client';
@@ -21,6 +23,8 @@ interface ShellProps {
 }
 
 export function Shell({ user, hubBaseUrl, locale, children }: ShellProps) {
+  const mainRef = useRef<HTMLElement>(null);
+  const refresco = usePullToRefresh(mainRef);
   return (
     <SytueShell
       currentApp="one"
@@ -34,10 +38,12 @@ export function Shell({ user, hubBaseUrl, locale, children }: ShellProps) {
           «Marco» son el marco de color y la hoja que flota dentro
           (tokens/appearance.css). */}
       <main
+        ref={mainRef}
         id="contenido"
         tabIndex={-1}
         class="sytue-frame sytue-frame-page sytue-safe-workspace focus-visible:outline-none"
       >
+        <IndicadorRefrescoTactil estado={refresco} fijo />
         <div class="sytue-sheet sytue-sheet-page">{children}</div>
       </main>
     </SytueShell>

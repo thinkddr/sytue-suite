@@ -3,19 +3,24 @@
  * SPDX-FileCopyrightText: (c) 2026 Daniel Delgado Ramos
  *
  * PublicNotebook — el cuaderno publicado, tal como lo ve quien llega por el
- * enlace. Sin sesión, sin shell, sin acciones: es una página de lectura.
+ * enlace. Sin sesión y sin shell: es una página de lectura; si el cuaderno
+ * está cifrado, permite desbloquearlo en memoria del navegador con su frase de
+ * paso sin enviar nada por la red.
  *
  * No reutiliza `NoteCanvas` porque ahí todo son manejadores —arrastrar, editar,
- * etiquetar, compartir— y aquí no hay ninguno. Traer ese componente con diez
+ * etiquetar, compartir— y aquí no hay edición. Traer ese componente con diez
  * props apagadas sería más código, no menos.
  */
 import type { JSX } from 'preact';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import type { Locale } from '@sytue/i18n';
-import { Icon } from '@sytue/ui';
+import { Button, Icon } from '@sytue/ui';
 import type { Note, Notebook } from '@sytue/api-clients';
 import { useT, type T } from '../i18n/index.js';
 import { conAnclas, enlacesAAnclas } from '../client/enlaces.js';
 import { textoDeNota } from '../client/extracto.js';
+import { abrirContenidoNota } from '../client/notesEncrypted.js';
+import { PassphraseDialog } from './PassphraseDialog.js';
 
 interface Props {
   locale: Locale;
@@ -25,17 +30,107 @@ interface Props {
 
 export function PublicNotebook({ locale, notebook, notes }: Props): JSX.Element {
   const t = useT(locale);
+  const [pidiendoClave, setPidiendoClave] = useState(false);
+  const [notasAbiertas, setNotasAbiertas] = useState<Note[] | null>(null);
+  const generacionRef = useRef(0);
+
+  const tieneCifrado = Boolean(
+    notebook.crypto && (notebook.encrypted || notes.some((n) => Boolean(n.content_cipher))),
+  );
+  const bloqueado = notasAbiertas === null;
+
+  const bloquear = () => {
+    generacionRef.current += 1;
+    setPidiendoClave(false);
+    setNotasAbiertas(null);
+  };
+
+  const previoRef = useRef({ id: notebook.id, check: notebook.crypto?.check });
+
+  useEffect(() => {
+    if (
+      previoRef.current.id === notebook.id &&
+      previoRef.current.check === notebook.crypto?.check
+    ) {
+      return;
+    }
+    previoRef.current = { id: notebook.id, check: notebook.crypto?.check };
+    generacionRef.current += 1;
+    setPidiendoClave(false);
+    setNotasAbiertas(null);
+  }, [notebook.id, notebook.crypto?.check]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const alOcultar = () => {
+      generacionRef.current += 1;
+      setNotasAbiertas(null);
+    };
+    window.addEventListener('pagehide', alOcultar);
+    return () => window.removeEventListener('pagehide', alOcultar);
+  }, []);
+
+  const desbloquear = async (key: CryptoKey) => {
+    const gen = ++generacionRef.current;
+    const abiertas = await Promise.all(
+      notes.map(async (n): Promise<Note> => {
+        if (!n.content_cipher) return n;
+        try {
+          const { claro } = await abrirContenidoNota(key, n, true);
+          const limpia: Note = {
+            ...n,
+            title: claro.title,
+            content: claro.content,
+            data: claro.data ?? {},
+          };
+          delete limpia.content_cipher;
+          return limpia;
+        } catch {
+          return n;
+        }
+      }),
+    );
+    if (generacionRef.current !== gen) return;
+    setNotasAbiertas(abiertas);
+    setPidiendoClave(false);
+  };
+
   return (
     <main class="mx-auto grid max-w-3xl gap-4 px-4 py-8">
-      <header class="grid gap-1">
-        <h1 class="text-text flex items-center gap-2 text-2xl font-semibold">
-          {notebook.emoji ? <span aria-hidden="true">{notebook.emoji}</span> : null}
-          {notebook.title}
-        </h1>
-        <p class="sytue-meta">{t('public.readOnly')}</p>
+      <header class="flex flex-wrap items-start justify-between gap-3">
+        <div class="grid min-w-0 gap-1">
+          <h1 class="text-text flex items-center gap-2 text-2xl font-semibold">
+            {notebook.emoji ? <span aria-hidden="true">{notebook.emoji}</span> : null}
+            <span class="break-words">{notebook.title}</span>
+          </h1>
+          <p class="sytue-meta">{t('public.readOnly')}</p>
+        </div>
+
+        {tieneCifrado ? (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={bloqueado ? () => setPidiendoClave(true) : bloquear}
+            leadingIcon={<Icon name="lock" size={14} />}
+          >
+            {bloqueado ? t('crypto.unlock') : t('crypto.lockNow')}
+          </Button>
+        ) : null}
       </header>
 
-      <NotasSoloLectura t={t} notes={notes} />
+      <NotasSoloLectura t={t} notes={notasAbiertas ?? notes} />
+
+      {pidiendoClave && notebook.crypto ? (
+        <PassphraseDialog
+          t={t}
+          modo="abrir"
+          params={notebook.crypto}
+          onClose={() => setPidiendoClave(false)}
+          onKey={(key) => {
+            void desbloquear(key);
+          }}
+        />
+      ) : null}
     </main>
   );
 }

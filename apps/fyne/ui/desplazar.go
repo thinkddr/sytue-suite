@@ -105,10 +105,20 @@ func MostrarFoco(s *container.Scroll, c fyne.Canvas, tapado float32) bool {
 		visible = min(visible, c.Size().Height-tapado-zp.Y-ps.Y)
 	}
 	switch {
+	case f.Size().Height+2*margen > visible:
+		nuevo := max(s.Offset.Y+arriba-margen, 0)
+		if nuevo == s.Offset.Y {
+			return false
+		}
+		s.ScrollToOffset(fyne.NewPos(s.Offset.X, nuevo))
 	case abajo+margen > visible:
 		s.ScrollToOffset(fyne.NewPos(s.Offset.X, s.Offset.Y+abajo+margen-visible))
-	case arriba < 0:
-		s.ScrollToOffset(fyne.NewPos(s.Offset.X, max(s.Offset.Y+arriba-margen, 0)))
+	case arriba < margen:
+		nuevo := max(s.Offset.Y+arriba-margen, 0)
+		if nuevo == s.Offset.Y {
+			return false
+		}
+		s.ScrollToOffset(fyne.NewPos(s.Offset.X, nuevo))
 	default:
 		return false
 	}

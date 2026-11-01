@@ -193,6 +193,13 @@ func (p *Pantalla) Construir() fyne.CanvasObject {
 	a.Menu = p.menu()
 	a.BarraMovil = p.nuevaBarraMovil()
 	a.CajonAbierto = p.cajonAbierto
+	a.AlCajon = func(abierto bool) {
+		if p.cajonAbierto != abierto && p.AlConmutarCajon != nil {
+			p.AlConmutarCajon()
+		} else {
+			p.cajonAbierto = abierto
+		}
+	}
 	return a
 }
 

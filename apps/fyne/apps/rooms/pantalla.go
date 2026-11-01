@@ -129,13 +129,11 @@ func NuevaPantalla(t *i18n.Translator, l i18n.Locale) *Pantalla {
 	// SIN control del propio cajón también lo recoge; la web solo lo hace en el velo.
 	// Se afina cuando `ui.Armazon` entregue el punto del toque.
 	p.Canal.Cabecera.AlMenu = func() {
-		p.armazon.CajonAbierto = true
-		p.armazon.Refresh()
+		p.armazon.AbrirCajon()
 	}
 	p.armazon.AlPulsar = func() {
 		if p.armazon.CajonAbierto && !p.Canal.sinCanal {
-			p.armazon.CajonAbierto = false
-			p.armazon.Refresh()
+			p.armazon.CerrarCajon()
 		}
 	}
 	p.armazon.Menu = p.Lateral.Construir()
@@ -354,6 +352,15 @@ func (r *canalRenderer) Layout(t fyne.Size) {
 	}
 	if c.sinCanal {
 		r.flujo.desbordando = false
+		if c.estrecha() && c.Cabecera.AlMenu != nil {
+			if c.Vacio.Accion == nil {
+				c.Vacio.Accion = ui.NuevoBoton(c.T.T("sidebar.openChannels", nil), c.Cabecera.AlMenu).Con(ui.Secundario, ui.TallaSM)
+				c.Vacio.Refresh()
+			}
+		} else if c.Vacio.Accion != nil {
+			c.Vacio.Accion = nil
+			c.Vacio.Refresh()
+		}
 		c.Vacio.Show()
 		c.Vacio.Move(fyne.NewPos(0, 0))
 		c.Vacio.Resize(t)

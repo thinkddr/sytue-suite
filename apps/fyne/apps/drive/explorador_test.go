@@ -289,8 +289,8 @@ func TestPorDebajoDe768LaCabeceraVaEnDosFilas(t *testing.T) {
 	casi(t, "el alto de la cabecera en ancho", cab.MinSize().Height, AltoCabeceraVista)
 }
 
-// Marco deja 272 px de hoja en un teléfono de 320; con 16 px de borde seguro
-// quedan 256. La rejilla no puede consumir todo el campo con su icono y relleno.
+// Con margen de área segura en un teléfono compacto quedan 272–256 px útiles de hoja;
+// la rejilla no puede consumir todo el campo con su icono y relleno.
 func TestLaRotacionDelBuscadorDeDriveConCarrilYAreaSeguraConservaLaConsulta(t *testing.T) {
 	defer ui.TactilDePrueba(true)()
 	forma := "carril"
@@ -312,14 +312,14 @@ func TestLaRotacionDelBuscadorDeDriveConCarrilYAreaSeguraConservaLaConsulta(t *t
 	w := test.NewTempWindow(t, arm)
 	w.SetPadded(false)
 	e.buscador.PonerTexto("acta")
-	for _, ancho := range []float32{320, 304, 360, 320, 304} {
+	for _, ancho := range []float32{272, 256, 360, 320, 272} {
 		w.Resize(fyne.NewSize(ancho, 700))
 		buscador := e.buscador
 		minimo := ui.MedidaEntrada(ui.CampoCromo, 0, true).Width
 		if buscador.Size().Width < minimo || buscador.Texto() != "acta" {
 			t.Fatalf("ventana útil %g: buscador=%v, consulta=%q", ancho, buscador.Size(), buscador.Texto())
 		}
-		if ancho <= 320 && buscador.Position().Y+buscador.Size().Height > lay.Acciones[1].Position().Y {
+		if ancho <= 272 && buscador.Position().Y+buscador.Size().Height > lay.Acciones[1].Position().Y {
 			t.Fatal("Nuevo invade el buscador cuando este necesita una fila completa")
 		}
 		for _, o := range lay.Acciones[1:] {

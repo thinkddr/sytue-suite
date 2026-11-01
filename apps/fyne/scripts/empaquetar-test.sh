@@ -541,6 +541,178 @@ salida="$(PATH="$tmp/cli-ios:$PATH" GOPRIVATE='github.com/thinkddr/*' SYTUE_IOS_
 grep -qx minimo-ios-15-recibido <<<"$salida" ||
   mal "el empaquetado iOS no pasa su mínimo a Xcode: $(tail -1 <<<"$salida")"
 
+# En el Mac propio el llavero efímero NO entra en `security list-keychains`, así que
+# `xcodebuild` de la CLI de Fyne debe construir el envoltorio `.app` SIN firmar
+# (`CODE_SIGNING_ALLOWED=NO`, sin `DEVELOPMENT_TEAM=VHC5QW7BZ3`) y `firmar_ipa` embebe
+# el perfil `0644`, deriva los derechos base (`application-identifier`, `team-identifier`,
+# `get-task-allow=false`, `beta-reports-active=true`) y firma con `codesign`.
+cat >"$tmp/cli-ios/xcrun" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$@" >"$XCRUN_ARGV"
+exit 72
+SH
+cat >"$tmp/cli-ios/fyne" <<'SH'
+#!/usr/bin/env bash
+[ "$1" = package ] || exit 99
+exec xcrun xcodebuild -configuration Release -project /tmp/main.xcodeproj -allowProvisioningUpdates DEVELOPMENT_TEAM=VHC5QW7BZ3
+SH
+chmod +x "$tmp/cli-ios/xcrun" "$tmp/cli-ios/fyne"
+XCRUN_ARGV="$tmp/cli-ios-xcrun.argv" PATH="$tmp/cli-ios:$PATH" GOPRIVATE='github.com/thinkddr/*' \
+  SYTUE_IOS_PROFILE=perfil-de-prueba SYTUE_IOS_IDENTIDAD=identidad-de-prueba "$GUION" ios demo >/dev/null 2>&1 || true
+if [ ! -s "$tmp/cli-ios-xcrun.argv" ] ||
+  grep -qx 'DEVELOPMENT_TEAM=VHC5QW7BZ3' "$tmp/cli-ios-xcrun.argv" ||
+  ! grep -qx 'CODE_SIGNING_ALLOWED=NO' "$tmp/cli-ios-xcrun.argv" ||
+  ! grep -qx 'CODE_SIGNING_REQUIRED=NO' "$tmp/cli-ios-xcrun.argv" ||
+  ! grep -qx 'DEVELOPMENT_TEAM=' "$tmp/cli-ios-xcrun.argv"; then
+  mal "empaquetar.sh ios deja que xcodebuild de la CLI pida el certificado en list-keychains"
+fi
+
+# `firmar_ipa` sobre un `.app` sin firmar salido de `xcodebuild` (`CODE_SIGNING_ALLOWED=NO`)
+# y con `Info.plist` en `0600` como escribe `fyne`: copia el perfil en `0644`, extrae los
+# derechos base + `beta-reports-active` + sesión + `associated-domains`, normaliza permisos
+# y produce un `.ipa` verificable.
+ipa_sin_firma="$tmp/ipa-sin-firma"
+mkdir -p "$ipa_sin_firma/bin" "$ipa_sin_firma/aqui" "$ipa_sin_firma/raiz/apps/nucleo/ajustes" \
+  "$ipa_sin_firma/abierto/Payload/Sytue Rooms.app" "$ipa_sin_firma/fuentes/rooms" "$ipa_sin_firma/dist"
+cat >"$ipa_sin_firma/raiz/apps/nucleo/ajustes/grupo_apple.go" <<'GO'
+package ajustes
+const GrupoSuite = "VHC5QW7BZ3.eu.sytue.suite"
+const GrupoContenedorSuite = "group.eu.sytue.suite"
+GO
+cat >"$ipa_sin_firma/fuentes/rooms/FyneApp.toml" <<'TOML'
+[Details]
+Name = "Sytue Rooms"
+ID = "eu.sytue.rooms"
+Version = "3.15.3"
+Build = 56
+[Development]
+esquema = "sytue-rooms"
+enlaces = "rooms"
+TOML
+python3 - "$ipa_sin_firma/abierto/Payload/Sytue Rooms.app/Info.plist" "$ipa_sin_firma/perfil.mobileprovision" <<'PY'
+import os, plistlib, sys
+with open(sys.argv[1], 'wb') as f:
+    plistlib.dump({'CFBundleExecutable': 'main'}, f)
+os.chmod(sys.argv[1], 0o600)
+with open(sys.argv[2], 'wb') as f:
+    plistlib.dump({
+        'TeamIdentifier': ['VHC5QW7BZ3'],
+        'Platform': ['iOS'],
+        'Entitlements': {
+            'application-identifier': 'VHC5QW7BZ3.eu.sytue.rooms',
+            'com.apple.developer.team-identifier': 'VHC5QW7BZ3',
+            'get-task-allow': False,
+            'beta-reports-active': True,
+            'com.apple.security.application-groups': ['group.eu.sytue.suite'],
+            'keychain-access-groups': ['VHC5QW7BZ3.*'],
+            'com.apple.developer.associated-domains': '*',
+        },
+    }, f)
+os.chmod(sys.argv[2], 0o600)
+PY
+printf 'macho-inicial' >"$ipa_sin_firma/abierto/Payload/Sytue Rooms.app/main"
+cat >"$ipa_sin_firma/aqui/apple-firma.sh" <<'SH'
+#!/usr/bin/env bash
+set -euo pipefail
+case "$1" in
+perfil-ruta)
+  [ "$2 $3" = "eu.sytue.rooms ios" ] || exit 1
+  printf '%s\n' "$IPA_SIN_FIRMA/perfil.mobileprovision" ;;
+verificar-perfil-grupo)
+  [ -f "$2" ] && [ "$3 $4" = "eu.sytue.rooms ios" ] ;;
+*) exit 1 ;;
+esac
+SH
+cat >"$ipa_sin_firma/aqui/apple_perfil.py" <<'PY'
+#!/usr/bin/env python3
+import pathlib, sys
+assert sys.argv[1] == 'decodificar' and sys.argv[3] == 'ios'
+sys.stdout.buffer.write(pathlib.Path(sys.argv[2]).read_bytes())
+PY
+chmod +x "$ipa_sin_firma/aqui/apple-firma.sh" "$ipa_sin_firma/aqui/apple_perfil.py"
+cat >"$ipa_sin_firma/bin/codesign" <<'SH'
+#!/usr/bin/env bash
+set -euo pipefail
+if [ "$1" = -d ]; then exit 1; fi
+if [ "$1" = --verify ]; then exit 0; fi
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = --entitlements ]; then cp "$2" "$IPA_SIN_FIRMA/firmados.plist"; break; fi
+  shift
+done
+SH
+chmod +x "$ipa_sin_firma/bin/codesign"
+if ! command -v zip >/dev/null 2>&1; then
+  cat >"$ipa_sin_firma/bin/zip" <<'PY'
+#!/usr/bin/env python3
+import os, sys, zipfile
+args = [a for a in sys.argv[1:] if not a.startswith('-')]
+destino, raices = args[0], args[1:]
+with zipfile.ZipFile(destino, 'w', zipfile.ZIP_DEFLATED) as zf:
+    for raiz in raices:
+        for base, dirs, ficheros in os.walk(raiz):
+            dirs.sort()
+            ficheros.sort()
+            st = os.lstat(base)
+            info = zipfile.ZipInfo(base.rstrip('/') + '/')
+            info.external_attr = ((st.st_mode & 0xFFFF) << 16) | 0x10
+            zf.writestr(info, b'')
+            for nombre in ficheros:
+                ruta = os.path.join(base, nombre)
+                st = os.lstat(ruta)
+                info = zipfile.ZipInfo(ruta)
+                info.external_attr = (st.st_mode & 0xFFFF) << 16
+                with open(ruta, 'rb') as f:
+                    zf.writestr(info, f.read())
+PY
+  chmod +x "$ipa_sin_firma/bin/zip"
+fi
+{
+  for funcion in metadato grupos_sesion_apple derechos_sesion verificar_permisos_apple firmar_ipa; do
+    awk -v fn="$funcion" '
+      $0 ~ "^" fn "\\(\\) \\{" { dentro = 1 }
+      dentro {
+        print
+        if (!py && $0 ~ /<<\x27PY\x27/) py = 1
+        else if (py && $0 == "PY") py = 0
+        else if (!py && $0 == "}") dentro = 0
+      }
+    ' "$GUION"
+  done
+  cat <<'SH'
+compilar_ios_paquete() { printf 'macho-go' >"$2/main"; chmod 0755 "$2/main"; }
+incorporar_widgets_apple() { mkdir -p "$1/../../SwiftSupport/iphoneos"; }
+SH
+} >"$ipa_sin_firma/funciones.sh"
+chmod 0700 "$ipa_sin_firma/abierto" "$ipa_sin_firma/abierto/Payload"
+if PATH="$ipa_sin_firma/bin:$PATH" IPA_SIN_FIRMA="$ipa_sin_firma" \
+  RAIZ="$ipa_sin_firma/raiz" AQUI="$ipa_sin_firma/aqui" \
+  SYTUE_IOS_IDENTIDAD="Apple Distribution: Prueba (VHC5QW7BZ3)" version=3.15.3 build=56 \
+  bash -c 'set -euo pipefail; source "$1/funciones.sh"; firmar_ipa "$1/abierto" "$1/abierto/Payload/Sytue Rooms.app" "$1/dist/sytue-rooms-ios.ipa" eu.sytue.rooms rooms.sytue.eu "$1/fuentes/rooms"' _ "$ipa_sin_firma" >"$ipa_sin_firma/salida" 2>&1; then
+  python3 - "$ipa_sin_firma/firmados.plist" "$ipa_sin_firma/dist/sytue-rooms-ios.ipa" <<'PY' || mal "firmar_ipa no graba los derechos o permisos esperados en el IPA"
+import plistlib, sys, zipfile
+derechos = plistlib.loads(open(sys.argv[1], 'rb').read())
+assert derechos == {
+    'application-identifier': 'VHC5QW7BZ3.eu.sytue.rooms',
+    'com.apple.developer.team-identifier': 'VHC5QW7BZ3',
+    'get-task-allow': False,
+    'beta-reports-active': True,
+    'com.apple.security.application-groups': ['group.eu.sytue.suite'],
+    'keychain-access-groups': ['VHC5QW7BZ3.eu.sytue.rooms', 'VHC5QW7BZ3.eu.sytue.suite'],
+    'com.apple.developer.associated-domains': ['applinks:rooms.sytue.eu'],
+}, derechos
+with zipfile.ZipFile(sys.argv[2]) as zf:
+    nombres = set(zf.namelist())
+    assert 'Payload/Sytue Rooms.app/embedded.mobileprovision' in nombres, nombres
+    assert not any(n.startswith('SwiftSupport') for n in nombres), nombres
+    for info in zf.infolist():
+        modo = (info.external_attr >> 16) & 0o777
+        minimo = 0o555 if info.is_dir() else 0o444
+        assert modo & minimo == minimo, (info.filename, oct(modo))
+PY
+else
+  mal "firmar_ipa rechaza un .app sin firma previa de xcodebuild: $(tail -2 "$ipa_sin_firma/salida")"
+fi
+
 # El Mach-O lo compila Go ANTES de Xcode: la xcconfig no cambia sus flags. Se
 # ejecutan los helpers reales con una CLI y un SDK de prueba; el mínimo del fixture
 # es 16 para detectar un 15 copiado, y el TOML simula el Build incrementado por CLI.

@@ -420,13 +420,14 @@ func TestAppleBundlePathsAndExpectedMockRequestsAreNotProviders(t *testing.T) {
 	path := "apps/fyne/scripts/empaquetar-test.sh"
 	unique := map[string]observation{}
 	scanFile(path, `cmp "$ios_fixture/Sytue Rooms.app/main" "$ios_fixture/main.antes"
+ assert 'Payload/Sytue Rooms.app/embedded.mobileprovision' in nombres
  [ "$(cat "$falso/peticiones")" = 'GET https://androidpublisher.googleapis.com/androidpublisher/v3/applications/eu.sytue.mail/generatedApks/3013004' ] || exit 1`, unique)
 	if len(unique) != 0 {
 		t.Fatalf("local paths and expected mock data became providers: %v", unique)
 	}
 	// A real URL in the same test script must remain visible, including the same
-	// .app/main suffix. The URL matcher cannot be suppressed with the path matcher.
-	scanFile(path, `curl https://rooms.app/main
+	// .app/main or .app/embedded.mobileprovision suffix. The URL matcher cannot be suppressed with the path matcher.
+	scanFile(path, `curl https://rooms.app/embedded.mobileprovision
  curl https://androidpublisher.googleapis.com/androidpublisher/v3/applications`, unique)
 	for _, host := range []string{"rooms.app", "androidpublisher.googleapis.com"} {
 		if _, ok := unique[host+"\t"+path]; !ok {

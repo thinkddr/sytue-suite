@@ -109,3 +109,20 @@ reason = "sprintf-js solo lo usa el registro del proxy de Renovate (global-agent
 id = "GHSA-gcqx-w48m-w2h4"
 ignoreUntil = 2026-12-14
 reason = "deepmerge 4.3.1 solo en tools/renovate/bun.lock (tooling de CI sobre configuración propia del repositorio); sin versión corregida publicada"
+
+# glob 13.0.6 (GHSA-3g3m-2fjr-6pw4) y minimatch 10.2.5/10.2.6/3.1.5 (GHSA-g3hv-75wg-m249)
+# entran únicamente por tooling de desarrollo y CI (eslint/typescript-eslint/@lhci/cli,
+# @capacitor/cli y Renovate), con cero imports en código de producto y sin patrones
+# controlados por usuarios. Sus primeras versiones corregidas (glob 14.0.2 y minimatch
+# 11.0.1, publicadas el 2026-10-27; 14.0.3 y 11.0.3 el 2026-10-28) aún no cumplen la
+# ventana obligatoria de cinco días de bunfig.toml (minimumReleaseAge = 432000). Caduca
+# tras cumplirse esa ventana para subirlas y retirar estas dos entradas.
+[[IgnoredVulns]]
+id = "GHSA-3g3m-2fjr-6pw4"
+ignoreUntil = 2026-11-04
+reason = "glob 13.0.6 solo en tooling de build/CI sin imports en producto; parche >=14.0.2 bloqueado hasta cumplir los 5 días de minimumReleaseAge (2026-11-02)"
+
+[[IgnoredVulns]]
+id = "GHSA-g3hv-75wg-m249"
+ignoreUntil = 2026-11-04
+reason = "minimatch solo en tooling de lint/build/CI sin patrones de usuario; parche >=11.0.1 bloqueado hasta cumplir los 5 días de minimumReleaseAge (2026-11-02)"

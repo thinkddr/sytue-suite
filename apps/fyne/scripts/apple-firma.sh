@@ -293,6 +293,32 @@ verificar_perfil_grupo() { # <ruta> <App ID> <ios|macappstore|developerid> <grup
   python3 "$(dirname "${BASH_SOURCE[0]}")/apple_perfil.py" verificar "$@"
 }
 
+# altool (ContentDelivery) se ha colgado 3 h 36 min sin escribir ni salir (41166113491,
+# sytue-diapos-macos-tienda.pkg). Se acota por grupo de procesos y solo se reintenta una
+# vez cuando vence el reloj, nunca ante un rechazo real de Apple.
+publicar_acotado() { # <ipa|pkg>
+  local paquete="$1" limite="${SYTUE_APPLE_PUBLISH_TIMEOUT_SEC:-900}"
+  python3 - "$limite" app-store-connect publish --path "$paquete" <<'PY'
+import os, signal, subprocess, sys
+limite = float(sys.argv[1])
+if limite <= 0:
+    sys.exit(2)
+orden = sys.argv[2:]
+for intento in (1, 2):
+    proc = subprocess.Popen(orden, stdout=sys.stderr, stderr=sys.stderr, start_new_session=True)
+    try:
+        sys.exit(proc.wait(timeout=limite))
+    except subprocess.TimeoutExpired:
+        try:
+            os.killpg(proc.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        proc.wait()
+        print(f"::warning::tiempo agotado ({limite:g}s) subiendo {orden[-1]} (intento {intento}/2)", file=sys.stderr)
+sys.exit(124)
+PY
+}
+
 # subir <ipa|pkg>...: a App Store Connect (los .pkg son los de la Mac App Store). SIN --testflight (que pide la revisión beta para
 # probadores externos) y SIN --app-store: el build queda en TestFlight para los grupos
 # INTERNOS y nada más. Se intentan todos y se dice cuáles no entraron: una app sin
@@ -303,7 +329,7 @@ subir() {
   credenciales || exit 1
   for ipa in "$@"; do
     [ -f "$ipa" ] || mal "$ipa no existe"
-    if app-store-connect publish --path "$ipa" >&2; then
+    if publicar_acotado "$ipa"; then
       echo "✓ $ipa: en App Store Connect (TestFlight, pruebas internas)" >&2
     else
       fallidos="$fallidos $(basename "$ipa")"

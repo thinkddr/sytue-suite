@@ -206,7 +206,7 @@ func (c *Cabecera) montar(v tema.Variante) {
 	c.llamar.Inerte = c.SinConexion
 
 	c.menu = nil
-	if c.Estrecha && !c.menuYaVisible && c.AlMenu != nil && !tema.EsMarco() {
+	if c.Estrecha && !c.menuYaVisible && c.AlMenu != nil {
 		c.menu = ui.NuevoBotonIcono(iconos.Menu, t.T("sidebar.openChannels", nil), c.AlMenu).SobreBanda()
 		c.menu.Lado, c.menu.TamIcono = ui.SueloTactil(LadoAccionCabecera), GlifoCabecera
 	}

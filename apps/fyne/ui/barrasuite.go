@@ -526,7 +526,7 @@ func (b *BarraSuite) CreateRenderer() fyne.WidgetRenderer {
 	// La pista del atajo va DESPUÉS del campo: se pinta encima de su borde derecho,
 	// que es donde la pone la hoja (`absolute right-3`).
 	r.objetos = append(r.objetos, r.filete, r.esquina, r.divisor, b.marca,
-		b.buscador.campo, b.buscador.atajo)
+		b.buscador.campo, b.buscador.atajo, b.buscador.limpiar)
 	r.objetos = append(r.objetos, b.avisos.objetos()...)
 	// El panel de resultados va el ÚLTIMO: cuelga por debajo de la barra y se pinta
 	// sobre todo lo demás.
@@ -598,6 +598,7 @@ func (r *barraSuiteRenderer) pintar(v tema.Variante) {
 		c.EnCarril = r.carril
 		c.Refresh()
 	}
+	r.b.buscador.enCarril(r.carril)
 }
 
 func (r *barraSuiteRenderer) MinSize() fyne.Size           { return MedidaBarraSuite() }
@@ -869,7 +870,7 @@ func (r *botonAvatarRenderer) Refresh() {
 	r.caja.CambiarRadio(tema.Forma("radius-control"))
 	r.aro.CambiarRadio(tema.Forma("radius-control"))
 	fondo := color.NRGBA{}
-	if r.b.Encima() || (r.b.estaAbierto != nil && r.b.estaAbierto()) {
+	if r.b.Encima() || r.b.pulsado || (r.b.estaAbierto != nil && r.b.estaAbierto()) {
 		fondo = tema.Color(velo, v)
 	}
 	r.caja.Pintar(fondo, color.NRGBA{})

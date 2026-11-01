@@ -69,9 +69,13 @@ def hacer_legible_publico(raiz):
             if ruta.is_symlink():
                 continue
             modo = ruta.stat().st_mode
-            minimo = 0o555 if stat.S_ISDIR(modo) or (modo & 0o100) else 0o444
-            if stat.S_IMODE(modo) & minimo != minimo:
-                os.chmod(ruta, stat.S_IMODE(modo) | minimo)
+            if stat.S_ISDIR(modo):
+                permisos = (stat.S_IMODE(modo) & 0o700) | 0o111
+            else:
+                minimo = 0o555 if modo & 0o100 else 0o444
+                permisos = stat.S_IMODE(modo) | minimo
+            if stat.S_IMODE(modo) != permisos:
+                os.chmod(ruta, permisos)
 
 
 def insertar(productos, host, destino, identidad, app, generador, incluir_widgets=True):
@@ -101,7 +105,7 @@ def insertar(productos, host, destino, identidad, app, generador, incluir_widget
             if carpeta.is_symlink() or not carpeta.resolve().is_relative_to(host.resolve()):
                 raise ValueError("el contenido anidado debe quedar dentro del host")
             carpeta.mkdir(parents=True, exist_ok=True)
-            os.chmod(carpeta, 0o755)
+            os.chmod(carpeta, 0o711)
         planes = []
         if incluir_widgets:
             planes.append(("Sytue-" + app["clave"] + "-Widgets.appex", app["id"] + ".widgets", "widgets",
@@ -125,9 +129,6 @@ def insertar(productos, host, destino, identidad, app, generador, incluir_widget
             shutil.copytree(productos / nombre, bundle, symlinks=True)
             perfil_destino = bundle / ("embedded.mobileprovision" if plataforma == "ios" else "Contents/embedded.provisionprofile")
             shutil.copyfile(perfil, perfil_destino)
-            # El árbol clonado del job Apple y su almacén privado son 0600; instalado
-            # pertenece a root y debe poder leerlo quien ejecuta la app (90255).
-            os.chmod(perfil_destino, 0o644)
             hacer_legible_publico(bundle)
             anidadas.append((bundle, derechos))
         puente = None
@@ -155,7 +156,7 @@ def insertar(productos, host, destino, identidad, app, generador, incluir_widget
             # SwiftSupport/iphoneos/iphoneos y disparaba el rechazo 90430 en Apple.
             # Tampoco se pasa --strip-bitcode (retirado en Xcode 16+).
             soporte_swift.mkdir(parents=True, exist_ok=True)
-            os.chmod(soporte_swift, 0o755)
+            os.chmod(soporte_swift, 0o711)
             bibliotecas += ["--unsigned-destination", soporte_swift]
         else:
             bibliotecas += ["--Xcodesign", "--options=runtime", "--Xcodesign", "--timestamp"]
@@ -202,6 +203,9 @@ def insertar(productos, host, destino, identidad, app, generador, incluir_widget
             firma += ["--options", "runtime", "--timestamp"]
         for dylib in dylibs:
             ejecutar(firma + [dylib])
+        for bundle, _ in anidadas:
+            perfil_destino = bundle / ("embedded.mobileprovision" if plataforma == "ios" else "Contents/embedded.provisionprofile")
+            os.chmod(perfil_destino, 0o600)
         if puente:
             ejecutar(firma + [puente])
         for bundle, derechos in anidadas:

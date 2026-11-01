@@ -1,0 +1,69 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Daniel Delgado Ramos
+name: Reviewed security dispositions
+
+on:
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: Apply the explicitly reviewed false-positive dispositions
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: reviewed-security-dispositions
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      security-events: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Validate evidence and prepare review plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          APPLY_REVIEW: 'false'
+          REVIEW_PATH: ${{ runner.temp }}/security-review-plan.json
+        run: node .github/scripts/security-review.mjs
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: security-review-plan
+          path: ${{ runner.temp }}/security-review-plan.json
+          retention-days: 1
+          if-no-files-found: error
+  apply:
+    needs: plan
+    if: inputs.apply && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Apply only the reviewed classifications
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          APPLY_REVIEW: 'true'
+          REVIEW_PATH: ${{ runner.temp }}/security-review-applied.json
+        run: node .github/scripts/security-review.mjs
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: security-review-applied
+          path: ${{ runner.temp }}/security-review-applied.json
+          retention-days: 1
+          if-no-files-found: error

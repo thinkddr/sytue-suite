@@ -42,7 +42,7 @@ const (
 	// utilizable aunque el despliegue no pase ninguna variable. Se pueden
 	// sobreescribir, pero no dejar en blanco.
 	bootstrapDefaultEmail = "admin@sytue.eu"
-	bootstrapDefaultName  = "Daniel Delgado"
+	bootstrapDefaultName  = "Admin Sytue"
 	// El slug ES la dirección de la organización: cada una vive en
 	// <slug>.sytue.eu, así que la de Sytue es corporate.sytue.eu. No se usa
 	// `sytue` para no acabar en sytue.sytue.eu.

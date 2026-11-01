@@ -61,7 +61,7 @@ func TestBotAuthRejectsMissingOrNonBotToken(t *testing.T) {
 		{"sin cabecera", ""},
 		{"bearer vacío", "Bearer "},
 		{"jwt (no bot_)", "Bearer eyJhbGciOiJSUzI1NiJ9.payload.sig"},
-		{"prefijo ajeno", "Bearer sk_live_abc"},
+		{"prefijo ajeno", "Bearer test_token_abc"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

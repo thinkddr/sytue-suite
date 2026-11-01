@@ -40,13 +40,13 @@ func TestLaVistaPreviaNoHeredaLosSecretosDeProduccion(t *testing.T) {
 			t.Fatalf("UpsertEnvVar(%s, %s): %v", key, scope, err)
 		}
 	}
-	poner("STRIPE_KEY", domain.ScopeAll, true, "sk_live")         // secreto de producción «para todo»
+	poner("STRIPE_KEY", domain.ScopeAll, true, "test_val_live")   // secreto de producción «para todo»
 	poner("SMTP_PASSWORD", domain.ScopeProduction, true, "prod")  // secreto solo de producción
 	poner("PUBLIC_URL", domain.ScopeAll, false, "https://x")      // configuración, no secreto
 	poner("MODO", domain.ScopeAll, false, "compartido")           // configuración con valor propio abajo
 	poner("MODO", domain.ScopePreview, false, "previa")           // ...que tiene que ganar
-	poner("PAGOS_KEY", domain.ScopeAll, true, "sk_live_pagos")    // secreto compartido...
-	poner("PAGOS_KEY", domain.ScopePreview, true, "sk_test_pago") // ...con uno de pruebas para vistas previas
+	poner("PAGOS_KEY", domain.ScopeAll, true, "test_pagos_live")    // secreto compartido...
+	poner("PAGOS_KEY", domain.ScopePreview, true, "test_pago_test") // ...con uno de pruebas para vistas previas
 
 	// --- Vista previa -------------------------------------------------------
 	previa, err := st.ResolveEnvForDeploy(ctx, tenant, p.ID, domain.TargetPreview)
@@ -75,7 +75,7 @@ func TestLaVistaPreviaNoHeredaLosSecretosDeProduccion(t *testing.T) {
 	if got := ultimo["MODO"]; got.Value != "previa" {
 		t.Errorf("el valor propio de la vista previa tiene que llegar el último: MODO = %+v", got)
 	}
-	if got := ultimo["PAGOS_KEY"]; string(got.ValueEnc) != "sk_test_pago" {
+	if got := ultimo["PAGOS_KEY"]; string(got.ValueEnc) != "test_pago_test" {
 		t.Errorf("PAGOS_KEY de la vista previa = %q; se esperaba el de pruebas", got.ValueEnc)
 	}
 

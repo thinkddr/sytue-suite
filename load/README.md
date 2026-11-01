@@ -7,7 +7,7 @@ contrato. El rendimiento es una **máxima** de la suite y criterio de
 build** si se incumplen ([`docs/CONVENTIONS.md`](../docs/CONVENTIONS.md) §0.8,
 estrategia completa en [`docs/operations.md#4-rendimiento-y-seo`](../docs/operations.md#4-rendimiento-y-seo)).
 
-> Licencia: código propietario © Sytue (`MIT`).
+> Licencia: código Apache-2.0 © 2026 Daniel Delgado Ramos (thinkddr) (`MIT`).
 > k6 es una herramienta externa (Apache-2.0); no se incorpora a los artefactos.
 
 ## SLO (objetivos de nivel de servicio)

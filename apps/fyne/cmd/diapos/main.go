@@ -93,6 +93,7 @@ func main() {
 	}
 	// La galería de plantillas de «Crear nuevo» y su selector de tema (editor/plantillas.go).
 	d.Portada().ConPlantillas = true
+	d.Portada().Widget = s.CapturarWidget
 	d.Portada().AlEntrar = func() {
 		go func() {
 			if err := s.Entrar(context.Background()); err == nil {

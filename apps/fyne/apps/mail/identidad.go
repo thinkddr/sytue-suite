@@ -79,6 +79,9 @@ func (b *Buzon) CambiarSesion(ctx context.Context, identidad string) {
 
 func (b *Buzon) olvidarBuzon() {
 	b.vista++
+	b.widgetMu.Lock()
+	b.widgetUnread, b.widgetItems = nil, nil
+	b.widgetMu.Unlock()
 	b.carpetas, b.etiquetas, b.compartidos = nil, nil, nil
 	b.carpetaID, b.etiquetaID, b.carpetaComp = "", "", ""
 	b.mensajes, b.resultados, b.hilo = nil, nil, nil

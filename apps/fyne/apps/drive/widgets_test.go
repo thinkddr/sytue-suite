@@ -12,6 +12,7 @@ import (
 	"os"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/ajustes"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
@@ -87,5 +88,16 @@ func TestStorageWidgetReusesQuotaWithoutPublishingUnknownCapacity(t *testing.T) 
 				t.Fatalf("storage percent: %+v", snapshot)
 			}
 		})
+	}
+}
+
+func TestDriveWidgetPublishesRootItemsAlongsideQuota(t *testing.T) {
+	ahora := time.Date(2026, 11, 1, 10, 0, 0, 0, time.UTC)
+	items := itemsDriveParaWidget([]Elemento{
+		{ID: "d1", Nombre: "Contratos", Carpeta: true, Tamano: -1, Modificado: ahora},
+		{ID: "f1", Nombre: "presupuesto.pdf", Tamano: 2 * 1024 * 1024, Tipo: "application/pdf", Modificado: ahora},
+	})
+	if len(items) != 2 || items[0].Badge != "DIR" || items[1].Badge != "2 MB" {
+		t.Fatalf("items de drive inesperados: %+v", items)
 	}
 }

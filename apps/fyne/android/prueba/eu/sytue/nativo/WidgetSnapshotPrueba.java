@@ -69,6 +69,33 @@ public final class WidgetSnapshotPrueba {
         WidgetSnapshot detached = new WidgetSnapshot(1, "mail", "generation-one", NOW, NOW + 120, true, values);
         values.clear();
         check(detached.counters.size() == 1, "defensive copy");
+        WidgetSnapshot.Item okItem = new WidgetSnapshot.Item(
+                "Revisión trimestral", "Sala Norte", "10:00", "#953be7", NOW + 60, NOW + 3600, false, true, false);
+        WidgetSnapshot.CalendarGrid okCal = new WidgetSnapshot.CalendarGrid(
+                2026, 11, Arrays.asList(3, 14, 28), Collections.singletonMap("3", "#953be7"));
+        WidgetSnapshot rich = new WidgetSnapshot(
+                1, "calendar", "generation-one", NOW, NOW + 120, true,
+                Collections.singletonList(new WidgetSnapshot.Counter("events", 2)),
+                Collections.singletonList(okItem), okCal);
+        check(rich.visible("calendar", "generation-one", false, NOW), "rich calendar snapshot");
+        check(!new WidgetSnapshot(1, "mail", "generation-one", NOW, NOW + 120, true, values,
+                Collections.singletonList(new WidgetSnapshot.Item("enc:v1:secret", "", "", "", 0, 0, false, false, false)), null)
+                .visible("mail", "generation-one", false, NOW), "reject encrypted title");
+        check(!new WidgetSnapshot(1, "mail", "generation-one", NOW, NOW + 120, true, values,
+                Collections.singletonList(new WidgetSnapshot.Item("Title", "ENC:V1:secret", "", "", 0, 0, false, false, false)), null)
+                .visible("mail", "generation-one", false, NOW), "reject encrypted subtitle");
+        check(!new WidgetSnapshot(1, "mail", "generation-one", NOW, NOW + 120, true, values,
+                Collections.nCopies(9, okItem), null)
+                .visible("mail", "generation-one", false, NOW), "reject >8 items");
+        check(!new WidgetSnapshot(1, "calendar", "generation-one", NOW, NOW + 120, true, values, null,
+                new WidgetSnapshot.CalendarGrid(2026, 2, Collections.singletonList(29), null))
+                .visible("calendar", "generation-one", false, NOW), "reject non-leap Feb 29");
+        check(!new WidgetSnapshot(1, "calendar", "generation-one", NOW, NOW + 120, true, values, null,
+                new WidgetSnapshot.CalendarGrid(2026, 11, Arrays.asList(14, 3), null))
+                .visible("calendar", "generation-one", false, NOW), "reject unsorted busy days");
+        check(!new WidgetSnapshot(1, "calendar", "generation-one", NOW, NOW + 120, true, values, null,
+                new WidgetSnapshot.CalendarGrid(2026, 11, null, Collections.singletonMap("03", "#953be7")))
+                .visible("calendar", "generation-one", false, NOW), "reject non-canonical day key");
         System.out.println("Widget snapshot: " + checks + " checks passed");
     }
 }

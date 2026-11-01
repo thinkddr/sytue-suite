@@ -17,6 +17,8 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -29,6 +31,7 @@ import (
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/auth"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
+	"git.sytue.eu/sytue/one/apps/nucleo/widgets"
 )
 
 // # La app viva
@@ -87,6 +90,13 @@ const (
 
 // App es Sytue Photos en marcha. El cero no vale: se crea con Nueva.
 type App struct {
+	Widget        widgets.Source
+	widgetMu      sync.Mutex
+	widgetGen     int
+	widgetCount   *int64
+	widgetAlbumes []widgets.Item
+	widgetFotos   []widgets.Item
+
 	cli *api.Photos
 	w   fyne.Window
 	v   Vista
@@ -578,10 +588,14 @@ func (a *App) cargarMas() {
 	a.g.cargando = true
 	a.pintar()
 	gen, cursor, texto, solo, tambien := a.gen, a.g.cursor, a.g.texto, a.soloFavoritas(), a.g.tambien
+	view := a.Widget.View()
 	a.enSesion(func(vida context.Context) {
 		c, fin := ctx(vida)
 		defer fin()
 		fotos, siguiente, err := a.cli.Timeline(c, cursor, PaginaLinea, solo, texto, tambien...)
+		if err == nil && cursor == "" && !solo && strings.TrimSpace(texto) == "" && len(tambien) == 0 {
+			a.publicarTimelineWidget(c, view, gen, fotos, siguiente)
+		}
 		//nolint:contextcheck // Sólo reconstruye UI; los eventos futuros capturan la vida de cuenta en enSesion.
 		a.hilo(gen, func() {
 			a.g.cargando = false
@@ -602,6 +616,102 @@ func (a *App) cargarMas() {
 			a.quizaMas()
 		})
 	})
+}
+
+func (a *App) publicarTimelineWidget(ctx context.Context, view widgets.View, gen int, fotos []api.Photo, siguiente string) {
+	items := make([]widgets.Item, 0, min(len(fotos), widgets.MaxItems))
+	for _, f := range fotos {
+		titulo := strings.TrimSpace(f.Description)
+		if titulo == "" {
+			titulo = strings.TrimSpace(f.Name)
+		}
+		if titulo == "" {
+			continue
+		}
+		badge := ""
+		var startAt int64
+		if !f.TakenAt.IsZero() && f.TakenAt.Unix() > 0 {
+			startAt = f.TakenAt.Unix()
+			badge = f.TakenAt.Format("02/01")
+		}
+		if f.Favorite {
+			badge = "★ " + badge
+		}
+		items = append(items, widgets.Item{
+			Title:    titulo,
+			Subtitle: f.Camera,
+			Badge:    strings.TrimSpace(badge),
+			StartAt:  startAt,
+			Unread:   f.Favorite,
+		})
+		if len(items) >= widgets.MaxItems {
+			break
+		}
+	}
+	a.widgetMu.Lock()
+	if a.widgetGen != gen {
+		a.widgetGen = gen
+		a.widgetAlbumes = nil
+	}
+	if siguiente == "" {
+		total := int64(len(fotos))
+		a.widgetCount = &total
+	} else {
+		a.widgetCount = nil
+	}
+	a.widgetFotos = widgets.SanitizeItems(items)
+	tieneDatos := a.widgetCount != nil || len(a.widgetAlbumes) > 0 || len(a.widgetFotos) > 0
+	detalle := a.detalleWidgetBloqueado()
+	a.widgetMu.Unlock()
+	if tieneDatos {
+		_ = view.PublicarDetalle(ctx, detalle)
+	}
+}
+
+func (a *App) publicarAlbumesWidget(ctx context.Context, view widgets.View, gen int, lista []api.Album) {
+	items := make([]widgets.Item, 0, min(len(lista), widgets.MaxItems))
+	for _, al := range lista {
+		titulo := strings.TrimSpace(al.Title)
+		if titulo == "" {
+			continue
+		}
+		items = append(items, widgets.Item{
+			Title: titulo,
+			Badge: strconv.Itoa(al.Count),
+		})
+		if len(items) >= widgets.MaxItems {
+			break
+		}
+	}
+	a.widgetMu.Lock()
+	if a.widgetGen != gen {
+		a.widgetGen = gen
+		a.widgetCount, a.widgetFotos = nil, nil
+	}
+	a.widgetAlbumes = widgets.SanitizeItems(items)
+	tieneDatos := a.widgetCount != nil || len(a.widgetAlbumes) > 0 || len(a.widgetFotos) > 0
+	detalle := a.detalleWidgetBloqueado()
+	a.widgetMu.Unlock()
+	if tieneDatos {
+		_ = view.PublicarDetalle(ctx, detalle)
+	}
+}
+
+func (a *App) detalleWidgetBloqueado() widgets.Detail {
+	var d widgets.Detail
+	if a.widgetCount != nil {
+		d.Counters = []widgets.Counter{{Kind: "photos", Value: *a.widgetCount}}
+	}
+	combinados := make([]widgets.Item, 0, len(a.widgetAlbumes)+len(a.widgetFotos))
+	combinados = append(combinados, a.widgetAlbumes...)
+	combinados = append(combinados, a.widgetFotos...)
+	if len(combinados) > widgets.MaxItems {
+		combinados = combinados[:widgets.MaxItems]
+	}
+	if len(combinados) > 0 {
+		d.Items = slices.Clone(combinados)
+	}
+	return d
 }
 
 // quizaMas pide otra página si el final ya está a menos de una pantalla: es lo que hace

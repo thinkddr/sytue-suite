@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 <resources>
-    <color name="sytue_widget_background">#FAFAFA</color>
+    <color name="sytue_widget_background">#FAFAFC</color>
     <color name="sytue_widget_text">#1C1C1E</color>
+    <color name="sytue_widget_muted">#6E6E73</color>
     <color name="sytue_widget_action">#005BCC</color>
+    <color name="sytue_widget_pill_bg">#14005BCC</color>
 </resources>

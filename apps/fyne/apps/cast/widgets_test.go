@@ -91,3 +91,14 @@ func TestStorageWidgetReusesCastQuotaAndKeepsLateAccountPrivate(t *testing.T) {
 		})
 	}
 }
+
+func TestCastWidgetPrioritizesLiveAndFormatsDuration(t *testing.T) {
+	items := itemsCastParaWidget(
+		[]api.CastVideo{{ID: "l1", Title: "Demo trimestral", Owner: api.CastOwner{Name: "Equipo"}, Status: api.CastStatusLive}},
+		[]api.CastVideo{{ID: "v1", Title: "Tutorial de Onboarding", Owner: api.CastOwner{Name: "Ada"}, DurationMS: 185000}},
+		nil,
+	)
+	if len(items) != 2 || items[0].Badge != "LIVE" || !items[0].Unread || items[1].Badge != "3:05" {
+		t.Fatalf("items de cast inesperados: %+v", items)
+	}
+}

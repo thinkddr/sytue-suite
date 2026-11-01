@@ -54,6 +54,7 @@ func main() {
 	w.Resize(fyne.NewSize(1280, 800))
 
 	p := bases.NuevaPantalla(t, api.NewBases(s.URL("bases"), s.Sesion, nil), w)
+	p.Widget = s.CapturarWidget
 	// «Toda la organización» al compartir es la de la sesión.
 	p.Org = s.Sesion.Organizacion
 	// El enlace de un formulario público es de la WEB (lo abre quien no tiene cuenta):

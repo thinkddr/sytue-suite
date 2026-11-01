@@ -11,6 +11,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -158,6 +159,12 @@ type Vista struct {
 	portapapeles func() fyne.Clipboard
 	// orgs son mis organizaciones y el cambio de la activa (la sesión transversal).
 	orgs Organizador
+
+	widgetMu     sync.Mutex
+	widgetUnread *int64
+	widgetEvents *int64
+	widgetAgenda []widgets.Item
+	widgetRecent []widgets.Item
 }
 
 // Organizador es lo que «Tus datos» necesita para elegir de qué organización es la
@@ -633,6 +640,10 @@ func (v *Vista) org() string {
 
 // Arrancar lanza las cargas de la pantalla inicial.
 func (v *Vista) Arrancar() {
+	v.widgetMu.Lock()
+	v.widgetUnread, v.widgetEvents = nil, nil
+	v.widgetAgenda, v.widgetRecent = nil, nil
+	v.widgetMu.Unlock()
 	v.enUI(func() {
 		v.revisionRefresco++
 		v.lanzador.PuedeConectarAlmacen = false
@@ -748,8 +759,8 @@ func (v *Vista) cargarAgenda() {
 	lecturas.Go(func() { sinLeer, errCorreo = v.agenda.SinLeer(ctx) })
 	eventos, errEventos := v.agenda.Hoy(ctx, desde, hasta)
 	lecturas.Wait()
-	if errCorreo == nil {
-		_ = view.Publicar(ctx, widgets.Counter{Kind: "unread", Value: int64(sinLeer)})
+	if errCorreo == nil || errEventos == nil {
+		v.publicarAgendaWidget(ctx, view, sinLeer, errCorreo == nil, eventos, errEventos == nil)
 	}
 	v.enUI(func() {
 		a := Agenda{Eventos: eventos, SinLeer: sinLeer, HayCorreo: errCorreo == nil}
@@ -771,8 +782,12 @@ func (v *Vista) cargarReciente() {
 	ctx, cancelar := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancelar()
 
+	view := v.Widget.View()
 	v.enUI(func() { v.lanzador.Reciente.Estado = Cargando })
 	res, err := v.hub.RecentDe(ctx, nil, MaxRecientes)
+	if err == nil {
+		v.publicarRecienteWidget(ctx, view, res.Hits)
+	}
 	v.enUI(func() {
 		v.lanzador.Reciente.Items = res.Hits
 		switch e := EstadoDe(err); {
@@ -852,4 +867,97 @@ func (v *Vista) enUI(f func()) {
 		}
 		v.bajadas.Refresh()
 	})
+}
+
+func (v *Vista) publicarAgendaWidget(ctx context.Context, view widgets.View, sinLeer int, okCorreo bool, eventos []EventoDeHoy, okEventos bool) {
+	v.widgetMu.Lock()
+	if okCorreo {
+		u := int64(max(sinLeer, 0))
+		v.widgetUnread = &u
+	}
+	if okEventos {
+		ev := int64(len(eventos))
+		v.widgetEvents = &ev
+		recortados := RecortarHoy(eventos)
+		agenda := make([]widgets.Item, 0, len(recortados))
+		for _, e := range recortados {
+			titulo := strings.TrimSpace(e.Resumen)
+			if titulo == "" {
+				continue
+			}
+			badge := e.Inicio.Format("15:04")
+			if e.TodoElDia {
+				badge = "HOY"
+			}
+			var startAt, endAt int64
+			if !e.Inicio.IsZero() && e.Inicio.Unix() > 0 {
+				startAt = e.Inicio.Unix()
+			}
+			if !e.Fin.IsZero() && e.Fin.Unix() > 0 {
+				endAt = e.Fin.Unix()
+			}
+			agenda = append(agenda, widgets.Item{
+				Title:   titulo,
+				Badge:   badge,
+				StartAt: startAt,
+				EndAt:   endAt,
+				Unread:  !HaTerminado(e, v.ahora),
+			})
+		}
+		v.widgetAgenda = widgets.SanitizeItems(agenda)
+	}
+	detalle := v.detalleWidgetBloqueado()
+	v.widgetMu.Unlock()
+	_ = view.PublicarDetalle(ctx, detalle)
+}
+
+func (v *Vista) publicarRecienteWidget(ctx context.Context, view widgets.View, hits []api.HubHit) {
+	recientes := make([]widgets.Item, 0, min(len(hits), widgets.MaxItems))
+	for _, h := range hits {
+		titulo := strings.TrimSpace(h.Title)
+		if titulo == "" {
+			continue
+		}
+		var startAt int64
+		if h.Timestamp != nil && !h.Timestamp.IsZero() && h.Timestamp.Unix() > 0 {
+			startAt = h.Timestamp.Unix()
+		}
+		recientes = append(recientes, widgets.Item{
+			Title:    titulo,
+			Subtitle: h.Kind,
+			Badge:    strings.ToUpper(h.Source),
+			StartAt:  startAt,
+		})
+		if len(recientes) >= widgets.MaxItems {
+			break
+		}
+	}
+	v.widgetMu.Lock()
+	v.widgetRecent = widgets.SanitizeItems(recientes)
+	tieneDatos := v.widgetUnread != nil || v.widgetEvents != nil || len(v.widgetAgenda) > 0 || len(v.widgetRecent) > 0
+	detalle := v.detalleWidgetBloqueado()
+	v.widgetMu.Unlock()
+	if tieneDatos {
+		_ = view.PublicarDetalle(ctx, detalle)
+	}
+}
+
+func (v *Vista) detalleWidgetBloqueado() widgets.Detail {
+	var d widgets.Detail
+	if v.widgetUnread != nil {
+		d.Counters = append(d.Counters, widgets.Counter{Kind: "unread", Value: *v.widgetUnread})
+	}
+	if v.widgetEvents != nil {
+		d.Counters = append(d.Counters, widgets.Counter{Kind: "events", Value: *v.widgetEvents})
+	}
+	combinados := make([]widgets.Item, 0, len(v.widgetAgenda)+len(v.widgetRecent))
+	combinados = append(combinados, v.widgetAgenda...)
+	combinados = append(combinados, v.widgetRecent...)
+	if len(combinados) > widgets.MaxItems {
+		combinados = combinados[:widgets.MaxItems]
+	}
+	if len(combinados) > 0 {
+		d.Items = slices.Clone(combinados)
+	}
+	return d
 }

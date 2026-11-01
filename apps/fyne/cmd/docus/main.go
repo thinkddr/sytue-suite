@@ -86,6 +86,7 @@ func main() {
 	d.Asistir, d.Idioma = api.NewIA(s.URL("ai"), s.Sesion, nil).Asistir, string(s.Idioma()) // el panel «Asistente»
 	// La galería de plantillas de «Crear nuevo» y su selector de tema (editor/plantillas.go).
 	d.Portada().ConPlantillas = true
+	d.Portada().Widget = s.CapturarWidget
 	d.Portada().AlEntrar = func() {
 		go func() {
 			if err := s.Entrar(context.Background()); err == nil {

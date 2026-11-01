@@ -42,13 +42,7 @@ func (a *App) pedirCuota() {
 		defer fin()
 		q, err := a.cli.Quota(c)
 		if err == nil {
-			if counter, valid := widgets.StoragePercent(q.UsedBytes, q.LimitBytes); valid && q.ExternalStorage != nil && !*q.ExternalStorage {
-				_ = view.Publicar(c, counter)
-			} else {
-				// An older backend cannot distinguish plan usage from an external
-				// store. Unknown/unlimited capacity also retires the previous percent.
-				_ = view.Publicar(c)
-			}
+			a.publicarCuotaWidget(c, view, gen, q)
 		}
 		a.hilo(gen, func() {
 			if err == nil {

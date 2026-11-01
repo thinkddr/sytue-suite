@@ -75,3 +75,58 @@ func TestWidgetCalendariosCompletosSinPublicarListaParcial(t *testing.T) {
 		})
 	}
 }
+
+func TestWidgetCalendarioPublicaRejillaYProximosEventos(t *testing.T) {
+	t.Cleanup(widgets.SimularLector(true))
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv("HOME", t.TempDir())
+	ajustes.MarcarSesion()
+
+	ahora := time.Now().UTC().Truncate(time.Minute)
+	proximo := ahora.Add(45 * time.Minute)
+	finProximo := proximo.Add(30 * time.Minute)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/v1/calendars":
+			_, _ = io.WriteString(w, `{"calendars":[{"id":"work","display_name":"Equipo","color":"#953be7"}]}`)
+		case "/api/v1/calendars/shared-with-me":
+			_, _ = io.WriteString(w, `{"calendars":[]}`)
+		case "/api/v1/calendars/work/instances":
+			_, _ = io.WriteString(w, `{"instances":[`+
+				`{"start":"`+proximo.Format(time.RFC3339)+`","end":"`+finProximo.Format(time.RFC3339)+`","event":{"id":"e1","title":"Revisión de diseño","location":"Sala Norte","status":"CONFIRMED"}},`+
+				`{"start":"`+proximo.Format(time.RFC3339)+`","end":"`+finProximo.Format(time.RFC3339)+`","event":{"id":"e2","title":"enc:v1:secreto","status":"CONFIRMED"}},`+
+				`{"start":"`+proximo.Format(time.RFC3339)+`","end":"`+finProximo.Format(time.RFC3339)+`","event":{"id":"e3","title":"Cancelada","status":"CANCELLED"}}`+
+				`]}`)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+
+	p := &Pantalla{T: traductor(t), Cursor: ahora, Zona: time.UTC}
+	a := NuevaApp(p, api.NewCalendars(srv.URL, nil, nil))
+	a.lanzar = func(f func()) { f() }
+	a.enUI = func(f func()) { f() }
+	a.Widget = func() widgets.View {
+		return widgets.NewView("eu.sytue.calendar", "calendar", widgets.Capture(ajustes.Leer().Sesion))
+	}
+	a.cargarCalendarios()
+
+	snapshot, err := widgets.Read("eu.sytue.calendar")
+	if err != nil {
+		t.Fatalf("lectura del snapshot: %v", err)
+	}
+	if snapshot.Calendar == nil || snapshot.Calendar.Year != proximo.Year() || snapshot.Calendar.Month != int(proximo.Month()) {
+		t.Fatalf("falta la rejilla mensual en el snapshot: %+v", snapshot.Calendar)
+	}
+	if len(snapshot.Calendar.BusyDays) == 0 {
+		t.Fatalf("faltan los días ocupados del mes: %+v", snapshot.Calendar)
+	}
+	if len(snapshot.Items) != 1 || snapshot.Items[0].Title != "Revisión de diseño" || snapshot.Items[0].Subtitle != "Sala Norte" {
+		t.Fatalf("debe publicar próximos eventos filtrando cancelados y cifrados: %+v", snapshot.Items)
+	}
+	if len(snapshot.Counters) != 2 || snapshot.Counters[1] != (widgets.Counter{Kind: "events", Value: 2}) {
+		t.Fatalf("contadores inesperados: %+v", snapshot.Counters)
+	}
+}

@@ -5,6 +5,7 @@ package contactos
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"image"
 	"log/slog"
@@ -101,6 +102,11 @@ type App struct {
 	red               *offline.Monitor
 	escrituras        map[string]*ui.Dialogo
 	importadorCargado bool
+
+	widgetMu    sync.Mutex
+	widgetGen   uint64
+	widgetBooks *int64
+	widgetItems []widgets.Item
 }
 
 // NuevaApp monta Contacts. `svc` nil deja la pantalla sin datos, que es lo que se ve
@@ -525,7 +531,7 @@ func (a *App) Cargar() {
 	ctx, fin := context.WithTimeout(scope.ctx, a.Plazo)
 	libretas, err := a.svc.AddressBooks(ctx)
 	if err == nil && conRed && !a.sinRed() {
-		publicarLibretas(ctx, widget, libretas)
+		a.publicarLibretas(ctx, widget, scope.generacion, libretas)
 	}
 	fin()
 	var abrir, refrescar *api.AddressBook
@@ -595,12 +601,92 @@ func (a *App) recibirLibretas(scope cargaContacts, sec uint64, libretas []api.Ad
 	return first
 }
 
-func publicarLibretas(ctx context.Context, view widgets.View, libretas []api.AddressBook) {
+func (a *App) publicarLibretas(ctx context.Context, view widgets.View, gen uint64, libretas []api.AddressBook) {
 	ids := make(map[string]struct{}, len(libretas))
 	for _, book := range libretas {
 		ids[book.ID] = struct{}{}
 	}
-	_ = view.Publicar(ctx, widgets.Counter{Kind: "address_books", Value: int64(len(ids))})
+	total := int64(len(ids))
+	a.widgetMu.Lock()
+	if a.widgetGen != gen {
+		a.widgetGen = gen
+		a.widgetItems = nil
+	}
+	a.widgetBooks = &total
+	detalle := a.detalleWidgetBloqueado()
+	a.widgetMu.Unlock()
+	_ = view.PublicarDetalle(ctx, detalle)
+}
+
+func (a *App) publicarContactosWidget(ctx context.Context, view widgets.View, gen uint64, lista []api.Contact) {
+	items := itemsContactosParaWidget(lista)
+	a.widgetMu.Lock()
+	if a.widgetGen != gen {
+		a.widgetGen = gen
+		a.widgetBooks = nil
+	}
+	a.widgetItems = items
+	tieneDatos := a.widgetBooks != nil || len(a.widgetItems) > 0
+	detalle := a.detalleWidgetBloqueado()
+	a.widgetMu.Unlock()
+	if tieneDatos {
+		_ = view.PublicarDetalle(ctx, detalle)
+	}
+}
+
+func (a *App) detalleWidgetBloqueado() widgets.Detail {
+	var d widgets.Detail
+	if a.widgetBooks != nil {
+		d.Counters = []widgets.Counter{{Kind: "address_books", Value: *a.widgetBooks}}
+	}
+	if len(a.widgetItems) > 0 {
+		d.Items = slices.Clone(a.widgetItems)
+	}
+	return d
+}
+
+func itemsContactosParaWidget(lista []api.Contact) []widgets.Item {
+	items := make([]widgets.Item, 0, min(len(lista), widgets.MaxItems))
+	for _, c := range lista {
+		nombre := strings.TrimSpace(c.DisplayName())
+		if nombre == "" {
+			continue
+		}
+		subtitulo := strings.TrimSpace(cmp.Or(c.Organization, c.Title))
+		if subtitulo == "" && len(c.Emails) > 0 {
+			subtitulo = strings.TrimSpace(c.Emails[0].Email)
+		}
+		var startAt int64
+		if !c.UpdatedAt.IsZero() && c.UpdatedAt.Unix() > 0 {
+			startAt = c.UpdatedAt.Unix()
+		}
+		items = append(items, widgets.Item{
+			Title:    nombre,
+			Subtitle: subtitulo,
+			Badge:    monogramaWidget(nombre),
+			StartAt:  startAt,
+		})
+		if len(items) >= widgets.MaxItems {
+			break
+		}
+	}
+	return widgets.SanitizeItems(items)
+}
+
+func monogramaWidget(s string) string {
+	var r []rune
+	for _, p := range strings.Fields(s) {
+		for _, ch := range p {
+			if unicode.IsLetter(ch) || unicode.IsDigit(ch) {
+				r = append(r, unicode.ToUpper(ch))
+				break
+			}
+		}
+		if len(r) == 2 {
+			break
+		}
+	}
+	return string(r)
 }
 
 func (a *App) sincronizarOrganizacionEn(scope cargaContacts) {
@@ -639,7 +725,7 @@ func (a *App) sincronizarOrganizacionEn(scope cargaContacts) {
 		return
 	}
 	if a.vigente(scope) && !a.sinRed() {
-		publicarLibretas(ctx, widget, libretas)
+		a.publicarLibretas(ctx, widget, scope.generacion, libretas)
 	}
 	var refrescar *api.AddressBook
 	fyne.DoAndWait(func() {
@@ -664,6 +750,9 @@ func (a *App) sincronizarOrganizacionEn(scope cargaContacts) {
 // quedarse en pantalla hasta la siguiente carga.
 func (a *App) Vaciar() {
 	a.invalidar(false)
+	a.widgetMu.Lock()
+	a.widgetBooks, a.widgetItems = nil, nil
+	a.widgetMu.Unlock()
 	a.pararImportador()
 	for key, d := range a.escrituras {
 		d.Cerrar()
@@ -723,6 +812,8 @@ func (a *App) abrirLibretaEn(scope cargaContacts, b api.AddressBook) {
 func (a *App) cargarContactos(b api.AddressBook) { a.cargarContactosEn(a.capturar(), b) }
 
 func (a *App) cargarContactosEn(scope cargaContacts, b api.AddressBook) {
+	widget := a.Widget.View()
+	conRed := !a.sinRed()
 	var sec uint64
 	fyne.DoAndWait(func() {
 		if a.vigente(scope) {
@@ -732,6 +823,9 @@ func (a *App) cargarContactosEn(scope cargaContacts, b api.AddressBook) {
 	})
 	ctx, fin := context.WithTimeout(scope.ctx, a.Plazo)
 	lista, err := a.svc.InBook(ctx, b.ID)
+	if err == nil && conRed && !a.sinRed() && a.vigente(scope) && len(lista) > 0 {
+		a.publicarContactosWidget(ctx, widget, scope.generacion, lista)
+	}
 	fin()
 	fyne.Do(func() {
 		p := a.Pantalla

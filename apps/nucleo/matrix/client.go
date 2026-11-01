@@ -104,6 +104,8 @@ type DecryptedEvent struct {
 	Reference    EventRef
 	SenderDevice string
 	Sender       string
+	SessionID    string
+	SenderKey    string
 	Timestamp    int64
 	Type         string
 	Content      json.RawMessage
@@ -123,6 +125,7 @@ type Client struct {
 	master       []byte
 	mu           sync.Mutex
 	callKeys     map[*CallKeys]struct{}
+	attested     map[attestedStorageSession]struct{}
 	backupMu     sync.Mutex
 	stateMu      sync.RWMutex
 	done         chan struct{}
@@ -449,6 +452,7 @@ func (c *Client) Close() error {
 	if done != nil {
 		<-done
 	}
+	c.clearAttestedSessions()
 	c.stateMu.Lock()
 	defer c.stateMu.Unlock()
 	defer clear(c.master)
@@ -465,7 +469,7 @@ func (c *Client) Logout(ctx context.Context) error {
 	}
 	_, remoteErr := c.cli.Logout(ctx)
 	localErr := c.Close()
-	forgetErr := errors.Join(c.cfg.Secrets.Delete(c.sessionKey()), c.cfg.Secrets.Delete(c.masterKey()), c.cfg.Secrets.Delete(c.backupSecretKey()))
+	forgetErr := errors.Join(c.cfg.Secrets.Delete(c.sessionKey()), c.cfg.Secrets.Delete(c.masterKey()), c.cfg.Secrets.Delete(c.backupSecretKey()), c.cfg.Secrets.Delete(c.ssssSecretKey()))
 	// The directory was constructed exclusively from the authenticated account hash.
 	removeErr := os.RemoveAll(c.directory)
 	return errors.Join(remoteErr, localErr, forgetErr, removeErr)

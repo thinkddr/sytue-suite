@@ -17,6 +17,7 @@ func TestMailboxWidgetUsesServerCountAndRejectsLateIdentity(t *testing.T) {
 	// Linux no tiene widgets nativos: se simula el lector para probar la publicación.
 	t.Cleanup(widgets.SimularLector(true))
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv("HOME", t.TempDir())
 	configSuite.MarcarSesion()
 	service := &servicioFalso{carpetas: []api.Mailbox{
 		{Role: "sent", UnreadEmails: 30}, {Role: "inbox", UnreadEmails: 7},

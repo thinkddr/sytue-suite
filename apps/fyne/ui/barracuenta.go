@@ -628,7 +628,7 @@ func (c *cuentaBarra) entrarOSalir(e sesion.Estado) fyne.CanvasObject {
 	}
 	salir := NuevoElementoMenu(c.t.T("account.signOut", nil), iconos.Salir, func() {
 		if c.s != nil {
-			c.salir(sesion.PendientesNotepads())
+			c.salir(sesion.PendientesAlmacenamiento())
 		}
 	})
 	salir.Peligro = true
@@ -637,11 +637,11 @@ func (c *cuentaBarra) entrarOSalir(e sesion.Estado) fyne.CanvasObject {
 	return salir
 }
 
-// salir avisa, antes de cerrar sesión, de lo que Notepads tiene sin subir en este equipo
-// —capturas en cola y borradores—, porque Salir lo borra del disco (NAT-08, «avisar y
-// luego borrar», 2026-10-16). Se elige subirlo, descartarlo o no salir. Si al subir
-// queda algo (sin red, rechazado, de otra organización), se vuelve a preguntar con lo
-// que quede.
+// salir avisa, antes de cerrar sesión, de lo que hay sin subir en este equipo
+// —capturas y borradores de Notepads más diarios de subidas cifradas—, porque Salir lo
+// borra del disco (NAT-08, «avisar y luego borrar», 2026-10-16). Se elige subirlo,
+// descartarlo o no salir. Si al subir queda algo (sin red, rechazado, diario sin origen
+// o de otra organización), se vuelve a preguntar con lo que quede.
 func (c *cuentaBarra) salir(pendientes int) {
 	if pendientes == 0 {
 		c.cerrarSesion()
@@ -661,7 +661,7 @@ func (c *cuentaBarra) salir(pendientes int) {
 		d.Ocupado(true)
 		go func() {
 			ctx, parar := context.WithTimeout(context.Background(), 30*time.Second)
-			quedan := c.s.SubirNotepads(ctx)
+			quedan := c.s.SubirPendientes(ctx)
 			parar()
 			fyne.Do(func() {
 				d.Cerrar()

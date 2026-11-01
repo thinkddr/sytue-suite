@@ -10,7 +10,7 @@ package ajustes
 #include <stdlib.h>
 char *sytue_contenedor_suite(const char *grupo, int *autorizado);
 */
-import "C"
+import "C" //nolint:gocritic // CGO exige importar C por separado
 
 import (
 	"log/slog"
@@ -20,7 +20,7 @@ import (
 	"runtime"
 	"sync"
 	"sync/atomic"
-	"unsafe"
+	"unsafe" //nolint:gocritic // dupImport falso positivo con import C
 )
 
 // enGrupoApple dice si la última base resuelta es el App Group: solo ahí se aplica la

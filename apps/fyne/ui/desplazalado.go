@@ -10,11 +10,12 @@ import (
 )
 
 // DesplazaLado es `overflow-x-auto`: el contenido se desplaza de lado, recortado a la
-// caja. NO es `container.NewHScroll`, que convierte la rueda vertical en lateral y se
-// queda el gesto: encima de una tabla ancha la página dejaba de bajar. Aquí manda el eje
-// dominante de cada gesto (la rueda, el trackpad y, en el móvil, el dedo, que el driver
-// entrega como desplazamiento): de lado, la tabla; en vertical, `Afuera`, que devuelve el
-// desplazador de la página cuando llega.
+// caja. NO es `container.NewHScroll`, que convierte la rueda vertical en lateral, pone
+// una pista invisible (`scrollBarArea`) encima del contenido y se queda el gesto: encima
+// de una tabla ancha la página dejaba de bajar. Aquí manda el eje dominante de cada gesto
+// —la rueda, el trackpad (`fyne.Scrollable`) y, en el móvil, el dedo (`fyne.Draggable`,
+// que es lo que el driver táctil busca y despacha al arrastrar)—: de lado, el contenido;
+// en vertical, `Afuera`, que devuelve el desplazador de la página cuando llega.
 //
 // Nació en `apps/erp` para las tablas de un informe y subió aquí el 2026-10-05, cuando la
 // rejilla de Sytue Bases necesitó lo mismo (`docs/CONVENTIONS.md` §13.2).
@@ -24,14 +25,20 @@ type DesplazaLado struct {
 	// Ancho es el del contenido. Con 0, el que pida su MinSize en cada momento.
 	Ancho float32
 	// Afuera devuelve quien se lleva lo vertical: el desplazador de la página
-	// (`container.Scroll` lo es). Nil, o si devuelve nil, lo vertical desplaza de lado,
-	// como `HScroll`.
+	// (`container.Scroll` lo es). Nil, o si devuelve nil, lo vertical desplaza de lado
+	// con la rueda, como `HScroll`.
 	Afuera func() fyne.Scrollable
+	// AlDesplazar avisa cuando cambia el desplazamiento o el alcance del contenido (por
+	// ejemplo, para encender o apagar `MASCARA_SCROLL_X`).
+	AlDesplazar func()
 
 	x float32
 }
 
-var _ fyne.Scrollable = (*DesplazaLado)(nil)
+var (
+	_ fyne.Scrollable = (*DesplazaLado)(nil)
+	_ fyne.Draggable  = (*DesplazaLado)(nil)
+)
 
 // NuevoDesplazaLado envuelve `o`, de `ancho`, para desplazarlo de lado.
 func NuevoDesplazaLado(o fyne.CanvasObject, ancho float32, afuera func() fyne.Scrollable) *DesplazaLado {
@@ -42,6 +49,9 @@ func NuevoDesplazaLado(o fyne.CanvasObject, ancho float32, afuera func() fyne.Sc
 
 // X es cuánto se ha desplazado el contenido.
 func (d *DesplazaLado) X() float32 { return d.x }
+
+// AnchoContenido es lo que mide el contenido que se desplaza.
+func (d *DesplazaLado) AnchoContenido() float32 { return d.ancho() }
 
 func (d *DesplazaLado) ancho() float32 {
 	if d.Ancho > 0 {
@@ -56,6 +66,9 @@ func (d *DesplazaLado) mover(dx float32) {
 	if x != d.x {
 		d.x = x
 		d.Refresh()
+		if d.AlDesplazar != nil {
+			d.AlDesplazar()
+		}
 	}
 }
 
@@ -86,6 +99,23 @@ func (d *DesplazaLado) Scrolled(e *fyne.ScrollEvent) {
 	d.mover(dy)
 }
 
+// Dragged es el gesto táctil: en iOS y Android el driver entrega el dedo como arrastre
+// sobre el `fyne.Draggable` alcanzado, no como `ScrollEvent`. De lado corre el contenido;
+// en vertical se lo cede a `Afuera`, igual que la rueda.
+func (d *DesplazaLado) Dragged(e *fyne.DragEvent) {
+	dx, dy := e.Dragged.DX, e.Dragged.DY
+	if max(dy, -dy) > max(dx, -dx) && d.Afuera != nil {
+		if f := d.Afuera(); f != nil {
+			f.Scrolled(&fyne.ScrollEvent{PointEvent: e.PointEvent, Scrolled: fyne.NewDelta(0, dy)})
+			return
+		}
+	}
+	d.mover(dx)
+}
+
+// DragEnd no hace nada: el contenido queda donde se soltó.
+func (d *DesplazaLado) DragEnd() {}
+
 // MinSize es el alto del contenido: el ancho lo pone la caja.
 func (d *DesplazaLado) MinSize() fyne.Size {
 	d.ExtendBaseWidget(d)
@@ -108,9 +138,14 @@ func (r *desplazaLadoRenderer) Destroy() {}
 
 func (r *desplazaLadoRenderer) Layout(t fyne.Size) {
 	ancho := r.d.ancho()
-	r.d.x = min(r.d.x, max(ancho-t.Width, 0))
+	x := min(r.d.x, max(ancho-t.Width, 0))
+	cambio := x != r.d.x
+	r.d.x = x
 	r.d.Contenido.Resize(fyne.NewSize(max(ancho, t.Width), t.Height))
 	r.d.Contenido.Move(fyne.NewPos(-r.d.x, 0))
+	if cambio && r.d.AlDesplazar != nil {
+		r.d.AlDesplazar()
+	}
 }
 
 func (r *desplazaLadoRenderer) Refresh() { r.Layout(r.d.Size()); canvas.Refresh(r.d.Contenido) }

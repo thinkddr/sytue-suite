@@ -382,9 +382,9 @@ func (l *lienzo) mallaComoPatron(tris []trianguloMalla, m matriz) (string, bool)
 	id := l.id("malla")
 	var b strings.Builder
 	b.WriteString(`<pattern id="` + id + `" patternUnits="userSpaceOnUse" ` +
-		`x="-100000" y="-100000" width="200000" height="200000">`)
+		`x="-100000" y="-100000" width="200000" height="200000" patternTransform="` + m.svg() + `">`)
 	var dentro strings.Builder
-	l.dibujarMalla(tris, matriz{1, 0, 0, 1, 100000, 100000}.por(m), &dentro)
+	l.dibujarMalla(tris, matriz{1, 0, 0, 1, 100000, 100000}, &dentro)
 	b.WriteString(dentro.String())
 	b.WriteString("</pattern>")
 	l.defsEscribir(b.String())

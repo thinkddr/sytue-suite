@@ -24,6 +24,7 @@ func TestWidgetLibretasCompletasSinConfundirContactosPaginados(t *testing.T) {
 	for _, caso := range []string{"completas", "fallo", "cambia sesión", "copia sin conexión"} {
 		t.Run(caso, func(t *testing.T) {
 			t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+			t.Setenv("HOME", t.TempDir())
 			ajustes.MarcarSesion()
 			listados := 0
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -73,6 +74,7 @@ func TestWidgetLibretasCompletasSinConfundirContactosPaginados(t *testing.T) {
 func TestWidgetIncluyeLibretaCreadaPorSincronizacionTardia(t *testing.T) {
 	t.Cleanup(widgets.SimularLector(true))
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv("HOME", t.TempDir())
 	ajustes.MarcarSesion()
 	var created atomic.Bool
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

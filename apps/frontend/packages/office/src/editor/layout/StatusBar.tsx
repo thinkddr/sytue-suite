@@ -32,7 +32,7 @@ export function StatusBar({ ctx }: { ctx: EditorContext }): JSX.Element {
   };
 
   return (
-    <div class="border-border bg-surface text-text-muted flex h-[var(--editor-status-h)] shrink-0 items-center gap-4 border-t px-3 text-xs">
+    <div class="sytue-sheet-corners border-border bg-surface text-text-muted flex h-[var(--editor-status-h)] shrink-0 items-center gap-4 border-t px-3 text-xs [--sytue-sheet-tl:0px] [--sytue-sheet-tr:0px]">
       <span class="shrink-0 whitespace-nowrap">
         {t(POSITION_KEY[ctx.kind] ?? 'status.page', { page, pages })}
       </span>

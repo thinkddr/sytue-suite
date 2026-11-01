@@ -6,6 +6,7 @@ package ui
 import (
 	"regexp"
 	"strconv"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -332,5 +333,69 @@ func TestUnRefreshDelDialogoVuelveAMedirlo(t *testing.T) {
 	d.Refresh()
 	if got := d.Size().Height; got < antes+200 {
 		t.Errorf("con 200 más de cuerpo el panel mide %v (antes %v)", got, antes)
+	}
+}
+
+func TestCambioDeCampoYRecogidaDeTecladoEnDialogoMovil(t *testing.T) {
+	telefono(t)
+	antesMovil := esMovil
+	esMovil = func() bool { return true }
+	t.Cleanup(func() { esMovil = antesMovil })
+
+	var altoActual atomic.Int32
+	altoActual.Store(300)
+	antesAlto := AltoTeclado
+	AltoTeclado = func(fyne.Canvas) float32 { return float32(altoActual.Load()) }
+	t.Cleanup(func() { AltoTeclado = antesAlto })
+
+	w := test.NewTempWindow(t, fcanvas.NewRectangle(tema.Color("bg", tema.Claro)))
+	w.Resize(fyne.NewSize(390, 844))
+	c := w.Canvas()
+	t.Cleanup(func() { detenerSeguimientoTeclado(c) })
+
+	primero := NuevaEntrada("Título")
+	segundo := NuevaEntrada("Ubicación")
+	casilla := NuevaCasilla("Permitir que todos los participantes invitados editen la descripción completa del evento", nil)
+	conmutador := NuevoConmutador("Enviar recordatorio automático por correo electrónico a todos los asistentes", nil)
+	cuerpo := container.New(Columna{Hueco: 8}, primero, cuerpoDe(420), casilla, conmutador, segundo)
+	d := NuevoDialogo("Nuevo evento", cuerpo).Con(DialogoMD, NuevoBoton("Guardar", nil))
+	d.Mostrar(c)
+	t.Cleanup(d.Cerrar)
+
+	// Las etiquetas largas de casilla y conmutador envuelven dentro de los 342 px del modal móvil.
+	if casilla.Size().Height <= SueloTactilBarra && len(Repartir(casilla.Etiqueta, casilla.escalon(), Normal, casilla.Size().Width-LadoEleccion-HuecoEleccion)) > 2 {
+		t.Errorf("la casilla larga no creció para repartir sus líneas: %v", casilla.Size())
+	}
+	if r := test.WidgetRenderer(casilla).(*eleccionRenderer); !r.parrafo.Visible() || r.texto.Visible() {
+		t.Error("la casilla estrecha no activó el párrafo multilínea")
+	}
+	if r := test.WidgetRenderer(conmutador).(*conmutadorRenderer); !r.parrafo.Visible() || r.texto.Visible() {
+		t.Error("el conmutador estrecho no activó el párrafo multilínea")
+	}
+
+	// Enfocar el primer campo abre el seguimiento del teclado; pasar al segundo con el
+	// teclado ya abierto lo lleva de inmediato a la zona visible sobre el teclado.
+	Enfocar(c, primero.editor)
+	d.ponerTeclado(c, float32(altoActual.Load()))
+	Enfocar(c, segundo.editor)
+	arribaTeclado := float32(844) - float32(altoActual.Load())
+	abs := fyne.CurrentApp().Driver().AbsolutePositionForObject
+	if fin := abs(segundo).Y + segundo.Size().Height; fin > arribaTeclado {
+		t.Fatalf("al pasar al segundo campo con el teclado abierto queda tapado: fin=%v > %v", fin, arribaTeclado)
+	}
+
+	// Pulsar una casilla del modal retira el foco del campo de texto y recoge la hoja abajo,
+	// acotando el desplazamiento sobrante cuando el contenido ya cabe entero.
+	altoActual.Store(0)
+	casilla.Tapped(&fyne.PointEvent{})
+	if c.Focused() != nil {
+		t.Fatalf("pulsar una casilla del modal dejó enfocado %T", c.Focused())
+	}
+	if fin := d.Position().Y + d.Size().Height; fin != 844 {
+		t.Fatalf("tras recoger el teclado la hoja acaba en %v y debe volver a 844", fin)
+	}
+	maxScroll := max(d.Desplazador().Content.MinSize().Height-d.Desplazador().Size().Height, 0)
+	if d.Desplazador().Offset.Y > maxScroll {
+		t.Fatalf("el desplazamiento quedó fuera de rango al cerrar el teclado: %v > %v", d.Desplazador().Offset.Y, maxScroll)
 	}
 }

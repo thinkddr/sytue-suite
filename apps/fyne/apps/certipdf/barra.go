@@ -204,8 +204,8 @@ type Barra struct {
 
 	// porciento es el rótulo del zoom, que el ajuste cambia sin rehacer la cinta.
 	porciento *ui.Rotulo
-	// Ancho es el de la ventana: por debajo de `md` los grupos se encogen y envuelven, y
-	// la banda crece. Lo pone la pantalla antes de componer.
+	// Ancho es el de la ventana: por debajo de `md` los grupos no pintan rótulo y la
+	// banda es más baja (`max-md:py-1`). Lo pone la pantalla antes de componer.
 	Ancho float32
 	// grupos son los de la última banda compuesta, para saber cuánto mide.
 	grupos []*editor.Grupo
@@ -259,31 +259,20 @@ func AltoBarra() float32 {
 	return AltoFilaBarra() + AltoGrupoBarra() + 2*rellenoCintaY + tema.Borde
 }
 
-// Alto es lo que ocupa la cinta con sus grupos: sólo envuelve el grupo cuyo ancho
-// natural supera la ventana, y entonces hace crecer la banda entera.
+// Alto es lo que ocupa la cinta con sus grupos: una sola fila por grupo, más baja por
+// debajo de `md` (`max-md:py-1` sin rótulos, como `RibbonGroup` sin `BandaDesplegada`).
 func (b *Barra) Alto() float32 {
-	_, alto := repartoBanda(b.grupos, b.disponible())
+	_, alto := repartoBanda(b.grupos)
 	return AltoFilaBarra() + alto + 2*rellenoCintaY + tema.Borde
 }
 
-// disponible es el ancho de la banda: la ventana menos el `px-1`.
-func (b *Barra) disponible() float32 {
-	if b.Ancho <= 0 {
-		return 0
-	}
-	return b.Ancho - 2*margenFila
-}
-
-// repartoBanda es la banda overflow-x-auto con RibbonGroup shrink-0 max-w-full.
-// Cada grupo conserva su ancho natural, limitado individualmente al ancho de la
-// banda. La suma puede superar ese ancho: el desplazador conserva el desbordamiento.
-func repartoBanda(grupos []*editor.Grupo, disponible float32) (anchos []float32, alto float32) {
+// repartoBanda es la banda `overflow-x-auto` con `RibbonGroup` `shrink-0` en una sola
+// fila (`BandaDesplegada = false` en `Barra.tsx`): cada grupo conserva su ancho natural
+// sin envolver tampoco en el teléfono, y lo que no cabe se alcanza deslizando la banda.
+func repartoBanda(grupos []*editor.Grupo) (anchos []float32, alto float32) {
 	anchos = make([]float32, len(grupos))
 	for i, g := range grupos {
 		anchos[i] = editor.MedidaGrupo(g).Width
-		if disponible > 0 {
-			anchos[i] = min(anchos[i], disponible)
-		}
 		// Por debajo de `md` el grupo no lleva rótulo (RibbonGroup) y la banda es más baja.
 		alto = max(alto, editor.AltoGrupoEn(g, anchos[i]))
 	}
@@ -486,7 +475,7 @@ func (b *Barra) bandaDeGrupos() fyne.CanvasObject {
 type bandaBarra struct{ b *Barra }
 
 func (l bandaBarra) MinSize(objs []fyne.CanvasObject) fyne.Size {
-	anchos, alto := repartoBanda(l.b.grupos, l.b.disponible())
+	anchos, alto := repartoBanda(l.b.grupos)
 	var ancho float32
 	for i, a := range anchos {
 		if i > 0 {
@@ -497,9 +486,8 @@ func (l bandaBarra) MinSize(objs []fyne.CanvasObject) fyne.Size {
 	return fyne.NewSize(ancho, alto)
 }
 
-func (l bandaBarra) Layout(objs []fyne.CanvasObject, t fyne.Size) {
-	// t.Width es el contenido del scroll; max-w-full se refiere a la ventana visible.
-	anchos, alto := repartoBanda(l.b.grupos, l.b.disponible())
+func (l bandaBarra) Layout(objs []fyne.CanvasObject, _ fyne.Size) {
+	anchos, alto := repartoBanda(l.b.grupos)
 	var x float32
 	for i, o := range objs {
 		w := o.MinSize().Width

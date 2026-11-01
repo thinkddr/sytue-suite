@@ -31,7 +31,7 @@ func TestRotacionDelEditorConservaElDocumentoYLasHerramientas(t *testing.T) {
 			texto.PonerTexto("Documento que debe sobrevivir a la rotación")
 			ctx := &Contexto{Tipo: tipo, Estado: Listo, Zoom: 125, Lienzo: &lienzoFijo{texto}}
 			m := NuevoMarco(ctx, Genericas(), nil)
-			b := ui.NuevaBarraSuite(tr, nil, iconos.Docs).ConHojaASangre()
+			b := ui.NuevaBarraSuite(tr, nil, iconos.Docs)
 			t.Cleanup(b.Parar)
 			w := test.NewTempWindow(t, b.Montar(m))
 			w.SetPadded(false)

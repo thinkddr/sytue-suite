@@ -14,6 +14,7 @@ import (
 	"git.sytue.eu/sytue/one/apps/fyne/catalogos"
 	"git.sytue.eu/sytue/one/apps/fyne/editor"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
+	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 )
 
@@ -88,15 +89,11 @@ func TestElPanelSoloEnsenaLoQueSabePintar(t *testing.T) {
 
 	// [máscara [línea, tira], degradado]: la tira va dentro de la máscara del borde.
 	conLinea := p.raiz.Objects[0].(*fyne.Container).Objects[0].(*fyne.Container)
-	envuelta, ok := conLinea.Objects[1].(*fyne.Container).Objects[0].(*container.ThemeOverride)
-	if !ok {
-		t.Fatal("la tira no va envuelta sin barra de desplazamiento")
-	}
-	desliza, ok := envuelta.Content.(*container.Scroll)
+	desliza, ok := conLinea.Objects[1].(*ui.DesplazaLado)
 	if !ok {
 		t.Fatal("la tira no se desliza: los nueve rótulos no caben en los 288 del panel")
 	}
-	fila, ok := desliza.Content.(*fyne.Container)
+	fila, ok := desliza.Contenido.(*fyne.Container)
 	if !ok {
 		t.Fatal("la tira no es un contenedor")
 	}

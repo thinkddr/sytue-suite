@@ -37,7 +37,7 @@ func montarLecturaDocus(t *testing.T) (*Folio, fyne.Window) {
 	m := editor.NuevoMarco(f.ctx, registroDocus("es"), nil)
 	barra, parar := ui.BarraSuiteDePrueba(tr, iconos.Docs)
 	t.Cleanup(parar)
-	w := test.NewTempWindow(t, barra.ConHojaASangre().Montar(m))
+	w := test.NewTempWindow(t, barra.Montar(m))
 	w.SetPadded(false)
 	return f, w
 }

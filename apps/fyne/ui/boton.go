@@ -652,6 +652,9 @@ func (b *Boton) Tapped(*fyne.PointEvent) {
 	if b.inerte() || b.AlPulsar == nil {
 		return
 	}
+	if esMovil() {
+		cerrarTecladoMovil(lienzoDe(b))
+	}
 	b.AlPulsar()
 }
 

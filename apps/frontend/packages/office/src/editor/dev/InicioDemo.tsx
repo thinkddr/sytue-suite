@@ -24,7 +24,7 @@ export function InicioDemo({ kind, locale }: { kind: DocKind | 'pdf'; locale: Lo
       producto={kind === 'pdf' ? 'pdf' : productoDeKind(kind)}
     >
       {kind === 'pdf' ? (
-        <div class="h-[calc(100dvh-var(--spacing-topbar)-var(--sytue-safe-bottom,0px))] min-h-0">
+        <div class="h-[calc(100dvh-var(--spacing-topbar)-var(--sytue-sheet-gap,0px)-var(--sytue-safe-bottom,0px))] min-h-0">
           <PortadaPdf locale={locale} />
         </div>
       ) : (

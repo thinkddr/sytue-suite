@@ -13,28 +13,48 @@ package sesion
 static float sytue_alto_teclado_ios = 0.0f;
 static int sytue_teclado_iniciado = 0;
 
+static void sytue_actualizar_alto_teclado(NSNotification *note) {
+	NSDictionary *info = note.userInfo;
+	CGRect endFrame = [[info objectForKey:UIKeyboardFrameEndUserInfoKey] CGRectValue];
+	CGRect screenBounds = [UIScreen mainScreen].bounds;
+	float solape = (float)(screenBounds.size.height - endFrame.origin.y);
+	if (solape <= 0.0f || endFrame.size.height <= 0.0f) {
+		sytue_alto_teclado_ios = 0.0f;
+	} else {
+		sytue_alto_teclado_ios = solape;
+	}
+}
+
 static void sytue_iniciar_teclado() {
 	if (sytue_teclado_iniciado) return;
 	sytue_teclado_iniciado = 1;
-	[[NSNotificationCenter defaultCenter] addObserverForName:UIKeyboardWillChangeFrameNotification
-	                                                  object:nil
-	                                                   queue:[NSOperationQueue mainQueue]
-	                                              usingBlock:^(NSNotification *note) {
-		NSDictionary *info = note.userInfo;
-		CGRect endFrame = [[info objectForKey:UIKeyboardFrameEndUserInfoKey] CGRectValue];
-		UIScreen *screen = [UIScreen mainScreen];
-		if (endFrame.origin.y >= screen.bounds.size.height) {
-			sytue_alto_teclado_ios = 0.0f;
-		} else {
-			sytue_alto_teclado_ios = (float)endFrame.size.height;
-		}
+	NSNotificationCenter *nc = [NSNotificationCenter defaultCenter];
+	NSOperationQueue *mq = [NSOperationQueue mainQueue];
+	[nc addObserverForName:UIKeyboardWillChangeFrameNotification
+	                object:nil
+	                 queue:mq
+	            usingBlock:^(NSNotification *note) {
+		sytue_actualizar_alto_teclado(note);
 	}];
-	[[NSNotificationCenter defaultCenter] addObserverForName:UIKeyboardWillHideNotification
-	                                                  object:nil
-	                                                   queue:[NSOperationQueue mainQueue]
-	                                              usingBlock:^(NSNotification *note) {
+	[nc addObserverForName:UIKeyboardDidChangeFrameNotification
+	                object:nil
+	                 queue:mq
+	            usingBlock:^(NSNotification *note) {
+		sytue_actualizar_alto_teclado(note);
+	}];
+	[nc addObserverForName:UIKeyboardWillHideNotification
+	                object:nil
+	                 queue:mq
+	            usingBlock:^(NSNotification *note) {
 		sytue_alto_teclado_ios = 0.0f;
 	}];
+}
+
+__attribute__((constructor))
+static void sytue_preparar_teclado_ios(void) {
+	dispatch_async(dispatch_get_main_queue(), ^{
+		sytue_iniciar_teclado();
+	});
 }
 
 static float sytue_obtener_alto_teclado_ios() {

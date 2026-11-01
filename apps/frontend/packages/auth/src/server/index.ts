@@ -33,8 +33,16 @@ export {
   resolveOidcConfig,
   resolveSessionSecret,
   resolveIntegrationsUrl,
+  resolveDriveServiceUrl,
+  resolveRoomsServiceUrl,
   serverEnv,
 } from '../config.js';
+export {
+  crearRutaBlobsCifrados,
+  crearRutaMatrixStorageBootstrap,
+  type OpcionesRutaBlobsCifrados,
+  type OpcionesRutaMatrixStorageBootstrap,
+} from './almacenamiento-cifrado.js';
 export { consulta } from './consulta.js';
 export { crearDirectorio } from './directorio.js';
 export { rutasDePeticiones } from './peticiones.js';

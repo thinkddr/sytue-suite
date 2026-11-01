@@ -214,7 +214,7 @@ export function Popover({
       document.removeEventListener('mousedown', onPointerDown);
       document.removeEventListener('keydown', onKeyDown, true);
       if (restoreRef.current) {
-        triggerEl?.querySelector<HTMLElement>(FOCUSABLE)?.focus();
+        triggerEl?.querySelector<HTMLElement>(FOCUSABLE)?.focus({ preventScroll: true });
       }
       restoreRef.current = true; // rearmar para el próximo ciclo
     };
@@ -231,7 +231,7 @@ export function Popover({
         // media y radio lg, igual que el menú de Dropdown. `fixed` y no
         // `absolute`: la caja ya va en coordenadas de ventana.
         'sytue-pop-in sytue-popover-surface border-border fixed w-max max-w-[calc(100vw-16px)]',
-        'max-h-[calc(100dvh-16px)] overflow-y-auto overscroll-contain',
+        'max-h-[calc(var(--sytue-vvh,100dvh)-16px)] overflow-y-auto overscroll-contain',
         'rounded-lg border p-4 shadow-[var(--shadow-md)] focus-visible:outline-none',
         // La orientación del volteo solo decide de qué lado CAE y desde dónde
         // escala la animación; la posición exacta la da `caja`.

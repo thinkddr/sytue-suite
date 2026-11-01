@@ -417,11 +417,10 @@ func (b *BarraSuite) conMenuLateral() bool {
 	return a != nil && (a.Menu != nil || a.Carril != nil)
 }
 
-// ConHojaASangre es para los EDITORES (Docus, Calcus, Diapos y CertiPDF): en la forma
-// Marco su hoja va a sangre —sin separación del borde ni sombra, con las cuatro
-// esquinas redondeadas—. Un
-// folio o una rejilla que flotan dentro de otra hoja que flota pierden sitio y no ganan
-// nada.
+// ConHojaASangre fuerza que en la forma Marco la hoja vaya a sangre —sin separación del
+// borde ni sombra, con las cuatro esquinas redondeadas— en cualquier ancho. Hoy todas las
+// apps de la suite (incluidos Docus, Calcus, Diapos y CertiPDF) flotan con `sheet-gap`
+// en >= 768 px y pasan solas a sangre por debajo de `Estrecho`.
 func (b *BarraSuite) ConHojaASangre() *BarraSuite {
 	b.hojaASangre = true
 	return b

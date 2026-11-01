@@ -32,11 +32,23 @@ import { privateDeviceFetch } from './private-policy.js';
 import { StorageRepository } from './storage-repository.js';
 import {
   decodeStorageRecord,
+  storageIdentifier,
   storageReference,
   StorageRecordError,
   type StorageRecord,
   type StorageRecordEntry,
 } from './storage.js';
+import {
+  decodeAttestedStorageSessions,
+  decodeSsssVaultSecret,
+  encodeAttestedStorageSessions,
+  encodeSsssVaultSecret,
+  isValidAttestedStorageSession,
+  normalizeAttestedStorageSessions,
+  ssssVaultEventPrefix,
+  storageSessionsSecretId,
+  type AttestedStorageSession,
+} from './ssss-vault.js';
 import type { MatrixStorageScope } from './types.js';
 import {
   MatrixSecurityError,
@@ -97,6 +109,9 @@ export class SuiteMatrix {
   private closed = false;
   private readonly policyRooms = new Set<string>();
   private readonly verificationPeers = new Set<string>();
+  private attestedStorageSessions?: Map<string, AttestedStorageSession>;
+  private liveStorageSessions?: Map<string, AttestedStorageSession>;
+  private pendingStorageEventRefs?: MatrixReference[];
   private constructor(
     readonly bootstrap: MatrixBootstrap,
     client: MatrixClient,
@@ -318,6 +333,197 @@ export class SuiteMatrix {
     await this.crypto.loadSessionBackupPrivateKeyFromSecretStorage();
     await this.crypto.restoreKeyBackup();
     if (!(await this.trusted())) throw new MatrixSecurityError('device');
+    if (this.bootstrap.storage_product) {
+      await this.loadAttestedStorageSessions(this.vaultScope());
+    }
+  }
+  async backup(): Promise<void> {
+    if (this.closed || !(await this.trusted())) throw new MatrixSecurityError('device');
+    const backup = await this.crypto.checkKeyBackupAndEnable();
+    if (!backup?.trustInfo.trusted) throw new MatrixSecurityError('device');
+    if (this.bootstrap.storage_product) {
+      await this.attestLiveStorageSessions(this.vaultScope());
+    }
+  }
+  async putSecret(id: string, payload: Uint8Array, revision = 1): Promise<void> {
+    if (this.closed || !(await this.trusted())) throw new MatrixSecurityError('device');
+    await this.putSecretInternal(this.vaultScope(), id, payload, revision);
+  }
+  async readSecret(
+    id: string,
+    minRevision = 1,
+  ): Promise<{ payload: Uint8Array<ArrayBuffer>; revision: number } | null> {
+    if (this.closed) throw new MatrixSecurityError('device');
+    return this.readSecretInternal(this.vaultScope(), id, minRevision);
+  }
+  private vaultScope(): MatrixStorageScope {
+    return {
+      tenant: this.bootstrap.tenant,
+      subject: this.bootstrap.actor,
+      product: this.bootstrap.storage_product ?? 'rooms',
+    };
+  }
+  private async putSecretInternal(
+    scope: MatrixStorageScope,
+    id: string,
+    payload: Uint8Array,
+    revision: number,
+  ): Promise<void> {
+    if (!this.client?.secretStorage) throw new MatrixSecurityError('recovery');
+    const encoded = await encodeSsssVaultSecret(id, scope, revision, payload);
+    await this.client.secretStorage.store(`${ssssVaultEventPrefix}${id}`, encoded);
+    if (this.closed) throw new MatrixSecurityError('device');
+  }
+  private async readSecretInternal(
+    scope: MatrixStorageScope,
+    id: string,
+    minRevision = 1,
+  ): Promise<{ payload: Uint8Array<ArrayBuffer>; revision: number } | null> {
+    if (!storageIdentifier(id) || !Number.isSafeInteger(minRevision) || minRevision < 1) {
+      throw new StorageRecordError();
+    }
+    if (!this.client?.secretStorage) throw new MatrixSecurityError('recovery');
+    const eventType = `${ssssVaultEventPrefix}${id}`;
+    let raw: string | undefined;
+    try {
+      raw = await this.client.secretStorage.get(eventType);
+    } catch (error) {
+      if (error instanceof MatrixSecurityError) throw error;
+      throw new MatrixSecurityError('identity');
+    }
+    if (this.closed) throw new MatrixSecurityError('device');
+    if (raw === undefined) return null;
+    return decodeSsssVaultSecret(raw, id, scope, minRevision);
+  }
+  private sessionTupleKey(entry: AttestedStorageSession): string {
+    return `${entry.room_id}\u0000${entry.session_id}\u0000${entry.sender_key}`;
+  }
+  private extractEncryptedSession(
+    roomId: string,
+    raw: Partial<IEvent>,
+  ): AttestedStorageSession | null {
+    const content = raw.content;
+    if (!content || typeof content !== 'object' || Array.isArray(content)) return null;
+    const record = content as Record<string, unknown>;
+    if (record.algorithm !== 'm.megolm.v1.aes-sha2') return null;
+    const candidate = {
+      room_id: roomId,
+      session_id: record.session_id,
+      sender_key: record.sender_key,
+    };
+    return isValidAttestedStorageSession(candidate) ? candidate : null;
+  }
+  private recordLiveStorageSession(
+    entry: AttestedStorageSession,
+    resolvedRef?: MatrixReference,
+  ): void {
+    this.liveStorageSessions ??= new Map();
+    this.liveStorageSessions.set(this.sessionTupleKey(entry), entry);
+    if (resolvedRef && this.pendingStorageEventRefs) {
+      this.pendingStorageEventRefs = this.pendingStorageEventRefs.filter(
+        (ref) => !(ref.room_id === resolvedRef.room_id && ref.event_id === resolvedRef.event_id),
+      );
+    }
+  }
+  private queueStorageEventAttestation(ref: MatrixReference): void {
+    this.pendingStorageEventRefs ??= [];
+    this.pendingStorageEventRefs.push(ref);
+    if (this.pendingStorageEventRefs.length > 128) {
+      this.pendingStorageEventRefs.splice(0, this.pendingStorageEventRefs.length - 128);
+    }
+  }
+  private cacheAttestedStorageSessions(entries: readonly AttestedStorageSession[]): void {
+    this.attestedStorageSessions ??= new Map();
+    for (const entry of entries) {
+      this.attestedStorageSessions.set(this.sessionTupleKey(entry), entry);
+    }
+  }
+  private async loadAttestedStorageSessions(scope: MatrixStorageScope): Promise<boolean> {
+    if (!this.client?.secretStorage) return false;
+    const secretId = await storageSessionsSecretId(scope);
+    let secret: { payload: Uint8Array<ArrayBuffer>; revision: number } | null;
+    try {
+      secret = await this.readSecretInternal(scope, secretId, 1);
+    } catch (error) {
+      if (
+        error instanceof MatrixSecurityError &&
+        (error.reason === 'recovery' || error.reason === 'identity')
+      ) {
+        return false;
+      }
+      throw error;
+    }
+    if (!secret) return false;
+    try {
+      const entries = decodeAttestedStorageSessions(secret.payload);
+      this.cacheAttestedStorageSessions(entries);
+      return true;
+    } catch (error) {
+      if (error instanceof MatrixSecurityError && error.reason === 'identity') {
+        return false;
+      }
+      throw error;
+    } finally {
+      secret.payload.fill(0);
+    }
+  }
+  private async isAttestedRecoveredStorageEvent(
+    scope: MatrixStorageScope,
+    roomId: string,
+    raw: Partial<IEvent>,
+  ): Promise<boolean> {
+    const candidate = this.extractEncryptedSession(roomId, raw);
+    if (!candidate) return false;
+    const key = this.sessionTupleKey(candidate);
+    if (this.attestedStorageSessions?.has(key)) return true;
+    if (!(await this.loadAttestedStorageSessions(scope))) return false;
+    return this.attestedStorageSessions?.has(key) === true;
+  }
+  private async attestLiveStorageSessions(scope: MatrixStorageScope): Promise<void> {
+    const pending = [...(this.pendingStorageEventRefs ?? [])];
+    if (this.pendingStorageEventRefs) this.pendingStorageEventRefs.length = 0;
+    for (const ref of pending) {
+      const raw = await this.client.fetchRoomEvent(ref.room_id, ref.event_id);
+      if (this.closed) throw new MatrixSecurityError('device');
+      if (
+        raw.type !== String(EventType.RoomMessageEncrypted) ||
+        raw.sender !== this.bootstrap.matrix_user_id ||
+        raw.event_id !== ref.event_id
+      ) {
+        continue;
+      }
+      const event = new MatrixEvent({ ...raw, room_id: ref.room_id });
+      await this.client.decryptEventIfNeeded(event);
+      if (this.closed) throw new MatrixSecurityError('device');
+      if (event.isDecryptionFailure()) continue;
+      const trust = await this.crypto.getEncryptionInfoForEvent(event);
+      if (this.closed) throw new MatrixSecurityError('device');
+      if (
+        trust?.shieldColour === EventShieldColour.NONE &&
+        (!event.getKeyForwardingUser() ||
+          event.getKeyForwardingUser() === this.bootstrap.matrix_user_id)
+      ) {
+        const live = this.extractEncryptedSession(ref.room_id, raw);
+        if (live) this.recordLiveStorageSession(live);
+      }
+    }
+    if (!this.liveStorageSessions || this.liveStorageSessions.size === 0) return;
+    const secretId = await storageSessionsSecretId(scope);
+    const existing = await this.readSecretInternal(scope, secretId, 1);
+    let combined: AttestedStorageSession[];
+    try {
+      const prior = existing ? decodeAttestedStorageSessions(existing.payload) : [];
+      combined = normalizeAttestedStorageSessions([...prior, ...this.liveStorageSessions.values()]);
+    } finally {
+      existing?.payload.fill(0);
+    }
+    const payload = encodeAttestedStorageSessions(combined);
+    try {
+      await this.putSecretInternal(scope, secretId, payload, (existing?.revision ?? 0) + 1);
+      this.cacheAttestedStorageSessions(combined);
+    } finally {
+      payload.fill(0);
+    }
   }
   requestVerification(): Promise<VerificationRequest> {
     return this.crypto.requestOwnUserVerification();
@@ -648,13 +854,24 @@ export class SuiteMatrix {
       assertOpen();
       // A decrypted byte string is not sufficient. Unknown, unsigned, changed
       // or unverifiably imported sender keys cannot publish private app records.
+      // Backup-restored history is accepted only when the exact Megolm session
+      // is attested inside the owner's authenticated SSSS vault.
       if (
         !trust ||
-        trust.shieldColour !== EventShieldColour.NONE ||
         (event.getKeyForwardingUser() &&
           event.getKeyForwardingUser() !== this.bootstrap.matrix_user_id)
       )
         throw new MatrixSecurityError('unverified');
+      if (trust.shieldColour === EventShieldColour.NONE) {
+        const live = this.extractEncryptedSession(reference.room_id, raw);
+        if (live) this.recordLiveStorageSession(live, reference);
+      } else if (
+        trust.shieldReason !== EventShieldReason.AUTHENTICITY_NOT_GUARANTEED ||
+        !(await this.isAttestedRecoveredStorageEvent(scope, reference.room_id, raw))
+      ) {
+        throw new MatrixSecurityError('unverified');
+      }
+      assertOpen();
       if (event.getType() !== String(EventType.RoomMessage)) return null;
       return decodeStorageRecord(event.getContent()['org.sytue.storage'], scope);
     };
@@ -671,7 +888,9 @@ export class SuiteMatrix {
           `sytue-storage-${transaction}`,
         );
         assertOpen();
-        return storageReference({ room_id: writeRoom, event_id: result.event_id });
+        const ref = storageReference({ room_id: writeRoom, event_id: result.event_id });
+        this.queueStorageEventAttestation(ref);
+        return ref;
       },
       read: async (input) => {
         const ref = storageReference(input);
@@ -1051,6 +1270,9 @@ export class SuiteMatrix {
     navigator.serviceWorker?.removeEventListener('message', this.onOfflineClear);
     for (const key of this.temporaryKeys.values()) key.fill(0);
     this.temporaryKeys.clear();
+    this.attestedStorageSessions?.clear();
+    this.liveStorageSessions?.clear();
+    if (this.pendingStorageEventRefs) this.pendingStorageEventRefs.length = 0;
     for (const url of this.urls) URL.revokeObjectURL(url);
     this.urls.clear();
     this.release();

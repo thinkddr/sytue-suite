@@ -42,7 +42,7 @@ func TestLaRotacionDeDiaposConPocaAlturaConservaLecturaReal(t *testing.T) {
 	}
 	barra, parar := ui.BarraSuiteDePrueba(tr, iconos.Slides)
 	t.Cleanup(parar)
-	w.SetContent(barra.ConHojaASangre().Montar(w.Content()))
+	w.SetContent(barra.Montar(w.Content()))
 	for _, tam := range []fyne.Size{{Width: 568, Height: 320}, {Width: 568, Height: 272}} {
 		w.Resize(tam)
 		e.deslizZona.ScrollToTop()
@@ -280,6 +280,19 @@ func TestLaRotacionDeDiaposConservaMandosTactilesSinRecortarlos(t *testing.T) {
 				p := d.AbsolutePositionForObject(o)
 				if o.Size().Width < mando || o.Size().Height < mando || p.Y < pie.Y || p.Y+o.Size().Height > pie.Y+e.carril.Size().Height {
 					t.Fatalf("mando recortado en pie del carril: %v/%v", p, o.Size())
+				}
+			}
+			if tactil {
+				w.Resize(fyne.NewSize(390, 740))
+				ultimo := e.miniBarra.Objects[len(e.miniBarra.Objects)-1]
+				if d.AbsolutePositionForObject(ultimo).X+ultimo.Size().Width <= 390 {
+					t.Fatal("a 390 táctil la mini-barra ya cabe entera: no prueba el arrastre")
+				}
+				e.deslizBarra.Dragged(&fyne.DragEvent{Dragged: fyne.NewDelta(-1000, 0)})
+				e.deslizBarra.DragEnd()
+				fin := d.AbsolutePositionForObject(ultimo).X + ultimo.Size().Width
+				if e.deslizBarra.X() == 0 || fin > 390+0.5 {
+					t.Fatalf("el dedo no alcanza el final de la mini-barra: X=%g, fin=%g", e.deslizBarra.X(), fin)
 				}
 			}
 		})

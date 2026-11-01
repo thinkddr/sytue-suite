@@ -7,10 +7,11 @@
  * docs/design.md §2 / §9 / §10.
  */
 import type { ComponentChildren, JSX } from 'preact';
-import { useId, useState } from 'preact/hooks';
+import { useId, useRef, useState } from 'preact/hooks';
 import { useT } from '@sytue/i18n/preact';
 import { cx } from '../lib/cx.js';
 import { useNavDrawer } from '../lib/useNavDrawer.js';
+import { IndicadorRefrescoTactil, usePullToRefresh } from '../lib/usePullToRefresh.js';
 import { Button } from './Button.js';
 import { Icon } from './Icon.js';
 
@@ -26,6 +27,8 @@ export interface AdminShellProps {
 export function AdminShell({ sidebar, title, children, class: cls }: AdminShellProps): JSX.Element {
   const t = useT();
   const [open, setOpen] = useState(false);
+  const hojaRef = useRef<HTMLDivElement>(null);
+  const refresco = usePullToRefresh(hojaRef);
   const base = useId();
   const drawerId = `sytue-admin-nav-${base}`;
   const toggleId = `sytue-admin-menu-${base}`;
@@ -117,7 +120,8 @@ export function AdminShell({ sidebar, title, children, class: cls }: AdminShellP
           {title ? <span class="truncate text-sm font-semibold">{title}</span> : null}
         </div>
         {/* La hoja empieza debajo de la barra móvil, que forma parte del marco. */}
-        <div class="sytue-sheet flex min-h-0 min-w-0 flex-1">
+        <div ref={hojaRef} class="sytue-sheet relative flex min-h-0 min-w-0 flex-1">
+          <IndicadorRefrescoTactil estado={refresco} />
           <main
             id="contenido"
             tabIndex={-1}

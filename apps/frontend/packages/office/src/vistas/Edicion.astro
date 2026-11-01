@@ -53,9 +53,9 @@ const aiEnabled = Boolean(serverEnv(import.meta.env).SYTUE_AI_URL);
       vertical (512 px de caja en el más bajo) y cualquier ventana de escritorio miden más y
       no cambian; un móvil apaisado sí: el editor ya no se encoge hasta caber y se llega a su
       barra de estado desplazando la página. */}
-  {/* El main de la shell reserva el inset inferior fuera del editor. Su alto
-      descuenta ese mismo espacio para mantener la barra de estado a la vista. */}
-  <div class="h-[calc(100dvh-var(--spacing-topbar)-var(--sytue-safe-bottom,0px))] min-h-[32rem]">
+  {/* El main de la shell reserva el inset inferior y el margen de la hoja fuera del editor.
+      Su alto descuenta ese mismo espacio para mantener la barra de estado a la vista. */}
+  <div class="h-[calc(100dvh-var(--spacing-topbar)-var(--sytue-sheet-gap,0px)-var(--sytue-safe-bottom,0px))] min-h-[32rem]">
     <EditorApp
       client:only="preact"
       documentId={documentId}

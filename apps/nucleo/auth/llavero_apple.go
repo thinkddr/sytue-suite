@@ -12,11 +12,11 @@ int sytue_llavero_guardar(const char *cuenta, const char *grupo, const void *dat
 int sytue_llavero_borrar(const char *cuenta, const char *grupo);
 int sytue_llavero_leer(const char *cuenta, const char *grupo, void **datos, int *n);
 */
-import "C"
+import "C" //nolint:gocritic // CGO exige importar C por separado
 
 import (
 	"fmt"
-	"unsafe"
+	"unsafe" //nolint:gocritic // dupImport falso positivo con import C
 )
 
 func leerDatosApple(cuenta, grupo string) ([]byte, error) {
@@ -25,7 +25,7 @@ func leerDatosApple(cuenta, grupo string) ([]byte, error) {
 	defer C.free(unsafe.Pointer(g))
 	var datos unsafe.Pointer
 	var n C.int
-	if st := C.sytue_llavero_leer(c, g, &datos, &n); st != 0 {
+	if st := C.sytue_llavero_leer(c, g, &datos, &n); st != 0 { //nolint:gocritic // dupSubExpr falso positivo en código generado por cgo
 		return nil, fmt.Errorf("auth: el Keychain no se deja leer (OSStatus %d)", int(st))
 	}
 	if datos == nil {

@@ -1027,7 +1027,7 @@ func TestBarraSuitePreguntaAntesDeSubirFicheroLocal(t *testing.T) {
 	tr := traductorPrueba(t)
 	b := NuevaBarraSuite(tr, nil, iconos.Docs)
 	t.Cleanup(b.Parar)
-	w.SetContent(b.ConSinSesionPropia().ConHojaASangre().Montar(canvas.NewRectangle(color.NRGBA{})))
+	w.SetContent(b.ConSinSesionPropia().Montar(canvas.NewRectangle(color.NRGBA{})))
 
 	var recordado *bool
 	b.confirmarSubidaLocal(w, "nomina.pdf", func(r bool) {

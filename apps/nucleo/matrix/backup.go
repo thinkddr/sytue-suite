@@ -46,6 +46,7 @@ func (c *Client) prepareBackup(ctx context.Context, recovery string) error {
 	if err != nil {
 		return err
 	}
+	defer clear(storageKey.Key)
 	privateKey, err := machine.SSSS.GetDecryptedAccountData(ctx, event.AccountDataMegolmBackupKey, storageKey)
 	if errors.Is(err, mautrix.MNotFound) {
 		if _, latestErr := c.cli.GetKeyBackupLatestVersion(ctx); !errors.Is(latestErr, mautrix.MNotFound) {
@@ -100,6 +101,9 @@ func (c *Client) prepareBackup(ctx context.Context, recovery string) error {
 	}
 	if versionInfo == nil || versionInfo.Version == "" || versionInfo.AuthData.PublicKey != id.Ed25519(base64.RawStdEncoding.EncodeToString(key.PublicKey().Bytes())) {
 		return errors.New("matrix: backup version is unavailable")
+	}
+	if err := c.saveSSSSKey(storageKey); err != nil {
+		return err
 	}
 	return c.saveBackupSecret(ctx, versionInfo.Version, privateKey)
 }
@@ -174,38 +178,48 @@ func (c *Client) Backup(ctx context.Context) error {
 		if err != nil || len(batch) == 0 {
 			return err
 		}
-		request := &mautrix.ReqKeyBackup{Rooms: map[id.RoomID]mautrix.ReqRoomKeyBackup{}}
-		for _, session := range batch {
-			exported, exportErr := session.Internal.Export(session.Internal.FirstKnownIndex())
-			if exportErr != nil {
-				return exportErr
-			}
-			payload, encryptErr := backup.EncryptSessionData(key, backup.MegolmSessionData{Algorithm: id.AlgorithmMegolmV1, ForwardingKeyChain: session.ForwardingChains, SenderClaimedKeys: backup.SenderClaimedKeys{Ed25519: session.SigningKey}, SenderKey: session.SenderKey, SessionKey: string(exported), SharedHistory: session.SharedHistory})
-			clear(exported)
-			if encryptErr != nil {
-				return encryptErr
-			}
-			encoded, marshalErr := json.Marshal(payload)
-			if marshalErr != nil {
-				return marshalErr
-			}
-			room := request.Rooms[session.RoomID]
-			if room.Sessions == nil {
-				room.Sessions = map[id.SessionID]mautrix.ReqKeyBackupData{}
-			}
-			room.Sessions[session.ID()] = mautrix.ReqKeyBackupData{FirstMessageIndex: int(session.Internal.FirstKnownIndex()), ForwardedCount: len(session.ForwardingChains), IsVerified: false, SessionData: encoded}
-			request.Rooms[session.RoomID] = room
-		}
-		if _, err = c.cli.PutKeysInBackup(ctx, version, request); err != nil {
+		if err := c.uploadBackupBatch(ctx, machine, key, version, batch); err != nil {
 			return err
 		}
-		for _, session := range batch {
-			session.KeyBackupVersion = version
-			if err := machine.CryptoStore.PutGroupSession(ctx, session); err != nil {
-				return err
-			}
+	}
+}
+
+func (c *Client) uploadBackupBatch(ctx context.Context, machine *mxcrypto.OlmMachine, key *backup.MegolmBackupKey, version id.KeyBackupVersion, batch []*mxcrypto.InboundGroupSession) error {
+	request := &mautrix.ReqKeyBackup{Rooms: map[id.RoomID]mautrix.ReqRoomKeyBackup{}}
+	for _, session := range batch {
+		exported, exportErr := session.Internal.Export(session.Internal.FirstKnownIndex())
+		if exportErr != nil {
+			return exportErr
+		}
+		payload, encryptErr := backup.EncryptSessionData(key, backup.MegolmSessionData{Algorithm: id.AlgorithmMegolmV1, ForwardingKeyChain: session.ForwardingChains, SenderClaimedKeys: backup.SenderClaimedKeys{Ed25519: session.SigningKey}, SenderKey: session.SenderKey, SessionKey: string(exported), SharedHistory: session.SharedHistory})
+		clear(exported)
+		if encryptErr != nil {
+			return encryptErr
+		}
+		encoded, marshalErr := json.Marshal(payload)
+		if marshalErr != nil {
+			return marshalErr
+		}
+		room := request.Rooms[session.RoomID]
+		if room.Sessions == nil {
+			room.Sessions = map[id.SessionID]mautrix.ReqKeyBackupData{}
+		}
+		room.Sessions[session.ID()] = mautrix.ReqKeyBackupData{FirstMessageIndex: int(session.Internal.FirstKnownIndex()), ForwardedCount: len(session.ForwardingChains), IsVerified: false, SessionData: encoded}
+		request.Rooms[session.RoomID] = room
+	}
+	if _, err := c.cli.PutKeysInBackup(ctx, version, request); err != nil {
+		return err
+	}
+	if err := c.attestStorageSessions(ctx, batch); err != nil {
+		return err
+	}
+	for _, session := range batch {
+		session.KeyBackupVersion = version
+		if err := machine.CryptoStore.PutGroupSession(ctx, session); err != nil {
+			return err
 		}
 	}
+	return nil
 }
 
 // RestoreBackup authenticates the standard backup and imports only this Rooms

@@ -331,8 +331,10 @@ func (p *Pantalla) vista() fyne.CanvasObject {
 	m.AlAbrir = p.AlAbrirEvento
 	// El mes conserva seis semanas legibles en horizontal: si no cabe su mínimo,
 	// se recorre entero en vez de apretar los números y eventos unos sobre otros.
-	_, vista := desplazable(m)
-	return vista
+	desplazar, vista := desplazable(m)
+	refresco := p.Refresco
+	refresco.Arriba = func() bool { return desplazar.Offset.Y <= 0.5 }
+	return ui.RefrescarAlTirar(vista, &refresco)
 }
 
 // textosDeEstado es la copia de cada uno de los seis, con las claves del catálogo de

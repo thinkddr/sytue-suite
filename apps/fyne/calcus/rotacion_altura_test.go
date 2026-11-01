@@ -29,7 +29,7 @@ func TestLaRotacionDeCalcusConPocaAlturaEnseñaDosFilasYLasCabeceras(t *testing.
 		t.Fatal(err)
 	}
 	a.T = tr.T
-	barra := ui.NuevaBarraSuite(tr, nil, iconos.Sheets).ConHojaASangre()
+	barra := ui.NuevaBarraSuite(tr, nil, iconos.Sheets)
 	t.Cleanup(barra.Parar)
 	w := test.NewTempWindow(t, barra.Montar(a.Objeto()))
 	w.SetPadded(false)

@@ -26,11 +26,6 @@ func ComprobarRotacion(t testing.TB, w fyne.Window, nombre string, producto icon
 	}
 	contenido, tamano, relleno := w.Canvas().Content(), w.Canvas().Size(), w.Padded()
 	barra, restaurar := ui.BarraSuiteDePrueba(tr, producto)
-	switch producto {
-	case iconos.Docs, iconos.Sheets, iconos.Slides, iconos.PDF:
-		barra.ConHojaASangre()
-	default:
-	}
 	defer func() {
 		fallo := recover()
 		restaurar()

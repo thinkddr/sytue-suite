@@ -101,7 +101,7 @@ func main() {
 			d.Arrancar()
 		}
 	})
-	w.SetContent(ui.NuevaBarraSuite(tr, s, iconos.Docs).ConSinSesionPropia().ConHojaASangre().Montar(d.Objeto()))
+	w.SetContent(ui.NuevaBarraSuite(tr, s, iconos.Docs).ConSinSesionPropia().Montar(d.Objeto()))
 	w.Resize(fyne.NewSize(1280, 800))
 	d.Arrancar()
 

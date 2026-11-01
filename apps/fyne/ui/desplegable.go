@@ -109,6 +109,7 @@ var (
 	_ fyne.Widget     = (*Menu)(nil)
 	_ fyne.Tappable   = (*Menu)(nil)
 	_ fyne.Scrollable = (*Menu)(nil)
+	_ fyne.Draggable  = (*Menu)(nil)
 	_ Descartable     = (*Menu)(nil)
 	_ fyne.Accessible = (*Menu)(nil)
 )
@@ -253,9 +254,10 @@ func (m *Menu) Mostrar(disparador fyne.CanvasObject) {
 		m.ventana = ventana
 		tam := MedidaMenu(m, ventana)
 		if enHoja(ventana) {
-			visible := min(tam.Height, FraccionAltoHojaMenu*ventana.Height)
+			disponible := max(ventana.Height-tapadoEnCapa(c, m.capa, ventana), 0)
+			visible := min(tam.Height, FraccionAltoHojaMenu*disponible)
 			m.desplazado = min(m.desplazado, max(tam.Height-visible, 0))
-			return fyne.NewPos(0, ventana.Height-visible), fyne.NewSize(ventana.Width, visible)
+			return fyne.NewPos(0, disponible-visible), fyne.NewSize(ventana.Width, visible)
 		}
 		ancla := disparador
 		if m.Ancla != nil {
@@ -420,6 +422,17 @@ func (m *Menu) mover(desde *ElementoMenu, paso int) {
 // Scrolled desplaza el contenido por dentro del panel, hasta el final: es su
 // `overflow-y-auto`. Con el contenido entero a la vista no hace nada.
 func (m *Menu) Scrolled(ev *fyne.ScrollEvent) { m.desplazar(m.desplazado - ev.Scrolled.DY) }
+
+// Dragged desplaza el contenido con el dedo cuando el menú supera el alto disponible.
+func (m *Menu) Dragged(ev *fyne.DragEvent) {
+	if ev == nil {
+		return
+	}
+	m.desplazar(m.desplazado - ev.Dragged.DY)
+}
+
+// DragEnd termina el arrastre táctil del panel.
+func (m *Menu) DragEnd() {}
 
 // desplazar pone el desplazamiento, acotado a lo que hay.
 func (m *Menu) desplazar(a float32) {

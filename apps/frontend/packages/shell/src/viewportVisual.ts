@@ -28,31 +28,61 @@ export function publicarViewportVisual(): () => void {
   const raiz = document.documentElement;
   let ancho = vv.width;
   let alturaConTeclado: number | null = null;
+  let panEnDialogo = false;
+  const enDialogo = (el: Element | null): boolean =>
+    el !== null && el.closest('[role="dialog"], dialog[open]') !== null;
   const medir = () => {
     raiz.style.setProperty('--sytue-vvh', `${Math.round(vv.height)}px`);
     raiz.style.setProperty('--sytue-vvy', `${Math.round(vv.offsetTop)}px`);
     const giroOZoom = Math.abs(vv.width - ancho) > 1 || vv.scale > 1.05;
     const recortado = window.innerHeight - vv.height > 80;
-    if (giroOZoom) alturaConTeclado = null;
-    else if (recortado && (alturaConTeclado !== null || enCampoDeTexto(document.activeElement)))
+    const activo = document.activeElement;
+    if (giroOZoom) {
+      alturaConTeclado = null;
+      panEnDialogo = false;
+    } else if (recortado && (alturaConTeclado !== null || enCampoDeTexto(activo))) {
       alturaConTeclado = Math.min(alturaConTeclado ?? vv.height, vv.height);
-    else if (!recortado) {
-      if (
+      if (enDialogo(activo)) panEnDialogo = true;
+    } else if (enCampoDeTexto(activo) && enDialogo(activo) && vv.offsetTop > 0) {
+      panEnDialogo = true;
+    } else if (!recortado) {
+      const vuelveDeTeclado =
         alturaConTeclado !== null &&
         vv.height - alturaConTeclado > 80 &&
-        (window.scrollY > 0 || vv.offsetTop > 0)
-      )
+        (window.scrollY > 0 || vv.offsetTop > 0);
+      const vuelveDePanEnDialogo =
+        panEnDialogo && !enCampoDeTexto(activo) && (window.scrollY > 0 || vv.offsetTop > 0);
+      if (vuelveDeTeclado || vuelveDePanEnDialogo) {
         window.scrollTo(0, 0);
+        panEnDialogo = false;
+      }
       alturaConTeclado = null;
     }
     ancho = vv.width;
   };
+  let rafCierre = 0;
+  const alSalirDeCampo = () => {
+    if (!panEnDialogo || typeof requestAnimationFrame !== 'function') return;
+    cancelAnimationFrame(rafCierre);
+    rafCierre = requestAnimationFrame(() => {
+      const recortado = window.innerHeight - vv.height > 80;
+      if (!recortado && !enCampoDeTexto(document.activeElement)) {
+        if (window.scrollY > 0 || vv.offsetTop > 0) window.scrollTo(0, 0);
+        panEnDialogo = false;
+        raiz.style.setProperty('--sytue-vvh', `${Math.round(vv.height)}px`);
+        raiz.style.setProperty('--sytue-vvy', `${Math.round(vv.offsetTop)}px`);
+      }
+    });
+  };
   medir();
   vv.addEventListener('resize', medir);
   vv.addEventListener('scroll', medir);
+  document.addEventListener('focusout', alSalirDeCampo);
   return () => {
+    if (rafCierre && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(rafCierre);
     vv.removeEventListener('resize', medir);
     vv.removeEventListener('scroll', medir);
+    document.removeEventListener('focusout', alSalirDeCampo);
     raiz.style.removeProperty('--sytue-vvh');
     raiz.style.removeProperty('--sytue-vvy');
   };

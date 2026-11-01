@@ -77,6 +77,7 @@ type glifo struct {
 
 type fuentePDF struct {
 	familia          string
+	nombreBase       string
 	negrita, italica bool
 
 	anchos   map[uint32]float64
@@ -103,8 +104,10 @@ type fuentePDF struct {
 	unicodeIdentidad bool
 	// gidARuna es el respaldo de una compuesta sin /ToUnicode útil: el
 	// carácter de cada glifo según la `cmap` de su propia TrueType.
-	gidARuna map[uint16]rune
-	simple   map[byte]string
+	gidARuna          map[uint16]rune
+	simple            map[byte]string
+	nombresSimple     map[byte]string
+	tieneBaseEncoding bool
 	// type3, si no es nil, son los DIBUJOS de una fuente de tipo 3: ahí cada
 	// glifo es un flujo de contenido y no un contorno. Ver pdftype3.go.
 	type3 *type3
@@ -112,11 +115,16 @@ type fuentePDF struct {
 	// Lo que sigue solo lo usa la salida PNG (`pdfraster.go`): el programa de la
 	// tipografía tal y como el SVG lo incrusta, ya parseado, y la tabla que lleva
 	// del CID al índice de glifo cuando no es la identidad.
-	programa  []byte
-	cara      *sfnt.Font
-	caraLista bool
-	reserva   bool // la cara es una de reserva, no la del documento
-	cidAGid   []byte
+	programa         []byte
+	cara             *sfnt.Font
+	caraLista        bool
+	reserva          bool // la cara es una de reserva, no la del documento
+	cidAGid          []byte
+	crudo            *tablasCrudasSfnt
+	inversoCompuesto map[rune]uint16
+	simpleGid        [256]uint16
+	simpleInverso    map[uint16]uint16
+	yaEnvueltaCFF    bool
 	// cmapUnicode: la tipografía trae una tabla por carácter; si no, sus
 	// tablas van por código (ver `indiceDeGlifo`).
 	cmapUnicode bool
@@ -441,6 +449,7 @@ func (l *lienzo) construir(fd pdfDict) *fuentePDF {
 	sub, _ := l.d.resolver(fd["Subtype"]).(pdfName)
 	base, _ := l.d.resolver(fd["BaseFont"]).(pdfName)
 	nombreBase := string(base)
+	f.nombreBase = nombreBase
 
 	descendiente := fd
 	if sub == "Type0" {
@@ -471,7 +480,7 @@ func (l *lienzo) construir(fd pdfDict) *fuentePDF {
 			}
 		}
 	} else {
-		f.simple = l.codificacionSimple(fd, nombreBase, sub)
+		f.simple, f.nombresSimple, f.tieneBaseEncoding = l.codificacionSimpleConNombres(fd, nombreBase, sub)
 		l.anchosSimples(fd, f)
 		// Una fuente de tipo 3 no tiene contornos: sus glifos son flujos de
 		// contenido y hay que EJECUTARLOS. Se lee aquí para que `mostrar` pueda
@@ -483,7 +492,7 @@ func (l *lienzo) construir(fd pdfDict) *fuentePDF {
 
 	desc, _ := l.d.resolver(descendiente["FontDescriptor"]).(pdfDict)
 	if f.dosBytes && len(f.aUnicode) == 0 && !f.unicodeIdentidad && (f.cmap == nil || f.cmap.unicode == "") {
-		f.gidARuna = l.runasDeLaTrueType(desc)
+		f.gidARuna = l.runasDeFuenteCompuesta(desc, f)
 	}
 	f.subconjunto = esSubconjunto(nombreBase)
 	f.negrita, f.italica = rasgos(nombreBase, l, desc)
@@ -504,41 +513,125 @@ func (l *lienzo) construir(fd pdfDict) *fuentePDF {
 	return f
 }
 
-// runasDeLaTrueType invierte la `cmap` Unicode de la TrueType incrustada: el
-// carácter de cada glifo (el menor, si dos comparten glifo). Es el último
-// recurso de una compuesta sin /ToUnicode: medido en el corpus, sin él salían
-// páginas enteras vacías de texto que la tipografía sí sabe leer.
-func (l *lienzo) runasDeLaTrueType(desc pdfDict) map[uint16]rune {
+// runasDeFuenteCompuesta extrae glifo -> carácter desde las tablas crudas del
+// programa incrustado (`FontFile2`, `FontFile3` o `FontFile`) cuando una fuente
+// compuesta carece de `/ToUnicode` útil.
+func (l *lienzo) runasDeFuenteCompuesta(desc pdfDict, f *fuentePDF) map[uint16]rune {
 	if desc == nil {
 		return nil
 	}
+	if out := l.runasDeFontFile2(desc, f); out != nil {
+		return out
+	}
+	if out := l.runasDeFontFile3(desc, f); out != nil {
+		return out
+	}
+	return l.runasDeFontFile1(desc, f)
+}
+
+func (l *lienzo) runasDeFontFile2(desc pdfDict, f *fuentePDF) map[uint16]rune {
 	st, ok := l.d.resolver(desc["FontFile2"]).(*pdfStream)
 	if !ok {
 		return nil
 	}
 	b, err := l.d.datosDeFlujo(st)
-	if err != nil || len(b) > maxFuenteIncrustada || !tieneCmapUnicode(b) {
+	if err != nil || len(b) > maxFuenteIncrustada {
 		return nil
 	}
-	cara, err := sfnt.Parse(b)
+	limpia, ok := normalizarSfnt(b, f.nombreBase)
+	if !ok {
+		return nil
+	}
+	return leerTablasCrudasSfnt(limpia).gidARuna
+}
+
+func (l *lienzo) runasDeFontFile3(desc pdfDict, f *fuentePDF) map[uint16]rune {
+	st, ok := l.d.resolver(desc["FontFile3"]).(*pdfStream)
+	if !ok {
+		return nil
+	}
+	b, err := l.d.datosDeFlujo(st)
+	if err != nil || len(b) <= 4 || len(b) > maxFuenteIncrustada {
+		return nil
+	}
+	s3, _ := l.d.resolver(st.Dict["Subtype"]).(pdfName)
+	switch {
+	case s3 == "OpenType" || esFlujoSfntOTTC(b):
+		limpia, ok := normalizarSfnt(b, f.nombreBase)
+		if !ok {
+			return nil
+		}
+		crudo := leerTablasCrudasSfnt(limpia)
+		if len(f.cidAGid) == 0 && len(crudo.cidAGidCFF) > 0 {
+			f.cidAGid = crudo.cidAGidCFF
+		}
+		return crudo.gidARuna
+	case s3 == "Type1C" || s3 == "CIDFontType0C" || esFlujoCFFCrudo(b):
+		info, err := leerCFF(b)
+		if err != nil {
+			return nil
+		}
+		if info.cid {
+			if len(f.cidAGid) == 0 {
+				f.cidAGid = construirMapaCidCFF(info.cids)
+			}
+			return nil
+		}
+		return runasDeNombresCFF(info)
+	}
+	return nil
+}
+
+func (l *lienzo) runasDeFontFile1(desc pdfDict, f *fuentePDF) map[uint16]rune {
+	st, ok := l.d.resolver(desc["FontFile"]).(*pdfStream)
+	if !ok {
+		return nil
+	}
+	b, err := l.d.datosDeFlujo(st)
+	if err != nil || len(b) <= 4 || len(b) > maxFuenteIncrustada {
+		return nil
+	}
+	if esFlujoCFFCrudo(b) {
+		info, err := leerCFF(b)
+		if err != nil {
+			return nil
+		}
+		if info.cid {
+			if len(f.cidAGid) == 0 {
+				f.cidAGid = construirMapaCidCFF(info.cids)
+			}
+			return nil
+		}
+		anchos := make([]float64, info.numGlifos)
+		f.cmapType0SobreSimpleCFF(info, anchos)
+		return f.gidARuna
+	}
+	if esFlujoSfntOTTC(b) {
+		limpia, ok := normalizarSfnt(b, f.nombreBase)
+		if !ok {
+			return nil
+		}
+		crudo := leerTablasCrudasSfnt(limpia)
+		if len(f.cidAGid) == 0 && len(crudo.cidAGidCFF) > 0 {
+			f.cidAGid = crudo.cidAGidCFF
+		}
+		return crudo.gidARuna
+	}
+	if len(b) < 16 {
+		return nil
+	}
+	len1, _ := numeroPDF(l.d.resolver(st.Dict["Length1"]))
+	cff, err := type1ACFF(b, int(len1))
 	if err != nil {
 		return nil
 	}
-	var buf sfnt.Buffer
-	out := map[uint16]rune{}
-	for r := rune(0x20); r <= 0xFFFF; r++ {
-		if r >= 0xD800 && r <= 0xDFFF || r >= 0xE000 && r <= 0xF8FF {
-			continue // sustitutos y uso privado: no son texto
-		}
-		gid, err := cara.GlyphIndex(&buf, r)
-		if err != nil || gid == 0 {
-			continue
-		}
-		if _, ya := out[uint16(gid)]; !ya {
-			out[uint16(gid)] = r
-		}
+	info, err := leerCFF(cff)
+	if err != nil {
+		return nil
 	}
-	return out
+	anchos := make([]float64, info.numGlifos)
+	f.cmapType0SobreSimpleCFF(info, anchos)
+	return f.gidARuna
 }
 
 // anchosSimples lee /FirstChar + /Widths, que es un array de anchuras
@@ -685,13 +778,14 @@ func (l *lienzo) anchosCID(dd pdfDict, f *fuentePDF) {
 	}
 }
 
-// codificacionSimple resuelve /Encoding: la base y las /Differences, que es como
-// un PDF mete un símbolo suelto en un hueco de la tabla. Sin base explícita, una
-// Type 1 usa la codificación de su programa, ZapfDingbats la suya y el resto de
-// Type 1 la estándar (§9.6.5.2); en una TrueType lo que falte se sigue leyendo
-// como WinAnsi.
-func (l *lienzo) codificacionSimple(fd pdfDict, base string, sub pdfName) map[byte]string {
+// codificacionSimpleConNombres resuelve /Encoding: la base y las /Differences,
+// que es como un PDF mete un símbolo suelto en un hueco de la tabla. Sin base
+// explícita, una Type 1 usa la codificación de su programa, ZapfDingbats la suya
+// y el resto de Type 1 la estándar (§9.6.5.2); en una TrueType lo que falte se
+// sigue leyendo como WinAnsi.
+func (l *lienzo) codificacionSimpleConNombres(fd pdfDict, base string, sub pdfName) (map[byte]string, map[byte]string, bool) {
 	tabla := map[byte]string{}
+	nombres := map[byte]string{}
 	var baseEnc pdfName
 	var difs pdfArray
 	switch v := l.d.resolver(fd["Encoding"]).(type) {
@@ -719,6 +813,7 @@ func (l *lienzo) codificacionSimple(fd pdfDict, base string, sub pdfName) map[by
 			}
 		case pdfName:
 			if codigo >= 0 && codigo < 256 {
+				nombres[byte(codigo)] = string(x)
 				if t, ok := textoDeNombreGlifo(string(x)); ok {
 					// En Type 3 sin /ToUnicode los nombres de /Differences identifican el
 					// dibujo en /CharProcs («/square», «/triangle» sobre 'a', 'b'); no se
@@ -732,7 +827,7 @@ func (l *lienzo) codificacionSimple(fd pdfDict, base string, sub pdfName) map[by
 			codigo++
 		}
 	}
-	return tabla
+	return tabla, nombres, baseEnc != ""
 }
 
 // aplicarBase pone la codificación base de una fuente simple (ver codificacionSimple).
@@ -749,21 +844,30 @@ func (l *lienzo) aplicarBase(tabla map[byte]string, baseEnc pdfName, base string
 	case "StandardEncoding":
 		aplicarEstandar(tabla)
 	case "":
+		n := strings.ToLower(base)
 		switch sub {
 		case "Type1", "MMType1":
 			desc, _ := l.d.resolver(fd["FontDescriptor"]).(pdfDict)
-			n := strings.ToLower(base)
 			switch {
 			case l.codificacionPropia(desc, tabla):
 			case strings.Contains(n, "dingbats"):
 				aplicarZapfDingbats(tabla)
-			case !strings.Contains(n, "symbol"):
+			case strings.Contains(n, "symbol"):
+				aplicarSymbol(tabla)
+			default:
 				aplicarEstandar(tabla)
 			}
 		case "TrueType":
 			desc, _ := l.d.resolver(fd["FontDescriptor"]).(pdfDict)
-			if desc["FontFile2"] == nil && desc["FontFile3"] == nil {
-				aplicarEstandar(tabla)
+			if desc == nil || (desc["FontFile2"] == nil && desc["FontFile3"] == nil) {
+				switch {
+				case strings.Contains(n, "dingbats"):
+					aplicarZapfDingbats(tabla)
+				case strings.Contains(n, "symbol"):
+					aplicarSymbol(tabla)
+				default:
+					aplicarEstandar(tabla)
+				}
 			}
 		}
 	}
@@ -801,6 +905,21 @@ var nombresDeGlifo = map[string]rune{
 	"nbspace": ' ', "hyphensoft": '­', "arrowright": '→',
 	"arrowleft": '←', "arrowup": '↑', "arrowdown": '↓',
 	"checkmark": '✓', "circle": '○', "square": '■',
+	"alpha": 'α', "beta": 'β', "gamma": 'γ', "delta": 'δ', "epsilon": 'ε',
+	"zeta": 'ζ', "eta": 'η', "theta": 'θ', "iota": 'ι', "kappa": 'κ',
+	"lambda": 'λ', "nu": 'ν', "xi": 'ξ', "omicron": 'ο', "pi": 'π',
+	"rho": 'ρ', "sigma": 'σ', "sigma1": 'ς', "tau": 'τ', "upsilon": 'υ',
+	"phi": 'φ', "chi": 'χ', "psi": 'ψ', "omega": 'ω',
+	"Alpha": 'Α', "Beta": 'Β', "Gamma": 'Γ', "Delta": 'Δ', "Epsilon": 'Ε',
+	"Zeta": 'Ζ', "Eta": 'Η', "Theta": 'Θ', "Iota": 'Ι', "Kappa": 'Κ',
+	"Lambda": 'Λ', "Mu": 'Μ', "Nu": 'Ν', "Xi": 'Ξ', "Omicron": 'Ο',
+	"Pi": 'Π', "Rho": 'Ρ', "Sigma": 'Σ', "Tau": 'Τ', "Upsilon": 'Υ',
+	"Phi": 'Φ', "Chi": 'Χ', "Psi": 'Ψ', "Omega": 'Ω',
+	"infinity": '∞', "integral": '∫', "summation": '∑', "product": '∏',
+	"radical": '√', "partialdiff": '∂', "lessequal": '≤', "greaterequal": '≥',
+	"notequal": '≠', "approxequal": '≈', "equivalence": '≡', "element": '∈',
+	"notelement": '∉', "intersection": '∩', "union": '∪', "emptyset": '∅',
+	"logicaland": '∧', "logicalor": '∨', "arrowboth": '↔', "lozenge": '◊',
 }
 
 // --- /ToUnicode --------------------------------------------------------------
@@ -991,8 +1110,16 @@ func (l *lienzo) incrustar(desc pdfDict, f *fuentePDF, sub pdfName) string {
 	var datos []byte
 	var mime string
 	if st, ok := l.d.resolver(desc["FontFile2"]).(*pdfStream); ok {
-		if b, err := l.d.datosDeFlujo(st); err == nil && len(b) > 12 {
-			datos, mime = b, "font/ttf"
+		if b, err := l.d.datosDeFlujo(st); err == nil && len(b) > 4 && len(b) <= maxFuenteIncrustada {
+			switch {
+			case esFlujoCFFCrudo(b):
+				if otf, ok := f.envolverCFF(aplanarSeacCFF(b)); ok {
+					f.yaEnvueltaCFF = true
+					datos, mime = otf, "font/otf"
+				}
+			case len(b) > 12:
+				datos, mime = b, "font/ttf"
+			}
 		}
 	}
 	if datos == nil {
@@ -1006,7 +1133,7 @@ func (l *lienzo) incrustar(desc pdfDict, f *fuentePDF, sub pdfName) string {
 	}
 
 	var ok bool
-	datos, ok = l.prepararFuenteIncrustada(datos, mime, sub, f)
+	datos, mime, ok = l.prepararFuenteIncrustada(datos, mime, sub, f)
 	if !ok {
 		return ""
 	}
@@ -1045,15 +1172,25 @@ func (l *lienzo) programaFontFile3(desc pdfDict, f *fuentePDF) ([]byte, string) 
 	if !ok {
 		return nil, ""
 	}
+	b, err := l.d.datosDeFlujo(st)
+	if err != nil || len(b) <= 4 || len(b) > maxFuenteIncrustada {
+		return nil, ""
+	}
 	s3, _ := l.d.resolver(st.Dict["Subtype"]).(pdfName)
-	switch s3 {
-	case "OpenType":
-		if b, err := l.d.datosDeFlujo(st); err == nil && len(b) > 12 {
+	switch {
+	case s3 == "OpenType" || esFlujoSfntOTTC(b):
+		if len(b) > 12 {
 			return b, "font/otf"
 		}
-	case "Type1C", "CIDFontType0C":
-		if b, err := l.d.datosDeFlujo(st); err == nil && len(b) > 4 && len(b) <= maxFuenteIncrustada {
-			if otf, ok := f.envolverCFF(aplanarSeacCFF(b)); ok {
+	case s3 == "Type1C" || s3 == "CIDFontType0C" || esFlujoCFFCrudo(b):
+		if otf, ok := f.envolverCFF(aplanarSeacCFF(b)); ok {
+			f.yaEnvueltaCFF = true
+			return otf, "font/otf"
+		}
+	case len(b) >= 16:
+		if cff, err := type1ACFF(b, 0); err == nil {
+			if otf, ok := f.envolverCFF(cff); ok {
+				f.yaEnvueltaCFF = true
 				return otf, "font/otf"
 			}
 		}
@@ -1062,14 +1199,28 @@ func (l *lienzo) programaFontFile3(desc pdfDict, f *fuentePDF) ([]byte, string) 
 }
 
 // programaType1 convierte la Type 1 de /FontFile en CFF (pdftype1.go) y la
-// envuelve en OpenType como un CFF suelto.
+// envuelve en OpenType como un CFF suelto, aceptando también flujos CFF o SFNT
+// colocados por error en /FontFile (issue5751.pdf).
 func (l *lienzo) programaType1(desc pdfDict, f *fuentePDF) ([]byte, string) {
 	st, ok := l.d.resolver(desc["FontFile"]).(*pdfStream)
 	if !ok {
 		return nil, ""
 	}
 	b, err := l.d.datosDeFlujo(st)
-	if err != nil || len(b) < 16 || len(b) > maxFuenteIncrustada {
+	if err != nil || len(b) <= 4 || len(b) > maxFuenteIncrustada {
+		return nil, ""
+	}
+	if esFlujoCFFCrudo(b) {
+		if otf, ok := f.envolverCFF(aplanarSeacCFF(b)); ok {
+			f.yaEnvueltaCFF = true
+			return otf, "font/otf"
+		}
+		return nil, ""
+	}
+	if esFlujoSfntOTTC(b) {
+		return b, "font/ttf"
+	}
+	if len(b) < 16 {
 		return nil, ""
 	}
 	len1, _ := numeroPDF(l.d.resolver(st.Dict["Length1"]))
@@ -1078,38 +1229,69 @@ func (l *lienzo) programaType1(desc pdfDict, f *fuentePDF) ([]byte, string) {
 		return nil, ""
 	}
 	if otf, ok := f.envolverCFF(cff); ok {
+		f.yaEnvueltaCFF = true
 		return otf, "font/otf"
 	}
 	return nil, ""
 }
 
-func (l *lienzo) prepararFuenteIncrustada(datos []byte, mime string, sub pdfName, f *fuentePDF) ([]byte, bool) {
-	// El subconjunto PDF puede omitir post: el PDF no necesita nombres de glifo,
-	// pero sfnt y los navegadores sí necesitan una tabla válida para abrirlo.
-	if mime == "font/ttf" {
-		datos = f.completarMetadatosTTF(datos)
+func esFlujoCFFCrudo(b []byte) bool {
+	return len(b) > 4 && b[0] == 1 && b[1] == 0 && b[2] >= 4 && b[3] >= 1 && b[3] <= 4
+}
+
+func esFlujoSfntOTTC(b []byte) bool {
+	if len(b) <= 12 {
+		return false
 	}
-	// El rasterizador usa el programa por CÓDIGO; la cmap Unicode es para SVG.
-	f.guardarPrograma(l, datos)
-	if sub != "Type0" && mime == "font/ttf" && !l.soloRaster {
-		if parcheada, ok := f.cmapSimpleParaTexto(datos); ok {
-			datos = parcheada
-		}
+	if string(b[:4]) == "ttcf" {
+		return true
+	}
+	_, ok := versionSfntNormalizada(b[:4])
+	return ok
+}
+
+func (l *lienzo) prepararFuenteIncrustada(datos []byte, mime string, sub pdfName, f *fuentePDF) ([]byte, string, bool) {
+	if f.yaEnvueltaCFF {
+		f.guardarPrograma(l, datos)
+		return datos, mime, true
+	}
+	limpia, ok := normalizarSfnt(datos, f.nombreBase)
+	if !ok {
+		return nil, "", false
+	}
+	f.crudo = leerTablasCrudasSfnt(limpia)
+	if f.crudo.esOTTO {
+		mime = "font/otf"
+	} else {
+		mime = "font/ttf"
+	}
+	if f.dosBytes && len(f.cidAGid) == 0 && len(f.crudo.cidAGidCFF) > 0 {
+		f.cidAGid = f.crudo.cidAGidCFF
+	}
+	if f.dosBytes && len(f.aUnicode) == 0 && len(f.gidARuna) == 0 && len(f.crudo.gidARuna) > 0 {
+		f.gidARuna = f.crudo.gidARuna
 	}
 
-	if sub == "Type0" && mime == "font/ttf" {
-		parcheada, ok := reescribirCmapTTF(datos, f.aUnicode)
+	datos = f.repararTablasMetricasSfnt(limpia)
+
+	if sub != "Type0" {
+		parcheada, ok := f.cmapSimpleParaTexto(datos)
 		if !ok {
-			// El PNG sí puede con ella: dibuja por índice de glifo y no necesita
-			// cmap ninguna. El SVG sustituye, que es lo que ya hacía.
-			f.guardarPrograma(l, datos)
-			return nil, false
+			return nil, "", false
 		}
 		datos = parcheada
 		f.guardarPrograma(l, datos)
+		return datos, mime, true
 	}
 
-	return datos, true
+	parcheada, invComp, ok := f.reescribirCmapCompuesta(datos, f.crudo.numGlifos)
+	if !ok {
+		return nil, "", false
+	}
+	f.inversoCompuesto = invComp
+	datos = parcheada
+	f.guardarPrograma(l, datos)
+	return datos, mime, true
 }
 
 // reglaFontFace declara el estilo real de cada fuente incrustada: declararla
@@ -1136,46 +1318,14 @@ func (f *fuentePDF) reglaFontFace(id, mime string, datos []byte) string {
 
 // completarMetadatosTTF repone tablas que un subconjunto PDF puede omitir.
 // post formato 3 declara que no hay nombres; OS/2 conserva peso y métricas del
-// head/hhea. No se alteran contornos ni avances. OTS exige ambas en el navegador.
+// head/hhea; name y hmtx se sanean para OTS. Si la fuente está truncada o tiene
+// desplazamientos fuera de rango, la devuelve intacta.
 func (f *fuentePDF) completarMetadatosTTF(datos []byte) []byte {
-	if len(datosTablaSfnt(datos, "post")) == 0 {
-		post := make([]byte, 32)
-		binary.BigEndian.PutUint32(post, 0x00030000)
-		if salida, ok := reemplazarTablaSfnt(datos, "post", post); ok {
-			datos = salida
-		}
-	}
-	if len(datosTablaSfnt(datos, "OS/2")) != 0 {
+	limpia, ok := normalizarSfnt(datos, f.nombreBase)
+	if !ok {
 		return datos
 	}
-	head, hhea := datosTablaSfnt(datos, "head"), datosTablaSfnt(datos, "hhea")
-	if len(head) < 54 || len(hhea) < 12 {
-		return datos
-	}
-	os2 := make([]byte, 78) // versión 0
-	be := binary.BigEndian
-	be.PutUint16(os2[2:4], be.Uint16(hhea[10:12])) // anchura máxima disponible
-	peso, seleccion := uint16(400), uint16(64)
-	if f.negrita {
-		peso, seleccion = 700, 32
-	}
-	if f.italica {
-		seleccion &^= 64
-		seleccion |= 1
-	}
-	be.PutUint16(os2[4:6], peso)
-	be.PutUint16(os2[6:8], 5) // anchura normal
-	copy(os2[58:62], "SYTU")
-	be.PutUint16(os2[62:64], seleccion)
-	be.PutUint16(os2[66:68], 0xFFFF)
-	copy(os2[68:74], hhea[4:10]) // ascendente, descendente y leading
-	copy(os2[74:76], hhea[4:6])
-	descenso := be.Uint16(hhea[6:8])
-	be.PutUint16(os2[76:78], ^descenso+1) // hhea guarda el descenso negativo
-	if salida, ok := reemplazarTablaSfnt(datos, "OS/2", os2); ok {
-		return salida
-	}
-	return datos
+	return f.repararTablasMetricasSfnt(limpia)
 }
 
 func datosTablaSfnt(datos []byte, etiqueta string) []byte {
@@ -1200,40 +1350,134 @@ func datosTablaSfnt(datos []byte, etiqueta string) []byte {
 	return nil
 }
 
-// cmapSimpleParaTexto resuelve cada código con las mismas reglas del PNG y
-// reconstruye Unicode → glifo para SVG. Macintosh formato 6 puede llevar códigos
-// renumerados de Word: su plataforma por sí sola no garantiza que sean caracteres.
+// cmapSimpleParaTexto resuelve cada código con las mismas reglas del PNG sobre
+// las tablas crudas originales y reconstruye Unicode → glifo (incluida la banda
+// visual U+E000+código para ligaduras, variantes y fuentes simbólicas).
 func (f *fuentePDF) cmapSimpleParaTexto(datos []byte) ([]byte, bool) {
-	cara, err := sfnt.Parse(datos)
-	if err != nil {
-		return nil, false
+	crudo := f.crudo
+	if crudo == nil {
+		crudo = leerTablasCrudasSfnt(datos)
+		f.crudo = crudo
 	}
-	f.cmapUnicode = tieneCmapUnicode(datos)
-	f.cmapMacRoman = tieneCmapMacRoman(datos)
-	var buf sfnt.Buffer
+	f.cmapUnicode = crudo.tieneUnicode
+	f.cmapMacRoman = crudo.tieneMac
 	unicodeAGlifo := map[uint16]uint16{}
-	for codigo := uint32(0); codigo < 256; codigo++ {
+
+	registrar := func(codigo uint32) {
 		g := f.glifoDe(codigo, codigo == 32)
-		rs := []rune(g.texto)
-		if len(rs) != 1 || rs[0] <= 0 || rs[0] > 0xFFFF {
-			continue
+		gid, ok := f.resolverGlifoSimple(crudo, g)
+		if !ok || gid == 0 {
+			return
 		}
-		if gid, ok := f.indiceDeGlifo(cara, &buf, g); ok {
-			unicodeAGlifo[uint16(rs[0]&0xFFFF)] = uint16(gid)
-			if f.simbolica {
-				unicodeAGlifo[0xE000+uint16(codigo)] = uint16(gid)
+		f.simpleGid[codigo] = gid
+		unicodeAGlifo[0xE000+uint16(codigo&0xFF)] = gid
+		rs := []rune(g.texto)
+		if len(rs) == 1 && rs[0] > 0 && rs[0] <= 0xFFFF && rs[0] != 0xFFFD && (rs[0] < 0xE000 || rs[0] > 0xE0FF) {
+			u := uint16(rs[0] & 0xFFFF)
+			if _, ya := unicodeAGlifo[u]; !ya {
+				unicodeAGlifo[u] = gid
 			}
 		}
 	}
+	for _, codigo := range f.ordenCodigosSimples() {
+		registrar(codigo)
+	}
+	if len(unicodeAGlifo) == 0 {
+		unicodeAGlifo[0xE000] = 0
+	}
+	f.simpleInverso = unicodeAGlifo
 	salida, ok := reescribirCmapUnicodeTTF(datos, unicodeAGlifo)
 	f.cmapVisual = ok && f.simbolica
 	return salida, ok
 }
 
-// guardarPrograma se queda con la tipografía para dibujar sus contornos. Solo
-// cuando hay rasterizador: en SVG son megas de memoria que nadie lee.
+// ordenCodigosSimples ordena los 256 códigos para poblar la `cmap`: primero los
+// que tienen `/ToUnicode` coincidente con `/Encoding`, después el resto con
+// `/ToUnicode` explícito y por último los códigos sin `/ToUnicode`.
+func (f *fuentePDF) ordenCodigosSimples() [256]uint32 {
+	var out [256]uint32
+	pos := 0
+	for codigo := uint32(0); codigo < 256; codigo++ {
+		t, ok := f.aUnicode[codigo]
+		if ok && f.runaEncodingSimple(byte(codigo)) == primeraRuna(t) {
+			out[pos] = codigo
+			pos++
+		}
+	}
+	for codigo := uint32(0); codigo < 256; codigo++ {
+		t, ok := f.aUnicode[codigo]
+		if ok && f.runaEncodingSimple(byte(codigo)) != primeraRuna(t) {
+			out[pos] = codigo
+			pos++
+		}
+	}
+	for codigo := uint32(0); codigo < 256; codigo++ {
+		if _, ok := f.aUnicode[codigo]; !ok {
+			out[pos] = codigo
+			pos++
+		}
+	}
+	return out
+}
+
+func (f *fuentePDF) runaEncodingSimple(c byte) rune {
+	if t, ok := f.simple[c]; ok {
+		return primeraRuna(t)
+	}
+	if f.nombresSimple[c] != "" {
+		return 0
+	}
+	if f.tieneBaseEncoding && c >= 0x20 {
+		return primeraRuna(decodificarTextoPDF(pdfString{c}))
+	}
+	return 0
+}
+
+// necesitaCapaVisualSimple indica si una cadena de fuente simple incrustada
+// requiere la capa visual U+E000+código (ligaduras, glifos sin Unicode o
+// variantes cuyo carácter Unicode apunta a otro glifo).
+func (f *fuentePDF) necesitaCapaVisualSimple(glifos []glifo) bool {
+	if len(f.simpleInverso) == 0 {
+		return false
+	}
+	for _, g := range glifos {
+		c := byte(g.codigo & 0xFF)
+		gid := f.simpleGid[c]
+		if gid == 0 {
+			continue
+		}
+		rs := []rune(g.texto)
+		if len(rs) != 1 || rs[0] <= 0 || rs[0] > 0xFFFF || f.simpleInverso[uint16(rs[0]&0xFFFF)] != gid {
+			return true
+		}
+	}
+	return false
+}
+
+// necesitaCapaVisualCompuesta indica si una cadena de fuente Type0 incrustada
+// requiere la capa visual por GID (códigos sin `/ToUnicode`, ligaduras de varios
+// caracteres o glifos alternativos que comparten carácter Unicode).
+func (f *fuentePDF) necesitaCapaVisualCompuesta(glifos []glifo) bool {
+	if len(f.inversoCompuesto) == 0 {
+		return false
+	}
+	for _, g := range glifos {
+		gid, ok := f.gidDeCID(g.codigo)
+		if !ok || gid == 0 {
+			continue
+		}
+		rs := []rune(g.texto)
+		if len(rs) != 1 || g.texto == "\u200b" || f.inversoCompuesto[rs[0]] != gid {
+			return true
+		}
+	}
+	return false
+}
+
+// guardarPrograma conserva el programa preparado durante el render por si
+// `pdfraster.go` o un recorte de texto (`Tr` 4-7 en SVG) piden sus contornos.
 func (f *fuentePDF) guardarPrograma(l *lienzo, datos []byte) {
-	if l.r != nil {
+	if !l.recolectando {
 		f.programa = datos
 	}
 }
@@ -1461,7 +1705,10 @@ func aplicarMetricasEstandar(l *lienzo, fd pdfDict, f *fuentePDF) {
 			tabla = &anchosTimes
 		}
 		f.anchoDef = 500
-	case strings.Contains(n, "symbol"), strings.Contains(n, "zapf"), strings.Contains(n, "dingbat"):
+	case strings.Contains(n, "zapf"), strings.Contains(n, "dingbat"):
+		f.anchoDef = 760
+		return
+	case strings.Contains(n, "symbol"):
 		f.anchoDef = 600
 		return
 	default:

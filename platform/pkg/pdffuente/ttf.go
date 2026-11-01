@@ -192,6 +192,9 @@ func (f *Fuente) Avance(g uint16) int {
 	return int(math.Round(float64(adv) * 1000 / float64(f.upem)))
 }
 
+// SFNT expone la cara ya parseada para quien solo lee contornos (el rasterizador de PDF).
+func (f *Fuente) SFNT() *sfnt.Font { return f.sf }
+
 func (f *Fuente) mil(v int) int { return int(math.Round(float64(v) * 1000 / float64(f.upem))) }
 
 // glifo devuelve los bytes de un glifo en glyf (vacío si no tiene contorno).

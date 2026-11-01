@@ -221,7 +221,7 @@ export function EditorHeader({ ctx }: { ctx: EditorContext }): JSX.Element {
   const peers = ctx.peers.slice(0, 4);
 
   return (
-    <header class="sytue-sheet-corners border-border bg-surface flex h-[var(--editor-header-h)] shrink-0 items-center gap-2 border-b px-3">
+    <header class="sytue-sheet-corners border-border bg-surface flex h-[var(--editor-header-h)] shrink-0 items-center gap-2 border-b px-3 [--sytue-sheet-bl:0px] [--sytue-sheet-br:0px]">
       {/* SALE AL HUB, no a la raíz de esta app. `/docs/` es la lista GENÉRICA sin
           producto: quien cerraba Calcus aterrizaba en un cajón con documentos,
           hojas, presentaciones y PDF mezclados, que es justo la portada conjunta

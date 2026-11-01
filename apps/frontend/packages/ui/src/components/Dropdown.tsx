@@ -118,7 +118,7 @@ export interface DropdownProps {
  * generada, no por el orden de la cadena.
  */
 const HOJA_MENU = cx(
-  'sytue-hoja-movil inset-x-0! top-auto! bottom-[calc(100dvh_-_var(--sytue-vvy,0px)_-_var(--sytue-vvh,100dvh))]! max-h-[80dvh]! max-w-none! min-w-0!',
+  'sytue-hoja-movil inset-x-0! top-auto! bottom-[calc(100dvh_-_var(--sytue-vvy,0px)_-_var(--sytue-vvh,100dvh))]! max-h-[calc(var(--sytue-vvh,100dvh)*0.8)]! max-w-none! min-w-0!',
   'rounded-t-card! rounded-b-none! border-x-0! border-b-0! p-2! pb-[max(0.5rem,env(safe-area-inset-bottom))]!',
   '[&_[role=menuitem]]:min-h-11',
 );
@@ -163,7 +163,9 @@ export function Dropdown({
     const onKeyDown = (e: KeyboardEvent) => {
       if (tecladoEnOtraSuperposicion(menuRef.current)) return;
       const volver = (): void =>
-        triggerRef.current?.querySelector<HTMLElement>('button,a,[tabindex]')?.focus();
+        triggerRef.current
+          ?.querySelector<HTMLElement>('button,a,[tabindex]')
+          ?.focus({ preventScroll: true });
       if (e.key === 'Escape') {
         // Solo cierra el menú: sin esto, dentro de un <dialog> modal el mismo
         // Escape cerraba también el diálogo (el visor de Fotos entero).
@@ -355,7 +357,7 @@ export function Dropdown({
         // La altura, por lo mismo: un menú más alto que su hueco se desplaza dentro,
         // en vez de salirse por abajo sin forma de alcanzarlo. Este es el tope hasta
         // que `colocar()` mide; el del hueco lo pone él (ver `encajarPanel`).
-        'max-h-[calc(100dvh-16px)] overflow-y-auto overscroll-contain',
+        'max-h-[calc(var(--sytue-vvh,100dvh)-16px)] overflow-y-auto overscroll-contain',
         'sytue-menu-surface p-1 shadow-[var(--shadow-md)]',
         panelClass,
       )}
@@ -402,7 +404,7 @@ export function Dropdown({
               <>
                 {/* El velo de los diálogos; tocarlo cierra (es «fuera» del menú). */}
                 <div
-                  class="sytue-fade-in fixed inset-0 bg-[var(--sytue-overlay)]"
+                  class="sytue-fade-in fixed inset-0 overscroll-contain bg-[var(--sytue-overlay)]"
                   style={{ zIndex: 'var(--z-modal)' }}
                   aria-hidden="true"
                 />

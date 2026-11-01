@@ -145,7 +145,7 @@ func main() {
 			listo(nombre, datos, false)
 		})
 	}
-	w.SetContent(ui.NuevaBarraSuite(tr, s, iconos.Slides).ConSinSesionPropia().ConHojaASangre().Montar(d.Objeto()))
+	w.SetContent(ui.NuevaBarraSuite(tr, s, iconos.Slides).ConSinSesionPropia().Montar(d.Objeto()))
 	w.Resize(fyne.NewSize(1280, 800))
 	d.Arrancar()
 

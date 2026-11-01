@@ -230,7 +230,7 @@ export function PortadaPdf({ locale }: { locale: Locale }) {
   return (
     <div
       data-suelo-tactil
-      class="mx-auto flex h-full min-h-0 w-full max-w-[var(--container-content,1280px)] flex-col overflow-y-auto px-6 pt-8 pb-10"
+      class="sytue-sheet-corners mx-auto flex h-full min-h-0 w-full max-w-[var(--container-content,1280px)] flex-col overflow-y-auto px-6 pt-8 pb-10"
     >
       <header class="mb-8 shrink-0">
         <h1 class="sytue-h2 text-text">{t('pdf.list.heading')}</h1>

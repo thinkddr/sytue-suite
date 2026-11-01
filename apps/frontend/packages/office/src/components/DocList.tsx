@@ -912,7 +912,7 @@ export function DocList({ locale, userId, kind: kindDeProps }: DocListProps) {
       onScroll={onListScroll}
       role="region"
       aria-labelledby="docs-page-heading"
-      class="sytue-sheet-corners mx-auto h-[calc(100dvh-var(--spacing-topbar)-var(--sytue-safe-bottom,0px))] w-full max-w-[var(--container-content,1280px)] overflow-y-auto px-6 pt-8"
+      class="sytue-sheet-corners mx-auto h-[calc(100dvh-var(--spacing-topbar)-var(--sytue-sheet-gap,0px)-var(--sytue-safe-bottom,0px))] w-full max-w-[var(--container-content,1280px)] overflow-y-auto px-6 pt-8"
     >
       <div class="min-w-0">
         <header class="mb-8 flex shrink-0 items-start gap-3">

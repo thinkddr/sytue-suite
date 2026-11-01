@@ -73,8 +73,20 @@ export type {
 } from './id/index.js';
 
 // Sytue Drive (drive.sytue.eu — REST + WebDAV)
-export { DriveClient, nodeResource } from './drive/index.js';
+export {
+  CIPHER_STORAGE_PRODUCTS,
+  MAX_CIPHER_BLOB_BYTES,
+  DriveClient,
+  createBffCipherBlobGateway,
+  isCipherBlobId,
+  isCipherStorageProduct,
+  isValidCipherBlobReceipt,
+  nodeResource,
+} from './drive/index.js';
 export type {
+  BffCipherBlobGateway,
+  CipherBlobReceipt,
+  CipherStorageProduct,
   DriveOptions,
   DriveResource,
   RawNode,

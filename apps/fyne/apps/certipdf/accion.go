@@ -10,7 +10,6 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
-	temafyne "fyne.io/fyne/v2/theme"
 
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
@@ -271,21 +270,18 @@ func (r *accionRenderer) Refresh() {
 	r.Layout(a.Size())
 }
 
-// deslizable es `overflow-x-auto`: la fila se desliza de lado y mide de alto lo que su
-// contenido. El `container.Scroll` de Fyne declara un alto mínimo propio (medido: 32 para
-// una fila de 24,5), que descolocaba la tira de pestañas 7 píxeles.
-//
-// Sin barra ni sombra de Fyne: la web desliza estas tiras sin enseñar barra (en el
-// navegador es fina y superpuesta, y en la lámina no se ve).
+// deslizable es `overflow-x-auto`: la fila se desliza de lado (con rueda, trackpad o
+// dedo) y mide de alto lo que su contenido, sin la barra ni la pista superpuesta de
+// `container.Scroll` (`ui.DesplazaLado`, `docs/CONVENTIONS.md` §13.2).
 func deslizable(o fyne.CanvasObject) fyne.CanvasObject {
 	d, _ := deslizableCon(o)
 	return d
 }
 
 // deslizableCon es [deslizable] y además su desplazador, para enmascararlo.
-func deslizableCon(o fyne.CanvasObject) (fyne.CanvasObject, *container.Scroll) {
-	s := container.NewHScroll(o)
-	return container.New(deslizaH{}, container.NewThemeOverride(s, temaDeslizable{})), s
+func deslizableCon(o fyne.CanvasObject) (fyne.CanvasObject, *ui.DesplazaLado) {
+	d := ui.NuevoDesplazaLado(o, 0, nil)
+	return d, d
 }
 
 // anchoMascara es el `calc(100% - 24px)` de `MASCARA_SCROLL_X`: lo que se difumina.
@@ -298,17 +294,17 @@ const anchoMascara float32 = 24
 // lo que se pinta: Fyne no enmascara.
 //
 // Se apaga al llegar al final para no anunciar lo que ya no hay.
-func conMascara(caja fyne.CanvasObject, s *container.Scroll, fondo string) fyne.CanvasObject {
+func conMascara(caja fyne.CanvasObject, s *ui.DesplazaLado, fondo string) fyne.CanvasObject {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	c := tema.Color(fondo, v)
 	transparente := c
 	transparente.A = 0
 	d := canvas.NewHorizontalGradient(transparente, c)
 	m := &mascara{s: s, degradado: d}
-	antes := s.OnScrolled
-	s.OnScrolled = func(p fyne.Position) {
+	antes := s.AlDesplazar
+	s.AlDesplazar = func() {
 		if antes != nil {
-			antes(p)
+			antes()
 		}
 		m.poner()
 	}
@@ -316,13 +312,13 @@ func conMascara(caja fyne.CanvasObject, s *container.Scroll, fondo string) fyne.
 }
 
 type mascara struct {
-	s         *container.Scroll
+	s         *ui.DesplazaLado
 	degradado *canvas.LinearGradient
 }
 
 // queda es `Math.ceil(scrollLeft + clientWidth) < scrollWidth`.
 func (m *mascara) queda() bool {
-	return float32(math.Ceil(float64(m.s.Offset.X+m.s.Size().Width))) < m.s.Content.MinSize().Width
+	return float32(math.Ceil(float64(m.s.X()+m.s.Size().Width))) < m.s.AnchoContenido()
 }
 
 func (m *mascara) poner() {
@@ -342,36 +338,10 @@ func (m *mascara) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 	esconder(objs[1], !m.queda())
 }
 
-// temaDeslizable es el de la suite sin la barra ni la sombra del desplazamiento.
-type temaDeslizable struct{ tema.Sytue }
-
-// Color devuelve transparente para la barra y la sombra.
-func (t temaDeslizable) Color(n fyne.ThemeColorName, v fyne.ThemeVariant) color.Color {
-	switch n {
-	case temafyne.ColorNameScrollBar, temafyne.ColorNameShadow, temafyne.ColorNameScrollBarBackground:
-		return color.Transparent
-	}
-	return t.Sytue.Color(n, v)
-}
-
-type deslizaH struct{}
-
-func (deslizaH) MinSize(objs []fyne.CanvasObject) fyne.Size {
-	return fyne.NewSize(0, contenidoDe(objs[0]).Height)
-}
-
-func (deslizaH) Layout(objs []fyne.CanvasObject, t fyne.Size) {
-	objs[0].Move(fyne.NewPos(0, 0))
-	objs[0].Resize(t)
-}
-
-// contenidoDe es el tamaño mínimo de lo que va dentro de un [deslizable].
+// contenidoDe es el tamaño mínimo de lo que va dentro de un desplazador.
 func contenidoDe(o fyne.CanvasObject) fyne.Size {
-	if c, ok := o.(*fyne.Container); ok && len(c.Objects) == 1 {
-		o = c.Objects[0]
-	}
-	if t, ok := o.(*container.ThemeOverride); ok {
-		o = t.Content
+	if d, ok := o.(*ui.DesplazaLado); ok {
+		return d.Contenido.MinSize()
 	}
 	if s, ok := o.(*container.Scroll); ok {
 		return s.Content.MinSize()

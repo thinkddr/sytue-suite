@@ -115,3 +115,20 @@ test('es la capa de los diálogos y en el teléfono una hoja con «Cancelar» y 
     quitar();
   }
 });
+
+test('Intro durante composición IME (isComposing o keyCode 229) no ejecuta el comando antes de tiempo', () => {
+  let elegida = '';
+  const quitar = montar({ onElegir: (o) => (elegida = o.id) });
+  try {
+    const campo = document.activeElement as HTMLInputElement;
+    campo.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', isComposing: true, bubbles: true }),
+    );
+    const safariIme = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true });
+    Object.defineProperty(safariIme, 'keyCode', { value: 229 });
+    campo.dispatchEvent(safariIme);
+    expect(elegida).toBe('');
+  } finally {
+    quitar();
+  }
+});

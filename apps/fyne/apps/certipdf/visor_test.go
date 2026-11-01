@@ -425,6 +425,53 @@ func TestLaCintaConservaLosGruposEnElMovil(t *testing.T) {
 	}
 }
 
+// TestLaCintaTactilSeDesplazaConElDedoSinEnvolver: en un teléfono táctil (360×740),
+// tanto la tira de pestañas como la banda de grupos —incluida «Anotar», cuyos 8 botones
+// táctiles de 44 px superan los 360 px de ventana— conservan UNA sola fila y se
+// desplazan con el dedo (`fyne.Draggable`) sin pistas de `HScroll` encima.
+func TestLaCintaTactilSeDesplazaConElDedoSinEnvolver(t *testing.T) {
+	defer ui.TactilDePrueba(true)()
+	tv := traductorES(t)
+	b := NuevaBarra(func(c string) string { return tv(c, nil) })
+	b.Ancho = 360
+	b.Elegir(PestAnotar)
+	w := ventanaSinRelleno(b.Objeto())
+	defer w.Close()
+	w.Resize(fyne.NewSize(360, b.Alto()))
+
+	if got := b.Alto(); math.Abs(float64(got-97)) > 0.02 {
+		t.Fatalf("«Anotar» táctil a 360 mide %g de alto; debe conservar una fila de 97 y desplazarse", got)
+	}
+	var deslizadores []*ui.DesplazaLado
+	var pestanas []*pestanaBarra
+	todos(w.Content(), func(o fyne.CanvasObject) {
+		switch x := o.(type) {
+		case *ui.DesplazaLado:
+			deslizadores = append(deslizadores, x)
+		case *pestanaBarra:
+			pestanas = append(pestanas, x)
+		}
+	})
+	if len(deslizadores) != 2 || len(pestanas) == 0 {
+		t.Fatalf("deslizadores=%d, pestañas=%d", len(deslizadores), len(pestanas))
+	}
+	tira, banda := deslizadores[0], deslizadores[1]
+	// La tira de pestañas desborda a 360 y llega hasta «Ver» arrastrando con el dedo.
+	tira.Dragged(&fyne.DragEvent{Dragged: fyne.NewDelta(-1000, 0)})
+	tira.DragEnd()
+	ultima := pestanas[len(pestanas)-1]
+	if p := absoluta(ultima); tira.X() == 0 || p.X+ultima.Size().Width > 360+0.5 {
+		t.Fatalf("el dedo no lleva la última pestaña a la vista: X=%g, pos=%v/%v", tira.X(), p, ultima.Size())
+	}
+	// La banda de «Anotar» desborda a 360 y llega hasta el control de grosor arrastrando.
+	banda.Dragged(&fyne.DragEvent{Dragged: fyne.NewDelta(-1000, 0)})
+	banda.DragEnd()
+	ultimoGrupo := b.grupos[len(b.grupos)-1]
+	if p := absoluta(ultimoGrupo); banda.X() == 0 || p.X+ultimoGrupo.Size().Width > 360+0.5 {
+		t.Fatalf("el dedo no lleva el último grupo de «Anotar» a la vista: X=%g, pos=%v/%v", banda.X(), p, ultimoGrupo.Size())
+	}
+}
+
 // TestTrasPulsarLaCintaLasTeclasSueltasSiguenLlegando: pulsar una herramienta de la
 // cinta rehace la cinta; el botón viejo no se queda con el foco, y Escape, sin nada
 // enfocado, llega a la pantalla y vuelve a la mano, como el `keydown` de la web.

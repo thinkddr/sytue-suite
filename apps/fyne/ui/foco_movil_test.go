@@ -20,8 +20,12 @@ import (
 // VISTO EN ROJO con `enfocar` llamando a `c.Focus` sin mirar si escribe.
 func TestEnElTelefonoElTecladoSoloSaleParaEscribir(t *testing.T) {
 	boton := NuevoBotonIcono(iconos.Camara, "Cámara", func() {})
+	accion := NuevoBoton("Guardar", func() {})
+	casilla := NuevaCasilla("Todo el día", nil)
+	conmutador := NuevoConmutador("Recordatorio", nil)
+	selector := NuevoSelector([]string{"Trabajo", "Personal"}, nil)
 	campo := NuevaEntrada("")
-	w := test.NewWindow(container.NewVBox(boton, campo))
+	w := test.NewWindow(container.NewVBox(boton, accion, casilla, conmutador, selector, campo))
 	t.Cleanup(w.Close)
 	c := w.Canvas()
 
@@ -38,6 +42,24 @@ func TestEnElTelefonoElTecladoSoloSaleParaEscribir(t *testing.T) {
 		t.Errorf("en el teléfono un campo no se enfoca: %T", c.Focused())
 	}
 
+	// Pulsar controles que no escriben cierra el teclado retirando el foco del campo.
+	for _, ctrl := range []fyne.Tappable{boton, accion, casilla, conmutador} {
+		Enfocar(c, campo.editor)
+		ctrl.Tapped(&fyne.PointEvent{})
+		if c.Focused() != nil {
+			t.Errorf("pulsar %T en el teléfono dejó el foco en %T y el teclado abierto", ctrl, c.Focused())
+		}
+	}
+	Enfocar(c, campo.editor)
+	selector.Tapped(&fyne.PointEvent{})
+	if c.Focused() != nil {
+		t.Errorf("abrir un selector en el teléfono dejó el foco en %T y el teclado abierto", c.Focused())
+	}
+	if selector.abierto != nil {
+		selector.Alternar()
+	}
+
+	Enfocar(c, campo.editor)
 	Enfocar(c, nil)
 	if c.Focused() != nil {
 		t.Fatal("retirar el foco deja un campo activo en el teléfono")

@@ -12,6 +12,7 @@ import { expect, test } from 'bun:test';
 import { render } from 'preact';
 import { useState } from 'preact/hooks';
 import { Modal } from './Modal.js';
+import { Checkbox, FieldGroup, Input, Select, Switch } from './Form.js';
 import { Dropdown, MenuItem } from './Dropdown.js';
 import { Popover } from './Popover.js';
 import { catalogs } from '@sytue/i18n';
@@ -478,3 +479,93 @@ for (const capa of ['menu', 'popover'] as const) {
     }
   });
 }
+
+test('tocar una casilla, conmutador, selector, botón o hueco libre en móvil recoge el teclado, salvo en barras de formato o etiquetas de campo', () => {
+  enHost((host) => {
+    render(
+      <Modal open onClose={() => {}} title="Evento" footer={<button id="guardar">Guardar</button>}>
+        <FieldGroup label="Título" htmlFor="titulo">
+          <Input id="titulo" />
+        </FieldGroup>
+        <FieldGroup label="Lugar" htmlFor="lugar">
+          <Input id="lugar" />
+        </FieldGroup>
+        <Checkbox id="todo-dia" label="Todo el día" />
+        <Switch id="recordar" label="Avisarme antes" />
+        <Select id="calendario">
+          <option>Personal</option>
+        </Select>
+        <div role="toolbar" aria-label="Formato">
+          <button id="negrita" type="button">
+            B
+          </button>
+        </div>
+        <p id="hueco-libre">Notas adicionales</p>
+      </Modal>,
+      host,
+    );
+
+    const tocar = (el: Element) => {
+      el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerType: 'touch' }));
+    };
+    const titulo = document.getElementById('titulo') as HTMLInputElement;
+    const etiquetaLugar = document.querySelector('label[for="lugar"]')!;
+    const etiquetaCasilla = document.querySelector('label[for="todo-dia"]')!;
+    const etiquetaSwitch = document.querySelector('label[for="recordar"]')!;
+    const selector = document.getElementById('calendario')!;
+    const negrita = document.getElementById('negrita')!;
+    const hueco = document.getElementById('hueco-libre')!;
+    const guardar = document.getElementById('guardar')!;
+
+    // Barra de formato y etiqueta de un campo de texto conservan el teclado activo.
+    titulo.focus();
+    tocar(negrita);
+    expect(document.activeElement).toBe(titulo);
+    tocar(etiquetaLugar);
+    expect(document.activeElement).toBe(titulo);
+
+    // Casilla, conmutador, selector, hueco del cuerpo y botón del pie sueltan el campo.
+    for (const destino of [etiquetaCasilla, etiquetaSwitch, selector, hueco, guardar]) {
+      titulo.focus();
+      expect(document.activeElement).toBe(titulo);
+      tocar(destino);
+      expect(document.activeElement).not.toBe(titulo);
+    }
+  });
+});
+
+test('cambiar de un campo de texto a otro con el teclado ya abierto desplaza el cuerpo del diálogo', () => {
+  enHost((host) => {
+    render(
+      <Modal open onClose={() => {}} title="Contacto">
+        <FieldGroup label="Nombre" htmlFor="c-nombre">
+          <Input id="c-nombre" />
+        </FieldGroup>
+        <FieldGroup label="Notas" htmlFor="c-notas">
+          <Input id="c-notas" />
+        </FieldGroup>
+      </Modal>,
+      host,
+    );
+    const cuerpo = document.querySelector('[data-sytue-dialog-body]') as HTMLElement;
+    const notas = document.getElementById('c-notas') as HTMLInputElement;
+    Object.defineProperty(cuerpo, 'clientHeight', { configurable: true, get: () => 180 });
+    cuerpo.getBoundingClientRect = () =>
+      ({ top: 100, bottom: 280, left: 0, right: 360, width: 360, height: 180 }) as DOMRect;
+    notas.getBoundingClientRect = () =>
+      ({
+        top: 310 - cuerpo.scrollTop,
+        bottom: 354 - cuerpo.scrollTop,
+        left: 24,
+        right: 336,
+        width: 312,
+        height: 44,
+      }) as DOMRect;
+
+    cuerpo.scrollTop = 0;
+    notas.focus();
+    notas.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
+    // Queda visible con 16 px de aire sobre el borde inferior del cuerpo (354 - (280 - 16) = 90).
+    expect(cuerpo.scrollTop).toBe(90);
+  });
+});

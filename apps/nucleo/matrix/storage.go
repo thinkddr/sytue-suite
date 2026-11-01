@@ -67,6 +67,9 @@ func (c *Client) ReadStorageRecord(ctx context.Context, ref EventRef, object, ro
 	if err != nil {
 		return storage.Record{}, err
 	}
+	if err := c.verifyRecoveredStorageEvent(ctx, scope, value); err != nil {
+		return storage.Record{}, err
+	}
 	return decodeStorageRecord(value, scope, c.session.UserID.String(), object, role)
 }
 

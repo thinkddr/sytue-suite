@@ -3,6 +3,11 @@ import { expect, test } from 'bun:test';
 import { createClient, EventType, type MatrixEvent, type IEvent } from 'matrix-js-sdk';
 import { EventShieldColour, EventShieldReason } from 'matrix-js-sdk/lib/crypto-api';
 import type { CryptoBackend } from 'matrix-js-sdk/lib/common-crypto/CryptoBackend';
+import {
+  SECRET_STORAGE_ALGORITHM_V1_AES,
+  ServerSideSecretStorageImpl,
+  type AccountDataClient,
+} from 'matrix-js-sdk/lib/secret-storage';
 import { SuiteMatrix } from './client.js';
 import { privateDeviceFetch } from './private-policy.js';
 import { createStorageRecord, storageJSONBytes, type StorageRecord } from './storage.js';
@@ -222,4 +227,144 @@ test('logout during prepare or fetch prevents private output and plaintext histo
   await expect(
     instance.storage().readRecord({ room_id: room, event_id: '$record' }, 'object', 'content'),
   ).rejects.toThrow('matrix_device');
+});
+
+async function createSsssHarness() {
+  const accountData = new Map<string, Record<string, unknown>>();
+  const rawKey = new Uint8Array(32);
+  for (let i = 0; i < rawKey.length; i++) rawKey[i] = (i * 17 + 0x29) & 0xff;
+  const adapter = {
+    getAccountDataFromServer: async (eventType: string) =>
+      structuredClone(accountData.get(eventType) ?? null),
+    setAccountData: async (eventType: string, content: Record<string, unknown>) => {
+      accountData.set(eventType, structuredClone(content));
+      return {};
+    },
+  } as unknown as AccountDataClient;
+  const secretStorage = new ServerSideSecretStorageImpl(adapter, {
+    getSecretStorageKey: async ({ keys }) => {
+      const id = Object.keys(keys)[0];
+      return id ? [id, rawKey.slice() as Uint8Array<ArrayBuffer>] : null;
+    },
+  });
+  const added = await secretStorage.addKey(
+    SECRET_STORAGE_ALGORITHM_V1_AES,
+    { key: rawKey.slice() as Uint8Array<ArrayBuffer>, name: 'sytue-vault-test' },
+    'default_vault_key',
+  );
+  await secretStorage.setDefaultKeyId(added.keyId);
+  return { accountData, secretStorage, keyId: added.keyId };
+}
+
+test('SSSS vault binds secret ID, scope, revision and authenticated ciphertext', async () => {
+  const { accountData, secretStorage, keyId } = await createSsssHarness();
+  const { instance } = fixture();
+  Object.assign(instance, {
+    trusted: async () => true,
+  });
+  Object.assign(instance.client, { secretStorage });
+
+  expect(await instance.readSecret('vault_item')).toBeNull();
+
+  const secretPayload = new TextEncoder().encode('{"pin":"987654","amount":9007199254740993}');
+  await instance.putSecret('vault_item', secretPayload, 2);
+
+  const stored = accountData.get('org.sytue.vault.vault_item') as {
+    encrypted: Record<string, { iv: string; ciphertext: string; mac: string }>;
+  };
+  expect(JSON.stringify(stored)).not.toContain('987654');
+
+  const loaded = await instance.readSecret('vault_item', 2);
+  expect(loaded?.revision).toBe(2);
+  expect(new TextDecoder().decode(loaded?.payload)).toBe(
+    '{"pin":"987654","amount":9007199254740993}',
+  );
+
+  // Rollback protection: demanding minRevision 3 rejects revision 2.
+  await expect(instance.readSecret('vault_item', 3)).rejects.toThrow('matrix_identity');
+
+  // Event-name / HKDF info binding: moving ciphertext under another vault key fails.
+  accountData.set('org.sytue.vault.moved_item', structuredClone(stored));
+  await expect(instance.readSecret('moved_item', 1)).rejects.toThrow('matrix_identity');
+
+  // Cross-product scope substitution fails even with valid SSSS key.
+  const mailInstance = Object.assign(Object.create(SuiteMatrix.prototype), {
+    bootstrap: { ...structuredClone(bootstrap), storage_product: 'mail' },
+    closed: false,
+    trusted: async () => true,
+    client: { secretStorage },
+  }) as SuiteMatrix;
+  await expect(mailInstance.readSecret('vault_item', 1)).rejects.toThrow('matrix_identity');
+
+  // Tampering with the SSSS IV fails HMAC/envelope verification.
+  const tampered = structuredClone(stored);
+  const entry = tampered.encrypted[keyId]!;
+  entry.iv = (entry.iv.startsWith('A') ? 'B' : 'A') + entry.iv.slice(1);
+  accountData.set('org.sytue.vault.vault_item', tampered);
+  await expect(instance.readSecret('vault_item', 1)).rejects.toThrow('matrix_identity');
+});
+
+test('recovered private storage accepts SSSS-attested owner sessions and rejects unattested backup injections', async () => {
+  const { secretStorage } = await createSsssHarness();
+  const writer = fixture();
+  writer.state.raw = {
+    type: String(EventType.RoomMessageEncrypted),
+    room_id: room,
+    sender: own,
+    event_id: '$record',
+    content: {
+      algorithm: 'm.megolm.v1.aes-sha2',
+      session_id: 'session_verified_owner_1',
+      sender_key: 'owner',
+      ciphertext: 'opaque_ciphertext',
+    },
+  };
+  Object.assign(writer.instance, {
+    trusted: async () => true,
+    crypto: {
+      ...writer.instance['crypto'],
+      checkKeyBackupAndEnable: async () => ({
+        backupInfo: { algorithm: 'm.megolm_backup.v1.curve25519-aes-sha2', version: '1' },
+        trustInfo: { trusted: true, matchesDecryptionKey: true },
+      }),
+    },
+  });
+  Object.assign(writer.instance.client, { secretStorage });
+
+  const saved = await writer.instance.storage().putRecord('opaque', record());
+  await writer.instance.backup();
+
+  // Simulate fresh recovered device where Megolm backup restores with AUTHENTICITY_NOT_GUARANTEED.
+  const reader = fixture();
+  reader.state.shield = EventShieldColour.GREY;
+  reader.state.reason = EventShieldReason.AUTHENTICITY_NOT_GUARANTEED;
+  reader.state.raw = structuredClone(writer.state.raw);
+  Object.assign(reader.instance.client, { secretStorage });
+
+  const recovered = await reader.instance.storage().readRecord(saved, 'object', 'content');
+  expect(new TextDecoder().decode(storageJSONBytes(recovered.payload))).toBe(
+    '{"amount":900719925474099312345}',
+  );
+
+  // Unattested Curve25519 backup injection (different session_id or sender_key) is rejected!
+  reader.state.raw = {
+    ...reader.state.raw,
+    content: {
+      algorithm: 'm.megolm.v1.aes-sha2',
+      session_id: 'session_unauthenticated_backup_injected',
+      sender_key: 'owner',
+      ciphertext: 'opaque_ciphertext',
+    },
+  };
+  await expect(reader.instance.storage().readRecord(saved, 'object', 'content')).rejects.toThrow(
+    'matrix_unverified',
+  );
+
+  // Non-backup shield warnings (e.g. UNSIGNED_DEVICE) still fail even for an attested session!
+  reader.state.raw = structuredClone(writer.state.raw);
+  reader.state.shield = EventShieldColour.RED;
+  reader.state.reason = EventShieldReason.UNSIGNED_DEVICE;
+  await expect(reader.instance.storage().readRecord(saved, 'object', 'content')).rejects.toThrow(
+    'matrix_unverified',
+  );
 });

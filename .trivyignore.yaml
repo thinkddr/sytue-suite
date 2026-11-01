@@ -26,7 +26,7 @@ misconfigurations:
       - "deploy/helm/charts/cloud-api/templates/rbac.yaml"
       - "**/sytue-one/charts/cloud-api/templates/rbac.yaml"
     statement: "Catálogo de terminal sin binding global ni de plataforma: el controller delega logs/exec solo mediante RoleBindings en namespaces tenant verificados; guardias Helm y Go impiden ampliar el alcance"
-    expired_at: 2026-11-01
+    expired_at: 2027-02-01
 
   # El identificador lleva GUION: `KSV-0041` es lo que emite Trivy 0.73 (el campo AVDID
   # viene vacío). Escrito como `KSV0041` la excepción se acepta sin protestar y no filtra
@@ -50,7 +50,7 @@ misconfigurations:
     #
     # Comprobación: helm template deploy/helm/upstream/traefik-*.tgz | grep -A8 secrets
     statement: "Traefik solo obtiene get/list/watch sobre secrets al renderizar; la escritura vive tras un if de Traefik Hub que no usamos"
-    expired_at: 2026-11-01
+    expired_at: 2027-02-01
 
   # El reconciliador de Sytue Cloud. Este NO es un falso positivo: gestiona `secrets` de
   # verdad, y es su función — materializa las credenciales que inyecta en las apps de
@@ -73,14 +73,14 @@ misconfigurations:
       - "deploy/helm/charts/cloud-controller/templates/rbac.yaml"
       - "**/sytue-one/charts/cloud-controller/templates/rbac.yaml"
     statement: "El reconciliador crea los secretos de las apps tenant; sin nodos, CRDs ni pods/exec; la delegación RBAC solo enlaza el catálogo concreto de runtime por namespace, sin escalate ni escritura de roles o bindings globales"
-    expired_at: 2026-11-01
+    expired_at: 2027-02-01
 
   - id: KSV-0056
     paths:
       - "deploy/helm/charts/cloud-controller/templates/rbac.yaml"
       - "**/sytue-one/charts/cloud-controller/templates/rbac.yaml"
     statement: "Mismo caso: el alcance de clúster es lo que permite crear el namespace de un tenant que aún no existe"
-    expired_at: 2026-11-01
+    expired_at: 2027-02-01
 
   # La plantilla pública contiene el literal SYTUE_REDIS_PASSWORD, nunca el
   # valor. El initContainer lo sustituye desde secretKeyRef y escribe el YAML
@@ -91,7 +91,7 @@ misconfigurations:
       - "deploy/helm/charts/livekit/templates/configmap.yaml"
       - "**/sytue-one/charts/livekit/templates/configmap.yaml"
     statement: "Falso positivo sobre el marcador SYTUE_REDIS_PASSWORD; la credencial solo llega desde un Secret al emptyDir privado del pod, con guardián que impide publicarla en el ConfigMap"
-    expired_at: 2026-11-01
+    expired_at: 2027-02-01
 
 vulnerabilities:
   # OpenSSL en la base de las imágenes de frontal: `oven/bun:1.4.2-alpine` trae

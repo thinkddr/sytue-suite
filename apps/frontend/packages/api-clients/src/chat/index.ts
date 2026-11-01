@@ -11,6 +11,7 @@
  * WS:         /api/v1/ws  (ws://)
  */
 import { HttpClient, type AuthProvider } from '../core/http.js';
+import { isCipherStorageProduct, type CipherStorageProduct } from '../drive/index.js';
 
 /** Server-authenticated mapping. No message keys or Matrix credentials cross the BFF. */
 export interface MatrixBootstrapMetadata {
@@ -19,10 +20,14 @@ export interface MatrixBootstrapMetadata {
   homeserver_url: string;
   sso_provider_id: string;
   matrix_user_id: string;
+  controller_user_id?: string;
   channels: { channel_id: string; matrix_room_id: string }[];
   encryption: 'm.megolm.v1.aes-sha2';
   draft_room_id?: string;
   draft_room_ids?: string[];
+  storage_product?: CipherStorageProduct;
+  storage_room_id?: string;
+  storage_room_ids?: string[];
   source_url?: string;
 }
 
@@ -150,6 +155,22 @@ export class ChatClient {
   /** Authenticated Matrix identity and channel mappings; never returns credentials. */
   matrixBootstrap(signal?: AbortSignal): Promise<MatrixBootstrapMetadata> {
     return this.http.json({ path: '/matrix/bootstrap', ...(signal ? { signal } : {}) });
+  }
+
+  /** Per-product private Matrix storage room bindings; never returns credentials or keys. */
+  matrixStorageBootstrap(
+    product: CipherStorageProduct,
+    signal?: AbortSignal,
+  ): Promise<MatrixBootstrapMetadata> {
+    if (!isCipherStorageProduct(product)) {
+      return Promise.reject(new RangeError('Invalid storage product'));
+    }
+    return this.http.json({
+      path: '/matrix/storage/bootstrap',
+      query: { product },
+      maxResponseBytes: 65536,
+      ...(signal ? { signal } : {}),
+    });
   }
 
   startMatrixNative(input: {

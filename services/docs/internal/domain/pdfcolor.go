@@ -268,6 +268,9 @@ func (l *lienzo) espacio(o pdfObj, prof int) *espacioColor {
 			}
 			return ec
 		case "Pattern":
+			if len(v) >= 2 {
+				return &espacioColor{clase: "Pattern", n: 1, base: l.espacio(v[1], prof+1)}
+			}
 			return espacioPatron
 		case "DeviceGray":
 			return espacioGris
@@ -304,7 +307,8 @@ func (l *lienzo) espacioIndexado(v pdfArray, prof int) *espacioColor {
 }
 
 // color aplica `sc`/`scn`/`SC`/`SCN`. Con un espacio de patrón, el último
-// operando es el NOMBRE del patrón y no un número.
+// operando es el NOMBRE del patrón y los anteriores (si es un mosaico no
+// coloreado, PaintType 2) son los componentes del espacio subyacente (§8.7.3.3).
 func (e *ejecucion) color(ops []pdfObj, trazo bool) {
 	ec := e.estado.csRelleno
 	if trazo {
@@ -313,8 +317,7 @@ func (e *ejecucion) color(ops []pdfObj, trazo bool) {
 	if ec != nil && ec.clase == "Pattern" {
 		if len(ops) > 0 {
 			if nom, ok := e.l.d.resolver(ops[len(ops)-1]).(pdfName); ok {
-				e.aplicarPatron(nom, trazo)
-				return
+				e.aplicarPatron(nom, trazo, e.colorBasePatron(ec, ops[:len(ops)-1]))
 			}
 		}
 		return
@@ -325,11 +328,30 @@ func (e *ejecucion) color(ops []pdfObj, trazo bool) {
 	}
 	css := ec.css(comps)
 	if trazo {
-		e.estado.trazo, e.estado.patronTrazo = css, ""
+		e.estado.trazo, e.estado.patTrazo = css, nil
 	} else {
-		e.estado.relleno, e.estado.patronRelleno = css, ""
-		e.estado.degRelleno, e.estado.mallaRelleno = nil, nil
+		e.estado.relleno, e.estado.patRelleno = css, nil
 	}
+}
+
+func (e *ejecucion) colorBasePatron(ec *espacioColor, ops []pdfObj) string {
+	base := ec.base
+	if base == nil {
+		if len(ops) == 0 {
+			return "#000000"
+		}
+		base = espacioGris
+	}
+	nComp := base.componentes()
+	if len(ops) < nComp {
+		return base.inicial()
+	}
+	comps := make([]float64, nComp)
+	inicio := len(ops) - nComp
+	for i := 0; i < nComp; i++ {
+		comps[i] = comoReal(e.l.d.resolver(ops[inicio+i]))
+	}
+	return base.css(comps)
 }
 
 // --- Funciones ---------------------------------------------------------------
@@ -1096,9 +1118,65 @@ func (e *ejecucion) sombrear(nombre pdfName) {
 	e.l.escribir("/>\n")
 }
 
+// patronPDF describe un patrón activo (mosaico tipo 1 o sombreado tipo 2) en el
+// estado gráfico. En SVG, `patternUnits="userSpaceOnUse"` y `gradientUnits` se
+// evalúan en el espacio local del elemento que los referencia (DESPUÉS de su
+// `transform`), así que la matriz de servidor de pintura depende de `elemM` y se
+// cachea por matriz de elemento para no duplicar `<defs>`.
+type patronPDF struct {
+	tipo      int
+	paintType int
+	mp        matriz
+	st        *pdfStream
+	sh        pdfObj
+	bbox      [4]float64
+	ancho     float64
+	alto      float64
+	colorBase string
+	aprox     string
+	deg       *degradadoRaster
+	malla     []trianguloMalla
+	ids       map[matriz]string
+}
+
+// idPara devuelve el id del `<pattern>` o `<linearGradient>` ajustado al
+// espacio local `elemM` del elemento SVG que lo usa (`mp = tSVG · elemM`).
+func (p *patronPDF) idPara(l *lienzo, elemM matriz) string {
+	if p == nil || l.soloRaster {
+		return ""
+	}
+	if id, ok := p.ids[elemM]; ok {
+		return id
+	}
+	tSVG := p.mp
+	if inv, ok := elemM.inversa(); ok {
+		tSVG = p.mp.por(inv)
+	}
+	var id string
+	var ok bool
+	switch p.tipo {
+	case 1:
+		id, ok = l.mosaicoPatron(p, tSVG)
+	case 2:
+		if len(p.malla) > 0 {
+			id, ok = l.mallaComoPatron(p.malla, tSVG)
+		} else {
+			id, ok = l.gradiente(p.sh, tSVG)
+		}
+	}
+	if !ok {
+		return ""
+	}
+	if p.ids == nil {
+		p.ids = map[matriz]string{}
+	}
+	p.ids[elemM] = id
+	return id
+}
+
 // aplicarPatron resuelve `scn /P1` con espacio /Pattern: un sombreado (tipo 2) o
 // un mosaico (tipo 1).
-func (e *ejecucion) aplicarPatron(nombre pdfName, trazo bool) {
+func (e *ejecucion) aplicarPatron(nombre pdfName, trazo bool, colorBase string) {
 	obj := e.l.d.resolver(e.recursoDe("Pattern", nombre))
 	var dict pdfDict
 	var st *pdfStream
@@ -1117,48 +1195,96 @@ func (e *ejecucion) aplicarPatron(nombre pdfName, trazo bool) {
 			m[i] = comoReal(e.l.d.resolver(arr[i]))
 		}
 	}
-	// La matriz del patrón se aplica sobre el espacio del PDF, NO sobre la CTM
-	// del momento: un patrón no se mueve con lo que se pinta. Por eso se compone
-	// con la matriz base de la página, que es la que hay en el fondo de la pila.
-	base := e.pila[0].ctm
-	mp := m.por(base)
-	tipo, _ := comoEntero(e.l.d.resolver(dict["PatternType"]))
+	// La matriz del patrón se aplica sobre el espacio inicial del contexto padre,
+	// NO sobre la CTM vigente: un patrón no se mueve con lo que se pinta (§8.7.2).
+	mp := m.por(e.pila[0].ctm)
+	tipo, _ := comoInt(e.l.d.resolver(dict["PatternType"]))
 
-	var id string
-	var ok bool
-	var malla []trianguloMalla
+	var pat *patronPDF
 	switch tipo {
-	case 2:
-		sh := e.l.d.resolver(dict["Shading"])
-		// Con una malla dentro hace falta envolverla: un relleno necesita un
-		// servidor de pintura y las figuras no lo son.
-		if tris, hay := e.l.mallaDeSombreado(sh); hay {
-			malla = tris
-			id, ok = e.l.mallaComoPatron(tris, mp)
-			break
-		}
-		id, ok = e.l.gradiente(sh, mp)
 	case 1:
-		if st != nil {
-			id, ok = e.l.mosaico(st, mp)
-		}
+		pat = e.l.construirPatronMosaico(st, mp, colorBase)
+	case 2:
+		pat = e.l.construirPatronSombreado(dict["Shading"], mp)
 	}
-	if !ok {
+	if pat == nil {
 		return
 	}
-	aprox := ""
-	var deg *degradadoRaster
-	if tipo == 2 && len(malla) == 0 {
-		sh := e.l.d.resolver(dict["Shading"])
-		aprox = e.l.colorMedioDeSombreado(sh)
-		deg = e.l.degradadoDe(sh, mp, true)
-	}
 	if trazo {
-		e.estado.patronTrazo, e.estado.aproxTrazo = id, aprox
+		e.estado.patTrazo = pat
 	} else {
-		e.estado.patronRelleno, e.estado.aproxRelleno, e.estado.degRelleno = id, aprox, deg
-		e.estado.mallaRelleno, e.estado.matrizMalla = malla, mp
+		e.estado.patRelleno = pat
 	}
+}
+
+func (l *lienzo) construirPatronMosaico(st *pdfStream, mp matriz, colorBase string) *patronPDF {
+	if st == nil || l.prof > maxProfundidadXObject {
+		return nil
+	}
+	caja, tiene := l.rectangulo(st.Dict["BBox"])
+	if !tiene {
+		return nil
+	}
+	paso := func(clave pdfName, alt float64) float64 {
+		if v, ok := st.Dict[clave]; ok {
+			if x := math.Abs(comoReal(l.d.resolver(v))); x > 1e-6 {
+				return x
+			}
+		}
+		return alt
+	}
+	ancho := paso("XStep", caja[2]-caja[0])
+	alto := paso("YStep", caja[3]-caja[1])
+	if ancho <= 0 || alto <= 0 || ancho > 1e5 || alto > 1e5 {
+		return nil
+	}
+	paintType, ok := comoInt(l.d.resolver(st.Dict["PaintType"]))
+	if !ok {
+		paintType = 1
+	}
+	return &patronPDF{
+		tipo:      1,
+		paintType: paintType,
+		mp:        mp,
+		st:        st,
+		bbox:      caja,
+		ancho:     ancho,
+		alto:      alto,
+		colorBase: colorBase,
+	}
+}
+
+func (l *lienzo) construirPatronSombreado(rawSh pdfObj, mp matriz) *patronPDF {
+	sh := l.d.resolver(rawSh)
+	if tris, hay := l.mallaDeSombreado(sh); hay {
+		return &patronPDF{tipo: 2, mp: mp, sh: sh, malla: tris}
+	}
+	if !l.sombreadoGradienteValido(sh) {
+		return nil
+	}
+	return &patronPDF{
+		tipo:  2,
+		mp:    mp,
+		sh:    sh,
+		aprox: l.colorMedioDeSombreado(sh),
+		deg:   l.degradadoDe(sh, mp, true),
+	}
+}
+
+func (l *lienzo) sombreadoGradienteValido(sh pdfObj) bool {
+	dict := dictDeSombreado(sh)
+	if dict == nil {
+		return false
+	}
+	tipo, _ := comoInt(l.d.resolver(dict["ShadingType"]))
+	coords := l.reales(dict["Coords"])
+	if tipo == 2 {
+		return len(coords) >= 4
+	}
+	if tipo == 3 {
+		return len(coords) >= 6
+	}
+	return l.funcion(dict["Function"], 0) != nil
 }
 
 // colorMedioDeSombreado evalúa la función del sombreado en el centro de su
@@ -1189,63 +1315,82 @@ func (l *lienzo) colorMedioDeSombreado(sh pdfObj) string {
 	return l.espacio(dict["ColorSpace"], 0).css(fn.evaluar((dom[0] + dom[1]) / 2))
 }
 
-// mosaico traduce un patrón de tipo 1 a <pattern>: se renderiza la celda una vez
-// y el navegador la repite. Es lo que dibuja los rayados de un plano, que es
-// justo donde se mide.
-func (l *lienzo) mosaico(st *pdfStream, m matriz) (string, bool) {
-	if l.prof > maxProfundidadXObject {
+// mosaicoPatron traduce un patrón de tipo 1 a <pattern>: se renderiza la celda
+// una vez y el navegador la repite. Respeta PaintType 2 (color subyacente),
+// recorte a /BBox cuando el paso supera la caja y solape periódico cuando /BBox
+// desborda XStep/YStep.
+func (l *lienzo) mosaicoPatron(p *patronPDF, m matriz) (string, bool) {
+	if p == nil || p.st == nil || l.prof > maxProfundidadXObject {
 		return "", false
 	}
-	contenido, err := l.d.datosDeFlujo(st)
+	contenido, err := l.d.datosDeFlujo(p.st)
 	if err != nil {
 		return "", false
 	}
-	paso := func(clave pdfName, alt float64) float64 {
-		if v, ok := st.Dict[clave]; ok {
-			if x := math.Abs(comoReal(l.d.resolver(v))); x > 1e-6 {
-				return x
-			}
-		}
-		return alt
-	}
-	caja, tiene := l.rectangulo(st.Dict["BBox"])
-	if !tiene {
-		return "", false
-	}
-	ancho := paso("XStep", caja[2]-caja[0])
-	alto := paso("YStep", caja[3]-caja[1])
-	if ancho <= 0 || alto <= 0 || ancho > 1e5 || alto > 1e5 {
-		return "", false
-	}
-
-	// El contenido de la celda se renderiza a un lienzo aparte para no mezclarlo
-	// con el flujo principal; sus defs sí se comparten, que es donde acaban las
-	// fuentes y los recortes.
 	sub := &lienzo{
-		d:          l.d,
-		opts:       l.opts,
-		fuentes:    l.fuentes,
-		caraCSS:    l.caraCSS,
-		prof:       l.prof + 1,
-		seq:        l.seq,
-		prefijoIDs: l.prefijoIDs,
+		d:           l.d,
+		opts:        l.opts,
+		fuentes:     l.fuentes,
+		caraCSS:     l.caraCSS,
+		ocgApagados: l.ocgApagados,
+		prof:        l.prof + 1,
+		seq:         l.seq,
+		prefijoIDs:  l.prefijoIDs,
 	}
-	recursos, _ := l.d.resolver(st.Dict["Resources"]).(pdfDict)
-	sub.ejecutar(contenido, recursos, estadoInicial(identidad))
+	est := estadoInicial(identidad)
+	ignorarColor := p.paintType == 2
+	if ignorarColor {
+		est.relleno = p.colorBase
+		est.trazo = p.colorBase
+	}
+	recursos, _ := l.d.resolver(p.st.Dict["Resources"]).(pdfDict)
+	sub.ejecutarModo(contenido, recursos, est, ignorarColor)
 	l.seq = sub.seq
 	l.defsEscribir(sub.defs.String())
 
 	id := l.id("mos")
+	caja, ancho, alto := p.bbox, p.ancho, p.alto
+	wBBox, hBBox := caja[2]-caja[0], caja[3]-caja[1]
 	var b strings.Builder
 	b.WriteString(`<pattern id="` + id + `" patternUnits="userSpaceOnUse" `)
 	b.WriteString(`x="` + num(caja[0]) + `" y="` + num(caja[1]) + `" `)
 	b.WriteString(`width="` + num(ancho) + `" height="` + num(alto) + `" `)
 	b.WriteString(`patternTransform="` + m.svg() + `">`)
-	b.WriteString(`<g transform="translate(` + num(-caja[0]) + " " + num(-caja[1]) + `)">`)
-	b.WriteString(sub.sb.String())
-	b.WriteString("</g></pattern>")
+	escribirCeldasMosaicoSVG(&b, sub.sb.String(), caja, ancho, alto, wBBox, hBBox)
+	b.WriteString("</pattern>")
 	l.defsEscribir(b.String())
 	return id, true
+}
+
+func escribirCeldasMosaicoSVG(
+	b *strings.Builder, celda string, caja [4]float64, ancho, alto, wBBox, hBBox float64,
+) {
+	recortarBBox := ancho > wBBox+1e-6 || alto > hBBox+1e-6
+	solapa := wBBox > ancho+1e-6 || hBBox > alto+1e-6
+	escribirUna := func(dx, dy float64) {
+		if recortarBBox && wBBox > 0 && hBBox > 0 {
+			b.WriteString(`<svg x="` + num(dx) + `" y="` + num(dy) +
+				`" width="` + num(wBBox) + `" height="` + num(hBBox) + `" overflow="hidden">`)
+			b.WriteString(`<g transform="translate(` + num(-caja[0]) + " " + num(-caja[1]) + `)">`)
+			b.WriteString(celda)
+			b.WriteString("</g></svg>")
+			return
+		}
+		b.WriteString(`<g transform="translate(` + num(dx-caja[0]) + " " + num(dy-caja[1]) + `)">`)
+		b.WriteString(celda)
+		b.WriteString("</g>")
+	}
+	if !solapa {
+		escribirUna(0, 0)
+		return
+	}
+	nx := min(max(int(math.Ceil(wBBox/ancho))-1, 0), 4)
+	ny := min(max(int(math.Ceil(hBBox/alto))-1, 0), 4)
+	for jy := -ny; jy <= 0; jy++ {
+		for jx := -nx; jx <= 0; jx++ {
+			escribirUna(float64(jx)*ancho, float64(jy)*alto)
+		}
+	}
 }
 
 // gradiente traduce un sombreado a <linearGradient> o <radialGradient>. Los

@@ -21,6 +21,26 @@ export function resolveIntegrationsUrl(env: EnvLike): string {
   );
 }
 
+/** Server-to-server Drive calls use the cluster service before the public ingress. */
+export function resolveDriveServiceUrl(env: EnvLike): string {
+  return (
+    env.SYTUE_DRIVE_INTERNAL_URL ??
+    env.SYTUE_DRIVE_API_URL ??
+    env.PUBLIC_SYTUE_DRIVE_BASE_URL ??
+    'https://drive.sytue.eu'
+  ).replace(/\/$/, '');
+}
+
+/** Server-to-server Rooms calls use the cluster service before the public ingress. */
+export function resolveRoomsServiceUrl(env: EnvLike): string {
+  return (
+    env.SYTUE_ROOMS_INTERNAL_URL ??
+    env.SYTUE_ROOMS_API_URL ??
+    env.PUBLIC_SYTUE_ROOMS_BASE_URL ??
+    'https://rooms.sytue.eu'
+  ).replace(/\/$/, '');
+}
+
 /**
  * Entorno EFECTIVO del servidor: fusiona el env de BUILD (`import.meta.env`, con
  * las PUBLIC_* inlineadas) con el de RUNTIME (`process.env`, las variables del

@@ -223,6 +223,26 @@ func conectarCarpetaDriveWindows(ctx context.Context, s *Suite, e estadoDriveSis
 	return conectar(ctx, dir, s.autorizacionDriveSistema(e.identidad))
 }
 
+func prepararCarpetaDriveWindows(ctx context.Context, s *Suite, i auth.IdentitySnapshot) (string, error) {
+	if _, err := s.autorizacionDriveSistema(i).AccessToken(ctx); err != nil {
+		return "", err
+	}
+	dir, err := nube.CarpetaCon(ctx, cuentaNube(i))
+	if err != nil {
+		return "", err
+	}
+	if err := s.comprobarAperturaDrive(ctx); err != nil {
+		return "", err
+	}
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return "", err
+	}
+	if err := s.comprobarAperturaDrive(ctx); err != nil {
+		return "", err
+	}
+	return dir, nil
+}
+
 func cerrojoDriveSistema(ctx context.Context) (func(), error) {
 	dir, err := ajustes.Carpeta()
 	if err != nil {

@@ -176,11 +176,17 @@ func (c *Client) readEncryptedEvent(ctx context.Context, reference EventRef) (De
 	if err := encrypted.Content.ParseRaw(encrypted.Type); err != nil {
 		return DecryptedEvent{}, err
 	}
+	wire := encrypted.Content.AsEncrypted()
 	clearEvent, err := c.crypto.Decrypt(ctx, encrypted)
 	if err != nil {
 		return DecryptedEvent{}, err
 	}
-	return c.decryptedEvent(ctx, clearEvent)
+	value, err := c.decryptedEvent(ctx, clearEvent)
+	if err == nil && wire != nil {
+		value.SessionID = wire.SessionID.String()
+		value.SenderKey = wire.SenderKey.String()
+	}
+	return value, err
 }
 
 func (c *Client) readReady(ctx context.Context) error {

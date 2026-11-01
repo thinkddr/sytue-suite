@@ -74,6 +74,7 @@ func (p *pulsable) activar() {
 	if p.Inerte || p.AlPulsar == nil {
 		return
 	}
+	cerrarTecladoActivo()
 	p.AlPulsar()
 }
 

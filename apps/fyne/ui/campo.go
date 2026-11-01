@@ -789,6 +789,9 @@ func (e *Entrada) Tapped(ev *fyne.PointEvent) {
 	// El icono vive en el relleno de la izquierda (`pl-9`), fuera del editor: el clic
 	// llega aquí.
 	if ev != nil && e.AlPulsarIcono != nil && e.Icono != iconos.Ninguno && ev.Position.X < e.medida().margenIcono {
+		if c := fyne.CurrentApp().Driver().CanvasForObject(e); c != nil {
+			cerrarTecladoMovil(c)
+		}
 		e.AlPulsarIcono()
 		return
 	}

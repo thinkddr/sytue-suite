@@ -35,8 +35,20 @@ const recordLockPrefix = ".record-lock-"
 
 func (f ficheros) encrypted() bool { return f.sealed != nil }
 
+func openRootLockFile(root *os.Root, name string) (*os.File, error) {
+	// En macOS (XNU/APFS), dos openat(O_CREAT) simultáneos sobre un nombre nuevo
+	// dentro de os.Root pueden devolver ENOENT al perdedor mientras se crea el vnode.
+	for range 4 {
+		file, err := root.OpenFile(name, os.O_CREATE|os.O_RDWR, 0o600)
+		if !errors.Is(err, fs.ErrNotExist) {
+			return file, err
+		}
+	}
+	return root.OpenFile(name, os.O_CREATE|os.O_RDWR, 0o600)
+}
+
 func (f ficheros) lockRecord(ctx context.Context, key string) (func(), error) {
-	file, err := f.raiz.OpenFile(recordLockPrefix+clave(key), os.O_CREATE|os.O_RDWR, 0o600)
+	file, err := openRootLockFile(f.raiz, recordLockPrefix+clave(key))
 	if err != nil {
 		return nil, err
 	}

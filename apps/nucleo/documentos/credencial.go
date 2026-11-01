@@ -7,7 +7,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"log/slog"
 	"slices"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
@@ -251,12 +250,4 @@ func revocar(ctx context.Context, c Cuenta, id string) error {
 		return err
 	}
 	return nil
-}
-
-// avisar apunta lo que no ha salido al conectar o desconectar: el sistema es de quien
-// lo usa y un fallo suyo no para la app.
-func avisar(que string, err error) {
-	if err != nil {
-		slog.Warn("documentos: "+que, "error", err)
-	}
 }

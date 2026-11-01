@@ -107,3 +107,56 @@ func TestElAltoDeLaClaseMandaSobreLaTalla(t *testing.T) {
 		t.Errorf("sin alto mide %v y no el de la talla", m)
 	}
 }
+
+func TestSelectorYMenuMovilEnHojaYDesplazablesConElDedo(t *testing.T) {
+	telefono(t)
+	opciones := make([]string, 30)
+	for i := range opciones {
+		opciones[i] = "Opción móvil"
+	}
+	s := NuevoSelector(opciones, nil)
+	s.Elegida = 2
+	w := test.NewTempWindow(t, container.NewWithoutLayout(s))
+	w.SetPadded(false)
+	w.Resize(fyne.NewSize(390, 844))
+	s.Move(fyne.NewPos(24, 120))
+	s.Resize(MedidaSelector(CampoMD, 342))
+	s.Tapped(&fyne.PointEvent{})
+	t.Cleanup(func() {
+		if s.abierto != nil {
+			s.abierto.Hide()
+		}
+	})
+
+	cp, _ := w.Canvas().Overlays().Top().(*capa)
+	if cp == nil {
+		t.Fatal("el selector móvil no abrió su capa")
+	}
+	p := cp.panel.(*panelLista)
+	if !p.hoja || p.Size().Width != 390 || p.Position().Y+p.Size().Height != 844 {
+		t.Fatalf("el selector móvil no se presentó como hoja inferior: hoja=%v pos=%v tam=%v", p.hoja, p.Position(), p.Size())
+	}
+	if fila := p.hijos[2].(*opcion); fila.Size().Height != SueloTactilBarra {
+		t.Fatalf("la fila táctil del selector mide %v; quiero %v", fila.Size().Height, SueloTactilBarra)
+	}
+	antes := p.desplazado
+	p.Dragged(&fyne.DragEvent{Dragged: fyne.Delta{DY: -120}})
+	p.DragEnd()
+	if p.desplazado <= antes {
+		t.Fatalf("arrastrar el selector con el dedo no desplazó las opciones: antes=%v después=%v", antes, p.desplazado)
+	}
+	s.Alternar()
+
+	items := make([]fyne.CanvasObject, 30)
+	for i := range items {
+		items[i] = NuevoElementoMenu("Acción", 0, nil)
+	}
+	m := NuevoMenu(items...)
+	m.Mostrar(s)
+	t.Cleanup(m.Cerrar)
+	m.Dragged(&fyne.DragEvent{Dragged: fyne.Delta{DY: -100}})
+	m.DragEnd()
+	if m.desplazado <= 0 {
+		t.Fatalf("arrastrar el menú con el dedo no desplazó sus elementos: desplazado=%v", m.desplazado)
+	}
+}

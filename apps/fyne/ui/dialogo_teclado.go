@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/container"
 
 	"git.sytue.eu/sytue/one/apps/fyne/sesion"
 )
@@ -54,18 +55,48 @@ func (d *Dialogo) tapadoPorTeclado(lienzo fyne.Size) float32 {
 	return min(max(tapa, 0), max(lienzo.Height-HuecoHoja-AltoCabeceraDialogo(), 0))
 }
 
+// tapadoEnCapa calcula cuánto pisa el teclado en pantalla dentro de la capa `cp` de
+// tamaño `lienzo`. En escritorio o sin teclado devuelve 0.
+func tapadoEnCapa(c fyne.Canvas, cp *capa, lienzo fyne.Size) float32 {
+	if !esMovil() || c == nil || AltoTeclado == nil {
+		return 0
+	}
+	tapa := AltoTeclado(c)
+	if tapa <= 0 {
+		return 0
+	}
+	if cp != nil {
+		debajo := c.Size().Height - cp.Position().Y - lienzo.Height
+		tapa -= max(debajo, 0)
+	}
+	return max(tapa, 0)
+}
+
 // ponerTeclado apoya la hoja sobre un teclado que tapa `alto` y deja a la vista el campo
-// enfocado. Con 0, la hoja vuelve abajo.
+// enfocado. Con 0, la hoja vuelve abajo y acota el desplazamiento sobrante.
 func (d *Dialogo) ponerTeclado(c fyne.Canvas, alto float32) {
 	if d.capa == nil {
 		return
 	}
-	if d.teclado != alto {
+	cambio := d.teclado != alto
+	if cambio {
 		d.teclado = alto
 		d.capa.Refresh()
 	}
 	if alto > 0 {
 		MostrarFoco(d.Desplazador(), c, 0)
+	} else if cambio {
+		acotarDesplazamiento(d.Desplazador())
+	}
+}
+
+func acotarDesplazamiento(s *container.Scroll) {
+	if s == nil || s.Content == nil {
+		return
+	}
+	maxY := max(s.Content.MinSize().Height-s.Size().Height, 0)
+	if s.Offset.Y > maxY {
+		s.ScrollToOffset(fyne.NewPos(s.Offset.X, maxY))
 	}
 }
 
@@ -83,74 +114,164 @@ func dialogoArriba(c fyne.Canvas) *Dialogo {
 	return nil
 }
 
+type seguimientoTeclado struct {
+	alto       float32
+	parar      chan struct{}
+	hecho      chan struct{}
+	cerrarOnce sync.Once
+}
+
+func (s *seguimientoTeclado) cancelar() {
+	s.cerrarOnce.Do(func() { close(s.parar) })
+}
+
 var (
-	tecladoMu   sync.Mutex
-	tecladoAlto = map[fyne.Canvas]float32{} // los lienzos que se siguen, con su último alto
+	tecladoMu           sync.Mutex
+	tecladoSeguimientos = map[fyne.Canvas]*seguimientoTeclado{}
 )
 
-// seguirTeclado mide el teclado cuando termina de salir —su animación tarda, más de
-// 400 ms en el emulador: se espera a que el alto deje de crecer— y lo sigue hasta que se
-// va. Si ya se seguía, solo deja a la vista el campo nuevo.
+// seguirTeclado mide el teclado mientras sale y lo acompaña hasta que se recoge. Si ya
+// estaba abierto (cambiar de un campo de texto a otro dentro del mismo diálogo), lleva a
+// la vista el nuevo campo de inmediato sin esperar otro ciclo de animación.
 func seguirTeclado(c fyne.Canvas) {
+	if c == nil {
+		return
+	}
 	medir := AltoTeclado
 	if medir == nil {
 		return
 	}
-	tecladoMu.Lock()
-	alto, siguiendo := tecladoAlto[c]
-	if !siguiendo {
-		tecladoAlto[c] = 0
-	}
-	tecladoMu.Unlock()
-	if siguiendo {
-		if d := dialogoArriba(c); d != nil && alto > 0 {
+	actual := medir(c)
+	alto, nuevo := registrarSeguimientoTeclado(c, actual)
+	if d := dialogoArriba(c); d != nil {
+		if alto > 0 {
 			d.ponerTeclado(c, alto)
+		} else {
+			MostrarFoco(d.Desplazador(), c, 0)
 		}
+	}
+	if nuevo == nil {
 		return
 	}
-	aplicar := func(alto float32) {
-		tecladoMu.Lock()
-		tecladoAlto[c] = alto
-		tecladoMu.Unlock()
-		fyne.Do(func() {
-			if d := dialogoArriba(c); d != nil {
-				d.ponerTeclado(c, alto)
-			}
-		})
+	go acompanarTeclado(c, nuevo, medir, alto)
+}
+
+func registrarSeguimientoTeclado(c fyne.Canvas, actual float32) (float32, *seguimientoTeclado) {
+	tecladoMu.Lock()
+	defer tecladoMu.Unlock()
+	if seg, ok := tecladoSeguimientos[c]; ok {
+		if actual > 0 {
+			seg.alto = actual
+		}
+		return seg.alto, nil
 	}
-	go func() {
-		defer func() {
-			tecladoMu.Lock()
-			delete(tecladoAlto, c)
-			tecladoMu.Unlock()
-		}()
-		antes := float32(-1)
-		for range 20 {
-			time.Sleep(100 * time.Millisecond)
-			alto := medir(c)
-			if alto > 0 && alto == antes {
-				aplicar(alto)
-				break
-			}
-			antes = alto
+	seg := &seguimientoTeclado{
+		alto:  max(actual, 0),
+		parar: make(chan struct{}),
+		hecho: make(chan struct{}),
+	}
+	tecladoSeguimientos[c] = seg
+	return seg.alto, seg
+}
+
+func detenerSeguimientoTeclado(c fyne.Canvas) {
+	if c == nil {
+		return
+	}
+	tecladoMu.Lock()
+	seg := tecladoSeguimientos[c]
+	delete(tecladoSeguimientos, c)
+	tecladoMu.Unlock()
+	if seg != nil {
+		seg.cancelar()
+		<-seg.hecho
+	}
+}
+
+func aplicarAltoTeclado(c fyne.Canvas, seg *seguimientoTeclado, alto float32) {
+	tecladoMu.Lock()
+	activo := tecladoSeguimientos[c] == seg
+	if activo {
+		seg.alto = alto
+	}
+	tecladoMu.Unlock()
+	if !activo {
+		return
+	}
+	fyne.Do(func() {
+		if d := dialogoArriba(c); d != nil {
+			d.ponerTeclado(c, alto)
+		} else {
+			seg.cancelar()
 		}
-		if antes <= 0 {
-			return // no ha salido: un campo de solo lectura, o un teclado físico
+	})
+}
+
+func acompanarTeclado(c fyne.Canvas, seg *seguimientoTeclado, medir func(fyne.Canvas) float32, inicial float32) {
+	defer func() {
+		tecladoMu.Lock()
+		if tecladoSeguimientos[c] == seg {
+			delete(tecladoSeguimientos, c)
 		}
-		// Mientras siga fuera, atento a que cambie de alto (la fila de sugerencias, otro
-		// idioma) y, al irse, la hoja vuelve abajo.
-		ultimo := antes
-		for {
-			time.Sleep(300 * time.Millisecond)
-			alto := medir(c)
-			if alto <= 0 {
-				aplicar(0)
-				return
-			}
-			if alto != ultimo {
-				ultimo = alto
-				aplicar(alto)
-			}
-		}
+		tecladoMu.Unlock()
+		close(seg.hecho)
 	}()
+	ultimo, ok := esperarSalidaTeclado(c, seg, medir, inicial)
+	if !ok || ultimo <= 0 {
+		return // se cerró el diálogo o no ha salido (solo lectura / teclado físico)
+	}
+	// Mientras siga fuera, atento a que cambie de alto (la fila de sugerencias, otro
+	// idioma) y, al irse, la hoja vuelve abajo y acota su desplazamiento.
+	vigilarTecladoAbierto(c, seg, medir, ultimo)
+}
+
+func esperarPasoTeclado(parar <-chan struct{}, d time.Duration) bool {
+	reloj := time.NewTimer(d)
+	defer reloj.Stop()
+	select {
+	case <-parar:
+		return false
+	case <-reloj.C:
+		return true
+	}
+}
+
+func esperarSalidaTeclado(c fyne.Canvas, seg *seguimientoTeclado, medir func(fyne.Canvas) float32, inicial float32) (float32, bool) {
+	ultimo := inicial
+	estables := 0
+	for range 24 {
+		if !esperarPasoTeclado(seg.parar, 25*time.Millisecond) {
+			return 0, false
+		}
+		medido := medir(c)
+		if medido <= 0 {
+			continue
+		}
+		if medido != ultimo {
+			ultimo = medido
+			estables = 0
+			aplicarAltoTeclado(c, seg, medido)
+			continue
+		}
+		estables++
+		if estables >= 3 {
+			aplicarAltoTeclado(c, seg, medido)
+			return ultimo, true
+		}
+	}
+	return ultimo, true
+}
+
+func vigilarTecladoAbierto(c fyne.Canvas, seg *seguimientoTeclado, medir func(fyne.Canvas) float32, ultimo float32) {
+	for esperarPasoTeclado(seg.parar, 80*time.Millisecond) {
+		medido := medir(c)
+		if medido <= 0 {
+			aplicarAltoTeclado(c, seg, 0)
+			return
+		}
+		if medido != ultimo {
+			ultimo = medido
+			aplicarAltoTeclado(c, seg, medido)
+		}
+	}
 }

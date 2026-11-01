@@ -47,6 +47,14 @@ export {
 export { formatBytes } from './lib/formatBytes.js';
 export { useNavDrawer, DRAWER_FOCUSABLE } from './lib/useNavDrawer.js';
 export { useMobileBack } from './lib/useMobileBack.js';
+export {
+  usePullToRefresh,
+  IndicadorRefrescoTactil,
+  UMBRAL_ACTUALIZAR,
+  INICIO_GESTO_REFRESCO,
+  hayDesplazamientoVerticalPrevio,
+} from './lib/usePullToRefresh.js';
+export type { EstadoRefrescoTactil, OpcionesRefrescoTactil } from './lib/usePullToRefresh.js';
 export { useEnHoja, CONSULTA_HOJA } from './lib/useEnHoja.js';
 // La fila de barra que en móvil se desplaza en vez de envolver, y el aviso de
 // que queda contenido. Lo usan las barras de toda la suite; ver el módulo para

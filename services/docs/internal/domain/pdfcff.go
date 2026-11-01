@@ -174,13 +174,8 @@ func leerCFF(b []byte) (*infoCFF, error) {
 	if err != nil || len(glifos) == 0 {
 		return nil, errCFF
 	}
-	info := &infoCFF{numGlifos: len(glifos), upem: 1000}
+	info := &infoCFF{numGlifos: len(glifos), upem: upemEfectivoCFF(b, top)}
 	_, info.cid = top[1230] // ROS
-	if m := top[1207]; len(m) >= 1 && m[0] > 0 && math.Abs(m[0]-0.001) > 1e-9 {
-		if u := int(math.Round(1 / m[0])); u >= 16 && u <= 16384 {
-			info.upem = u
-		}
-	}
 	sids, err := charsetCFF(b, top, info.numGlifos)
 	if err != nil {
 		return nil, err
@@ -200,6 +195,36 @@ func leerCFF(b []byte) (*infoCFF, error) {
 	}
 	info.propia = codificacionCFF(b, top, sids)
 	return info, nil
+}
+
+// upemEfectivoCFF calcula las unidades por em combinando `FontMatrix` de Top
+// DICT y, en una fuente CID, `FDArray[0]` (TN 5176 §18, como en text_clip_cff_cid.pdf).
+func upemEfectivoCFF(b []byte, top map[int][]float64) int {
+	topM := top[1207]
+	var fdM []float64
+	if fda := top[1236]; len(fda) == 1 && fda[0] >= 0 && int(fda[0]) < len(b) {
+		if fds, _, err := indiceCFF(b, int(fda[0])); err == nil && len(fds) > 0 {
+			fdM = dictCFF(fds[0])[1207]
+		}
+	}
+	if len(topM) >= 4 && topM[0] > 0 {
+		if len(fdM) >= 4 && fdM[0] > 0 {
+			if u := int(math.Round(1 / (topM[0] * fdM[0]))); u >= 16 && u <= 16384 {
+				return u
+			}
+		}
+		if u := int(math.Round(1 / topM[0])); u >= 16 && u <= 16384 {
+			return u
+		}
+	} else if len(fdM) >= 4 && fdM[0] > 0 {
+		if u := int(math.Round(1 / fdM[0])); u >= 16 && u <= 16384 {
+			return u
+		}
+		if u := int(math.Round(1 / (0.001 * fdM[0]))); u >= 16 && u <= 16384 {
+			return u
+		}
+	}
+	return 1000
 }
 
 // charsetCFF devuelve el SID (o el CID) de cada glifo (§13). El glifo 0 es
@@ -342,9 +367,12 @@ func (f *fuentePDF) envolverCFF(cff []byte) ([]byte, bool) {
 	}
 	inverso := map[uint16]uint16{}
 	anchos := make([]float64, info.numGlifos) // en milésimas de em
-	if info.cid {
+	switch {
+	case info.cid:
 		f.cmapCID(info, inverso, anchos)
-	} else {
+	case f.dosBytes:
+		f.cmapType0SobreSimpleCFF(info, anchos)
+	default:
 		f.cmapSimpleCFF(info, inverso, anchos)
 	}
 	otf := sfntNuevo(0x4F54544F, "CFF ", cff)
@@ -356,10 +384,65 @@ func (f *fuentePDF) envolverCFF(cff []byte) ([]byte, bool) {
 		}
 	}
 	otf = f.completarMetadatosTTF(otf)
+	if info.cid || f.dosBytes {
+		parcheada, invComp, ok := f.reescribirCmapCompuesta(otf, info.numGlifos)
+		if !ok {
+			return nil, false
+		}
+		f.inversoCompuesto = invComp
+		return parcheada, true
+	}
 	if len(inverso) == 0 {
-		return otf, true
+		inverso[0xE000] = 0
 	}
 	return reescribirCmapUnicodeTTF(otf, inverso)
+}
+
+// cmapType0SobreSimpleCFF cubre un Type0/CIDFontType0 cuyo programa incrustado
+// es una Type 1 o CFF no CID-keyed (como en issue11740_reduced.pdf).
+func (f *fuentePDF) cmapType0SobreSimpleCFF(info *infoCFF, anchos []float64) {
+	if len(f.cidAGid) == 0 {
+		f.cidAGid = tablaCidSobreSimpleCFF(info)
+	}
+	if len(f.gidARuna) == 0 {
+		f.gidARuna = runasDeNombresCFF(info)
+	}
+	for c, w := range f.anchos {
+		if gid, ok := f.gidDeCID(c); ok && int(gid) < len(anchos) {
+			anchos[gid] = w
+		}
+	}
+}
+
+func tablaCidSobreSimpleCFF(info *infoCFF) []byte {
+	mayor := max(info.numGlifos-1, 255)
+	tabla := make([]byte, 2*(mayor+1))
+	for cid := 0; cid <= mayor; cid++ {
+		gid := 0
+		if cid < 256 {
+			if gp, ok := info.propia[byte(cid)]; ok && gp < info.numGlifos {
+				gid = gp
+			}
+		}
+		if gid == 0 && cid < info.numGlifos {
+			gid = cid
+		}
+		binary.BigEndian.PutUint16(tabla[2*cid:], uint16(gid)) //nolint:gosec // gid < numGlifos <= 0xFFFF
+	}
+	return tabla
+}
+
+func runasDeNombresCFF(info *infoCFF) map[uint16]rune {
+	out := map[uint16]rune{}
+	for g, nom := range info.nombres {
+		if g <= 0 || g >= info.numGlifos {
+			continue
+		}
+		if r, ok := runaDeNombreGlifo(nom); ok && esRunaTextoUtil(r) {
+			out[uint16(g)] = r //nolint:gosec // g < numGlifos <= 0xFFFF
+		}
+	}
+	return out
 }
 
 // cmapCID resuelve una fuente compuesta: el código es el CID, y el charset dice
@@ -390,39 +473,79 @@ func (f *fuentePDF) cmapCID(info *infoCFF, inverso map[uint16]uint16, anchos []f
 	}
 }
 
-// cmapSimpleCFF resuelve una fuente simple: cada código se busca por la letra que
-// el PDF dice que es, y si no casa, por la codificación propia del CFF.
+// cmapSimpleCFF resuelve una fuente simple: cada código se busca por nombre
+// explícito de /Differences, por la letra que el PDF dice que es y, si no casa
+// (o es simbólica), por la codificación propia del CFF.
 func (f *fuentePDF) cmapSimpleCFF(info *infoCFF, inverso map[uint16]uint16, anchos []float64) {
+	gidDeNombre, gidDeRuna := indicesNombresCFF(info)
+	for c := 0; c < 256; c++ {
+		gl := f.glifoDe(uint32(c), false)
+		g, ok := f.buscarGlifoSimpleCFF(byte(c), primeraRuna(gl.texto), info, gidDeNombre, gidDeRuna)
+		if !ok {
+			continue
+		}
+		if g > 0 {
+			f.simpleGid[c] = uint16(g) //nolint:gosec // G115: g < numGlifos <= 0xFFFF
+		}
+		inverso[uint16(0xE000+c)] = uint16(g) //nolint:gosec // G115: g < numGlifos <= 0xFFFF
+		inverso[uint16(0xF000+c)] = uint16(g) //nolint:gosec // G115: g < numGlifos <= 0xFFFF
+		rs := []rune(gl.texto)
+		if len(rs) == 1 && rs[0] > 0 && rs[0] <= 0xFFFF && rs[0] != 0xFFFD {
+			u := uint16(rs[0]) //nolint:gosec // G115: rs[0] <= 0xFFFF
+			if _, ya := inverso[u]; !ya {
+				inverso[u] = uint16(g) //nolint:gosec // G115: idem
+			}
+		}
+		anchos[g] = gl.ancho
+	}
+	f.simpleInverso = inverso
+	f.cmapVisual = f.simbolica
+}
+
+func indicesNombresCFF(info *infoCFF) (map[string]int, map[rune]int) {
+	gidDeNombre := make(map[string]int, len(info.nombres))
 	gidDeRuna := map[rune]int{}
 	for g, n := range info.nombres {
+		if n != "" && n != ".notdef" {
+			if _, ya := gidDeNombre[n]; !ya {
+				gidDeNombre[n] = g
+			}
+		}
 		r, ok := runaDeNombreGlifo(n)
 		if !ok {
 			r, ok = nombresAcentuados[n]
 		}
-		if _, ya := gidDeRuna[r]; ok && !ya {
-			gidDeRuna[r] = g
-		}
-	}
-	for c := 0; c < 256; c++ {
-		gl := f.glifoDe(uint32(c), false)
-		r := primeraRuna(gl.texto)
-		g, ok := gidDeRuna[r]
-		if !ok || f.simbolica {
-			// Sin nombre que case —o una fuente de símbolos, cuyos códigos solo
-			// entiende su propia codificación—: la del CFF.
-			if gp, okp := info.propia[byte(c)]; okp {
-				g, ok = gp, true
+		if ok {
+			if _, ya := gidDeRuna[r]; !ya {
+				gidDeRuna[r] = g
 			}
 		}
-		if !ok {
-			continue
-		}
-		inverso[uint16(0xF000+c)] = uint16(g)                                        //nolint:gosec // G115: g < numGlifos ≤ 0xFFFF
-		if _, ya := inverso[uint16(r)]; !ya && r > 0 && r <= 0xFFFF && r != 0xFFFD { //nolint:gosec // G115: r ≤ 0xFFFF
-			inverso[uint16(r)] = uint16(g) //nolint:gosec // G115: idem
-		}
-		anchos[g] = gl.ancho
 	}
+	return gidDeNombre, gidDeRuna
+}
+
+func (f *fuentePDF) buscarGlifoSimpleCFF(c byte, r rune, info *infoCFF, porNom map[string]int, porRuna map[rune]int) (int, bool) {
+	porNombre := func() (int, bool) {
+		if nom := f.nombresSimple[c]; nom != "" {
+			if g, ok := porNom[nom]; ok {
+				return g, true
+			}
+		}
+		g, ok := porRuna[r]
+		return g, ok
+	}
+	if !f.simbolica {
+		if g, ok := porNombre(); ok {
+			return g, true
+		}
+	}
+	if gp, ok := info.propia[c]; ok {
+		return gp, true
+	}
+	if f.simbolica {
+		return porNombre()
+	}
+	return 0, false
 }
 
 // sfntNuevo arma un sfnt de una sola tabla, para ir añadiendo las demás con

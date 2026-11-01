@@ -189,8 +189,14 @@ func (p *Pantalla) vistaHoraria() fyne.CanvasObject {
 	}
 	desplazar.Offset = fyne.NewPos(0, p.scrollHorario)
 	desplazar.OnScrolled = func(pos fyne.Position) { p.scrollHorario = pos.Y }
+	refrescoCab := p.Refresco
+	refrescoCab.Arriba = func() bool { return true }
+	refrescoRejilla := p.Refresco
+	refrescoRejilla.Arriba = func() bool { return desplazar.Offset.Y <= 0.5 }
 	return container.NewStack(canvas.NewRectangle(tema.Color("surface", v)),
-		container.New(&arriba{Alto: MedidaCabeceraHoraria(d)}, container.New(ui.Margen{Der: canalon}, cab), conScroll))
+		container.New(&arriba{Alto: MedidaCabeceraHoraria(d)},
+			ui.RefrescarAlTirar(container.New(ui.Margen{Der: canalon}, cab), &refrescoCab),
+			ui.RefrescarAlTirar(conScroll, &refrescoRejilla)))
 }
 
 // ---- La cabecera: días y franja de «todo el día» ----

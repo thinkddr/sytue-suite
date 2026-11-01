@@ -116,10 +116,14 @@ func TestLaTiraQueSeDeslizaSeDifuminaMientrasQuede(t *testing.T) {
 	if !degradado.Visible() || degradado.Position().X != 176 || degradado.Size().Width != 24 {
 		t.Fatalf("con 300 px por ver, el degradado está visible=%v en x=%g de %g", degradado.Visible(), degradado.Position().X, degradado.Size().Width)
 	}
-	// Como la rueda o el arrastre: es lo que avisa a `OnScrolled`.
-	s.Scrolled(&fyne.ScrollEvent{Scrolled: fyne.NewDelta(-300, 0)})
-	if s.Offset.X != 300 {
-		t.Fatalf("la tira no ha llegado al final: x=%g", s.Offset.X)
+	// Como la rueda o el arrastre con el dedo: avisa a `AlDesplazar`.
+	s.Dragged(&fyne.DragEvent{Dragged: fyne.NewDelta(-150, 0)})
+	if s.X() != 150 || !degradado.Visible() {
+		t.Fatalf("a mitad de la tira: x=%g, degradado visible=%v", s.X(), degradado.Visible())
+	}
+	s.Scrolled(&fyne.ScrollEvent{Scrolled: fyne.NewDelta(-150, 0)})
+	if s.X() != 300 {
+		t.Fatalf("la tira no ha llegado al final: x=%g", s.X())
 	}
 	if degradado.Visible() {
 		t.Error("al final de la tira el degradado sigue anunciando más")

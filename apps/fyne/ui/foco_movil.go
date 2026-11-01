@@ -30,15 +30,47 @@ func enfocar(c fyne.Canvas, f fyne.Focusable) {
 		return
 	}
 	if f == nil {
+		cerrarTecladoMovil(c)
 		c.Unfocus() // lo que hace `Focus(nil)`: nadie enfocado
 		return
 	}
 	if esMovil() {
 		if _, escribe := f.(mobile.Keyboardable); !escribe {
+			cerrarTecladoMovil(c)
 			return
 		}
 	}
 	c.Focus(f)
+}
+
+// cerrarTecladoMovil retira el foco activo en el teléfono cuando se pulsa un control que
+// no escribe (casilla, conmutador, selector, botón, fondo del diálogo) y devuelve la hoja
+// del diálogo a su altura sin teclado.
+func cerrarTecladoMovil(c fyne.Canvas) {
+	if c == nil || !esMovil() {
+		return
+	}
+	if c.Focused() != nil {
+		c.Unfocus()
+	}
+	if d := dialogoArriba(c); d != nil && d.teclado > 0 {
+		d.ponerTeclado(c, 0)
+	}
+}
+
+func cerrarTecladoActivo() {
+	if !esMovil() {
+		return
+	}
+	a := fyne.CurrentApp()
+	if a == nil {
+		return
+	}
+	for _, w := range a.Driver().AllWindows() {
+		if w.Canvas().Focused() != nil {
+			cerrarTecladoMovil(w.Canvas())
+		}
+	}
 }
 
 // EsMovil dice si la app corre en un teléfono: donde se toca con el dedo y no hay

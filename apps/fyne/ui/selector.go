@@ -221,7 +221,23 @@ func (s *Selector) Alternar() {
 	if c == nil || len(s.Opciones) == 0 {
 		return
 	}
-	lista := s.lista()
+	hoja := EsTactil() && enHoja(c.Size())
+	lista := s.listaConModo(hoja)
+	s.abierto = NuevoFlotante(lista, c)
+	s.abierto.AlCerrar(func() { s.abierto = nil })
+	if hoja {
+		s.abierto.MostrarEnHoja(func(ventana fyne.Size) (fyne.Position, fyne.Size) {
+			lista.ancho = ventana.Width
+			natural := lista.MinSize()
+			disponible := max(ventana.Height-tapadoEnCapa(c, s.abierto.capa, ventana), 0)
+			visible := min(natural.Height, FraccionAltoHojaMenu*disponible)
+			lista.desplazado = min(lista.desplazado, max(natural.Height-visible, 0))
+			return fyne.NewPos(0, disponible-visible), fyne.NewSize(ventana.Width, visible)
+		})
+		lista.centrar(s.Elegida, lista.Size().Height)
+		enfocar(c, lista)
+		return
+	}
 	// El panel se queda en el hueco bajo el selector —o encima, si ahí hay más sitio—
 	// y lo que no cabe se desplaza por dentro, con la elegida a la vista: la misma
 	// cuenta que un menú (`EncajarMenu`).
@@ -230,8 +246,6 @@ func (s *Selector) Alternar() {
 		natural, c.Size(), true, false, tema.Espacio(1))
 	tam := fyne.NewSize(natural.Width, min(natural.Height, tope))
 	lista.centrar(s.Elegida, tam.Height)
-	s.abierto = NuevoFlotante(lista, c)
-	s.abierto.AlCerrar(func() { s.abierto = nil })
 	s.abierto.Resize(tam)
 	s.abierto.ShowAtPosition(pos)
 	// Con la lista abierta el teclado es de su capa: se enfoca el panel, que le pasa las
@@ -391,19 +405,29 @@ func (r *selectorRenderer) Refresh() {
 var AltoOpcion = 2*tema.Espacio(2) + tema.TextoBase.Linea
 
 // lista construye el panel con una fila por opción. Las medidas son las del panel de
-// Dropdown.tsx: borde, `rounded-lg` y `p-1`.
-func (s *Selector) lista() *panelLista {
+// Dropdown.tsx: borde, `rounded-lg` y `p-1` (o hoja inferior `rounded-t-card` y `p-2`
+// en móvil estrecho).
+func (s *Selector) lista() *panelLista { return s.listaConModo(false) }
+
+func (s *Selector) listaConModo(hoja bool) *panelLista {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	ancho := max(s.Size().Width, MedidaSelector(s.Talla, s.Ancho).Width)
+	relleno := tema.Espacio(1)
+	radio := tema.RadioLG
+	if hoja {
+		relleno = rellenoHojaMenu
+		radio = tema.Forma("radius-card")
+	}
 	filas := make([]fyne.CanvasObject, len(s.Opciones))
 	for i, o := range s.Opciones {
-		filas[i] = nuevaOpcion(s, i, o, ancho-2*(tema.Borde+tema.Espacio(1)))
+		filas[i] = nuevaOpcionConModo(s, i, o, ancho-2*(tema.Borde+relleno), hoja)
 	}
 	p := &panelLista{
 		s:     s,
 		hijos: filas,
-		fondo: NuevaCaja(tema.Color("menu-surface", v), tema.Color("border", v), tema.RadioLG),
+		fondo: NuevaCaja(tema.Color("menu-surface", v), tema.Color("border", v), radio),
 		ancho: ancho,
+		hoja:  hoja,
 	}
 	p.ExtendBaseWidget(p)
 	return p
@@ -419,26 +443,51 @@ type panelLista struct {
 	hijos []fyne.CanvasObject
 	fondo *Caja
 	ancho float32
+	hoja  bool
 	// desplazado es lo que las filas han subido dentro del panel.
 	desplazado float32
 }
 
 var (
 	_ fyne.Scrollable = (*panelLista)(nil)
+	_ fyne.Draggable  = (*panelLista)(nil)
 	_ fyne.Focusable  = (*panelLista)(nil)
 )
 
+func (p *panelLista) margenInterior() float32 {
+	if p.hoja {
+		return tema.Borde + rellenoHojaMenu
+	}
+	return tema.Borde + tema.Espacio(1)
+}
+
 func (p *panelLista) MinSize() fyne.Size {
 	p.ExtendBaseWidget(p)
+	if p.hoja {
+		return fyne.NewSize(p.ancho, altoFilas(len(p.hijos))+2*rellenoHojaMenu+tema.Borde)
+	}
 	return fyne.NewSize(p.ancho, altoFilas(len(p.hijos))+2*(tema.Borde+tema.Espacio(1)))
 }
 
-func altoFilas(n int) float32 { return float32(n) * AltoOpcion }
+func altoFilaSelector() float32 { return sueloTactil(AltoOpcion) }
+
+func altoFilas(n int) float32 { return float32(n) * altoFilaSelector() }
 
 // Scrolled desplaza las filas por dentro del panel, hasta el final.
 func (p *panelLista) Scrolled(ev *fyne.ScrollEvent) {
 	p.desplazar(p.desplazado-ev.Scrolled.DY, p.Size().Height)
 }
+
+// Dragged desplaza las filas con el dedo cuando el panel supera su hueco visible.
+func (p *panelLista) Dragged(ev *fyne.DragEvent) {
+	if ev == nil {
+		return
+	}
+	p.desplazar(p.desplazado-ev.Dragged.DY, p.Size().Height)
+}
+
+// DragEnd termina el arrastre táctil del panel.
+func (p *panelLista) DragEnd() {}
 
 // desplazar pone el desplazamiento, acotado a lo que hay, para un panel de ese alto.
 func (p *panelLista) desplazar(a, visible float32) {
@@ -452,18 +501,20 @@ func (p *panelLista) desplazar(a, visible float32) {
 // centrar deja la fila `i` a media altura de un panel de ese alto: al abrir, la elegida
 // está a la vista aunque sea la doscientas.
 func (p *panelLista) centrar(i int, visible float32) {
-	p.desplazar(float32(i)*AltoOpcion-visible/2+AltoOpcion/2, visible)
+	h := altoFilaSelector()
+	p.desplazar(float32(i)*h-visible/2+h/2, visible)
 }
 
 // revelar trae la fila `i` a la vista si ha quedado fuera, sin mover nada si ya se ve.
 func (p *panelLista) revelar(i int) {
-	m := tema.Borde + tema.Espacio(1)
-	arriba := m + float32(i)*AltoOpcion - p.desplazado
+	m := p.margenInterior()
+	h := altoFilaSelector()
+	arriba := m + float32(i)*h - p.desplazado
 	switch alto := p.Size().Height; {
 	case arriba < m:
 		p.desplazar(p.desplazado-(m-arriba), alto)
-	case arriba+AltoOpcion > alto-m:
-		p.desplazar(p.desplazado+arriba+AltoOpcion-(alto-m), alto)
+	case arriba+h > alto-m:
+		p.desplazar(p.desplazado+arriba+h-(alto-m), alto)
 	}
 }
 
@@ -484,13 +535,17 @@ func (p *panelLista) TypedKey(e *fyne.KeyEvent) {
 
 func (p *panelLista) CreateRenderer() fyne.WidgetRenderer {
 	p.ExtendBaseWidget(p)
+	radio := tema.RadioLG
+	if p.hoja {
+		radio = tema.Forma("radius-card")
+	}
 	r := &panelRenderer{
 		p:     p,
 		marco: canvas.NewRectangle(color.NRGBA{}),
-		aviso: nuevoMasAbajo(tema.RadioLG - tema.Borde),
+		aviso: nuevoMasAbajo(max(radio-tema.Borde, 0)),
 	}
 	// El borde otra vez, encima: las filas que se desplazan pasan por debajo de él.
-	r.marco.StrokeWidth, r.marco.CornerRadius = tema.Borde, tema.RadioLG
+	r.marco.StrokeWidth, r.marco.CornerRadius = tema.Borde, radio
 	r.objetos = slices.Concat(p.fondo.Objetos(), p.hijos, r.aviso.objetos(), []fyne.CanvasObject{r.marco})
 	r.Refresh()
 	return r
@@ -525,14 +580,41 @@ func (r *panelRenderer) Refresh() {
 
 func (r *panelRenderer) Layout(t fyne.Size) {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
-	r.p.fondo.Redimensionar(t)
+	radio := tema.RadioLG
+	if r.p.hoja {
+		radio = tema.Forma("radius-card")
+	}
+	r.p.fondo.CambiarRadio(radio)
+	r.marco.CornerRadius = radio
+	abajo := radio
+	if r.p.hoja {
+		abajo = esquinaRecta
+	}
+	for _, o := range append(r.p.fondo.Objetos(), r.marco) {
+		if rect, es := o.(*canvas.Rectangle); es {
+			rect.BottomLeftCornerRadius, rect.BottomRightCornerRadius = abajo, abajo
+		}
+	}
 	r.marco.StrokeColor = tema.Color("border", v)
-	r.marco.Resize(t)
+	if r.p.hoja {
+		b := tema.Borde
+		r.p.fondo.Redimensionar(fyne.NewSize(t.Width+2*b, t.Height+b))
+		for _, o := range r.p.fondo.Objetos() {
+			o.Move(o.Position().SubtractXY(b, 0))
+		}
+		r.marco.Move(fyne.NewPos(-b, 0))
+		r.marco.Resize(fyne.NewSize(t.Width+2*b, t.Height+b))
+	} else {
+		r.p.fondo.Redimensionar(t)
+		r.marco.Move(fyne.Position{})
+		r.marco.Resize(t)
+	}
 	r.aviso.colocar(t, QuedaMasAbajo(r.p.MinSize().Height, r.p.desplazado, t.Height), v)
-	m := tema.Borde + tema.Espacio(1)
+	m := r.p.margenInterior()
+	alto := altoFilaSelector()
 	for i, h := range r.p.hijos {
-		h.Move(fyne.NewPos(m, m+float32(i)*AltoOpcion-r.p.desplazado))
-		h.Resize(fyne.NewSize(t.Width-2*m, AltoOpcion))
+		h.Move(fyne.NewPos(m, m+float32(i)*alto-r.p.desplazado))
+		h.Resize(fyne.NewSize(t.Width-2*m, alto))
 	}
 }
 
@@ -544,6 +626,7 @@ type opcion struct {
 	i      int
 	rotulo string
 	ancho  float32
+	hoja   bool
 	encima bool
 }
 
@@ -552,15 +635,15 @@ var (
 	_ desktop.Hoverable = (*opcion)(nil)
 )
 
-func nuevaOpcion(s *Selector, i int, rotulo string, ancho float32) *opcion {
-	o := &opcion{s: s, i: i, rotulo: rotulo, ancho: ancho}
+func nuevaOpcionConModo(s *Selector, i int, rotulo string, ancho float32, hoja bool) *opcion {
+	o := &opcion{s: s, i: i, rotulo: rotulo, ancho: ancho, hoja: hoja}
 	o.ExtendBaseWidget(o)
 	return o
 }
 
 func (o *opcion) MinSize() fyne.Size {
 	o.ExtendBaseWidget(o)
-	return fyne.NewSize(o.ancho, AltoOpcion)
+	return fyne.NewSize(o.ancho, altoFilaSelector())
 }
 
 func (o *opcion) Tapped(*fyne.PointEvent) {
@@ -578,9 +661,11 @@ func (o *opcion) CreateRenderer() fyne.WidgetRenderer {
 		o:     o,
 		fondo: canvas.NewRectangle(o.relleno(v)),
 		texto: Texto(o.rotulo, tema.TextoBase, Normal, tema.Color("text", v)),
+		tic:   iconos.TrazoConTinta(iconos.Tic, TamTicMenu, tema.Color("primary-text", v)),
 	}
 	r.fondo.CornerRadius = tema.RadioMD
-	r.objetos = []fyne.CanvasObject{r.fondo, r.texto}
+	r.tic.Objeto().Hide()
+	r.objetos = []fyne.CanvasObject{r.fondo, r.texto, r.tic.Objeto()}
 	return r
 }
 
@@ -598,6 +683,7 @@ type opcionRenderer struct {
 	o       *opcion
 	fondo   *canvas.Rectangle
 	texto   *canvas.Text
+	tic     *iconos.Dibujo
 	objetos []fyne.CanvasObject
 }
 
@@ -608,7 +694,18 @@ func (r *opcionRenderer) Destroy()                     {}
 func (r *opcionRenderer) Layout(t fyne.Size) {
 	r.fondo.Move(fyne.NewPos(0, 0))
 	r.fondo.Resize(t)
-	ColocarTexto(r.texto, tema.TextoBase, tema.Espacio(3), tema.Espacio(2))
+	padX := tema.Espacio(3)
+	elegida := r.o.hoja && r.o.s != nil && r.o.i == r.o.s.Elegida
+	anchoTexto := max(t.Width-2*padX, 0)
+	if elegida {
+		anchoTexto = max(anchoTexto-TamTicMenu-tema.Espacio(2), 0)
+		r.tic.Colocar(t.Width-padX-TamTicMenu, (t.Height-TamTicMenu)/2, TamTicMenu)
+		r.tic.Objeto().Show()
+	} else {
+		r.tic.Objeto().Hide()
+	}
+	Truncar(r.texto, r.o.rotulo, tema.TextoBase, Normal, anchoTexto)
+	ColocarTexto(r.texto, tema.TextoBase, padX, (t.Height-tema.TextoBase.Linea)/2)
 }
 
 func (r *opcionRenderer) Refresh() {
@@ -616,6 +713,8 @@ func (r *opcionRenderer) Refresh() {
 	r.fondo.FillColor = r.o.relleno(v)
 	r.fondo.Refresh()
 	r.texto.Color = tema.Color("text", v)
+	r.tic.TenirCon(tema.Color("primary-text", v))
+	r.Layout(r.o.Size())
 	r.texto.Refresh()
 }
 

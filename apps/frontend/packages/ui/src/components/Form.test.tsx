@@ -151,3 +151,20 @@ test('con el dedo, campos, selectores, casillas e interruptores miden 44 como un
   expect(host.querySelector('#d')!.className).not.toContain(SUELO);
   render(null, host);
 });
+
+test('en modales estrechos las etiquetas largas envuelven sin aplastar casillas ni interruptores', () => {
+  const host = montar(
+    <>
+      <Checkbox id="chk" label="Recordar esta preferencia en todos los dispositivos conectados" />
+      <Radio id="rad" label="Aplicar también a todas las repeticiones futuras de la serie" />
+      <Switch id="sw" label="Enviar confirmación cifrada a los asistentes externos" />
+    </>,
+  );
+  for (const l of host.querySelectorAll('label')) {
+    expect(l.className).toContain('max-w-full');
+    expect(l.lastElementChild?.className).toContain('break-words');
+    expect(l.firstElementChild?.className).toContain('shrink-0');
+  }
+  render(null, host);
+  host.remove();
+});

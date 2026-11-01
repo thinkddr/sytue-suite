@@ -9,9 +9,12 @@ import (
 	"time"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/driver/mobile"
 	"fyne.io/fyne/v2/test"
 	"fyne.io/fyne/v2/widget"
+
+	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 )
 
 func TestGestoRevisionListaValidaLimitesFirmados(t *testing.T) {
@@ -341,5 +344,69 @@ func TestBuscadorBarraLimpiarYAlturaMovil(t *testing.T) {
 	test.Tap(b.buscador.limpiar)
 	if b.buscador.campo.Texto() != "" || b.buscador.limpiar.Visible() || b.buscador.campo.MargenDerecho != 0 || b.buscador.panel.Visible() {
 		t.Fatal("el botón de vaciar no limpió el texto ni cerró el panel")
+	}
+}
+
+func TestGestoActualizarYMenuFuncionanBajoCapasHermanasEIndicador(t *testing.T) {
+	sinAnimacionDelMenu(t)
+	previous := esMovil
+	esMovil = func() bool { return true }
+	t.Cleanup(func() { esMovil = previous })
+	t.Cleanup(TactilDePrueba(true))
+
+	refrescos := 0
+	desplazar := container.NewVScroll(cuerpoDe(900))
+	lista := RefrescarAlTirar(desplazar, &RefrescoLista{
+		Arriba:     func() bool { return desplazar.Offset.Y <= 0.5 },
+		Actualizar: func() { refrescos++ },
+	})
+	armazon := NuevoArmazon(lista)
+	armazon.Menu = NuevoLateral("Menú", widget.NewLabel("carpetas"))
+	fabPulsado := 0
+	fab := NuevoBotonFlotante("Nuevo", iconos.Mas, func() { fabPulsado++ })
+	avisos := NuevaPilaAvisos()
+
+	b := barraPruebaA(t, 390)
+	montado := b.Montar(container.NewStack(armazon, container.New(CapaFlotante{}, fab), avisos))
+	w := test.NewTempWindow(t, montado)
+	w.SetPadded(false)
+	w.Resize(fyne.NewSize(390, 844))
+
+	raiz, ok := w.Canvas().Content().(*raizGestos)
+	if !ok {
+		t.Fatal("la ventana móvil no montó raizGestos")
+	}
+	raiz.gestos.canvas = w.Canvas()
+	rend := test.WidgetRenderer(raiz).(*rendererGestos)
+
+	// Simula `touchPath` de Fyne: el último hermano visible a pantalla completa
+	// (`avisos`) eclipsa `armazon` y `lista` en `e.Path`.
+	rutaEclipsada := []fyne.CanvasObject{raiz, avisos}
+
+	// 1. Tirar hacia abajo sobre la lista actualiza y enseña el disco indicador mientras dura.
+	comprobarFiltro(t, &raiz.gestos, eventoGesto(mobile.FilterBegin, 195, 220, rutaEclipsada...), mobile.FilterDefer)
+	comprobarFiltro(t, &raiz.gestos, eventoGesto(mobile.FilterMove, 195, 310, rutaEclipsada...), mobile.FilterClaim)
+	if !rend.disco.Visible() {
+		t.Fatal("el indicador visual de refresco no se enseña durante el tirón")
+	}
+	comprobarFiltro(t, &raiz.gestos, eventoGesto(mobile.FilterEnd, 210, 320, rutaEclipsada...), mobile.FilterClaim)
+	if refrescos != 1 {
+		t.Fatalf("el tirón bajo capas hermanas refrescó %d veces; quiero 1", refrescos)
+	}
+	if rend.disco.Visible() {
+		t.Fatal("el indicador visual sigue visible tras soltar")
+	}
+
+	// 2. Tirar empezando sobre el FAB no reclama el gesto como refresco.
+	posFab := fyne.CurrentApp().Driver().AbsolutePositionForObject(fab)
+	centroFab := fyne.NewPos(posFab.X+fab.Size().Width/2, posFab.Y+fab.Size().Height/2)
+	comprobarFiltro(t, &raiz.gestos, eventoGesto(mobile.FilterBegin, centroFab.X, centroFab.Y, rutaEclipsada...), mobile.FilterPass)
+
+	// 3. Deslizar desde el borde izquierdo abre el cajón aunque `avisos` eclipse `e.Path`.
+	comprobarFiltro(t, &raiz.gestos, eventoGesto(mobile.FilterBegin, 10, 300, rutaEclipsada...), mobile.FilterDefer)
+	comprobarFiltro(t, &raiz.gestos, eventoGesto(mobile.FilterMove, 80, 302, rutaEclipsada...), mobile.FilterClaim)
+	comprobarFiltro(t, &raiz.gestos, eventoGesto(mobile.FilterEnd, 110, 302, rutaEclipsada...), mobile.FilterClaim)
+	if !armazon.CajonAbierto {
+		t.Fatal("el gesto de borde izquierdo no abrió el cajón bajo capas hermanas")
 	}
 }

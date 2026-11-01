@@ -126,6 +126,92 @@ function conElDedo(): boolean {
   return typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
 }
 
+const TIPOS_SIN_TECLADO = new Set([
+  'checkbox',
+  'radio',
+  'button',
+  'submit',
+  'reset',
+  'file',
+  'range',
+  'color',
+  'image',
+  'hidden',
+]);
+
+/** ¿Este elemento abre y mantiene el teclado virtual en pantallas táctiles? */
+function esControlDeEscritura(el: Element | null): el is HTMLElement {
+  if (!(el instanceof HTMLElement)) return false;
+  if (el.isContentEditable) return true;
+  if (el instanceof HTMLTextAreaElement) return !el.disabled && !el.readOnly;
+  if (el instanceof HTMLInputElement) {
+    return !el.disabled && !el.readOnly && !TIPOS_SIN_TECLADO.has(el.type.toLowerCase());
+  }
+  return false;
+}
+
+/**
+ * ¿El toque cae en otro campo editable, en su `<label>` o en una barra de formato que
+ * actúa sobre la selección actual? Si no (casilla, conmutador, selector, botón o hueco
+ * libre del diálogo), en móvil se suelta el foco de escritura para recoger el teclado.
+ */
+function destinoMantieneTeclado(destino: Element | null, raiz: HTMLElement): boolean {
+  if (!destino) return false;
+  if (destino.closest('[role="toolbar"], [data-mantiene-teclado]')) return true;
+  const directo = destino.closest('input, textarea, [contenteditable="true"]');
+  if (directo) return esControlDeEscritura(directo);
+  const etiqueta = destino.closest('label');
+  if (etiqueta) {
+    const idAsociado = etiqueta.getAttribute('for');
+    const escapeCss =
+      typeof CSS !== 'undefined' && typeof CSS.escape === 'function'
+        ? CSS.escape(idAsociado ?? '')
+        : (idAsociado ?? '');
+    const control = idAsociado
+      ? (raiz.querySelector(`#${escapeCss}`) ?? document.getElementById(idAsociado))
+      : etiqueta.querySelector('input, textarea, select, [contenteditable="true"]');
+    if (control) return esControlDeEscritura(control);
+  }
+  return false;
+}
+
+/**
+ * Desplaza únicamente el cuerpo del diálogo —sin mover el documento ni el viewport
+ * visual de Safari— para dejar el campo enfocado (y su etiqueta si cabe) con 16 px de
+ * aire, o alinear arriba un `<textarea>` más alto que el hueco libre sobre el teclado.
+ */
+function revelarCampoEnCuerpo(cuerpo: HTMLElement, campo: HTMLElement): void {
+  const margen = 16;
+  const cajaCuerpo = cuerpo.getBoundingClientRect();
+  const cajaCampo = campo.getBoundingClientRect();
+  const altoVisible = cuerpo.clientHeight || cajaCuerpo.height;
+  if (altoVisible <= 0 || cajaCampo.height <= 0) {
+    campo.scrollIntoView?.({ block: 'nearest' });
+    return;
+  }
+  const grupo = campo.closest<HTMLElement>('[data-field-group]');
+  const cajaGrupo = grupo && cuerpo.contains(grupo) ? grupo.getBoundingClientRect() : null;
+  const bordeArriba = cajaCuerpo.top + margen;
+  const bordeAbajo = cajaCuerpo.top + altoVisible - margen;
+  const cabeEntero = altoVisible - 2 * margen;
+
+  if (cajaCampo.height > cabeEntero && cabeEntero > 0) {
+    if (cajaCampo.top < bordeArriba || cajaCampo.top > bordeAbajo) {
+      cuerpo.scrollTop = Math.max(0, cuerpo.scrollTop + (cajaCampo.top - bordeArriba));
+    }
+    return;
+  }
+  if (cajaCampo.bottom > bordeAbajo) {
+    cuerpo.scrollTop += cajaCampo.bottom - bordeAbajo;
+    return;
+  }
+  const techoDeseado =
+    cajaGrupo && cajaCampo.bottom - cajaGrupo.top <= cabeEntero ? cajaGrupo.top : cajaCampo.top;
+  if (techoDeseado < bordeArriba) {
+    cuerpo.scrollTop = Math.max(0, cuerpo.scrollTop + (techoDeseado - bordeArriba));
+  }
+}
+
 export function Modal({
   open,
   onClose,
@@ -221,14 +307,31 @@ export function Modal({
       }
     };
 
+    const onPointerDownPanel = (e: PointerEvent) => {
+      if (e.pointerType === 'mouse' || !panel) return;
+      const activo = document.activeElement;
+      if (!esControlDeEscritura(activo) || !panel.contains(activo)) return;
+      const destino = e.target instanceof Element ? e.target : null;
+      if (destino === activo || destinoMantieneTeclado(destino, panel)) return;
+      activo.blur();
+    };
+
     document.addEventListener('keydown', onKeyDown, true);
+    panel?.addEventListener('pointerdown', onPointerDownPanel);
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
 
     return () => {
       document.removeEventListener('keydown', onKeyDown, true);
+      panel?.removeEventListener('pointerdown', onPointerDownPanel);
       document.body.style.overflow = prevOverflow;
-      previouslyFocusedRef.current?.focus();
+      if (
+        panel?.contains(document.activeElement) &&
+        document.activeElement instanceof HTMLElement
+      ) {
+        document.activeElement.blur();
+      }
+      previouslyFocusedRef.current?.focus({ preventScroll: true });
     };
   }, [open, onCloseRef]);
 
@@ -247,21 +350,39 @@ export function Modal({
     return () => ro.disconnect();
   });
 
-  // El campo en el que se escribe, a la vista cuando sale el teclado. La capa ya mide el
-  // viewport visual, así que la hoja se apoya encima del teclado y el cuerpo encoge;
-  // pero el campo se quedaba donde estaba, debajo del nuevo borde, en Chrome de Android
-  // (Safari lo desplaza él solo). Es `ui.MostrarFoco` de Fyne: lo justo, sin saltos.
+  // El campo en el que se escribe, siempre a la vista: tanto al salir o moverse el
+  // teclado (`visualViewport` resize/scroll) como al saltar de un campo a otro con el
+  // teclado ya desplegado (`focusin`, donde `visualViewport` no cambia de tamaño).
   useLayoutEffect(() => {
+    const cuerpo = cuerpoRef.current;
+    if (!open || !cuerpo) return;
     const vv = typeof window === 'undefined' ? undefined : window.visualViewport;
-    if (!open || !vv) return;
-    const alCambiar = () => {
-      const cuerpo = cuerpoRef.current;
+    let raf = 0;
+    const asegurarVisible = () => {
       const activo = document.activeElement as HTMLElement | null;
-      if (!cuerpo || !activo || !cuerpo.contains(activo) || !activo.matches(CAMPO)) return;
-      requestAnimationFrame(() => activo.scrollIntoView({ block: 'nearest' }));
+      if (!activo || !cuerpo.contains(activo) || !activo.matches(CAMPO)) return;
+      revelarCampoEnCuerpo(cuerpo, activo);
     };
-    vv.addEventListener('resize', alCambiar);
-    return () => vv.removeEventListener('resize', alCambiar);
+    const programarRevelado = () => {
+      asegurarVisible();
+      if (typeof requestAnimationFrame === 'function') {
+        cancelAnimationFrame(raf);
+        raf = requestAnimationFrame(asegurarVisible);
+      }
+    };
+    const alEnfocar = (e: FocusEvent) => {
+      const destino = e.target;
+      if (destino instanceof HTMLElement && destino.matches(CAMPO)) programarRevelado();
+    };
+    cuerpo.addEventListener('focusin', alEnfocar);
+    vv?.addEventListener('resize', programarRevelado);
+    vv?.addEventListener('scroll', programarRevelado);
+    return () => {
+      if (raf && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(raf);
+      cuerpo.removeEventListener('focusin', alEnfocar);
+      vv?.removeEventListener('resize', programarRevelado);
+      vv?.removeEventListener('scroll', programarRevelado);
+    };
   }, [open]);
 
   if (!open || typeof document === 'undefined') return null;
@@ -282,6 +403,13 @@ export function Modal({
     if (!a || !panel) return;
     // Solo hacia abajo: hacia arriba la hoja ya está en su sitio.
     a.dy = Math.max(0, e.clientY - a.y);
+    if (
+      a.dy > 8 &&
+      esControlDeEscritura(document.activeElement) &&
+      panel.contains(document.activeElement)
+    ) {
+      document.activeElement.blur();
+    }
     panel.style.transition = 'none';
     panel.style.transform = `translateY(${a.dy}px)`;
   };
@@ -325,7 +453,7 @@ export function Modal({
       // el alto sería correcto pero el diálogo seguiría anclado arriba y dejaría
       // una franja entre su pie y el teclado. Sin shell, `100dvh` desde 0.
       class={cx(
-        'sytue-safe-overlay fixed inset-x-0 top-[var(--sytue-vvy,0px)] flex h-[var(--sytue-vvh,100dvh)]',
+        'sytue-safe-overlay fixed inset-x-0 top-[var(--sytue-vvy,0px)] flex h-[var(--sytue-vvh,100dvh)] overscroll-contain',
         // Teléfono: la hoja apoyada abajo, con aire arriba para que se lea como una capa
         // encima de la pantalla y no como una pantalla nueva.
         'max-md:items-end max-md:pt-[max(2.5rem,calc(env(safe-area-inset-top)_+_1rem))]',
@@ -407,7 +535,7 @@ export function Modal({
           ref={cuerpoRef}
           data-sytue-dialog-body
           class={cx(
-            'text-text min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pt-3 text-base max-md:min-h-11',
+            'text-text min-h-0 flex-1 scroll-py-4 overflow-y-auto overscroll-contain px-6 pt-3 text-base max-md:min-h-11',
             footer ? 'pb-3' : ['pb-5', bandaFinal],
           )}
         >

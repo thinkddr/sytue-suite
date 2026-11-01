@@ -206,12 +206,12 @@ static int sytueArchivosAbrir(const char *identificador, int estricto) {
 }
 
 */
-import "C"
+import "C" //nolint:gocritic // CGO exige importar C por separado
 
 import (
 	"errors"
 	"fmt"
-	"unsafe"
+	"unsafe" //nolint:gocritic // dupImport falso positivo con import C
 
 	"git.sytue.eu/sytue/one/apps/nucleo/ajustes"
 )

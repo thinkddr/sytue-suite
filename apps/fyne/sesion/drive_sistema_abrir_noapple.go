@@ -7,7 +7,6 @@ package sesion
 
 import (
 	"context"
-	"os"
 	"os/exec"
 	"runtime"
 	"time"
@@ -15,7 +14,6 @@ import (
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/auth"
 	"git.sytue.eu/sytue/one/apps/nucleo/documentos"
-	"git.sytue.eu/sytue/one/apps/nucleo/nube"
 )
 
 func abrirDriveEnSistema(ctx context.Context, s *Suite, i auth.IdentitySnapshot) error {
@@ -75,24 +73,4 @@ func abrirCarpetaDriveWindows(ctx context.Context, s *Suite, i auth.IdentitySnap
 		return err
 	}
 	return s.aplicarAperturaDrive(ctx, func() error { return exec.CommandContext(context.WithoutCancel(ctx), "explorer.exe", dir).Start() }) //nolint:gosec // G204: ruta generada y ligada a la cuenta por nube.Carpeta.
-}
-
-func prepararCarpetaDriveWindows(ctx context.Context, s *Suite, i auth.IdentitySnapshot) (string, error) {
-	if _, err := s.autorizacionDriveSistema(i).AccessToken(ctx); err != nil {
-		return "", err
-	}
-	dir, err := nube.CarpetaCon(ctx, cuentaNube(i))
-	if err != nil {
-		return "", err
-	}
-	if err := s.comprobarAperturaDrive(ctx); err != nil {
-		return "", err
-	}
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return "", err
-	}
-	if err := s.comprobarAperturaDrive(ctx); err != nil {
-		return "", err
-	}
-	return dir, nil
 }

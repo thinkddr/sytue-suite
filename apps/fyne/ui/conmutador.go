@@ -95,12 +95,31 @@ func (c *Conmutador) MinSize() fyne.Size {
 	return m
 }
 
+// envuelveEn indica si la etiqueta debe repartirse en varias líneas para `ancho`.
+func (c *Conmutador) envuelveEn(ancho float32) bool {
+	if c.Etiqueta == "" {
+		return false
+	}
+	if c.AnchoEtiqueta > 0 {
+		return true
+	}
+	return ancho > 0 && ancho+0.5 < medidaConmutador(c.Etiqueta, c.escalon()).Width
+}
+
 // AltoPara mide la etiqueta optativamente envuelta al ancho útil actual.
 func (c *Conmutador) AltoPara(ancho float32) float32 {
-	if c.AnchoEtiqueta <= 0 || c.Etiqueta == "" {
-		return medidaConmutador(c.Etiqueta, c.escalon()).Height
+	if !c.envuelveEn(ancho) {
+		h := medidaConmutador(c.Etiqueta, c.escalon()).Height
+		if c.Etiqueta != "" {
+			return sueloTactil(h)
+		}
+		return h
 	}
-	w := max(min(c.AnchoEtiqueta, ancho-AnchoCarril-HuecoConmutador), 1)
+	disp := ancho - AnchoCarril - HuecoConmutador
+	if c.AnchoEtiqueta > 0 {
+		disp = min(c.AnchoEtiqueta, disp)
+	}
+	w := max(disp, 1)
 	return sueloTactil(max(AltoCarril, float32(len(Repartir(c.Etiqueta, c.escalon(), Normal, w)))*c.escalon().Linea))
 }
 
@@ -222,15 +241,27 @@ func (r *conmutadorRenderer) Layout(t fyne.Size) {
 	r.pomo.Resize(fyne.NewSize(LadoPomo, LadoPomo))
 	r.sombra.Ajustar(fyne.NewPos(x, y+MargenPomo), fyne.NewSize(LadoPomo, LadoPomo), tema.De(fyne.CurrentApp().Settings().ThemeVariant()))
 
-	if r.parrafo != nil && r.c.AnchoEtiqueta > 0 {
-		w := max(min(t.Width-AnchoCarril-HuecoConmutador, r.c.AnchoEtiqueta), 1)
-		h := AltoParrafo(r.parrafo, w)
-		r.parrafo.Move(fyne.NewPos(AnchoCarril+HuecoConmutador, (t.Height-h)/2))
-		r.parrafo.Resize(fyne.NewSize(w, h))
+	envuelve := r.c.envuelveEn(t.Width)
+	if r.parrafo != nil {
+		ver(r.parrafo, envuelve)
+		if envuelve {
+			disp := t.Width - AnchoCarril - HuecoConmutador
+			if r.c.AnchoEtiqueta > 0 {
+				disp = min(disp, r.c.AnchoEtiqueta)
+			}
+			w := max(disp, 1)
+			r.parrafo.Ancho = w
+			h := AltoParrafo(r.parrafo, w)
+			r.parrafo.Move(fyne.NewPos(AnchoCarril+HuecoConmutador, (t.Height-h)/2))
+			r.parrafo.Resize(fyne.NewSize(w, h))
+		}
 	}
 	if r.texto != nil {
-		e := r.c.escalon()
-		ColocarTexto(r.texto, e, AnchoCarril+HuecoConmutador, (t.Height-e.Linea)/2)
+		ver(r.texto, !envuelve)
+		if !envuelve {
+			e := r.c.escalon()
+			ColocarTexto(r.texto, e, AnchoCarril+HuecoConmutador, (t.Height-e.Linea)/2)
+		}
 	}
 }
 
@@ -258,19 +289,20 @@ func (r *conmutadorRenderer) Refresh() {
 	}
 	r.aro.Pintar(v)
 	r.aro.Ver(r.c.enfocado)
+	envuelve := r.c.envuelveEn(r.c.Size().Width)
 	if r.texto != nil {
 		r.texto.Text = r.c.Etiqueta
 		r.texto.TextSize = r.c.escalon().Tam
 		r.texto.Color = atenuar(tema.Color("text", v), r.c.inerte)
 		r.texto.Refresh()
-		ver(r.texto, r.c.AnchoEtiqueta <= 0)
+		ver(r.texto, !envuelve)
 	}
 	if r.parrafo != nil {
 		r.parrafo.Texto, r.parrafo.Escalon = r.c.Etiqueta, r.c.escalon()
 		r.parrafo.Tinta = atenuar(tema.Color("text", v), r.c.inerte)
 		r.parrafo.Ancho = r.c.AnchoEtiqueta
 		r.parrafo.Refresh()
-		ver(r.parrafo, r.c.AnchoEtiqueta > 0)
+		ver(r.parrafo, envuelve)
 	}
 	r.Layout(r.c.Size())
 }

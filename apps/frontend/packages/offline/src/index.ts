@@ -10,6 +10,8 @@ export type { OfflineRecord } from './storage.js';
 export {
   clearOfflineStorage,
   deleteOfflineValue,
+  exclusiveOfflineRecord,
+  isOfflineStorageEncrypted,
   listOfflineValues,
   mutateOfflineValue,
   readOfflineValue,

@@ -6136,9 +6136,11 @@ El servidor HTTP del harness se apagó al terminar. Las claves del fixture son s
 3. **Recuperación:** las API existentes son `client.secretStorage.store/get` en web y
    `Machine().SSSS.SetEncryptedAccountData/GetDecryptedAccountData` en Go. El secreto
    namespaced debe coincidir exactamente: Go recibe bytes crudos y web el string base64 de
-   esos bytes. No usar metadatos adicionales en claro. Hoy sólo Rooms conecta ese cliente y
-   Go no expone una bóveda general ni conserva la raíz SSSS tras recuperar; conectar las otras
-   apps requiere ese trabajo. Falta de clave/backup o identidad incompatible bloquea el
+   esos bytes (`apps/nucleo/matrix` y `@sytue/offline/matrix` comparten la derivación de
+   nombre `sytue.<producto>.v1.<hex32>` y el sobre contextual JSON en base64, conservando la
+   clave SSSS en memoria tras desbloquear el backup). No usar metadatos adicionales en claro.
+   Falta conectar esa bóveda común a los repositorios de producto del resto de apps. Falta de
+   clave/backup o identidad incompatible bloquea el
    acceso, sin crear una bóveda vacía encima de la anterior.
    **SSSS no garantiza frescura:** un fixture con el SDK mautrix 0.32.0 y account-data
    artificial rechazó MAC alterado y el traslado a otro nombre, pero aceptó una revisión

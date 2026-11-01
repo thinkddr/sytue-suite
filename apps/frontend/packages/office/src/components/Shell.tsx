@@ -3,7 +3,9 @@
  * de access token del cliente. Recibe solo props serializables desde el SSR.
  */
 import type { ComponentChildren } from 'preact';
+import { useRef } from 'preact/hooks';
 import { SytueShell } from '@sytue/shell';
+import { IndicadorRefrescoTactil, usePullToRefresh } from '@sytue/ui';
 import type { SytueUser } from '@sytue/auth';
 import type { Locale } from '@sytue/i18n';
 import { getAccessToken } from '@sytue/auth/client';
@@ -20,6 +22,8 @@ interface ShellProps {
 }
 
 export function Shell({ user, hubBaseUrl, locale, producto = 'docs', children }: ShellProps) {
+  const mainRef = useRef<HTMLElement>(null);
+  const refresco = usePullToRefresh(mainRef);
   return (
     <SytueShell
       currentApp={producto}
@@ -33,10 +37,12 @@ export function Shell({ user, hubBaseUrl, locale, producto = 'docs', children }:
           editor a viewport). En «Marco» son el marco y la hoja con la separación común de
           toda la suite (`--sytue-sheet-gap`, tokens/appearance.css). */}
       <main
+        ref={mainRef}
         id="contenido"
         tabIndex={-1}
         class="sytue-frame sytue-frame-page sytue-safe-workspace focus-visible:outline-none"
       >
+        <IndicadorRefrescoTactil estado={refresco} fijo />
         <div class="sytue-sheet sytue-sheet-page">{children}</div>
       </main>
     </SytueShell>

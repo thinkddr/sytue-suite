@@ -146,29 +146,19 @@ type estadoG struct {
 	// copiarlo con la pila es lo que hace que el anidamiento salga gratis.
 	recorte *recorteRaster
 
-	csRelleno, csTrazo *espacioColor
-	relleno, trazo     string // ya en forma CSS: «#rrggbb» o «none»
-	patronRelleno      string // id de <linearGradient>/<pattern> si el color es un patrón
-	patronTrazo        string
-	// aproxRelleno/aproxTrazo son el color liso con el que la salida PNG sustituye
-	// a un patrón que no sabe pintar. Vacío = no se pinta (ver `colorDePintura`).
-	aproxRelleno string
-	aproxTrazo   string
-	// degRelleno es el degradado de verdad para la salida PNG cuando el patrón de
-	// relleno es un sombreado axial, radial o de función; mallaRelleno son los
-	// triángulos cuando el patrón es una malla (tipos 4 a 7).
-	degRelleno   *degradadoRaster
-	mallaRelleno []trianguloMalla
-	matrizMalla  matriz
-	alfaRelleno  float64
-	alfaTrazo    float64
+	csRelleno, csTrazo   *espacioColor
+	relleno, trazo       string // ya en forma CSS: «#rrggbb» o «none»
+	patRelleno, patTrazo *patronPDF
+	alfaRelleno          float64
+	alfaTrazo            float64
 
-	grosor  float64
-	tapa    int
-	union   int
-	limite  float64
-	guiones string
-	mezcla  string
+	grosor    float64
+	tapa      int
+	union     int
+	limite    float64
+	guiones   string
+	faseGuion float64
+	mezcla    string
 
 	fuente       *fuentePDF
 	tamano       float64
@@ -301,7 +291,8 @@ func (d *PDFDoc) RenderizarPaginaSVG(i int, opts OpcionesRender) (string, error)
 			`width="%s" height="%s" viewBox="0 0 %s %s" `+
 			// El fondo blanco es del PAPEL, no del visor: un PDF no declara fondo
 			// y sin esto una página se vería transparente sobre el tema oscuro.
-			`style="background:#fff">`+"\n",
+			// white-space:pre conserva secuencias de espacios dentro de HTML5 inline.
+			`style="background:#fff;white-space:pre">`+"\n",
 		num(p.Ancho*escala), num(p.Alto*escala), num(p.Ancho), num(p.Alto))
 	if l.defs.Len() > 0 {
 		out.WriteString("<defs>")
@@ -414,14 +405,19 @@ func matrizBase(p PDFPagina) matriz {
 // ejecutar recorre un flujo de contenido. La notación de PDF es postfija: se
 // apilan operandos hasta dar con la palabra del operador, que los consume.
 func (l *lienzo) ejecutar(contenido []byte, recursos pdfDict, inicial estadoG) {
+	l.ejecutarModo(contenido, recursos, inicial, false)
+}
+
+func (l *lienzo) ejecutarModo(contenido []byte, recursos pdfDict, inicial estadoG, ignorarColor bool) {
 	if l.prof > maxProfundidadXObject || l.truncado {
 		return
 	}
 	e := &ejecucion{
-		l:         l,
-		recursos:  recursos,
-		estado:    inicial,
-		abiertosN: []int{0},
+		l:            l,
+		recursos:     recursos,
+		estado:       inicial,
+		abiertosN:    []int{0},
+		ignorarColor: ignorarColor,
 	}
 	e.pila = append(e.pila, inicial)
 
@@ -503,15 +499,19 @@ type ejecucion struct {
 	recortePe int // 0 ninguno, 1 nonzero (W), 2 evenodd (W*)
 
 	// Estado de texto entre BT y ET.
-	tm, tlm  matriz
-	enTexto  bool
-	textoAbi bool
+	tm, tlm      matriz
+	enTexto      bool
+	textoAbi     bool
+	ignorarColor bool // tras d1 en un CharProc de Type 3 (§9.6.5) o PaintType 2
+	hayClipTexto bool
+	clipTextoSVG strings.Builder
+	clipTextoPts [][]punto
 }
 
 // tabla de la especificación (§8-9). Partirlo escondería esa correspondencia
 // uno a uno, que es lo que hace este fichero legible frente al PDF abierto al lado.
 //
-//nolint:gocyclo // El switch de operadores del flujo de contenido es la
+//nolint:gocognit,gocyclo // El switch de operadores del flujo de contenido es la
 func (e *ejecucion) aplicar(op string, ops []pdfObj) {
 	n := func(i int) float64 {
 		// Los operandos se leen desde el FINAL: un flujo mal formado puede dejar
@@ -561,7 +561,7 @@ func (e *ejecucion) aplicar(op string, ops []pdfObj) {
 	case "M":
 		e.estado.limite = n(1)
 	case "d":
-		e.estado.guiones = e.guionesCSS(ops)
+		e.estado.guiones, e.estado.faseGuion = e.guionesCSS(ops)
 	case "gs":
 		e.aplicarExtGState(nombre(1))
 	case "i", "ri":
@@ -614,37 +614,53 @@ func (e *ejecucion) aplicar(op string, ops []pdfObj) {
 
 	// --- Color ---
 	case "CS":
-		e.estado.csTrazo = e.l.espacioPorNombre(nombre(1), e.recursos)
-		e.estado.trazo, e.estado.patronTrazo = e.estado.csTrazo.inicial(), ""
+		if !e.ignorarColor {
+			e.estado.csTrazo = e.l.espacioPorNombre(nombre(1), e.recursos)
+			e.estado.trazo, e.estado.patTrazo = e.estado.csTrazo.inicial(), nil
+		}
 	case "cs":
-		e.estado.csRelleno = e.l.espacioPorNombre(nombre(1), e.recursos)
-		e.estado.relleno, e.estado.patronRelleno = e.estado.csRelleno.inicial(), ""
-		e.estado.degRelleno, e.estado.mallaRelleno = nil, nil
+		if !e.ignorarColor {
+			e.estado.csRelleno = e.l.espacioPorNombre(nombre(1), e.recursos)
+			e.estado.relleno, e.estado.patRelleno = e.estado.csRelleno.inicial(), nil
+		}
 	case "SC", "SCN":
-		e.color(ops, true)
+		if !e.ignorarColor {
+			e.color(ops, true)
+		}
 	case "sc", "scn":
-		e.color(ops, false)
+		if !e.ignorarColor {
+			e.color(ops, false)
+		}
 	case "G":
-		e.estado.csTrazo, e.estado.patronTrazo = espacioGris, ""
-		e.estado.trazo = cssGris(n(1))
+		if !e.ignorarColor {
+			e.estado.csTrazo, e.estado.patTrazo = espacioGris, nil
+			e.estado.trazo = cssGris(n(1))
+		}
 	case "g":
-		e.estado.csRelleno, e.estado.patronRelleno = espacioGris, ""
-		e.estado.degRelleno, e.estado.mallaRelleno = nil, nil
-		e.estado.relleno = cssGris(n(1))
+		if !e.ignorarColor {
+			e.estado.csRelleno, e.estado.patRelleno = espacioGris, nil
+			e.estado.relleno = cssGris(n(1))
+		}
 	case "RG":
-		e.estado.csTrazo, e.estado.patronTrazo = espacioRGB, ""
-		e.estado.trazo = cssRGB(n(3), n(2), n(1))
+		if !e.ignorarColor {
+			e.estado.csTrazo, e.estado.patTrazo = espacioRGB, nil
+			e.estado.trazo = cssRGB(n(3), n(2), n(1))
+		}
 	case "rg":
-		e.estado.csRelleno, e.estado.patronRelleno = espacioRGB, ""
-		e.estado.degRelleno, e.estado.mallaRelleno = nil, nil
-		e.estado.relleno = cssRGB(n(3), n(2), n(1))
+		if !e.ignorarColor {
+			e.estado.csRelleno, e.estado.patRelleno = espacioRGB, nil
+			e.estado.relleno = cssRGB(n(3), n(2), n(1))
+		}
 	case "K":
-		e.estado.csTrazo, e.estado.patronTrazo = espacioCMYK, ""
-		e.estado.trazo = cssCMYK(n(4), n(3), n(2), n(1))
+		if !e.ignorarColor {
+			e.estado.csTrazo, e.estado.patTrazo = espacioCMYK, nil
+			e.estado.trazo = cssCMYK(n(4), n(3), n(2), n(1))
+		}
 	case "k":
-		e.estado.csRelleno, e.estado.patronRelleno = espacioCMYK, ""
-		e.estado.degRelleno, e.estado.mallaRelleno = nil, nil
-		e.estado.relleno = cssCMYK(n(4), n(3), n(2), n(1))
+		if !e.ignorarColor {
+			e.estado.csRelleno, e.estado.patRelleno = espacioCMYK, nil
+			e.estado.relleno = cssCMYK(n(4), n(3), n(2), n(1))
+		}
 
 	// --- Sombreado ---
 	case "sh":
@@ -654,9 +670,11 @@ func (e *ejecucion) aplicar(op string, ops []pdfObj) {
 	case "BT":
 		e.enTexto = true
 		e.tm, e.tlm = identidad, identidad
+		e.reiniciarRecorteTexto()
 	case "ET":
 		e.cerrarTexto()
 		e.enTexto = false
+		e.aplicarRecorteTexto()
 	case "Tc":
 		e.estado.espCar = n(1)
 	case "Tw":
@@ -721,7 +739,28 @@ func (e *ejecucion) aplicar(op string, ops []pdfObj) {
 			}
 			e.marcas = e.marcas[:len(e.marcas)-1]
 		}
-	case "MP", "DP", "BX", "EX", "d0", "d1":
+	case "d1":
+		e.ignorarColor = true
+		e.fijarColorMascaraType3()
+	case "MP", "DP", "BX", "EX", "d0":
+	}
+}
+
+func (e *ejecucion) fijarColorMascaraType3() {
+	aplicar := func(st *estadoG) {
+		if st.modoRender == 1 || st.modoRender == 5 {
+			st.relleno = st.trazo
+			st.alfaRelleno = st.alfaTrazo
+			st.patRelleno = st.patTrazo
+			return
+		}
+		st.trazo = st.relleno
+		st.alfaTrazo = st.alfaRelleno
+		st.patTrazo = st.patRelleno
+	}
+	aplicar(&e.estado)
+	for i := range e.pila {
+		aplicar(&e.pila[i])
 	}
 }
 
@@ -940,7 +979,7 @@ func (e *ejecucion) pintar(relleno, trazo, parImpar bool) {
 	pend := e.recortePe
 	e.recortePe = 0
 	if e.l.r != nil {
-		e.pintarRaster(hab, relleno, trazo, pend)
+		e.pintarRaster(hab, relleno, trazo, parImpar, pend)
 		e.cam = e.cam[:0]
 	}
 
@@ -969,11 +1008,7 @@ func (e *ejecucion) escribirRelleno(b *strings.Builder, relleno, parImpar bool) 
 		b.WriteString(` fill="none"`)
 		return
 	}
-	if e.estado.patronRelleno != "" {
-		b.WriteString(` fill="url(#` + e.estado.patronRelleno + `)"`)
-	} else {
-		b.WriteString(` fill="` + e.estado.relleno + `"`)
-	}
+	b.WriteString(` fill="` + e.colorRellenoSVG(e.estado.ctm) + `"`)
 	if parImpar {
 		b.WriteString(` fill-rule="evenodd"`)
 	}
@@ -986,11 +1021,7 @@ func (e *ejecucion) escribirTrazo(b *strings.Builder, trazo bool) {
 	if !trazo {
 		return
 	}
-	if e.estado.patronTrazo != "" {
-		b.WriteString(` stroke="url(#` + e.estado.patronTrazo + `)"`)
-	} else {
-		b.WriteString(` stroke="` + e.estado.trazo + `"`)
-	}
+	b.WriteString(` stroke="` + e.colorTrazoSVG(e.estado.ctm) + `"`)
 	if e.estado.grosor <= 0 {
 		// Grosor 0 en PDF es «la línea más fina que el dispositivo sepa pintar»
 		// (§8.4.3.2). Con un 0 literal, SVG no pinta NADA: la tabla se quedaría
@@ -1016,10 +1047,27 @@ func (e *ejecucion) escribirTrazo(b *strings.Builder, trazo bool) {
 	}
 	if e.estado.guiones != "" {
 		b.WriteString(` stroke-dasharray="` + e.estado.guiones + `"`)
+		if e.estado.faseGuion != 0 {
+			b.WriteString(` stroke-dashoffset="` + num(e.estado.faseGuion) + `"`)
+		}
 	}
 	if e.estado.alfaTrazo < 1 {
 		b.WriteString(` stroke-opacity="` + num(e.estado.alfaTrazo) + `"`)
 	}
+}
+
+func (e *ejecucion) colorRellenoSVG(elemM matriz) string {
+	if id := e.estado.patRelleno.idPara(e.l, elemM); id != "" {
+		return "url(#" + id + ")"
+	}
+	return e.estado.relleno
+}
+
+func (e *ejecucion) colorTrazoSVG(elemM matriz) string {
+	if id := e.estado.patTrazo.idPara(e.l, elemM); id != "" {
+		return "url(#" + id + ")"
+	}
+	return e.estado.trazo
 }
 
 // aplicarRecorte abre un <g clip-path=...> que se cerrará con el `Q` de este
@@ -1069,15 +1117,15 @@ func (e *ejecucion) cerrarTodo() {
 	}
 }
 
-// guionesCSS traduce `[a b] fase d` a stroke-dasharray. Un array vacío es línea
-// continua, que en SVG se escribe omitiendo el atributo.
-func (e *ejecucion) guionesCSS(ops []pdfObj) string {
+// guionesCSS traduce `[a b] fase d` a stroke-dasharray y stroke-dashoffset. Un
+// array vacío es línea continua, que en SVG se escribe omitiendo el atributo.
+func (e *ejecucion) guionesCSS(ops []pdfObj) (string, float64) {
 	if len(ops) < 2 {
-		return ""
+		return "", 0
 	}
 	arr, ok := e.l.d.resolver(ops[len(ops)-2]).(pdfArray)
 	if !ok || len(arr) == 0 {
-		return ""
+		return "", 0
 	}
 	partes := make([]string, 0, len(arr))
 	todoCero := true
@@ -1089,9 +1137,10 @@ func (e *ejecucion) guionesCSS(ops []pdfObj) string {
 		partes = append(partes, num(x))
 	}
 	if todoCero {
-		return "" // [0 0] es continua, y en SVG haría desaparecer la línea
+		return "", 0 // [0 0] es continua, y en SVG haría desaparecer la línea
 	}
-	return strings.Join(partes, ",")
+	fase := comoReal(e.l.d.resolver(ops[len(ops)-1]))
+	return strings.Join(partes, ","), fase
 }
 
 // aplicarExtGState aplica /ExtGState, donde vive lo que no tiene operador
@@ -1121,7 +1170,11 @@ func (e *ejecucion) aplicarExtGState(nombre pdfName) {
 	}
 	if v, ok := egs["D"]; ok {
 		if arr, ok := e.l.d.resolver(v).(pdfArray); ok && len(arr) >= 1 {
-			e.estado.guiones = e.guionesCSS(pdfArray{arr[0], int64(0)})
+			fase := pdfObj(int64(0))
+			if len(arr) >= 2 {
+				fase = arr[1]
+			}
+			e.estado.guiones, e.estado.faseGuion = e.guionesCSS(pdfArray{arr[0], fase})
 		}
 	}
 	if v, ok := egs["Font"]; ok {
@@ -1279,11 +1332,16 @@ func (e *ejecucion) mostrar(s pdfString) {
 		}
 	}
 
-	if e.estado.modoRender != 7 && e.estado.tamano != 0 {
+	if e.estado.tamano != 0 {
+		if e.estado.modoRender >= 4 && e.estado.modoRender <= 7 {
+			e.acumularRecorteTexto(f, glifos)
+		}
 		e.emitirTexto(f, glifos, avance)
-		// El PNG dibuja los CONTORNOS de los mismos glifos: es lo que un motor de
-		// SVG sin `<text>` no puede hacer y por lo que existe esta salida.
-		e.dibujarTexto(f, glifos)
+		if e.estado.modoRender != 7 {
+			// El PNG dibuja los CONTORNOS de los mismos glifos: es lo que un motor de
+			// SVG sin `<text>` no puede hacer y por lo que existe esta salida.
+			e.dibujarTexto(f, glifos)
+		}
 	}
 	if f.vertical {
 		e.tm = matriz{1, 0, 0, 1, 0, bajada}.por(e.tm)
@@ -1298,12 +1356,13 @@ func (e *ejecucion) emitirTexto(f *fuentePDF, glifos []glifo, avance float64) {
 		texto.WriteString(g.texto)
 	}
 	t := texto.String()
-	if strings.TrimSpace(t) == "" && e.estado.modoRender != 3 {
+	if strings.TrimSpace(t) == "" && e.estado.modoRender != 3 && !tieneGlifoSimbolicoVisible(f, glifos) {
 		return // solo espacios: no aporta píxeles y ensucia la selección
 	}
 
 	trm := matriz{e.estado.escalaH, 0, 0, 1, 0, e.estado.subida}.
 		por(e.tm).por(e.estado.ctm)
+	elemM := matriz{1, 0, 0, -1, 0, 0}.por(trm)
 
 	var b strings.Builder
 	b.WriteString(`<text transform="` + trm.svg() + ` scale(1,-1)" xml:space="preserve"`)
@@ -1321,16 +1380,40 @@ func (e *ejecucion) emitirTexto(f *fuentePDF, glifos []glifo, avance float64) {
 	if avance > 0 && len(glifos) > 1 {
 		b.WriteString(` textLength="` + num(avance/e.estado.escalaH) + `" lengthAdjust="spacingAndGlyphs"`)
 	}
-	if f.cmapVisual {
-		e.emitirTextoPorCodigo(&b, glifos)
+	switch {
+	case f.cmapVisual || (!f.dosBytes && f.necesitaCapaVisualSimple(glifos)):
+		e.emitirTextoPorCodigo(&b, glifos, elemM)
 		t = e.textoDeLaMarca(t)
 		// La capa Unicode sigue seleccionándose y copiándose como antes. Los
 		// códigos privados solo eligen el contorno y nunca entran en la selección.
 		b.WriteString(` fill="#000000" fill-opacity="0"`)
-	} else {
-		e.pintarTexto(&b)
+	case f.dosBytes && f.necesitaCapaVisualCompuesta(glifos):
+		e.emitirTextoPorGID(&b, f, glifos, elemM)
+		t = e.textoDeLaMarca(t)
+		b.WriteString(` fill="#000000" fill-opacity="0"`)
+	default:
+		e.pintarTexto(&b, elemM)
 	}
 	b.WriteString(">" + escaparXML(t) + "</text>\n")
+	e.l.escribir(b.String())
+}
+
+// emitirTextoPorGID dibuja los glifos de una fuente compuesta por su índice de
+// glifo privado (`runaVisualGID`) cuando `/ToUnicode` falta, descompone una
+// ligadura o comparte carácter entre dos glifos distintos.
+func (e *ejecucion) emitirTextoPorGID(base *strings.Builder, f *fuentePDF, glifos []glifo, elemM matriz) {
+	var b, texto strings.Builder
+	b.WriteString(base.String())
+	b.WriteString(` aria-hidden="true" style="-webkit-user-select:none;user-select:none;pointer-events:none"`)
+	e.pintarTexto(&b, elemM)
+	for _, g := range glifos {
+		if gid, ok := f.gidDeCID(g.codigo); ok && gid != 0 {
+			texto.WriteRune(runaVisualGID(gid))
+		} else {
+			texto.WriteRune(' ')
+		}
+	}
+	b.WriteString(">" + escaparXML(texto.String()) + "</text>\n")
 	e.l.escribir(b.String())
 }
 
@@ -1338,11 +1421,11 @@ func (e *ejecucion) emitirTexto(f *fuentePDF, glifos []glifo, avance float64) {
 // El dibujo va por el código original, igual que PNG; su texto lógico se emite
 // después en la capa seleccionable. Word usa ActualText para ligaduras como «ti»
 // cuyo contorno no tiene un punto Unicode propio.
-func (e *ejecucion) emitirTextoPorCodigo(base *strings.Builder, glifos []glifo) {
+func (e *ejecucion) emitirTextoPorCodigo(base *strings.Builder, glifos []glifo, elemM matriz) {
 	var b, texto strings.Builder
 	b.WriteString(base.String())
 	b.WriteString(` aria-hidden="true" style="-webkit-user-select:none;user-select:none;pointer-events:none"`)
-	e.pintarTexto(&b)
+	e.pintarTexto(&b, elemM)
 	for _, g := range glifos {
 		texto.WriteRune(0xE000 + rune(g.codigo&0xFF))
 	}
@@ -1350,20 +1433,41 @@ func (e *ejecucion) emitirTextoPorCodigo(base *strings.Builder, glifos []glifo) 
 	e.l.escribir(b.String())
 }
 
+func tieneGlifoSimbolicoVisible(f *fuentePDF, glifos []glifo) bool {
+	if !f.cmapVisual || f.dosBytes {
+		return false
+	}
+	for _, g := range glifos {
+		if f.simpleGid[byte(g.codigo&0xFF)] != 0 {
+			return true
+		}
+	}
+	return false
+}
+
 // pintarTexto aplica el modo de render del texto (§9.3.6).
-func (e *ejecucion) pintarTexto(b *strings.Builder) {
+func (e *ejecucion) pintarTexto(b *strings.Builder, elemM matriz) {
 	switch e.estado.modoRender {
 	case 1, 5: // solo contorno
-		b.WriteString(` fill="none" stroke="` + e.estado.trazo + `" stroke-width="` + num(e.estado.grosor) + `"`)
+		b.WriteString(` fill="none" stroke="` + e.colorTrazoSVG(elemM) + `" stroke-width="` + num(e.estado.grosor) + `"`)
+		if e.estado.alfaTrazo < 1 {
+			b.WriteString(` stroke-opacity="` + num(e.estado.alfaTrazo) + `"`)
+		}
 	case 2, 6: // relleno y contorno
-		b.WriteString(` fill="` + e.estado.relleno + `" stroke="` + e.estado.trazo + `" stroke-width="` + num(e.estado.grosor) + `"`)
+		b.WriteString(` fill="` + e.colorRellenoSVG(elemM) + `" stroke="` + e.colorTrazoSVG(elemM) + `" stroke-width="` + num(e.estado.grosor) + `"`)
+		if e.estado.alfaRelleno < 1 {
+			b.WriteString(` fill-opacity="` + num(e.estado.alfaRelleno) + `"`)
+		}
+		if e.estado.alfaTrazo < 1 {
+			b.WriteString(` stroke-opacity="` + num(e.estado.alfaTrazo) + `"`)
+		}
 	case 3, 7:
-		// Invisible. Es la capa de texto de un PDF escaneado con OCR: se emite
-		// transparente en vez de omitirla, porque `fill-opacity:0` sigue siendo
-		// seleccionable y buscable. Omitirlo dejaría el escaneo sin texto.
+		// Invisible. Es la capa de texto de un PDF escaneado con OCR (3) o el
+		// texto que solo recorta (7): se emite transparente en vez de omitirlo,
+		// porque `fill-opacity:0` sigue siendo seleccionable y buscable.
 		b.WriteString(` fill="#000000" fill-opacity="0"`)
 	default:
-		b.WriteString(` fill="` + e.estado.relleno + `"`)
+		b.WriteString(` fill="` + e.colorRellenoSVG(elemM) + `"`)
 		if e.estado.alfaRelleno < 1 {
 			b.WriteString(` fill-opacity="` + num(e.estado.alfaRelleno) + `"`)
 		}

@@ -59,7 +59,7 @@ func sealCache(ctx context.Context, root *os.Root, secrets CacheSecrets) (ficher
 	if secrets == nil {
 		return ficheros{}, ErrCacheKey
 	}
-	lock, err := root.OpenFile(cacheKeyLock, os.O_CREATE|os.O_RDWR, 0o600)
+	lock, err := openRootLockFile(root, cacheKeyLock)
 	if err != nil {
 		return ficheros{}, err
 	}

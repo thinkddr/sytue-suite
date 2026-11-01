@@ -161,8 +161,9 @@ type Editor struct {
 	deslizZona *container.Scroll
 	miniBarra  *fyne.Container
 	// deslizBarra es el `overflow-x-auto` de la mini-barra: en un teléfono sus ~483 px
-	// de controles no caben y se desliza de lado, sin encoger ninguno.
-	deslizBarra *container.Scroll
+	// de controles no caben y se desliza de lado con el dedo o la rueda (`ui.DesplazaLado`,
+	// sin la pista superpuesta de `container.NewHScroll`), sin encoger ninguno.
+	deslizBarra *ui.DesplazaLado
 	escenario   *Lienzo
 	sombra      *ui.Sombra
 	desliz      *container.Scroll
@@ -191,7 +192,7 @@ func NuevoEditor(ctx *editor.Contexto) *Editor {
 	e.carril = nuevoCarrilDiapos(e)
 	e.notas = nuevoPanelNotas(e)
 	e.miniBarra = container.New(&filaMiniBarra{})
-	e.deslizBarra = container.NewHScroll(e.miniBarra)
+	e.deslizBarra = ui.NuevoDesplazaLado(e.miniBarra, 0, func() fyne.Scrollable { return e.deslizZona })
 	e.zona = container.New(&zonaDiapo{e: e})
 	e.deslizZona = container.NewVScroll(e.zona)
 	e.raiz = container.New(&disposicionDiapos{e: e}, e.carril, e.deslizZona)
@@ -570,6 +571,7 @@ func (e *Editor) recomponer() {
 	e.zona.Objects = objs
 	e.zona.Refresh()
 	e.miniBarra.Refresh()
+	e.deslizBarra.Refresh()
 	e.escenario.Refresh()
 	e.capa.Refresh()
 	e.desliz.Refresh() // el zoom cambia lo que mide el contenido desplazable

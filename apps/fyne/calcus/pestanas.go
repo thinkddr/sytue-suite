@@ -342,9 +342,13 @@ func (t *tiraHojas) Tapped(e *fyne.PointEvent) {
 	}
 }
 
-// Dragged arrastra el pulgar: la tira corre lo que corre el puntero, a escala de lo que
-// mide entera sobre la pista. Un arrastre que no empieza en el pulgar no hace nada.
+// Dragged arrastra el pulgar en escritorio; en táctil corre la tira con el dedo, como
+// `overflow-x-auto` en la web móvil (`SheetCanvas.tsx`).
 func (t *tiraHojas) Dragged(e *fyne.DragEvent) {
+	if ui.EsTactil() {
+		t.correr(-e.Dragged.DX)
+		return
+	}
 	if !t.arrastrandoPulgar {
 		if t.arrastreSuelto || !t.enPulgar(e.Position.SubtractXY(e.Dragged.DX, e.Dragged.DY)) {
 			t.arrastreSuelto = true
@@ -556,9 +560,13 @@ func (ph *pestanaHoja) TypedKey(e *fyne.KeyEvent) {
 	}
 }
 
-// Dragged sigue el puntero en coordenadas de la TIRA, que es donde se decide sobre qué
-// pestaña cae.
+// Dragged sigue el puntero en coordenadas de la TIRA para reordenar en escritorio; en
+// táctil desliza la tira de pestañas, igual que la web móvil (`SheetCanvas.tsx`).
 func (ph *pestanaHoja) Dragged(e *fyne.DragEvent) {
+	if ui.EsTactil() {
+		ph.tira.correr(-e.Dragged.DX)
+		return
+	}
 	if lz := ph.tira.p.lz; lz.Rejilla.SoloLectura || lz.Libro.ProteccionLibro() != nil { // `draggable={!protectedWorkbook}`
 		return
 	}
@@ -567,7 +575,12 @@ func (ph *pestanaHoja) Dragged(e *fyne.DragEvent) {
 }
 
 // DragEnd suelta.
-func (ph *pestanaHoja) DragEnd() { ph.tira.soltar() }
+func (ph *pestanaHoja) DragEnd() {
+	if ui.EsTactil() {
+		return
+	}
+	ph.tira.soltar()
+}
 
 // AccessibilityLabel es el nombre de la hoja, que es el texto del botón.
 func (ph *pestanaHoja) AccessibilityLabel() string { return ph.nombre }

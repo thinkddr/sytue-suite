@@ -16,6 +16,22 @@ import {
   type StorageObjectCommit,
   type StorageObjectVersion,
 } from './storage.js';
+import {
+  downloadStorageBlock,
+  uploadStorageBlock,
+  type CipherBlobGateway,
+  type StorageBlock,
+} from './storage-blocks.js';
+import {
+  downloadStorageFile,
+  readStorageFileRange,
+  storageFileInfo,
+  uploadStorageFile,
+  type StorageFileRequest,
+  type StorageFileSource,
+  type StorageManifestRecordIO,
+  type StorageUploadJournal,
+} from './storage-files.js';
 
 /** Implemented by the maintained SDK adapter; these records are already authenticated client data. */
 export interface StorageRecordTransport {
@@ -56,6 +72,15 @@ export class StorageRepository {
     if (!this.rooms.includes(ref.room_id)) throw new MatrixSecurityError('reference');
     return ref;
   }
+  private manifestIO(): StorageManifestRecordIO {
+    return {
+      scope: this.scope,
+      assertOpen: () => this.transport.assertOpen(),
+      putRecord: (transaction, record, signal) => this.putRecord(transaction, record, signal),
+      readRecord: (reference, object, role, signal) =>
+        this.readRecord(reference, object, role, signal),
+    };
+  }
   async readRecord(
     reference: MatrixReference,
     object: string,
@@ -84,6 +109,112 @@ export class StorageRepository {
     if (!sameStorageRecord(got, record)) throw new StorageRecordError();
     this.check(signal);
     return ref;
+  }
+  async uploadBlock(
+    gateway: CipherBlobGateway,
+    object: string,
+    revision: string,
+    part: number,
+    plaintext: Uint8Array,
+    signal?: AbortSignal,
+  ): Promise<StorageBlock> {
+    this.check(signal);
+    const block = await uploadStorageBlock(
+      gateway,
+      this.scope,
+      object,
+      revision,
+      part,
+      plaintext,
+      signal,
+    );
+    this.check(signal);
+    return block;
+  }
+  async downloadBlock(
+    gateway: CipherBlobGateway,
+    block: StorageBlock,
+    object: string,
+    revision: string,
+    part: number,
+    signal?: AbortSignal,
+  ): Promise<Uint8Array<ArrayBuffer>> {
+    this.check(signal);
+    const plain = await downloadStorageBlock(
+      gateway,
+      this.scope,
+      block,
+      object,
+      revision,
+      part,
+      signal,
+    );
+    try {
+      this.check(signal);
+      return plain;
+    } catch (error) {
+      plain.fill(0);
+      throw error;
+    }
+  }
+  async fileInfo(
+    reference: MatrixReference,
+    object: string,
+    revision: string,
+    signal?: AbortSignal,
+  ): Promise<StorageFileRequest> {
+    const ref = this.ref(reference);
+    this.check(signal);
+    return storageFileInfo(this.manifestIO(), ref, object, revision, signal);
+  }
+  async uploadFile(
+    gateway: CipherBlobGateway,
+    job: string,
+    request: StorageFileRequest,
+    source: StorageFileSource,
+    options?: {
+      journal?: StorageUploadJournal;
+      signal?: AbortSignal;
+    },
+  ): Promise<MatrixReference> {
+    this.check(options?.signal);
+    const ref = await uploadStorageFile(this.manifestIO(), gateway, job, request, source, options);
+    this.check(options?.signal);
+    return this.ref(ref);
+  }
+  async downloadFile(
+    gateway: CipherBlobGateway,
+    reference: MatrixReference,
+    object: string,
+    revision: string,
+    sink?: (chunk: Uint8Array<ArrayBuffer>, blockIndex: number) => void | Promise<void>,
+    signal?: AbortSignal,
+  ): Promise<StorageFileRequest> {
+    const ref = this.ref(reference);
+    this.check(signal);
+    return downloadStorageFile(this.manifestIO(), gateway, ref, object, revision, sink, signal);
+  }
+  async readFileRange(
+    gateway: CipherBlobGateway,
+    reference: MatrixReference,
+    object: string,
+    revision: string,
+    offset: number,
+    length: number,
+    signal?: AbortSignal,
+  ): Promise<Uint8Array<ArrayBuffer>> {
+    const ref = this.ref(reference);
+    this.check(signal);
+    return readStorageFileRange(
+      this.manifestIO(),
+      gateway,
+      ref,
+      object,
+      revision,
+      offset,
+      length,
+      signal,
+    );
   }
   async object(
     reference: MatrixReference,
@@ -114,10 +245,12 @@ export class StorageRepository {
       if (previous.revision_id === revision) throw new StorageRecordError();
     }
     if (commit.content) {
-      // File publication stays disabled until the paged file verifier is available in this adapter.
-      if (commit.content.kind === 'file') throw new MatrixSecurityError('unsupported');
-      const content = await this.readRecord(commit.content.reference, object, 'content', signal);
-      if (content.revision_id !== commit.content.revision_id) throw new StorageRecordError();
+      if (commit.content.kind === 'file') {
+        await this.fileInfo(commit.content.reference, object, commit.content.revision_id, signal);
+      } else {
+        const content = await this.readRecord(commit.content.reference, object, 'content', signal);
+        if (content.revision_id !== commit.content.revision_id) throw new StorageRecordError();
+      }
     }
     const record = createStorageRecord(
       this.scope,

@@ -282,6 +282,19 @@ func TestLaRotacionDeDiaposConservaMandosTactilesSinRecortarlos(t *testing.T) {
 					t.Fatalf("mando recortado en pie del carril: %v/%v", p, o.Size())
 				}
 			}
+			if tactil {
+				w.Resize(fyne.NewSize(390, 740))
+				ultimo := e.miniBarra.Objects[len(e.miniBarra.Objects)-1]
+				if d.AbsolutePositionForObject(ultimo).X+ultimo.Size().Width <= 390 {
+					t.Fatal("a 390 táctil la mini-barra ya cabe entera: no prueba el arrastre")
+				}
+				e.deslizBarra.Dragged(&fyne.DragEvent{Dragged: fyne.NewDelta(-1000, 0)})
+				e.deslizBarra.DragEnd()
+				fin := d.AbsolutePositionForObject(ultimo).X + ultimo.Size().Width
+				if e.deslizBarra.X() == 0 || fin > 390+0.5 {
+					t.Fatalf("el dedo no alcanza el final de la mini-barra: X=%g, fin=%g", e.deslizBarra.X(), fin)
+				}
+			}
 		})
 	}
 }

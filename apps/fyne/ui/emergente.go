@@ -7,6 +7,7 @@ package ui
 
 import (
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
 
@@ -116,12 +117,13 @@ func MostrarPopover(disparador, contenido fyne.CanvasObject) *Emergente {
 	// El clic de fuera cierra SIN devolver el foco al disparador: se lo robaría a
 	// donde la persona acaba de pulsar (`restoreRef = false` de la web).
 	e.capa = nuevaCapa(nuevoVeloCruzado(func() { e.cerrar(false) }), e, func(ventana fyne.Size) (fyne.Position, fyne.Size) {
+		disponible := fyne.NewSize(ventana.Width, max(ventana.Height-tapadoEnCapa(c, e.capa, ventana), 0))
 		tam := MedidaEmergente(contenido, e.relleno)
-		tam.Width = max(min(tam.Width, ventana.Width-2*MargenVentana), 0)
+		tam.Width = max(min(tam.Width, disponible.Width-2*MargenVentana), 0)
 		interior := max(tam.Width-2*(tema.Borde+e.relleno), 0)
-		tam.Height = min(AltoA(contenido, interior)+2*(tema.Borde+e.relleno), max(ventana.Height-2*MargenVentana, 0))
+		tam.Height = min(AltoA(contenido, interior)+2*(tema.Borde+e.relleno), max(disponible.Height-2*MargenVentana, 0))
 		abs := fyne.CurrentApp().Driver().AbsolutePositionForObject(disparador)
-		return ColocarPopover(abs, disparador.Size(), tam, ventana), tam
+		return ColocarPopover(abs, disparador.Size(), tam, disponible), tam
 	})
 	e.capa.sombra = NuevaSombra(tema.SombraMD, tema.RadioLG)
 	e.capa.alDescartar = e.Cerrar
@@ -282,8 +284,12 @@ func (e *Emergente) cerrar(devolverFoco bool) {
 }
 
 // Tapped se traga el clic que cae en el panel y no en un control, para que el velo de
-// debajo no lo recoja y lo cierre.
-func (e *Emergente) Tapped(*fyne.PointEvent) {}
+// debajo no lo recoja y lo cierre; en móvil retira además el teclado activo.
+func (e *Emergente) Tapped(*fyne.PointEvent) {
+	if c := lienzoDe(e); c != nil {
+		cerrarTecladoMovil(c)
+	}
+}
 
 // FocusGained y FocusLost no pintan nada: el panel se enfoca para oír Escape.
 func (e *Emergente) FocusGained() {}
@@ -412,6 +418,26 @@ func (f *Flotante) Resize(t fyne.Size) {
 	if f.capa != nil {
 		f.capa.Refresh()
 	}
+}
+
+// MostrarEnHoja despliega el panel como hoja inferior táctil, con velo opaco, faldón
+// hacia la zona segura y entrada desde abajo.
+func (f *Flotante) MostrarEnHoja(coloca func(fyne.Size) (fyne.Position, fyne.Size)) {
+	if f.capa != nil || f.c == nil {
+		return
+	}
+	cerrar := func() {
+		f.Hide()
+		if f.alCerrar != nil {
+			f.alCerrar()
+		}
+	}
+	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
+	f.capa = nuevaCapa(NuevoVelo(true, cerrar), f.panel, coloca)
+	f.capa.faldon = canvas.NewRectangle(tema.Color("menu-surface", v))
+	f.capa.alDescartar = cerrar
+	f.previo = mostrar(f.c, f.capa)
+	f.capa.entrar(f.c, DuracionHoja, f.panel.Size().Height, 1, 1)
 }
 
 // ShowAtPosition lo enseña con su esquina en `p`, en coordenadas de la ventana.

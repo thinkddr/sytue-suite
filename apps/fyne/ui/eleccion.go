@@ -120,15 +120,30 @@ func (e *Eleccion) AltoPara(ancho float32) float32 {
 	return sueloTactil(e.altoEtiqueta(ancho))
 }
 
+// envuelveEn indica si la etiqueta debe repartirse en varias líneas para `ancho`.
+func (e *Eleccion) envuelveEn(ancho float32) bool {
+	if e.SinEtiqueta || e.Etiqueta == "" {
+		return false
+	}
+	if e.AnchoEtiqueta > 0 {
+		return true
+	}
+	return ancho > 0 && ancho+0.5 < MedidaEleccionEn(e.Etiqueta, e.escalon()).Width
+}
+
 // altoEtiqueta es el alto de la etiqueta repartida a ese ancho.
 func (e *Eleccion) altoEtiqueta(ancho float32) float32 {
 	if e.SinEtiqueta {
 		return MedidaEleccion("").Height
 	}
-	if e.AnchoEtiqueta <= 0 {
+	if !e.envuelveEn(ancho) {
 		return MedidaEleccionEn(e.Etiqueta, e.escalon()).Height
 	}
-	w := max(min(e.AnchoEtiqueta, ancho-LadoEleccion-HuecoEleccion), 1)
+	disp := ancho - LadoEleccion - HuecoEleccion
+	if e.AnchoEtiqueta > 0 {
+		disp = min(e.AnchoEtiqueta, disp)
+	}
+	w := max(disp, 1)
 	return max(LadoEleccion, float32(len(Repartir(e.Etiqueta, e.escalon(), Normal, w)))*e.escalon().Linea)
 }
 
@@ -269,14 +284,26 @@ func (r *eleccionRenderer) Layout(t fyne.Size) {
 	pos := fyne.NewPos(0, y)
 	r.pieza.Colocar(pos)
 	r.aro.ColocarEn(pos, fyne.NewSize(LadoEleccion, LadoEleccion))
-	if r.parrafo != nil && r.e.AnchoEtiqueta > 0 {
-		w := max(min(t.Width-LadoEleccion-HuecoEleccion, r.e.AnchoEtiqueta), 1)
-		h := AltoParrafo(r.parrafo, w)
-		r.parrafo.Move(fyne.NewPos(LadoEleccion+HuecoEleccion, (t.Height-h)/2))
-		r.parrafo.Resize(fyne.NewSize(w, h))
+	envuelve := r.e.envuelveEn(t.Width)
+	if r.parrafo != nil {
+		ver(r.parrafo, envuelve)
+		if envuelve {
+			disp := t.Width - LadoEleccion - HuecoEleccion
+			if r.e.AnchoEtiqueta > 0 {
+				disp = min(disp, r.e.AnchoEtiqueta)
+			}
+			w := max(disp, 1)
+			r.parrafo.Ancho = w
+			h := AltoParrafo(r.parrafo, w)
+			r.parrafo.Move(fyne.NewPos(LadoEleccion+HuecoEleccion, (t.Height-h)/2))
+			r.parrafo.Resize(fyne.NewSize(w, h))
+		}
 	}
 	if r.texto != nil {
-		ColocarTexto(r.texto, r.e.escalon(), LadoEleccion+HuecoEleccion, (t.Height-r.e.escalon().Linea)/2)
+		ver(r.texto, !envuelve)
+		if !envuelve {
+			ColocarTexto(r.texto, r.e.escalon(), LadoEleccion+HuecoEleccion, (t.Height-r.e.escalon().Linea)/2)
+		}
 	}
 }
 
@@ -285,18 +312,19 @@ func (r *eleccionRenderer) Refresh() {
 	r.pieza.Pintar(EstadoCasilla{Marcada: r.e.Marcada, Parcial: r.e.Parcial, Encima: r.e.encima && !r.e.inerte, Inerte: r.e.inerte}, v)
 	r.aro.Pintar(v)
 	r.aro.Ver(r.e.enfocado)
+	envuelve := r.e.envuelveEn(r.e.Size().Width)
 	if r.texto != nil {
 		r.texto.Text = r.e.Etiqueta
 		r.texto.Color = atenuar(tema.Color("text", v), r.e.inerte)
 		r.texto.Refresh()
-		ver(r.texto, r.e.AnchoEtiqueta <= 0)
+		ver(r.texto, !envuelve)
 	}
 	if r.parrafo != nil {
 		r.parrafo.Texto, r.parrafo.Escalon = r.e.Etiqueta, r.e.escalon()
 		r.parrafo.Tinta = atenuar(tema.Color("text", v), r.e.inerte)
 		r.parrafo.Ancho = r.e.AnchoEtiqueta
 		r.parrafo.Refresh()
-		ver(r.parrafo, r.e.AnchoEtiqueta > 0)
+		ver(r.parrafo, envuelve)
 	}
 	r.Layout(r.e.Size())
 }

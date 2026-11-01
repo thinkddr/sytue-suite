@@ -24,6 +24,7 @@ func TestWidgetNotasUsaConteosACLDelArbolCompleto(t *testing.T) {
 	for _, caso := range []string{"completo", "fallo", "cambia sesión", "copia sin conexión"} {
 		t.Run(caso, func(t *testing.T) {
 			t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+			t.Setenv("HOME", t.TempDir())
 			ajustes.MarcarSesion()
 			listados := 0
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

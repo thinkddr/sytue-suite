@@ -195,7 +195,7 @@ helm template sytue-one deploy/helm/sytue-one \
 
 ## Licencias
 
-Código de producto **PROPIETARIO (© Sytue)** — sin copyleft. Dependencias de terceros
+Código de producto **Apache-2.0 (© 2026 Daniel Delgado Ramos (thinkddr))** — sin copyleft. Dependencias de terceros
 solo **permisivas**: Traefik (MIT), cert-manager (Apache-2.0), **LiveKit** (Apache-2.0,
 única app de terceros). **Prohibido** AGPL/GPL/source-available. Matriz en
 [`docs/security.md#5-licencias-propiedad-y-cumplimiento`](../../docs/security.md#5-licencias-propiedad-y-cumplimiento).

@@ -78,6 +78,12 @@ def hacer_legible_publico(raiz):
                 os.chmod(ruta, permisos)
 
 
+def restringir_listado_publico(ruta):
+    permisos = stat.S_IMODE(ruta.stat().st_mode)
+    lectura_escritura = stat.S_IRGRP | stat.S_IWGRP | stat.S_IROTH | stat.S_IWOTH
+    os.chmod(ruta, (permisos & ~lectura_escritura) | stat.S_IXOTH)
+
+
 def insertar(productos, host, destino, identidad, app, generador, incluir_widgets=True):
     """Firma sólo el contenido anidado. File Provider no depende de WidgetKit."""
     plataforma = "ios" if destino == "ios" else "macos"
@@ -105,7 +111,7 @@ def insertar(productos, host, destino, identidad, app, generador, incluir_widget
             if carpeta.is_symlink() or not carpeta.resolve().is_relative_to(host.resolve()):
                 raise ValueError("el contenido anidado debe quedar dentro del host")
             carpeta.mkdir(parents=True, exist_ok=True)
-            os.chmod(carpeta, 0o711)
+            restringir_listado_publico(carpeta)
         planes = []
         if incluir_widgets:
             planes.append(("Sytue-" + app["clave"] + "-Widgets.appex", app["id"] + ".widgets", "widgets",
@@ -156,7 +162,7 @@ def insertar(productos, host, destino, identidad, app, generador, incluir_widget
             # SwiftSupport/iphoneos/iphoneos y disparaba el rechazo 90430 en Apple.
             # Tampoco se pasa --strip-bitcode (retirado en Xcode 16+).
             soporte_swift.mkdir(parents=True, exist_ok=True)
-            os.chmod(soporte_swift, 0o711)
+            restringir_listado_publico(soporte_swift)
             bibliotecas += ["--unsigned-destination", soporte_swift]
         else:
             bibliotecas += ["--Xcodesign", "--options=runtime", "--Xcodesign", "--timestamp"]
@@ -177,6 +183,13 @@ def insertar(productos, host, destino, identidad, app, generador, incluir_widget
         dylibs = sorted(p for p in frameworks.glob("*.dylib") if p.is_file() and not p.is_symlink())
         hacer_legible_publico(extensiones)
         hacer_legible_publico(frameworks)
+        restringir_listado_publico(extensiones)
+        restringir_listado_publico(frameworks)
+        # El perfil sólo lo necesita el proceso de instalación, que es root.
+        for bundle, _ in anidadas:
+            perfil = bundle / ("embedded.mobileprovision" if plataforma == "ios"
+                               else "Contents/embedded.provisionprofile")
+            os.chmod(perfil, 0o600)
         if plataforma == "ios" and soporte_swift.exists():
             dylibs_soporte = []
             for entrada in sorted(soporte_swift.rglob("*")):
@@ -194,6 +207,7 @@ def insertar(productos, host, destino, identidad, app, generador, incluir_widget
                                  + repr([p.name for p in dylibs_soporte]) + " != " + repr([p.name for p in dylibs]))
             if dylibs_soporte:
                 hacer_legible_publico(soporte_swift)
+                restringir_listado_publico(soporte_swift)
                 for dylib_soporte in dylibs_soporte:
                     ids_soporte[dylib_soporte.name] = identificador_firma(dylib_soporte)
             else:
@@ -203,9 +217,6 @@ def insertar(productos, host, destino, identidad, app, generador, incluir_widget
             firma += ["--options", "runtime", "--timestamp"]
         for dylib in dylibs:
             ejecutar(firma + [dylib])
-        for bundle, _ in anidadas:
-            perfil_destino = bundle / ("embedded.mobileprovision" if plataforma == "ios" else "Contents/embedded.provisionprofile")
-            os.chmod(perfil_destino, 0o600)
         if puente:
             ejecutar(firma + [puente])
         for bundle, derechos in anidadas:

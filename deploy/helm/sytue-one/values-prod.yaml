@@ -603,7 +603,7 @@ livekit:
     # nadie.
     #
     # Es la IP del Load Balancer de Traefik, la misma que sirve toda la suite y
-    # la que `03-desplegar.sh` valida contra DNS en cada despliegue.
+    # la que debe validarse contra DNS en cada despliegue.
     nodeIP: ""
   redis:
     enabled: true

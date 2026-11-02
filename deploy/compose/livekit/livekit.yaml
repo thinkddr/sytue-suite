@@ -41,7 +41,7 @@ rtc:
 # cambias esa variable, cambia también esta línea. El api_secret no aparece aquí (llega
 # por LIVEKIT_KEYS). `rooms` es el nombre del servicio en la red de compose.
 webhook:
-  api_key: changeme-livekit-api-key
+  api_key: ""
   urls:
     - http://rooms:8085/webhooks/livekit
     - http://cast:8099/webhooks/livekit

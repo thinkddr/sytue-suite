@@ -264,11 +264,11 @@ func TestLaClaveDeOBS(t *testing.T) {
 	a.emi.visible = true
 	a.pintar()
 	a.copiarEstudio(a.emi.clave.StreamKey, "studio.obs.copied")
-	if got := fyne.CurrentApp().Clipboard().Content(); got != "sk_live_7Qf2mX9kR4tB8wNz0" {
+	if got := fyne.CurrentApp().Clipboard().Content(); got != "cast_stream_key_sample_0" {
 		t.Errorf("el portapapeles tiene %q", got)
 	}
 	a.regenerar()
-	if a.emi.clave.StreamKey != "sk_live_7Qf2mX9kR4tB8wNz1" || !contiene(s.vistas(), "POST /api/v1/studio/stream-key:rotate") {
+	if a.emi.clave.StreamKey != "cast_stream_key_sample_1" || !contiene(s.vistas(), "POST /api/v1/studio/stream-key:rotate") {
 		t.Errorf("regenerar no trajo la clave nueva: %+v", a.emi.clave)
 	}
 	// Programar para OBS da de alta un directo rtmp y lo pone el primero de la lista.

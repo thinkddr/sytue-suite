@@ -165,7 +165,7 @@ func pantallaDe(t *testing.T, nombre string, v Vista) (fyne.CanvasObject, Seccio
 			Personas: []api.CastPerson{{UserID: "u9", Name: "Bea Martín", Username: "bea"}, {UserID: "u8", Name: "Carlos Ibáñez", Username: "cibanez"}},
 		}), 255
 	case "emitir":
-		clave := api.CastStreamKey{RTMPURL: "rtmp://cast-ingest.sytue.eu/live", StreamKey: "sk_live_7Qf2mX9kR4tB8wNz"}
+		clave := api.CastStreamKey{RTMPURL: "rtmp://cast-ingest.sytue.eu/live", StreamKey: "cast_stream_key_sample_"}
 		d := directoDePrueba()
 		programado := directoDePrueba()
 		programado.ID, programado.Title, programado.Status = "v11", "Formación trimestral de ventas", api.CastStatusScheduled

@@ -164,7 +164,7 @@ class InsercionTests(unittest.TestCase):
             with contextlib.redirect_stdout(io.StringIO()):
                 widgetkit.insertar(self.productos, self.host, "ios", "Distribución de pruebas", self.app, self.generador)
 
-    def test_firma_anidada_perfil_0600_y_swift_support_dentro_del_ipa(self):
+    def test_firma_anidada_perfil_privado_y_swift_support_dentro_del_ipa(self):
         creado_antes = []
 
         def registrar(comando):
@@ -315,6 +315,8 @@ class InsercionTests(unittest.TestCase):
         self.assertEqual(modos_al_firmar["Sytue-rooms-Widgets.appex"]["main"], 0o755)
         self.assertEqual(modos_al_firmar["SytueWidgetBridge.framework"]["Resources/Info.plist"], 0o644)
         self.assertEqual(modos_al_firmar["SytueWidgetBridge.framework"]["Resources"], 0o711)
+        self.assertEqual((self.host / "PlugIns").stat().st_mode & 0o777, 0o711)
+        self.assertEqual((self.host / "Frameworks").stat().st_mode & 0o777, 0o711)
         self.assertEqual((self.raiz / "ipa/SwiftSupport").stat().st_mode & 0o777, 0o711)
         self.assertEqual((self.raiz / "ipa/SwiftSupport/iphoneos/libswiftCore.dylib").stat().st_mode & 0o777, 0o644)
 

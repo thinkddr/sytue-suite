@@ -130,8 +130,9 @@ type Explorador struct {
 	marcados int
 	// arrastrando es lo que viaja en un arrastre y destino la carpeta sobre la que se
 	// soltaría (su id; vacío, ninguna que lo acepte).
-	arrastrando []Elemento
-	destino     string
+	arrastrando  []Elemento
+	autoArrastre ui.AutoScrollArrastre
+	destino      string
 	// tarjetas son las de la rejilla de este pintado, en su orden, con lo que está en el
 	// lienzo (`objeto`: la tarjeta o la que la embebe para arrastrarse) para saber dónde
 	// cae el puntero, y la tarjeta en sí para marcar el destino sin repintar la rejilla.
@@ -627,10 +628,14 @@ func (e *Explorador) lista(v tema.Variante) fyne.CanvasObject {
 				// que se queda el arrastre no deja desplazar la lista.
 				var o fyne.CanvasObject
 				var f *ui.FilaDrive
-				if punteroGrueso() || e.AlMoverA == nil {
+				switch {
+				case punteroGrueso() && e.AlMoverA != nil:
+					a := e.nuevaFilaTactil()
+					f, o = a.fila, a
+				case e.AlMoverA == nil:
 					f = ui.NuevaFilaDrive("", "")
 					o = f
-				} else {
+				default:
 					a := &filaArrastrable{e: e}
 					a.ExtendBaseWidget(a)
 					f, o = &a.FilaDrive, a
@@ -721,6 +726,10 @@ func (e *Explorador) rellenarFila(i widget.ListItemID, o fyne.CanvasObject) {
 		return
 	}
 	f, ok := o.(*ui.FilaDrive)
+	if a, es := o.(*filaTactilDrive); es {
+		f, ok, a.el = a.fila, true, e.filasDeLista()[i]
+		a.asa.Rotulo = e.t("move.title", i18n.Vars{"name": a.el.Nombre})
+	}
 	if a, es := o.(*filaArrastrable); es {
 		f, ok, a.el = &a.FilaDrive, true, e.filasDeLista()[i]
 	}
@@ -1353,6 +1362,25 @@ type tarjetaPintada struct {
 // mover solo ese es lo contrario de lo que acaba de pedir quien los marcó—, y si no, solo
 // él. El destino es la carpeta de debajo, si acepta algo de lo que viaja.
 func (e *Explorador) arrastrar(el Elemento, abs fyne.Position) {
+	e.seguirScrollArrastre(el, abs)
+	e.marcarCarpetaArrastre(el, abs)
+}
+
+func (e *Explorador) seguirScrollArrastre(el Elemento, abs fyne.Position) {
+	if e.Rejilla && e.desplazable != nil {
+		e.autoArrastre.Actualizar(e.desplazable, abs, func(_, dy float32) {
+			e.desplazable.ScrollToOffset(fyne.NewPos(0, e.desplazable.Offset.Y+dy))
+			e.marcarCarpetaArrastre(el, abs)
+		})
+	} else if e.filas != nil {
+		e.autoArrastre.Actualizar(e.filas, abs, func(_, dy float32) {
+			e.filas.ScrollToOffset(e.filas.GetScrollOffset() + dy)
+			e.marcarCarpetaArrastre(el, abs)
+		})
+	}
+}
+
+func (e *Explorador) marcarCarpetaArrastre(el Elemento, abs fyne.Position) {
 	if e.arrastrando == nil {
 		e.arrastrando = []Elemento{el}
 		if e.Seleccion[el.ID] {
@@ -1372,6 +1400,7 @@ func (e *Explorador) arrastrar(el Elemento, abs fyne.Position) {
 
 // soltar termina el arrastre: si hay carpeta de destino, mueve; si no, no pasa nada.
 func (e *Explorador) soltar() {
+	e.autoArrastre.Parar()
 	origenes, destino := e.arrastrando, e.destino
 	e.arrastrando, e.destino = nil, ""
 	e.marcarDestino(destino)
@@ -1384,6 +1413,59 @@ func (e *Explorador) soltar() {
 			return
 		}
 	}
+}
+
+func (e *Explorador) cancelarArrastre() {
+	e.autoArrastre.Parar()
+	antes := e.destino
+	e.arrastrando, e.destino = nil, ""
+	e.marcarDestino(antes)
+}
+
+type filaTactilDrive struct {
+	widget.BaseWidget
+	fila     *ui.FilaDrive
+	asa      *ui.AsaArrastre
+	el       Elemento
+	origen   *Elemento
+	revision uint64
+}
+
+func (e *Explorador) nuevaFilaTactil() *filaTactilDrive {
+	a := &filaTactilDrive{fila: ui.NuevaFilaDrive("", ""), asa: ui.NuevaAsaArrastre(e.t("action.move"))}
+	a.asa.Puede = func() bool {
+		return !e.SinRed() && !e.Ocupado && e.AlMoverA != nil && a.el.ID != "" &&
+			(a.origen == nil || e.Refresco.Revision == nil || e.Refresco.Revision() == a.revision)
+	}
+	a.asa.AlArrastrar = func(pos fyne.Position) {
+		if a.origen == nil {
+			origen := a.el // una fila virtual puede reciclarse durante el autoscroll
+			a.origen = &origen
+			if e.Refresco.Revision != nil {
+				a.revision = e.Refresco.Revision()
+			}
+		}
+		e.arrastrar(*a.origen, pos)
+	}
+	a.asa.AlSoltar = func(fyne.Position) {
+		a.origen = nil
+		e.soltar()
+	}
+	a.asa.AlCancelar = func() {
+		a.origen = nil
+		e.cancelarArrastre()
+	}
+	a.asa.AlPulsar = func() {
+		if e.AlMenu != nil {
+			e.AlMenu(a.el, a.asa)
+		}
+	}
+	a.ExtendBaseWidget(a)
+	return a
+}
+
+func (a *filaTactilDrive) CreateRenderer() fyne.WidgetRenderer {
+	return widget.NewSimpleRenderer(container.New(ui.FilaAuto{Derecha: 1}, a.fila, a.asa))
 }
 
 // marcarDestino repinta el resalte: en la lista, las filas visibles; en la rejilla, solo

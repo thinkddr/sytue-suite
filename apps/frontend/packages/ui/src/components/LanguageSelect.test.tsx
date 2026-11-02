@@ -102,7 +102,9 @@ test.each([
   Object.defineProperty(document, 'cookie', {
     configurable: true,
     get: () => entrada,
-    set: (value: string) => escritos.push(value),
+    set: (value: string) => {
+      escritos.push(value);
+    },
   });
   Object.defineProperty(globalThis, 'location', {
     configurable: true,

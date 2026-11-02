@@ -1,0 +1,45 @@
+---
+/* SPDX-License-Identifier: Apache-2.0 */
+// Pantallas reales para la comprobación remota con BFF sintético. La sesión de
+// producto sigue en AppLayout; este banco aislado no existe en producción.
+import '../../styles/app.css';
+import { APP_VIEWPORT } from '@sytue/config';
+import { basePathScript, themeInitScript } from '@sytue/ui';
+import type { SytueUser } from '@sytue/auth';
+import { PhotosApp } from '../../components/PhotosApp.js';
+import { Albums } from '../../components/Albums.js';
+
+export const prerender = false;
+if (!import.meta.env.DEV) return new Response(null, { status: 404 });
+
+const usuario: SytueUser = {
+  id: 'photos-fixture',
+  tenant: 'prueba',
+  email: 'photos-fixture@sytue.test',
+  emailVerified: true,
+  name: 'Cuenta de prueba',
+  preferredUsername: 'photos-fixture',
+  roles: [],
+  groups: [],
+};
+const hubBaseUrl = `${Astro.url.origin}/photos/api/fixture-hub`;
+---
+
+<!doctype html>
+<html lang="es" class="h-full">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content={APP_VIEWPORT} />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Photos — banco de pruebas</title>
+    <script is:inline set:html={basePathScript(import.meta.env.BASE_URL)}></script>
+    <script is:inline set:html={themeInitScript}></script>
+  </head>
+  <body class="bg-bg text-text h-full antialiased">
+    {Astro.url.searchParams.get('vista') === 'albums' ? (
+      <Albums client:only="preact" user={usuario} locale="es" hubBaseUrl={hubBaseUrl} />
+    ) : (
+      <PhotosApp client:only="preact" user={usuario} locale="es" hubBaseUrl={hubBaseUrl} />
+    )}
+  </body>
+</html>

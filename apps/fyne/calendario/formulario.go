@@ -329,23 +329,7 @@ func (f *formulario) construirRepeticion() {
 	})
 	f.finSerie = ui.NuevoSelector([]string{
 		p.t("event.repeatEndNever", nil), p.t("event.repeatEndCount", nil), p.t("event.repeatEndUntil", nil),
-	}, func(i int) {
-		switch finesSerie[i] {
-		case "count":
-			f.e.Regla.Hasta = ""
-			if f.e.Regla.Cuenta == 0 {
-				f.e.Regla.Cuenta = 4
-			}
-		case "until":
-			f.e.Regla.Cuenta = 0
-			if f.e.Regla.Hasta == "" {
-				f.e.Regla.Hasta = f.e.Inicio.Format(time.DateOnly)
-			}
-		default:
-			f.e.Regla.Cuenta, f.e.Regla.Hasta = 0, ""
-		}
-		f.rehacer()
-	})
+	}, f.cambiarFinSerie)
 	if r := e.Regla; r != nil {
 		for i, fr := range frecuencias {
 			if fr == r.Freq {
@@ -377,6 +361,24 @@ func (f *formulario) construirRepeticion() {
 			f.hasta.PonerTexto(ui.EscribirFecha(t))
 		}
 	}
+}
+
+func (f *formulario) cambiarFinSerie(i int) {
+	switch finesSerie[i] {
+	case "count":
+		f.e.Regla.Hasta = ""
+		if f.e.Regla.Cuenta == 0 {
+			f.e.Regla.Cuenta = 4
+		}
+	case "until":
+		f.e.Regla.Cuenta = 0
+		if f.e.Regla.Hasta == "" {
+			f.e.Regla.Hasta = f.e.Inicio.Format(time.DateOnly)
+		}
+	default:
+		f.e.Regla.Cuenta, f.e.Regla.Hasta = 0, ""
+	}
+	f.rehacer()
 }
 
 // construirInvitados es el campo del correo: Intro o salir del campo lo añaden.

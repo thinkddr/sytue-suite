@@ -14,12 +14,13 @@
  * es un detalle que deba costar un clic.
  */
 import type { JSX } from 'preact';
-import { useState } from 'preact/hooks';
-import { Icon, SIDEBAR_ACTION_CLASS, cx } from '@sytue/ui';
+import { useRef, useState } from 'preact/hooks';
+import { Dropdown, Icon, MenuItem, SIDEBAR_ACTION_CLASS, cx, usePointerDrag } from '@sytue/ui';
 import type { Note, Notebook } from '@sytue/api-clients';
 import type { T } from '../i18n/index.js';
 import { Glyph, type GlyphName } from './glyphs.js';
 import { resumenNota, terminada } from '../client/diario.js';
+import { colocarCuaderno, ordenDeCuaderno, type ColocacionCuaderno } from '../client/cuadernos.js';
 
 /**
  * El anillo del CROMO, no el global: este árbol vive en el menú de tinta, y el azul
@@ -54,7 +55,16 @@ interface Props {
   onUnlock?: (nb: Notebook) => void;
   onSelectNota?: (id: string) => void;
   onMoveNoteToNotebook?: (noteId: string, targetNotebookId: string) => void;
-  onReorderNotebook?: (draggedId: string, targetId: string) => void;
+  onReorderNotebook?: (draggedId: string, targetId: string, lado: ColocacionCuaderno) => void;
+}
+
+interface ArrastreArbol {
+  tipo: 'notebook' | 'note';
+  id: string;
+  titulo: string;
+  pointerId: number;
+  x0: number;
+  y0: number;
 }
 
 /** Distintivo de visibilidad. `personal` no lleva: es el caso normal. */
@@ -83,9 +93,112 @@ export function NotebookTree({
   // Contraídos y no expandidos: un árbol recién abierto se ve entero, que es lo
   // que espera quien acaba de crear un cuaderno dentro de otro.
   const [cerrados, setCerrados] = useState<Set<string>>(new Set());
+  const arbol = useRef<HTMLUListElement>(null);
+  const [arrastrando, setArrastrando] = useState<(ArrastreArbol & { x: number; y: number }) | null>(
+    null,
+  );
+
+  const limpiarDestino = (): void => {
+    document
+      .querySelectorAll('[data-notebook-drop]')
+      .forEach((el) => el.removeAttribute('data-notebook-drop'));
+  };
+  const destino = (data: ArrastreArbol, x: number, y: number) => {
+    limpiarDestino();
+    const fila = document
+      .elementsFromPoint(x, y)
+      .map((el) => el.closest<HTMLElement>('[data-notebook-id]'))
+      .find((el) => el && el.dataset.notebookId !== data.id);
+    const nb = notebooks.find((n) => n.id === fila?.dataset.notebookId);
+    if (!fila || !nb || nb.read_only) return null;
+    if (data.tipo === 'note') {
+      if (!onMoveNoteToNotebook || nb.encrypted || nb.id === activo) return null;
+      fila.setAttribute('data-notebook-drop', 'inside');
+      return { nb, lado: 'inside' as const };
+    }
+    const caja = fila.getBoundingClientRect();
+    const fraccion = (y - caja.top) / caja.height;
+    const lado: ColocacionCuaderno =
+      fraccion < 0.25 ? 'before' : fraccion > 0.75 ? 'after' : 'inside';
+    if (!onReorderNotebook || !colocarCuaderno(notebooks, data.id, nb.id, lado)) return null;
+    fila.setAttribute('data-notebook-drop', lado);
+    return { nb, lado };
+  };
+  const arrastre = usePointerDrag<ArrastreArbol>({
+    scrollContainer: () => arbol.current?.closest<HTMLElement>('.overflow-y-auto') ?? null,
+    onMove: ({ data, dxRaw, dyRaw, clientX, clientY }) => {
+      if (Math.hypot(dxRaw, dyRaw) < 4) return;
+      destino(data, clientX, clientY);
+      setArrastrando({ ...data, x: clientX, y: clientY });
+    },
+    onEnd: (data, e) => {
+      const drop =
+        Math.hypot(e.clientX - data.x0, e.clientY - data.y0) >= 4
+          ? destino(data, e.clientX, e.clientY)
+          : null;
+      limpiarDestino();
+      setArrastrando(null);
+      if (!drop) return;
+      if (data.tipo === 'note') onMoveNoteToNotebook?.(data.id, drop.nb.id);
+      else onReorderNotebook?.(data.id, drop.nb.id, drop.lado);
+    },
+    onCancel: () => {
+      limpiarDestino();
+      setArrastrando(null);
+    },
+  });
+  const asa = (tipo: ArrastreArbol['tipo'], id: string, titulo: string) => (
+    <button
+      type="button"
+      data-mantiene-nav
+      aria-label={`${t(tipo === 'notebook' ? 'notebook.move' : 'history.move')}: ${titulo}`}
+      title={t(tipo === 'notebook' ? 'notebook.move' : 'history.move')}
+      class={cx(
+        ANILLO_CROMO,
+        'notes-tree-grip text-sidebar-fg-muted hover:text-sidebar-fg grid size-6 shrink-0 cursor-grab touch-none place-items-center rounded-sm select-none active:cursor-grabbing pointer-coarse:size-11',
+      )}
+      onClick={(e) => e.stopPropagation()}
+      onPointerDown={(e) => {
+        if (e.button === 0)
+          arrastre.iniciarArrastre(e, {
+            tipo,
+            id,
+            titulo,
+            pointerId: e.pointerId,
+            x0: e.clientX,
+            y0: e.clientY,
+          });
+      }}
+      onPointerMove={arrastre.onPointerMove}
+      onPointerUp={arrastre.onPointerUp}
+      onPointerCancel={arrastre.onPointerCancel}
+      onLostPointerCapture={arrastre.onLostPointerCapture}
+      onKeyDown={(e) => {
+        e.stopPropagation();
+        if (e.key === 'Escape' && arrastrando) {
+          e.stopPropagation();
+          arrastre.cancelarArrastre();
+        }
+        if (tipo !== 'notebook' || !e.altKey || !['ArrowUp', 'ArrowDown'].includes(e.key)) return;
+        const nb = notebooks.find((n) => n.id === id);
+        const hermanos = notebooks
+          .filter((n) => (n.parent_id ?? null) === (nb?.parent_id ?? null))
+          .sort(ordenDeCuaderno);
+        const indice = hermanos.findIndex((n) => n.id === id);
+        const target = hermanos[indice + (e.key === 'ArrowUp' ? -1 : 1)];
+        if (target) {
+          e.preventDefault();
+          e.stopPropagation();
+          onReorderNotebook?.(id, target.id, e.key === 'ArrowUp' ? 'before' : 'after');
+        }
+      }}
+    >
+      <Glyph name="drag" size={14} />
+    </button>
+  );
 
   const hijosDe = (padre: string | null) =>
-    notebooks.filter((n) => (n.parent_id ?? null) === padre);
+    notebooks.filter((n) => (n.parent_id ?? null) === padre).sort(ordenDeCuaderno);
 
   /**
    * Cuántas notas tiene un cuaderno.
@@ -130,26 +243,13 @@ export function NotebookTree({
           tabIndex={activo === nb.id ? 0 : -1}
           onClick={() => onSelect(nb)}
           // El asa de una nota (arrastre de puntero, NoteCanvas) la suelta aquí.
-          {...(onMoveNoteToNotebook ? { 'data-drop-notebook': nb.id } : {})}
-          draggable
-          onDragStart={(e) => {
-            e.dataTransfer?.setData('text/x-sytue-notebook-id', nb.id);
-            e.dataTransfer?.setData('text/plain', nb.title);
-          }}
-          onDragOver={(e) => {
-            e.preventDefault();
-            if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
-          }}
-          onDrop={(e) => {
-            e.preventDefault();
-            const noteId = e.dataTransfer?.getData('text/x-sytue-note-id');
-            const draggedNbId = e.dataTransfer?.getData('text/x-sytue-notebook-id');
-            if (noteId && onMoveNoteToNotebook) {
-              onMoveNoteToNotebook(noteId, nb.id);
-            } else if (draggedNbId && draggedNbId !== nb.id && onReorderNotebook) {
-              onReorderNotebook(draggedNbId, nb.id);
-            }
-          }}
+          {...(onMoveNoteToNotebook && !nb.encrypted && !nb.read_only
+            ? { 'data-drop-notebook': nb.id }
+            : {})}
+          data-notebook-id={nb.id}
+          data-drag-source={
+            arrastrando?.tipo === 'notebook' && arrastrando.id === nb.id ? 'true' : undefined
+          }
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {
               e.preventDefault();
@@ -161,7 +261,7 @@ export function NotebookTree({
             }
           }}
           class={cx(
-            'group flex cursor-pointer items-center gap-1.5 rounded-md py-1.5 pr-1 text-base transition-colors duration-150 pointer-coarse:min-h-[max(44px,2.75rem)]',
+            'notes-notebook-row group relative flex cursor-pointer items-center gap-1.5 rounded-md py-1.5 pr-1 text-base transition-colors duration-150 pointer-coarse:min-h-[max(44px,2.75rem)]',
             ANILLO_CROMO,
             activo === nb.id
               ? 'bg-sidebar-active text-sidebar-active-fg font-medium'
@@ -169,6 +269,7 @@ export function NotebookTree({
           )}
           style={{ paddingLeft: `${0.5 + (nivel - 1) * 0.85}rem` }}
         >
+          {onReorderNotebook && !nb.read_only ? asa('notebook', nb.id, nb.title) : null}
           {hijos.length > 0 ? (
             <button
               type="button"
@@ -248,29 +349,29 @@ export function NotebookTree({
 
           {/* Acciones del cuaderno. Aparecen al pasar por encima o al enfocar; en
               táctil están siempre, que es donde no hay `hover`. */}
-          <span class="flex shrink-0 gap-0.5 opacity-0 transition-opacity duration-150 group-focus-within:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100">
-            <button
-              type="button"
-              aria-label={t('notebook.newChild')}
-              onClick={(e) => {
-                e.stopPropagation();
-                onNewChild(nb);
-              }}
-              class={ACCION_DE_CUADERNO}
+          <span class="shrink-0 opacity-0 transition-opacity duration-150 group-focus-within:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100">
+            <Dropdown
+              label={t('notebook.settings')}
+              align="end"
+              trigger={(props) => (
+                <button
+                  {...props}
+                  type="button"
+                  data-mantiene-nav
+                  class={ACCION_DE_CUADERNO}
+                  aria-label={t('notebook.settings')}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    props.onClick();
+                  }}
+                >
+                  <Icon name="ellipsis" size={14} />
+                </button>
+              )}
             >
-              <Icon name="plus" size={13} />
-            </button>
-            <button
-              type="button"
-              aria-label={t('notebook.settings')}
-              onClick={(e) => {
-                e.stopPropagation();
-                onSettings(nb);
-              }}
-              class={ACCION_DE_CUADERNO}
-            >
-              <Icon name="settings" size={13} />
-            </button>
+              <MenuItem onClick={() => onNewChild(nb)}>{t('notebook.newChild')}</MenuItem>
+              <MenuItem onClick={() => onSettings(nb)}>{t('notebook.settings')}</MenuItem>
+            </Dropdown>
           </span>
         </div>
 
@@ -289,13 +390,11 @@ export function NotebookTree({
                       onSelectNota?.(n.id);
                     }
                   }}
-                  draggable
-                  onDragStart={(e) => {
-                    e.dataTransfer?.setData('text/x-sytue-note-id', n.id);
-                    e.dataTransfer?.setData('text/plain', n.title || 'nota');
-                  }}
+                  data-drag-source={
+                    arrastrando?.tipo === 'note' && arrastrando.id === n.id ? 'true' : undefined
+                  }
                   class={cx(
-                    'group/nota flex w-full cursor-pointer items-center gap-1.5 rounded-md py-1 pr-1 text-left text-xs transition-colors duration-150 pointer-coarse:min-h-[36px]',
+                    'group/nota flex w-full cursor-pointer items-center gap-1.5 rounded-md py-1 pr-1 text-left text-sm transition-colors duration-150 pointer-coarse:min-h-[44px]',
                     ANILLO_CROMO,
                     notaSeleccionada === n.id
                       ? 'bg-sidebar-active/60 text-sidebar-active-fg font-medium'
@@ -303,6 +402,7 @@ export function NotebookTree({
                   )}
                   style={{ paddingLeft: `${0.75 + nivel * 0.85}rem` }}
                 >
+                  {onMoveNoteToNotebook ? asa('note', n.id, n.title || t('note.untitled')) : null}
                   {n.data?.icon && typeof n.data.icon === 'string' ? (
                     <Glyph
                       name={n.data.icon as GlyphName}
@@ -334,8 +434,22 @@ export function NotebookTree({
   };
 
   return (
-    <ul role="tree" aria-label={t('sidebar.notebooks')} class="grid gap-0.5">
-      {hijosDe(null).map((nb) => rama(nb, 1))}
-    </ul>
+    <>
+      <ul ref={arbol} role="tree" aria-label={t('sidebar.notebooks')} class="grid gap-0.5">
+        {hijosDe(null).map((nb) => rama(nb, 1))}
+      </ul>
+      {arrastrando ? (
+        <div
+          aria-hidden="true"
+          class="notes-drag-preview border-border bg-surface text-text pointer-events-none fixed z-50 max-w-64 truncate rounded-md border px-3 py-2 text-sm font-medium shadow-sm"
+          style={{
+            left: `${Math.min(arrastrando.x + 16, window.innerWidth - 160)}px`,
+            top: `${arrastrando.y + 12}px`,
+          }}
+        >
+          {arrastrando.titulo}
+        </div>
+      ) : null}
+    </>
   );
 }

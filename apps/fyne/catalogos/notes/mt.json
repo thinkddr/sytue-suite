@@ -32,6 +32,7 @@
   "common.offline": "Int offline. Il-bidliet ma jiġux issejvjati sakemm il-konnessjoni terġa' tiġi.",
   "common.retry": "Erġa' pprova",
   "common.save": "Issejvja",
+  "crypto.dataReviewRequired": "Din il-parti fiha data li din l-app ma tistax tibdel mingħajr ma tintilef il-preċiżjoni. L-oriġinal inżamm.",
   "crypto.disable": "Neħħi l-kriptaġġ",
   "crypto.disableWarning": "In-noti kriptati eżistenti jibqgħu ma jinqrawx. L-ewwel iftaħ il-ktieb tan-noti.",
   "crypto.enable": "Ikkripta",
@@ -39,7 +40,6 @@
   "crypto.lockNow": "Sakkar issa",
   "crypto.locked": "Msakkar",
   "crypto.migrating": "Qed jiġi protett il-kontenut tan-notebook…",
-  "crypto.dataReviewRequired": "Din il-parti fiha data li din l-app ma tistax tibdel mingħajr ma tintilef il-preċiżjoni. L-oriġinal inżamm.",
   "crypto.migrationFailed": "Il-kriptaġġ ma setax jitlesta. Id-data tiegħek inżammet. Erġa’ iftaħ in-notebook biex tirrevedi l-bidliet.",
   "crypto.mismatch": "Iż-żewġ frażijiet tal-password huma differenti.",
   "crypto.passphrase": "Frażi tal-password",
@@ -268,6 +268,7 @@
   "notebook.delete": "Ħassar il-ktieb tan-noti",
   "notebook.deleteConfirm": "Tħassar “{title}” u dak kollu li hemm ġewwa?",
   "notebook.emoji": "Ikona",
+  "notebook.move": "Mexxi n-notebook",
   "notebook.newChild": "Ktieb tan-noti ġdid ġewwa",
   "notebook.notes": {
     "one": "Nota {count}",

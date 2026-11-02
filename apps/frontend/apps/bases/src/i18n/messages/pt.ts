@@ -10,6 +10,7 @@ import type { en } from './en.js';
 export const pt: AppCatalog<typeof en> = {
   'nav.title': 'Bases',
   'nav.bases': 'As minhas bases',
+  'actions.more': 'Mais ações',
   'bases.title': 'As minhas bases',
   'bases.newName': 'Nome da nova base',
   'bases.create': 'Criar base',

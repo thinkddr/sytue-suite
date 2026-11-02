@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Contributing
 
-Use Bun 1.4.3 and the Go version in `native/go.mod`. Pin new dependencies and Actions to
+Use Bun 1.4.4 and the Go version in `native/go.mod`. Pin new dependencies and Actions to
 verified stable versions. Keep the public distribution independent of private repositories,
 fonts, product assets and services. Optional host adapters belong outside this distribution.
 

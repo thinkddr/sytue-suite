@@ -80,6 +80,36 @@
   ],
   "packageRules": [
     {
+      "description": "Los nombres sytue-* sin registro ni namespace son imágenes construidas por este repositorio, no upstreams de Docker Hub. Renovate lee repository del chart sin combinar nuestro campo registry y consulta library/sytue-*: ese lookup devuelve 401. Sólo se excluyen nombres locales completos; GHCR, otros registros y namespaces como sytue-prod-platform/traefik siguen auditados.",
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchPackageNames": [
+        "/^sytue-[a-z0-9._-]+$/"
+      ],
+      "enabled": false
+    },
+    {
+      "description": "Estos tres nombres de Helm son aliases del espejo privado, no repositorios de Docker Hub. Sus upstreams cualificados siguen auditados por custom.regex en deploy/production/upstream-images.txt; renovate-resultado-test exige que estén en ese catálogo. Sólo se omite la lectura duplicada del alias en estos values.yaml.",
+      "matchManagers": [
+        "helm-values"
+      ],
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchFileNames": [
+        "deploy/helm/charts/cert-manager-webhook-scaleway/values.yaml",
+        "deploy/helm/charts/livekit-egress/values.yaml",
+        "deploy/helm/charts/prometheus-adapter/values.yaml"
+      ],
+      "matchPackageNames": [
+        "cert-manager-webhook-scaleway",
+        "livekit-egress",
+        "prometheus-adapter"
+      ],
+      "enabled": false
+    },
+    {
       "description": "engines.node NO se fija: declara COMPATIBILIDAD, no una dependencia instalada. Renovate lo cambió de «>=26.8.1 <27» a «v26.9.0» dentro de una PR titulada «Pin dependencies» y tumbó la v3.3.0 en `make toolchain-check`, que exige el rango («apps/mobile/suite/package.json no exige Node 26.8.1»). Un rango dice qué versiones valen; una versión fija dice que solo vale esa, que es falso y además no es lo que el gate comprueba.",
       "matchDepTypes": [
         "engines"
@@ -138,6 +168,16 @@
       "description": "Bun workspace (npm/JS): Astro/Preact/Tailwind y demás. Agrupado."
     },
     {
+      "matchDatasources": [
+        "npm"
+      ],
+      "matchPackageNames": [
+        "astro"
+      ],
+      "rangeStrategy": "bump",
+      "description": "catalog.astro declara el intervalo >=X.Y.Z <MAYOR+1 exigido por check-toolchain-versions.sh. Se actualiza su mínimo conservando el intervalo; la estrategia global pin lo convertiría en una versión exacta y rompería ese contrato."
+    },
+    {
       "matchManagers": [
         "npm",
         "bun"
@@ -146,7 +186,7 @@
         "preact"
       ],
       "allowedVersions": "<11.0.0",
-      "description": "Astro 7 + Preact 10.29: NO subir a Preact 11 (beta, §3)."
+      "description": "Astro 7 + Preact 10.x: Preact 11 ya es GA; se conserva la línea 10.x por la política de compatibilidad de CONVENTIONS §3."
     },
     {
       "matchPackageNames": [

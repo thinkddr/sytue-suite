@@ -149,10 +149,10 @@
    llegan solos. */
 @layer components {
   .notes-col {
-    @apply mx-auto w-full max-w-[51rem] px-4 sm:px-6;
+    @apply mx-auto w-full max-w-[46rem] px-4 sm:px-6;
   }
   .notes-page {
-    @apply pt-8 pb-10;
+    @apply pt-6 pb-10;
   }
   .notes-page-head {
     @apply mb-5 flex flex-wrap items-end justify-between gap-x-4 gap-y-2;
@@ -184,7 +184,7 @@
   }
 
   .notes-day {
-    @apply pt-8 pb-1;
+    @apply pt-6 pb-1;
   }
   /* «Trasladada: 2». En el teléfono se cae: al lado de un recordatorio dejaba el título
      de la tarea en tres palabras, y el título es lo que se viene a leer. */
@@ -264,10 +264,10 @@
   /* La captura: una línea donde se escribe, sin caja. La pista de la sintaxis solo
      aparece al entrar en el campo y ocupa el hueco que ya hay debajo: no empuja nada. */
   .notes-capture-wrap {
-    @apply relative;
+    @apply relative pt-2 pb-3;
   }
   .notes-capture {
-    @apply border-border-subtle flex items-center gap-1 border-b py-1 transition-colors duration-150;
+    @apply border-border bg-surface flex min-h-12 items-center gap-1 rounded-lg border px-2 py-1 transition-colors duration-150;
   }
   .notes-capture:focus-within {
     @apply border-primary;
@@ -279,13 +279,16 @@
     box-shadow: none !important;
   }
   .notes-capture-hint {
-    @apply text-text-subtle pointer-events-none absolute top-full left-0 mt-1 px-1 text-xs opacity-0 transition-opacity duration-150;
+    @apply text-text-muted pointer-events-none mt-1 min-h-4 px-1 text-xs opacity-0 transition-opacity duration-150;
   }
   .notes-capture:focus-within + .notes-capture-hint {
     @apply opacity-100;
   }
   .notes-day-filters {
     @apply -mx-2 mt-7 flex flex-wrap items-center justify-between gap-x-3 gap-y-1;
+  }
+  .notes-dashboard-docked .notes-day-filters {
+    @apply mt-3;
   }
 
   /* La agenda del día: las mismas filas que las notas, con el glifo del calendario
@@ -307,10 +310,10 @@
      más ancha (una con recordatorio y «Trasladada») y en el teléfono TODAS las filas
      se salían de la pantalla. */
   .notes-stream {
-    @apply grid grid-cols-1 gap-px pb-10;
+    @apply relative grid grid-cols-1 gap-1 pb-10;
   }
   .notes-stream-note {
-    @apply rounded-md border-0 bg-transparent px-2 py-1.5 shadow-none!;
+    @apply rounded-md border-0 bg-transparent px-2 py-2 shadow-none!;
   }
   .notes-stream-note:hover,
   .notes-stream-note:focus-within {
@@ -331,7 +334,7 @@
   }
   /* La nota de un cuaderno en árbol llena el panel: es una página, no una tarjeta. */
   .notes-sheet {
-    @apply rounded-none border-0 bg-transparent px-6 py-6 shadow-none! sm:px-10;
+    @apply mx-auto w-full max-w-[64rem] rounded-none border-0 bg-transparent px-6 py-6 shadow-none! sm:px-10;
   }
   .notes-sheet-title {
     @apply text-2xl! leading-tight font-semibold! tracking-tight;
@@ -390,6 +393,55 @@
   }
   .notes-this-day {
     @apply border-border-subtle mt-2 flex flex-col gap-2 border-t pt-5 pb-10;
+  }
+}
+
+.notes-tree-grip {
+  -webkit-user-select: none;
+}
+.notes-notebook-row[data-notebook-drop='inside'] {
+  background: var(--sytue-sidebar-active);
+  box-shadow: inset 0 0 0 2px var(--sytue-sidebar-fg);
+}
+.notes-notebook-row[data-notebook-drop='before']::before,
+.notes-notebook-row[data-notebook-drop='after']::after {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  block-size: 2px;
+  background: var(--sytue-sidebar-fg);
+}
+.notes-notebook-row[data-notebook-drop='before']::before {
+  inset-block-start: 0;
+}
+.notes-notebook-row[data-notebook-drop='after']::after {
+  inset-block-end: 0;
+}
+[data-drag-source='true'],
+[data-note-dragging='true'] {
+  opacity: 0.45;
+}
+[data-note-before='true']::before {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  inset-block-start: -2px;
+  block-size: 2px;
+  background: var(--sytue-primary);
+}
+[data-column-drop='true'] {
+  box-shadow: inset 0 -2px var(--sytue-primary);
+}
+@media (max-height: 480px) {
+  .notes-capture-dock .notes-capture-hint {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .notes-notebook-row,
+  .notes-stream-note,
+  .notes-tree-grip {
+    transition: none;
   }
 }
 

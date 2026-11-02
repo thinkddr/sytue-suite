@@ -32,6 +32,7 @@
   "common.offline": "Sunteți offline. Modificările nu se salvează până nu revine conexiunea.",
   "common.retry": "Reîncearcă",
   "common.save": "Salvează",
+  "crypto.dataReviewRequired": "Această parte conține date pe care aplicația nu le poate modifica fără a pierde precizia. Originalul a fost păstrat.",
   "crypto.disable": "Scoate criptarea",
   "crypto.disableWarning": "Notițele criptate existente rămân ilizibile. Deblocați mai întâi carnetul.",
   "crypto.enable": "Criptează",
@@ -39,7 +40,6 @@
   "crypto.lockNow": "Blochează acum",
   "crypto.locked": "Blocat",
   "crypto.migrating": "Se protejează conținutul caietului…",
-  "crypto.dataReviewRequired": "Această parte conține date pe care aplicația nu le poate modifica fără a pierde precizia. Originalul a fost păstrat.",
   "crypto.migrationFailed": "Criptarea nu a putut fi finalizată. Datele tale au fost păstrate. Redeschide caietul pentru a verifica modificările.",
   "crypto.mismatch": "Cele două fraze de acces sunt diferite.",
   "crypto.passphrase": "Frază de acces",
@@ -270,6 +270,7 @@
   "notebook.delete": "Șterge carnetul",
   "notebook.deleteConfirm": "Ștergeți „{title}” și tot ce e înăuntru?",
   "notebook.emoji": "Pictogramă",
+  "notebook.move": "Mută caietul",
   "notebook.newChild": "Carnet nou înăuntru",
   "notebook.notes": {
     "one": "{count} notiță",

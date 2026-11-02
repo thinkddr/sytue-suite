@@ -70,9 +70,8 @@ type Barra struct {
 	// va en su nombre accesible («Deshacer: mover»).
 	Deshacer string
 	Rehacer  string
-	// Estrecha es la ventana por debajo de `sm` (640, rem de 16): el filtro baja a su
-	// propia fila, entera, y «Orden», «Exportar» y «Nueva nota» se quedan en su icono
-	// (`max-sm:sr-only`: el rótulo sigue siendo su nombre accesible).
+	// Estrecha hace que el filtro abierto ocupe su propia fila. «Nueva nota» conserva
+	// su texto, también en el teléfono; las herramientas secundarias van en «…».
 	Estrecha bool
 
 	AlFiltrar      func(string)
@@ -146,60 +145,17 @@ func (b *Barra) Objeto(v tema.Variante) fyne.CanvasObject {
 		candado = bt
 	}
 
-	filtro := b.campoFiltro()
-
-	// Los tres menús, con un icono por disparador: la barra dice qué cuaderno es y deja
-	// escribir; los rótulos («Orden propio», «Filtrar por etiqueta», «Exportar») la
-	// convertían en una fila de texto azul más larga que el título.
-	orden := b.menuIcono(OrdenD, t("orden.label", nil)+": "+t(b.Orden.ClaveI18n(), nil), b.menuOrden)
-
-	var etiquetas fyne.CanvasObject
-	if len(b.Etiquetas) > 0 {
-		e := b.menuIcono(FiltroD, t("tags.filterBy", nil), b.menuEtiquetas)
-		e.Pulsado = b.FiltroEstado != ""
-		etiquetas = e
-	}
-
-	// EXPORTAR ES UN DERECHO y por eso está en la barra y no escondido en los ajustes:
-	// el artículo 20 del RGPD da derecho a recibir los propios datos, y un derecho que
-	// hay que buscar en un modal se ejerce menos. Es el comentario de la web, literal.
-	exportar := b.menuIcono(BajarD, t("export.label", nil), b.menuExportar)
-
-	// Deshacer y rehacer solo salen cuando hay algo que deshacer o rehacer: dos flechas
-	// apagadas eran dos botones que no hacían nada.
-	var deshacer, rehacer fyne.CanvasObject
-	if b.Deshacer != "" {
-		deshacer = b.accionPropia(DeshacerD, t("history.undoOf", i18n.Vars{"action": b.Deshacer}), false, b.AlDeshacer)
-	}
-	if b.Rehacer != "" {
-		rehacer = b.accionPropia(RehacerD, t("history.redoOf", i18n.Vars{"action": b.Rehacer}), false, b.AlRehacer)
-	}
-
-	var compartir fyne.CanvasObject
-	if b.AlCompartir != nil {
-		c := ui.NuevoBotonIcono(iconos.Usuarios, t("sharePeople.open", nil), func() { llamar0(b.AlCompartir) })
-		c.Lado, c.TamIcono = ui.LadoIconoSM, GlifoAccion
-		compartir = c
-	}
-	ajustes := ui.NuevoBotonIcono(iconos.Ajustes, t("notebook.settings", nil),
-		func() { llamar0(b.AlAjustes) })
-	ajustes.Lado, ajustes.TamIcono = ui.LadoIconoSM, GlifoAccion
-
-	nueva := ui.NuevoBoton(b.rotulo(t("note.new", nil)), func() { llamar0(b.AlNuevaNota) })
+	nueva := ui.NuevoBoton(t("note.new", nil), func() { llamar0(b.AlNuevaNota) })
 	nueva.Talla, nueva.Icono, nueva.TamIcono = ui.TallaSM, iconos.Mas, 15
-	nueva.Rotulo = t("note.new", nil)
 	nueva.Inerte = b.Bloqueado || b.SinRed
-	b.soloIcono(nueva)
 
 	// El título es `mr-auto flex min-w-0 items-center gap-2`: el emoji y el nombre juntos,
 	// y todo lo que sobre de la primera fila detrás de él.
 	titulo := container.New(&filaElastica{hueco: HuecoBarra, elastico: len(piezas) - 1}, piezas...)
-	items := sinNil([]fyne.CanvasObject{
-		titulo, candado, filtro, orden, etiquetas, exportar, deshacer, rehacer, compartir, ajustes, nueva,
-	})
+	items := sinNil(append(append([]fyne.CanvasObject{titulo, candado}, b.Acciones(v)...), nueva))
 	entera := -1
-	if b.Estrecha {
-		// `order-last basis-full`: el filtro, el último y en su fila.
+	if b.Estrecha && (b.Filtrando || b.Filtro != "") {
+		filtro := b.campoFiltro()
 		items = append(slices.DeleteFunc(items, func(o fyne.CanvasObject) bool { return o == filtro }), filtro)
 		entera = len(items) - 1
 	}
@@ -210,23 +166,6 @@ func (b *Barra) Objeto(v tema.Variante) fyne.CanvasObject {
 		minAlto: AltoBarra, auto: true,
 	}
 	return container.New(flex, append([]fyne.CanvasObject{fondo, filete}, items...)...)
-}
-
-// soloIcono ajusta el ancho de un botón que en móvil pierde el rótulo: el rótulo va
-// `sr-only` —fuera del flujo—, así que no queda ni el texto ni el `gap` que lo separaba
-// del icono, y el botón mide su relleno más el glifo.
-func (b *Barra) soloIcono(bt *ui.Boton) {
-	if b.Estrecha {
-		bt.Ancho = ui.MedidaBoton("", bt.Talla, 0).Width + bt.TamIcono
-	}
-}
-
-// rotulo es el texto visible de un botón que en móvil se queda en su icono.
-func (b *Barra) rotulo(s string) string {
-	if b.Estrecha {
-		return ""
-	}
-	return s
 }
 
 // campoFiltro es el campo de filtrar, creado una sola vez. El texto solo cambia
@@ -253,9 +192,8 @@ func (b *Barra) menuIcono(d, rotulo string, menu func() *ui.Menu) *ui.BotonIcono
 	return bt
 }
 
-// Acciones es la barra de una PÁGINA (`variante="dia"` de BarraDeCuaderno): en un día y en
-// un cuaderno en lista no hay tira —el título lo escribe la página— y lo mismo cabe en
-// tres botones al lado: el filtro tras una lupa (no en un día), exportar y «…».
+// Acciones agrupa las herramientas del cuaderno: filtro, exportar y «…». En un día
+// o una lista acompaña al título de la página; en las demás vistas, a «Nueva nota».
 func (b *Barra) Acciones(v tema.Variante) []fyne.CanvasObject {
 	t := b.tr.T
 	var out []fyne.CanvasObject
@@ -330,40 +268,6 @@ func (b *Barra) accionPropia(d, rotulo string, inerte bool, alPulsar func()) *ui
 	// `disabled:opacity-40`: el glifo al 40 % y el botón sin puntero ni foco.
 	bt.Inerte = inerte
 	return bt
-}
-
-// menuEtiquetas es «Todas» y, separados, los estados de cada etiqueta. El elegido lleva
-// la marca.
-//
-// ponytail: la web marca el elegido con « ✓» escrito al final del rótulo; aquí es el tic
-// del menú (`Marcada`), porque Figtree no trae ese carácter y saldría la caja vacía.
-//
-// Delante va el punto del color del estado (`h-2.5 w-2.5 rounded-full` con el color de
-// los datos), y ocupa solo lo suyo: el `icon` de MenuItem no reserva los 16 de un glifo.
-func (b *Barra) menuEtiquetas() *ui.Menu {
-	elementos := []fyne.CanvasObject{
-		ui.NuevoElementoMenu(b.tr.T("filter.all", nil), iconos.Ninguno, func() { llamar1(b.AlFiltroEstado, "") }),
-		ui.NuevoSeparadorMenu(),
-	}
-	for _, tag := range b.Etiquetas {
-		for _, s := range tag.States {
-			e := ui.NuevoElementoMenu(tag.Name+": "+s.Name, iconos.Ninguno, func() { llamar1(b.AlFiltroEstado, s.ID) })
-			e.Marcada = b.FiltroEstado == s.ID
-			e.PuntoColor, e.TamIcono = hexO(s.Color, color.NRGBA{}), ui.LadoPuntoMenu
-			elementos = append(elementos, e)
-		}
-	}
-	return ui.NuevoMenu(elementos...)
-}
-
-func (b *Barra) menuOrden() *ui.Menu {
-	elementos := make([]fyne.CanvasObject, 0, len(Ordenes))
-	for _, o := range Ordenes {
-		e := ui.NuevoElementoMenu(b.tr.T(o.ClaveI18n(), nil), iconos.Ninguno, func() { llamar1(b.AlOrdenar, o) })
-		e.Marcada = b.Orden == o
-		elementos = append(elementos, e)
-	}
-	return ui.NuevoMenu(elementos...)
 }
 
 // menuExportar son los cinco formatos y, separada, la vista previa.

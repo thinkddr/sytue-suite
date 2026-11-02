@@ -42,6 +42,6 @@ if (import.meta.main) {
       };
   const ruta = new URL('./ets-esperado-libreoffice.json', import.meta.url);
   writeFileSync(ruta, JSON.stringify({ ...e, solo365: undefined, intervalos }, null, 1) + '\n');
-  Bun.spawnSync(['bunx', 'prettier@3.9.9', '--write', fileURLToPath(ruta)]);
+  Bun.spawnSync(['bunx', 'prettier@3.9.10', '--write', fileURLToPath(ruta)]);
   process.stdout.write(`${e.casos.length} fórmulas calculadas con ${e.libreoffice}\n`);
 }

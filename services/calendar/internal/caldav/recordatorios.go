@@ -101,12 +101,12 @@ func ConRecordatorios(data string, minutos []int, descripcion string) (string, e
 	if descripcion == "" {
 		descripcion = "Recordatorio"
 	}
-	for _, min := range minutos {
+	for _, antelacion := range minutos {
 		a := ical.NewComponent(ical.CompAlarm)
 		a.Props.SetText(ical.PropAction, "DISPLAY")
 		a.Props.SetText(ical.PropDescription, descripcion)
 		disparo := ical.NewProp(ical.PropTrigger)
-		disparo.Value = disparoAntes(min)
+		disparo.Value = disparoAntes(antelacion)
 		a.Props.Set(disparo)
 		m.Children = append(m.Children, a)
 	}

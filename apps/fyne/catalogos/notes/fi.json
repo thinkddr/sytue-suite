@@ -32,6 +32,7 @@
   "common.offline": "Olet offline-tilassa. Muutoksia ei tallenneta ennen kuin yhteys palaa.",
   "common.retry": "Yritä uudelleen",
   "common.save": "Tallenna",
+  "crypto.dataReviewRequired": "Tämä osa sisältää tietoja, joita sovellus ei voi muuttaa tarkkuutta menettämättä. Alkuperäinen on säilytetty.",
   "crypto.disable": "Poista salaus",
   "crypto.disableWarning": "Olemassa olevat salatut muistiinpanot pysyvät lukukelvottomina. Avaa ensin muistikirjan lukitus.",
   "crypto.enable": "Salaa",
@@ -39,7 +40,6 @@
   "crypto.lockNow": "Lukitse nyt",
   "crypto.locked": "Lukittu",
   "crypto.migrating": "Suojataan muistikirjan sisältöä…",
-  "crypto.dataReviewRequired": "Tämä osa sisältää tietoja, joita sovellus ei voi muuttaa tarkkuutta menettämättä. Alkuperäinen on säilytetty.",
   "crypto.migrationFailed": "Salausta ei voitu viimeistellä. Tietosi ovat tallessa. Avaa muistikirja uudelleen ja tarkista muutokset.",
   "crypto.mismatch": "Salalauseet eroavat toisistaan.",
   "crypto.passphrase": "Salalause",
@@ -266,6 +266,7 @@
   "notebook.delete": "Poista muistikirja",
   "notebook.deleteConfirm": "Poistetaanko ”{title}” ja kaikki sen sisältö?",
   "notebook.emoji": "Kuvake",
+  "notebook.move": "Siirrä muistikirjaa",
   "notebook.newChild": "Uusi muistikirja sisälle",
   "notebook.notes": {
     "one": "{count} muistiinpano",

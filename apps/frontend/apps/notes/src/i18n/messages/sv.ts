@@ -122,6 +122,7 @@ export const sv: AppCatalog<typeof en> = {
   'notebook.notes': { one: '{count} anteckning', other: '{count} anteckningar' },
   'notebook.emoji': 'Ikon',
   'notebook.color': 'Färg',
+  'notebook.move': 'Flytta anteckningsbok',
   'notebook.title': 'Namn',
   'layout.label': 'Layout',
   'layout.tree': 'Träd',

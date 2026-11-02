@@ -131,7 +131,7 @@ export function Albums({
 
   return (
     <Marco user={user} hubBaseUrl={hubBaseUrl} locale={locale} title={t('nav.albums')}>
-      <div class="mx-auto flex h-full w-full max-w-7xl flex-col px-4 py-6">
+      <div class="mx-auto flex min-h-full w-full max-w-7xl flex-col px-4 py-6">
         <Nav t={t} locale={locale} activa="albums" />
         <form onSubmit={(e) => void crear(e)} class="mb-6 flex gap-2">
           {/* El campo de la casa, del alto de su botón: el de antes medía 28 px
@@ -249,14 +249,14 @@ export function Albums({
             illustration={<Illustration name="emptyPhotos" />}
           />
         ) : (
-          <ul class="grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-3">
+          <ul class="grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-6">
             {lista.map((al) => (
               <li key={al.id}>
                 <a
                   href={`${RUTA}album?id=${encodeURIComponent(al.id)}`}
                   class="sytue-focus-ring block rounded-sm"
                 >
-                  <div class="bg-bg-subtle aspect-square overflow-hidden rounded-sm">
+                  <div class="bg-bg-subtle border-border-subtle flex aspect-[4/3] items-center justify-center overflow-hidden rounded-sm border">
                     {al.coverAssetId ? (
                       <img
                         src={urlDeVariante(al.coverAssetId, 'miniatura')}
@@ -265,9 +265,11 @@ export function Albums({
                         decoding="async"
                         class="h-full w-full object-cover"
                       />
-                    ) : null}
+                    ) : (
+                      <Icon name="album" size={32} class="text-text-subtle" />
+                    )}
                   </div>
-                  <div class="mt-1 truncate text-sm font-medium">{al.title}</div>
+                  <div class="text-text mt-2 truncate text-sm font-semibold">{al.title}</div>
                   <div class="text-text-muted text-xs">
                     {t('albums.count', { count: al.count })}
                   </div>

@@ -9,6 +9,7 @@
 export const en = {
   'nav.title': 'Bases',
   'nav.bases': 'My bases',
+  'actions.more': 'More actions',
   'bases.title': 'My bases',
   'bases.newName': 'Name of the new base',
   'bases.create': 'Create base',

@@ -47,6 +47,7 @@ import {
 import {
   DialogosDelEditor,
   Spinner,
+  usePointerDrag,
   confirmarEnEditor,
   enCampoDeTexto,
   preguntarEnEditor,
@@ -1104,7 +1105,7 @@ function Hoja({
 
   const onDown = (ev: PointerEvent) => {
     if (!capaInteractiva || !puedeDibujar(ev)) return;
-    (ev.currentTarget as Element).setPointerCapture(ev.pointerId);
+    if (!gesto.iniciarArrastre(ev, null)) return;
     dibujandoRef.current = true;
     const [x, y] = enSVG(ev);
     presionesRef.current = [];
@@ -1228,6 +1229,17 @@ function Hoja({
     setTrazo([]);
     setArrastre(null);
   };
+
+  const gesto = usePointerDrag<null>({
+    onMove: (_, e) => onMove(e),
+    onEnd: onUp,
+    onCancel: () => {
+      dibujandoRef.current = false;
+      presionesRef.current = [];
+      setTrazo([]);
+      setArrastre(null);
+    },
+  });
 
   /** Resaltar lo SELECCIONADO: los rectángulos los da el propio navegador. */
   const resaltarSeleccion = () => {
@@ -1364,9 +1376,10 @@ function Hoja({
           style={capaInteractiva ? { touchAction: 'none' } : undefined}
           viewBox={`0 0 ${pagina.ancho} ${pagina.alto}`}
           onPointerDown={onDown}
-          onPointerMove={onMove}
-          onPointerUp={onUp}
-          onPointerCancel={onUp}
+          onPointerMove={gesto.onPointerMove}
+          onPointerUp={gesto.onPointerUp}
+          onPointerCancel={gesto.onPointerCancel}
+          onLostPointerCapture={gesto.onLostPointerCapture}
           aria-hidden="true"
         >
           {/* Lo marcado para censurar, tal y como quedará: negro y opaco. Se ve

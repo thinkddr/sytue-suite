@@ -22,6 +22,41 @@ const ORIGIN = API.replace(/\/$/, '');
 // aleatorio lo evita). Mismo criterio que drive-trash.spec.ts.
 const unico = () => `${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
 
+test('el asa táctil mueve sin abrir después el diálogo de mover', async ({ page, request }) => {
+  const carpeta = `/e2e-asa-${unico()}`;
+  const destino = `${carpeta}/destino`;
+  const fichero = `${carpeta}/origen.txt`;
+  await crearCarpeta(request, carpeta);
+  await crearCarpeta(request, destino);
+  await subir(request, fichero, 'Fixture de arrastre táctil');
+  try {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`${API}?path=${encodeURIComponent(carpeta)}`);
+    const asa = page.locator(`[data-drive-move=${JSON.stringify(fichero)}]`).first();
+    const receptor = page.locator(`[data-drive-folder=${JSON.stringify(destino)}]`).first();
+    await expect(asa).toBeVisible();
+    await expect(receptor).toBeVisible();
+    const caja = await receptor.boundingBox();
+    expect(caja).not.toBeNull();
+    const respuesta = page.waitForResponse((r) => r.request().method() === 'POST' &&
+      r.url().includes('/api/files') && (r.request().postData() ?? '').includes(fichero));
+    await asa.evaluate((el, punto) => {
+      const r = el.getBoundingClientRect();
+      const inicio = { pointerId: 71, pointerType: 'touch', isPrimary: true, button: 0, bubbles: true, cancelable: true };
+      el.dispatchEvent(new PointerEvent('pointerdown', { ...inicio, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 }));
+      document.dispatchEvent(new PointerEvent('pointermove', { ...inicio, clientX: punto.x, clientY: punto.y }));
+      document.dispatchEvent(new PointerEvent('pointerup', { ...inicio, clientX: punto.x, clientY: punto.y }));
+      // El click de compatibilidad llega antes del repintado que desmonta el asa.
+      el.dispatchEvent(new MouseEvent('click', { detail: 1, bubbles: true, cancelable: true }));
+    }, { x: caja!.x + caja!.width / 2, y: caja!.y + caja!.height / 2 });
+    expect((await respuesta).status()).toBe(200);
+    await expect.poll(() => nombres(request, destino)).toContain('origen.txt');
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+  } finally {
+    await borrar(request, carpeta);
+  }
+});
+
 /** Nombres de una carpeta. GET /api/files?path= → 200 con items. */
 async function nombres(request: APIRequestContext, ruta = '/'): Promise<string[]> {
   const res = await request.get(`${API}api/files?path=${encodeURIComponent(ruta)}`);

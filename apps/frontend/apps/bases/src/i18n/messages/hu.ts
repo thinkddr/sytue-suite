@@ -10,6 +10,7 @@ import type { en } from './en.js';
 export const hu: AppCatalog<typeof en> = {
   'nav.title': 'Bases',
   'nav.bases': 'Adatbázisaim',
+  'actions.more': 'További műveletek',
   'bases.title': 'Adatbázisaim',
   'bases.newName': 'Az új adatbázis neve',
   'bases.create': 'Adatbázis létrehozása',

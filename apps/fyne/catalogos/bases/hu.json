@@ -1,4 +1,5 @@
 {
+  "actions.more": "További műveletek",
   "attach.add": "Fájl hozzáadása",
   "attach.badType": "Ez a fájltípus nem engedélyezett, vagy a tartalma nem felel meg a nevének.",
   "attach.delete": "{name} törlése",

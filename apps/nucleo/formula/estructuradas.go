@@ -93,12 +93,7 @@ func ResolverEstructurada(tablas []TablaResoluble, q TableQuery, aqui Here) (*Re
 			return nil, ""
 		}
 	} else {
-		for i := range tablas {
-			if strings.EqualFold(tablas[i].Nombre, q.Table) {
-				def = &tablas[i]
-				break
-			}
-		}
+		def = tablaPorNombre(tablas, q.Table)
 		if def == nil {
 			return nil, ErrName
 		}
@@ -139,4 +134,13 @@ func ResolverEstructurada(tablas []TablaResoluble, q TableQuery, aqui Here) (*Re
 		f1, f2 = aqui.Row, aqui.Row
 	}
 	return &RefRange{Sheet: def.Hoja, C1: c1, R1: f1, C2: c2, R2: f2}, ""
+}
+
+func tablaPorNombre(tablas []TablaResoluble, nombre string) *TablaResoluble {
+	for i := range tablas {
+		if strings.EqualFold(tablas[i].Nombre, nombre) {
+			return &tablas[i]
+		}
+	}
+	return nil
 }

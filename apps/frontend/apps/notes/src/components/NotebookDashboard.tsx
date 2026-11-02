@@ -7,6 +7,7 @@
 // fantasma y lo que se lee es el texto. Todo lo que no es escribir va en dos líneas:
 // la del título (con ir de un día a otro) y la del año (con la vista).
 import type { JSX } from 'preact';
+import { createPortal } from 'preact/compat';
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { Button, Dropdown, Icon, IconButton, Input, MenuItem, cx, useAtajo } from '@sytue/ui';
 import { appUrl, orgActual } from '@sytue/config';
@@ -67,6 +68,8 @@ interface Props {
    * ajustes) y en un día cabe en un menú al final de la navegación.
    */
   acciones?: JSX.Element | null | undefined;
+  /** El mismo formulario se coloca al pie del panel, fuera del desplazador. */
+  captureContainer?: HTMLElement | null;
 }
 
 /** El progreso del día: un aro pequeño y «2/5»; la frase entera, para quien no ve. */
@@ -132,16 +135,19 @@ export function NotebookDashboard({
   pendientes = [],
   onDescartar,
   acciones,
+  captureContainer,
 }: Props): JSX.Element {
-  const mounted = useRef(true);
+  const mountedRef = useRef(true);
   useLayoutEffect(
     () => () => {
-      mounted.current = false;
+      mountedRef.current = false;
     },
     [],
   );
   const [draft, setDraft] = useState(initialDraft);
+  const borradorActualRef = useRef(initialDraft);
   const changeDraft = (text: string) => {
+    borradorActualRef.current = text;
     setDraft(text);
     onDraft(text);
   };
@@ -188,12 +194,16 @@ export function NotebookDashboard({
     if (saving || disabled) return;
     const input = capturaRapida(draft, kind);
     if (!input) return;
+    const enviado = draft;
     setSaving(true);
     try {
       if (await onCapture(input)) {
-        onDraft('');
-        if (mounted.current) {
-          setDraft('');
+        if (borradorActualRef.current === enviado) {
+          borradorActualRef.current = '';
+          onDraft('');
+          if (mountedRef.current) setDraft('');
+        }
+        if (mountedRef.current) {
           onEnfoque('all');
         }
       }
@@ -205,7 +215,7 @@ export function NotebookDashboard({
     if (saving || disabled) return;
     setSaving(true);
     try {
-      if ((await onTemplate(p)) && mounted.current) onEnfoque('all');
+      if ((await onTemplate(p)) && mountedRef.current) onEnfoque('all');
     } finally {
       setSaving(false);
     }
@@ -219,9 +229,15 @@ export function NotebookDashboard({
   const conFiltros = date
     ? vista === 'day' && notes.length > 0
     : tasks.length > 0 || enfoque !== 'all';
+  const colocarCaptura = (form: JSX.Element) =>
+    captureContainer ? createPortal(form, captureContainer) : form;
   return (
     <section
-      class={cx('notes-day', lectura ? 'notes-col' : 'px-4 sm:px-6')}
+      class={cx(
+        (date || lectura || !captureContainer) && 'notes-day',
+        lectura ? 'notes-col' : 'px-4 sm:px-6',
+        captureContainer && 'notes-dashboard-docked',
+      )}
       aria-label={t('capture.label')}
     >
       {date ? (
@@ -366,63 +382,65 @@ export function NotebookDashboard({
           </div>
         </header>
       ) : null}
-      <div class="notes-capture-wrap">
-        <form
-          class="notes-capture"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void submit();
-          }}
-        >
-          {/* El conmutador de tarea ocupa la columna del glifo de las filas: lo que se
+      {colocarCaptura(
+        <div class={cx('notes-capture-wrap', captureContainer && 'notes-col')}>
+          <form
+            class="notes-capture"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void submit();
+            }}
+          >
+            {/* El conmutador de tarea ocupa la columna del glifo de las filas: lo que se
               escribe empieza donde empieza el texto de las notas. */}
-          <IconButton
-            class="-ml-1"
-            label={t('note.newTodo')}
-            pressed={kind === 'todo'}
-            disabled={disabled || saving}
-            onClick={() => setKind(kind === 'todo' ? 'text' : 'todo')}
-          >
-            <Glyph name="todo" size={16} />
-          </IconButton>
-          <Input
-            name="capture"
-            class="notes-capture-input"
-            aria-label={t('capture.label')}
-            aria-describedby="notes-capture-hint"
-            placeholder={t('capture.placeholder')}
-            value={draft}
-            disabled={disabled || saving}
-            maxLength={kind === 'todo' ? 400 : 10000}
-            onInput={(e) => changeDraft(expandirCaptura(draft, e.currentTarget.value))}
-          />
-          <Dropdown
-            label={t('template.label')}
-            align="end"
-            trigger={(props) => (
-              <IconButton {...props} label={t('template.label')} disabled={disabled || saving}>
-                <Icon name="ellipsis" size={16} />
-              </IconButton>
-            )}
-          >
-            {PLANTILLAS.map((p) => (
-              <MenuItem key={p} disabled={disabled || saving} onSelect={() => void template(p)}>
-                {t(`template.${p}`)}
-              </MenuItem>
-            ))}
-          </Dropdown>
-          <IconButton
-            type="submit"
-            label={saving ? t('note.saving') : t('capture.add')}
-            disabled={disabled || saving || !draft.trim()}
-          >
-            <Icon name="plus" size={16} />
-          </IconButton>
-        </form>
-        <p id="notes-capture-hint" class="notes-capture-hint">
-          {t('capture.submitHint')}
-        </p>
-      </div>
+            <IconButton
+              class="-ml-1"
+              label={t('note.newTodo')}
+              pressed={kind === 'todo'}
+              disabled={disabled || saving}
+              onClick={() => setKind(kind === 'todo' ? 'text' : 'todo')}
+            >
+              <Glyph name="todo" size={16} />
+            </IconButton>
+            <Input
+              name="capture"
+              class="notes-capture-input"
+              aria-label={t('capture.label')}
+              aria-describedby="notes-capture-hint"
+              placeholder={t('capture.placeholder')}
+              value={draft}
+              disabled={disabled}
+              maxLength={kind === 'todo' ? 400 : 10000}
+              onInput={(e) => changeDraft(expandirCaptura(draft, e.currentTarget.value))}
+            />
+            <Dropdown
+              label={t('template.label')}
+              align="end"
+              trigger={(props) => (
+                <IconButton {...props} label={t('template.label')} disabled={disabled || saving}>
+                  <Icon name="ellipsis" size={16} />
+                </IconButton>
+              )}
+            >
+              {PLANTILLAS.map((p) => (
+                <MenuItem key={p} disabled={disabled || saving} onSelect={() => void template(p)}>
+                  {t(`template.${p}`)}
+                </MenuItem>
+              ))}
+            </Dropdown>
+            <IconButton
+              type="submit"
+              label={saving ? t('note.saving') : t('capture.add')}
+              disabled={disabled || saving || !draft.trim()}
+            >
+              <Icon name="plus" size={16} />
+            </IconButton>
+          </form>
+          <p id="notes-capture-hint" class="notes-capture-hint">
+            {t('capture.submitHint')}
+          </p>
+        </div>,
+      )}
       {pendientes.length > 0 ? (
         <ul class="notes-pending">
           {pendientes.map((c) => (

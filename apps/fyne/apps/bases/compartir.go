@@ -442,7 +442,7 @@ func (p *Pantalla) panelFormulario(v tema.Variante) fyne.CanvasObject {
 		}
 		hijos = append(hijos, container.New(extremos{Hueco: tema.Espacio(2), Centro: true}, fila...))
 	}
-	return caja("bg", tema.RadioLG, v, container.New(ui.Columna{Hueco: tema.Espacio(3)}, hijos...))
+	return caja("bg", tema.RadioLG, tema.Espacio(2), v, container.New(ui.Columna{Hueco: tema.Espacio(3)}, hijos...))
 }
 
 // ---- Exportar ----

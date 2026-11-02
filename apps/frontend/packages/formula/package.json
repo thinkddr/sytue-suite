@@ -2,7 +2,7 @@
   "name": "@sytue/formula",
   "version": "1.0.0",
   "private": true,
-  "description": "Sytue One — motor de fórmulas clean-room (semántica OpenFormula / ECMA-376) para el KIND spreadsheet del editor Sytue Docs. Parser, grafo de dependencias, recálculo topológico y registro de funciones. TypeScript puro, cero dependencias.",
+  "description": "Sytue One \u2014 motor de f\u00f3rmulas clean-room (sem\u00e1ntica OpenFormula / ECMA-376) para el KIND spreadsheet del editor Sytue Docs. Parser, grafo de dependencias, rec\u00e1lculo topol\u00f3gico y registro de funciones. TypeScript puro, cero dependencias.",
   "license": "Apache-2.0",
   "type": "module",
   "exports": {
@@ -19,7 +19,7 @@
   },
   "devDependencies": {
     "@sytue/config": "workspace:*",
-    "@types/bun": "1.4.2",
+    "@types/bun": "1.4.4",
     "@types/node": "catalog:",
     "typescript": "6.0.3"
   }

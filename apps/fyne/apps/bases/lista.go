@@ -7,6 +7,7 @@ package bases
 
 import (
 	"context"
+	"image/color"
 	"strings"
 
 	"fyne.io/fyne/v2"
@@ -15,6 +16,7 @@ import (
 	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/widget"
 
+	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
@@ -167,7 +169,7 @@ func (p *Pantalla) tarjeta(b api.BasesBase) *tarjetaBase {
 		tono = ui.InsigniaPrimaria
 	}
 	id := b.ID
-	x := &tarjetaBase{Nombre: b.Name, Detalle: detalle, Rol: rol, Tono: tono, AlPulsar: func() { p.Abrir(id) }}
+	x := &tarjetaBase{Nombre: b.Name, Detalle: detalle, Rol: rol, Tono: tono, Color: tonoDeBase(id), AlPulsar: func() { p.Abrir(id) }}
 	x.ExtendBaseWidget(x)
 	return x
 }
@@ -180,7 +182,9 @@ type tarjetaBase struct {
 	widget.BaseWidget
 	Nombre, Detalle, Rol string
 	Tono                 ui.Tono
-	AlPulsar             func()
+	// Color es el color de grupo de la base, en su icono (`CardIcon`).
+	Color    ui.TonoTarjeta
+	AlPulsar func()
 
 	encima, enfocada bool
 }
@@ -193,9 +197,15 @@ var (
 
 var margenTarjeta = tema.Espacio(3)
 
+// ladoIconoBase es el `size-10` del icono de color de una base, y ladoGlifoBase su glifo.
+var (
+	ladoIconoBase = tema.Espacio(10)
+	ladoGlifoBase = float32(20)
+)
+
 func (x *tarjetaBase) MinSize() fyne.Size {
-	return fyne.NewSize(ui.MedidaInsignia(x.Rol).Width+2*margenTarjeta+tema.Espacio(2),
-		2*margenTarjeta+tema.TextoBase.Linea+tema.TextoSM.Linea)
+	return fyne.NewSize(ladoIconoBase+tema.Espacio(3)+ui.MedidaInsignia(x.Rol).Width+2*margenTarjeta+tema.Espacio(2),
+		2*margenTarjeta+max(tema.TextoBase.Linea+tema.TextoSM.Linea, ladoIconoBase))
 }
 
 func (x *tarjetaBase) Tapped(*fyne.PointEvent) {
@@ -237,7 +247,12 @@ func (x *tarjetaBase) CreateRenderer() fyne.WidgetRenderer {
 		nombre:   ui.Texto(x.Nombre, tema.TextoBase, ui.SemiNegrita, tema.Color("text", v)),
 		detalle:  ui.Texto(x.Detalle, tema.TextoSM, ui.Normal, tema.Color("text-muted", v)),
 		insignia: ui.NuevaInsignia(x.Rol, x.Tono),
+		icono:    canvas.NewRectangle(color.Transparent),
 	}
+	r.icono.CornerRadius = tema.RadioLG
+	relleno, tinta := ui.TonoSolido(x.Color, v)
+	r.icono.FillColor = relleno
+	r.glifo = iconos.TrazoConTinta(iconos.BaseDeDatos, ladoGlifoBase, tinta)
 	r.caja.CornerRadius = tema.RadioLG
 	r.caja.StrokeWidth = tema.Borde
 	r.Refresh()
@@ -249,12 +264,14 @@ type tarjetaRenderer struct {
 	caja            *canvas.Rectangle
 	nombre, detalle *canvas.Text
 	insignia        *ui.Insignia
+	icono           *canvas.Rectangle
+	glifo           *iconos.Dibujo
 }
 
 func (r *tarjetaRenderer) Destroy()           {}
 func (r *tarjetaRenderer) MinSize() fyne.Size { return r.x.MinSize() }
 func (r *tarjetaRenderer) Objects() []fyne.CanvasObject {
-	return []fyne.CanvasObject{r.caja, r.nombre, r.detalle, r.insignia}
+	return []fyne.CanvasObject{r.caja, r.icono, r.glifo.Objeto(), r.nombre, r.detalle, r.insignia}
 }
 
 func (r *tarjetaRenderer) Layout(t fyne.Size) {
@@ -262,15 +279,27 @@ func (r *tarjetaRenderer) Layout(t fyne.Size) {
 	ins := ui.MedidaInsignia(r.x.Rol)
 	r.insignia.Resize(ins)
 	r.insignia.Move(fyne.NewPos(t.Width-margenTarjeta-ins.Width, (t.Height-ins.Height)/2))
-	cabe := max(t.Width-2*margenTarjeta-ins.Width-tema.Espacio(2), 0)
+	yIcono := (t.Height - ladoIconoBase) / 2
+	r.icono.Move(fyne.NewPos(margenTarjeta, yIcono))
+	r.icono.Resize(fyne.NewSquareSize(ladoIconoBase))
+	r.glifo.Colocar(margenTarjeta+(ladoIconoBase-ladoGlifoBase)/2, yIcono+(ladoIconoBase-ladoGlifoBase)/2, ladoGlifoBase)
+	xTexto := margenTarjeta + ladoIconoBase + tema.Espacio(3)
+	cabe := max(t.Width-xTexto-margenTarjeta-ins.Width-tema.Espacio(2), 0)
 	ui.Truncar(r.nombre, r.x.Nombre, tema.TextoBase, ui.SemiNegrita, cabe)
 	ui.Truncar(r.detalle, r.x.Detalle, tema.TextoSM, ui.Normal, cabe)
-	ui.ColocarTexto(r.nombre, tema.TextoBase, margenTarjeta, margenTarjeta)
-	ui.ColocarTexto(r.detalle, tema.TextoSM, margenTarjeta, margenTarjeta+tema.TextoBase.Linea)
+	yTexto := (t.Height - tema.TextoBase.Linea - tema.TextoSM.Linea) / 2
+	ui.ColocarTexto(r.nombre, tema.TextoBase, xTexto, yTexto)
+	ui.ColocarTexto(r.detalle, tema.TextoSM, xTexto, yTexto+tema.TextoBase.Linea)
 }
 
 func (r *tarjetaRenderer) Refresh() {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
+	relleno, tinta := ui.TonoSolido(r.x.Color, v)
+	r.icono.FillColor = relleno
+	r.glifo.TenirCon(tinta)
+	r.nombre.Color = tema.Color("text", v)
+	r.detalle.Color = tema.Color("text-muted", v)
+	r.insignia.Refresh()
 	fondo := "surface"
 	if r.x.encima {
 		fondo = "bg-subtle"

@@ -32,6 +32,7 @@
   "common.offline": "Jste offline. Změny se neuloží, dokud se připojení nevrátí.",
   "common.retry": "Zkusit znovu",
   "common.save": "Uložit",
+  "crypto.dataReviewRequired": "Tato část obsahuje data, která aplikace nemůže změnit bez ztráty přesnosti. Originál byl zachován.",
   "crypto.disable": "Odstranit šifrování",
   "crypto.disableWarning": "Stávající šifrované poznámky zůstanou nečitelné. Nejprve zápisník odemkněte.",
   "crypto.enable": "Zašifrovat",
@@ -39,7 +40,6 @@
   "crypto.lockNow": "Zamknout hned",
   "crypto.locked": "Zamčeno",
   "crypto.migrating": "Zabezpečování obsahu sešitu…",
-  "crypto.dataReviewRequired": "Tato část obsahuje data, která aplikace nemůže změnit bez ztráty přesnosti. Originál byl zachován.",
   "crypto.migrationFailed": "Šifrování se nepodařilo dokončit. Tvá data zůstala zachována. Znovu otevři sešit a zkontroluj změny.",
   "crypto.mismatch": "Obě heslové fráze se liší.",
   "crypto.passphrase": "Heslová fráze",
@@ -274,6 +274,7 @@
   "notebook.delete": "Smazat zápisník",
   "notebook.deleteConfirm": "Smazat „{title}“ a všechno, co je uvnitř?",
   "notebook.emoji": "Ikona",
+  "notebook.move": "Přesunout zápisník",
   "notebook.newChild": "Nový zápisník uvnitř",
   "notebook.notes": {
     "one": "{count} poznámka",

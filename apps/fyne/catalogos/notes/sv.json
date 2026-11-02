@@ -32,6 +32,7 @@
   "common.offline": "Du är offline. Ändringar sparas inte förrän anslutningen är tillbaka.",
   "common.retry": "Försök igen",
   "common.save": "Spara",
+  "crypto.dataReviewRequired": "Den här delen innehåller data som appen inte kan ändra utan att förlora precision. Originalet har bevarats.",
   "crypto.disable": "Ta bort krypteringen",
   "crypto.disableWarning": "Befintliga krypterade anteckningar förblir oläsbara. Lås upp anteckningsboken först.",
   "crypto.enable": "Kryptera",
@@ -39,7 +40,6 @@
   "crypto.lockNow": "Lås nu",
   "crypto.locked": "Låst",
   "crypto.migrating": "Skyddar anteckningsbokens innehåll…",
-  "crypto.dataReviewRequired": "Den här delen innehåller data som appen inte kan ändra utan att förlora precision. Originalet har bevarats.",
   "crypto.migrationFailed": "Krypteringen kunde inte slutföras. Dina data har bevarats. Öppna anteckningsboken igen för att granska ändringarna.",
   "crypto.mismatch": "De två lösenfraserna är olika.",
   "crypto.passphrase": "Lösenfras",
@@ -266,6 +266,7 @@
   "notebook.delete": "Ta bort anteckningsbok",
   "notebook.deleteConfirm": "Ta bort ”{title}” och allt som finns i den?",
   "notebook.emoji": "Ikon",
+  "notebook.move": "Flytta anteckningsbok",
   "notebook.newChild": "Ny anteckningsbok inuti",
   "notebook.notes": {
     "one": "{count} anteckning",

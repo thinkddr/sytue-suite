@@ -642,10 +642,11 @@ func NuevoAccesoPapelera(rotulo string, alPulsar func()) *FiltroDestacados {
 	return f
 }
 
-// MinSize es MedidaFiltro.
+// MinSize conserva MedidaFiltro y el suelo táctil compartido.
 func (f *FiltroDestacados) MinSize() fyne.Size {
 	f.ExtendBaseWidget(f)
-	return MedidaFiltro(f.Rotulo)
+	m := MedidaFiltro(f.Rotulo)
+	return fyne.NewSize(ui.SueloTactil(m.Width), ui.SueloTactil(m.Height))
 }
 
 func (f *FiltroDestacados) colores(v tema.Variante) (fondo, borde, tinta color.NRGBA) {

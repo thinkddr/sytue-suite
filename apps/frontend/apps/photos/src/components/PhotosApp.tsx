@@ -837,7 +837,7 @@ export function PhotosApp({ locale, user, hubBaseUrl, soloFavoritas = false }: P
               del fondo: pegada tapa las fotos, y suelta no pinta una banda blanca. */}
             <h2
               class={cx(
-                'bg-bg text-text-muted sytue-overline sticky z-10 flex items-center gap-3 py-2',
+                'bg-bg text-text sticky z-10 flex items-center gap-3 py-2 text-sm font-semibold',
                 // Bajo la barra de selección cuando está: si no, el mes se escondía detrás.
                 // Su alto: 12 de relleno, 2 de borde y los 32 de un mando —44 con el dedo—.
                 seleccion !== null ? 'top-[2.875rem] pointer-coarse:top-[3.625rem]' : 'top-0',
@@ -847,7 +847,7 @@ export function PhotosApp({ locale, user, hubBaseUrl, soloFavoritas = false }: P
               {(() => {
                 const aproximadas = grupo.fotos.filter((f) => !f.takenAtFromExif).length;
                 return aproximadas > 0 ? (
-                  <span class="text-text-subtle font-normal tracking-normal normal-case">
+                  <span class="text-text-muted text-xs font-normal">
                     {t('gallery.approxCount', { count: aproximadas })}
                   </span>
                 ) : null;

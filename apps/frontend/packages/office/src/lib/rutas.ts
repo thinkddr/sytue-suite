@@ -34,8 +34,6 @@ import { orgActual, rutaConOrg } from '@sytue/config';
 import { withBase } from '@sytue/ui';
 
 export function r(path: string, org?: string | null): string {
-  return withBase(
-    import.meta.env.BASE_URL,
-    rutaConOrg('', org ?? orgActual(import.meta.env.BASE_URL), path),
-  );
+  const base = import.meta.env.BASE_URL ?? '/';
+  return withBase(base, rutaConOrg('', org ?? orgActual(base), path));
 }

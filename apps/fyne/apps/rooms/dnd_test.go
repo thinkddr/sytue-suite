@@ -148,3 +148,38 @@ func TestArrastrarUnaCategoria(t *testing.T) {
 	}
 	fila.DragEnd()
 }
+
+func TestElCanalTactilSoloSeMueveDesdeSuAsaYCancelaSinGuardar(t *testing.T) {
+	t.Cleanup(ui.TactilDePrueba(true))
+	s := servicioConDos()
+	s.categorias = []api.RoomsCategory{{ID: "k1", Name: "Clientes"}}
+	sa, _ := salaDePrueba(t, s)
+	sa.Arrancar(context.Background())
+	l := sa.P.Lateral
+	c := l.Canales[0]
+	o, ok := l.fila(c, tema.Claro).(*fyne.Container)
+	if !ok {
+		t.Fatal("no hay asa táctil separada de la fila")
+	}
+	if _, captura := o.Objects[0].(fyne.Draggable); captura {
+		t.Fatal("la fila entera captura el desplazamiento del carril")
+	}
+	asa, ok := o.Objects[1].(*ui.AsaArrastre)
+	if !ok {
+		t.Fatal("el control de movimiento no es el asa compartida")
+	}
+	k := dianaDe(t, l, "k1")
+	pos := fyne.CurrentApp().Driver().AbsolutePositionForObject(k.o).AddXY(40, 10)
+	antes := len(s.llamadas)
+	asa.Dragged(arrastre(fyne.Position{}, pos))
+	asa.TypedKey(&fyne.KeyEvent{Name: fyne.KeyEscape})
+	asa.DragEnd()
+	if k.sec.Diana || len(s.llamadas) != antes {
+		t.Fatal("cancelar el gesto modifica el canal o deja el destino marcado")
+	}
+	asa.Dragged(arrastre(fyne.Position{}, pos))
+	asa.DragEnd()
+	if !s.pidio("SetChannelCategory(" + c.ID + ",k1)") {
+		t.Fatal("soltar el asa no mueve el canal a su categoría")
+	}
+}

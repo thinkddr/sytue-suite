@@ -97,14 +97,17 @@ type Rejilla struct {
 	// en otra parte o con Escape; devuelve si había algo que cerrar.
 	AlPulsarFuera func() bool
 
-	sel        Celda
-	ext        *Celda // extremo del rango; nil si solo hay celda ancla
-	desX, desY float32
-	enfocado   bool
-	mays       bool
-	arrastre   int // la zona donde empezó el arrastre, o zonaFuera
-	señalando  bool
-	mayRaton   bool // Mayús en la última pulsación del ratón
+	sel          Celda
+	ext          *Celda // extremo del rango; nil si solo hay celda ancla
+	desX, desY   float32
+	enfocado     bool
+	mays         bool
+	arrastre     int // la zona donde empezó el arrastre, o zonaFuera
+	señalando    bool
+	mayRaton     bool // Mayús en la última pulsación del ratón
+	autoArrastre ui.AutoScrollArrastre
+	cancelado    bool // ignora movimientos tardíos hasta DragEnd
+	arrastrando  bool
 	// El autorrelleno: arrastrando el asa, el rango de origen y el que se va a rellenar.
 	rellenando bool
 	origenRell [4]int
@@ -660,6 +663,26 @@ func (r *Rejilla) DoubleTapped(e *fyne.PointEvent) {
 // arrastre empieza donde se pulsó: sobre una celda, marca celdas; sobre una cabecera,
 // columnas o filas enteras. Volver a la celda ancla deshace el rango, como en la web.
 func (r *Rejilla) Dragged(e *fyne.DragEvent) {
+	if r.cancelado {
+		return
+	}
+	r.arrastrarRango(e)
+	if r.arrastre == zonaFuera && !r.rellenando && !r.señalando {
+		return
+	}
+	r.arrastrando = true
+	pos := e.AbsolutePosition
+	if pos.IsZero() {
+		pos = fyne.CurrentApp().Driver().AbsolutePositionForObject(r).Add(e.Position)
+	}
+	r.autoArrastre.Actualizar(r, pos, func(dx, dy float32) {
+		r.Desplazar(dx, dy)
+		inicio := fyne.CurrentApp().Driver().AbsolutePositionForObject(r)
+		r.arrastrarRango(&fyne.DragEvent{PointEvent: fyne.PointEvent{Position: pos.Subtract(inicio), AbsolutePosition: pos}})
+	})
+}
+
+func (r *Rejilla) arrastrarRango(e *fyne.DragEvent) {
 	if r.rellenando {
 		r.arrastrarAsa(Celda{C: clamp(r.colEn(e.Position.X), r.Cols-1), F: clamp(r.filaEn(e.Position.Y), r.Fils-1)})
 		return
@@ -709,11 +732,31 @@ func (r *Rejilla) Dragged(e *fyne.DragEvent) {
 
 // DragEnd suelta el arrastre: el rango ya está puesto.
 func (r *Rejilla) DragEnd() {
+	r.autoArrastre.Parar()
+	r.arrastrando = false
+	if r.cancelado {
+		r.cancelado = false
+		return
+	}
 	r.arrastre, r.mayRaton = zonaFuera, false
 	r.señalado()
 	if r.rellenando {
 		r.soltarAsa()
 	}
+}
+
+// CancelarArrastre quita la previa del autorrelleno sin escribir en el libro ni
+// cerrar una celda que se estuviera editando.
+func (r *Rejilla) CancelarArrastre() {
+	r.autoArrastre.Parar()
+	if r.arrastre == zonaFuera && !r.rellenando && !r.señalando {
+		return
+	}
+	r.cancelado = r.cancelado || r.arrastrando
+	r.arrastrando = false
+	r.arrastre, r.mayRaton = zonaFuera, false
+	r.rellenando, r.señalando, r.destRell = false, false, nil
+	r.Refresh()
 }
 
 // vista es la geometría del pintado de ahora.
@@ -796,7 +839,14 @@ func (r *Rejilla) Cursor() desktop.Cursor { return desktop.CrosshairCursor }
 func (r *Rejilla) FocusGained() { r.enfocado = true; r.Refresh() }
 
 // FocusLost lo apaga.
-func (r *Rejilla) FocusLost() { r.enfocado = false; r.Refresh() }
+func (r *Rejilla) FocusLost() {
+	r.autoArrastre.Parar()
+	if r.arrastre != zonaFuera || r.rellenando {
+		r.CancelarArrastre()
+	}
+	r.enfocado = false
+	r.Refresh()
+}
 
 // AcceptsTab se queda con el tabulador: en una hoja de cálculo pasa a la celda de al
 // lado, como en la web. Para salir de la rejilla con el teclado está Escape.
@@ -842,6 +892,9 @@ func (r *Rejilla) mayus() bool {
 // complejidad ciclomática del linter se mide por función y esto es un `switch` largo,
 // no lógica enredada.
 func (r *Rejilla) TypedKey(k *fyne.KeyEvent) {
+	if k.Name == fyne.KeyEscape {
+		r.CancelarArrastre()
+	}
 	ext := r.mayus()
 	base := r.sel
 	if r.ext != nil && ext {

@@ -825,7 +825,7 @@ func (w *vistaPortada) CreateRenderer() fyne.WidgetRenderer {
 	r := &vistaRenderer{
 		w:        w,
 		fondo:    canvas.NewRectangle(color.NRGBA{}),
-		titulo:   ui.Texto(p.t(claveCabeceraPortada(p.Tipo)), ui.EscalonTitulo(2), ui.PesoTitulo(2), color.NRGBA{}),
+		titulo:   ui.NuevoParrafo(p.t(claveCabeceraPortada(p.Tipo)), ui.EscalonTitulo(2), ui.PesoTitulo(2), "text", v),
 		nuevo:    ui.NuevoVersal(p.t("list.new.heading"), tema.TextoXS, ui.SemiNegrita, tema.Color("text-subtle", v)),
 		reciente: ui.NuevoVersal(p.t("list.recent.heading"), tema.TextoXS, ui.SemiNegrita, tema.Color("text-subtle", v)),
 		banda:    ui.NuevaCaja(tema.Color("surface", v), tema.Color("border", v), tema.RadioLG),
@@ -835,6 +835,7 @@ func (w *vistaPortada) CreateRenderer() fyne.WidgetRenderer {
 		rueda:    ui.NuevaRueda(RuedaFranja, "text-muted", v),
 		mas:      ui.Texto(p.t("list.loadingMore"), tema.TextoSM, ui.Normal, color.NRGBA{}),
 	}
+	r.titulo.PartirPalabras = true
 	w.r = r
 	// Un solo desplazamiento para la cabecera, las plantillas y los recientes.
 	// AlAnchoFluido evita que el ancho de la galería fije el mínimo de la ventana;
@@ -892,7 +893,7 @@ type vistaRenderer struct {
 	w               *vistaPortada
 	pagina          *fyne.Container
 	fondo           *canvas.Rectangle
-	titulo          *canvas.Text
+	titulo          *ui.Parrafo
 	lema            []*canvas.Text
 	nuevo, reciente *ui.Versal
 	banda           *ui.Caja
@@ -972,9 +973,13 @@ func (r *vistaRenderer) Layout(t fyne.Size) {
 	w.papelera.Move(fyne.NewPos(x+ancho-pap.Width, y))
 	w.papelera.Resize(pap)
 	izq := max(ancho-pap.Width-HuecoPapelera, 0)
-	ui.Truncar(r.titulo, p.t(claveCabeceraPortada(p.Tipo)), ui.EscalonTitulo(2), ui.PesoTitulo(2), izq)
-	ui.ColocarTexto(r.titulo, ui.EscalonTitulo(2), x, y)
-	y += ui.EscalonTitulo(2).Linea + BajoLema
+	// El h1 de DocList puede partir: la papelera conserva su tamaño y el lema baja
+	// después del título completo, también con la tipografía de Marco.
+	r.titulo.Texto, r.titulo.Escalon, r.titulo.Peso = p.t(claveCabeceraPortada(p.Tipo)), ui.EscalonTitulo(2), ui.PesoTitulo(2)
+	r.titulo.Move(fyne.NewPos(x, y))
+	r.titulo.Resize(ui.MedidaParrafo(r.titulo, izq))
+	r.titulo.Refresh()
+	y += r.titulo.Size().Height + BajoLema
 	r.lemaEn(min(izq, AnchoLema), v)
 	for _, l := range r.lema {
 		ui.ColocarTexto(l, tema.TextoBase, x, y)
@@ -1088,7 +1093,7 @@ func (r *vistaRenderer) Layout(t fyne.Size) {
 func (r *vistaRenderer) Refresh() {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	r.fondo.FillColor = tema.Color("bg", v)
-	r.titulo.Color = tema.Color("text", v)
+	r.titulo.Tinta = tema.Color("text", v)
 	for _, l := range r.lema {
 		l.Color = tema.Color("text-muted", v)
 	}

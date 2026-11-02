@@ -225,6 +225,12 @@ func (l *Lista) filasMovil(v tema.Variante, ancho float32) (fyne.CanvasObject, f
 				l.AlAbrir(reg)
 			}
 		})
+		f.Marcada = l.Marcadas[reg.ID]
+		f.AlMarcar = func() {
+			if l.AlMarcar != nil {
+				l.AlMarcar(reg.ID)
+			}
+		}
 		fila := &filaMovil{fondo: f}
 		objs := []fyne.CanvasObject{f}
 		fila.nombre = ui.Texto(NombreDe(r), tema.TextoSM, ui.SemiNegrita, tema.Color("text", v))
@@ -459,13 +465,14 @@ func (l *Lista) tarjeta(v tema.Variante, r Registro) fyne.CanvasObject {
 		}
 	}
 	fondo := NuevaTarjetaReg(NombreDe(r), abrir)
-	tj := &tarjetaReg{fondo: fondo}
-	objs := []fyne.CanvasObject{fondo}
-	cs := NuevaCasillaNativa(NombreDe(r), l.Marcadas[r.ID], func() {
+	fondo.AlMarcar = func() {
 		if l.AlMarcar != nil {
 			l.AlMarcar(r.ID)
 		}
-	})
+	}
+	tj := &tarjetaReg{fondo: fondo}
+	objs := []fyne.CanvasObject{fondo}
+	cs := NuevaCasillaNativa(NombreDe(r), l.Marcadas[r.ID], fondo.AlMarcar)
 	tj.casilla = cs
 	ref := r.Ref
 	if ref == "" {
@@ -559,6 +566,13 @@ func (t *tarjetaReg) Layout(_ []fyne.CanvasObject, tam fyne.Size) {
 // borde a `border-strong` con el puntero encima.
 type TarjetaReg struct {
 	ui.Pulsable
+	AlMarcar func()
+}
+
+func (t *TarjetaReg) TappedSecondary(*fyne.PointEvent) {
+	if t.AlMarcar != nil {
+		t.AlMarcar()
+	}
 }
 
 // NuevaTarjetaReg crea el fondo de una tarjeta de registro.

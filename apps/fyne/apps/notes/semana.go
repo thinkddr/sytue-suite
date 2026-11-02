@@ -56,8 +56,9 @@ type estadoDiario struct {
 	agendaDe string
 	// semana y semanaDia son la barra pintada y su día central: donde se busca el día
 	// sobre el que se suelta una nota.
-	semana    *fyne.Container
-	semanaDia time.Time
+	semana        *fyne.Container
+	semanaDia     time.Time
+	marcasDestino []*canvas.Rectangle
 }
 
 func (p *Pantalla) vistaDiario() string {

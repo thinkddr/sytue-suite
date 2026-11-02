@@ -106,6 +106,14 @@ type Tarjeta struct {
 	// AlSoltar es el final de un arrastre en el lienzo libre, con la esquina de la
 	// tarjeta en coordenadas de su contenedor. Con él puesto, la tarjeta lleva el asa.
 	AlSoltar func(fyne.Position)
+	// Las filas se arrastran por el asa sin mover el texto bajo el dedo.
+	arrastreEnSitio    bool
+	alArrastrar        func(fyne.Position)
+	alSoltarEn         func(fyne.Position)
+	alCancelarArrastre func()
+	punteroArrastre    fyne.Position
+	inicioArrastre     fyne.Position
+	insercion          int // -1 antes, +1 después, 0 sin destino
 	// Imagen es la imagen de una dirección tal como vaya (la de una nota de imagen), y
 	// Documento el HTML de un documento de Docs (la vista previa de una nota `doc`).
 	Imagen    func(url string) imagenRemota
@@ -153,12 +161,12 @@ const (
 	PuntoEstado = 2 * 0.25 * tema.Rem
 )
 
-// Las filas (`.notes-stream-note` de app.css): `px-2 py-1.5` sin borde; la cabecera en
+// Las filas (`.notes-stream-note` de app.css): `px-2 py-2` sin borde; la cabecera en
 // `gap-2`, el glifo en su columna de `w-5` y el cuerpo con el `pl-7` que lo alinea con el
 // título. La hoja de un árbol (`.notes-sheet`) es `px-6 py-6 sm:px-10`, también sin borde.
 const (
 	RellenoFilaX      = 2 * 0.25 * tema.Rem
-	RellenoFilaY      = 1.5 * 0.25 * tema.Rem
+	RellenoFilaY      = 2 * 0.25 * tema.Rem
 	HuecoFila         = 2 * 0.25 * tema.Rem
 	ColumnaGlifoFila  = 5 * 0.25 * tema.Rem
 	SangriaCuerpoFila = 7 * 0.25 * tema.Rem
@@ -172,7 +180,7 @@ const (
 // hoja es la nota de un árbol, que llena su panel: una página, no una tarjeta.
 func (t *Tarjeta) hoja() bool { return t.Llenar && !t.Diario }
 
-// margenY es el relleno vertical: el `py-1.5` de la fila, el `py-6` de la hoja o el `p-3`
+// margenY es el relleno vertical: el `py-2` de la fila, el `py-6` de la hoja o el `p-3`
 // de la tarjeta, este dentro de su borde.
 func (t *Tarjeta) margenY() float32 {
 	switch {
@@ -316,6 +324,9 @@ func (t *Tarjeta) altoCabecera(interior float32) float32 {
 	if t.Editor != nil {
 		alto = max(alto, LadoBotonEd)
 	}
+	if t.AlSoltar != nil {
+		alto = max(alto, ladoAsa()-2*t.margenY())
+	}
 	return alto
 }
 
@@ -353,6 +364,7 @@ type tarjetaRenderer struct {
 	cuerpo   fyne.CanvasObject
 	pie      fyne.CanvasObject
 	objetos  []fyne.CanvasObject
+	marca    *canvas.Rectangle
 }
 
 func (r *tarjetaRenderer) rehacerHijos(v tema.Variante) {
@@ -373,10 +385,13 @@ func (r *tarjetaRenderer) rehacerHijos(v tema.Variante) {
 		r.objetos = append(r.objetos, r.pie)
 	}
 	r.asa = nil
-	if t.AlSoltar != nil {
-		r.asa = nuevaAsa(t, v)
-		r.objetos = append(r.objetos, r.asa)
+	for _, p := range r.der {
+		if a, ok := p.o.(*asaArrastre); ok {
+			r.asa = a
+		}
 	}
+	r.marca = canvas.NewRectangle(tema.Color("primary", v))
+	r.objetos = append(r.objetos, r.marca)
 }
 
 // cantidadFija son los objetos de fondo (sombra, caja, aro) que van SIEMPRE los
@@ -418,34 +433,10 @@ type pieza struct {
 // El «…» sale también aparte: es el que la tarjeta enciende al pasar, y quien solo mide
 // (`MedidaTarjetaNota`) no debe quitarle el suyo.
 func (t *Tarjeta) cabecera(v tema.Variante) (izq []pieza, titulo fyne.CanvasObject, der []pieza, mas *botonMas) {
-	switch {
-	case t.nota.Icono != "" && GlifoPorNombre(t.nota.Icono) != "":
-		izq = append(izq, pieza{Glifo(GlifoPorNombre(t.nota.Icono), GlifoTarjeta, "primary-text", v), bajaGlifoTarjeta})
-	case t.nota.Tipo == "todo":
-		c := ui.NuevaCasilla("", func(marcada bool) { llamar1(t.AlMarcar, marcada) })
-		c.Marcada = t.nota.Marcada
-		if t.SoloLectura || t.Bloqueada {
-			c.Disable()
-		}
-		izq = append(izq, pieza{c, bajaCasillaTarjet})
-	default:
-		if d := GlifoDeTipo(t.nota.Tipo); d != "" {
-			izq = append(izq, pieza{Glifo(d, GlifoTarjeta, "text-subtle", v), bajaGlifoTarjeta})
-		}
+	if t.AlSoltar != nil {
+		der = append(der, pieza{o: nuevaAsa(t), baja: -t.margenY()})
 	}
-	if t.Diario {
-		// La columna fija de Twos (`.notes-stream-glyph`, `h-5 w-5` centrada y `mt-0.5`):
-		// cada fila empieza por su glifo en el mismo sitio, y un texto lleva la viñeta.
-		dentro := punto(VinetaFila, tema.Color("text-subtle", v))
-		switch {
-		case len(izq) > 0:
-			dentro = izq[0].o
-		case t.esSeparador():
-			// Un separador es solo su raya: la columna del glifo se queda vacía.
-			dentro = canvas.NewRectangle(color.NRGBA{})
-		}
-		izq = []pieza{{container.New(&celdaGlifo{lado: ColumnaGlifoFila}, dentro), bajaGlifoTarjeta}}
-	}
+	izq = t.glifosCabecera(v)
 	titulo = t.titulo(v)
 	switch {
 	case t.esSeparador():
@@ -484,6 +475,39 @@ func (t *Tarjeta) cabecera(v tema.Variante) (izq []pieza, titulo fyne.CanvasObje
 		der = append(der, pieza{mas, 0})
 	}
 	return izq, titulo, der, mas
+}
+
+// glifosCabecera conserva la columna de icono o casilla de cada tipo de nota.
+func (t *Tarjeta) glifosCabecera(v tema.Variante) (izq []pieza) {
+	switch {
+	case t.nota.Icono != "" && GlifoPorNombre(t.nota.Icono) != "":
+		izq = append(izq, pieza{Glifo(GlifoPorNombre(t.nota.Icono), GlifoTarjeta, "primary-text", v), bajaGlifoTarjeta})
+	case t.nota.Tipo == "todo":
+		c := ui.NuevaCasilla("", func(marcada bool) { llamar1(t.AlMarcar, marcada) })
+		c.Marcada = t.nota.Marcada
+		if t.SoloLectura || t.Bloqueada {
+			c.Disable()
+		}
+		izq = append(izq, pieza{c, bajaCasillaTarjet})
+	default:
+		if d := GlifoDeTipo(t.nota.Tipo); d != "" {
+			izq = append(izq, pieza{Glifo(d, GlifoTarjeta, "text-subtle", v), bajaGlifoTarjeta})
+		}
+	}
+	if t.Diario {
+		// La columna fija de Twos (`.notes-stream-glyph`, `h-5 w-5` centrada y `mt-0.5`):
+		// cada fila empieza por su glifo en el mismo sitio, y un texto lleva la viñeta.
+		dentro := punto(VinetaFila, tema.Color("text-subtle", v))
+		switch {
+		case len(izq) > 0:
+			dentro = izq[0].o
+		case t.esSeparador():
+			// Un separador es solo su raya: la columna del glifo se queda vacía.
+			dentro = canvas.NewRectangle(color.NRGBA{})
+		}
+		izq = []pieza{{container.New(&celdaGlifo{lado: ColumnaGlifoFila}, dentro), bajaGlifoTarjeta}}
+	}
+	return izq
 }
 
 // titulo es lo que va en el `<h3>`, en uno de sus cuatro estados: el candado de un
@@ -839,10 +863,12 @@ func (r *tarjetaRenderer) Layout(t fyne.Size) {
 		}
 		alto = max(alto, resto)
 	}
-	if r.asa != nil {
-		r.asa.Move(fyne.NewPos(PosAsa, PosAsa))
-		r.asa.Resize(fyne.NewSize(GlifoAsa, GlifoAsa))
+	yMarca := float32(0)
+	if r.t.insercion > 0 {
+		yMarca = max(t.Height-tema.AnilloFoco, 0)
 	}
+	r.marca.Move(fyne.NewPos(0, yMarca))
+	r.marca.Resize(fyne.NewSize(t.Width, tema.AnilloFoco))
 	r.cuerpo.Move(fyne.NewPos(margen+sangria, y))
 	r.cuerpo.Resize(fyne.NewSize(interior-sangria, alto))
 	y += alto
@@ -887,6 +913,42 @@ func (r *tarjetaRenderer) Refresh() {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	t := r.t
 	r.sombra.Objeto().Hide()
+	r.pintarFondo(v)
+	r.marca.FillColor = tema.Color("primary", v)
+	yMarca := float32(0)
+	if t.insercion > 0 {
+		yMarca = max(t.Size().Height-tema.AnilloFoco, 0)
+	}
+	r.marca.Move(fyne.NewPos(0, yMarca))
+	r.marca.Resize(fyne.NewSize(t.Size().Width, tema.AnilloFoco))
+	if t.insercion != 0 {
+		r.marca.Show()
+	} else {
+		r.marca.Hide()
+	}
+	r.aro.Pintar(v)
+	r.aro.Ver(t.enfocado)
+	if t.mas != nil {
+		if t.verMas() {
+			t.mas.Show()
+		} else {
+			t.mas.Hide()
+		}
+	}
+	if r.asa != nil {
+		// `opacity-0 group-hover:opacity-100 group-focus-within:opacity-100`, y en táctil
+		// siempre (al 60 %, que pinta `nuevaAsa`).
+		if t.encima || t.enfocado || r.asa.enfocada || t.arrastrando || t.Editor != nil || ui.EsTactil() {
+			r.asa.Show()
+		} else {
+			r.asa.Hide()
+		}
+	}
+}
+
+// pintarFondo aplica los colores de fila, hoja o tarjeta sin cambiar la geometría.
+func (r *tarjetaRenderer) pintarFondo(v tema.Variante) {
+	t := r.t
 	// Tres formas (NoteCard.tsx): fila, hoja y tarjeta. Solo la tarjeta lleva borde.
 	var fondo, borde color.NRGBA
 	switch {
@@ -911,46 +973,32 @@ func (r *tarjetaRenderer) Refresh() {
 		}
 	}
 	r.caja.Pintar(fondo, borde)
-	r.aro.Pintar(v)
-	r.aro.Ver(t.enfocado)
-	if t.mas != nil {
-		if t.verMas() {
-			t.mas.Show()
-		} else {
-			t.mas.Hide()
-		}
-	}
-	if r.asa != nil {
-		// `opacity-0 group-hover:opacity-100 group-focus-within:opacity-100`, y en táctil
-		// siempre (al 60 %, que pinta `nuevaAsa`).
-		if t.encima || t.enfocado || t.arrastrando || t.Editor != nil || esMovil() {
-			r.asa.Show()
-		} else {
-			r.asa.Hide()
-		}
+	if t.arrastrando {
+		r.caja.Pintar(tema.Color("selected", v), borde)
 	}
 }
 
-// Medidas del asa: `absolute top-1 left-1` y el glifo de 14.
-const (
-	PosAsa   = 1 * 0.25 * tema.Rem
-	GlifoAsa = 14
-)
+const GlifoAsa = 14
 
-func esMovil() bool { return fyne.CurrentApp().Driver().Device().IsMobile() }
+func ladoAsa() float32 {
+	return ui.SueloTactil(ui.LadoIconoSM)
+}
 
 // asaArrastre es el asa de la tarjeta en el lienzo libre: el `drag` en `text-subtle`.
 // Arrastrarla mueve la tarjeta, que sigue al puntero y va por encima de las demás
 // (`z-10`: `alFrente` del lienzo), y soltarla la coloca con una sola escritura. La
 // alternativa de teclado es Alt+flechas (`moverConTeclado`).
 type asaArrastre struct {
-	widget.BaseWidget
-	t      *Tarjeta
-	dibujo fyne.CanvasObject
+	ui.Boton
+	t         *Tarjeta
+	enfocada  bool
+	cancelada bool
 }
 
 var (
 	_ fyne.Draggable     = (*asaArrastre)(nil)
+	_ fyne.Focusable     = (*asaArrastre)(nil)
+	_ fyne.Tappable      = (*asaArrastre)(nil)
 	_ desktop.Cursorable = (*asaArrastre)(nil)
 )
 
@@ -1014,42 +1062,106 @@ func imagenCursor(dibujo func(color.NRGBA) *iconos.Dibujo) image.Image {
 	return out
 }
 
-func nuevaAsa(t *Tarjeta, v tema.Variante) *asaArrastre {
-	c := tema.Color("text-subtle", v)
-	if esMovil() {
-		c = velo(c, 0.6)
-	}
-	a := &asaArrastre{t: t, dibujo: iconos.TrazoDeRuta(AsaD, GlifoAsa, c).Objeto()}
+func nuevaAsa(t *Tarjeta) *asaArrastre {
+	a := &asaArrastre{t: t, Boton: ui.Boton{
+		Rotulo:   t.tr.T("history.move", nil) + ": " + t.nota.Rotulo(t.tr),
+		Variante: ui.Fantasma, Talla: ui.TallaSM,
+		Icono: iconos.Arrastrar, TamIcono: GlifoAsa, SoloIcono: true, Atenuado: true,
+	}}
+	a.AlPulsar = func() { llamar1(t.AlMenu, fyne.CanvasObject(a)) }
 	a.ExtendBaseWidget(a)
 	return a
 }
 
-// AccessibilityLabel es el `aria-label` del botón del asa: el título de la nota.
-func (a *asaArrastre) AccessibilityLabel() string { return a.t.nota.Rotulo(a.t.tr) }
+func (a *asaArrastre) FocusLost() {
+	a.enfocada = false
+	a.CancelarArrastre()
+	a.Boton.FocusLost()
+	a.t.Refresh()
+}
 
-func (a *asaArrastre) CreateRenderer() fyne.WidgetRenderer {
-	return widget.NewSimpleRenderer(a.dibujo)
+func (a *asaArrastre) FocusGained() {
+	a.enfocada = true
+	a.Boton.FocusGained()
+	a.t.Refresh()
+}
+
+func (a *asaArrastre) TypedKey(e *fyne.KeyEvent) {
+	switch e.Name {
+	case fyne.KeyEscape:
+		a.CancelarArrastre()
+	default:
+		a.Boton.TypedKey(e)
+	}
+}
+
+// CancelarArrastre descarta el gesto aunque el sistema aún entregue Dragged y DragEnd.
+func (a *asaArrastre) CancelarArrastre() {
+	a.MouseUp(nil)
+	if !a.t.arrastrando {
+		return
+	}
+	a.cancelada = true
+	a.t.cancelarArrastre()
+	llamar0(a.t.alCancelarArrastre)
 }
 
 func (a *asaArrastre) Dragged(e *fyne.DragEvent) {
+	if a.cancelada {
+		return
+	}
 	t := a.t
 	if !t.arrastrando {
+		if c := fyne.CurrentApp().Driver().CanvasForObject(a); c != nil {
+			c.Focus(a)
+		}
 		t.arrastrando, t.arrastre = true, t.Position()
+		t.inicioArrastre = t.Position()
 		llamar0(t.alEmpezar)
+		t.Refresh()
 	}
+	t.punteroArrastre = e.AbsolutePosition
 	t.arrastre = t.arrastre.Add(e.Dragged)
 	// Recortado a cero por la izquierda y por arriba: una nota soltada fuera del
 	// lienzo quedaría inalcanzable.
-	t.Move(fyne.NewPos(max(t.arrastre.X, MargenLienzo), max(t.arrastre.Y, MargenLienzo)))
+	if !t.arrastreEnSitio {
+		t.Move(fyne.NewPos(max(t.arrastre.X, MargenLienzo), max(t.arrastre.Y, MargenLienzo)))
+	}
+	llamar1(t.alArrastrar, e.AbsolutePosition)
+}
+
+func (t *Tarjeta) cancelarArrastre() {
+	if !t.arrastrando {
+		return
+	}
+	t.arrastrando = false
+	if !t.arrastreEnSitio {
+		t.Move(t.inicioArrastre)
+	}
+	t.Refresh()
 }
 
 func (a *asaArrastre) DragEnd() {
+	if a.cancelada {
+		a.cancelada = false
+		return
+	}
 	t := a.t
 	if !t.arrastrando {
 		return
 	}
 	t.arrastrando = false
-	llamar1(t.AlSoltar, t.Position())
+	t.Refresh()
+	if t.alSoltarEn != nil {
+		t.alSoltarEn(t.punteroArrastre)
+	} else {
+		llamar1(t.AlSoltar, t.Position())
+	}
+}
+
+func (a *asaArrastre) MouseDown(e *desktop.MouseEvent) {
+	a.cancelada = false
+	a.Boton.MouseDown(e)
 }
 
 // velo baja el alfa de un color, que es el `/50` de Tailwind: `tokens.ConAlfa`, que

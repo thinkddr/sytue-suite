@@ -2,7 +2,7 @@
   "name": "@sytue/config",
   "version": "1.0.0",
   "private": true,
-  "description": "Sytue One — configuracion compartida del frontend: tsconfig estricto, ESLint plano (solo *.astro; el resto lo lintea oxlint), Prettier y preset Tailwind v4 que consume los tokens de branding/.",
+  "description": "Sytue One \u2014 configuracion compartida del frontend: tsconfig estricto, ESLint plano (solo *.astro; el resto lo lintea oxlint), Prettier y preset Tailwind v4 que consume los tokens de branding/.",
   "license": "Apache-2.0",
   "type": "module",
   "exports": {
@@ -40,9 +40,9 @@
   "devDependencies": {
     "@eslint/js": "10.0.1",
     "@types/node": "catalog:",
-    "eslint": "10.11.0",
+    "eslint": "10.13.0",
     "eslint-plugin-astro": "catalog:",
-    "prettier": "3.9.9",
+    "prettier": "3.9.10",
     "prettier-plugin-astro": "catalog:",
     "prettier-plugin-tailwindcss": "0.8.1",
     "typescript": "6.0.3"

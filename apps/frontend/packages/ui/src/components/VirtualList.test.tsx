@@ -10,9 +10,9 @@ import { VirtualList } from './VirtualList.js';
 // Idempotente: otro fichero de test puede haber registrado ya happy-dom.
 if (typeof document === 'undefined') GlobalRegistrator.register();
 
-// happy-dom no tiene motor de layout: offsetWidth/offsetHeight devuelven 0
-// (el core de @tanstack/virtual-core mide con ellos). Fingimos un viewport de
-// 600px y filas de 32px (las filas del virtualizador llevan data-index).
+// happy-dom no tiene motor de layout. Las filas se miden por sus offsets;
+// el viewport del core usa clientWidth/clientHeight y se proporciona en cada caso.
+// Fingimos filas de 32px (las filas del virtualizador llevan data-index).
 const VIEWPORT_H = 600;
 const ROW_H = 32;
 Object.defineProperty(HTMLElement.prototype, 'offsetHeight', {
@@ -28,33 +28,51 @@ test('VirtualList con 1000 items pinta solo una ventana de filas', async () => {
   const host = document.createElement('div');
   document.body.appendChild(host);
   const items = Array.from({ length: 1000 }, (_, i) => `fila ${i}`);
+  const clientGeometry = new Map<string, PropertyDescriptor | undefined>();
+  for (const [field, size] of [
+    ['clientHeight', VIEWPORT_H],
+    ['clientWidth', 800],
+  ] as const) {
+    clientGeometry.set(field, Object.getOwnPropertyDescriptor(HTMLElement.prototype, field));
+    Object.defineProperty(HTMLElement.prototype, field, {
+      configurable: true,
+      get: () => size,
+    });
+  }
 
-  render(
-    <VirtualList
-      items={items}
-      estimateSize={ROW_H}
-      renderItem={(texto) => <span>{texto}</span>}
-      aria-label="lista de prueba"
-    />,
-    host,
-  );
-  // Deja correr los layout effects + el rerender que dispara onChange.
-  await new Promise((r) => setTimeout(r, 20));
+  try {
+    render(
+      <VirtualList
+        items={items}
+        estimateSize={ROW_H}
+        renderItem={(texto) => <span>{texto}</span>}
+        aria-label="lista de prueba"
+      />,
+      host,
+    );
+    // Deja correr los layout effects + el rerender que dispara onChange.
+    await new Promise((r) => setTimeout(r, 20));
 
-  const list = host.querySelector('[role="list"]');
-  expect(list).not.toBeNull();
+    const list = host.querySelector('[role="list"]');
+    expect(list).not.toBeNull();
 
-  const rows = host.querySelectorAll('[role="listitem"]');
-  // Ventana esperada: ~19 visibles (600/32) + overscan 6 por lado ≈ 31.
-  expect(rows.length).toBeGreaterThanOrEqual(10);
-  expect(rows.length).toBeLessThan(100);
+    const rows = host.querySelectorAll('[role="listitem"]');
+    // Ventana esperada: ~19 visibles (600/32) + overscan 6 por lado ≈ 31.
+    expect(rows.length).toBeGreaterThanOrEqual(10);
+    expect(rows.length).toBeLessThan(100);
 
-  // La ventana arranca en el primer item y el spacer reserva el alto total.
-  expect(rows[0]?.textContent).toBe('fila 0');
-  const spacer = list?.firstElementChild as HTMLElement;
-  expect(spacer.style.height).toBe(`${1000 * ROW_H}px`);
-  render(null, host);
-  host.remove();
+    // La ventana arranca en el primer item y el spacer reserva el alto total.
+    expect(rows[0]?.textContent).toBe('fila 0');
+    const spacer = list?.firstElementChild as HTMLElement;
+    expect(spacer.style.height).toBe(`${1000 * ROW_H}px`);
+  } finally {
+    render(null, host);
+    host.remove();
+    for (const [field, descriptor] of clientGeometry) {
+      if (descriptor) Object.defineProperty(HTMLElement.prototype, field, descriptor);
+      else Reflect.deleteProperty(HTMLElement.prototype, field);
+    }
+  }
 });
 
 test('el padre desplaza una ventana virtual bajo una cabecera que cambia de alto', async () => {

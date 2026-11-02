@@ -5,27 +5,11 @@
  * PdfPageOrder — las páginas ELEGIDAS de un PDF, en el orden en que van a salir,
  * y la forma de cambiarlo.
  *
- * Existe porque elegir y ordenar son dos cosas distintas y el diálogo solo hacía
- * la primera: el orden salía de pulsar las páginas en secuencia, así que corregir
- * la posición de UNA página en un documento de veinte obligaba a deseleccionarlo
- * todo y volver a empezar. Arrastrar es el gesto que la gente ya trae aprendido.
- *
- * Arrastrar NO puede ser la única forma. Va con dos botones por fila (subir y
- * bajar) que hacen exactamente lo mismo, porque:
- *   - el arrastre HTML5 no existe en pantallas táctiles (no hay `dragstart` con
- *     el dedo), así que sin botones el móvil se queda fuera;
- *   - un lector de pantalla no puede arrastrar, y el agarre es `aria-hidden`
- *     justamente por eso: lo que se anuncia son los botones, que sí se pulsan.
- * Cada movimiento se cuenta en una región `aria-live` («la página 5 pasa a la
- * posición 2 de 12»), porque quien no ve la lista no tiene otra forma de saber
- * que el arrastre —o el botón— hizo algo.
- *
- * Sin librería de drag-and-drop: `draggable` + `dragover` + `drop` es API del
- * navegador desde hace quince años y aquí solo hay que mover un elemento dentro
- * de un array.
+ * El asa compartida reordena con dedo, ratón o flechas, y desplaza la lista en sus
+ * bordes. Los botones subir/bajar conservan su foco y anuncian la posición final.
  */
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { Icon, IconButton, cx } from '@sytue/ui';
+import { Icon, IconButton, useListReorder } from '@sytue/ui';
 import type { T } from '../i18n';
 
 /**
@@ -91,8 +75,6 @@ export function PdfPageOrder({
   t: T;
   onChange: (siguiente: number[]) => void;
 }) {
-  const [arrastrando, setArrastrando] = useState<number | null>(null);
-  const [sobre, setSobre] = useState<number | null>(null);
   const [aviso, setAviso] = useState('');
   const listaRef = useRef<HTMLUListElement>(null);
   // Fila y dirección del último movimiento hecho con el teclado, para devolverle
@@ -111,7 +93,7 @@ export function PdfPageOrder({
     if (pend === null || listaRef.current === null) return;
     focoRef.current = null;
     const fila = listaRef.current.querySelector(`[data-fila="${pend.fila}"]`);
-    const botones = fila?.querySelectorAll<HTMLButtonElement>('button');
+    const botones = fila?.querySelectorAll<HTMLButtonElement>('button[data-mover-pagina]');
     if (!botones) return;
     const preferido = pend.dir === 'arriba' ? botones[0] : botones[1];
     const otro = pend.dir === 'arriba' ? botones[1] : botones[0];
@@ -126,73 +108,37 @@ export function PdfPageOrder({
     if (dir !== undefined) focoRef.current = { fila: hasta, dir };
   }
 
+  const reordenar = useListReorder({
+    ids: orden.map((_, i) => String(i)),
+    container: () => listaRef.current,
+    onReorder: (desde, hasta) => {
+      mover(desde, hasta);
+      return String(hasta);
+    },
+  });
+
   return (
     <fieldset>
       <legend class="text-text mb-1 text-sm font-medium">{t('pdf.order')}</legend>
       <p class="text-text-muted mb-2 text-xs">{t('pdf.orderHint')}</p>
-      {/* Los eventos de ARRASTRE van en la lista y en sus filas porque no hay
-          ningún elemento interactivo al que puedan ir: una zona de suelta no es
-          un botón, y darle un `role` interactivo para callar al linter le
-          anunciaría al lector de pantalla algo que no existe.
-
-          Desactivar la regla aquí es legítimo, y no por comodidad: lo que
-          protege —que una función no quede solo al alcance del ratón— ya está
-          cubierto. Reordenar se puede hacer entera con el teclado mediante los
-          dos botones del final de cada fila, con el foco persiguiendo a la
-          página y cada movimiento anunciado por `aria-live`. El arrastre es un
-          atajo de ratón ENCIMA de eso, no la única vía. */}
-      {/* eslint-disable jsx-a11y/no-noninteractive-element-interactions */}
-      <ul
-        ref={listaRef}
-        class="border-border max-h-56 overflow-y-auto rounded-md border"
-        onDragLeave={() => setSobre(null)}
-      >
+      <ul ref={listaRef} class="border-border max-h-56 overflow-y-auto rounded-md border">
         {orden.map((n, i) => (
           <li
             key={`${n}-${i}`}
             data-fila={i}
-            onDragOver={(e) => {
-              if (arrastrando === null) return;
-              // Sin `preventDefault` el navegador NO deja soltar aquí.
-              e.preventDefault();
-              if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
-              setSobre(i);
-            }}
-            onDrop={(e) => {
-              e.preventDefault();
-              if (arrastrando !== null) mover(arrastrando, i);
-              setArrastrando(null);
-              setSobre(null);
-            }}
-            class={cx(
-              'border-border/60 flex items-center gap-2 border-b px-2 py-1.5 last:border-b-0 pointer-coarse:min-h-[max(44px,2.75rem)]',
-              sobre === i && arrastrando !== null && arrastrando !== i ? 'bg-primary/10' : '',
-              arrastrando === i ? 'opacity-50' : '',
-            )}
+            {...reordenar.itemProps(String(i))}
+            class="border-border/60 flex items-center gap-2 border-b px-2 py-1.5 last:border-b-0 pointer-coarse:min-h-[max(44px,2.75rem)]"
           >
-            {/* El agarre es `aria-hidden` a propósito: arrastrar no está al
-                alcance de un lector de pantalla ni de un dedo, y anunciarlo
-                sería ofrecer algo que no se puede usar. Lo que se anuncia son
-                los dos botones del final de la fila, que hacen lo mismo. */}
-            <span
-              draggable
-              aria-hidden="true"
-              onDragStart={(e) => {
-                setArrastrando(i);
-                if (e.dataTransfer) {
-                  e.dataTransfer.effectAllowed = 'move';
-                  // Firefox no inicia el arrastre sin datos en el portapapeles.
-                  e.dataTransfer.setData('text/plain', String(n));
-                }
-              }}
-              onDragEnd={() => {
-                setArrastrando(null);
-                setSobre(null);
-              }}
-              class="text-text-subtle hover:text-text shrink-0 cursor-grab px-1 py-1 active:cursor-grabbing"
+            <button
+              type="button"
+              {...reordenar.handleProps(String(i))}
+              aria-label={`${t('pdf.order')} · ${t('pdf.pageN', { n })}`}
+              aria-keyshortcuts="ArrowUp ArrowDown Home End"
+              title={t('pdf.orderHint')}
+              class="sytue-focus-ring text-text-muted hover:text-text min-h-8 shrink-0 cursor-grab touch-none rounded px-1 py-1 select-none [-webkit-user-select:none] active:cursor-grabbing pointer-coarse:min-h-[max(44px,2.75rem)] pointer-coarse:min-w-[max(44px,2.75rem)]"
             >
-              <Icon name="menu" size={14} />
-            </span>
+              <Icon name="grip" size={16} />
+            </button>
             <span class="text-text-subtle w-5 shrink-0 text-right text-xs tabular-nums">
               {i + 1}
             </span>
@@ -203,6 +149,7 @@ export function PdfPageOrder({
               {extractos.get(n) || t('pdf.pageNoText')}
             </span>
             <IconButton
+              data-mover-pagina
               size="sm"
               label={t('pdf.order.up', { n })}
               disabled={i === 0}
@@ -211,6 +158,7 @@ export function PdfPageOrder({
               <Icon name="chevronUp" size={14} />
             </IconButton>
             <IconButton
+              data-mover-pagina
               size="sm"
               label={t('pdf.order.down', { n })}
               disabled={i === orden.length - 1}
@@ -221,7 +169,6 @@ export function PdfPageOrder({
           </li>
         ))}
       </ul>
-      {/* eslint-enable jsx-a11y/no-noninteractive-element-interactions */}
       <span class="sr-only" role="status">
         {aviso}
       </span>

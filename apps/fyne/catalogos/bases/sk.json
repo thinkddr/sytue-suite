@@ -1,4 +1,5 @@
 {
+  "actions.more": "Ďalšie akcie",
   "attach.add": "Pridať súbor",
   "attach.badType": "Tento typ súboru nie je povolený alebo jeho obsah nezodpovedá názvu.",
   "attach.delete": "Odstrániť {name}",

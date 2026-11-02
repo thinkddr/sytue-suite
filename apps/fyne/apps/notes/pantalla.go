@@ -114,7 +114,8 @@ type Pantalla struct {
 	// desplazador es el del lienzo, el mismo en cada repintado (ver `desplazar`).
 	desplazador *container.Scroll
 	// animAncla es el desplazamiento suave hasta el título de un enlace, si va a medias.
-	animAncla *fyne.Animation
+	animAncla    *fyne.Animation
+	autoArrastre ui.AutoScrollArrastre
 	// imagenes son las de las notas de imagen, por dirección (ver `imagenDe`), y docs
 	// los documentos de las notas `doc`, por ID (ver `docDe`).
 	imagenes map[string]imagenRemota
@@ -361,6 +362,11 @@ func (p *Pantalla) contenido(v tema.Variante) fyne.CanvasObject {
 		return p.archivo.Objeto(v)
 	case VistaCuaderno:
 	}
+	return p.contenidoCuaderno(v)
+}
+
+// contenidoCuaderno monta las franjas y el lienzo del cuaderno activo.
+func (p *Pantalla) contenidoCuaderno(v tema.Variante) fyne.CanvasObject {
 	if p.activo.ID == "" {
 		// Sin ningún cuaderno: el estado vacío que invita a crear el primero, que es
 		// lo que hace la web con `empty.noNotebooks`.
@@ -411,8 +417,12 @@ func (p *Pantalla) contenido(v tema.Variante) fyne.CanvasObject {
 		}
 	}
 	contenido := ui.PilaBloques(bloques...)
+	elastico := len(franjas)
 	franjas = append(franjas, p.desplazar(ui.AlAnchoFluido(p.anchoContenido(), contenido), p.lienzo.Cuaderno.Vista == Libre))
-	return container.New(pilaElastica{elastico: len(franjas) - 1}, franjas...)
+	if p.activo.Vista != VistaArbol {
+		franjas = append(franjas, p.capturaFija(v))
+	}
+	return container.New(pilaElastica{elastico: elastico}, franjas...)
 }
 
 // desplazar mete el lienzo en su desplazador (`min-h-0 flex-1 overflow-auto`), que es
@@ -462,6 +472,7 @@ func (p *Pantalla) variante() tema.Variante {
 // Repintar rehace el árbol con el estado de ahora. Se llama SIEMPRE desde la rutina
 // principal: quien venga de una goroutine pasa por `enHilo`.
 func (p *Pantalla) Repintar() {
+	p.autoArrastre.Parar()
 	if p.raiz == nil {
 		return
 	}
@@ -527,6 +538,9 @@ func bloqueDeAncla(d *Documento, slug string) (int, bool) {
 // sincronizar vuelca el estado de la pantalla en cada vista antes de pintarla. Está
 // junto y no repartido para que no haya un campo que solo se actualice en un camino.
 func (p *Pantalla) sincronizar() {
+	if p.activo.Crudo.DailyDate == "" {
+		p.dia.semana, p.dia.marcasDestino = nil, nil
+	}
 	visibles := Ordenar(Filtrar(enfocarNotas(p.notas, p.enfoque, p.ocultarTerminadas), p.filtro, p.filtroEstado), p.orden, p.loc)
 
 	p.lateral.Cuadernos, p.lateral.Activo, p.lateral.EsMio = enArbol(p.cuadernos), p.activo.ID, p.esMio
@@ -740,7 +754,7 @@ func itemsNotasParaWidget(c Cuaderno, lista []api.Note) []widgets.Item {
 	for _, n := range candidatas {
 		titulo := strings.TrimSpace(n.Title)
 		if titulo == "" && n.Kind == "task" {
-			titulo = strings.TrimSpace(htmltext.Plain(n.Content))
+			titulo = strings.TrimSpace(htmltext.Text(n.Content))
 		}
 		if titulo == "" {
 			continue
@@ -976,6 +990,9 @@ func (p *Pantalla) enganchar() {
 	p.lienzo.AlEditar = p.abrirEditor
 	p.lienzo.AlMoverLibre = func(n Nota, en fyne.Position) { lanzar(func() error { return p.moverLibre(n, en) }) }
 	p.lienzo.AlSoltarEnDia = p.soltarEnDia
+	p.lienzo.AlArrastrarNota = p.marcarArrastreNota
+	p.lienzo.AlSoltarNota = p.soltarNota
+	p.lienzo.AlCancelarArrastre = p.cancelarArrastreNota
 	p.lienzo.AlEnsanchar = func() {
 		p.lienzo.Ancha = !p.lienzo.Ancha
 		p.Repintar()
@@ -1042,6 +1059,9 @@ func (p *Pantalla) atajos() {
 // teclaEspecial atiende Escape: quita la selección, que es la única forma de hacerlo en
 // la web (no hay «clic en el vacío», que sería un manejador sin equivalente de teclado).
 func (p *Pantalla) teclaEspecial(e *fyne.KeyEvent) {
+	if e.Name == fyne.KeyEscape {
+		p.cancelarArrastreNota()
+	}
 	if e.Name == fyne.KeyEscape && p.lienzo.Seleccionada != "" && p.hayRed() {
 		p.lienzo.Seleccionada = ""
 		p.Repintar()

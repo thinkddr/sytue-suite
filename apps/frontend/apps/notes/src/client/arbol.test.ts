@@ -4,7 +4,13 @@
  */
 import { expect, test } from 'bun:test';
 import type { Note } from '@sytue/api-clients';
-import { conSangria, construirArbol, descendientes } from '../client/arbol.js';
+import {
+  colocarNota,
+  conSangria,
+  construirArbol,
+  descendientes,
+  reponerFamilia,
+} from '../client/arbol.js';
 
 function nota(id: string, extra: Partial<Note> = {}): Note {
   return {
@@ -25,6 +31,48 @@ function nota(id: string, extra: Partial<Note> = {}): Note {
     ...extra,
   } as Note;
 }
+
+test('reponer una familia tras un 409 conserva capturas y ediciones posteriores', () => {
+  const anteriores = [
+    nota('padre', { content: 'antes' }),
+    nota('hija', { group_id: 'padre' }),
+    nota('otra'),
+  ];
+  const actuales = [
+    nota('padre', { content: 'editado después' }),
+    nota('otra', { content: 'otra edición' }),
+    nota('captura', { content: 'recién guardada' }),
+  ];
+  const finales = reponerFamilia(actuales, anteriores, new Set(['padre', 'hija']));
+  expect(finales.map((n) => n.id)).toEqual(['padre', 'otra', 'captura', 'hija']);
+  expect(finales[0]!.content).toBe('editado después');
+  expect(finales[0]).toBe(actuales[0]);
+  expect(finales[1]!.content).toBe('otra edición');
+  expect(finales[2]!.content).toBe('recién guardada');
+});
+
+test('reordenar conserva padres, fijadas y notas ocultas en el plan de posiciones', () => {
+  const notas = [
+    nota('a'),
+    nota('oculta', { position: 1 }),
+    nota('b', { position: 2 }),
+    nota('hija', { group_id: 'a', position: 0 }),
+    nota('fijada', { pinned: true, position: 0 }),
+  ];
+  const cambios = colocarNota(notas, 'b', 0, 'a', true);
+  const porId = new Map(cambios.map((n) => [n.id, n]));
+  const finales = notas.map((n) => porId.get(n.id) ?? n);
+  expect(
+    finales
+      .filter((n) => !n.group_id && !n.pinned)
+      .sort((a, b) => a.position - b.position)
+      .map((n) => n.id),
+  ).toEqual(['b', 'a', 'oculta']);
+  expect(porId.has('hija')).toBe(false);
+  expect(porId.has('fijada')).toBe(false);
+  expect(colocarNota(notas, 'b', 0, 'hija', true)).toEqual([]);
+  expect(colocarNota(notas, 'b', 0, 'fijada', true)).toEqual([]);
+});
 
 test('anida por group_id y ordena hermanos por posición', () => {
   const arbol = construirArbol([

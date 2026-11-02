@@ -117,6 +117,7 @@ export const et: AppCatalog<typeof en> = {
   'notebook.notes': { one: '{count} märge', other: '{count} märget' },
   'notebook.emoji': 'Ikoon',
   'notebook.color': 'Värv',
+  'notebook.move': 'Teisalda märkmik',
   'notebook.title': 'Nimi',
   'layout.label': 'Paigutus',
   'layout.tree': 'Puu',

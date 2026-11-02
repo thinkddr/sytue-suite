@@ -125,8 +125,8 @@ github.com/livekit/mageutil v0.0.0-20250511045019-0f1ff63f7731 h1:9x+U2HGLrSw5AT
 github.com/livekit/mageutil v0.0.0-20250511045019-0f1ff63f7731/go.mod h1:Rs3MhFwutWhGwmY1VQsygw28z5bWcnEYmS1OG9OxjOQ=
 github.com/livekit/mediatransportutil v0.0.0-20260821083140-f234b534b095 h1:BcliKAXoMhl/nWmzQweQ5kmh4Qqagxl4s3Z5pvM/7AY=
 github.com/livekit/mediatransportutil v0.0.0-20260821083140-f234b534b095/go.mod h1:o8CFmAdrVwzJNOCsQCLUzXRjokkufNshnQHOe4fRaqU=
-github.com/livekit/protocol v1.53.0 h1:O5lcOxwgEqyhczAxYd2IPEYuq039+7MXzjxjdLPid8o=
-github.com/livekit/protocol v1.53.0/go.mod h1:kUTAI2TrTngGOiWP6MTAOkJpru6YYGd0MP9wzlDATy4=
+github.com/livekit/protocol v1.53.1 h1:qmB3I7OP9e6jkr842Gn+L1RLrk0BeKeZj3cMyAj+qzI=
+github.com/livekit/protocol v1.53.1/go.mod h1:h9P4KCc3K715NCgCrkkFsb8/RRY1kKqOS1EIHUNRlCk=
 github.com/livekit/psrpc v0.8.2 h1:7tbkhBJoYlK5Csfkdv1XYbZjyAQeaEZgupvIXNCv7Dc=
 github.com/livekit/psrpc v0.8.2/go.mod h1:6KnU8vULoizX0Er9NNfeKJDV8ug87j3fuo19M0bhj6Q=
 github.com/magefile/mage v1.17.2 h1:fyXVu1eadI8Ap1HCCNgEhJ5McIWiYhLR8uol64ZZc40=
@@ -233,8 +233,8 @@ github.com/tetratelabs/wazero v1.12.0 h1:DuWcpNu/FzgEXgGBDp8J1Spc+CWOvvtvVyjKlaZ
 github.com/tetratelabs/wazero v1.12.0/go.mod h1:LvKtzl2RqO4gyF27BiXU+nKAjcV8f38U+kP/q2vgxh0=
 github.com/thesyncim/govpx v0.0.0-20260716224042-691cd0512c48 h1:FksWpQxtBteDfzvInJoEo8ZkiNgZnKU1VCVt124GIbI=
 github.com/thesyncim/govpx v0.0.0-20260716224042-691cd0512c48/go.mod h1:NtVLM5omlmx4IstMc/Rx+YsHQ4sAVq3VQ25wnMl43L4=
-github.com/thinkddr/fyne/v2 v2.8.2-sytue.2 h1:FpMZcSqCy2NDBesZsDGOMYX1YN10VDLgpFRAfAv4Kxk=
-github.com/thinkddr/fyne/v2 v2.8.2-sytue.2/go.mod h1:Woh/rEARztuuoGHPKmK+iXvUOxbombOxvP3AbQVcMB0=
+github.com/thinkddr/fyne/v2 v2.8.2-sytue.3 h1:jbLZtVZY7HW72aF2Wf25mRev9MN3PUWhJPoBBOOtaHY=
+github.com/thinkddr/fyne/v2 v2.8.2-sytue.3/go.mod h1:Woh/rEARztuuoGHPKmK+iXvUOxbombOxvP3AbQVcMB0=
 github.com/thinkddr/glfw/v3.4/glfw v0.1.0-sytue.4 h1:rnI0FqcdfXNP6BalG4Uki79mdUWTIzJ+St7LeSfjsn8=
 github.com/thinkddr/glfw/v3.4/glfw v0.1.0-sytue.4/go.mod h1:T5Dn0JwIJOX1euPZ/iT4tq6nFYtmukjcYa7937HuYK8=
 github.com/thinkddr/typesetting v0.3.5-sytue.1 h1:dtqy6maR+LRqhYCRqjySd1RpTI6MJ10axa1opsq6bp8=

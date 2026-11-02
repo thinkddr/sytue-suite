@@ -137,6 +137,8 @@ import { contenidoPlantilla } from '../client/plantillas.js';
 import { intlTag } from '@sytue/i18n';
 import { ListaDeHits, PanelArchivo, PanelFijadas } from './Archivo.js';
 import { enArbol as cuadernosEnArbol, raicesArchivadas } from '../client/archivo.js';
+import { colocarCuaderno, type ColocacionCuaderno } from '../client/cuadernos.js';
+import { reponerFamilia } from '../client/arbol.js';
 
 interface Props {
   user: SytueUser;
@@ -263,6 +265,9 @@ function NotesView({
   const [tags, setTags] = useState<Tag[]>([]);
   const [vista, setVista] = useState<Vista>(compartidaInicial ? 'shared' : 'notebook');
   const [cargandoArbol, setCargandoArbol] = useState(true);
+  const [reordenandoCuadernos, setReordenandoCuadernos] = useState(false);
+  const [reordenandoNotas, setReordenandoNotas] = useState(false);
+  const [capturaHost, setCapturaHost] = useState<HTMLDivElement | null>(null);
   const [cargandoNotas, setCargandoNotas] = useState(false);
   const [errorArbol, setErrorArbol] = useState(false);
   const [seleccionada, setSeleccionada] = useState<string | null>(notaInicial ?? null);
@@ -276,7 +281,17 @@ function NotesView({
   const [vistaDiario, setVistaDiario] = useState<VistaDiario>('day');
   const [versionDiario, setVersionDiario] = useState(0);
   const [openingDay, setOpeningDay] = useState(false);
-  const captureDrafts = useRef(new Map<string, string>());
+  const captureDraftsRef = useRef(new Map<string, string>());
+  const cuadernoCifrado = activo?.encrypted ? activo.id : null;
+  useLayoutEffect(() => {
+    // También purga el borrador anterior a activar el cifrado: no puede reaparecer
+    // si el cuaderno vuelve después a texto sin cifrar.
+    for (const nb of notebooks) {
+      if (nb.encrypted) captureDraftsRef.current.delete(nb.id);
+    }
+    if (cuadernoCifrado) captureDraftsRef.current.delete(cuadernoCifrado);
+  }, [notebooks, cuadernoCifrado]);
+  useLayoutEffect(() => () => captureDraftsRef.current.clear(), []);
   const openingDayRef = useRef(false);
   const activeId = useRef(activo?.id);
   activeId.current = activo?.id;
@@ -395,6 +410,7 @@ function NotesView({
   const ultimas = useRef<{
     editar: (id: string, patch: ParcheDeNota, opts?: OpcionesDeAccion) => Promise<void>;
     mover: (id: string, pos: PosicionDeNota, opts?: OpcionesDeAccion) => void;
+    moverACuaderno: (note: Note, destino: Notebook, opts?: OpcionesDeAccion) => void;
     borrar: (id: string, opts?: OpcionesDeAccion) => void;
   } | null>(null);
   // Lo que trae un `.onex` antes de decidir si entra. Guarda el volcado crudo
@@ -938,6 +954,78 @@ function NotesView({
     [notes, toast, t],
   );
 
+  const reordenarNotas = useCallback(
+    (destinos: Note[]) => {
+      if (
+        !destinos.length ||
+        reordenandoNotas ||
+        offline ||
+        bloqueado ||
+        activo?.read_only ||
+        migrando
+      )
+        return;
+      const antes = notes.filter((n) => destinos.some((d) => d.id === n.id));
+      const posicion = (n: Note): PosicionDeNota => ({
+        x: n.x,
+        y: n.y,
+        col: n.col,
+        position: n.position,
+        group_id: n.group_id ?? null,
+      });
+      const pintar = (lista: Note[]) =>
+        setNotes((prev) =>
+          prev.map((n) => {
+            const destino = lista.find((d) => d.id === n.id);
+            return destino ? { ...n, ...posicion(destino) } : n;
+          }),
+        );
+      const aplicar = async (nuevas: Note[], anteriores: Note[]): Promise<void> => {
+        pintar(nuevas);
+        const intentadas = new Set<string>();
+        try {
+          for (const n of nuevas) {
+            // La respuesta puede perderse después de aplicar el cambio en el servidor.
+            intentadas.add(n.id);
+            await api.moveNote(n.id, posicion(n));
+          }
+        } catch (err) {
+          let falloAlRevertir = false;
+          for (const n of anteriores.filter((a) => intentadas.has(a.id)).reverse()) {
+            await api.moveNote(n.id, posicion(n)).catch(() => {
+              falloAlRevertir = true;
+            });
+          }
+          if (falloAlRevertir && activo) {
+            const reales = await api.listNotes(activo.id).catch(() => null);
+            pintar(reales ?? anteriores);
+          } else pintar(anteriores);
+          throw err;
+        }
+      };
+      const repetir = async (nuevas: Note[], anteriores: Note[]): Promise<void> => {
+        setReordenandoNotas(true);
+        try {
+          await aplicar(nuevas, anteriores);
+        } finally {
+          setReordenandoNotas(false);
+        }
+      };
+      void repetir(destinos, antes)
+        .then(() => {
+          if (activeId.current !== activo?.id) return;
+          historial.current.registrar({
+            etiqueta: t('history.move'),
+            deshacer: () => repetir(antes, destinos),
+            rehacer: () => repetir(destinos, antes),
+          });
+          tocarHistorial();
+        })
+        .catch(() => toast.notify({ tone: 'danger', title: t('note.saveFailed') }));
+    },
+    [notes, activo, reordenandoNotas, offline, bloqueado, migrando, toast, t],
+  );
+
   const borrarNota = useCallback(
     (id: string, opts: OpcionesDeAccion = {}) => {
       const antes = notes;
@@ -986,40 +1074,44 @@ function NotesView({
           }
         }
       }
+      const reponer = () => {
+        if (activeId.current === origen.id)
+          setNotes((prev) => reponerFamilia(prev, antes, familia));
+      };
+      const contar = (delta: number) =>
+        setNotebooks((prev) =>
+          prev.map((nb) =>
+            nb.id === origen.id
+              ? { ...nb, note_count: Math.max(0, nb.note_count - delta * familia.size) }
+              : nb.id === destino.id
+                ? { ...nb, note_count: Math.max(0, nb.note_count + delta * familia.size) }
+                : nb,
+          ),
+        );
       setNotes((prev) => prev.filter((n) => !familia.has(n.id)));
-      setNotebooks((prev) =>
-        prev.map((nb) =>
-          nb.id === origen.id
-            ? { ...nb, note_count: Math.max(0, nb.note_count - familia.size) }
-            : nb.id === destino.id
-              ? { ...nb, note_count: nb.note_count + familia.size }
-              : nb,
-        ),
-      );
+      contar(1);
       void api
         .moveNoteToNotebook(note.id, destino.id)
         .then(() => {
           toast.notify({ tone: 'success', title: t('move.done', { name: destino.title }) });
+          if (opts.historial !== false && activeId.current === origen.id) {
+            historial.current.registrar({
+              etiqueta: t('history.move'),
+              deshacer: async () => {
+                await api.moveNoteToNotebook(note.id, origen.id);
+                reponer();
+                contar(-1);
+              },
+              rehacer: () => ultimas.current?.moverACuaderno(note, destino, { historial: false }),
+            });
+            tocarHistorial();
+          }
         })
         .catch(() => {
-          setNotes(antes);
+          reponer();
+          contar(-1);
           toast.notify({ tone: 'danger', title: t('move.failed') });
         });
-      if (opts.historial !== false) {
-        historial.current.registrar({
-          etiqueta: t('history.move'),
-          deshacer: async () => {
-            await api.moveNoteToNotebook(note.id, origen.id);
-            setNotes((prev) =>
-              prev.some((n) => n.id === note.id)
-                ? prev
-                : [...prev, ...antes.filter((n) => familia.has(n.id))],
-            );
-          },
-          rehacer: () => moverACuaderno(note, destino, { historial: false }),
-        });
-        tocarHistorial();
-      }
     },
     [activo, notes, toast, t],
   );
@@ -1755,20 +1847,59 @@ function NotesView({
   }, [offline, quedan]);
 
   // Soltar una nota sobre un cuaderno del árbol la lleva allí: desde la lista de notas
-  // de la barra lateral (arrastre de HTML) y desde el asa de una nota del lienzo.
+  // de la barra lateral y desde el asa de una nota del lienzo, con dedo o ratón.
   const moverNotaACuaderno = (noteId: string, targetNbId: string) => {
-    if (targetNbId === activo?.id) return;
+    const target = notebooks.find((n) => n.id === targetNbId);
+    const note = notes.find((n) => n.id === noteId);
+    if (
+      offline ||
+      bloqueado ||
+      migrando ||
+      activo?.encrypted ||
+      activo?.read_only ||
+      !target ||
+      !note ||
+      target.encrypted ||
+      target.read_only ||
+      targetNbId === activo?.id
+    )
+      return;
+    moverACuaderno(note, target);
+  };
+
+  const colocarUnCuaderno = (id: string, destino: string, lado: ColocacionCuaderno): void => {
+    if (offline || reordenandoCuadernos) return;
+    const plan = colocarCuaderno(notebooks, id, destino, lado);
+    if (!plan?.length) return;
+    if (
+      plan.some(
+        ({ notebook: nb, input }) =>
+          (nb.parent_id ?? null) !== input.parent_id && !puedeAdministrarCuaderno(nb),
+      )
+    ) {
+      toast.notify({ tone: 'danger', title: t('notebook.ownerOnly') });
+      return;
+    }
+    setReordenandoCuadernos(true);
+    setNotebooks((lista) =>
+      lista.map((nb) => {
+        const cambio = plan.find((p) => p.notebook.id === nb.id);
+        return cambio
+          ? { ...nb, parent_id: cambio.input.parent_id ?? null, position: cambio.input.position! }
+          : nb;
+      }),
+    );
     void (async () => {
       try {
-        await api.moveNoteToNotebook(noteId, targetNbId);
-        setNotes((prev) => prev.filter((n) => n.id !== noteId));
-        const target = notebooks.find((n) => n.id === targetNbId);
-        toast.notify({
-          tone: 'success',
-          title: t('move.done', { name: target?.title ?? targetNbId }),
-        });
+        const actualizados: Notebook[] = [];
+        for (const cambio of plan)
+          actualizados.push(await api.updateNotebook(cambio.notebook.id, cambio.input));
+        setNotebooks((lista) => lista.map((nb) => actualizados.find((n) => n.id === nb.id) ?? nb));
       } catch {
         toast.notify({ tone: 'danger', title: t('move.failed') });
+        await cargarArbol();
+      } finally {
+        setReordenandoCuadernos(false);
       }
     })();
   };
@@ -1882,7 +2013,7 @@ function NotesView({
               activo={activo?.id ?? null}
               {...(activo && !cargandoNotas ? { notasDelActivo: notes.length } : {})}
               bloqueado={bloqueado}
-              notasActivas={notasEnClaro}
+              {...(activo?.layout === 'tree' ? { notasActivas: notasEnClaro } : {})}
               notaSeleccionada={seleccionada}
               onSelect={(nb) => {
                 setActivo(nb);
@@ -1895,32 +2026,12 @@ function NotesView({
                 setPidiendoClave(true);
               }}
               onSelectNota={setSeleccionada}
-              onMoveNoteToNotebook={moverNotaACuaderno}
-              onReorderNotebook={(draggedId, targetId) => {
-                void (async () => {
-                  const target = notebooks.find((n) => n.id === targetId);
-                  const dragged = notebooks.find((n) => n.id === draggedId);
-                  if (!target || !dragged || dragged.id === target.id) return;
-                  const targetParent = target.parent_id ?? null;
-                  const draggedParent = dragged.parent_id ?? null;
-                  if (targetParent !== draggedParent && !puedeAdministrarCuaderno(dragged)) {
-                    toast.notify({ tone: 'danger', title: t('notebook.ownerOnly') });
-                    return;
-                  }
-                  try {
-                    await api.updateNotebook(dragged.id, {
-                      title: dragged.title,
-                      parent_id: targetParent,
-                      position: target.position + 1,
-                    });
-                    await cargarArbol();
-                  } catch (err) {
-                    if (err instanceof api.NotesApiError && err.code === 'notebook_owner_only') {
-                      toast.notify({ tone: 'danger', title: t('notebook.ownerOnly') });
-                    }
-                  }
-                })();
-              }}
+              {...(!offline && !bloqueado && !migrando && !activo?.encrypted && !activo?.read_only
+                ? { onMoveNoteToNotebook: moverNotaACuaderno }
+                : {})}
+              {...(!offline && !reordenandoCuadernos
+                ? { onReorderNotebook: colocarUnCuaderno }
+                : {})}
             />
           )}
         </li>
@@ -1968,7 +2079,7 @@ function NotesView({
   // La vista por defecto: árbol a la izquierda, nota a la derecha. El árbol va
   // en el panel secundario del AppShell —el mismo sitio que la lista de hilos
   // en Mail— y en móvil se alternan lista y detalle con el botón de volver.
-  ultimas.current = { editar: editarNota, mover: moverNota, borrar: borrarNota };
+  ultimas.current = { editar: editarNota, mover: moverNota, borrar: borrarNota, moverACuaderno };
 
   const deshacer = useCallback(async () => {
     try {
@@ -2239,16 +2350,21 @@ function NotesView({
                     (las notas nuevas nacen en la lista de la izquierda). */}
                 {enArbol ? null : (
                   <NotebookDashboard
-                    key={activo.id}
+                    key={`${cryptoScope}:${bloqueado}`}
+                    captureContainer={capturaHost}
                     acciones={enDia ? barraDe('dia') : undefined}
                     t={t}
                     locale={locale}
                     notebook={activo}
                     notes={cargandoNotas ? [] : notes}
-                    initialDraft={captureDrafts.current.get(activo.id) ?? ''}
+                    initialDraft={
+                      activo.encrypted ? '' : (captureDraftsRef.current.get(activo.id) ?? '')
+                    }
                     notasPropiasCargadas={!cargandoNotas && activo.owner_sub === user.id}
                     onDraft={(text) => {
-                      captureDrafts.current.set(activo.id, text);
+                      // Un borrador cifrado sólo vive en la captura abierta: cerrar la
+                      // clave o cambiar su ámbito desmonta también ese texto en claro.
+                      if (!activo.encrypted) captureDraftsRef.current.set(activo.id, text);
                     }}
                     disabled={activo.read_only === true || bloqueado || cargandoNotas || migrando}
                     openingDay={openingDay}
@@ -2320,6 +2436,12 @@ function NotesView({
                     notebook={enArbol ? { ...activo, layout: 'list' } : activo}
                     llenar={enArbol}
                     notes={enArbol && notaSeleccionada ? [notaSeleccionada] : notasVisibles}
+                    allNotes={notes}
+                    ordenOcupado={reordenandoNotas}
+                    onReorder={(cambios) => {
+                      cambiarOrden('manual');
+                      reordenarNotas(cambios);
+                    }}
                     cargando={cargandoNotas}
                     claro={claro}
                     bloqueado={bloqueado}
@@ -2385,6 +2507,12 @@ function NotesView({
                   />
                 ) : null}
               </div>
+              {enArbol ? null : (
+                <div
+                  ref={setCapturaHost}
+                  class="notes-capture-dock border-border-subtle bg-bg shrink-0 border-t empty:hidden"
+                />
+              )}
             </>
           ) : vista === 'search' ? (
             <PanelBusqueda
@@ -2848,6 +2976,53 @@ function BarraDeCuaderno({
       )),
     ),
   ];
+  const itemsAcciones = (cerrar: () => void) => (
+    <>
+      {deshacer ? (
+        <MenuItem
+          onClick={() => {
+            cerrar();
+            onDeshacer();
+          }}
+        >
+          {t('history.undoOf', { action: deshacer })}
+        </MenuItem>
+      ) : null}
+      {rehacer ? (
+        <MenuItem
+          onClick={() => {
+            cerrar();
+            onRehacer();
+          }}
+        >
+          {t('history.redoOf', { action: rehacer })}
+        </MenuItem>
+      ) : null}
+      {deshacer || rehacer ? <MenuSeparator /> : null}
+      {itemsOrden()}
+      {tags.length > 0 ? <MenuSeparator /> : null}
+      {tags.length > 0 ? itemsEtiquetas() : null}
+      <MenuSeparator />
+      {compartir ? (
+        <MenuItem
+          onClick={() => {
+            cerrar();
+            compartir.onClick();
+          }}
+        >
+          {compartir.rotulo}
+        </MenuItem>
+      ) : null}
+      <MenuItem
+        onClick={() => {
+          cerrar();
+          onAjustes();
+        }}
+      >
+        {t('notebook.settings')}
+      </MenuItem>
+    </>
+  );
   /* EXPORTAR ES UN DERECHO, no una opción escondida en los ajustes: el artículo 20 del
      RGPD da derecho a recibir los propios datos, y un derecho que hay que buscar en un
      modal se ejerce menos. Por eso tiene su botón, también en un día. */
@@ -2905,120 +3080,71 @@ function BarraDeCuaderno({
             </IconButton>
           )}
         >
-          {deshacer ? (
-            <MenuItem onClick={onDeshacer}>{t('history.undoOf', { action: deshacer })}</MenuItem>
-          ) : null}
-          {rehacer ? (
-            <MenuItem onClick={onRehacer}>{t('history.redoOf', { action: rehacer })}</MenuItem>
-          ) : null}
-          {deshacer || rehacer ? <MenuSeparator /> : null}
-          {itemsOrden()}
-          {tags.length > 0 ? <MenuSeparator /> : null}
-          {tags.length > 0 ? itemsEtiquetas() : null}
-          <MenuSeparator />
-          {compartir ? <MenuItem onClick={compartir.onClick}>{compartir.rotulo}</MenuItem> : null}
-          <MenuItem onClick={onAjustes}>{t('notebook.settings')}</MenuItem>
+          {itemsAcciones}
         </Dropdown>
       </>
     );
   }
 
   return (
-    <div class="border-border-subtle flex min-h-12 shrink-0 flex-wrap items-center gap-1 border-b px-4 py-2 sm:px-6">
-      <h2 class="text-text mr-auto flex min-w-0 items-center gap-2 text-lg font-semibold">
+    <div class="notes-notebook-toolbar border-border-subtle flex shrink-0 flex-wrap items-center justify-between gap-3 border-b px-4 py-3 sm:px-6">
+      <h2 class="text-text flex min-w-0 flex-1 basis-40 items-center gap-2 text-lg font-semibold">
         {notebook.emoji ? <span aria-hidden="true">{notebook.emoji}</span> : null}
-        <span class="truncate">{notebook.title}</span>
+        <span class="truncate" title={notebook.title}>
+          {notebook.title}
+        </span>
       </h2>
-
-      {notebook.encrypted ? (
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={bloqueado ? onDesbloquear : onBloquear}
-          leadingIcon={<Icon name="lock" size={14} />}
-        >
-          {bloqueado ? t('crypto.unlock') : t('crypto.lockNow')}
-        </Button>
-      ) : null}
-
-      <Input
-        type="search"
-        size="sm"
-        value={filtro}
-        aria-label={t('filter.placeholder')}
-        placeholder={t('filter.placeholder')}
-        // `max-w`, no `w`: el control ya lleva `w-full` de base y las dos anchuras
-        // se pisaban; ganaba el 100 % y el filtro ocupaba la fila entera.
-        // En el móvil baja a SU fila, entera, detrás de los botones: así la barra son
-        // dos filas y no tres antes de la primera nota.
-        class="order-last basis-full sm:order-none sm:mr-1 sm:max-w-52 sm:basis-auto"
-        onInput={(e) => onFiltro((e.target as HTMLInputElement).value)}
-      />
-
-      {/* Orden de lectura: no toca nada en el servidor, así que no se pierde nada
-          al cambiarlo y se recuerda para la próxima vez. */}
-      <Dropdown
-        label={t('orden.label')}
-        align="end"
-        trigger={(props) => (
-          <IconButton {...props} label={`${t('orden.label')}: ${t(`orden.${orden}`)}`}>
-            <Glyph name="sort" size={16} />
+      <div class="flex min-w-0 flex-wrap items-center gap-1">
+        {notebook.encrypted ? (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={bloqueado ? onDesbloquear : onBloquear}
+            leadingIcon={<Icon name="lock" size={14} />}
+          >
+            {bloqueado ? t('crypto.unlock') : t('crypto.lockNow')}
+          </Button>
+        ) : null}
+        {filtrando || filtro ? (
+          <Input
+            type="search"
+            size="sm"
+            value={filtro}
+            // eslint-disable-next-line jsx-a11y/no-autofocus -- la lupa abre el campo y le entrega el foco
+            autoFocus={filtrando}
+            aria-label={t('filter.placeholder')}
+            placeholder={t('filter.placeholder')}
+            class="w-44! max-w-full"
+            onInput={(e) => onFiltro(e.currentTarget.value)}
+            onBlur={() => setFiltrando(false)}
+          />
+        ) : (
+          <IconButton label={t('filter.placeholder')} onClick={() => setFiltrando(true)}>
+            <Icon name="search" size={16} />
           </IconButton>
         )}
-      >
-        {(close) => <>{itemsOrden(close)}</>}
-      </Dropdown>
-
-      {tags.length > 0 ? (
+        {exportar}
         <Dropdown
-          label={t('tags.filterBy')}
+          label={t('common.more')}
           align="end"
           trigger={(props) => (
-            <IconButton {...props} label={t('tags.filterBy')} pressed={filtroEstado !== null}>
-              <Glyph name="filter" size={16} />
+            <IconButton {...props} label={t('common.more')} pressed={filtroEstado !== null}>
+              <Icon name="ellipsis" size={16} />
             </IconButton>
           )}
         >
-          {itemsEtiquetas()}
+          {itemsAcciones}
         </Dropdown>
-      ) : null}
-
-      {exportar}
-
-      {/* Deshacer y rehacer del CUADERNO —crear, editar, mover, eliminar—, que es
-          el «Deshacer» de la barra del BasKet clásico. El del texto vive en la
-          barra del editor de cada nota. Solo salen cuando hay algo que deshacer o
-          rehacer: dos flechas apagadas eran dos botones que no hacían nada. */}
-      {deshacer ? (
-        <IconButton label={t('history.undoOf', { action: deshacer })} onClick={onDeshacer}>
-          <Glyph name="undo" size={16} />
-        </IconButton>
-      ) : null}
-      {rehacer ? (
-        <IconButton label={t('history.redoOf', { action: rehacer })} onClick={onRehacer}>
-          <Glyph name="redo" size={16} />
-        </IconButton>
-      ) : null}
-
-      {compartir ? (
-        <IconButton label={compartir.rotulo} onClick={compartir.onClick}>
-          <Icon name="users" size={16} />
-        </IconButton>
-      ) : null}
-      <IconButton label={t('notebook.settings')} onClick={onAjustes}>
-        <Icon name="settings" size={16} />
-      </IconButton>
-
-      <Button
-        size="sm"
-        class="ml-1"
-        disabled={bloqueado || offline}
-        aria-label={t('note.new')}
-        leadingIcon={<Icon name="plus" size={15} />}
-        onClick={onNueva}
-      >
-        <span class="max-sm:sr-only">{t('note.new')}</span>
-      </Button>
+        <Button
+          size="sm"
+          class="ms-2"
+          disabled={bloqueado || offline || notebook.read_only}
+          leadingIcon={<Icon name="plus" size={15} />}
+          onClick={onNueva}
+        >
+          {t('note.new')}
+        </Button>
+      </div>
     </div>
   );
 }

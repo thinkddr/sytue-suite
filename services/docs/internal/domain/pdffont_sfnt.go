@@ -1113,10 +1113,7 @@ func recorrerSubtablaCmapConCero(sub []byte, fn func(codigo uint32, gid uint16),
 
 func recorrerCmapFormato4(sub []byte, fn func(codigo uint32, gid uint16), ceroFn func(codigo uint32)) {
 	be := binary.BigEndian
-	lon := int(be.Uint16(sub[2:4]))
-	if lon > len(sub) {
-		lon = len(sub)
-	}
+	lon := min(int(be.Uint16(sub[2:4])), len(sub))
 	if lon < 16 {
 		return
 	}

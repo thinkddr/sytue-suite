@@ -32,6 +32,7 @@
   "common.offline": "Þú ert án nettengingar. Breytingar vistast ekki fyrr en tengingin kemur aftur.",
   "common.retry": "Reyna aftur",
   "common.save": "Vista",
+  "crypto.dataReviewRequired": "Þessi hluti inniheldur gögn sem forritið getur ekki breytt án þess að tapa nákvæmni. Frumritið hefur verið varðveitt.",
   "crypto.disable": "Fjarlægja dulkóðun",
   "crypto.disableWarning": "Þeir dulkóðuðu minnispunktar sem fyrir eru verða áfram ólæsilegir. Aflæstu minnisbókinni fyrst.",
   "crypto.enable": "Dulkóða",
@@ -39,7 +40,6 @@
   "crypto.lockNow": "Læsa núna",
   "crypto.locked": "Læst",
   "crypto.migrating": "Vernda efni glósubókarinnar…",
-  "crypto.dataReviewRequired": "Þessi hluti inniheldur gögn sem forritið getur ekki breytt án þess að tapa nákvæmni. Frumritið hefur verið varðveitt.",
   "crypto.migrationFailed": "Ekki tókst að ljúka dulkóðun. Gögnin þín hafa varðveist. Opnaðu glósubókina aftur til að fara yfir breytingarnar.",
   "crypto.mismatch": "Lykilsetningarnar tvær eru ólíkar.",
   "crypto.passphrase": "Lykilsetning",
@@ -266,6 +266,7 @@
   "notebook.delete": "Eyða minnisbók",
   "notebook.deleteConfirm": "Eyða „{title}“ og öllu sem í henni er?",
   "notebook.emoji": "Táknmynd",
+  "notebook.move": "Færa minnisbók",
   "notebook.newChild": "Ný minnisbók innan í",
   "notebook.notes": {
     "one": "{count} minnispunktur",

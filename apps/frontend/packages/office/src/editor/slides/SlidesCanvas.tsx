@@ -34,8 +34,8 @@
  *   La transición de entrada por diapositiva (ninguna/fundido/deslizar) se
  *   elige en la mini-barra del escenario, no en el ribbon: ahí el select puede
  *   mostrar el valor REAL de la diapositiva activa (el ribbon no ve el modelo).
- * - El carril de miniaturas reordena con drag and drop nativo (paridad con las
- *   pestañas multi-hoja de Sheets); cada movimiento es un commit (apply).
+ * - El carril de miniaturas reordena con el asa compartida de dedo, ratón y
+ *   teclado; cada movimiento terminado es un commit (apply).
  */
 import { render } from 'preact';
 import type { CSSProperties, JSX } from 'preact';
@@ -44,6 +44,8 @@ import { EditorI18nCtx, useT } from '../context';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import {
   useToast,
+  Icon,
+  useListReorder,
   FOCUSABLE,
   useUltimo,
   useMobileBack,
@@ -4266,8 +4268,13 @@ export function SlidesCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
 
   useEffect(() => () => setEditorRoot(null), []);
 
-  /** Miniatura en arrastre (reordenar con drag and drop nativo, como Sheets). */
-  const slideDrag = useRef<number | null>(null);
+  const slideOrderPanel = useRef<HTMLDivElement>(null);
+  const slideOrder = useListReorder({
+    ids: model.slides.map((s) => s.id),
+    container: () => slideOrderPanel.current,
+    axis: 'auto',
+    onReorder: moveSlideTo,
+  });
 
   /* ----- arrastre de asas (Pointer Events con setPointerCapture, §7.2) ----- */
 
@@ -4555,90 +4562,89 @@ export function SlidesCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
         style={{ '--carril-diapos-w': `${THUMB_W + 32}px` }}
       >
         <div
+          ref={slideOrderPanel}
           data-scroll-x
           class="flex min-h-0 min-w-0 flex-1 flex-col items-center gap-2 overflow-y-auto p-2 max-sm:flex-row max-sm:overflow-x-auto max-sm:overflow-y-hidden"
         >
           {model.slides.map((s, i) => {
             const vis = slideVisuals(model, s);
             return (
-              <button
-                key={s.id}
-                type="button"
-                class={`relative shrink-0 overflow-hidden rounded-sm ${FOCUS_RING}`}
-                style={{
-                  ...visualsStyle(vis),
-                  // Ancho y alto en las MISMAS unidades que la escala de dentro:
-                  // ver el comentario del carril.
-                  width: `${THUMB_W}px`,
-                  // Alto por proporción del lienzo (16:9 → 72px como el h-18 clásico).
-                  height: `${(THUMB_W * sh) / STAGE_W}px`,
-                  boxShadow: i === active ? `0 0 0 2px ${ACCENT}` : '0 0 0 1px var(--sytue-border)',
-                }}
-                aria-label={t('slides.aria.slideOf', { n: i + 1, total: model.slides.length })}
-                aria-current={i === active ? 'true' : undefined}
-                title={t('slides.aria.dragHint', { n: i + 1 })}
-                draggable
-                onDragStart={(e) => {
-                  slideDrag.current = i;
-                  // setData: sin él, Firefox no inicia el arrastre.
-                  e.dataTransfer?.setData('text/plain', String(i + 1));
-                  if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
-                }}
-                onDragOver={(e) => {
-                  if (slideDrag.current !== null) e.preventDefault(); // acepta soltar aquí
-                }}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  const from = slideDrag.current;
-                  slideDrag.current = null;
-                  if (from !== null && from !== i) moveSlideTo(from, i);
-                }}
-                onDragEnd={() => {
-                  slideDrag.current = null;
-                }}
-                /* Reordenar sin ratón: el arrastre del carril no existe para quien
-                 * navega con teclado, y el orden de las diapositivas no es un
-                 * adorno. Mismo atajo que PowerPoint y Google Slides. */
-                onKeyDown={(e) => {
-                  if (!(e.ctrlKey || e.metaKey) || !e.shiftKey) return;
-                  const to = e.key === 'ArrowUp' ? i - 1 : e.key === 'ArrowDown' ? i + 1 : -1;
-                  if (to < 0 || to >= model.slides.length) return;
-                  e.preventDefault();
-                  moveSlideTo(i, to);
-                }}
-                onClick={() => {
-                  setActive(i);
-                  setSelBox(null);
-                  setEditBox(null);
-                }}
-              >
+              <div key={s.id} {...slideOrder.itemProps(s.id)} class="group relative shrink-0">
+                <button
+                  type="button"
+                  {...slideOrder.handleProps(s.id)}
+                  aria-label={t('slides.aria.dragHint', { n: i + 1 })}
+                  aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Home End"
+                  class="sytue-focus-ring bg-surface text-text-muted hover:text-text absolute top-1 left-1 z-10 grid min-h-8 w-6 cursor-grab touch-none place-items-center rounded-sm opacity-0 transition-opacity select-none [-webkit-user-select:none] group-focus-within:opacity-100 group-hover:opacity-100 active:cursor-grabbing motion-reduce:transition-none pointer-coarse:min-h-[max(44px,2.75rem)] pointer-coarse:min-w-[max(44px,2.75rem)] pointer-coarse:opacity-100"
+                >
+                  <Icon name="grip" size={14} />
+                </button>
+                {/* La miniatura representa el contenido, no el nombre del
+                    control: el botón superpuesto se identifica por su número. */}
                 <div
                   aria-hidden="true"
-                  class="pointer-events-none absolute top-0 left-0 origin-top-left"
+                  class="pointer-events-none relative block shrink-0 overflow-hidden rounded-sm select-none [-webkit-user-select:none]"
                   style={{
-                    width: `${STAGE_W}px`,
-                    height: `${sh}px`,
-                    transform: `scale(${THUMB_W / STAGE_W})`,
-                    color: vis.ink,
+                    ...visualsStyle(vis),
+                    // Ancho y alto en las MISMAS unidades que la escala de dentro:
+                    // ver el comentario del carril.
+                    width: `${THUMB_W}px`,
+                    // Alto por proporción del lienzo (16:9 → 72px como el h-18 clásico).
+                    height: `${(THUMB_W * sh) / STAGE_W}px`,
+                    boxShadow:
+                      i === active ? `0 0 0 2px ${ACCENT}` : '0 0 0 1px var(--sytue-border)',
                   }}
                 >
-                  {masterBoxesFor(model, i).map((b) => (
-                    <div key={`m-${b.id}`} class="absolute" style={boxPos(b)}>
-                      {renderBox(t, b, sh)}
-                    </div>
-                  ))}
-                  <ConnectorLayer connectors={layoutConnectorsFor(model, i)} boxes={[]} sh={sh} />
-                  {s.boxes.map((b) => (
-                    <div key={b.id} class="absolute" style={boxPos(b)}>
-                      {renderBox(t, b, sh)}
-                    </div>
-                  ))}
-                  <ConnectorLayer connectors={s.connectors ?? []} boxes={s.boxes} sh={sh} />
+                  <div
+                    class="pointer-events-none absolute top-0 left-0 origin-top-left"
+                    style={{
+                      width: `${STAGE_W}px`,
+                      height: `${sh}px`,
+                      transform: `scale(${THUMB_W / STAGE_W})`,
+                      color: vis.ink,
+                    }}
+                  >
+                    {masterBoxesFor(model, i).map((b) => (
+                      <div key={`m-${b.id}`} class="absolute" style={boxPos(b)}>
+                        {renderBox(t, b, sh)}
+                      </div>
+                    ))}
+                    <ConnectorLayer connectors={layoutConnectorsFor(model, i)} boxes={[]} sh={sh} />
+                    {s.boxes.map((b) => (
+                      <div key={b.id} class="absolute" style={boxPos(b)}>
+                        {renderBox(t, b, sh)}
+                      </div>
+                    ))}
+                    <ConnectorLayer connectors={s.connectors ?? []} boxes={s.boxes} sh={sh} />
+                  </div>
                 </div>
-                <span class="bg-bg-subtle text-text-muted text-2xs absolute right-1 bottom-0.5 rounded-sm px-1 leading-4">
-                  {i + 1}
-                </span>
-              </button>
+                <button
+                  type="button"
+                  class={`absolute inset-0 block h-full w-full overflow-hidden rounded-sm bg-transparent ${FOCUS_RING}`}
+                  aria-label={t('slides.aria.slideOf', { n: i + 1, total: model.slides.length })}
+                  aria-current={i === active ? 'true' : undefined}
+                  title={t('slides.aria.dragHint', { n: i + 1 })}
+                  /* Reordenar sin ratón: el arrastre del carril no existe para quien
+                   * navega con teclado, y el orden de las diapositivas no es un
+                   * adorno. Mismo atajo que PowerPoint y Google Slides. */
+                  onKeyDown={(e) => {
+                    if (!(e.ctrlKey || e.metaKey) || !e.shiftKey) return;
+                    const to = e.key === 'ArrowUp' ? i - 1 : e.key === 'ArrowDown' ? i + 1 : -1;
+                    if (to < 0 || to >= model.slides.length) return;
+                    e.preventDefault();
+                    moveSlideTo(i, to);
+                  }}
+                  onClick={() => {
+                    setActive(i);
+                    setSelBox(null);
+                    setEditBox(null);
+                  }}
+                >
+                  <span class="bg-bg-subtle text-text-muted text-2xs absolute right-1 bottom-0.5 rounded-sm px-1 leading-4">
+                    {i + 1}
+                  </span>
+                </button>
+              </div>
             );
           })}
         </div>

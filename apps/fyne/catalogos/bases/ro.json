@@ -1,4 +1,5 @@
 {
+  "actions.more": "Mai multe acțiuni",
   "attach.add": "Adaugă un fișier",
   "attach.badType": "Acest tip de fișier nu este permis sau conținutul nu corespunde numelui.",
   "attach.delete": "Șterge {name}",

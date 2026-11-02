@@ -32,6 +32,7 @@
   "common.offline": "Vous êtes hors ligne. Les modifications ne seront pas enregistrées avant le retour de la connexion.",
   "common.retry": "Réessayer",
   "common.save": "Enregistrer",
+  "crypto.dataReviewRequired": "Cette partie contient des données que cette app ne peut pas modifier sans perte de précision. L’original a été conservé.",
   "crypto.disable": "Retirer le chiffrement",
   "crypto.disableWarning": "Les notes déjà chiffrées resteront illisibles. Déverrouillez d’abord le carnet.",
   "crypto.enable": "Chiffrer",
@@ -39,7 +40,6 @@
   "crypto.lockNow": "Verrouiller maintenant",
   "crypto.locked": "Verrouillé",
   "crypto.migrating": "Protection du contenu du carnet…",
-  "crypto.dataReviewRequired": "Cette partie contient des données que cette app ne peut pas modifier sans perte de précision. L’original a été conservé.",
   "crypto.migrationFailed": "Le chiffrement n’a pas pu être terminé. Tes données ont été conservées. Rouvre le carnet pour vérifier les modifications.",
   "crypto.mismatch": "Les deux phrases secrètes diffèrent.",
   "crypto.passphrase": "Phrase secrète",
@@ -266,6 +266,7 @@
   "notebook.delete": "Supprimer le carnet",
   "notebook.deleteConfirm": "Supprimer « {title} » et tout son contenu ?",
   "notebook.emoji": "Icône",
+  "notebook.move": "Déplacer le carnet",
   "notebook.newChild": "Nouveau carnet à l’intérieur",
   "notebook.notes": {
     "one": "{count} note",

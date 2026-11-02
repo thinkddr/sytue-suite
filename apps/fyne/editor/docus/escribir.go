@@ -1056,6 +1056,7 @@ func (p *pagina) FocusGained() {
 // FocusLost apaga el cursor; la selección se queda, como en el navegador.
 func (p *pagina) FocusLost() {
 	f := p.f
+	p.CancelarArrastre()
 	f.enfocado, f.mayus = false, false
 	if f.parpadeo != nil {
 		f.parpadeo.Stop()
@@ -1091,6 +1092,7 @@ func (p *pagina) TypedKey(e *fyne.KeyEvent) {
 	ext := f.mayus
 	switch e.Name {
 	case fyne.KeyEscape:
+		p.CancelarArrastre()
 		switch {
 		case f.caja != nil && f.caja.AlSalir != nil:
 			f.caja.AlSalir()
@@ -1386,6 +1388,27 @@ func (p *pagina) DoubleTapped(e *fyne.PointEvent) {
 // Dragged extiende la selección en el escritorio; en el móvil mueve un tirador de la
 // selección o desplaza la página, que es lo que espera un dedo.
 func (p *pagina) Dragged(e *fyne.DragEvent) {
+	if p.cancelado {
+		return
+	}
+	p.arrastrando = true
+	p.arrastrar(e)
+	f := p.f
+	if f.arrastre != nil || (esMovil() && f.tiradorTexto != tiradorInicio && f.tiradorTexto != tiradorFin) {
+		return
+	}
+	pos := e.AbsolutePosition
+	if pos.IsZero() {
+		pos = fyne.CurrentApp().Driver().AbsolutePositionForObject(p).Add(e.Position)
+	}
+	f.autoArrastre.Actualizar(f.scroll, pos, func(dx, dy float32) {
+		f.scroll.ScrollToOffset(fyne.NewPos(f.scroll.Offset.X+dx, f.scroll.Offset.Y+dy))
+		inicio := fyne.CurrentApp().Driver().AbsolutePositionForObject(p)
+		p.arrastrar(&fyne.DragEvent{PointEvent: fyne.PointEvent{Position: pos.Subtract(inicio), AbsolutePosition: pos}})
+	})
+}
+
+func (p *pagina) arrastrar(e *fyne.DragEvent) {
 	f := p.f
 	if f.arrastre != nil {
 		f.arrastrar(e.Position)
@@ -1401,8 +1424,38 @@ func (p *pagina) Dragged(e *fyne.DragEvent) {
 
 // DragEnd termina el arrastre: el de un tirador o el de mover una imagen se guarda.
 func (p *pagina) DragEnd() {
+	p.f.autoArrastre.Parar()
+	p.arrastrando = false
+	if p.cancelado {
+		p.cancelado = false
+		return
+	}
 	p.f.tiradorTexto = sinDecidir
 	p.f.soltarArrastre()
+}
+
+// CancelarArrastre descarta una edición provisional de imagen sin guardarla ni añadirla al
+// historial. El final tardío del sistema solo libera el gesto cancelado.
+func (p *pagina) CancelarArrastre() {
+	f := p.f
+	f.autoArrastre.Parar()
+	if !p.arrastrando && f.arrastre == nil {
+		return
+	}
+	p.cancelado = p.cancelado || p.arrastrando
+	p.arrastrando = false
+	f.tiradorTexto = sinDecidir
+	a := f.arrastre
+	f.arrastre = nil
+	if a != nil && a.hayMovimiento {
+		rastreo := f.doc.Rastreo()
+		f.doc = rico.ParseCon(a.foto.html, f.hoja())
+		f.doc.PonerRastreo(rastreo)
+		f.cur, f.anc = a.foto.cur, a.foto.anc
+		f.ed = nil
+		f.remaquetar()
+		f.programarFormato()
+	}
 }
 
 // ---- valores de la cinta ----

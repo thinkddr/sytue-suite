@@ -119,8 +119,10 @@ type Lateral struct {
 
 	// dianas son las secciones de canales pintadas, para saber dónde se suelta; punto,
 	// dónde va el puntero del arrastre.
-	dianas []diana
-	punto  fyne.Position
+	dianas       []diana
+	punto        fyne.Position
+	scroll       *container.Scroll
+	autoArrastre ui.AutoScrollArrastre
 }
 
 // diana es una sección del carril donde se puede soltar un canal: la pieza (`sec`, que
@@ -135,6 +137,16 @@ type diana struct {
 // arrastrar sigue el puntero de un arrastre y enciende el aro (`dropActive && over`) de
 // la sección de debajo si `vale` la acepta.
 func (l *Lateral) arrastrar(p fyne.Position, vale func(Seccion) bool) {
+	l.marcarArrastre(p, vale)
+	if l.scroll != nil {
+		l.autoArrastre.Actualizar(l.scroll, p, func(_, dy float32) {
+			l.scroll.ScrollToOffset(fyne.NewPos(0, l.scroll.Offset.Y+dy))
+			l.marcarArrastre(p, vale)
+		})
+	}
+}
+
+func (l *Lateral) marcarArrastre(p fyne.Position, vale func(Seccion) bool) {
 	l.punto = p
 	debajo, hay := l.SeccionEn(p)
 	for _, x := range l.dianas {
@@ -147,6 +159,7 @@ func (l *Lateral) arrastrar(p fyne.Position, vale func(Seccion) bool) {
 
 // soltar apaga los aros y devuelve la sección donde ha acabado el puntero.
 func (l *Lateral) soltar() (Seccion, bool) {
+	l.autoArrastre.Parar()
 	for _, x := range l.dianas {
 		if x.sec.Diana {
 			x.sec.Diana = false
@@ -180,6 +193,7 @@ const (
 
 // Construir devuelve el `ui.Lateral` ya montado.
 func (l *Lateral) Construir() *ui.Lateral {
+	l.autoArrastre.Parar()
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 
 	secciones := l.seccionesDeCanales(v)
@@ -191,6 +205,7 @@ func (l *Lateral) Construir() *ui.Lateral {
 	// no empuja al pie, que es el `overflow-y-auto` de la web; lo decide quien monta
 	// el carril, como dice `ui.Lateral`.
 	c := container.NewVScroll(container.New(ui.Columna{}, cuerpo...))
+	l.scroll = c
 	refresco := l.Refresco
 	refresco.Arriba = func() bool { return c.Offset.Y <= 0.5 }
 	lat := ui.NuevoLateral(l.T.T("ui.mainNav", nil), ui.RefrescarAlTirar(c, &refresco))
@@ -393,6 +408,9 @@ func (l *Lateral) seccion(s Seccion, v tema.Variante) (*ui.SeccionLateral, fyne.
 				dibujo(glifoMas, GlifoFila, "sidebar-fg-muted", v), func() { l.AlMenuCategoria(k, mas) })
 			sec.Acciones = []fyne.CanvasObject{mas}
 		}
+		if asa := l.asaCategoria(*s.Categoria, titulo); asa != nil {
+			sec.Acciones = append(sec.Acciones, asa)
+		}
 	}
 	if s.Clave == ClaveCanales {
 		// El «＋» de «Canales»: la puerta principal para crear uno. Siempre visible y
@@ -426,6 +444,24 @@ func (l *Lateral) seccion(s Seccion, v tema.Variante) (*ui.SeccionLateral, fyne.
 		sec.Filas = append(sec.Filas, l.accion("sidebar.newMessage", iconos.Mas, l.AlNuevoDirecto, v))
 	}
 	return sec, obj
+}
+
+func (l *Lateral) asaCategoria(k Categoria, titulo string) *ui.AsaArrastre {
+	if !ui.EsTactil() || l.AlSoltarCategoria == nil || l.AlMenuCategoria == nil {
+		return nil
+	}
+	otra := func(d Seccion) bool { return d.Categoria != nil && d.Categoria.ID != k.ID }
+	asa := ui.NuevaAsaArrastre(l.T.T("category.actions", i18n.Vars{"name": titulo}))
+	asa.SobreCromo, asa.TokenAro = true, "sidebar-focus"
+	asa.AlPulsar = func() { l.AlMenuCategoria(k, asa) }
+	asa.AlArrastrar = func(p fyne.Position) { l.arrastrar(p, otra) }
+	asa.AlSoltar = func(fyne.Position) {
+		if d, ok := l.soltar(); ok && otra(d) {
+			l.AlSoltarCategoria(k, *d.Categoria)
+		}
+	}
+	asa.AlCancelar = func() { _, _ = l.soltar() }
+	return asa
 }
 
 func (l *Lateral) accion(clave string, i iconos.Icono, al func(), v tema.Variante) *ui.FilaLateral {
@@ -467,6 +503,19 @@ func (l *Lateral) fila(c Canal, v tema.Variante) fyne.CanvasObject {
 	}
 	if l.AlMenuCanal != nil {
 		f.AlMenu = func(d fyne.CanvasObject) { l.AlMenuCanal(c, d) }
+	}
+	if ui.EsTactil() && l.AlSoltarCanal != nil && l.AlMenuCanal != nil && !c.Externo {
+		asa := ui.NuevaAsaArrastre(l.T.T("channel.actions", i18n.Vars{"name": c.Nombre}))
+		asa.SobreCromo, asa.TokenAro = true, "sidebar-focus"
+		asa.AlPulsar = func() { l.AlMenuCanal(c, asa) }
+		asa.AlArrastrar = func(pos fyne.Position) { l.arrastrar(pos, func(Seccion) bool { return true }) }
+		asa.AlSoltar = func(fyne.Position) {
+			if s, ok := l.soltar(); ok {
+				l.AlSoltarCanal(c, s)
+			}
+		}
+		asa.AlCancelar = func() { _, _ = l.soltar() }
+		out = container.New(ui.FilaAuto{Derecha: 1}, out, asa)
 	}
 	return out
 }

@@ -53,10 +53,12 @@ type LienzoEditor struct {
 	// AlMarco avisa de que el marco ha cambiado, para encender «Aplicar».
 	AlMarco func()
 
-	ancla  [2]float64
-	caja   fyne.Position
-	tamPx  fyne.Size
-	activo bool
+	ancla         [2]float64
+	caja          fyne.Position
+	tamPx         fyne.Size
+	activo        bool
+	cancelado     bool
+	marcoAnterior *Marco
 }
 
 var (
@@ -111,11 +113,16 @@ func (l *LienzoEditor) fraccion(p fyne.Position) (float64, float64) {
 
 // Dragged es el `pointerdown` + `pointermove` del recorte: el primero fija el ancla.
 func (l *LienzoEditor) Dragged(e *fyne.DragEvent) {
-	if !l.Recortando {
+	if !l.Recortando || l.cancelado {
 		return
 	}
 	px, py := l.fraccion(e.Position)
 	if !l.activo {
+		l.marcoAnterior = nil
+		if l.Marco != nil {
+			anterior := *l.Marco
+			l.marcoAnterior = &anterior
+		}
 		l.activo = true
 		l.ancla[0], l.ancla[1] = l.fraccion(e.Position.Subtract(e.Dragged))
 	}
@@ -132,7 +139,22 @@ func (l *LienzoEditor) Dragged(e *fyne.DragEvent) {
 }
 
 // DragEnd suelta el ancla; el marco se queda hasta que se aplique o se cancele.
-func (l *LienzoEditor) DragEnd() { l.activo = false }
+func (l *LienzoEditor) DragEnd() {
+	l.activo, l.cancelado, l.marcoAnterior = false, false, nil
+}
+
+// CancelarArrastre recupera el recorte anterior sin aplicar la edición.
+func (l *LienzoEditor) CancelarArrastre() {
+	if !l.activo {
+		return
+	}
+	l.Marco, l.marcoAnterior = l.marcoAnterior, nil
+	l.activo, l.cancelado = false, true
+	l.Refresh()
+	if l.AlMarco != nil {
+		l.AlMarco()
+	}
+}
 
 // AjustarProporcion es lo que hace pulsar una proporción con un marco ya dibujado: se
 // rehace desde su esquina de arriba a la izquierda.

@@ -13,6 +13,8 @@ import { Badge } from './Badge.js';
 import { Icon } from './Icon.js';
 
 export interface SidebarProps {
+  /** Identifica el panel de navegación, también al acotar gestos a este carril. */
+  id?: string;
   /** Cabecera (p.ej. logo de la app o selector de workspace). */
   header?: ComponentChildren;
   /** Pie (p.ej. ayuda, version). */
@@ -23,6 +25,7 @@ export interface SidebarProps {
 }
 
 export function Sidebar({
+  id,
   header,
   footer,
   collapsed = false,
@@ -32,6 +35,7 @@ export function Sidebar({
   const t = useT();
   return (
     <nav
+      id={id}
       aria-label={t('ui.mainNav')}
       data-collapsed={collapsed ? 'true' : 'false'}
       class={cx(
@@ -73,7 +77,9 @@ export function Sidebar({
           contacto», «Hilos», «Buscar notas» y «Plataforma». */}
       {/* `relative`: es un panel que desplaza, y lo que lleva dentro se ancla a él y no
           al documento (ver la nota del `main` de AdminShell). */}
-      <div class="relative min-h-0 flex-1 overflow-y-auto px-4 py-2">{children}</div>
+      <div data-sidebar-scroll class="relative min-h-0 flex-1 overflow-y-auto px-4 py-2">
+        {children}
+      </div>
       {/* `empty:hidden`: el pie de Calendar y Contacts es `<ImportData>`, que no pinta nada
           si la organización no ha conectado ningún origen. `footer` es un elemento igual,
           y sin esto quedaba un filete con 15 px de nada debajo (medido el 2026-09-28). */}

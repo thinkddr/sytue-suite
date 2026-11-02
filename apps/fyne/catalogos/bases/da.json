@@ -1,4 +1,5 @@
 {
+  "actions.more": "Flere handlinger",
   "attach.add": "Tilføj en fil",
   "attach.badType": "Denne filtype er ikke tilladt, eller indholdet svarer ikke til navnet.",
   "attach.delete": "Slet {name}",

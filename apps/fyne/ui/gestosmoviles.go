@@ -174,14 +174,24 @@ func (r *rendererGestos) Layout(size fyne.Size) {
 		sincronizarExclusionMenuMovil(c)
 		return
 	}
-	filter, supported := c.(mobile.TouchFilterCanvas)
-	if !supported {
+	if !instalarGestosMoviles(c, &w.gestos) {
 		return
 	}
 	w.canvas = c
 	w.gestos.canvas = c
-	filter.SetTouchFilter(w.gestos.recibir)
 	sincronizarExclusionMenuMovil(c)
+}
+
+func instalarGestosMoviles(c fyne.Canvas, gestos *gestosMoviles) bool {
+	filter, supported := c.(mobile.TouchFilterCanvas)
+	if !supported {
+		return false
+	}
+	filter.SetTouchFilter(gestos.filtrar)
+	if observer, ok := c.(mobile.TouchObserverCanvas); ok {
+		observer.SetTouchObserver(gestos.observarPulsacion)
+	}
+	return true
 }
 
 func (r *rendererGestos) Refresh() {
@@ -230,6 +240,81 @@ type gestosMoviles struct {
 	arrastreY         float32
 	alIndicador       func()
 	activo, capturado bool
+	pulsado           pulsableMovil
+	pulsadoID         int
+	pulsadoInicio     fyne.Position
+	arrastre          arrastreCancelable
+	arrastreID        int
+}
+
+// El observador refleja el estado visual sin convertir los botones en Touchable: hacerlo
+// impediría que un arrastre iniciado sobre ellos llegase al desplazador de la lista.
+type pulsableMovil interface {
+	fyne.CanvasObject
+	pulsacionDisponible() bool
+	pulsacionDePuntero(bool)
+}
+
+// Descarta la operación provisional antes del DragEnd con el que el driver cierra
+// una cancelación del sistema. Es distinto de cancelar la edición de un campo.
+type arrastreCancelable interface {
+	fyne.Draggable
+	CancelarArrastre()
+}
+
+func (g *gestosMoviles) soltarPulsacion() {
+	if g.pulsado != nil {
+		g.pulsado.pulsacionDePuntero(false)
+		g.pulsado = nil
+	}
+}
+
+func (g *gestosMoviles) observarInicio(e mobile.FilterEvent, resultado mobile.FilterResult) {
+	g.soltarPulsacion()
+	if g.arrastre != nil && g.arrastreID != e.ID {
+		g.arrastre.CancelarArrastre()
+	}
+	g.arrastre = nil
+	if resultado == mobile.FilterClaim {
+		return
+	}
+	for i := len(e.Path) - 1; i >= 0; i-- {
+		if a, ok := e.Path[i].(arrastreCancelable); ok && g.arrastre == nil {
+			g.arrastre, g.arrastreID = a, e.ID
+		}
+		if b, ok := e.Path[i].(pulsableMovil); ok && g.pulsado == nil && b.Visible() && b.pulsacionDisponible() {
+			g.pulsado, g.pulsadoID, g.pulsadoInicio = b, e.ID, e.Position
+			b.pulsacionDePuntero(true)
+		}
+	}
+}
+
+func (g *gestosMoviles) observarPulsacion(e mobile.FilterEvent, resultado mobile.FilterResult) {
+	if e.Phase == mobile.FilterBegin {
+		g.observarInicio(e, resultado)
+		return
+	}
+	g.terminarArrastre(e)
+	if g.pulsado == nil || e.ID != g.pulsadoID {
+		return
+	}
+	dx, dy := e.Position.X-g.pulsadoInicio.X, e.Position.Y-g.pulsadoInicio.Y
+	if e.Phase == mobile.FilterEnd || e.Phase == mobile.FilterCancel || resultado == mobile.FilterClaim ||
+		dx*dx+dy*dy > decidirGesto*decidirGesto || !g.pulsado.Visible() || !g.pulsado.pulsacionDisponible() {
+		g.soltarPulsacion()
+	}
+}
+
+func (g *gestosMoviles) terminarArrastre(e mobile.FilterEvent) {
+	if g.arrastre == nil || e.ID != g.arrastreID {
+		return
+	}
+	if e.Phase == mobile.FilterCancel {
+		g.arrastre.CancelarArrastre()
+	}
+	if e.Phase == mobile.FilterEnd || e.Phase == mobile.FilterCancel {
+		g.arrastre = nil
+	}
 }
 
 func (g *gestosMoviles) actualizarIndicador(dy float32) {
@@ -244,6 +329,11 @@ func (g *gestosMoviles) actualizarIndicador(dy float32) {
 }
 
 func (g *gestosMoviles) cancelar() {
+	g.soltarPulsacion()
+	if g.arrastre != nil {
+		g.arrastre.CancelarArrastre()
+		g.arrastre = nil
+	}
 	menu, cierre := g.menu, g.cierre
 	teniaIndicador := g.arrastreY > 0
 	g.activo, g.capturado = false, false
@@ -265,7 +355,7 @@ func (g *gestosMoviles) bloqueado() bool {
 	return g.canvas != nil && (g.canvas.Overlays().Top() != nil || dialogoArriba(g.canvas) != nil)
 }
 
-func (g *gestosMoviles) recibir(e mobile.FilterEvent) mobile.FilterResult {
+func (g *gestosMoviles) filtrar(e mobile.FilterEvent) mobile.FilterResult {
 	switch e.Phase {
 	case mobile.FilterBegin:
 		return g.empezar(e)
@@ -316,7 +406,7 @@ func esControlDeEscritura(o fyne.CanvasObject) bool {
 
 func bloqueaRefrescoMovil(o fyne.CanvasObject) bool {
 	switch o.(type) {
-	case *BotonFlotante, *Aviso:
+	case *BotonFlotante, *Aviso, *AsaArrastre:
 		return true
 	}
 	return false
@@ -535,7 +625,7 @@ func (g *gestosMoviles) anotarObjetivo(object fyne.CanvasObject, posX, left floa
 }
 
 func menuPorGesto(a *Armazon) bool {
-	return a.Visible() && a.Menu != nil && !a.CajonAbierto && !a.DetalleAbierto &&
+	return a.Visible() && a.Menu != nil && !a.CajonAbierto && (!a.DetalleAbierto || a.MenuEnDetalle) &&
 		(a.Size().Width < Estrecho || a.Carril != nil)
 }
 

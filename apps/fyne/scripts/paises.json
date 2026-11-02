@@ -1,0 +1,14 @@
+{
+  "_comentario": "Política de países de las tiendas (App Store, Mac App Store y Google Play), decidida por el titular el 2026-11-01: todos los territorios que ofrezca cada tienda salvo estos. La lista de excluidos es explícita; la disponibilidad automática en territorios nuevos sigue desactivada. La leen appstore-publicar.py (--paises, --ficha, --cifrado-exento) y play-publicar.sh (--paises). Quitar a Francia exige antes la declaración de cifrado ante la ANSSI y revisar la respuesta de cifrado de Apple.",
+  "excluidos": [
+    { "iso2": "FR", "iso3": "FRA", "motivo": "declaración de medios de cifrado ante la ANSSI pendiente (decisión 2026-10-14)" },
+    { "iso2": "CN", "iso3": "CHN", "motivo": "China continental exige licencia ICP; sin ella Apple rechaza la app" },
+    { "iso2": "RU", "iso3": "RUS", "motivo": "sanciones UE (Reglamento 833/2014, art. 5 quindecies: software de gestión empresarial)" },
+    { "iso2": "BY", "iso3": "BLR", "motivo": "sanciones UE (Reglamento 765/2006)" },
+    { "iso2": "IR", "iso3": "IRN", "motivo": "sanciones; defensivo, las tiendas no lo ofrecen" },
+    { "iso2": "KP", "iso3": "PRK", "motivo": "sanciones; defensivo, las tiendas no lo ofrecen" },
+    { "iso2": "SY", "iso3": "SYR", "motivo": "sanciones; defensivo, las tiendas no lo ofrecen" },
+    { "iso2": "CU", "iso3": "CUB", "motivo": "sanciones; defensivo, las tiendas no lo ofrecen" }
+  ],
+  "minimo_play": 150
+}

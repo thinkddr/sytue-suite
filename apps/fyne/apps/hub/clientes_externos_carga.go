@@ -283,21 +283,7 @@ func (c *controlClientesExternos) perfilApple(p Plataforma) {
 		if nativo {
 			aplicar, err = c.perfilNativo(ctx)
 		} else {
-			var enlace string
-			enlace, err = c.perfil(ctx, "Apple · "+string(p))
-			if err == nil {
-				u, fallo := url.Parse(enlace)
-				if fallo != nil || u.Scheme != "https" || u.Host == "" || u.User != nil {
-					err = errors.New("hub: el enlace de perfil no es HTTPS")
-				}
-			}
-			aplicar = func() error {
-				if err := ctx.Err(); err != nil {
-					return err
-				}
-				c.v.AbrirURL(enlace)
-				return nil
-			}
+			aplicar, err = c.prepararEnlacePerfilApple(ctx, p)
 		}
 		c.v.enUI(func() {
 			defer cancelar()
@@ -313,6 +299,23 @@ func (c *controlClientesExternos) perfilApple(p Plataforma) {
 			w.PerfilCreando, w.PerfilFallo = false, err != nil || aplicar == nil
 		})
 	}()
+}
+
+func (c *controlClientesExternos) prepararEnlacePerfilApple(ctx context.Context, p Plataforma) (func() error, error) {
+	enlace, err := c.perfil(ctx, "Apple · "+string(p))
+	if err == nil {
+		u, fallo := url.Parse(enlace)
+		if fallo != nil || u.Scheme != "https" || u.Host == "" || u.User != nil {
+			err = errors.New("hub: el enlace de perfil no es HTTPS")
+		}
+	}
+	return func() error {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		c.v.AbrirURL(enlace)
+		return nil
+	}, err
 }
 
 func (c *controlClientesExternos) montarDrive(direccion string) {

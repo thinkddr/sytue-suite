@@ -87,6 +87,9 @@ func etiquetaDeRegistro(campos []api.BasesField, r api.BasesRecord) string {
 
 // cadenasDe son los valores de una celda de selección múltiple, o nada.
 func cadenasDe(valor any) []string {
+	if ya, ok := valor.([]string); ok { // armado aquí y no llegado en JSON
+		return ya
+	}
 	lista, _ := valor.([]any)
 	out := make([]string, 0, len(lista))
 	for _, x := range lista {

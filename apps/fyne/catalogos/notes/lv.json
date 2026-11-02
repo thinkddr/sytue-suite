@@ -32,6 +32,7 @@
   "common.offline": "Jūs esat bezsaistē. Izmaiņas netiks saglabātas, kamēr savienojums neatjaunosies.",
   "common.retry": "Mēģināt vēlreiz",
   "common.save": "Saglabāt",
+  "crypto.dataReviewRequired": "Šajā daļā ir dati, kurus lietotne nevar mainīt, nezaudējot precizitāti. Oriģināls ir saglabāts.",
   "crypto.disable": "Noņemt šifrēšanu",
   "crypto.disableWarning": "Esošās šifrētās piezīmes paliks nelasāmas. Vispirms atbloķējiet piezīmju grāmatu.",
   "crypto.enable": "Šifrēt",
@@ -39,7 +40,6 @@
   "crypto.lockNow": "Bloķēt tagad",
   "crypto.locked": "Bloķēta",
   "crypto.migrating": "Tiek aizsargāts piezīmju grāmatiņas saturs…",
-  "crypto.dataReviewRequired": "Šajā daļā ir dati, kurus lietotne nevar mainīt, nezaudējot precizitāti. Oriģināls ir saglabāts.",
   "crypto.migrationFailed": "Šifrēšanu neizdevās pabeigt. Tavi dati ir saglabāti. Atver piezīmju grāmatiņu vēlreiz, lai pārskatītu izmaiņas.",
   "crypto.mismatch": "Abas paroles frāzes atšķiras.",
   "crypto.passphrase": "Paroles frāze",
@@ -270,6 +270,7 @@
   "notebook.delete": "Dzēst piezīmju grāmatu",
   "notebook.deleteConfirm": "Dzēst “{title}” un visu, kas tajā ir?",
   "notebook.emoji": "Ikona",
+  "notebook.move": "Pārvietot piezīmju grāmatiņu",
   "notebook.newChild": "Jauna piezīmju grāmata iekšā",
   "notebook.notes": {
     "zero": "{count} piezīmju",

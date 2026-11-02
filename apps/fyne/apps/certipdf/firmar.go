@@ -647,6 +647,7 @@ type lienzoFirma struct {
 	widget.BaseWidget
 	trazos    [][][2]float64
 	dibujando bool
+	cancelado bool
 	ancho     float32
 	alCambiar func()
 }
@@ -676,6 +677,9 @@ func (l *lienzoFirma) interno(p fyne.Position) [2]float64 {
 
 // Dragged empieza un trazo o lo alarga.
 func (l *lienzoFirma) Dragged(e *fyne.DragEvent) {
+	if l.cancelado {
+		return
+	}
 	if !l.dibujando {
 		l.dibujando = true
 		l.trazos = append(l.trazos, [][2]float64{l.interno(e.Position.Subtract(e.Dragged))})
@@ -687,10 +691,27 @@ func (l *lienzoFirma) Dragged(e *fyne.DragEvent) {
 
 // DragEnd cierra el trazo; lo que se dibujó ya puede firmarse.
 func (l *lienzoFirma) DragEnd() {
+	if l.cancelado {
+		l.cancelado = false
+		return
+	}
+	if !l.dibujando {
+		return
+	}
 	l.dibujando = false
 	if l.alCambiar != nil {
 		l.alCambiar()
 	}
+}
+
+// CancelarArrastre elimina solo el trazo en curso y conserva la firma anterior.
+func (l *lienzoFirma) CancelarArrastre() {
+	if !l.dibujando {
+		return
+	}
+	l.dibujando, l.cancelado = false, true
+	l.trazos = l.trazos[:len(l.trazos)-1]
+	l.Refresh()
 }
 
 // Cursor es el `cursor-crosshair`.

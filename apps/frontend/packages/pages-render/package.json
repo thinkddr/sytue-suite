@@ -2,7 +2,7 @@
   "name": "@sytue/pages-render",
   "version": "1.0.0",
   "private": true,
-  "description": "Sytue Web — el IR del diseño de una web (tipos, tabla de campos, validador espejo del de services/pages/internal/ir), el renderizador determinista (lienzo y publicación), el exportador Astro+Preact y las islas. Un solo renderizador para el navegador y el BFF.",
+  "description": "Sytue Web \u2014 el IR del dise\u00f1o de una web (tipos, tabla de campos, validador espejo del de services/pages/internal/ir), el renderizador determinista (lienzo y publicaci\u00f3n), el exportador Astro+Preact y las islas. Un solo renderizador para el navegador y el BFF.",
   "license": "Apache-2.0",
   "type": "module",
   "exports": {
@@ -28,7 +28,7 @@
   "devDependencies": {
     "@sytue/config": "workspace:*",
     "@sytue/i18n": "workspace:*",
-    "@types/bun": "1.4.2",
+    "@types/bun": "1.4.4",
     "@types/node": "catalog:",
     "typescript": "6.0.3"
   }

@@ -31,7 +31,7 @@ mal() {
   fallos=1
 }
 
-if ! grep -qx 'replace fyne.io/fyne/v2 => github.com/thinkddr/fyne/v2 v2.8.2-sytue.2' "$FYNE/go.mod"; then
+if ! grep -qx 'replace fyne.io/fyne/v2 => github.com/thinkddr/fyne/v2 v2.8.2-sytue.3' "$FYNE/go.mod"; then
   mal "apps/fyne debe usar el fork mantenido con URL entrantes y geometría UIKit de Fyne v2.8.2"
 fi
 
@@ -1963,8 +1963,8 @@ uso, codigo = "ITSAppUsesNonExemptEncryption", "ITSEncryptionExportComplianceCod
 fuentes = [xcode / ("Info-%s.plist" % p) for p in ("ios", "macos")]
 # run_path no añade el directorio del guion para sus importaciones hermanas.
 sys.path.insert(0, str(xcode.parent / "scripts"))
-paises = runpy.run_path(str(xcode.parent / "scripts/appstore-publicar.py"))["PAISES"]
-if "FRA" in paises:
+excluidos = runpy.run_path(str(xcode.parent / "scripts/appstore-publicar.py"))["EXCLUIDOS"]
+if "FRA" not in excluidos:
     sys.exit("revisar la exención documental antes de habilitar Francia")
 for ruta in fuentes:
     with ruta.open("rb") as fichero:

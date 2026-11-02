@@ -133,6 +133,7 @@ export const cs: AppCatalog<typeof en> = {
   },
   'notebook.emoji': 'Ikona',
   'notebook.color': 'Barva',
+  'notebook.move': 'Přesunout zápisník',
   'notebook.title': 'Název',
   'layout.label': 'Rozvržení',
   'layout.tree': 'Strom',

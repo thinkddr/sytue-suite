@@ -22,6 +22,7 @@ import {
   MASCARA_SCROLL_X,
   Button,
   Icon,
+  usePointerDrag,
   IconButton,
   Spinner,
   cx,
@@ -351,7 +352,7 @@ export function Editor({ locale, id, volverA }: Props): JSX.Element {
   };
   const empezarRecorte = (e: PointerEvent) => {
     if (!recortando) return;
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    if (!gestoRecorte.iniciarArrastre(e, marco)) return;
     origen.current = fraccion(e);
     setMarco({ ...origen.current, w: 0, h: 0 });
   };
@@ -373,6 +374,14 @@ export function Editor({ locale, id, volverA }: Props): JSX.Element {
   const soltarRecorte = () => {
     origen.current = null;
   };
+  const gestoRecorte = usePointerDrag<typeof marco>({
+    onMove: (_, e) => moverRecorte(e),
+    onEnd: soltarRecorte,
+    onCancel: (anterior) => {
+      origen.current = null;
+      setMarco(anterior);
+    },
+  });
   const aplicarRecorte = () => {
     if (marco && marco.w > 0.01 && marco.h > 0.01) {
       anyadir({
@@ -503,9 +512,10 @@ export function Editor({ locale, id, volverA }: Props): JSX.Element {
               ...estiloFondo.style,
             }}
             onPointerDown={empezarRecorte}
-            onPointerMove={moverRecorte}
-            onPointerUp={soltarRecorte}
-            onPointerCancel={soltarRecorte}
+            onPointerMove={gestoRecorte.onPointerMove}
+            onPointerUp={gestoRecorte.onPointerUp}
+            onPointerCancel={gestoRecorte.onPointerCancel}
+            onLostPointerCapture={gestoRecorte.onLostPointerCapture}
           >
             <canvas
               ref={lienzo}

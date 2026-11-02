@@ -106,7 +106,8 @@ type Lateral struct {
 	EsMio func(string) bool
 	// Fase es la del árbol: mientras carga no se pinta nada y con error se escribe el
 	// aviso, igual que hace la web con su `cargandoArbol` / `errorArbol`.
-	Fase Fase
+	Fase          Fase
+	filasCuaderno map[string]*ui.FilaLateral
 
 	AlHoy                 func()
 	AlDia                 func(string)
@@ -130,6 +131,7 @@ func NuevoLateral(tr *i18n.Translator) *Lateral {
 
 // Objeto arma el carril entero.
 func (l *Lateral) Objeto(v tema.Variante) fyne.CanvasObject {
+	l.filasCuaderno = make(map[string]*ui.FilaLateral)
 	destino := func(vista Vista, d, clave string) *ui.FilaLateral {
 		f := ui.NuevaFilaLateral(l.tr.T(clave, nil), Glifo(d, ui.GlifoMenu, "sidebar-fg", v),
 			func() { llamar1(l.AlIrA, vista) })
@@ -212,7 +214,7 @@ func (l *Lateral) ramas(v tema.Variante) []fyne.CanvasObject {
 			if l.Cerrados[c.ID] {
 				continue
 			}
-			if c.ID == l.Activo {
+			if c.ID == l.Activo && c.Vista == VistaArbol {
 				for _, n := range l.Notas {
 					filas = append(filas, l.filaNota(n, nivel, v))
 				}
@@ -227,6 +229,9 @@ func (l *Lateral) ramas(v tema.Variante) []fyne.CanvasObject {
 // fila es la de un cuaderno: sangría por nivel, marca de color o emoji, contador y los
 // dos botones de acción que cierran los 30,5.
 func (l *Lateral) fila(c Cuaderno, nivel int, v tema.Variante) *ui.FilaLateral {
+	if l.filasCuaderno == nil {
+		l.filasCuaderno = make(map[string]*ui.FilaLateral)
+	}
 	f := ui.NuevaFilaLateral(c.Titulo, nil, func() { llamar1(l.AlAbrir, c) })
 	var caja float32
 	if c.Emoji != "" {
@@ -238,6 +243,7 @@ func (l *Lateral) fila(c Cuaderno, nivel int, v tema.Variante) *ui.FilaLateral {
 		f.Punto, caja = hexO(c.Color, tema.Color("sidebar-fg-muted", v)), ui.PuntoEtiqueta
 	}
 	f.Activa = c.ID == l.Activo
+	l.filasCuaderno[c.ID] = f
 	cola, acciones := l.cola(c, v)
 	f.Rama = &ui.RamaLateral{
 		Sangria:   SangriaBase + float32(nivel-1)*SangriaNivel,

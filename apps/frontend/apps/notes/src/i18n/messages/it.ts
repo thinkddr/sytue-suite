@@ -121,6 +121,7 @@ export const it: AppCatalog<typeof en> = {
   'notebook.notes': { one: '{count} nota', other: '{count} note' },
   'notebook.emoji': 'Icona',
   'notebook.color': 'Colore',
+  'notebook.move': 'Sposta quaderno',
   'notebook.title': 'Nome',
 
   'layout.label': 'Disposizione',

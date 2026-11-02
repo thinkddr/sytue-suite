@@ -7,6 +7,7 @@
  * SOLO en desarrollo: en producción es un 404 y nada lo enlaza.
  */
 import '../../styles/app.css';
+import { basePathScript, themeInitScript } from '@sytue/ui';
 import { BasesApp } from '../../islands/BasesApp.js';
 import { BaseApp } from '../../islands/BaseApp.js';
 
@@ -36,6 +37,8 @@ const hub = 'http://127.0.0.1:9';
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Bases (banco de pruebas)</title>
+    <script is:inline set:html={basePathScript('/bases')}></script>
+    <script is:inline set:html={themeInitScript}></script>
   </head>
   <body class="bg-bg text-text h-full antialiased">
     {q.get('que') === 'base' ? (

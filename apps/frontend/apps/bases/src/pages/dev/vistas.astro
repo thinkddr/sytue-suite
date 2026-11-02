@@ -4,6 +4,7 @@
  * auditoría de accesibilidad. SOLO en desarrollo: en producción es un 404.
  */
 import '../../styles/app.css';
+import { basePathScript, themeInitScript } from '@sytue/ui';
 import { VistasDemo } from '../../dev/VistasDemo.js';
 
 export const prerender = false;
@@ -23,6 +24,8 @@ const que = q.get('que') === 'formulario' ? 'formulario' : 'tablero';
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Vistas (banco de pruebas)</title>
+    <script is:inline set:html={basePathScript('/bases')}></script>
+    <script is:inline set:html={themeInitScript}></script>
   </head>
   <body class="bg-bg h-full">
     <VistasDemo client:only="preact" locale={lang} que={que} />

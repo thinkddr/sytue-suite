@@ -10,6 +10,7 @@ import type { en } from './en.js';
 export const lt: AppCatalog<typeof en> = {
   'nav.title': 'Bases',
   'nav.bases': 'Mano duomenų bazės',
+  'actions.more': 'Daugiau veiksmų',
   'bases.title': 'Mano duomenų bazės',
   'bases.newName': 'Naujos duomenų bazės pavadinimas',
   'bases.create': 'Sukurti duomenų bazę',

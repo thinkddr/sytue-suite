@@ -32,6 +32,7 @@
   "common.offline": "Niste povezani. Spremembe se ne bodo shranile, dokler se povezava ne vrne.",
   "common.retry": "Poskusi znova",
   "common.save": "Shrani",
+  "crypto.dataReviewRequired": "Ta del vsebuje podatke, ki jih aplikacija ne more spremeniti brez izgube natančnosti. Izvirnik je ohranjen.",
   "crypto.disable": "Odstrani šifriranje",
   "crypto.disableWarning": "Obstoječi šifrirani zapiski ostanejo neberljivi. Najprej odklenite beležnico.",
   "crypto.enable": "Šifriraj",
@@ -39,7 +40,6 @@
   "crypto.lockNow": "Zakleni zdaj",
   "crypto.locked": "Zaklenjeno",
   "crypto.migrating": "Zaščita vsebine zvezka…",
-  "crypto.dataReviewRequired": "Ta del vsebuje podatke, ki jih aplikacija ne more spremeniti brez izgube natančnosti. Izvirnik je ohranjen.",
   "crypto.migrationFailed": "Šifriranja ni bilo mogoče dokončati. Tvoji podatki so ohranjeni. Znova odpri zvezek in preglej spremembe.",
   "crypto.mismatch": "Gesli se razlikujeta.",
   "crypto.passphrase": "Geslo",
@@ -274,6 +274,7 @@
   "notebook.delete": "Izbriši beležnico",
   "notebook.deleteConfirm": "Izbrišem »{title}« in vse, kar je notri?",
   "notebook.emoji": "Ikona",
+  "notebook.move": "Premakni zvezek",
   "notebook.newChild": "Nova beležnica znotraj",
   "notebook.notes": {
     "one": "{count} zapisek",

@@ -32,6 +32,7 @@
   "common.offline": "Nėra interneto ryšio. Pakeitimai nebus išsaugoti, kol ryšys negrįš.",
   "common.retry": "Bandyti dar kartą",
   "common.save": "Išsaugoti",
+  "crypto.dataReviewRequired": "Šioje dalyje yra duomenų, kurių programėlė negali pakeisti neprarasdama tikslumo. Originalas išsaugotas.",
   "crypto.disable": "Pašalinti šifravimą",
   "crypto.disableWarning": "Esami šifruoti užrašai liks neįskaitomi. Pirmiausia atrakinkite užrašinę.",
   "crypto.enable": "Šifruoti",
@@ -39,7 +40,6 @@
   "crypto.lockNow": "Užrakinti dabar",
   "crypto.locked": "Užrakinta",
   "crypto.migrating": "Apsaugomas užrašinės turinys…",
-  "crypto.dataReviewRequired": "Šioje dalyje yra duomenų, kurių programėlė negali pakeisti neprarasdama tikslumo. Originalas išsaugotas.",
   "crypto.migrationFailed": "Šifravimo užbaigti nepavyko. Tavo duomenys išsaugoti. Atidaryk užrašinę iš naujo ir peržiūrėk pakeitimus.",
   "crypto.mismatch": "Slaptafrazės skiriasi.",
   "crypto.passphrase": "Slaptafrazė",
@@ -274,6 +274,7 @@
   "notebook.delete": "Ištrinti užrašinę",
   "notebook.deleteConfirm": "Ištrinti „{title}“ ir viską, kas joje?",
   "notebook.emoji": "Piktograma",
+  "notebook.move": "Perkelti užrašinę",
   "notebook.newChild": "Nauja užrašinė viduje",
   "notebook.notes": {
     "one": "{count} užrašas",

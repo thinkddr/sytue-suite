@@ -45,6 +45,7 @@
 package notes
 
 import (
+	"cmp"
 	"encoding/json"
 	"errors"
 	"slices"
@@ -399,6 +400,7 @@ func Ordenar(notas []Nota, o Orden, _ i18n.Locale) []Nota {
 		case OrdenCreada:
 			return b.Creada.Compare(a.Creada)
 		case OrdenManual:
+			return cmp.Compare(a.Posicion, b.Posicion)
 		}
 		return 0
 	})

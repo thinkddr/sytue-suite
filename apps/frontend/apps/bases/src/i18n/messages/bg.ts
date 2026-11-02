@@ -10,6 +10,7 @@ import type { en } from './en.js';
 export const bg: AppCatalog<typeof en> = {
   'nav.title': 'Bases',
   'nav.bases': 'Моите бази',
+  'actions.more': 'Още действия',
   'bases.title': 'Моите бази',
   'bases.newName': 'Име на новата база',
   'bases.create': 'Създаване на база',

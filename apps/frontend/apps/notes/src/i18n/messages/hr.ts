@@ -129,6 +129,7 @@ export const hr: AppCatalog<typeof en> = {
   },
   'notebook.emoji': 'Ikona',
   'notebook.color': 'Boja',
+  'notebook.move': 'Premjesti bilježnicu',
   'notebook.title': 'Naziv',
   'layout.label': 'Raspored',
   'layout.tree': 'Stablo',

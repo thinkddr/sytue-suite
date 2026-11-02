@@ -119,6 +119,7 @@ export const el: AppCatalog<typeof en> = {
   'notebook.notes': { one: '{count} σημείωση', other: '{count} σημειώσεις' },
   'notebook.emoji': 'Εικονίδιο',
   'notebook.color': 'Χρώμα',
+  'notebook.move': 'Μετακίνηση σημειωματαρίου',
   'notebook.title': 'Όνομα',
   'layout.label': 'Διάταξη',
   'layout.tree': 'Δέντρο',

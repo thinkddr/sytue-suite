@@ -519,7 +519,8 @@ type pestanaHoja struct {
 	activa           bool
 	encima, enfocado bool
 	// color es el de la pestaña (`tabColor`): una banda debajo del nombre, como la web.
-	color string
+	color     string
+	cancelado bool
 }
 
 var (
@@ -563,6 +564,9 @@ func (ph *pestanaHoja) TypedKey(e *fyne.KeyEvent) {
 // Dragged sigue el puntero en coordenadas de la TIRA para reordenar en escritorio; en
 // táctil desliza la tira de pestañas, igual que la web móvil (`SheetCanvas.tsx`).
 func (ph *pestanaHoja) Dragged(e *fyne.DragEvent) {
+	if ph.cancelado {
+		return
+	}
 	if ui.EsTactil() {
 		ph.tira.correr(-e.Dragged.DX)
 		return
@@ -576,10 +580,23 @@ func (ph *pestanaHoja) Dragged(e *fyne.DragEvent) {
 
 // DragEnd suelta.
 func (ph *pestanaHoja) DragEnd() {
+	if ph.cancelado {
+		ph.cancelado = false
+		return
+	}
 	if ui.EsTactil() {
 		return
 	}
 	ph.tira.soltar()
+}
+
+// CancelarArrastre deja el orden de las hojas intacto.
+func (ph *pestanaHoja) CancelarArrastre() {
+	if ph.tira.arrastre != ph.i {
+		return
+	}
+	ph.cancelado, ph.tira.arrastre = true, -1
+	ph.tira.Refresh()
 }
 
 // AccessibilityLabel es el nombre de la hoja, que es el texto del botón.

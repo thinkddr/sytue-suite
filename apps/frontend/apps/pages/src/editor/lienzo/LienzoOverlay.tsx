@@ -116,8 +116,11 @@ export function LienzoOverlay({
     iniciarArrastre,
     onPointerMove: dragMove,
     onPointerUp: dragUp,
+    onPointerCancel: dragCancel,
+    onLostPointerCapture: lostCapture,
   } = usePointerDrag<EstadoArrastreTirador>({
     escala: zoom,
+    onCancel: () => setTamanoArrastre(null),
     onMove: ({ data, dxRaw, dyRaw }) => {
       const redim = calcularRedimension(
         data.rectInicial,
@@ -222,6 +225,8 @@ export function LienzoOverlay({
       ref={contenedorRef}
       onPointerMove={handlePointerMove}
       onPointerUp={dragUp}
+      onPointerCancel={dragCancel}
+      onLostPointerCapture={lostCapture}
       onPointerLeave={handlePointerLeave}
       onClick={handleClick}
       class="pointer-events-auto absolute inset-0 cursor-default select-none"

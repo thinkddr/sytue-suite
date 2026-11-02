@@ -12,7 +12,7 @@
  */
 import type { ComponentChildren, JSX } from 'preact';
 import { useState } from 'preact/hooks';
-import { cx, Badge, SIDEBAR_ACTION_CLASS, Glifo } from '@sytue/ui';
+import { cx, Badge, SIDEBAR_ACTION_CLASS, Glifo, Icon } from '@sytue/ui';
 import type { T } from '../i18n/index.js';
 import { MessageMenu, type MenuEntry } from './MessageMenu.js';
 
@@ -53,6 +53,8 @@ export interface CategorySectionProps {
   draggable?: boolean;
   onDragStart?: () => void;
   onDragEnd?: () => void;
+  pointerDrag?: JSX.ButtonHTMLAttributes<HTMLButtonElement> | undefined;
+  pointerOver?: boolean;
   /** id estable para aria-controls (relaciona la cabecera con la lista). */
   bodyId: string;
   /** Traductor ya atado al idioma. */
@@ -73,6 +75,8 @@ export function CategorySection({
   draggable = false,
   onDragStart,
   onDragEnd,
+  pointerDrag,
+  pointerOver = false,
   bodyId,
   t,
   children,
@@ -93,9 +97,10 @@ export function CategorySection({
 
   return (
     <div
+      data-rooms-group={bodyId}
       class={cx(
         'mb-4 rounded-md',
-        dropActive && over && 'ring-2 ring-[var(--sytue-indicator)] ring-inset',
+        dropActive && (over || pointerOver) && 'ring-2 ring-[var(--sytue-indicator)] ring-inset',
       )}
       onDragOver={handleDragOver}
       onDragLeave={() => setOver(false)}
@@ -111,6 +116,18 @@ export function CategorySection({
         }}
         onDragEnd={onDragEnd}
       >
+        {pointerDrag ? (
+          <button
+            type="button"
+            {...pointerDrag}
+            data-mantiene-nav
+            aria-label={menuLabel ?? t('category.actions', { name: title })}
+            aria-keyshortcuts="ArrowUp ArrowDown"
+            class="sytue-focus-ring-chrome text-sidebar-fg-muted hover:text-sidebar-fg grid min-h-8 w-6 shrink-0 cursor-grab touch-none place-items-center rounded select-none [-webkit-user-select:none] active:cursor-grabbing pointer-coarse:min-h-[max(44px,2.75rem)] pointer-coarse:w-[max(44px,2.75rem)]"
+          >
+            <Icon name="grip" size={14} />
+          </button>
+        ) : null}
         <button
           type="button"
           // Colapsar una categoría ocurre DENTRO del menú y no lo termina: sin

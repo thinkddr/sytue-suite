@@ -26,7 +26,7 @@ export function Nav({
     // pestaña es un hijo flex y encogía partiendo su rótulo —«Compartido / conmigo»
     // en dos líneas, medido a 390—. Y con el dedo, 44 de alto: es la navegación
     // principal de la app.
-    `sytue-focus-ring inline-flex h-8 shrink-0 items-center gap-1.5 rounded-sm px-2 text-sm whitespace-nowrap pointer-coarse:min-h-[max(44px,2.75rem)] ${activa === k ? 'bg-bg-subtle font-medium' : 'text-text-muted hover:text-text'}`;
+    `sytue-focus-ring inline-flex h-8 shrink-0 items-center gap-1.5 rounded-sm px-2 text-sm whitespace-nowrap pointer-coarse:min-h-[max(44px,2.75rem)] ${activa === k ? 'bg-selected text-primary-text font-medium' : 'text-text-muted hover:bg-bg-subtle hover:text-text'}`;
   return (
     // `min-w-0` NO es decoración. Esta nav es un hijo flex de la fila de
     // herramientas, y un hijo flex trae `min-width: auto`: se niega a encoger

@@ -32,6 +32,7 @@
   "common.offline": "Du er offline. Ændringer gemmes ikke, før forbindelsen er tilbage.",
   "common.retry": "Prøv igen",
   "common.save": "Gem",
+  "crypto.dataReviewRequired": "Denne del indeholder data, som appen ikke kan ændre uden at miste præcision. Originalen er bevaret.",
   "crypto.disable": "Fjern krypteringen",
   "crypto.disableWarning": "Eksisterende krypterede noter forbliver ulæselige. Lås notesbogen op først.",
   "crypto.enable": "Kryptér",
@@ -39,7 +40,6 @@
   "crypto.lockNow": "Lås nu",
   "crypto.locked": "Låst",
   "crypto.migrating": "Beskytter notesbogens indhold…",
-  "crypto.dataReviewRequired": "Denne del indeholder data, som appen ikke kan ændre uden at miste præcision. Originalen er bevaret.",
   "crypto.migrationFailed": "Krypteringen kunne ikke fuldføres. Dine data er bevaret. Åbn notesbogen igen for at gennemgå ændringerne.",
   "crypto.mismatch": "De to adgangssætninger er forskellige.",
   "crypto.passphrase": "Adgangssætning",
@@ -266,6 +266,7 @@
   "notebook.delete": "Slet notesbog",
   "notebook.deleteConfirm": "Slet “{title}” og alt, hvad der er i den?",
   "notebook.emoji": "Ikon",
+  "notebook.move": "Flyt notesbog",
   "notebook.newChild": "Ny notesbog indeni",
   "notebook.notes": {
     "one": "{count} note",

@@ -130,18 +130,24 @@ func (p *PestanaNav) CreateRenderer() fyne.WidgetRenderer {
 	return r
 }
 
-// fondo es `bg-bg-subtle` en la activa y nada en las demás.
+// fondo es `bg-selected` en la activa y `hover:bg-bg-subtle` en las demás.
 func (p *PestanaNav) fondo(v tema.Variante) color.NRGBA {
 	if p.Activa {
+		return tema.Color("selected", v)
+	}
+	if p.Encima() {
 		return tema.Color("bg-subtle", v)
 	}
 	return color.NRGBA{}
 }
 
-// tinta es el color del texto: `text-text-muted`, y `text-text` en la activa o al pasar
-// por encima.
+// tinta es `text-primary-text` en la activa, `text-text-muted` en las demás y
+// `text-text` al pasar por encima.
 func (p *PestanaNav) tinta(v tema.Variante) color.NRGBA {
-	if p.Activa || p.Encima() { // `hover:text-text` de la inactiva
+	if p.Activa {
+		return tema.Color("primary-text", v)
+	}
+	if p.Encima() { // `hover:text-text` de la inactiva
 		return tema.Color("text", v)
 	}
 	return tema.Color("text-muted", v)

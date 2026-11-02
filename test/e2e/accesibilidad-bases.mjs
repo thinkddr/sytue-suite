@@ -10,8 +10,8 @@
 // o a mano:
 //   cd apps/frontend/apps/bases && bun --bun astro dev --port 4337 &
 //   cd test/e2e && ACC_URL=http://127.0.0.1:4337/bases bun run accesibilidad-bases.mjs
-// Salida: informe en consola y capturas de lo que falle en ACC_OUT (por defecto
-// /tmp/accesibilidad-bases). Código de salida 1 si algo falla.
+// Salida: consola, results.json y capturas en ACC_OUT (o un directorio temporal
+// privado). Código de salida 1 si algo falla.
 //
 // Qué comprueba, a 1280, 390 y 320 px y en claro y oscuro:
 //   1. axe-core (WCAG 2.0/2.1/2.2 A y AA): `serious` y `critical` FALLAN.
@@ -39,13 +39,17 @@
 // la pila dev entera con sesión).
 import { chromium } from 'playwright';
 import AxeBuilder from '@axe-core/playwright';
-import { mkdirSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
+import { createServer, request as requestHttp } from 'node:http';
+import { join } from 'node:path';
 import { es } from '../../apps/frontend/apps/bases/src/i18n/messages/es.ts';
+import { createReportDirectory, writeReport } from './lib/report-output.mjs';
+import { prepareFixtureTheme, assertFixtureTheme } from './lib/wizard-checks.mjs';
 
-const BASE = process.env.ACC_URL || 'http://127.0.0.1:4337/bases';
-const OUT = process.env.ACC_OUT || '/tmp/accesibilidad-bases';
+const ASTRO = new URL(process.env.ACC_URL || 'http://127.0.0.1:4337/bases');
+let BASE = ASTRO.href.replace(/\/$/, '');
+const OUT = createReportDirectory('accesibilidad-bases', process.env.ACC_OUT);
 const IDIOMA = process.env.ACC_LANG || 'es';
-mkdirSync(OUT, { recursive: true });
 
 const ANCHOS = [
   { w: 1280, h: 800, movil: false },
@@ -66,9 +70,9 @@ const LADO_CELDA = 24;
 const PANTALLAS = [
   { id: 'lista', ruta: '/dev/app?que=lista', espera: 'section[aria-labelledby="lista-bases"] li a' },
   { id: 'base', ruta: '/dev/app?que=base', espera: '[role="grid"]' },
-  { id: 'base-tablero', ruta: '/dev/app?que=base', espera: '[role="grid"]', abrir: [`Por estado · ${es['view.kind.kanban']}`], luego: 'section[aria-label] select' },
+  { id: 'base-tablero', ruta: '/dev/app?que=base', espera: '[role="grid"]', vista: `Por estado · ${es['view.kind.kanban']}`, luego: 'section[aria-label] select' },
   { id: 'compartir', ruta: '/dev/app?que=base', espera: '[role="grid"]', abrir: [es['share.open']], luego: '[role="dialog"]' },
-  { id: 'scripts', ruta: '/dev/app?que=base', espera: '[role="grid"]', abrir: [es['scripts.open']], luego: '[role="dialog"] textarea' },
+  { id: 'scripts', ruta: '/dev/app?que=base', espera: '[role="grid"]', menuBase: es['scripts.open'], luego: '[role="dialog"] textarea' },
 ];
 
 /* ---------- API de mentira para las pantallas enteras ---------- */
@@ -91,27 +95,128 @@ const REGISTROS_API = [
   registro(2, { nombre: 'Taller Bea', importe: 85.5, estado: 'hecho' }),
   registro(3, { nombre: 'Cleo y Gus' }),
 ];
+// Chromium puede saltarse page.route al convertir una navegación en descarga
+// (microsoft/playwright#27575/#27638). El origen visitado sirve el attachment
+// directamente; el resto se reenvía al Astro efímero, incluido su HMR.
+const rutaExportacion = `${ASTRO.pathname.replace(/\/$/, '')}/api/tables/${T1}/export`;
+const exportacionesServidas = [];
+let exportacionesInterceptadas = 0;
+const erroresProxy = [];
+const destinoAstro = (req) => {
+  const entrada = new URL(req.url ?? '/', ASTRO);
+  const destino = new URL(ASTRO);
+  destino.pathname = entrada.pathname;
+  destino.search = entrada.search;
+  return destino;
+};
+const servidorFixture = createServer((req, res) => {
+  const destino = destinoAstro(req);
+  if (destino.pathname !== rutaExportacion) {
+    const proxy = requestHttp(destino, {
+      method: req.method,
+      headers: { ...req.headers, host: ASTRO.host },
+    }, (respuesta) => {
+      res.writeHead(respuesta.statusCode ?? 502, respuesta.headers);
+      respuesta.on('error', (error) => {
+        erroresProxy.push({ path: destino.pathname, code: error.code ?? 'upstream_aborted' });
+        res.destroy();
+      });
+      respuesta.pipe(res);
+    });
+    proxy.on('error', (error) => {
+      erroresProxy.push({ path: destino.pathname, code: error.code ?? 'proxy_error' });
+      if (!res.headersSent) res.writeHead(502);
+      res.end();
+    });
+    req.pipe(proxy);
+    return;
+  }
+  const formato = destino.searchParams.get('format');
+  if (req.method !== 'GET' || !['csv', 'json'].includes(formato)) {
+    res.writeHead(404).end();
+    return;
+  }
+  exportacionesServidas.push(formato);
+  res
+    .writeHead(200, {
+      "content-type":
+        formato === "csv" ? "text/csv; charset=utf-8" : "application/json",
+      "content-disposition": `attachment; filename="clientes.${formato}"`,
+    })
+    .end(
+      formato === "csv"
+        ? "Nombre,Importe\nPanadería Aurora,1200\n"
+        : JSON.stringify(REGISTROS_API),
+    );
+});
+// Vite abre el websocket contra el mismo origen del módulo /@vite/client.
+servidorFixture.on('upgrade', (req, socket, head) => {
+  const proxy = requestHttp(destinoAstro(req), {
+    method: req.method,
+    headers: { ...req.headers, host: ASTRO.host },
+  });
+  socket.once('close', () => proxy.destroy());
+  proxy.on('upgrade', (respuesta, remoto, cabecera) => {
+    socket.write(`HTTP/1.1 ${respuesta.statusCode} ${respuesta.statusMessage}\r\n`);
+    for (let i = 0; i < respuesta.rawHeaders.length; i += 2)
+      socket.write(`${respuesta.rawHeaders[i]}: ${respuesta.rawHeaders[i + 1]}\r\n`);
+    socket.write('\r\n');
+    if (head.length) remoto.write(head);
+    if (cabecera.length) socket.write(cabecera);
+    socket.on('error', () => remoto.destroy());
+    remoto.on('error', () => socket.destroy());
+    socket.on('close', () => remoto.destroy());
+    remoto.on('close', () => socket.destroy());
+    socket.pipe(remoto).pipe(socket);
+  });
+  proxy.on('error', () => socket.destroy());
+  proxy.on('response', () => socket.destroy());
+  proxy.end();
+});
+const conexionesFixture = new Set();
+servidorFixture.on('connection', (socket) => {
+  conexionesFixture.add(socket);
+  socket.once('close', () => conexionesFixture.delete(socket));
+});
 const json = (route, cuerpo, status = 200) =>
   route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(cuerpo) });
 
 /** Contesta al BFF de Bases y al Hub: ni sesión ni servicio detrás. */
-async function simularApi(page) {
+async function simularApi(page, { rol = 'owner', vistasExtra = 0 } = {}) {
+  const datos = { mutaciones: [], creados: [] };
+  let tablaBorrada = false;
   // El Hub (notificaciones, catálogo del marco): fuera de alcance, contesta vacío.
   await page.route('http://127.0.0.1:9/**', (r) => json(r, {}));
-  // El banco no lleva el prefijo de la app en `/auth` (no hay `basePathScript`): los dos valen.
+  // El marco publica /bases; se aceptan ambos namespaces de autenticación del fixture.
   await page.route(/\/auth\/[a-z]+(\?|$)/, (r) =>
     json(r, { accessToken: 'demo', expiresAt: Date.now() + 3600e3, organizations: [], authenticated: true }),
   );
   await page.route('**/bases/api/**', (route) => {
-    const camino = new URL(route.request().url()).pathname.split('/api/')[1] ?? '';
-    if (route.request().method() !== 'GET') return json(route, {});
-    if (camino === 'bases') return json(route, [base(B1, 'Clientes y pedidos', 'owner'), base('00000000-0000-4000-8000-0000000000b2', 'Inventario', 'viewer')]);
-    if (/^bases\/[^/]+$/.test(camino)) return json(route, base(B1, 'Clientes y pedidos', 'owner'));
-    if (camino.endsWith('/tables')) return json(route, [{ id: T1, base_id: B1, name: 'Clientes', position: 0, role: 'owner', fields: CAMPOS_API }]);
-    if (camino.endsWith('/records')) return json(route, { fields: CAMPOS_API, records: REGISTROS_API, role: 'owner' });
+    const url = new URL(route.request().url());
+    const camino = url.pathname.split('/api/')[1] ?? '';
+    const method = route.request().method();
+    if (method !== 'GET') {
+      datos.mutaciones.push({ method, camino });
+      if (method === 'DELETE' && camino === `tables/${T1}`) tablaBorrada = true;
+      if (method === 'POST' && camino === `tables/${T1}/records`) {
+        const r = registro(9, {});
+        datos.creados.push(r);
+        return json(route, r, 201);
+      }
+      return json(route, {});
+    }
+    if (camino === 'bases') return json(route, [base(B1, 'Clientes y pedidos', rol), base('00000000-0000-4000-8000-0000000000b2', 'Inventario', 'viewer')]);
+    if (/^bases\/[^/]+$/.test(camino)) return json(route, base(B1, 'Clientes y pedidos', rol));
+    if (camino.endsWith('/tables')) return json(route, tablaBorrada ? [] : [{ id: T1, base_id: B1, name: 'Clientes', position: 0, role: rol, fields: CAMPOS_API }]);
+    if (camino.endsWith('/records')) return json(route, { fields: CAMPOS_API, records: [...REGISTROS_API, ...datos.creados], role: rol });
+    if (camino.endsWith('/export')) {
+      exportacionesInterceptadas++;
+      return route.continue();
+    }
     if (camino.endsWith('/views'))
       return json(route, [
         { id: '00000000-0000-4000-8000-0000000000d1', table_id: T1, name: 'Por estado', kind: 'kanban', config: { group_by: 'estado' }, created_by: 'demo-user' },
+        ...Array.from({ length: vistasExtra }, (_, i) => ({ id: `vista-${i}`, table_id: T1, name: `Vista del equipo ${i + 1}`, kind: 'grid', config: {}, created_by: 'demo-user' })),
       ]);
     if (camino.endsWith('/scripts'))
       return json(route, {
@@ -126,14 +231,30 @@ async function simularApi(page) {
       ]);
     return json(route, []);
   });
+  return datos;
 }
 
 const fallos = [];
+const resultados = new Map();
+const caso = (ctx) => {
+  if (!resultados.has(ctx))
+    resultados.set(ctx, {
+      context: ctx,
+      passed: [],
+      failures: [],
+      downloads: [],
+    });
+  return resultados.get(ctx);
+};
 const falla = (area, ctx, msg) => {
   fallos.push(`[${area}] ${ctx}: ${msg}`);
+  caso(ctx).failures.push({ area, message: msg });
   console.log(`  ✗ ${ctx} [${area}] ${msg}`);
 };
-const ok = (ctx, msg) => console.log(`  ✓ ${ctx} ${msg}`);
+const ok = (ctx, msg) => {
+  caso(ctx).passed.push(msg);
+  console.log(`  ✓ ${ctx} ${msg}`);
+};
 
 const url = (extra = '') => `${BASE}/dev/rejilla?lang=${IDIOMA}${extra}`;
 
@@ -144,10 +265,12 @@ async function abrir(browser, ancho, esquema, extra = '') {
     hasTouch: ancho.movil,
     isMobile: ancho.movil,
   });
+  await prepareFixtureTheme(ctx, esquema);
   const page = await ctx.newPage();
   await page.goto(url(extra), { waitUntil: 'networkidle' });
   await page.waitForSelector('[role="grid"]', { timeout: 60000 });
   await page.waitForTimeout(300);
+  await assertFixtureTheme(page, esquema);
   return { ctx, page };
 }
 
@@ -326,8 +449,20 @@ async function lector(page, ctx) {
 }
 
 async function tactil(page, ctx) {
-  const pequenos = await page.evaluate(([ladoControl, ladoCelda]) => {
+  // La hoja móvil entra trasladándose: medir durante esa animación puede producir
+  // alturas fraccionarias al restar coordenadas. Estas acciones esperan Stable,
+  // sin pulsar controles ni sustituir el mínimo de 44 px por una tolerancia.
+  const capas = page.locator('[role="menu"]:visible,[role="dialog"]:visible');
+  for (const capa of await capas.all()) {
+    await capa.scrollIntoViewIfNeeded();
+    const ultimo = capa
+      .locator('button:visible,a[href]:visible,input:not([type=hidden]):visible,select:visible')
+      .last();
+    if (await ultimo.count()) await ultimo.scrollIntoViewIfNeeded();
+  }
+  const { pequenos, medidas } = await page.evaluate(([ladoControl, ladoCelda]) => {
     const out = [];
+    const medidas = [];
     for (const e of document.querySelectorAll('button,a[href],input:not([type=hidden]),select,td[data-fila]')) {
       // La cabecera es el marco común de la suite (`@sytue/shell`), no de Bases: su buscador
       // mide 36 px de alto en todas las apps y no se arregla desde aquí.
@@ -344,13 +479,24 @@ async function tactil(page, ctx) {
         const re = etiqueta.getBoundingClientRect();
         if (re.width >= lado && re.height >= lado) continue;
       }
-      if (r.width < lado || r.height < lado) {
-        out.push(`${e.tagName.toLowerCase()} ${(e.getAttribute('aria-label') || e.textContent || '').trim().slice(0, 30)} ${Math.round(r.width)}×${Math.round(r.height)}`);
-      }
+      const medida = {
+        tag: e.tagName.toLowerCase(),
+        name: (e.getAttribute('aria-label') || e.textContent || '').trim().slice(0, 30),
+        width: r.width,
+        height: r.height,
+        minimum: lado,
+      };
+      medidas.push(medida);
+      if (r.width < lado || r.height < lado) out.push(medida);
     }
-    return out;
+    return { pequenos: out, medidas };
   }, [LADO_TACTIL, LADO_CELDA]);
-  if (pequenos.length) falla('tactil', ctx, `${pequenos.length} controles por debajo de ${LADO_TACTIL}px: ${pequenos.slice(0, 12).join(' | ')}`);
+  caso(ctx).touchTargets = medidas;
+  if (pequenos.length) {
+    const detalle = pequenos.slice(0, 12)
+      .map((m) => `${m.tag} ${m.name} ${m.width}×${m.height}`).join(' | ');
+    falla('tactil', ctx, `${pequenos.length} controles por debajo de ${LADO_TACTIL}px: ${detalle}`);
+  }
 }
 
 /** Lo que un lector encuentra en una pantalla entera: nombres, idioma, título. */
@@ -411,25 +557,225 @@ async function abrirPantalla(browser, p, ancho, esquema) {
     hasTouch: ancho.movil,
     isMobile: ancho.movil,
   });
+  await prepareFixtureTheme(c, esquema);
   const page = await c.newPage();
   const errores = [];
   page.on('pageerror', (e) => errores.push(e.message));
-  await simularApi(page);
+  const datos = await simularApi(page, { rol: p.rol ?? 'owner', vistasExtra: ancho.movil ? 12 : 0 });
   await page.goto(`${BASE}${p.ruta}&lang=${IDIOMA}`, { timeout: 120000 });
   await page.waitForSelector(p.espera, { timeout: 90000 });
+  await assertFixtureTheme(page, esquema);
+  if (p.vista) {
+    await selectorDeVistas(page).click();
+    await page.getByRole('menuitem', { name: p.vista, exact: true }).click();
+  }
+  if (p.menuBase) {
+    await menuBase(page).click();
+    await page.getByRole('menuitem', { name: p.menuBase, exact: true }).click();
+  }
   for (const nombre of p.abrir ?? []) await page.getByRole('button', { name: nombre, exact: true }).first().click();
   if (p.luego) await page.waitForSelector(p.luego, { timeout: 15000 });
   await page.waitForTimeout(300);
-  return { c, page, errores };
+  return { c, page, errores, datos };
 }
 
-const browser = await chromium.launch();
+const selectorDeVistas = (page) =>
+  page.getByRole('button', { name: new RegExp(`^${es['view.list']}:`) });
+const menuBase = (page) =>
+  page.getByRole('button', { name: `${es['actions.more']} · Clientes y pedidos`, exact: true });
+const menuTabla = (page) =>
+  page.getByRole('button', { name: `${es['actions.more']} · Clientes`, exact: true });
+
+async function contenidoEnPrimeraPantalla(page, p, ancho, ctx) {
+  if (!ancho.movil || !['base', 'base-tablero'].includes(p.id)) return;
+  const primera =
+    p.id === 'base'
+      ? page.locator('[role="tabpanel"] tbody tr').first()
+      : page.locator('[role="tabpanel"] section[aria-label] li').first();
+  await primera.getByText('Panadería Aurora', { exact: true }).waitFor();
+  const caja = await primera.boundingBox();
+  if (!caja || caja.y < 0 || caja.y + caja.height > ancho.h - 8) {
+    falla(
+      'densidad',
+      ctx,
+      `el primer registro/tarjeta queda fuera de la primera pantalla (${JSON.stringify(caja)})`,
+    );
+  } else ok(ctx, 'primer registro/tarjeta completo sin desplazar');
+}
+
+async function descargarExportacion(page, formato, ctx) {
+  await menuTabla(page).click();
+  const enlace = page.getByRole("menuitem", {
+    name: es[`export.${formato}`],
+    exact: true,
+  });
+  const destino = new URL(await enlace.getAttribute("href"), page.url());
+  if (
+    destino.origin !== new URL(page.url()).origin ||
+    destino.pathname !== rutaExportacion ||
+    destino.searchParams.get("format") !== formato ||
+    (await enlace.getAttribute("download")) === null
+  )
+    falla("gestión", ctx, `falta el enlace de descarga ${formato}`);
+  const antes = exportacionesServidas.filter((f) => f === formato).length;
+  const interceptadasAntes = exportacionesInterceptadas;
+  const diagnostico = {
+    format: formato,
+    path: destino.pathname,
+    served: 0,
+    intercepted: 0,
+  };
+  caso(ctx).downloads.push(diagnostico);
+  try {
+    const [descarga] = await Promise.all([
+      page.waitForEvent("download"),
+      enlace.click(),
+    ]);
+    diagnostico.downloadPath = new URL(descarga.url()).pathname;
+    diagnostico.failure = await descarga.failure();
+    if (diagnostico.failure)
+      throw new Error(`la descarga ${formato} falla: ${diagnostico.failure}`);
+    const archivo = await descarga.path();
+    const contenido = archivo ? readFileSync(archivo, "utf8") : "";
+    diagnostico.filename = descarga.suggestedFilename();
+    diagnostico.bytes = Buffer.byteLength(contenido);
+    if (diagnostico.filename !== `clientes.${formato}`)
+      falla(
+        "gestión",
+        ctx,
+        `la exportación ${formato} no termina como descarga`,
+      );
+    if (!contenido.includes("Panadería Aurora"))
+      falla("gestión", ctx, `la descarga ${formato} está vacía`);
+  } finally {
+    diagnostico.served =
+      exportacionesServidas.filter((f) => f === formato).length - antes;
+    diagnostico.intercepted = exportacionesInterceptadas - interceptadasAntes;
+    console.log(`  Descarga ${ctx}: ${JSON.stringify(diagnostico)}`);
+  }
+  if (diagnostico.served !== 1)
+    falla(
+      "gestión",
+      ctx,
+      `la descarga ${formato} no recibe exactamente una respuesta HTTP`,
+    );
+}
+
+async function gestionCompacta(page, datos, ctx) {
+  // Hay trece vistas guardadas: Inicio/Fin y flechas deben seguir llegando a la última.
+  const selector = selectorDeVistas(page);
+  await selector.focus();
+  await selector.press('Enter');
+  await page.getByRole('menu', { name: es['view.list'], exact: true }).waitFor();
+  await page.waitForFunction(() => document.activeElement?.getAttribute('role') === 'menuitem');
+  await page.keyboard.press('End');
+  await page.keyboard.press('ArrowUp');
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(
+    (id) =>
+      document.getElementById(id)?.getAttribute('aria-label')?.includes('Vista del equipo 12'),
+    await selector.getAttribute('id'),
+  );
+  if (!(await selector.evaluate((el) => el === document.activeElement)))
+    falla('teclado', ctx, 'elegir vista no devuelve el foco al selector');
+  await selector.click();
+  await page.getByRole('menuitem', { name: es['view.all'], exact: true }).click();
+
+  await menuTabla(page).press('Enter');
+  for (const clave of [
+    'field.add',
+    'table.rename',
+    'table.delete',
+    'table.add',
+    'import.open',
+    'export.csv',
+    'export.json',
+  ]) {
+    if (!(await page.getByRole('menuitem', { name: es[clave], exact: true }).isVisible()))
+      falla('gestión', ctx, `${clave} no es alcanzable en gestión de tabla`);
+  }
+  await tactil(page, `${ctx} menú tabla`);
+  await page.keyboard.press('Escape');
+  for (const formato of ['csv', 'json']) await descargarExportacion(page, formato, ctx);
+
+  for (const clave of ['field.add', 'table.rename']) {
+    await menuTabla(page).click();
+    await page.getByRole('menuitem', { name: es[clave], exact: true }).click();
+    const dialogo = page.getByRole('dialog');
+    await dialogo.waitFor();
+    if (
+      clave === 'table.rename' &&
+      (await dialogo.getByRole('textbox').inputValue()) !== 'Clientes'
+    )
+      falla('gestión', ctx, 'renombrar no conserva el nombre actual');
+    await page.keyboard.press('Escape');
+    await dialogo.waitFor({ state: 'hidden' });
+  }
+  await selector.click();
+  await page.getByRole('menuitem', { name: es['view.add'], exact: true }).click();
+  await page.getByRole('dialog').waitFor();
+  await page.keyboard.press('Escape');
+  await page.getByRole('dialog').waitFor({ state: 'hidden' });
+
+  // Alta cotidiana disponible también con el tablero abierto, usando el endpoint real.
+  await selector.click();
+  await page
+    .getByRole('menuitem', { name: `Por estado · ${es['view.kind.kanban']}`, exact: true })
+    .click();
+  const tarjetas = page.locator('[role="tabpanel"] section[aria-label] li');
+  await tarjetas.first().waitFor();
+  const antes = await tarjetas.count();
+  await page.getByRole('button', { name: es['grid.addRecord'], exact: true }).first().click();
+  await page.waitForFunction(
+    (n) => document.querySelectorAll('[role="tabpanel"] section[aria-label] li').length === n,
+    antes + 1,
+  );
+  if (datos.creados.length !== 1) falla('gestión', ctx, 'añadir registro no ejecuta una sola alta');
+
+  // Abrir una acción destructiva no confirma; cancelar no debe emitir DELETE.
+  await menuTabla(page).click();
+  await page.getByRole('menuitem', { name: es['table.delete'], exact: true }).click();
+  const confirmacion = page.getByRole('dialog', { name: es['common.delete'], exact: true });
+  await confirmacion.waitFor();
+  if (datos.mutaciones.some((m) => m.method === 'DELETE'))
+    falla('gestión', ctx, 'borrar actúa antes de confirmar');
+  await confirmacion.getByRole('button', { name: es['common.cancel'], exact: true }).click();
+  await confirmacion.waitFor({ state: 'hidden' });
+  if (datos.mutaciones.some((m) => m.method === 'DELETE'))
+    falla('gestión', ctx, 'cancelar ha borrado la tabla');
+  await menuTabla(page).click();
+  await page.getByRole('menuitem', { name: es['table.delete'], exact: true }).click();
+  await Promise.all([
+    page.waitForResponse(
+      (r) => r.request().method() === 'DELETE' && r.url().endsWith(`/tables/${T1}`),
+    ),
+    confirmacion.getByRole('button', { name: es['common.delete'], exact: true }).click(),
+  ]);
+  if (
+    datos.mutaciones.filter((m) => m.method === 'DELETE' && m.camino === `tables/${T1}`).length !==
+    1
+  )
+    falla('gestión', ctx, 'la confirmación no emite exactamente un borrado de tabla');
+  await page.getByText(es['base.noTables'], { exact: true }).waitFor();
+  ok(ctx, 'vistas, descargas, diálogos, alta y confirmación accesibles desde menús');
+}
+
+let browser;
 try {
+  await new Promise((resolve, reject) => {
+    servidorFixture.once('error', reject);
+    servidorFixture.listen(0, '127.0.0.1', resolve);
+  });
+  const origenFixture = new URL(ASTRO);
+  origenFixture.host = `127.0.0.1:${servidorFixture.address().port}`;
+  BASE = origenFixture.href.replace(/\/$/, '');
+  browser = await chromium.launch();
   // Pantallas enteras: la lista, la base, su tablero y compartir, con el marco.
   for (const p of PANTALLAS) {
     for (const ancho of [...ANCHOS, { w: 640, h: 400, movil: false, zoom: true }]) {
       for (const esquema of ESQUEMAS) {
         const ctx = `${p.id} ${ancho.zoom ? 'zoom200' : `${ancho.w}px`} ${esquema}`;
+        Object.assign(caso(ctx), { screen: p.id, width: ancho.w, height: ancho.h, theme: esquema });
         let abierta;
         try {
           abierta = await abrirPantalla(browser, p, ancho, esquema);
@@ -437,14 +783,33 @@ try {
           falla('lector', ctx, `la pantalla no llega a pintarse: ${String(e.message).slice(0, 160)}`);
           continue;
         }
-        const { c, page, errores } = abierta;
+        const { c, page, errores, datos } = abierta;
         const antes = fallos.length;
+        try { await contenidoEnPrimeraPantalla(page, p, ancho, ctx); }
+        catch (e) { falla('densidad', ctx, String(e.message).slice(0, 240)); }
+        if (p.id === 'lista' && ancho.movil) {
+          const desalineadas = await page.locator('section[aria-labelledby="lista-bases"] li a').evaluateAll((enlaces) => enlaces.filter((a) => Math.abs(a.getBoundingClientRect().width - a.parentElement.getBoundingClientRect().width) > 1).length);
+          if (desalineadas) falla('densidad', ctx, 'las tarjetas no ocupan el mismo ancho de la lista');
+        }
+        if (['lista', 'base', 'base-tablero'].includes(p.id) && [320, 390, 1280].includes(ancho.w)) {
+          await page.screenshot({ path: `${OUT}/muestra-${p.id}-${ancho.w}-${esquema}.png` });
+        }
         await pasarAxe(page, ctx);
         const desborda = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
         if (desborda) falla('zoom', ctx, 'la página desborda de lado');
         if (esquema === 'light') await lectorDePantalla(page, ctx);
         if (ancho.movil && esquema === 'light') await tactil(page, ctx);
         if (ancho.w === 1280 && esquema === 'light') await tabulacion(page, ctx);
+        if (p.id === 'base' && ancho.movil && esquema === 'light') {
+          try { await gestionCompacta(page, datos, ctx); }
+          catch (e) { falla('gestión', ctx, String(e.message).slice(0, 240)); }
+        }
+        if (p.id === 'base' && ancho.w === 1280 && esquema === 'light') {
+          try {
+            for (const formato of ['csv', 'json']) await descargarExportacion(page, formato, ctx);
+            ok(ctx, 'descargas CSV y JSON reales también en escritorio');
+          } catch (e) { falla('gestión', ctx, String(e.message).slice(0, 240)); }
+        }
         if (errores.length) falla('lector', ctx, `errores de página: ${errores.slice(0, 2).join(' | ')}`);
         if (fallos.length > antes) await page.screenshot({ path: `${OUT}/${ctx.replace(/ /g, '-')}.png` });
         await c.close();
@@ -486,9 +851,11 @@ try {
           hasTouch: ancho.movil,
           isMobile: ancho.movil,
         });
+        await prepareFixtureTheme(c, esquema);
         const page = await c.newPage();
         await page.goto(`${BASE}/dev/vistas?que=${que}&lang=${IDIOMA}`, { waitUntil: 'networkidle' });
         await page.waitForSelector(que === 'tablero' ? 'section[aria-label]' : 'form', { timeout: 60000 });
+        await assertFixtureTheme(page, esquema);
         await pasarAxe(page, ctx);
         if (ancho.movil) await tactil(page, ctx);
         const desborda = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);
@@ -506,6 +873,28 @@ try {
           if ((await cuenta()) !== antes + 1) falla('teclado', ctx, 'mover una tarjeta con el selector no la cambia de columna');
           else ok(ctx, 'la tarjeta se mueve sin arrastrar');
           if (!(await page.locator('[role="status"]').first().innerText()).trim()) falla('lector', ctx, 'mover una tarjeta no se anuncia');
+          const origen = page.locator('[data-bases-column="en curso"]');
+          const destino = page.locator('[data-bases-column="hecho"]');
+          const asa = origen.locator('li button').first();
+          const desde = await asa.boundingBox();
+          const hasta = await destino.boundingBox();
+          if (!desde || !hasta) falla('arrastre', ctx, 'falta el asa o su destino');
+          else {
+            const empezar = async () => {
+              await page.mouse.move(desde.x + desde.width / 2, desde.y + desde.height / 2);
+              await page.mouse.down();
+              await page.mouse.move(hasta.x + hasta.width / 2, hasta.y + 60, { steps: 8 });
+            };
+            await empezar();
+            await page.keyboard.press('Escape');
+            await page.mouse.up();
+            if (await origen.locator('li').count() !== antes + 1) falla('arrastre', ctx, 'Escape ha guardado el movimiento');
+            const enDestino = await destino.locator('li').count();
+            await empezar();
+            await page.mouse.up();
+            await page.waitForFunction((n) => document.querySelector('[data-bases-column="hecho"]')?.querySelectorAll('li').length === n, enDestino + 1);
+            ok(ctx, 'el asa mueve al soltar y Escape conserva la columna');
+          }
         }
         if (que === 'formulario' && ancho.w === 1280 && esquema === 'light') {
           // Cada control tiene etiqueta y un envío vacío se explica sin perder lo escrito.
@@ -539,8 +928,49 @@ try {
     if ((await page.locator('tbody th button').count()) > 0) falla('lectura', 'solo lectura', 'hay botones de borrar en solo lectura');
     await c.close();
   }
+  // La gestión compacta respeta el rol real de la base y de su tabla.
+  {
+    const { c, page } = await abrirPantalla(browser, { id: 'base-lector', ruta: '/dev/app?que=base', espera: '[role="grid"]', rol: 'viewer' }, ANCHOS[1], 'light');
+    for (const clave of ['share.open', 'grid.addRecord']) {
+      if (await page.getByRole('button', { name: es[clave], exact: true }).count()) falla('lectura', 'menús', `${clave} aparece para un lector`);
+    }
+    await menuTabla(page).click();
+    for (const clave of ['field.add', 'table.rename', 'table.delete', 'table.add', 'import.open']) {
+      if (await page.getByRole('menuitem', { name: es[clave], exact: true }).count()) falla('lectura', 'menús', `${clave} aparece para un lector`);
+    }
+    for (const clave of ['export.csv', 'export.json']) {
+      if (!await page.getByRole('menuitem', { name: es[clave], exact: true }).isVisible()) falla('lectura', 'menús', `${clave} no está disponible para un lector`);
+    }
+    await page.keyboard.press('Escape');
+    await selectorDeVistas(page).click();
+    if (await page.getByRole('menuitem', { name: es['view.add'], exact: true }).count()) falla('lectura', 'menús', 'crear vista aparece para un lector');
+    await page.getByRole('menuitem', { name: `Por estado · ${es['view.kind.kanban']}`, exact: true }).click();
+    await selectorDeVistas(page).click();
+    if (await page.getByRole('menuitem', { name: es['view.delete'], exact: true }).count()) falla('lectura', 'menús', 'borrar vista aparece para un lector');
+    await page.keyboard.press('Escape');
+    await menuBase(page).click();
+    for (const clave of ['base.rename', 'base.delete', 'conn.open']) {
+      if (await page.getByRole('menuitem', { name: es[clave], exact: true }).count()) falla('lectura', 'menús', `${clave} aparece para un lector`);
+    }
+    await c.close();
+  }
+} catch (error) {
+  // Sólo contexto sintético: sin cabeceras, credenciales, entorno ni cuerpos de red.
+  falla('arnés', 'fatal', String(error.message).slice(0, 400));
+  throw error;
 } finally {
-  await browser.close();
+  try {
+    await browser?.close();
+  } finally {
+    for (const socket of conexionesFixture) socket.destroy();
+    await new Promise((resolve) => servidorFixture.close(resolve));
+    writeReport(join(OUT, 'results.json'), JSON.stringify({
+      synthetic: true,
+      ok: fallos.length === 0,
+      results: [...resultados.values()].map((r) => ({ ...r, ok: r.failures.length === 0 })),
+      transport: { served: exportacionesServidas, intercepted: exportacionesInterceptadas, errors: erroresProxy },
+    }, null, 2));
+  }
 }
 
 console.log(`\n${fallos.length === 0 ? 'OK: sin fallos' : `${fallos.length} fallo(s)`}`);

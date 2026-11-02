@@ -121,6 +121,7 @@ export const de: AppCatalog<typeof en> = {
   'notebook.notes': { one: '{count} Notiz', other: '{count} Notizen' },
   'notebook.emoji': 'Symbol',
   'notebook.color': 'Farbe',
+  'notebook.move': 'Notizbuch verschieben',
   'notebook.title': 'Name',
 
   'layout.label': 'Anordnung',

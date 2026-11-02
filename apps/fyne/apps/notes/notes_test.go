@@ -131,6 +131,18 @@ func TestElContadorDelCuadernoAbiertoCuentaLasQueHay(t *testing.T) {
 	}
 }
 
+func TestLaListaNoDuplicaLasNotasEnElLateral(t *testing.T) {
+	l := pantallaLateral(t)
+	l.Cuadernos[0].Vista = notes.Lista
+	filas := filasDelArbol(t, l)
+	if len(filas) != 2 {
+		t.Fatalf("la lista empuja los otros cuadernos fuera del lateral: %d filas", len(filas))
+	}
+	if !tiene(textosDe(t, l.Objeto(tema.Claro)), "3") {
+		t.Fatal("ocultar las filas duplicadas pierde el contador real")
+	}
+}
+
 // TestLaBarraMide42: `min-h-12` con el rem de 14. Los botones que van dentro son de
 // talla `sm` (28) y de icono `sm` (24), los dos MEDIDOS en producción.
 func TestLaBarraMide42(t *testing.T) {
@@ -309,7 +321,7 @@ func pantallaLateral(t *testing.T) *notes.Lateral {
 	l := notes.NuevoLateral(traductor(t))
 	l.Fase = notes.Exito
 	l.Cuadernos = []notes.Cuaderno{
-		{ID: "n1", Titulo: "test", Color: "#e11d48", Notas: 1},
+		{ID: "n1", Titulo: "test", Color: "#e11d48", Notas: 1, Vista: notes.VistaArbol},
 		{ID: "n2", Titulo: "Operaciones", Color: "#0ea5e9", Notas: 9},
 	}
 	l.Activo = "n1"

@@ -125,6 +125,7 @@ export const mt: AppCatalog<typeof en> = {
   },
   'notebook.emoji': 'Ikona',
   'notebook.color': 'Kulur',
+  'notebook.move': 'Mexxi n-notebook',
   'notebook.title': 'Isem',
   'layout.label': 'Tqassim',
   'layout.tree': 'Siġra',

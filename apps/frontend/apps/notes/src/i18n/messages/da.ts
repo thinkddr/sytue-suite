@@ -117,6 +117,7 @@ export const da: AppCatalog<typeof en> = {
   'notebook.notes': { one: '{count} note', other: '{count} noter' },
   'notebook.emoji': 'Ikon',
   'notebook.color': 'Farve',
+  'notebook.move': 'Flyt notesbog',
   'notebook.title': 'Navn',
   'layout.label': 'Layout',
   'layout.tree': 'Træ',

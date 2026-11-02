@@ -543,14 +543,7 @@ func escribirBloques(b *strings.Builder, bloques []Bloque) {
 			i = j - 1
 			continue
 		}
-		quiere := ""
-		switch bl.Tipo {
-		case Vineta:
-			quiere = "ul"
-		case Numerada:
-			quiere = "ol"
-		case Parrafo, Titulo, Cita, Codigo, Tarea, Regla, BloqueOpaco:
-		}
+		quiere := etiquetaLista(bl.Tipo)
 		if quiere == "" {
 			for len(pila) > 0 {
 				cerrarUna()
@@ -580,6 +573,17 @@ func escribirBloques(b *strings.Builder, bloques []Bloque) {
 	for len(pila) > 0 {
 		cerrarUna()
 	}
+}
+
+func etiquetaLista(tipo TipoBloque) string {
+	switch tipo {
+	case Vineta:
+		return "ul"
+	case Numerada:
+		return "ol"
+	case Parrafo, Titulo, Cita, Codigo, Tarea, Regla, BloqueOpaco:
+	}
+	return ""
 }
 
 // escribirTabla escribe los bloques de UNA tabla con su forma. Una celda que se hubiera

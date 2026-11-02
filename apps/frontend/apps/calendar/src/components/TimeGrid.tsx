@@ -12,7 +12,7 @@
 import type { CSSProperties, JSX, TargetedPointerEvent } from 'preact';
 import type { Locale } from '@sytue/i18n';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { cx, useToast } from '@sytue/ui';
+import { cx, usePointerDrag, useToast } from '@sytue/ui';
 import type { GridEvent } from './CalendarGrid.js';
 import { eventInstant, parseTzid, isToday, timeLabel } from './dates.js';
 import { DiaDeSemana } from './DiaDeSemana.js';
@@ -227,7 +227,7 @@ export function TimeGrid({
   }, []);
 
   /** Coordenadas del puntero → (columna de día, minuto crudo del día). */
-  function locate(e: PE): { dayIdx: number; min: number } {
+  function locate(e: Pick<PointerEvent, 'clientX' | 'clientY'>): { dayIdx: number; min: number } {
     const el = regionRef.current;
     if (!el) return { dayIdx: 0, min: 0 };
     const r = el.getBoundingClientRect();
@@ -240,8 +240,7 @@ export function TimeGrid({
   // --- Inicio de gestos --------------------------------------------------------
 
   function startCreate(e: PE, dayIdx: number): void {
-    if (e.button !== 0) return;
-    e.currentTarget.setPointerCapture(e.pointerId);
+    if (!arrastre.iniciarArrastre(e, null)) return;
     const anchor = snapMin(locate(e).min, snap);
     setDrag({ kind: 'create', dayIdx, anchorMin: anchor, curMin: anchor });
   }
@@ -251,10 +250,8 @@ export function TimeGrid({
     // padre pregunta el alcance (este / este y siguientes / todos). Los eventos de
     // un calendario de SOLO LECTURA (suscripción ICS) no se mueven.
     if (block.event.readOnly) return;
-    e.stopPropagation();
-    if (e.button !== 0) return;
+    if (!arrastre.iniciarArrastre(e, null)) return;
     const rect = e.currentTarget.getBoundingClientRect();
-    e.currentTarget.setPointerCapture(e.pointerId);
     setDrag({
       kind: 'move',
       event: block.event,
@@ -271,9 +268,7 @@ export function TimeGrid({
 
   function startResize(e: PE, block: TimedBlock, dayIdx: number): void {
     if (block.event.readOnly) return; // suscripción ICS: no redimensionable
-    e.stopPropagation();
-    if (e.button !== 0) return;
-    e.currentTarget.setPointerCapture(e.pointerId);
+    if (!arrastre.iniciarArrastre(e, null)) return;
     setDrag({
       kind: 'resize',
       event: block.event,
@@ -287,7 +282,7 @@ export function TimeGrid({
 
   // --- Seguimiento y cierre ----------------------------------------------------
 
-  function onRegionMove(e: PE): void {
+  function onRegionMove(e: PointerEvent): void {
     if (!drag) return;
     const { dayIdx, min } = locate(e);
     setDrag((d) => {
@@ -354,6 +349,12 @@ export function TimeGrid({
   // href del evento que se está arrastrando/guardando: su bloque «normal» se
   // omite y se pinta el de arrastre en su lugar.
   const activeHref = drag && 'event' in drag ? drag.event.href : (pending?.event.href ?? null);
+  const arrastre = usePointerDrag<null>({
+    scrollContainer: () => scrollRef.current,
+    onMove: (_, e) => onRegionMove(e),
+    onEnd: onRegionUp,
+    onCancel: () => setDrag(null),
+  });
 
   return (
     <div class="bg-surface flex h-full flex-col">
@@ -458,15 +459,16 @@ export function TimeGrid({
             ref={regionRef}
             class="relative grid flex-1"
             style={{ gridTemplateColumns: `repeat(${days.length}, minmax(0, 1fr))` }}
-            onPointerMove={onRegionMove}
-            onPointerUp={onRegionUp}
+            onPointerMove={arrastre.onPointerMove}
+            onPointerUp={arrastre.onPointerUp}
             // En táctil, deslizar para DESPLAZAR la rejilla empieza siempre por un
             // pointerdown en una columna, o sea por un arrastre de «crear»; cuando
             // el navegador se queda el gesto para el scroll manda `pointercancel`.
             // Sin recogerlo, el arrastre quedaba vivo: el rectángulo azul se quedaba
             // pintado y el SIGUIENTE toque —el que iba a abrir un evento— caía en
             // este `pointerup` y abría «Nuevo evento» con un rango inventado.
-            onPointerCancel={() => setDrag(null)}
+            onPointerCancel={arrastre.onPointerCancel}
+            onLostPointerCapture={arrastre.onLostPointerCapture}
           >
             {layout.map(({ day, timed }, di) => (
               <div

@@ -103,7 +103,7 @@ en-US es-ES fi fr-FR hr hu it nl-NL no pl pt-PT ro sk sl-SI sv`. El principal es
 | Notas para la revisión                                                     | Sí, `appStoreReviewDetails`                                                 | `--ficha` o sólo `--notas`                          |
 | Contacto y **cuenta de prueba** para el revisor                            | Sí, pero **no están en el repositorio**                                     | El dueño: variables en Codemagic, o en la web       |
 | Precio gratis                                                              | Sí, `appPriceSchedules` (solo si no hay ninguno puesto)                     | `--ficha`                                           |
-| Países (UE + EEE + CH, sin Francia: veintinueve)                           | Sí, `appAvailabilities` v2 (solo si no hay ninguno puesto)                  | `--ficha`                                           |
+| Países (todos salvo `scripts/paises.json`: Francia, China, sanciones)      | Sí, `appAvailabilities` v2 al crear; `territoryAvailabilities` al ampliar   | `--ficha` (alta) y `--paises` (ya creados)          |
 | **Etiquetas de privacidad («App Privacy»)**                                | **No**: la API no las tiene                                                 | El dueño, con `<app>/privacidad.txt`                |
 | **Cifrado (cumplimiento de exportación)**                                  | Cuestionario por API autorizado; exención documental en el plist: ver abajo | Pipeline y revisión de los hechos                   |
 | Estado de comerciante de la DSA                                            | No                                                                          | Hecho por el dueño                                  |
@@ -301,10 +301,17 @@ Lo que se deriva de esas respuestas —si hace falta documentación de exportaci
 el informe anual de autoclasificación o la declaración francesa— lo determina Apple en el
 propio cuestionario y es una declaración legal del dueño. El texto exacto de las preguntas
 es el de App Store Connect el día que se responda; arriba va el sentido. Los valores
-predeterminados de `--ficha` son los otros veintinueve países, con altas automáticas de
-nuevos territorios desactivadas. Si una app ya tiene disponibilidad configurada, el
-guion la conserva: la retirada de Francia se aplica y verifica en App Store Connect.
-Los países de Google Play y los textos en francés no cambian por esta decisión.
+**Distribución global (decisión del dueño, 2026-11-01).** Todos los territorios de la
+App Store salvo los de [`scripts/paises.json`](../scripts/paises.json): Francia (ANSSI
+pendiente), China continental (licencia ICP) y los países sancionados por la UE (Rusia,
+Bielorrusia y, por si aparecen, Irán, Corea del Norte, Siria y Cuba). Las altas automáticas
+de territorios nuevos siguen desactivadas: la lista se calcula con `/v1/territories` y se
+comprueba. `--ficha` la crea cuando no hay ninguna; `--paises` (workflow `modo=paises`,
+`confirmacion_paises=GLOBAL_SALVO_EXCLUIDOS`, sin `ref`) lleva la ya creada a la política
+con `PATCH /v1/territoryAvailabilities`, relee y es rojo si Apple rechaza algún territorio.
+Fuera de la UE sigue aplicando el control de exportación de EE. UU.: el **informe anual de
+autoclasificación** ante el BIS (cifrado de mercado masivo) es una obligación del dueño.
+Los textos en francés no cambian.
 
 ## Lo que le queda al dueño, en este orden
 

@@ -258,6 +258,6 @@ if (import.meta.main) {
   const ruta = new URL('./esperado-libreoffice.json', import.meta.url);
   writeFileSync(ruta, JSON.stringify(e, null, 1) + '\n');
   // El gate de formato del frontend mira también los JSON: se deja como lo deja prettier.
-  Bun.spawnSync(['bunx', 'prettier@3.9.9', '--write', fileURLToPath(ruta)]);
+  Bun.spawnSync(['bunx', 'prettier@3.9.10', '--write', fileURLToPath(ruta)]);
   process.stdout.write(`${e.casos.length} fórmulas calculadas con ${e.libreoffice}\n`);
 }

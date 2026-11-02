@@ -125,6 +125,7 @@ export const ro: AppCatalog<typeof en> = {
   'notebook.notes': { one: '{count} notiță', few: '{count} notițe', other: '{count} de notițe' },
   'notebook.emoji': 'Pictogramă',
   'notebook.color': 'Culoare',
+  'notebook.move': 'Mută caietul',
   'notebook.title': 'Nume',
   'layout.label': 'Aranjare',
   'layout.tree': 'Arbore',

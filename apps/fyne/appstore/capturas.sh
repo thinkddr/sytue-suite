@@ -30,7 +30,7 @@ elegidas() { # <clase> <app>
   iphone/certipdf) echo 019 020 023 ;;
   iphone/contacts) echo 001 004 002 003 ;;
   iphone/diapos) echo 002 013 ;;
-  iphone/docus) echo 005 013 001 ;;
+  iphone/docus) echo 007 013 001 ;;
   iphone/drive) echo 001 007 013 ;;
   iphone/erp) echo 001 014 003 036 ;;
   iphone/hub) echo 001 002 ;;

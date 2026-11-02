@@ -23,6 +23,7 @@ import {
   EmptyState,
   cx,
   useToast,
+  usePointerDrag,
   useNavDrawer,
   useSondeo,
   ConfirmDialog,
@@ -2817,7 +2818,8 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
         menuItems={items}
         menuLabel={t('channel.actions', { name: c.name })}
         t={t}
-        draggable={!c.external}
+        draggable={!c.external && !offline}
+        pointerDrag={c.external || offline ? undefined : asaSidebar({ kind: 'channel', id: c.id })}
         onDragStart={() => setDrag({ kind: 'channel', id: c.id })}
         onDragEnd={() => setDrag(null)}
       />
@@ -3497,6 +3499,82 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
   // categorías personalizadas). Un canal en una categoría personalizada conocida va solo
   // en ella; si no, cae a su sección por defecto según favorito/kind. Ver lib/categories.
   const groups = groupChannels(channels, categories);
+  const sidebarGestoId = useId();
+  const [grupoPuntero, setGrupoPuntero] = useState<string | null>(null);
+  const sidebarMovido = useRef(false);
+  type OrigenSidebar = { kind: 'channel' | 'category'; id: string };
+  const grupoEn = (x: number, y: number, origen: OrigenSidebar): SidebarGroup | undefined => {
+    const raiz = document.getElementById(sidebarGestoId);
+    const el = document
+      .elementsFromPoint(x, y)
+      .map((e) => e.closest<HTMLElement>('[data-rooms-group]'))
+      .find((e) => e && raiz?.contains(e));
+    return groups.find(
+      (g) =>
+        `cat-body-${g.key}` === el?.dataset.roomsGroup &&
+        (origen.kind === 'channel' || (g.category && g.category.id !== origen.id)),
+    );
+  };
+  const limpiarSidebar = (): void => {
+    setGrupoPuntero(null);
+    setDrag(null);
+  };
+  const gestoSidebar = usePointerDrag<OrigenSidebar & { x0: number; y0: number }>({
+    scrollContainer: () =>
+      document
+        .getElementById(sidebarGestoId)
+        ?.querySelector<HTMLElement>('[data-sidebar-scroll]') ?? null,
+    onMove: ({ data, clientX, clientY, dxRaw, dyRaw }) => {
+      if (Math.hypot(dxRaw, dyRaw) < 4) return;
+      sidebarMovido.current = true;
+      setDrag({ kind: data.kind, id: data.id });
+      setGrupoPuntero(grupoEn(clientX, clientY, data)?.key ?? null);
+    },
+    onCancel: limpiarSidebar,
+    onEnd: (data, e) => {
+      limpiarSidebar();
+      if (offline) return;
+      if (Math.hypot(e.clientX - data.x0, e.clientY - data.y0) < 4) return;
+      const group = grupoEn(e.clientX, e.clientY, data);
+      if (!group) return;
+      if (data.kind === 'channel' && channels.some((c) => c.id === data.id && !c.external))
+        dropChannelOnGroup(group, data.id);
+      else if (data.kind === 'category' && group.category)
+        reorderCategoryBefore(data.id, group.category.id);
+    },
+  });
+  const { cancelarArrastre: cancelarOrdenSidebar } = gestoSidebar;
+  useEffect(() => {
+    if (offline) cancelarOrdenSidebar();
+  }, [offline, cancelarOrdenSidebar]);
+  function asaSidebar(origen: OrigenSidebar): JSX.ButtonHTMLAttributes<HTMLButtonElement> {
+    return {
+      onPointerDown: (e) => {
+        sidebarMovido.current = false;
+        gestoSidebar.iniciarArrastre(e, { ...origen, x0: e.clientX, y0: e.clientY });
+      },
+      onPointerMove: gestoSidebar.onPointerMove,
+      onPointerUp: gestoSidebar.onPointerUp,
+      onPointerCancel: gestoSidebar.onPointerCancel,
+      onLostPointerCapture: gestoSidebar.onLostPointerCapture,
+      onClick: (e) => {
+        e.stopPropagation();
+        if (e.detail !== 0 && sidebarMovido.current) return;
+        const root = e.currentTarget.closest(
+          origen.kind === 'channel' ? 'li' : '[data-rooms-group]',
+        );
+        root?.querySelector<HTMLButtonElement>('button[aria-haspopup="menu"]')?.click();
+      },
+      onKeyDown: (e) => {
+        if (origen.kind !== 'category' || !['ArrowUp', 'ArrowDown'].includes(e.key)) return;
+        const cat = categories.find((c) => c.id === origen.id);
+        if (!cat) return;
+        e.preventDefault();
+        e.stopPropagation();
+        moveCategory(cat, e.key === 'ArrowUp' ? -1 : 1);
+      },
+    };
+  }
 
   // Estado de conexion en tiempo real: nunca solo color (WCAG AA) — el punto se
   // acompana de texto; con la conexion sana el texto queda para lectores de
@@ -3555,6 +3633,7 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
 
   const sidebar = (
     <Sidebar
+      id={sidebarGestoId}
       header={
         // px-2.5 alinea la cabecera con el overline «Canales» y los items. Sin
         // «Sytue Rooms»: el selector de apps de la barra superior ya lo dice y la
@@ -3772,8 +3851,9 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
             // ¿Puede soltarse aquí lo que se arrastra? Un canal cae en cualquier sección;
             // una categoría se reordena soltándola sobre OTRA categoría personalizada.
             const dropActive =
-              drag?.kind === 'channel' ||
-              (drag?.kind === 'category' && isCustom && drag.id !== group.category!.id);
+              !offline &&
+              (drag?.kind === 'channel' ||
+                (drag?.kind === 'category' && isCustom && drag.id !== group.category!.id));
             // Personalizada: el nombre que escribió el usuario. Por defecto: catálogo.
             const groupTitle = group.title ?? (group.titleKey ? t(group.titleKey) : '');
             return (
@@ -3806,7 +3886,13 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
                       ),
                     }
                   : {})}
-                draggable={isCustom}
+                draggable={isCustom && !offline}
+                pointerDrag={
+                  group.category && !offline
+                    ? asaSidebar({ kind: 'category', id: group.category.id })
+                    : undefined
+                }
+                pointerOver={grupoPuntero === group.key}
                 onDragStart={() =>
                   group.category && setDrag({ kind: 'category', id: group.category.id })
                 }

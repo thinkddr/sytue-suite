@@ -196,6 +196,7 @@ type capaEdicion struct {
 	// trayectoria.
 	arrastreCon *arrastreConector
 	arrastreMov *arrastreMovimiento
+	cancelado   bool
 }
 
 var (
@@ -256,7 +257,11 @@ func (c *capaEdicion) enfocar() {
 func (c *capaEdicion) FocusGained() { c.enfocada = true; c.Refresh() }
 
 // FocusLost lo quita.
-func (c *capaEdicion) FocusLost() { c.enfocada = false; c.Refresh() }
+func (c *capaEdicion) FocusLost() {
+	c.CancelarArrastre()
+	c.enfocada = false
+	c.Refresh()
+}
 
 // TypedRune no escribe nada: en el escenario no hay texto en edición.
 func (c *capaEdicion) TypedRune(rune) {}
@@ -278,6 +283,9 @@ func (c *capaEdicion) KeyUp(ev *fyne.KeyEvent) {
 // TypedKey es `onStageKeyDown` para el escenario: Supr/Retroceso borran la selección,
 // Escape la quita y las flechas mueven (o, con Mayús, redimensionan la primaria).
 func (c *capaEdicion) TypedKey(ev *fyne.KeyEvent) {
+	if ev.Name == fyne.KeyEscape {
+		c.CancelarArrastre()
+	}
 	e := c.e
 	if e.selCon != "" {
 		// Conector elegido: Supr lo borra y Escape lo suelta.
@@ -459,7 +467,7 @@ func (r *capaRenderer) trayectorias(k float32, acento color.NRGBA, elegidas map[
 			fin := pts[len(pts)-1]
 			if (fin.DX != 0 || fin.DY != 0) && !e.ctx.SoloLectura { // el circuito cierra en el inicio
 				id, indice := cj.ID, i
-				asa := nuevaAsaRedonda(acento, acento, 0,
+				asa := nuevaAsaRedonda(r.c, acento, acento, 0,
 					func(d fyne.Delta) { r.c.moverFinTrayectoria(id, indice, d) }, r.c.soltarRedonda)
 				asa.colocarEn(fyne.NewPos(float32(cx+fin.DX*mulX)*k, float32(cy+fin.DY*mulY)*k), radioAsaMovimiento*k, k)
 				asas = append(asas, asa)
@@ -499,7 +507,7 @@ func (r *capaRenderer) asasConector(k float32, acento color.NRGBA) []fyne.Canvas
 				continue
 			}
 			id, final := rd.c.ID, ext.final
-			a := nuevaAsaRedonda(color.NRGBA{R: 255, G: 255, B: 255, A: 255}, acento, 2*k,
+			a := nuevaAsaRedonda(r.c, color.NRGBA{R: 255, G: 255, B: 255, A: 255}, acento, 2*k,
 				func(d fyne.Delta) { r.c.moverExtremo(id, final, d) }, r.c.soltarRedonda)
 			a.colocarEn(fyne.NewPos(float32(ext.en.x)*k, float32(ext.en.y)*k), radioAsaConector*k, k)
 			objs = append(objs, a)
@@ -543,6 +551,7 @@ func distintivo(paso string, pos fyne.Position, k float32, acento color.NRGBA) [
 
 // arrastreCaja es `dragRef`: qué se mueve, desde dónde y con qué topes.
 type arrastreCaja struct {
+	objetivo      int
 	redimensionar bool
 	caja          string
 	dx, dy        float32 // lo arrastrado, en px de pantalla
@@ -554,7 +563,7 @@ type arrastreCaja struct {
 // selección efectiva si la caja está en ella (o a su grupo), topada por su envolvente.
 func (c *capaEdicion) empezar(id string, redimensionar bool) {
 	e := c.e
-	a := &arrastreCaja{redimensionar: redimensionar, caja: id}
+	a := &arrastreCaja{objetivo: e.objetivo(), redimensionar: redimensionar, caja: id}
 	cs := e.cajasEdit()
 	if redimensionar {
 		if p := e.m.caja(e.objetivo(), id); p != nil {
@@ -611,11 +620,48 @@ func (c *capaEdicion) seguir(d fyne.Delta) {
 // soltar es `onHandleUp`: un único cambio al soltar, que es el que marca el documento
 // y programa el guardado.
 func (c *capaEdicion) soltar() {
+	if c.cancelado {
+		c.cancelado = false
+		return
+	}
 	if c.arrastre == nil {
 		return
 	}
 	c.arrastre = nil
 	c.e.cambiar(func() {}, true)
+}
+
+// CancelarArrastre restaura únicamente lo que el gesto mostraba en vivo. No llama a
+// cambiar: una interrupción del sistema no marca el documento ni programa guardado.
+func (c *capaEdicion) CancelarArrastre() {
+	if c.arrastre == nil && c.arrastreCon == nil && c.arrastreMov == nil {
+		return
+	}
+	c.cancelado = true
+	if a := c.arrastre; a != nil {
+		for _, o := range a.origs {
+			if p := c.e.m.caja(a.objetivo, o.ID); p != nil {
+				p.X, p.Y, p.W, p.H = o.X, o.Y, o.W, o.H
+			}
+		}
+	}
+	if a := c.arrastreCon; a != nil {
+		if con := c.e.m.conector(a.objetivo, a.id); con != nil {
+			if a.final {
+				con.Hasta = a.original
+			} else {
+				con.Desde = a.original
+			}
+		}
+	}
+	if a := c.arrastreMov; a != nil {
+		if caja := c.e.m.caja(a.objetivo, a.caja); caja != nil {
+			caja.Anims, caja.Anim = a.anims, a.anim
+		}
+	}
+	c.arrastre, c.arrastreCon, c.arrastreMov = nil, nil, nil
+	c.e.escenario.Refresh()
+	c.Refresh()
 }
 
 // ---- los hijos de la capa ----
@@ -675,6 +721,9 @@ func (m *marcoCaja) Tapped(ev *fyne.PointEvent) {
 // Dragged mueve una caja que no es de texto; la elige primero si no lo estaba.
 func (m *marcoCaja) Dragged(ev *fyne.DragEvent) {
 	c := m.capa
+	if c.cancelado {
+		return
+	}
 	if m.texto || c.e.ctx.SoloLectura {
 		if ui.EsTactil() {
 			c.e.desliz.Scrolled(&fyne.ScrollEvent{PointEvent: ev.PointEvent, Scrolled: ev.Dragged})
@@ -693,6 +742,8 @@ func (m *marcoCaja) Dragged(ev *fyne.DragEvent) {
 
 // DragEnd suelta.
 func (m *marcoCaja) DragEnd() { m.capa.soltar() }
+
+func (m *marcoCaja) CancelarArrastre() { m.capa.CancelarArrastre() }
 
 // AccessibilityLabel es el `aria-label` de una caja que no es de texto (`boxLabel`).
 func (m *marcoCaja) AccessibilityLabel() string {
@@ -728,6 +779,9 @@ func nuevaAsa(c *capaEdicion, id string, redimensionar bool, col color.NRGBA, ra
 
 // Dragged mueve o redimensiona.
 func (a *asa) Dragged(ev *fyne.DragEvent) {
+	if a.capa.cancelado {
+		return
+	}
 	if a.capa.arrastre == nil {
 		a.capa.empezar(a.id, a.redimensionar)
 	}
@@ -736,6 +790,8 @@ func (a *asa) Dragged(ev *fyne.DragEvent) {
 
 // DragEnd suelta.
 func (a *asa) DragEnd() { a.capa.soltar() }
+
+func (a *asa) CancelarArrastre() { a.capa.CancelarArrastre() }
 
 // Cursor es `cursor-move` en la barra.
 func (a *asa) Cursor() desktop.Cursor {
@@ -790,6 +846,7 @@ const (
 // el final de una trayectoria. Lo que hace al moverse lo dice quien lo crea.
 type asaRedonda struct {
 	widget.BaseWidget
+	capa           *capaEdicion
 	relleno, borde color.NRGBA
 	grosor         float32
 	toque          float32
@@ -799,8 +856,8 @@ type asaRedonda struct {
 
 var _ fyne.Draggable = (*asaRedonda)(nil)
 
-func nuevaAsaRedonda(relleno, borde color.NRGBA, grosor float32, mover func(fyne.Delta), alSoltar func()) *asaRedonda {
-	a := &asaRedonda{relleno: relleno, borde: borde, grosor: grosor, mover: mover, alSoltar: alSoltar}
+func nuevaAsaRedonda(c *capaEdicion, relleno, borde color.NRGBA, grosor float32, mover func(fyne.Delta), alSoltar func()) *asaRedonda {
+	a := &asaRedonda{capa: c, relleno: relleno, borde: borde, grosor: grosor, mover: mover, alSoltar: alSoltar}
 	a.ExtendBaseWidget(a)
 	return a
 }
@@ -817,10 +874,16 @@ func (a *asaRedonda) colocarEn(centro fyne.Position, radio, k float32) {
 }
 
 // Dragged mueve.
-func (a *asaRedonda) Dragged(ev *fyne.DragEvent) { a.mover(ev.Dragged) }
+func (a *asaRedonda) Dragged(ev *fyne.DragEvent) {
+	if !a.capa.cancelado {
+		a.mover(ev.Dragged)
+	}
+}
 
 // DragEnd suelta: el único cambio que marca el documento.
 func (a *asaRedonda) DragEnd() { a.alSoltar() }
+
+func (a *asaRedonda) CancelarArrastre() { a.capa.CancelarArrastre() }
 
 // Cursor es `cursor: move`.
 func (a *asaRedonda) Cursor() desktop.Cursor { return desktop.PointerCursor }
@@ -848,10 +911,12 @@ func (r *asaRedondaRenderer) Layout(t fyne.Size) {
 
 // arrastreConector es el gesto de un tirador de extremo: desde dónde (en %) y cuánto.
 type arrastreConector struct {
-	id     string
-	final  bool
-	x0, y0 float64
-	dx, dy float32
+	objetivo int
+	original Extremo
+	id       string
+	final    bool
+	x0, y0   float64
+	dx, dy   float32
 }
 
 // moverExtremo es `onConnHandleMove`: el extremo sigue al puntero sin marcar el
@@ -867,7 +932,7 @@ func (c *capaEdicion) moverExtremo(id string, final bool, d fyne.Delta) {
 		if final {
 			ext = con.Hasta
 		}
-		g := &arrastreConector{id: id, final: final}
+		g := &arrastreConector{objetivo: e.activa, original: ext, id: id, final: final}
 		if ext.X != nil && ext.Y != nil {
 			g.x0, g.y0 = *ext.X, *ext.Y
 		}
@@ -884,10 +949,13 @@ func (c *capaEdicion) moverExtremo(id string, final bool, d fyne.Delta) {
 
 // arrastreMovimiento es el del final de una trayectoria: sus vértices al empezar.
 type arrastreMovimiento struct {
-	caja   string
-	indice int
-	base   []Punto
-	dx, dy float32
+	objetivo int
+	anims    []Anim
+	anim     *Anim
+	caja     string
+	indice   int
+	base     []Punto
+	dx, dy   float32
 }
 
 // moverFinTrayectoria es `onMotionEndMove`: el último vértice sigue al puntero, topado
@@ -904,7 +972,10 @@ func (c *capaEdicion) moverFinTrayectoria(caja string, indice int, d fyne.Delta)
 			return
 		}
 		a := anims[indice]
-		c.arrastreMov = &arrastreMovimiento{caja: caja, indice: indice, base: PuntosMovimiento(a.Tipo, a.Puntos)}
+		c.arrastreMov = &arrastreMovimiento{
+			objetivo: e.objetivo(), anims: slices.Clone(cj.Anims), anim: cj.Anim,
+			caja: caja, indice: indice, base: PuntosMovimiento(a.Tipo, a.Puntos),
+		}
 	}
 	g := c.arrastreMov
 	g.dx, g.dy = g.dx+d.DX, g.dy+d.DY
@@ -921,6 +992,10 @@ func (c *capaEdicion) moverFinTrayectoria(caja string, indice int, d fyne.Delta)
 
 // soltarRedonda es `onConnHandleUp` y `onMotionEndUp`.
 func (c *capaEdicion) soltarRedonda() {
+	if c.cancelado {
+		c.cancelado = false
+		return
+	}
 	if c.arrastreCon == nil && c.arrastreMov == nil {
 		return
 	}

@@ -151,6 +151,7 @@ const (
 	Video                     // video
 	VozApagada                // vozOff
 	OjoTachado                // ojoOff
+	Arrastrar                 // grip
 
 	// --- Los glifos PROPIOS de Sytue Drive (`apps/drive/.../glyphs.tsx`) ---
 	//
@@ -308,6 +309,8 @@ var catalogo = [...]entrada{
 	Video:               {"video", "M3.5 6.5h12v11h-12zM15.5 10.5l5-3v9l-5-3"},
 	VozApagada:          {"vozOff", "M4 9.5h3.5L12 5.5v13L7.5 14.5H4zM16 9.5l5 5M21 9.5l-5 5"},
 	OjoTachado:          {"ojoOff", "M10 5.7A9.5 9.5 0 0 1 12 5.5c6 0 9.5 6.5 9.5 6.5a17 17 0 0 1-2.4 3.2M6.3 6.8C3.9 8.4 2.5 12 2.5 12s3.5 6.5 9.5 6.5a9 9 0 0 0 4.7-1.3M10.2 10.2a2.5 2.5 0 0 0 3.6 3.6M4 4l16 16"},
+
+	Arrastrar: {"grip", "M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01"},
 
 	// Los glifos propios de Sytue Drive, verbatim de su `glyphs.tsx`.
 	DriveCarpeta:      {"folder", "M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"},

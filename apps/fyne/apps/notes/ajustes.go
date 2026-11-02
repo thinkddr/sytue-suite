@@ -57,12 +57,12 @@ var ColoresCuaderno = []string{
 	"#0f766e", "#0e7490", "#1c58d9", "#4c1d95", "#7e22ce", "#3a4a5e",
 }
 
-// Disposiciones son las cuatro con su glifo, EL ÁRBOL PRIMERO: es la de serie y las
+// Disposiciones son las cuatro con su glifo, LA LISTA PRIMERO: es la de serie y las
 // demás son «funciones añadidas», como pide el producto.
 var Disposiciones = []struct {
 	D     Disposicion
 	Glifo string
-}{{VistaArbol, ArbolD}, {Libre, LibreD}, {Columnas, ColumnasD}, {Lista, ListaD}}
+}{{Lista, ListaD}, {VistaArbol, ArbolD}, {Columnas, ColumnasD}, {Libre, LibreD}}
 
 // Visibilidades son las cuatro con su consecuencia escrita al lado: «privado» y
 // «personal» suenan igual, y la diferencia —una está en la búsqueda y la otra no— es
@@ -131,7 +131,7 @@ func (p *Pantalla) dialogoAjustes(c *Cuaderno, padre string) {
 		return
 	}
 	t := p.tr.T
-	f := formAjustes{color: ColoresCuaderno[0], disposicion: VistaArbol.Clave(), visibilidad: "personal", indexable: true}
+	f := formAjustes{color: ColoresCuaderno[0], disposicion: Lista.Clave(), visibilidad: "personal", indexable: true}
 	if c != nil {
 		f = formAjustes{
 			color: c.Color, disposicion: c.Vista.Clave(), visibilidad: c.Publico,

@@ -4,9 +4,11 @@
 package notes
 
 import (
+	"image/color"
 	"slices"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
@@ -35,9 +37,8 @@ const (
 	MargenLienzo  = 4 * 0.25 * tema.Rem
 	HuecoLista    = 2.5 * 0.25 * tema.Rem
 	HuecoColumnas = 3 * 0.25 * tema.Rem
-	// AnchoLectura es `max-w-3xl` (48 rem): el ancho al que se acota la lista cuando
-	// NO llena el panel.
-	AnchoLectura = 48 * tema.Rem
+	// La columna exterior mide 46 rem con sus 3 rem de margen horizontal.
+	AnchoLectura = 43 * tema.Rem
 )
 
 // Lienzo es el panel principal del cuaderno abierto.
@@ -95,9 +96,14 @@ type Lienzo struct {
 	Imagen          func(url string) imagenRemota
 	Documento       func(id string) docRemoto
 	// vivas son las tarjetas del último repintado, por nota: a las que llevar la vista.
-	vivas map[string]*Tarjeta
+	vivas          map[string]*Tarjeta
+	columnas       []fyne.CanvasObject
+	marcasColumnas []*canvas.Rectangle
 	// AlMoverLibre es soltar una nota arrastrada en el lienzo libre, en su nuevo (x, y).
-	AlMoverLibre func(Nota, fyne.Position)
+	AlMoverLibre       func(Nota, fyne.Position)
+	AlArrastrarNota    func(Nota, fyne.Position)
+	AlSoltarNota       func(Nota, fyne.Position)
+	AlCancelarArrastre func()
 	// AlSoltarEnDia es soltar el asa de una nota del diario, con el puntero en
 	// coordenadas absolutas: sobre un día de la barra de semana, se mueve allí.
 	AlSoltarEnDia   func(Nota, fyne.Position)
@@ -233,12 +239,9 @@ func (l *Lienzo) vacio(titulo, cuerpo, cta string, accion func(), v tema.Variant
 }
 
 // reparto coloca las tarjetas según la disposición del cuaderno.
-//
-// porque es el parámetro de todos los `Objeto`/`reparto` del paquete y quitarlo de uno
-// obliga a mirar cuál lo lleva cada vez.
-//
-//nolint:unparam // `v` no se usa HOY porque las tarjetas se tiñen solas; se queda
 func (l *Lienzo) reparto(v tema.Variante) fyne.CanvasObject {
+	l.vivas = make(map[string]*Tarjeta, len(l.Notas))
+	l.columnas, l.marcasColumnas = nil, nil
 	tarjetas := make([]fyne.CanvasObject, 0, len(l.Notas))
 	var arrastrables []*Tarjeta
 	// En lista, cada sublista va justo debajo de su nota y sangrada (`conSangria` de la web).
@@ -249,17 +252,17 @@ func (l *Lienzo) reparto(v tema.Variante) fyne.CanvasObject {
 	for _, n := range notas {
 		t := l.tarjeta(n)
 		t.Nivel = niveles[n.ID]
-		if l.Cuaderno.Vista == Libre && !l.SoloLectura {
+		if l.Cuaderno.Vista == Libre && !l.SoloLectura && !l.Bloqueado {
 			t.AlSoltar = func(p fyne.Position) {
 				llamar2(l.AlMoverLibre, n, fyne.NewPos(max(p.X-MargenLienzo, 0), max(p.Y-MargenLienzo, 0)))
 			}
 			arrastrables = append(arrastrables, t)
-		} else if t.Diario && !l.SoloLectura && !l.Cuaderno.Cifrado && l.AlSoltarEnDia != nil {
-			t.AlSoltar = func(fyne.Position) {
-				// El puntero va sobre el asa, que está en la esquina de la tarjeta.
-				en := fyne.CurrentApp().Driver().AbsolutePositionForObject(t).AddXY(PosAsa+GlifoAsa/2, PosAsa+GlifoAsa/2)
-				llamar2(l.AlSoltarEnDia, n, en)
-			}
+		} else if !l.Llenar && !l.SoloLectura && !l.Bloqueado && l.AlSoltarNota != nil {
+			t.AlSoltar = func(fyne.Position) {}
+			t.arrastreEnSitio = true
+			t.alArrastrar = func(en fyne.Position) { llamar2(l.AlArrastrarNota, n, en) }
+			t.alSoltarEn = func(en fyne.Position) { l.AlSoltarNota(n, en) }
+			t.alCancelarArrastre = l.AlCancelarArrastre
 		}
 		tarjetas = append(tarjetas, t)
 	}
@@ -284,7 +287,13 @@ func (l *Lienzo) reparto(v tema.Variante) fyne.CanvasObject {
 					dentro = append(dentro, tarjetas[j])
 				}
 			}
-			cols[i] = container.New(columnaTarjetas{hueco: HuecoLista}, dentro...)
+			columna := container.New(columnaConDestino{columnaTarjetas{hueco: HuecoLista}}, dentro...)
+			marca := canvas.NewRectangle(color.Transparent)
+			marca.StrokeWidth, marca.StrokeColor, marca.CornerRadius = tema.AnilloFoco, tema.Color("primary", v), tema.RadioMD
+			marca.Hide()
+			cols[i] = container.NewStack(columna, marca)
+			l.columnas = append(l.columnas, cols[i])
+			l.marcasColumnas = append(l.marcasColumnas, marca)
 		}
 		// `grid-cols-1 md:grid-cols-2 lg:grid-cols-3`: en el teléfono las tres columnas
 		// van una debajo de otra, y en una tableta la tercera baja a la segunda fila.
@@ -306,8 +315,8 @@ func (l *Lienzo) reparto(v tema.Variante) fyne.CanvasObject {
 	}
 	// Las filas, en la columna de lectura (`.notes-col`) y sangradas 8 px hacia fuera
 	// (`.notes-stream -mx-2`): el glifo de cada una cae en el borde de la columna, bajo el
-	// título. Un píxel entre fila y fila (`gap-px`) y `pb-10`.
-	filas := container.New(columnaTarjetas{hueco: 1}, tarjetas...)
+	// título, con `gap-1` entre filas y `pb-10`.
+	filas := container.New(columnaTarjetas{hueco: tema.Espacio(1)}, tarjetas...)
 	margen := max(l.margenDiario()-RellenoFilaX, 0)
 	return container.New(&acotado{ancho: AnchoLectura + 2*tema.Espacio(6)},
 		container.New(ui.Margen{Izq: margen, Der: margen, Abj: tema.Espacio(10)}, filas))
@@ -605,6 +614,15 @@ func anchoLibre(n Nota, minimo float32) float32 {
 // ancho no parte ninguna línea ni sabe cuánto mide su imagen: hasta el fotograma
 // siguiente (el `EnsureMinSize` del driver), su contenido se salía por debajo.
 type columnaTarjetas struct{ hueco float32 }
+
+// Una columna vacía sigue siendo un destino visible y alcanzable para el asa.
+type columnaConDestino struct{ columnaTarjetas }
+
+func (c columnaConDestino) MinSize(objs []fyne.CanvasObject) fyne.Size {
+	m := c.columnaTarjetas.MinSize(objs)
+	m.Height = max(m.Height, tema.Espacio(16))
+	return m
+}
 
 func (c columnaTarjetas) MinSize(objs []fyne.CanvasObject) fyne.Size {
 	return ui.Columna{Hueco: c.hueco}.MinSize(objs)

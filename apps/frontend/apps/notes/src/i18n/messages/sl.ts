@@ -134,6 +134,7 @@ export const sl: AppCatalog<typeof en> = {
   },
   'notebook.emoji': 'Ikona',
   'notebook.color': 'Barva',
+  'notebook.move': 'Premakni zvezek',
   'notebook.title': 'Ime',
   'layout.label': 'Postavitev',
   'layout.tree': 'Drevo',

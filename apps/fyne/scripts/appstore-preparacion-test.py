@@ -317,5 +317,90 @@ class Preparacion(unittest.TestCase):
         self.assertFalse(datos["canonicalScreenshotsComplete"])
 
 
+class PaisesGlobales(unittest.TestCase):
+    """--paises: todos los territorios menos paises.json, sin activar los nuevos automáticos."""
+
+    TERRITORIOS = ["ESP", "DEU", "USA", "JPN", "BRA", "FRA", "CHN", "RUS", "BLR"] + [f"T{n:02d}" for n in range(100)]
+
+    class Escribible:
+        def __init__(self, filas, automatico=False, rechaza=()):
+            self.filas = filas
+            self.automatico = automatico
+            self.rechaza = set(rechaza)
+            self.parches = []
+
+        def pedir(self, metodo, ruta, cuerpo=None, tolerar=()):
+            base = ruta.split("?")[0]
+            if base == "/v1/apps/app":
+                return {"data": {"attributes": {"bundleId": asc.bundle_de("rooms")}}}
+            if base == "/v1/apps/app/appAvailabilityV2":
+                return {"data": {"id": "disp", "attributes": {"availableInNewTerritories": self.automatico}}}
+            raise AssertionError(base)
+
+        def lista(self, ruta):
+            if ruta.startswith("/v1/territories"):
+                return [{"id": t} for t in PaisesGlobales.TERRITORIOS]
+            assert ruta.startswith("/v2/appAvailabilities/disp/territoryAvailabilities"), ruta
+            return copy.deepcopy(self.filas)
+
+        def escribir(self, tipo, attrs=None, rels=None, id=None, ruta=None):
+            assert tipo == "territoryAvailabilities" and id and set(attrs) == {"available"}
+            territorio = next(f for f in self.filas if f["id"] == id)["relationships"]["territory"]["data"]["id"]
+            if territorio in self.rechaza:
+                raise RuntimeError("HTTP 409 PATCH /v1/territoryAvailabilities: rechazado")
+            self.parches.append((territorio, attrs["available"]))
+            next(f for f in self.filas if f["id"] == id)["attributes"]["available"] = attrs["available"]
+            return {}
+
+    def filas_ue(self):
+        ue = {"ESP", "DEU"}
+        return [{"id": "fila-" + t, "attributes": {"available": t in ue},
+                 "relationships": {"territory": {"data": {"type": "territories", "id": t}}}} for t in self.TERRITORIOS]
+
+    def ficha(self):
+        return {"apps": {"rooms": {"id": "app"}}}
+
+    def test_amplia_a_todos_salvo_excluidos_y_conserva_francia_fuera(self):
+        api = self.Escribible(self.filas_ue())
+        with contextlib.redirect_stdout(io.StringIO()):
+            asc.ajustar_paises(api, "rooms", self.ficha(), ["IOS"], "")
+        cambiados = dict(api.parches)
+        for t in ("FRA", "CHN", "RUS", "BLR", "ESP", "DEU"):
+            self.assertNotIn(t, cambiados)
+        self.assertTrue(cambiados["USA"] and cambiados["JPN"] and cambiados["BRA"])
+        self.assertTrue(all(f["attributes"]["available"] is (f["relationships"]["territory"]["data"]["id"] not in asc.EXCLUIDOS) for f in api.filas))
+        api.parches.clear()
+        with contextlib.redirect_stdout(io.StringIO()):
+            asc.ajustar_paises(api, "rooms", self.ficha(), ["IOS"], "")
+        self.assertEqual(api.parches, [], "repetir no reescribe nada")
+
+    def test_retira_un_excluido_que_estuviera_disponible(self):
+        filas = self.filas_ue()
+        next(f for f in filas if f["id"] == "fila-RUS")["attributes"]["available"] = True
+        api = self.Escribible(filas)
+        with contextlib.redirect_stdout(io.StringIO()):
+            asc.ajustar_paises(api, "rooms", self.ficha(), ["IOS"], "")
+        self.assertIn(("RUS", False), api.parches)
+
+    def test_no_toca_nada_con_territorios_nuevos_automaticos(self):
+        api = self.Escribible(self.filas_ue(), automatico=True)
+        with self.assertRaisesRegex(RuntimeError, "territorios nuevos"):
+            asc.ajustar_paises(api, "rooms", self.ficha(), ["IOS"], "")
+        self.assertEqual(api.parches, [])
+
+    def test_un_rechazo_de_apple_es_rojo_y_lo_nombra(self):
+        api = self.Escribible(self.filas_ue(), rechaza={"JPN"})
+        with self.assertRaisesRegex(RuntimeError, "JPN"):
+            asc.ajustar_paises(api, "rooms", self.ficha(), ["IOS"], "")
+
+    def test_politica_excluye_francia_china_y_sanciones(self):
+        self.assertTrue({"FRA", "CHN", "RUS", "BLR"} <= asc.EXCLUIDOS)
+
+    def test_paises_pide_confirmacion_antes_de_credenciales(self):
+        with mock.patch.dict("os.environ", {}, clear=True), contextlib.redirect_stderr(io.StringIO()) as err:
+            self.assertEqual(asc.main(["--paises", "rooms"]), 2)
+        self.assertIn("GLOBAL_SALVO_EXCLUIDOS", err.getvalue())
+
+
 if __name__ == "__main__":
     unittest.main()

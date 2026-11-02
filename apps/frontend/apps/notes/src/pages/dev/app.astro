@@ -1,0 +1,39 @@
+---
+/* SPDX-License-Identifier: Apache-2.0 */
+import '../../styles/app.css';
+import { basePathScript, themeInitScript } from '@sytue/ui';
+import { NotesApp } from '../../components/NotesApp.js';
+
+export const prerender = false;
+if (!import.meta.env.DEV) return new Response(null, { status: 404 });
+const usuario = {
+  id: 'fixture-owner',
+  tenant: 'prueba',
+  email: 'fixture@sytue.test',
+  emailVerified: true,
+  name: 'Cuenta de prueba',
+  preferredUsername: 'fixture',
+  roles: [],
+  groups: [],
+};
+---
+
+<html lang="es" class="h-full">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Notepads — banco de pruebas</title>
+    <script is:inline set:html={basePathScript(import.meta.env.BASE_URL)}></script>
+    <script is:inline set:html={themeInitScript}></script>
+  </head>
+  <body class="bg-bg text-text h-full antialiased">
+    <NotesApp
+      client:only="preact"
+      user={usuario}
+      locale="es"
+      hubBaseUrl={`${Astro.url.origin}/hub`}
+      publicBase={`${Astro.url.origin}/notes/prueba`}
+      notebookInicial="cuaderno-proyecto"
+    />
+  </body>
+</html>

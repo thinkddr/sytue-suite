@@ -6,6 +6,47 @@
 
 @source '../**/*.{astro,ts,tsx}';
 
+/* La rejilla conserva sus encabezados al recorrer tablas anchas o largas. */
+.bases-grid-scroll {
+  max-block-size: max(18rem, 65dvh);
+  scrollbar-gutter: stable;
+}
+.bases-grid thead {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 2;
+}
+.bases-grid th:first-child {
+  position: sticky;
+  inset-inline-start: 0;
+  z-index: 1;
+  background: inherit;
+  border-inline-end: 1px solid var(--color-border);
+}
+.bases-grid thead th:first-child {
+  z-index: 3;
+}
+.bases-grid thead tr {
+  background: var(--color-bg-subtle);
+}
+.bases-grid tbody tr {
+  background: var(--color-surface);
+}
+.bases-grid tbody tr:nth-child(even) {
+  background: color-mix(in srgb, var(--color-bg-subtle) 40%, var(--color-surface));
+}
+@media (hover: hover) {
+  .bases-grid tbody tr:hover {
+    background: var(--color-bg-subtle);
+  }
+}
+.bases-grid tbody tr:focus-within {
+  background: color-mix(in srgb, var(--color-selected) 40%, var(--color-surface));
+}
+.bases-grid tbody tr:last-child > * {
+  border-block-end: 0;
+}
+
 /*
  * Objetivos táctiles (WCAG 2.5.5): con puntero grueso —dedo— cada control de Bases mide al
  * menos 44 × 44 px. Con ratón no cambia nada. Lo vigila test/e2e/accesibilidad-bases.mjs a

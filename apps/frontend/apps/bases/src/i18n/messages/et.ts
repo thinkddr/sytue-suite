@@ -10,6 +10,7 @@ import type { en } from './en.js';
 export const et: AppCatalog<typeof en> = {
   'nav.title': 'Bases',
   'nav.bases': 'Minu andmebaasid',
+  'actions.more': 'Rohkem toiminguid',
   'bases.title': 'Minu andmebaasid',
   'bases.newName': 'Uue andmebaasi nimi',
   'bases.create': 'Loo andmebaas',

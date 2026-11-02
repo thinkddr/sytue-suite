@@ -32,6 +32,7 @@ import {
   EmptyState,
   FILA_UNICA_EN_MOVIL,
   Icon,
+  useLongPress,
   MASCARA_SCROLL_X,
   PaletaDeComandos,
   Spinner,
@@ -1582,8 +1583,8 @@ function Lista({
     }
   }
 
-  function toggleFila(id: string, e: MouseEvent): void {
-    e.stopPropagation();
+  function toggleFila(id: string, e?: MouseEvent): void {
+    e?.stopPropagation();
     setSeleccionados((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -1591,6 +1592,12 @@ function Lista({
       return next;
     });
   }
+
+  const mantenerRegistro = useLongPress<string>((id) => {
+    if (!ejecutandoLote) toggleFila(id);
+  });
+  const { cancelar: cancelarSeleccionRegistro } = mantenerRegistro;
+  useEffect(() => cancelarSeleccionRegistro(), [registros, cancelarSeleccionRegistro]);
 
   async function ejecutarLote(
     accion: 'estado' | 'borrar' | 'restaurar',
@@ -1926,7 +1933,13 @@ function Lista({
           {registros.map((r) => (
             <Card
               key={r.id}
-              class="hover:border-border-strong flex cursor-pointer flex-col justify-between p-4 transition-colors"
+              class={cx(
+                'hover:border-border-strong flex cursor-pointer flex-col justify-between p-4 transition-colors',
+                seleccionados.has(r.id) && 'border-primary bg-selected',
+              )}
+              onPointerDown={(e) => mantenerRegistro.iniciar(e, r.id)}
+              onClickCapture={mantenerRegistro.onClickCapture}
+              onContextMenuCapture={mantenerRegistro.onContextMenuCapture}
               onClick={() => onAbrir(r)}
             >
               <div>
@@ -2070,9 +2083,13 @@ function Lista({
                   return (
                     <tr
                       key={r.id}
+                      onPointerDown={(e) => mantenerRegistro.iniciar(e, r.id)}
+                      onClickCapture={mantenerRegistro.onClickCapture}
+                      onContextMenuCapture={mantenerRegistro.onContextMenuCapture}
                       tabIndex={0}
                       onClick={() => onAbrir(r)}
                       onKeyDown={(e) => {
+                        if (e.target !== e.currentTarget) return;
                         if (e.key === 'Enter' || e.key === ' ') {
                           e.preventDefault();
                           onAbrir(r);

@@ -1,4 +1,5 @@
 {
+  "actions.more": "Rohkem toiminguid",
   "attach.add": "Lisa fail",
   "attach.badType": "See failitüüp ei ole lubatud või selle sisu ei vasta nimele.",
   "attach.delete": "Kustuta {name}",

@@ -32,6 +32,7 @@
   "common.offline": "Du er frakoblet. Endringer lagres ikke før tilkoblingen er tilbake.",
   "common.retry": "Prøv igjen",
   "common.save": "Lagre",
+  "crypto.dataReviewRequired": "Denne delen inneholder data som appen ikke kan endre uten å miste presisjon. Originalen er bevart.",
   "crypto.disable": "Fjern krypteringen",
   "crypto.disableWarning": "Eksisterende krypterte notater forblir uleselige. Lås opp notatboken først.",
   "crypto.enable": "Krypter",
@@ -39,7 +40,6 @@
   "crypto.lockNow": "Lås nå",
   "crypto.locked": "Låst",
   "crypto.migrating": "Beskytter innholdet i notatboken…",
-  "crypto.dataReviewRequired": "Denne delen inneholder data som appen ikke kan endre uten å miste presisjon. Originalen er bevart.",
   "crypto.migrationFailed": "Krypteringen kunne ikke fullføres. Dataene dine er bevart. Åpne notatboken igjen for å se gjennom endringene.",
   "crypto.mismatch": "De to passfrasene er forskjellige.",
   "crypto.passphrase": "Passfrase",
@@ -266,6 +266,7 @@
   "notebook.delete": "Slett notatbok",
   "notebook.deleteConfirm": "Slette «{title}» og alt som ligger i den?",
   "notebook.emoji": "Ikon",
+  "notebook.move": "Flytt notatbok",
   "notebook.newChild": "Ny notatbok inni",
   "notebook.notes": {
     "one": "{count} notat",

@@ -168,7 +168,7 @@ func TestLaFilaDelArbolMide43Coma75(t *testing.T) {
 // —sin «Orden propio», «Filtrar por etiqueta» ni «Exportar» escritos— cabe en UNA fila
 // también a 740, el lienzo de la vista de árbol en una ventana de 1280: «Nueva nota» se
 // queda la última de esa fila, el título cede sin desaparecer y la barra mide `min-h-12`.
-// En el móvil sigue partiendo: el filtro baja a su fila, entera.
+// Al abrir la lupa en el móvil, el filtro baja a su fila, entera.
 //
 // VISTO EN ROJO (2026-09-23, en el frontal): sin partir la fila, la barra mide 43 donde
 // la hoja da 78, «Nueva nota» se queda en la primera fila y el título a cero de ancho,
@@ -190,8 +190,28 @@ func TestLaBarraBajaLoQueNoCabe(t *testing.T) {
 	if titulo := o.Objects[2]; titulo.Size().Width < 60 {
 		t.Errorf("el título mide %v de ancho: no ha cedido, ha desaparecido", titulo.Size().Width)
 	}
-	// En el móvil el filtro va el último y en su fila, entera.
+	// Como en NotesApp.tsx, la lupa abre el campo. Cerrado no ocupa una fila.
 	b.Estrecha = true
+	b.AlAbrirFiltro = func() { b.Filtrando = true }
+	o = b.Objeto(tema.Claro).(*fyne.Container)
+	o.Resize(fyne.NewSize(360, 200))
+	o.Layout.Layout(o.Objects, o.Size())
+	var lupa *ui.BotonIcono
+	recorrerInterno(o, func(obj fyne.CanvasObject) {
+		if bt, ok := obj.(*ui.BotonIcono); ok && bt.Rotulo == b.tr.T("filter.placeholder", nil) {
+			lupa = bt
+		}
+		if _, ok := obj.(*ui.Entrada); ok {
+			t.Error("el filtro cerrado ocupa espacio en la barra")
+		}
+	})
+	if lupa == nil {
+		t.Fatal("el filtro cerrado no tiene su lupa para abrirlo")
+	}
+	test.Tap(lupa)
+	if !b.Filtrando {
+		t.Fatal("pulsar la lupa no abre el filtro")
+	}
 	o = b.Objeto(tema.Claro).(*fyne.Container)
 	o.Resize(fyne.NewSize(360, 200))
 	o.Layout.Layout(o.Objects, o.Size())

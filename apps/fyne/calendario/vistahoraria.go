@@ -194,15 +194,15 @@ func (p *Pantalla) vistaHoraria() fyne.CanvasObject {
 	refrescoRejilla := p.Refresco
 	refrescoRejilla.Arriba = func() bool { return desplazar.Offset.Y <= 0.5 }
 	return container.NewStack(canvas.NewRectangle(tema.Color("surface", v)),
-		container.New(&arriba{Alto: MedidaCabeceraHoraria(d)},
+		container.New(&bajoCabeceraHoraria{cab: cab, canalon: canalon},
 			ui.RefrescarAlTirar(container.New(ui.Margen{Der: canalon}, cab), &refrescoCab),
 			ui.RefrescarAlTirar(conScroll, &refrescoRejilla)))
 }
 
 // ---- La cabecera: días y franja de «todo el día» ----
 
-// AltoFilaDias es la fila de los días: `py-2` y, dentro, versalita y número alineados
-// por la base, más el `border-b`.
+// AltoFilaDias es la fila de los días cuando caben en una línea: `py-2` y, dentro,
+// versalita y número alineados por la base, más el `border-b`.
 func AltoFilaDias() float32 {
 	bajoXS := tema.TextoXS.Linea - lineaBase(tema.TextoXS)
 	bajoSM := tema.TextoSM.Linea - lineaBase(tema.TextoSM)
@@ -223,7 +223,8 @@ func AltoFranja(d disposicionHoraria) float32 {
 	return max(barras, texto) + tema.Borde
 }
 
-// MedidaCabeceraHoraria es lo que ocupa la cabecera entera.
+// MedidaCabeceraHoraria es el mínimo de la cabecera entera con los días en una línea.
+// AltoPara calcula el alto que corresponde a su ancho actual.
 func MedidaCabeceraHoraria(d disposicionHoraria) float32 {
 	return AltoFilaDias() + AltoFranja(d)
 }
@@ -232,6 +233,54 @@ type cabeceraHoraria struct {
 	widget.BaseWidget
 	p *Pantalla
 	d disposicionHoraria
+}
+
+// La consulta de contenedor de TimeGrid apila el nombre y el número bajo 110 px
+// por día. Se comprueba también el texto: el idioma no debe invadir la columna
+// siguiente aunque su abreviatura ocupe más que la prevista en la web.
+func (c *cabeceraHoraria) apilar(ancho float32) bool {
+	columna := max(ancho-AnchoEje, 0) / float32(len(c.d.dias))
+	if columna < 110 {
+		return true
+	}
+	nombres := i18n.WeekdaysShort(c.p.locale())
+	for _, dia := range c.d.dias {
+		nombre := nombres[(int(dia.Weekday())+6)%7]
+		texto := ui.MedirVersal(nombre, tema.TextoXS, ui.SemiNegrita) + espacio1p5 +
+			ui.Medir(strconv.Itoa(dia.Day()), tema.TextoSM, ui.SemiNegrita).Width
+		if texto+2*espacio3+tema.Borde > columna {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *cabeceraHoraria) altoFila(ancho float32) float32 {
+	contenido := AltoFilaDias() - tema.Borde
+	if c.apilar(ancho) {
+		contenido = 2*espacio2 + tema.TextoXS.Linea + tema.TextoSM.Linea
+	}
+	return ui.SueloTactil(contenido) + tema.Borde
+}
+
+// AltoPara incluye la fila apilada cuando la columna no admite nombre y número juntos.
+func (c *cabeceraHoraria) AltoPara(ancho float32) float32 {
+	return c.altoFila(ancho) + AltoFranja(c.d)
+}
+
+// Reutiliza el reparto de cabecera y cuerpo, declarando el alto para el ancho
+// actual: al girar, las columnas y el inicio del cuerpo cambian juntos.
+type bajoCabeceraHoraria struct {
+	cab     *cabeceraHoraria
+	canalon float32
+}
+
+func (b *bajoCabeceraHoraria) MinSize(objs []fyne.CanvasObject) fyne.Size {
+	return (&arriba{Alto: MedidaCabeceraHoraria(b.cab.d)}).MinSize(objs)
+}
+
+func (b *bajoCabeceraHoraria) Layout(objs []fyne.CanvasObject, t fyne.Size) {
+	(&arriba{Alto: b.cab.AltoPara(max(t.Width-b.canalon, 0))}).Layout(objs, t)
 }
 
 func nuevaCabeceraHoraria(p *Pantalla, d disposicionHoraria) *cabeceraHoraria {
@@ -245,7 +294,7 @@ func (c *cabeceraHoraria) CreateRenderer() fyne.WidgetRenderer {
 	p, l := c.p, c.p.locale()
 	r := &cabeceraHorariaRenderer{c: c, fondo: canvas.NewRectangle(tema.Color("surface", v))}
 	r.objetos = []fyne.CanvasObject{r.fondo}
-	nombres := i18n.WeekdaysShort(l)
+	nombres, iniciales := i18n.WeekdaysShort(l), i18n.WeekdaysNarrow(l)
 	for _, dia := range c.d.dias {
 		hoy := esHoy(dia)
 		tinta := "text"
@@ -253,10 +302,11 @@ func (c *cabeceraHoraria) CreateRenderer() fyne.WidgetRenderer {
 			tinta = "primary-text"
 		}
 		col := &colDia{
-			fondo:  canvas.NewRectangle(color.NRGBA{}),
-			semana: ui.NuevoVersal(nombres[(int(dia.Weekday())+6)%7], tema.TextoXS, ui.SemiNegrita, tema.Color("text-subtle", v)),
-			numero: ui.Texto(strconv.Itoa(dia.Day()), tema.TextoSM, ui.SemiNegrita, tema.Color(tinta, v)),
-			raya:   canvas.NewRectangle(tema.Color("border", v)),
+			fondo:   canvas.NewRectangle(color.NRGBA{}),
+			semana:  ui.NuevoVersal(nombres[(int(dia.Weekday())+6)%7], tema.TextoXS, ui.SemiNegrita, tema.Color("text-subtle", v)),
+			inicial: ui.NuevoVersal(iniciales[(int(dia.Weekday())+6)%7], tema.TextoXS, ui.SemiNegrita, tema.Color("text-subtle", v)),
+			numero:  ui.Texto(strconv.Itoa(dia.Day()), tema.TextoSM, ui.SemiNegrita, tema.Color(tinta, v)),
+			raya:    canvas.NewRectangle(tema.Color("border", v)),
 		}
 		if hoy {
 			col.fondo.FillColor = tema.Color("selected", v)
@@ -264,6 +314,7 @@ func (c *cabeceraHoraria) CreateRenderer() fyne.WidgetRenderer {
 		r.cols = append(r.cols, col)
 		r.objetos = append(r.objetos, col.fondo, col.raya)
 		r.objetos = append(r.objetos, col.semana.Objetos()...)
+		r.objetos = append(r.objetos, col.inicial.Objetos()...)
 		r.objetos = append(r.objetos, col.numero)
 	}
 	r.iman = nuevoBotonIman(p)
@@ -288,10 +339,11 @@ func (c *cabeceraHoraria) CreateRenderer() fyne.WidgetRenderer {
 }
 
 type colDia struct {
-	fondo  *canvas.Rectangle
-	semana *ui.Versal
-	numero *canvas.Text
-	raya   *canvas.Rectangle // el `border-l`, salvo en la primera
+	fondo   *canvas.Rectangle
+	semana  *ui.Versal
+	inicial *ui.Versal
+	numero  *canvas.Text
+	raya    *canvas.Rectangle // el `border-l`, salvo en la primera
 }
 
 type cabeceraHorariaRenderer struct {
@@ -314,12 +366,11 @@ func (r *cabeceraHorariaRenderer) Refresh()                     { canvas.Refresh
 
 func (r *cabeceraHorariaRenderer) Layout(t fyne.Size) {
 	r.fondo.Resize(t)
-	fila := AltoFilaDias()
+	fila := r.c.altoFila(t.Width)
+	apilar := r.c.apilar(t.Width)
 	rejilla := ui.Rejilla{Fijas: len(r.cols)}
 	util := max(t.Width-AnchoEje, 0)
 	ancho := rejilla.AnchoColumna(util)
-	bXS, bSM := lineaBase(tema.TextoXS), lineaBase(tema.TextoSM)
-	base := max(bXS, bSM)
 	for i, col := range r.cols {
 		x := AnchoEje + rejilla.X(util, i)
 		col.fondo.Move(fyne.NewPos(x, 0))
@@ -327,13 +378,7 @@ func (r *cabeceraHorariaRenderer) Layout(t fyne.Size) {
 		col.raya.Hidden = i == 0
 		col.raya.Move(fyne.NewPos(x, 0))
 		col.raya.Resize(fyne.NewSize(tema.Borde, fila-tema.Borde))
-		tx := x + espacio3
-		if i > 0 {
-			tx += tema.Borde
-		}
-		col.semana.Colocar(tx, espacio2+base-bXS)
-		tx += col.semana.Ancho() + espacio1p5
-		ui.ColocarTexto(col.numero, tema.TextoSM, tx, espacio2+base-bSM)
+		r.colocarDia(col, x, ancho, apilar)
 	}
 	m := r.iman.MinSize()
 	r.iman.Move(fyne.NewPos((AnchoEje-m.Width)/2, (fila-tema.Borde-m.Height)/2))
@@ -355,6 +400,31 @@ func (r *cabeceraHorariaRenderer) Layout(t fyne.Size) {
 	}
 	r.fileteFranja.Move(fyne.NewPos(0, fila+alto-tema.Borde))
 	r.fileteFranja.Resize(fyne.NewSize(t.Width, tema.Borde))
+}
+
+func (r *cabeceraHorariaRenderer) colocarDia(col *colDia, x, ancho float32, apilar bool) {
+	inicial := apilar && (ancho < 84 || col.semana.Ancho()+2*espacio0p5+tema.Borde > ancho)
+	col.semana.Ver(!inicial)
+	col.inicial.Ver(inicial)
+	semana := col.semana
+	if inicial {
+		semana = col.inicial
+	}
+	if apilar {
+		semana.Colocar(x+(ancho-semana.Ancho())/2, espacio2)
+		numero := ui.Medir(col.numero.Text, tema.TextoSM, ui.SemiNegrita).Width
+		ui.ColocarTexto(col.numero, tema.TextoSM, x+(ancho-numero)/2, espacio2+tema.TextoXS.Linea)
+		return
+	}
+	tx := x + espacio3
+	if !col.raya.Hidden {
+		tx += tema.Borde
+	}
+	bXS, bSM := lineaBase(tema.TextoXS), lineaBase(tema.TextoSM)
+	base := max(bXS, bSM)
+	semana.Colocar(tx, espacio2+base-bXS)
+	tx += semana.Ancho() + espacio1p5
+	ui.ColocarTexto(col.numero, tema.TextoSM, tx, espacio2+base-bSM)
 }
 
 // botonIman es el conmutador de imantado de la esquina: «15 min» ↔ «30 min».
@@ -408,10 +478,10 @@ func (b *botonIman) AccessibilityLabel() string {
 }
 func (b *botonIman) AccessibilityRole() fyne.AccessibleRole { return fyne.AccessibleRoleButton }
 
-// MinSize: el rótulo con su `px-1.5 py-0.5`.
+// MinSize: el rótulo con su `px-1.5 py-0.5` y el suelo compartido para el dedo.
 func (b *botonIman) MinSize() fyne.Size {
-	return fyne.NewSize(ui.Medir(b.rotulo(), tema.Texto2XS, ui.Medio).Width+2*espacio1p5,
-		tema.Texto2XS.Linea+2*espacio0p5)
+	return fyne.NewSize(ui.SueloTactil(ui.Medir(b.rotulo(), tema.Texto2XS, ui.Medio).Width+2*espacio1p5),
+		ui.SueloTactil(tema.Texto2XS.Linea+2*espacio0p5))
 }
 
 func (b *botonIman) CreateRenderer() fyne.WidgetRenderer {
@@ -442,7 +512,8 @@ func (r *botonImanRenderer) Destroy()                     {}
 
 func (r *botonImanRenderer) Layout(t fyne.Size) {
 	r.fondo.Resize(t)
-	ui.ColocarTexto(r.texto, tema.Texto2XS, espacio1p5, espacio0p5)
+	ancho := ui.Medir(r.texto.Text, tema.Texto2XS, ui.Medio).Width
+	ui.ColocarTexto(r.texto, tema.Texto2XS, (t.Width-ancho)/2, (t.Height-tema.Texto2XS.Linea)/2)
 	r.aro.Colocar(t)
 }
 
@@ -500,7 +571,8 @@ type cuerpoHorario struct {
 	p *Pantalla
 	d disposicionHoraria
 
-	arr *arrastre
+	arr       *arrastre
+	cancelado bool
 	// ahora es el minuto de la línea roja; lo mueve el reloj de la App.
 	ahora int
 	// renderer es donde viven los bloques ya colocados, para saber cuál se pulsó.
@@ -586,6 +658,9 @@ func (c *cuerpoHorario) bloqueEn(p fyne.Position) (*bloqueHorario, bool) {
 // de ahora menos lo arrastrado—: un bloque editable se mueve, su asa lo estira, y todo
 // lo demás (también un bloque de solo lectura, como en la web) crea.
 func (c *cuerpoArrastrable) Dragged(e *fyne.DragEvent) {
+	if c.cancelado {
+		return
+	}
 	p := c.p
 	if c.arr == nil {
 		ini := e.Position.Subtract(e.Dragged)
@@ -623,6 +698,10 @@ func (c *cuerpoArrastrable) Dragged(e *fyne.DragEvent) {
 
 // DragEnd es `onRegionUp`: crea con el rango pintado, o guarda lo movido.
 func (c *cuerpoArrastrable) DragEnd() {
+	if c.cancelado {
+		c.cancelado = false
+		return
+	}
 	a := c.arr
 	c.arr = nil
 	if a == nil {
@@ -656,6 +735,15 @@ func (c *cuerpoArrastrable) DragEnd() {
 	if p.AlMoverEvento != nil {
 		p.AlMoverEvento(a.o, alMinuto(dia, a.desde, loc), alMinuto(dia, a.hasta, loc))
 	}
+}
+
+// CancelarArrastre retira el rango o evento provisional sin crear ni guardar nada.
+func (c *cuerpoArrastrable) CancelarArrastre() {
+	if c.arr == nil {
+		return
+	}
+	c.arr, c.cancelado = nil, true
+	c.Refresh()
 }
 
 func (c *cuerpoHorario) CreateRenderer() fyne.WidgetRenderer {

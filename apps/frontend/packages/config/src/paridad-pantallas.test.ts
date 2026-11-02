@@ -100,6 +100,10 @@ const SOLO_WEB: Record<string, string> = {
     'DECISIÓN del dueño (2026-09-22): «Mi cuenta» se accede SOLO por web. El menú de cuenta de la barra transversal de cada app nativa abre el navegador en Sytue ID, en vez de llevar dentro una copia de la pantalla. Se llegó a portar a Fyne y se retiró.',
   'apps/frontend/apps/account/src/pages/dev/almacenamiento.astro':
     'Banco de pruebas de DESARROLLO de PlanCard con layout, sesión y CSP reales: en producción es un 404. La fixture no es una pantalla del producto.',
+  'apps/frontend/apps/notes/src/pages/dev/app.astro':
+    'Banco de pruebas de DESARROLLO de NotesApp con BFF sintético para captura, orden y recuperación de Notepads: en producción es un 404 y nada lo enlaza. Las funciones se portan en Fyne; la fixture no es una pantalla del producto.',
+  'apps/frontend/apps/photos/src/pages/dev/app.astro':
+    'Banco de pruebas de DESARROLLO de la galería y los álbumes reales de Photos con BFF e imágenes sintéticos: en producción es un 404 y nada lo enlaza. Las funciones se portan en Fyne; la fixture no es una pantalla del producto.',
   'apps/frontend/packages/ui/src/components/AppGrid.tsx':
     'EXCEPCIÓN de §13.6: su único consumidor es el selector de aplicaciones de la TopBar (`shell/AppSwitcher.tsx`), que en nativo no existe: se cambia de app en el sistema.',
   'apps/frontend/packages/ui/src/components/SkipLink.tsx':
@@ -391,6 +395,8 @@ test('la auditoría móvil excluye bancos de desarrollo sin ocultar pantallas re
     'calendar/src/pages/dev/servicios-vinculados.astro',
     'drive/src/pages/dev/almacenamiento.astro',
     'account/src/pages/dev/almacenamiento.astro',
+    'notes/src/pages/dev/app.astro',
+    'photos/src/pages/dev/app.astro',
     'rooms/src/pages/dev/conexiones.astro',
     'rooms/src/pages/dev/avisos-directos.astro',
     'rooms/src/pages/dev/idioma-sistema.astro',
@@ -419,6 +425,14 @@ test('la auditoría móvil excluye bancos de desarrollo sin ocultar pantallas re
     false,
   );
   expect(esSoloWeb('apps/frontend/apps/account/src/pages/dev/pantalla-nueva.astro')).toBe(false);
+  expect(esSoloWeb('apps/frontend/apps/notes/src/pages/dev/app.astro')).toBe(true);
+  for (const nombre of ['app-nueva.astro', 'app/otra.astro', 'pantalla-nueva.astro']) {
+    expect(esSoloWeb(`apps/frontend/apps/notes/src/pages/dev/${nombre}`)).toBe(false);
+  }
+  expect(esSoloWeb('apps/frontend/apps/photos/src/pages/dev/app.astro')).toBe(true);
+  for (const nombre of ['app-nueva.astro', 'app/otra.astro', 'pantalla-nueva.astro']) {
+    expect(esSoloWeb(`apps/frontend/apps/photos/src/pages/dev/${nombre}`)).toBe(false);
+  }
   const fuente = await Bun.file(new URL('test/e2e/mobile-audit.mjs', RAIZ)).text();
   // Leer el matcher que usa el barrido, sin ejecutar navegador, sesión ni su inventario.
   const literal = /const NO_VISITABLES = \[\s*\[\s*\/([^\n]+)\/,/.exec(fuente)?.[1];
@@ -438,6 +452,8 @@ test('la auditoría móvil excluye bancos de desarrollo sin ocultar pantallas re
       'calendar/dev/servicios-vinculados',
       'drive/dev/almacenamiento',
       'account/dev/almacenamiento',
+      'notes/dev/app',
+      'photos/dev/app',
       'rooms/dev/conexiones',
       'rooms/dev/avisos-directos',
       'rooms/dev/idioma-sistema',
@@ -460,6 +476,14 @@ test('la auditoría móvil excluye bancos de desarrollo sin ocultar pantallas re
       'account/dev/almacenamiento/otra',
       'account/dev/pantalla-nueva',
       'account/index',
+      'notes/dev/app-nueva',
+      'notes/dev/app/otra',
+      'notes/dev/pantalla-nueva',
+      'notes/index',
+      'photos/dev/app-nueva',
+      'photos/dev/app/otra',
+      'photos/dev/pantalla-nueva',
+      'photos/index',
       'rooms/dev/conexiones-nueva',
       'rooms/dev/conexiones/otra',
       'rooms/dev/avisos-directos-nuevo',
@@ -477,6 +501,7 @@ test('la auditoría móvil excluye bancos de desarrollo sin ocultar pantallas re
   expect(comprobar(new RegExp(matcher.source.replace('avisos-directos', 'quitada')))).toBe(false);
   expect(comprobar(new RegExp(matcher.source.replace('idioma-sistema', 'quitada')))).toBe(false);
   expect(comprobar(new RegExp(matcher.source.replace('account', 'quitada')))).toBe(false);
+  expect(comprobar(new RegExp(matcher.source.replace('notes', 'quitada')))).toBe(false);
   expect(comprobar(new RegExp(matcher.source.replace('superposiciones', '.*')))).toBe(false);
 });
 

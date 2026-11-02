@@ -11,8 +11,10 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/test"
 
+	"git.sytue.eu/sytue/one/apps/fyne/catalogos"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
+	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 )
 
 const papeleraDeDos = `{"documents":[` +
@@ -96,6 +98,11 @@ func TestLaPapeleraPintaCadaEstado(t *testing.T) {
 func TestLaPapeleraVaEnLaCabecera(t *testing.T) {
 	s := &servicio{lista: dosDocs}
 	p := portadaDePrueba(t, s)
+	tr, err := i18n.New("es", i18n.Common(), catalogos.Docs())
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.T = tr.T
 	p.Cargar()
 	for _, ancho := range []float32{360, 1280} {
 		ventana := test.NewWindow(p.Objeto())
@@ -109,10 +116,61 @@ func TestLaPapeleraVaEnLaCabecera(t *testing.T) {
 			t.Errorf("a %g la papelera acaba en %g (quiero %g) y empieza en y=%g", ancho, fin, der, pap.Position().Y)
 		}
 		titulo := w.r.titulo
-		if fin := titulo.Position().X + ui.Medir(titulo.Text, tema.Texto2XL, ui.Negrita).Width; fin > pap.Position().X {
-			t.Errorf("a %g el título acaba en %g y pisa la papelera (%g)", ancho, fin, pap.Position().X)
+		for _, linea := range ui.LineasDe(titulo, titulo.Size().Width) {
+			if fin := titulo.Position().X + ui.Medir(linea, titulo.Escalon, titulo.Peso).Width; fin > pap.Position().X {
+				t.Errorf("a %g el título acaba en %g y pisa la papelera (%g)", ancho, fin, pap.Position().X)
+			}
 		}
 		ventana.Close()
+	}
+}
+
+func TestElTituloDeCalcusCabeCompletoJuntoALaPapelera(t *testing.T) {
+	marco := tema.EsMarco()
+	tema.ElegirForma("marco")
+	t.Cleanup(func() {
+		if marco {
+			tema.ElegirForma("marco")
+		} else {
+			tema.ElegirForma("carril")
+		}
+	})
+	defer ui.TactilDePrueba(true)()
+	for _, loc := range []i18n.Locale{"es", "fi"} {
+		t.Run(string(loc), func(t *testing.T) {
+			tr, err := i18n.New(loc, i18n.Common(), catalogos.Docs())
+			if err != nil {
+				t.Fatal(err)
+			}
+			p := NuevaPortada(Hoja, tr.T, loc, nil)
+			p.Estado = Vacio
+			p.Repintar()
+			w := test.NewTempWindow(t, p.Objeto())
+			w.SetPadded(false)
+			for _, ancho := range []float32{393, 320, 1024, 393} {
+				w.Resize(fyne.NewSize(ancho, 740))
+				r, papelera := p.vista.r, p.vista.papelera
+				lineas := ui.LineasDe(r.titulo, r.titulo.Size().Width)
+				separador := " "
+				if loc == "fi" { // Laskentataulukkosi es una sola palabra.
+					separador = ""
+				}
+				if strings.Join(lineas, separador) != tr.T("list.heading.spreadsheet", nil) {
+					t.Fatalf("a %g se pierde el título: %q", ancho, lineas)
+				}
+				for _, linea := range lineas {
+					if fin := r.titulo.Position().X + ui.Medir(linea, r.titulo.Escalon, r.titulo.Peso).Width; fin > papelera.Position().X {
+						t.Fatalf("a %g el título pisa la papelera", ancho)
+					}
+				}
+				if len(r.lema) > 0 && r.lema[0].Position().Y < r.titulo.Position().Y+r.titulo.Size().Height {
+					t.Fatalf("a %g el lema se solapa con el título", ancho)
+				}
+				if papelera.Size().Height < ui.SueloTactilBarra || papelera.Size().Width < ui.SueloTactilBarra {
+					t.Fatalf("a %g se ha reducido el blanco táctil: %v", ancho, papelera.Size())
+				}
+			}
+		})
 	}
 }
 

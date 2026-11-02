@@ -99,7 +99,10 @@ func TestRoomsWidgetReusesCompleteInventoryAndReadReceipts(t *testing.T) {
 			}
 			data, err := os.ReadFile(filepath.Join(directory, "widgets", "eu.sytue.rooms.json"))
 			if err != nil || strings.Contains(string(data), "private channel name") || strings.Contains(string(data), "Ana") || strings.Contains(string(data), "hola") {
-				t.Fatalf("widget must contain counters only: %q %v", data, err)
+				t.Fatalf("widget must not leak external channels, DMs or message bodies: %q %v", data, err)
+			}
+			if len(snapshot.Items) != 1 || snapshot.Items[0].Title != "#equipo" || snapshot.Items[0].Subtitle != "Guardias" {
+				t.Fatalf("public team channel missing from widget items: %+v", snapshot.Items)
 			}
 			service.pend[1].Unread = 9
 			sa.refrescarPendientes()

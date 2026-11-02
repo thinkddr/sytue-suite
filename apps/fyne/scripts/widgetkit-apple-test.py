@@ -311,10 +311,10 @@ class InsercionTests(unittest.TestCase):
             os.umask(umask_previa)
 
         self.assertEqual(modos_al_firmar["Sytue-rooms-Widgets.appex"]["Contents/Resources/Icon.png"], 0o644)
-        self.assertEqual(modos_al_firmar["Sytue-rooms-Widgets.appex"]["Contents/Resources"], 0o755)
+        self.assertEqual(modos_al_firmar["Sytue-rooms-Widgets.appex"]["Contents/Resources"], 0o711)
         self.assertEqual(modos_al_firmar["Sytue-rooms-Widgets.appex"]["main"], 0o755)
         self.assertEqual(modos_al_firmar["SytueWidgetBridge.framework"]["Resources/Info.plist"], 0o644)
-        self.assertEqual(modos_al_firmar["SytueWidgetBridge.framework"]["Resources"], 0o755)
+        self.assertEqual(modos_al_firmar["SytueWidgetBridge.framework"]["Resources"], 0o711)
         self.assertEqual((self.host / "PlugIns").stat().st_mode & 0o777, 0o711)
         self.assertEqual((self.host / "Frameworks").stat().st_mode & 0o777, 0o711)
         self.assertEqual((self.raiz / "ipa/SwiftSupport").stat().st_mode & 0o777, 0o711)

@@ -6,6 +6,7 @@ package bases
 // paridad-web: apps/frontend/apps/bases/src/pages/index.astro
 
 import (
+	"context"
 	"strings"
 
 	"fyne.io/fyne/v2"
@@ -18,6 +19,7 @@ import (
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
+	"git.sytue.eu/sytue/one/apps/nucleo/widgets"
 )
 
 // Medidas de «Mis bases» (BasesApp.tsx).
@@ -35,10 +37,14 @@ func (p *Pantalla) cargarLista() {
 	if p.svc == nil {
 		return
 	}
+	view := p.Widget.View()
 	p.fondo(func() {
 		ctx, cancelar := p.ctx()
 		defer cancelar()
 		lista, err := p.svc.ListBases(ctx)
+		if err == nil {
+			publicarBasesWidget(ctx, view, lista)
+		}
 		enHilo(func() {
 			p.Cargando = false
 			if err != nil {
@@ -48,6 +54,33 @@ func (p *Pantalla) cargarLista() {
 			}
 			p.Repintar()
 		})
+	})
+}
+
+func publicarBasesWidget(ctx context.Context, view widgets.View, lista []api.BasesBase) {
+	items := make([]widgets.Item, 0, min(len(lista), widgets.MaxItems))
+	for _, b := range lista {
+		nombre := strings.TrimSpace(b.Name)
+		if nombre == "" {
+			continue
+		}
+		var startAt int64
+		if !b.UpdatedAt.IsZero() && b.UpdatedAt.Unix() > 0 {
+			startAt = b.UpdatedAt.Unix()
+		}
+		items = append(items, widgets.Item{
+			Title:    nombre,
+			Subtitle: b.Description,
+			Badge:    strings.ToUpper(b.Role),
+			StartAt:  startAt,
+		})
+		if len(items) >= widgets.MaxItems {
+			break
+		}
+	}
+	_ = view.PublicarDetalle(ctx, widgets.Detail{
+		Counters: []widgets.Counter{{Kind: "documents", Value: int64(len(lista))}},
+		Items:    widgets.SanitizeItems(items),
 	})
 }
 

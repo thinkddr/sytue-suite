@@ -79,6 +79,7 @@ func main() {
 
 	pdf := api.NewPDF(s.URL("docs"), s.URL("drive"), s.Sesion, nil)
 	p := certipdf.NuevaPantalla(tr.T)
+	p.Widget = s.CapturarWidget
 	// El Asistente va en directo al servicio de IA, por el ingress que el chart abre a
 	// las apps nativas; la web pasa por su BFF, que solo reenvía.
 	p.IA = api.NewIA(s.URL("ai"), s.Sesion, nil)

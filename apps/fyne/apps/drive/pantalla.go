@@ -13,7 +13,10 @@ import (
 	_ "image/jpeg"
 	_ "image/png"
 	"net/http"
+	"slices"
+	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -144,6 +147,11 @@ type Pantalla struct {
 	// AutorizarNube conecta una nube personal con el mismo consentimiento nativo y
 	// devuelve su instancia. Lo pone el `main`; nil, «Conectar» no hace nada.
 	AutorizarNube func(ctx context.Context, proveedor string) (string, error)
+
+	widgetMu         sync.Mutex
+	widgetCuota      *widgets.Counter
+	widgetCuotaLeida bool
+	widgetItems      []widgets.Item
 }
 
 // ConIntegraciones monta «Traer mis datos» con la pasarela: el bloque del pie del lateral
@@ -415,6 +423,9 @@ func (p *Pantalla) Arrancar(dentro bool) {
 	}
 	p.dentro = dentro
 	if !dentro {
+		p.widgetMu.Lock()
+		p.widgetCuota, p.widgetCuotaLeida, p.widgetItems = nil, false, nil
+		p.widgetMu.Unlock()
 		p.explor.Fase, p.papelera.Fase = SinSesion, SinSesion
 		p.sec.recientes.Fase, p.sec.destacados.Fase = SinSesion, SinSesion
 		p.sec.compartido.Fase, p.sec.documentos.Fase = SinSesion, SinSesion
@@ -468,6 +479,9 @@ func (p *Pantalla) Sesion(dentro bool) {
 // Vuelve SIEMPRE arriba, como la web, que al recargar vacía la lista y la vuelve a
 // montar: tras subir o renombrar, lo nuevo se ve desde el principio.
 func (p *Pantalla) cargarCarpeta(id string) {
+	esRaiz := id == ""
+	view := p.Widget.View()
+	conRed := p.hayRed()
 	epoca := p.epoca.Add(1)
 	enHilo(func() {
 		p.explor.Fase = Cargando
@@ -495,6 +509,9 @@ func (p *Pantalla) cargarCarpeta(id string) {
 	}
 	hijos, err := p.svc.Children(ctx, id, "")
 	elementos := DeHijos(hijos)
+	if err == nil && esRaiz && conRed && p.hayRed() {
+		p.publicarArchivosWidget(ctx, view, elementos)
+	}
 	enHilo(func() {
 		if p.epoca.Load() != epoca {
 			return
@@ -579,13 +596,19 @@ func (p *Pantalla) cargarCuota() {
 		return
 	}
 	if p.hayRed() {
+		p.widgetMu.Lock()
+		p.widgetCuotaLeida = true
 		if counter, valid := widgets.StoragePercent(q.UsedBytes, q.LimitBytes); valid && !q.ExternalStorage {
-			_ = view.Publicar(ctx, counter)
+			c := counter
+			p.widgetCuota = &c
 		} else {
 			// La cuota de Sytue no mide el almacén externo. Sin capacidad conocida
 			// tampoco existe un porcentaje: retira la observación anterior.
-			_ = view.Publicar(ctx)
+			p.widgetCuota = nil
 		}
+		detalle := p.detalleWidgetBloqueado()
+		p.widgetMu.Unlock()
+		_ = view.PublicarDetalle(ctx, detalle)
 	}
 	enHilo(func() {
 		p.lateral.Cuota = &Cuota{
@@ -595,6 +618,74 @@ func (p *Pantalla) cargarCuota() {
 		}
 		p.Repintar()
 	})
+}
+
+func (p *Pantalla) publicarArchivosWidget(ctx context.Context, view widgets.View, elementos []Elemento) {
+	items := itemsDriveParaWidget(elementos)
+	p.widgetMu.Lock()
+	p.widgetItems = items
+	tieneDatos := p.widgetCuotaLeida || len(p.widgetItems) > 0
+	detalle := p.detalleWidgetBloqueado()
+	p.widgetMu.Unlock()
+	if tieneDatos {
+		_ = view.PublicarDetalle(ctx, detalle)
+	}
+}
+
+func (p *Pantalla) detalleWidgetBloqueado() widgets.Detail {
+	var d widgets.Detail
+	if p.widgetCuota != nil {
+		d.Counters = []widgets.Counter{*p.widgetCuota}
+	}
+	if len(p.widgetItems) > 0 {
+		d.Items = slices.Clone(p.widgetItems)
+	}
+	return d
+}
+
+func itemsDriveParaWidget(elementos []Elemento) []widgets.Item {
+	items := make([]widgets.Item, 0, min(len(elementos), widgets.MaxItems))
+	for _, el := range elementos {
+		nombre := strings.TrimSpace(el.Nombre)
+		if nombre == "" {
+			continue
+		}
+		badge := tamanoWidget(el.Tamano)
+		subtitulo := el.Tipo
+		if el.Carpeta {
+			badge = "DIR"
+			subtitulo = ""
+		}
+		var startAt int64
+		if !el.Modificado.IsZero() && el.Modificado.Unix() > 0 {
+			startAt = el.Modificado.Unix()
+		}
+		items = append(items, widgets.Item{
+			Title:    nombre,
+			Subtitle: subtitulo,
+			Badge:    badge,
+			StartAt:  startAt,
+		})
+		if len(items) >= widgets.MaxItems {
+			break
+		}
+	}
+	return widgets.SanitizeItems(items)
+}
+
+func tamanoWidget(b int64) string {
+	switch {
+	case b < 0:
+		return ""
+	case b < 1024:
+		return strconv.FormatInt(b, 10) + " B"
+	case b < 1024*1024:
+		return strconv.FormatInt(b/1024, 10) + " KB"
+	case b < 1024*1024*1024:
+		return strconv.FormatInt(b/(1024*1024), 10) + " MB"
+	default:
+		return strconv.FormatInt(b/(1024*1024*1024), 10) + " GB"
+	}
 }
 
 // cargarPapelera pide la papelera.

@@ -23,6 +23,8 @@ import (
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
+	"git.sytue.eu/sytue/one/apps/nucleo/offline"
+	"git.sytue.eu/sytue/one/apps/nucleo/widgets"
 )
 
 // # Lo que escribe: la ficha, el lote y lo que cuelga del registro
@@ -925,14 +927,56 @@ func (p *Pantalla) contarTareas() {
 	if p.svc == nil {
 		return
 	}
+	view := p.Widget.View()
+	conRed := p.red == nil || p.red.State() != offline.Offline
 	p.fondo(func() {
 		ctx, cancelar := p.ctx()
 		defer cancelar()
-		as, err := p.svc.Actividades(ctx, api.ERPFiltroActividades{Estado: "pendiente", Mias: true, Hasta: HoyISO(time.Now())})
+		hoy := HoyISO(time.Now())
+		as, err := p.svc.Actividades(ctx, api.ERPFiltroActividades{Estado: "pendiente", Mias: true, Hasta: hoy})
 		if err != nil {
 			return
 		}
+		if conRed && (p.red == nil || p.red.State() != offline.Offline) {
+			publicarTareasERPWidget(ctx, view, as, hoy)
+		}
 		enHilo(func() { p.TareasHoy = len(as); p.Repintar() })
+	})
+}
+
+func publicarTareasERPWidget(ctx context.Context, view widgets.View, as []api.ERPActividad, hoy string) {
+	items := make([]widgets.Item, 0, min(len(as), widgets.MaxItems))
+	for _, a := range as {
+		titulo := strings.TrimSpace(a.Resumen)
+		if titulo == "" {
+			titulo = strings.TrimSpace(a.RegistroEtiqueta)
+		}
+		if titulo == "" {
+			continue
+		}
+		sub := strings.TrimSpace(a.RegistroEtiqueta)
+		if sub == "" {
+			sub = strings.TrimSpace(a.Modelo)
+		}
+		vencida := a.Vence != "" && a.Vence < hoy
+		color := ""
+		if vencida {
+			color = "#dc2626"
+		}
+		items = append(items, widgets.Item{
+			Title:    titulo,
+			Subtitle: sub,
+			Badge:    a.Vence,
+			Color:    color,
+			Unread:   vencida || a.Vence == hoy,
+		})
+		if len(items) >= widgets.MaxItems {
+			break
+		}
+	}
+	_ = view.PublicarDetalle(ctx, widgets.Detail{
+		Counters: []widgets.Counter{{Kind: "pending", Value: int64(len(as))}},
+		Items:    widgets.SanitizeItems(items),
 	})
 }
 

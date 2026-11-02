@@ -87,3 +87,21 @@ func TestWidgetNotasRechazaConteosInvalidos(t *testing.T) {
 		t.Fatalf("incluyó un cuaderno archivado: %d, %v", total, valido)
 	}
 }
+
+func TestWidgetNotasPublicaTareasSinFiltrarCifradas(t *testing.T) {
+	ahora := time.Date(2026, 11, 1, 12, 0, 0, 0, time.UTC)
+	items := itemsNotasParaWidget(
+		Cuaderno{ID: "nb1", Titulo: "Producto", Color: "#a91fb4"},
+		[]api.Note{
+			{ID: "n1", Kind: "task", Content: "<p>Revisar lanzamiento</p>", UpdatedAt: ahora},
+			{ID: "n2", Kind: "text", Title: "Notas de arquitectura", Content: "<p>Secreto del cuerpo</p>", Pinned: true, UpdatedAt: ahora.Add(-time.Hour)},
+			{ID: "n3", Kind: "text", Title: "Cifrada", ContentCipher: "enc:v1:abc", UpdatedAt: ahora},
+		},
+	)
+	if len(items) != 2 || items[0].Title != "Notas de arquitectura" || items[1].Title != "Revisar lanzamiento" || !items[1].Unread {
+		t.Fatalf("items de notas inesperados: %+v", items)
+	}
+	if vacio := itemsNotasParaWidget(Cuaderno{ID: "enc", Cifrado: true}, []api.Note{{ID: "n1", Title: "Oculta"}}); len(vacio) != 0 {
+		t.Fatalf("un cuaderno cifrado publicó notas en el widget: %+v", vacio)
+	}
+}

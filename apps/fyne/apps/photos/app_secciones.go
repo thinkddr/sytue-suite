@@ -78,7 +78,15 @@ func (a *App) datosAlbumes() Albumes {
 }
 
 func (a *App) pedirAlbumes() {
-	pedir(a, func(x context.Context, c *api.Photos) ([]api.Album, error) { return c.Albums(x) }, func(l []api.Album, err error) {
+	gen := a.gen
+	view := a.Widget.View()
+	pedir(a, func(x context.Context, c *api.Photos) ([]api.Album, error) {
+		l, err := c.Albums(x)
+		if err == nil {
+			a.publicarAlbumesWidget(x, view, gen, l)
+		}
+		return l, err
+	}, func(l []api.Album, err error) {
 		a.alb.cargando, a.alb.fallo = false, err
 		if err != nil {
 			a.alb.error = a.textoDeFallo(err)

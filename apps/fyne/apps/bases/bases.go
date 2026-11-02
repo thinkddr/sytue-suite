@@ -25,6 +25,7 @@ import (
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
+	"git.sytue.eu/sytue/one/apps/nucleo/widgets"
 )
 
 // Traductor es el catálogo de Bases sobre el común de la suite.
@@ -34,6 +35,7 @@ func Traductor(l i18n.Locale) (*i18n.Translator, error) {
 
 // Pantalla es Sytue Bases entera: el carril, «Mis bases» y la base abierta.
 type Pantalla struct {
+	Widget  widgets.Source
 	tr      *i18n.Translator
 	svc     *api.Bases
 	ventana fyne.Window

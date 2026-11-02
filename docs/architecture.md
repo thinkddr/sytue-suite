@@ -5545,35 +5545,45 @@ El porqué está en el [ADR 0078](decisions.md#0078); aquí, las piezas y quién
 
 - **Quién escribe.** `apps/nucleo/widgets` es el único escritor. Cada app se apunta con
   `X.Widget = s.CapturarWidget` (`apps/fyne/sesion/widgets.go`), que captura la generación de
-  sesión adoptada **antes** de pedir los datos; al volver, `View.Publicar` escribe los
-  contadores bajo el cerrojo de la suite (`ajustes.Cerrojo`) y avisa al sistema
-  (`widgets.Notify`). Publican Hub y Mail (`unread`, el contador del servidor), Notes
-  (`notes`), Calendar (`calendars`), Contacts (`address_books`), Rooms (`channels` y
-  `unread` de un inventario completo) y Drive/Cast (`storage_percent` de una cuota ya
-  consultada). Una capacidad desconocida, sin límite o externa retira el porcentaje;
-  Cast conserva como desconocido el origen omitido por un backend anterior. Las otras
-  siete apps muestran sus acciones. No se añaden consultas para alimentar widgets.
+  sesión adoptada **antes** de pedir los datos; al volver, `View.Publicar` o
+  `View.PublicarDetalle` escribe los contadores, las filas visuales saneadas (`items`, máx. 8,
+  sin `enc:v1:` ni cuerpos) y, en Calendar, la cuadrícula mensual (`calendar`: `busy_days` y
+  `day_colors`) bajo el cerrojo de la suite (`ajustes.Cerrojo`) y avisa al sistema
+  (`widgets.Notify`). Publican las **quince apps**: Calendar (cuadrícula mensual, próximos
+  eventos no cifrados y `calendars`/`events`), Mail (`unread` y cabeceras de Entrada sin
+  cuerpo), Rooms (`channels`, `unread` y canales públicos internos), Notes (`notes` y
+  notas/tareas no cifradas), Drive (`storage_percent` y raíz reciente), Contacts
+  (`address_books` y contactos con monograma), Hub (`unread`, `events`, agenda de hoy y
+  actividad reciente), Cast (`storage_percent`, `episodes` y directos/vídeos), Docus/Calcus/Diapos
+  (`documents` y documentos recientes), CertiPDF (`pending` firmas, `files` y PDFs recientes),
+  Bases (`documents` y bases con rol), ERP (`pending` y actividades con vencimiento) y Photos
+  (`photos` y álbumes/fotos). No se añaden consultas de red para alimentar widgets.
   Las respuestas idénticas agrupan la escritura y la recarga sin alargar una caducidad
   más corta que solicite el consumidor.
 - **Quién borra.** `Suite.iniciarWidgets` escucha los cambios de sesión y de bloqueo:
   fuera de sesión o bloqueada, `widgets.ClearIf` borra los snapshots de esa generación (una
   llamada tardía no borra los de la cuenta nueva).
-- **Quién lee.** En Android, `eu.sytue.nativo.Widgets` (`AppWidgetProvider`, uno por APK) con
-  sus recursos, que `android-widgets.py` compila e inyecta en el AAB y `verificar_aab`
-  comprueba. En Apple, una extensión WidgetKit por app (`Sytue-<app>-Widgets.appex`,
+- **Quién lee.** En Android, `eu.sytue.nativo.Widgets` (`AppWidgetProvider`, uno por APK)
+  renderiza un lienzo `Canvas` adaptado al tamaño del widget y al modo oscuro (cuadrícula
+  mensual gráfica con el día actual resaltado, puntos de eventos y agenda en Calendar; barra
+  de almacenamiento en Drive/Cast; avatares, estados y tarjetas en el resto, con tope de
+  135 000 píxeles para respetar el límite de Binder), compilado e inyectado en el AAB por
+  `android-widgets.py`. En Apple, una extensión WidgetKit por app (`Sytue-<app>-Widgets.appex`,
   `eu.sytue.<app>.widgets`) generada por `apps/fyne/xcode/generar.py` desde el
   `widget_acciones` de su `FyneApp.toml`, más el framework `SytueWidgetBridge`, que da al
   ejecutable de Go `sytue_widgets_reload` (WidgetCenter). Las dos implementan las mismas
   comprobaciones que `Snapshot.Visible` en Go.
-- **Galería de Apple.** Cada extensión declara un `WidgetBundle`: conserva el identificador
-  del resumen y añade Buscar; Mail añade Redactar y Calendar Crear evento. El generador
-  deriva sus condiciones de compilación del catálogo, por lo que esas acciones solo
-  aparecen en las apps que las aceptan. Los tamaños pequeño y mediano funcionan en iOS,
-  iPadOS y macOS; en iOS/iPadOS compatibles se añaden accesorios para la pantalla bloqueada.
-  Las acciones tienen una cronología estática, no abren el contenedor compartido y llevan
-  a la app mediante su esquema local. El resumen solo contiene recuentos y porcentaje de
-  almacenamiento, con `privacySensitive` y protección completa de datos. Sin snapshot
-  válido muestra una descripción de la app, nunca un cero inventado.
+- **Galería de Apple (iOS, iPadOS y escritorio de macOS).** Cada extensión declara un
+  `WidgetBundle`: conserva el identificador del resumen y añade Buscar; Mail añade Redactar
+  y Calendar Crear evento. El resumen soporta `systemSmall`, `systemMedium`, `systemLarge`
+  y `systemExtraLarge` (iPadOS 15+ y macOS 14+, compatible con el modo vibrante/acentuado del
+  escritorio de macOS mediante `widgetAccentable` y `containerBackground`), además de los
+  accesorios de pantalla bloqueada en iOS 16+. Calendar dibuja siempre la cuadrícula gráfica
+  del mes actual con hoy seleccionado y superpone puntos de color y próximos eventos cuando
+  hay snapshot válido; el resto combina barra de cuota, tarjetas visuales y acciones rápidas
+  con `privacySensitive` y protección completa de datos. Sin snapshot válido muestra una
+  descripción neutra de la app (o la cuadrícula vacía del mes en Calendar), nunca ceros
+  inventados.
 - **Dónde, en Apple.** El App Group `group.eu.sytue.suite`, solo con
   `SYTUE_WIDGETS_APPLE = YES` en `Sytue.xcconfig`. Apagado, `ajustes` usa la carpeta de
   antes (`os.UserConfigDir` en iOS y Developer ID, `<equipo>.eu.sytue.suite` en la Mac App

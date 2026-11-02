@@ -107,6 +107,37 @@ struct SnapshotContractTests {
         try reject("counters", [["kind": "unread", "value": 1], ["kind": "unread", "value": 2]])
         try reject("counters", [["kind": "unread", "value": 1, "text": "private message"]])
         try reject("access_token", "never-display-or-open")
+        var rich = valid
+        rich["items"] = [[
+            "title": "Reunión de diseño",
+            "subtitle": "Sala Norte",
+            "badge": "10:00",
+            "color": "#953be7",
+            "start_at": now + 1800,
+            "end_at": now + 3600,
+            "unread": true,
+        ]]
+        rich["calendar"] = [
+            "year": 2026,
+            "month": 11,
+            "busy_days": [3, 14, 28],
+            "day_colors": ["3": "#953be7", "14": "#16734d"],
+        ]
+        try write(rich)
+        let loadedRich = load()
+        require(loadedRich?.visualItems.first?.title == "Reunión de diseño"
+                && loadedRich?.calendar?.busyDays == [3, 14, 28]
+                && loadedRich?.calendar?.dayColors["3"] == "#953be7",
+                "rich visual items and calendar month grid are decoded")
+        try reject("items", [["title": "enc:v1:secret-title"]])
+        try reject("items", [["title": "Valid", "subtitle": "ENC:V1:secret-sub"]])
+        try reject("items", [["title": "Valid", "url": "https://evil.example"]])
+        try reject("items", [["title": "Valid", "color": "#953BE7"]])
+        try reject("items", Array(repeating: ["title": "x"], count: 9))
+        try reject("calendar", ["year": 2026, "month": 2, "busy_days": [29]])
+        try reject("calendar", ["year": 2026, "month": 11, "busy_days": [14, 3]])
+        try reject("calendar", ["year": 2026, "month": 11, "day_colors": ["03": "#953be7"]])
+        try reject("calendar", ["year": 2026, "month": 11, "secret": "nope"])
         try reset()
         try Data("another-session".utf8).write(to: marker, options: .atomic)
         require(load() == nil, "reject snapshot from another session")

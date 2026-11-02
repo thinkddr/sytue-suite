@@ -55,6 +55,7 @@ func main() {
 	// dentro, la carga falla y se pinta el estado de error —con su «Reintentar»—, que
 	// es lo honesto; en cuanto se entra desde el menú de cuenta, se vuelve a pedir todo.
 	p := erp.NuevaPantalla(t, api.NewERP(s.URL("erp"), s.Sesion, nil, string(l)), nil)
+	p.Widget = s.CapturarWidget
 	// Subir documentos e importar CSV usan el selector de ficheros DEL SISTEMA, como el
 	// `<input type="file">` de la web.
 	switch runtime.GOOS {

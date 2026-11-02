@@ -5441,21 +5441,28 @@ rompe la firma de iOS, Mac App Store y Developer ID de las quince apps a la vez.
 
 - **El formato del snapshot** (`apps/nucleo/widgets`, versión 1): un JSON por app,
   `widgets/<bundle>.json` dentro de la carpeta de ajustes de la suite, con `version`,
-  `product`, `generation`, `updated_at`, `expires_at`, `active` y como mucho doce
-  `counters` `{kind, value}`. `kind` sale de una lista cerrada (`unread`, `notes`,
-  `calendars`, `address_books`…) y `value` es un entero acotado. El lector nativo
-  (`Snapshot.swift`, `WidgetSnapshot.java`) rechaza campos de más, ficheros de más de
-  16 KiB y cualquier valor fuera de esa forma.
-- **Límites de privacidad.** Solo **contadores**: ni asuntos, ni nombres, ni títulos de
-  evento, ni texto de mensajes, ni enlaces; el tipo no los admite. Un snapshot **caduca**
+  `product`, `generation`, `updated_at`, `expires_at`, `active`, hasta doce `counters`
+  `{kind, value}`, hasta ocho `items` visuales saneados (`title`, `subtitle`, `badge`,
+  `color`, `start_at`, `end_at`, `all_day`, `unread`, `done`) y `calendar` opcional
+  (`year`, `month`, `busy_days`, `day_colors`). `kind` sale de una lista cerrada (`unread`,
+  `notes`, `calendars`, `address_books`…) y `value` es un entero acotado. El lector nativo
+  (`Snapshot.swift`, `WidgetSnapshot.java`, `Widgets.java`) rechaza campos de más, nulos,
+  ficheros de más de 16 KiB y cualquier valor fuera de esa forma.
+- **Límites de privacidad (ampliados el 2026-11-01 para widgets visuales).** Las quince
+  apps publican cabeceras visuales acotadas (próximos eventos y días ocupados del mes en
+  Calendar, remitente/asunto en Mail, canales públicos no externos en Rooms, notas/tareas
+  no cifradas en Notes, archivos recientes en Drive/Docus/Calcus/Diapos/CertiPDF/Bases/Photos,
+  contactos, vídeos/directos en Cast, actividades pendientes en ERP y agenda en Hub), nunca
+  cuerpos de mensaje, marcadores de cifrado E2E (`enc:v1:`, rechazados tanto al publicar
+  como al leer), salas privadas/externas ni enlaces arbitrarios. Un snapshot **caduca**
   (15 min al publicarlo, 30 como máximo) y se ignora caducado, con fecha futura o de otra
   generación de sesión (`sesion.marca`, opaca, nunca el sujeto ni el correo). Se **borra al
   cerrar sesión o al activar el bloqueo** de la suite, y el lector comprueba la marca y el
-  bloqueo aunque el borrado falle. En iOS se escribe con `NSFileProtectionComplete` y la
-  extensión pide Data Protection Complete: con el teléfono bloqueado no se lee. La app
-  publica solo lo que ya ha pedido para su propia pantalla, nunca una petición extra, y
-  captura la sesión **antes** de pedirlo: una respuesta tardía de otra cuenta no se publica.
-  Las extensiones no tienen red ni Keychain.
+  bloqueo (`KeyguardManager.isDeviceLocked()` en Android y `NSFileProtectionComplete` +
+  `privacySensitive()` en Apple) aunque el borrado falle. La app publica solo lo que ya ha
+  pedido para su propia pantalla, nunca una petición extra, y captura la sesión **antes**
+  de pedirlo: una respuesta tardía de otra cuenta no se publica. Las extensiones no tienen
+  red ni Keychain.
 - **Dónde vive.** En Android, la carpeta privada del propio APK, que lee su
   `AppWidgetProvider` (`eu.sytue.nativo.Widgets`). En Apple, el App Group
   **`group.eu.sytue.suite`** (`ajustes/grupo_apple.go`), común a las quince apps y a sus

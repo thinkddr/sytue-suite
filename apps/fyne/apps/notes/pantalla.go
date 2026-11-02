@@ -27,6 +27,7 @@ import (
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
+	"git.sytue.eu/sytue/one/apps/nucleo/htmltext"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 	"git.sytue.eu/sytue/one/apps/nucleo/offline"
 	"git.sytue.eu/sytue/one/apps/nucleo/widgets"
@@ -184,6 +185,11 @@ type Pantalla struct {
 	// Asistir es Sytue AI (`api.IA.Asistir`): con él, el editor lleva el asistente al
 	// final de la barra (asistente.go). Nil: no sale.
 	Asistir func(context.Context, api.PeticionIA) (string, error)
+
+	widgetMu    sync.Mutex
+	widgetGen   string
+	widgetTotal *int64
+	widgetItems []widgets.Item
 }
 
 // ConServiciosVinculados añade el acceso a las páginas del proveedor sin copiarlas
@@ -606,7 +612,7 @@ func (p *Pantalla) cargarCuadernos() {
 		// NoteCount ya aplica los permisos del lector. El árbol no se pagina y
 		// cada nota pertenece a un cuaderno; no se cuentan las páginas de notas.
 		if total, valido := notasParaWidget(lista); valido {
-			_ = widget.Publicar(ctx, widgets.Counter{Kind: "notes", Value: total})
+			p.publicarTotalWidget(ctx, widget, generacion, total)
 		}
 	}
 	cuadernos := DeCuadernos(lista)
@@ -667,6 +673,106 @@ func notasParaWidget(lista []api.Notebook) (int64, bool) {
 	return total, true
 }
 
+func (p *Pantalla) publicarTotalWidget(ctx context.Context, view widgets.View, gen string, total int64) {
+	p.widgetMu.Lock()
+	if p.widgetGen != gen {
+		p.widgetGen = gen
+		p.widgetItems = nil
+	}
+	v := total
+	p.widgetTotal = &v
+	detalle := p.detalleWidgetBloqueado()
+	p.widgetMu.Unlock()
+	_ = view.PublicarDetalle(ctx, detalle)
+}
+
+func (p *Pantalla) publicarNotasWidget(ctx context.Context, view widgets.View, gen string, c Cuaderno, lista []api.Note) {
+	var items []widgets.Item
+	if !c.Cifrado {
+		items = itemsNotasParaWidget(c, lista)
+	}
+	p.widgetMu.Lock()
+	if p.widgetGen != gen {
+		p.widgetGen = gen
+		p.widgetTotal = nil
+	}
+	p.widgetItems = items
+	tieneDatos := p.widgetTotal != nil || len(p.widgetItems) > 0
+	detalle := p.detalleWidgetBloqueado()
+	p.widgetMu.Unlock()
+	if tieneDatos {
+		_ = view.PublicarDetalle(ctx, detalle)
+	}
+}
+
+func (p *Pantalla) detalleWidgetBloqueado() widgets.Detail {
+	var d widgets.Detail
+	if p.widgetTotal != nil {
+		d.Counters = []widgets.Counter{{Kind: "notes", Value: *p.widgetTotal}}
+	}
+	if len(p.widgetItems) > 0 {
+		d.Items = slices.Clone(p.widgetItems)
+	}
+	return d
+}
+
+func itemsNotasParaWidget(c Cuaderno, lista []api.Note) []widgets.Item {
+	if c.Cifrado {
+		return nil
+	}
+	candidatas := make([]api.Note, 0, len(lista))
+	for _, n := range lista {
+		if n.ContentCipher != "" || n.CancelledAt != nil {
+			continue
+		}
+		candidatas = append(candidatas, n)
+	}
+	slices.SortStableFunc(candidatas, func(a, b api.Note) int {
+		if a.Pinned != b.Pinned {
+			if a.Pinned {
+				return -1
+			}
+			return 1
+		}
+		return b.UpdatedAt.Compare(a.UpdatedAt)
+	})
+	items := make([]widgets.Item, 0, min(len(candidatas), widgets.MaxItems))
+	for _, n := range candidatas {
+		titulo := strings.TrimSpace(n.Title)
+		if titulo == "" && n.Kind == "task" {
+			titulo = strings.TrimSpace(htmltext.Plain(n.Content))
+		}
+		if titulo == "" {
+			continue
+		}
+		badge := ""
+		switch {
+		case n.Kind == "task" && n.Checked:
+			badge = "✓"
+		case n.Kind == "task":
+			badge = "○"
+		case n.Pinned:
+			badge = "★"
+		}
+		var startAt int64
+		if !n.UpdatedAt.IsZero() && n.UpdatedAt.Unix() > 0 {
+			startAt = n.UpdatedAt.Unix()
+		}
+		items = append(items, widgets.Item{
+			Title:    titulo,
+			Subtitle: c.Titulo,
+			Badge:    badge,
+			StartAt:  startAt,
+			Color:    c.Color,
+			Unread:   n.Kind == "task" && !n.Checked,
+		})
+		if len(items) >= widgets.MaxItems {
+			break
+		}
+	}
+	return widgets.SanitizeItems(items)
+}
+
 func (p *Pantalla) cargarEtiquetas() {
 	if p.svc == nil || !p.hayRed() {
 		return
@@ -708,6 +814,8 @@ func (p *Pantalla) abrirCuaderno(c Cuaderno) {
 }
 
 func (p *Pantalla) cargarNotas(c Cuaderno) {
+	widget := p.Widget.View()
+	conRed := p.hayRed()
 	var generacion string
 	var epoch uint64
 	fyne.DoAndWait(func() { generacion, epoch = p.generacionCrypto(), p.cryptoEpoch })
@@ -724,6 +832,9 @@ func (p *Pantalla) cargarNotas(c Cuaderno) {
 	ctx, cancelar := p.ctx()
 	defer cancelar()
 	lista, err := p.svc.ListNotes(ctx, c.ID)
+	if err == nil && conRed && p.hayRed() {
+		p.publicarNotasWidget(ctx, widget, generacion, c, lista)
+	}
 	enHilo(func() {
 		if p.activo.ID != c.ID || p.generacionCrypto() != generacion || p.cryptoEpoch != epoch {
 			return // se ha cambiado de cuaderno mientras llegaba: esto ya no vale

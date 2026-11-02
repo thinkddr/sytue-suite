@@ -27,6 +27,7 @@ import (
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 	"git.sytue.eu/sytue/one/apps/nucleo/offline"
+	"git.sytue.eu/sytue/one/apps/nucleo/widgets"
 )
 
 // La portada de documentos: `DocList.tsx` bajo un producto (`?kind=`), que es lo que
@@ -82,9 +83,10 @@ var (
 // Portada es la pantalla y su estado. Se construye con NuevaPortada y se arranca con
 // Cargar.
 type Portada struct {
-	Tipo Tipo
-	T    func(string, i18n.Vars) string
-	Loc  i18n.Locale
+	Tipo   Tipo
+	Widget widgets.Source
+	T      func(string, i18n.Vars) string
+	Loc    i18n.Locale
 	// Svc es el cliente del servicio. nil: la portada se pinta y no pide nada.
 	Svc *api.Docs
 	// Red es el monitor de conectividad. nil: se asume que hay red.
@@ -269,10 +271,15 @@ func (p *Portada) Cargar() {
 		p.CargarPlantillas()
 	}
 	f := p.filtro("")
+	view := p.Widget.View()
+	conRed := p.hayRed()
 	p.lanzar(func() {
 		ctx, cancelar := p.ctx()
 		defer cancelar()
 		docs, cursor, err := p.Svc.List(ctx, f)
+		if err == nil && conRed && p.hayRed() && f.Query == "" && !f.Starred {
+			publicarPortadaWidget(ctx, view, docs, cursor)
+		}
 		fyne.Do(func() {
 			if !p.vigente(seq) {
 				return // llegó tarde: ya se pidió otro listado
@@ -288,6 +295,41 @@ func (p *Portada) vigente(seq int) bool {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return seq == p.seq
+}
+
+func publicarPortadaWidget(ctx context.Context, view widgets.View, docs []api.Document, cursor string) {
+	var detalle widgets.Detail
+	if cursor == "" {
+		detalle.Counters = []widgets.Counter{{Kind: "documents", Value: int64(len(docs))}}
+	}
+	items := make([]widgets.Item, 0, min(len(docs), widgets.MaxItems))
+	for _, d := range docs {
+		titulo := strings.TrimSpace(d.Title)
+		if titulo == "" {
+			continue
+		}
+		badge := ""
+		if d.Starred {
+			badge = "★"
+		}
+		var startAt int64
+		if !d.UpdatedAt.IsZero() && d.UpdatedAt.Unix() > 0 {
+			startAt = d.UpdatedAt.Unix()
+		}
+		items = append(items, widgets.Item{
+			Title:   titulo,
+			Badge:   badge,
+			StartAt: startAt,
+			Unread:  d.Starred,
+		})
+		if len(items) >= widgets.MaxItems {
+			break
+		}
+	}
+	detalle.Items = widgets.SanitizeItems(items)
+	if len(detalle.Counters) > 0 || len(detalle.Items) > 0 {
+		_ = view.PublicarDetalle(ctx, detalle)
+	}
 }
 
 // Mas pide la página siguiente, si la hay. Tiene candado propio: el desplazamiento

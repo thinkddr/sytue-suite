@@ -60,6 +60,7 @@ func main() {
 		Variante: tema.De(a.Settings().ThemeVariant()),
 	}
 	p := photos.Nueva(cli, v, w)
+	p.Widget = s.CapturarWidget
 	p.Drive = api.NewDrive(s.URL("drive"), s.Sesion, nil)
 	p.IA = api.NewIA(s.URL("ai"), s.Sesion, nil)
 	// Compartir un álbum con alguien y decir quién me compartió uno: Sytue ID.

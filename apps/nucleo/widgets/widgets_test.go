@@ -309,3 +309,80 @@ func TestWindowsYLinuxNoTienenLector(t *testing.T) {
 		t.Fatal("una plataforma sin widgets nativos dice tener lector")
 	}
 }
+
+func TestDetailSnapshotItemsCalendarSanitizationAndReloads(t *testing.T) {
+	scope := fixture(t)
+	ctx := context.Background()
+	previousNotify := notifyPlatform
+	t.Cleanup(func() { notifyPlatform = previousNotify })
+	reloads := 0
+	notifyPlatform = func(string) { reloads++ }
+
+	items := SanitizeItems([]Item{
+		{Title: "  Revisión\ntrimestral  ", Subtitle: "Sala\tNorte", Badge: " 10:00 ", Color: "#93E", StartAt: 1700000000, EndAt: 1700003600},
+		{Title: "enc:v1:secreto-cifrado", Subtitle: "no debe salir"},
+		{Title: "Nota abierta", Subtitle: "ENC:V1:cuerpo-cifrado", Badge: "MD"},
+	})
+	if len(items) != 2 || items[0].Title != "Revisión trimestral" || items[0].Subtitle != "Sala Norte" || items[0].Color != "#9933ee" {
+		t.Fatalf("unexpected sanitized items: %+v", items)
+	}
+	if items[1].Subtitle != "" {
+		t.Fatalf("encrypted subtitle leaked: %+v", items[1])
+	}
+
+	cal := BuildCalendarGrid(2026, time.February, []int{18, 3, 18, 30, 0}, map[int]string{
+		3:  "#953BE7",
+		18: "invalid",
+		30: "#16734d",
+	})
+	if cal == nil || len(cal.BusyDays) != 2 || cal.BusyDays[0] != 3 || cal.BusyDays[1] != 18 || cal.DayColors["3"] != "#953be7" || len(cal.DayColors) != 1 {
+		t.Fatalf("unexpected calendar grid: %+v", cal)
+	}
+
+	detail := Detail{
+		Counters: []Counter{{Kind: "calendars", Value: 2}, {Kind: "events", Value: 1}},
+		Items:    items,
+		Calendar: cal,
+	}
+	if err := PublishDetail(ctx, "eu.sytue.calendar", "calendar", scope, detail, 15*time.Minute); err != nil {
+		t.Fatal(err)
+	}
+	if reloads != 1 {
+		t.Fatalf("expected 1 reload, got %d", reloads)
+	}
+	// Identical detail coalesces without rewriting or reloading.
+	if err := PublishDetail(ctx, "eu.sytue.calendar", "calendar", scope, detail, 15*time.Minute); err != nil {
+		t.Fatal(err)
+	}
+	if reloads != 1 {
+		t.Fatalf("identical detail reloaded: %d", reloads)
+	}
+	// Changing an item title with identical counters triggers an immediate reload.
+	detail.Items = []Item{{Title: "Demo de producto", Color: "#953be7", AllDay: true}}
+	if err := PublishDetail(ctx, "eu.sytue.calendar", "calendar", scope, detail, 15*time.Minute); err != nil {
+		t.Fatal(err)
+	}
+	readBack, err := Read("eu.sytue.calendar")
+	if err != nil || reloads != 2 || len(readBack.Items) != 1 || readBack.Items[0].Title != "Demo de producto" || readBack.Calendar == nil || readBack.Calendar.Month != 2 {
+		t.Fatalf("updated detail not persisted: %+v reloads=%d err=%v", readBack, reloads, err)
+	}
+
+	// Direct publication of ciphertext, control chars, >MaxItems or impossible calendar dates fails closed.
+	badDetails := []Detail{
+		{Items: []Item{{Title: "enc:v1:ciphertext"}}},
+		{Items: []Item{{Title: "line\nbreak"}}},
+		{Items: []Item{{Title: "bad color", Color: "red"}}},
+		{Items: make([]Item, MaxItems+1)},
+		{Calendar: &CalendarGrid{Year: 2026, Month: 2, BusyDays: []int{29}}},
+		{Calendar: &CalendarGrid{Year: 2026, Month: 3, BusyDays: []int{10, 5}}},
+		{Calendar: &CalendarGrid{Year: 2026, Month: 3, DayColors: map[string]string{"01": "#953be7"}}},
+	}
+	for i := range badDetails[3].Items {
+		badDetails[3].Items[i] = Item{Title: "ok"}
+	}
+	for _, bad := range badDetails {
+		if err := PublishDetail(ctx, "eu.sytue.calendar", "calendar", scope, bad, time.Minute); !errors.Is(err, ErrInvalid) {
+			t.Fatalf("invalid detail accepted: %+v -> %v", bad, err)
+		}
+	}
+}

@@ -18,6 +18,7 @@ import (
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 	"git.sytue.eu/sytue/one/apps/nucleo/offline"
+	"git.sytue.eu/sytue/one/apps/nucleo/widgets"
 )
 
 // Pantalla es Sytue ERP entero: el menú y lo que ocupe el panel principal.
@@ -29,9 +30,10 @@ import (
 // La TOPBAR no está, y no es un olvido: es una de las dos exclusiones de paridad
 // escritas en `docs/CONVENTIONS.md` §13.6.
 type Pantalla struct {
-	svc *api.ERP
-	tr  *i18n.Translator
-	red *offline.Monitor
+	Widget widgets.Source
+	svc    *api.ERP
+	tr     *i18n.Translator
+	red    *offline.Monitor
 
 	// Catalogo es lo que publica el servicio y Permisos lo que esta persona alcanza.
 	Catalogo Catalogo

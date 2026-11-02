@@ -69,9 +69,13 @@ def hacer_legible_publico(raiz):
             if ruta.is_symlink():
                 continue
             modo = ruta.stat().st_mode
-            minimo = 0o555 if stat.S_ISDIR(modo) or (modo & 0o100) else 0o444
-            if stat.S_IMODE(modo) & minimo != minimo:
-                os.chmod(ruta, stat.S_IMODE(modo) | minimo)
+            if stat.S_ISDIR(modo):
+                permisos = (stat.S_IMODE(modo) & 0o700) | 0o111
+            else:
+                minimo = 0o555 if modo & 0o100 else 0o444
+                permisos = stat.S_IMODE(modo) | minimo
+            if stat.S_IMODE(modo) != permisos:
+                os.chmod(ruta, permisos)
 
 
 def restringir_listado_publico(ruta):

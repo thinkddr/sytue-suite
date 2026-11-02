@@ -11,6 +11,7 @@ import (
 	"os"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/ajustes"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
@@ -103,5 +104,14 @@ func TestWidgetIncluyeLibretaCreadaPorSincronizacionTardia(t *testing.T) {
 	snapshot, err := widgets.Read("eu.sytue.contacts")
 	if err != nil || len(snapshot.Counters) != 1 || snapshot.Counters[0].Value != 2 || a.Pantalla.Activa == nil || a.Pantalla.Activa.ID != "one" {
 		t.Fatalf("contador tardío/selección: %+v error=%v activa=%+v", snapshot, err, a.Pantalla.Activa)
+	}
+}
+
+func TestWidgetContactosPublicaFichasConMonograma(t *testing.T) {
+	items := itemsContactosParaWidget([]api.Contact{
+		{ID: "c1", FormattedName: "Elena Rivas", Organization: "Sytue", UpdatedAt: time.Date(2026, 11, 1, 8, 0, 0, 0, time.UTC)},
+	})
+	if len(items) != 1 || items[0].Title != "Elena Rivas" || items[0].Subtitle != "Sytue" || items[0].Badge != "ER" {
+		t.Fatalf("items de contactos inesperados: %+v", items)
 	}
 }

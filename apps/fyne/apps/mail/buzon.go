@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -218,6 +219,10 @@ type Buzon struct {
 	// mientras tanto: al volver se pregunta otra vez sin esperar.
 	deltaEnCurso, otraVuelta bool
 	segundoPlano             bool
+
+	widgetMu     sync.Mutex
+	widgetUnread *int64
+	widgetItems  []widgets.Item
 }
 
 // Cuerpo es lo que se enseña de un mensaje abierto.
@@ -467,7 +472,15 @@ func (b *Buzon) carpetasParaWidget() func(context.Context) ([]api.Mailbox, error
 	return func(ctx context.Context) ([]api.Mailbox, error) {
 		mailboxes, err := b.S.Mailboxes(ctx)
 		if err == nil {
-			_ = view.Publicar(ctx, widgets.Counter{Kind: "unread", Value: int64(api.MailInboxUnread(mailboxes))})
+			unread := int64(api.MailInboxUnread(mailboxes))
+			b.widgetMu.Lock()
+			b.widgetUnread = &unread
+			items := slices.Clone(b.widgetItems)
+			b.widgetMu.Unlock()
+			_ = view.PublicarDetalle(ctx, widgets.Detail{
+				Counters: []widgets.Counter{{Kind: "unread", Value: unread}},
+				Items:    items,
+			})
 		}
 		return mailboxes, err
 	}
@@ -789,7 +802,74 @@ func (b *Buzon) pintarLista() {
 		b.P.Bandeja.Estado = Vacio
 	}
 	b.pintarHilo()
+	b.publicarHilosWidget()
 	b.P.Refrescar()
+}
+
+// publicarHilosWidget adjunta las cabeceras de Recibidos (remitente, asunto y
+// hora, nunca el cuerpo ni el extracto) al contador autoritativo ya cargado.
+func (b *Buzon) publicarHilosWidget() {
+	if b.Widget == nil || !widgets.Disponible() || b.P == nil || b.P.Bandeja == nil {
+		return
+	}
+	if b.compartido != nil || b.etiquetaID != "" || b.consulta != "" || b.rolVista() != "inbox" {
+		return
+	}
+	convs := b.P.Bandeja.Conversaciones
+	raw := make([]widgets.Item, 0, min(len(convs), widgets.MaxItems))
+	for _, c := range convs {
+		if len(raw) >= widgets.MaxItems {
+			break
+		}
+		remitente := ""
+		if len(c.Ultimo.De) > 0 {
+			remitente = strings.TrimSpace(c.Ultimo.De[0].Nombre)
+			if remitente == "" {
+				remitente = strings.TrimSpace(c.Ultimo.De[0].Correo)
+			}
+		}
+		asunto := strings.TrimSpace(c.Ultimo.Asunto)
+		titulo, subtitulo := remitente, asunto
+		if titulo == "" {
+			titulo, subtitulo = asunto, ""
+		}
+		if titulo == "" {
+			continue
+		}
+		var badge string
+		var startAt int64
+		if !c.Ultimo.Recibido.IsZero() && c.Ultimo.Recibido.Unix() > 0 {
+			startAt = c.Ultimo.Recibido.Unix()
+			badge = c.Ultimo.Recibido.Local().Format("15:04")
+		}
+		raw = append(raw, widgets.Item{
+			Title:    titulo,
+			Subtitle: subtitulo,
+			Badge:    badge,
+			StartAt:  startAt,
+			Unread:   c.SinLeer,
+		})
+	}
+	items := widgets.SanitizeItems(raw)
+	b.widgetMu.Lock()
+	b.widgetItems = items
+	var unreadPtr *int64
+	if b.widgetUnread != nil {
+		v := *b.widgetUnread
+		unreadPtr = &v
+	}
+	b.widgetMu.Unlock()
+	if unreadPtr == nil {
+		return
+	}
+	view := b.Widget.View()
+	detail := widgets.Detail{
+		Counters: []widgets.Counter{{Kind: "unread", Value: *unreadPtr}},
+		Items:    items,
+	}
+	pedir(b, func(ctx context.Context) (struct{}, error) {
+		return struct{}{}, view.PublicarDetalle(ctx, detail)
+	}, func(struct{}, error) {})
 }
 
 // ---- La conversación abierta ----

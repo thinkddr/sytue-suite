@@ -6,7 +6,10 @@ package calendario
 import (
 	"context"
 	"errors"
+	"fmt"
+	"image/color"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -141,14 +144,15 @@ type App struct {
 	recError       bool
 	recDescartados map[string]bool
 
-	conocidos     map[string]bool           // `knownUrls`: los calendarios ya vistos
-	porCal        map[string][]api.Instance // la caché de eventos, válida para `clave`
-	clave         string                    // el rango de la caché
-	secCal, secEv int                       // secuencias de carga
-	cargandoCal   bool                      // `loadingCals`
-	cargandoEv    bool                      // `loadingEvents`
-	fallo         string                    // clave del error, o ""
-	prohibido     bool                      // el error fue un 403
+	conocidos      map[string]bool           // `knownUrls`: los calendarios ya vistos
+	porCal         map[string][]api.Instance // la caché de eventos, válida para `clave`
+	clave          string                    // el rango de la caché
+	secCal, secEv  int                       // secuencias de carga
+	cargandoCal    bool                      // `loadingCals`
+	cargandoEv     bool                      // `loadingEvents`
+	fallo          string                    // clave del error, o ""
+	prohibido      bool                      // el error fue un 403
+	widgetCompleta bool                      // propios y compartidos cargaron sin error
 }
 
 // NuevaApp conecta la pantalla con el servicio. Arranca en carga: hasta que no
@@ -339,7 +343,8 @@ func (a *App) cargarCalendarios() {
 		lecturas.Go(func() { compartidos, errC = a.Cal.SharedWithMe(ctx) })
 		propios, err := a.Cal.List(ctx)
 		lecturas.Wait()
-		if err == nil && errC == nil && !sinConexion {
+		completa := err == nil && errC == nil && !sinConexion
+		if completa {
 			// Las ocurrencias sólo cubren la ventana visible; estas dos listas sí
 			// contienen todos los calendarios accesibles, incluidos los compartidos.
 			ids := make(map[string]struct{}, len(propios)+len(compartidos))
@@ -357,6 +362,7 @@ func (a *App) cargarCalendarios() {
 			if sec != a.secCal {
 				return // llegó otra carga después: esta es rancia
 			}
+			a.widgetCompleta = completa
 			a.cargandoCal = false
 			if err != nil {
 				a.fallar("cal.error.loadCalendars", err)
@@ -407,8 +413,13 @@ func (a *App) cargarEventos() {
 	}
 	a.secEv++
 	sec := a.secEv
+	evWidget := a.Widget.View()
+	sinConexion := p.SinConexion
 	if len(faltan) == 0 || a.Cal == nil {
 		a.cargandoEv = false
+		if a.Cal != nil && !sinConexion && a.widgetCompleta {
+			a.publicarWidget(evWidget, desde, hasta)
+		}
 		a.pintar()
 		return
 	}
@@ -460,8 +471,131 @@ func (a *App) cargarEventos() {
 			// Llegó lo guardado: el fantasma del bloque soltado ya no hace falta.
 			a.P.pendiente = nil
 			a.fallo = ""
+			if !sinConexion && a.widgetCompleta && !a.P.SinConexion {
+				a.publicarWidget(evWidget, desde, hasta)
+			}
 			a.pintar()
 		})
+	})
+}
+
+func hexColorDe(c color.Color) string {
+	if c == nil {
+		return ""
+	}
+	r, g, b, _ := c.RGBA()
+	return fmt.Sprintf("#%02x%02x%02x", uint8(r>>8), uint8(g>>8), uint8(b>>8))
+}
+
+func (a *App) publicarWidget(view widgets.View, desde, hasta time.Time) {
+	if a.Widget == nil || !widgets.Disponible() {
+		return
+	}
+	todos := a.todos()
+	ids := make(map[string]struct{}, len(todos))
+	for _, c := range todos {
+		ids[c.ID] = struct{}{}
+	}
+	zona := a.P.zona()
+	ahora := time.Now().In(zona)
+	corte := ahora
+	if ahora.Before(desde) || !ahora.Before(hasta) {
+		corte = a.P.Cursor.In(zona)
+	}
+	inicioMes := time.Date(corte.Year(), corte.Month(), 1, 0, 0, 0, 0, zona)
+	finMes := inicioMes.AddDate(0, 1, 0)
+	hoyInicio := inicioDelDia(corte, zona)
+
+	ocs := Fundir(todos, a.P.Visibles, a.porCal, false)
+	sort.SliceStable(ocs, func(i, j int) bool {
+		if !ocs[i].Start.Equal(ocs[j].Start) {
+			return ocs[i].Start.Before(ocs[j].Start)
+		}
+		return ocs[i].End.Before(ocs[j].End)
+	})
+
+	var busyDays []int
+	dayColors := map[int]string{}
+	var rawItems []widgets.Item
+	var upcomingCount int64
+
+	for _, oc := range ocs {
+		if strings.EqualFold(oc.Event.Status, "CANCELLED") {
+			continue
+		}
+		ini := oc.Start.In(zona)
+		fin := oc.End.In(zona)
+		finInc := fin
+		if oc.Event.AllDay && fin.After(ini) && fin.Hour() == 0 && fin.Minute() == 0 && fin.Second() == 0 {
+			finInc = fin.Add(-time.Nanosecond)
+		}
+		hex := hexColorDe(oc.Color)
+		if !finInc.Before(inicioMes) && ini.Before(finMes) {
+			primero := ini
+			if primero.Before(inicioMes) {
+				primero = inicioMes
+			}
+			ultimo := finInc
+			limiteMes := finMes.Add(-time.Nanosecond)
+			if ultimo.After(limiteMes) {
+				ultimo = limiteMes
+			}
+			dIni := inicioDelDia(primero, zona).Day()
+			dFin := inicioDelDia(ultimo, zona).Day()
+			for d := dIni; d <= dFin; d++ {
+				busyDays = append(busyDays, d)
+				if _, ok := dayColors[d]; !ok && hex != "" {
+					dayColors[d] = hex
+				}
+			}
+		}
+		vigente := (!oc.Event.AllDay && (fin.After(corte) || !ini.Before(corte))) ||
+			(oc.Event.AllDay && !finInc.Before(hoyInicio))
+		if !vigente {
+			continue
+		}
+		upcomingCount++
+		if len(rawItems) < widgets.MaxItems {
+			titulo := strings.TrimSpace(oc.Event.Title)
+			if titulo == "" {
+				titulo = a.P.t("cal.untitled", nil)
+			}
+			insignia := ini.Format("15:04")
+			if oc.Event.AllDay {
+				insignia = ""
+			}
+			var startAt, endAt int64
+			if oc.Start.Unix() > 0 {
+				startAt = oc.Start.Unix()
+			}
+			if oc.End.Unix() > 0 {
+				endAt = oc.End.Unix()
+			}
+			rawItems = append(rawItems, widgets.Item{
+				Title:    titulo,
+				Subtitle: oc.Event.Location,
+				Badge:    insignia,
+				Color:    hex,
+				StartAt:  startAt,
+				EndAt:    endAt,
+				AllDay:   oc.Event.AllDay,
+			})
+		}
+	}
+
+	counters := []widgets.Counter{{Kind: "calendars", Value: int64(len(ids))}}
+	if upcomingCount > 0 {
+		counters = append(counters, widgets.Counter{Kind: "events", Value: upcomingCount})
+	}
+	detalle := widgets.Detail{
+		Counters: counters,
+		Items:    widgets.SanitizeItems(rawItems),
+		Calendar: widgets.BuildCalendarGrid(corte.Year(), corte.Month(), busyDays, dayColors),
+	}
+	a.lanzar(func() {
+		ctx, parar := context.WithTimeout(context.Background(), 5*time.Second)
+		defer parar()
+		_ = view.PublicarDetalle(ctx, detalle)
 	})
 }
 

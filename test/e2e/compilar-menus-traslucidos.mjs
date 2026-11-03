@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // Solo CI: compila el banco con componentes reales y sin servidor de Astro/Vite.
+// El modo ?nav=app/erp incluye Sidebar/AppShell y el cajón que vive en el propio nav.
 // El único contrato de Vite que necesita es SVG?url. Se conserva el SVG completo
 // como data URI con loader JS, sin depender del soporte de `dataurl` de Bun.
 import { resolve } from 'node:path';

@@ -92,7 +92,7 @@ export function ChannelRow({
           // resto de la suite (docs/design.md §3.2). Sin ella, Rooms era la única app
           // cuyo «estás aquí» dependía solo del fondo del ítem.
           active
-            ? 'bg-sidebar-active before:bg-indicator before:absolute before:top-1.5 before:bottom-1.5 before:left-0 before:w-[min(2px,var(--sytue-nav-indicator))] before:rounded-full before:content-[""]'
+            ? 'sytue-nav-current bg-sidebar-active before:bg-indicator before:absolute before:top-1.5 before:bottom-1.5 before:left-0 before:w-[min(2px,var(--sytue-nav-indicator))] before:rounded-full before:content-[""]'
             : 'hover:bg-sidebar-hover',
         )}
       >
@@ -113,7 +113,7 @@ export function ChannelRow({
           title={label}
           onClick={onSelect}
           class={cx(
-            'rounded-nav flex min-w-0 flex-1 items-center gap-2 px-[var(--sytue-nav-pad)] py-2 text-left text-base',
+            'rounded-nav flex min-w-0 flex-1 items-center gap-2 px-[var(--sytue-nav-pad)] py-2 text-left text-base pointer-coarse:min-h-[max(44px,2.75rem)]',
             // No leído = negrita y texto a pleno contraste (§3.7 «unread»: peso
             // semibold), como en Slack o Teams; el contador solo no se ve al recorrer
             // una lista larga. Silenciado: se queda tenue, que es lo que pidió. Tenue es

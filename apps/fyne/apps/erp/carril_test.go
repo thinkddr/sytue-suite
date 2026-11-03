@@ -157,6 +157,39 @@ func TestElCarrilDeIconosColocaDondeLaWeb(t *testing.T) {
 	}
 }
 
+// Cambiar «Tinta y papel» repinta el árbol existente, sin reconstruir el carril.
+func TestElCarrilDeIconosActualizaElFondoSinReconstruirse(t *testing.T) {
+	t.Cleanup(func() { tema.Elegir(""); tema.FormaDeLosGuardianes() })
+	tema.Elegir("claro")
+	tema.ElegirForma("marco")
+	c := &CarrilIconos{Arriba: []*AccionCarril{NuevaAccionCarril(iconos.Rejilla, "Inicio", true, nil)}}
+	o := c.Objeto(tema.Claro).(*fyne.Container)
+	o.Resize(fyne.NewSize(72, 480))
+	desplaza := o.Objects[0].(*container.Scroll)
+	contenido := desplaza.Content.(*fyne.Container)
+	fondo := contenido.Objects[0].(*canvas.Rectangle)
+	accion := contenido.Objects[1]
+	for _, variante := range []string{"claro", "oscuro", "traslucido"} {
+		tema.Elegir(variante)
+		v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
+		for _, forma := range []string{"marco", "carril", "marco"} {
+			tema.ElegirForma(forma)
+			o.Refresh()
+			quiero := color.NRGBA{}
+			if forma == "carril" {
+				quiero = tema.Color("rail", v)
+			}
+			if fondo.FillColor != quiero {
+				t.Fatalf("%s %s: el mismo carril conserva fondo %v; quiero %v", forma, variante, fondo.FillColor, quiero)
+			}
+			if fondo.Size() != fyne.NewSize(72, 480) || accion.Position() != fyne.NewPos(14, 24) || accion.Size() != fyne.NewSize(44, 44) {
+				t.Fatalf("%s %s: actualizar el fondo ha cambiado el carril %v o su acción %v/%v", forma, variante,
+					fondo.Size(), accion.Position(), accion.Size())
+			}
+		}
+	}
+}
+
 // TestElCarrilDeIconosPintaSusEstados: reposo, puntero encima y activo, en las dos formas
 // y los tres modos, con los colores PINTADOS contra los tokens de forma compuestos sobre
 // lo que tienen debajo (el marco en Marco, el carril en Carril). Y lo que dice «estás

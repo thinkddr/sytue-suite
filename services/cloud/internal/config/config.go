@@ -321,9 +321,9 @@ func Load(defaultPort string) (Config, error) {
 		RegistryPassword: l.Get("REGISTRY_PASSWORD"),
 		// 18.6: la 18.4 arrastra CVE-2026-19385 (8.8) —quien crea objetos ejecuta
 		// código como el usuario que corre pg_dump— y otros tres del 2026-08-13.
-		ManagedPostgresImage:  l.GetDefault("MANAGED_POSTGRES_IMAGE", "postgres:18.6@sha256:06cad38a5d9f5d24b4d83d86def30795d5e4b757fedbf5281172b576dedcd941"),
-		ManagedPostgrestImage: l.GetDefault("MANAGED_POSTGREST_IMAGE", "postgrest/postgrest:v14.16@sha256:bea1c76a856fa39d1e542d25911cf95d02fe2bf971992d033044ff209f1504b8"),
-		ManagedRcloneImage:    l.GetDefault("MANAGED_RCLONE_IMAGE", "rclone/rclone:1.75.0@sha256:b06aed988cf5967de7c25be5925240983981c757f4ed1ac9d2fa659d51d60548"),
+		ManagedPostgresImage:  l.GetDefault("MANAGED_POSTGRES_IMAGE", "postgres:18.6@sha256:3a4264520e121176619f54ff867d12774bc81e95e7b84db58d63bccdb6144b81"),
+		ManagedPostgrestImage: l.GetDefault("MANAGED_POSTGREST_IMAGE", "postgrest/postgrest:v14.18@sha256:c7cd7e265a85b05248abf53f4473fcec7e327c282d0bd0cf60f1551996d09fcf"),
+		ManagedRcloneImage:    l.GetDefault("MANAGED_RCLONE_IMAGE", "rclone/rclone:1.75.2@sha256:2687085f718d3c628f7fdfb77c52a1d344332aed543110bb88088f2c70d43eb5"),
 
 		SMTPHost:     l.Get("SMTP_HOST"),
 		SMTPPort:     l.GetDefault("SMTP_PORT", "587"),
@@ -341,14 +341,14 @@ func Load(defaultPort string) (Config, error) {
 		AbiertoATerceros:              l.GetBoolDefault("ABIERTO_A_TERCEROS", false),
 		TenantsPermitidos:             l.GetCSVDefault("TENANTS_PERMITIDOS", "sytue"),
 		RunnerMode:                    l.GetDefault("RUNNER_MODE", ""),
-		BuildkitImage:                 l.GetDefault("BUILDKIT_IMAGE", "moby/buildkit:v0.32.1-rootless@sha256:66e5fe5b25509626c0e628c6e57badbcc2e8a62218ba3e1358f1427e90de6a88"),
-		HTTPTaskImage:                 l.GetDefault("HTTP_TASK_IMAGE", "curlimages/curl:8.21.0@sha256:7c12af72ceb38b7432ab85e1a265cff6ae58e06f95539d539b654f2cfa64bb13"),
-		CraneImage:                    l.GetDefault("CRANE_IMAGE", "gcr.io/go-containerregistry/crane:v0.21.8@sha256:e85fa14e99e5ef7351822ed887ce322bc1e22f9ef8e9eb54ebf2d7a9473bfef9"),
+		BuildkitImage:                 l.GetDefault("BUILDKIT_IMAGE", "moby/buildkit:v0.34.1-rootless@sha256:f68752a5a94acfcdad2d07867b7075601a421638e17fc5f28efc1c814d0c4f89"),
+		HTTPTaskImage:                 l.GetDefault("HTTP_TASK_IMAGE", "curlimages/curl:8.23.0@sha256:3fb7e13e5d179a845c97d78204f3f1064d1907037f26a3ebf91710571151fd93"),
+		CraneImage:                    l.GetDefault("CRANE_IMAGE", "gcr.io/go-containerregistry/crane:v0.22.1@sha256:1f968817b95790bed063f71175aa6b8ff879fa17064020415f3e18bb6e6a36e1"),
 
 		// Pinneadas por tag (no :latest); en prod, re-pinnear por digest tras
 		// verificar con un build vivo (como KANIKO_IMAGE).
-		CNBBuilderImage: l.GetDefault("CNB_BUILDER_IMAGE", "paketobuildpacks/builder-jammy-base:0.4.615@sha256:ff504f33d9ce9f3ed9f109e61bffbf145f80e98d90abfeb2172b96dbb4eceb92"),
-		CNBGitImage:     l.GetDefault("CNB_GIT_IMAGE", "alpine/git:2.54.0@sha256:b4d933c7185b5cc9da7704f2c6e19d477f935ea31a50d9a017ffce2bbd1109a3"),
+		CNBBuilderImage: l.GetDefault("CNB_BUILDER_IMAGE", "paketobuildpacks/builder-jammy-base:0.4.676@sha256:572490d21e0819aecd032d381ec0fa9e31eebd611bb56c4fb4961b6dd818af92"),
+		CNBGitImage:     l.GetDefault("CNB_GIT_IMAGE", "alpine/git:2.54.0@sha256:ac6c828f15d82775d204d3d75112e1d34af8945da80ccf922713c9891ba68e7a"),
 		CNBRunImage:     l.Get("CNB_RUN_IMAGE"),
 
 		BuildNamespace:      l.GetDefault("BUILD_NAMESPACE", "sytue-builds"),

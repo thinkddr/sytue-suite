@@ -11,7 +11,7 @@ image:
 service:
   type: ClusterIP
   port: 80
-  targetPort: 8091           # puerto del SPEC (Sytue Cloud builder)
+  targetPort: 8091 # puerto del SPEC (Sytue Cloud builder)
 
 # Requests MEDIDOS en producción (kubectl top, 2026-08-09), no estimados: en
 # Kubernetes la factura la fija lo RESERVADO, no lo usado, y estos pods pedían
@@ -46,16 +46,17 @@ serviceMonitor:
 # config.go. Sustituye a Kaniko, que Google archivó en junio de 2025: sin
 # versiones nuevas ni parches, y esto compila código de terceros.
 buildkit:
-  image: moby/buildkit:v0.32.1-rootless@sha256:66e5fe5b25509626c0e628c6e57badbcc2e8a62218ba3e1358f1427e90de6a88
+  image: moby/buildkit:v0.34.1-rootless@sha256:f68752a5a94acfcdad2d07867b7075601a421638e17fc5f28efc1c814d0c4f89
 
 crane:
-  image: gcr.io/go-containerregistry/crane:v0.21.9@sha256:1adc5402d3545c76c559d095faaedec779f55b8457bb032b0905d4287fcd3597
+  image: gcr.io/go-containerregistry/crane:v0.22.1@sha256:1f968817b95790bed063f71175aa6b8ff879fa17064020415f3e18bb6e6a36e1
 
 # Cloud Native Buildpacks (deploy sin Dockerfile). CNB_* en config.go; pinneadas por tag.
 cnb:
-  builderImage: paketobuildpacks/builder-jammy-base:0.4.615@sha256:ff504f33d9ce9f3ed9f109e61bffbf145f80e98d90abfeb2172b96dbb4eceb92
-  gitImage: alpine/git:2.54.0@sha256:ae0f6f4bce38d2b8c40becc0d6241a08d9f57186ea03029de2189a2b5e722d94
-  runImage: ""    # CNB_RUN_IMAGE opcional: vacío ⇒ derivada del builder (como `pack`)
+  builderImage: paketobuildpacks/builder-jammy-base:0.4.676@sha256:572490d21e0819aecd032d381ec0fa9e31eebd611bb56c4fb4961b6dd818af92
+  gitImage: alpine/git:2.54.0@sha256:ac6c828f15d82775d204d3d75112e1d34af8945da80ccf922713c9891ba68e7a
+  # Base de ejecución fijada junto con el builder, sin depender de latest.
+  runImage: "paketobuildpacks/run-jammy-base:0.1.294@sha256:6eee311992a4c85a55c5b62a706a71e403b194b6e5697db7d24c52f661740518"
 
 # Nombres de env: services/cloud/internal/config/config.go. No-secretos por value.
 config:

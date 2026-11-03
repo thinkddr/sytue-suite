@@ -78,11 +78,11 @@ func newKubeJobClientFor(cs kubernetes.Interface, cfg KubeJobConfig) *KubeJobCli
 	}
 	img := cfg.BuildkitImage
 	if img == "" {
-		img = "moby/buildkit:v0.32.1-rootless@sha256:66e5fe5b25509626c0e628c6e57badbcc2e8a62218ba3e1358f1427e90de6a88"
+		img = "moby/buildkit:v0.34.1-rootless@sha256:f68752a5a94acfcdad2d07867b7075601a421638e17fc5f28efc1c814d0c4f89"
 	}
 	crane := cfg.CraneImage
 	if crane == "" {
-		crane = "gcr.io/go-containerregistry/crane:v0.21.8@sha256:e85fa14e99e5ef7351822ed887ce322bc1e22f9ef8e9eb54ebf2d7a9473bfef9"
+		crane = "gcr.io/go-containerregistry/crane:v0.22.1@sha256:1f968817b95790bed063f71175aa6b8ff879fa17064020415f3e18bb6e6a36e1"
 	}
 	return &KubeJobClient{cs: cs, pollInterval: poll, buildkitImage: img, craneImage: crane, cacheVolumeSize: "2Gi"}
 }

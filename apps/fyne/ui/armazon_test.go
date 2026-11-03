@@ -313,15 +313,17 @@ func TestElCajonEntraDesdeLaIzquierda(t *testing.T) {
 	a.entrada = 0
 }
 
-// TestElCajonDelTraslucidoVaSobreUnaBaseOpaca: el carril del traslúcido deja ver un punto
+// TestElCajonDelTraslucidoVaSobreUnaBaseOpaca: Carril traslúcido deja ver un punto
 // de lo que tiene debajo. En escritorio es el fondo ambiental; en el cajón del teléfono
 // es el contenido, y el texto se colaba entre los rótulos del menú. La web le pone su
 // mismo color sobre `neutral-50` (`nav.bg-sidebar` por debajo de 768, appearance.css).
 // Con un carril opaco —claro y oscuro— la base no se pinta.
 //
-// VISTO EN ROJO sin `ponerBase` en el reparto: la base ni se coloca ni se esconde (mide
+// VISTO EN ROJO sin el suelo del cajón en el reparto: la base ni se coloca ni se esconde (mide
 // 0×0 y sigue a la vista con el carril opaco).
 func TestElCajonDelTraslucidoVaSobreUnaBaseOpaca(t *testing.T) {
+	tema.ElegirForma("carril")
+	t.Cleanup(tema.FormaDeLosGuardianes)
 	t.Cleanup(func() { tema.Elegir("") })
 	for variante, quiero := range map[string]bool{"claro": false, "oscuro": false, "traslucido": true} {
 		tema.Elegir(variante)

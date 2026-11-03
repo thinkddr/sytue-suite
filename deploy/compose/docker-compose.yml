@@ -372,7 +372,7 @@ services:
   # siguen funcionando.
   # ===========================================================================
   dragonfly:
-    # Tag FIJA estable (nunca 'latest'): v1.40.1.
+    # Tag FIJA estable (nunca 'latest'): v1.40.2.
     #
     # 1.40.0 es el MÍNIMO por seguridad, no por features: CVE-2026-62357
     # (GHSA-cmmv-h748-v93x) desborda el entero de `CMS.INITBYDIM` y deja que
@@ -406,7 +406,7 @@ services:
   # Nodo único en dev: SIN Redis/Valkey. Ver CONVENTIONS §1, §6, §8.
   # ===========================================================================
   livekit:
-    image: livekit/livekit-server:v1.13.7@sha256:6fd3b7088874c4d119160dd688798dfec852bc014786d392caad15f6f63912a3
+    image: livekit/livekit-server:v1.13.11@sha256:25cd902de7cacbd5f1f779f6a6ac1eae20ba8f56b0935934ce6b0ab80d1e3d20
     <<: [*restart, *logging]
     mem_limit: 256m             # DEV-ONLY (prod: Helm)
     profiles: ["full", "rooms"]

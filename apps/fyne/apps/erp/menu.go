@@ -152,12 +152,14 @@ func (e *Entrada) CreateRenderer() fyne.WidgetRenderer {
 		// El aro del menú es el BLANCO (`chrome-focus`) y no el azul: sobre la tinta del
 		// carril el azul no llega a 3:1 contra el ítem activo (ver `ui.NuevoAroCon`).
 		// `rounded-nav`: el radio del ítem es de la forma.
-		aro:   ui.NuevoAroCon("sidebar-focus", tema.Forma("radius-nav"), ui.SinHueco, v).Abierto(),
-		caja:  ui.NuevaCaja(color.NRGBA{}, color.NRGBA{}, tema.Forma("radius-nav")),
-		barra: ui.NuevaCaja(tema.Color("sidebar-indicator", v), color.NRGBA{}, AnchoIndicador/2),
-		texto: ui.Texto(e.Rotulo, tema.TextoBase, e.peso(), tema.Color("sidebar-fg", v)),
+		aro:      ui.NuevoAroCon("sidebar-focus", tema.Forma("radius-nav"), ui.SinHueco, v).Abierto(),
+		caja:     ui.NuevaCaja(color.NRGBA{}, color.NRGBA{}, tema.Forma("radius-nav")),
+		barra:    ui.NuevaCaja(tema.Color("sidebar-indicator", v), color.NRGBA{}, AnchoIndicador/2),
+		texto:    ui.Texto(e.Rotulo, tema.TextoBase, e.peso(), tema.Color("sidebar-fg", v)),
+		contorno: canvas.NewRectangle(color.NRGBA{}),
 	}
 	r.objetos = append(r.aro.Objetos(), r.caja.Objetos()...)
+	r.objetos = append(r.objetos, r.contorno)
 	r.objetos = append(r.objetos, r.barra.Objetos()...)
 	r.objetos = append(r.objetos, r.texto)
 	if t := e.insignia(); t != "" {
@@ -176,6 +178,7 @@ type entradaRenderer struct {
 	caja, barra *ui.Caja
 	texto       *canvas.Text
 	marca       *ui.Insignia
+	contorno    *canvas.Rectangle
 	objetos     []fyne.CanvasObject
 }
 
@@ -186,6 +189,8 @@ func (r *entradaRenderer) Destroy()                     {}
 func (r *entradaRenderer) Layout(t fyne.Size) {
 	r.aro.Colocar(t)
 	r.caja.Redimensionar(t)
+	ui.PintarContornoLateral(r.contorno, t, tema.Forma("radius-nav"), r.e.Activa && !r.e.Enfocado(), false,
+		tema.De(fyne.CurrentApp().Settings().ThemeVariant()))
 	ui.MoverCaja(r.barra, fyne.NewPos(0, MargenIndicador),
 		fyne.NewSize(anchoIndicador(), max(t.Height-2*MargenIndicador, 0)))
 
@@ -216,6 +221,7 @@ func (r *entradaRenderer) Refresh() {
 	r.aro.Pintar(v)
 	r.caja.CambiarRadio(radio)
 	r.caja.Pintar(fondo, color.NRGBA{})
+	ui.PintarContornoLateral(r.contorno, r.e.Size(), radio, r.e.Activa && !r.e.Enfocado(), false, v)
 	// La barra de «estás aquí» solo existe en la entrada activa: es el `before:` del
 	// ramo activo y no una decoración permanente.
 	r.barra.Pintar(barraActiva(r.e.Activa, v), color.NRGBA{})
@@ -402,9 +408,9 @@ func (m *Menu) abierta(a Modulo) bool {
 
 // Objeto arma el carril con todas sus filas.
 func (m *Menu) Objeto(v tema.Variante) fyne.CanvasObject {
-	l := &carril{}
+	l := &carril{fondo: canvas.NewRectangle(ui.ColorFondoLateral(v)), divisor: filete(v)}
 	hijos := make([]fyne.CanvasObject, 0, 2+len(m.Fijas)+len(m.Tableros)+4*len(m.Areas))
-	hijos = append(hijos, canvas.NewRectangle(tema.Color("sidebar-bg", v)), filete(v))
+	hijos = append(hijos, l.fondo, l.divisor)
 
 	// El aspa: `<Button variant="ghost" iconOnly class="mb-3 ml-auto flex">`, a la
 	// derecha. Dentro del carril el fantasma pinta con sus tokens (`primary-text` y
@@ -501,7 +507,14 @@ func (f *versalEnFila) Layout(_ []fyne.CanvasObject, t fyne.Size) {
 // no aplanado sobre `surface`, que lo pintaba como una raya clara. Es SOLO del carril:
 // la web lo conserva (`border-border-subtle … border-r` en su `BarraLateral`).
 func filete(v tema.Variante) *canvas.Rectangle {
-	return canvas.NewRectangle(ui.BordeSobre("border-subtle", "sidebar-bg", v))
+	return canvas.NewRectangle(colorFileteMenu(v))
+}
+
+func colorFileteMenu(v tema.Variante) color.NRGBA {
+	if tema.EsMarco() { // el armazón ya dibuja el borde del cajón integrado
+		return color.NRGBA{}
+	}
+	return ui.BordeSobre("border-subtle", "sidebar-bg", v)
 }
 
 // fileteHoja es un divisor del CONTENIDO: `border-subtle` sobre la superficie. No es
@@ -531,7 +544,10 @@ type bloque struct {
 
 // carril apila las filas con el `px-3 py-4` del `<nav>`. No desplaza por su cuenta: lo
 // decide quien lo monta, como en `ui.Lateral`.
-type carril struct{ arriba []bloque }
+type carril struct {
+	arriba         []bloque
+	fondo, divisor *canvas.Rectangle
+}
 
 var _ fyne.Layout = (*carril)(nil)
 
@@ -547,6 +563,10 @@ func (c *carril) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 	if len(objs) < 2 {
 		return
 	}
+	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
+	c.fondo.FillColor, c.divisor.FillColor = ui.ColorFondoLateral(v), colorFileteMenu(v)
+	c.fondo.Refresh()
+	c.divisor.Refresh()
 	objs[0].Move(fyne.NewPos(0, 0))
 	objs[0].Resize(t)
 	objs[1].Move(fyne.NewPos(t.Width-tema.Borde, 0))

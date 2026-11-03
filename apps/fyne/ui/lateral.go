@@ -86,6 +86,15 @@ func TokenCarril() string {
 // FondoCarril es el color de TokenCarril en ese tema.
 func FondoCarril(v tema.Variante) color.NRGBA { return tema.Color(TokenCarril(), v) }
 
+// ColorFondoLateral adapta los menús con reparto propio, como el ERP, que se montan
+// siempre dentro de Armazon. Lateral conserva su fondo hasta recibir SinFondo.
+func ColorFondoLateral(v tema.Variante) color.NRGBA {
+	if tema.EsMarco() {
+		return color.NRGBA{}
+	}
+	return tema.Color("sidebar-bg", v)
+}
+
 // RellenoNav es el relleno horizontal de un ítem del menú, `px-[var(--sytue-nav-pad)]`:
 // de la forma (14 en Marco, 10 en Carril). Lo comparte el rótulo de la sección, que cae
 // en la misma vertical.
@@ -154,7 +163,7 @@ type Lateral struct {
 	// Plegado es el carril estrecho de 64 (`data-collapsed`).
 	Plegado bool
 	// SinFondo deja ver lo que hay detrás: en la forma Marco el menú va sobre el marco,
-	// que ya es de su color. Lo pone el armazón; en el cajón del teléfono no.
+	// que ya es de su color. Lo pone el armazón también en el cajón del teléfono.
 	SinFondo bool
 }
 
@@ -289,7 +298,7 @@ func (l *Lateral) CreateRenderer() fyne.WidgetRenderer {
 		}
 	}
 	if l.Pie != nil {
-		r.filetePie = canvas.NewRectangle(BordeSobre("sidebar-border", TokenCarril(), v))
+		r.filetePie = canvas.NewRectangle(colorFileteLateral(v))
 		r.objetos = append(r.objetos, r.filetePie)
 	}
 	azulSobreTinta(l)
@@ -347,12 +356,16 @@ func (r *lateralRenderer) Layout(t fyne.Size) {
 	if r.l.Pie != nil {
 		if r.filetePie == nil {
 			v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
-			r.filetePie = canvas.NewRectangle(BordeSobre("sidebar-border", TokenCarril(), v))
+			r.filetePie = canvas.NewRectangle(colorFileteLateral(v))
 		}
 		h := r.l.Pie.MinSize().Height
 		abajo -= h + 2*rellenoMenu
-		r.filetePie.Move(fyne.NewPos(0, abajo-tema.Borde))
-		r.filetePie.Resize(fyne.NewSize(t.Width, tema.Borde))
+		xFilete, anchoFilete := float32(0), t.Width
+		if tema.EsMarco() {
+			xFilete, anchoFilete = canalonMenu, ancho
+		}
+		r.filetePie.Move(fyne.NewPos(xFilete, abajo-tema.Borde))
+		r.filetePie.Resize(fyne.NewSize(anchoFilete, tema.Borde))
 		r.l.Pie.Move(fyne.NewPos(canalonMenu, abajo+rellenoMenu))
 		r.l.Pie.Resize(fyne.NewSize(ancho, h))
 		abajo -= tema.Borde
@@ -382,10 +395,17 @@ func (r *lateralRenderer) Refresh() {
 	r.fondo.Hidden = r.l.SinFondo
 	r.fondo.Refresh()
 	if r.filetePie != nil {
-		r.filetePie.FillColor = BordeSobre("sidebar-border", TokenCarril(), v)
+		r.filetePie.FillColor = colorFileteLateral(v)
 		r.filetePie.Refresh()
 	}
 	r.Layout(r.l.Size())
+}
+
+func colorFileteLateral(v tema.Variante) color.NRGBA {
+	if tema.EsMarco() {
+		return tokens.Crudo("sidebar-border", v)
+	}
+	return BordeSobre("sidebar-border", TokenCarril(), v)
 }
 
 // SeccionLateral es SidebarSection: un rótulo en versalitas, sus filas separadas por
@@ -1082,13 +1102,16 @@ func (f *FilaLateral) CreateRenderer() fyne.WidgetRenderer {
 	m := f.metrica()
 	fondo, texto := f.colores(v)
 	r := &filaRenderer{
-		f:       f,
-		aro:     NuevoAroCon("sidebar-focus", f.radio(), SinHueco, v).Abierto(), // transparente en reposo
-		caja:    NuevaCaja(enTinta(fondo, f.Inerte), f.borde(v), f.radio()),
-		rotulo:  Texto(f.Rotulo, m.texto, m.peso, enTinta(texto, f.Inerte)),
-		rotulo2: Texto("", m.texto, m.peso, enTinta(texto, f.Inerte)),
+		f:        f,
+		aro:      NuevoAroCon("sidebar-focus", f.radio(), SinHueco, v).Abierto(), // transparente en reposo
+		caja:     NuevaCaja(enTinta(fondo, f.Inerte), f.borde(v), f.radio()),
+		rotulo:   Texto(f.Rotulo, m.texto, m.peso, enTinta(texto, f.Inerte)),
+		rotulo2:  Texto("", m.texto, m.peso, enTinta(texto, f.Inerte)),
+		contorno: canvas.NewRectangle(color.NRGBA{}),
 	}
 	r.objetos = append(r.aro.Objetos(), r.caja.Objetos()...)
+	r.objetos = append(r.objetos, r.contorno)
+	r.pintarContorno(f.Size(), v)
 	if f.Activa && f.Rama == nil {
 		r.barra = canvas.NewRectangle(tema.Color("sidebar-indicator", v))
 		r.objetos = append(r.objetos, r.barra)
@@ -1136,13 +1159,14 @@ func (f *FilaLateral) CreateRenderer() fyne.WidgetRenderer {
 }
 
 type filaRenderer struct {
-	f       *FilaLateral
-	aro     *Aro
-	caja    *Caja
-	barra   *canvas.Rectangle
-	punto   *canvas.Circle
-	rotulo  *canvas.Text
-	rotulo2 *canvas.Text // la segunda línea del rótulo, cuando no cabe en una
+	f        *FilaLateral
+	aro      *Aro
+	caja     *Caja
+	contorno *canvas.Rectangle
+	barra    *canvas.Rectangle
+	punto    *canvas.Circle
+	rotulo   *canvas.Text
+	rotulo2  *canvas.Text // la segunda línea del rótulo, cuando no cabe en una
 	// tacha y tacha2 son el `line-through` de cada línea del rótulo.
 	tacha, tacha2 *canvas.Rectangle
 	contador      *Contador
@@ -1157,6 +1181,23 @@ func (r *filaRenderer) pintarFondo(c color.NRGBA) {
 	r.caja.Pintar(c, r.f.borde(tema.De(fyne.CurrentApp().Settings().ThemeVariant())))
 }
 
+// PintarContornoLateral comparte el trazo interior de selección con los menús que
+// mantienen su propia densidad. No añade relleno ni modifica el área pulsable.
+func PintarContornoLateral(contorno *canvas.Rectangle, tam fyne.Size, radio float32, activa, inerte bool, v tema.Variante) {
+	contorno.StrokeColor = enTinta(tokens.Crudo("sidebar-border", v), inerte)
+	contorno.StrokeWidth = tema.Borde
+	contorno.CornerRadius = max(radio-tema.Borde/2, 0)
+	medioBorde := tema.Borde / 2
+	contorno.Move(fyne.NewPos(medioBorde, medioBorde))
+	contorno.Resize(fyne.NewSize(max(tam.Width-tema.Borde, 0), max(tam.Height-tema.Borde, 0)))
+	esconder(contorno, !tema.EsMarco() || !activa)
+	contorno.Refresh()
+}
+
+func (r *filaRenderer) pintarContorno(tam fyne.Size, v tema.Variante) {
+	PintarContornoLateral(r.contorno, tam, r.f.radio(), r.f.Activa && !r.f.enfocado && r.f.Borde == "", r.f.Inerte, v)
+}
+
 func (r *filaRenderer) MinSize() fyne.Size           { return MedidaFilaLateral(r.f) }
 func (r *filaRenderer) Objects() []fyne.CanvasObject { return r.objetos }
 func (r *filaRenderer) Destroy()                     {}
@@ -1167,6 +1208,7 @@ func (r *filaRenderer) Layout(t fyne.Size) {
 	f, m := r.f, r.f.metrica()
 	r.aro.Colocar(t)
 	r.caja.Redimensionar(t)
+	r.pintarContorno(t, tema.De(fyne.CurrentApp().Settings().ThemeVariant()))
 	if r.barra != nil {
 		// «Estás aquí»: `before:top-2 before:bottom-2 before:left-0 before:w-[3px]`.
 		margen := tema.Espacio(2)
@@ -1268,6 +1310,7 @@ func (r *filaRenderer) Refresh() {
 	r.aro.CambiarRadio(f.radio())
 	r.aro.Ver(f.enfocado)
 	r.aro.Pintar(v)
+	r.pintarContorno(f.Size(), v)
 	r.fondo.hacia(enTinta(fondo, f.Inerte), r.pintarFondo)
 	if r.barra != nil {
 		r.barra.FillColor = tema.Color("sidebar-indicator", v)

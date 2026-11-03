@@ -210,10 +210,7 @@ type CarrilIconos struct {
 // Objeto arma el carril. En Carril pinta su fondo; en Marco deja ver el marco, que ya es
 // de su color (`.sytue-frame .bg-rail` en appearance.css).
 func (c *CarrilIconos) Objeto(v tema.Variante) fyne.CanvasObject {
-	fondo := canvas.NewRectangle(tema.Color("rail", v))
-	if tema.EsMarco() {
-		fondo.FillColor = color.NRGBA{}
-	}
+	fondo := canvas.NewRectangle(colorFondoCarril(v))
 	hijos := make([]fyne.CanvasObject, 0, 1+len(c.Arriba)+len(c.Abajo))
 	hijos = append(hijos, fondo)
 	for _, a := range append(append([]*AccionCarril{}, c.Arriba...), c.Abajo...) {
@@ -223,10 +220,17 @@ func (c *CarrilIconos) Objeto(v tema.Variante) fyne.CanvasObject {
 		titulo.Derecha = true
 		hijos = append(hijos, titulo)
 	}
-	contenido := container.New(&columnaCarril{arriba: len(c.Arriba)}, hijos...)
+	contenido := container.New(&columnaCarril{arriba: len(c.Arriba), fondo: fondo}, hijos...)
 	desplaza := container.NewVScroll(contenido)
 	ui.RevelarFocoEnScroll(desplaza, contenido)
 	return container.New(viewportCarril{}, desplaza)
+}
+
+func colorFondoCarril(v tema.Variante) color.NRGBA {
+	if tema.EsMarco() {
+		return color.NRGBA{}
+	}
+	return tema.Color("rail", v)
 }
 
 // El carril conserva su ancho y permite recorrer todas las acciones con poco alto.
@@ -247,7 +251,10 @@ func (viewportCarril) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 // columnaCarril coloca [fondo, las de arriba…, las de abajo…]: las primeras desde el
 // `padding-block` y las últimas pegadas al fondo, que es el `margin-block-start: auto` de
 // `.erp-rail-bottom`.
-type columnaCarril struct{ arriba int }
+type columnaCarril struct {
+	arriba int
+	fondo  *canvas.Rectangle
+}
 
 var _ fyne.Layout = (*columnaCarril)(nil)
 
@@ -257,6 +264,8 @@ func (l *columnaCarril) MinSize(objs []fyne.CanvasObject) fyne.Size {
 }
 
 func (l *columnaCarril) Layout(objs []fyne.CanvasObject, t fyne.Size) {
+	l.fondo.FillColor = colorFondoCarril(tema.De(fyne.CurrentApp().Settings().ThemeVariant()))
+	l.fondo.Refresh()
 	objs[0].Move(fyne.NewPos(0, 0))
 	objs[0].Resize(t)
 	lado := fyne.NewSize(LadoAccionCarril, LadoAccionCarril)

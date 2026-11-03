@@ -261,7 +261,7 @@ func (a *Armazon) moverCajonEnVivo() {
 	posX := min(max(a.entrada, -ancho), 0)
 	progreso := min(max((ancho+posX)/ancho, 0), 1)
 	a.Menu.Move(fyne.NewPos(posX, 0))
-	r.ponerBase(true)
+	r.ponerFondoCajon(true, t.Width)
 	r.colocarAdornosCajon(posX, ancho, t.Height, progreso, true)
 	a.refrescarFlotantes()
 }
@@ -618,7 +618,9 @@ func (a *Armazon) CreateRenderer() fyne.WidgetRenderer {
 		base:        canvas.NewRectangle(color.NRGBA{}),
 		bordeCajon:  borde,
 		marco:       nuevoMarco(),
+		fondoCajon:  nuevoFondoMarco(),
 	}
+	r.fondoCajon.esconder()
 	a.r = r
 	if a.Panel != nil && a.Contenido != nil {
 		r.separador = a.separadorPanel()
@@ -638,6 +640,7 @@ type armazonRenderer struct {
 	// color sobre `neutral-50` (`nav.bg-sidebar` por debajo de 768, appearance.css).
 	base       *canvas.Rectangle
 	bordeCajon *canvas.Rectangle
+	fondoCajon *fondoMarco
 	// marco es la forma «Marco»: el color continuo detrás del menú y la hoja en la que
 	// van el panel y el contenido (ver marco.go). En Carril no se ve.
 	marco     *marco
@@ -671,7 +674,9 @@ func (r *armazonRenderer) rehacer() {
 		r.objetos = append(r.objetos, a.Carril)
 	}
 	if a.Menu != nil {
-		r.objetos = append(r.objetos, r.velo, r.sombraCajon.Objeto(), r.base, a.Menu, r.bordeCajon)
+		r.objetos = append(r.objetos, r.velo, r.sombraCajon.Objeto(), r.base)
+		r.objetos = append(r.objetos, r.fondoCajon.objetos()...)
+		r.objetos = append(r.objetos, a.Menu, r.bordeCajon)
 	}
 }
 
@@ -686,11 +691,11 @@ func (a *Armazon) separacionHoja(estrecha bool) float32 {
 
 // colocarMarco pinta la forma Marco: el color continuo detrás de todo y la hoja desde
 // `x` —donde acaba el menú— hasta lo que se separa del borde. En Carril lo quita y deja
-// el lienzo de siempre. Y le dice al menú si deja ver el marco, que ya es de su color:
-// en el cajón —el del teléfono y el de quien lleva carril de iconos— conserva su fondo.
+// el lienzo de siempre. El menú deja ver el marco tanto fijo como en el cajón: en
+// este último, fondoCajon conserva ese mismo fondo por encima del velo.
 func (r *armazonRenderer) colocarMarco(t fyne.Size, x, arriba, separa float32, estrecha bool) {
 	enMarco := tema.EsMarco()
-	sinFondo := enMarco && !estrecha && r.a.Carril == nil
+	sinFondo := enMarco
 	if l := lateralEn(r.a.Menu); l != nil && l.SinFondo != sinFondo {
 		l.SinFondo = sinFondo
 		l.Refresh()
@@ -706,11 +711,22 @@ func (r *armazonRenderer) colocarMarco(t fyne.Size, x, arriba, separa float32, e
 	r.marco.colocar(fyne.NewPos(0, 0), t, fyne.NewPos(x, arriba), hoja, estrecha, v)
 }
 
-// ponerBase coloca el suelo opaco bajo el cajón y lo enseña solo cuando hace falta: con
-// el cajón abierto y un carril que deja ver lo de debajo (el del traslúcido).
-func (r *armazonRenderer) ponerBase(conCajon bool) {
+// ponerFondoCajon conserva la continuidad de Marco bajo el menú transparente. Sólo
+// pinta el tramo visible: al arrastrar, el color queda anclado a la ventana. Carril
+// mantiene su suelo opaco bajo el sidebar translúcido.
+func (r *armazonRenderer) ponerFondoCajon(conCajon bool, anchoVentana float32) {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
-	esconder(r.base, !conCajon || tema.Color("sidebar-bg", v).A == 0xff)
+	enMarco := tema.EsMarco()
+	pos, tam := r.a.Menu.Position(), r.a.Menu.Size()
+	x := max(pos.X, 0)
+	visible := max(tam.Width+min(pos.X, 0), 0)
+	if conCajon && enMarco && visible > 0 {
+		r.fondoCajon.pintarTramo(v, x, visible, anchoVentana)
+		r.fondoCajon.colocar(fyne.NewPos(x, pos.Y), fyne.NewSize(visible, tam.Height))
+	} else {
+		r.fondoCajon.esconder()
+	}
+	esconder(r.base, !conCajon || enMarco || tema.Color("sidebar-bg", v).A == 0xff)
 	r.base.FillColor = tema.Color("neutral-50", v)
 	r.base.Move(r.a.Menu.Position())
 	r.base.Resize(r.a.Menu.Size())
@@ -873,7 +889,7 @@ func (r *armazonRenderer) colocarNavegacion(t fyne.Size, separa float32, estrech
 		a.Menu.Move(fyne.NewPos(posX, 0))
 		a.Menu.Resize(fyne.NewSize(ancho, t.Height))
 	}
-	r.ponerBase(conCajon)
+	r.ponerFondoCajon(conCajon, t.Width)
 	progreso := float32(0)
 	if conCajon && ancho > 0 {
 		progreso = min(max((ancho+posX)/ancho, 0), 1)
@@ -901,7 +917,7 @@ func (r *armazonRenderer) colocarAdornosCajon(posX, ancho, alto, progreso float3
 	conBorde := activo && ancho >= tema.Borde
 	esconder(r.bordeCajon, !conBorde)
 	if conBorde {
-		r.bordeCajon.FillColor = BordeSobre("sidebar-border", TokenCarril(), v)
+		r.bordeCajon.FillColor = colorFileteLateral(v)
 		r.bordeCajon.Move(fyne.NewPos(posX+ancho-tema.Borde, 0))
 		r.bordeCajon.Resize(fyne.NewSize(tema.Borde, alto))
 		r.bordeCajon.Refresh()

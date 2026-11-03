@@ -215,6 +215,7 @@ export function NoteCard({
       ? { ...rawNote, data: claro.data ?? {} }
       : rawNote;
   const [editando, setEditando] = useState(false);
+  const tarjetaRef = useRef<HTMLElement>(null);
   const [ancha, setAncha] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const temporizadorRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -327,6 +328,98 @@ export function NoteCard({
     setAncha(false);
     if (borrador !== contenido) onChange({ content: borrador }, { fusion: sesionRef.current });
   };
+  const guardarRef = useUltimo(guardar);
+  useEffect(() => {
+    if (!editando) return;
+    let pulsando = false;
+    let salidaPendiente = false;
+    let terminada = false;
+    let salidaTrasClick: ReturnType<typeof setTimeout> | undefined;
+    const terminar = () => {
+      if (terminada || !tarjetaRef.current) return;
+      terminada = true;
+      guardarRef.current();
+    };
+    const alApoyar = () => {
+      pulsando = true;
+    };
+    const alPulsar = () => {
+      pulsando = false;
+      if (!salidaPendiente) return;
+      salidaPendiente = false;
+      // Cerrar antes de mouseup desplaza la siguiente nota bajo el puntero y
+      // pierde su click. La acción receptora debe completarse antes del cierre.
+      salidaTrasClick = setTimeout(terminar, 0);
+    };
+    const alCancelar = () => {
+      pulsando = false;
+      if (salidaPendiente) terminar();
+      salidaPendiente = false;
+    };
+    // El foco puede salir al portal de una herramienta y desde allí ir a otra
+    // nota. Seguir sólo el blur del article perdería ese segundo salto.
+    const alEnfocar = (e: FocusEvent) => {
+      const destino = e.target;
+      if (
+        !(destino instanceof Element) ||
+        !destino.isConnected ||
+        destino === document.body ||
+        destino === document.documentElement ||
+        tarjetaRef.current?.contains(destino)
+      ) {
+        salidaPendiente = false;
+        return;
+      }
+      if (
+        !destino.closest('[data-notes-editor-exit]') &&
+        !destino.closest('[data-note-id]') &&
+        destino.closest(
+          '[role="toolbar"], [data-notes-editor-tools], [role="menu"], [role="dialog"], [role="listbox"]',
+        )
+      ) {
+        salidaPendiente = false;
+        return;
+      }
+      // El candado retira la clave en click: guardar antes conserva la edición
+      // donde el navegador sí entrega foco al botón. Su barra no se desplaza.
+      if (pulsando && !destino.closest('[data-notes-editor-exit]')) salidaPendiente = true;
+      else terminar();
+    };
+    const alTeclear = (e: KeyboardEvent) => {
+      alCancelar();
+      if (e.key !== 'Escape' || e.defaultPrevented) return;
+      const destino = e.target;
+      if (
+        !(destino instanceof Element) ||
+        destino.closest(
+          '[role="menu"], [role="dialog"], [role="listbox"], [aria-expanded="true"][aria-haspopup]',
+        )
+      )
+        return;
+      const nota = destino.closest('[data-note-id]');
+      if (
+        (nota && nota !== tarjetaRef.current) ||
+        !destino.closest('[role="toolbar"], [data-notes-editor-tools]')
+      )
+        return;
+      e.preventDefault();
+      terminar();
+    };
+    document.addEventListener('pointerdown', alApoyar, true);
+    document.addEventListener('click', alPulsar, true);
+    document.addEventListener('pointercancel', alCancelar, true);
+    document.addEventListener('focusin', alEnfocar);
+    document.addEventListener('keydown', alTeclear);
+    return () => {
+      terminada = true;
+      clearTimeout(salidaTrasClick);
+      document.removeEventListener('pointerdown', alApoyar, true);
+      document.removeEventListener('click', alPulsar, true);
+      document.removeEventListener('pointercancel', alCancelar, true);
+      document.removeEventListener('focusin', alEnfocar);
+      document.removeEventListener('keydown', alTeclear);
+    };
+  }, [editando, guardarRef]);
 
   const glifo =
     note.data?.icon && typeof note.data.icon === 'string' ? (
@@ -392,6 +485,7 @@ export function NoteCard({
 
   return (
     <article
+      ref={tarjetaRef}
       data-note-id={note.id}
       // `article` y no `div`: cada nota es una unidad de contenido independiente y
       // así los lectores de pantalla ofrecen saltar de una a la siguiente.
@@ -426,21 +520,6 @@ export function NoteCard({
         // dentro de la rejilla, sin taparlo todo ni pelearse con el scroll.
         editando && ancha ? 'col-span-full min-h-[70dvh]' : '',
       )}
-      onBlurCapture={(e: FocusEvent) => {
-        // Salir de la tarjeta (otra nota, tabulación fuera) guarda. El foco que va a
-        // un hijo —la barra de formato— no cuenta, y tampoco el clic en el lienzo
-        // vacío (relatedTarget null; en Safari los botones tampoco toman el foco).
-        const destino = e.relatedTarget as Node | null;
-        if (!editando || !destino) return;
-        const tarjeta = e.currentTarget as HTMLElement;
-        // Y NO BASTA CON `contains`: un menú de la barra se cierra al elegir una
-        // opción, así que para cuando llega este evento su elemento ya no está en
-        // el documento y `contains` dice que no. Eso se leía como «me he ido de
-        // la nota» y cerraba el editor a mitad de dar formato. Un destino que ya
-        // no existe no es un sitio al que se haya ido nadie.
-        if (!destino.isConnected) return;
-        if (!tarjeta.contains(destino)) guardar();
-      }}
     >
       <header class={cx('flex items-start', diario ? 'gap-2' : 'gap-1.5')}>
         {/* UNA asa por nota: reordena, mueve en el lienzo libre y, soltada sobre un día

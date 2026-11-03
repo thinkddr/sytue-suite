@@ -13,7 +13,7 @@ image:
   # producción no tira de Docker Hub. El digest lo fija el catálogo de
   # deploy/production/upstream-images.txt y lo espeja el workflow de release.
   repository: livekit-egress
-  tag: "v1.14.0"
+  tag: "v1.15.0"
   pullPolicy: IfNotPresent
   useGlobalRegistry: true
 

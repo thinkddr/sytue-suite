@@ -63,7 +63,7 @@ config:
 # BUILDKIT_IMAGE + CNB_* del builder. PLACEHOLDER por digest: re-pinnear con
 # crane/skopeo ANTES de prod (crane digest <ref:tag>).
 buildkit:
-  image: moby/buildkit:v0.32.1-rootless@sha256:<PIN>   # -> BUILDKIT_IMAGE; re-pin por digest
+  image: moby/buildkit:v0.34.1-rootless@sha256:<PIN>   # -> BUILDKIT_IMAGE; re-pin por digest
 cnb:
   builderImage: paketobuildpacks/builder-jammy-base@sha256:<PIN>  # -> CNB_BUILDER_IMAGE
   gitImage: alpine/git@sha256:<PIN>                                # -> CNB_GIT_IMAGE

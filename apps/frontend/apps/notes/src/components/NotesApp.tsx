@@ -2429,6 +2429,9 @@ function NotesView({
                   </div>
                 ) : (
                   <NoteCanvas
+                    // Bloquear o cambiar de ámbito retira también la sesión local
+                    // y los rangos del editor, aunque el foco siga en una herramienta.
+                    key={`${cryptoScope}:${bloqueado}`}
                     t={t}
                     // En árbol el panel principal es UNA nota a todo el ancho: la
                     // disposición de lista con una sola nota es exactamente eso, y
@@ -2930,9 +2933,47 @@ function BarraDeCuaderno({
    */
   variante?: 'barra' | 'dia';
 }): JSX.Element {
-  // En la página, el filtro de texto es una lupa que se abre; con algo escrito se
-  // queda abierto, o no se sabría por qué faltan notas.
+  // El filtro permanece abierto al pasar a otra herramienta o nota. Colapsarlo
+  // en blur mueve el destino entre pointerdown y click, especialmente en móvil.
+  // El mismo botón lo cierra y limpia la consulta sin perder su propio foco.
   const [filtrando, setFiltrando] = useState(false);
+  const filtroAbierto = filtrando || Boolean(filtro);
+  const controlFiltro = (
+    <div
+      role="group"
+      aria-label={t('filter.placeholder')}
+      class={cx(
+        'inline-flex shrink-0 items-center gap-1',
+        filtroAbierto && (variante === 'dia' ? 'w-44 max-w-[50vw]' : 'w-44 max-w-full'),
+      )}
+    >
+      <IconButton
+        label={filtroAbierto ? t('common.close') : t('filter.placeholder')}
+        aria-expanded={filtroAbierto}
+        onClick={() => {
+          if (filtroAbierto) {
+            onFiltro('');
+            setFiltrando(false);
+          } else setFiltrando(true);
+        }}
+      >
+        <Icon name={filtroAbierto ? 'close' : 'search'} size={16} />
+      </IconButton>
+      {filtroAbierto ? (
+        <Input
+          type="search"
+          size="sm"
+          value={filtro}
+          // eslint-disable-next-line jsx-a11y/no-autofocus -- la lupa abre el campo y le entrega el foco
+          autoFocus={filtrando}
+          aria-label={t('filter.placeholder')}
+          placeholder={t('filter.placeholder')}
+          class="min-w-0 flex-1 pointer-coarse:min-h-[max(44px,2.75rem)]"
+          onInput={(e) => onFiltro(e.currentTarget.value)}
+        />
+      ) : null}
+    </div>
+  );
 
   // Los tres menús, con un icono por disparador: la barra dice qué cuaderno es y deja
   // escribir; los rótulos («Orden propio», «Filtrar por etiqueta», «Exportar») la
@@ -3051,25 +3092,8 @@ function BarraDeCuaderno({
 
   if (variante === 'dia') {
     return (
-      <>
-        {filtrando || filtro ? (
-          <Input
-            type="search"
-            size="sm"
-            value={filtro}
-            // eslint-disable-next-line jsx-a11y/no-autofocus -- se abre al pulsar la lupa: el foco va al campo
-            autoFocus={filtrando}
-            aria-label={t('filter.placeholder')}
-            placeholder={t('filter.placeholder')}
-            class="w-44! max-w-[50vw]"
-            onInput={(e) => onFiltro((e.target as HTMLInputElement).value)}
-            onBlur={() => setFiltrando(false)}
-          />
-        ) : notebook.daily_date ? null : (
-          <IconButton label={t('filter.placeholder')} onClick={() => setFiltrando(true)}>
-            <Icon name="search" size={16} />
-          </IconButton>
-        )}
+      <div class="contents" data-notes-editor-tools>
+        {filtroAbierto || !notebook.daily_date ? controlFiltro : null}
         {exportar}
         <Dropdown
           label={t('common.more')}
@@ -3082,12 +3106,15 @@ function BarraDeCuaderno({
         >
           {itemsAcciones}
         </Dropdown>
-      </>
+      </div>
     );
   }
 
   return (
-    <div class="notes-notebook-toolbar border-border-subtle flex shrink-0 flex-wrap items-center justify-between gap-3 border-b px-4 py-3 sm:px-6">
+    <div
+      data-notes-editor-tools
+      class="notes-notebook-toolbar border-border-subtle flex shrink-0 flex-wrap items-center justify-between gap-3 border-b px-4 py-3 sm:px-6"
+    >
       <h2 class="text-text flex min-w-0 flex-1 basis-40 items-center gap-2 text-lg font-semibold">
         {notebook.emoji ? <span aria-hidden="true">{notebook.emoji}</span> : null}
         <span class="truncate" title={notebook.title}>
@@ -3099,30 +3126,14 @@ function BarraDeCuaderno({
           <Button
             size="sm"
             variant="ghost"
+            data-notes-editor-exit
             onClick={bloqueado ? onDesbloquear : onBloquear}
             leadingIcon={<Icon name="lock" size={14} />}
           >
             {bloqueado ? t('crypto.unlock') : t('crypto.lockNow')}
           </Button>
         ) : null}
-        {filtrando || filtro ? (
-          <Input
-            type="search"
-            size="sm"
-            value={filtro}
-            // eslint-disable-next-line jsx-a11y/no-autofocus -- la lupa abre el campo y le entrega el foco
-            autoFocus={filtrando}
-            aria-label={t('filter.placeholder')}
-            placeholder={t('filter.placeholder')}
-            class="w-44! max-w-full"
-            onInput={(e) => onFiltro(e.currentTarget.value)}
-            onBlur={() => setFiltrando(false)}
-          />
-        ) : (
-          <IconButton label={t('filter.placeholder')} onClick={() => setFiltrando(true)}>
-            <Icon name="search" size={16} />
-          </IconButton>
-        )}
+        {controlFiltro}
         {exportar}
         <Dropdown
           label={t('common.more')}

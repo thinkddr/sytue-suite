@@ -132,7 +132,7 @@ spec:
             - |
               mkdir -p /home/egress/tmp /home/egress/.cache/xdgr
               chmod 700 /home/egress/.cache/xdgr
-              exec /entrypoint.sh
+              exec /tini -- /entrypoint.sh
           env:
             - name: EGRESS_CONFIG_FILE
               value: /etc/egress/config.yaml
@@ -178,7 +178,7 @@ spec:
             # grabación, y el fichero sale truncado sin decir por qué.
             - name: dshm
               mountPath: /dev/shm
-            # v1.14.0 fija TmpDir=/home/egress/tmp (pkg/config/base.go), NO
+            # v1.15.0 fija TmpDir=/home/egress/tmp (pkg/config/base.go), NO
             # /tmp. También viven aquí el estado de PulseAudio y las cachés del
             # navegador/GStreamer. Un /tmp escribible por sí solo no basta.
             # El home NO contiene binarios: Dockerfile copia egress a /bin,

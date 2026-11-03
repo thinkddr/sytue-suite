@@ -261,10 +261,10 @@ export function NotebookTree({
             }
           }}
           class={cx(
-            'notes-notebook-row group relative flex cursor-pointer items-center gap-1.5 rounded-md py-1.5 pr-1 text-base transition-colors duration-150 pointer-coarse:min-h-[max(44px,2.75rem)]',
+            'notes-notebook-row group rounded-nav relative flex cursor-pointer items-center gap-1.5 py-1.5 pr-1 text-base transition-colors duration-150 pointer-coarse:min-h-[max(44px,2.75rem)]',
             ANILLO_CROMO,
             activo === nb.id
-              ? 'bg-sidebar-active text-sidebar-active-fg font-medium'
+              ? 'sytue-nav-current bg-sidebar-active text-sidebar-active-fg [font-weight:var(--sytue-nav-active-weight)]'
               : 'text-sidebar-fg hover:bg-sidebar-hover',
           )}
           style={{ paddingLeft: `${0.5 + (nivel - 1) * 0.85}rem` }}
@@ -394,10 +394,10 @@ export function NotebookTree({
                     arrastrando?.tipo === 'note' && arrastrando.id === n.id ? 'true' : undefined
                   }
                   class={cx(
-                    'group/nota flex w-full cursor-pointer items-center gap-1.5 rounded-md py-1 pr-1 text-left text-sm transition-colors duration-150 pointer-coarse:min-h-[44px]',
+                    'group/nota rounded-nav flex w-full cursor-pointer items-center gap-1.5 py-1 pr-1 text-left text-sm transition-colors duration-150 pointer-coarse:min-h-[44px]',
                     ANILLO_CROMO,
                     notaSeleccionada === n.id
-                      ? 'bg-sidebar-active/60 text-sidebar-active-fg font-medium'
+                      ? 'sytue-nav-current bg-sidebar-active/60 text-sidebar-active-fg [font-weight:var(--sytue-nav-active-weight)]'
                       : 'text-sidebar-fg-muted hover:bg-sidebar-hover hover:text-sidebar-fg',
                   )}
                   style={{ paddingLeft: `${0.75 + nivel * 0.85}rem` }}

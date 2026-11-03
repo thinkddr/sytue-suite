@@ -307,13 +307,13 @@ const HISTORY_CAP = 200;
  *  que el cromo declara para lo que vive encima de él (WCAG 1.4.11). */
 const SIDEBAR_ITEM =
   'flex w-full items-center gap-2 rounded-nav px-[var(--sytue-nav-pad)] py-2 text-left text-base ' +
-  'transition-colors duration-150 sytue-focus-ring-chrome ' +
+  'transition-colors duration-150 sytue-focus-ring-chrome pointer-coarse:min-h-[max(44px,2.75rem)] ' +
   'focus-visible:outline-none';
 
 /** Estado visual de una entrada del sidebar según esté su panel abierto. */
 const sidebarItemState = (on: boolean): string =>
   on
-    ? 'bg-sidebar-active text-sidebar-active-fg [font-weight:var(--sytue-nav-active-weight)]'
+    ? 'sytue-nav-current bg-sidebar-active text-sidebar-active-fg [font-weight:var(--sytue-nav-active-weight)]'
     : 'font-medium text-sidebar-fg hover:bg-sidebar-hover';
 
 /** Clave de localStorage del colapso de las secciones POR DEFECTO del sidebar

@@ -6,6 +6,7 @@
 #
 #   renovate-resultado.sh <registro JSON de Renovate (LOG_FILE)> [full|lookup]
 #   renovate-resultado.sh --propuestas <registro JSON de Renovate (LOG_FILE)>
+#   renovate-resultado.sh --diagnostico <registro JSON de Renovate (LOG_FILE)>
 #
 #   0 = procesó el repositorio entero, o completó la consulta solicitada
 #   1 = abortó, o no se sabe: el registro no existe o no llega al final
@@ -23,6 +24,9 @@ accion=comprobar
 if [ "${1:-}" = "--propuestas" ]; then
   accion=propuestas
   shift
+elif [ "${1:-}" = "--diagnostico" ]; then
+  accion=diagnostico
+  shift
 fi
 registro="${1:?uso: renovate-resultado.sh <registro JSON de Renovate> [full|lookup]}"
 modo="${2:-full}"
@@ -30,6 +34,41 @@ modo="${2:-full}"
   echo "Renovate no dejó registro en $registro: no se sabe qué hizo, y eso no es «todo al día»." >&2
   exit 1
 }
+if [ "$accion" = diagnostico ]; then
+  # El debug contiene credenciales. Sólo salen códigos HTTP, métodos conocidos
+  # y la forma de una ruta API: los demás segmentos, consultas y textos se omiten.
+  jq -Rn '
+    def ruta_api:
+      if type != "string" then null
+      elif startswith("https://api.github.com/") then ltrimstr("https://api.github.com")
+      elif startswith("/repos/") or . == "/graphql" then .
+      else null end
+      | if . == null then null else
+          split("?")[0] | split("#")[0] | split("/")[1:]
+          | map(if test("^[0-9]+$") then ":id" elif . == "" or
+              IN("repos", "pulls", "issues", "comments", "labels", "reviews",
+                 "requested_reviewers", "branches", "main", "sytue-native",
+                 "protection", "required_status_checks", "commits", "status",
+                 "statuses", "check-runs", "check-suites", "git", "refs", "heads",
+                 "trees", "blobs", "merges", "contents", "actions", "runs",
+                 "workflows", "dispatches", "automerge", "auto_merge", "merge-queue",
+                 "merge_queue", "dependabot", "alerts", "rulesets", "graphql")
+              then . else "*" end)
+          | "/" + join("/")
+        end;
+    [inputs | fromjson? | select(type == "object") | . as $linea
+     | [$linea | .. | objects | (.statusCode?, .status?) | tonumber?
+        | select(. >= 400 and . <= 599)] | unique as $codigos
+     | select($codigos | length > 0)
+     | {http: $codigos,
+        methods: ([$linea | .. | objects | .method?
+          | select(IN("GET", "POST", "PATCH", "PUT", "DELETE", "HEAD", "OPTIONS"))] | unique),
+        routes: ([$linea | .. | objects | (.url?, .href?, .requestUrl?, .path?, .pathname?)
+          | ruta_api | select(. != null)] | unique)}]
+    | unique | .[-20:]
+  ' "$registro"
+  exit 0
+fi
 if [ "$accion" = propuestas ]; then
   # Sólo nombres y versiones/propuestas: jamás se exporta el JSON de Renovate,
   # que contiene también configuración y credenciales de registros. En el log

@@ -34,12 +34,10 @@ image:
   # en un rollout es un fallo dificil de atribuir.
   repository: docker.dragonflydb.io/dragonflydb/dragonfly
   # 1.40.0 es el mínimo por CVE-2026-62357 (`CMS.INITBYDIM`, escritura fuera de
-  # límites sin autenticar, afecta a < 1.40). Se fija la 1.40.1, que es la última.
-  tag: v1.40.2@sha256:18afa43e911f1dff18c7d1eb452361876d9702bb1cdff5c5d75c69617a4065c9
-  # Digest del INDICE multi-arch (no del hijo de una arquitectura). Vacio =>
-  # se referencia solo por tag. Se fija en produccion, donde ademas hoy se tira
-  # del origen sin espejo: ver deploy/production/upstream-directo.txt.
-  digest: ""
+  # límites sin autenticar, afecta a < 1.40). El digest fija la imagen revisada.
+  tag: v1.40.2
+  # Índice multi-arquitectura, conservado byte a byte en el espejo de producción.
+  digest: "sha256:18afa43e911f1dff18c7d1eb452361876d9702bb1cdff5c5d75c69617a4065c9"
   pullPolicy: IfNotPresent
   # false por defecto, como pgbouncer y livekit: fuera de produccion se tira del
   # origen. En produccion, `values-prod.yaml` lo pone a true Y reescribe

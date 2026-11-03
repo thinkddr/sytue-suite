@@ -1191,11 +1191,12 @@ function Entrada({
       onClick={onClick}
       aria-current={activa ? 'page' : undefined}
       // Tokens de navegación: superficie blanca, selección y marcador azules.
-      class={
+      class={cx(
+        'pointer-coarse:min-h-[max(44px,2.75rem)]',
         activa
-          ? 'bg-sidebar-active text-sidebar-active-fg before:bg-indicator sytue-focus-ring-chrome rounded-nav relative w-full px-3 py-1.5 text-left text-base [font-weight:var(--sytue-nav-active-weight)] before:absolute before:top-1.5 before:bottom-1.5 before:left-0 before:w-[min(2px,var(--sytue-nav-indicator))] before:rounded-full before:content-[""] focus-visible:outline-none'
-          : 'text-sidebar-fg hover:bg-sidebar-hover sytue-focus-ring-chrome rounded-nav w-full px-3 py-1.5 text-left text-base transition-colors focus-visible:outline-none'
-      }
+          ? 'sytue-nav-current bg-sidebar-active text-sidebar-active-fg before:bg-indicator sytue-focus-ring-chrome rounded-nav relative w-full px-3 py-1.5 text-left text-base [font-weight:var(--sytue-nav-active-weight)] before:absolute before:top-1.5 before:bottom-1.5 before:left-0 before:w-[min(2px,var(--sytue-nav-indicator))] before:rounded-full before:content-[""] focus-visible:outline-none'
+          : 'text-sidebar-fg hover:bg-sidebar-hover sytue-focus-ring-chrome rounded-nav w-full px-3 py-1.5 text-left text-base transition-colors focus-visible:outline-none',
+      )}
     >
       {children}
     </button>

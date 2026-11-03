@@ -3,8 +3,9 @@
 // No levanta aplicaciones ni usa sesión. Incluye una mutación: quitar la exclusión
 // del tooltip tiene que reproducir la tinta oscura sobre fondo oscuro de Marco.
 import { chromium } from 'playwright';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { createReportDirectory, writeReport } from './lib/report-output.mjs';
 
 const css = readFileSync(process.env.MENUS_CSS || '/tmp/menus-traslucidos.css', 'utf8');
 const js = readFileSync(process.env.MENUS_JS || '/tmp/menus-traslucidos.js', 'utf8');
@@ -15,8 +16,7 @@ const paletas = [
   { color: 'cobalto', app: 'cast' },
   ...apps.map((app) => ({ color: 'app', app })),
 ];
-const out = process.env.MENUS_OUT || '/tmp/menus-traslucidos';
-mkdirSync(out, { recursive: true });
+const out = createReportDirectory('menus-traslucidos', process.env.MENUS_OUT);
 const browser = await chromium.launch();
 let comprobaciones = 0;
 
@@ -370,9 +370,9 @@ async function navegacion() {
     } finally {
       resultados.push(resultado);
       if (page) await page.close();
-      writeFileSync(join(out, 'results.json'), JSON.stringify({ results: resultados }, null, 2));
     }
   }
+  writeReport(join(out, 'results.json'), JSON.stringify({ results: resultados }, null, 2));
   const fallos = resultados.filter((r) => !r.ok);
   exigir(fallos.length === 0, `navegación: ${fallos.map((r) => `${r.id}: ${r.error}`).join('; ')}`);
 }

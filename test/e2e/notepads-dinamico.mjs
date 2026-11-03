@@ -330,7 +330,19 @@ async function herramientasDelEditor(page, leerNotas) {
         ?.content.includes('Escritura posterior.'),
     );
     const guardado = leerNotas().find((n) => n.id === 'nota-3').content;
-    assert(guardado.includes('<h2') && guardado.includes(url), 'se guarda el formato aplicado');
+    const enlacesGuardados = await page.evaluate(
+      (html) =>
+        [...new DOMParser().parseFromString(html, 'text/html').querySelectorAll('a')].map(
+          (anchor) => anchor.href,
+        ),
+      guardado,
+    );
+    assert(
+      guardado.includes('<h2') &&
+        enlacesGuardados.length === 1 &&
+        enlacesGuardados[0] === url,
+      'se guarda el formato aplicado',
+    );
     contextoActual.fase = 'editor-escape';
     const segundo = otra.locator('[contenteditable="true"]');
     await segundo.fill('Salir con Escape también guarda.');

@@ -19,7 +19,7 @@ type StorageWire struct {
 type StorageMessage struct {
 	MsgType string      `json:"msgtype"`
 	Body    string      `json:"body"`
-	Wire    StorageWire `json:"org.sytue.storage_pq"`
+	Wire    StorageWire `json:"org.sytue.storage_pq"` //nolint:tagliatelle // namespace inverso de evento Matrix, no snake_case.
 }
 
 func NewStorageMessage(kind string, envelope Envelope) StorageMessage {

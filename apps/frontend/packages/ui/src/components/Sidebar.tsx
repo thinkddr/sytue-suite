@@ -83,8 +83,15 @@ export function Sidebar({
       {/* `empty:hidden`: el pie de Calendar y Contacts es `<ImportData>`, que no pinta nada
           si la organización no ha conectado ningún origen. `footer` es un elemento igual,
           y sin esto quedaba un filete con 15 px de nada debajo (medido el 2026-09-28). */}
+      {/* `max-h-[60%] overflow-y-auto`: el pie vive FUERA de la zona que desplaza y el
+          carril entero recorta (`overflow-hidden`), así que en una ventana baja el botón
+          «Trae tus datos» quedaba cortado y no había manera de llegar a él — −30px POR
+          ABAJO (inalcanzable) en Galaxy S24 landscape (780×360), barrido móvil del
+          2026-11-03, en Calendar y Contacts. Con el tope al 60 % del carril el pie
+          desplaza por dentro cuando no cabe, y lo suyo sigue siendo pulsable; en una
+          ventana normal no cabe a propósito y no cambia nada. */}
       {footer ? (
-        <div class="sytue-sidebar-footer border-chrome-border border-t px-4 py-2 empty:hidden">
+        <div class="sytue-sidebar-footer max-h-[60%] min-h-0 overflow-y-auto border-chrome-border border-t px-4 py-2 empty:hidden">
           {footer}
         </div>
       ) : null}

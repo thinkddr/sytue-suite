@@ -11,6 +11,7 @@ import (
 	"io"
 
 	"filippo.io/age"
+
 	"git.sytue.eu/sytue/one/apps/nucleo/storage"
 )
 
@@ -68,7 +69,9 @@ func Seal(recipient Recipient, context, payload []byte) (Envelope, error) {
 		return Envelope{}, err
 	}
 	var size [4]byte
-	binary.BigEndian.PutUint32(size[:], uint32(len(context)))
+	// G115: len(context) ya está acotado a MaxEnvelopeContext (4 KiB) por la guarda
+	// de arriba; en esta arquitectura un int nunca excede uint32 con ese techo.
+	binary.BigEndian.PutUint32(size[:], uint32(len(context))) //nolint:gosec
 	for _, part := range [][]byte{envelopeMagic, size[:], context, payload} {
 		if _, err := writer.Write(part); err != nil {
 			return Envelope{}, err
@@ -97,10 +100,20 @@ func Open(identity *Identity, context []byte, envelope Envelope) ([]byte, error)
 	if err != nil {
 		return nil, ErrEnvelope
 	}
-	max := len(envelopeMagic) + 4 + MaxEnvelopeContext + MaxEnvelopePayload
-	raw, err := io.ReadAll(io.LimitReader(reader, int64(max+1)))
+	limit := len(envelopeMagic) + 4 + MaxEnvelopeContext + MaxEnvelopePayload
+	raw, err := io.ReadAll(io.LimitReader(reader, int64(limit+1)))
 	defer clear(raw)
-	if err != nil || len(raw) > max || len(raw) < len(envelopeMagic)+4 || !bytes.Equal(raw[:len(envelopeMagic)], envelopeMagic) {
+	if err != nil {
+		return nil, ErrEnvelope
+	}
+	return openStream(raw, context, limit)
+}
+
+// openStream separates the framed stream that age already authenticated: the
+// magic, the declared context length, the bound context and the payload. The
+// frame layout is shared with Seal; the two must not drift apart.
+func openStream(raw, context []byte, limit int) ([]byte, error) {
+	if len(raw) > limit || len(raw) < len(envelopeMagic)+4 || !bytes.Equal(raw[:len(envelopeMagic)], envelopeMagic) {
 		return nil, ErrEnvelope
 	}
 	start := len(envelopeMagic) + 4
@@ -147,7 +160,9 @@ func encodeStorageRecord(record storage.Record, proof []byte) ([]byte, error) {
 		return nil, ErrEnvelope
 	}
 	raw := make([]byte, 4+len(header)+len(record.Payload))
-	binary.BigEndian.PutUint32(raw[:4], uint32(len(header)))
+	// G115: la guarda de arriba acota len(header)+len(record.Payload) a
+	// MaxEnvelopePayload (64 KiB), muy por debajo de uint32.
+	binary.BigEndian.PutUint32(raw[:4], uint32(len(header))) //nolint:gosec
 	copy(raw[4:], header)
 	copy(raw[4+len(header):], record.Payload)
 	return raw, nil

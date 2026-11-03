@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"filippo.io/age"
+
 	"git.sytue.eu/sytue/one/apps/nucleo/storage"
 )
 
@@ -108,18 +109,18 @@ func TestHybridStorageRecordPreservesExactJSONAndMaximumWireRecord(t *testing.T)
 		t.Fatal(err)
 	}
 	padding := base64.RawStdEncoding.EncodeToString(random)
-	max := 0
+	fits := 0
 	for low, high := 1, len(padding); low <= high; {
 		n := low + (high-low)/2
 		record.Payload = []byte("{\"high_entropy\":\"" + padding[:n] + "\"}")
 		if record.Validate(scope) != nil {
 			high = n - 1
 		} else {
-			max = n
+			fits = n
 			low = n + 1
 		}
 	}
-	record.Payload = []byte("{\"high_entropy\":\"" + padding[:max] + "\"}")
+	record.Payload = []byte("{\"high_entropy\":\"" + padding[:fits] + "\"}")
 	raw, err := json.Marshal(record)
 	if err != nil || len(raw) < storage.MaxRecordBytes-4 || record.Validate(scope) != nil {
 		t.Fatal("maximum wire vector was not exercised", len(raw), err)

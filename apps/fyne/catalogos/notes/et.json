@@ -32,6 +32,7 @@
   "common.offline": "Olete võrguühenduseta. Muudatusi ei salvestata enne ühenduse taastumist.",
   "common.retry": "Proovi uuesti",
   "common.save": "Salvesta",
+  "crypto.dataReviewRequired": "See osa sisaldab andmeid, mida rakendus ei saa täpsust kaotamata muuta. Algandmed on säilitatud.",
   "crypto.disable": "Eemalda krüpteering",
   "crypto.disableWarning": "Olemasolevad krüpteeritud märkmed jäävad loetamatuks. Avage esmalt märkmik.",
   "crypto.enable": "Krüpteeri",
@@ -39,7 +40,6 @@
   "crypto.lockNow": "Lukusta kohe",
   "crypto.locked": "Lukus",
   "crypto.migrating": "Märkmiku sisu kaitsmine…",
-  "crypto.dataReviewRequired": "See osa sisaldab andmeid, mida rakendus ei saa täpsust kaotamata muuta. Algandmed on säilitatud.",
   "crypto.migrationFailed": "Krüptimist ei saanud lõpule viia. Sinu andmed on alles. Ava märkmik uuesti, et muudatused üle vaadata.",
   "crypto.mismatch": "Kaks paroolifraasi on erinevad.",
   "crypto.passphrase": "Paroolifraas",
@@ -266,6 +266,7 @@
   "notebook.delete": "Kustuta märkmik",
   "notebook.deleteConfirm": "Kas kustutada „{title}“ ja kõik, mis selles on?",
   "notebook.emoji": "Ikoon",
+  "notebook.move": "Teisalda märkmik",
   "notebook.newChild": "Uus märkmik sisse",
   "notebook.notes": {
     "one": "{count} märge",

@@ -49,12 +49,10 @@ const VISIBILIDADES: { key: NoteVisibility; glyph: GlyphName }[] = [
 ];
 
 const LAYOUTS: { key: NotebookLayout; glyph: GlyphName }[] = [
-  // El árbol va primero porque es el modo por defecto; el resto son «funciones
-  // añadidas», como pide el producto.
+  { key: 'list', glyph: 'layoutList' },
   { key: 'tree', glyph: 'layoutTree' },
   { key: 'free', glyph: 'layoutFree' },
   { key: 'columns', glyph: 'layoutColumns' },
-  { key: 'list', glyph: 'layoutList' },
 ];
 
 /** Paleta de cuadernos. Doce tonos medidos para llevar texto blanco encima. */
@@ -91,7 +89,7 @@ export function NotebookSettings({
   const [title, setTitle] = useState(notebook?.title ?? '');
   const [emoji, setEmoji] = useState(notebook?.emoji ?? '');
   const [color, setColor] = useState(notebook?.color ?? COLORES[0]!);
-  const [layout, setLayout] = useState<NotebookLayout>(notebook?.layout ?? 'tree');
+  const [layout, setLayout] = useState<NotebookLayout>(notebook?.layout ?? 'list');
   const [visibility, setVisibility] = useState<NoteVisibility>(notebook?.visibility ?? 'personal');
   const [indexable, setIndexable] = useState(notebook?.indexable ?? true);
   const [encrypted, setEncrypted] = useState(notebook?.encrypted ?? false);

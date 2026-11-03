@@ -683,20 +683,23 @@ func (b *Boton) MouseOut() {
 
 // MouseDown y MouseUp son `:active`.
 func (b *Boton) MouseDown(*desktop.MouseEvent) {
-	if b.inerte() {
-		return
-	}
-	b.pulsado = true
-	b.Refresh()
+	b.pulsacionDePuntero(true)
 }
 
 func (b *Boton) MouseUp(*desktop.MouseEvent) {
-	if !b.pulsado {
+	b.pulsacionDePuntero(false)
+}
+
+func (b *Boton) pulsacionDePuntero(pulsado bool) {
+	pulsado = pulsado && !b.inerte()
+	if b.pulsado == pulsado {
 		return
 	}
-	b.pulsado = false
+	b.pulsado = pulsado
 	b.Refresh()
 }
+
+func (b *Boton) pulsacionDisponible() bool { return !b.inerte() }
 
 type botonRenderer struct {
 	b               *Boton

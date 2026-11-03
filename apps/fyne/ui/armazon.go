@@ -86,6 +86,10 @@ type Armazon struct {
 	// DetalleAbierto solo cuenta con Panel y ventana estrecha: `true` enseña el
 	// detalle y `false` la lista. Sin él, en estrecho el detalle sería inalcanzable.
 	DetalleAbierto bool
+	// MenuEnDetalle permite abrir el cajón por gesto también en el detalle cuando
+	// este es la pantalla principal, como una conversación de Rooms. Por defecto
+	// el borde conserva la navegación de volver de los detalles secundarios.
+	MenuEnDetalle bool
 	// CajonAbierto abre el menú como cajón superpuesto en móvil (o con carril de iconos).
 	CajonAbierto bool
 	// Titulo es el de la barra móvil que pone el propio armazón cuando la app no trae

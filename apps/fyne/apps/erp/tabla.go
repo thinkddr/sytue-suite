@@ -521,13 +521,14 @@ func (l *Lista) filaERP(v tema.Variante, res tablaResuelta, f int) fyne.CanvasOb
 		}
 	})
 	fila.Marcada = l.Marcadas[r.ID]
-	lay := &filaCeldas{anchos: res.anchos}
-	hijos := []fyne.CanvasObject{fila}
-	casilla := NuevaCasillaNativa(NombreDe(r), fila.Marcada, func() {
+	fila.AlMarcar = func() {
 		if l.AlMarcar != nil {
 			l.AlMarcar(r.ID)
 		}
-	})
+	}
+	lay := &filaCeldas{anchos: res.anchos}
+	hijos := []fyne.CanvasObject{fila}
+	casilla := NuevaCasillaNativa(NombreDe(r), fila.Marcada, fila.AlMarcar)
 	lay.casilla, lay.casillaY = casilla, filaCasillaY
 	lay.fondo = fila
 	hijos = append(hijos, casilla)
@@ -669,7 +670,14 @@ func (f *filaCeldas) Layout(_ []fyne.CanvasObject, t fyne.Size) {
 // ratón, con Intro y con Espacio, que son las tres teclas de la web.
 type FilaERP struct {
 	ui.Pulsable
-	Marcada bool
+	Marcada  bool
+	AlMarcar func()
+}
+
+func (f *FilaERP) TappedSecondary(*fyne.PointEvent) {
+	if f.AlMarcar != nil {
+		f.AlMarcar()
+	}
 }
 
 // NuevaFilaERP crea el fondo de una fila.

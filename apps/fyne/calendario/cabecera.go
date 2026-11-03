@@ -263,6 +263,13 @@ func (r *cabeceraVistaRenderer) colocarMovil(util float32) {
 	r.tira.Move(fyne.NewPos(cabeceraPX, cabeceraPY))
 	r.tira.Lado = r.c.altoFila()
 	r.tira.Resize(fyne.NewSize(max(util, 0), r.tira.Lado))
+	// Los controles son los mismos del reparto de escritorio. Volver al MISMO
+	// ancho no dispara Resize: hay que recuperar sus coordenadas dentro de la tira
+	// y, en el grupo izquierdo, dentro del contenedor que los vuelve a agrupar.
+	r.tira.Refresh()
+	for _, o := range r.tira.Objetos {
+		o.Refresh()
+	}
 }
 
 func (r *cabeceraVistaRenderer) colocarFilas(t fyne.Size, util float32) {

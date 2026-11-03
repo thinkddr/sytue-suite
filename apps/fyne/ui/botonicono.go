@@ -270,18 +270,23 @@ func (b *BotonIcono) MouseOut() {
 
 // MouseDown y MouseUp son `:active`.
 func (b *BotonIcono) MouseDown(*desktop.MouseEvent) {
-	if !b.Inerte {
-		b.pulsado = true
-		b.Refresh()
-	}
+	b.pulsacionDePuntero(true)
 }
 
 func (b *BotonIcono) MouseUp(*desktop.MouseEvent) {
-	if b.pulsado {
-		b.pulsado = false
-		b.Refresh()
-	}
+	b.pulsacionDePuntero(false)
 }
+
+func (b *BotonIcono) pulsacionDePuntero(pulsado bool) {
+	pulsado = pulsado && !b.Disabled()
+	if b.pulsado == pulsado {
+		return
+	}
+	b.pulsado = pulsado
+	b.Refresh()
+}
+
+func (b *BotonIcono) pulsacionDisponible() bool { return !b.Disabled() }
 
 // FocusGained enciende el aro.
 func (b *BotonIcono) FocusGained() {

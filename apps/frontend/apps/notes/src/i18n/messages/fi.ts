@@ -118,6 +118,7 @@ export const fi: AppCatalog<typeof en> = {
   'notebook.notes': { one: '{count} muistiinpano', other: '{count} muistiinpanoa' },
   'notebook.emoji': 'Kuvake',
   'notebook.color': 'Väri',
+  'notebook.move': 'Siirrä muistikirjaa',
   'notebook.title': 'Nimi',
   'layout.label': 'Asettelu',
   'layout.tree': 'Puu',

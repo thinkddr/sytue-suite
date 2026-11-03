@@ -70,6 +70,7 @@ type DeslizaFoto struct {
 	alTocar                 func(fx, fy float32, vista fyne.Position)
 	dx, dy                  float32
 	desde                   time.Time
+	cancelado               bool
 	toques                  toques
 }
 
@@ -132,7 +133,7 @@ func (d *DeslizaFoto) Cursor() desktop.Cursor { return desktop.PointerCursor }
 
 // Dragged sigue al dedo, a un cuarto hacia un lado sin foto.
 func (d *DeslizaFoto) Dragged(e *fyne.DragEvent) {
-	if !conDedo() {
+	if !conDedo() || d.cancelado {
 		return
 	}
 	if d.desde.IsZero() {
@@ -154,6 +155,10 @@ func (d *DeslizaFoto) Dragged(e *fyne.DragEvent) {
 
 // DragEnd decide.
 func (d *DeslizaFoto) DragEnd() {
+	if d.cancelado {
+		d.cancelado = false
+		return
+	}
 	if d.desde.IsZero() {
 		return
 	}
@@ -166,6 +171,16 @@ func (d *DeslizaFoto) DragEnd() {
 	case paso == -1 && d.alAnterior != nil:
 		d.alAnterior()
 	}
+}
+
+// CancelarArrastre devuelve la foto a su sitio sin navegar a otra.
+func (d *DeslizaFoto) CancelarArrastre() {
+	if d.desde.IsZero() {
+		return
+	}
+	d.cancelado = true
+	d.dx, d.dy, d.desde = 0, 0, time.Time{}
+	d.lienzo.Desplazar(0)
 }
 
 // CreateRenderer: no pinta nada, solo recibe.

@@ -118,6 +118,7 @@ export const hu: AppCatalog<typeof en> = {
   'notebook.notes': { one: '{count} jegyzet', other: '{count} jegyzet' },
   'notebook.emoji': 'Ikon',
   'notebook.color': 'Szín',
+  'notebook.move': 'Jegyzetfüzet áthelyezése',
   'notebook.title': 'Név',
   'layout.label': 'Elrendezés',
   'layout.tree': 'Fa',

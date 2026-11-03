@@ -1,9 +1,28 @@
 # El parche de URL entrantes, listo para enviar a Fyne
 
-`apps/fyne/go.mod` reemplaza Fyne por `github.com/thinkddr/fyne/v2 v2.8.2-sytue.2`
+`apps/fyne/go.mod` reemplaza Fyne por `github.com/thinkddr/fyne/v2 v2.8.2-sytue.3`
 (alojado en GitHub desde el 2026-09-27; antes en git.gay, con las mismas ramas y tags)
 (ADR «URL entrante» en `docs/decisions.md`). Un fork es deuda: esta carpeta tiene lo que
 hace falta para quitarlo, que es que el parche entre aguas arriba.
+
+## Ciclo completo del toque móvil (2026-11-02)
+
+El tag [`v2.8.2-sytue.3`](https://github.com/thinkddr/fyne/tree/v2.8.2-sytue.3)
+añade la interfaz opcional `mobile.TouchObserverCanvas`. Su observador recibe
+el ciclo físico completo aunque un `TouchFilter` haya devuelto `FilterPass`;
+observar no captura ni retrasa los eventos. Esto permite mostrar el estado
+pulsado sin impedir que se desplace una lista.
+
+Al cambiar el contenido, las capas, la geometría o el observador, la cancelación
+se entrega antes del `DragEnd` del driver. La suite la usa para descartar los
+movimientos provisionales, sin persistirlos como si el usuario hubiera soltado.
+Las rutas observadas no retienen el árbol anterior de objetos.
+
+La fuente etiquetada es `b3cbd9833ac5018dd93e0789fd4f50d24da9be07`.
+Pasaron las matrices de Web, Mobile, Platform, análisis estático y CodeQL,
+además de [Fork conformance](https://github.com/thinkddr/fyne/actions/runs/41372869526)
+con UIKit en iPhone e iPad. Las pruebas del driver cubren `FilterPass`, replay,
+multitáctil y el orden de cancelación; no acreditan el uso en un dispositivo físico.
 
 ## Geometría de iOS y actualización a Fyne 2.8.2 (2026-10-25)
 

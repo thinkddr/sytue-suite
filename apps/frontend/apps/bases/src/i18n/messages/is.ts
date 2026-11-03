@@ -10,6 +10,7 @@ import type { en } from './en.js';
 export const is: AppCatalog<typeof en> = {
   'nav.title': 'Bases',
   'nav.bases': 'Gagnagrunnarnir mínir',
+  'actions.more': 'Fleiri aðgerðir',
   'bases.title': 'Gagnagrunnarnir mínir',
   'bases.newName': 'Heiti nýja gagnagrunnsins',
   'bases.create': 'Búa til gagnagrunn',

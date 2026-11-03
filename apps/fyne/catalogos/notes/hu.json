@@ -32,6 +32,7 @@
   "common.offline": "Offline van. A módosítások nem mentődnek, amíg a kapcsolat vissza nem tér.",
   "common.retry": "Újra",
   "common.save": "Mentés",
+  "crypto.dataReviewRequired": "Ez a rész olyan adatokat tartalmaz, amelyeket az alkalmazás nem tud pontosságvesztés nélkül módosítani. Az eredeti megmaradt.",
   "crypto.disable": "Titkosítás megszüntetése",
   "crypto.disableWarning": "A meglévő titkosított jegyzetek olvashatatlanok maradnak. Előbb oldja fel a jegyzetfüzetet.",
   "crypto.enable": "Titkosítás",
@@ -39,7 +40,6 @@
   "crypto.lockNow": "Zárolás most",
   "crypto.locked": "Zárolva",
   "crypto.migrating": "A jegyzetfüzet tartalmának védelme…",
-  "crypto.dataReviewRequired": "Ez a rész olyan adatokat tartalmaz, amelyeket az alkalmazás nem tud pontosságvesztés nélkül módosítani. Az eredeti megmaradt.",
   "crypto.migrationFailed": "A titkosítást nem sikerült befejezni. Az adataid megmaradtak. Nyisd meg újra a jegyzetfüzetet a módosítások ellenőrzéséhez.",
   "crypto.mismatch": "A két jelmondat eltér.",
   "crypto.passphrase": "Jelmondat",
@@ -266,6 +266,7 @@
   "notebook.delete": "Jegyzetfüzet törlése",
   "notebook.deleteConfirm": "Törli a(z) „{title}” füzetet és mindent, ami benne van?",
   "notebook.emoji": "Ikon",
+  "notebook.move": "Jegyzetfüzet áthelyezése",
   "notebook.newChild": "Új jegyzetfüzet belül",
   "notebook.notes": {
     "one": "{count} jegyzet",

@@ -37,6 +37,9 @@ type Parrafo struct {
 	// Lineas es el `line-clamp-N`: como mucho N líneas, y la última acaba en elipsis
 	// si el texto sigue. Cero es sin tope, que es lo que hace un `<p>` normal.
 	Lineas int
+	// PartirPalabras permite cortar una palabra que no cabe sola, como
+	// overflow-wrap: break-word en los titulares. Conserva grafemas completos.
+	PartirPalabras bool
 	// Ancho es el que se usa para REPARTIR y para declarar el mínimo. Con 0 se reparte
 	// al que le dé su padre al colocarlo y el mínimo no declara ancho: dentro de una
 	// `Columna` —que suma los mínimos de sus hijos— un párrafo que declarase el ancho
@@ -102,6 +105,13 @@ func LineasDe(t *Parrafo, ancho float32) []string {
 		return nil
 	}
 	lineas := Repartir(t.Texto, t.Escalon, t.Peso, ancho)
+	if t.PartirPalabras && ancho > 0 {
+		partidas := make([]string, 0, len(lineas))
+		for _, linea := range lineas {
+			partidas = append(partidas, partirPalabra(linea, t.Escalon, t.Peso, ancho)...)
+		}
+		lineas = partidas
+	}
 	if t.Lineas <= 0 || len(lineas) <= t.Lineas {
 		return lineas
 	}

@@ -245,26 +245,7 @@ func (e *Engine) SetCellAt(sheet string, col, row int, raw string) {
 		} else {
 			c.seq = e.siguiente()
 		}
-		// Fórmula normal «=…» o de matriz clásica CSE «{=…}» (se le quitan las llaves).
-		c.matriz = strings.HasPrefix(raw, "{=") && strings.HasSuffix(raw, "}")
-		if c.matriz || strings.HasPrefix(raw, "=") {
-			src := raw
-			if c.matriz {
-				src = raw[1 : len(raw)-1]
-			}
-			if ast, err := parseFormula(src); err != nil {
-				c.rota = true
-			} else {
-				c.ast = ast
-				c.deps = e.collectDeps(ast, Here{sheet, col, row})
-				if c.volatil = e.esVolatil(ast, map[string]struct{}{}); c.volatil {
-					e.volatiles[k] = struct{}{}
-				}
-				if c.matriz || mightSpill(ast) {
-					e.arrayAnchors[k] = ancla{sheet, col, row, e.siguiente()}
-				}
-			}
-		}
+		e.prepararFormula(c, k)
 		e.cells[k] = c
 		e.anotarDeps(k, c.deps)
 	}
@@ -294,6 +275,29 @@ func (e *Engine) SetCellAt(sheet string, col, row int, raw string) {
 		// día hay muchísimos arrays en una misma hoja.
 		for _, a := range e.anclasEnOrden() {
 			e.invalidate(celdaK(a.hoja, a.col, a.fila))
+		}
+	}
+}
+
+func (e *Engine) prepararFormula(c *celda, k clave) {
+	// Fórmula normal «=…» o de matriz clásica CSE «{=…}» (se le quitan las llaves).
+	c.matriz = strings.HasPrefix(c.raw, "{=") && strings.HasSuffix(c.raw, "}")
+	if c.matriz || strings.HasPrefix(c.raw, "=") {
+		src := c.raw
+		if c.matriz {
+			src = c.raw[1 : len(c.raw)-1]
+		}
+		if ast, err := parseFormula(src); err != nil {
+			c.rota = true
+		} else {
+			c.ast = ast
+			c.deps = e.collectDeps(ast, Here{c.hoja, c.col, c.fila})
+			if c.volatil = e.esVolatil(ast, map[string]struct{}{}); c.volatil {
+				e.volatiles[k] = struct{}{}
+			}
+			if c.matriz || mightSpill(ast) {
+				e.arrayAnchors[k] = ancla{c.hoja, c.col, c.fila, e.siguiente()}
+			}
 		}
 	}
 }

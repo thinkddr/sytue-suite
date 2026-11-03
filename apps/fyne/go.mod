@@ -25,7 +25,7 @@ require (
 	github.com/go-text/typesetting v0.3.5
 	github.com/godbus/dbus/v5 v5.2.4
 	github.com/google/uuid v1.6.0
-	github.com/livekit/protocol v1.53.0
+	github.com/livekit/protocol v1.53.1
 	github.com/livekit/server-sdk-go/v2 v2.19.0
 	github.com/pion/rtcp v1.2.20
 	github.com/pion/rtp v1.10.6
@@ -154,7 +154,7 @@ replace git.sytue.eu/sytue/one/apps/nucleo => ../nucleo
 // móviles y geometría de la ventana UIKit al girar o redimensionar. El original
 // conserva BSD-3-Clause y las modificaciones Apache-2.0; parches y retirada en
 // upstream/README.md.
-replace fyne.io/fyne/v2 => github.com/thinkddr/fyne/v2 v2.8.2-sytue.2
+replace fyne.io/fyne/v2 => github.com/thinkddr/fyne/v2 v2.8.2-sytue.3
 
 // GLFW solo acepta FICHEROS soltados: su XDnD de X11 y su wl_data_device de Wayland
 // piden `text/uri-list` y nada más. El fork —el mismo commit que requiere Fyne, con un

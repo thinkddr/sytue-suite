@@ -121,6 +121,7 @@ export const is: AppCatalog<typeof en> = {
   'notebook.notes': { one: '{count} minnispunktur', other: '{count} minnispunktar' },
   'notebook.emoji': 'Táknmynd',
   'notebook.color': 'Litur',
+  'notebook.move': 'Færa minnisbók',
   'notebook.title': 'Heiti',
   'layout.label': 'Útlit',
   'layout.tree': 'Tré',

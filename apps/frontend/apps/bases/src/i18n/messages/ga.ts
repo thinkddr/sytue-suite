@@ -10,6 +10,7 @@ import type { en } from './en.js';
 export const ga: AppCatalog<typeof en> = {
   'nav.title': 'Bases',
   'nav.bases': 'Mo bhunachair',
+  'actions.more': 'Tuilleadh gníomhartha',
   'bases.title': 'Mo bhunachair',
   'bases.newName': 'Ainm an bhunachair nua',
   'bases.create': 'Cruthaigh bunachar',

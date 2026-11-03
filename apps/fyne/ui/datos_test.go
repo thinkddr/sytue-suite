@@ -562,6 +562,29 @@ func TestLaInsigniaMide20(t *testing.T) {
 	}
 }
 
+// Una etiqueta de una celda no puede pintar sobre la columna siguiente; al
+// ensancharse recupera el texto entero y conserva su nombre accesible.
+func TestLaInsigniaSeRecortaYRecuperaSuTexto(t *testing.T) {
+	i := NuevaInsignia("Pendiente de aprobación", InsigniaAviso)
+	r := test.WidgetRenderer(i).(*insigniaRenderer)
+	i.Resize(fyne.NewSize(96, 20))
+	r.Layout(i.Size())
+	if r.texto.Text == i.Texto {
+		t.Fatal("la etiqueta larga no se ha recortado")
+	}
+	if p := r.texto.Position(); p.X < 8 || p.X+Medir(r.texto.Text, escalonInsignia, SemiNegrita).Width > 88 {
+		t.Fatalf("el texto sale del relleno de la insignia: %v, %q", p, r.texto.Text)
+	}
+	if i.AccessibilityLabel() != "Pendiente de aprobación" {
+		t.Fatal("el nombre accesible también se ha recortado")
+	}
+	i.Resize(i.MinSize())
+	r.Layout(i.Size())
+	if r.texto.Text != i.Texto {
+		t.Fatalf("al ensancharse conserva el recorte: %q", r.texto.Text)
+	}
+}
+
 // TestLosTonosDeLaInsigniaSonSemanticos: los siete tonosInsignia de Badge.tsx van por tokens
 // `-bg`/`-text`, que conmutan por tema. Los escalones crudos salían como manchas casi
 // blancas con texto marrón en oscuro.

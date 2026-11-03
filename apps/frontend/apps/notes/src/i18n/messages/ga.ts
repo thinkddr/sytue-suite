@@ -121,6 +121,7 @@ export const ga: AppCatalog<typeof en> = {
   'notebook.notes': { one: '{count} nóta', other: '{count} nóta' },
   'notebook.emoji': 'Deilbhín',
   'notebook.color': 'Dath',
+  'notebook.move': 'Bog an leabhar nótaí',
   'notebook.title': 'Ainm',
   'layout.label': 'Leagan amach',
   'layout.tree': 'Crann',

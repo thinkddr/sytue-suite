@@ -120,6 +120,7 @@ export const en = {
   'notebook.notes': { one: '{count} note', other: '{count} notes' },
   'notebook.emoji': 'Icon',
   'notebook.color': 'Colour',
+  'notebook.move': 'Move notebook',
   'notebook.title': 'Name',
 
   // --- Disposición ---

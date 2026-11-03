@@ -141,6 +141,7 @@ interface Props {
   sinMenu?: boolean;
   /** Empieza a mover o reordenar desde el asa, con ratón, dedo o lápiz. */
   arrastre?: {
+    disabled?: boolean;
     onPointerDown: (e: PointerEvent) => void;
     onPointerMove: (e: PointerEvent) => void;
     onPointerUp: (e: PointerEvent) => void;
@@ -454,7 +455,7 @@ export function NoteCard({
             title={t('history.move')}
             {...arrastre}
             class={cx(
-              'text-text-subtle hover:text-primary-text sytue-focus-ring grid shrink-0 cursor-grab touch-none place-items-center rounded-md select-none active:cursor-grabbing pointer-coarse:size-11',
+              'text-text-subtle hover:text-primary-text sytue-focus-ring grid shrink-0 cursor-grab touch-none place-items-center rounded-md select-none active:cursor-grabbing disabled:cursor-wait disabled:opacity-40 pointer-coarse:size-11',
               diario
                 ? 'size-6 opacity-60 transition-opacity duration-150 sm:pointer-fine:absolute sm:pointer-fine:top-1.5 sm:pointer-fine:-left-5 sm:pointer-fine:opacity-0 sm:pointer-fine:group-focus-within:opacity-100 sm:pointer-fine:group-hover:opacity-100'
                 : '-mt-0.5 -ml-1 size-6',

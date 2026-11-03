@@ -4,6 +4,7 @@
  * de Playwright. SOLO en desarrollo: en producción es un 404 y nada lo enlaza.
  */
 import '../../styles/app.css';
+import { basePathScript, themeInitScript } from '@sytue/ui';
 import { RejillaDemo } from '../../dev/RejillaDemo.js';
 
 export const prerender = false;
@@ -22,6 +23,8 @@ const lang = ['en', 'de', 'fr'].includes(q.get('lang') ?? '')
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Rejilla (banco de pruebas)</title>
+    <script is:inline set:html={basePathScript('/bases')}></script>
+    <script is:inline set:html={themeInitScript}></script>
   </head>
   <body class="bg-bg h-full">
     <main>

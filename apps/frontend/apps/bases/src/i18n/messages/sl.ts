@@ -10,6 +10,7 @@ import type { en } from './en.js';
 export const sl: AppCatalog<typeof en> = {
   'nav.title': 'Bases',
   'nav.bases': 'Moje zbirke',
+  'actions.more': 'Več dejanj',
   'bases.title': 'Moje zbirke',
   'bases.newName': 'Ime nove zbirke',
   'bases.create': 'Ustvari zbirko',

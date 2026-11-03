@@ -7,6 +7,9 @@ case "$NOMBRE" in
   almacenamiento-externo|rooms-conexiones|conectar-app|correo-externo) ;;
   cinta-*) [[ "$NOMBRE" =~ ^cinta(-nativa)?-[0-9]+$ ]] || exit 1 ;;
   rotacion-nativa-*) [[ "$NOMBRE" =~ ^rotacion-nativa-[0-9]+$ ]] || exit 1 ;;
+  accesibilidad-bases-*) [[ "$NOMBRE" =~ ^accesibilidad-bases-[0-9]+$ ]] || exit 1 ;;
+  notepads-ux-*) [[ "$NOMBRE" =~ ^notepads-ux-[0-9]+$ ]] || exit 1 ;;
+  photos-visual-*) [[ "$NOMBRE" =~ ^photos-visual-[0-9]+$ ]] || exit 1 ;;
   *) printf 'Unknown fixture: %s\n' "$NOMBRE" >&2; exit 1 ;;
 esac
 DIRECTORIO="/tmp/$NOMBRE"
@@ -14,7 +17,9 @@ DIRECTORIO="/tmp/$NOMBRE"
 TEMPORAL="$(mktemp -d)"
 trap 'rm -rf "$TEMPORAL"' EXIT
 # Deliberately exclude astro.log, environment/configuration files and symlinks.
-if [[ "$NOMBRE" == rotacion-nativa-* ]]; then
+if [[ "$NOMBRE" == accesibilidad-bases-* ]]; then
+  (cd "$DIRECTORIO" && find . -maxdepth 1 -type f -name 'muestra-*.png' -print0) >"$TEMPORAL/files"
+elif [[ "$NOMBRE" == rotacion-nativa-* ]]; then
   (cd "$DIRECTORIO" && find . -maxdepth 1 -type f -name 'native-rotacion-*.png' -print0) >"$TEMPORAL/files"
 elif [[ "$NOMBRE" == cinta-* ]]; then
   # Native touch widths or Spanish portrait/landscape web states per editor.

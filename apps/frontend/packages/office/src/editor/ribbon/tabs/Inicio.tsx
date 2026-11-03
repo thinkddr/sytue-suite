@@ -87,34 +87,42 @@ function StyleChip(props: {
   const name = props.ctx.t(item.nameKey);
   const bloqueado = useBloqueado('heading');
   return (
-    <button
-      type="button"
-      class={
-        // `shrink-0` y `snap-start`: la ficha no se deforma cuando la galería se
-        // estrecha —72 px es el ancho en el que «Título 1» aún se lee— y el
-        // desplazamiento se detiene en ella, nunca a mitad de ficha.
-        'border-border flex h-11 w-[72px] shrink-0 snap-start flex-col items-center justify-center gap-0.5 rounded-sm border ' +
-        // La elegida se SEÑALA con borde de acción además del relleno: antes perdía el borde
-        // (`border-transparent`) y quedaba como una mancha tenue entre cuatro fichas enmarcadas.
-        'hover:bg-bg-subtle aria-pressed:bg-selected aria-pressed:border-primary transition-colors duration-150 ' +
-        'disabled:pointer-events-none disabled:opacity-40 ' +
-        FOCUS_RING
-      }
-      aria-label={props.ctx.t('style.apply', { name })}
-      title={props.ctx.t('style.apply', { name })}
-      aria-pressed={props.active}
-      disabled={bloqueado}
-      onMouseDown={(e) => e.preventDefault()} // no robar la selección del lienzo (§5)
-      onClick={() => props.onApply(item.value)}
-    >
-      <span aria-hidden="true" class={'leading-none ' + item.previewClass}>
-        AaBb
-      </span>
-      {/* El nombre del estilo puede desbordar la ficha de 72 px en alemán
+    <div class="relative w-[72px] shrink-0 snap-start">
+      <button
+        type="button"
+        class={
+          'border-border flex h-11 w-full flex-col items-center justify-end rounded-sm border pb-1.5 ' +
+          // La elegida se SEÑALA con borde de acción además del relleno: antes perdía el borde
+          // (`border-transparent`) y quedaba como una mancha tenue entre cuatro fichas enmarcadas.
+          'hover:bg-bg-subtle aria-pressed:bg-selected aria-pressed:border-primary transition-colors duration-150 ' +
+          'disabled:pointer-events-none disabled:opacity-40 ' +
+          FOCUS_RING
+        }
+        aria-label={props.ctx.t('style.apply', { name })}
+        title={props.ctx.t('style.apply', { name })}
+        aria-pressed={props.active}
+        disabled={bloqueado}
+        onMouseDown={(e) => e.preventDefault()} // no robar la selección del lienzo (§5)
+        onClick={() => props.onApply(item.value)}
+      >
+        {/* El nombre del estilo puede desbordar la ficha de 72 px en alemán
           («Überschrift 1»): se trunca con puntos suspensivos y el título
           completo sigue en el aria-label/title del botón. */}
-      <span class="sytue-meta w-full truncate px-1 text-center leading-none">{name}</span>
-    </button>
+        <span class="sytue-meta w-full truncate px-1 text-center leading-none">{name}</span>
+      </button>
+      {/* La muestra tipográfica es decorativa; el control se identifica por
+          el nombre del estilo, también al usar reconocimiento de voz. */}
+      <span
+        aria-hidden="true"
+        class={
+          'pointer-events-none absolute inset-x-0 top-2 text-center leading-none select-none [-webkit-user-select:none] ' +
+          item.previewClass +
+          (bloqueado ? ' opacity-40' : '')
+        }
+      >
+        AaBb
+      </span>
+    </div>
   );
 }
 

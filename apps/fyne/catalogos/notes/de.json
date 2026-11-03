@@ -32,6 +32,7 @@
   "common.offline": "Sie sind offline. Änderungen werden erst gespeichert, wenn die Verbindung zurück ist.",
   "common.retry": "Erneut versuchen",
   "common.save": "Speichern",
+  "crypto.dataReviewRequired": "Dieser Teil enthält Daten, die diese App nicht ohne Genauigkeitsverlust ändern kann. Das Original wurde beibehalten.",
   "crypto.disable": "Verschlüsselung entfernen",
   "crypto.disableWarning": "Bereits verschlüsselte Notizen bleiben unlesbar. Entsperren Sie das Notizbuch zuerst.",
   "crypto.enable": "Verschlüsseln",
@@ -39,7 +40,6 @@
   "crypto.lockNow": "Jetzt sperren",
   "crypto.locked": "Gesperrt",
   "crypto.migrating": "Inhalt des Notizbuchs wird geschützt…",
-  "crypto.dataReviewRequired": "Dieser Teil enthält Daten, die diese App nicht ohne Genauigkeitsverlust ändern kann. Das Original wurde beibehalten.",
   "crypto.migrationFailed": "Die Verschlüsselung konnte nicht abgeschlossen werden. Deine Daten sind erhalten geblieben. Öffne das Notizbuch erneut, um die Änderungen zu prüfen.",
   "crypto.mismatch": "Die beiden Passphrasen stimmen nicht überein.",
   "crypto.passphrase": "Passphrase",
@@ -266,6 +266,7 @@
   "notebook.delete": "Notizbuch löschen",
   "notebook.deleteConfirm": "„{title}“ mit allem Inhalt löschen?",
   "notebook.emoji": "Symbol",
+  "notebook.move": "Notizbuch verschieben",
   "notebook.newChild": "Neues Notizbuch darin",
   "notebook.notes": {
     "one": "{count} Notiz",

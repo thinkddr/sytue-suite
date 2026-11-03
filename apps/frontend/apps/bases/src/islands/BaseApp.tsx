@@ -7,8 +7,21 @@
  * solo decide qué se PINTA; cada operación la vuelve a autorizar el servicio.
  */
 import type { JSX } from 'preact';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { Avatar, Button, Skeleton, Tabs, useConfirm, usePrompt } from '@sytue/ui';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'preact/hooks';
+import {
+  Avatar,
+  Button,
+  CardIcon,
+  Dropdown,
+  Icon,
+  IconButton,
+  MenuItem,
+  MenuSeparator,
+  Skeleton,
+  Tabs,
+  useConfirm,
+  usePrompt,
+} from '@sytue/ui';
 import type { Locale } from '@sytue/i18n';
 import type { SytueUser } from '@sytue/auth';
 import { HttpError } from '@sytue/api-clients';
@@ -37,6 +50,7 @@ import { Rejilla } from '../components/Rejilla.js';
 import { Tablero } from '../components/Tablero.js';
 import { useT } from '../i18n/index.js';
 import { cliente, mensajeDeError } from '../lib/api.js';
+import { tonoDeBase } from '../lib/aspecto.js';
 import { registroDelEnlace } from '../lib/comentarios.js';
 import { MAX_OPCIONES_ENLACE, PAGINA } from '../lib/limites.js';
 import { ruta } from '../lib/rutas.js';
@@ -116,6 +130,7 @@ export function BaseApp({ baseId, locale, user, hubBaseUrl }: Props): JSX.Elemen
   const [vistas, setVistas] = useState<BasesView[]>([]);
   /** La vista guardada que se está mirando; '' = todos los registros, en rejilla. */
   const [vistaId, setVistaId] = useState('');
+  const selectorVistaId = useId();
   /** El registro cuyos comentarios están abiertos en el panel lateral. */
   const [comentando, setComentando] = useState<{ id: string; nombre: string } | null>(null);
   /** Tiempo real: quién más está, si el flujo está caído y si se ha perdido el acceso. */
@@ -607,59 +622,106 @@ export function BaseApp({ baseId, locale, user, hubBaseUrl }: Props): JSX.Elemen
 
   const exportar = (formato: 'csv' | 'json') =>
     ruta(`/api/tables/${activa}/export?format=${formato}`);
+  const nombreBase = base?.name || t('nav.title');
+  const accionesBase = `${t('actions.more')} · ${nombreBase}`;
+  const accionesTabla = `${t('actions.more')} · ${tabla?.name ?? t('base.tables')}`;
+  const nombreVista = vista
+    ? `${vista.name} · ${t(`view.kind.${vista.kind}`)}`
+    : `${t('view.kind.grid')} · ${t('view.all')}`;
+  const elegirVista = (id: string, cerrar: () => void): void => {
+    cerrar();
+    setVistaId(id);
+    document.getElementById(selectorVistaId)?.focus({ preventScroll: true });
+  };
 
   return (
     <Marco user={user} hubBaseUrl={hubBaseUrl} locale={locale} activa="bases">
-      <div class="flex flex-col gap-4 p-4 md:p-6">
-        <div class="flex flex-wrap items-center justify-between gap-2">
-          <div class="flex min-w-0 items-center gap-3">
-            <a
-              href={ruta('/')}
-              class="text-primary-text sytue-focus-ring rounded-sm text-sm underline"
+      <div class="flex min-w-0 flex-col gap-2 p-4 sm:gap-3 md:p-6">
+        <div class="border-border-subtle flex min-w-0 items-center justify-between gap-2 border-b pb-3">
+          <div class="flex min-w-0 flex-1 items-center gap-2">
+            <IconButton href={ruta('/')} label={t('base.back')}>
+              <Icon name="chevronLeft" size={18} />
+            </IconButton>
+            <CardIcon tone={tonoDeBase(baseId)} class="hidden h-9 w-9 shrink-0 rounded-lg sm:flex">
+              <Icon name="database" size={20} />
+            </CardIcon>
+            <h1
+              class="text-text line-clamp-2 min-w-0 text-lg font-semibold sm:truncate sm:text-2xl"
+              title={nombreBase}
             >
-              {t('base.back')}
-            </a>
-            <h1 class="text-text min-w-0 truncate text-2xl font-semibold">
-              {base?.name || t('nav.title')}
+              {nombreBase}
             </h1>
           </div>
           {puedeScripts || esPropietario ? (
-            <div class="flex flex-wrap gap-2">
-              {puedeScripts ? (
+            <div class="ml-auto flex shrink-0 items-center gap-2">
+              {esPropietario ? (
                 <Button
                   variant="secondary"
                   size="sm"
-                  onClick={() => setDialogo({ tipo: 'scripts' })}
+                  aria-label={t('share.open')}
+                  title={t('share.open')}
+                  leadingIcon={<Icon name="users" size={15} />}
+                  onClick={() => setDialogo({ tipo: 'compartir' })}
                 >
-                  {t('scripts.open')}
+                  <span class="hidden sm:inline">{t('share.open')}</span>
                 </Button>
               ) : null}
-              {esPropietario ? (
-                <>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => setDialogo({ tipo: 'compartir' })}
-                  >
-                    {t('share.open')}
-                  </Button>
-                  {tabla ? (
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => setDialogo({ tipo: 'conexiones' })}
-                    >
-                      {t('conn.open')}
-                    </Button>
-                  ) : null}
-                  <Button variant="ghost" size="sm" onClick={() => void renombrarBase()}>
-                    {t('base.rename')}
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={() => void borrarBase()}>
-                    {t('base.delete')}
-                  </Button>
-                </>
-              ) : null}
+              <Dropdown
+                label={accionesBase}
+                trigger={(props) => (
+                  <IconButton {...props} label={accionesBase}>
+                    <Icon name="ellipsis" size={18} />
+                  </IconButton>
+                )}
+              >
+                {(cerrar) => (
+                  <>
+                    {puedeScripts ? (
+                      <MenuItem
+                        icon={<Icon name="code" size={16} />}
+                        onClick={() => {
+                          cerrar();
+                          setDialogo({ tipo: 'scripts' });
+                        }}
+                      >
+                        {t('scripts.open')}
+                      </MenuItem>
+                    ) : null}
+                    {esPropietario ? (
+                      <>
+                        {tabla ? (
+                          <MenuItem
+                            onClick={() => {
+                              cerrar();
+                              setDialogo({ tipo: 'conexiones' });
+                            }}
+                          >
+                            {t('conn.open')}
+                          </MenuItem>
+                        ) : null}
+                        <MenuSeparator />
+                        <MenuItem
+                          onClick={() => {
+                            cerrar();
+                            void renombrarBase();
+                          }}
+                        >
+                          {t('base.rename')}
+                        </MenuItem>
+                        <MenuItem
+                          danger
+                          onClick={() => {
+                            cerrar();
+                            void borrarBase();
+                          }}
+                        >
+                          {t('base.delete')}
+                        </MenuItem>
+                      </>
+                    ) : null}
+                  </>
+                )}
+              </Dropdown>
             </div>
           ) : null}
         </div>
@@ -704,186 +766,267 @@ export function BaseApp({ baseId, locale, user, hubBaseUrl }: Props): JSX.Elemen
             ) : null}
           </div>
         ) : (
-          <>
-            <Tabs
-              label={t('base.tables')}
-              value={activa}
-              onChange={setActiva}
-              items={tablas.map((x) => ({
-                id: x.id,
-                label: x.name,
-                content:
-                  x.id === activa ? (
-                    <div class="flex flex-col gap-3">
-                      <div class="flex flex-wrap items-center gap-2">
-                        {esPropietario ? (
-                          <>
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={() => setDialogo({ tipo: 'campo' })}
-                            >
-                              {t('field.add')}
-                            </Button>
-                            <Button variant="ghost" size="sm" onClick={() => void renombrarTabla()}>
-                              {t('table.rename')}
-                            </Button>
-                            <Button variant="ghost" size="sm" onClick={() => void borrarTabla()}>
-                              {t('table.delete')}
-                            </Button>
-                          </>
-                        ) : null}
-                        <a
-                          href={exportar('csv')}
-                          download
-                          class="text-primary-text sytue-focus-ring rounded-sm px-2 text-sm underline"
-                        >
-                          {t('export.csv')}
-                        </a>
-                        <a
-                          href={exportar('json')}
-                          download
-                          class="text-primary-text sytue-focus-ring rounded-sm px-2 text-sm underline"
-                        >
-                          {t('export.json')}
-                        </a>
-                      </div>
-                      <div
-                        role="group"
-                        aria-label={t('view.list')}
-                        class="flex flex-wrap items-center gap-2"
+          <Tabs
+            class="min-w-0"
+            label={t('base.tables')}
+            value={activa}
+            onChange={setActiva}
+            items={tablas.map((x) => ({
+              id: x.id,
+              label: x.name,
+              icon: <Icon name="table" size={16} />,
+              content:
+                x.id === activa ? (
+                  <div class="flex min-w-0 flex-col gap-3">
+                    <div class="flex min-w-0 items-center gap-2">
+                      <Dropdown
+                        class="min-w-0 flex-1 sm:max-w-72"
+                        align="start"
+                        label={t('view.list')}
+                        trigger={(props) => (
+                          <Button
+                            {...props}
+                            id={selectorVistaId}
+                            variant="secondary"
+                            size="sm"
+                            class="w-full min-w-0 justify-between"
+                            aria-label={`${t('view.list')}: ${nombreVista}`}
+                            title={nombreVista}
+                            trailingIcon={<Icon name="chevronDown" size={14} />}
+                          >
+                            <span class="min-w-0 truncate">
+                              {vista?.name || t('view.kind.grid')}
+                            </span>
+                          </Button>
+                        )}
                       >
+                        {(cerrar) => (
+                          <>
+                            <MenuItem
+                              aria-current={vistaId === '' ? 'true' : undefined}
+                              onClick={() => elegirVista('', cerrar)}
+                            >
+                              {t('view.all')}
+                            </MenuItem>
+                            {vistas.map((v) => (
+                              <MenuItem
+                                key={v.id}
+                                aria-current={vistaId === v.id ? 'true' : undefined}
+                                onClick={() => elegirVista(v.id, cerrar)}
+                              >
+                                {v.name} · {t(`view.kind.${v.kind}`)}
+                              </MenuItem>
+                            ))}
+                            {puedeEditar ? (
+                              <>
+                                <MenuSeparator />
+                                <MenuItem
+                                  onClick={() => {
+                                    cerrar();
+                                    setDialogo({ tipo: 'vista' });
+                                  }}
+                                >
+                                  {t('view.add')}
+                                </MenuItem>
+                                {vista ? (
+                                  <MenuItem
+                                    danger
+                                    onClick={() => {
+                                      cerrar();
+                                      void borrarVista(vista);
+                                    }}
+                                  >
+                                    {t('view.delete')}
+                                  </MenuItem>
+                                ) : null}
+                              </>
+                            ) : null}
+                          </>
+                        )}
+                      </Dropdown>
+                      {puedeEditar && vista?.kind !== 'form' ? (
                         <Button
-                          variant={vistaId === '' ? 'secondary' : 'ghost'}
+                          variant="primary"
                           size="sm"
-                          aria-pressed={vistaId === ''}
-                          onClick={() => setVistaId('')}
+                          class="max-w-[50%] min-w-0 shrink-0 sm:max-w-none"
+                          disabled={ocupado || sinAcceso}
+                          aria-label={t('grid.addRecord')}
+                          title={t('grid.addRecord')}
+                          leadingIcon={<Icon name="plus" size={14} />}
+                          onClick={() => void nuevoRegistro()}
                         >
-                          {t('view.all')}
+                          <span class="min-w-0 truncate">{t('grid.addRecord')}</span>
                         </Button>
-                        {vistas.map((v) => (
-                          <Button
-                            key={v.id}
-                            variant={vistaId === v.id ? 'secondary' : 'ghost'}
-                            size="sm"
-                            aria-pressed={vistaId === v.id}
-                            onClick={() => setVistaId(v.id)}
-                          >
-                            {v.name} · {t(`view.kind.${v.kind}`)}
-                          </Button>
-                        ))}
-                        {puedeEditar ? (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setDialogo({ tipo: 'vista' })}
-                          >
-                            {t('view.add')}
-                          </Button>
-                        ) : null}
-                        {puedeEditar && vista ? (
-                          <Button variant="ghost" size="sm" onClick={() => void borrarVista(vista)}>
-                            {t('view.delete')}
-                          </Button>
+                      ) : null}
+                      <Dropdown
+                        class="shrink-0"
+                        label={accionesTabla}
+                        trigger={(props) => (
+                          <IconButton {...props} label={accionesTabla}>
+                            <Icon name="ellipsis" size={18} />
+                          </IconButton>
+                        )}
+                      >
+                        {(cerrar) => (
+                          <>
+                            {esPropietario ? (
+                              <>
+                                <MenuItem
+                                  icon={<Icon name="plus" size={16} />}
+                                  onClick={() => {
+                                    cerrar();
+                                    setDialogo({ tipo: 'campo' });
+                                  }}
+                                >
+                                  {t('field.add')}
+                                </MenuItem>
+                                <MenuItem
+                                  onClick={() => {
+                                    cerrar();
+                                    void renombrarTabla();
+                                  }}
+                                >
+                                  {t('table.rename')}
+                                </MenuItem>
+                                <MenuItem
+                                  danger
+                                  onClick={() => {
+                                    cerrar();
+                                    void borrarTabla();
+                                  }}
+                                >
+                                  {t('table.delete')}
+                                </MenuItem>
+                                <MenuSeparator />
+                              </>
+                            ) : null}
+                            <MenuItem
+                              href={exportar('csv')}
+                              download
+                              icon={<Icon name="download" size={16} />}
+                              onClick={cerrar}
+                            >
+                              {t('export.csv')}
+                            </MenuItem>
+                            <MenuItem
+                              href={exportar('json')}
+                              download
+                              icon={<Icon name="download" size={16} />}
+                              onClick={cerrar}
+                            >
+                              {t('export.json')}
+                            </MenuItem>
+                            {esPropietario ? (
+                              <>
+                                <MenuSeparator />
+                                <MenuItem
+                                  onClick={() => {
+                                    cerrar();
+                                    void nuevaTabla();
+                                  }}
+                                >
+                                  {t('table.add')}
+                                </MenuItem>
+                                <MenuItem
+                                  onClick={() => {
+                                    cerrar();
+                                    setDialogo({ tipo: 'importar' });
+                                  }}
+                                >
+                                  {t('import.open')}
+                                </MenuItem>
+                              </>
+                            ) : null}
+                          </>
+                        )}
+                      </Dropdown>
+                    </div>
+                    {vista?.kind === 'form' ? (
+                      <div class="flex flex-col gap-3">
+                        <p class="text-text-muted text-sm">{t('form.preview')}</p>
+                        <ul class="text-text list-disc pl-5 text-sm">
+                          {campos
+                            .filter((c) =>
+                              (vista.config.fields ?? []).length > 0
+                                ? vista.config.fields!.includes(c.id)
+                                : c.kind !== 'link' &&
+                                  c.kind !== 'formula' &&
+                                  c.kind !== 'attachment',
+                            )
+                            .map((c) => (
+                              <li key={c.id}>
+                                {c.name} ({t(`field.kind.${c.kind}`)})
+                              </li>
+                            ))}
+                        </ul>
+                        {esPropietario ? (
+                          <PanelFormulario t={t} locale={locale} vista={vista.id} />
                         ) : null}
                       </div>
-                      {vista?.kind === 'form' ? (
-                        <div class="flex flex-col gap-3">
-                          <p class="text-text-muted text-sm">{t('form.preview')}</p>
-                          <ul class="text-text list-disc pl-5 text-sm">
-                            {campos
-                              .filter((c) =>
-                                (vista.config.fields ?? []).length > 0
-                                  ? vista.config.fields!.includes(c.id)
-                                  : c.kind !== 'link' &&
-                                    c.kind !== 'formula' &&
-                                    c.kind !== 'attachment',
-                              )
-                              .map((c) => (
-                                <li key={c.id}>
-                                  {c.name} ({t(`field.kind.${c.kind}`)})
-                                </li>
-                              ))}
-                          </ul>
-                          {esPropietario ? (
-                            <PanelFormulario t={t} locale={locale} vista={vista.id} />
-                          ) : null}
-                        </div>
-                      ) : campoTablero ? (
-                        <>
-                          <Tablero
-                            t={t}
-                            campos={campos}
-                            agrupar={campoTablero}
-                            registros={registros}
-                            puedeEditar={puedeEditar}
-                            onMover={(r, valor) => cambiar(r, { [campoTablero.id]: valor })}
-                            onComentar={comentar}
-                            presentes={enCeldas}
-                          />
-                          <div class="flex flex-wrap gap-2">
-                            {hayAntes ? (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => void cargarRegistros(activa, vistaId, 'antes')}
-                              >
-                                {t('grid.loadPrevious')}
-                              </Button>
-                            ) : null}
-                            {hayMas ? (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => void cargarRegistros(activa, vistaId, 'mas')}
-                              >
-                                {t('grid.loadMore')}
-                              </Button>
-                            ) : null}
-                          </div>
-                        </>
-                      ) : (
-                        <Rejilla
+                    ) : campoTablero ? (
+                      <>
+                        <Tablero
                           t={t}
-                          nombreTabla={x.name}
                           campos={campos}
+                          agrupar={campoTablero}
                           registros={registros}
                           puedeEditar={puedeEditar}
-                          etiquetas={etiquetas}
-                          onCambiar={cambiar}
-                          onElegirVarios={(registro, campo) =>
-                            setDialogo({ tipo: 'varios', registro, campo })
-                          }
-                          onAdjuntos={(registro, campo) =>
-                            setDialogo({ tipo: 'adjuntos', registro: registro.id, campo })
-                          }
-                          onBorrar={(r) => void borrarRegistro(r)}
+                          onMover={(r, valor) => cambiar(r, { [campoTablero.id]: valor })}
                           onComentar={comentar}
                           presentes={enCeldas}
-                          onFoco={alEnfocarCelda}
-                          onNuevo={() => void nuevoRegistro()}
-                          desde={ventanas.primera * PAGINA}
-                          hayAntes={hayAntes}
-                          onAntes={() => void cargarRegistros(activa, vistaId, 'antes')}
-                          hayMas={hayMas}
-                          onMas={() => void cargarRegistros(activa, vistaId, 'mas')}
                         />
-                      )}
-                    </div>
-                  ) : null,
-              }))}
-            />
-            {esPropietario ? (
-              <div class="flex flex-wrap gap-2">
-                <Button variant="ghost" size="sm" onClick={() => void nuevaTabla()}>
-                  {t('table.add')}
-                </Button>
-                <Button variant="ghost" size="sm" onClick={() => setDialogo({ tipo: 'importar' })}>
-                  {t('import.open')}
-                </Button>
-              </div>
-            ) : null}
-          </>
+                        <div class="flex flex-wrap gap-2">
+                          {hayAntes ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => void cargarRegistros(activa, vistaId, 'antes')}
+                            >
+                              {t('grid.loadPrevious')}
+                            </Button>
+                          ) : null}
+                          {hayMas ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => void cargarRegistros(activa, vistaId, 'mas')}
+                            >
+                              {t('grid.loadMore')}
+                            </Button>
+                          ) : null}
+                        </div>
+                      </>
+                    ) : (
+                      <Rejilla
+                        t={t}
+                        nombreTabla={x.name}
+                        campos={campos}
+                        registros={registros}
+                        puedeEditar={puedeEditar}
+                        etiquetas={etiquetas}
+                        onCambiar={cambiar}
+                        onElegirVarios={(registro, campo) =>
+                          setDialogo({ tipo: 'varios', registro, campo })
+                        }
+                        onAdjuntos={(registro, campo) =>
+                          setDialogo({ tipo: 'adjuntos', registro: registro.id, campo })
+                        }
+                        onBorrar={(r) => void borrarRegistro(r)}
+                        onComentar={comentar}
+                        presentes={enCeldas}
+                        onFoco={alEnfocarCelda}
+                        onNuevo={() => void nuevoRegistro()}
+                        desde={ventanas.primera * PAGINA}
+                        hayAntes={hayAntes}
+                        onAntes={() => void cargarRegistros(activa, vistaId, 'antes')}
+                        hayMas={hayMas}
+                        onMas={() => void cargarRegistros(activa, vistaId, 'mas')}
+                      />
+                    )}
+                  </div>
+                ) : null,
+            }))}
+          />
         )}
         {recalculando ? (
           <p class="text-text-muted text-sm" role="status">

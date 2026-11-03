@@ -2,7 +2,7 @@
   "name": "@sytue/escena",
   "version": "1.0.0",
   "private": true,
-  "description": "Sytue One — escena vectorial común para Docus, Diapos y Pages: nodos (forma, línea, conector con anclajes, texto, imagen, grupo, trazo a mano alzada), capas con nombre y orden, transformaciones, serialización estable y versionada, hit-testing y exportación a SVG. TypeScript puro, cero dependencias y sin DOM.",
+  "description": "Sytue One \u2014 escena vectorial com\u00fan para Docus, Diapos y Pages: nodos (forma, l\u00ednea, conector con anclajes, texto, imagen, grupo, trazo a mano alzada), capas con nombre y orden, transformaciones, serializaci\u00f3n estable y versionada, hit-testing y exportaci\u00f3n a SVG. TypeScript puro, cero dependencias y sin DOM.",
   "license": "Apache-2.0",
   "type": "module",
   "exports": {
@@ -18,7 +18,7 @@
   },
   "devDependencies": {
     "@sytue/config": "workspace:*",
-    "@types/bun": "1.4.2",
+    "@types/bun": "1.4.4",
     "@types/node": "catalog:",
     "typescript": "6.0.3"
   }

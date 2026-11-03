@@ -7,6 +7,7 @@ import type { ComponentChildren, JSX, TargetedEvent } from 'preact';
 import { createContext } from 'preact';
 import { useContext, useEffect, useState } from 'preact/hooks';
 import { cx } from '../lib/cx.js';
+import { useLongPress } from '../lib/useLongPress.js';
 
 interface ListFocusContextValue {
   focusedIndex: number;
@@ -79,6 +80,8 @@ export function List({
 }
 
 export interface ListItemProps extends Omit<JSX.HTMLAttributes<HTMLLIElement>, 'icon' | 'title'> {
+  /** Selección táctil sostenida, conservando la casilla o la alternativa de teclado. */
+  onLongPress?: () => void;
   leading?: ComponentChildren;
   title: ComponentChildren;
   subtitle?: ComponentChildren;
@@ -104,9 +107,11 @@ export function ListItem({
   class: cls,
   onFocus,
   onKeyDown,
+  onLongPress,
   ...rest
 }: ListItemProps): JSX.Element {
   const focusCtx = useContext(ListFocusContext);
+  const hold = useLongPress<undefined>(onLongPress);
   // El List solo provee ListFocusContext cuando es `selectable` (role=listbox).
   // `role=option` fuera de un listbox es ARIA inválido, así que solo lo emitimos
   // dentro de un listbox; en una lista plana el item queda como <li> (listitem).
@@ -150,6 +155,9 @@ export function ListItem({
       aria-selected={interactive && inListbox ? Boolean(selected) : undefined}
       tabIndex={tabIndex}
       title={tooltip}
+      onPointerDown={(e) => hold.iniciar(e, undefined)}
+      onClickCapture={hold.onClickCapture}
+      onContextMenuCapture={hold.onContextMenuCapture}
       onKeyDown={handleKeyDown}
       onFocus={(e) => {
         if (focusCtx && index !== undefined) focusCtx.setFocusedIndex(index);

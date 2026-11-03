@@ -1,4 +1,5 @@
 {
+  "actions.more": "Autres actions",
   "attach.add": "Ajouter un fichier",
   "attach.badType": "Ce type de fichier n’est pas accepté, ou son contenu ne correspond pas à son nom.",
   "attach.delete": "Supprimer {name}",

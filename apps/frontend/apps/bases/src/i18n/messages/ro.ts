@@ -10,6 +10,7 @@ import type { en } from './en.js';
 export const ro: AppCatalog<typeof en> = {
   'nav.title': 'Bases',
   'nav.bases': 'Bazele mele',
+  'actions.more': 'Mai multe acțiuni',
   'bases.title': 'Bazele mele',
   'bases.newName': 'Numele noii baze',
   'bases.create': 'Creează baza',

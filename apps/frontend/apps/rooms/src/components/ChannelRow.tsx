@@ -38,6 +38,7 @@ export interface ChannelRowProps {
   draggable?: boolean;
   onDragStart?: () => void;
   onDragEnd?: () => void;
+  pointerDrag?: JSX.ButtonHTMLAttributes<HTMLButtonElement> | undefined;
 }
 
 /**
@@ -67,6 +68,7 @@ export function ChannelRow({
   draggable = false,
   onDragStart,
   onDragEnd,
+  pointerDrag,
 }: ChannelRowProps): JSX.Element {
   return (
     // Los handlers del <li> son SOLO de arrastre (reordenar canales), que no es una
@@ -94,6 +96,17 @@ export function ChannelRow({
             : 'hover:bg-sidebar-hover',
         )}
       >
+        {pointerDrag ? (
+          <button
+            type="button"
+            {...pointerDrag}
+            data-mantiene-nav
+            aria-label={menuLabel}
+            class="sytue-focus-ring-chrome text-sidebar-fg-muted hover:text-sidebar-fg grid min-h-8 w-6 shrink-0 cursor-grab touch-none place-items-center rounded select-none [-webkit-user-select:none] active:cursor-grabbing pointer-coarse:min-h-[max(44px,2.75rem)] pointer-coarse:w-[max(44px,2.75rem)]"
+          >
+            <Icon name="grip" size={14} />
+          </button>
+        ) : null}
         <button
           type="button"
           aria-current={active ? 'page' : undefined}

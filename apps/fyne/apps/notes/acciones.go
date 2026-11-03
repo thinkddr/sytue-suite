@@ -407,26 +407,52 @@ func (p *Pantalla) entradaEditada(n Nota, pa Parche) (api.NoteInput, error) {
 // colocar es el `moverNota` de la web: cambia de sitio una nota DENTRO de su cuaderno
 // —otra columna, otra posición, otro grupo—.
 func (p *Pantalla) colocar(id string, pos api.NotePosition, conHistorial bool) error {
+	return p.colocarVarias([]posicionNota{{id, pos}}, conHistorial)
+}
+
+type posicionNota struct {
+	id  string
+	pos api.NotePosition
+}
+
+func (p *Pantalla) ponerPosiciones(destinos []posicionNota) {
+	for _, d := range destinos {
+		n, ok := p.nota(d.id)
+		if !ok {
+			continue
+		}
+		n.X, n.Y, n.Col, n.Posicion = d.pos.X, d.pos.Y, d.pos.Col, d.pos.Position
+		n.Grupo = ""
+		if d.pos.GroupID != nil {
+			n.Grupo = *d.pos.GroupID
+		}
+		n.Crudo = enPosicion(n.Crudo, d.pos)
+		p.reemplazar(n)
+	}
+}
+
+// colocarVarias pinta el gesto completo antes de hablar con la red. La API conserva
+// una posición por nota; si alguna falla se revierten las ya escritas y la pantalla.
+func (p *Pantalla) colocarVarias(destinos []posicionNota, conHistorial bool) error {
 	var (
-		n     Nota
-		antes []Nota
-		c     string
-		listo bool
+		inversas []posicionNota
+		c        string
+		listo    bool
+		epoch    uint64
 	)
 	fyne.DoAndWait(func() {
-		var ok bool
-		if n, ok = p.nota(id); !ok || !p.puedeEscribir() {
+		if !p.puedeEscribir() || len(destinos) == 0 {
 			return
 		}
-		antes, c, listo = p.notas, p.activo.ID, true
-		movida := n
-		movida.X, movida.Y, movida.Col, movida.Posicion = pos.X, pos.Y, pos.Col, pos.Position
-		movida.Grupo = ""
-		if pos.GroupID != nil {
-			movida.Grupo = *pos.GroupID
+		for _, d := range destinos {
+			n, ok := p.nota(d.id)
+			if !ok {
+				return
+			}
+			inversas = append(inversas, posicionNota{d.id, posicionDe(n.Crudo)})
 		}
-		movida.Crudo = enPosicion(n.Crudo, pos)
-		p.reemplazar(movida)
+		c, listo, epoch = p.activo.ID, true, p.cryptoEpoch
+		p.ponerPosiciones(destinos)
 		p.Repintar()
 	})
 	if !listo {
@@ -434,27 +460,44 @@ func (p *Pantalla) colocar(id string, pos api.NotePosition, conHistorial bool) e
 	}
 	ctx, cancelar := p.ctx()
 	defer cancelar()
-	err := p.svc.MoveNote(ctx, id, pos)
+	var err error
+	for i, d := range destinos {
+		if err = p.svc.MoveNote(ctx, d.id, d.pos); err != nil {
+			err = errors.Join(err, p.restaurarPosiciones(inversas[:i+1]))
+			break
+		}
+	}
 	enHilo(func() {
-		if p.activo.ID != c {
+		if p.activo.ID != c || p.cryptoEpoch != epoch {
 			return
 		}
 		if err != nil {
-			p.notas = antes
+			p.ponerPosiciones(inversas)
 			p.fallo("note.saveFailed", err)
 			p.Repintar()
 			return
 		}
 		if conHistorial {
-			sitio := posicionDe(n.Crudo)
 			p.hist.Registrar(Accion{
 				Etiqueta: p.tr.T("history.move", nil),
-				Deshacer: func() error { return p.colocar(id, sitio, false) },
-				Rehacer:  func() error { return p.colocar(id, pos, false) },
+				Deshacer: func() error { return p.colocarVarias(inversas, false) },
+				Rehacer:  func() error { return p.colocarVarias(destinos, false) },
 			}, "")
 			p.Repintar()
 		}
 	})
+	return err
+}
+
+func (p *Pantalla) restaurarPosiciones(inversas []posicionNota) error {
+	// El plazo de la petición que falló puede haberse agotado. Restaurar usa otro,
+	// e incluye la escritura cuyo resultado pudo perderse tras llegar al servidor.
+	ctx, cancelar := p.ctx()
+	defer cancelar()
+	var err error
+	for i := len(inversas) - 1; i >= 0; i-- {
+		err = errors.Join(err, p.svc.MoveNote(ctx, inversas[i].id, inversas[i].pos))
+	}
 	return err
 }
 

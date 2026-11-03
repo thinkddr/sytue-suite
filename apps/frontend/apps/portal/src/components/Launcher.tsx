@@ -221,6 +221,36 @@ type Momento = 'morning' | 'afternoon' | 'evening';
 export const momentoDelDia = (hora: number): Momento =>
   hora >= 5 && hora < 12 ? 'morning' : hora >= 12 && hora < 20 ? 'afternoon' : 'evening';
 
+function navegarProducto(e: KeyboardEvent): void {
+  if (e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+  if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key)) return;
+  const actual = e.currentTarget as HTMLAnchorElement;
+  const enlaces = Array.from(
+    actual.closest('ul')?.querySelectorAll<HTMLAnchorElement>('a[data-hub-product][href]') ?? [],
+  );
+  const i = enlaces.indexOf(actual);
+  if (i < 0) return;
+  let destino: HTMLAnchorElement | undefined;
+  if (e.key === 'Home') destino = enlaces[0];
+  else if (e.key === 'End') destino = enlaces[enlaces.length - 1];
+  else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight')
+    destino = enlaces[i + (e.key === 'ArrowLeft' ? -1 : 1)];
+  else {
+    const r = actual.getBoundingClientRect();
+    const dir = e.key === 'ArrowUp' ? -1 : 1;
+    destino = enlaces
+      .map((el) => ({ el, r: el.getBoundingClientRect() }))
+      .filter((c) => (c.r.top - r.top) * dir > 1)
+      .sort(
+        (a, b) =>
+          Math.abs(a.r.top - r.top) - Math.abs(b.r.top - r.top) ||
+          Math.abs(a.r.left - r.left) - Math.abs(b.r.left - r.left),
+      )[0]?.el;
+  }
+  e.preventDefault();
+  destino?.focus();
+}
+
 export function Launcher({
   locale,
   puedeAdmin,
@@ -544,6 +574,9 @@ export function Launcher({
                 return (
                   <li key={app.key}>
                     <a
+                      data-hub-product={app.key}
+                      onKeyDown={navegarProducto}
+                      aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown Home End"
                       href={disabled ? undefined : app.href}
                       aria-disabled={disabled ? 'true' : undefined}
                       aria-label={caption}

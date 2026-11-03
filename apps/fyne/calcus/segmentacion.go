@@ -302,9 +302,10 @@ type TarjetaSegmentacion struct {
 	lz *Lienzo
 	id string
 
-	moviendo bool
-	desp     fyne.Delta
-	desY     float32 // el desplazamiento de la lista
+	moviendo  bool
+	cancelado bool
+	desp      fyne.Delta
+	desY      float32 // el desplazamiento de la lista
 
 	borrar, quitar *botonTarjeta
 }
@@ -435,6 +436,9 @@ func (t *TarjetaSegmentacion) Scrolled(e *fyne.ScrollEvent) {
 
 // Dragged mueve la tarjeta desde su cabecera.
 func (t *TarjetaSegmentacion) Dragged(e *fyne.DragEvent) {
+	if t.cancelado {
+		return
+	}
 	z := t.lz.Rejilla.z()
 	if !t.moviendo {
 		if e.Position.Y-e.Dragged.DY >= (tema.Borde+altoCabeceraTarjeta)*z {
@@ -448,6 +452,10 @@ func (t *TarjetaSegmentacion) Dragged(e *fyne.DragEvent) {
 }
 
 func (t *TarjetaSegmentacion) DragEnd() {
+	if t.cancelado {
+		t.cancelado = false
+		return
+	}
 	if !t.moviendo {
 		return
 	}
@@ -458,6 +466,15 @@ func (t *TarjetaSegmentacion) DragEnd() {
 		t.lz.moverObjeto(t.id, redondearJS(float64(x+t.desp.DX)), redondearJS(float64(y+t.desp.DY)))
 	}
 	t.desp = fyne.Delta{}
+	t.lz.Rejilla.Refresh()
+}
+
+// CancelarArrastre descarta el desplazamiento provisional sin mover la segmentación.
+func (t *TarjetaSegmentacion) CancelarArrastre() {
+	if !t.moviendo {
+		return
+	}
+	t.moviendo, t.cancelado, t.desp = false, true, fyne.Delta{}
 	t.lz.Rejilla.Refresh()
 }
 

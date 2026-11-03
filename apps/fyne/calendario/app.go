@@ -153,6 +153,7 @@ type App struct {
 	fallo          string                    // clave del error, o ""
 	prohibido      bool                      // el error fue un 403
 	widgetCompleta bool                      // propios y compartidos cargaron sin error
+	widgetVista    widgets.View              // sesión de esas listas y de su caché de eventos
 }
 
 // NuevaApp conecta la pantalla con el servicio. Arranca en carga: hasta que no
@@ -331,6 +332,7 @@ func (a *App) cargarCalendarios() {
 	a.secCal++
 	sec := a.secCal
 	a.cargandoCal = true
+	a.widgetCompleta = false
 	a.pintar()
 	widget := a.Widget.View()
 	sinConexion := a.P.SinConexion
@@ -363,6 +365,7 @@ func (a *App) cargarCalendarios() {
 				return // llegó otra carga después: esta es rancia
 			}
 			a.widgetCompleta = completa
+			a.widgetVista = widget
 			a.cargandoCal = false
 			if err != nil {
 				a.fallar("cal.error.loadCalendars", err)
@@ -372,7 +375,7 @@ func (a *App) cargarCalendarios() {
 			a.encender()
 			a.engancharPeticiones()
 			a.fallo = ""
-			a.cargarEventos()
+			a.cargarEventosConVista(widget)
 		})
 	})
 }
@@ -397,6 +400,10 @@ func (a *App) encender() {
 // cargarEventos es el efecto de eventos de la web: un `Instances` por calendario
 // visible que no esté ya en la caché del rango, todos en paralelo.
 func (a *App) cargarEventos() {
+	a.cargarEventosConVista(a.widgetVista)
+}
+
+func (a *App) cargarEventosConVista(evWidget widgets.View) {
 	p := a.P
 	desde, hasta := Rango(p.Vista, p.Cursor, p.zona())
 	clave := desde.Format(time.RFC3339) + ".." + hasta.Format(time.RFC3339)
@@ -413,7 +420,6 @@ func (a *App) cargarEventos() {
 	}
 	a.secEv++
 	sec := a.secEv
-	evWidget := a.Widget.View()
 	sinConexion := p.SinConexion
 	if len(faltan) == 0 || a.Cal == nil {
 		a.cargandoEv = false
@@ -484,7 +490,58 @@ func hexColorDe(c color.Color) string {
 		return ""
 	}
 	r, g, b, _ := c.RGBA()
-	return fmt.Sprintf("#%02x%02x%02x", uint8(r>>8), uint8(g>>8), uint8(b>>8))
+	return fmt.Sprintf("#%02x%02x%02x", r>>8&0xff, g>>8&0xff, b>>8&0xff)
+}
+
+// marcarDiasWidget añade a la cuadrícula del mes los días que ocupa [ini, finInc].
+func marcarDiasWidget(busy []int, colores map[int]string, ini, finInc, inicioMes, finMes time.Time, zona *time.Location, hex string) []int {
+	if finInc.Before(inicioMes) || !ini.Before(finMes) {
+		return busy
+	}
+	primero := ini
+	if primero.Before(inicioMes) {
+		primero = inicioMes
+	}
+	ultimo := finInc
+	if limiteMes := finMes.Add(-time.Nanosecond); ultimo.After(limiteMes) {
+		ultimo = limiteMes
+	}
+	for d := inicioDelDia(primero, zona).Day(); d <= inicioDelDia(ultimo, zona).Day(); d++ {
+		busy = append(busy, d)
+		if _, ok := colores[d]; !ok && hex != "" {
+			colores[d] = hex
+		}
+	}
+	return busy
+}
+
+// itemWidgetDe es la fila visual de un evento próximo: título, lugar, hora y color.
+func (a *App) itemWidgetDe(oc Ocurrencia, ini time.Time, hex string) widgets.Item {
+	titulo := strings.TrimSpace(oc.Event.Summary)
+	if titulo == "" {
+		titulo = a.P.t("event.untitled", nil)
+	}
+	insignia := ini.Format("15:04")
+	if oc.Event.AllDay {
+		insignia = ""
+	}
+	return widgets.Item{
+		Title:    titulo,
+		Subtitle: oc.Event.Location,
+		Badge:    insignia,
+		Color:    hex,
+		StartAt:  max(oc.Start.Unix(), 0),
+		EndAt:    max(oc.End.Unix(), 0),
+		AllDay:   oc.Event.AllDay,
+	}
+}
+
+// finInclusivoWidget descuenta el final exclusivo de un evento de día completo.
+func finInclusivoWidget(ini, fin time.Time, diaCompleto bool) time.Time {
+	if diaCompleto && fin.After(ini) && fin.Hour() == 0 && fin.Minute() == 0 && fin.Second() == 0 {
+		return fin.Add(-time.Nanosecond)
+	}
+	return fin
 }
 
 func (a *App) publicarWidget(view widgets.View, desde, hasta time.Time) {
@@ -514,74 +571,7 @@ func (a *App) publicarWidget(view widgets.View, desde, hasta time.Time) {
 		return ocs[i].End.Before(ocs[j].End)
 	})
 
-	var busyDays []int
-	dayColors := map[int]string{}
-	var rawItems []widgets.Item
-	var upcomingCount int64
-
-	for _, oc := range ocs {
-		if strings.EqualFold(oc.Event.Status, "CANCELLED") {
-			continue
-		}
-		ini := oc.Start.In(zona)
-		fin := oc.End.In(zona)
-		finInc := fin
-		if oc.Event.AllDay && fin.After(ini) && fin.Hour() == 0 && fin.Minute() == 0 && fin.Second() == 0 {
-			finInc = fin.Add(-time.Nanosecond)
-		}
-		hex := hexColorDe(oc.Color)
-		if !finInc.Before(inicioMes) && ini.Before(finMes) {
-			primero := ini
-			if primero.Before(inicioMes) {
-				primero = inicioMes
-			}
-			ultimo := finInc
-			limiteMes := finMes.Add(-time.Nanosecond)
-			if ultimo.After(limiteMes) {
-				ultimo = limiteMes
-			}
-			dIni := inicioDelDia(primero, zona).Day()
-			dFin := inicioDelDia(ultimo, zona).Day()
-			for d := dIni; d <= dFin; d++ {
-				busyDays = append(busyDays, d)
-				if _, ok := dayColors[d]; !ok && hex != "" {
-					dayColors[d] = hex
-				}
-			}
-		}
-		vigente := (!oc.Event.AllDay && (fin.After(corte) || !ini.Before(corte))) ||
-			(oc.Event.AllDay && !finInc.Before(hoyInicio))
-		if !vigente {
-			continue
-		}
-		upcomingCount++
-		if len(rawItems) < widgets.MaxItems {
-			titulo := strings.TrimSpace(oc.Event.Title)
-			if titulo == "" {
-				titulo = a.P.t("cal.untitled", nil)
-			}
-			insignia := ini.Format("15:04")
-			if oc.Event.AllDay {
-				insignia = ""
-			}
-			var startAt, endAt int64
-			if oc.Start.Unix() > 0 {
-				startAt = oc.Start.Unix()
-			}
-			if oc.End.Unix() > 0 {
-				endAt = oc.End.Unix()
-			}
-			rawItems = append(rawItems, widgets.Item{
-				Title:    titulo,
-				Subtitle: oc.Event.Location,
-				Badge:    insignia,
-				Color:    hex,
-				StartAt:  startAt,
-				EndAt:    endAt,
-				AllDay:   oc.Event.AllDay,
-			})
-		}
-	}
+	busyDays, dayColors, rawItems, upcomingCount := a.eventosWidget(ocs, zona, corte, inicioMes, finMes, hoyInicio)
 
 	counters := []widgets.Counter{{Kind: "calendars", Value: int64(len(ids))}}
 	if upcomingCount > 0 {
@@ -597,6 +587,41 @@ func (a *App) publicarWidget(view widgets.View, desde, hasta time.Time) {
 		defer parar()
 		_ = view.PublicarDetalle(ctx, detalle)
 	})
+}
+
+func (a *App) eventosWidget(ocs []Ocurrencia, zona *time.Location, corte, inicioMes, finMes, hoyInicio time.Time) ([]int, map[int]string, []widgets.Item, int64) {
+	var busyDays []int
+	dayColors := map[int]string{}
+	var rawItems []widgets.Item
+	var upcomingCount int64
+	for _, oc := range ocs {
+		if strings.EqualFold(oc.Event.Status, "CANCELLED") {
+			continue
+		}
+		ini, fin, finInc := fechasOcurrenciaWidget(oc, zona)
+		hex := hexColorDe(oc.Color)
+		busyDays = marcarDiasWidget(busyDays, dayColors, ini, finInc, inicioMes, finMes, zona, hex)
+		if !vigenteWidget(oc, ini, fin, finInc, corte, hoyInicio) {
+			continue
+		}
+		upcomingCount++
+		if len(rawItems) < widgets.MaxItems {
+			rawItems = append(rawItems, a.itemWidgetDe(oc, ini, hex))
+		}
+	}
+	return busyDays, dayColors, rawItems, upcomingCount
+}
+
+func fechasOcurrenciaWidget(oc Ocurrencia, zona *time.Location) (time.Time, time.Time, time.Time) {
+	ini, fin := oc.Start.In(zona), oc.End.In(zona)
+	return ini, fin, finInclusivoWidget(ini, fin, oc.Event.AllDay)
+}
+
+func vigenteWidget(oc Ocurrencia, ini, fin, finInc, corte, hoyInicio time.Time) bool {
+	if oc.Event.AllDay {
+		return !finInc.Before(hoyInicio)
+	}
+	return fin.After(corte) || !ini.Before(corte)
 }
 
 // sinAcceso: el servicio dice que ese calendario ya no es para esta persona (403) o

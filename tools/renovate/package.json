@@ -4,7 +4,7 @@
   "private": true,
   "description": "Renovate para .github/workflows/dependencias.yml. La versi\u00f3n se fija aqu\u00ed y todo su \u00e1rbol en bun.lock: el flujo instala con --frozen-lockfile y sin scripts de instalaci\u00f3n.",
   "dependencies": {
-    "renovate": "44.145.2"
+    "renovate": "44.190.2"
   },
   "overrides": {
     "handlebars": "4.7.10",
@@ -12,6 +12,6 @@
     "markdown-it": "15.0.3",
     "undici": "8.12.3",
     "zod": "4.6.7",
-    "qs": "6.16.1"
+    "qs": "6.17.0"
   }
 }

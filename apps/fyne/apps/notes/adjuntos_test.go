@@ -23,6 +23,7 @@ import (
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
+	"git.sytue.eu/sytue/one/apps/nucleo/webref"
 )
 
 // TestUnAdjuntoViajaComoEnLaWeb: leer un fichero da la URL de datos de `readAsDataURL`
@@ -201,10 +202,16 @@ func TestLaNotaDocEnseñaElDocumento(t *testing.T) {
 	if cajas != 1 || !strings.Contains(todo, "Orden") || !strings.Contains(todo, p.tr.T("docs.openViewer", nil)) {
 		t.Errorf("la nota doc enseña %d cajas y %q", cajas, todo)
 	}
-	// Medido en la web con la nota como TARJETA: a 323,7 de ancho, 340 (el iframe de 256 y
-	// «Abrir documento» con su `gap-1.5`). En lista la nota es una FILA: en vez del `p-3`
-	// con borde lleva `py-1.5` sin él, así que mide 340 − 2·(12+1) + 2·6 = 326.
-	if h := MedidaTarjetaNota(tj, 323.7).Height; h < 325.5 || h > 326.5 {
-		t.Errorf("la fila de la nota doc mide %.2f y en la web 326", h)
+	// La fila de la web usa ahora px-2 py-2. El iframe de 256 y «Abrir documento»
+	// conservan su gap-1.5; respecto a la tarjeta de 340 se quita p-3 con borde y
+	// se añade py-2 sin borde: 340 − 2·(12+1) + 2·8 = 330.
+	css := webref.Read(t, "apps/frontend/apps/notes/src/styles/app.css")
+	_, regla, existe := strings.Cut(css, ".notes-stream-note {")
+	regla, _, _ = strings.Cut(regla, "}")
+	if !existe || !strings.Contains(regla, "px-2 py-2") {
+		t.Fatal("ha cambiado el relleno de la fila web: revisar su medida nativa")
+	}
+	if h := MedidaTarjetaNota(tj, 323.7).Height; h < 329.5 || h > 330.5 {
+		t.Errorf("la fila de la nota doc mide %.2f y en la web 330", h)
 	}
 }

@@ -1,6 +1,32 @@
 // SPDX-License-Identifier: Apache-2.0
 import { expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import {
+  COLOR_KEY, FORMA_KEY, STORAGE_KEY,
+} from '../../../apps/frontend/packages/ui/src/theme/init.ts';
+
+/** Preferencias reales de la suite antes de cargar cualquier isla del fixture. */
+export async function prepareFixtureTheme(context, mode) {
+  await context.addInitScript(
+    ({ mode, keys }) => {
+      // El contexto puede crear primero about:blank, sin almacenamiento por origen.
+      if (!['http:', 'https:'].includes(location.protocol)) return;
+      localStorage.setItem(keys.mode, mode);
+      localStorage.setItem(keys.color, 'app');
+      localStorage.setItem(keys.forma, 'marco');
+    },
+    { mode, keys: { mode: STORAGE_KEY, color: COLOR_KEY, forma: FORMA_KEY } },
+  );
+}
+
+/** Verifica lo aplicado por el init/ThemeProvider real; nunca fuerza atributos. */
+export async function assertFixtureTheme(page, mode) {
+  const html = page.locator('html');
+  await expect(html).toHaveAttribute('data-theme', mode);
+  await expect(html).toHaveAttribute('data-color', 'app');
+  // Marco se representa sin atributo, según applyThemeForma del design system.
+  await expect.poll(() => html.getAttribute('data-forma')).toBeNull();
+}
 
 /** Astro dev may replace an optimized dependency during the first hydration. */
 export async function openWizardFixture(page, url, readySelector = 'main') {

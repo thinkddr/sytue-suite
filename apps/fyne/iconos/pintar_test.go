@@ -5,9 +5,12 @@ package iconos
 
 import (
 	"bytes"
+	"encoding/xml"
+	"errors"
 	"fmt"
 	"image"
 	"image/color"
+	"io"
 	"math"
 	"strings"
 	"testing"
@@ -361,21 +364,82 @@ func TestLosArcosConHolguraConservanLaGeometria(t *testing.T) {
 	if c := rasteriza(contacts, 80, 80).NRGBAAt(31, 29); !blanco(c) {
 		t.Errorf("el lado izquierdo de la cabeza de Contacts no está pintado (%v)", c)
 	}
-	// El aro de ID es un semicírculo exacto con el final relativo: sin la holgura de los
-	// radios no pinta nada y del aro queda solo el agujero.
+	// El aro de ID contiene un semicírculo exacto con el final relativo; normaliza debe
+	// ampliar ambos radios antes de rasterizarlo.
 	id, err := marcasFS.ReadFile("marcas/id.svg")
 	if err != nil {
 		t.Fatal(err)
+	}
+	originales := radiosDelAroID(t, id)
+	ajustados := radiosDelAroID(t, normaliza(id))
+	conHolgura := func(radios [2]float64) bool {
+		for i, radio := range radios {
+			proporcion := radio / originales[i]
+			if !(proporcion > 1 && math.Abs(proporcion-(1+1e-7)) <= 1e-12) {
+				return false
+			}
+		}
+		return true
+	}
+	if !conHolgura(ajustados) {
+		t.Errorf("normaliza no amplía ambos radios del aro de ID: originales=%v, ajustados=%v", originales, ajustados)
+	}
+	// Contraste numérico: quitar toda la holgura o la de UN solo eje debe fallar.
+	// El píxel crudo depende también del relleno par-impar y no aísla esta corrección.
+	for _, sinHolgura := range [][2]float64{
+		originales,
+		{originales[0], ajustados[1]},
+		{ajustados[0], originales[1]},
+	} {
+		if conHolgura(sinHolgura) {
+			t.Errorf("el guardián admite un radio sin ampliar: %v", sinHolgura)
+		}
 	}
 	// El aro (radio 6,4 en (15,2, 25) del viewBox, agujero de 2,6) pasa, en su lado
 	// izquierdo, por x ≈ 10,5; a 80 px y con su `scale(0.9692)`, por (22, 47).
 	if c := rasteriza(id, 80, 80).NRGBAAt(22, 47); !blanco(c) {
 		t.Errorf("el aro de la llave de ID no está pintado (%v)", c)
 	}
-	crudo := escalaDeUno.ReplaceAll(id, []byte("scale($1 $1)"))
-	if c := rasterizaCon(crudo, 80, 80, nil).NRGBAAt(22, 47); blanco(c) {
-		t.Errorf("sin la holgura el semicírculo de ID ya sale entero (%v): revisar la normalización de radios", c)
+}
+
+// radiosDelAroID lee los números del primer arco del aro, sin usar el parser de
+// producción que los amplía. No depende de cómo se serialicen sus decimales.
+func radiosDelAroID(t *testing.T, svg []byte) [2]float64 {
+	t.Helper()
+	d := xml.NewDecoder(bytes.NewReader(svg))
+	for {
+		token, err := d.Token()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		inicio, ok := token.(xml.StartElement)
+		if !ok || inicio.Name.Local != "path" {
+			continue
+		}
+		var regla, camino string
+		for _, atributo := range inicio.Attr {
+			switch atributo.Name.Local {
+			case "fill-rule":
+				regla = atributo.Value
+			case "d":
+				camino = atributo.Value
+			}
+		}
+		arco := strings.IndexAny(camino, "aA")
+		if regla != "evenodd" || arco < 0 {
+			continue
+		}
+		var radios [2]float64
+		if n, err := fmt.Sscanf(strings.ReplaceAll(camino[arco+1:], ",", " "), "%f %f", &radios[0], &radios[1]); err != nil || n != 2 {
+			t.Fatalf("no se pueden leer los dos radios del aro: %q (%v)", camino, err)
+		}
+		return radios
 	}
+	t.Fatal("la marca ID no contiene el arco de su aro par-impar")
+	return [2]float64{}
 }
 
 // TestUnaMarcaApagadaSaleEnGrisYAl40 es el `opacity-40 grayscale` de la tesela de un

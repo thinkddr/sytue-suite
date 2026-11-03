@@ -68,9 +68,10 @@ type TarjetaGrafico struct {
 
 	editando bool
 	// El arrastre en curso: mover desde la cabecera o cambiar el tamaño desde el asa.
-	modo  int
-	desp  fyne.Delta
-	medid fyne.Size
+	modo      int
+	desp      fyne.Delta
+	medid     fyne.Size
+	cancelado bool
 
 	editar, quitar *botonTarjeta
 	editor         *editorGrafico
@@ -247,6 +248,9 @@ func (t *TarjetaGrafico) Cursor() desktop.Cursor { return desktop.DefaultCursor 
 // empezó en el asa de la esquina. Los desplazamientos van en px de la pantalla y se
 // guardan en los de la hoja (sin zoom).
 func (t *TarjetaGrafico) Dragged(e *fyne.DragEvent) {
+	if t.cancelado {
+		return
+	}
 	z := t.lz.Rejilla.z()
 	if t.modo == gestoNada {
 		inicio := fyne.NewPos(e.Position.X-e.Dragged.DX, e.Position.Y-e.Dragged.DY)
@@ -276,6 +280,10 @@ func (t *TarjetaGrafico) Dragged(e *fyne.DragEvent) {
 
 // DragEnd guarda la posición o el tamaño, redondeados como la web.
 func (t *TarjetaGrafico) DragEnd() {
+	if t.cancelado {
+		t.cancelado = false
+		return
+	}
 	modo := t.modo
 	t.modo = gestoNada
 	g, ok := t.grafico()
@@ -296,6 +304,16 @@ func (t *TarjetaGrafico) DragEnd() {
 			t.lz.editarGrafico(t.id, map[string]any{"w": float64(t.medid.Width), "h": float64(t.medid.Height)})
 		}
 	}
+	t.lz.Rejilla.Refresh()
+}
+
+// CancelarArrastre quita la posición o medida provisional sin modificar el libro.
+func (t *TarjetaGrafico) CancelarArrastre() {
+	if t.modo == gestoNada {
+		return
+	}
+	t.modo, t.cancelado = gestoNada, true
+	t.desp, t.medid = fyne.Delta{}, fyne.Size{}
 	t.lz.Rejilla.Refresh()
 }
 

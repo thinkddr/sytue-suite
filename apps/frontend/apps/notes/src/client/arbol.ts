@@ -18,6 +18,16 @@ export interface Nodo {
   hijos: Nodo[];
 }
 
+/** Reponer un traslado fallido no puede borrar capturas ni pisar una edición posterior. */
+export function reponerFamilia(
+  actuales: readonly Note[],
+  anteriores: readonly Note[],
+  familia: ReadonlySet<string>,
+): Note[] {
+  const presentes = new Set(actuales.map((n) => n.id));
+  return [...actuales, ...anteriores.filter((n) => familia.has(n.id) && !presentes.has(n.id))];
+}
+
 export function construirArbol(notes: Note[]): Nodo[] {
   const porId = new Map<string, Nodo>(notes.map((n) => [n.id, { note: n, hijos: [] }]));
   const raiz: Nodo[] = [];
@@ -87,6 +97,33 @@ export function conSangria(notes: readonly Note[]): { note: Note; nivel: number 
   };
   for (const r of raices) bajar(r, 0);
   return out;
+}
+
+/** Reordena hermanos: ni cambia su padre ni cruza las fijadas con las demás. */
+export function colocarNota(
+  notes: readonly Note[],
+  id: string,
+  col: number,
+  antes: string | null,
+  lista: boolean,
+): Note[] {
+  const origen = notes.find((n) => n.id === id);
+  if (!origen) return [];
+  const hermanos = notes
+    .filter(
+      (n) =>
+        n.id !== id &&
+        (n.group_id ?? null) === (origen.group_id ?? null) &&
+        Boolean(n.pinned) === Boolean(origen.pinned) &&
+        (lista || n.col === col),
+    )
+    .sort((a, b) => a.position - b.position || a.created_at.localeCompare(b.created_at));
+  const indice = antes === null ? hermanos.length : hermanos.findIndex((n) => n.id === antes);
+  if (indice < 0) return [];
+  hermanos.splice(indice, 0, origen);
+  return hermanos.flatMap((n, position) =>
+    n.position === position && n.col === col ? [] : [{ ...n, col, position }],
+  );
 }
 
 /** ¿Subiendo por los padres desde `desde` se llega a la nota `id`? */

@@ -32,6 +32,7 @@
   "common.offline": "Tá tú as líne. Ní shábhálfar athruithe go dtí go dtiocfaidh an nasc ar ais.",
   "common.retry": "Bain triail eile as",
   "common.save": "Sábháil",
+  "crypto.dataReviewRequired": "Tá sonraí sa chuid seo nach féidir leis an aip seo a athrú gan cruinneas a chailleadh. Coinníodh an bunleagan.",
   "crypto.disable": "Bain an criptiú",
   "crypto.disableWarning": "Fanfaidh na nótaí criptithe atá ann cheana doléite. Díghlasáil an leabhar nótaí ar dtús.",
   "crypto.enable": "Criptigh",
@@ -39,7 +40,6 @@
   "crypto.lockNow": "Glasáil anois",
   "crypto.locked": "Faoi ghlas",
   "crypto.migrating": "Ábhar an leabhair nótaí á chosaint…",
-  "crypto.dataReviewRequired": "Tá sonraí sa chuid seo nach féidir leis an aip seo a athrú gan cruinneas a chailleadh. Coinníodh an bunleagan.",
   "crypto.migrationFailed": "Níorbh fhéidir an criptiú a chríochnú. Coinníodh do chuid sonraí. Oscail an leabhar nótaí arís chun na hathruithe a sheiceáil.",
   "crypto.mismatch": "Tá an dá fhrása faire difriúil.",
   "crypto.passphrase": "Frása faire",
@@ -269,6 +269,7 @@
   "notebook.delete": "Scrios an leabhar nótaí",
   "notebook.deleteConfirm": "Scrios “{title}” agus gach a bhfuil istigh ann?",
   "notebook.emoji": "Deilbhín",
+  "notebook.move": "Bog an leabhar nótaí",
   "notebook.newChild": "Leabhar nótaí nua istigh",
   "notebook.notes": {
     "one": "{count} nóta",

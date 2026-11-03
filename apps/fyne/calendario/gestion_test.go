@@ -344,6 +344,21 @@ func TestLaCabeceraNoRecortaHoyConControlesDe44(t *testing.T) {
 			if hoy.Position() != posHoy || buscar.Position() != posBuscar {
 				t.Error("el foco mueve los controles de escritorio con el reparto de la tira móvil")
 			}
+			// Al volver al mismo ancho, Resize de la tira puede no ejecutarse. Las
+			// coordenadas de escritorio no deben quedar dentro del viewport móvil.
+			cab.Resize(fyne.NewSize(ancho, cab.AltoPara(ancho)))
+			w.Canvas().Capture()
+			drv := fyne.CurrentApp().Driver()
+			arriba := drv.AbsolutePositionForObject(r.tira).Y
+			abajo := arriba + r.tira.Size().Height
+			controles := append(append([]fyne.CanvasObject{}, grupoIzq.Objects...), r.tira.Objetos[1:]...)
+			for _, o := range controles {
+				y := drv.AbsolutePositionForObject(o).Y
+				if y < arriba-0.1 || y+o.Size().Height > abajo+0.1 {
+					t.Errorf("%s a %g tras volver: %T ocupa Y%g..%g fuera del viewport Y%g..%g", modo, ancho, o,
+						y, y+o.Size().Height, arriba, abajo)
+				}
+			}
 			w.Close()
 		}
 	}

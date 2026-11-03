@@ -10,10 +10,11 @@
  */
 import type { JSX } from 'preact';
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
-import { Button, Checkbox, Icon, Input, Select } from '@sytue/ui';
+import { Badge, Button, Checkbox, Icon, Input, Select } from '@sytue/ui';
 import type { BasesField, BasesRecord, BasesValue } from '@sytue/api-clients/bases';
 import type { T } from '../i18n/index.js';
 import { moverFoco, type Celda } from '../lib/rejilla.js';
+import { esNumerico, ICONO_DE_TIPO, tonoDeOpcion } from '../lib/aspecto.js';
 import { enlacesDe, textoDeValor, valorDeTexto } from '../lib/valores.js';
 
 export interface OpcionEnlace {
@@ -256,15 +257,35 @@ export function Rejilla(p: RejillaProps): JSX.Element {
       );
     }
     if (campo.kind === 'attachment') {
-      return (r.attachments?.[campo.id] ?? []).map((a) => a.name).join(', ');
+      const nombres = (r.attachments?.[campo.id] ?? []).map((a) => a.name).join(', ');
+      return <span class="block max-w-72 break-words whitespace-normal">{nombres}</span>;
     }
     if (campo.kind === 'link') {
       const mapa = p.etiquetas[campo.link_table_id ?? ''];
-      return enlacesDe(r, campo)
+      const nombres = enlacesDe(r, campo)
         .map((id) => mapa?.get(id) ?? id.slice(0, 8))
         .join(', ');
+      return <span class="block max-w-72 break-words whitespace-normal">{nombres}</span>;
     }
-    return textoDeValor(campo, r.data[campo.id]);
+    if (campo.kind === 'select' || campo.kind === 'multiselect') {
+      const valor = r.data[campo.id];
+      const opciones = Array.isArray(valor)
+        ? valor
+        : typeof valor === 'string' && valor
+          ? [valor]
+          : [];
+      return (
+        <span class="flex max-w-72 flex-wrap gap-1">
+          {opciones.map((opcion) => (
+            <Badge key={opcion} tone={tonoDeOpcion(campo, opcion)} class="max-w-full">
+              <span class="break-words whitespace-normal">{opcion}</span>
+            </Badge>
+          ))}
+        </span>
+      );
+    }
+    const texto = textoDeValor(campo, r.data[campo.id]);
+    return <span class="block max-w-72 break-words whitespace-normal">{texto}</span>;
   }
 
   if (campos.length === 0) {
@@ -283,7 +304,10 @@ export function Rejilla(p: RejillaProps): JSX.Element {
           </Button>
         </div>
       ) : null}
-      <div class="border-border max-w-full overflow-auto rounded-lg border">
+      <div
+        class="bases-grid-scroll border-border bg-surface max-w-full overflow-auto rounded-lg border"
+        data-scroll-x
+      >
         <table
           ref={tabla}
           role="grid"
@@ -292,22 +316,25 @@ export function Rejilla(p: RejillaProps): JSX.Element {
           aria-rowcount={p.hayMas || p.hayAntes ? -1 : registros.length + 1}
           aria-colcount={campos.length + 1}
           aria-readonly={!puedeEditar}
-          class="w-full min-w-max border-collapse text-sm"
+          class="bases-grid w-full min-w-max border-separate border-spacing-0 text-sm"
         >
           <thead class="bg-bg-subtle">
             <tr>
-              <th scope="col" class="border-border w-12 border-b px-2 py-2 text-left">
+              <th scope="col" class="border-border w-12 border-b px-2 py-3 text-start">
                 <span class="sr-only">{t('grid.rowCol')}</span>
               </th>
               {campos.map((c) => (
                 <th
                   key={c.id}
                   scope="col"
-                  class="border-border text-text border-b px-3 py-2 text-left font-semibold whitespace-nowrap"
+                  class={`border-border text-text border-b px-3 py-3 font-semibold whitespace-nowrap ${esNumerico(c) ? 'text-end' : 'text-start'}`}
                 >
-                  {c.name}
-                  <span class="text-text-muted ml-1 text-xs font-normal">
-                    {t(`field.kind.${c.kind}`)}
+                  <span class={`flex items-center gap-2 ${esNumerico(c) ? 'justify-end' : ''}`}>
+                    <Icon name={ICONO_DE_TIPO[c.kind]} size={15} class="text-text-muted shrink-0" />
+                    <span class="max-w-72 truncate" title={c.name}>
+                      {c.name}
+                    </span>
+                    <span class="sr-only"> · {t(`field.kind.${c.kind}`)}</span>
                   </span>
                 </th>
               ))}
@@ -315,10 +342,15 @@ export function Rejilla(p: RejillaProps): JSX.Element {
           </thead>
           <tbody>
             {registros.map((r, fila) => (
-              <tr key={r.id} class="border-border border-b last:border-b-0">
-                <th scope="row" class="text-text-muted w-12 px-2 py-1 text-left font-normal">
+              <tr key={r.id}>
+                <th
+                  scope="row"
+                  class="border-border text-text-muted w-12 border-b px-2 py-2 text-start font-normal"
+                >
                   <span class="inline-flex items-center gap-1">
-                    <span aria-hidden="true">{p.desde + fila + 1}</span>
+                    <span aria-hidden="true" class="min-w-4 text-end text-xs tabular-nums">
+                      {p.desde + fila + 1}
+                    </span>
                     <span class="sr-only">{t('grid.row', { n: p.desde + fila + 1 })}</span>
                     {p.onComentar ? (
                       <Button
@@ -354,7 +386,7 @@ export function Rejilla(p: RejillaProps): JSX.Element {
                       tabIndex={activa ? 0 : -1}
                       data-fila={fila}
                       data-col={col}
-                      class={`sytue-focus-ring-inset text-text min-w-32 px-3 py-1 align-middle ${otros ? 'ring-primary relative ring-2 ring-inset' : ''}`}
+                      class={`sytue-focus-ring-inset border-border text-text min-w-36 border-b px-3 py-2 align-middle ${esNumerico(campo) ? 'text-end tabular-nums' : ''} ${otros ? 'ring-primary relative ring-2 ring-inset' : ''}`}
                       onFocus={() => {
                         setFoco(c);
                         p.onFoco?.(r, campo);
@@ -380,7 +412,12 @@ export function Rejilla(p: RejillaProps): JSX.Element {
       {registros.length === 0 ? <p class="text-text-muted text-sm">{t('grid.empty')}</p> : null}
       <div class="flex flex-wrap items-center gap-2">
         {puedeEditar ? (
-          <Button variant="secondary" size="sm" onClick={p.onNuevo}>
+          <Button
+            variant="secondary"
+            size="sm"
+            leadingIcon={<Icon name="plus" size={14} />}
+            onClick={p.onNuevo}
+          >
             {t('grid.addRecord')}
           </Button>
         ) : null}

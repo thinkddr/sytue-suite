@@ -1,4 +1,5 @@
 {
+  "actions.more": "Daugiau veiksmų",
   "attach.add": "Pridėti failą",
   "attach.badType": "Šis failo tipas neleidžiamas arba jo turinys neatitinka pavadinimo.",
   "attach.delete": "Ištrinti {name}",

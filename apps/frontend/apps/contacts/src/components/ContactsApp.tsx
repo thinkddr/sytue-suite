@@ -33,6 +33,7 @@ import {
   describedBy,
   useConfirm,
   useToast,
+  useLongPress,
   BulkActionBar,
   withBase,
   Illustration,
@@ -692,6 +693,13 @@ export function ContactsApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
     </Sidebar>
   );
 
+  const mantenerContacto = useLongPress<string>((href) => {
+    const i = filtered.findIndex((c) => c.href === href);
+    if (i >= 0) toggleRow(i, false);
+  });
+  const { cancelar: cancelarSeleccionContacto } = mantenerContacto;
+  useEffect(() => cancelarSeleccionContacto(), [filtered, cancelarSeleccionContacto]);
+
   const listPanel = (
     <section class="flex h-full flex-col" aria-label={t('list.region')}>
       {/* Cabecera de lista en BLANCO (SectionHeader, estilo Mattermost): el color
@@ -874,6 +882,7 @@ export function ContactsApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
                     isSelected
                       ? 'border-l-primary bg-selected'
                       : 'hover:bg-bg-subtle border-l-transparent',
+                    selection.has(c.href) && 'border-l-primary bg-selected',
                   )}
                 >
                   {/* La casilla va SUELTA del botón que abre la ficha (patrón del
@@ -896,6 +905,9 @@ export function ContactsApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
                     type="button"
                     class="sytue-focus-ring-inner flex min-w-0 flex-1 items-center gap-2.5 rounded-md text-left"
                     aria-current={isSelected ? 'true' : undefined}
+                    onPointerDown={(e) => mantenerContacto.iniciar(e, c.href)}
+                    onClickCapture={mantenerContacto.onClickCapture}
+                    onContextMenuCapture={mantenerContacto.onContextMenuCapture}
                     onClick={() => setSelected(c)}
                   >
                     <Avatar name={c.fullName} src={avatarSrc(c)} size="sm" />

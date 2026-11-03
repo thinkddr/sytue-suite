@@ -56,7 +56,7 @@ const deadline = setTimeout(() => {
 }, 120000);
 const summary = {
   artificial: true,
-  sdk: 'matrix-js-sdk 43.0.0 + mautrix-go 0.32.0/goolm',
+  sdk: 'matrix-js-sdk 45.0.0 + mautrix-go 0.32.0/goolm',
   transport: false,
   sas: false,
   js_to_go: false,

@@ -73,7 +73,7 @@ por la API» de `docs/operations.md`.
 | Seguridad de los datos                                                                          | Sí, `applications.dataSafety` (fuera de la edición)                               | `play-publicar.sh`                             |
 | AAB a «internal» (como borrador)                                                                | Sí, `edits.bundles.upload` + `edits.tracks.update`                                | `play-publicar.sh --aab`                       |
 | Testers de «internal»                                                                           | Solo **grupos de Google** (`edits.testers`); las listas de correos, en la consola | El dueño                                       |
-| Países (30: UE + EEE + CH, sin Francia)                                                         | **No**: `countryAvailability` solo se lee                                         | El dueño; DECISIÓN abajo                       |
+| Países (todos salvo `scripts/paises.json`)                                                      | **No**: `countryAvailability` solo se lee; `--paises` lo comprueba               | El dueño; DECISIÓN abajo                       |
 | Clasificación de contenido, público objetivo, anuncios, acceso, declaraciones, ID de publicidad | **No**                                                                            | El dueño, con las respuestas de abajo          |
 | Enviar a revisión y a producción                                                                | No se hace                                                                        | El dueño                                       |
 
@@ -295,14 +295,19 @@ Se sube por la API desde `seguridad-datos.csv`. Resumen de lo declarado:
 | Sytue ERP         | `eu.sytue.erp`      | Empresa                           | Contabilidad         |
 | Sytue Bases       | `eu.sytue.bases`    | Productividad                     | Bases de datos       |
 
-**Países** (DECISIÓN): **30**, los 26 de la UE sin Francia, Islandia, Liechtenstein,
-Noruega y Suiza. Se conserva la exclusión de Francia decidida por el titular el
-**2026-10-14**, posterior a la lista de 31 de septiembre. La disponibilidad de Play
-se fija por esa decisión de distribución del titular.
+**Países** (DECISIÓN del titular, **2026-11-01**): **todos** los que ofrece Play salvo
+los de [`scripts/paises.json`](../scripts/paises.json): Francia (exclusión del
+2026-10-14, hasta tramitar la ANSSI), China (Play no opera allí; se deja explícito) y los
+sancionados por la UE (Rusia y Bielorrusia; Irán, Corea del Norte, Siria y Cuba por si
+aparecieran). Sustituye a la lista de 30 (UE + EEE + CH) guardada el 2026-10-25.
 
-El **2026-10-25** quedaron guardados esos 30 países en las **quince apps** de Play
-Console, sin enviar los cambios a revisión ni publicar. Se configuran en _Prueba y
-publicación → Producción → Países o regiones_; en «internal» no hace falta.
+La API no deja escribirlos. En **cada una de las quince**: _Prueba y publicación →
+Producción → Países o regiones → Añadir países o regiones_, marcar **todos**, desmarcar
+Francia, Rusia y Bielorrusia (y cualquier otro de `paises.json` que ofrezca), guardar y
+enviar los cambios con la siguiente publicación. No activar la disponibilidad automática
+en países nuevos. Después, `play-publicar` con `modo=paises` lo comprueba (solo lee):
+falla si aparece un excluido, si «resto del mundo» está activado o si hay menos de
+`minimo_play` países.
 
 **Lo que le queda al dueño en CADA una de las quince**, en este orden:
 

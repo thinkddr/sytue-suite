@@ -4,15 +4,11 @@
 package bases
 
 import (
-	"image/color"
-	"strconv"
 	"strings"
 	"time"
 	"unicode"
 
 	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/canvas"
-	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/widget"
 
@@ -41,6 +37,12 @@ var (
 	altoCabeza = 2*tema.Espacio(2) + tema.TextoSM.Linea
 	// ladoCasilla es el `h-4 w-4` de la casilla de una celda.
 	ladoCasilla = tema.Espacio(4)
+	// ladoIconoCabeza es el `size={14}` del glifo de tipo de cada cabecera, y
+	// huecoCabeza el `gap-1.5` que lo separa del nombre.
+	ladoIconoCabeza = float32(14)
+	huecoCabeza     = tema.Espacio(1.5)
+	// huecoChips es el `gap-1` entre los chips de una celda de elección, enlace o adjuntos.
+	huecoChips = tema.Espacio(1)
 )
 
 // rejilla es la rejilla editable de una tabla, con el patrón «grid» de WAI-ARIA de la
@@ -78,6 +80,9 @@ type rejilla struct {
 
 	foco     celda
 	enfocada bool
+	// filaEncima es la fila bajo el puntero (`hover:` de la fila), si hayEncima.
+	filaEncima int
+	hayEncima  bool
 	// version sube cuando cambian los datos: el renderer vuelve a armar las celdas.
 	version int
 	// Edición de texto, número o fecha: el campo va encima de la celda.
@@ -97,6 +102,7 @@ var (
 	_ fyne.DoubleTappable = (*rejilla)(nil)
 	_ fyne.Focusable      = (*rejilla)(nil)
 	_ fyne.Shortcutable   = (*rejilla)(nil)
+	_ desktop.Hoverable   = (*rejilla)(nil)
 )
 
 func nuevaRejilla(t func(string, ...i18n.Vars) string) *rejilla {
@@ -149,6 +155,51 @@ func (g *rejilla) textoCelda(r api.BasesRecord, campo api.BasesField) string {
 		return strings.Join(etiquetas, ", ")
 	}
 	return textoDeValor(r.Data[campo.ID])
+}
+
+// pieza es un chip de una celda: lo que dice y su color.
+type pieza struct {
+	texto string
+	tono  ui.Tono
+}
+
+// conChips dice si la celda se pinta con chips y no con texto: las elecciones (con el
+// color de su opción), los enlaces y los adjuntos.
+func conChips(campo api.BasesField) bool {
+	switch campo.Kind {
+	case api.BasesKindSelect, api.BasesKindMultiselect, api.BasesKindLink, api.BasesKindAttachment:
+		return true
+	}
+	return false
+}
+
+// piezas son los chips de una celda: una opción, varias, los registros enlazados o los
+// ficheros adjuntos.
+func (g *rejilla) piezas(r api.BasesRecord, campo api.BasesField) []pieza {
+	var out []pieza
+	switch campo.Kind {
+	case api.BasesKindSelect:
+		if v, _ := r.Data[campo.ID].(string); v != "" {
+			out = append(out, pieza{v, tonoDeOpcion(campo, v)})
+		}
+	case api.BasesKindMultiselect:
+		for _, v := range cadenasDe(r.Data[campo.ID]) {
+			out = append(out, pieza{v, tonoDeOpcion(campo, v)})
+		}
+	case api.BasesKindLink:
+		for _, id := range r.Links[campo.ID] {
+			e, ok := g.Etiquetas[campo.LinkTableID][id]
+			if !ok {
+				e = id[:min(len(id), 8)]
+			}
+			out = append(out, pieza{e, ui.InsigniaPrimaria})
+		}
+	case api.BasesKindAttachment:
+		for _, a := range r.Attachments[campo.ID] {
+			out = append(out, pieza{a.Name, ui.InsigniaNeutra})
+		}
+	}
+	return out
 }
 
 // enfocar mueve el foco a una celda y lo dice.
@@ -360,6 +411,39 @@ func (g *rejilla) celdaEn(p fyne.Position) (celda, bool) {
 func (g *rejilla) FocusGained() { g.enfocada = true; g.Refresh() }
 func (g *rejilla) FocusLost()   { g.enfocada = false; g.Refresh() }
 
+// MouseIn, MouseMoved y MouseOut son el `hover:` de la fila: solo se repintan los fondos
+// de la fila que se deja y de la que se entra, no la rejilla entera (con trescientas
+// filas, recolocar cada celda a cada movimiento del ratón se notaría).
+func (g *rejilla) MouseIn(ev *desktop.MouseEvent)    { g.MouseMoved(ev) }
+func (g *rejilla) MouseMoved(ev *desktop.MouseEvent) { g.ponerEncima(g.filaEn(ev.Position)) }
+func (g *rejilla) MouseOut()                         { g.ponerEncima(-1) }
+
+// filaEn es la fila de registros que hay a esa altura, o -1 (la cabecera, el vacío).
+func (g *rejilla) filaEn(p fyne.Position) int {
+	if g.r == nil || g.r.alto <= 0 || p.Y < altoCabeza {
+		return -1
+	}
+	if fila := int((p.Y - altoCabeza) / g.r.alto); fila < len(g.Registros) {
+		return fila
+	}
+	return -1
+}
+
+func (g *rejilla) ponerEncima(fila int) {
+	antes := -1
+	if g.hayEncima {
+		antes = g.filaEncima
+	}
+	if fila == antes {
+		return
+	}
+	g.filaEncima, g.hayEncima = fila, fila >= 0
+	if g.r != nil {
+		g.r.pintarFila(antes)
+		g.r.pintarFila(fila)
+	}
+}
+
 // TypedShortcut es Ctrl+Inicio y Ctrl+Fin (⌘ en un Mac): la primera y la última celda.
 // Con un modificador pulsado el driver no manda la tecla por `TypedKey`, sino como atajo
 // al objeto con el foco (visto en una ventana real: por `TypedKey` no llegaba nunca).
@@ -417,248 +501,4 @@ func (g *rejilla) CreateRenderer() fyne.WidgetRenderer {
 	g.r = &rejillaRenderer{g: g, version: -1}
 	g.r.Refresh()
 	return g.r
-}
-
-type rejillaRenderer struct {
-	g       *rejilla
-	version int
-
-	marco, cabeza, anillo, ancla *canvas.Rectangle
-	lineas                       []*canvas.Rectangle
-	titulos, tipos, numeros      []*canvas.Text
-	borrar                       []*ui.Boton
-	// textos[fila][col] es el texto de la celda; nil donde va una casilla.
-	textos   [][]*canvas.Text
-	casillas map[celda]fyne.CanvasObject
-	objetos  []fyne.CanvasObject
-
-	// La geometría: el ancho de cada columna de campo (a su contenido) y de la primera,
-	// el alto de una fila, y lo que cada columna se estira para llenar el ancho dado.
-	anchos       []float32
-	ancho0, alto float32
-	ladoBoton    float32
-	estirado     float32
-	// conEditor es el campo de edición que hay entre los objetos, o nil.
-	conEditor *ui.Entrada
-}
-
-func (r *rejillaRenderer) Destroy()                     {}
-func (r *rejillaRenderer) Objects() []fyne.CanvasObject { return r.objetos }
-
-// poner vuelve a armar las celdas si los datos han cambiado.
-func (r *rejillaRenderer) poner() {
-	if r.version != r.g.version {
-		r.armar()
-	}
-}
-
-// armar crea los objetos de la cabecera y de cada fila, y mide las columnas.
-func (r *rejillaRenderer) armar() {
-	g := r.g
-	r.version = g.version
-	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
-	tinta, apagada := tema.Color("text", v), tema.Color("text-muted", v)
-
-	r.marco = canvas.NewRectangle(tema.Color("surface", v))
-	r.marco.CornerRadius, r.marco.StrokeWidth, r.marco.StrokeColor = tema.RadioLG, tema.Borde, tema.Color("border", v)
-	r.cabeza = canvas.NewRectangle(tema.Color("bg-subtle", v))
-	r.anillo = canvas.NewRectangle(color.Transparent)
-	r.anillo.StrokeWidth, r.anillo.StrokeColor = tema.AnilloFoco, tema.Color("focus-ring", v)
-	r.ancla = canvas.NewRectangle(color.Transparent)
-	r.objetos = []fyne.CanvasObject{r.marco, r.cabeza}
-
-	muestra := ui.NuevoBoton("", nil).Con(ui.Fantasma, ui.TallaSM).ConIcono(iconos.Papelera, 14)
-	muestra.SoloIcono = true
-	r.ladoBoton = ui.MedidaBotonDe(muestra).Height
-	r.alto = 2*tema.Espacio(1) + r.ladoBoton
-
-	r.anchos = make([]float32, len(g.Campos))
-	r.titulos, r.tipos = r.titulos[:0], r.tipos[:0]
-	for i, c := range g.Campos {
-		titulo := ui.Texto(c.Name, tema.TextoSM, ui.SemiNegrita, tinta)
-		tipo := ui.Texto(g.t("field.kind."+c.Kind), tema.TextoXS, ui.Normal, apagada)
-		r.titulos, r.tipos = append(r.titulos, titulo), append(r.tipos, tipo)
-		r.objetos = append(r.objetos, titulo, tipo)
-		r.anchos[i] = ui.Medir(c.Name, tema.TextoSM, ui.SemiNegrita).Width + tema.Espacio(1) + ui.Medir(tipo.Text, tema.TextoXS, ui.Normal).Width
-	}
-
-	r.lineas, r.numeros, r.borrar, r.textos = r.lineas[:0], r.numeros[:0], r.borrar[:0], r.textos[:0]
-	r.casillas = map[celda]fyne.CanvasObject{}
-	var anchoNumero float32
-	for fila, reg := range g.Registros {
-		linea := canvas.NewRectangle(tema.Color("border", v))
-		n := strconv.Itoa(g.Desde + fila + 1)
-		numero := ui.Texto(n, tema.TextoSM, ui.Normal, apagada)
-		anchoNumero = max(anchoNumero, ui.Medir(n, tema.TextoSM, ui.Normal).Width)
-		r.lineas, r.numeros = append(r.lineas, linea), append(r.numeros, numero)
-		r.objetos = append(r.objetos, linea, numero)
-		if g.PuedeEditar {
-			b := ui.NuevoBoton(g.t("grid.deleteRecord", i18n.Vars{"n": g.Desde + fila + 1}), func() {
-				if g.AlBorrar != nil {
-					g.AlBorrar(reg)
-				}
-			}).Con(ui.Fantasma, ui.TallaSM).ConIcono(iconos.Papelera, 14)
-			b.SoloIcono = true
-			r.borrar = append(r.borrar, b)
-			r.objetos = append(r.objetos, b)
-		}
-		textos := make([]*canvas.Text, len(g.Campos))
-		for col, c := range g.Campos {
-			if c.Kind == api.BasesKindCheckbox {
-				o := casilla(reg.Data[c.ID] == true, v)
-				r.casillas[celda{fila, col}] = o
-				r.objetos = append(r.objetos, o)
-				continue
-			}
-			completo := g.textoCelda(reg, c)
-			textos[col] = ui.Texto(completo, tema.TextoSM, ui.Normal, tinta)
-			r.objetos = append(r.objetos, textos[col])
-			r.anchos[col] = max(r.anchos[col], ui.Medir(completo, tema.TextoSM, ui.Normal).Width)
-		}
-		r.textos = append(r.textos, textos)
-	}
-	for i := range r.anchos {
-		r.anchos[i] = min(max(r.anchos[i]+2*margenCelda, minCelda), maxCelda)
-	}
-	r.ancho0 = 2*margenFila0 + anchoNumero
-	if g.PuedeEditar {
-		r.ancho0 += tema.Espacio(1) + r.ladoBoton
-	}
-	r.ancho0 = max(r.ancho0, tema.Espacio(12)) // el `w-12`
-	r.objetos = append(r.objetos, r.ancla, r.anillo)
-	r.conEditor = nil
-	if g.editando && g.editor != nil {
-		r.conEditor = g.editor
-		r.objetos = append(r.objetos, g.editor)
-	}
-}
-
-// casilla es la casilla de una celda: se ve y no se pulsa (`pointer-events-none`); la
-// marca Espacio, Intro o el doble clic sobre la celda.
-func casilla(marcada bool, v tema.Variante) fyne.CanvasObject {
-	caja := canvas.NewRectangle(tema.Color("surface", v))
-	caja.CornerRadius, caja.StrokeWidth, caja.StrokeColor = tema.RadioSM, tema.Borde, tema.Color("border-strong", v)
-	caja.Resize(fyne.NewSquareSize(ladoCasilla))
-	if !marcada {
-		return container.NewWithoutLayout(caja)
-	}
-	caja.FillColor, caja.StrokeColor = tema.Color("primary", v), tema.Color("primary", v)
-	tic := iconos.Trazo(iconos.Tic, ladoCasilla-4, "on-primary", v).Objeto()
-	tic.Move(fyne.NewPos(2, 2))
-	tic.Resize(fyne.NewSquareSize(ladoCasilla - 4))
-	return container.NewWithoutLayout(caja, tic)
-}
-
-func (r *rejillaRenderer) MinSize() fyne.Size {
-	r.poner()
-	ancho := r.ancho0
-	for _, a := range r.anchos {
-		ancho += a
-	}
-	return fyne.NewSize(ancho, altoCabeza+float32(len(r.g.Registros))*r.alto)
-}
-
-// columna es dónde empieza la columna `col` y cuánto mide, ya estirada.
-func (r *rejillaRenderer) columna(col int) (x, ancho float32) {
-	x = r.ancho0
-	for i := 0; i < col; i++ {
-		x += r.anchos[i] + r.estirado
-	}
-	return x, r.anchos[col] + r.estirado
-}
-
-// cajaDe es la caja de una celda dentro de la rejilla.
-func (r *rejillaRenderer) cajaDe(c celda) (fyne.Position, fyne.Size) {
-	if c.col < 0 || c.col >= len(r.anchos) {
-		return fyne.Position{}, fyne.Size{}
-	}
-	x, ancho := r.columna(c.col)
-	return fyne.NewPos(x, altoCabeza+float32(c.fila)*r.alto), fyne.NewSize(ancho, r.alto)
-}
-
-func (r *rejillaRenderer) celdaEn(p fyne.Position) (celda, bool) {
-	if p.Y < altoCabeza || p.X < r.ancho0 || r.alto <= 0 {
-		return celda{}, false
-	}
-	fila := int((p.Y - altoCabeza) / r.alto)
-	if fila >= len(r.g.Registros) {
-		return celda{}, false
-	}
-	for col := range r.anchos {
-		if x, ancho := r.columna(col); p.X >= x && p.X < x+ancho {
-			return celda{fila, col}, true
-		}
-	}
-	return celda{}, false
-}
-
-func (r *rejillaRenderer) Layout(t fyne.Size) {
-	r.poner()
-	g := r.g
-	// `w-full`: lo que sobre del ancho se reparte entre las columnas de campo.
-	r.estirado = 0
-	if sobra := t.Width - r.MinSize().Width; sobra > 0 && len(r.anchos) > 0 {
-		r.estirado = sobra / float32(len(r.anchos))
-	}
-	r.marco.Resize(t)
-	r.cabeza.Move(fyne.NewPos(tema.Borde, tema.Borde))
-	r.cabeza.Resize(fyne.NewSize(max(t.Width-2*tema.Borde, 0), altoCabeza-tema.Borde))
-	for i := range g.Campos {
-		x, _ := r.columna(i)
-		ui.ColocarTexto(r.titulos[i], tema.TextoSM, x+margenCelda, tema.Espacio(2))
-		ancho := ui.Medir(r.titulos[i].Text, tema.TextoSM, ui.SemiNegrita).Width
-		ui.ColocarTexto(r.tipos[i], tema.TextoXS, x+margenCelda+ancho+tema.Espacio(1), tema.Espacio(2)+(tema.TextoSM.Linea-tema.TextoXS.Linea)/2)
-	}
-	yTexto := (r.alto - tema.TextoSM.Linea) / 2
-	for fila := range g.Registros {
-		y := altoCabeza + float32(fila)*r.alto
-		r.lineas[fila].Move(fyne.NewPos(tema.Borde, y))
-		r.lineas[fila].Resize(fyne.NewSize(max(t.Width-2*tema.Borde, 0), tema.Borde))
-		ui.ColocarTexto(r.numeros[fila], tema.TextoSM, margenFila0, y+yTexto)
-		if fila < len(r.borrar) {
-			b := r.borrar[fila]
-			b.Move(fyne.NewPos(r.ancho0-margenFila0-r.ladoBoton, y+tema.Espacio(1)))
-			b.Resize(fyne.NewSquareSize(r.ladoBoton))
-		}
-		for col, c := range g.Campos {
-			x, ancho := r.columna(col)
-			if o, ok := r.casillas[celda{fila, col}]; ok {
-				o.Move(fyne.NewPos(x+margenCelda, y+(r.alto-ladoCasilla)/2))
-				o.Resize(fyne.NewSquareSize(ladoCasilla))
-				continue
-			}
-			ui.Truncar(r.textos[fila][col], g.textoCelda(g.Registros[fila], c), tema.TextoSM, ui.Normal, ancho-2*margenCelda)
-			ui.ColocarTexto(r.textos[fila][col], tema.TextoSM, x+margenCelda, y+yTexto)
-		}
-	}
-	// El aro de la celda con el foco (`sytue-focus-ring-inset`), el ancla de un menú de
-	// opciones y, si se está editando, el campo encima de su celda.
-	pos, tam := r.cajaDe(g.foco)
-	r.ancla.Move(pos)
-	r.ancla.Resize(tam)
-	r.anillo.Move(pos)
-	r.anillo.Resize(tam)
-	if g.enfocada && !g.editando && len(g.Registros) > 0 && len(g.Campos) > 0 {
-		r.anillo.Show()
-	} else {
-		r.anillo.Hide()
-	}
-	if g.editando && g.editor != nil {
-		alto := g.editor.MinSize().Height
-		g.editor.Move(fyne.NewPos(pos.X+tema.Espacio(1), pos.Y+(tam.Height-alto)/2))
-		g.editor.Resize(fyne.NewSize(max(tam.Width-2*tema.Espacio(1), 0), alto))
-	}
-}
-
-func (r *rejillaRenderer) Refresh() {
-	// El campo de edición entra y sale de los objetos con la edición.
-	var editor *ui.Entrada
-	if r.g.editando {
-		editor = r.g.editor
-	}
-	if r.version != r.g.version || r.conEditor != editor {
-		r.armar()
-	}
-	r.Layout(r.g.Size())
-	canvas.Refresh(r.g)
 }

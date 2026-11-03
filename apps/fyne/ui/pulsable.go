@@ -194,19 +194,23 @@ func (p *pulsable) esPulsable() *pulsable { return p }
 // MouseDown y MouseUp son `:active`: el color de pulsado mientras el botón del ratón
 // está abajo. No lo ponía nadie, y ningún `active:` de la suite llegaba a verse.
 func (p *pulsable) MouseDown(*desktop.MouseEvent) {
-	if p.Inerte {
-		return
-	}
-	p.pulsado = true
-	p.Refresh()
+	p.pulsacionDePuntero(true)
 }
 
 func (p *pulsable) MouseUp(*desktop.MouseEvent) {
-	if !p.pulsado {
+	p.pulsacionDePuntero(false)
+}
+
+func (p *pulsable) pulsacionDisponible() bool { return !p.Inerte }
+
+func (p *pulsable) pulsacionDePuntero(pulsado bool) {
+	pulsado = pulsado && !p.Inerte
+	if p.pulsado == pulsado {
 		return
 	}
-	p.pulsado = false
+	p.pulsado = pulsado
 	p.Refresh()
+	p.avisar()
 }
 
 // AccessibilityLabel es el nombre que se anuncia.

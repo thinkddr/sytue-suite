@@ -134,6 +134,7 @@ export const pl: AppCatalog<typeof en> = {
   },
   'notebook.emoji': 'Ikona',
   'notebook.color': 'Kolor',
+  'notebook.move': 'Przenieś notatnik',
   'notebook.title': 'Nazwa',
   'layout.label': 'Układ',
   'layout.tree': 'Drzewo',

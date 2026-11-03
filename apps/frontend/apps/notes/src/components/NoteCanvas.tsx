@@ -19,10 +19,19 @@
  */
 import type { JSX } from 'preact';
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
-import { Button, Illustration, EmptyState, Spinner, cx, usePointerDrag } from '@sytue/ui';
+import {
+  Button,
+  Illustration,
+  EmptyState,
+  Spinner,
+  cx,
+  usePointerDrag,
+  enCampoDeTexto,
+  haySuperposicionAbierta,
+} from '@sytue/ui';
 import type { Note, Notebook, Reminder } from '@sytue/api-clients';
 import type { T } from '../i18n/index.js';
-import { conSangria } from '../client/arbol.js';
+import { colocarNota, conSangria } from '../client/arbol.js';
 import { interpretarCaptura, type Captura } from '../client/captura.js';
 import type { DestinoInterno } from '../client/enlaces.js';
 import type { FuentesDeEnlace } from './LinkTool.js';
@@ -40,6 +49,10 @@ interface Props {
   t: T;
   notebook: Notebook;
   notes: Note[];
+  /** Las ocultas por un filtro conservan su posición al reordenar las visibles. */
+  allNotes?: Note[];
+  onReorder?: (cambios: Note[]) => void;
+  ordenOcupado?: boolean;
   cargando: boolean;
   /** Contenidos ya descifrados, si el cuaderno está desbloqueado. */
   claro: ClaroPorNota;
@@ -100,6 +113,9 @@ export function NoteCanvas({
   t,
   notebook,
   notes,
+  allNotes = notes,
+  onReorder,
+  ordenOcupado = false,
   cargando,
   claro,
   bloqueado,
@@ -134,8 +150,14 @@ export function NoteCanvas({
 }: Props): JSX.Element {
   const lienzo = useRef<HTMLDivElement>(null);
   // Nota que se está arrastrando y su posición provisional. Vive en estado para
-  // que la tarjeta siga al dedo; al soltar se confirma con una sola escritura.
-  const [arrastrando, setArrastrando] = useState<{ id: string; x: number; y: number } | null>(null);
+  // que la tarjeta siga al dedo; al soltar se confirma como una sola acción.
+  const [arrastrando, setArrastrando] = useState<{
+    id: string;
+    x: number;
+    y: number;
+    clientX: number;
+    clientY: number;
+  } | null>(null);
   const [alturaLibre, setAlturaLibre] = useState(0);
 
   const libre = notebook.layout === 'free';
@@ -146,6 +168,13 @@ export function NoteCanvas({
     notebook.layout === 'list' && !llenar
       ? conSangria(notes)
       : notes.map((note) => ({ note, nivel: 0 }));
+  const confirmarOrden = useCallback(
+    (cambios: Note[]) => {
+      if (onReorder) onReorder(cambios);
+      else cambios.forEach((n) => onMove(n.id, pd(n)));
+    },
+    [onReorder, onMove],
+  );
   useEffect(() => {
     const root = lienzo.current;
     if (!libre || !root) return;
@@ -170,6 +199,16 @@ export function NoteCanvas({
   // marcado se lee del propio DOM: guardarlo en un ref era escribirlo desde los
   // manejadores que se le pasan a `usePointerDrag`, que el compilador de React no admite.
   const marcado = (): Element | null => document.querySelector('[data-drop="true"]');
+  const limpiarArrastre = (): void => {
+    marcado()?.removeAttribute('data-drop');
+    lienzo.current
+      ?.querySelectorAll('[data-note-before], [data-note-dragging], [data-column-drop]')
+      .forEach((el) => {
+        el.removeAttribute('data-note-before');
+        el.removeAttribute('data-note-dragging');
+        el.removeAttribute('data-column-drop');
+      });
+  };
   const marcarDestino = (x: number, y: number): HTMLElement | null => {
     // Sin ningún destino que reciba la nota (un cuaderno de solo lectura, el lienzo de
     // una prueba) no hay nada que buscar bajo el puntero.
@@ -191,27 +230,82 @@ export function NoteCanvas({
     }
     return el;
   };
+  const insercion = (
+    note: Note,
+    x: number,
+    y: number,
+  ): { col: number; antes: string | null } | null => {
+    const caja = lienzo.current?.getBoundingClientRect();
+    if (!caja || x < caja.left || x > caja.right || y < caja.top || y > caja.bottom) return null;
+    const columna =
+      notebook.layout === 'list'
+        ? null
+        : document
+            .elementsFromPoint(x, y)
+            .map((el) => el.closest<HTMLElement>('[data-note-column]'))
+            .find((el) => el && lienzo.current?.contains(el));
+    const col = notebook.layout === 'list' ? 0 : Number(columna?.dataset.noteColumn);
+    if (!Number.isInteger(col)) return null;
+    const filas = Array.from(
+      lienzo.current?.querySelectorAll<HTMLElement>('article[data-note-id]') ?? [],
+    );
+    const candidatas = new Set(
+      notes
+        .filter(
+          (n) =>
+            n.id !== note.id &&
+            (n.group_id ?? null) === (note.group_id ?? null) &&
+            Boolean(n.pinned) === Boolean(note.pinned) &&
+            (notebook.layout === 'list' || n.col === col),
+        )
+        .map((n) => n.id),
+    );
+    const antes = filas.find(
+      (el) =>
+        candidatas.has(el.dataset.noteId ?? '') &&
+        y < el.getBoundingClientRect().top + el.offsetHeight / 2,
+    );
+    antes?.setAttribute('data-note-before', 'true');
+    if (!antes)
+      (columna ?? lienzo.current?.querySelector('.notes-stream'))?.setAttribute(
+        'data-column-drop',
+        'true',
+      );
+    return { col, antes: antes?.dataset.noteId ?? null };
+  };
   const arrastre = usePointerDrag<{ note: Note; dx: number; dy: number; x0: number; y0: number }>({
+    scrollContainer: () => lienzo.current?.closest<HTMLElement>('.overflow-auto') ?? null,
     onMove: ({ data, clientX, clientY, dxRaw, dyRaw }) => {
       if (Math.hypot(dxRaw, dyRaw) < 4) return;
-      marcarDestino(clientX, clientY);
+      limpiarArrastre();
+      const fuera = marcarDestino(clientX, clientY);
+      if (!libre && !fuera) insercion(data.note, clientX, clientY);
+      lienzo.current?.querySelectorAll<HTMLElement>('article[data-note-id]').forEach((el) => {
+        if (el.dataset.noteId === data.note.id) el.setAttribute('data-note-dragging', 'true');
+      });
       const caja = lienzo.current?.getBoundingClientRect();
       if (!caja) return;
       setArrastrando({
         id: data.note.id,
         x: Math.max(0, clientX - caja.left - data.dx),
         y: Math.max(0, clientY - caja.top - data.dy),
+        clientX,
+        clientY,
       });
     },
     onCancel: () => {
       setArrastrando(null);
-      marcado()?.removeAttribute('data-drop');
+      limpiarArrastre();
     },
     onEnd: ({ note, dx, dy, x0, y0 }, e) => {
       setArrastrando(null);
-      if (Math.hypot(e.clientX - x0, e.clientY - y0) < 4) return;
+      if (Math.hypot(e.clientX - x0, e.clientY - y0) < 4) {
+        limpiarArrastre();
+        return;
+      }
       const sobre = marcarDestino(e.clientX, e.clientY);
-      marcado()?.removeAttribute('data-drop');
+      const hueco = !libre && !sobre ? insercion(note, e.clientX, e.clientY) : null;
+      limpiarArrastre();
       if (sobre?.dataset.dropDay) {
         onSoltarEnDia?.(note.id, sobre.dataset.dropDay);
         return;
@@ -230,30 +324,13 @@ export function NoteCanvas({
           });
         return;
       }
-      const columna = document
-        .elementsFromPoint(e.clientX, e.clientY)
-        .map((el) => el.closest<HTMLElement>('[data-note-column]'))
-        .find((el) => el && lienzo.current?.contains(el));
-      const col = notebook.layout === 'list' ? 0 : Number(columna?.dataset.noteColumn);
-      if (!Number.isInteger(col)) return;
-      const grupo = enOrden
-        .map((x) => x.note)
-        .filter((n) => n.id !== note.id && (notebook.layout === 'list' || n.col === col));
-      const indice = grupo.findIndex((n) => {
-        const el = Array.from(
-          lienzo.current?.querySelectorAll<HTMLElement>('article[data-note-id]') ?? [],
-        ).find((el) => el.dataset.noteId === n.id);
-        return el && e.clientY < el.getBoundingClientRect().top + el.offsetHeight / 2;
-      });
-      grupo.splice(indice < 0 ? grupo.length : indice, 0, note);
-      // Posiciones enteras únicas, sin empates al recargar.
-      grupo.forEach((n, position) => {
-        if (n.position !== position || n.col !== col) onMove(n.id, { ...pd(n), col, position });
-      });
+      if (!hueco) return;
+      const { col, antes } = hueco;
+      confirmarOrden(colocarNota(allNotes, note.id, col, antes, notebook.layout === 'list'));
     },
   });
   const empezarArrastre = (note: Note) => (e: PointerEvent) => {
-    if (soloLectura || e.button !== 0) return;
+    if (soloLectura || bloqueado || ordenOcupado || e.button !== 0) return;
     const caja = lienzo.current?.getBoundingClientRect();
     if (!caja) return;
     arrastre.iniciarArrastre(e, {
@@ -269,8 +346,9 @@ export function NoteCanvas({
   // arrastre: en libre desplaza el lienzo, en columnas cambia de columna o de
   // orden. Sin Alt las flechas siguen siendo del navegador (desplazar la página).
   useEffect(() => {
-    if (soloLectura) return;
+    if (soloLectura || bloqueado || ordenOcupado) return;
     const onKey = (e: KeyboardEvent) => {
+      if (enCampoDeTexto(e.target) || haySuperposicionAbierta()) return;
       if (e.key === 'Escape' && seleccionada) {
         onSelect(null);
         return;
@@ -292,12 +370,44 @@ export function NoteCanvas({
         else if (e.key === 'ArrowUp') pos = { ...pd(note), y: Math.max(0, note.y - PASO) };
         else if (e.key === 'ArrowDown') pos = { ...pd(note), y: note.y + PASO };
       } else {
-        if (e.key === 'ArrowLeft') pos = { ...pd(note), col: Math.max(0, note.col - 1) };
-        else if (e.key === 'ArrowRight')
-          pos = { ...pd(note), col: Math.min(COLUMNAS - 1, note.col + 1) };
-        else if (e.key === 'ArrowUp')
-          pos = { ...pd(note), position: Math.max(0, note.position - 1) };
-        else if (e.key === 'ArrowDown') pos = { ...pd(note), position: note.position + 1 };
+        if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+          const hermanos = enOrden
+            .map((x) => x.note)
+            .filter(
+              (n) =>
+                (n.group_id ?? null) === (note.group_id ?? null) &&
+                Boolean(n.pinned) === Boolean(note.pinned) &&
+                (notebook.layout === 'list' || n.col === note.col),
+            );
+          const indice = hermanos.findIndex((n) => n.id === note.id);
+          const target = hermanos[indice + (e.key === 'ArrowUp' ? -1 : 1)];
+          if (target) {
+            e.preventDefault();
+            const antes = e.key === 'ArrowUp' ? target.id : (hermanos[indice + 2]?.id ?? null);
+            confirmarOrden(
+              colocarNota(
+                allNotes,
+                note.id,
+                notebook.layout === 'list' ? 0 : note.col,
+                antes,
+                notebook.layout === 'list',
+              ),
+            );
+          }
+          return;
+        }
+        if (notebook.layout === 'list') return;
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+          const col = Math.min(
+            COLUMNAS - 1,
+            Math.max(0, note.col + (e.key === 'ArrowLeft' ? -1 : 1)),
+          );
+          if (col !== note.col) {
+            e.preventDefault();
+            confirmarOrden(colocarNota(allNotes, note.id, col, null, false));
+          }
+          return;
+        }
       }
       if (pos) {
         e.preventDefault();
@@ -306,7 +416,20 @@ export function NoteCanvas({
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [seleccionada, notes, libre, soloLectura, onMove, onSelect]);
+  }, [
+    seleccionada,
+    notes,
+    allNotes,
+    enOrden,
+    notebook.layout,
+    libre,
+    soloLectura,
+    bloqueado,
+    ordenOcupado,
+    onMove,
+    onSelect,
+    confirmarOrden,
+  ]);
 
   // --- Captura: soltar o pegar sobre el cuaderno -------------------------------
   //
@@ -458,20 +581,36 @@ export function NoteCanvas({
       compartir={compartir?.(note) ?? undefined}
       {...(enlaces ? { enlaces } : {})}
       {...(onNavigate ? { onNavigate } : {})}
-      {...(!soloLectura && !llenar
+      {...(!soloLectura && !bloqueado && !llenar
         ? {
             arrastre: {
+              disabled: ordenOcupado,
               onPointerDown: empezarArrastre(note),
               onPointerMove: arrastre.onPointerMove,
               onPointerUp: arrastre.onPointerUp,
               onPointerCancel: arrastre.onPointerCancel,
-              onLostPointerCapture: arrastre.onPointerCancel,
+              onLostPointerCapture: arrastre.onLostPointerCapture,
             },
           }
         : {})}
       {...(onCrearEvento ? { onCrearEvento: () => onCrearEvento(note) } : {})}
     />
   );
+  const flotante =
+    !libre && arrastrando ? (
+      <div
+        aria-hidden="true"
+        class="notes-drag-preview border-border bg-surface text-text pointer-events-none fixed z-50 max-w-72 truncate rounded-md border px-3 py-2 text-sm font-medium shadow-sm"
+        style={{
+          left: `${Math.min(arrastrando.clientX + 16, window.innerWidth - 160)}px`,
+          top: `${arrastrando.clientY + 12}px`,
+        }}
+      >
+        {claro[arrastrando.id]?.title ||
+          notes.find((n) => n.id === arrastrando.id)?.title ||
+          t('note.untitled')}
+      </div>
+    ) : null;
 
   if (libre) {
     return (
@@ -527,6 +666,7 @@ export function NoteCanvas({
       <div ref={lienzo} class="notes-col" {...zonaDeCaptura}>
         <div class="notes-stream -mx-2">
           {enOrden.map(({ note, nivel }) => tarjeta(note, nivel))}
+          {flotante}
         </div>
       </div>
     );
@@ -540,6 +680,7 @@ export function NoteCanvas({
       class="grid grid-cols-1 items-start gap-3 p-4 md:grid-cols-2 lg:grid-cols-3"
       {...zonaDeCaptura}
     >
+      {flotante}
       {Array.from({ length: COLUMNAS }, (_, i) => (
         <div key={i} data-note-column={i} class="grid min-h-32 content-start gap-2.5">
           {notes

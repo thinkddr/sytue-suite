@@ -38,7 +38,7 @@
 #   3. Queda un solo ejecutable de la arquitectura equivocada: el propio `bun`,
 #      que viene de la imagen base. Se cambia con `crane rebase`, que sustituye
 #      las capas de la base y deja intactas las de encima. La base
-#      `oven/bun:1.4.3-alpine` está fijada por el digest de su ÍNDICE, que trae
+#      `oven/bun:1.4.4-alpine` está fijada por el digest de su ÍNDICE, que trae
 #      amd64 y arm64, así que las dos variantes salen de ese mismo digest sin
 #      tocar el pinning.
 #

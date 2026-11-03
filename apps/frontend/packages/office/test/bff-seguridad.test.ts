@@ -824,7 +824,12 @@ describe('contraseña de un enlace: el BFF la transporta, no la decide ni la gua
 describe('abrir desde Drive', () => {
   const navegacion = (sitio: string): APIContext => {
     const url = new URL(`https://docs.sytue.eu/open-from-drive?file=${ID}`);
-    const request = new Request(url, { headers: { 'sec-fetch-site': sitio } });
+    const request = new Request(url);
+    Object.defineProperty(request, 'headers', {
+      value: {
+        get: (nombre: string) => (nombre.toLowerCase() === 'sec-fetch-site' ? sitio : null),
+      },
+    });
     const redirect = (destino: string) =>
       new Response(null, { status: 302, headers: { location: destino } });
     return {
@@ -837,6 +842,7 @@ describe('abrir desde Drive', () => {
   };
 
   test('desde otra web no llega al servicio', async () => {
+    llamadas = [];
     const res = await (abrirDeDrive.GET as Handler)(navegacion('cross-site'));
     expect(res.status).toBe(302);
     expect(res.headers.get('location')).toContain('error=open_failed');

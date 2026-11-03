@@ -10,6 +10,7 @@ import type { en } from './en.js';
 export const lv: AppCatalog<typeof en> = {
   'nav.title': 'Bases',
   'nav.bases': 'Manas datubāzes',
+  'actions.more': 'Vairāk darbību',
   'bases.title': 'Manas datubāzes',
   'bases.newName': 'Jaunās datubāzes nosaukums',
   'bases.create': 'Izveidot datubāzi',

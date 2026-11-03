@@ -428,6 +428,7 @@ export function MessageList({
                     selected={conv.threadId === selectedThreadId}
                     unread={unread}
                     onClick={() => onSelect(conv)}
+                    onLongPress={() => onToggleSelect(conv.threadId, index, false)}
                     onKeyDown={(e: KeyboardEvent) => {
                       // Teclas sobre los botones de acción de la fila: no seleccionar.
                       if (e.target !== e.currentTarget) return;

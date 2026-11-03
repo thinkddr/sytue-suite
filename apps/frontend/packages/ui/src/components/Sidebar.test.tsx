@@ -25,6 +25,32 @@ function mount(children: VNode): HTMLElement {
   return host;
 }
 
+test('el id acota el panel desplazable sin incluir cabecera ni pie', () => {
+  const host = mount(
+    <Sidebar
+      id="sidebar-gesto"
+      header={<button>Crear canal</button>}
+      footer={<button>Ayuda</button>}
+    >
+      <SidebarItem label="Canal del proyecto" />
+    </Sidebar>,
+  );
+  try {
+    // Rooms obtiene así el destino del autoscroll, dentro de su propia navegación.
+    const nav = document.getElementById('sidebar-gesto');
+    const scroll = nav?.querySelector<HTMLElement>('[data-sidebar-scroll]');
+    expect(nav?.tagName).toBe('NAV');
+    expect(scroll?.classList.contains('overflow-y-auto')).toBe(true);
+    expect(scroll?.querySelector('li')?.textContent).toBe('Canal del proyecto');
+    expect(scroll?.querySelector('button')?.textContent).toBe('Canal del proyecto');
+    expect(scroll?.textContent).not.toContain('Crear canal');
+    expect(scroll?.textContent).not.toContain('Ayuda');
+  } finally {
+    render(null, host);
+    host.remove();
+  }
+});
+
 test('las acciones del encabezado quedan fuera de la lista de items', () => {
   const host = mount(
     <SidebarSection

@@ -23,6 +23,9 @@ export SYTUE_OIDC_REDIRECT_URI="${SYTUE_OIDC_REDIRECT_URI:-https://bases.prueba.
 export SYTUE_OIDC_CLIENT_SECRET="${SYTUE_OIDC_CLIENT_SECRET:-prueba}"
 export SYTUE_SESSION_SECRET="${SYTUE_SESSION_SECRET:-$(head -c 40 /dev/zero | tr '\0' 'k')}"
 
+# La preferencia sólo pertenece al proyecto efímero del CI: la barra de Astro no es UI.
+(cd "$RAIZ/apps/frontend/apps/bases" && bun --bun astro preferences disable devToolbar)
+
 (cd "$RAIZ/apps/frontend/apps/bases" && exec bun --bun astro dev --port "$PUERTO" --host 127.0.0.1) >"$LOG" 2>&1 &
 SERVIDOR=$!
 trap 'kill "$SERVIDOR" 2>/dev/null; wait "$SERVIDOR" 2>/dev/null' EXIT

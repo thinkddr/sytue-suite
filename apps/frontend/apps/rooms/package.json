@@ -2,7 +2,7 @@
   "name": "@sytue/rooms",
   "version": "1.0.0",
   "private": true,
-  "description": "Sytue Rooms — mensajeria y videollamada (Astro 7 + Preact 10) sobre el servicio Go propio Sytue Rooms (WebSocket + REST + salas). Canales, vista de canal, redaccion y la llamada embebida en el canal (LiveKit web SDK). Monta la Sytue Shell y usa @sytue/ui. Producto Sytue-native, propietario. docs/CONVENTIONS.md §1.",
+  "description": "Sytue Rooms \u2014 mensajeria y videollamada (Astro 7 + Preact 10) sobre el servicio Go propio Sytue Rooms (WebSocket + REST + salas). Canales, vista de canal, redaccion y la llamada embebida en el canal (LiveKit web SDK). Monta la Sytue Shell y usa @sytue/ui. Producto Sytue-native, propietario. docs/CONVENTIONS.md \u00a71.",
   "license": "Apache-2.0",
   "type": "module",
   "scripts": {
@@ -25,9 +25,9 @@
     "@sytue/shell": "workspace:*",
     "@sytue/ui": "workspace:*",
     "astro": "catalog:",
-    "livekit-client": "2.22.3",
+    "livekit-client": "2.23.0",
     "preact": "10.29.8",
-    "matrix-js-sdk": "44.0.0",
+    "matrix-js-sdk": "45.0.0",
     "@matrix-org/matrix-sdk-crypto-wasm": "18.9.0"
   },
   "devDependencies": {

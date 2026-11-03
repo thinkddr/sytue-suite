@@ -1,4 +1,5 @@
 {
+  "actions.more": "Fleiri aðgerðir",
   "attach.add": "Bæta við skrá",
   "attach.badType": "Þessi skráartegund er ekki leyfð, eða innihaldið passar ekki við nafnið.",
   "attach.delete": "Eyða {name}",

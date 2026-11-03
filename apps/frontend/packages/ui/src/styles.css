@@ -697,3 +697,20 @@ dialog::backdrop {
     left: 100%;
   }
 }
+
+/* Señal de inserción sin desplazar el contenido ni alterar la medida de una fila. */
+[data-reorder-over='before'] {
+  box-shadow: inset 0 2px 0 var(--sytue-primary);
+}
+[data-reorder-over='after'] {
+  box-shadow: inset 0 -2px 0 var(--sytue-primary);
+}
+[data-reorder-axis='x'][data-reorder-over='before'] {
+  box-shadow: inset 2px 0 0 var(--sytue-primary);
+}
+[data-reorder-axis='x'][data-reorder-over='after'] {
+  box-shadow: inset -2px 0 0 var(--sytue-primary);
+}
+[data-reorder-dragging='true'] {
+  opacity: 0.5;
+}

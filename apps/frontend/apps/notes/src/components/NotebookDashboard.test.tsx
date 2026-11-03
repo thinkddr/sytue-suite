@@ -16,7 +16,12 @@ afterEach(() => {
   }
 });
 const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
-function montar(capture: () => Promise<boolean>, draft: (s: string) => void, focus: () => void) {
+function montar(
+  capture: () => Promise<boolean>,
+  draft: (s: string) => void,
+  focus: () => void,
+  dock?: HTMLElement,
+) {
   host = document.createElement('div');
   document.body.append(host);
   render(
@@ -29,6 +34,7 @@ function montar(capture: () => Promise<boolean>, draft: (s: string) => void, foc
       enfoque="pending"
       openingDay={false}
       initialDraft="[ ] Preparar reunión"
+      {...(dock ? { captureContainer: dock } : {})}
       onDraft={draft}
       onEnfoque={focus}
       hideFinished={false}
@@ -42,6 +48,62 @@ function montar(capture: () => Promise<boolean>, draft: (s: string) => void, foc
   );
   return host;
 }
+test('la captura del pie es un solo formulario y conserva borrador, submit y foco fuera del scroll', async () => {
+  const dock = document.createElement('div');
+  document.body.append(dock);
+  try {
+    let capturas = 0;
+    const h = montar(
+      async () => {
+        capturas++;
+        return true;
+      },
+      () => {},
+      () => {},
+      dock,
+    );
+    expect(h.querySelector('form')).toBeNull();
+    expect(dock.querySelectorAll('form')).toHaveLength(1);
+    expect(dock.querySelector('input')!.value).toBe('[ ] Preparar reunión');
+    dock.querySelector('input')!.focus();
+    dock
+      .querySelector('form')!
+      .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await tick();
+    await tick();
+    expect(capturas).toBe(1);
+    expect(dock.querySelector('input')!.value).toBe('');
+    expect(document.activeElement).toBe(dock.querySelector('input'));
+  } finally {
+    render(null, host!);
+    dock.remove();
+  }
+});
+test('puede seguir escribiendo mientras guarda sin perder el siguiente borrador', async () => {
+  let finalizar: (ok: boolean) => void = () => {};
+  const pendiente = new Promise<boolean>((resolve) => {
+    finalizar = resolve;
+  });
+  const drafts: string[] = [];
+  const h = montar(
+    () => pendiente,
+    (s) => drafts.push(s),
+    () => {},
+  );
+  const input = h.querySelector('input')!;
+  input.focus();
+  h.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+  await tick();
+  expect(input.disabled).toBe(false);
+  input.value = 'Lo siguiente';
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  await tick();
+  finalizar(true);
+  await tick();
+  await tick();
+  expect(input.value).toBe('Lo siguiente');
+  expect(drafts).toEqual(['Lo siguiente']);
+});
 test('un fallo conserva la captura; el éxito borra el borrador y vuelve a Todas', async () => {
   let success = false;
   const drafts: string[] = [];

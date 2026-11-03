@@ -236,8 +236,17 @@ test('actual Notes screen encrypts migration and edits, then clears plaintext wh
   const reopened = await desempaquetar(key, String(edited.content_cipher));
   expect(reopened?.title).toBe('changed private title');
   expect(reopened?.data?.attachments).toHaveLength(1);
-  const newButton = host.querySelector('button[aria-label="New note"]') as HTMLButtonElement;
-  expect(newButton).not.toBeNull();
+  const capturar = async () => {
+    const input = host!.querySelector<HTMLInputElement>('input[name="capture"]');
+    expect(input).not.toBeNull();
+    expect(input!.disabled).toBe(false);
+    input!.value = 'new private capture';
+    input!.dispatchEvent(new Event('input', { bubbles: true }));
+    const submit = input!.form!.querySelector<HTMLButtonElement>('button[type="submit"]');
+    expect(submit).not.toBeNull();
+    await until(() => submit!.disabled === false);
+    input!.form!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+  };
   const editTitle = async (current: string, next: string) => {
     const button = [...host!.querySelectorAll('[data-note-id="n"] button')].find(
       (b) => b.textContent?.trim() === current,
@@ -267,7 +276,7 @@ test('actual Notes screen encrypts migration and edits, then clears plaintext wh
   expect((await desempaquetar(key, row.content_cipher!))?.title).toBe('changed private title');
   expect(writes).toHaveLength(2);
   expect(legacyWrites).toBe(0);
-  newButton.click();
+  await capturar();
   await until(
     () => rejectedCreates === 1 && Boolean(document.body.textContent?.includes('Could not save.')),
   );
@@ -311,12 +320,16 @@ test('actual Notes screen encrypts migration and edits, then clears plaintext wh
   await until(() => rejectedEdits === 2 && Boolean(retryButton()));
   const staleRetry = retryButton();
   oldBackend = false;
-  newButton.click();
+  await capturar();
   await until(() => writes.length === 4);
   const created = writes[3]!.body;
   expect(created.cipher_version).toBe(2);
   expect(created.expected_crypto).toEqual(params);
   expect(created.title).toBe('');
+  expect(JSON.stringify(created)).not.toContain('new private capture');
+  expect((await desempaquetar(key, String(created.content_cipher)))?.content).toContain(
+    'new private capture',
+  );
   expect(Object.keys(created.data as Record<string, unknown>)).toEqual(['client_id']);
   expect(typeof (created.data as Record<string, unknown>).client_id).toBe('string');
   const lockButton = [...host.querySelectorAll('button')].find((b) =>
@@ -325,6 +338,7 @@ test('actual Notes screen encrypts migration and edits, then clears plaintext wh
   expect(lockButton).not.toBeUndefined();
   lockButton.click();
   await until(() => !host?.textContent?.includes('private.pdf'));
+  expect(host.querySelector<HTMLInputElement>('input[name="capture"]')?.value ?? '').toBe('');
   staleRetry.click();
   expect(writes).toHaveLength(4);
   releaseCreate();
@@ -343,6 +357,94 @@ test('actual Notes screen encrypts migration and edits, then clears plaintext wh
   );
   expect(host.textContent).not.toContain('historic private');
   expect(host.textContent).not.toContain('private.pdf');
+  expect(host.querySelector<HTMLInputElement>('input[name="capture"]')?.value ?? '').toBe('');
   expect(document.body.textContent).not.toContain('draft discarded on lock');
   expect(legacyWrites).toBe(0);
+}, 15000);
+
+test('capture drafts survive normal refreshes but cannot return after enabling encryption', async () => {
+  browser.happyDOM.setURL('https://notes.invalid/notes');
+  const { params } = await nuevosParametros('long password for test');
+  let nb = {
+    id: 'normal',
+    owner_sub: 'owner',
+    title: 'Normal notebook',
+    color: '',
+    layout: 'list',
+    visibility: 'personal',
+    indexable: false,
+    encrypted: false,
+    position: 0,
+    note_count: 0,
+    created_at: '2026-10-20T12:00:00Z',
+    updated_at: '2026-10-20T12:00:00Z',
+  } as Notebook;
+  let reverse = false;
+  globalThis.fetch = (async (input) => {
+    const path = String(input);
+    if (path.endsWith('/api/notebooks')) {
+      const other = { ...nb, id: 'other', title: 'Other notebook', encrypted: false };
+      return Response.json({ notebooks: reverse ? [other, nb] : [nb, other] });
+    }
+    return Response.json({
+      notes: [],
+      tags: [],
+      reminders: [],
+      notifications: [],
+      unread: 0,
+      accessToken: '',
+      access_token: '',
+    });
+  }) as typeof fetch;
+  host = document.createElement('div');
+  document.body.append(host);
+  const user = {
+    id: 'owner',
+    tenant: 'test',
+    email: 'owner@example.invalid',
+    name: 'Owner',
+    roles: [],
+  } as unknown as SytueUser;
+  const paint = (revision: string) =>
+    render(
+      <NotesApp
+        user={user}
+        hubBaseUrl="https://hub.invalid"
+        publicBase="https://notes.invalid/notes"
+        locale="en"
+        notebookInicial={revision}
+      />,
+      host!,
+    );
+  const capture = () => host!.querySelector<HTMLInputElement>('input[name="capture"]');
+  paint('normal');
+  await until(() => Boolean(capture()) && capture()!.disabled === false);
+  capture()!.value = 'normal draft before encryption';
+  capture()!.dispatchEvent(new Event('input', { bubbles: true }));
+
+  // A new list response changes object identity and order, not the open notebook.
+  reverse = true;
+  nb = { ...nb, title: 'Normal notebook refreshed' };
+  paint('refresh-normal');
+  await until(() => Boolean(host?.textContent?.includes(nb.title)));
+  expect(capture()!.value).toBe('normal draft before encryption');
+
+  nb = { ...nb, title: 'Encrypted notebook refreshed', encrypted: true, crypto: params };
+  paint('refresh-encrypted');
+  await until(() => Boolean(host?.textContent?.includes(nb.title)) && capture()?.disabled === true);
+  expect(capture()!.value).toBe('');
+
+  // Reading no draft while encrypted is insufficient: the former map entry must be gone.
+  nb = { ...nb, title: 'Normal notebook restored', encrypted: false };
+  paint('refresh-restored');
+  await until(
+    () => Boolean(host?.textContent?.includes(nb.title)) && capture()?.disabled === false,
+  );
+  expect(capture()!.value).toBe('');
+  capture()!.value = 'normal draft after encryption';
+  capture()!.dispatchEvent(new Event('input', { bubbles: true }));
+  nb = { ...nb, title: 'Normal notebook repainted' };
+  paint('refresh-repainted');
+  await until(() => Boolean(host?.textContent?.includes(nb.title)));
+  expect(capture()!.value).toBe('normal draft after encryption');
 }, 15000);

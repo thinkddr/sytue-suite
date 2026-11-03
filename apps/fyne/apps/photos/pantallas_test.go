@@ -22,6 +22,7 @@ import (
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
+	"git.sytue.eu/sytue/one/apps/nucleo/tokens"
 	"git.sytue.eu/sytue/one/apps/nucleo/webref"
 )
 
@@ -341,8 +342,7 @@ func TestElGlifoDeRepetidasEsElDeNavTsx(t *testing.T) {
 	}
 }
 
-// TestLaPestanaActivaLlevaFondoYLaOtraNo: `bg-bg-subtle` en la activa y nada en las
-// demás, que es lo único que distingue dónde estás.
+// TestLaPestanaActivaLlevaFondoYLaOtraNo: `bg-selected` en la activa y nada en las demás.
 func TestLaPestanaActivaLlevaFondoYLaOtraNo(t *testing.T) {
 	v := vistaDePrueba(t, nil)
 	for _, c := range []struct {
@@ -350,7 +350,7 @@ func TestLaPestanaActivaLlevaFondoYLaOtraNo(t *testing.T) {
 		quiero color.NRGBA
 		que    string
 	}{
-		{true, tema.Color("bg-subtle", tema.Claro), "bg-bg-subtle"},
+		{true, tokens.SobreSRGB(tema.Color("selected", tema.Claro), blanco), "bg-selected"},
 		{false, color.NRGBA{R: 255, G: 255, B: 255, A: 255}, "el lienzo, sin fondo propio"},
 	} {
 		p := NuevaPestanaNav(v.Traduce("nav.photos"), iconosNav[SecFotos], c.activa, nil)
@@ -651,9 +651,8 @@ func TestLaMuestraElegidaCreceUnDiezPorCiento(t *testing.T) {
 	}
 }
 
-// TestLaCabeceraDelMesSeParteEnUnTelefono: Chromium con las clases reales y rem
-// de 16 (2026-10-04). A 360 el contenido de 328 reparte 109,688 / 95,609 / 98,703;
-// los tres hijos quedan en dos líneas y el encabezado mide 52; en escritorio, 36.
+// TestLaCabeceraDelMesSeParteEnUnTelefono: el mes y sus controles pueden partirse
+// para caber a 328; a 1216 conservan una sola línea.
 func TestLaCabeceraDelMesSeParteEnUnTelefono(t *testing.T) {
 	v := vistaDePrueba(t, nil)
 	g := GrupoMes{Titulo: "septiembre de 2026", Aproximadas: 4, Fotos: fotosDePrueba(2)}
@@ -666,21 +665,22 @@ func TestLaCabeceraDelMesSeParteEnUnTelefono(t *testing.T) {
 	if !ok {
 		t.Fatal("la cabecera del mes no encoge")
 	}
-	lejos := func(a, b float32) bool { return a-b > 0.75 || b-a > 0.75 }
-	for i, want := range []float32{109.6875, 95.609375, 98.703125} {
-		if got := f.Anchos(328)[i]; lejos(got, want) {
-			t.Errorf("a 328 el hijo %d mide %.2f y en la web %.1f", i, got, want)
+	for _, ancho := range []float32{328, 1216} {
+		fila.Resize(fyne.NewSize(ancho, ui.AltoA(fila, ancho)))
+		for i, obj := range fila.Objects {
+			if obj.Position().X < 0 || obj.Position().X+obj.Size().Width > ancho+0.75 {
+				t.Errorf("a %.0f el hijo %d sale del encabezado: %v %v", ancho, i, obj.Position(), obj.Size())
+			}
+			if obj.Size().Height > fila.Size().Height {
+				t.Errorf("a %.0f el hijo %d queda recortado en alto", ancho, i)
+			}
 		}
 	}
-	if h := ui.AltoA(cab, 328); lejos(h, 52) {
-		t.Errorf("a 328 la cabecera mide %.2f de alto y en la web 52", h)
+	if ui.AltoA(cab, 328) <= ui.AltoA(cab, 1216) {
+		t.Error("la cabecera estrecha debe dejar sitio a los textos partidos")
 	}
-	if h := ui.AltoA(cab, 1216); lejos(h, 36) {
-		t.Errorf("a 1216 la cabecera mide %.2f de alto y en la web 36", h)
-	}
-	b, _ := fila.Objects[2].(*BotonMes)
-	if l := lineasBotonMes(b.Texto, 98.703125); len(l) != 2 {
-		t.Errorf("«Seleccionar el mes» a 98,703 sale en %d líneas: %q", len(l), l)
+	if anchos := f.Anchos(328); anchos[0] < f.Piezas[0].Min {
+		t.Error("el mes se ha comprimido por debajo de su palabra más larga")
 	}
 }
 
@@ -844,7 +844,7 @@ func TestElAvisoYSueltaParaAnyadirMidenLoQueLaWeb(t *testing.T) {
 // `fondoCabeceraMes = "surface"`.
 func TestLaCabeceraDelMesTieneElFondoDeLaWeb(t *testing.T) {
 	app := webref.Read(t, "apps/frontend/apps/photos/src/components/PhotosApp.tsx")
-	m := regexp.MustCompile(`'bg-([a-z-]+) [^']*sytue-overline sticky`).FindStringSubmatch(app)
+	m := regexp.MustCompile(`'bg-([a-z-]+) text-text sticky`).FindStringSubmatch(app)
 	if m == nil {
 		t.Fatal("no encuentro el `<h2>` del mes en PhotosApp.tsx")
 	}

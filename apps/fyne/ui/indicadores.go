@@ -142,6 +142,13 @@ func (r *insigniaRenderer) Layout(t fyne.Size) {
 	// El radio de píldora se recorta al medio alto, como hace `border-radius: 999px`.
 	MoverCaja(r.caja, fyne.NewPos(0, 0), t)
 	ancho := Medir(r.i.Texto, escalonInsignia, SemiNegrita).Width
+	r.texto.Text = r.i.Texto
+	// Con menos ancho que su medida —el chip de una celda de Sytue Bases, que no puede
+	// ensanchar la columna— recorta con puntos suspensivos (`max-w-full truncate`) y
+	// se apoya en su `px-2`. Con su medida o más, centrado como siempre.
+	if cabe := t.Width - 2*MargenInsignia; ancho > cabe && t.Width > 0 {
+		ancho = Truncar(r.texto, r.i.Texto, escalonInsignia, SemiNegrita, max(cabe, 0))
+	}
 	ColocarTexto(r.texto, escalonInsignia, (t.Width-ancho)/2, (t.Height-escalonInsignia.Linea)/2)
 }
 
@@ -149,8 +156,11 @@ func (r *insigniaRenderer) Refresh() {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	relleno, tinta := r.i.colores(v)
 	r.caja.Pintar(relleno, color.NRGBA{})
-	r.texto.Text = r.i.Texto
 	r.texto.Color = tinta
+	r.texto.Text = r.i.Texto
+	if t := r.i.Size(); t.Width > 0 {
+		r.Layout(t) // el texto, entero o recortado al ancho de ahora
+	}
 	for _, o := range r.objetos {
 		o.Refresh()
 	}

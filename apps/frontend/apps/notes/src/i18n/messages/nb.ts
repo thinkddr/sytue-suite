@@ -119,6 +119,7 @@ export const nb: AppCatalog<typeof en> = {
   'notebook.notes': { one: '{count} notat', other: '{count} notater' },
   'notebook.emoji': 'Ikon',
   'notebook.color': 'Farge',
+  'notebook.move': 'Flytt notatbok',
   'notebook.title': 'Navn',
   'layout.label': 'Oppsett',
   'layout.tree': 'Tre',

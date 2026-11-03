@@ -7,16 +7,16 @@
  * teclado, lector de pantalla y móvil. Mover es escribir ese campo en el registro: lo
  * decide y valida el servicio, como en la rejilla.
  *
- * ponytail: sin arrastrar y soltar. El selector cubre todos los casos; el arrastre sería
- * un atajo solo de puntero y se añade si alguien lo pide.
+ * El asa permite mover con dedo o ratón; el selector conserva la alternativa de teclado.
  */
 import type { JSX } from 'preact';
-import { useState } from 'preact/hooks';
-import { Button, Icon, Select } from '@sytue/ui';
+import { useRef, useState } from 'preact/hooks';
+import { Badge, Button, Icon, Select, usePointerDrag } from '@sytue/ui';
 import type { BasesField, BasesRecord, BasesValue } from '@sytue/api-clients/bases';
 import type { T } from '../i18n/index.js';
 import { SIN_VALOR, columnasDeTablero } from '../lib/vistas.js';
 import { etiquetaDeRegistro, textoDeValor } from '../lib/valores.js';
+import { tonoDeOpcion } from '../lib/aspecto.js';
 
 export interface TableroProps {
   t: T;
@@ -44,6 +44,11 @@ export function Tablero({
 }: TableroProps): JSX.Element {
   const columnas = columnasDeTablero(agrupar, registros);
   const [aviso, setAviso] = useState('');
+  const panel = useRef<HTMLDivElement>(null);
+  const [destino, setDestino] = useState<string | null>(null);
+  const [arrastrando, setArrastrando] = useState<{ nombre: string; x: number; y: number } | null>(
+    null,
+  );
   const otros = campos.filter(
     (c) => c.id !== agrupar.id && c.kind !== 'link' && c.kind !== 'checkbox',
   );
@@ -65,28 +70,93 @@ export function Tablero({
     setAviso(error ?? t('board.moved'));
   }
 
+  function columnaEn(x: number, y: number): string | null {
+    const el = document
+      .elementsFromPoint(x, y)
+      .map((e) => e.closest<HTMLElement>('[data-bases-column]'))
+      .find((e) => e && panel.current?.contains(e));
+    const valor = el?.dataset.basesColumn;
+    return valor !== undefined && columnas.some((c) => c.valor === valor) ? valor : null;
+  }
+
+  const soltar = (): void => {
+    setDestino(null);
+    setArrastrando(null);
+  };
+  const arrastre = usePointerDrag<{ registro: BasesRecord; x0: number; y0: number }>({
+    scrollContainer: () => panel.current,
+    onMove: ({ data, clientX, clientY, dxRaw, dyRaw }) => {
+      if (Math.hypot(dxRaw, dyRaw) < 4) return;
+      setDestino(columnaEn(clientX, clientY));
+      setArrastrando({ nombre: etiquetaDeRegistro(campos, data.registro), x: clientX, y: clientY });
+    },
+    onCancel: soltar,
+    onEnd: ({ registro, x0, y0 }, e) => {
+      soltar();
+      if (!puedeEditar || Math.hypot(e.clientX - x0, e.clientY - y0) < 4) return;
+      const valor = columnaEn(e.clientX, e.clientY);
+      if (valor !== null) void mover(registro, valor);
+    },
+  });
+
   return (
     <div class="flex flex-col gap-2">
       {puedeEditar ? null : <p class="text-text-muted text-xs">{t('grid.readOnly')}</p>}
-      <div class="flex gap-3 overflow-x-auto pb-2" data-scroll-x>
+      <div ref={panel} class="flex items-stretch gap-4 overflow-x-auto pb-2" data-scroll-x>
         {columnas.map((col) => {
           const nombre = col.valor === SIN_VALOR ? t('board.noValue') : col.valor;
           return (
             <section
               key={col.valor || '__sin__'}
+              data-bases-column={col.valor}
               aria-label={t('board.column', { name: nombre, n: col.registros.length })}
-              class="border-border bg-bg-subtle flex w-64 shrink-0 flex-col gap-2 rounded-lg border p-2"
+              class={`border-border bg-bg-subtle/50 flex min-h-48 w-72 shrink-0 flex-col gap-3 rounded-lg border p-3 ${destino === col.valor ? 'ring-primary ring-2 ring-inset' : ''}`}
             >
-              <h3 class="text-text px-1 text-sm font-semibold">
-                {nombre} <span class="text-text-muted font-normal">({col.registros.length})</span>
+              <h3 class="text-text flex items-center justify-between gap-2 text-sm font-semibold">
+                <Badge tone={tonoDeOpcion(agrupar, col.valor)} class="max-w-full min-w-0">
+                  <span class="truncate" title={nombre}>
+                    {nombre}
+                  </span>
+                </Badge>
+                <span class="text-text-muted text-xs font-normal tabular-nums">
+                  {col.registros.length}
+                </span>
               </h3>
               <ul class="flex flex-col gap-2">
                 {col.registros.map((r) => (
                   <li
                     key={r.id}
-                    class="border-border bg-surface flex flex-col gap-1 rounded-md border p-2 text-sm"
+                    class="border-border bg-surface flex min-w-0 flex-col gap-2 rounded-md border p-3 text-sm"
                   >
-                    <span class="text-text font-semibold">{etiquetaDeRegistro(campos, r)}</span>
+                    <div class="flex items-start gap-2">
+                      {puedeEditar ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          iconOnly
+                          class="text-text-muted shrink-0 cursor-grab touch-none select-none [-webkit-user-select:none] active:cursor-grabbing"
+                          aria-label={t('board.moveTo', { name: etiquetaDeRegistro(campos, r) })}
+                          leadingIcon={<Icon name="grip" size={16} />}
+                          onPointerDown={(e) =>
+                            arrastre.iniciarArrastre(e, {
+                              registro: r,
+                              x0: e.clientX,
+                              y0: e.clientY,
+                            })
+                          }
+                          onPointerMove={arrastre.onPointerMove}
+                          onPointerUp={arrastre.onPointerUp}
+                          onPointerCancel={arrastre.onPointerCancel}
+                          onLostPointerCapture={arrastre.onLostPointerCapture}
+                          onClick={(e) =>
+                            e.currentTarget.closest('li')?.querySelector('select')?.focus()
+                          }
+                        />
+                      ) : null}
+                      <span class="text-text min-w-0 flex-1 font-semibold break-words">
+                        {etiquetaDeRegistro(campos, r)}
+                      </span>
+                    </div>
                     {enTarjeta(r.id).length > 0 ? (
                       <span class="bg-selected text-primary-text self-start rounded px-1 text-xs">
                         {t('rt.inCell', { names: enTarjeta(r.id).join(', ') })}
@@ -137,6 +207,18 @@ export function Tablero({
           );
         })}
       </div>
+      {arrastrando ? (
+        <div
+          aria-hidden="true"
+          class="border-border bg-surface text-text pointer-events-none fixed z-50 max-w-64 truncate rounded-md border px-3 py-2 text-sm font-semibold shadow-sm"
+          style={{
+            left: Math.max(8, Math.min(arrastrando.x + 12, window.innerWidth - 272)),
+            top: Math.max(8, Math.min(arrastrando.y + 12, window.innerHeight - 52)),
+          }}
+        >
+          {arrastrando.nombre}
+        </div>
+      ) : null}
       <p class="sr-only" role="status" aria-live="polite">
         {aviso}
       </p>

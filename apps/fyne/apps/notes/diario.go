@@ -8,6 +8,7 @@ package notes
 
 import (
 	"html"
+	"image/color"
 	"regexp"
 	"strconv"
 	"strings"
@@ -210,9 +211,9 @@ func (p *Pantalla) dashboard(v tema.Variante) fyne.CanvasObject {
 		margenX = tema.Espacio(6)
 	}
 	interior := max(ancho-2*margenX, 1)
-	desactivado := !p.puedeCapturar() || p.bloqueado || p.guardandoCaptura || p.creando || (p.lienzo.Fase != Exito && p.lienzo.Fase != Vacia)
 	var bloques []ui.Bloque
 	p.dia.semana = nil
+	p.dia.marcasDestino = nil
 	// Las acciones de la página (filtro, exportar, «…»): al lado del título.
 	var acciones []fyne.CanvasObject
 	if enPagina(p.activo) {
@@ -228,6 +229,13 @@ func (p *Pantalla) dashboard(v tema.Variante) fyne.CanvasObject {
 			fila := ui.NuevaSemanaFecha(p.loc, dia, time.Now(), inerte,
 				func(d time.Time) { llamar1(p.lateral.AlDia, d.Format(time.DateOnly)) },
 				func(d time.Time) (int, string) { return p.marcaDia(d, dia) })
+			for i, o := range fila.Objects {
+				marca := canvas.NewRectangle(color.Transparent)
+				marca.StrokeWidth, marca.StrokeColor, marca.CornerRadius = tema.AnilloFoco, tema.Color("primary", v), tema.RadioMD
+				marca.Hide()
+				fila.Objects[i] = container.NewStack(o, marca)
+				p.dia.marcasDestino = append(p.dia.marcasDestino, marca)
+			}
 			p.dia.semana, p.dia.semanaDia = fila, dia
 			bloques = append(bloques, ui.Bloque{Obj: fila, Margen: tema.Espacio(3)})
 		}
@@ -237,16 +245,6 @@ func (p *Pantalla) dashboard(v tema.Variante) fyne.CanvasObject {
 		derecha := container.New(filaCentro{hueco: tema.Espacio(0.5)}, acciones...)
 		bloques = append(bloques, ui.Bloque{Obj: p.cabeceraPagina(p.activo.Titulo, derecha, interior, v), Margen: tema.Espacio(5)})
 	}
-	// La pista de la sintaxis solo aparece al entrar en la captura, y su sitio está
-	// reservado: 4 + 16 + 8 son el `mt-7` que separa la captura de los filtros.
-	pista := ui.NuevoParrafo(p.tr.T("capture.submitHint", nil), tema.TextoXS, ui.Normal, "text-subtle", v)
-	if !p.capturaEnfocada {
-		pista.Hide()
-	}
-	p.pistaCaptura = pista
-	bloques = append(bloques,
-		ui.Bloque{Obj: p.capturaDiaria(v, desactivado), Margen: tema.Espacio(1)},
-		ui.Bloque{Obj: container.New(reserva{alto: tema.TextoXS.Linea}, pista), Margen: tema.Espacio(2)})
 	if pend := p.pendientesAqui(); len(pend) > 0 {
 		bloques = append(bloques, ui.Bloque{Obj: p.listaPendientes(v, pend), Margen: tema.Espacio(3)})
 	}
@@ -258,6 +256,28 @@ func (p *Pantalla) dashboard(v tema.Variante) fyne.CanvasObject {
 	}
 	dashboard := ui.AlAnchoFluido(interior, ui.PilaBloques(bloques...))
 	return container.New(&acotado{ancho: ancho}, container.New(ui.Margen{Izq: margenX, Der: margenX, Arr: tema.Espacio(8), Abj: tema.Espacio(1)}, dashboard))
+}
+
+// La misma captura permanece al pie mientras se recorren las notas. El campo no se
+// recrea: conserva borrador, selección y foco al guardar o cambiar de disposición.
+func (p *Pantalla) capturaFija(v tema.Variante) fyne.CanvasObject {
+	inhabilitada := !p.puedeCapturar() || p.bloqueado || p.guardandoCaptura || p.creando || (p.lienzo.Fase != Exito && p.lienzo.Fase != Vacia)
+	pista := ui.NuevoParrafo(p.tr.T("capture.submitHint", nil), tema.TextoXS, ui.Normal, "text-subtle", v)
+	if !p.capturaEnfocada {
+		pista.Hide()
+	}
+	p.pistaCaptura = pista
+	ancho := min(p.anchoContenido(), AnchoLectura+2*tema.Espacio(6))
+	margen := p.lienzo.margenDiario()
+	cuerpo := ui.PilaBloques(
+		ui.Bloque{Obj: p.capturaDiaria(v, inhabilitada), Margen: tema.Espacio(1)},
+		ui.Bloque{Obj: container.New(reserva{alto: tema.TextoXS.Linea}, pista)})
+	interior := ui.AlAnchoFluido(max(ancho-2*margen, 1), cuerpo)
+	centrado := container.New(&acotado{ancho: ancho},
+		container.New(ui.Margen{Izq: margen, Der: margen, Arr: tema.Espacio(2), Abj: tema.Espacio(2)}, interior))
+	linea := canvas.NewRectangle(tema.Color("border-subtle", v))
+	linea.SetMinSize(fyne.NewSize(0, tema.Borde))
+	return ui.PilaBloques(ui.Bloque{Obj: linea}, ui.Bloque{Obj: centrado})
 }
 
 // botonDiario es un botón fantasma de la página: poco cromo, como en la web.

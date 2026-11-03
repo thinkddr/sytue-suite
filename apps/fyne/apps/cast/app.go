@@ -810,14 +810,14 @@ func duracionCastWidget(ms int64) string {
 		return ""
 	}
 	seg := ms / 1000
-	min := seg / 60
+	minutos := seg / 60
 	rem := seg % 60
-	if min >= 60 {
-		h := min / 60
-		min %= 60
-		return strconv.FormatInt(h, 10) + ":" + dosCifras(min) + ":" + dosCifras(rem)
+	if minutos >= 60 {
+		h := minutos / 60
+		minutos %= 60
+		return strconv.FormatInt(h, 10) + ":" + dosCifras(minutos) + ":" + dosCifras(rem)
 	}
-	return strconv.FormatInt(min, 10) + ":" + dosCifras(rem)
+	return strconv.FormatInt(minutos, 10) + ":" + dosCifras(rem)
 }
 
 func dosCifras(v int64) string {

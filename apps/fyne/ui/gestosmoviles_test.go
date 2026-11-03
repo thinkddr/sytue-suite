@@ -48,7 +48,7 @@ func eventoGesto(phase mobile.FilterPhase, x, y float32, path ...fyne.CanvasObje
 
 func comprobarFiltro(t *testing.T, g *gestosMoviles, e mobile.FilterEvent, want mobile.FilterResult) {
 	t.Helper()
-	if got := g.recibir(e); got != want {
+	if got := g.filtrar(e); got != want {
 		t.Fatalf("phase %v at %v: got %v, want %v", e.Phase, e.Position, got, want)
 	}
 }
@@ -125,7 +125,7 @@ func TestGestoListaDeclinaScrollFormulariosYMovimientosSinIntencion(t *testing.T
 				path = append(path, widget.NewEntry())
 			}
 			g := &gestosMoviles{}
-			begin := g.recibir(eventoGesto(mobile.FilterBegin, 100, 200, path...))
+			begin := g.filtrar(eventoGesto(mobile.FilterBegin, 100, 200, path...))
 			if !tc.top || !tc.ready || tc.form {
 				if begin != mobile.FilterPass {
 					t.Fatal("ordinary control was deferred")
@@ -171,7 +171,7 @@ func TestGestoListaCapturadaRevalidaPermisosVistaYCancelacion(t *testing.T) {
 				}
 				comprobarFiltro(t, g, e, mobile.FilterPass)
 			}
-			g.recibir(eventoGesto(mobile.FilterEnd, 100, 180, path...))
+			g.filtrar(eventoGesto(mobile.FilterEnd, 100, 180, path...))
 			if calls != 0 {
 				t.Fatal("invalidated pull refreshed")
 			}
@@ -191,6 +191,7 @@ func TestGestoMenuSoloDesdeElBordeIzquierdoHaciaLaDerecha(t *testing.T) {
 		name         string
 		start, end   float32
 		detail, open bool
+		menuInDetail bool
 		want         int
 	}{
 		{name: "left-to-right", start: 10, end: 90, want: 1},
@@ -199,6 +200,8 @@ func TestGestoMenuSoloDesdeElBordeIzquierdoHaciaLaDerecha(t *testing.T) {
 		{name: "middle", start: 100, end: 200},
 		{name: "short", start: 10, end: 40},
 		{name: "detail-back", start: 10, end: 100, detail: true},
+		{name: "conversation-menu", start: 10, end: 100, detail: true, menuInDetail: true, want: 1},
+		{name: "conversation-middle", start: 100, end: 200, detail: true, menuInDetail: true},
 		{name: "already-open", start: 10, end: 100, open: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -210,13 +213,62 @@ func TestGestoMenuSoloDesdeElBordeIzquierdoHaciaLaDerecha(t *testing.T) {
 			a.BarraMovil = bar
 			a.Resize(fyne.NewSize(390, 700))
 			a.DetalleAbierto, a.CajonAbierto = tc.detail, tc.open
+			a.MenuEnDetalle = tc.menuInDetail
 			g := &gestosMoviles{}
-			g.recibir(eventoGesto(mobile.FilterBegin, tc.start, 100, a))
-			g.recibir(eventoGesto(mobile.FilterEnd, tc.end, 103, a))
+			g.filtrar(eventoGesto(mobile.FilterBegin, tc.start, 100, a))
+			g.filtrar(eventoGesto(mobile.FilterEnd, tc.end, 103, a))
 			if calls != tc.want {
 				t.Fatalf("menu action called %d times, want %d", calls, tc.want)
 			}
 		})
+	}
+}
+
+func TestGestoMenuEnDetalleSinBarraConservaConversacionYScroll(t *testing.T) {
+	sinAnimacionDelMenu(t)
+	a := NuevoArmazon(widget.NewLabel("conversación"))
+	a.Menu = NuevoLateral("Canales", nil)
+	a.DetalleAbierto, a.MenuEnDetalle, a.SinBarraMovil = true, true, true
+	a.Resize(fyne.NewSize(390, 700))
+	test.WidgetRenderer(a)
+	a.Refresh()
+	g := &gestosMoviles{}
+
+	comprobarFiltro(t, g, eventoGesto(mobile.FilterBegin, 8, 200, a), mobile.FilterDefer)
+	comprobarFiltro(t, g, eventoGesto(mobile.FilterMove, 80, 202, a), mobile.FilterClaim)
+	comprobarFiltro(t, g, eventoGesto(mobile.FilterEnd, 100, 202, a), mobile.FilterClaim)
+	if !a.CajonAbierto || !a.Menu.Visible() || !a.DetalleAbierto {
+		t.Fatal("el gesto debe abrir los canales sin abandonar la conversación")
+	}
+
+	comprobarFiltro(t, g, eventoGesto(mobile.FilterBegin, 240, 250, a), mobile.FilterDefer)
+	comprobarFiltro(t, g, eventoGesto(mobile.FilterMove, 170, 252, a), mobile.FilterClaim)
+	comprobarFiltro(t, g, eventoGesto(mobile.FilterEnd, 160, 252, a), mobile.FilterClaim)
+	if a.CajonAbierto || a.Menu.Visible() || !a.DetalleAbierto {
+		t.Fatal("cerrar los canales debe volver a la misma conversación")
+	}
+
+	comprobarFiltro(t, g, eventoGesto(mobile.FilterBegin, 8, 200, a), mobile.FilterDefer)
+	comprobarFiltro(t, g, eventoGesto(mobile.FilterMove, 80, 202, a), mobile.FilterClaim)
+	comprobarFiltro(t, g, eventoGesto(mobile.FilterCancel, 80, 202, a), mobile.FilterPass)
+	if a.CajonAbierto || a.Menu.Visible() || !a.DetalleAbierto {
+		t.Fatal("cancelar el gesto no debe dejar abierto el cajón ni cambiar de canal")
+	}
+
+	comprobarFiltro(t, g, eventoGesto(mobile.FilterBegin, 8, 200, a), mobile.FilterDefer)
+	comprobarFiltro(t, g, eventoGesto(mobile.FilterMove, 80, 202, a), mobile.FilterClaim)
+	a.MenuEnDetalle = false // una página secundaria tapa la conversación durante el gesto
+	comprobarFiltro(t, g, eventoGesto(mobile.FilterEnd, 100, 202, a), mobile.FilterClaim)
+	if a.CajonAbierto || a.Menu.Visible() || !a.DetalleAbierto {
+		t.Fatal("el gesto no debe abrir el cajón detrás de la página que sustituyó la conversación")
+	}
+	a.MenuEnDetalle = true
+
+	comprobarFiltro(t, g, eventoGesto(mobile.FilterBegin, 8, 200, a), mobile.FilterDefer)
+	comprobarFiltro(t, g, eventoGesto(mobile.FilterMove, 10, 300, a), mobile.FilterPass)
+	comprobarFiltro(t, g, eventoGesto(mobile.FilterBegin, 8, 200, a, widget.NewEntry()), mobile.FilterPass)
+	if a.CajonAbierto {
+		t.Fatal("el desplazamiento vertical y la edición no deben abrir el cajón")
 	}
 }
 

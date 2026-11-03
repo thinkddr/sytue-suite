@@ -32,6 +32,7 @@
   "common.offline": "Sei offline. Le modifiche non verranno salvate finché non torna la rete.",
   "common.retry": "Riprova",
   "common.save": "Salva",
+  "crypto.dataReviewRequired": "Questa parte contiene dati che l’app non può modificare senza perdere precisione. L’originale è stato conservato.",
   "crypto.disable": "Togli la cifratura",
   "crypto.disableWarning": "Le note già cifrate resteranno illeggibili. Sblocca prima il taccuino.",
   "crypto.enable": "Cifra",
@@ -39,7 +40,6 @@
   "crypto.lockNow": "Blocca adesso",
   "crypto.locked": "Bloccato",
   "crypto.migrating": "Protezione del contenuto del taccuino…",
-  "crypto.dataReviewRequired": "Questa parte contiene dati che l’app non può modificare senza perdere precisione. L’originale è stato conservato.",
   "crypto.migrationFailed": "Impossibile completare la cifratura. I tuoi dati sono stati conservati. Riapri il taccuino per controllare le modifiche.",
   "crypto.mismatch": "Le due passphrase non coincidono.",
   "crypto.passphrase": "Passphrase",
@@ -266,6 +266,7 @@
   "notebook.delete": "Elimina taccuino",
   "notebook.deleteConfirm": "Eliminare «{title}» e tutto il suo contenuto?",
   "notebook.emoji": "Icona",
+  "notebook.move": "Sposta quaderno",
   "notebook.newChild": "Nuovo taccuino dentro",
   "notebook.notes": {
     "one": "{count} nota",

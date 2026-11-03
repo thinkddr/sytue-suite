@@ -32,6 +32,7 @@
   "common.offline": "Estás sin conexión. Los cambios no se guardarán hasta que vuelva.",
   "common.retry": "Reintentar",
   "common.save": "Guardar",
+  "crypto.dataReviewRequired": "Esta parte contiene datos que esta app no puede modificar sin perder precisión. El original se ha conservado.",
   "crypto.disable": "Quitar el cifrado",
   "crypto.disableWarning": "Las notas ya cifradas seguirán sin poder leerse. Desbloquea el cuaderno primero.",
   "crypto.enable": "Cifrar",
@@ -39,7 +40,6 @@
   "crypto.lockNow": "Bloquear ahora",
   "crypto.locked": "Bloqueado",
   "crypto.migrating": "Protegiendo el contenido del cuaderno…",
-  "crypto.dataReviewRequired": "Esta parte contiene datos que esta app no puede modificar sin perder precisión. El original se ha conservado.",
   "crypto.migrationFailed": "No se pudo completar el cifrado. Tus datos se han conservado. Vuelve a abrir el cuaderno para revisar los cambios.",
   "crypto.mismatch": "Las dos contraseñas no coinciden.",
   "crypto.passphrase": "Contraseña",
@@ -266,6 +266,7 @@
   "notebook.delete": "Eliminar cuaderno",
   "notebook.deleteConfirm": "¿Eliminar «{title}» y todo lo que contiene?",
   "notebook.emoji": "Icono",
+  "notebook.move": "Mover cuaderno",
   "notebook.newChild": "Nuevo cuaderno dentro",
   "notebook.notes": {
     "one": "{count} nota",

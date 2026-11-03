@@ -21,7 +21,8 @@
  * —eso desajustaria la hidratacion— y los tamaños y fechas se formatean con ese
  * locale (docs/CONVENTIONS.md §13.1).
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { createContext } from 'preact';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import {
   Button,
   ChoiceCard,
@@ -54,6 +55,7 @@ import {
   esAtajoDeApp,
   Checkbox,
   Radio,
+  usePointerDrag,
 } from '@sytue/ui';
 import type { DriveResource, ShareLink as ShareLinkSdk, TrashItem } from '@sytue/api-clients';
 
@@ -709,6 +711,47 @@ function resourceHref(item: DriveResource): string {
   return u.toString();
 }
 
+interface DatosMoverDrive {
+  rutas: string[];
+  carpeta: string;
+  x0: number;
+  y0: number;
+}
+const MovimientoDrive = createContext<{
+  gesto: ReturnType<typeof usePointerDrag<DatosMoverDrive>>;
+  iniciar: (e: PointerEvent, item: DriveResource) => void;
+  elegir: (item: DriveResource) => void;
+  destino: string | null;
+  haMovido: () => boolean;
+} | null>(null);
+
+function AsaMoverDrive({ item }: { item: DriveResource }) {
+  const movimiento = useContext(MovimientoDrive);
+  const { t } = useDriveT();
+  if (!movimiento) return null;
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      iconOnly
+      aria-label={`${t('files.selection.move')} · ${item.name}`}
+      data-drive-move={item.path}
+      leadingIcon={<Icon name="grip" size={16} />}
+      class="shrink-0 cursor-grab touch-none select-none [-webkit-user-select:none] active:cursor-grabbing"
+      onPointerDown={(e) => movimiento.iniciar(e, item)}
+      onPointerMove={movimiento.gesto.onPointerMove}
+      onPointerUp={movimiento.gesto.onPointerUp}
+      onPointerCancel={movimiento.gesto.onPointerCancel}
+      onLostPointerCapture={movimiento.gesto.onLostPointerCapture}
+      onKeyDown={(e) => e.stopPropagation()}
+      onClick={(e) => {
+        e.stopPropagation();
+        if (e.detail === 0 || !movimiento.haMovido()) movimiento.elegir(item);
+      }}
+    />
+  );
+}
+
 export function FileBrowser() {
   const toast = useToast();
   const offline = useConnectivity() === 'offline';
@@ -1200,6 +1243,11 @@ export function FileBrowser() {
     } catch {
       return; // arrastre de otra cosa: se ignora sin ruido
     }
+    await moverRutas(rutas, destino);
+  }
+
+  async function moverRutas(rutas: string[], destino: string): Promise<void> {
+    if (offline || busy) return;
     const aMover = movibles(rutas, destino);
     if (aMover.length === 0) return;
     setBusy(true);
@@ -1223,6 +1271,41 @@ export function FileBrowser() {
       void load(path);
     }
   }
+
+  const panelMover = useRef<HTMLDivElement>(null);
+  const movimientoPuntero = useRef(false);
+  const [destinoPuntero, setDestinoPuntero] = useState<string | null>(null);
+  function carpetaEn(x: number, y: number, rutas: string[]): string | null {
+    const el = document
+      .elementsFromPoint(x, y)
+      .map((e) => e.closest<HTMLElement>('[data-drive-folder]'))
+      .find((e) => e && panelMover.current?.contains(e));
+    const destino = el?.dataset.driveFolder;
+    return destino !== undefined && movibles(rutas, destino).length > 0 ? destino : null;
+  }
+  const gestoMover = usePointerDrag<DatosMoverDrive>({
+    documentEvents: true,
+    scrollContainer: () =>
+      panelMover.current?.querySelector<HTMLElement>('[data-drive-scroll]') ?? panelMover.current,
+    onMove: ({ data, clientX, clientY, dxRaw, dyRaw }) => {
+      if (Math.hypot(dxRaw, dyRaw) >= 4) {
+        movimientoPuntero.current = true;
+        setDestinoPuntero(carpetaEn(clientX, clientY, data.rutas));
+      }
+    },
+    onCancel: () => setDestinoPuntero(null),
+    onEnd: (data, e) => {
+      setDestinoPuntero(null);
+      if (data.carpeta !== path || Math.hypot(e.clientX - data.x0, e.clientY - data.y0) < 4) return;
+      const destino = carpetaEn(e.clientX, e.clientY, data.rutas);
+      if (destino !== null) void moverRutas(data.rutas, destino);
+    },
+  });
+  const { cancelarArrastre: cancelarMovimiento } = gestoMover;
+  useEffect(() => {
+    if (offline || busy) cancelarMovimiento();
+  }, [offline, busy, cancelarMovimiento]);
+  useEffect(() => () => cancelarMovimiento(), [path, cancelarMovimiento]);
 
   const onRename = async () => {
     const item = pendingRename;
@@ -1629,7 +1712,7 @@ export function FileBrowser() {
   // (que exige altura acotada); en el resto de estados scrollea el contenedor.
   const listActive = view === 'list' && !error && items !== null && items.length > 0;
 
-  return (
+  const vista = (
     <div class="flex h-full flex-col">
       {/* Barra de vista: cabecera sólida con el acento del producto (a juego con
           la topbar de la shell). Desde 768 px es una fila que envuelve.
@@ -1921,6 +2004,7 @@ export function FileBrowser() {
           vacía) acepta ficheros del SO; el botón «Subir» sigue disponible (el drop no
           es el único camino). Los handlers ignoran drags que no traen ficheros. */}
       <div
+        ref={panelMover}
         class={cx('relative min-h-0 flex-1', listActive ? 'flex flex-col' : 'overflow-y-auto')}
         onDragEnter={onDragEnter}
         onDragOver={onDragOver}
@@ -2326,6 +2410,36 @@ export function FileBrowser() {
         />
       ) : null}
     </div>
+  );
+
+  return (
+    <MovimientoDrive.Provider
+      value={
+        offline || busy
+          ? null
+          : {
+              gesto: gestoMover,
+              destino: destinoPuntero,
+              elegir: setPendingMove,
+              haMovido: () => movimientoPuntero.current,
+              iniciar: (e, item) => {
+                movimientoPuntero.current = false;
+                const rutas =
+                  item.id && selected.has(item.id) && selectionCount > 0
+                    ? selectedItems.map((x) => x.path)
+                    : [item.path];
+                gestoMover.iniciarArrastre(e, {
+                  rutas,
+                  carpeta: path,
+                  x0: e.clientX,
+                  y0: e.clientY,
+                });
+              },
+            }
+      }
+    >
+      {vista}
+    </MovimientoDrive.Provider>
   );
 }
 
@@ -4306,6 +4420,7 @@ function FileList({
       <VirtualList
         items={items}
         estimateSize={53} /* py-2 (16) + icono 36 + hairline 1; la real se mide */
+        data-drive-scroll
         getItemKey={getKey}
         aria-label={t('files.list.aria')}
         class="min-h-0 flex-1 px-3 pb-6 text-base"
@@ -4379,6 +4494,7 @@ function FileRow({
   onDropOnFolder,
 }: { item: DriveResource; index: number } & Omit<RowActions, 'items'>) {
   const { t, locale } = useDriveT();
+  const movimiento = useContext(MovimientoDrive);
   const checked = !!(item.id && selectedIds?.has(item.id));
   const openLabel = t(item.isDirectory ? 'files.openFolder' : 'files.open', { name: item.name });
   // `encima` solo se pinta cuando lo que se arrastra PUEDE soltarse aquí: un
@@ -4391,6 +4507,7 @@ function FileRow({
       role="button"
       tabIndex={0}
       aria-label={openLabel}
+      data-drive-folder={puedeRecibir ? item.path : undefined}
       draggable={!!onDragItem}
       onDragStart={(e: DragEvent) => onDragItem?.(e, item)}
       onDragOver={
@@ -4419,6 +4536,7 @@ function FileRow({
         'group border-border/60 hover:bg-bg-subtle focus-within:bg-bg-subtle sytue-focus-ring flex cursor-pointer items-center gap-3 border-b px-3 py-2 transition-colors duration-150',
         checked && 'bg-selected hover:bg-selected',
         encima && 'bg-selected ring-primary ring-2 ring-inset',
+        movimiento?.destino === item.path && 'bg-selected ring-primary ring-2 ring-inset',
       )}
       onClick={() => onOpen(item)}
       onKeyDown={(e) => {
@@ -4439,6 +4557,7 @@ function FileRow({
         />
       ) : null}
       <FileIcon resource={item} size={36} />
+      {onMove ? <AsaMoverDrive item={item} /> : null}
       <span class="min-w-0 flex-1">
         {/* La fila entera es el control «Abrir» (mismo patrón que la rejilla); el nombre solo muestra el tooltip. */}
         <span title={openLabel} class="text-text block max-w-full truncate text-left font-medium">
@@ -4582,6 +4701,7 @@ function FileGrid({
   // Ruta de la carpeta sobre la que se está soltando. Una sola: el puntero está
   // encima de un tile o de ninguno, así que no hace falta un estado por tarjeta.
   const [encima, setEncima] = useState<string | null>(null);
+  const movimiento = useContext(MovimientoDrive);
   return (
     <ul
       class={cx(
@@ -4604,6 +4724,7 @@ function FileGrid({
                 name: item.name,
               })}
               draggable={!!onDragItem}
+              data-drive-folder={puedeRecibir ? item.path : undefined}
               onDragStart={(e: DragEvent) => onDragItem?.(e, item)}
               onDragOver={
                 puedeRecibir
@@ -4640,6 +4761,7 @@ function FileGrid({
                 tono?.class,
                 checked && 'border-primary ring-primary ring-1',
                 encima === item.path && 'border-primary ring-primary ring-2',
+                movimiento?.destino === item.path && 'border-primary ring-primary ring-2',
               )}
             >
               {onToggleSelect && item.id ? (
@@ -4697,9 +4819,15 @@ function FileGrid({
               )}
               {/* Pie: nombre + meta (tamaño/fecha). */}
               <div class={cx('min-w-0 px-3 py-2', !franja && 'border-border border-t')}>
-                <p class="text-text truncate text-base font-medium" title={item.name}>
-                  {item.name}
-                </p>
+                <div class="flex min-w-0 items-center gap-2">
+                  <p
+                    class="text-text min-w-0 flex-1 truncate text-base font-medium"
+                    title={item.name}
+                  >
+                    {item.name}
+                  </p>
+                  {onMove ? <AsaMoverDrive item={item} /> : null}
+                </div>
                 <p class="sytue-meta mt-0.5 truncate tabular-nums">
                   {item.isDirectory ? t('files.folder') : formatSize(locale, item.size)}
                   {!item.isDirectory && item.modifiedAt

@@ -72,6 +72,18 @@ func TestWidgetCalendariosCompletosSinPublicarListaParcial(t *testing.T) {
 			if err != nil || len(snapshot.Counters) != 1 || snapshot.Counters[0] != (widgets.Counter{Kind: "calendars", Value: 3}) {
 				t.Fatalf("debe contar calendarios únicos completos, no eventos: %+v, %v", snapshot, err)
 			}
+			if snapshot.Generation == "" || snapshot.Generation != ajustes.Leer().Sesion {
+				t.Fatalf("el snapshot completo no pertenece a la sesión actual: %+v", snapshot)
+			}
+			// Reutilizar una caché completa tampoco permite atribuirla a otra sesión.
+			ajustes.MarcarSesion()
+			if ajustes.Leer().Sesion == snapshot.Generation {
+				t.Fatal("no cambió la marca de sesión para comprobar el aislamiento de la caché")
+			}
+			a.cargarEventos()
+			if _, err := widgets.Read("eu.sytue.calendar"); !errors.Is(err, widgets.ErrPrivate) {
+				t.Fatalf("la caché no debe quedar visible bajo otra sesión: %v", err)
+			}
 		})
 	}
 }
@@ -94,9 +106,9 @@ func TestWidgetCalendarioPublicaRejillaYProximosEventos(t *testing.T) {
 			_, _ = io.WriteString(w, `{"calendars":[]}`)
 		case "/api/v1/calendars/work/instances":
 			_, _ = io.WriteString(w, `{"instances":[`+
-				`{"start":"`+proximo.Format(time.RFC3339)+`","end":"`+finProximo.Format(time.RFC3339)+`","event":{"id":"e1","title":"Revisión de diseño","location":"Sala Norte","status":"CONFIRMED"}},`+
-				`{"start":"`+proximo.Format(time.RFC3339)+`","end":"`+finProximo.Format(time.RFC3339)+`","event":{"id":"e2","title":"enc:v1:secreto","status":"CONFIRMED"}},`+
-				`{"start":"`+proximo.Format(time.RFC3339)+`","end":"`+finProximo.Format(time.RFC3339)+`","event":{"id":"e3","title":"Cancelada","status":"CANCELLED"}}`+
+				`{"start":"`+proximo.Format(time.RFC3339)+`","end":"`+finProximo.Format(time.RFC3339)+`","event":{"id":"e1","summary":"Revisión de diseño","location":"Sala Norte","status":"CONFIRMED"}},`+
+				`{"start":"`+proximo.Format(time.RFC3339)+`","end":"`+finProximo.Format(time.RFC3339)+`","event":{"id":"e2","summary":"enc:v1:secreto","status":"CONFIRMED"}},`+
+				`{"start":"`+proximo.Format(time.RFC3339)+`","end":"`+finProximo.Format(time.RFC3339)+`","event":{"id":"e3","summary":"Cancelada","status":"CANCELLED"}}`+
 				`]}`)
 		default:
 			http.NotFound(w, r)

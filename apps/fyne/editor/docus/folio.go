@@ -236,9 +236,10 @@ type Folio struct {
 	laminas   map[string]*canvas.Image
 	laminasMu sync.Mutex
 
-	pag        *pagina
-	scroll     *container.Scroll
-	envoltorio *container.ThemeOverride
+	pag          *pagina
+	scroll       *container.Scroll
+	autoArrastre ui.AutoScrollArrastre
+	envoltorio   *container.ThemeOverride
 
 	// AlEditar se llama tras CADA cambio del documento: quien lo pone programa el
 	// guardado. nil en solo lectura.
@@ -645,7 +646,8 @@ func (r *folioRenderer) Refresh() {
 // aire de abajo. Es la que recibe el teclado y el ratón (escribir.go).
 type pagina struct {
 	widget.BaseWidget
-	f *Folio
+	f                      *Folio
+	arrastrando, cancelado bool
 }
 
 // origen es la esquina de la caja de CONTENIDO del papel dentro de la página, en px de

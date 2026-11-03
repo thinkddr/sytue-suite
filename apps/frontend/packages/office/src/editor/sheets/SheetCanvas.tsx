@@ -36,6 +36,8 @@ import {
   MenuItem,
   MenuSeparator,
   useToast,
+  Icon,
+  useListReorder,
   Checkbox,
   useUltimo,
   useMobileBack,
@@ -5374,8 +5376,7 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
     setFilterCol(null);
   };
 
-  /** Índice de la pestaña en arrastre (reordenar con drag and drop nativo). */
-  const sheetDrag = useRef<number | null>(null);
+  const sheetOrderPanel = useRef<HTMLDivElement>(null);
 
   const moveSheetTo = (from: number, to: number): void => {
     if (from === to) return;
@@ -5432,6 +5433,13 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
   const protectedSheet = !!sheet.protect;
   // Protección de LIBRO: estructura bloqueada (deshabilita botones y arrastre de pestañas).
   const protectedWorkbook = !!model.protect;
+  const sheetOrder = useListReorder({
+    ids: model.sheets.map((s) => s.id ?? s.name),
+    container: () => sheetOrderPanel.current,
+    axis: 'x',
+    disabled: protectedWorkbook,
+    onReorder: moveSheetTo,
+  });
   const selRef = refOf(sel);
   const canEditSel = canEditCellContent(
     protectedSheet,
@@ -6529,7 +6537,7 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
       </div>
 
       {/* Pestañas de hoja (§7.1): activa con subrayado del acento del producto;
-       * doble clic renombra y arrastrar reordena (drag and drop nativo). */}
+       * doble clic renombra y el asa compartida reordena con dedo, ratón o teclado. */}
       <div class="border-border bg-surface flex h-8 shrink-0 items-center gap-1 border-t px-2 text-xs pointer-coarse:h-auto pointer-coarse:min-h-[max(44px,2.75rem)]">
         {/* La tira de pestañas se DESPLAZA: acotar el ancho de cada nombre retrasaba
             el problema, pero con seis hojas —o con una pantalla de móvil— las
@@ -6537,60 +6545,60 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
             ellas. Los botones se quedan fuera de la tira: siempre alcanzables.
             `data-scroll-x`: desplazamiento declarado, como la banda de la cinta; sin él el
             barrido lo contaba como desbordamiento en cuanto hay dos hojas en un móvil. */}
-        <div data-scroll-x class="flex h-full min-w-0 flex-1 items-center gap-1 overflow-x-auto">
+        <div
+          ref={sheetOrderPanel}
+          data-scroll-x
+          class="flex h-full min-w-0 flex-1 items-center gap-1 overflow-x-auto"
+        >
           {model.sheets.map((s, i) => (
-            <button
-              key={i}
-              type="button"
-              // Se acota el ancho para que un nombre largo no se coma la tira entera;
-              // el nombre completo sigue en el `title`.
-              class={`relative h-full max-w-[12rem] shrink-0 truncate px-2 ${FOCUS_RING} ${
-                i === model.active ? 'text-text font-medium' : 'text-text-muted hover:text-text'
-              }`}
-              aria-pressed={i === model.active}
-              title={
-                protectedWorkbook
-                  ? t('sheet.tab.locked', { name: s.name })
-                  : t('sheet.tab.hint', { name: s.name })
-              }
-              draggable={!protectedWorkbook}
-              onDragStart={(e) => {
-                sheetDrag.current = i;
-                // setData: sin él, Firefox no inicia el arrastre.
-                e.dataTransfer?.setData('text/plain', s.name);
-                if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
-              }}
-              onDragOver={(e) => {
-                if (sheetDrag.current !== null) e.preventDefault(); // acepta soltar aquí
-              }}
-              onDrop={(e) => {
-                e.preventDefault();
-                const from = sheetDrag.current;
-                sheetDrag.current = null;
-                if (from !== null && from !== i) moveSheetTo(from, i);
-              }}
-              onDragEnd={() => {
-                sheetDrag.current = null;
-              }}
-              onClick={() => switchSheet(i)}
-              onDblClick={() => void renameSheet(i)}
+            <span
+              key={s.id ?? i}
+              {...sheetOrder.itemProps(s.id ?? s.name)}
+              class="flex h-full shrink-0 items-center"
             >
-              {s.name}
-              {s.tabColor && (
-                // El color de la pestaña (el de Excel): una banda debajo del nombre.
-                <span
-                  aria-hidden="true"
-                  class="absolute inset-x-1 bottom-0 h-1 rounded-full"
-                  style={{ background: s.tabColor }}
-                />
-              )}
-              {i === model.active && (
-                <span
-                  aria-hidden="true"
-                  class="bg-indicator absolute inset-x-1 bottom-0 h-0.5 rounded-full"
-                />
-              )}
-            </button>
+              <button
+                type="button"
+                {...sheetOrder.handleProps(s.id ?? s.name)}
+                disabled={protectedWorkbook}
+                aria-label={t('sheet.tab.hint', { name: s.name })}
+                aria-keyshortcuts="ArrowLeft ArrowRight Home End"
+                class="sytue-focus-ring text-text-muted hover:text-text h-full w-6 shrink-0 cursor-grab touch-none rounded-sm select-none [-webkit-user-select:none] active:cursor-grabbing disabled:cursor-default disabled:opacity-40 pointer-coarse:min-h-[max(44px,2.75rem)] pointer-coarse:min-w-[max(44px,2.75rem)]"
+              >
+                <Icon name="grip" size={14} />
+              </button>
+              <button
+                type="button"
+                // Se acota el ancho para que un nombre largo no se coma la tira entera;
+                // el nombre completo sigue en el `title`.
+                class={`relative h-full max-w-[12rem] shrink-0 truncate px-2 ${FOCUS_RING} ${
+                  i === model.active ? 'text-text font-medium' : 'text-text-muted hover:text-text'
+                }`}
+                aria-pressed={i === model.active}
+                title={
+                  protectedWorkbook
+                    ? t('sheet.tab.locked', { name: s.name })
+                    : t('sheet.tab.hint', { name: s.name })
+                }
+                onClick={() => switchSheet(i)}
+                onDblClick={() => void renameSheet(i)}
+              >
+                {s.name}
+                {s.tabColor && (
+                  // El color de la pestaña (el de Excel): una banda debajo del nombre.
+                  <span
+                    aria-hidden="true"
+                    class="absolute inset-x-1 bottom-0 h-1 rounded-full"
+                    style={{ background: s.tabColor }}
+                  />
+                )}
+                {i === model.active && (
+                  <span
+                    aria-hidden="true"
+                    class="bg-indicator absolute inset-x-1 bottom-0 h-0.5 rounded-full"
+                  />
+                )}
+              </button>
+            </span>
           ))}
         </div>
         <RibbonButton

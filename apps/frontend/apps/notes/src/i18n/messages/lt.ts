@@ -133,6 +133,7 @@ export const lt: AppCatalog<typeof en> = {
   },
   'notebook.emoji': 'Piktograma',
   'notebook.color': 'Spalva',
+  'notebook.move': 'Perkelti užrašinę',
   'notebook.title': 'Pavadinimas',
   'layout.label': 'Išdėstymas',
   'layout.tree': 'Medis',

@@ -179,3 +179,165 @@ test('cancelar distingue restaurar del commit y solo termina una vez', () => {
   act(() => render(null, host));
   host.remove();
 });
+
+test('Escape y perder la captura cancelan sin guardar ni terminar dos veces', () => {
+  const host = document.createElement('div');
+  document.body.append(host);
+  let guardados = 0;
+  let cancelados = 0;
+  function Fixture() {
+    const drag = usePointerDrag<string>({
+      onEnd: () => {
+        guardados++;
+      },
+      onCancel: () => {
+        cancelados++;
+      },
+    });
+    return (
+      <button
+        onPointerDown={(e) => drag.iniciarArrastre(e, 'fila')}
+        onPointerUp={drag.onPointerUp}
+        onLostPointerCapture={drag.onLostPointerCapture}
+      />
+    );
+  }
+  act(() => render(<Fixture />, host));
+  const el = host.firstElementChild!;
+  el.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 1, bubbles: true }));
+  document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  el.dispatchEvent(new PointerEvent('pointerup', { pointerId: 1, bubbles: true }));
+  expect(cancelados).toBe(1);
+  expect(guardados).toBe(0);
+  el.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 2, bubbles: true }));
+  el.dispatchEvent(new PointerEvent('lostpointercapture', { pointerId: 2, bubbles: true }));
+  el.dispatchEvent(new PointerEvent('pointerup', { pointerId: 2, bubbles: true }));
+  expect(cancelados).toBe(2);
+  expect(guardados).toBe(0);
+  act(() => render(null, host));
+  host.remove();
+});
+
+test('el borde sigue desplazando sin mover el dedo y deja de hacerlo al cancelar', () => {
+  const host = document.createElement('div');
+  document.body.append(host);
+  const originalFrame = globalThis.requestAnimationFrame;
+  const originalCancel = globalThis.cancelAnimationFrame;
+  const frames = new Map<number, FrameRequestCallback>();
+  let siguiente = 0;
+  globalThis.requestAnimationFrame = (cb) => {
+    frames.set(++siguiente, cb);
+    return siguiente;
+  };
+  globalThis.cancelAnimationFrame = (id) => {
+    frames.delete(id);
+  };
+  let movimientos = 0;
+  function Fixture() {
+    const drag = usePointerDrag<string>({
+      scrollContainer: () => host,
+      onMove: () => {
+        movimientos++;
+      },
+    });
+    return (
+      <button
+        onPointerDown={(e) => drag.iniciarArrastre(e, 'fila')}
+        onPointerMove={drag.onPointerMove}
+        onPointerCancel={drag.onLostPointerCapture}
+      />
+    );
+  }
+  try {
+    host.getBoundingClientRect = () => new DOMRect(0, 0, 200, 200);
+    act(() => render(<Fixture />, host));
+    const el = host.firstElementChild!;
+    el.dispatchEvent(
+      new PointerEvent('pointerdown', { clientX: 100, clientY: 100, pointerId: 1, bubbles: true }),
+    );
+    el.dispatchEvent(
+      new PointerEvent('pointermove', { clientX: 100, clientY: 195, pointerId: 1, bubbles: true }),
+    );
+    for (const t of [16, 32]) {
+      const [id, cb] = frames.entries().next().value!;
+      frames.delete(id);
+      cb(t);
+    }
+    expect(host.scrollTop).toBeGreaterThan(0);
+    expect(movimientos).toBe(3);
+    el.dispatchEvent(new PointerEvent('pointercancel', { pointerId: 1, bubbles: true }));
+    expect(frames.size).toBe(0);
+  } finally {
+    act(() => render(null, host));
+    host.remove();
+    globalThis.requestAnimationFrame = originalFrame;
+    globalThis.cancelAnimationFrame = originalCancel;
+  }
+});
+
+test('una fila virtualizada conserva el origen y cada evento se entrega una sola vez', () => {
+  const host = document.createElement('div');
+  document.body.append(host);
+  const guardados: string[] = [];
+  let movimientos = 0;
+  let capturas = 0;
+  let cancelados = 0;
+  function Fixture({ id }: { id: string }) {
+    const drag = usePointerDrag<string>({
+      documentEvents: true,
+      onCancel: () => {
+        cancelados++;
+      },
+      onMove: () => {
+        movimientos++;
+      },
+      onEnd: (origen) => {
+        guardados.push(origen);
+      },
+    });
+    return (
+      <button
+        key={id}
+        onPointerDown={(e) => drag.iniciarArrastre(e, id)}
+        onPointerMove={drag.onPointerMove}
+        onPointerUp={drag.onPointerUp}
+        onLostPointerCapture={drag.onLostPointerCapture}
+      />
+    );
+  }
+  try {
+    act(() => render(<Fixture id="original" />, host));
+    const el = host.firstElementChild! as HTMLElement;
+    el.setPointerCapture = () => {
+      capturas++;
+    };
+    el.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 1, bubbles: true }));
+    el.dispatchEvent(new PointerEvent('pointermove', { pointerId: 1, clientY: 20, bubbles: true }));
+    expect(movimientos).toBe(1);
+    expect(capturas).toBe(0);
+    act(() => render(<Fixture id="reciclada" />, host));
+    expect(el.isConnected).toBe(false);
+    document.dispatchEvent(
+      new PointerEvent('pointermove', { pointerId: 1, clientY: 40, bubbles: true }),
+    );
+    document.dispatchEvent(
+      new PointerEvent('pointerup', { pointerId: 1, clientY: 40, bubbles: true }),
+    );
+    expect(movimientos).toBe(2);
+    expect(guardados).toEqual(['original']);
+    document.dispatchEvent(
+      new PointerEvent('pointermove', { pointerId: 1, clientY: 60, bubbles: true }),
+    );
+    expect(movimientos).toBe(2);
+    host.firstElementChild!.dispatchEvent(
+      new PointerEvent('pointerdown', { pointerId: 2, bubbles: true }),
+    );
+    window.dispatchEvent(new Event('blur'));
+    document.dispatchEvent(new PointerEvent('pointerup', { pointerId: 2, bubbles: true }));
+    expect(cancelados).toBe(1);
+    expect(guardados).toEqual(['original']);
+  } finally {
+    act(() => render(null, host));
+    host.remove();
+  }
+});

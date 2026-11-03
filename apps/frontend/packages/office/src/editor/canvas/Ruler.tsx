@@ -25,7 +25,7 @@
  */
 import type { JSX } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { useUltimo } from '@sytue/ui';
+import { usePointerDrag, useUltimo } from '@sytue/ui';
 import type { EditorContext } from '../types';
 import { getEditorRoot } from './exec';
 import { RULER_H } from './metrics';
@@ -178,7 +178,7 @@ export function Ruler({ ctx }: { ctx: EditorContext }): JSX.Element | null {
     event.preventDefault();
     const block = selectedBlock();
     if (!block) return; // sin bloque seleccionado no hay dónde aplicar la sangría
-    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+    if (!gesto.iniciarArrastre(event, { block, original: { ...indentsRef.current } })) return;
     dragRef.current = { marker, block };
     setDragging(marker);
   };
@@ -200,6 +200,18 @@ export function Ruler({ ctx }: { ctx: EditorContext }): JSX.Element | null {
     setDragging(null);
     dispatchInput(); // un único `input` por arrastre: autosave + estadísticas
   };
+
+  const gesto = usePointerDrag<{ block: HTMLElement; original: Indents }>({
+    onMove: (_, e) => onDragMove(e),
+    onEnd: endDrag,
+    onCancel: ({ block, original }) => {
+      if (block.isConnected) applyIndents(block, original);
+      indentsRef.current = original;
+      setIndents(original);
+      dragRef.current = null;
+      setDragging(null);
+    },
+  });
 
   /* Operable con teclado (AA): las flechas mueven el marcador EN PANTALLA
    * (← izquierda, → derecha) a pasos de 0,25 cm; para «derecha», → reduce la
@@ -336,9 +348,10 @@ export function Ruler({ ctx }: { ctx: EditorContext }): JSX.Element | null {
               : undefined),
           }}
           onPointerDown={(e) => startDrag(m.id, e)}
-          onPointerMove={onDragMove}
-          onPointerUp={endDrag}
-          onPointerCancel={endDrag}
+          onPointerMove={gesto.onPointerMove}
+          onPointerUp={gesto.onPointerUp}
+          onPointerCancel={gesto.onPointerCancel}
+          onLostPointerCapture={gesto.onLostPointerCapture}
           onKeyDown={(e) => nudgeMarker(m.id, e)}
         >
           {/* Triángulo: hacia abajo = primera línea (arriba); hacia arriba = izquierda/derecha (abajo). */}

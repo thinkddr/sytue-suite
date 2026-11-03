@@ -189,11 +189,13 @@ preparar() {
     ;;
   ios | macappstore)
     local destino="$1" plataforma=IOS tipo=IOS_APP_STORE
-    local herramientas=(codesign productsign)
+    # iOS se prepara primero en el job combinado. Distribution y el instalador
+    # comparten CERTIFICATE_PRIVATE_KEY: Security conserva la ACL de la primera
+    # importación y reimportar el P12 existente no amplía sus herramientas.
+    # Autorizar los tres firmantes desde esa primera importación evita que
+    # productbuild pida permiso interactivo horas después, al publicar macOS.
+    local herramientas=(codesign productsign productbuild)
     [ "$destino" = ios ] || { plataforma=MAC_OS && tipo=MAC_APP_STORE; }
-    # productbuild firma el .pkg. El importador solo autoriza codesign/productsign
-    # por defecto: omitirlo deja el job esperando un diálogo de llavero (v3.13.3).
-    [ "$destino" != macappstore ] || herramientas+=(productbuild)
     shift
     [ "$#" -gt 0 ] || mal "preparar $destino: falta al menos un App ID"
     credenciales || exit 1

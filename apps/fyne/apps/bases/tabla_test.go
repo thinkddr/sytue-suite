@@ -808,6 +808,9 @@ func TestElTableroMueveTarjetasConSuSelector(t *testing.T) {
 		if _, ok := o.(*ui.Selector); ok {
 			t.Error("un lector puede mover tarjetas")
 		}
+		if _, ok := o.(*ui.AsaArrastre); ok {
+			t.Error("un lector tiene un asa para mover tarjetas")
+		}
 	})
 	if !strings.Contains(textos(w), "Puedes leer esta tabla pero no cambiarla.") {
 		t.Error("el tablero de un lector no dice que es de solo lectura")

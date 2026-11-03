@@ -32,6 +32,7 @@
   "common.offline": "You are offline. Changes will not be saved until the connection is back.",
   "common.retry": "Retry",
   "common.save": "Save",
+  "crypto.dataReviewRequired": "This part contains data this app cannot change without losing precision. The original has been preserved.",
   "crypto.disable": "Remove encryption",
   "crypto.disableWarning": "Existing encrypted notes stay unreadable. Unlock the notebook first.",
   "crypto.enable": "Encrypt",
@@ -39,7 +40,6 @@
   "crypto.lockNow": "Lock now",
   "crypto.locked": "Locked",
   "crypto.migrating": "Protecting this notebook’s content…",
-  "crypto.dataReviewRequired": "This part contains data this app cannot change without losing precision. The original has been preserved.",
   "crypto.migrationFailed": "Encryption could not be completed. Your data has been preserved. Reopen the notebook to review the changes.",
   "crypto.mismatch": "The two passphrases are different.",
   "crypto.passphrase": "Passphrase",
@@ -266,6 +266,7 @@
   "notebook.delete": "Delete notebook",
   "notebook.deleteConfirm": "Delete “{title}” and everything inside it?",
   "notebook.emoji": "Icon",
+  "notebook.move": "Move notebook",
   "notebook.newChild": "New notebook inside",
   "notebook.notes": {
     "one": "{count} note",

@@ -85,23 +85,7 @@ func componerBarrasLineas(b *strings.Builder, tipo string, rotulos []string, ser
 	for _, s := range series {
 		todos = append(todos, s.Valores...)
 	}
-	var esc figuras.Escala
-	if tipo == "bar" {
-		lo, hi := 0.0, 0.0
-		for _, v := range todos {
-			lo, hi = min(lo, v), max(hi, v)
-		}
-		esc = marcasBonitas(lo, hi)
-	} else {
-		lo, hi := 0.0, 1.0
-		if len(todos) > 0 {
-			lo, hi = todos[0], todos[0]
-			for _, v := range todos {
-				lo, hi = min(lo, v), max(hi, v)
-			}
-		}
-		esc = marcasBonitas(lo, hi)
-	}
+	esc := escalaBarrasLineas(tipo, todos)
 	rango := esc.Max - esc.Min
 	if rango == 0 {
 		rango = 1
@@ -166,6 +150,24 @@ func componerBarrasLineas(b *strings.Builder, tipo string, rotulos []string, ser
 		})
 	}
 	return fuera
+}
+
+func escalaBarrasLineas(tipo string, valores []float64) figuras.Escala {
+	if tipo == "bar" {
+		lo, hi := 0.0, 0.0
+		for _, v := range valores {
+			lo, hi = min(lo, v), max(hi, v)
+		}
+		return marcasBonitas(lo, hi)
+	}
+	lo, hi := 0.0, 1.0
+	if len(valores) > 0 {
+		lo, hi = valores[0], valores[0]
+		for _, v := range valores {
+			lo, hi = min(lo, v), max(hi, v)
+		}
+	}
+	return marcasBonitas(lo, hi)
 }
 
 // componerTarta es `bodyPie`: sectores de la primera serie, los valores > 0.

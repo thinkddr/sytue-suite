@@ -212,7 +212,8 @@ func (h *Hoja) generarPrevia(w, alto int) image.Image {
 // desplazaría el documento en vez de dibujar.
 type tapaHoja struct {
 	widget.BaseWidget
-	h *Hoja
+	h         *Hoja
+	cancelado bool
 	// doble es cuándo y dónde fue el último doble clic: un clic justo después, en el
 	// mismo sitio, es el triple.
 	doble      time.Time
@@ -247,9 +248,32 @@ func (t *tapaHoja) Cursor() desktop.Cursor {
 	return desktop.CrosshairCursor
 }
 
-func (t *tapaHoja) Dragged(e *fyne.DragEvent) { t.h.Arrastrar(e.Position, e.Dragged) }
+func (t *tapaHoja) Dragged(e *fyne.DragEvent) {
+	if !t.cancelado {
+		t.h.Arrastrar(e.Position, e.Dragged)
+	}
+}
 
-func (t *tapaHoja) DragEnd() { t.h.Soltar() }
+func (t *tapaHoja) DragEnd() {
+	if t.cancelado {
+		t.cancelado = false
+		return
+	}
+	t.h.Soltar()
+}
+
+// CancelarArrastre descarta la herramienta provisional: no entrega un gesto final
+// a la pantalla, que es donde se convierte en una anotación persistida.
+func (t *tapaHoja) CancelarArrastre() {
+	t.h.mu.Lock()
+	activo := t.h.gesto != nil
+	t.h.gesto = nil
+	t.h.mu.Unlock()
+	if activo {
+		t.cancelado = true
+		t.h.refrescarPrevia()
+	}
+}
 
 // Tapped es un clic sin arrastrar: un gesto de un punto, que con la mano quita la
 // selección, como un clic en el texto del navegador. Las demás no hacen nada con él.

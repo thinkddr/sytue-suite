@@ -2,7 +2,7 @@
   "name": "@sytue/erp",
   "version": "1.0.0",
   "private": true,
-  "description": "SyERP — el ERP de la suite (Astro 7 + Preact 10) sobre el servicio Go propio SyERP. Una sola interfaz generada del catálogo de módulos que publica el servicio: lista, ficha y paleta de comandos sirven a los treinta y seis modelos sin una línea de código por módulo. Producto Sytue-native, propietario. docs/CONVENTIONS.md §1.",
+  "description": "SyERP \u2014 el ERP de la suite (Astro 7 + Preact 10) sobre el servicio Go propio SyERP. Una sola interfaz generada del cat\u00e1logo de m\u00f3dulos que publica el servicio: lista, ficha y paleta de comandos sirven a los treinta y seis modelos sin una l\u00ednea de c\u00f3digo por m\u00f3dulo. Producto Sytue-native, propietario. docs/CONVENTIONS.md \u00a71.",
   "license": "Apache-2.0",
   "type": "module",
   "scripts": {
@@ -29,7 +29,7 @@
     "@astrojs/check": "catalog:",
     "@happy-dom/global-registrator": "21.0.4",
     "@tailwindcss/vite": "4.3.3",
-    "@types/bun": "1.4.2",
+    "@types/bun": "1.4.4",
     "tailwindcss": "4.3.3",
     "typescript": "6.0.3"
   }

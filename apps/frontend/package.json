@@ -5,25 +5,25 @@
   "description": "Sytue One \u2014 monorepo frontend (Astro 7 + Preact 10.29, Bun). Design system, shell, auth OIDC/PKCE contra Sytue ID y SDKs a los servicios Go propios. Dise\u00f1o Sytue-native. Soberan\u00eda 100% UE.",
   "license": "Apache-2.0",
   "type": "module",
-  "packageManager": "bun@1.4.3",
+  "packageManager": "bun@1.4.4",
   "workspaces": [
     "packages/*",
     "apps/*"
   ],
   "catalog": {
-    "@astrojs/check": "0.9.10",
-    "@astrojs/node": "11.1.6",
-    "@astrojs/preact": "6.0.5",
+    "@astrojs/check": "0.9.12",
+    "@astrojs/node": "11.1.9",
+    "@astrojs/preact": "6.1.1",
     "@astrojs/sitemap": "3.7.4",
     "@lhci/cli": "0.15.1",
-    "@types/bun": "1.4.2",
-    "@types/node": "26.6.3",
-    "astro": ">=7.3.5 <8",
+    "@types/bun": "1.4.4",
+    "@types/node": "26.6.5",
+    "astro": ">=7.4.2 <8",
     "eslint-plugin-astro": "3.2.1",
-    "prettier-plugin-astro": "1.1.0"
+    "prettier-plugin-astro": "1.1.2"
   },
   "engines": {
-    "bun": ">=1.4.3"
+    "bun": ">=1.4.4"
   },
   "scripts": {
     "build": "bun run --filter './packages/*' build",
@@ -37,8 +37,8 @@
     "lint:marca": "./scripts/lint-marca.sh",
     "lint:terceros": "./scripts/lint-terceros.sh",
     "lint:tokens": "./scripts/lint-tokens.sh",
-    "format": "bunx prettier@3.9.9 --write \"**/*.{ts,tsx,astro,css,json,md}\" \"../../docs/*.md\"",
-    "format:check": "bunx prettier@3.9.9 --check \"**/*.{ts,tsx,astro,css,json,md}\" \"../../docs/*.md\"",
+    "format": "bunx prettier@3.9.10 --write \"**/*.{ts,tsx,astro,css,json,md}\" \"../../docs/*.md\"",
+    "format:check": "bunx prettier@3.9.10 --check \"**/*.{ts,tsx,astro,css,json,md}\" \"../../docs/*.md\"",
     "clean": "bun run --filter '*' clean",
     "test": "bun run --filter '*' test"
   },
@@ -47,12 +47,12 @@
     "@sytue/config": "workspace:*",
     "@tailwindcss/cli": "4.3.3",
     "@types/bun": "catalog:",
-    "@typescript-eslint/parser": "8.71.0",
-    "eslint": "10.11.0",
+    "@typescript-eslint/parser": "8.72.1",
+    "eslint": "10.13.0",
     "eslint-scope": "9.1.2",
-    "oxlint": "1.86.0",
-    "oxlint-tsgolint": "7.0.2003",
-    "prettier": "3.9.9",
+    "oxlint": "1.90.0",
+    "oxlint-tsgolint": "7.0.2005",
+    "prettier": "3.9.10",
     "prettier-plugin-tailwindcss": "0.8.1",
     "typescript": "6.0.3"
   },
@@ -62,35 +62,35 @@
     "eslint-plugin-astro": "catalog:",
     "eslint-plugin-jsx-a11y": "6.10.2",
     "prettier-plugin-astro": "catalog:",
-    "typescript-eslint": "8.71.0",
+    "typescript-eslint": "8.72.1",
     "yaml": "2.9.1"
   },
   "overrides": {
     "body-parser": "1.20.9",
     "http-cache-semantics": "4.3.0",
-    "basic-ftp": "6.2.1",
-    "ip-address": "10.7.4",
-    "devalue": "5.9.4",
+    "basic-ftp": "6.2.3",
+    "ip-address": "10.7.5",
+    "devalue": "6.0.3",
     "undici": "8.12.3",
     "yaml": "2.9.1",
     "js-yaml": "4.3.2",
     "brace-expansion": "5.0.12",
-    "browserslist": "4.29.0",
+    "browserslist": "4.29.5",
     "nanoid": "3.3.20",
-    "postcss": "8.5.30",
-    "qs": "6.16.1",
+    "postcss": "8.5.32",
+    "qs": "6.17.0",
     "svgo": "4.1.0",
     "sharp": "0.35.5",
     "fast-uri": "3.1.9",
     "tmp": "0.2.7",
     "uuid": "11.1.1",
-    "@puppeteer/browsers": "3.2.5",
-    "vite": "8.3.4",
-    "puppeteer-core": "25.14.0",
+    "@puppeteer/browsers": "3.2.6",
+    "vite": "8.3.5",
+    "puppeteer-core": "25.16.0",
     "zod": "4.6.7"
   },
   "patchedDependencies": {
-    "astro@7.3.5": "patches/astro@7.3.5.patch",
-    "livekit-client@2.22.3": "patches/livekit-client@2.22.3.patch"
+    "astro@7.4.2": "patches/astro@7.4.2.patch",
+    "livekit-client@2.23.0": "patches/livekit-client@2.23.0.patch"
   }
 }

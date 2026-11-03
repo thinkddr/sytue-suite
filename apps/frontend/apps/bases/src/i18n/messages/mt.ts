@@ -10,6 +10,7 @@ import type { en } from './en.js';
 export const mt: AppCatalog<typeof en> = {
   'nav.title': 'Bases',
   'nav.bases': 'Id-databases tiegħi',
+  'actions.more': 'Aktar azzjonijiet',
   'bases.title': 'Id-databases tiegħi',
   'bases.newName': 'Isem id-database l-ġdida',
   'bases.create': 'Oħloq database',

@@ -1,0 +1,25 @@
+diff --git a/dist/core/app/node.js b/dist/core/app/node.js
+index df6321eb6fb4917f9bdc57531159cd36b02e9ba1..09bff613a56c5876edb771ce66f5616e573f3afc 100644
+--- a/dist/core/app/node.js
++++ b/dist/core/app/node.js
+@@ -205,7 +205,19 @@
+ 		});
+ 		let result = await reader.read();
+ 		while (!result.done) {
+-			destination.write(result.value);
++			// sytue: respetar la contrapresión. Un origen más rápido que el cliente
++			// no debe acumular el cuerpo entero (incidente del instalador de 660 MB).
++			if (!destination.write(result.value) && !destination.destroyed) {
++				await new Promise((resolve) => {
++					const seguir = () => {
++						destination.off("drain", seguir);
++						destination.off("close", seguir);
++						resolve();
++					};
++					destination.on("drain", seguir);
++					destination.on("close", seguir);
++				});
++			}
+ 			result = await reader.read();
+ 		}
+ 		destination.end();

@@ -281,8 +281,8 @@ func centinela(v Vista, cargando bool) fyne.CanvasObject {
 	return container.New(fijo{alto: AltoCentinela}, container.NewCenter(r))
 }
 
-// cabeceraMes es el `<h2>` pegajoso del mes: `bg-bg sytue-overline flex
-// items-center gap-3 py-2`, el rótulo en versalitas, cuántas fotos van por fecha de
+// cabeceraMes es el `<h2>` pegajoso del mes: `bg-bg text-sm font-semibold flex
+// items-center gap-3 py-2`, el mes con su capitalización original, cuántas fotos van por fecha de
 // subida si las hay y, seleccionando, «Seleccionar el mes».
 //
 // Sus hijos ENCOGEN (FilaEncoge): en un teléfono los tres se parten en dos líneas en
@@ -291,11 +291,11 @@ func centinela(v Vista, cargando bool) fyne.CanvasObject {
 // Es pegajosa (`sticky top-0`, bajo la barra de selección cuando está): la pega la app,
 // que es quien sabe cuánto se ha desplazado (ver pegar en app_pegar.go).
 func cabeceraMes(v Vista, g GrupoMes, d Galeria) fyne.CanvasObject {
-	titulo := NuevoVersalRepartido(g.Titulo, tema.TextoXS, ui.SemiNegrita, tema.Color("text-muted", v.Variante), ui.TrackingOverline)
-	hijos, piezas := []fyne.CanvasObject{titulo}, []PiezaFlex{titulo.Pieza()}
+	titulo := ui.NuevoParrafo(g.Titulo, tema.TextoSM, ui.SemiNegrita, "text", v.Variante)
+	hijos, piezas := []fyne.CanvasObject{titulo}, []PiezaFlex{PiezaParrafo(titulo)}
 	if g.Aproximadas > 0 {
 		p := ui.NuevoParrafo(v.T.T("gallery.approxCount", i18n.Vars{"count": g.Aproximadas}),
-			tema.TextoXS, ui.Normal, "text-subtle", v.Variante)
+			tema.TextoXS, ui.Normal, "text-muted", v.Variante)
 		hijos, piezas = append(hijos, p), append(piezas, PiezaParrafo(p))
 	}
 	if d.EnSeleccion {
@@ -629,6 +629,7 @@ func PantallaAlbumes(v Vista, d Albumes) *fyne.Container {
 		tarjetas[i] = TarjetaAlbum(v, a, d.AlAbrir)
 	}
 	r := ui.RejillaAlbumes()
+	r.Hueco = tema.Espacio(6)
 	bloques = append(bloques, ui.Bloque{
 		Obj:  container.New(r, tarjetas...),
 		Alto: func(ancho float32) float32 { return r.MinSizeCon(tarjetas, ancho).Height },
@@ -826,37 +827,54 @@ func compartirO(a api.Album) string {
 	return "album.share"
 }
 
-// TarjetaAlbum es una tarjeta de «Álbumes»: portada cuadrada, título y recuento.
+// TarjetaAlbum es una portada 4:3, con el título y el recuento debajo.
 func TarjetaAlbum(v Vista, a api.Album, alAbrir func(api.Album)) fyne.CanvasObject {
-	portada := NuevaMiniatura(api.Photo{ID: a.CoverAssetID, Name: a.Title}, v.Teca)
+	teca := v.Teca
+	if a.CoverAssetID == "" {
+		teca = nil
+	}
+	portada := NuevaMiniatura(api.Photo{ID: a.CoverAssetID, Name: a.Title}, teca)
 	portada.Rotulo, portada.SinMarcas = a.Title, true
+	portada.Filete = true
 	if alAbrir != nil {
 		portada.AlPulsar = func() { alAbrir(a) }
 	}
-	titulo := ParrafoEn(a.Title, tema.TextoSM, ui.Medio, "text", v.Variante)
+	var cubierta fyne.CanvasObject = portada
+	if a.CoverAssetID == "" {
+		cubierta = container.NewStack(portada, container.NewCenter(iconos.Trazo(iconos.Album, 32, "text-subtle", v.Variante).Objeto()))
+	}
+	titulo := ParrafoEn(a.Title, tema.TextoSM, ui.SemiNegrita, "text", v.Variante)
 	cuenta := ParrafoEn(Recuento(v, "albums.count", a.Count), tema.TextoXS, ui.Normal, "text-muted", v.Variante)
-	return container.New(tarjetaAlbumLayout{}, portada, titulo, cuenta)
+	return container.New(tarjetaAlbumLayout{titulo: a.Title}, cubierta, titulo, cuenta)
 }
 
-// tarjetaAlbumLayout: portada cuadrada a todo el ancho, `mt-1` y las dos líneas.
-type tarjetaAlbumLayout struct{}
+// tarjetaAlbumLayout: portada 4:3 a todo el ancho, `mt-2` y las dos líneas.
+type tarjetaAlbumLayout struct{ titulo string }
 
 var _ fyne.Layout = tarjetaAlbumLayout{}
 
-const margenPieAlbum = 1 * 0.25 * tema.Rem // `mt-1`
+const margenPieAlbum = 2 * 0.25 * tema.Rem // `mt-2`
 
 func (tarjetaAlbumLayout) MinSize(objs []fyne.CanvasObject) fyne.Size {
 	lado := float32(11 * tema.Rem) // `minmax(11rem,1fr)`
-	return fyne.NewSize(lado, lado+margenPieAlbum+tema.TextoSM.Linea+tema.TextoXS.Linea)
+	return fyne.NewSize(lado, (tarjetaAlbumLayout{}).AltoCon(objs, lado))
 }
 
-func (tarjetaAlbumLayout) Layout(objs []fyne.CanvasObject, t fyne.Size) {
+func (tarjetaAlbumLayout) AltoCon(_ []fyne.CanvasObject, ancho float32) float32 {
+	return ancho*3/4 + margenPieAlbum + tema.TextoSM.Linea + tema.TextoXS.Linea
+}
+
+func (l tarjetaAlbumLayout) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 	if len(objs) < 3 {
 		return
 	}
 	objs[0].Move(fyne.NewPos(0, 0))
-	objs[0].Resize(fyne.NewSize(t.Width, t.Width))
-	y := t.Width + margenPieAlbum
+	alto := t.Width * 3 / 4
+	objs[0].Resize(fyne.NewSize(t.Width, alto))
+	y := alto + margenPieAlbum
+	if titulo, ok := objs[1].(*canvas.Text); ok {
+		ui.Truncar(titulo, l.titulo, tema.TextoSM, ui.SemiNegrita, t.Width)
+	}
 	objs[1].Move(fyne.NewPos(0, y))
 	objs[1].Resize(fyne.NewSize(t.Width, tema.TextoSM.Linea))
 	objs[2].Move(fyne.NewPos(0, y+tema.TextoSM.Linea))

@@ -38,41 +38,56 @@ export interface UsePointerDragOptions<TData = unknown> {
   onEnd?: (data: TData, e: PointerEvent) => void;
   /** Cancelación sin guardar; si no se declara, conserva el comportamiento de onEnd. */
   onCancel?: (data: TData, e: PointerEvent) => void;
+  /** Desplazador de la lista o lienzo: se recorre al acercar el arrastre a sus bordes. */
+  scrollContainer?: () => HTMLElement | null;
+  /** Lista virtualizada: el gesto sobrevive al desmontaje del asa que lo inició. */
+  documentEvents?: boolean;
 }
 
 export function usePointerDrag<TData = unknown>(opciones: UsePointerDragOptions<TData>) {
   const dragRef = useRef<DragState<TData> | null>(null);
   const opcionesRef = useRef(opciones);
-  useEffect(
-    () => () => {
-      dragRef.current = null;
-    },
-    [],
-  );
+  const capturaRef = useRef<HTMLElement | null>(null);
+  const ultimoRef = useRef<PointerEvent | null>(null);
+  const frameRef = useRef<number | null>(null);
+  const escapeRef = useRef<((e: KeyboardEvent) => void) | null>(null);
+  const documentoRef = useRef(false);
+  const quitarEventosRef = useRef<(() => void) | null>(null);
   useEffect(() => {
     opcionesRef.current = opciones;
   }, [opciones]);
 
-  const iniciarArrastre = useCallback((e: PointerEvent, data: TData) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const target = e.currentTarget as HTMLElement | null;
-    if (target && typeof target.setPointerCapture === 'function') {
-      try {
-        target.setPointerCapture(e.pointerId);
-      } catch {
-        // En navegadores antiguos o entornos de prueba
-      }
-    }
-    dragRef.current = {
-      pointerId: e.pointerId,
-      x0: e.clientX,
-      y0: e.clientY,
-      data,
-    };
+  const limpiar = useCallback(() => {
+    const drag = dragRef.current;
+    dragRef.current = null;
+    if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
+    frameRef.current = null;
+    if (escapeRef.current) document.removeEventListener('keydown', escapeRef.current, true);
+    escapeRef.current = null;
+    quitarEventosRef.current?.();
+    quitarEventosRef.current = null;
+    documentoRef.current = false;
+    const target = capturaRef.current;
+    capturaRef.current = null;
+    ultimoRef.current = null;
+    if (drag && target?.hasPointerCapture?.(drag.pointerId))
+      target.releasePointerCapture(drag.pointerId);
   }, []);
 
-  const onPointerMove = useCallback((e: PointerEvent) => {
+  const cancelarArrastre = useCallback(
+    (e?: PointerEvent) => {
+      const drag = dragRef.current;
+      const evento = e ?? ultimoRef.current;
+      if (!drag || !evento || evento.pointerId !== drag.pointerId) return;
+      limpiar();
+      opcionesRef.current.onCancel?.(drag.data, evento);
+    },
+    [limpiar],
+  );
+
+  useEffect(() => () => cancelarArrastre(), [cancelarArrastre]);
+
+  const notificarMovimiento = useCallback((e: PointerEvent) => {
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== e.pointerId) return;
 
@@ -105,27 +120,138 @@ export function usePointerDrag<TData = unknown>(opciones: UsePointerDragOptions<
     );
   }, []);
 
-  const onPointerUp = useCallback((e: PointerEvent) => {
-    const drag = dragRef.current;
-    if (!drag || drag.pointerId !== e.pointerId) return;
-    const data = drag.data;
-    dragRef.current = null;
-    opcionesRef.current.onEnd?.(data, e);
-  }, []);
+  const recorrerBorde = useCallback(() => {
+    let anterior = 0;
+    const frame = (ahora: number): void => {
+      frameRef.current = null;
+      const drag = dragRef.current;
+      const e = ultimoRef.current;
+      const scroller = opcionesRef.current.scrollContainer?.();
+      if (!drag || !e || !scroller) return;
+      const rect = scroller.getBoundingClientRect();
+      const paso = (anterior ? Math.min(ahora - anterior, 32) : 16) / 1000;
+      anterior = ahora;
+      const velocidad = (p: number, inicio: number, fin: number): number => {
+        const borde = Math.min(40, (fin - inicio) / 3);
+        if (borde <= 0 || p < inicio - borde || p > fin + borde) return 0;
+        if (p < inicio + borde) return -480 * Math.min(1, (inicio + borde - p) / borde);
+        if (p > fin - borde) return 480 * Math.min(1, (p - fin + borde) / borde);
+        return 0;
+      };
+      const x = scroller.scrollLeft;
+      const y = scroller.scrollTop;
+      // Fuera del panel no se desplaza su contenido: el puntero puede estar ya sobre
+      // un destino de otra lista, del árbol lateral o de la tira de días.
+      if (e.clientY >= rect.top && e.clientY <= rect.bottom)
+        scroller.scrollLeft += velocidad(e.clientX, rect.left, rect.right) * paso;
+      if (e.clientX >= rect.left && e.clientX <= rect.right)
+        scroller.scrollTop += velocidad(e.clientY, rect.top, rect.bottom) * paso;
+      if (x !== scroller.scrollLeft || y !== scroller.scrollTop) notificarMovimiento(e);
+      if (dragRef.current) frameRef.current = requestAnimationFrame(frame);
+    };
+    frameRef.current = requestAnimationFrame(frame);
+  }, [notificarMovimiento]);
 
-  const onPointerCancel = useCallback((e: PointerEvent) => {
-    const drag = dragRef.current;
-    if (!drag || drag.pointerId !== e.pointerId) return;
-    dragRef.current = null;
-    const opts = opcionesRef.current;
-    (opts.onCancel ?? opts.onEnd)?.(drag.data, e);
-  }, []);
+  const onPointerMove = useCallback(
+    (e: PointerEvent) => {
+      const drag = dragRef.current;
+      if (!drag || drag.pointerId !== e.pointerId || ultimoRef.current === e) return;
+      ultimoRef.current = e;
+      notificarMovimiento(e);
+      if (
+        opcionesRef.current.scrollContainer &&
+        frameRef.current === null &&
+        Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) >= 4
+      )
+        recorrerBorde();
+    },
+    [notificarMovimiento, recorrerBorde],
+  );
+
+  const onPointerUp = useCallback(
+    (e: PointerEvent) => {
+      const drag = dragRef.current;
+      if (!drag || drag.pointerId !== e.pointerId) return;
+      const data = drag.data;
+      limpiar();
+      opcionesRef.current.onEnd?.(data, e);
+    },
+    [limpiar],
+  );
+
+  const onPointerCancel = useCallback(
+    (e: PointerEvent) => {
+      const drag = dragRef.current;
+      if (!drag || drag.pointerId !== e.pointerId) return;
+      limpiar();
+      const opts = opcionesRef.current;
+      (opts.onCancel ?? opts.onEnd)?.(drag.data, e);
+    },
+    [limpiar],
+  );
+
+  const onLostPointerCapture = useCallback(
+    (e: PointerEvent) => {
+      if (!documentoRef.current) cancelarArrastre(e);
+    },
+    [cancelarArrastre],
+  );
+
+  const iniciarArrastre = useCallback(
+    (e: PointerEvent, data: TData) => {
+      if (e.button !== 0 || (e.pointerType && !e.isPrimary) || dragRef.current) return false;
+      e.preventDefault();
+      e.stopPropagation();
+      const target = e.currentTarget as HTMLElement | null;
+      documentoRef.current = opcionesRef.current.documentEvents === true;
+      if (!documentoRef.current && target && typeof target.setPointerCapture === 'function') {
+        try {
+          target.setPointerCapture(e.pointerId);
+        } catch {
+          // La interacción sigue funcionando sin captura en los entornos de prueba.
+        }
+      }
+      capturaRef.current = documentoRef.current ? null : target;
+      ultimoRef.current = e;
+      dragRef.current = { pointerId: e.pointerId, x0: e.clientX, y0: e.clientY, data };
+      if (documentoRef.current) {
+        document.addEventListener('pointermove', onPointerMove, true);
+        document.addEventListener('pointerup', onPointerUp, true);
+        document.addEventListener('pointercancel', onPointerCancel, true);
+      }
+      const abandonar = (): void => cancelarArrastre();
+      const alOcultar = (): void => {
+        if (document.hidden) abandonar();
+      };
+      window.addEventListener('blur', abandonar);
+      document.addEventListener('visibilitychange', alOcultar);
+      quitarEventosRef.current = () => {
+        document.removeEventListener('pointermove', onPointerMove, true);
+        document.removeEventListener('pointerup', onPointerUp, true);
+        document.removeEventListener('pointercancel', onPointerCancel, true);
+        window.removeEventListener('blur', abandonar);
+        document.removeEventListener('visibilitychange', alOcultar);
+      };
+      const alEscape = (key: KeyboardEvent): void => {
+        if (key.key !== 'Escape') return;
+        key.preventDefault();
+        key.stopPropagation();
+        cancelarArrastre();
+      };
+      escapeRef.current = alEscape;
+      document.addEventListener('keydown', alEscape, true);
+      return true;
+    },
+    [cancelarArrastre, onPointerMove, onPointerUp, onPointerCancel],
+  );
 
   return {
     iniciarArrastre,
     onPointerMove,
     onPointerUp,
     onPointerCancel,
+    onLostPointerCapture,
+    cancelarArrastre,
     dragRef,
     estaArrastrando: () => dragRef.current !== null,
   };

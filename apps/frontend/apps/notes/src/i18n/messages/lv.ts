@@ -125,6 +125,7 @@ export const lv: AppCatalog<typeof en> = {
   'notebook.notes': { zero: '{count} piezīmju', one: '{count} piezīme', other: '{count} piezīmes' },
   'notebook.emoji': 'Ikona',
   'notebook.color': 'Krāsa',
+  'notebook.move': 'Pārvietot piezīmju grāmatiņu',
   'notebook.title': 'Nosaukums',
   'layout.label': 'Izkārtojums',
   'layout.tree': 'Koks',

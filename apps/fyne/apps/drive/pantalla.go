@@ -14,7 +14,6 @@ import (
 	_ "image/png"
 	"net/http"
 	"slices"
-	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -621,7 +620,7 @@ func (p *Pantalla) cargarCuota() {
 }
 
 func (p *Pantalla) publicarArchivosWidget(ctx context.Context, view widgets.View, elementos []Elemento) {
-	items := itemsDriveParaWidget(elementos)
+	items := itemsDriveParaWidget(p.tr.Locale(), elementos)
 	p.widgetMu.Lock()
 	p.widgetItems = items
 	tieneDatos := p.widgetCuotaLeida || len(p.widgetItems) > 0
@@ -643,14 +642,14 @@ func (p *Pantalla) detalleWidgetBloqueado() widgets.Detail {
 	return d
 }
 
-func itemsDriveParaWidget(elementos []Elemento) []widgets.Item {
+func itemsDriveParaWidget(l i18n.Locale, elementos []Elemento) []widgets.Item {
 	items := make([]widgets.Item, 0, min(len(elementos), widgets.MaxItems))
 	for _, el := range elementos {
 		nombre := strings.TrimSpace(el.Nombre)
 		if nombre == "" {
 			continue
 		}
-		badge := tamanoWidget(el.Tamano)
+		badge := tamanoWidget(l, el.Tamano)
 		subtitulo := el.Tipo
 		if el.Carpeta {
 			badge = "DIR"
@@ -673,19 +672,11 @@ func itemsDriveParaWidget(elementos []Elemento) []widgets.Item {
 	return widgets.SanitizeItems(items)
 }
 
-func tamanoWidget(b int64) string {
-	switch {
-	case b < 0:
+func tamanoWidget(l i18n.Locale, b int64) string {
+	if b < 0 {
 		return ""
-	case b < 1024:
-		return strconv.FormatInt(b, 10) + " B"
-	case b < 1024*1024:
-		return strconv.FormatInt(b/1024, 10) + " KB"
-	case b < 1024*1024*1024:
-		return strconv.FormatInt(b/(1024*1024), 10) + " MB"
-	default:
-		return strconv.FormatInt(b/(1024*1024*1024), 10) + " GB"
 	}
+	return Tamano(l, b)
 }
 
 // cargarPapelera pide la papelera.

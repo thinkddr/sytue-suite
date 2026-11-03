@@ -12,6 +12,8 @@ Store: ficha y envío por la API» en docs/operations.md y apps/fyne/appstore/RE
                                             metadatos reutilizables y ausencias; solo GET, sin datos personales
   appstore-publicar.py --ficha [--version X.Y.Z] [app...]
                                             textos, capturas, categoría, edades, precio y países
+  appstore-publicar.py --paises [app...]    lleva la disponibilidad ya creada a la política de
+                                            scripts/paises.json; pide APPSTORE_CONFIRMAR_PAISES
   appstore-publicar.py --revision --version X.Y.Z [app...]
                                             ata el build de esa versión y la ENVÍA A REVISIÓN
   appstore-publicar.py --notas --version X.Y.Z [app...]
@@ -73,13 +75,21 @@ CAPTURAS = {
     "mac": ("APP_DESKTOP", "MAC_OS", (2880, 1800)),
 }
 CATEGORIAS = {"PRODUCTIVITY", "BUSINESS", "PHOTO_AND_VIDEO", "FINANCE", "UTILITIES", "SOCIAL_NETWORKING"}
-# UE + EEE + Suiza, sin Francia por decisión del dueño el 2026-10-14 mientras no se
-# tramite su declaración de cifrado. Liechtenstein no tiene App Store propia: son 29.
-# Es una política de Apple; los países de Google Play se conservan en su propio guion.
-PAISES = (
-    "AUT BEL BGR HRV CYP CZE DNK EST FIN DEU GRC HUN IRL ITA LVA LTU LUX MLT NLD POL PRT ROU SVK SVN ESP SWE "
-    "ISL NOR CHE"
-).split()
+# Países: todos los territorios de la App Store salvo los excluidos de paises.json
+# (decisión del titular el 2026-11-01; antes, UE + EEE + Suiza). Francia sigue fuera
+# mientras no se tramite su declaración de cifrado ante la ANSSI, y la disponibilidad
+# automática en territorios nuevos sigue desactivada: la lista se calcula y se comprueba.
+# El mismo fichero lo lee play-publicar.sh.
+with open(os.environ.get("SYTUE_PAISES") or os.path.join(AQUI, "paises.json"), encoding="utf-8") as _f:
+    EXCLUIDOS = frozenset(e["iso3"] for e in json.load(_f)["excluidos"])
+
+
+def paises_politica(asc):
+    """Territorios de la App Store a los que se distribuye: todos menos EXCLUIDOS."""
+    todos = sorted(t["id"] for t in asc.lista("/v1/territories?limit=200"))
+    if len(todos) < 100:
+        raise RuntimeError(f"Apple solo devuelve {len(todos)} territorios; no se calcula una política global con eso")
+    return [t for t in todos if t not in EXCLUIDOS]
 # Estados en los que una versión se puede editar, y en los que una revisión está viva.
 EDITABLE = {"PREPARE_FOR_SUBMISSION", "DEVELOPER_REJECTED", "REJECTED", "METADATA_REJECTED", "INVALID_BINARY"}
 EN_REVISION = {"WAITING_FOR_REVIEW", "IN_REVIEW", "UNRESOLVED_ISSUES", "CANCELING"}
@@ -751,6 +761,7 @@ def publicar_ficha(asc, app, ficha, plataformas, version):
         )
         hechos.append("precio gratis")
     if not asc.pedir("GET", f"/v1/apps/{id}/appAvailabilityV2", tolerar=(404,)):
+        paises = paises_politica(asc)
         asc.pedir(
             "POST",
             "/v2/appAvailabilities",
@@ -760,7 +771,7 @@ def publicar_ficha(asc, app, ficha, plataformas, version):
                     "attributes": {"availableInNewTerritories": False},
                     "relationships": {
                         "app": {"data": rel("apps", id)},
-                        "territoryAvailabilities": {"data": [rel("territoryAvailabilities", "${" + t + "}") for t in PAISES]},
+                        "territoryAvailabilities": {"data": [rel("territoryAvailabilities", "${" + t + "}") for t in paises]},
                     },
                 },
                 "included": [
@@ -770,11 +781,11 @@ def publicar_ficha(asc, app, ficha, plataformas, version):
                         "attributes": {"available": True},
                         "relationships": {"territory": {"data": rel("territories", t)}},
                     }
-                    for t in PAISES
+                    for t in paises
                 ],
             },
         )
-        hechos.append(f"{len(PAISES)} países")
+        hechos.append(f"{len(paises)} países")
     # Un contacto incompleto no impide terminar las dos plataformas, el precio y
     # los países. Los errores siguen siendo rojos y se identifican por plataforma.
     attrs = {"demoAccountRequired": bool(ficha["revision"]["cuenta_de_prueba"])}
@@ -813,6 +824,48 @@ def comprobar_sin_francia(asc, id):
     francia = [t for t in territorios if (t.get("relationships", {}).get("territory", {}).get("data") or {}).get("id") == "FRA"]
     if len(francia) != 1 or francia[0].get("attributes", {}).get("available") is not False:
         raise RuntimeError("Francia no consta inequívocamente excluida en App Store Connect")
+
+
+def _territorio(fila):
+    return (fila.get("relationships", {}).get("territory", {}).get("data") or {}).get("id")
+
+
+def ajustar_paises(asc, app, ficha, plataformas, version):
+    """Lleva la disponibilidad ya creada a la política global (todos menos EXCLUIDOS).
+
+    Primero lee todo; después, solo PATCH de las filas que cambian; al final relee y
+    comprueba. No activa los territorios nuevos automáticos ni toca precio o ficha.
+    Sin disponibilidad todavía, la crea --ficha.
+    """
+    id, _ = comprobar_app(asc, app, ficha)
+    disponibilidad = asc.pedir("GET", f"/v1/apps/{id}/appAvailabilityV2", tolerar=(404,))
+    if not (disponibilidad and disponibilidad.get("data")):
+        raise RuntimeError("sin disponibilidad todavía: pasa antes --ficha, que la crea con la política global")
+    d = disponibilidad["data"]
+    if d["attributes"].get("availableInNewTerritories") is not False:
+        raise RuntimeError("la disponibilidad automática en territorios nuevos está activada; la política la quiere desactivada")
+    objetivo = set(paises_politica(asc))
+    ruta = f"/v2/appAvailabilities/{d['id']}/territoryAvailabilities?include=territory&fields[territoryAvailabilities]=available,territory&limit=200"
+    filas = asc.lista(ruta)
+    vistos = {_territorio(f) for f in filas}
+    faltan = sorted(objetivo - vistos)
+    if faltan:
+        raise RuntimeError("App Store Connect no tiene fila de disponibilidad para: " + " ".join(faltan))
+    cambios = [(f["id"], _territorio(f), _territorio(f) in objetivo) for f in filas
+               if f.get("attributes", {}).get("available") is not (_territorio(f) in objetivo)]
+    rechazados = []
+    for fila_id, territorio, disponible in cambios:
+        try:
+            asc.escribir("territoryAvailabilities", {"available": disponible}, id=fila_id)
+        except RuntimeError as e:
+            rechazados.append(f"{territorio}: {e}")
+    finales = {_territorio(f): f.get("attributes", {}).get("available") for f in asc.lista(ruta)}
+    mal = sorted(t for t, v in finales.items() if t is not None and v is not (t in objetivo))
+    if rechazados or mal:
+        raise RuntimeError("países sin ajustar (" + " ".join(mal) + ")" + ("; " + "; ".join(rechazados) if rechazados else ""))
+    if "FRA" in EXCLUIDOS:
+        comprobar_sin_francia(asc, id)
+    print(f"✓ {app}: {len(objetivo)} territorios disponibles, {len(cambios)} cambiados; excluidos {' '.join(sorted(EXCLUIDOS & set(finales)))}")
 
 
 def comprobar_build_exento(build):
@@ -915,7 +968,7 @@ def main(argv):
     i = 0
     while i < len(argv):
         a = argv[i]
-        if a in ("--seco", "--sondear", "--preparacion", "--ficha", "--revision", "--cifrado-exento", "--notas"):
+        if a in ("--seco", "--sondear", "--preparacion", "--ficha", "--paises", "--revision", "--cifrado-exento", "--notas"):
             if modo:
                 sys.exit("appstore-publicar: un solo modo cada vez")
             modo = a[2:]
@@ -932,7 +985,7 @@ def main(argv):
             apps.append(a)
         i += 1
     if not modo or not plataformas or set(plataformas) - {"IOS", "MAC_OS"}:
-        print(f"uso: {sys.argv[0]} --seco|--sondear|--preparacion|--ficha|--revision|--cifrado-exento|--notas [--version X.Y.Z] [--plataformas \"IOS MAC_OS\"] [app...]", file=sys.stderr)
+        print(f"uso: {sys.argv[0]} --seco|--sondear|--preparacion|--ficha|--paises|--revision|--cifrado-exento|--notas [--version X.Y.Z] [--plataformas \"IOS MAC_OS\"] [app...]", file=sys.stderr)
         return 2
     if version and not re.fullmatch(r"\d+\.\d+\.\d+", version):
         print(f"appstore-publicar: la versión tiene que ser X.Y.Z y es «{version}»", file=sys.stderr)
@@ -952,7 +1005,7 @@ def main(argv):
             print("appstore-publicar: cifrado-exento requiere --version X.Y.Z y APPSTORE_CONFIRMAR_CIFRADO=ESTANDAR_EXENTO_SIN_FRANCIA", file=sys.stderr)
             return 2
         # Esta política es la ya revisada para la suite, no un clasificador automático.
-        if "FRA" in PAISES:
+        if "FRA" not in EXCLUIDOS:
             print("appstore-publicar: Francia está en la política de distribución; no se declara exención", file=sys.stderr)
             return 2
         for p in ("ios", "macos"):
@@ -960,6 +1013,11 @@ def main(argv):
                 if plistlib.load(f).get("ITSAppUsesNonExemptEncryption") is not False:
                     print("appstore-publicar: la política de Xcode no declara exención estándar", file=sys.stderr)
                     return 2
+
+    # Cambiar países es visible para todo el mundo: frase fija, antes de leer credenciales.
+    if modo == "paises" and os.environ.get("APPSTORE_CONFIRMAR_PAISES") != "GLOBAL_SALVO_EXCLUIDOS":
+        print("appstore-publicar: --paises requiere APPSTORE_CONFIRMAR_PAISES=GLOBAL_SALVO_EXCLUIDOS", file=sys.stderr)
+        return 2
 
     # El envío a revisión no admite atajos: la frase exacta, con el número de apps, o nada.
     # Se comprueba ANTES de leer una sola credencial.
@@ -974,7 +1032,7 @@ def main(argv):
 
     with open(os.path.join(FICHAS, "ficha.json"), encoding="utf-8") as f:
         ficha = json.load(f)
-    if modo not in ("sondear", "preparacion", "cifrado-exento"):
+    if modo not in ("sondear", "preparacion", "cifrado-exento", "paises"):
         validar_comun(ficha)
         for app in apps:
             validar(app, ficha)
@@ -1008,7 +1066,13 @@ def main(argv):
         return completar_exencion(asc, apps, ficha, plataformas, version)
     if modo == "notas":
         return actualizar_notas(asc, apps, ficha, plataformas, version)
-    hacer = {"sondear": sondear, "preparacion": preparacion, "ficha": publicar_ficha, "revision": enviar_a_revision}[modo]
+    hacer = {
+        "sondear": sondear,
+        "preparacion": preparacion,
+        "ficha": publicar_ficha,
+        "paises": ajustar_paises,
+        "revision": enviar_a_revision,
+    }[modo]
     malas = []
     for app in apps:
         try:

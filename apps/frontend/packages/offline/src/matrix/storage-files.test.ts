@@ -198,6 +198,8 @@ test('cipher blocks authenticate scope, object, revision, part and ciphertext be
   );
 });
 
+// This functional fixture must cross the real 8 MiB block boundary. Its repeated
+// encryption, resume and full-file hashes need a bounded budget under CI CPU load.
 test('multi-block resumable upload, range read across block boundary, source-change guard and kind=file catalog publication', async () => {
   const transport = new MemoryTransport();
   const repo = new StorageRepository(scope, transport);
@@ -300,7 +302,7 @@ test('multi-block resumable upload, range read across block boundary, source-cha
   expect(version.commit.content?.kind).toBe('file');
   const heads = await repo.catalog();
   expect(heads.map((h) => h.object_id)).toEqual(['sheet-budget']);
-});
+}, 20_000);
 
 test('paged manifest tree geometry matches Go fanout-16 multi-level invariants', () => {
   expect(fileBlocks(0)).toBe(1);

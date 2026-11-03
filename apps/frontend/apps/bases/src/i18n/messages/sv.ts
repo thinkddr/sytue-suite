@@ -10,6 +10,7 @@ import type { en } from './en.js';
 export const sv: AppCatalog<typeof en> = {
   'nav.title': 'Bases',
   'nav.bases': 'Mina databaser',
+  'actions.more': 'Fler åtgärder',
   'bases.title': 'Mina databaser',
   'bases.newName': 'Namn på den nya databasen',
   'bases.create': 'Skapa databas',

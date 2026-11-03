@@ -15,6 +15,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/widget"
+	"github.com/go-text/typesetting/segmenter"
 
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 )
@@ -48,6 +49,33 @@ func Repartir(texto string, e tema.Escalon, p Peso, cabe float32) []string {
 			continue
 		}
 		lineas = append(lineas, w)
+	}
+	return lineas
+}
+
+// partirPalabra completa el reparto normal solo si una palabra no cabe ni sola.
+// El segmentador ya usado por el motor de texto conserva acentos y secuencias emoji.
+func partirPalabra(texto string, e tema.Escalon, p Peso, cabe float32) []string {
+	if Medir(texto, e, p).Width <= cabe {
+		return []string{texto}
+	}
+	var seg segmenter.Segmenter
+	seg.Init([]rune(texto))
+	it := seg.GraphemeIterator()
+	var lineas []string
+	linea := ""
+	for it.Next() {
+		grafema := string(it.Grapheme().Text)
+		candidato := linea + grafema
+		if linea != "" && Medir(candidato, e, p).Width > cabe {
+			lineas = append(lineas, linea)
+			linea = grafema
+		} else {
+			linea = candidato
+		}
+	}
+	if linea != "" {
+		lineas = append(lineas, linea)
 	}
 	return lineas
 }

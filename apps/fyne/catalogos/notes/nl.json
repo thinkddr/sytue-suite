@@ -32,6 +32,7 @@
   "common.offline": "Je bent offline. Wijzigingen worden pas opgeslagen als de verbinding terug is.",
   "common.retry": "Opnieuw proberen",
   "common.save": "Opslaan",
+  "crypto.dataReviewRequired": "Dit deel bevat gegevens die deze app niet zonder precisieverlies kan wijzigen. Het origineel is bewaard.",
   "crypto.disable": "Versleuteling verwijderen",
   "crypto.disableWarning": "Bestaande versleutelde notities blijven onleesbaar. Ontgrendel eerst het notitieboek.",
   "crypto.enable": "Versleutelen",
@@ -39,7 +40,6 @@
   "crypto.lockNow": "Nu vergrendelen",
   "crypto.locked": "Vergrendeld",
   "crypto.migrating": "De inhoud van het notitieboek beveiligen…",
-  "crypto.dataReviewRequired": "Dit deel bevat gegevens die deze app niet zonder precisieverlies kan wijzigen. Het origineel is bewaard.",
   "crypto.migrationFailed": "De versleuteling kon niet worden voltooid. Je gegevens zijn bewaard gebleven. Open het notitieboek opnieuw om de wijzigingen te bekijken.",
   "crypto.mismatch": "De twee wachtwoordzinnen zijn verschillend.",
   "crypto.passphrase": "Wachtwoordzin",
@@ -266,6 +266,7 @@
   "notebook.delete": "Notitieboek verwijderen",
   "notebook.deleteConfirm": "“{title}” en alles wat erin zit verwijderen?",
   "notebook.emoji": "Pictogram",
+  "notebook.move": "Notitieboek verplaatsen",
   "notebook.newChild": "Nieuw notitieboek erin",
   "notebook.notes": {
     "one": "{count} notitie",

@@ -10,6 +10,7 @@ import type { en } from './en.js';
 export const cs: AppCatalog<typeof en> = {
   'nav.title': 'Bases',
   'nav.bases': 'Moje databáze',
+  'actions.more': 'Další akce',
   'bases.title': 'Moje databáze',
   'bases.newName': 'Název nové databáze',
   'bases.create': 'Vytvořit databázi',

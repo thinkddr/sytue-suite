@@ -32,6 +32,7 @@
   "common.offline": "Niste povezani. Promjene se neće spremiti dok se veza ne vrati.",
   "common.retry": "Pokušaj ponovno",
   "common.save": "Spremi",
+  "crypto.dataReviewRequired": "Ovaj dio sadrži podatke koje aplikacija ne može promijeniti bez gubitka preciznosti. Izvornik je sačuvan.",
   "crypto.disable": "Ukloni šifriranje",
   "crypto.disableWarning": "Postojeće šifrirane bilješke ostaju nečitljive. Prvo otključajte bilježnicu.",
   "crypto.enable": "Šifriraj",
@@ -39,7 +40,6 @@
   "crypto.lockNow": "Zaključaj odmah",
   "crypto.locked": "Zaključano",
   "crypto.migrating": "Zaštita sadržaja bilježnice…",
-  "crypto.dataReviewRequired": "Ovaj dio sadrži podatke koje aplikacija ne može promijeniti bez gubitka preciznosti. Izvornik je sačuvan.",
   "crypto.migrationFailed": "Šifriranje nije dovršeno. Tvoji su podaci sačuvani. Ponovno otvori bilježnicu i pregledaj promjene.",
   "crypto.mismatch": "Dvije se lozinke razlikuju.",
   "crypto.passphrase": "Lozinka",
@@ -270,6 +270,7 @@
   "notebook.delete": "Izbriši bilježnicu",
   "notebook.deleteConfirm": "Izbrisati „{title}” i sve što je unutra?",
   "notebook.emoji": "Ikona",
+  "notebook.move": "Premjesti bilježnicu",
   "notebook.newChild": "Nova bilježnica unutra",
   "notebook.notes": {
     "one": "{count} bilješka",

@@ -95,9 +95,19 @@ function installMemoryIndexedDB() {
           transaction(storeName: string) {
             const store = current.stores.get(storeName);
             if (!store) throw new Error(`missing object store ${storeName}`);
+            // Como en IndexedDB real, «complete» llega después de las peticiones y
+            // aunque el manejador se asigne tras esperar una de ellas: se dispara en
+            // un macrotask al asignarlo, no en un microtask al crear la transacción.
+            let alCompletar: ((ev: Event) => unknown) | null = null;
             const tx = {
               error: null,
-              oncomplete: null as ((ev: Event) => unknown) | null,
+              get oncomplete() {
+                return alCompletar;
+              },
+              set oncomplete(fn: ((ev: Event) => unknown) | null) {
+                alCompletar = fn;
+                if (fn) setTimeout(() => fn(new Event('complete')), 0);
+              },
               onerror: null as ((ev: Event) => unknown) | null,
               onabort: null as ((ev: Event) => unknown) | null,
               abort() {
@@ -135,7 +145,6 @@ function installMemoryIndexedDB() {
                 };
               },
             };
-            queueMicrotask(() => tx.oncomplete?.(new Event('complete')));
             return tx as unknown as IDBTransaction;
           },
           close() {},

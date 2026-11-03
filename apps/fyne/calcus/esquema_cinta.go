@@ -177,11 +177,7 @@ func (lz *Lienzo) cuerpoSubtotales(c *editor.Contexto, f *formSubtotal, v tema.V
 		// hoja sola. Tocar una fija la lista.
 		marcadas := f.anadir
 		if marcadas == nil {
-			for i := range cab {
-				if i != gc && slices.ContainsFunc(rejilla[1:], func(fila []string) bool { return i < len(fila) && numeroEs(fila[i]) }) {
-					marcadas = append(marcadas, i)
-				}
-			}
+			marcadas = columnasNumericasSubtotal(rejilla, len(cab), gc)
 		}
 		var casillas []fyne.CanvasObject
 		for i, cf := range campos {
@@ -217,6 +213,16 @@ func (lz *Lienzo) cuerpoSubtotales(c *editor.Contexto, f *formSubtotal, v tema.V
 	aplicarB := botonPop(c.Traducir("action.apply"), false, aplicar)
 	aplicarB.Inerte = !rangoOK || len(cab) == 0 || gc < 0 || gc >= len(cab) || c.SoloLectura
 	return append(out, rejillaBotones(2, quitarB, aplicarB))
+}
+
+func columnasNumericasSubtotal(rejilla [][]string, columnas, grupo int) []int {
+	var marcadas []int
+	for i := range columnas {
+		if i != grupo && slices.ContainsFunc(rejilla[1:], func(fila []string) bool { return i < len(fila) && numeroEs(fila[i]) }) {
+			marcadas = append(marcadas, i)
+		}
+	}
+	return marcadas
 }
 
 // cabecerasDe es la primera fila de lo leído (sin nada si no hay filas).

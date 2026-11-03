@@ -15,6 +15,7 @@ import (
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/ui/recorrido"
 	"git.sytue.eu/sytue/one/apps/fyne/ui/recorrido/montaje"
+	"git.sytue.eu/sytue/one/apps/nucleo/api"
 )
 
 // TestRecorridoConSesion pulsa todo lo que se ve con los datos del servicio falso y
@@ -33,6 +34,24 @@ func TestRecorridoConSesion(t *testing.T) {
 		}
 	})
 	recorrido.Comprobar(t, w, 400)
+	if dir := os.Getenv("SYTUE_CAPTURAS_PLAY"); dir != "" {
+		// El servicio del recorrido no tiene álbumes propios. Esta escena revisa las
+		// portadas y el álbum vacío a la medida pedida, fuera de la numeración de tienda.
+		contenido := w.Canvas().Content()
+		defer w.SetContent(contenido)
+		recorrido.AMedida(w)
+		v := a.v
+		v.Ventana, v.Estado = w.Canvas().Size().Width, Exito
+		fotos := fotosDelServicio(2)
+		albumes := PantallaAlbumes(v, Albumes{Lista: []api.Album{
+			{ID: "paisajes", Title: "Paisajes de la costa", CoverAssetID: fotos[0].ID, Count: 12},
+			{ID: "viaje", Title: "Un viaje en familia con un título que ocupa más de una línea", CoverAssetID: fotos[1].ID, Count: 24},
+			{ID: "vacio", Title: "Por organizar"},
+		}})
+		w.SetContent(albumes)
+		recorrido.PrepararCaptura(w, v.Teca.Esperar, albumes.Refresh)
+		guardarEn(t, dir, "albumes-portadas", w.Canvas().Capture())
+	}
 }
 
 func pedirEscena(_ context.Context, id, _ string) ([]byte, error) {

@@ -1,4 +1,5 @@
 {
+  "actions.more": "Vairāk darbību",
   "attach.add": "Pievienot failu",
   "attach.badType": "Šis faila tips nav atļauts, vai tā saturs neatbilst nosaukumam.",
   "attach.delete": "Dzēst {name}",

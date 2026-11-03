@@ -432,6 +432,8 @@ export interface MenuItemProps extends Omit<
   /** Si se indica, el item se renderiza como enlace <a href> en vez de <button>
    *  (mismos estilos/rol); útil para acciones de navegación dentro del menú. */
   href?: string;
+  /** Descarga del enlace, conservando el nombre sugerido por el servidor. */
+  download?: string | boolean;
 }
 
 export function MenuItem({
@@ -439,6 +441,7 @@ export function MenuItem({
   danger,
   size = 'md',
   href,
+  download,
   class: cls,
   children,
   ...rest
@@ -471,6 +474,7 @@ export function MenuItem({
       <a
         role="menuitem"
         href={href}
+        download={download === true ? '' : download || undefined}
         class={klass}
         {...(rest as unknown as JSX.HTMLAttributes<HTMLAnchorElement>)}
       >

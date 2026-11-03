@@ -9,6 +9,7 @@
 #
 #   play-publicar.sh --seco [app...]          valida textos, imágenes y CSV; no llama a nadie
 #   play-publicar.sh --sondear [app...]       ¿existe la app y nos deja editarla? (insert + delete)
+#   play-publicar.sh --paises [app...]       solo lee: ¿los países de producción cumplen paises.json?
 #   play-publicar.sh --huellas --tag vX.Y.Z [app...]
 #                                           solo GET: certificados públicos finales de Play
 #   play-publicar.sh --interno --tag vX.Y.Z --estado sondear|completed [app...]
@@ -45,6 +46,7 @@ while [ $# -gt 0 ]; do
   --seco) modo=seco ;;
   --sondear) modo=sondear ;;
   --huellas) modo=huellas ;;
+  --paises) modo=paises ;;
   --interno) modo=interno ;;
   --produccion) modo=produccion ;;
   --aab) aab="$2"; shift ;;
@@ -53,7 +55,7 @@ while [ $# -gt 0 ]; do
   --borrador-anterior)
     [ -z "$borrador_anterior" ] || { echo 'play-publicar: --borrador-anterior no se puede repetir' >&2; exit 2; }
     borrador_anterior="${2:?--borrador-anterior necesita vX.Y.Z}"; shift ;;
-  -*) echo "uso: $0 [--seco|--sondear|--huellas --tag vX.Y.Z|--interno --tag vX.Y.Z --estado sondear|completed|--produccion --tag vX.Y.Z --estado draft|completed [--borrador-anterior vA.B.C]] [--aab DIR] [app...]" >&2; exit 2 ;;
+  -*) echo "uso: $0 [--seco|--sondear|--paises|--huellas --tag vX.Y.Z|--interno --tag vX.Y.Z --estado sondear|completed|--produccion --tag vX.Y.Z --estado draft|completed [--borrador-anterior vA.B.C]] [--aab DIR] [app...]" >&2; exit 2 ;;
   *) break ;;
   esac
   shift
@@ -160,7 +162,7 @@ validar() {
     error "$app: seguridad-datos.csv no tiene la cabecera de la exportación de Play"
 }
 
-case "$modo" in sondear | produccion | huellas | interno) ;; *) for app in "${apps[@]}"; do validar "$app"; done ;; esac
+case "$modo" in sondear | paises | produccion | huellas | interno) ;; *) for app in "${apps[@]}"; do validar "$app"; done ;; esac
 [ "$fallos" -eq 0 ] || { echo "play-publicar: $fallos errores de validación" >&2; exit 1; }
 if [ "$modo" = seco ]; then
   echo "play-publicar --seco: ${#apps[@]} apps válidas (${apps[*]})"
@@ -315,6 +317,44 @@ interno() {
 if [ "$modo" = interno ]; then
   interno
   exit $?
+fi
+
+# Países (decisión del titular el 2026-11-01): todos los que ofrece Play salvo los
+# excluidos de paises.json, el mismo fichero que usa appstore-publicar.py. La API no deja
+# escribirlos (countryAvailability solo se lee): los marca el dueño en la consola y este
+# modo comprueba el resultado. Abre ediciones temporales que el trap borra; no cambia nada.
+if [ "$modo" = paises ]; then
+  politica="${SYTUE_PAISES:-$AQUI/paises.json}"
+  malas=()
+  for app in "${apps[@]}"; do
+    paquete="$(paquete_de "$app")"
+    [[ "$paquete" =~ ^eu\.sytue\.[a-z]+$ ]] || { echo 'play-publicar: paquete no admitido' >&2; exit 2; }
+    edit="$(abrir_edicion "$paquete")" || { malas+=("$app"); continue; }
+    ediciones+=("$API/$paquete/edits/$edit")
+    if ! api GET "$API/$paquete/edits/$edit/countryAvailability/production" >"$TMP/$app-paises.json"; then
+      malas+=("$app")
+      continue
+    fi
+    if ! jq -e --slurpfile p "$politica" --arg a "$app" '
+        ([.countries[]?.countryCode] | unique) as $vistos |
+        ([$p[0].excluidos[].iso2]) as $fuera |
+        ($vistos - ($vistos - $fuera)) as $prohibidos |
+        if ($prohibidos | length) > 0 then
+          error("\($a): disponible en excluidos: \($prohibidos | join(" "))")
+        elif .restOfWorld == true then
+          error("\($a): «resto del mundo» activado; la lista tiene que ser explícita")
+        elif ($vistos | length) < $p[0].minimo_play then
+          error("\($a): solo \($vistos | length) países; la política global pide al menos \($p[0].minimo_play)")
+        else "✓ \($a): \($vistos | length) países, sin \($fuera | join(" "))" end
+      ' -r "$TMP/$app-paises.json"; then
+      malas+=("$app")
+    fi
+  done
+  [ ${#malas[@]} -eq 0 ] || {
+    echo "::error::países de Play fuera de la política: ${malas[*]}. Consola → Producción → Países o regiones: añadir todos salvo los de apps/fyne/scripts/paises.json" >&2
+    exit 1
+  }
+  exit 0
 fi
 
 # La firma del AAB es la clave de subida. Para el broker se necesitan las firmas

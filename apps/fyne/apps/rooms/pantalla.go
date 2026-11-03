@@ -120,6 +120,9 @@ func NuevaPantalla(t *i18n.Translator, l i18n.Locale) *Pantalla {
 	// La hamburguesa es la de la cabecera del canal, como en ChatApp.tsx: con la barra
 	// móvil del armazón salían dos, una encima de otra (visto en ventana real a 360).
 	p.armazon.SinBarraMovil = true
+	// La conversación es la pantalla principal: su estado de detalle no debe
+	// desactivar el gesto que abre el carril de canales.
+	p.armazon.MenuEnDetalle = true
 	p.Avisos = ui.NuevaPilaAvisos()
 	p.raiz = container.NewStack(p.armazon, p.Avisos)
 	p.Canal.Ventana = func() float32 { return p.armazon.Size().Width }
@@ -207,6 +210,7 @@ func (p *Pantalla) PonerPagina(o fyne.CanvasObject) {
 	}
 	objs = append(objs, p.Avisos)
 	p.pagina = o
+	p.armazon.MenuEnDetalle = o == nil
 	p.raiz.(*fyne.Container).Objects = objs //nolint:errcheck,forcetypeassert // Raíz se crea como contenedor en NuevaPantalla.
 	p.raiz.Refresh()
 }

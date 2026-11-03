@@ -140,6 +140,8 @@ func textos(w fyne.Window) string {
 			b.WriteString("[" + x.Texto + "]\n")
 		case *ui.Enlace:
 			b.WriteString(x.Texto + "\n")
+		case *ui.Insignia:
+			b.WriteString(x.AccessibilityLabel() + "\n")
 		case *ui.Pestana:
 			b.WriteString("<" + x.Rotulo + ">\n")
 		}

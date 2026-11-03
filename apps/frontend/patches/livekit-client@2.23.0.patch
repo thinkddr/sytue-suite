@@ -1,8 +1,8 @@
 diff --git a/dist/livekit-client.esm.mjs b/dist/livekit-client.esm.mjs
-index 0bdf98540d93d7deb581737dca7afb299308d307..3600a0c36ddbbda9c6ca66c33969efd7278e2361 100644
+index a983f6e39c474912a9052d4a5f7155875f204e4a..4fdfe1b8436a1948749dc06048fcc2281ee100bf 100644
 --- a/dist/livekit-client.esm.mjs
 +++ b/dist/livekit-client.esm.mjs
-@@ -25598,6 +25598,7 @@ class RTCEngine extends eventsExports.EventEmitter {
+@@ -26563,6 +26563,7 @@
            packet.value = {
              case: 'encryptedPacket',
              value: new EncryptedPacket({
@@ -11,10 +11,10 @@ index 0bdf98540d93d7deb581737dca7afb299308d307..3600a0c36ddbbda9c6ca66c33969efd7
                iv: encryptedData.iv,
                keyIndex: encryptedData.keyIndex
 diff --git a/src/room/RTCEngine.ts b/src/room/RTCEngine.ts
-index b640f4316a53b4c4f4211849b78457f425f8849c..0e0b4a67c1d08000296b304ccc698051126c8c8f 100644
+index e71dab0ee4b34277f520acdf0623c7fa31bee503..591d51f502d3fed935906516629169bbba778344 100644
 --- a/src/room/RTCEngine.ts
 +++ b/src/room/RTCEngine.ts
-@@ -1603,6 +1603,7 @@ export default class RTCEngine extends (EventEmitter as new () => TypedEventEmit
+@@ -1714,6 +1714,7 @@
          packet.value = {
            case: 'encryptedPacket',
            value: new EncryptedPacket({

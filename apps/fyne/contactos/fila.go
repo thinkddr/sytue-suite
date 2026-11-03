@@ -68,9 +68,10 @@ type FilaContacto struct {
 }
 
 var (
-	_ fyne.Widget       = (*FilaContacto)(nil)
-	_ fyne.Tappable     = (*FilaContacto)(nil)
-	_ desktop.Hoverable = (*FilaContacto)(nil)
+	_ fyne.Widget            = (*FilaContacto)(nil)
+	_ fyne.Tappable          = (*FilaContacto)(nil)
+	_ fyne.SecondaryTappable = (*FilaContacto)(nil)
+	_ desktop.Hoverable      = (*FilaContacto)(nil)
 )
 
 // NuevaFilaContacto crea una fila vacía, lista para reciclar.
@@ -112,6 +113,13 @@ func (f *FilaContacto) Tapped(e *fyne.PointEvent) {
 	}
 	if f.AlAbrir != nil {
 		f.AlAbrir()
+	}
+}
+
+// Mantener pulsado selecciona sin abrir la ficha: la misma acción que su casilla.
+func (f *FilaContacto) TappedSecondary(*fyne.PointEvent) {
+	if f.AlMarcar != nil {
+		f.AlMarcar()
 	}
 }
 

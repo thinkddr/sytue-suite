@@ -220,7 +220,7 @@ test('un cuaderno nuevo conserva los controles de acceso por defecto', async () 
       title: 'New notebook',
       emoji: '',
       color: '#86198f',
-      layout: 'tree',
+      layout: 'list',
       visibility: 'organization',
       indexable: true,
       encrypted: false,

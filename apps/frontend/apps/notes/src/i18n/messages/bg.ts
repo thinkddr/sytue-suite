@@ -121,6 +121,7 @@ export const bg: AppCatalog<typeof en> = {
   'notebook.notes': { one: '{count} бележка', other: '{count} бележки' },
   'notebook.emoji': 'Икона',
   'notebook.color': 'Цвят',
+  'notebook.move': 'Преместване на бележник',
   'notebook.title': 'Име',
   'layout.label': 'Подредба',
   'layout.tree': 'Дърво',

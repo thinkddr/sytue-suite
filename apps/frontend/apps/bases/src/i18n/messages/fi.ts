@@ -10,6 +10,7 @@ import type { en } from './en.js';
 export const fi: AppCatalog<typeof en> = {
   'nav.title': 'Bases',
   'nav.bases': 'Omat tietokannat',
+  'actions.more': 'Lisää toimintoja',
   'bases.title': 'Omat tietokannat',
   'bases.newName': 'Uuden tietokannan nimi',
   'bases.create': 'Luo tietokanta',

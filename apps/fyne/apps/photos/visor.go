@@ -636,11 +636,12 @@ type AsaFicha struct {
 	ui.Pulsable
 	// Vertical es el asa del móvil (`aria-orientation="horizontal"`): va encima de la
 	// ficha y ajusta su ALTO.
-	Vertical bool
-	ancho    float32
-	desde    float32
-	alMover  func(float32, bool)
-	fondo    *canvas.Rectangle
+	Vertical               bool
+	ancho                  float32
+	desde                  float32
+	arrastrando, cancelado bool
+	alMover                func(float32, bool)
+	fondo                  *canvas.Rectangle
 	// mayus es Mayúsculas pulsada: las flechas mueven 48 y no 16, como `e.shiftKey`.
 	mayus bool
 }
@@ -665,6 +666,10 @@ func NuevaAsaFicha(v Vista, d Visor) *AsaFicha {
 // Dragged mueve el borde: la ficha está a la derecha, así que arrastrar hacia la
 // izquierda la hace CRECER.
 func (a *AsaFicha) Dragged(e *fyne.DragEvent) {
+	if a.cancelado {
+		return
+	}
+	a.arrastrando = true
 	if a.Vertical {
 		a.desde -= e.Dragged.DY // abajo, arrastrar hacia ARRIBA la hace crecer
 	} else {
@@ -677,10 +682,29 @@ func (a *AsaFicha) Dragged(e *fyne.DragEvent) {
 
 // DragEnd guarda la medida.
 func (a *AsaFicha) DragEnd() {
+	if a.cancelado {
+		a.cancelado = false
+		return
+	}
+	if !a.arrastrando {
+		return
+	}
+	a.arrastrando = false
 	if a.alMover != nil {
 		a.alMover(a.ancho+a.desde, true)
 	}
 	a.ancho, a.desde = a.ancho+a.desde, 0
+}
+
+// CancelarArrastre restaura la medida de la ficha sin guardarla en preferencias.
+func (a *AsaFicha) CancelarArrastre() {
+	if !a.arrastrando {
+		return
+	}
+	a.arrastrando, a.cancelado, a.desde = false, true, 0
+	if a.alMover != nil {
+		a.alMover(a.ancho, false)
+	}
 }
 
 // TypedKey es el `onKeyDown` del separador.

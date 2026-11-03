@@ -119,12 +119,15 @@ export type {
 
 // Hook de puntero con captura
 export { usePointerDrag } from './lib/usePointerDrag.js';
+export { useListReorder } from './lib/useListReorder.js';
+export type { ListReorderOptions } from './lib/useListReorder.js';
 export type { DragState, DragMoveEvent, UsePointerDragOptions } from './lib/usePointerDrag.js';
 
 export { Icon } from './components/Icon.js';
 export type { IconName, IconProps } from './components/Icon.js';
 export { Glifo, grosorDeGlifo, puntos, subtrazosCerrados } from './components/Glifo.js';
 export type { GlifoProps } from './components/Glifo.js';
+export { useLongPress } from './lib/useLongPress.js';
 
 // Catalogo de apps (app switcher)
 export {

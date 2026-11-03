@@ -32,6 +32,7 @@
   "common.offline": "Jesteś offline. Zmiany nie zostaną zapisane, dopóki połączenie nie wróci.",
   "common.retry": "Ponów",
   "common.save": "Zapisz",
+  "crypto.dataReviewRequired": "Ta część zawiera dane, których aplikacja nie może zmienić bez utraty precyzji. Oryginał został zachowany.",
   "crypto.disable": "Usuń szyfrowanie",
   "crypto.disableWarning": "Istniejące zaszyfrowane notatki pozostaną nieczytelne. Najpierw odblokuj notatnik.",
   "crypto.enable": "Zaszyfruj",
@@ -39,7 +40,6 @@
   "crypto.lockNow": "Zablokuj teraz",
   "crypto.locked": "Zablokowany",
   "crypto.migrating": "Zabezpieczanie zawartości notatnika…",
-  "crypto.dataReviewRequired": "Ta część zawiera dane, których aplikacja nie może zmienić bez utraty precyzji. Oryginał został zachowany.",
   "crypto.migrationFailed": "Nie udało się ukończyć szyfrowania. Twoje dane zostały zachowane. Otwórz notatnik ponownie, aby sprawdzić zmiany.",
   "crypto.mismatch": "Oba hasła są różne.",
   "crypto.passphrase": "Hasło",
@@ -274,6 +274,7 @@
   "notebook.delete": "Usuń notatnik",
   "notebook.deleteConfirm": "Usunąć „{title}” i wszystko, co jest w środku?",
   "notebook.emoji": "Ikona",
+  "notebook.move": "Przenieś notatnik",
   "notebook.newChild": "Nowy notatnik wewnątrz",
   "notebook.notes": {
     "one": "{count} notatka",

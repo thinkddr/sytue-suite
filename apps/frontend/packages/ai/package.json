@@ -2,7 +2,7 @@
   "name": "@sytue/ai",
   "version": "1.0.0",
   "private": true,
-  "description": "Sytue One — lo que comparten todas las superficies del asistente: el contrato de la petición al BFF y el analizador del Markdown que devuelve el modelo. Sin DOM: cada app decide cómo pinta los bloques que salen de aquí.",
+  "description": "Sytue One \u2014 lo que comparten todas las superficies del asistente: el contrato de la petici\u00f3n al BFF y el analizador del Markdown que devuelve el modelo. Sin DOM: cada app decide c\u00f3mo pinta los bloques que salen de aqu\u00ed.",
   "license": "Apache-2.0",
   "type": "module",
   "exports": {
@@ -18,7 +18,7 @@
     "test": "bun test"
   },
   "devDependencies": {
-    "@types/bun": "1.4.2",
+    "@types/bun": "1.4.4",
     "@types/node": "catalog:",
     "typescript": "6.0.3"
   }

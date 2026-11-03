@@ -21,10 +21,10 @@ function base32Decode(s: string): Buffer {
     // El mensaje NOMBRA lo que se esperaba, porque este es el punto donde muere
     // la auditoría entera y el carácter suelto no basta para saber qué hacer.
     // El caso real (2026-08-16): en `SYTUE_AUDIT_TOTP` se guardó un código de
-    // seis dígitos en vez de la semilla. `otplib` no se quejaba —descarta lo que
-    // no reconoce— y generaba un código VÁLIDO EN FORMA pero incorrecto, así que
-    // el único síntoma era que Sytue ID lo rechazaba y el login se quedaba en
-    // `/login/mfa`. Un fallo mudo cuesta una investigación; este cuesta una línea.
+    // seis dígitos en vez de la semilla. La librería anterior toleraba los
+    // caracteres inválidos y generaba un código con forma válida pero incorrecto;
+    // este helper compartido rechaza la semilla antes del login en `/login/mfa`.
+    // Un fallo mudo cuesta una investigación; este cuesta una línea.
     if (idx < 0)
       throw new Error(
         `base32 inválido: «${ch}». El secreto TOTP es la SEMILLA (A-Z y 2-7, sin ` +

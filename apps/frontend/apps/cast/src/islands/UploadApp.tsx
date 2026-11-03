@@ -20,7 +20,17 @@
  */
 import type { JSX } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { Button, Card, Icon, Meter, ProgressBar, SectionHeader, cx, formatBytes } from '@sytue/ui';
+import {
+  Button,
+  Card,
+  Icon,
+  Meter,
+  ProgressBar,
+  SectionHeader,
+  cx,
+  formatBytes,
+  useListReorder,
+} from '@sytue/ui';
 import type { Locale } from '@sytue/i18n';
 import type { SytueUser } from '@sytue/auth';
 import { useT } from '../i18n/index.js';
@@ -87,6 +97,18 @@ function SubirFicheros({ locale, user, hubBaseUrl }: Omit<Props, 'drive'>): JSX.
   const [disponibles, setDisponibles] = useState<number | null>(null);
   const [encima, setEncima] = useState(false);
   const [preparados, setPreparados] = useState<Preparado[]>([]);
+  const listaPreparados = useRef<HTMLUListElement>(null);
+  const ordenPreparados = useListReorder({
+    ids: preparados.map((p) => p.clave),
+    container: () => listaPreparados.current,
+    onReorder: (desde, hasta) =>
+      setPreparados((prev) => {
+        const next = [...prev];
+        const [item] = next.splice(desde, 1);
+        if (item) next.splice(hasta, 0, item);
+        return next;
+      }),
+  });
   const [calidades, setCalidades] = useState<number[]>([]);
   const [calidadesTocadas, setCalidadesTocadas] = useState(false);
   const ficheros = useRef(new Map<string, File>());
@@ -303,11 +325,39 @@ function SubirFicheros({ locale, user, hubBaseUrl }: Omit<Props, 'drive'>): JSX.
             {preparados.length ? (
               <Card class="flex flex-col gap-4 p-4 sm:p-5">
                 <h2 class="text-text text-base font-semibold">{t('upload.prepare.title')}</h2>
-                <ul class="flex flex-col gap-1">
+                <ul ref={listaPreparados} class="flex max-h-64 flex-col gap-1 overflow-y-auto">
                   {preparados.map((p) => (
-                    <li key={p.clave} class="text-text-muted truncate text-sm">
-                      <span class="text-text font-medium">{p.fichero.name}</span> ·{' '}
-                      {formatBytes(locale, p.fichero.size)}
+                    <li
+                      key={p.clave}
+                      {...ordenPreparados.itemProps(p.clave)}
+                      class="text-text-muted flex items-center gap-2 text-sm"
+                    >
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        iconOnly
+                        {...ordenPreparados.handleProps(p.clave)}
+                        aria-label={`${t('upload.queue')} · ${p.fichero.name}`}
+                        aria-keyshortcuts="ArrowUp ArrowDown Home End"
+                        class="shrink-0 cursor-grab touch-none select-none [-webkit-user-select:none] active:cursor-grabbing"
+                        leadingIcon={<Icon name="grip" size={16} />}
+                      />
+                      <span class="min-w-0 flex-1 truncate">
+                        <span class="text-text font-medium">{p.fichero.name}</span> ·{' '}
+                        {formatBytes(locale, p.fichero.size)}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        iconOnly
+                        aria-label={`${t('upload.remove')} · ${p.fichero.name}`}
+                        leadingIcon={<Icon name="close" size={16} />}
+                        onClick={() =>
+                          preparados.length === 1
+                            ? descartar()
+                            : setPreparados((prev) => prev.filter((x) => x.clave !== p.clave))
+                        }
+                      />
                     </li>
                   ))}
                 </ul>

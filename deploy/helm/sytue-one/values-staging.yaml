@@ -148,7 +148,7 @@ livekit:
   replicaCount: 1
   image:
     repository: livekit
-    tag: v1.13.5
+    tag: v1.13.11
     useGlobalRegistry: true
   # Canal SFU→egress: sin él la grabación no arranca. Ver values-prod.yaml.
   redis:

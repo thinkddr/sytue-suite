@@ -44,6 +44,10 @@ func colocarFondoDeVentana(fondo *canvas.Rectangle, segura fyne.Position, total 
 type FondoSuite struct {
 	widget.BaseWidget
 	Variante tema.Variante
+	// Los insets prolongan el lienzo de la hoja: conservan su rectángulo de
+	// referencia y muestrean el borde, sin reiniciar ni estirar el degradado.
+	referencia     fyne.Size
+	desplazamiento fyne.Position
 }
 
 // NuevoFondoSuite construye el lienzo para esa apariencia.
@@ -59,6 +63,14 @@ func (f *FondoSuite) PonerVariante(v tema.Variante) {
 		return
 	}
 	f.Variante = v
+	f.Refresh()
+}
+
+func (f *FondoSuite) prolongar(desplazamiento fyne.Position, referencia fyne.Size) {
+	if f.desplazamiento == desplazamiento && f.referencia == referencia {
+		return
+	}
+	f.desplazamiento, f.referencia = desplazamiento, referencia
 	f.Refresh()
 }
 
@@ -157,12 +169,21 @@ func (r *fondoSuiteRenderer) pintar(ancho, alto int) image.Image {
 	if ancho <= 0 || alto <= 0 {
 		return imagen
 	}
-	g := geometriaDelFondoSuite(float64(ancho), float64(alto))
+	w, h := float64(ancho), float64(alto)
+	dx, dy := 0.0, 0.0
+	if ref, tam := r.f.referencia, r.f.Size(); ref.Width > 0 && ref.Height > 0 && tam.Width > 0 && tam.Height > 0 {
+		sx, sy := w/float64(tam.Width), h/float64(tam.Height)
+		w, h = float64(ref.Width)*sx, float64(ref.Height)*sy
+		dx, dy = float64(r.f.desplazamiento.X)*sx, float64(r.f.desplazamiento.Y)*sy
+	}
+	g := geometriaDelFondoSuite(w, h)
 	for y := range alto {
 		for x := range ancho {
 			// Los stops se muestrean en el centro del píxel de dispositivo, igual que
 			// Chromium; usar las esquinas desplaza la mezcla al cambiar de escala.
-			c := g.color(float64(x)+0.5, float64(y)+0.5, r.tintas)
+			px := min(max(float64(x)+0.5+dx, 0.5), max(w-0.5, 0.5))
+			py := min(max(float64(y)+0.5+dy, 0.5), max(h-0.5, 0.5))
+			c := g.color(px, py, r.tintas)
 			i := y*imagen.Stride + x*4
 			imagen.Pix[i], imagen.Pix[i+1], imagen.Pix[i+2], imagen.Pix[i+3] = c.R, c.G, c.B, c.A
 		}

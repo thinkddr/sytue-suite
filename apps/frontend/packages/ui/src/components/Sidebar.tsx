@@ -84,7 +84,9 @@ export function Sidebar({
           si la organización no ha conectado ningún origen. `footer` es un elemento igual,
           y sin esto quedaba un filete con 15 px de nada debajo (medido el 2026-09-28). */}
       {footer ? (
-        <div class="border-chrome-border border-t px-4 py-2 empty:hidden">{footer}</div>
+        <div class="sytue-sidebar-footer border-chrome-border border-t px-4 py-2 empty:hidden">
+          {footer}
+        </div>
       ) : null}
     </nav>
   );
@@ -220,7 +222,7 @@ export function SidebarItem({
     // radio 9 con la barra ámbar en «Carril» (theme.css, «Tokens de forma»).
     // El PESO va en cada estado y no aquí: el del ítem activo es un token de forma, y dos
     // utilidades de `font-weight` en el mismo elemento se resolverían por el orden de la hoja.
-    'rounded-nav relative flex items-center gap-2 px-[var(--sytue-nav-pad)] py-2 text-base',
+    'rounded-nav relative flex items-center gap-2 px-[var(--sytue-nav-pad)] py-2 text-base pointer-coarse:min-h-[max(44px,2.75rem)]',
     'transition-colors duration-150 focus-visible:outline-none',
     // El anillo del CROMO, no el global: sobre el carril el primario de foco no se
     // ve, y ahí el token es blanco.
@@ -237,7 +239,7 @@ export function SidebarItem({
           // «estás aquí» de un vistazo.
           // En «Marco» no hay barra: «estás aquí» lo dicen el velo y la NEGRITA
           // (`--sytue-nav-active-weight`: 650 en Marco, 500 en Carril).
-          'bg-sidebar-active text-sidebar-active-fg [font-weight:var(--sytue-nav-active-weight)] before:bg-indicator before:absolute before:top-2 before:bottom-2 before:left-0 before:w-[var(--sytue-nav-indicator)] before:rounded-full before:content-[""]'
+          'sytue-nav-current bg-sidebar-active text-sidebar-active-fg [font-weight:var(--sytue-nav-active-weight)] before:bg-indicator before:absolute before:top-2 before:bottom-2 before:left-0 before:w-[var(--sytue-nav-indicator)] before:rounded-full before:content-[""]'
         : // En reposo, atenuado: sobre el carril todo es blanco, y si los ítems fueran
           // tan blancos como el activo, a este solo lo delataría el velo.
           'text-sidebar-fg-muted hover:bg-sidebar-hover hover:text-sidebar-fg active:bg-sidebar-active/60 font-medium',

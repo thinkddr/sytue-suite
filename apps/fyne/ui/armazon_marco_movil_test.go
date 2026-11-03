@@ -92,8 +92,9 @@ func TestElCajonMovilTieneSombraFileteBaseYVeloProporcional(t *testing.T) {
 			if r.velo.fondo.FillColor != ColorVelo(v, 0.5) {
 				t.Fatalf("%s/%s: velo a mitad=%v, quiero %v", variante, paleta, r.velo.fondo.FillColor, ColorVelo(v, 0.5))
 			}
-			if r.base.Visible() != (variante == "traslucido") {
-				t.Fatalf("%s/%s: base opaca visible=%v", variante, paleta, r.base.Visible())
+			if r.base.Visible() || !lateralEn(a.Menu).SinFondo ||
+				(!r.fondoCajon.liso.Visible() && !r.fondoCajon.degradado.Visible()) {
+				t.Fatalf("%s/%s: el cajón de Marco no conserva su fondo continuo y opaco", variante, paleta)
 			}
 
 			a.AbrirCajon()

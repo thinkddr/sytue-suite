@@ -14,7 +14,7 @@ image:
   # Upstream para desarrollo del subchart. values-prod lo sustituye por el
   # mirror byte-a-byte firmado en Scaleway Registry.
   repository: livekit/livekit-server
-  tag: "v1.13.7@sha256:6fd3b7088874c4d119160dd688798dfec852bc014786d392caad15f6f63912a3"
+  tag: "v1.13.11@sha256:25cd902de7cacbd5f1f779f6a6ac1eae20ba8f56b0935934ce6b0ab80d1e3d20"
   pullPolicy: IfNotPresent
   useGlobalRegistry: false
 

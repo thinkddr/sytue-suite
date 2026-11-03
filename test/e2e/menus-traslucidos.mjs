@@ -3,7 +3,7 @@
 // No levanta aplicaciones ni usa sesión. Incluye una mutación: quitar la exclusión
 // del tooltip tiene que reproducir la tinta oscura sobre fondo oscuro de Marco.
 import { chromium } from 'playwright';
-import { mkdirSync, readFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const css = readFileSync(process.env.MENUS_CSS || '/tmp/menus-traslucidos.css', 'utf8');
@@ -25,24 +25,36 @@ function exigir(condicion, mensaje) {
   if (!condicion) throw new Error(mensaje);
 }
 
-async function abrir(hoja, tema, forma, color, app = 'cast') {
-  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+async function abrir(hoja, tema, forma, color, app = 'cast', opciones = {}) {
+  const page = await browser.newPage({
+    viewport: opciones.viewport || { width: 1280, height: 900 },
+    hasTouch: Boolean(opciones.touch),
+    isMobile: Boolean(opciones.touch),
+  });
   const errores = [];
   page.on('pageerror', (error) => errores.push(error.message));
   // El bundle lee las cookies reales de idioma: about:blank tiene origen opaco.
   // La navegación se resuelve en memoria, sin servidor ni tráfico externo.
-  const url = 'http://menus.sytue.test/';
+  const url = `http://menus.sytue.test/${opciones.nav ? `?nav=${opciones.nav}` : ''}`;
   await page.route(url, (route) =>
     route.fulfill({
       contentType: 'text/html',
-      body: `<!doctype html><html lang="es" data-theme="${tema}" data-forma="${forma}" data-color="${color}" data-app="${app}"><head></head><body></body></html>`,
+      body: `<!doctype html><html lang="es" data-theme="${tema}" data-forma="${forma}" data-color="${color}" data-app="${app}"><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body></body></html>`,
     }),
   );
   await page.goto(url);
+  if (opciones.safe)
+    await page.evaluate((safe) => {
+      for (const [lado, valor] of Object.entries(safe)) {
+        document.documentElement.style.setProperty(`--sytue-safe-${lado}`, `${valor}px`);
+      }
+    }, opciones.safe);
   await page.addStyleTag({ content: hoja });
   await page.addScriptTag({ content: js, type: 'module' });
   try {
-    await page.locator('[data-contexto="tarjeta"]').waitFor({ timeout: 10000 });
+    await page
+      .locator(opciones.nav ? '[data-nav-fixture]' : '[data-contexto="tarjeta"]')
+      .waitFor({ timeout: 10000 });
   } catch (error) {
     throw new Error(`no se montó la fixture: ${errores.join('; ') || error.message}`);
   }
@@ -127,6 +139,242 @@ async function paneles(page, nombre) {
       await legible(texto, `${nombre}, texto de opción`);
     }
   }
+}
+
+/** Fondo REAL de PNG: medir() no compone las imágenes de fondo del marco. */
+async function pixelesNavegacion(page, png, datos) {
+  return page.evaluate(
+    async ({ png, datos }) => {
+      const imagen = new Image();
+      imagen.src = `data:image/png;base64,${png}`;
+      await imagen.decode();
+      const canvas = document.createElement('canvas');
+      canvas.width = imagen.width;
+      canvas.height = imagen.height;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      ctx.drawImage(imagen, 0, 0);
+      const pixel = (x, y) => [...ctx.getImageData(Math.floor(x), Math.floor(y), 1, 1).data];
+      const muestra = (rect, y) => [pixel(rect.x + 4, y), pixel(rect.right - 5, y)];
+      // El borde derecho recibe la sombra legítima de la hoja contigua. Dos
+      // puntos interiores limpian esa interferencia sin tolerar otra diferencia:
+      // barra y menú se comparan siempre en las MISMAS coordenadas horizontales.
+      const ejeMarco = [datos.nav.x + 4, datos.nav.x + datos.nav.width / 2];
+      const superior = ejeMarco.map((x) => pixel(x, datos.topbar.y + 2));
+      const menu = ejeMarco.map((x) => pixel(x, datos.nav.y + 2));
+      const seleccion = muestra(datos.active, datos.active.y + datos.active.height / 2);
+      const pie = muestra(datos.nav, datos.footer.y + datos.footer.height / 2);
+      const color = (css) => {
+        const c = document.createElement('canvas');
+        c.width = c.height = 1;
+        const p = c.getContext('2d');
+        p.fillStyle = css;
+        p.fillRect(0, 0, 1, 1);
+        return [...p.getImageData(0, 0, 1, 1).data];
+      };
+      const luminancia = (rgb) =>
+        rgb
+          .slice(0, 3)
+          .map((v) => {
+            const s = v / 255;
+            return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+          })
+          .reduce((s, v, i) => s + v * [0.2126, 0.7152, 0.0722][i], 0);
+      const contraste = (css, fondos) =>
+        fondos.map((fondo) => {
+          const tinta = color(css);
+          const sobre = tinta
+            .slice(0, 3)
+            .map((v, i) => (v * tinta[3]) / 255 + fondo[i] * (1 - tinta[3] / 255));
+          const a = luminancia(sobre),
+            b = luminancia(fondo);
+          return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+        });
+      return {
+        ejeMarco,
+        superior,
+        menu,
+        diferencias: menu.map((rgb, i) =>
+          rgb.slice(0, 3).map((v, c) => Math.abs(v - superior[i][c])),
+        ),
+        texto: contraste(datos.color, seleccion),
+        pie: contraste(datos.footerColor, pie),
+        foco: contraste(datos.focusColor, menu),
+      };
+    },
+    { png: png.toString('base64'), datos },
+  );
+}
+
+async function navegacion() {
+  const modos = ['light', 'dark', 'translucent'].map((tema) => ({ tema, forma: 'marco' }));
+  modos.push({ tema: 'dark', forma: 'carril' });
+  const casos = modos.flatMap((modo) => [
+    { ...modo, tipo: 'desktop', width: 1280, height: 800 },
+    { ...modo, tipo: 'mobile', width: 390, height: 844 },
+    { ...modo, tipo: 'erp', width: 1280, height: 800 },
+  ]);
+  casos.push({
+    tema: 'translucent',
+    forma: 'marco',
+    tipo: 'mobile',
+    width: 640,
+    height: 320,
+    safe: { left: 44, right: 44, bottom: 21 },
+  });
+  const resultados = [];
+  for (const caso of casos) {
+    const id = `nav-${caso.tipo}-${caso.tema}-${caso.forma}-${caso.width}`;
+    const resultado = { id, ...caso, ok: false };
+    let page;
+    try {
+      page = await abrir(css, caso.tema, caso.forma, 'app', 'notes', {
+        nav: caso.tipo === 'erp' ? 'erp' : 'app',
+        viewport: { width: caso.width, height: caso.height },
+        touch: caso.tipo === 'mobile',
+        safe: caso.safe,
+      });
+      const drawer = page.locator('[data-nav-fixture] .sytue-nav-drawer');
+      const toggle = page.locator('[data-nav-fixture] button[aria-controls]').first();
+      if (caso.tipo !== 'desktop') await toggle.click();
+      await drawer.scrollIntoViewIfNeeded(); // Stable: incluye la entrada animada real.
+      const nav = caso.tipo === 'erp' ? drawer : drawer.locator('nav.bg-sidebar');
+      const active = nav.getByRole('button', { name: 'Archivo', exact: true });
+      await active.click();
+      if (caso.tipo !== 'desktop') await toggle.click();
+      await drawer.scrollIntoViewIfNeeded();
+      exigir(
+        (await active.getAttribute('aria-current')) === 'page',
+        `${id}: no cambió la selección`,
+      );
+      exigir((await nav.locator('.sytue-nav-current').count()) === 1, `${id}: selección duplicada`);
+      await nav.getByRole('button', { name: 'Mi cuaderno', exact: true }).focus();
+      const idle = await active.evaluate((el) => getComputedStyle(el).boxShadow);
+      await active.focus();
+      await active.press('Tab');
+      await page.keyboard.press('Shift+Tab');
+      const datos = await active.evaluate((el) => {
+        const nav = el.closest('nav');
+        const drawer = el.closest('.sytue-nav-drawer');
+        const frame = el.closest('.sytue-frame');
+        const topbar = document.querySelector('.sytue-topbar-carril');
+        const footer = nav.querySelector('.sytue-sidebar-footer');
+        const textoPie = nav.querySelector('[data-nav-footer]');
+        const rect = (e) => e.getBoundingClientRect().toJSON();
+        const fondo = getComputedStyle(
+          drawer.classList.contains('sytue-drawer-in') ? drawer : frame,
+        );
+        // CSSOM puede conservar calc()/porcentajes; que el navegador resuelva el eje.
+        const eje = document.createElement('span');
+        eje.style.cssText = 'position:fixed;width:0;height:0;pointer-events:none';
+        eje.style.left = fondo.backgroundPositionX;
+        document.body.append(eje);
+        const offset = eje.getBoundingClientRect().x;
+        eje.remove();
+        const estilo = getComputedStyle(el);
+        const linea = getComputedStyle(footer, '::before');
+        return {
+          nav: rect(nav),
+          active: rect(el),
+          footer: rect(textoPie),
+          topbar: rect(topbar),
+          color: estilo.color,
+          footerColor: getComputedStyle(textoPie).color,
+          focusColor: estilo.getPropertyValue('--sytue-focus-ring'),
+          focusVisible: el.matches(':focus-visible'),
+          shadow: estilo.boxShadow,
+          background: {
+            image: fondo.backgroundImage,
+            size: fondo.backgroundSize,
+            x: fondo.backgroundPositionX,
+            offset,
+          },
+          topbarImage: getComputedStyle(topbar).backgroundImage,
+          footerLine: {
+            border: getComputedStyle(footer).borderTopWidth,
+            content: linea.content,
+            width: linea.borderTopWidth,
+            left: linea.left,
+            right: linea.right,
+          },
+          coarse: matchMedia('(pointer:coarse)').matches,
+        };
+      });
+      resultado.datos = datos;
+      const safe = { left: 0, right: 0, bottom: 0, ...caso.safe };
+      exigir(
+        datos.nav.x === safe.left && datos.nav.right <= caso.width - safe.right,
+        `${id}: el menú invade el área segura horizontal`,
+      );
+      exigir(
+        datos.nav.y === datos.topbar.bottom && datos.nav.bottom <= caso.height - safe.bottom,
+        `${id}: el menú invade la barra o el área segura inferior`,
+      );
+      exigir(
+        datos.footer.bottom <= datos.nav.bottom && datos.footer.y >= datos.nav.y,
+        `${id}: pie fuera del menú`,
+      );
+      exigir(
+        datos.focusVisible && datos.shadow !== idle && /0px 0px 0px 2px/.test(datos.shadow),
+        `${id}: selección oculta el aro de foco de2px (${datos.shadow})`,
+      );
+      if (caso.tipo === 'mobile')
+        exigir(datos.coarse && datos.active.height >= 44, `${id}: entrada táctil inferior a44px`);
+      if (caso.forma === 'marco') {
+        exigir(
+          idle.includes('inset') && idle.includes('1px'),
+          `${id}: falta contorno de selección`,
+        );
+        exigir(
+          datos.background.image === datos.topbarImage &&
+            datos.background.image.includes('linear-gradient'),
+          `${id}: el menú reinicia el fondo del marco`,
+        );
+        exigir(
+          parseFloat(datos.background.size) === caso.width &&
+            datos.background.offset + safe.left === 0,
+          `${id}: fondo fuera del eje del viewport`,
+        );
+        exigir(
+          datos.footerLine.border === '0px' &&
+            datos.footerLine.width === '1px' &&
+            parseFloat(datos.footerLine.left) > 0 &&
+            datos.footerLine.left === datos.footerLine.right,
+          `${id}: el separador del pie atraviesa todo el marco`,
+        );
+      } else
+        exigir(
+          datos.footerLine.border === '1px' && !idle.includes('inset'),
+          `${id}: Carril heredó el contorno o el pie de Marco`,
+        );
+      const png = await page.screenshot({ path: join(out, `${id}.png`) });
+      resultado.pixeles = await pixelesNavegacion(page, png, datos);
+      if (caso.forma === 'marco')
+        exigir(
+          resultado.pixeles.diferencias.flat().every((v) => v <= 1),
+          `${id}: discontinuidad real del gradiente ${JSON.stringify(resultado.pixeles.diferencias)}`,
+        );
+      exigir(
+        Math.min(...resultado.pixeles.texto, ...resultado.pixeles.pie) >= 4.5,
+        `${id}: texto sin contraste suficiente sobre el PNG real`,
+      );
+      exigir(
+        Math.min(...resultado.pixeles.foco) >= 3,
+        `${id}: aro de foco sin contraste suficiente`,
+      );
+      resultado.ok = true;
+      console.log(`✓ ${id}: geometría, PNG, selección, foco y pie`);
+    } catch (error) {
+      resultado.error = String(error.message).slice(0, 500);
+      if (page)
+        await page.screenshot({ path: join(out, `${id}-fallo.png`) }).catch(() => undefined);
+    } finally {
+      resultados.push(resultado);
+      if (page) await page.close();
+      writeFileSync(join(out, 'results.json'), JSON.stringify({ results: resultados }, null, 2));
+    }
+  }
+  const fallos = resultados.filter((r) => !r.ok);
+  exigir(fallos.length === 0, `navegación: ${fallos.map((r) => `${r.id}: ${r.error}`).join('; ')}`);
 }
 
 try {
@@ -309,6 +557,7 @@ try {
       }
     }
   }
+  await navegacion();
   console.log(`✓ ${comprobaciones} comprobaciones de contraste, opacidad y herencia`);
 } finally {
   await browser.close();

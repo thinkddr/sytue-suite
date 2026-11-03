@@ -65,6 +65,7 @@ func (p *Pantalla) abrirEditor(n Nota) {
 	s.guardado = s.html
 	ed.AlCambiar = func(html string) { p.alEscribir(s, html) }
 	ed.AlTerminar = p.cerrarEditor
+	ed.conservaEdicion = p.barra.conservaEdicion
 	ed.AlEnlazar = func(d fyne.CanvasObject) { p.herramientaEnlace(ed, d) }
 	ed.AlCrecer = p.recolocarLienzo
 	ed.AlIrA = p.abrirIrA

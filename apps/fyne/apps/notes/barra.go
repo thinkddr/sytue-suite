@@ -101,6 +101,9 @@ type Barra struct {
 	// Filtrando es la lupa de una página abierta: con algo escrito el campo se queda
 	// aunque se cierre, o no se sabría por qué faltan notas.
 	Filtrando bool
+	// foco recuerda sólo el último botón de esta barra que recibió el foco. Sobrevive
+	// al repintado de sus controles: pulsar una herramienta no termina la nota abierta.
+	foco fyne.Focusable
 }
 
 // enPagina dice si el cuaderno se pinta como PÁGINA: un día y un cuaderno en lista llevan
@@ -142,12 +145,14 @@ func (b *Barra) Objeto(v tema.Variante) fyne.CanvasObject {
 		bt := ui.NuevoBoton(t(clave, nil), func() { llamar0(accion) })
 		bt.Variante, bt.Talla = ui.Secundario, ui.TallaSM
 		bt.Icono, bt.TamIcono = iconos.Candado, GlifoBarra
+		bt.AlEnfocar = func() { b.foco = bt }
 		candado = bt
 	}
 
 	nueva := ui.NuevoBoton(t("note.new", nil), func() { llamar0(b.AlNuevaNota) })
 	nueva.Talla, nueva.Icono, nueva.TamIcono = ui.TallaSM, iconos.Mas, 15
 	nueva.Inerte = b.Bloqueado || b.SinRed
+	nueva.AlEnfocar = func() { b.foco = nueva }
 
 	// El título es `mr-auto flex min-w-0 items-center gap-2`: el emoji y el nombre juntos,
 	// y todo lo que sobre de la primera fila detrás de él.
@@ -181,6 +186,13 @@ func (b *Barra) campoFiltro() *ui.Entrada {
 	return b.filtro
 }
 
+// conservaEdicion reconoce las herramientas de la barra, incluido el editor interno
+// del filtro. El foco puede quedarse en el control: no se devuelve al cuerpo mientras
+// la persona lo esté usando.
+func (b *Barra) conservaEdicion(f fyne.Focusable) bool {
+	return f != nil && (f == b.foco || b.filtro != nil && b.filtro.Enfocado())
+}
+
 // menuIcono es un botón de icono con un glifo de esta app que abre un menú.
 func (b *Barra) menuIcono(d, rotulo string, menu func() *ui.Menu) *ui.BotonIcono {
 	var bt *ui.BotonIcono
@@ -203,6 +215,7 @@ func (b *Barra) Acciones(v tema.Variante) []fyne.CanvasObject {
 	case b.Cuaderno.Crudo.DailyDate == "":
 		lupa := ui.NuevoBotonIcono(iconos.Buscar, t("filter.placeholder", nil), func() { llamar0(b.AlAbrirFiltro) })
 		lupa.Lado, lupa.TamIcono = ui.LadoIconoSM, GlifoAccion
+		lupa.AlEnfocar = func() { b.foco = lupa }
 		out = append(out, lupa)
 	}
 	out = append(out, b.menuIcono(BajarD, t("export.label", nil), b.menuExportar))
@@ -213,6 +226,7 @@ func (b *Barra) Acciones(v tema.Variante) []fyne.CanvasObject {
 		}
 	})
 	mas.Lado, mas.TamIcono = ui.LadoIconoSM, GlifoAccion
+	mas.AlEnfocar = func() { b.foco = mas }
 	return append(out, mas)
 }
 
@@ -267,6 +281,7 @@ func (b *Barra) accionPropia(d, rotulo string, inerte bool, alPulsar func()) *ui
 	bt.Lado, bt.TamIcono = ui.LadoIconoSM, GlifoAccion
 	// `disabled:opacity-40`: el glifo al 40 % y el botón sin puntero ni foco.
 	bt.Inerte = inerte
+	bt.AlEnfocar = func() { b.foco = bt }
 	return bt
 }
 

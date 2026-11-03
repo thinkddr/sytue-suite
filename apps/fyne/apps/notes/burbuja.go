@@ -26,11 +26,11 @@ func (e *EditorNota) armarBurbuja() *flotante {
 	enlace := nuevoBotonBarra(EnlaceD, iconos.Ninguno, atajo(t("editor.linkTool", nil), ui.AtajoDelSistema("Ctrl+K")), nil)
 	enlace.AlPulsar = func() { llamar1(e.AlEnlazar, fyne.CanvasObject(enlace)) }
 	botones := []fyne.CanvasObject{
-		nuevoBotonBarra(NegritaD, iconos.Ninguno, atajo(t("editor.bold", nil), ui.AtajoDelSistema("Ctrl+B")), func() { e.Orden("b", "") }),
-		nuevoBotonBarra(CursivaD, iconos.Ninguno, atajo(t("editor.italic", nil), ui.AtajoDelSistema("Ctrl+I")), func() { e.Orden("i", "") }),
-		nuevoBotonBarra(TachadoD, iconos.Ninguno, t("editor.strike", nil), func() { e.Orden("s", "") }),
-		nuevoBotonBarra("", iconos.Rotulador, t("editor.highlight", nil), func() { e.Orden("mark", "") }),
-		nuevoBotonBarra("", iconos.Codigo, t("editor.inlineCode", nil), func() { e.Orden("code", "") }),
+		e.botonDeOrden(NegritaD, iconos.Ninguno, atajo(t("editor.bold", nil), ui.AtajoDelSistema("Ctrl+B")), func() { e.Orden("b", "") }),
+		e.botonDeOrden(CursivaD, iconos.Ninguno, atajo(t("editor.italic", nil), ui.AtajoDelSistema("Ctrl+I")), func() { e.Orden("i", "") }),
+		e.botonDeOrden(TachadoD, iconos.Ninguno, t("editor.strike", nil), func() { e.Orden("s", "") }),
+		e.botonDeOrden("", iconos.Rotulador, t("editor.highlight", nil), func() { e.Orden("mark", "") }),
+		e.botonDeOrden("", iconos.Codigo, t("editor.inlineCode", nil), func() { e.Orden("code", "") }),
 		enlace,
 	}
 	return nuevoFlotante(container.New(ui.Fila{Hueco: HuecoBarraEd}, botones...), tema.Espacio(1))

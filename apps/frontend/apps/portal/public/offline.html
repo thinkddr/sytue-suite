@@ -1711,7 +1711,8 @@ html {
 
    El ítem activo del menú es una píldora de VELO claro con el texto blanco, sin barra de
    señal: los mismos valores que en Carril (`--sytue-sidebar-active-*`), con el radio de
-   píldora. El botón principal del menú («Redactar», «Nuevo») conserva su relleno
+   píldora y un contorno interior del separador lateral. El botón principal del menú
+   («Redactar», «Nuevo») conserva su relleno
    macizo —blanco; en oscuro, del primario— y las esquinas de `radius-control`.
 
    Lo vigila contraste-paleta.test.ts («Marco: …»). */
@@ -1758,8 +1759,12 @@ html {
      de la suite: lectores y páginas autónomas conservan su fondo. */
   :root:not([data-forma='carril']):has(.sytue-topbar-carril),
   :root:not([data-forma='carril']):has(.sytue-topbar-carril) body,
-  :root:not([data-forma='carril']) :is(.sytue-frame, .sytue-topbar-carril) {
+  :root:not([data-forma='carril']) :is(.sytue-frame, .sytue-topbar-carril),
+  :root:not([data-forma='carril']) .sytue-nav-drawer.sytue-drawer-in {
     background: linear-gradient(90deg in srgb, var(--sytue-frame-from), var(--sytue-frame-to));
+    background-size: 100vw 100%;
+    background-position: left top;
+    background-repeat: no-repeat;
   }
   /* Sin línea inferior: la barra y el menú son la misma pieza. */
   :root:not([data-forma='carril']) .sytue-topbar-carril {
@@ -1774,8 +1779,8 @@ html {
     color: var(--sytue-sidebar-fg);
     border-bottom-color: transparent;
   }
-  /* El menú lateral y la esquina de marca dejan ver el marco, que ya es de su color. En
-     <768 px el menú es un cajón sobre el contenido y conserva su fondo. */
+  /* El menú lateral y la esquina de marca dejan ver el marco. En el cajón móvil,
+     su contenedor prolonga ese mismo fondo por encima del contenido. */
   :root:not([data-forma='carril']) .sytue-topbar-carril :is(.bg-sidebar, .bg-rail) {
     background-color: transparent;
   }
@@ -1783,6 +1788,35 @@ html {
     :root:not([data-forma='carril']) .sytue-frame :is(.bg-sidebar, .bg-rail) {
       background-color: transparent;
     }
+  }
+  /* El cajón abierto es otra parte del marco, también en el ERP de escritorio.
+     Su ancho sigue siendo el del menú; el fondo conserva la referencia de la
+     ventana completa para no reiniciar el degradado en una columna de 260 px. */
+  :root:not([data-forma='carril']) .sytue-nav-drawer.sytue-drawer-in {
+    background-position-x: calc(-1 * var(--sytue-safe-left));
+    border-color: transparent;
+  }
+  :root:not([data-forma='carril']) .sytue-nav-drawer > :is(.bg-sidebar, .bg-rail) {
+    background-color: transparent;
+    background-image: none;
+  }
+  /* Sólo la superficie seleccionada, sin duplicar el contorno en sus botones
+     internos de arrastre/acciones. El foco sigue usando su anillo independiente. */
+  :root:not([data-forma='carril']) .sytue-nav-current:not(:focus-visible) {
+    box-shadow: inset 0 0 0 1px var(--sytue-sidebar-border);
+  }
+  /* Un separador interior mantiene el pie en la misma columna que las entradas;
+     la línea completa del carril partía visualmente el marco de lado a lado. */
+  :root:not([data-forma='carril']) .sytue-sidebar-footer {
+    position: relative;
+    border-top-width: 0;
+  }
+  :root:not([data-forma='carril']) .sytue-sidebar-footer::before {
+    content: '';
+    position: absolute;
+    inset-inline: 1rem;
+    top: 0;
+    border-top: 1px solid var(--sytue-sidebar-border);
   }
   /* El buscador de la barra, como en la barra-carril de <768px (más arriba): el velo
      neutro `--sytue-sidebar-field` con el texto del cromo. Uno claro —el del ítem activo

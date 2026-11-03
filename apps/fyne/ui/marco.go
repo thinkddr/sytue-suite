@@ -215,6 +215,15 @@ func (f *fondoMarco) pintar(v tema.Variante) {
 	f.degradado.Refresh()
 }
 
+// pintarTramo conserva la escala del marco de la ventana al pintarlo en un cajón
+// más estrecho. El fondo no reinicia el degradado ni se desplaza con el menú.
+func (f *fondoMarco) pintarTramo(v tema.Variante, x, ancho, ventana float32) {
+	f.pintar(v)
+	f.degradado.StartColor = f.colorEn(x, ventana)
+	f.degradado.EndColor = f.colorEn(x+ancho, ventana)
+	f.degradado.Refresh()
+}
+
 func (f *fondoMarco) colocar(pos fyne.Position, tam fyne.Size) {
 	for _, o := range f.objetos() {
 		o.Move(pos)

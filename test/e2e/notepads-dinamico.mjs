@@ -184,6 +184,199 @@ async function gesto(page, source, target, touch, durante) {
   }
 }
 
+async function herramientasDelEditor(page, leerNotas) {
+  const tarjeta = page.locator('article[data-note-id="nota-3"]');
+  await tarjeta.getByRole('button', { name: es['note.placeholder'], exact: true }).click();
+  const editor = tarjeta.locator('[contenteditable="true"]');
+  await editor.fill('Texto seleccionado y resto intacto.');
+  const original = await editor.elementHandle();
+  assert(original, 'se montó el editor');
+  const sigueEditando = async () => {
+    assert(
+      await original.evaluate((el) => el.isConnected && el.isContentEditable),
+      'las herramientas deben conservar el mismo editor, sin cerrarlo y remontarlo',
+    );
+    assert.equal(await editor.count(), 1);
+  };
+  const seleccionar = async () => {
+    await sigueEditando();
+    await editor.evaluate((el) => {
+      el.focus();
+      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+      let nodo;
+      while ((nodo = walker.nextNode())) {
+        const inicio = nodo.textContent.indexOf('seleccionado');
+        if (inicio < 0) continue;
+        const rango = document.createRange();
+        rango.setStart(nodo, inicio);
+        rango.setEnd(nodo, inicio + 'seleccionado'.length);
+        const seleccion = window.getSelection();
+        seleccion.removeAllRanges();
+        seleccion.addRange(rango);
+        document.dispatchEvent(new Event('selectionchange'));
+        return;
+      }
+      throw new Error('No se encontró el fragmento que debe conservar su formato');
+    });
+  };
+  const estilo = (fragmento, propiedad) =>
+    editor.evaluate(
+      (el, { fragmento, propiedad }) => {
+        const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+        let nodo;
+        while ((nodo = walker.nextNode()))
+          if (nodo.textContent.includes(fragmento))
+            return getComputedStyle(nodo.parentElement)[propiedad];
+        throw new Error(`No se encontró ${fragmento}`);
+      },
+      { fragmento, propiedad },
+    );
+  try {
+    const barra = tarjeta.getByRole('toolbar').first();
+    contextoActual.fase = 'editor-bloque';
+    await seleccionar();
+    await barra.getByRole('button', { name: es['editor.block'], exact: true }).click();
+    const bloques = page.getByRole('menu', { name: es['editor.block'], exact: true });
+    await bloques.waitFor();
+    await sigueEditando();
+    await bloques.getByRole('menuitem', { name: es['editor.h2'], exact: true }).click();
+    await sigueEditando();
+    assert.equal(await editor.locator('h2').textContent(), 'Texto seleccionado y resto intacto.');
+    // El selector de estilo puede permanecer abierto; Escape cierra esa capa,
+    // mientras que el Escape del editor, comprobado abajo, sí termina la edición.
+    if (await bloques.isVisible()) {
+      await bloques.getByRole('menuitem').first().focus();
+      await page.keyboard.press('Escape');
+    }
+    await bloques.waitFor({ state: 'hidden' });
+    await sigueEditando();
+
+    contextoActual.fase = 'editor-teclado';
+    await seleccionar();
+    await barra.getByRole('button', { name: es['editor.italic'], exact: true }).press('Enter');
+    await sigueEditando();
+    assert.equal(await estilo('seleccionado', 'fontStyle'), 'italic');
+    assert.notEqual(await estilo('Texto ', 'fontStyle'), 'italic');
+
+    contextoActual.fase = 'editor-color';
+    await seleccionar();
+    await barra.getByRole('button', { name: es['editor.textColor'], exact: true }).click();
+    const colores = page.getByRole('dialog', { name: es['editor.textColor'], exact: true });
+    await colores.waitFor();
+    await sigueEditando();
+    await colores.getByRole('button', { name: '#b91c1c', exact: true }).click();
+    await colores.waitFor({ state: 'hidden' });
+    await sigueEditando();
+    assert.equal(await estilo('seleccionado', 'color'), 'rgb(185, 28, 28)');
+    assert.notEqual(await estilo('Texto ', 'color'), 'rgb(185, 28, 28)');
+
+    contextoActual.fase = 'editor-enlace';
+    await seleccionar();
+    await barra.getByRole('button', { name: es['editor.linkTool'], exact: true }).click();
+    const enlace = page.getByRole('dialog', { name: es['editor.linkTool'], exact: true });
+    const url = 'https://sytue.example/editor';
+    await enlace.getByRole('textbox', { name: es['editor.linkTool'], exact: true }).fill(url);
+    await sigueEditando();
+    await enlace
+      .getByRole('button', {
+        name: es['editor.linkToUrl'].replace('{url}', url),
+        exact: true,
+      })
+      .click();
+    await enlace.waitFor({ state: 'hidden' });
+    await sigueEditando();
+    assert.equal(await editor.locator('a').count(), 1);
+    assert.equal(await editor.locator('a').textContent(), 'seleccionado');
+    assert.equal(await editor.locator('a').getAttribute('href'), url);
+    assert.equal(await editor.textContent(), 'Texto seleccionado y resto intacto.');
+
+    contextoActual.fase = 'editor-barra-cuaderno';
+    const cuaderno = page.locator('.notes-day-head');
+    const filtro = cuaderno.getByRole('searchbox', { name: es['filter.placeholder'], exact: true });
+    const abrirFiltro = async () => {
+      if (!(await filtro.isVisible()))
+        await cuaderno.getByRole('button', { name: es['filter.placeholder'], exact: true }).click();
+      await filtro.focus();
+    };
+    await abrirFiltro();
+    await sigueEditando();
+    await cuaderno.getByRole('button', { name: es['export.label'], exact: true }).click();
+    const exportar = page.getByRole('menu', { name: es['export.label'], exact: true });
+    await exportar.waitFor();
+    await sigueEditando();
+    await page.keyboard.press('Escape');
+    await exportar.waitFor({ state: 'hidden' });
+    await sigueEditando();
+    await cuaderno
+      .getByRole('group', { name: es['filter.placeholder'], exact: true })
+      .getByRole('button', { name: es['common.close'], exact: true })
+      .click();
+    await filtro.waitFor({ state: 'hidden' });
+    await sigueEditando();
+    await editor.focus();
+    await editor.press('ControlOrMeta+End');
+    await page.keyboard.type(' Escritura posterior.');
+    await sigueEditando();
+    assert((await editor.textContent()).includes(' y resto intacto. Escritura posterior.'));
+
+    contextoActual.fase = 'editor-salir-a-otra-nota';
+    const otra = page.locator('article[data-note-id="nota-4"]');
+    await otra.getByRole('button', { name: es['note.placeholder'], exact: true }).click();
+    await editor.waitFor({ state: 'detached' });
+    assert.equal(await editor.count(), 0, 'otra nota sí termina la sesión anterior');
+    await hasta(() =>
+      leerNotas()
+        .find((n) => n.id === 'nota-3')
+        ?.content.includes('Escritura posterior.'),
+    );
+    const guardado = leerNotas().find((n) => n.id === 'nota-3').content;
+    assert(guardado.includes('<h2') && guardado.includes(url), 'se guarda el formato aplicado');
+    contextoActual.fase = 'editor-escape';
+    const segundo = otra.locator('[contenteditable="true"]');
+    await segundo.fill('Salir con Escape también guarda.');
+    await segundo.press('Escape');
+    assert.equal(await segundo.count(), 0, 'Escape en el texto sí termina la edición');
+    await hasta(() =>
+      leerNotas()
+        .find((n) => n.id === 'nota-4')
+        ?.content.includes('Salir con Escape'),
+    );
+    contextoActual.fase = 'editor-filtro-otra-nota';
+    await otra.getByRole('button', { name: es['note.placeholder'], exact: true }).click();
+    await segundo.fill('Salir desde el filtro a otra nota.');
+    await abrirFiltro();
+    assert.equal(await segundo.count(), 1, 'el filtro conserva la sesión');
+    await tarjeta.getByRole('button', { name: es['note.placeholder'], exact: true }).click();
+    await segundo.waitFor({ state: 'detached' });
+    assert.equal(
+      await segundo.count(),
+      0,
+      'salir del filtro a otra nota cierra la sesión anterior',
+    );
+    await hasta(() =>
+      leerNotas()
+        .find((n) => n.id === 'nota-4')
+        ?.content.includes('Salir desde el filtro'),
+    );
+    await editor.press('Escape');
+
+    contextoActual.fase = 'editor-escape-desde-toolbar';
+    await otra.getByRole('button', { name: es['note.placeholder'], exact: true }).click();
+    await segundo.fill('Escape desde la barra también guarda.');
+    await abrirFiltro();
+    assert.equal(await segundo.count(), 1, 'el foco del filtro no cierra el editor');
+    await filtro.press('Escape');
+    assert.equal(await segundo.count(), 0, 'Escape desde la barra sí termina la edición');
+    await hasta(() =>
+      leerNotas()
+        .find((n) => n.id === 'nota-4')
+        ?.content.includes('Escape desde la barra'),
+    );
+  } finally {
+    await original.dispose();
+  }
+}
+
 try {
   for (const [width, height] of [
     [1280, 800],
@@ -373,6 +566,7 @@ try {
         false,
       );
       await page.screenshot({ path: join(OUT, `${id}-lista.png`) });
+      await herramientasDelEditor(page, () => notes);
       if (height >= 600) {
         const source = () =>
           page.locator('article[data-note-id="nota-2"]').getByRole('button', {

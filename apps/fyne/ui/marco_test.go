@@ -106,7 +106,8 @@ func TestLaHojaFlotaEnElMarco(t *testing.T) {
 	}
 
 	// En estrecho va a sangre bajo la barra móvil, sin separación y con las cuatro
-	// esquinas. Y el menú, que es un cajón, conserva su fondo.
+	// esquinas. El menú deja ver también dentro del cajón el fondo de Marco que
+	// el armazón pinta por encima del velo.
 	a.Resize(fyne.NewSize(600, alto))
 	a.Refresh()
 	img = pinta(t, 600, alto, a)
@@ -116,8 +117,8 @@ func TestLaHojaFlotaEnElMarco(t *testing.T) {
 	mira(t, img, "a sangre, la esquina de abajo es del marco", 1, alto-2, marco)
 	mira(t, img, "a sangre, la esquina superior de la hoja es del marco", 1, AltoBarraMovil+1, marco)
 	mira(t, img, "a sangre, arriba sí", 1, 1, marco)
-	if l := lateralEn(a.Menu); l == nil || l.SinFondo {
-		t.Error("en estrecho el menú es un cajón y conserva su fondo")
+	if l := lateralEn(a.Menu); l == nil || !l.SinFondo {
+		t.Error("en estrecho el menú deja ver el fondo de Marco del cajón")
 	}
 
 	// En Carril no hay nada de esto: el contenido llega a la esquina.
@@ -232,20 +233,122 @@ func TestElMarcoCubreLasAreasSegurasSinEstirarElDegradado(t *testing.T) {
 	}
 }
 
+// El relleno testigo es ajeno al tema: un inset sin pintar no puede confundirse
+// con el fondo del canvas. Las referencias son la barra sobre bg y el borde real
+// de la hoja, no los colores ni los rectángulos de prolongación bajo prueba.
 func TestCarrilProlongaLaBarraSobreElAreaSegura(t *testing.T) {
 	tema.ElegirForma("carril")
-	t.Cleanup(tema.FormaDeLosGuardianes)
-	b := NuevaBarraSuite(traductorPrueba(t), nil, iconos.Mail)
-	t.Cleanup(b.Parar)
-	montado := b.Montar(contenidoDePrueba()).(*fyne.Container)
-	segura, total := fyne.NewPos(0, 24), fyne.NewSize(390, 380)
-	montado.Resize(fyne.NewSize(390, 322))
-	montado.Move(segura)
-	m := montado.Layout.(*montaje)
-	m.colocarFondo(montado.Size(), segura, total)
-	img := pinta(t, total.Width, total.Height, montado)
-	if techo, barra := px(img, 2, 2), px(img, 2, int((segura.Y+1)*escala)); !cercaDe(techo, barra, 2) {
-		t.Errorf("el área segura de Carril pinta %v y la barra %v", techo, barra)
+	tema.ElegirColor("app")
+	antes := tactilDePrueba
+	tactil := true
+	tactilDePrueba = &tactil
+	t.Cleanup(func() {
+		tactilDePrueba = antes
+		tema.Elegir("")
+		tema.ElegirColor("")
+		tema.ElegirApp("")
+		tema.FormaDeLosGuardianes()
+	})
+	for _, variante := range []string{"claro", "oscuro", "traslucido"} {
+		for _, navegacion := range []string{"sin-menu", "menu", "iconos"} {
+			t.Run(fmt.Sprintf("%s/%s", variante, navegacion), func(t *testing.T) {
+				tactil = true
+				tema.Elegir(variante)
+				v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
+				var contenido fyne.CanvasObject = NuevoFondoSuite(v)
+				if navegacion != "sin-menu" {
+					a := NuevoArmazon(canvas.NewRectangle(color.NRGBA{}))
+					a.SinBarraMovil = true
+					if navegacion == "menu" {
+						a.Menu = NuevoLateral("Menú", nil)
+					} else {
+						carril := canvas.NewRectangle(tema.Color("rail", v))
+						carril.SetMinSize(fyne.NewSize(64, 0))
+						a.Carril = carril
+					}
+					contenido = a
+				}
+				b := NuevaBarraSuite(traductorPrueba(t), nil, iconos.Mail)
+				defer b.Parar()
+				montado := b.Montar(contenido).(*fyne.Container)
+				m := montado.Layout.(*montaje)
+				for _, area := range []struct {
+					nombre       string
+					tactil       bool
+					total        fyne.Size
+					pos          fyne.Position
+					derecha, pie float32
+				}{
+					{"retrato", true, fyne.NewSize(390, 260), fyne.NewPos(0, 24), 0, 34},
+					{"paisaje", true, fyne.NewSize(844, 240), fyne.NewPos(44, 0), 44, 21},
+					{"ancho-tactil", true, fyne.NewSize(1060, 260), fyne.NewPos(44, 20), 28, 16},
+					{"vuelta", true, fyne.NewSize(390, 260), fyne.NewPos(0, 24), 0, 34},
+					{"escritorio", false, fyne.NewSize(1280, 240), fyne.NewPos(0, 0), 0, 0},
+				} {
+					tactil = area.tactil
+					tam := fyne.NewSize(area.total.Width-area.pos.X-area.derecha, area.total.Height-area.pos.Y-area.pie)
+					montado.Resize(tam)
+					montado.Move(area.pos)
+					posBarra, tamBarra, posContenido, tamContenido := b.Position(), b.Size(), contenido.Position(), contenido.Size()
+					m.colocarFondo(tam, area.pos, area.total)
+					if b.Position() != posBarra || b.Size() != tamBarra || contenido.Position() != posContenido || contenido.Size() != tamContenido {
+						t.Fatal("prolongar el fondo ha movido o redimensionado los controles")
+					}
+					if m.marco.hoja.Visible() || m.marco.fondo.degradado.Visible() || m.marco.fondo.liso.Visible() {
+						t.Fatal("Carril ha incorporado la hoja o el fondo de Marco")
+					}
+					for _, esc := range []float32{2, 3} {
+						testigo := canvas.NewRectangle(magenta)
+						testigo.Resize(area.total)
+						img := pintaA(t, esc, area.total.Width, area.total.Height, testigo, montado)
+						baseBarra := canvas.NewRectangle(tema.Color("bg", v))
+						baseBarra.Resize(b.Size())
+						barra := pintaA(t, esc, tam.Width, b.Size().Height, baseBarra, b)
+						comprobar := func(que string, p fyne.Position, quiero color.NRGBA) {
+							t.Helper()
+							if quiero == magenta || quiero.A != 255 {
+								t.Fatalf("la referencia de %s no contiene pintura opaca del tema: %v", que, quiero)
+							}
+							if got := px(img, int(p.X*esc), int(p.Y*esc)); !cercaDe(got, quiero, 3) {
+								t.Errorf("%s a %v ×%g en %v: %v, quiero continuidad con %v", que, area.pos, esc, p, got, quiero)
+							}
+						}
+						for _, x := range []float32{1, area.pos.X + 20, area.total.Width / 2, area.total.Width - 2} {
+							xBarra := min(max(int((x-area.pos.X)*esc), 0), barra.Bounds().Dx()-1)
+							quiero := px(barra, xBarra, int(esc))
+							if area.pos.Y > 0 {
+								comprobar("techo adaptativo", fyne.NewPos(x, 1), quiero)
+							}
+							if x < area.pos.X || x >= area.pos.X+tam.Width {
+								comprobar("lateral de la cabecera", fyne.NewPos(x, area.pos.Y+1), quiero)
+							}
+						}
+						for _, p := range []fyne.Position{
+							{X: 1, Y: area.total.Height - 2},
+							{X: area.pos.X + 32, Y: area.total.Height - 2},
+							{X: area.total.Width / 2, Y: area.total.Height - 2},
+							{X: area.total.Width - 2, Y: area.total.Height - 2},
+							{X: 1, Y: area.pos.Y + b.Size().Height + (tam.Height-b.Size().Height)/2},
+							{X: area.total.Width - 2, Y: area.pos.Y + b.Size().Height + (tam.Height-b.Size().Height)/2},
+						} {
+							x := min(max(int(p.X*esc), int(area.pos.X*esc)), int((area.pos.X+tam.Width)*esc)-1)
+							y := min(int(p.Y*esc), int((area.pos.Y+tam.Height)*esc)-1)
+							comprobar("borde de la hoja", p, px(img, x, y))
+						}
+						// Quince muestras opt-in: teléfono en dos orientaciones a ×2/×3
+						// y escritorio a ×2, en las tres apariencias. Reutilizan el PNG
+						// ya medido; el resto de la matriz sigue comprobándose sin exportar.
+						if base := os.Getenv("SYTUE_CAPTURA_CROMO"); base != "" && navegacion == "menu" &&
+							(area.nombre == "retrato" || area.nombre == "paisaje" || (area.nombre == "escritorio" && esc == 2)) {
+							nombre := fmt.Sprintf("%s-carril-segura-%s-%s-x%g.png", filepath.Base(base), variante, area.nombre, esc)
+							guardarEn(t, base, nombre, img)
+							t.Logf("pintor=software forma=carril modo=%s ventana=%v segura=%v tactil=%v escala=%g captura=%s",
+								variante, area.total, area.pos, area.tactil, esc, nombre)
+						}
+					}
+				}
+			})
+		}
 	}
 }
 

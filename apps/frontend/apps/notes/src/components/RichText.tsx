@@ -23,7 +23,7 @@
  * allowlist en `@sytue/ui` (compartido con Mail), no relajar esto.
  */
 import type { JSX } from 'preact';
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { createPortal } from 'preact/compat';
 import {
   BARRA_DE_EDICION,
@@ -203,9 +203,35 @@ export function RichText({
   // Si hay algo que deshacer o rehacer, según el navegador: sin esto los dos
   // botones se ven iguales con la pila vacía y con veinte cambios dentro.
   const [puede, setPuede] = useState({ undo: false, redo: false });
-  // La selección se guarda al abrir la herramienta de enlaces: enfocar su caja
-  // de texto la pierde, y sin ella no habría dónde meter el enlace.
+  // Las herramientas pueden tomar el foco (menús, colores, enlaces, teclado).
+  // El rango sigue perteneciendo al texto hasta volver de ellas.
   const seleccion = useRef<Range | null>(null);
+
+  const guardarSeleccion = useCallback(() => {
+    const rango = window.getSelection();
+    if (
+      rango &&
+      rango.rangeCount > 0 &&
+      ref.current?.contains(rango.anchorNode) &&
+      ref.current.contains(rango.focusNode)
+    )
+      seleccion.current = rango.getRangeAt(0).cloneRange();
+  }, []);
+
+  const enfocarTexto = () => {
+    if (document.activeElement === ref.current) guardarSeleccion();
+    const rango = seleccion.current;
+    ref.current?.focus();
+    if (
+      rango &&
+      ref.current?.contains(rango.startContainer) &&
+      ref.current.contains(rango.endContainer)
+    ) {
+      const actual = window.getSelection();
+      actual?.removeAllRanges();
+      actual?.addRange(rango);
+    }
+  };
 
   // --- Menú de «/» ----------------------------------------------------------
   //
@@ -404,7 +430,7 @@ export function RichText({
   };
 
   const aplicar = (cmd: string, valor?: string) => {
-    ref.current?.focus();
+    enfocarTexto();
     executeEditingCommand(cmd, valor);
     refrescar();
     emitir();
@@ -417,7 +443,7 @@ export function RichText({
    * la barra que Ctrl+Z no revierte es un botón en el que no se puede confiar.
    */
   const envolver = (tag: 'code' | 'mark') => {
-    ref.current?.focus();
+    enfocarTexto();
     const sel = window.getSelection();
     if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
     const caja = document.createElement('div');
@@ -486,7 +512,7 @@ export function RichText({
   /** Tabla de `filas`×`columnas`. Los bordes van en línea, como en Mail: así se
    *  ven igual en la nota, en el HTML exportado y en el PDF. */
   const insertarTabla = (filas: number, columnas: number) => {
-    ref.current?.focus();
+    enfocarTexto();
     const celda = `<td style="${ESTILO_CELDA}">&nbsp;</td>`;
     const fila = `<tr>${celda.repeat(columnas)}</tr>`;
     executeEditingCommand(
@@ -499,7 +525,7 @@ export function RichText({
 
   /** Inserta una fila de cuadro de tarea interactiva en el texto. */
   const insertarTarea = () => {
-    ref.current?.focus();
+    enfocarTexto();
     const sel = window.getSelection();
     if (sel && sel.rangeCount > 0) {
       const range = sel.getRangeAt(0);
@@ -538,6 +564,7 @@ export function RichText({
 
   /** Aplica una acción a la celda donde está el cursor. */
   const enCelda = (accion: (c: HTMLTableCellElement) => void) => {
+    enfocarTexto();
     const celda = celdaDe(window.getSelection()?.anchorNode ?? null);
     if (!celda) return;
     accion(celda);
@@ -546,19 +573,14 @@ export function RichText({
   };
 
   const abrirEnlaces = () => {
-    const sel = window.getSelection();
-    seleccion.current = sel && sel.rangeCount > 0 ? sel.getRangeAt(0).cloneRange() : null;
+    if (document.activeElement === ref.current) guardarSeleccion();
     setEnlaceAbierto(true);
   };
 
   const insertarEnlace = (url: string, label: string) => {
     setEnlaceAbierto(false);
-    ref.current?.focus();
+    enfocarTexto();
     const sel = window.getSelection();
-    if (sel && seleccion.current) {
-      sel.removeAllRanges();
-      sel.addRange(seleccion.current);
-    }
     // Con texto seleccionado, ese texto es el enlace; sin él, se inserta el
     // nombre de lo enlazado. Nunca la URL pelada como texto de un enlace a una nota.
     if (sel && !sel.isCollapsed) {
@@ -652,6 +674,7 @@ export function RichText({
   // llega igual con el ratón, con Mayús+flechas y con «seleccionar todo».
   useEffect(() => {
     const mirar = () => {
+      if (document.activeElement === ref.current) guardarSeleccion();
       const raiz = ref.current;
       const sel = window.getSelection();
       if (
@@ -682,7 +705,7 @@ export function RichText({
       document.removeEventListener('selectionchange', mirar);
       window.removeEventListener('scroll', mirar, true);
     };
-  }, []);
+  }, [guardarSeleccion]);
 
   /** Pinta las coincidencias y lleva la vista a la actual. */
   const pintarBusqueda = (q: string, i: number) => {
@@ -750,13 +773,12 @@ export function RichText({
         aria-label={a.label}
         disabled={a.desactivada}
         {...(a.conEstado ? { 'aria-pressed': activos[a.cmd] ?? false } : {})}
-        // onMouseDown y no onClick: al pulsar con el ratón, el navegador quita el
-        // foco del contenteditable ANTES del click y con él la selección, así que
-        // el comando se aplicaría sobre nada.
+        // Conservar el cursor al apoyar; activar en click también permite usar
+        // Intro/Espacio y la activación táctil normal del botón.
         onMouseDown={(e) => {
           e.preventDefault();
-          onPress();
         }}
+        onClick={onPress}
       >
         {a.icon ? <Icon name={a.icon} size={16} /> : <Glyph name={a.glyph ?? 'note'} size={16} />}
       </button>
@@ -940,7 +962,7 @@ export function RichText({
             onPick={(e) => insertarEnlace(e.url, e.label)}
             onClose={() => {
               setEnlaceAbierto(false);
-              ref.current?.focus();
+              enfocarTexto();
             }}
           />
         </Popover>
@@ -1132,19 +1154,23 @@ export function RichText({
             estirado && 'flex-1',
           )}
           onInput={() => {
+            guardarSeleccion();
             emitir();
             refrescar();
             mirarMenuCmd();
           }}
           onBlur={() => {
+            guardarSeleccion();
             emitir();
             setMenuCmd(null);
           }}
           onKeyUp={() => {
+            guardarSeleccion();
             refrescar();
             mirarMenuCmd();
           }}
           onMouseUp={() => {
+            guardarSeleccion();
             refrescar();
             mirarMenuCmd();
           }}

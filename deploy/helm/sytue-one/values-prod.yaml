@@ -168,8 +168,8 @@ traefik:
   image:
     registry: rg.fr-par.scw.cloud
     repository: sytue-prod-platform/traefik
-    tag: v3.7.10
-  versionOverride: v3.7.10
+    tag: v3.7.17
+  versionOverride: v3.7.17
   # Cada chart upstream nombra esta clave a su manera y NO lee la global: hay que
   # apagarlas una a una o el render se cae por el CRD que falta (ver global.metrics).
   metrics:
@@ -244,11 +244,10 @@ dragonfly:
     # `<mirror>/docker.dragonflydb.io/dragonflydb/dragonfly` y el pull daría un
     # 404 que parece que la imagen no existe.
     #
-    # El digest se conserva: es el mismo a los dos lados —`crane copy` no
-    # reempaqueta— y es lo que fija QUÉ se ejecuta.
+    # Se hereda el digest del chart: es el mismo a los dos lados —`crane copy`
+    # no reempaqueta— y así no puede quedarse un pin anterior en este perfil.
     repository: dragonfly
     useGlobalRegistry: true
-    digest: "sha256:ebf3c6c213e82fb51b4521660cca13f06f3421dc5b1ed14f2f474c50b5e29986"
 
 # -----------------------------------------------------------------------------
 # Servicios Go. config.dbMaxConns = pool pgx POR replica (DB_MAX_CONNS): bajo,
@@ -552,10 +551,10 @@ cloud-controller:
     # cada namespace de tenant se emite para el HOST entero (`rg.fr-par.scw.cloud`,
     # ver controller/kubeplatform.go), no para un namespace suelto del registro.
     managedImages:
-      postgres: rg.fr-par.scw.cloud/sytue-prod-platform/managed-postgres:18.6@sha256:06cad38a5d9f5d24b4d83d86def30795d5e4b757fedbf5281172b576dedcd941
-      postgrest: rg.fr-par.scw.cloud/sytue-prod-platform/managed-postgrest:v14.16@sha256:bea1c76a856fa39d1e542d25911cf95d02fe2bf971992d033044ff209f1504b8
-      rclone: rg.fr-par.scw.cloud/sytue-prod-platform/managed-rclone:1.75.0@sha256:b06aed988cf5967de7c25be5925240983981c757f4ed1ac9d2fa659d51d60548
-      httpTask: rg.fr-par.scw.cloud/sytue-prod-platform/managed-http-task:8.21.0@sha256:7c12af72ceb38b7432ab85e1a265cff6ae58e06f95539d539b654f2cfa64bb13
+      postgres: rg.fr-par.scw.cloud/sytue-prod-platform/managed-postgres:18.6@sha256:3a4264520e121176619f54ff867d12774bc81e95e7b84db58d63bccdb6144b81
+      postgrest: rg.fr-par.scw.cloud/sytue-prod-platform/managed-postgrest:v14.18@sha256:c7cd7e265a85b05248abf53f4473fcec7e327c282d0bd0cf60f1551996d09fcf
+      rclone: rg.fr-par.scw.cloud/sytue-prod-platform/managed-rclone:1.75.2@sha256:2687085f718d3c628f7fdfb77c52a1d344332aed543110bb88088f2c70d43eb5
+      httpTask: rg.fr-par.scw.cloud/sytue-prod-platform/managed-http-task:8.23.0@sha256:3fb7e13e5d179a845c97d78204f3f1064d1907037f26a3ebf91710571151fd93
 
 # Sytue Analytics (ADR 0026). El COLECTOR es el endpoint de mas volumen de la
 # plataforma y el unico publico sin autenticar: suelo de 3 replicas para absorber
@@ -586,7 +585,7 @@ livekit:
   replicaCount: 1
   image:
     repository: livekit
-    tag: v1.13.5
+    tag: v1.13.11
     useGlobalRegistry: true
   # Store de routing del SFU. NO es caché ni rendimiento: es el único canal por el
   # que el SFU le pasa trabajo al egress. Sin esto, el botón de grabar arranca un

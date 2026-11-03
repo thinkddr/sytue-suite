@@ -10,6 +10,7 @@ case "$NOMBRE" in
   accesibilidad-bases-*) [[ "$NOMBRE" =~ ^accesibilidad-bases-[0-9]+$ ]] || exit 1 ;;
   notepads-ux-*) [[ "$NOMBRE" =~ ^notepads-ux-[0-9]+$ ]] || exit 1 ;;
   photos-visual-*) [[ "$NOMBRE" =~ ^photos-visual-[0-9]+$ ]] || exit 1 ;;
+  menus-traslucidos-*) [[ "$NOMBRE" =~ ^menus-traslucidos-[0-9]+$ ]] || exit 1 ;;
   *) printf 'Unknown fixture: %s\n' "$NOMBRE" >&2; exit 1 ;;
 esac
 DIRECTORIO="/tmp/$NOMBRE"

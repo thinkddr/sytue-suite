@@ -189,19 +189,22 @@ test('actual Notes screen encrypts migration and edits, then clears plaintext wh
   await new Promise((r) => setTimeout(r, 50));
   expect(host.textContent).not.toContain('historic private');
   expect(host.textContent).not.toContain('private.pdf');
-  (
-    [...document.querySelectorAll('button')].find(
+  const unlock = async () => {
+    const button = [...document.querySelectorAll('button')].find(
       (b) => b.textContent?.trim() === 'Unlock notebook',
-    ) as HTMLButtonElement
-  ).click();
-  await until(() => Boolean(document.querySelector('input[type="password"]')));
-  const pass = document.querySelector('input[type="password"]') as HTMLInputElement;
-  pass.value = 'long password for test';
-  pass.dispatchEvent(new Event('input', { bubbles: true }));
-  await new Promise((r) => setTimeout(r, 0));
-  document
-    .querySelector('#cuaderno-clave')!
-    .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    ) as HTMLButtonElement;
+    expect(button).not.toBeUndefined();
+    button.click();
+    await until(() => Boolean(document.querySelector('input[type="password"]')));
+    const pass = document.querySelector('input[type="password"]') as HTMLInputElement;
+    pass.value = 'long password for test';
+    pass.dispatchEvent(new Event('input', { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 0));
+    document
+      .querySelector('#cuaderno-clave')!
+      .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+  };
+  await unlock();
   await until(() => writes.length === 1 && Boolean(host?.textContent?.includes('private.pdf')));
   const body = writes[0]!.body;
   expect(JSON.stringify(body)).not.toContain('private.pdf');
@@ -332,15 +335,53 @@ test('actual Notes screen encrypts migration and edits, then clears plaintext wh
   );
   expect(Object.keys(created.data as Record<string, unknown>)).toEqual(['client_id']);
   expect(typeof (created.data as Record<string, unknown>).client_id).toBe('string');
+  const savedCipher = row.content_cipher;
+  expect(savedCipher).toEqual(expect.any(String));
+  const privateBodyDraft = 'private body discarded on lock';
+  const bodyButton = host.querySelector<HTMLElement>('[data-note-id="n"] [role="button"]');
+  expect(bodyButton?.textContent).toContain('historic body');
+  bodyButton!.click();
+  await until(
+    () =>
+      host
+        ?.querySelector('[data-note-id="n"] [contenteditable]')
+        ?.textContent?.includes('historic body') === true,
+  );
+  const editor = host.querySelector<HTMLElement>('[data-note-id="n"] [contenteditable]')!;
+  editor.focus();
+  editor.innerHTML = `<p>${privateBodyDraft}</p>`;
+  editor.dispatchEvent(new Event('input', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 0));
+  expect(document.activeElement).toBe(editor);
+  expect(editor.textContent).toBe(privateBodyDraft);
   const lockButton = [...host.querySelectorAll('button')].find((b) =>
     b.textContent?.trim().startsWith('Lock'),
   ) as HTMLButtonElement;
   expect(lockButton).not.toBeUndefined();
+  // Activate the real lock button without a separate focus/blur transition, as
+  // touch, assistive activation and Safari may do. Closing the key must discard
+  // editor state itself rather than depend on the button first taking focus.
   lockButton.click();
   await until(() => !host?.textContent?.includes('private.pdf'));
+  expect(editor.isConnected).toBe(false);
+  expect(host.querySelector('[data-note-id="n"] [contenteditable]')).toBeNull();
+  expect(host.textContent).not.toContain(privateBodyDraft);
   expect(host.querySelector<HTMLInputElement>('input[name="capture"]')?.value ?? '').toBe('');
   staleRetry.click();
   expect(writes).toHaveLength(4);
+  await unlock();
+  await until(() => Boolean(host?.textContent?.includes('private.pdf')));
+  expect(host.querySelector('[data-note-id="n"] [contenteditable]')).toBeNull();
+  expect(host.querySelector('[data-note-id="n"] [role="button"]')?.textContent).toContain(
+    'historic body',
+  );
+  expect(host.textContent).not.toContain(privateBodyDraft);
+  // Let a retained draft's normal autosave pause elapse under the newly opened
+  // key: neither an encrypted replay nor a legacy plaintext request may escape.
+  await new Promise((r) => setTimeout(r, 500));
+  expect(writes).toHaveLength(4);
+  expect(row.content_cipher).toBe(savedCipher);
+  expect(JSON.stringify(writes)).not.toContain(privateBodyDraft);
   releaseCreate();
   await until(() => createFinished);
   await new Promise((r) => setTimeout(r, 20));

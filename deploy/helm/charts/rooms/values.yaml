@@ -102,7 +102,7 @@ config:
     homeserverURL: ""
     serverName: ""
     ssoProviderID: oidc-sytue
-    sourceURL: https://github.com/element-hq/synapse/tree/v1.163.0
+    sourceURL: https://github.com/element-hq/synapse/tree/v1.164.2
     existingSecret: sytue-matrix
   # Tamano del pool pgx por replica (DB_MAX_CONNS). Prod lo baja (3-5):
   # PgBouncer multiplexa hacia la RDB (ver values-prod.yaml del umbrella).

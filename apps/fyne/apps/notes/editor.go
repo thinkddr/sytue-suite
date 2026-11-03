@@ -136,6 +136,9 @@ type EditorNota struct {
 
 	AlCambiar  func(html string)
 	AlTerminar func()
+	// conservaEdicion reconoce las herramientas del cuaderno que aloja este editor;
+	// mover allí el foco conserva el documento y su selección, sin robarle el foco.
+	conservaEdicion func(fyne.Focusable) bool
 	// AlEnlazar abre la herramienta de enlaces colgando del botón; la pantalla sabe qué
 	// notas ofrecer. Devuelve por `aplicarEnlace`.
 	AlEnlazar func(disparador fyne.CanvasObject)
@@ -859,12 +862,21 @@ func (e *EditorNota) atajoPropio(x *desktop.CustomShortcut) {
 
 // ---- La barra ----
 
+// botonDeOrden devuelve el foco a la escritura después de una acción directa. Los
+// disparadores de menús sustituyen AlPulsar: su capa conserva el foco hasta cerrarse.
+func (e *EditorNota) botonDeOrden(glifo string, icono iconos.Icono, rotulo string, aplicar func()) *botonBarra {
+	return nuevoBotonBarra(glifo, icono, rotulo, func() {
+		llamar0(aplicar)
+		e.reenfocar()
+	})
+}
+
 // armarBarra monta los botones en el orden de RichText.tsx.
 func (e *EditorNota) armarBarra() *fyne.Container {
 	t := e.tr.T
 	e.botones = map[string]*botonBarra{}
 	boton := func(clave, glifo string, icono iconos.Icono, rotulo string, f func()) *botonBarra {
-		b := nuevoBotonBarra(glifo, icono, rotulo, f)
+		b := e.botonDeOrden(glifo, icono, rotulo, f)
 		e.botones[clave] = b
 		return b
 	}
@@ -930,7 +942,7 @@ func (e *EditorNota) armarBarraTabla() *fyne.Container {
 		if i >= 4 {
 			glifo, icono = PapeleraD, iconos.Ninguno
 		}
-		b := nuevoBotonBarra(glifo, icono, t(o.Clave, nil), func() { e.Orden(o.Orden, "") })
+		b := e.botonDeOrden(glifo, icono, t(o.Clave, nil), func() { e.Orden(o.Orden, "") })
 		e.botones[o.Orden] = b
 		items = append(items, b)
 	}
@@ -1195,23 +1207,29 @@ func (z *zonaEdicion) FocusLost() {
 	z.enfocado = false
 	z.Refresh()
 	z.e.Refresh() // la burbuja solo se ve con el cuerpo enfocado
-	fyne.Do(func() {
-		c := fyne.CurrentApp().Driver().CanvasForObject(z)
-		if c == nil {
-			return
-		}
-		// Con una capa abierta (el menú de bloque, la paleta, la herramienta de enlaces)
-		// el foco está en ella y vuelve aquí al cerrarla: no es haberse ido.
-		f := c.Focused()
-		if f == nil || f == fyne.Focusable(z) || len(c.Overlays().List()) > 0 {
-			return
-		}
-		// La caja de «Buscar en la nota» es del propio editor: ir a ella no es salir.
-		if z.e.buscador != nil && f == fyne.Focusable(z.e.buscador.campo) {
-			return
-		}
-		llamar0(z.e.AlTerminar)
-	})
+	fyne.Do(z.comprobarSalida)
+}
+
+func (z *zonaEdicion) comprobarSalida() {
+	c := fyne.CurrentApp().Driver().CanvasForObject(z)
+	if c == nil {
+		return
+	}
+	// Con una capa abierta (el menú de bloque, la paleta, la herramienta de enlaces)
+	// el foco está en ella y vuelve aquí al cerrarla: no es haberse ido.
+	f := c.Focused()
+	if f == nil || f == fyne.Focusable(z) || len(c.Overlays().List()) > 0 {
+		return
+	}
+	// La caja de «Buscar en la nota» y las herramientas del cuaderno conservan la
+	// sesión sin robar el foco a la herramienta que la persona está usando.
+	if z.e.buscador != nil && z.e.buscador.campo.Enfocado() {
+		return
+	}
+	if z.e.conservaEdicion != nil && z.e.conservaEdicion(f) {
+		return
+	}
+	llamar0(z.e.AlTerminar)
 }
 
 func (z *zonaEdicion) TypedRune(r rune) {

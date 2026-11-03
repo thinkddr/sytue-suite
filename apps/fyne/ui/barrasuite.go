@@ -311,11 +311,20 @@ func NuevaBarraSuite(t *i18n.Translator, s *sesion.Suite, p iconos.Producto) *Ba
 func (b *BarraSuite) Montar(contenido fyne.CanvasObject) fyne.CanvasObject {
 	b.Arrancar()
 	m := &montaje{
-		marco: nuevoMarco(), aSangre: b.hojaASangre,
-		superior:  canvas.NewRectangle(color.NRGBA{}),
-		laterales: [2]*canvas.Rectangle{canvas.NewRectangle(color.NRGBA{}), canvas.NewRectangle(color.NRGBA{})},
+		marco: nuevoMarco(), aSangre: b.hojaASangre, barra: b,
+		baseSegura:       canvas.NewRectangle(color.NRGBA{}),
+		superior:         canvas.NewRectangle(color.NRGBA{}),
+		esquinaSuperior:  canvas.NewRectangle(color.NRGBA{}),
+		laterales:        [2]*canvas.Rectangle{canvas.NewRectangle(color.NRGBA{}), canvas.NewRectangle(color.NRGBA{})},
+		navegacionSegura: [2]*canvas.Rectangle{canvas.NewRectangle(color.NRGBA{}), canvas.NewRectangle(color.NRGBA{})},
 	}
-	objetos := append([]fyne.CanvasObject{m.superior, m.laterales[0], m.laterales[1]}, m.marco.detras()...)
+	objetos := []fyne.CanvasObject{m.baseSegura}
+	for i := range m.cuerpoSeguro {
+		m.cuerpoSeguro[i] = NuevoFondoSuite(tema.De(fyne.CurrentApp().Settings().ThemeVariant()))
+		objetos = append(objetos, m.cuerpoSeguro[i])
+	}
+	objetos = append(objetos, m.navegacionSegura[0], m.navegacionSegura[1], m.superior, m.esquinaSuperior, m.laterales[0], m.laterales[1])
+	objetos = append(objetos, m.marco.detras()...)
 	objetos = append(objetos, contenido)
 	m.contenido = len(objetos) - 1
 	objetos = append(append(objetos, m.marco.delante()...), b)
@@ -553,13 +562,28 @@ type barraSuiteRenderer struct {
 // tokenFondo es el que pinta la barra: el suyo, el del carril cuando es estrecha, o el
 // del marco.
 func (r *barraSuiteRenderer) tokenFondo() string {
+	return tokenFondoBarra(r.carril)
+}
+
+func tokenFondoBarra(carril bool) string {
 	switch {
 	case tema.EsMarco():
 		return "frame-from"
-	case r.carril:
+	case carril:
 		return fondoEsquina
 	}
 	return fondoBarra
+}
+
+func barraDeCarril(ancho float32) bool {
+	return ancho > 0 && (ancho < CorteEsquinaMarca || tema.EsMarco())
+}
+
+func (b *BarraSuite) anchoEsquinaPintada(ancho, marca float32) float32 {
+	if !b.conMenuLateral() {
+		return esquinaCenida(marca)
+	}
+	return AnchoEsquinaMarca(ancho, marca)
 }
 
 // pintar pone los colores de la barra y de sus piezas según sea clara o carril.
@@ -613,7 +637,7 @@ func (r *barraSuiteRenderer) Destroy()                     {}
 // Las acciones van de fuera hacia dentro, como en la web: el avatar con su `ml-0.5`,
 // el filete con su `mx-1` y la campana, con `gap-1` entre ellas.
 func (r *barraSuiteRenderer) Layout(t fyne.Size) {
-	if carril := t.Width > 0 && (t.Width < CorteEsquinaMarca || tema.EsMarco()); carril != r.carril {
+	if carril := barraDeCarril(t.Width); carril != r.carril {
 		r.carril = carril
 		r.pintar(tema.De(fyne.CurrentApp().Settings().ThemeVariant()))
 	}
@@ -654,10 +678,7 @@ func (r *barraSuiteRenderer) Layout(t fyne.Size) {
 	// ocupa la marca: el buscador no se mueve al pasar de una app a otra (las dos cajas
 	// de TopBar.tsx).
 	reserva := AnchoEsquinaMarca(t.Width, m.Width)
-	pintada := reserva
-	if !r.b.conMenuLateral() {
-		pintada = esquinaCenida(m.Width)
-	}
+	pintada := r.b.anchoEsquinaPintada(t.Width, m.Width)
 	r.esquina.Resize(fyne.NewSize(pintada, AltoBarraSuite()))
 
 	// El buscador, centrado en lo que queda entre las dos, hasta su ancho canónico.
@@ -686,11 +707,16 @@ func (r *barraSuiteRenderer) Refresh() {
 // lleva el resto. Los objetos van en orden de PINTADO y no en orden visual: el marco y
 // el papel de la hoja, el contenido, las máscaras y la sombra de la hoja, y la barra.
 type montaje struct {
-	marco     *marco
-	superior  *canvas.Rectangle    // el área segura sobre la barra de Carril
-	laterales [2]*canvas.Rectangle // prolongación del marco en los bordes seguros del teléfono
-	contenido int                  // dónde va el contenido en los objetos
-	aSangre   bool
+	marco            *marco
+	superior         *canvas.Rectangle    // el área segura sobre la barra de Carril
+	laterales        [2]*canvas.Rectangle // bordes seguros del marco o de la cabecera
+	contenido        int                  // dónde va el contenido en los objetos
+	aSangre          bool
+	barra            *BarraSuite
+	baseSegura       *canvas.Rectangle
+	esquinaSuperior  *canvas.Rectangle
+	cuerpoSeguro     [3]*FondoSuite // izquierda, derecha y pie, sin solaparse
+	navegacionSegura [2]*canvas.Rectangle
 }
 
 var _ fyne.Layout = (*montaje)(nil)
@@ -746,16 +772,20 @@ func (m *montaje) colocarFondoSeguro(barra fyne.CanvasObject, t fyne.Size) {
 // prolongan sus extremos para que también encaje al girar el teléfono.
 func (m *montaje) colocarFondo(t fyne.Size, segura fyne.Position, total fyne.Size) {
 	m.superior.Hide()
+	m.baseSegura.Hide()
+	m.esquinaSuperior.Hide()
+	for _, o := range m.cuerpoSeguro {
+		o.Hide()
+	}
+	for _, o := range m.navegacionSegura {
+		o.Hide()
+	}
 	for _, o := range m.laterales {
 		o.Hide()
 	}
 	if !tema.EsMarco() {
 		m.marco.fondo.esconder()
-		m.superior.FillColor = tema.Color(fondoEsquina, tema.De(fyne.CurrentApp().Settings().ThemeVariant()))
-		m.superior.Move(fyne.NewPos(0, -segura.Y))
-		m.superior.Resize(fyne.NewSize(t.Width, segura.Y))
-		esconder(m.superior, segura.Y <= 0)
-		m.superior.Refresh()
+		m.colocarFondoCarril(t, segura, total)
 		return
 	}
 	f := m.marco.fondo
@@ -772,6 +802,79 @@ func (m *montaje) colocarFondo(t fyne.Size, segura fyne.Position, total fyne.Siz
 		esconder(o, lado.ancho <= 0)
 		o.Refresh()
 	}
+}
+
+func (m *montaje) colocarFondoCarril(t fyne.Size, segura fyne.Position, total fyne.Size) {
+	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
+	// La misma base opaca que el canvas, también bajo el alfa de la cabecera.
+	// El ambiental se prolonga sólo en los insets: la hoja conserva su pintura.
+	ponerFondoSeguro(m.baseSegura, fyne.NewPos(-segura.X, -segura.Y), total, tema.Color("bg", v))
+	alto := m.barra.MinSize().Height
+	derecha, pie := max(total.Width-segura.X-t.Width, 0), max(total.Height-segura.Y-t.Height, 0)
+	referencia := fyne.NewSize(t.Width, max(t.Height-alto, 0))
+	for i, zona := range []struct {
+		pos, desplazamiento fyne.Position
+		tam                 fyne.Size
+	}{
+		{fyne.NewPos(-segura.X, alto), fyne.NewPos(-segura.X, 0), fyne.NewSize(segura.X, referencia.Height+pie)},
+		{fyne.NewPos(t.Width, alto), fyne.NewPos(t.Width, 0), fyne.NewSize(derecha, referencia.Height+pie)},
+		{fyne.NewPos(0, t.Height), fyne.NewPos(0, referencia.Height), fyne.NewSize(t.Width, pie)},
+	} {
+		f := m.cuerpoSeguro[i]
+		f.PonerVariante(v)
+		f.Move(zona.pos)
+		f.Resize(zona.tam)
+		f.prolongar(zona.desplazamiento, referencia)
+		esconder(f, zona.tam.Width <= 0 || zona.tam.Height <= 0)
+		f.Refresh()
+	}
+	m.colocarCabeceraSegura(t, segura, total, alto, v)
+	m.colocarNavegacionSegura(t, segura, referencia.Height+pie, pie, alto, v)
+}
+
+func ponerFondoSeguro(o *canvas.Rectangle, pos fyne.Position, tam fyne.Size, tinta color.NRGBA) {
+	o.FillColor = tinta
+	o.Move(pos)
+	o.Resize(tam)
+	esconder(o, tam.Width <= 0 || tam.Height <= 0)
+	o.Refresh()
+}
+
+func (m *montaje) colocarCabeceraSegura(t fyne.Size, segura fyne.Position, total fyne.Size, alto float32, v tema.Variante) {
+	fondo := tema.Color(tokenFondoBarra(barraDeCarril(t.Width)), v)
+	marca := tema.Color(fondoEsquina, v)
+	esquina := float32(0)
+	if !barraDeCarril(t.Width) {
+		anchoMarca := MedidaMarcaBarra(m.barra.marca.producto, t.Width >= CorteNombreMarca).Width
+		esquina = min(m.barra.anchoEsquinaPintada(t.Width, anchoMarca), t.Width)
+		ponerFondoSeguro(m.esquinaSuperior, fyne.NewPos(-segura.X, -segura.Y), fyne.NewSize(segura.X+esquina, segura.Y), marca)
+	}
+	x, ancho := -segura.X, total.Width
+	if esquina > 0 {
+		x, ancho = esquina, max(total.Width-segura.X-esquina, 0)
+	}
+	ponerFondoSeguro(m.superior, fyne.NewPos(x, -segura.Y), fyne.NewSize(ancho, segura.Y), fondo)
+	ponerFondoSeguro(m.laterales[0], fyne.NewPos(-segura.X, 0), fyne.NewSize(segura.X, alto), marca)
+	ponerFondoSeguro(m.laterales[1], fyne.NewPos(t.Width, 0), fyne.NewSize(max(total.Width-segura.X-t.Width, 0), alto), fondo)
+}
+
+func (m *montaje) colocarNavegacionSegura(t fyne.Size, segura fyne.Position, altoCuerpo, pie, altoBarra float32, v tema.Variante) {
+	a := armazonEn(ContenidoMontado(m.barra.montado))
+	if a == nil || t.Width < Estrecho {
+		return
+	}
+	ancho, token := float32(0), fondoEsquina
+	if a.Carril != nil {
+		ancho, token = a.Carril.MinSize().Width, "rail"
+	} else if a.Menu != nil {
+		ancho = a.Menu.MinSize().Width
+	}
+	if ancho <= 0 {
+		return
+	}
+	tinta := tema.Color(token, v)
+	ponerFondoSeguro(m.navegacionSegura[0], fyne.NewPos(-segura.X, altoBarra), fyne.NewSize(segura.X, altoCuerpo), tinta)
+	ponerFondoSeguro(m.navegacionSegura[1], fyne.NewPos(0, t.Height), fyne.NewSize(min(ancho, t.Width), pie), tinta)
 }
 
 func (m *montaje) MinSize(objs []fyne.CanvasObject) fyne.Size {

@@ -111,7 +111,11 @@ func absf(x float32) float32 {
 // guardar deja la captura en SYTUE_CAPTURA_DIR para MIRARLA; sin la variable, nada.
 func guardar(t *testing.T, nombre string, img image.Image) {
 	t.Helper()
-	dir := os.Getenv("SYTUE_CAPTURA_DIR")
+	guardarEn(t, os.Getenv("SYTUE_CAPTURA_DIR"), nombre, img)
+}
+
+func guardarEn(t *testing.T, dir, nombre string, img image.Image) {
+	t.Helper()
 	if dir == "" {
 		return
 	}

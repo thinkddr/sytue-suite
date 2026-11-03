@@ -72,7 +72,15 @@ function newAccountForm() {
   };
 }
 
-export function ExternalMail({ onClose, t }: { onClose: () => void; t: T }): JSX.Element {
+export function ExternalMail({
+  onClose,
+  t,
+  initialInstance,
+}: {
+  onClose: () => void;
+  t: T;
+  initialInstance?: string;
+}): JSX.Element {
   const { t: commonT } = useI18n();
   const api = useMemo(externalMailClient, []);
   const [data, setData] = useState(EMPTY);
@@ -109,7 +117,7 @@ export function ExternalMail({ onClose, t }: { onClose: () => void; t: T }): JSX
       .then((result) => {
         if (controller.signal.aborted) return;
         setData(result);
-        const id = returned.current.get('instance');
+        const id = returned.current.get('instance') ?? initialInstance;
         const account = result.items.find((item) => item.instance_id === id);
         if (account) {
           setProvider(account.provider);
@@ -138,7 +146,7 @@ export function ExternalMail({ onClose, t }: { onClose: () => void; t: T }): JSX
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [api, attempt]);
+  }, [api, attempt, initialInstance]);
   const available = data.providers.some((item) => item.provider === provider && item.available);
   const oauth = MAIL_PROVIDERS[provider].oauth;
   const offeredServices: LinkedServiceCapability[] = data.providers.find(

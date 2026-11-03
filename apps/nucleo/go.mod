@@ -22,6 +22,7 @@ module git.sytue.eu/sytue/one/apps/nucleo
 go 1.27.3
 
 require (
+	filippo.io/age v1.3.2
 	git.wow.st/gmp/jni v0.0.0-20210610011705-34026c7e22d0
 	github.com/coder/websocket v1.8.15
 	github.com/godbus/dbus/v5 v5.2.4
@@ -36,6 +37,7 @@ require (
 
 require (
 	filippo.io/edwards25519 v1.2.0 // indirect
+	filippo.io/hpke v0.4.0 // indirect
 	github.com/danieljoos/wincred v1.2.3 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect

@@ -215,7 +215,6 @@ func (r mailConfigureRequest) valid() bool {
 }
 
 func (h *Handlers) storeMailConsent(ctx context.Context, inst *domain.AppInstance, cfg map[string]string, tok tokenResponse, status domain.Status, secrets map[string]string, challenge string) error {
-	secrets[secretKeyRefresh] = tok.RefreshToken
 	if tok.ExpiresIn <= 0 {
 		delete(cfg, configKeyExpires)
 	}

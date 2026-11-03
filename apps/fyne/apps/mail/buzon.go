@@ -255,6 +255,7 @@ func NuevoBuzon(p *Pantalla, s Servicio) *Buzon {
 	p.Menu.AlElegirCarpeta = b.ElegirCarpeta
 	p.Menu.AlElegirEtiqueta = b.ElegirEtiqueta
 	p.Menu.AlElegirCompartido = b.ElegirCompartido
+	p.Menu.AlElegirExterna = func(c Compartido) { b.P.CerrarCajon(); b.abrirCorreoExternoEn(c.ID) }
 	p.Menu.AlReintentarCarpetas = b.cargarCarpetas
 	p.Menu.AlRefrescar = b.Refrescar
 	p.Menu.AlGestionarEtiquetas = func() { b.P.CerrarCajon(); b.verEtiquetas() }
@@ -368,6 +369,8 @@ func (b *Buzon) Arrancar(ctx context.Context) {
 	b.cargarIdentidad()
 	//nolint:contextcheck // Estas cargas toman el contexto de vida guardado en b.ctx.
 	b.cargarCompartidos()
+	//nolint:contextcheck // Usa la vida guardada en b.ctx.
+	b.cargarExternas()
 	b.sondear()
 	if d := b.P.Menu.Importar; d != nil {
 		d.CargarCon(ctx)

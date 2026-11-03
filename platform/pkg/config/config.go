@@ -150,23 +150,49 @@ func FirstPartyWebSocketHosts(env Environment) string {
 // audiencia mal listada: la galería sale vacía, la shell no trae notificaciones
 // ni presencia y la consola del navegador solo enseña «401». Medido en
 // producción el 2026-09-10.
+// FirstPartyProductClientID is the current web client for one product. Legacy
+// service audiences remain in FirstPartyAudiences but confer no cross-product
+// resource enrollment authority. Keep this mapping as the single client-ID source.
+func FirstPartyProductClientID(product string) string {
+	return firstPartyProductClients[product]
+}
+
+var firstPartyProductClients = map[string]string{
+	"hub":      "sytue-one",
+	"mail":     "sytue-mail",
+	"drive":    "sytue-drive",
+	"calendar": "sytue-calendar",
+	"contacts": "sytue-contacts",
+	"docs":     "sytue-docus",
+	"sheets":   "sytue-calcus",
+	"slides":   "sytue-diapos",
+	"pdf":      "sytue-certipdf",
+	"notes":    "sytue-notes",
+	"photos":   "sytue-syphotos",
+	"rooms":    "sytue-chat",
+	"cast":     "sytue-cast",
+	"erp":      "sytue-syerp",
+	"bases":    "sytue-bases",
+	"pages":    "sytue-pages",
+}
+
 var firstPartyAudiences = []string{
-	"sytue-one", "sytue-mail", "sytue-drive", "sytue-docs", "sytue-calendar",
-	"sytue-contacts", "sytue-notes", "sytue-syphotos", "sytue-syerp", "sytue-rooms", "sytue-chat",
+	FirstPartyProductClientID("hub"), FirstPartyProductClientID("mail"), FirstPartyProductClientID("drive"), "sytue-docs", FirstPartyProductClientID("calendar"),
+	FirstPartyProductClientID("contacts"), FirstPartyProductClientID("notes"), FirstPartyProductClientID("photos"), FirstPartyProductClientID("erp"), "sytue-rooms", FirstPartyProductClientID("rooms"),
 	// Sytue Cast: vídeo y directo. Entra aquí ANTES de que exista su cliente en el
 	// chart, para que el día que se publique no repita el 401 de Fotos.
-	"sytue-cast",
+	FirstPartyProductClientID("cast"),
 	// Sytue Web: el constructor de webs, con la misma previsión. Su origen es
 	// `web.<dominio>` (la app; `pages.<dominio>` fue su host hasta el 2026-10-04 y
 	// sigue en la lista mientras sirva o redirija); las webs que publica (`*.sites.<dominio>` y los
 	// dominios de los clientes) son contenido de terceros y no entran en ninguna lista.
-	"sytue-pages",
+	FirstPartyProductClientID("pages"),
 	// La ofimática con una app por producto (2026-10-12): cada BFF tiene su client y
 	// llama al servicio de documentos, al Hub y a Drive con un token de esa audiencia.
-	"sytue-docus", "sytue-calcus", "sytue-diapos", "sytue-certipdf",
+	FirstPartyProductClientID("docs"), FirstPartyProductClientID("sheets"), FirstPartyProductClientID("slides"), FirstPartyProductClientID("pdf"),
 	// Sytue Bases: tablas relacionales (ADR 0068). Su BFF habla con el Hub (campana,
 	// presencia, buscador) con un token cuya audiencia es la suya.
-	"sytue-bases",
+	FirstPartyProductClientID("bases"),
 	"sytue-meet", "sytue-cloud", "sytue-console", "sytue-platform", "sytue-hub",
 	// «Mi cuenta» (id.<dominio>/account). Faltaba y su campana, su presencia y su
 	// buscador recibían 401 del Hub: el mismo síntoma de arriba, medido el 2026-09-25.

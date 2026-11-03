@@ -11,6 +11,7 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
+	"github.com/google/uuid"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/ficheros"
@@ -134,7 +135,13 @@ func (a *App) formularioCalendario(c *api.Calendar) {
 	}
 	var d *ui.Dialogo
 	var guardar *ui.Boton
+	// El nombre de colección es distinto del título visible y permanece igual
+	// en los intentos de este formulario; no acredita una escritura previa.
+	var nombreColeccion string
 	enviar := func() {
+		if guardar.Cargando {
+			return
+		}
 		n := strings.TrimSpace(nombre.Texto())
 		if n == "" {
 			nombre.Invalida = true
@@ -142,9 +149,17 @@ func (a *App) formularioCalendario(c *api.Calendar) {
 			lienzo.Focus(nombre)
 			return
 		}
+		if !editar && nombreColeccion == "" {
+			id, err := uuid.NewRandom()
+			if err != nil {
+				a.avisar(ui.AvisoPeligro, "toast.calendarSaveFailed")
+				return
+			}
+			nombreColeccion = id.String()
+		}
 		guardar.Cargando = true
 		guardar.Refresh()
-		in := api.CalendarInput{DisplayName: n, Color: color}
+		in := api.CalendarInput{Name: nombreColeccion, DisplayName: n, Color: color}
 		a.escribir(func(ctx context.Context) error {
 			var err error
 			if editar {

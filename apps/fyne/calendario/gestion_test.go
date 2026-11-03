@@ -5,12 +5,17 @@ package calendario
 
 import (
 	"context"
+	"encoding/json"
+	"net/http"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/test"
+	"github.com/google/uuid"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 
@@ -122,7 +127,110 @@ func TestCrearUnCalendarioPideSuNombre(t *testing.T) {
 	guardar.Tapped(nil)
 	hechas, cuerpos := s.apuntadas()
 	if len(hechas) != 1 || hechas[0] != "POST /api/v1/calendars" || cuerpos[0]["display_name"] != "Equipo" || cuerpos[0]["color"] != PaletaCalendario[0].Hex {
-		t.Errorf("alta: %v %v", hechas, cuerpos)
+		t.Fatalf("alta: %v %v", hechas, cuerpos)
+	}
+	if nombre, ok := cuerpos[0]["name"].(string); !ok {
+		t.Errorf("falta el nombre de colección: %v", cuerpos[0]["name"])
+	} else if _, err := uuid.Parse(nombre); err != nil {
+		t.Errorf("el nombre de colección no es un UUID: %q", nombre)
+	}
+}
+
+func TestCrearCalendarioIgnoraDobleIntroYPermiteReintento(t *testing.T) {
+	servidor := &escrituras{}
+	primerPost := make(chan struct{})
+	liberarPrimerPost := make(chan struct{})
+	peticiones := make(chan api.CalendarInput, 4)
+	var llamadas atomic.Int32
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/api/v1/calendars" {
+			servidor.ServeHTTP(w, r)
+			return
+		}
+		var input api.CalendarInput
+		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+			http.Error(w, "invalid request", http.StatusBadRequest)
+			return
+		}
+		peticiones <- input
+		if llamadas.Add(1) == 1 {
+			close(primerPost)
+			<-liberarPrimerPost
+			http.Error(w, "try again", http.StatusServiceUnavailable)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{}`))
+	})
+	a, w := appConVentana(t, handler)
+	var liberar sync.Once
+	var trabajos sync.WaitGroup
+	t.Cleanup(func() {
+		liberar.Do(func() { close(liberarPrimerPost) })
+		trabajos.Wait()
+	})
+	var lanzados atomic.Int32
+	devolverUI := make(chan func(), 4)
+	a.lanzar = func(f func()) {
+		lanzados.Add(1)
+		trabajos.Add(1)
+		go func() { defer trabajos.Done(); f() }()
+	}
+	a.enUI = func(f func()) { devolverUI <- f }
+	a.formularioCalendario(nil)
+	var nombre *ui.Entrada
+	var guardar *ui.Boton
+	enCapas(w.Canvas(), func(o fyne.CanvasObject) {
+		switch v := o.(type) {
+		case *ui.Entrada:
+			nombre = v
+		case *ui.Boton:
+			if v.Texto == a.P.t("common.save", nil) {
+				guardar = v
+			}
+		}
+	})
+	if nombre == nil || guardar == nil {
+		t.Fatal("no está el formulario")
+	}
+	nombre.PonerTexto("Equipo")
+	nombre.TypedKey(&fyne.KeyEvent{Name: fyne.KeyReturn})
+	select {
+	case <-primerPost:
+	case <-time.After(10 * time.Second):
+		t.Fatal("el primer POST no arrancó")
+	}
+	nombre.PonerTexto("Equipo modificado")
+	nombre.TypedKey(&fyne.KeyEvent{Name: fyne.KeyEnter})
+	guardar.Tapped(nil)
+	if got := lanzados.Load(); got != 1 {
+		t.Fatalf("se lanzaron %d trabajos mientras el primer POST estaba pendiente", got)
+	}
+	liberar.Do(func() { close(liberarPrimerPost) })
+	var primerResultado func()
+	select {
+	case primerResultado = <-devolverUI:
+	case <-time.After(10 * time.Second):
+		t.Fatal("el fallo no llegó a la interfaz")
+	}
+	trabajos.Wait()
+	primerResultado()
+	if guardar.Cargando {
+		t.Fatal("el fallo dejó el formulario bloqueado")
+	}
+	nombre.TypedKey(&fyne.KeyEvent{Name: fyne.KeyReturn})
+	select {
+	case <-devolverUI:
+	case <-time.After(10 * time.Second):
+		t.Fatal("el reintento no terminó")
+	}
+	trabajos.Wait()
+	if got := llamadas.Load(); got != 2 {
+		t.Fatalf("POST recibidos: %d; se esperaban uno y un reintento", got)
+	}
+	primera, segunda := <-peticiones, <-peticiones
+	if primera.DisplayName != "Equipo" || segunda.DisplayName != "Equipo modificado" || primera.Name == "" || primera.Name != segunda.Name {
+		t.Fatalf("intenciones de alta inesperadas: %+v %+v", primera, segunda)
 	}
 }
 

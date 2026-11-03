@@ -264,6 +264,7 @@ async function abrir(browser, ancho, esquema, extra = '') {
     colorScheme: esquema,
     hasTouch: ancho.movil,
     isMobile: ancho.movil,
+    acceptDownloads: true,
   });
   await prepareFixtureTheme(ctx, esquema);
   const page = await ctx.newPage();

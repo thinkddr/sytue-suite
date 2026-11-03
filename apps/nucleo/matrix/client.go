@@ -260,6 +260,11 @@ func (c *Client) loadMaster(create bool) error {
 	return nil
 }
 
+func (c *Client) devicePath(device id.DeviceID) string {
+	h := sha256.Sum256([]byte(device))
+	return filepath.Join(c.directory, hex.EncodeToString(h[:])+".sqlite")
+}
+
 func (c *Client) initialize(ctx context.Context, create bool) error {
 	if err := c.loadMaster(false); err != nil {
 		return err
@@ -279,8 +284,7 @@ func (c *Client) initialize(ctx context.Context, create bool) error {
 		return err
 	}
 	// The filename is a hash, not an untrusted device ID or provider URL.
-	h := sha256.Sum256([]byte(c.session.DeviceID))
-	dbPath := filepath.Join(c.directory, hex.EncodeToString(h[:])+".sqlite")
+	dbPath := c.devicePath(c.session.DeviceID)
 	if !create {
 		if info, err := os.Stat(dbPath); err != nil || info.Size() == 0 {
 			return fmt.Errorf("%w: device database", ErrSecureStore)

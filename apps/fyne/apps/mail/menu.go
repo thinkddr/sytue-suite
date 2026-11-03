@@ -35,6 +35,8 @@ type Menu struct {
 	// Compartidos son los buzones ajenos con acceso; sin ninguno, no hay sección.
 	Compartidos  []Compartido
 	CompartidoID string
+	// Externas son las cuentas de otros proveedores ya conectadas (Gmail, Outlook…).
+	Externas []Compartido
 	// EstadoCarpetas es el de la sección «Carpetas»: la web pinta un cargador, un
 	// aviso con reintento o «no hay carpetas», y no la lista vacía en los tres casos.
 	EstadoCarpetas Estado
@@ -61,6 +63,7 @@ type Menu struct {
 	AlElegirCarpeta      func(Carpeta)
 	AlElegirEtiqueta     func(Etiqueta)
 	AlElegirCompartido   func(Compartido)
+	AlElegirExterna      func(Compartido)
 	AlRedactar           func()
 	AlGestionarCarpetas  func()
 	AlGestionarEtiquetas func()
@@ -88,6 +91,9 @@ func (m *Menu) Construir() *ui.Lateral {
 	redactar.Icono = iconos.Mas
 
 	secciones := []fyne.CanvasObject{m.seccionCarpetas(v), m.seccionEtiquetas(v)}
+	if len(m.Externas) > 0 {
+		secciones = append(secciones, m.seccionExternas(v))
+	}
 	if len(m.Compartidos) > 0 {
 		secciones = append(secciones, m.seccionCompartidos(v))
 	}
@@ -215,6 +221,20 @@ func (m *Menu) seccionCompartidos(v tema.Variante) *ui.SeccionLateral {
 			}
 		})
 		f.Activa = c.ID == m.CompartidoID
+		s.Filas = append(s.Filas, f)
+	}
+	return s
+}
+
+// seccionExternas lista las cuentas externas conectadas como buzones adicionales.
+func (m *Menu) seccionExternas(v tema.Variante) *ui.SeccionLateral {
+	s := ui.NuevaSeccionLateral(m.T.T("externalMail.title", nil))
+	for _, c := range m.Externas {
+		f := ui.NuevaFilaLateral(c.Direccion, iconos.Trazo(iconos.Usuario, ui.GlifoMenu, "sidebar-fg", v).Objeto(), func() {
+			if m.AlElegirExterna != nil {
+				m.AlElegirExterna(c)
+			}
+		})
 		s.Filas = append(s.Filas, f)
 	}
 	return s

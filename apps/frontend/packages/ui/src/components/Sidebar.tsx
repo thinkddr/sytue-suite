@@ -91,7 +91,7 @@ export function Sidebar({
           desplaza por dentro cuando no cabe, y lo suyo sigue siendo pulsable; en una
           ventana normal no cabe a propósito y no cambia nada. */}
       {footer ? (
-        <div class="sytue-sidebar-footer max-h-[60%] min-h-0 overflow-y-auto border-chrome-border border-t px-4 py-2 empty:hidden">
+        <div class="sytue-sidebar-footer border-chrome-border max-h-[60%] min-h-0 overflow-y-auto border-t px-4 py-2 empty:hidden">
           {footer}
         </div>
       ) : null}

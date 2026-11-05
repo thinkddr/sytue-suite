@@ -69,9 +69,8 @@ func Seal(recipient Recipient, context, payload []byte) (Envelope, error) {
 		return Envelope{}, err
 	}
 	var size [4]byte
-	// G115: len(context) ya está acotado a MaxEnvelopeContext (4 KiB) por la guarda
-	// de arriba; en esta arquitectura un int nunca excede uint32 con ese techo.
-	binary.BigEndian.PutUint32(size[:], uint32(len(context))) //nolint:gosec
+	// G115: len(context) está acotado a MaxEnvelopeContext (4 KiB) por la guarda de entrada.
+	binary.BigEndian.PutUint32(size[:], uint32(len(context))) //nolint:gosec // acotado por la guarda de entrada
 	for _, part := range [][]byte{envelopeMagic, size[:], context, payload} {
 		if _, err := writer.Write(part); err != nil {
 			return Envelope{}, err
@@ -160,9 +159,8 @@ func encodeStorageRecord(record storage.Record, proof []byte) ([]byte, error) {
 		return nil, ErrEnvelope
 	}
 	raw := make([]byte, 4+len(header)+len(record.Payload))
-	// G115: la guarda de arriba acota len(header)+len(record.Payload) a
-	// MaxEnvelopePayload (64 KiB), muy por debajo de uint32.
-	binary.BigEndian.PutUint32(raw[:4], uint32(len(header))) //nolint:gosec
+	// G115: la guarda de arriba acota el total a MaxEnvelopePayload (64 KiB).
+	binary.BigEndian.PutUint32(raw[:4], uint32(len(header))) //nolint:gosec // acotado por la guarda de arriba
 	copy(raw[4:], header)
 	copy(raw[4+len(header):], record.Payload)
 	return raw, nil

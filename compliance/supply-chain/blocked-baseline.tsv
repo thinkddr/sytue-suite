@@ -146,6 +146,7 @@ login.microsoftonline.com	services/integrations/db/seeds/templates/microsoft-mai
 api.login.yahoo.com	services/integrations/db/seeds/templates/yahoo-mail.json
 caldav.calendar.yahoo.com	services/integrations/internal/linkedservices/dav.go
 carddav.address.yahoo.com	services/integrations/internal/linkedservices/dav.go
+graph.microsoft.com	services/integrations/internal/linkedservices/catalog.go
 graph.microsoft.com	services/integrations/internal/linkedservices/client.go
 people.googleapis.com	services/integrations/internal/linkedservices/client.go
 www.googleapis.com	apps/fyne/scripts/play-publicar.sh

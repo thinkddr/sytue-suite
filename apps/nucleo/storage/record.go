@@ -6,8 +6,11 @@
 package storage
 
 import (
+	"bytes"
+	_ "embed"
 	"encoding/json"
 	"errors"
+	"slices"
 	"strings"
 	"unicode/utf8"
 )
@@ -21,14 +24,16 @@ const PendingUploadsNamespace = "storage-file-uploads-v1"
 
 var ErrRecord = errors.New("storage: invalid encrypted application record")
 
-func Product(product string) bool {
-	switch product {
-	case "hub", "mail", "drive", "docs", "sheets", "slides", "pdf", "calendar", "contacts", "notes", "photos", "rooms", "cast", "erp", "bases":
-		return true
-	default:
-		return false
-	}
-}
+//go:embed products.txt
+var productCatalog string
+
+var productIDs = strings.Fields(productCatalog)
+
+func Product(product string) bool { return slices.Contains(productIDs, product) }
+
+// Products is the shared routing registry for the private storage core.
+// Callers receive a copy and cannot change accepted application namespaces.
+func Products() []string { return slices.Clone(productIDs) }
 
 // NativeApp uses the existing native URL catalog: the Hub app is named One.
 // Unknown products cannot become custom URL schemes supplied by a caller.
@@ -52,6 +57,15 @@ type Scope struct {
 // journal tuple. Content codecs must never silently normalize a different owner.
 func (s Scope) Valid() bool {
 	return s.Tenant != "" && len(s.Tenant) <= 63 && s.Subject != "" && len(s.Subject) <= 255 && Product(s.Product) && utf8.ValidString(s.Tenant) && utf8.ValidString(s.Subject) && !strings.ContainsAny(s.Tenant+s.Subject, "\x00\r\n\t")
+}
+
+// JournalOwner is the exact account/product tuple used by the shared private
+// work inventory. A Subject alone must never name a private application's WAL.
+func (s Scope) JournalOwner() (string, error) {
+	if !s.Valid() {
+		return "", ErrRecord
+	}
+	return s.Tenant + "\x00" + s.Subject + "\x00" + s.Product, nil
 }
 
 // Record is private application data, not Matrix state. Names, MIME types,
@@ -105,4 +119,11 @@ func (r Record) Validate(scope Scope) error {
 		return ErrRecord
 	}
 	return nil
+}
+
+// MatchesExact compares two valid private application records without parsing
+// or normalizing Payload. It is a logical readback check, not SDK provenance
+// or authority to publish. The caller must obtain actual through its scoped SDK.
+func (r Record) MatchesExact(actual Record) bool {
+	return r.Validate(r.Scope) == nil && actual.Validate(r.Scope) == nil && actual.ObjectID == r.ObjectID && actual.RevisionID == r.RevisionID && actual.Role == r.Role && bytes.Equal(actual.Payload, r.Payload) && slices.Equal(actual.Previous, r.Previous)
 }

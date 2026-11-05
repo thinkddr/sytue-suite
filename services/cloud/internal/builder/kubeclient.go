@@ -78,7 +78,7 @@ func newKubeJobClientFor(cs kubernetes.Interface, cfg KubeJobConfig) *KubeJobCli
 	}
 	img := cfg.BuildkitImage
 	if img == "" {
-		img = "moby/buildkit:v0.34.1-rootless@sha256:f68752a5a94acfcdad2d07867b7075601a421638e17fc5f28efc1c814d0c4f89"
+		img = "moby/buildkit:v0.34.2-rootless@sha256:c8252268760e1baba80780d63d738ef9f260fb7c7c0973c78494cb9ddd99eda1"
 	}
 	crane := cfg.CraneImage
 	if crane == "" {

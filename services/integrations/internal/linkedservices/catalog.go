@@ -8,6 +8,7 @@ package linkedservices
 import (
 	"errors"
 	"slices"
+	"strings"
 )
 
 const (
@@ -129,12 +130,20 @@ func Granted(provider string, requestedScopes, grantedScopes []string) []string 
 
 func containsAll(scopes, required []string) bool {
 	for _, scope := range required {
-		if !slices.Contains(scopes, scope) {
+		if !slices.ContainsFunc(scopes, func(got string) bool { return sameScope(got, scope) }) {
 			return false
 		}
 	}
 	return true
 }
+
+// sameScope tolerates how Microsoft echoes Graph scopes in token responses: any
+// casing, and optionally qualified with the resource ("https://graph.microsoft.com/Mail.Send").
+func sameScope(a, b string) bool {
+	return strings.EqualFold(strings.TrimPrefix(a, graphResource), strings.TrimPrefix(b, graphResource))
+}
+
+const graphResource = "https://graph.microsoft.com/"
 
 func serviceScopes(provider, service string) []string {
 	switch provider + "/" + service {

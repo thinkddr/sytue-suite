@@ -341,7 +341,7 @@ func Load(defaultPort string) (Config, error) {
 		AbiertoATerceros:              l.GetBoolDefault("ABIERTO_A_TERCEROS", false),
 		TenantsPermitidos:             l.GetCSVDefault("TENANTS_PERMITIDOS", "sytue"),
 		RunnerMode:                    l.GetDefault("RUNNER_MODE", ""),
-		BuildkitImage:                 l.GetDefault("BUILDKIT_IMAGE", "moby/buildkit:v0.34.1-rootless@sha256:f68752a5a94acfcdad2d07867b7075601a421638e17fc5f28efc1c814d0c4f89"),
+		BuildkitImage:                 l.GetDefault("BUILDKIT_IMAGE", "moby/buildkit:v0.34.2-rootless@sha256:c8252268760e1baba80780d63d738ef9f260fb7c7c0973c78494cb9ddd99eda1"),
 		HTTPTaskImage:                 l.GetDefault("HTTP_TASK_IMAGE", "curlimages/curl:8.23.0@sha256:3fb7e13e5d179a845c97d78204f3f1064d1907037f26a3ebf91710571151fd93"),
 		CraneImage:                    l.GetDefault("CRANE_IMAGE", "gcr.io/go-containerregistry/crane:v0.22.1@sha256:1f968817b95790bed063f71175aa6b8ff879fa17064020415f3e18bb6e6a36e1"),
 

@@ -33,6 +33,7 @@ async function gesto(page, source, target, touch, durante) {
   // CDP/mouse no tienen el auto-wait de click: el drawer puede ser visible
   // mientras aún desliza sus asas fuera del viewport. Esta acción espera Stable.
   await source.scrollIntoViewIfNeeded();
+  await target.scrollIntoViewIfNeeded();
   const asa = await source.elementHandle();
   const destino = await target.elementHandle();
   assert(asa && destino, 'fuente y destino deben estar montados');
@@ -48,7 +49,16 @@ async function gesto(page, source, target, touch, durante) {
         const a = el.getBoundingClientRect();
         const b = destino.getBoundingClientRect();
         const caja = scroller.getBoundingClientRect();
-        const source = { x: a.left + a.width / 2, y: a.top + a.height / 2 };
+        const centro = { x: a.left + a.width / 2, y: a.top + a.height / 2 };
+        const puntos = [
+          centro,
+          { x: a.left + Math.min(4, a.width / 2), y: a.top + Math.min(4, a.height / 2) },
+          { x: a.right - Math.min(4, a.width / 2), y: a.top + Math.min(4, a.height / 2) },
+          { x: a.left + Math.min(4, a.width / 2), y: a.bottom - Math.min(4, a.height / 2) },
+          { x: a.right - Math.min(4, a.width / 2), y: a.bottom - Math.min(4, a.height / 2) },
+        ];
+        const source =
+          puntos.find((p) => el.contains(document.elementFromPoint(p.x, p.y))) ?? centro;
         const target = { x: b.left + Math.min(b.width / 2, 80), y: b.top + 2 };
         const top = caja.top + scroller.clientTop;
         const left = caja.left + scroller.clientLeft;

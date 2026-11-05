@@ -87,6 +87,7 @@ import { FoldersModal } from './FoldersModal.js';
 import { StorageMeter } from './StorageMeter.js';
 import { Glyph } from './glyphs.js';
 import { bajarAncla } from '../lib/ancla.js';
+import { externalMailClient } from '../client/externalMail.js';
 import { ExternalMail } from './ExternalMail.js';
 
 /**
@@ -203,11 +204,31 @@ export function MailApp({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Ele
     setFiltersOpen(true);
   };
   const [foldersOpen, setFoldersOpen] = useState(false);
+  const [externalAccounts, setExternalAccounts] = useState<
+    { instance_id: string; address: string; name: string }[]
+  >([]);
+  const [externalInstance, setExternalInstance] = useState<string | undefined>();
   const [externalMailOpen, setExternalMailOpen] = useState(
     () =>
       typeof window !== 'undefined' &&
       new URLSearchParams(window.location.search).has('connect-mail'),
   );
+  useEffect(() => {
+    if (externalMailOpen) return;
+    const controller = new AbortController();
+    externalMailClient()
+      .accounts(controller.signal)
+      .then((result) => {
+        if (controller.signal.aborted) return;
+        setExternalAccounts(
+          result.items.filter(
+            (item) => item.connected && (item.services ?? ['mail']).includes('mail'),
+          ),
+        );
+      })
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, [externalMailOpen]);
   const [aliasesOpen, setAliasesOpen] = useState(false);
   const [vacationOpen, setVacationOpen] = useState(false);
   const [smimeIdentityOpen, setSmimeIdentityOpen] = useState(false);
@@ -1403,6 +1424,17 @@ export function MailApp({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Ele
       }
     >
       <SidebarSection title={t('externalMail.title')}>
+        {externalAccounts.map((account) => (
+          <SidebarItem
+            key={account.instance_id}
+            label={account.address || account.name}
+            icon={<Icon name="user" />}
+            onClick={() => {
+              setExternalInstance(account.instance_id);
+              setExternalMailOpen(true);
+            }}
+          />
+        ))}
         <SidebarItem
           label={t('externalMail.add')}
           icon={<Icon name="plus" />}
@@ -1805,7 +1837,16 @@ export function MailApp({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Ele
           setFiltersInitial(undefined);
         }}
       />
-      {externalMailOpen ? <ExternalMail t={t} onClose={() => setExternalMailOpen(false)} /> : null}
+      {externalMailOpen ? (
+        <ExternalMail
+          t={t}
+          {...(externalInstance ? { initialInstance: externalInstance } : {})}
+          onClose={() => {
+            setExternalMailOpen(false);
+            setExternalInstance(undefined);
+          }}
+        />
+      ) : null}
 
       <LabelsModal
         locale={locale}

@@ -68,6 +68,35 @@ type correoExterno struct {
 
 var proveedoresCorreo = []string{"gmail", "microsoft", "yahoo", "imap", "pop3"}
 
+// cargarExternas llena la sección del lateral con las cuentas conectadas. Best-effort.
+func (b *Buzon) cargarExternas() {
+	if b.CorreoExterno == nil {
+		return
+	}
+	pedir(b, b.CorreoExterno.MailAccounts, func(v api.ExternalMailAccounts, err error) {
+		if err == nil {
+			b.fijarExternas(v)
+		}
+	})
+}
+
+func (b *Buzon) fijarExternas(v api.ExternalMailAccounts) {
+	b.P.Menu.Externas = b.P.Menu.Externas[:0]
+	for _, a := range v.Items {
+		if a.Connected && (a.Services == nil || slices.Contains(a.Services, "mail")) {
+			b.P.Menu.Externas = append(b.P.Menu.Externas, Compartido{ID: a.InstanceID, Direccion: cmp.Or(a.Address, a.Name)})
+		}
+	}
+	b.P.Refrescar()
+}
+
+func (b *Buzon) abrirCorreoExternoEn(id string) {
+	b.abrirCorreoExterno()
+	if b.correoAbierto != nil {
+		b.correoAbierto.cargarCuentas(id)
+	}
+}
+
 func (b *Buzon) abrirCorreoExterno() {
 	if b.CorreoExterno == nil || b.P.Lienzo() == nil {
 		return
@@ -246,6 +275,7 @@ func (c *correoExterno) cargarCuentas(instancia string) {
 			return
 		}
 		c.cuentas = v
+		c.b.fijarExternas(v)
 		if instancia != "" {
 			for _, a := range v.Items {
 				if a.InstanceID == instancia && a.Connected && (a.Services == nil || slices.Contains(a.Services, "mail")) {

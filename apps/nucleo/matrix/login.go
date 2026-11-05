@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/url"
+	"os"
 	"time"
 
 	"maunium.net/go/mautrix"
@@ -108,14 +109,21 @@ func LoginNative(ctx context.Context, cfg Config, rooms *api.Rooms, await func(c
 func (c *Client) finishLogin(ctx context.Context, loginToken string) (*Client, error) {
 	cfg := c.cfg
 	var err error
+	// A saved session that belongs to another identity (ErrIdentity) is stale, not
+	// a reason to block signing in again.
 	// Preserve an existing device only when its identity comes from this account's
 	// keychain, so reauthentication does not replace its encryption keys.
 	device := id.DeviceID("SYTUE_" + rand.Text())
 	newDevice := true
 	if saved, readErr := c.readSession(); readErr == nil {
-		device = saved.DeviceID
-		newDevice = false
-	} else if !errors.Is(readErr, ErrLoginRequired) {
+		// Without its crypto database the saved device can never be restored
+		// (initialize refuses to create one for an existing device), and every
+		// retry would fail forever. Its keys are gone, so enroll a fresh device.
+		if info, statErr := os.Stat(c.devicePath(saved.DeviceID)); statErr == nil && info.Size() > 0 {
+			device = saved.DeviceID
+			newDevice = false
+		}
+	} else if !errors.Is(readErr, ErrLoginRequired) && !errors.Is(readErr, ErrIdentity) {
 		return nil, readErr
 	}
 	response, err := c.cli.Login(ctx, &mautrix.ReqLogin{Type: mautrix.AuthTypeToken, Token: loginToken, DeviceID: device, InitialDeviceDisplayName: cfg.DeviceName, StoreCredentials: true})

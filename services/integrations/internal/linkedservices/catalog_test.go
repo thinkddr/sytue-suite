@@ -100,3 +100,14 @@ func TestOriginatingAppDoesNotAcquireMailboxPermissions(t *testing.T) {
 		}
 	}
 }
+
+func TestMicrosoftGrantedScopesAreMatchedCaseInsensitivelyAndWithResource(t *testing.T) {
+	requested := []string{"User.Read", "Mail.ReadWrite", "Mail.Send", "offline_access"}
+	granted := []string{"https://graph.microsoft.com/mail.readwrite", "https://graph.microsoft.com/Mail.Send", "user.read"}
+	if got := Granted("microsoft", requested, granted); !reflect.DeepEqual(got, []string{Mail}) {
+		t.Fatalf("Microsoft scope echo not recognised: %v", got)
+	}
+	if got := Granted("microsoft", requested, []string{"Mail.Send"}); len(got) != 0 {
+		t.Fatalf("partial grant enabled a service: %v", got)
+	}
+}

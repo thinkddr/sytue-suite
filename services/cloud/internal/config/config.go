@@ -321,7 +321,7 @@ func Load(defaultPort string) (Config, error) {
 		RegistryPassword: l.Get("REGISTRY_PASSWORD"),
 		// 18.6: la 18.4 arrastra CVE-2026-19385 (8.8) —quien crea objetos ejecuta
 		// código como el usuario que corre pg_dump— y otros tres del 2026-08-13.
-		ManagedPostgresImage:  l.GetDefault("MANAGED_POSTGRES_IMAGE", "postgres:18.6@sha256:3a4264520e121176619f54ff867d12774bc81e95e7b84db58d63bccdb6144b81"),
+		ManagedPostgresImage:  l.GetDefault("MANAGED_POSTGRES_IMAGE", "postgres:18.6@sha256:bd5dfa494a5a259704365813dbfa5fa6b3e69be7348d43b547f540c730478583"),
 		ManagedPostgrestImage: l.GetDefault("MANAGED_POSTGREST_IMAGE", "postgrest/postgrest:v14.18@sha256:c7cd7e265a85b05248abf53f4473fcec7e327c282d0bd0cf60f1551996d09fcf"),
 		ManagedRcloneImage:    l.GetDefault("MANAGED_RCLONE_IMAGE", "rclone/rclone:1.75.2@sha256:2687085f718d3c628f7fdfb77c52a1d344332aed543110bb88088f2c70d43eb5"),
 
@@ -347,7 +347,7 @@ func Load(defaultPort string) (Config, error) {
 
 		// Pinneadas por tag (no :latest); en prod, re-pinnear por digest tras
 		// verificar con un build vivo (como KANIKO_IMAGE).
-		CNBBuilderImage: l.GetDefault("CNB_BUILDER_IMAGE", "paketobuildpacks/builder-jammy-base:0.4.676@sha256:572490d21e0819aecd032d381ec0fa9e31eebd611bb56c4fb4961b6dd818af92"),
+		CNBBuilderImage: l.GetDefault("CNB_BUILDER_IMAGE", "paketobuildpacks/builder-jammy-base:0.4.679@sha256:e3207981dcd71fa83d65c8dce98e0d92c308add66a8a404c0d59d89015d5a1b7"),
 		CNBGitImage:     l.GetDefault("CNB_GIT_IMAGE", "alpine/git:2.54.0@sha256:ac6c828f15d82775d204d3d75112e1d34af8945da80ccf922713c9891ba68e7a"),
 		CNBRunImage:     l.Get("CNB_RUN_IMAGE"),
 

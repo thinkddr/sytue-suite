@@ -37,7 +37,7 @@ import (
 // coinciden con deploy/compose (una sola fuente de versión). En prod, ops debería
 // sobreescribirlas por digest sha256.
 const (
-	managedPostgresImage  = "postgres:18.6@sha256:3a4264520e121176619f54ff867d12774bc81e95e7b84db58d63bccdb6144b81"
+	managedPostgresImage  = "postgres:18.6@sha256:bd5dfa494a5a259704365813dbfa5fa6b3e69be7348d43b547f540c730478583"
 	managedPostgrestImage = "postgrest/postgrest:v14.18@sha256:c7cd7e265a85b05248abf53f4473fcec7e327c282d0bd0cf60f1551996d09fcf"
 	managedRcloneImage    = "rclone/rclone:1.75.2@sha256:2687085f718d3c628f7fdfb77c52a1d344332aed543110bb88088f2c70d43eb5"
 )

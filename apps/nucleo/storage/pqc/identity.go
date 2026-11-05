@@ -106,7 +106,7 @@ func ValidProfile(profile string) bool { return profile == HybridProfile || prof
 // ParseRecipient binds the declared profile to its canonical maintained codec.
 // A hybrid enrollment can never be silently accepted as a classical recipient.
 func ParseRecipient(profile, raw string) (Recipient, error) {
-	if len(raw) == 0 || len(raw) > MaxRecipientBytes {
+	if raw == "" || len(raw) > MaxRecipientBytes {
 		return nil, ErrIdentity
 	}
 	switch profile {

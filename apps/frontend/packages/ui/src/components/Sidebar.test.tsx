@@ -221,3 +221,20 @@ test('un pie que no pinta nada no deja su filete', () => {
   expect(pie!.childNodes.length).toBe(0);
   expect(pie!.className.split(' ')).toContain('empty:hidden');
 });
+
+test('el pie queda alcanzable cuando no cabe: tope y desplazamiento propio', () => {
+  // «Von Microsoft 365 holen» —el pie de Calendar y Contacts— quedó a −30px POR
+  // ABAJO (inalcanzable) en un Galaxy S24 landscape (780×360), barrido móvil del
+  // 2026-11-03: el pie vive FUERA de la zona que desplaza del carril y el carril
+  // entero recorta, así que un pie más alto que la ventana no tenía manera de
+  // verse entero. El tope al 60 % del carril hace que encoja y desplace por
+  // dentro; sin las dos clases de abajo, vuelve a quedar cortado.
+  const host = mount(
+    <Sidebar footer={<button>Von Microsoft 365 holen</button>}>
+      <SidebarItem label="Hoy" />
+    </Sidebar>,
+  );
+  const pie = host.querySelector('nav > div.border-t')!;
+  expect(pie.className.split(' ')).toContain('overflow-y-auto');
+  expect(pie.className.split(' ')).toContain('max-h-[60%]');
+});
